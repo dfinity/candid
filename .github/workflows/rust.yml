@@ -6,6 +6,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - name: Cache Rust dependencies
+      uses: actions/cache@v1
+      with:
+        path: target
+        key: ${{ runner.OS }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
       run: cargo build
     - name: Run tests
@@ -13,4 +18,4 @@ jobs:
     - name: fmt
       run: cargo fmt -v -- --check
     - name: lint
-      run: cargo clippy --all-features --all-targets -- -D warnings
+      run: cargo clippy --tests -- -D clippy::all
