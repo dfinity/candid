@@ -1,19 +1,16 @@
 name: Rust
-
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+on: push
 
 jobs:
-  build:
-
+  tests:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: cargo build --verbose
+      run: cargo build
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test
+    - name: fmt
+      run: cargo fmt -v -- --check
+    - name: lint
+      run: cargo clippy --all-features --all-targets -- -D warnings
