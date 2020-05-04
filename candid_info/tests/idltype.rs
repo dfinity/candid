@@ -46,7 +46,9 @@ fn test_struct() {
             field("head", Type::Int),
             field(
                 "tail",
-                Type::Opt(Box::new(Type::Knot(candid_info::types::TypeId::of::<List>())))
+                Type::Opt(Box::new(Type::Knot(
+                    candid_info::types::TypeId::of::<List>()
+                )))
             )
         ])
     );

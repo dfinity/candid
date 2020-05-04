@@ -1,2 +1,12 @@
 /target
 Cargo.lock
+
+# IDEs
+.idea/
+.vscode/
+*~
+
+# Mac Temporary Files
+.DS_Store
+**/.DS_Store
+
