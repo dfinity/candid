@@ -1,7 +1,7 @@
 extern crate candid_info;
 
 use candid_info::types::{get_type, Type};
-use candid_info::{idl_hash, IDLType};
+use candid_info::{idl_hash, CandidType};
 
 #[test]
 fn test_primitive() {
@@ -14,7 +14,7 @@ fn test_primitive() {
 
 #[test]
 fn test_struct() {
-    #[derive(Debug, IDLType)]
+    #[derive(Debug, CandidType)]
     struct A {
         foo: i32,
         bar: bool,
@@ -24,7 +24,7 @@ fn test_struct() {
         Type::Record(vec![field("bar", Type::Bool), field("foo", Type::Int),])
     );
 
-    #[derive(Debug, IDLType)]
+    #[derive(Debug, CandidType)]
     struct G<T, E> {
         g1: T,
         g2: E,
@@ -35,7 +35,7 @@ fn test_struct() {
         Type::Record(vec![field("g1", Type::Int), field("g2", Type::Bool)])
     );
 
-    #[derive(Debug, IDLType)]
+    #[derive(Debug, CandidType)]
     struct List {
         head: i32,
         tail: Option<Box<List>>,
@@ -57,7 +57,7 @@ fn test_struct() {
 #[test]
 fn test_variant() {
     #[allow(dead_code)]
-    #[derive(Debug, IDLType)]
+    #[derive(Debug, CandidType)]
     enum E {
         Foo,
         Bar(bool, i32),

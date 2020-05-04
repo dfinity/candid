@@ -11,7 +11,7 @@ use std::collections::BTreeSet;
 use syn::punctuated::Punctuated;
 use syn::{parse_macro_input, Data, DeriveInput, GenericParam, Generics};
 
-#[proc_macro_derive(IDLType)]
+#[proc_macro_derive(CandidType)]
 pub fn derive_idl_type(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = input.ident;
@@ -26,7 +26,7 @@ pub fn derive_idl_type(input: TokenStream) -> TokenStream {
         Data::Union(_) => unimplemented!("doesn't derive union type"),
     };
     let gen = quote! {
-        impl #impl_generics candid_info::IDLType for #name #ty_generics #where_clause {
+        impl #impl_generics candid_info::CandidType for #name #ty_generics #where_clause {
             fn _ty() -> candid_info::types::Type {
                 #ty_body
             }
@@ -261,14 +261,14 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (Tokens, 
 
 fn derive_type(t: &syn::Type) -> Tokens {
     quote! {
-        <#t as candid_info::IDLType>::ty()
+        <#t as candid_info::CandidType>::ty()
     }
 }
 
 fn add_trait_bounds(mut generics: Generics) -> Generics {
     for param in &mut generics.params {
         if let GenericParam::Type(ref mut type_param) = *param {
-            let bound = syn::parse_str("::candid_info::IDLType").unwrap();
+            let bound = syn::parse_str("::candid_info::CandidType").unwrap();
             type_param.bounds.push(bound);
         }
     }
