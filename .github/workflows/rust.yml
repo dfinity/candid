@@ -18,4 +18,4 @@ jobs:
     - name: fmt
       run: cargo fmt -v -- --check
     - name: lint
-      run: cargo clippy --all-features --all-targets -- -D warnings
+      run: cargo clippy --tests -- -D clippy::all
