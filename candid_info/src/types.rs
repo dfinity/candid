@@ -97,7 +97,7 @@ pub fn env_add(id: TypeId, t: Type) {
 
 pub fn get_type<T>(_v: &T) -> Type
 where
-    T: super::IDLType,
+    T: super::CandidType,
 {
     T::ty()
 }

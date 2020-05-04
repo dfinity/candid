@@ -1,10 +1,10 @@
 use types::*;
-use IDLType;
+use CandidType;
 use Serializer;
 
 macro_rules! primitive_impl {
     ($t:ty, $id:tt, $method:ident $($cast:tt)*) => {
-        impl IDLType for $t {
+        impl CandidType for $t {
             fn id() -> TypeId { TypeId::of::<$t>() }
             fn _ty() -> Type { Type::$id }
             fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error> where S: Serializer {
@@ -28,7 +28,7 @@ primitive_impl!(usize, Nat, serialize_nat as u64);
 primitive_impl!(&str, Text, serialize_text);
 primitive_impl!((), Null, serialize_null);
 
-impl IDLType for String {
+impl CandidType for String {
     fn id() -> TypeId {
         TypeId::of::<String>()
     }
@@ -43,9 +43,9 @@ impl IDLType for String {
     }
 }
 
-impl<T: Sized> IDLType for Option<T>
+impl<T: Sized> CandidType for Option<T>
 where
-    T: IDLType,
+    T: CandidType,
 {
     fn id() -> TypeId {
         TypeId::of::<Option<T>>()
@@ -61,9 +61,9 @@ where
     }
 }
 
-impl<T> IDLType for Vec<T>
+impl<T> CandidType for Vec<T>
 where
-    T: IDLType,
+    T: CandidType,
 {
     fn id() -> TypeId {
         TypeId::of::<Vec<T>>()
@@ -83,9 +83,9 @@ where
     }
 }
 
-impl<T> IDLType for [T]
+impl<T> CandidType for [T]
 where
-    T: IDLType,
+    T: CandidType,
 {
     fn id() -> TypeId {
         TypeId::of::<[T]>()
@@ -108,8 +108,8 @@ where
 macro_rules! array_impls {
     ($($len:tt)+) => {
         $(
-            impl<T> IDLType for [T; $len]
-            where T: IDLType,
+            impl<T> CandidType for [T; $len]
+            where T: CandidType,
             {
                 fn id() -> TypeId { TypeId::of::<[T; $len]>() }
                 fn _ty() -> Type { Type::Vec(Box::new(T::ty())) }
@@ -134,10 +134,10 @@ array_impls! {
     31 32 00
 }
 
-impl<T, E> IDLType for Result<T, E>
+impl<T, E> CandidType for Result<T, E>
 where
-    T: IDLType,
-    E: IDLType,
+    T: CandidType,
+    E: CandidType,
 {
     fn id() -> TypeId {
         TypeId::of::<Result<T, E>>()
@@ -174,9 +174,9 @@ where
     }
 }
 
-impl<T> IDLType for Box<T>
+impl<T> CandidType for Box<T>
 where
-    T: ?Sized + IDLType,
+    T: ?Sized + CandidType,
 {
     fn id() -> TypeId {
         TypeId::of::<Box<T>>()
@@ -192,9 +192,9 @@ where
     }
 }
 
-impl<'a, T> IDLType for &'a T
+impl<'a, T> CandidType for &'a T
 where
-    T: 'a + ?Sized + IDLType,
+    T: 'a + ?Sized + CandidType,
 {
     fn id() -> TypeId {
         TypeId::of::<&T>()
@@ -213,9 +213,9 @@ where
 macro_rules! tuple_impls {
     ($($len:expr => ($($n:tt $name:ident)+))+) => {
         $(
-            impl<$($name),+> IDLType for ($($name,)+)
+            impl<$($name),+> CandidType for ($($name,)+)
             where
-                $($name: IDLType,)+
+                $($name: CandidType,)+
             {
                 fn id() -> TypeId { TypeId::of::<($($name,)+)>() }
                 fn _ty() -> Type {
