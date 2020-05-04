@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "candid_info",
+    "candid_derive",
+]
