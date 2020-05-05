@@ -2,8 +2,8 @@
 
 extern crate paste;
 
-use super::error::{Error, Result};
-use candid_info::idl_hash;
+use error::{Error, Result};
+use idl_hash;
 use num_enum::TryFromPrimitive;
 use serde::de::{self, Visitor};
 use std::collections::{BTreeMap, VecDeque};

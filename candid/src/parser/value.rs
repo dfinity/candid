@@ -28,7 +28,7 @@ pub struct IDLField {
 pub struct IDLArgs {
     pub args: Vec<IDLValue>,
 }
-/*
+
 impl IDLArgs {
     pub fn new(args: &[IDLValue]) -> Self {
         IDLArgs {
@@ -53,7 +53,7 @@ impl IDLArgs {
         Ok(IDLArgs { args })
     }
 }
-*/
+
 impl std::str::FromStr for IDLArgs {
     type Err = crate::Error;
     fn from_str(str: &str) -> Result<Self, Self::Err> {
