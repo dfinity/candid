@@ -6,16 +6,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    # Necessary for now for the cargo cache:
+    # https://github.com/actions/cache/issues/133#issuecomment-599102035
+    - name: Fix ~/.cargo directory permissions
+      run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/    
     - name: Cache cargo registry
       uses: actions/cache@v1
       with:
         path: ~/.cargo/registry
         key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-    - name: Cache cargo index
-      uses: actions/cache@v1
-      with:
-        path: ~/.cargo/git
-        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
     - name: Cache cargo build
       uses: actions/cache@v1
       with:
