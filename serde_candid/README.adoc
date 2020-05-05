@@ -1,10 +1,10 @@
-= IDL Serialization library in Rust
+= Candid Serialization library in Rust
 
 == Using the library
 * Example
 [source,rust]
-extern crate serde_idl;
-use serde_idl::{IDLType, Deserialize, Encode, Decode};
+extern crate serde_candid;
+use serde_candid::{Encode, Decode};
 // Serialization
 let bytes = Encode!(&[(42, "text")], &(42, "text"));
 // Deserialization
@@ -14,7 +14,7 @@ assert_eq!(b, (42i32, "text".to_string()));
 
 * Serialize/Deserialize struct/enum
 [source,rust]
-#[derive(IDLType, Deserialize)]
+#[derive(CandidType, Deserialize)]
 struct List {
     head: i32,
     tail: Option<Box<List>>,
@@ -23,9 +23,9 @@ let list = List { head: 42, tail: None };
 let bytes = Encode!(&list);
 Decode!(&bytes, l: List);
 
-* Inspect IDL type
+* Inspect Candid type
 [source,rust]
-#[derive(IDLType)]
+#[derive(CandidType)]
 struct List { head: i32, tail: Option<Box<List>> }
 assert_eq!(List::ty(),
            Type::Record(vec![
@@ -41,5 +41,5 @@ assert_eq!(List::ty(),
 * Optimize for `new struct` type
 * Refactor serialization to use serde
 * Import `.did` file in Rust
-* Get rid of `std` dependency for `wasm` support
+
 

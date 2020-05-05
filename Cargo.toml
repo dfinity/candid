@@ -3,4 +3,5 @@ members = [
     "candid_info",
     "candid_derive",
     "serde_candid",
+    "candid_parser",
 ]

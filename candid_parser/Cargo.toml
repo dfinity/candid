@@ -1,0 +1,12 @@
+[package]
+name = "candid_parser"
+version = "0.1.0"
+authors = ["Yan Chen <yan.chen@dfinity.org>"]
+
+[build-dependencies]
+lalrpop = "0.17.2"
+
+[dependencies]
+candid_info = { path = "../candid_info" }
+lalrpop-util = "0.17.2"
+pretty = "0.5"
