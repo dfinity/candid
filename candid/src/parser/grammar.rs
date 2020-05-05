@@ -1,2 +1,2 @@
 #![allow(clippy::all)]
-include!(concat!(env!("OUT_DIR"), "/grammar.rs"));
+include!(concat!(env!("OUT_DIR"), "/parser/grammar.rs"));
