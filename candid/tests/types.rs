@@ -1,7 +1,7 @@
-extern crate candid_info;
+extern crate candid;
 
-use candid_info::types::{get_type, Type};
-use candid_info::{idl_hash, CandidType};
+use candid::types::{get_type, Type};
+use candid::{idl_hash, CandidType};
 
 #[test]
 fn test_primitive() {
@@ -47,7 +47,7 @@ fn test_struct() {
             field(
                 "tail",
                 Type::Opt(Box::new(Type::Knot(
-                    candid_info::types::TypeId::of::<List>()
+                    candid::types::TypeId::of::<List>()
                 )))
             )
         ])
@@ -84,16 +84,16 @@ fn test_variant() {
     );
 }
 
-fn field(id: &str, ty: Type) -> candid_info::types::Field {
-    candid_info::types::Field {
+fn field(id: &str, ty: Type) -> candid::types::Field {
+    candid::types::Field {
         id: id.to_string(),
         hash: idl_hash(id),
         ty,
     }
 }
 
-fn unnamed_field(id: u32, ty: Type) -> candid_info::types::Field {
-    candid_info::types::Field {
+fn unnamed_field(id: u32, ty: Type) -> candid::types::Field {
+    candid::types::Field {
         id: id.to_string(),
         hash: id,
         ty,

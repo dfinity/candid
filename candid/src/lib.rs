@@ -4,21 +4,19 @@ pub use candid_derive::*;
 pub mod types;
 use types::{Type, TypeId};
 
-mod impls;
-
 pub trait CandidType {
     // memoized type derivation
     fn ty() -> Type {
         let id = Self::id();
-        if let Some(t) = types::find_type(id) {
+        if let Some(t) = types::internal::find_type(id) {
             match t {
                 Type::Unknown => Type::Knot(id),
                 _ => t,
             }
         } else {
-            types::env_add(id, Type::Unknown);
+            types::internal::env_add(id, Type::Unknown);
             let t = Self::_ty();
-            types::env_add(id, t.clone());
+            types::internal::env_add(id, t.clone());
             t
         }
     }
