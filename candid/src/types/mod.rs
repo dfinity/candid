@@ -1,24 +1,21 @@
-extern crate candid_derive;
-pub use candid_derive::*;
-
-pub mod types;
-use types::{Type, TypeId};
-
 mod impls;
+pub mod internal;
+
+pub use self::internal::{get_type, Field, Type, TypeId};
 
 pub trait CandidType {
     // memoized type derivation
     fn ty() -> Type {
         let id = Self::id();
-        if let Some(t) = types::find_type(id) {
+        if let Some(t) = self::internal::find_type(id) {
             match t {
                 Type::Unknown => Type::Knot(id),
                 _ => t,
             }
         } else {
-            types::env_add(id, Type::Unknown);
+            self::internal::env_add(id, Type::Unknown);
             let t = Self::_ty();
-            types::env_add(id, t.clone());
+            self::internal::env_add(id, t.clone());
             t
         }
     }
@@ -55,14 +52,4 @@ pub trait Compound {
     fn serialize_element<T: ?Sized>(&mut self, v: &T) -> Result<(), Self::Error>
     where
         T: CandidType;
-}
-
-// IDL hash function comes from
-// https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf
-pub fn idl_hash(id: &str) -> u32 {
-    let mut s: u32 = 0;
-    for c in id.chars() {
-        s = s.wrapping_mul(223).wrapping_add(c as u32);
-    }
-    s
 }

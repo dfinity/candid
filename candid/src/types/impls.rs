@@ -1,6 +1,7 @@
-use types::*;
-use CandidType;
-use Serializer;
+use super::CandidType;
+use super::Compound;
+use super::Serializer;
+use types::internal::*;
 
 macro_rules! primitive_impl {
     ($t:ty, $id:tt, $method:ident $($cast:tt)*) => {
@@ -77,7 +78,7 @@ where
     {
         let mut ser = serializer.serialize_vec(self.len())?;
         for e in self.iter() {
-            super::Compound::serialize_element(&mut ser, &e)?;
+            Compound::serialize_element(&mut ser, &e)?;
         }
         Ok(())
     }
@@ -99,7 +100,7 @@ where
     {
         let mut ser = serializer.serialize_vec(self.len())?;
         for e in self.iter() {
-            super::Compound::serialize_element(&mut ser, &e)?;
+            Compound::serialize_element(&mut ser, &e)?;
         }
         Ok(())
     }
@@ -118,7 +119,7 @@ macro_rules! array_impls {
                 {
                     let mut ser = serializer.serialize_vec($len)?;
                     for e in self.iter() {
-                        super::Compound::serialize_element(&mut ser, &e)?;
+                        Compound::serialize_element(&mut ser, &e)?;
                     };
                     Ok(())
                 }
@@ -164,11 +165,11 @@ where
         match *self {
             Result::Ok(ref v) => {
                 let mut ser = serializer.serialize_variant(0)?;
-                super::Compound::serialize_element(&mut ser, v)
+                Compound::serialize_element(&mut ser, v)
             }
             Result::Err(ref e) => {
                 let mut ser = serializer.serialize_variant(1)?;
-                super::Compound::serialize_element(&mut ser, e)
+                Compound::serialize_element(&mut ser, e)
             }
         }
     }
@@ -228,7 +229,7 @@ macro_rules! tuple_impls {
                 {
                     let mut ser = serializer.serialize_struct()?;
                     $(
-                        super::Compound::serialize_element(&mut ser, &self.$n)?;
+                        Compound::serialize_element(&mut ser, &self.$n)?;
                     )+
                     Ok(())
                 }

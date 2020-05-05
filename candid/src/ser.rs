@@ -1,9 +1,10 @@
-//! Serialize a Rust data structure to Dfinity IDL
+//! Serialize a Rust data structure to Candid
 
-use super::error::{Error, Result};
+use error::{Error, Result};
 
-use super::value::IDLValue;
-use candid_info::types::{Field, Type};
+use super::types;
+use super::types::{Field, Type};
+use parser::value::IDLValue;
 use std::collections::HashMap;
 use std::io;
 use std::vec::Vec;
@@ -23,13 +24,13 @@ impl IDLBuilder {
             value_ser: ValueSerializer::new(),
         }
     }
-    pub fn arg<'a, T: candid_info::CandidType>(&'a mut self, value: &T) -> Result<&'a mut Self> {
+    pub fn arg<'a, T: types::CandidType>(&'a mut self, value: &T) -> Result<&'a mut Self> {
         self.type_ser.push_type(&T::ty())?;
         value.idl_serialize(&mut self.value_ser)?;
         Ok(self)
     }
     pub fn value_arg<'a>(&'a mut self, value: &IDLValue) -> Result<&'a mut Self> {
-        use candid_info::CandidType;
+        use CandidType;
         self.type_ser.push_type(&value.value_ty())?;
         value.idl_serialize(&mut self.value_ser)?;
         Ok(self)
@@ -69,7 +70,7 @@ impl ValueSerializer {
     }
 }
 
-impl<'a> candid_info::Serializer for &'a mut ValueSerializer {
+impl<'a> types::Serializer for &'a mut ValueSerializer {
     type Error = Error;
     type Compound = Compound<'a>;
     fn serialize_bool(self, v: bool) -> Result<()> {
@@ -96,7 +97,7 @@ impl<'a> candid_info::Serializer for &'a mut ValueSerializer {
     }
     fn serialize_option<T: ?Sized>(self, v: Option<&T>) -> Result<()>
     where
-        T: candid_info::CandidType,
+        T: super::CandidType,
     {
         match v {
             None => {
@@ -125,11 +126,11 @@ impl<'a> candid_info::Serializer for &'a mut ValueSerializer {
 pub struct Compound<'a> {
     ser: &'a mut ValueSerializer,
 }
-impl<'a> candid_info::Compound for Compound<'a> {
+impl<'a> types::Compound for Compound<'a> {
     type Error = Error;
     fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<()>
     where
-        T: candid_info::CandidType,
+        T: types::CandidType,
     {
         value.idl_serialize(&mut *self.ser)?;
         Ok(())
@@ -158,12 +159,12 @@ impl TypeSerialize {
 
     #[inline]
     fn build_type(&mut self, t: &Type) -> Result<()> {
-        if !candid_info::types::is_primitive(t) && !self.type_map.contains_key(t) {
+        if !types::internal::is_primitive(t) && !self.type_map.contains_key(t) {
             // This is a hack to remove (some) equivalent mu types
             // from the type table.
             // Someone should implement Pottier's O(nlogn) algorithm
             // http://gallium.inria.fr/~fpottier/publis/gauthier-fpottier-icfp04.pdf
-            let unrolled = candid_info::types::unroll(t);
+            let unrolled = types::internal::unroll(t);
             if let Some(idx) = self.type_map.get(&unrolled) {
                 let idx = *idx;
                 self.type_map.insert((*t).clone(), idx);
@@ -229,7 +230,7 @@ impl TypeSerialize {
             Type::Int => sleb128_encode(buf, -4),
             Type::Text => sleb128_encode(buf, -15),
             Type::Knot(id) => {
-                let ty = candid_info::types::find_type(*id).expect("knot TypeId not found");
+                let ty = types::internal::find_type(*id).expect("knot TypeId not found");
                 let idx = self
                     .type_map
                     .get(&ty)

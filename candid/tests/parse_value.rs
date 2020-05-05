@@ -1,8 +1,9 @@
-extern crate serde_candid;
+extern crate candid;
 
-use serde_candid::grammar::ArgsParser;
-use serde_candid::lexer::Lexer;
-use serde_candid::value::{IDLArgs, IDLField, IDLValue, ParserError};
+use candid::parser::grammar::ArgsParser;
+use candid::parser::lexer::Lexer;
+use candid::parser::value::{IDLArgs, IDLField, IDLValue};
+use candid::parser::ParserError;
 
 fn parse_args(input: &str) -> IDLArgs {
     let lexer = Lexer::new(input);

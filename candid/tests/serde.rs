@@ -1,7 +1,6 @@
-extern crate candid_info;
-extern crate serde_candid;
+extern crate candid;
 
-use serde_candid::{CandidType, Decode, Deserialize, Encode};
+use candid::{CandidType, Decode, Deserialize, Encode};
 
 #[test]
 fn test_error() {

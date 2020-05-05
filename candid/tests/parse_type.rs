@@ -1,8 +1,8 @@
-extern crate serde_candid;
+extern crate candid;
 
-use serde_candid::grammar::IDLProgParser;
-use serde_candid::lexer::Lexer;
-use serde_candid::types::{to_pretty, IDLProg};
+use candid::parser::grammar::IDLProgParser;
+use candid::parser::lexer::Lexer;
+use candid::parser::types::{to_pretty, IDLProg};
 
 fn parse_idl(input: &str) -> IDLProg {
     let lexer = Lexer::new(input);

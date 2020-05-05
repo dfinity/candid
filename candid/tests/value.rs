@@ -1,7 +1,7 @@
-extern crate serde_candid;
+extern crate candid;
 
-use serde_candid::value::{IDLArgs, IDLField, IDLValue};
-use serde_candid::Decode;
+use candid::parser::value::{IDLArgs, IDLField, IDLValue};
+use candid::Decode;
 
 #[test]
 fn test_parser() {

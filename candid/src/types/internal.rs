@@ -1,3 +1,4 @@
+use super::CandidType;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -39,7 +40,7 @@ pub struct Field {
 }
 
 pub fn is_primitive(t: &Type) -> bool {
-    use Type::*;
+    use self::Type::*;
     match t {
         Null | Bool | Nat | Int | Text => true,
         Unknown => panic!("Unknown type"),
@@ -49,7 +50,7 @@ pub fn is_primitive(t: &Type) -> bool {
 }
 
 pub fn unroll(t: &Type) -> Type {
-    use Type::*;
+    use self::Type::*;
     match t {
         Knot(id) => find_type(*id).unwrap(),
         Opt(ref t) => Opt(Box::new(unroll(t))),
@@ -97,7 +98,7 @@ pub fn env_add(id: TypeId, t: Type) {
 
 pub fn get_type<T>(_v: &T) -> Type
 where
-    T: super::CandidType,
+    T: CandidType,
 {
     T::ty()
 }

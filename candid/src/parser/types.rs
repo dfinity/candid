@@ -1,7 +1,7 @@
 extern crate pretty;
 use self::pretty::{BoxDoc, Doc};
+use crate::idl_hash;
 use crate::{Error, Result};
-use candid_info::idl_hash;
 
 #[derive(Debug, Clone)]
 pub enum IDLType {
@@ -168,8 +168,8 @@ impl IDLProg {
 impl std::str::FromStr for IDLProg {
     type Err = crate::Error;
     fn from_str(str: &str) -> Result<Self> {
-        let lexer = crate::lexer::Lexer::new(str);
-        Ok(crate::grammar::IDLProgParser::new().parse(lexer)?)
+        let lexer = super::lexer::Lexer::new(str);
+        Ok(super::grammar::IDLProgParser::new().parse(lexer)?)
     }
 }
 

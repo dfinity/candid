@@ -64,7 +64,7 @@ pub enum Token {
 
 pub struct TmpIDLField {
     pub has_id: bool,
-    pub inner: crate::value::IDLField,
+    pub inner: super::value::IDLField,
 }
 
 fn hex_to_char(hex: &str) -> Result<char, LexicalError> {

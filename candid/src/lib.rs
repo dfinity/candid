@@ -1,9 +1,9 @@
-//! # Serde Dfinity IDL
+//! # Candid
 //!
 //! # Using the library
 //!
 //! ```
-//! use serde_candid::{Encode, Decode};
+//! use candid::{Encode, Decode};
 //! // Serialization
 //! let bytes = Encode!(&[(42, "text")], &(42, "text"));
 //! // Deserialization
@@ -15,7 +15,7 @@
 //! # Serialize/Deserialize struct/enum
 //!
 //! ```
-//! # #[macro_use] extern crate serde_candid;
+//! # #[macro_use] extern crate candid;
 //! #[derive(CandidType, Deserialize)]
 //! struct List {
 //!     head: i32,
@@ -35,7 +35,7 @@
 //! As an example, the following assertions should always be true.
 //!
 //! ```
-//! use serde_candid::{IDLArgs};
+//! use candid::{IDLArgs};
 //! let idl_text = "(42,opt true, vec {1;2;3}, opt record {label=\"text\"; 42=\"haha\"})";
 //! let args: IDLArgs = idl_text.parse().unwrap();
 //! let encoded: Vec<u8> = args.to_bytes().unwrap();
@@ -46,31 +46,42 @@
 //! assert_eq!(args, back_args);
 //! ```
 
-extern crate candid_info;
 extern crate leb128;
 extern crate num_enum;
 extern crate serde;
 
-pub use crate::de::IDLDeserialize;
-pub use crate::error::{Error, Result};
-pub use crate::types::IDLProg;
-pub use crate::value::IDLArgs;
-pub use candid_info::CandidType;
+extern crate candid_derive;
+pub use candid_derive::CandidType;
 pub use serde::Deserialize;
 
-pub mod de;
-pub mod error;
-pub mod grammar;
-pub mod lexer;
-pub mod ser;
 pub mod types;
-pub mod value;
+pub use types::CandidType;
+
+pub mod error;
+pub use error::{Error, Result};
+
+pub mod parser;
+pub use parser::types::IDLProg;
+pub use parser::value::IDLArgs;
+
+pub mod de;
+pub mod ser;
+
+// IDL hash function comes from
+// https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf
+pub fn idl_hash(id: &str) -> u32 {
+    let mut s: u32 = 0;
+    for c in id.chars() {
+        s = s.wrapping_mul(223).wrapping_add(c as u32);
+    }
+    s
+}
 
 /// Encode sequence of Rust values into IDL message.
 #[macro_export]
 macro_rules! Encode {
     ( $($x:expr),* ) => {{
-        let mut idl = serde_candid::ser::IDLBuilder::new();
+        let mut idl = candid::ser::IDLBuilder::new();
         $(idl.arg($x).unwrap();)*
         idl.serialize_to_vec().unwrap()
     }}
@@ -80,7 +91,7 @@ macro_rules! Encode {
 #[macro_export]
 macro_rules! Decode {
     ( $hex:expr, $($name:ident: $ty:ty),* ) => {
-        let mut de = serde_candid::de::IDLDeserialize::new($hex);
+        let mut de = candid::de::IDLDeserialize::new($hex);
         $(let $name: $ty = de.get_value().unwrap();)*
         de.done().unwrap()
     }

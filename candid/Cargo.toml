@@ -1,5 +1,5 @@
 [package]
-name = "serde_candid"
+name = "candid"
 version = "0.1.0"
 authors = ["Yan Chen <yan@dfinity.org>"]
 
@@ -14,12 +14,10 @@ serde = "1.0.101"
 serde_bytes = "0.11.2"
 paste = "0.1"
 num_enum = "0.4.1"
-candid_info = { path = "../candid_info" }
+candid_derive = { path = "../candid_derive" }
 lalrpop-util = "0.17.2"
 pretty = "0.5"
 
 [dev-dependencies]
 serde_derive = "1.0"
 
-[features]
-default = []

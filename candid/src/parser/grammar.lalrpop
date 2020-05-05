@@ -1,7 +1,7 @@
-use crate::value::{IDLField, IDLValue, IDLArgs};
-use crate::types::{IDLType, PrimType, Label, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg};
-use crate::lexer::{Token, LexicalError, TmpIDLField};
-use candid_info::idl_hash;
+use super::value::{IDLField, IDLValue, IDLArgs};
+use super::types::{IDLType, PrimType, Label, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg};
+use super::lexer::{Token, LexicalError, TmpIDLField};
+use crate::idl_hash;
 
 grammar;
 

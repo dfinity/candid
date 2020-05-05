@@ -1,4 +1,4 @@
-use candid_info::types::{Field, Type};
+use crate::types::{Field, Type};
 use serde::de;
 use serde::de::{Deserialize, Visitor};
 use std::fmt;
@@ -29,9 +29,6 @@ pub struct IDLArgs {
     pub args: Vec<IDLValue>,
 }
 
-pub type ParserError =
-    lalrpop_util::ParseError<usize, crate::lexer::Token, crate::lexer::LexicalError>;
-
 impl IDLArgs {
     pub fn new(args: &[IDLValue]) -> Self {
         IDLArgs {
@@ -60,8 +57,8 @@ impl IDLArgs {
 impl std::str::FromStr for IDLArgs {
     type Err = crate::Error;
     fn from_str(str: &str) -> Result<Self, Self::Err> {
-        let lexer = crate::lexer::Lexer::new(str);
-        Ok(crate::grammar::ArgsParser::new().parse(lexer)?)
+        let lexer = super::lexer::Lexer::new(str);
+        Ok(super::grammar::ArgsParser::new().parse(lexer)?)
     }
 }
 
@@ -120,11 +117,11 @@ impl fmt::Display for IDLField {
     }
 }
 
-impl candid_info::CandidType for IDLValue {
+impl crate::CandidType for IDLValue {
     fn ty() -> Type {
         unreachable!();
     }
-    fn id() -> candid_info::types::TypeId {
+    fn id() -> crate::types::TypeId {
         unreachable!();
     }
     fn _ty() -> Type {
@@ -173,9 +170,9 @@ impl candid_info::CandidType for IDLValue {
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
-        S: candid_info::Serializer,
+        S: crate::types::Serializer,
     {
-        use candid_info::Compound;
+        use crate::types::Compound;
         match *self {
             IDLValue::Null => serializer.serialize_null(()),
             IDLValue::Bool(b) => serializer.serialize_bool(b),
