@@ -26,7 +26,7 @@ pub fn derive_idl_type(input: TokenStream) -> TokenStream {
         Data::Union(_) => unimplemented!("doesn't derive union type"),
     };
     let gen = quote! {
-        impl #impl_generics candid::CandidType for #name #ty_generics #where_clause {
+        impl #impl_generics candid::types::CandidType for #name #ty_generics #where_clause {
             fn _ty() -> candid::types::Type {
                 #ty_body
             }
@@ -34,7 +34,7 @@ pub fn derive_idl_type(input: TokenStream) -> TokenStream {
 
             fn idl_serialize<__S>(&self, __serializer: __S) -> Result<(), __S::Error>
                 where
-                __S: candid::Serializer,
+                __S: candid::types::Serializer,
                 {
                     #ser_body
                 }
@@ -155,7 +155,7 @@ fn enum_from_ast(
             (
                 pattern,
                 quote! {
-                    #(candid::Compound::serialize_element(&mut ser, #id)?;)*
+                    #(candid::types::Compound::serialize_element(&mut ser, #id)?;)*
                 },
             )
         })
@@ -176,7 +176,7 @@ fn serialize_struct(idents: &[Ident]) -> Tokens {
     let id = idents.iter().map(|ident| ident.to_token());
     quote! {
         let mut ser = __serializer.serialize_struct()?;
-        #(candid::Compound::serialize_element(&mut ser, &self.#id)?;)*
+        #(candid::types::Compound::serialize_element(&mut ser, &self.#id)?;)*
         Ok(())
     }
 }
@@ -261,14 +261,14 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (Tokens, 
 
 fn derive_type(t: &syn::Type) -> Tokens {
     quote! {
-        <#t as candid::CandidType>::ty()
+        <#t as candid::types::CandidType>::ty()
     }
 }
 
 fn add_trait_bounds(mut generics: Generics) -> Generics {
     for param in &mut generics.params {
         if let GenericParam::Type(ref mut type_param) = *param {
-            let bound = syn::parse_str("::candid::CandidType").unwrap();
+            let bound = syn::parse_str("::candid::types::CandidType").unwrap();
             type_param.bounds.push(bound);
         }
     }

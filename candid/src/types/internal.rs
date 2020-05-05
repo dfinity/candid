@@ -1,6 +1,6 @@
+use super::CandidType;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use CandidType;
 
 // This is a re-implementation of std::any::TypeId to get rid of 'static constraint.
 // The current TypeId doesn't consider lifetime while computing the hash, which is

@@ -1,7 +1,7 @@
+use super::CandidType;
+use super::Compound;
+use super::Serializer;
 use types::internal::*;
-use CandidType;
-use Compound;
-use Serializer;
 
 macro_rules! primitive_impl {
     ($t:ty, $id:tt, $method:ident $($cast:tt)*) => {
