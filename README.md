@@ -1,11 +1,13 @@
 # Candid
-Rust candid library for the Internet Computer
+
+[![](https://github.com/dfinity/candid/workflows/Rust/badge.svg)]
+
+[Candid](IDL.md) is an interface description language (IDL) for specifying the signature of an actor. It is used to interact with all canisters running on the Internet Computer.
 
 This respository hosts the following crates:
 
-- candid_info
-- candid_derive
-- serde_candid
+- `candid`, providing the parser for Candid types `candid::IDLProg` and values `candid::IDLArgs`; integrating Candid value with `serde`, allowing to serialize and deserialize Rust data structures to and from Candid.
+- `candid_derive`, an internal crate similar to `serde_derive` to convert Rust data types to Candid types. This crate should be considered as an implementation detail, and not be used directly, only via the `candid` crate.
 
 # Contributing to the documentation
 
