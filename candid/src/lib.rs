@@ -65,7 +65,7 @@
 //!
 //! ```
 //! # #[macro_use] extern crate candid;
-//! #[derive(CandidType, Deserialize)]
+//! #[derive(CandidType, Deserialize, Debug)]
 //! struct List {
 //!     head: i32,
 //!     tail: Option<Box<List>>,
@@ -73,7 +73,7 @@
 //! let list = List { head: 42, tail: None };
 //! let bytes = &Encode!(&list, &list);
 //! let lists_res : Result<(List, List), _> =
-//!    DecodeResult!(bytes, l1:List, l2:List);
+//!    DecodeResult!(&bytes, l1:List, l2:List);
 //! ```
 
 extern crate leb128;
@@ -135,10 +135,9 @@ macro_rules! DecodeResult {
     ( $hex:expr, $($name:ident: $ty:ty),* ) => {{
         let mut de = candid::de::IDLDeserialize::new($hex);
         $(let $name: Result<$ty,_> = de.get_value();)*
-        let tup_res = ( ( $($name),* ) );
         let res_tup : Result<($($ty),*), candid::Error> =
             de.done().and_then(|_|
-                               UnwrapTup!( [ $($name),* ] ; { } )
+                               UnwrapTup!( $($name)* [])
             );
         res_tup
     }}
@@ -148,10 +147,12 @@ macro_rules! DecodeResult {
 //   unwrap each in the "option monad" and form a tuple of unwrapped results.
 #[macro_export]
 macro_rules! UnwrapTup {
-    ( [ $name:ident, $($names:ident),* ] ; { $($ans:tt),* } ) => {{
-        $name.and_then( |$name|
-           UnwrapTup!( [ $($names),* ] ; { $($ans:tt),*, $name } )
+    ( $name:ident $($rest:ident)* [ $($ans:ident)* ]) => {
+        $name.and_then( |val|
+                         UnwrapTup!( $($rest)* [ val $($ans)* ])
         )
-    }};
-    ( [ ] ; { $($ans:tt),* } ) => { ($($ans),*) }; // return unwrapped tuple
+    };
+    ( [ $($ans:ident)* ]) => {
+        ( $($ans),* )
+    };
 }
