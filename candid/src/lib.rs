@@ -24,9 +24,13 @@
 //! let list = List { head: 42, tail: None };
 //! let bytes = Encode!(&list);
 //! Decode!(&bytes, l: List);
+//! let lists_res : Result<(List, List), _> = 
+//!    DecodeResult!(&Encode!(&list, &list), l1:List, l2:List);
 //! ```
 //!
 //! # Operating on untyped IDL values
+//!
+//! ## Option 1: Represent decoded message with `IDLArgs` type
 //!
 //! Any valid IDL message can be manipulated in the `IDLArgs` data structure, which contains
 //! a vector of untyped enum structure called `IDLValue`.
@@ -45,6 +49,18 @@
 //! let back_args: IDLArgs = output.parse().unwrap();
 //! assert_eq!(args, back_args);
 //! ```
+//!
+//! ## Option 2: Represent decoded message with an Result Rust type
+//!
+//! In some generic tooling scenarios, the message may have an _unknown_ Rust type (or none at all),
+//! but it may also have a Rust type that is known, and either case is possible.
+//!
+//! Imagine a tool that intercepts and displays special log messages, but ignores all others.
+//!
+//! In these scenarios, the program may wish to distinguish the known and uknown cases
+//! by decoding into an a Rust `Result` type,
+//! using the `DecodeResult` macro:
+//!
 
 extern crate leb128;
 extern crate num_enum;
@@ -88,6 +104,7 @@ macro_rules! Encode {
 }
 
 /// Decode IDL message into a sequence of Rust values.
+/// Traps if the message fails to decode at the given types.
 #[macro_export]
 macro_rules! Decode {
     ( $hex:expr, $($name:ident: $ty:ty),* ) => {
@@ -95,4 +112,30 @@ macro_rules! Decode {
         $(let $name: $ty = de.get_value().unwrap();)*
         de.done().unwrap()
     }
+}
+
+/// Decode IDL message into an tuple of Rust values of the given types.
+/// Produces `Err` if the message fails to decode at the given types.
+#[macro_export]
+macro_rules! DecodeResult {
+    ( $hex:expr, $($name:ident: $ty:ty),* ) => {{
+        let mut de = candid::de::IDLDeserialize::new($hex);
+        $(let $name: Result<$ty,_> = de.get_value();)*
+        let tup_res = ( ( $($name),* ) );
+        let res_tup : Result<($($ty,)*), _> =
+            de.done().and_then(|_| UnwrapTup!( ( $($name),* ) () ));
+        res_tup
+    }}
+}
+
+// Helper: Define inductive macro over a tuple of names;
+//   unwrap each in the "option monad" and form a tuple of unwrapped results.
+#[macro_export]
+macro_rules! UnwrapTup {
+    ( ( $name:ident, $($names:ident),+ ) ($($ans:tt),*) ) => {{
+        $name.and_then( |$name|
+           UnwrapTup!( ($($names),+) ($($ans:tt),*, $name) )
+        )
+    }};
+    ( () (($ans:tt,)*) ) => {{ ($($ans,)*) }}; // return unwrapped tuple
 }
