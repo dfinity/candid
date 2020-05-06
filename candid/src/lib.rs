@@ -22,10 +22,12 @@
 //!     tail: Option<Box<List>>,
 //! }
 //! let list = List { head: 42, tail: None };
+//!
 //! let bytes = Encode!(&list);
 //! Decode!(&bytes, l: List);
-//! let lists_res : Result<(List, List), _> = 
-//!    DecodeResult!(&Encode!(&list, &list), l1:List, l2:List);
+//!
+//! let bytes2 = &Encode!(&list, &list);
+//! Decode!(bytes2, l1:List, l2:List);
 //! ```
 //!
 //! # Operating on untyped IDL values
@@ -61,6 +63,18 @@
 //! by decoding into an a Rust `Result` type,
 //! using the `DecodeResult` macro:
 //!
+//! ```
+//! # #[macro_use] extern crate candid;
+//! #[derive(CandidType, Deserialize)]
+//! struct List {
+//!     head: i32,
+//!     tail: Option<Box<List>>,
+//! }
+//! let list = List { head: 42, tail: None };
+//! let bytes = &Encode!(&list, &list);
+//! let lists_res : Result<(List, List), _> =
+//!    DecodeResult!(bytes, l1:List, l2:List);
+//! ```
 
 extern crate leb128;
 extern crate num_enum;
@@ -122,8 +136,10 @@ macro_rules! DecodeResult {
         let mut de = candid::de::IDLDeserialize::new($hex);
         $(let $name: Result<$ty,_> = de.get_value();)*
         let tup_res = ( ( $($name),* ) );
-        let res_tup : Result<($($ty,)*), _> =
-            de.done().and_then(|_| UnwrapTup!( ( $($name),* ) () ));
+        let res_tup : Result<($($ty),*), candid::Error> =
+            de.done().and_then(|_|
+                               UnwrapTup!( [ $($name),* ] ; { } )
+            );
         res_tup
     }}
 }
@@ -132,10 +148,10 @@ macro_rules! DecodeResult {
 //   unwrap each in the "option monad" and form a tuple of unwrapped results.
 #[macro_export]
 macro_rules! UnwrapTup {
-    ( ( $name:ident, $($names:ident),+ ) ($($ans:tt),*) ) => {{
+    ( [ $name:ident, $($names:ident),* ] ; { $($ans:tt),* } ) => {{
         $name.and_then( |$name|
-           UnwrapTup!( ($($names),+) ($($ans:tt),*, $name) )
+           UnwrapTup!( [ $($names),* ] ; { $($ans:tt),*, $name } )
         )
     }};
-    ( () (($ans:tt,)*) ) => {{ ($($ans,)*) }}; // return unwrapped tuple
+    ( [ ] ; { $($ans:tt),* } ) => { ($($ans),*) }; // return unwrapped tuple
 }
