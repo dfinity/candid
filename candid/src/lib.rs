@@ -71,9 +71,10 @@
 //!     tail: Option<Box<List>>,
 //! }
 //! let list = List { head: 42, tail: None };
-//! let bytes = &Encode!(&list, &list);
-//! let lists_res : Result<(List, List), _> =
-//!    DecodeResult!(&bytes, l1:List, l2:List);
+//! let num : usize = 42;
+//! let bytes = &Encode!(&list, &num, &list);
+//! let lists_res : Result<(List, usize, List), _> =
+//!    DecodeResult!(&bytes, l1:List, n:usize, l2:List);
 //! ```
 
 extern crate leb128;
@@ -153,6 +154,6 @@ macro_rules! UnwrapTup {
         )
     };
     ( [ $($ans:ident)* ]) => {
-        ( $($ans),* )
+        std::result::Result::Ok(($($ans),*))
     };
 }
