@@ -52,7 +52,7 @@
 //! assert_eq!(args, back_args);
 //! ```
 //!
-//! ## Option 2: Represent decoded message with an Result Rust type
+//! ## Option 2: Represent decoded message with a `Result` type in Rust
 //!
 //! In some generic tooling scenarios, the message may have an _unknown_ Rust type (or none at all),
 //! but it may also have a Rust type that is known, and either case is possible.
@@ -145,7 +145,7 @@ macro_rules! DecodeResult {
 }
 
 // Helper: Define inductive macro over a tuple of names;
-//   unwrap each in the "option monad" and form a tuple of unwrapped results.
+//   unwrap each in the "result monad" and form a tuple of unwrapped results.
 #[macro_export]
 macro_rules! UnwrapTup {
     ( $name:ident $($rest:ident)* [ $($ans:ident)* ]) => {
