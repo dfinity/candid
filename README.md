@@ -1,6 +1,6 @@
 # Candid
 
-[![](https://github.com/dfinity/candid/workflows/Rust/badge.svg)]
+![](https://github.com/dfinity/candid/workflows/Rust/badge.svg)
 
 [Candid](IDL.md) is an interface description language (IDL) for specifying the signature of an actor. It is used to interact with all canisters running on the Internet Computer.
 
