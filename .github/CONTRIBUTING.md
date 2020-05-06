@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for your interest in contributing to example apps for the Internet Computer.
+Thank you for your interest in contributing to the Rust crates for the Internet Computer.
 By participating in this project, you agree to abide by our [Code of Conduct](./CODE_OF_CONDUCT.md).
 
 As a member of the community, you are invited and encouraged to contribute by submitting issues, offering suggestions for improvements, adding review comments to existing pull requests, or creating new pull requests to fix issues.

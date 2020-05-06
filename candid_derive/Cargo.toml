@@ -1,7 +1,7 @@
 [package]
 name = "candid_derive"
 version = "0.1.0"
-authors = ["chenyan-dfinity <yan.chen@dfinity.org>"]
+authors = ["DFINITY Team"]
 
 [lib]
 name = "candid_derive"
@@ -10,8 +10,5 @@ proc-macro = true
 [dependencies]
 quote = "1.0"
 syn = { version = "1.0", features = ["visit"] }
-proc-macro2 = "1.0.2"
-
-[dev-dependencies]
-serde = { version = "1.0" }
+proc-macro2 = "1.0.12"
 
