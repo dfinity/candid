@@ -74,7 +74,7 @@
 //! let num : usize = 42;
 //! let bytes = &Encode!(&list, &num, &list);
 //! let lists_res : Result<(List, usize, List), _> =
-//!    DecodeResult!(&bytes, l1:List, n:usize, l2:List);
+//!    Decoder!(&bytes, List, usize, List);
 //! ```
 
 extern crate leb128;
@@ -129,6 +129,22 @@ macro_rules! Decode {
     }
 }
 
+#[macro_export]
+macro_rules! Decoder {
+    ( $hex:expr $(,$ty:ty)* ) => {{
+        let mut de = candid::de::IDLDeserialize::new($hex);
+        let res = Decoder!(@GetValue [] de $($ty,)*);
+        res
+    }};
+    (@GetValue [$($ans:ident)*] $de:ident) => {{
+        Ok(($($ans),*))
+    }};
+    (@GetValue [$($ans:ident)*] $de:ident $ty:ty, $($tail:ty,)* ) => {{
+        let x = $de.get_value::<$ty>();
+        x.and_then(|val| Decoder!(@GetValue [val $($ans)*] $de $($tail,)* ))
+    }};
+}
+
 /// Decode IDL message into an tuple of Rust values of the given types.
 /// Produces `Err` if the message fails to decode at the given types.
 #[macro_export]
@@ -154,6 +170,6 @@ macro_rules! UnwrapTup {
         )
     };
     ( [ $($ans:ident)* ]) => {
-        std::result::Result::Ok(($($ans),*))
+        Ok(($($ans),*))
     };
 }
