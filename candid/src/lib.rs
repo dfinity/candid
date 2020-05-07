@@ -134,7 +134,7 @@ macro_rules! Decoder {
     ( $hex:expr $(,$ty:ty)* ) => {{
         let mut de = candid::de::IDLDeserialize::new($hex);
         let res = Decoder!(@GetValue [] de $($ty,)*);
-        res
+        de.done().and(res)
     }};
     (@GetValue [$($ans:ident)*] $de:ident) => {{
         Ok(($($ans),*))
