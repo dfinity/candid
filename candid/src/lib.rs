@@ -22,11 +22,17 @@
 //!     tail: Option<Box<List>>,
 //! }
 //! let list = List { head: 42, tail: None };
+//!
 //! let bytes = Encode!(&list);
 //! Decode!(&bytes, l: List);
+//!
+//! let bytes2 = &Encode!(&list, &list);
+//! Decode!(bytes2, l1:List, l2:List);
 //! ```
 //!
 //! # Operating on untyped IDL values
+//!
+//! ## Option 1: Represent decoded message with `IDLArgs` type
 //!
 //! Any valid IDL message can be manipulated in the `IDLArgs` data structure, which contains
 //! a vector of untyped enum structure called `IDLValue`.
@@ -44,6 +50,31 @@
 //! let output: String = decoded.to_string();
 //! let back_args: IDLArgs = output.parse().unwrap();
 //! assert_eq!(args, back_args);
+//! ```
+//!
+//! ## Option 2: Represent decoded message with a `Result` type in Rust
+//!
+//! In some generic tooling scenarios, the message may have an _unknown_ Rust type (or none at all),
+//! but it may also have a Rust type that is known, and either case is possible.
+//!
+//! Imagine a tool that intercepts and displays special log messages, but ignores all others.
+//!
+//! In these scenarios, the program may wish to distinguish the known and uknown cases
+//! by decoding into an a Rust `Result` type,
+//! using the `DecodeResult` macro:
+//!
+//! ```
+//! # #[macro_use] extern crate candid;
+//! #[derive(CandidType, Deserialize, Debug)]
+//! struct List {
+//!     head: i32,
+//!     tail: Option<Box<List>>,
+//! }
+//! let list = List { head: 42, tail: None };
+//! let num : usize = 42;
+//! let bytes = &Encode!(&list, &num, &list);
+//! let lists_res : Result<(List, usize, List), _> =
+//!    DecodeResult!(&bytes, List, usize, List);
 //! ```
 
 extern crate leb128;
@@ -88,6 +119,7 @@ macro_rules! Encode {
 }
 
 /// Decode IDL message into a sequence of Rust values.
+/// Traps if the message fails to decode at the given types.
 #[macro_export]
 macro_rules! Decode {
     ( $hex:expr, $($name:ident: $ty:ty),* ) => {
@@ -95,4 +127,22 @@ macro_rules! Decode {
         $(let $name: $ty = de.get_value().unwrap();)*
         de.done().unwrap()
     }
+}
+
+/// Decode IDL message into an tuple of Rust values of the given types.
+/// Produces `Err` if the message fails to decode at the given types.
+#[macro_export]
+macro_rules! DecodeResult {
+    ( $hex:expr $(,$ty:ty)* ) => {{
+        let mut de = candid::de::IDLDeserialize::new($hex);
+        let res = DecodeResult!(@GetValue [] de $($ty,)*);
+        de.done().and(res)
+    }};
+    (@GetValue [$($ans:ident)*] $de:ident) => {{
+        Ok(($($ans),*))
+    }};
+    (@GetValue [$($ans:ident)*] $de:ident $ty:ty, $($tail:ty,)* ) => {{
+        let x = $de.get_value::<$ty>();
+        x.and_then(|val| DecodeResult!(@GetValue [val $($ans)*] $de $($tail,)* ))
+    }};
 }
