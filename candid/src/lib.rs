@@ -74,7 +74,7 @@
 //! let num : usize = 42;
 //! let bytes = &Encode!(&list, &num, &list);
 //! let lists_res : Result<(List, usize, List), _> =
-//!    Decoder!(&bytes, List, usize, List);
+//!    DecodeResult!(&bytes, List, usize, List);
 //! ```
 
 extern crate leb128;
@@ -129,11 +129,13 @@ macro_rules! Decode {
     }
 }
 
+/// Decode IDL message into an tuple of Rust values of the given types.
+/// Produces `Err` if the message fails to decode at the given types.
 #[macro_export]
-macro_rules! Decoder {
+macro_rules! DecodeResult {
     ( $hex:expr $(,$ty:ty)* ) => {{
         let mut de = candid::de::IDLDeserialize::new($hex);
-        let res = Decoder!(@GetValue [] de $($ty,)*);
+        let res = DecodeResult!(@GetValue [] de $($ty,)*);
         de.done().and(res)
     }};
     (@GetValue [$($ans:ident)*] $de:ident) => {{
@@ -141,35 +143,6 @@ macro_rules! Decoder {
     }};
     (@GetValue [$($ans:ident)*] $de:ident $ty:ty, $($tail:ty,)* ) => {{
         let x = $de.get_value::<$ty>();
-        x.and_then(|val| Decoder!(@GetValue [val $($ans)*] $de $($tail,)* ))
+        x.and_then(|val| DecodeResult!(@GetValue [val $($ans)*] $de $($tail,)* ))
     }};
-}
-
-/// Decode IDL message into an tuple of Rust values of the given types.
-/// Produces `Err` if the message fails to decode at the given types.
-#[macro_export]
-macro_rules! DecodeResult {
-    ( $hex:expr, $($name:ident: $ty:ty),* ) => {{
-        let mut de = candid::de::IDLDeserialize::new($hex);
-        $(let $name: Result<$ty,_> = de.get_value();)*
-        let res_tup : Result<($($ty),*), candid::Error> =
-            de.done().and_then(|_|
-                               UnwrapTup!( $($name)* [])
-            );
-        res_tup
-    }}
-}
-
-// Helper: Define inductive macro over a tuple of names;
-//   unwrap each in the "result monad" and form a tuple of unwrapped results.
-#[macro_export]
-macro_rules! UnwrapTup {
-    ( $name:ident $($rest:ident)* [ $($ans:ident)* ]) => {
-        $name.and_then( |val|
-                         UnwrapTup!( $($rest)* [ val $($ans)* ])
-        )
-    };
-    ( [ $($ans:ident)* ]) => {
-        Ok(($($ans),*))
-    };
 }
