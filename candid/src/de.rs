@@ -34,12 +34,11 @@ pub struct IDLDeserialize<'de> {
 
 impl<'de> IDLDeserialize<'de> {
     /// Create a new deserializer with IDL binary message.
-    pub fn new(bytes: &'de [u8]) -> Self {
+    pub fn new(bytes: &'de [u8]) -> Result<Self> {
         let mut de = Deserializer::from_bytes(bytes);
         de.parse_table()
-            .map_err(|e| de.dump_error_state(e))
-            .unwrap();
-        IDLDeserialize { de }
+            .map_err(|e| de.dump_error_state(e))?;
+        Ok(IDLDeserialize { de })
     }
     /// Deserialize one value from deserializer.
     pub fn get_value<T>(&mut self) -> Result<T>
@@ -672,6 +671,7 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
                         index_ty = Some(ty);
                     }
                 }
+                // Okay to unwrap, as index_ty always has a value here.
                 self.de.current_type.push_front(index_ty.unwrap());
                 let val = seed.deserialize(&mut *self.de)?;
                 Ok((val, self))

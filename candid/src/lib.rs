@@ -123,7 +123,7 @@ macro_rules! Encode {
 #[macro_export]
 macro_rules! Decode {
     ( $hex:expr, $($name:ident: $ty:ty),* ) => {
-        let mut de = candid::de::IDLDeserialize::new($hex);
+        let mut de = candid::de::IDLDeserialize::new($hex).unwrap();
         $(let $name: $ty = de.get_value().unwrap();)*
         de.done().unwrap()
     }
@@ -134,9 +134,11 @@ macro_rules! Decode {
 #[macro_export]
 macro_rules! DecodeResult {
     ( $hex:expr $(,$ty:ty)* ) => {{
-        let mut de = candid::de::IDLDeserialize::new($hex);
-        let res = DecodeResult!(@GetValue [] de $($ty,)*);
-        de.done().and(res)
+        let de = candid::de::IDLDeserialize::new($hex);
+        de.and_then(|mut de| {
+            let res = DecodeResult!(@GetValue [] de $($ty,)*);
+            de.done().and(res)
+        })
     }};
     (@GetValue [$($ans:ident)*] $de:ident) => {{
         Ok(($($ans),*))
