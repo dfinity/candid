@@ -36,8 +36,7 @@ impl<'de> IDLDeserialize<'de> {
     /// Create a new deserializer with IDL binary message.
     pub fn new(bytes: &'de [u8]) -> Result<Self> {
         let mut de = Deserializer::from_bytes(bytes);
-        de.parse_table()
-            .map_err(|e| de.dump_error_state(e))?;
+        de.parse_table().map_err(|e| de.dump_error_state(e))?;
         Ok(IDLDeserialize { de })
     }
     /// Deserialize one value from deserializer.
