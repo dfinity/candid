@@ -7,7 +7,7 @@
 //! // Serialization
 //! let bytes = Encode!(&[(42, "text")], &(42, "text"));
 //! // Deserialization
-//! Decode!(&bytes, a: Vec<(i64, &str)>, b: (i32, String));
+//! let (a, b) = Decode!(&bytes, Vec<(i64, &str)>, (i32, String)).unwrap();
 //! assert_eq!(a, [(42, "text")]);
 //! assert_eq!(b, (42i32, "text".to_string()));
 //! ```
@@ -24,10 +24,8 @@
 //! let list = List { head: 42, tail: None };
 //!
 //! let bytes = Encode!(&list);
-//! Decode!(&bytes, l: List);
+//! let res = Decode!(&bytes, List).unwrap();
 //!
-//! let bytes2 = &Encode!(&list, &list);
-//! Decode!(bytes2, l1:List, l2:List);
 //! ```
 //!
 //! # Operating on untyped IDL values
@@ -61,7 +59,7 @@
 //!
 //! In these scenarios, the program may wish to distinguish the known and uknown cases
 //! by decoding into an a Rust `Result` type,
-//! using the `DecodeResult` macro:
+//! using the `Decode` macro:
 //!
 //! ```
 //! # #[macro_use] extern crate candid;
@@ -74,7 +72,7 @@
 //! let num : usize = 42;
 //! let bytes = &Encode!(&list, &num, &list);
 //! let lists_res : Result<(List, usize, List), _> =
-//!    DecodeResult!(&bytes, List, usize, List);
+//!    Decode!(&bytes, List, usize, List);
 //! ```
 
 extern crate leb128;
@@ -118,33 +116,21 @@ macro_rules! Encode {
     }}
 }
 
-/// Decode IDL message into a sequence of Rust values.
-/// Traps if the message fails to decode at the given types.
+/// Decode IDL message into an tuple of Rust values of the given types.
+/// Produces `Err` if the message fails to decode at any given types.
+/// If the message contains only one value, it returns the value directly instead of a tuple.
 #[macro_export]
 macro_rules! Decode {
-    ( $hex:expr, $($name:ident: $ty:ty),* ) => {
-        let mut de = candid::de::IDLDeserialize::new($hex).unwrap();
-        $(let $name: $ty = de.get_value().unwrap();)*
-        de.done().unwrap()
-    }
-}
-
-/// Decode IDL message into an tuple of Rust values of the given types.
-/// Produces `Err` if the message fails to decode at the given types.
-#[macro_export]
-macro_rules! DecodeResult {
     ( $hex:expr $(,$ty:ty)* ) => {{
-        let de = candid::de::IDLDeserialize::new($hex);
-        de.and_then(|mut de| {
-            let res = DecodeResult!(@GetValue [] de $($ty,)*);
-            de.done().and(res)
-        })
+        candid::de::IDLDeserialize::new($hex)
+            .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
+                      .and_then(|res| de.done().and(Ok(res))))
     }};
     (@GetValue [$($ans:ident)*] $de:ident) => {{
         Ok(($($ans),*))
     }};
     (@GetValue [$($ans:ident)*] $de:ident $ty:ty, $($tail:ty,)* ) => {{
-        let x = $de.get_value::<$ty>();
-        x.and_then(|val| DecodeResult!(@GetValue [val $($ans)*] $de $($tail,)* ))
+        $de.get_value::<$ty>()
+            .and_then(|val| Decode!(@GetValue [$($ans)* val] $de $($tail,)* ))
     }};
 }

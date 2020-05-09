@@ -297,18 +297,12 @@ fn test_generics() {
 fn test_multiargs() {
     let bytes = Encode!();
     assert_eq!(bytes, b"DIDL\0\0");
-    Decode!(&bytes,);
+    Decode!(&bytes).unwrap();
 
     let bytes = Encode!(&42, &Some(42), &Some(1), &Some(2));
     assert_eq!(bytes, hex("4449444c016e7c047c0000002a012a01010102"));
 
-    Decode!(
-        &bytes,
-        a: i32,
-        b: Option<i32>,
-        c: Option<i32>,
-        d: Option<i32>
-    );
+    let (a, b, c, d) = Decode!(&bytes, i32, Option<i32>, Option<i32>, Option<i32>).unwrap();
     assert_eq!(a, 42);
     assert_eq!(b, Some(42));
     assert_eq!(c, Some(1));
@@ -325,12 +319,12 @@ fn test_multiargs() {
         hex("4449444c026d016c02007c0171020001012a04746578742a0474657874")
     );
 
-    Decode!(&bytes, a: Vec<(i64, &str)>, b: (i64, String));
-    assert_eq!(a, [(42, "text")]);
-    assert_eq!(b, (42, "text".to_string()));
+    let tuple = Decode!(&bytes, Vec<(i64, &str)>, (i64, String)).unwrap();
+    assert_eq!(tuple.0, [(42, "text")]);
+    assert_eq!(tuple.1, (42, "text".to_string()));
 
     let err = || {
-        Decode!(&bytes, _a: Vec<(i64, &str)>, _b: (i64, String), _c: i32);
+        Decode!(&bytes, Vec<(i64, &str)>, (i64, String), i32).unwrap();
         true
     };
     check_error(err, "No more values to deserialize");
@@ -365,7 +359,7 @@ fn test_decode<'de, T>(bytes: &'de [u8], expected: &T)
 where
     T: PartialEq + serde::de::Deserialize<'de> + std::fmt::Debug,
 {
-    Decode!(bytes, decoded: T);
+    let decoded = Decode!(bytes, T).unwrap();
     assert_eq!(decoded, *expected);
 }
 
