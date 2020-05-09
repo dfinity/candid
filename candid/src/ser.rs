@@ -62,11 +62,13 @@ impl ValueSerializer {
         ValueSerializer { value: Vec::new() }
     }
 
-    fn write_sleb128(&mut self, value: i64) {
-        sleb128_encode(&mut self.value, value).unwrap();
+    fn write_sleb128(&mut self, value: i64) -> Result<()> {
+        sleb128_encode(&mut self.value, value)?;
+        Ok(())
     }
-    fn write_leb128(&mut self, value: u64) {
-        leb128_encode(&mut self.value, value).unwrap();
+    fn write_leb128(&mut self, value: u64) -> Result<()> {
+        leb128_encode(&mut self.value, value)?;
+        Ok(())
     }
 }
 
@@ -75,20 +77,20 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
     type Compound = Compound<'a>;
     fn serialize_bool(self, v: bool) -> Result<()> {
         let v = if v { 1 } else { 0 };
-        self.write_leb128(v);
+        self.write_leb128(v)?;
         Ok(())
     }
     fn serialize_int(self, v: i64) -> Result<()> {
-        self.write_sleb128(v);
+        self.write_sleb128(v)?;
         Ok(())
     }
     fn serialize_nat(self, v: u64) -> Result<()> {
-        self.write_leb128(v);
+        self.write_leb128(v)?;
         Ok(())
     }
     fn serialize_text(self, v: &str) -> Result<()> {
         let mut buf = Vec::from(v.as_bytes());
-        self.write_leb128(buf.len() as u64);
+        self.write_leb128(buf.len() as u64)?;
         self.value.append(&mut buf);
         Ok(())
     }
@@ -101,24 +103,24 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
     {
         match v {
             None => {
-                self.write_leb128(0);
+                self.write_leb128(0)?;
                 Ok(())
             }
             Some(v) => {
-                self.write_leb128(1);
+                self.write_leb128(1)?;
                 v.idl_serialize(self)
             }
         }
     }
     fn serialize_variant(self, index: u64) -> Result<Self::Compound> {
-        self.write_leb128(index);
+        self.write_leb128(index)?;
         Ok(Self::Compound { ser: self })
     }
     fn serialize_struct(self) -> Result<Self::Compound> {
         Ok(Self::Compound { ser: self })
     }
     fn serialize_vec(self, len: usize) -> Result<Self::Compound> {
-        self.write_leb128(len as u64);
+        self.write_leb128(len as u64)?;
         Ok(Self::Compound { ser: self })
     }
 }
