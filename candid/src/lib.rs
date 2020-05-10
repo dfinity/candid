@@ -5,7 +5,7 @@
 //! ```
 //! use candid::{Encode, Decode};
 //! // Serialization
-//! let bytes = Encode!(&[(42, "text")], &(42, "text"));
+//! let bytes = Encode!(&[(42, "text")], &(42, "text")).unwrap();
 //! // Deserialization
 //! let (a, b) = Decode!(&bytes, Vec<(i64, &str)>, (i32, String)).unwrap();
 //! assert_eq!(a, [(42, "text")]);
@@ -23,9 +23,8 @@
 //! }
 //! let list = List { head: 42, tail: None };
 //!
-//! let bytes = Encode!(&list);
-//! let res = Decode!(&bytes, List).unwrap();
-//!
+//! let bytes = Encode!(&list).unwrap();
+//! let res = Decode!(&bytes, List);
 //! ```
 //!
 //! # Operating on untyped IDL values
@@ -70,7 +69,7 @@
 //! }
 //! let list = List { head: 42, tail: None };
 //! let num : usize = 42;
-//! let bytes = &Encode!(&list, &num, &list);
+//! let bytes = &Encode!(&list, &num, &list).unwrap();
 //! let lists_res : Result<(List, usize, List), _> =
 //!    Decode!(&bytes, List, usize, List);
 //! ```
@@ -106,14 +105,19 @@ pub fn idl_hash(id: &str) -> u32 {
     s
 }
 
-/// Encode sequence of Rust values into IDL message.
+/// Encode sequence of Rust values into IDL message in a Result type.
 #[macro_export]
 macro_rules! Encode {
     ( $($x:expr),* ) => {{
-        let mut idl = candid::ser::IDLBuilder::new();
-        $(idl.arg($x).unwrap();)*
-        idl.serialize_to_vec().unwrap()
-    }}
+        let mut builder = candid::ser::IDLBuilder::new();
+        Encode!(@PutValue builder $($x,)*)
+    }};
+    ( @PutValue $builder:ident $x:expr, $($tail:expr,)* ) => {{
+        $builder.arg($x).and_then(|mut builder| Encode!(@PutValue builder $($tail,)*))
+    }};
+    ( @PutValue $builder:ident ) => {{
+        $builder.serialize_to_vec()
+    }};
 }
 
 /// Decode IDL message into an tuple of Rust values of the given types.
@@ -126,11 +130,11 @@ macro_rules! Decode {
             .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
                       .and_then(|res| de.done().and(Ok(res))))
     }};
-    (@GetValue [$($ans:ident)*] $de:ident) => {{
-        Ok(($($ans),*))
-    }};
     (@GetValue [$($ans:ident)*] $de:ident $ty:ty, $($tail:ty,)* ) => {{
         $de.get_value::<$ty>()
             .and_then(|val| Decode!(@GetValue [$($ans)* val] $de $($tail,)* ))
+    }};
+    (@GetValue [$($ans:ident)*] $de:ident) => {{
+        Ok(($($ans),*))
     }};
 }

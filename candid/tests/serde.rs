@@ -70,7 +70,7 @@ fn test_option() {
     // Deserialize None of type Option<i32> to Option<String>
     let none_i32: Option<i32> = None;
     let none_str: Option<String> = None;
-    let bytes = Encode!(&none_i32);
+    let bytes = Encode!(&none_i32).unwrap();
     test_decode(&bytes, &none_str);
     all_check(none_i32, "4449444c016e7c010000");
     // Deserialize \mu T.Option<T> to a non-recursive type
@@ -178,10 +178,10 @@ fn test_extra_fields() {
         },
     };
     // Decode A2 to A1
-    let bytes = Encode!(&a2);
+    let bytes = Encode!(&a2).unwrap();
     test_decode(&bytes, &a1);
     // Cannot Decode A1 to A2
-    let bytes = Encode!(&a1);
+    let bytes = Encode!(&a1).unwrap();
     check_error(|| test_decode(&bytes, &a2), "missing field `baz`");
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
@@ -191,11 +191,11 @@ fn test_extra_fields() {
         Baz,
     }
     // E1, E2 can be used interchangably as long as the variant matches
-    let bytes = Encode!(&E1::Foo);
+    let bytes = Encode!(&E1::Foo).unwrap();
     test_decode(&bytes, &E2::Foo);
-    let bytes = Encode!(&E2::Foo);
+    let bytes = Encode!(&E2::Foo).unwrap();
     test_decode(&bytes, &E1::Foo);
-    let bytes = Encode!(&E2::Baz);
+    let bytes = Encode!(&E2::Baz).unwrap();
     check_error(
         || test_decode(&bytes, &E1::Bar),
         "Unknown variant hash 3303867",
@@ -295,11 +295,11 @@ fn test_generics() {
 
 #[test]
 fn test_multiargs() {
-    let bytes = Encode!();
+    let bytes = Encode!().unwrap();
     assert_eq!(bytes, b"DIDL\0\0");
     Decode!(&bytes).unwrap();
 
-    let bytes = Encode!(&42, &Some(42), &Some(1), &Some(2));
+    let bytes = Encode!(&42, &Some(42), &Some(1), &Some(2)).unwrap();
     assert_eq!(bytes, hex("4449444c016e7c047c0000002a012a01010102"));
 
     let (a, b, c, d) = Decode!(&bytes, i32, Option<i32>, Option<i32>, Option<i32>).unwrap();
@@ -313,7 +313,7 @@ fn test_multiargs() {
         "3 more values need to be deserialized",
     );
 
-    let bytes = Encode!(&[(42, "text")], &(42, "text"));
+    let bytes = Encode!(&[(42, "text")], &(42, "text")).unwrap();
     assert_eq!(
         bytes,
         hex("4449444c026d016c02007c0171020001012a04746578742a0474657874")
@@ -347,7 +347,7 @@ fn test_encode<T>(value: &T, expected: &[u8])
 where
     T: CandidType,
 {
-    let encoded = Encode!(&value);
+    let encoded = Encode!(&value).unwrap();
     assert_eq!(
         encoded, expected,
         "\nActual\n{:02x?}\nExpected\n{:02x?}\n",

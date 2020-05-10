@@ -39,7 +39,7 @@ impl de::Error for Error {
 
 impl Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&self.to_string())
+        formatter.write_str(&self.message)
     }
 }
 
