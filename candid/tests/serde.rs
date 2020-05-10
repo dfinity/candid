@@ -70,7 +70,7 @@ fn test_option() {
     // Deserialize None of type Option<i32> to Option<String>
     let none_i32: Option<i32> = None;
     let none_str: Option<String> = None;
-    let bytes = Encode!(&none_i32).unwrap();
+    let bytes = encode(&none_i32);
     test_decode(&bytes, &none_str);
     all_check(none_i32, "4449444c016e7c010000");
     // Deserialize \mu T.Option<T> to a non-recursive type
@@ -178,10 +178,10 @@ fn test_extra_fields() {
         },
     };
     // Decode A2 to A1
-    let bytes = Encode!(&a2).unwrap();
+    let bytes = encode(&a2);
     test_decode(&bytes, &a1);
     // Cannot Decode A1 to A2
-    let bytes = Encode!(&a1).unwrap();
+    let bytes = encode(&a1);
     check_error(|| test_decode(&bytes, &a2), "missing field `baz`");
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
@@ -191,11 +191,11 @@ fn test_extra_fields() {
         Baz,
     }
     // E1, E2 can be used interchangably as long as the variant matches
-    let bytes = Encode!(&E1::Foo).unwrap();
+    let bytes = encode(&E1::Foo);
     test_decode(&bytes, &E2::Foo);
-    let bytes = Encode!(&E2::Foo).unwrap();
+    let bytes = encode(&E2::Foo);
     test_decode(&bytes, &E1::Foo);
-    let bytes = Encode!(&E2::Baz).unwrap();
+    let bytes = encode(&E2::Baz);
     check_error(
         || test_decode(&bytes, &E1::Bar),
         "Unknown variant hash 3303867",
@@ -347,7 +347,7 @@ fn test_encode<T>(value: &T, expected: &[u8])
 where
     T: CandidType,
 {
-    let encoded = Encode!(&value).unwrap();
+    let encoded = encode(&value);
     assert_eq!(
         encoded, expected,
         "\nActual\n{:02x?}\nExpected\n{:02x?}\n",
@@ -361,6 +361,10 @@ where
 {
     let decoded = Decode!(bytes, T).unwrap();
     assert_eq!(decoded, *expected);
+}
+
+fn encode<T: CandidType>(value: &T) -> Vec<u8> {
+    Encode!(&value).unwrap()
 }
 
 fn check_error<F: FnOnce() -> R + std::panic::UnwindSafe, R>(f: F, str: &str) {
