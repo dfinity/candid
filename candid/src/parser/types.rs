@@ -126,7 +126,7 @@ pub struct IDLProg {
 }
 
 impl IDLProg {
-    fn find_type(&self, id: &str) -> Result<IDLType> {
+    pub fn find_type(&self, id: &str) -> Result<IDLType> {
         for dec in self.decs.iter() {
             if let Dec::TypD(bind) = dec {
                 if bind.id == *id {
