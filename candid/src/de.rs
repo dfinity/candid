@@ -1,4 +1,4 @@
-//! Deserialize Dfinity IDL binary data to Rust data structures
+//! Deserialize Candid binary format to Rust data structures
 
 extern crate paste;
 

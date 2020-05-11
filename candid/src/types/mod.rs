@@ -1,3 +1,9 @@
+//! Provides Candid type conversion and serialization.
+//!  * `CandidType` trait converts a Rust type to Candid type `types::Type`. The implementation for user-defined data types can be derived from `candid_derive` crate.
+//!  * `Serializer` trait serializes a Rust value to Candid binary format.
+//!    We do not use Serde's `Serialize` trait because Candid requires serializing types along with the values.
+//!    This is difficult to achieve in `Serialize`, especially for enum types.
+
 mod impls;
 pub mod internal;
 

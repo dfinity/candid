@@ -39,7 +39,10 @@
 //! ```
 //! use candid::{Encode, Decode, Result};
 //! fn macro_example() -> Result<()> {
+//!   // Serialize two values [(42, "text")] and (42, "text")
 //!   let bytes: Vec<u8> = Encode!(&[(42, "text")], &(42, "text"))?;
+//!   // Deserialize the first value as type Vec<(i64, &str)>,
+//!   // and the second value as type (i32, String)
 //!   let (a, b) = Decode!(&bytes, Vec<(i64, &str)>, (i32, String))?;
 //!   assert_eq!(a, [(42, "text")]);
 //!   assert_eq!(b, (42i32, "text".to_string()));
@@ -47,15 +50,22 @@
 //! }
 //! # macro_example().unwrap();
 //! ```
-//! `Encode!` macro takes a sequence of Rust values, and returns a binary format `Vec<u8>` that can be sent over the wire.
-//! `Decode!` macro takes the binary message and a sequence of Rust types that you want to decode into, and returns a tuple
+//! The `Encode!` macro takes a sequence of Rust values, and returns a binary format `Vec<u8>` that can be sent over the wire.
+//! The `Decode!` macro takes the binary message and a sequence of Rust types that you want to decode into, and returns a tuple
 //! of Rust values of the given types.
 //!
-//! Note that a fixed Candid message may be decoded to multiple Rust types. For example,
+//! Note that a fixed Candid message may be decoded in multiple Rust types. For example,
 //! we can decode a Candid `text` type into either `String` or `&str` in Rust.
 //!
 //! ## Operating on user defined struct/enum
+//! We use trait `CandidType` for serialization, and Serde's `Deserialize` trait for deserialization.
+//! Any type that implements these two traits can be used for serialization and deserialization respectively.
+//! This includes built-in Rust standard library types like `Vec<T>` and `Result<T, E>`, as well as any structs
+//! or enums annotated with `#[derive(CandidType, Deserialize)]`.
 //!
+//! We do not use Serde's `Serialize` trait because Candid requires serializing types along with the values.
+//! This is difficult to achieve in `Serialize`, especially for enum types. Besides serialization, `CandidType`
+//! trait also converts Rust type to Candid type defined as `candid::types::Type`.
 //! ```
 //! # #[macro_use] extern crate candid;
 //! #[derive(CandidType, Deserialize)]
@@ -70,8 +80,8 @@
 //! ```
 //!
 //! ## Operating on untyped Candid values
-//! Any valid Candid message can be manipulated a recursive enum representation `candid::parser::value::IDLValue`.
-//! Use `ser.value_arg(v)` and `de.get_value::<IDLValue>()` for encoding and decoding the message.
+//! Any valid Candid value can be manipulated in an recursive enum representation `candid::parser::value::IDLValue`.
+//! We use `ser.value_arg(v)` and `de.get_value::<IDLValue>()` for encoding and decoding the value.
 //!
 //! ```
 //! use candid::{Result, parser::value::IDLValue};
@@ -92,21 +102,25 @@
 //! # untyped_examples().unwrap();
 //! ```
 //!
-//! We provide `candid::IDLArgs` to represent a vector of `IDLValue`s,
+//! We provide a data structure `candid::IDLArgs` to represent a sequence of `IDLValue`s,
 //! and use `to_bytes()` and `from_bytes()` to encode and decode Candid messages.
-//! We also provide a parser to parse Candid value in text format.
+//! We also provide a parser to parse Candid values in text format.
 //!
 //! ```
 //! use candid::{IDLArgs, Result};
 //! fn untyped_examples() -> Result<()> {
+//!   // Candid values represented in text format
 //!   let text_value = r#"
 //!      (42, opt true, vec {1;2;3},
 //!       opt record {label="text"; 42="haha"})
 //!   "#;
+//!   // Parse text format into IDLArgs for serialization
 //!   let args: IDLArgs = text_value.parse()?;
 //!   let encoded: Vec<u8> = args.to_bytes()?;
+//!   // Deserialize into IDLArgs
 //!   let decoded: IDLArgs = IDLArgs::from_bytes(&encoded)?;
 //!   assert_eq!(args, decoded);
+//!   // Convert IDLArgs to text format
 //!   let output: String = decoded.to_string();
 //!   let parsed_args: IDLArgs = output.parse()?;
 //!   assert_eq!(args, parsed_args);
@@ -115,11 +129,12 @@
 //! # untyped_examples().unwrap();
 //! ```
 //!
-//! ## Operating on Candid types
+//! ## Operating on Candid AST
 //!
 //! ```
 //! use candid::{IDLProg, Result, parser::types::to_pretty};
 //! fn parser_examples() -> Result<()> {
+//!   // .did file for actor signature. Most likely built by DFX
 //!   let did_file = r#"
 //!     type List = record { head: int; tail: List };
 //!     service : {
@@ -127,7 +142,9 @@
 //!       g : (List) -> (int) query;
 //!     }
 //!   "#;
+//!   // Parse did file into an AST
 //!   let ast: IDLProg = did_file.parse()?;
+//!   // Pretty-print AST and access type definitions
 //!   let pretty: String = to_pretty(&ast, 80);
 //!   let showList = to_pretty(&ast.find_type("List")?, 80);
 //!   let showMethod = to_pretty(&ast.get_method_type("g").unwrap(), 80);
@@ -171,7 +188,7 @@ pub fn idl_hash(id: &str) -> u32 {
     s
 }
 
-/// Encode sequence of Rust values into Candid message in a Result type.
+/// Encode sequence of Rust values into Candid message of type `candid::Result<Vec<u8>>`.
 #[macro_export]
 macro_rules! Encode {
     ( $($x:expr),* ) => {{
@@ -186,7 +203,7 @@ macro_rules! Encode {
     }};
 }
 
-/// Decode Candid message into an tuple of Rust values of the given types.
+/// Decode Candid message into a tuple of Rust values of the given types.
 /// Produces `Err` if the message fails to decode at any given types.
 /// If the message contains only one value, it returns the value directly instead of a tuple.
 #[macro_export]

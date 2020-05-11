@@ -1,3 +1,5 @@
+//! `candid::Result<T> = Result<T, candid::Error>>`
+
 use serde::{de, ser};
 
 use std::fmt::{self, Debug, Display};

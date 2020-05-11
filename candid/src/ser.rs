@@ -1,4 +1,4 @@
-//! Serialize a Rust data structure to Candid
+//! Serialize a Rust data structure to Candid binary format
 
 use error::{Error, Result};
 
