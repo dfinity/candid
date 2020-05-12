@@ -11,7 +11,7 @@ use std::vec::Vec;
 
 use leb128::write::{signed as sleb128_encode, unsigned as leb128_encode};
 
-#[derive(Debug, Default)]
+/// Use this struct to serialize a sequence of Rust values (heterogeneous) to IDL binary message.
 pub struct IDLBuilder {
     type_ser: TypeSerialize,
     value_ser: ValueSerializer,

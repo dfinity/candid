@@ -10,7 +10,7 @@
 //! Candid provides efficient, flexible and safe ways of converting data between each of these representations.
 //!
 //! ## Operating on native Rust values
-//! We are using a builder pattern to encode/decode Candid messages.
+//! We are using a builder pattern to encode/decode Candid messages, see [`candid::ser::IDLBuilder`](ser/struct.IDLBuilder.html) for serialization and [`candid::de::IDLDeserialize`](de/struct.IDLDeserialize.html) for deserialization.
 //!
 //! ```
 //! fn builder_example() -> Result<(), candid::Error> {
@@ -59,7 +59,7 @@
 //! we can decode a Candid `text` type into either `String` or `&str` in Rust.
 //!
 //! ## Operating on user defined struct/enum
-//! We use trait [`CandidType`](types/trait.CandidType.html) for serialization, and Serde's `Deserialize` trait for deserialization.
+//! We use trait [`CandidType`](types/trait.CandidType.html) for serialization, and Serde's [`Deserialize`](trait.Deserialize.html) trait for deserialization.
 //! Any type that implements these two traits can be used for serialization and deserialization respectively.
 //! This includes built-in Rust standard library types like `Vec<T>` and `Result<T, E>`, as well as any structs
 //! or enums annotated with `#[derive(CandidType, Deserialize)]`.
