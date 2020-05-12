@@ -10,7 +10,10 @@ Your participation is an important factor in the success of the Internet Compute
 
 ## Contents of this repository
 
-This repository contains example apps built for the Internet Computer by the DFINITY team. The purpose of these example apps is to showcase useful features and use cases of both the Internet Computer and Motoko through sample code and accompanying documentation. It is our hope that these examples help and inspire you to build your own Internet Computer applications.
+This repository contains source code for the canister interface description language—often referred to as Candid or IDL. Candid provides a common language for specifying the signature of a canister service and interacting with canisters running on the
+Internet Computer.
+
+The Candid user interface enables you to test and work with program functions directly without requiring you to write front-end code.
 
 ## Before you contribute
 
@@ -23,8 +26,7 @@ Before contributing, consider the following:
 
     You can also post a message to the [community forum](https://forum.dfinity.org/) or submit a [support request](mailto://support@dfinity.org).
 
-- If you are reporting a bug, provide as much information about the problem
-as possible, including the name of the example app and SDK version.
+- If you are reporting a bug, provide as much information about the problem as possible, including the name of the example app and SDK version.
 
 - If you want to contribute directly to this repository, typical fixes might include any of the following:
 
@@ -86,15 +88,15 @@ Here's a summary of what you need to do:
 
 1. Celebrate your success after your pull request is merged!
 
-## Tips for contributing to example apps
+## Tips for contributing
 
 Depending on the type of contribution you want to make, you might follow a different workflow.
-For example, if you are only interested in reporting an issue, there's no need to clone repository or set up a documentation environment.
+For example, if you are only interested in reporting an issue, there's no need to clone repository or set up a development environment.
 
 This section describes the most common workflow scenarios:
 
 - Reporting an issue
-- Submitting your own example
+- Submitting your own code
 
 ### Reporting an issue
 
@@ -110,8 +112,8 @@ To open a new issue:
 
     Be as clear and descriptive as possible.
 
-    For any problem, describe it in detail, including details about the example app, the version of the code you are using, the results you expected, and how the actual results differed from your expectations.
+    For any problem, describe it in detail, including details about the version of the code you are using, the results you expected, and how the actual results differed from your expectations.
 
-### Submitting your own example
+### Submitting your own code
 
-We're not accepting community examples at this time -- we have something better planned.
+We're not accepting community updates to Candid at this time. Stay tuned for further developments.
