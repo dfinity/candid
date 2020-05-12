@@ -51,22 +51,22 @@
 //! }
 //! # macro_example().unwrap();
 //! ```
-//! The `Encode!` macro takes a sequence of Rust values, and returns a binary format `Vec<u8>` that can be sent over the wire.
-//! The `Decode!` macro takes the binary message and a sequence of Rust types that you want to decode into, and returns a tuple
+//! The [`Encode!`](macro.Encode.html) macro takes a sequence of Rust values, and returns a binary format `Vec<u8>` that can be sent over the wire.
+//! The [`Decode!`](macro.Decode.html) macro takes the binary message and a sequence of Rust types that you want to decode into, and returns a tuple
 //! of Rust values of the given types.
 //!
 //! Note that a fixed Candid message may be decoded in multiple Rust types. For example,
 //! we can decode a Candid `text` type into either `String` or `&str` in Rust.
 //!
 //! ## Operating on user defined struct/enum
-//! We use trait `CandidType` for serialization, and Serde's `Deserialize` trait for deserialization.
+//! We use trait [`CandidType`](types/trait.CandidType.html) for serialization, and Serde's `Deserialize` trait for deserialization.
 //! Any type that implements these two traits can be used for serialization and deserialization respectively.
 //! This includes built-in Rust standard library types like `Vec<T>` and `Result<T, E>`, as well as any structs
 //! or enums annotated with `#[derive(CandidType, Deserialize)]`.
 //!
 //! We do not use Serde's `Serialize` trait because Candid requires serializing types along with the values.
-//! This is difficult to achieve in `Serialize`, especially for enum types. Besides serialization, `CandidType`
-//! trait also converts Rust type to Candid type defined as `candid::types::Type`.
+//! This is difficult to achieve in `Serialize`, especially for enum types. Besides serialization, [`CandidType`](types/trait.CandidType.html)
+//! trait also converts Rust type to Candid type defined as [`candid::types::Type`](types/internal/enum.Type.html).
 //! ```
 //! # #[macro_use] extern crate candid;
 //! #[derive(CandidType, Deserialize)]
@@ -81,7 +81,7 @@
 //! ```
 //!
 //! ## Operating on untyped Candid values
-//! Any valid Candid value can be manipulated in an recursive enum representation `candid::parser::value::IDLValue`.
+//! Any valid Candid value can be manipulated in an recursive enum representation [`candid::parser::value::IDLValue`](parser/value/enum.IDLValue.html).
 //! We use `ser.value_arg(v)` and `de.get_value::<IDLValue>()` for encoding and decoding the value.
 //! The use of Rust value and `IDLValue` can be intermixed.
 //!
@@ -107,7 +107,7 @@
 //! # untyped_examples().unwrap();
 //! ```
 //!
-//! We provide a data structure `candid::IDLArgs` to represent a sequence of `IDLValue`s,
+//! We provide a data structure [`candid::IDLArgs`](parser/value/struct.IDLArgs.html) to represent a sequence of `IDLValue`s,
 //! and use `to_bytes()` and `from_bytes()` to encode and decode Candid messages.
 //! We also provide a parser to parse Candid values in text format.
 //!
