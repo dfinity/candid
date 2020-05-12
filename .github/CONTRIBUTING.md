@@ -13,7 +13,7 @@ Your participation is an important factor in the success of the Internet Compute
 This repository contains source code for the canister interface description language—often referred to as Candid or IDL. Candid provides a common language for specifying the signature of a canister service and interacting with canisters running on the
 Internet Computer.
 
-The Candid user interface enables you to test and work with program functions directly without requiring you to write front-end code.
+In addition, the Candid user interface enables you to test and work with program functions directly without requiring you to write front-end code.
 
 ## Before you contribute
 
@@ -26,12 +26,11 @@ Before contributing, consider the following:
 
     You can also post a message to the [community forum](https://forum.dfinity.org/) or submit a [support request](mailto://support@dfinity.org).
 
-- If you are reporting a bug, provide as much information about the problem as possible, including the name of the example app and SDK version.
+- If you are reporting a bug, provide as much information about the problem as possible.
 
 - If you want to contribute directly to this repository, typical fixes might include any of the following:
 
-    - Bugs and errors when compiling the example apps
-    - Bugs and errors associated with front-end assets
+    - Fixes to resolve bugs or documentation errors
     - Code improvements
     - Feature requests
 
@@ -43,60 +42,13 @@ If you are new to working with GitHub repositories and creating pull requests, c
 
 # How to make a contribution
 
-Here's a summary of what you need to do:
-
-1. Make sure you have a GitHub account, an internet connection, and access to a terminal shell or GitHub Desktop application for running commands.
-
-1. Navigate to the DFINITY public repository in a web browser.
-
-1. Click **Fork** to create a copy the repository associated with the issue you want to address under your GitHub account or organization name.
-
-1. Clone the repository to your local machine.
-
-1. Create a new branch for your fix by running a command similar to the following:
-
-    ```
-    git checkout -b my-branch-name-here
-    ```
-
-1. Open the file you want to fix in a text editor and make the appropriate changes for the issue you are trying to address.
-
-1. Add the file contents of the changed files to the index `git` uses to manage the state of the project by running a command similar to the following:
-
-    ```
-    git add path-to-changed-file
-    ```
-1. Commit your changes to store the contents you added to the index along with a descriptive message by running a command similar to the following:
-
-    ```
-    git commit -m "Description of the fix being committed."
-    ```
-
-1. Push the changes to the remote repository by running a command similar to the following:
-
-    ```
-    git push origin my-branch-name-here
-    ```
-
-1. Create a new pull request for the branch you pushed to the upstream GitHub repository.
-
-    Provide a title that includes a short description of the changes made.
-
-1. Wait for the pull request to be reviewed.
-
-1. Make changes to the pull request, if requested.
-
-1. Celebrate your success after your pull request is merged!
-
-## Tips for contributing
-
 Depending on the type of contribution you want to make, you might follow a different workflow.
-For example, if you are only interested in reporting an issue, there's no need to clone repository or set up a development environment.
+For example, if you are only interested in reporting an issue, there's no need to clone the repository or set up a development environment.
 
 This section describes the most common workflow scenarios:
 
 - Reporting an issue
-- Submitting your own code
+- Submitting a pull request
 
 ### Reporting an issue
 
@@ -112,8 +64,51 @@ To open a new issue:
 
     Be as clear and descriptive as possible.
 
-    For any problem, describe it in detail, including details about the version of the code you are using, the results you expected, and how the actual results differed from your expectations.
+    For any problem, describe it in detail, including details about the crate, the version of the code you are using, the results you expected, and how the actual results differed from your expectations.
 
-### Submitting your own code
+### Submitting a pull request
 
-We're not accepting community updates to Candid at this time. Stay tuned for further developments.
+If you want to submit a pull request to fix an issue or add a feature, here's a summary of what you need to do:
+
+1. Make sure you have a GitHub account, an internet connection, and access to a terminal shell or GitHub Desktop application for running commands.
+
+1. Navigate to the DFINITY public repository in a web browser.
+
+1. Click **Fork** to create a copy the repository associated with the issue you want to address under your GitHub account or organization name.
+
+1. Clone the repository to your local machine.
+
+1. Create a new branch for your fix by running a command similar to the following:
+
+    ```bash
+    git checkout -b my-branch-name-here
+    ```
+
+1. Open the file you want to fix in a text editor and make the appropriate changes for the issue you are trying to address.
+
+1. Add the file contents of the changed files to the index `git` uses to manage the state of the project by running a command similar to the following:
+
+    ```bash
+    git add path-to-changed-file
+    ```
+1. Commit your changes to store the contents you added to the index along with a descriptive message by running a command similar to the following:
+
+    ```bash
+    git commit -m "Description of the fix being committed."
+    ```
+
+1. Push the changes to the remote repository by running a command similar to the following:
+
+    ```bash
+    git push origin my-branch-name-here
+    ```
+
+1. Create a new pull request for the branch you pushed to the upstream GitHub repository.
+
+    Provide a title that includes a short description of the changes made.
+
+1. Wait for the pull request to be reviewed.
+
+1. Make changes to the pull request, if requested.
+
+1. Celebrate your success after your pull request is merged!
