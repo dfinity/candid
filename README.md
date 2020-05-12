@@ -6,8 +6,8 @@
 
 This respository hosts the following crates:
 
-- `candid`, providing the parser for Candid types `candid::IDLProg` and values `candid::IDLArgs`; integrating Candid value with `serde`, allowing to serialize and deserialize Rust data structures to and from Candid.
-- `candid_derive`, an internal crate similar to `serde_derive` to convert Rust data types to Candid types. This crate should be considered as an implementation detail, and not be used directly, only via the `candid` crate.
+- `candid`, a serialization/deserialization library for Candid.
+- `candid_derive`, an internal crate to convert Rust data types to Candid types. This crate should be considered as an implementation detail, and not be used directly, only via the `candid` crate.
 
 # Contribution
 
