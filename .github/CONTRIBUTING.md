@@ -13,8 +13,6 @@ Your participation is an important factor in the success of the Internet Compute
 This repository contains source code for the canister interface description language—often referred to as Candid or IDL. Candid provides a common language for specifying the signature of a canister service and interacting with canisters running on the
 Internet Computer.
 
-In addition, the Candid user interface enables you to test and work with program functions directly without requiring you to write front-end code.
-
 ## Before you contribute
 
 Before contributing, please take a few minutes to review these contributor guidelines.
@@ -42,8 +40,7 @@ If you are new to working with GitHub repositories and creating pull requests, c
 
 # How to make a contribution
 
-Depending on the type of contribution you want to make, you might follow a different workflow.
-For example, if you are only interested in reporting an issue, there's no need to clone the repository or set up a development environment.
+Depending on the type of contribution you want to make, you might follow different workflows.
 
 This section describes the most common workflow scenarios:
 
