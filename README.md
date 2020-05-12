@@ -5,7 +5,7 @@
 [Candid](IDL.ms) is an interface description language (IDL) for interacting with _canisters_ (also known as _services_ or _actors_) running on the Internet Computer.
 
 There are three common ways that you might find yourself needing to work with Candid in Rust.
- - As a typed Rust data strcuture. When you write canisters in Rust, you want to have a seamless way of converting data between Rust and Candid.
+ - As a typed Rust data strcuture. When you write canisters or frontend in Rust, you want to have a seamless way of converting data between Rust and Candid.
  - As an untyped Candid value. When you write generic tools for the Internet Computer without knowing the type of the Candid data.
  - As text data. When you get the data from CLI or read from a file, you can use the provided parser to send/receive messages.
 
