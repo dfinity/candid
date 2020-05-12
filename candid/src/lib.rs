@@ -45,6 +45,7 @@
 //!   // Deserialize the first value as type Vec<(i64, &str)>,
 //!   // and the second value as type (i32, String)
 //!   let (a, b) = Decode!(&bytes, Vec<(i64, &str)>, (i32, String))?;
+//!
 //!   assert_eq!(a, [(42, "text")]);
 //!   assert_eq!(b, (42i32, "text".to_string()));
 //!   Ok(())
@@ -99,9 +100,10 @@
 //!   let mut de = candid::de::IDLDeserialize::new(&bytes)?;
 //!   let x = de.get_value::<IDLValue>()?;
 //!   let y = de.get_value::<i32>()?;
+//!   de.done()?;
+//!
 //!   assert_eq!(x, IDLValue::Opt(Box::new(IDLValue::Int(42))));
 //!   assert_eq!(y, 42);
-//!   de.done()?;
 //!   Ok(())
 //! }
 //! # untyped_examples().unwrap();
@@ -119,12 +121,15 @@
 //!      (42, opt true, vec {1;2;3},
 //!       opt record {label="text"; 42="haha"})
 //!   "#;
+//!
 //!   // Parse text format into IDLArgs for serialization
 //!   let args: IDLArgs = text_value.parse()?;
 //!   let encoded: Vec<u8> = args.to_bytes()?;
+//!
 //!   // Deserialize into IDLArgs
 //!   let decoded: IDLArgs = IDLArgs::from_bytes(&encoded)?;
 //!   assert_eq!(args, decoded);
+//!
 //!   // Convert IDLArgs to text format
 //!   let output: String = decoded.to_string();
 //!   let parsed_args: IDLArgs = output.parse()?;
@@ -147,8 +152,10 @@
 //!       g : (List) -> (int) query;
 //!     }
 //!   "#;
+//!
 //!   // Parse did file into an AST
 //!   let ast: IDLProg = did_file.parse()?;
+//!
 //!   // Pretty-print AST and access type definitions
 //!   let pretty: String = to_pretty(&ast, 80);
 //!   let showList = to_pretty(&ast.find_type("List")?, 80);

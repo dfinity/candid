@@ -2,7 +2,14 @@
 
 ![](https://github.com/dfinity/candid/workflows/Rust/badge.svg)
 
-[Candid](IDL.md) is an interface description language (IDL) for specifying the signature of an actor. It is used to interact with all canisters running on the Internet Computer.
+[Candid](IDL.ms) is an interface description language (IDL) for interacting with _canisters_ (also known as _services_ or _actors_) running on the Internet Computer.
+
+There are three common ways that you might find yourself needing to work with Candid in Rust.
+ - As a typed Rust data strcuture. When you write canisters in Rust, you want to have a seamless way of converting data between Rust and Candid.
+ - As an untyped Candid value. When you write generic tools for the Internet Computer without knowing the type of the Candid data.
+ - As text data. When you get the data from CLI or read from a file, you can use the provided parser to send/receive messages.
+
+Candid crate provides efficient, flexible and safe ways of converting data between each of these representations.
 
 This respository hosts the following crates:
 
