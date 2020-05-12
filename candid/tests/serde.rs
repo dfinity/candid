@@ -70,7 +70,7 @@ fn test_option() {
     // Deserialize None of type Option<i32> to Option<String>
     let none_i32: Option<i32> = None;
     let none_str: Option<String> = None;
-    let bytes = Encode!(&none_i32);
+    let bytes = encode(&none_i32);
     test_decode(&bytes, &none_str);
     all_check(none_i32, "4449444c016e7c010000");
     // Deserialize \mu T.Option<T> to a non-recursive type
@@ -178,10 +178,10 @@ fn test_extra_fields() {
         },
     };
     // Decode A2 to A1
-    let bytes = Encode!(&a2);
+    let bytes = encode(&a2);
     test_decode(&bytes, &a1);
     // Cannot Decode A1 to A2
-    let bytes = Encode!(&a1);
+    let bytes = encode(&a1);
     check_error(|| test_decode(&bytes, &a2), "missing field `baz`");
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
@@ -191,11 +191,11 @@ fn test_extra_fields() {
         Baz,
     }
     // E1, E2 can be used interchangably as long as the variant matches
-    let bytes = Encode!(&E1::Foo);
+    let bytes = encode(&E1::Foo);
     test_decode(&bytes, &E2::Foo);
-    let bytes = Encode!(&E2::Foo);
+    let bytes = encode(&E2::Foo);
     test_decode(&bytes, &E1::Foo);
-    let bytes = Encode!(&E2::Baz);
+    let bytes = encode(&E2::Baz);
     check_error(
         || test_decode(&bytes, &E1::Bar),
         "Unknown variant hash 3303867",
@@ -295,20 +295,14 @@ fn test_generics() {
 
 #[test]
 fn test_multiargs() {
-    let bytes = Encode!();
+    let bytes = Encode!().unwrap();
     assert_eq!(bytes, b"DIDL\0\0");
-    Decode!(&bytes,);
+    Decode!(&bytes).unwrap();
 
-    let bytes = Encode!(&42, &Some(42), &Some(1), &Some(2));
+    let bytes = Encode!(&42, &Some(42), &Some(1), &Some(2)).unwrap();
     assert_eq!(bytes, hex("4449444c016e7c047c0000002a012a01010102"));
 
-    Decode!(
-        &bytes,
-        a: i32,
-        b: Option<i32>,
-        c: Option<i32>,
-        d: Option<i32>
-    );
+    let (a, b, c, d) = Decode!(&bytes, i32, Option<i32>, Option<i32>, Option<i32>).unwrap();
     assert_eq!(a, 42);
     assert_eq!(b, Some(42));
     assert_eq!(c, Some(1));
@@ -319,18 +313,18 @@ fn test_multiargs() {
         "3 more values need to be deserialized",
     );
 
-    let bytes = Encode!(&[(42, "text")], &(42, "text"));
+    let bytes = Encode!(&[(42, "text")], &(42, "text")).unwrap();
     assert_eq!(
         bytes,
         hex("4449444c026d016c02007c0171020001012a04746578742a0474657874")
     );
 
-    Decode!(&bytes, a: Vec<(i64, &str)>, b: (i64, String));
-    assert_eq!(a, [(42, "text")]);
-    assert_eq!(b, (42, "text".to_string()));
+    let tuple = Decode!(&bytes, Vec<(i64, &str)>, (i64, String)).unwrap();
+    assert_eq!(tuple.0, [(42, "text")]);
+    assert_eq!(tuple.1, (42, "text".to_string()));
 
     let err = || {
-        Decode!(&bytes, _a: Vec<(i64, &str)>, _b: (i64, String), _c: i32);
+        Decode!(&bytes, Vec<(i64, &str)>, (i64, String), i32).unwrap();
         true
     };
     check_error(err, "No more values to deserialize");
@@ -353,7 +347,7 @@ fn test_encode<T>(value: &T, expected: &[u8])
 where
     T: CandidType,
 {
-    let encoded = Encode!(&value);
+    let encoded = encode(&value);
     assert_eq!(
         encoded, expected,
         "\nActual\n{:02x?}\nExpected\n{:02x?}\n",
@@ -365,8 +359,12 @@ fn test_decode<'de, T>(bytes: &'de [u8], expected: &T)
 where
     T: PartialEq + serde::de::Deserialize<'de> + std::fmt::Debug,
 {
-    Decode!(bytes, decoded: T);
+    let decoded = Decode!(bytes, T).unwrap();
     assert_eq!(decoded, *expected);
+}
+
+fn encode<T: CandidType>(value: &T) -> Vec<u8> {
+    Encode!(&value).unwrap()
 }
 
 fn check_error<F: FnOnce() -> R + std::panic::UnwindSafe, R>(f: F, str: &str) {

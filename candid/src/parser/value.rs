@@ -43,7 +43,7 @@ impl IDLArgs {
         idl.serialize_to_vec()
     }
     pub fn from_bytes(bytes: &[u8]) -> crate::Result<Self> {
-        let mut de = crate::de::IDLDeserialize::new(bytes);
+        let mut de = crate::de::IDLDeserialize::new(bytes)?;
         let mut args = Vec::new();
         while !de.is_done() {
             let v = de.get_value::<IDLValue>()?;

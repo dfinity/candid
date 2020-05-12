@@ -1,3 +1,5 @@
+//! `candid::Result<T> = Result<T, candid::Error>>`
+
 use serde::{de, ser};
 
 use std::fmt::{self, Debug, Display};
@@ -39,7 +41,7 @@ impl de::Error for Error {
 
 impl Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(std::error::Error::description(self))
+        formatter.write_str(&self.message)
     }
 }
 

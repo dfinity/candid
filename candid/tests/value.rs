@@ -93,7 +93,7 @@ fn test_encode(v: &IDLValue, expected: &[u8]) {
 }
 
 fn test_decode(bytes: &[u8], expected: &IDLValue) {
-    Decode!(bytes, decoded: IDLValue);
+    let decoded = Decode!(bytes, IDLValue).unwrap();
     assert_eq!(decoded, *expected);
 }
 
