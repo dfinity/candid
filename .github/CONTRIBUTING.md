@@ -8,6 +8,10 @@ As a member of the community, you are invited and encouraged to contribute by su
 All contributions to DFINITY documentation and the developer community are respected and appreciated.
 Your participation is an important factor in the success of the Internet Computer.
 
+## Contents of this repository
+
+This repository contains example apps built for the Internet Computer by the DFINITY team. The purpose of these example apps is to showcase useful features and use cases of both the Internet Computer and Motoko through sample code and accompanying documentation. It is our hope that these examples help and inspire you to build your own Internet Computer applications.
+
 ## Before you contribute
 
 Before contributing, please take a few minutes to review these contributor guidelines.
@@ -20,11 +24,12 @@ Before contributing, consider the following:
     You can also post a message to the [community forum](https://forum.dfinity.org/) or submit a [support request](mailto://support@dfinity.org).
 
 - If you are reporting a bug, provide as much information about the problem
-as possible.
+as possible, including the name of the example app and SDK version.
 
 - If you want to contribute directly to this repository, typical fixes might include any of the following:
 
-    - Bugs fixes
+    - Bugs and errors when compiling the example apps
+    - Bugs and errors associated with front-end assets
     - Code improvements
     - Feature requests
 
@@ -35,31 +40,6 @@ as possible.
 If you are new to working with GitHub repositories and creating pull requests, consider exploring [First Contributions](https://github.com/firstcontributions/first-contributions) or [How to Contribute to an Open Source Project on GitHub](https://egghead.io/courses/how-to-contribute-to-an-open-source-project-on-github).
 
 # How to make a contribution
-
-Depending on the type of contribution you want to make, you might follow different workflows.
-
-This section describes the most common workflow scenarios:
-
-- Reporting an issue
-- Submitting a pull request
-
-## Reporting an issue
-
-To open a new issue:
-
-1. Click **Issues**.
-
-1. Click **New Issue**.
-
-1. Click **Open a blank issue**.
-
-1. Type a title and description, then click **Submit new issue**.
-
-    Be as clear and descriptive as possible.
-
-    For any problem, describe it in detail, including details about the crate, the version of the code you are using, the results you expected, and how the actual results differed from your expectations.
-
-## Submitting a pull request
 
 Here's a summary of what you need to do:
 
@@ -105,3 +85,33 @@ Here's a summary of what you need to do:
 1. Make changes to the pull request, if requested.
 
 1. Celebrate your success after your pull request is merged!
+
+## Tips for contributing to example apps
+
+Depending on the type of contribution you want to make, you might follow a different workflow.
+For example, if you are only interested in reporting an issue, there's no need to clone repository or set up a documentation environment.
+
+This section describes the most common workflow scenarios:
+
+- Reporting an issue
+- Submitting your own example
+
+### Reporting an issue
+
+To open a new issue:
+
+1. Click **Issues**.
+
+1. Click **New Issue**.
+
+1. Click **Open a blank issue**.
+
+1. Type a title and description, then click **Submit new issue**.
+
+    Be as clear and descriptive as possible.
+
+    For any problem, describe it in detail, including details about the example app, the version of the code you are using, the results you expected, and how the actual results differed from your expectations.
+
+### Submitting your own example
+
+We're not accepting community examples at this time -- we have something better planned.
