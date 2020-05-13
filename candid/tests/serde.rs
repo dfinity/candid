@@ -45,14 +45,23 @@ fn test_bool() {
 
 #[test]
 fn test_integer() {
-    all_check(42, "4449444c00017c2a");
-    all_check(1_234_567_890, "4449444c00017cd285d8cc04");
-    all_check(-1_234_567_890, "4449444c00017caefaa7b37b");
-    all_check(Box::new(42), "4449444c00017c2a");
+    all_check(42i64, "4449444c00017c2a");
+    all_check(42u64, "4449444c00017d2a");
+    all_check(1_234_567_890i64, "4449444c00017cd285d8cc04");
+    all_check(-1_234_567_890i64, "4449444c00017caefaa7b37b");
+    all_check(Box::new(42i64), "4449444c00017c2a");
     check_error(
         || test_decode(&hex("4449444c00017c2a"), &42u32),
         "Type mismatch. Type on the wire: Int; Provided type: Nat",
     );
+}
+
+#[test]
+fn test_fixed_number() {
+    test_decode(&hex("4449444c00017d2a"), &42u64);
+    test_decode(&hex("4449444c00017b2a"), &42u8);
+    test_decode(&hex("4449444c00017a2a00"), &42u16);
+    test_decode(&hex("4449444c0001782a00000000000000"), &42u64);
 }
 
 #[test]
@@ -65,8 +74,8 @@ fn test_text() {
 
 #[test]
 fn test_option() {
-    all_check(Some(42), "4449444c016e7c0100012a");
-    all_check(Some(Some(42)), "4449444c026e016e7c010001012a");
+    all_check(Some(42i64), "4449444c016e7c0100012a");
+    all_check(Some(Some(42i64)), "4449444c026e016e7c010001012a");
     // Deserialize None of type Option<i32> to Option<String>
     let none_i32: Option<i32> = None;
     let none_str: Option<String> = None;
@@ -217,13 +226,13 @@ fn test_mutual_recursion() {
 
 #[test]
 fn test_vector() {
-    all_check(vec![0, 1, 2, 3], "4449444c016d7c01000400010203");
-    all_check([0, 1, 2, 3], "4449444c016d7c01000400010203");
+    all_check(vec![0, 1, 2, 3], "4449444c016d7501000400010203");
+    all_check([0, 1, 2, 3], "4449444c016d7501000400010203");
     let boxed_array: Box<[i32]> = Box::new([0, 1, 2, 3]);
-    all_check(boxed_array, "4449444c016d7c01000400010203");
+    all_check(boxed_array, "4449444c016d7501000400010203");
     all_check(
         [(42, "text".to_string())],
-        "4449444c026d016c02007c01710100012a0474657874",
+        "4449444c026d016c02007501710100012a0474657874",
     );
     all_check([[[[()]]]], "4449444c046d016d026d036d7f010001010101");
     // Space bomb!
