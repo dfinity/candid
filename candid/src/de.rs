@@ -5,36 +5,15 @@ extern crate paste;
 use byteorder::{LittleEndian, ReadBytesExt};
 use error::{Error, Result};
 use idl_hash;
-use num_enum::TryFromPrimitive;
 use serde::de::{self, Visitor};
 use std::collections::{BTreeMap, VecDeque};
 use std::convert::TryFrom;
 use std::io::Read;
+use types::internal::Opcode;
 
 use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
 
 const MAGIC_NUMBER: &[u8; 4] = b"DIDL";
-#[derive(Debug, PartialEq, TryFromPrimitive)]
-#[repr(i64)]
-enum Opcode {
-    Null = -1,
-    Bool = -2,
-    Nat = -3,
-    Int = -4,
-    Nat8 = -5,
-    Nat16 = -6,
-    Nat32 = -7,
-    Nat64 = -8,
-    Int8 = -9,
-    Int16 = -10,
-    Int32 = -11,
-    Int64 = -12,
-    Text = -15,
-    Opt = -18,
-    Vec = -19,
-    Record = -20,
-    Variant = -21,
-}
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
 pub struct IDLDeserialize<'de> {

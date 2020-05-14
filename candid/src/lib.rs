@@ -168,6 +168,7 @@
 
 extern crate byteorder;
 extern crate leb128;
+extern crate num_bigint;
 extern crate num_enum;
 extern crate serde;
 

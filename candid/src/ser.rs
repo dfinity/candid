@@ -1,15 +1,14 @@
 //! Serialize a Rust data structure to Candid binary format
 
-use error::{Error, Result};
-
 use super::types;
-use super::types::{Field, Type};
+use super::types::{internal::Opcode, Field, Type};
+use byteorder::{LittleEndian, WriteBytesExt};
+use error::{Error, Result};
+use leb128::write::{signed as sleb128_encode, unsigned as leb128_encode};
 use parser::value::IDLValue;
 use std::collections::HashMap;
 use std::io;
 use std::vec::Vec;
-
-use leb128::write::{signed as sleb128_encode, unsigned as leb128_encode};
 
 /// Use this struct to serialize a sequence of Rust values (heterogeneous) to IDL binary message.
 #[derive(Default)]
@@ -87,6 +86,22 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
     }
     fn serialize_nat(self, v: u64) -> Result<()> {
         self.write_leb128(v)?;
+        Ok(())
+    }
+    fn serialize_nat8(self, v: u8) -> Result<()> {
+        self.value.write_u8(v)?;
+        Ok(())
+    }
+    fn serialize_nat16(self, v: u16) -> Result<()> {
+        self.value.write_u16::<LittleEndian>(v)?;
+        Ok(())
+    }
+    fn serialize_nat32(self, v: u32) -> Result<()> {
+        self.value.write_u32::<LittleEndian>(v)?;
+        Ok(())
+    }
+    fn serialize_nat64(self, v: u64) -> Result<()> {
+        self.value.write_u64::<LittleEndian>(v)?;
         Ok(())
     }
     fn serialize_text(self, v: &str) -> Result<()> {
@@ -181,12 +196,12 @@ impl TypeSerialize {
             match t {
                 Type::Opt(ref ty) => {
                     self.build_type(ty)?;
-                    sleb128_encode(&mut buf, -18)?;
+                    sleb128_encode(&mut buf, Opcode::Opt as i64)?;
                     self.encode(&mut buf, ty)?;
                 }
                 Type::Vec(ref ty) => {
                     self.build_type(ty)?;
-                    sleb128_encode(&mut buf, -19)?;
+                    sleb128_encode(&mut buf, Opcode::Vec as i64)?;
                     self.encode(&mut buf, ty)?;
                 }
                 Type::Record(fs) => {
@@ -194,7 +209,7 @@ impl TypeSerialize {
                         self.build_type(ty)?;
                     }
 
-                    sleb128_encode(&mut buf, -20)?;
+                    sleb128_encode(&mut buf, Opcode::Record as i64)?;
                     leb128_encode(&mut buf, fs.len() as u64)?;
                     for Field { hash, ty, .. } in fs.iter() {
                         leb128_encode(&mut buf, u64::from(*hash))?;
@@ -206,7 +221,7 @@ impl TypeSerialize {
                         self.build_type(ty)?;
                     }
 
-                    sleb128_encode(&mut buf, -21)?;
+                    sleb128_encode(&mut buf, Opcode::Variant as i64)?;
                     leb128_encode(&mut buf, fs.len() as u64)?;
                     for Field { hash, ty, .. } in fs.iter() {
                         leb128_encode(&mut buf, u64::from(*hash))?;
@@ -227,11 +242,15 @@ impl TypeSerialize {
 
     fn encode(&self, buf: &mut Vec<u8>, t: &Type) -> Result<()> {
         match t {
-            Type::Null => sleb128_encode(buf, -1),
-            Type::Bool => sleb128_encode(buf, -2),
-            Type::Nat => sleb128_encode(buf, -3),
-            Type::Int => sleb128_encode(buf, -4),
-            Type::Text => sleb128_encode(buf, -15),
+            Type::Null => sleb128_encode(buf, Opcode::Null as i64),
+            Type::Bool => sleb128_encode(buf, Opcode::Bool as i64),
+            Type::Nat => sleb128_encode(buf, Opcode::Nat as i64),
+            Type::Int => sleb128_encode(buf, Opcode::Int as i64),
+            Type::Nat8 => sleb128_encode(buf, Opcode::Nat8 as i64),
+            Type::Nat16 => sleb128_encode(buf, Opcode::Nat16 as i64),
+            Type::Nat32 => sleb128_encode(buf, Opcode::Nat32 as i64),
+            Type::Nat64 => sleb128_encode(buf, Opcode::Nat64 as i64),
+            Type::Text => sleb128_encode(buf, Opcode::Text as i64),
             Type::Knot(id) => {
                 let ty = types::internal::find_type(*id).expect("knot TypeId not found");
                 let idx = self

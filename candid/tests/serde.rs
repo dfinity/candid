@@ -58,10 +58,9 @@ fn test_integer() {
 
 #[test]
 fn test_fixed_number() {
-    test_decode(&hex("4449444c00017d2a"), &42u64);
-    test_decode(&hex("4449444c00017b2a"), &42u8);
-    test_decode(&hex("4449444c00017a2a00"), &42u16);
-    test_decode(&hex("4449444c0001782a00000000000000"), &42u64);
+    all_check(42u8, "4449444c00017b2a");
+    all_check(42u16, "4449444c00017a2a00");
+    all_check(42u64, "4449444c0001782a00000000000000");
 }
 
 #[test]
