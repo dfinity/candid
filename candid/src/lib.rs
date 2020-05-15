@@ -166,11 +166,6 @@
 //! ```
 //!
 
-extern crate leb128;
-extern crate num_enum;
-extern crate serde;
-
-extern crate candid_derive;
 pub use candid_derive::CandidType;
 pub use serde::Deserialize;
 

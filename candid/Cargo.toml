@@ -1,6 +1,7 @@
 [package]
 name = "candid"
-version = "0.1.0"
+version = "0.1.2"
+edition = "2018"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
 homepage = "https://docs.rs/candid"
@@ -12,6 +13,7 @@ readme = "README.md"
 categories = ["encoding", "parsing", "wasm"]
 keywords = ["internet-computer", "idl", "candid", "dfinity", "parser"]
 include = ["src", "Cargo.toml", "build.rs", "LICENSE", "README.md"]
+build = "build.rs"
 
 [build-dependencies]
 lalrpop = "0.18.1"

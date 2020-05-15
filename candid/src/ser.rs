@@ -1,10 +1,9 @@
 //! Serialize a Rust data structure to Candid binary format
 
-use error::{Error, Result};
-
+use super::error::{Error, Result};
+use super::parser::value::IDLValue;
 use super::types;
 use super::types::{Field, Type};
-use parser::value::IDLValue;
 use std::collections::HashMap;
 use std::io;
 use std::vec::Vec;
@@ -31,7 +30,7 @@ impl IDLBuilder {
         Ok(self)
     }
     pub fn value_arg<'a>(&'a mut self, value: &IDLValue) -> Result<&'a mut Self> {
-        use CandidType;
+        use super::CandidType;
         self.type_ser.push_type(&value.value_ty())?;
         value.idl_serialize(&mut self.value_ser)?;
         Ok(self)
