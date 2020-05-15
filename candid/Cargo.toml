@@ -23,7 +23,7 @@ leb128 = "0.2.4"
 serde = "1.0.106"
 paste = "0.1"
 num_enum = "0.4.3"
-candid_derive = { path = "../candid_derive", version = "0.1.1" }
+candid_derive = { path = "../candid_derive", version = "0.2.0" }
 lalrpop-util = "0.18.1"
 pretty = "0.6"
 
