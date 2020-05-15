@@ -1,5 +1,3 @@
-extern crate candid;
-
 use candid::parser::grammar::ArgsParser;
 use candid::parser::lexer::Lexer;
 use candid::parser::value::{IDLArgs, IDLField, IDLValue};

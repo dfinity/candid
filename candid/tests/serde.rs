@@ -1,5 +1,3 @@
-extern crate candid;
-
 use candid::{CandidType, Decode, Deserialize, Encode};
 
 #[test]
