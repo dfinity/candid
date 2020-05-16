@@ -47,6 +47,10 @@ pub trait Serializer: Sized {
     fn serialize_nat16(self, v: u16) -> Result<(), Self::Error>;
     fn serialize_nat32(self, v: u32) -> Result<(), Self::Error>;
     fn serialize_nat64(self, v: u64) -> Result<(), Self::Error>;
+    fn serialize_int8(self, v: i8) -> Result<(), Self::Error>;
+    fn serialize_int16(self, v: i16) -> Result<(), Self::Error>;
+    fn serialize_int32(self, v: i32) -> Result<(), Self::Error>;
+    fn serialize_int64(self, v: i64) -> Result<(), Self::Error>;
     fn serialize_text(self, v: &str) -> Result<(), Self::Error>;
     fn serialize_null(self, v: ()) -> Result<(), Self::Error>;
     fn serialize_option<T: ?Sized>(self, v: Option<&T>) -> Result<(), Self::Error>

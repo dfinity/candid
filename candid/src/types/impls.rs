@@ -16,18 +16,18 @@ macro_rules! primitive_impl {
 }
 
 primitive_impl!(bool, Bool, serialize_bool);
-primitive_impl!(i8, Int, serialize_int as i64);
-primitive_impl!(i16, Int, serialize_int as i64);
-primitive_impl!(i32, Int, serialize_int as i64);
-primitive_impl!(i64, Int, serialize_int);
+primitive_impl!(i8, Int8, serialize_int8);
+primitive_impl!(i16, Int16, serialize_int16);
+primitive_impl!(i32, Int32, serialize_int32);
+primitive_impl!(i64, Int64, serialize_int64);
 primitive_impl!(isize, Int, serialize_int as i64);
 
 primitive_impl!(u8, Nat8, serialize_nat8);
 primitive_impl!(u16, Nat16, serialize_nat16);
 primitive_impl!(u32, Nat32, serialize_nat32);
 primitive_impl!(u64, Nat64, serialize_nat64);
-
 primitive_impl!(usize, Nat, serialize_nat as u64);
+
 primitive_impl!(&str, Text, serialize_text);
 primitive_impl!((), Null, serialize_null);
 

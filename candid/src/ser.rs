@@ -73,6 +73,17 @@ impl ValueSerializer {
     }
 }
 
+macro_rules! serialize_num {
+    ($name:ident, $ty:ty, $method:expr) => {
+        paste::item! {
+            fn [<serialize_ $name>](self, v: $ty) -> Result<()> {
+                self.value.$method(v)?;
+                Ok(())
+            }
+        }
+    };
+}
+
 impl<'a> types::Serializer for &'a mut ValueSerializer {
     type Error = Error;
     type Compound = Compound<'a>;
@@ -89,22 +100,16 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
         self.write_leb128(v)?;
         Ok(())
     }
-    fn serialize_nat8(self, v: u8) -> Result<()> {
-        self.value.write_u8(v)?;
-        Ok(())
-    }
-    fn serialize_nat16(self, v: u16) -> Result<()> {
-        self.value.write_u16::<LittleEndian>(v)?;
-        Ok(())
-    }
-    fn serialize_nat32(self, v: u32) -> Result<()> {
-        self.value.write_u32::<LittleEndian>(v)?;
-        Ok(())
-    }
-    fn serialize_nat64(self, v: u64) -> Result<()> {
-        self.value.write_u64::<LittleEndian>(v)?;
-        Ok(())
-    }
+    serialize_num!(nat8, u8, write_u8);
+    serialize_num!(nat16, u16, write_u16::<LittleEndian>);
+    serialize_num!(nat32, u32, write_u32::<LittleEndian>);
+    serialize_num!(nat64, u64, write_u64::<LittleEndian>);
+
+    serialize_num!(int8, i8, write_i8);
+    serialize_num!(int16, i16, write_i16::<LittleEndian>);
+    serialize_num!(int32, i32, write_i32::<LittleEndian>);
+    serialize_num!(int64, i64, write_i64::<LittleEndian>);
+
     fn serialize_text(self, v: &str) -> Result<()> {
         let mut buf = Vec::from(v.as_bytes());
         self.write_leb128(buf.len() as u64)?;
@@ -251,6 +256,10 @@ impl TypeSerialize {
             Type::Nat16 => sleb128_encode(buf, Opcode::Nat16 as i64),
             Type::Nat32 => sleb128_encode(buf, Opcode::Nat32 as i64),
             Type::Nat64 => sleb128_encode(buf, Opcode::Nat64 as i64),
+            Type::Int8 => sleb128_encode(buf, Opcode::Int8 as i64),
+            Type::Int16 => sleb128_encode(buf, Opcode::Int16 as i64),
+            Type::Int32 => sleb128_encode(buf, Opcode::Int32 as i64),
+            Type::Int64 => sleb128_encode(buf, Opcode::Int64 as i64),
             Type::Text => sleb128_encode(buf, Opcode::Text as i64),
             Type::Knot(id) => {
                 let ty = types::internal::find_type(*id).expect("knot TypeId not found");

@@ -28,6 +28,10 @@ pub enum Type {
     Nat16,
     Nat32,
     Nat64,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
     Text,
     Knot(TypeId),
     Unknown,
@@ -71,6 +75,7 @@ pub fn is_primitive(t: &Type) -> bool {
     match t {
         Null | Bool | Nat | Int | Text => true,
         Nat8 | Nat16 | Nat32 | Nat64 => true,
+        Int8 | Int16 | Int32 | Int64 => true,
         Unknown => panic!("Unknown type"),
         Knot(_) => true,
         Opt(_) | Vec(_) | Record(_) | Variant(_) => false,
