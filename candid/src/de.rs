@@ -1,9 +1,7 @@
 //! Deserialize Candid binary format to Rust data structures
 
-extern crate paste;
-
-use error::{Error, Result};
-use idl_hash;
+use super::error::{Error, Result};
+use super::idl_hash;
 use num_enum::TryFromPrimitive;
 use serde::de::{self, Visitor};
 use std::collections::{BTreeMap, VecDeque};

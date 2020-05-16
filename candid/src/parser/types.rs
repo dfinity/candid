@@ -1,7 +1,6 @@
-extern crate pretty;
-use self::pretty::{BoxDoc, Doc};
 use crate::idl_hash;
 use crate::{Error, Result};
+use pretty::{BoxDoc, Doc};
 
 #[derive(Debug, Clone)]
 pub enum IDLType {

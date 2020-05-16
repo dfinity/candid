@@ -1,6 +1,7 @@
 [package]
 name = "candid"
-version = "0.1.0"
+version = "0.2.1"
+edition = "2018"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
 homepage = "https://docs.rs/candid"
@@ -12,17 +13,18 @@ readme = "README.md"
 categories = ["encoding", "parsing", "wasm"]
 keywords = ["internet-computer", "idl", "candid", "dfinity", "parser"]
 include = ["src", "Cargo.toml", "build.rs", "LICENSE", "README.md"]
+build = "build.rs"
 
 [build-dependencies]
-lalrpop = "0.18.1"
+lalrpop = "0.19.0"
 
 [dependencies]
 leb128 = "0.2.4"
 serde = "1.0.106"
 paste = "0.1"
 num_enum = "0.4.3"
-candid_derive = { path = "../candid_derive", version = "0.1.1" }
-lalrpop-util = "0.18.1"
+candid_derive = { path = "../candid_derive", version = "0.2.0" }
+lalrpop-util = "0.19.0"
 pretty = "0.6"
 
 [dev-dependencies]

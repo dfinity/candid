@@ -1,5 +1,3 @@
-extern crate candid;
-
 use candid::types::{get_type, Type};
 use candid::{idl_hash, CandidType};
 
