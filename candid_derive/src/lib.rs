@@ -1,15 +1,11 @@
 extern crate proc_macro;
-extern crate proc_macro2;
-#[macro_use]
-extern crate syn;
-extern crate quote;
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as Tokens;
 use quote::quote;
 use std::collections::BTreeSet;
 use syn::punctuated::Punctuated;
-use syn::{parse_macro_input, Data, DeriveInput, GenericParam, Generics};
+use syn::{parse_macro_input, Data, DeriveInput, GenericParam, Generics, Token};
 
 #[proc_macro_derive(CandidType)]
 pub fn derive_idl_type(input: TokenStream) -> TokenStream {

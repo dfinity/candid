@@ -1,15 +1,13 @@
 //! Deserialize Candid binary format to Rust data structures
 
-extern crate paste;
-
+use super::error::{Error, Result};
+use super::idl_hash;
+use super::types::internal::Opcode;
 use byteorder::{LittleEndian, ReadBytesExt};
-use error::{Error, Result};
-use idl_hash;
 use serde::de::{self, Visitor};
 use std::collections::{BTreeMap, VecDeque};
 use std::convert::TryFrom;
 use std::io::Read;
-use types::internal::Opcode;
 
 use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
 

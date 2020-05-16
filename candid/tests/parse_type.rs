@@ -1,5 +1,3 @@
-extern crate candid;
-
 use candid::parser::grammar::IDLProgParser;
 use candid::parser::lexer::Lexer;
 use candid::parser::types::{to_pretty, IDLProg};

@@ -1,5 +1,3 @@
-extern crate candid;
-
 use candid::parser::value::{IDLArgs, IDLField, IDLValue};
 use candid::Decode;
 
