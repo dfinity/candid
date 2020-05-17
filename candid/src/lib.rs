@@ -175,6 +175,9 @@ pub use types::CandidType;
 pub mod error;
 pub use error::{Error, Result};
 
+pub mod number;
+pub use number::{Int, Nat};
+
 pub mod parser;
 pub use parser::types::IDLProg;
 pub use parser::value::IDLArgs;

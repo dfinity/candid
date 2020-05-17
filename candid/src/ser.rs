@@ -92,11 +92,13 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
         self.write_leb128(v)?;
         Ok(())
     }
-    fn serialize_int(self, v: i64) -> Result<()> {
+    fn serialize_int(self, v: &str) -> Result<()> {
+        let v = v.parse::<i64>().unwrap();
         self.write_sleb128(v)?;
         Ok(())
     }
-    fn serialize_nat(self, v: u64) -> Result<()> {
+    fn serialize_nat(self, v: &str) -> Result<()> {
+        let v = v.parse::<u64>().unwrap();
         self.write_leb128(v)?;
         Ok(())
     }

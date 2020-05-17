@@ -41,8 +41,8 @@ pub trait Serializer: Sized {
     type Error;
     type Compound: Compound<Error = Self::Error>;
     fn serialize_bool(self, v: bool) -> Result<(), Self::Error>;
-    fn serialize_int(self, v: i64) -> Result<(), Self::Error>;
-    fn serialize_nat(self, v: u64) -> Result<(), Self::Error>;
+    fn serialize_int(self, v: &str) -> Result<(), Self::Error>;
+    fn serialize_nat(self, v: &str) -> Result<(), Self::Error>;
     fn serialize_nat8(self, v: u8) -> Result<(), Self::Error>;
     fn serialize_nat16(self, v: u16) -> Result<(), Self::Error>;
     fn serialize_nat32(self, v: u32) -> Result<(), Self::Error>;

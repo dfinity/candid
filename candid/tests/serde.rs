@@ -1,4 +1,4 @@
-use candid::{CandidType, Decode, Deserialize, Encode};
+use candid::{CandidType, Decode, Deserialize, Encode, Int, Nat};
 
 #[test]
 fn test_error() {
@@ -43,14 +43,14 @@ fn test_bool() {
 
 #[test]
 fn test_integer() {
-    all_check(42i64, "4449444c00017c2a");
-    all_check(42u64, "4449444c00017d2a");
-    all_check(1_234_567_890i64, "4449444c00017cd285d8cc04");
-    all_check(-1_234_567_890i64, "4449444c00017caefaa7b37b");
-    all_check(Box::new(42i64), "4449444c00017c2a");
+    all_check(Int::from(42), "4449444c00017c2a");
+    all_check(Nat::from(42), "4449444c00017d2a");
+    all_check(Int::from(1_234_567_890), "4449444c00017cd285d8cc04");
+    all_check(Int::from(-1_234_567_890), "4449444c00017caefaa7b37b");
+    all_check(Box::new(Int::from(42)), "4449444c00017c2a");
     check_error(
-        || test_decode(&hex("4449444c00017c2a"), &42u32),
-        "Type mismatch. Type on the wire: Int; Provided type: Nat",
+        || test_decode(&hex("4449444c00017c2a"), &42i64),
+        "Type mismatch. Type on the wire: Int; Provided type: Int64",
     );
 }
 
@@ -71,14 +71,14 @@ fn test_text() {
 
 #[test]
 fn test_option() {
-    all_check(Some(42i64), "4449444c016e7c0100012a");
-    all_check(Some(Some(42i64)), "4449444c026e016e7c010001012a");
+    all_check(Some(Int::from(42)), "4449444c016e7c0100012a");
+    all_check(Some(Some(Int::from(42))), "4449444c026e016e7c010001012a");
     // Deserialize None of type Option<i32> to Option<String>
     let none_i32: Option<i32> = None;
     let none_str: Option<String> = None;
     let bytes = encode(&none_i32);
     test_decode(&bytes, &none_str);
-    all_check(none_i32, "4449444c016e7c010000");
+    all_check(none_i32, "4449444c016e75010000");
     // Deserialize \mu T.Option<T> to a non-recursive type
     let v: Option<Option<Option<i32>>> = Some(Some(None));
     test_decode(b"DIDL\x01\x6e\0\x01\0\x01\x01\0", &v);
@@ -213,7 +213,7 @@ fn test_mutual_recursion() {
     type List = Option<ListA>;
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct ListA {
-        head: i32,
+        head: Int,
         tail: Box<List>,
     };
 
@@ -295,7 +295,10 @@ fn test_generics() {
         g2: E,
     }
 
-    let res = G { g1: 42, g2: true };
+    let res = G {
+        g1: Int::from(42),
+        g2: true,
+    };
     all_check(res, "4449444c016c02eab3017cebb3017e01002a01")
 }
 

@@ -23,8 +23,6 @@ leb128 = "0.2.4"
 serde = "1.0.106"
 byteorder = "1.3.4"
 paste = "0.1"
-num-bigint = "0.2.6"
-#num-bigint = { version = "0.2.6", features = ["serde"] }
 num_enum = "0.4.3"
 candid_derive = { path = "../candid_derive", version = "0.2.0" }
 lalrpop-util = "0.19.0"

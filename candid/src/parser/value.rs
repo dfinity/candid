@@ -176,8 +176,8 @@ impl crate::CandidType for IDLValue {
         match *self {
             IDLValue::Null => serializer.serialize_null(()),
             IDLValue::Bool(b) => serializer.serialize_bool(b),
-            IDLValue::Int(i) => serializer.serialize_int(i),
-            IDLValue::Nat(n) => serializer.serialize_nat(n),
+            IDLValue::Int(i) => serializer.serialize_int(&i.to_string()),
+            IDLValue::Nat(n) => serializer.serialize_nat(&n.to_string()),
             IDLValue::Text(ref s) => serializer.serialize_text(s),
             IDLValue::None => serializer.serialize_option::<Option<String>>(None),
             IDLValue::Opt(ref v) => serializer.serialize_option(Some(v.deref())),

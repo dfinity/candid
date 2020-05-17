@@ -367,50 +367,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     primitive_impl!(i8, Opcode::Int8, self.input.read_i8()?);
     primitive_impl!(i16, Opcode::Int16, self.input.read_i16::<LittleEndian>()?);
     primitive_impl!(i32, Opcode::Int32, self.input.read_i32::<LittleEndian>()?);
+    primitive_impl!(i64, Opcode::Int64, self.input.read_i64::<LittleEndian>()?);
     primitive_impl!(u8, Opcode::Nat8, self.input.read_u8()?);
     primitive_impl!(u16, Opcode::Nat16, self.input.read_u16::<LittleEndian>()?);
     primitive_impl!(u32, Opcode::Nat32, self.input.read_u32::<LittleEndian>()?);
+    primitive_impl!(u64, Opcode::Nat64, self.input.read_u64::<LittleEndian>()?);
     primitive_impl!(bool, Opcode::Bool, self.parse_byte()? == 1u8);
-
-    // u64 can deserialize either Nat64 or Nat
-    fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        let t = self.peek_type()?;
-        match t {
-            Opcode::Nat => self.deserialize_nat(visitor),
-            Opcode::Nat64 => {
-                self.check_type(Opcode::Nat64)?;
-                let value = self.input.read_u64::<LittleEndian>()?;
-                visitor.visit_u64(value)
-            }
-            _ => Err(Error::msg(format!(
-                "Type mismatch. Type on the wire: {:?}; Provided type: u64",
-                t
-            ))),
-        }
-    }
-
-    // i64 can deserialize either Int64 or Int
-    fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        let t = self.peek_type()?;
-        match t {
-            Opcode::Int => self.deserialize_int(visitor),
-            Opcode::Int64 => {
-                self.check_type(Opcode::Int64)?;
-                let value = self.input.read_i64::<LittleEndian>()?;
-                visitor.visit_i64(value)
-            }
-            _ => Err(Error::msg(format!(
-                "Type mismatch. Type on the wire: {:?}; Provided type: i64",
-                t
-            ))),
-        }
-    }
 
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
     where
