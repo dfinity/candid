@@ -88,10 +88,13 @@ fn test_option() {
 fn test_struct() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct A1 {
-        foo: i32,
+        foo: Int,
         bar: bool,
     }
-    let a1 = A1 { foo: 42, bar: true };
+    let a1 = A1 {
+        foo: 42.into(),
+        bar: true,
+    };
     all_check(a1, "4449444c016c02d3e3aa027e868eb7027c0100012a");
 
     // Field name hash is larger than u32
@@ -99,7 +102,10 @@ fn test_struct() {
         || {
             test_decode(
                 &hex("4449444c016c02a3e0d4b9bf86027e868eb7027c0100012a"),
-                &A1 { foo: 42, bar: true },
+                &A1 {
+                    foo: 42.into(),
+                    bar: true,
+                },
             )
         },
         "missing field `bar`",
@@ -107,16 +113,16 @@ fn test_struct() {
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct A11 {
-        foo: i32,
+        foo: Int,
         bar: bool,
         baz: A1,
     }
     all_check(
         A11 {
-            foo: 42,
+            foo: 42.into(),
             bar: true,
             baz: A1 {
-                foo: 10,
+                foo: 10.into(),
                 bar: false,
             },
         },
@@ -124,19 +130,19 @@ fn test_struct() {
     );
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
-    struct B(bool, i32);
-    all_check(B(true, 42), "4449444c016c02007e017c0100012a");
+    struct B(bool, Int);
+    all_check(B(true, 42.into()), "4449444c016c02007e017c0100012a");
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct List {
-        head: i32,
+        head: Int,
         tail: Option<Box<List>>,
     }
 
     let list = List {
-        head: 42,
+        head: 42.into(),
         tail: Some(Box::new(List {
-            head: 43,
+            head: 43.into(),
             tail: None,
         })),
     };
@@ -223,13 +229,14 @@ fn test_mutual_recursion() {
 
 #[test]
 fn test_vector() {
-    all_check(vec![0, 1, 2, 3], "4449444c016d7501000400010203");
-    all_check([0, 1, 2, 3], "4449444c016d7501000400010203");
-    let boxed_array: Box<[i32]> = Box::new([0, 1, 2, 3]);
-    all_check(boxed_array, "4449444c016d7501000400010203");
+    let vec: Vec<Int> = [0, 1, 2, 3].iter().map(|x| Int::from(*x)).collect();
+    all_check(vec, "4449444c016d7c01000400010203");
+    //all_check(vec.as_slice(), "4449444c016d7c01000400010203");
+    let boxed_array: Box<[Int]> = Box::new([0.into(), 1.into(), 2.into(), 3.into()]);
+    all_check(boxed_array, "4449444c016d7c01000400010203");
     all_check(
-        [(42, "text".to_string())],
-        "4449444c026d016c02007501710100012a0474657874",
+        [(Int::from(42), "text".to_string())],
+        "4449444c026d016c02007c01710100012a0474657874",
     );
     all_check([[[[()]]]], "4449444c046d016d026d036d7f010001010101");
     // Space bomb!
@@ -239,15 +246,28 @@ fn test_vector() {
 #[test]
 fn test_tuple() {
     all_check(
-        (42, "💩".to_string()),
+        (Int::from(42), "💩".to_string()),
         "4449444c016c02007c017101002a04f09f92a9",
     );
     let none: Option<String> = None;
     let bytes =
         hex("4449444c046c04007c017e020103026d7c6e036c02a0d2aca8047c90eddae7040201002b010302030400");
-    test_decode(&bytes, &(43, true, [2, 3, 4], none));
+    test_decode(
+        &bytes,
+        &(
+            Int::from(43),
+            true,
+            [Int::from(2), Int::from(3), Int::from(4)],
+            none,
+        ),
+    );
     check_error(
-        || test_decode(&hex("4449444c016c02007c027101002a04f09f92a9"), &(42, "💩")),
+        || {
+            test_decode(
+                &hex("4449444c016c02007c027101002a04f09f92a9"),
+                &(Int::from(42), "💩"),
+            )
+        },
         "Expect vector index 1, but get 2",
     );
 }
@@ -276,11 +296,11 @@ fn test_variant() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     enum E {
         Foo,
-        Bar(bool, i32),
-        Baz { a: i32, b: u32 },
+        Bar(bool, Int),
+        Baz { a: Int, b: Nat },
     }
 
-    let v = E::Bar(true, 42);
+    let v = E::Bar(true, 42.into());
     all_check(
         v,
         "4449444c036b03b3d3c90101bbd3c90102e6fdd5017f6c02007e017c6c02617c627d010000012a",
@@ -308,32 +328,38 @@ fn test_multiargs() {
     assert_eq!(bytes, b"DIDL\0\0");
     Decode!(&bytes).unwrap();
 
-    let bytes = Encode!(&42, &Some(42), &Some(1), &Some(2)).unwrap();
+    let bytes = Encode!(
+        &Int::from(42),
+        &Some(Int::from(42)),
+        &Some(Int::from(1)),
+        &Some(Int::from(2))
+    )
+    .unwrap();
     assert_eq!(bytes, hex("4449444c016e7c047c0000002a012a01010102"));
 
-    let (a, b, c, d) = Decode!(&bytes, i32, Option<i32>, Option<i32>, Option<i32>).unwrap();
-    assert_eq!(a, 42);
-    assert_eq!(b, Some(42));
-    assert_eq!(c, Some(1));
-    assert_eq!(d, Some(2));
+    let (a, b, c, d) = Decode!(&bytes, Int, Option<Int>, Option<Int>, Option<Int>).unwrap();
+    assert_eq!(a, 42.into());
+    assert_eq!(b, Some(42.into()));
+    assert_eq!(c, Some(1.into()));
+    assert_eq!(d, Some(2.into()));
 
     check_error(
-        || test_decode(&bytes, &42),
+        || test_decode(&bytes, &Int::from(42)),
         "3 more values need to be deserialized",
     );
 
-    let bytes = Encode!(&[(42, "text")], &(42, "text")).unwrap();
+    let bytes = Encode!(&[(Int::from(42), "text")], &(Int::from(42), "text")).unwrap();
     assert_eq!(
         bytes,
         hex("4449444c026d016c02007c0171020001012a04746578742a0474657874")
     );
 
-    let tuple = Decode!(&bytes, Vec<(i64, &str)>, (i64, String)).unwrap();
-    assert_eq!(tuple.0, [(42, "text")]);
-    assert_eq!(tuple.1, (42, "text".to_string()));
+    let tuple = Decode!(&bytes, Vec<(Int, &str)>, (Int, String)).unwrap();
+    assert_eq!(tuple.0, [(42.into(), "text")]);
+    assert_eq!(tuple.1, (42.into(), "text".to_string()));
 
     let err = || {
-        Decode!(&bytes, Vec<(i64, &str)>, (i64, String), i32).unwrap();
+        Decode!(&bytes, Vec<(Int, &str)>, (Int, String), i32).unwrap();
         true
     };
     check_error(err, "No more values to deserialize");

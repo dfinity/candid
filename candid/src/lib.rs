@@ -40,14 +40,14 @@
 //! ```
 //! use candid::{Encode, Decode, Result};
 //! fn macro_example() -> Result<()> {
-//!   // Serialize two values [(42, "text")] and (42, "text")
-//!   let bytes: Vec<u8> = Encode!(&[(42, "text")], &(42, "text"))?;
-//!   // Deserialize the first value as type Vec<(i64, &str)>,
-//!   // and the second value as type (i32, String)
-//!   let (a, b) = Decode!(&bytes, Vec<(i64, &str)>, (i32, String))?;
+//!   // Serialize two values [(42, "text")] and (42u32, "text")
+//!   let bytes: Vec<u8> = Encode!(&[(42, "text")], &(42u32, "text"))?;
+//!   // Deserialize the first value as type Vec<(i32, &str)>,
+//!   // and the second value as type (u32, String)
+//!   let (a, b) = Decode!(&bytes, Vec<(i32, &str)>, (u32, String))?;
 //!
 //!   assert_eq!(a, [(42, "text")]);
-//!   assert_eq!(b, (42i32, "text".to_string()));
+//!   assert_eq!(b, (42u32, "text".to_string()));
 //!   Ok(())
 //! }
 //! # macro_example().unwrap();
@@ -89,21 +89,21 @@
 //! ```
 //! use candid::{Result, parser::value::IDLValue};
 //! fn untyped_examples() -> Result<()> {
-//!   // Serialize Rust value Some(42) and IDLValue 42
+//!   // Serialize Rust value Some(42) and IDLValue "hello"
 //!   let bytes = candid::ser::IDLBuilder::new()
 //!     .arg(&Some(42))?
-//!     .value_arg(&IDLValue::Int(42))?
+//!     .value_arg(&IDLValue::Text("hello".to_string()))?
 //!     .serialize_to_vec()?;
 //!
 //!   // Deserialize the first Rust value into IDLValue,
 //!   // and the second IDLValue into Rust value
 //!   let mut de = candid::de::IDLDeserialize::new(&bytes)?;
 //!   let x = de.get_value::<IDLValue>()?;
-//!   let y = de.get_value::<i32>()?;
+//!   let y = de.get_value::<&str>()?;
 //!   de.done()?;
 //!
 //!   assert_eq!(x, IDLValue::Opt(Box::new(IDLValue::Int(42))));
-//!   assert_eq!(y, 42);
+//!   assert_eq!(y, "hello");
 //!   Ok(())
 //! }
 //! # untyped_examples().unwrap();

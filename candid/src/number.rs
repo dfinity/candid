@@ -1,5 +1,6 @@
 use crate::types::{CandidType, Serializer, Type, TypeId};
 use serde::de::{Deserialize, Visitor};
+use std::convert::From;
 use std::fmt;
 
 #[derive(PartialEq, Debug)]
@@ -7,14 +8,14 @@ pub struct Int(String);
 #[derive(PartialEq, Debug)]
 pub struct Nat(String);
 
-impl Int {
-    pub fn from(v: i64) -> Self {
+impl From<i64> for Int {
+    fn from(v: i64) -> Self {
         Int(v.to_string())
     }
 }
 
-impl Nat {
-    pub fn from(v: u64) -> Self {
+impl From<u64> for Nat {
+    fn from(v: u64) -> Self {
         Nat(v.to_string())
     }
 }
