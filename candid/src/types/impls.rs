@@ -1,7 +1,5 @@
 use super::internal::*;
-use super::CandidType;
-use super::Compound;
-use super::Serializer;
+use super::{CandidType, Compound, Serializer};
 
 macro_rules! primitive_impl {
     ($t:ty, $id:tt, $method:ident $($cast:tt)*) => {
@@ -15,21 +13,24 @@ macro_rules! primitive_impl {
     };
 }
 
+primitive_impl!(&str, Text, serialize_text);
+primitive_impl!((), Null, serialize_null);
 primitive_impl!(bool, Bool, serialize_bool);
+
 primitive_impl!(i8, Int8, serialize_int8);
 primitive_impl!(i16, Int16, serialize_int16);
 primitive_impl!(i32, Int32, serialize_int32);
 primitive_impl!(i64, Int64, serialize_int64);
-primitive_impl!(isize, Int64, serialize_int64 as i64);
 
 primitive_impl!(u8, Nat8, serialize_nat8);
 primitive_impl!(u16, Nat16, serialize_nat16);
 primitive_impl!(u32, Nat32, serialize_nat32);
 primitive_impl!(u64, Nat64, serialize_nat64);
-primitive_impl!(usize, Nat64, serialize_nat64 as u64);
 
-primitive_impl!(&str, Text, serialize_text);
-primitive_impl!((), Null, serialize_null);
+// isize, usize always encode to 64bit to ensure the same behavior
+// on different platforms.
+primitive_impl!(isize, Int64, serialize_int64 as i64);
+primitive_impl!(usize, Nat64, serialize_nat64 as u64);
 
 impl CandidType for String {
     fn id() -> TypeId {

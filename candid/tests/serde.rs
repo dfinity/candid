@@ -231,7 +231,10 @@ fn test_mutual_recursion() {
 fn test_vector() {
     let vec: Vec<Int> = [0, 1, 2, 3].iter().map(|x| Int::from(*x)).collect();
     all_check(vec, "4449444c016d7c01000400010203");
-    //all_check(vec.as_slice(), "4449444c016d7c01000400010203");
+    all_check(
+        [Int::from(0), Int::from(1), Int::from(2), Int::from(3)],
+        "4449444c016d7c01000400010203",
+    );
     let boxed_array: Box<[Int]> = Box::new([0.into(), 1.into(), 2.into(), 3.into()]);
     all_check(boxed_array, "4449444c016d7c01000400010203");
     all_check(

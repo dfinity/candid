@@ -1,22 +1,23 @@
 use crate::types::{CandidType, Serializer, Type, TypeId};
+use num_bigint::{BigInt, BigUint};
 use serde::de::{Deserialize, Visitor};
 use std::convert::From;
 use std::fmt;
 
 #[derive(PartialEq, Debug)]
-pub struct Int(String);
+pub struct Int(BigInt);
 #[derive(PartialEq, Debug)]
-pub struct Nat(String);
+pub struct Nat(BigUint);
 
 impl From<i64> for Int {
     fn from(v: i64) -> Self {
-        Int(v.to_string())
+        Int(v.into())
     }
 }
 
 impl From<u64> for Nat {
     fn from(v: u64) -> Self {
-        Nat(v.to_string())
+        Nat(v.into())
     }
 }
 
@@ -31,7 +32,7 @@ impl CandidType for Int {
     where
         S: Serializer,
     {
-        serializer.serialize_int(&self.0)
+        serializer.serialize_int(&self.0.to_str_radix(10))
     }
 }
 
@@ -46,7 +47,7 @@ impl CandidType for Nat {
     where
         S: Serializer,
     {
-        serializer.serialize_nat(&self.0)
+        serializer.serialize_nat(&self.0.to_str_radix(10))
     }
 }
 
@@ -62,7 +63,7 @@ impl<'de> Deserialize<'de> for Int {
                 formatter.write_str("Int value")
             }
             fn visit_i64<E>(self, value: i64) -> Result<Int, E> {
-                Ok(Int(value.to_string()))
+                Ok(Int(value.into()))
             }
         }
         deserializer.deserialize_any(IntVisitor)
@@ -81,7 +82,7 @@ impl<'de> Deserialize<'de> for Nat {
                 formatter.write_str("Nat value")
             }
             fn visit_u64<E>(self, value: u64) -> Result<Nat, E> {
-                Ok(Nat(value.to_string()))
+                Ok(Nat(value.into()))
             }
         }
         deserializer.deserialize_any(NatVisitor)

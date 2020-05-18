@@ -169,14 +169,14 @@
 pub use candid_derive::CandidType;
 pub use serde::Deserialize;
 
-pub mod types;
-pub use types::CandidType;
-
 pub mod error;
 pub use error::{Error, Result};
 
 pub mod number;
 pub use number::{Int, Nat};
+
+pub mod types;
+pub use types::CandidType;
 
 pub mod parser;
 pub use parser::types::IDLProg;
