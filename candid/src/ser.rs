@@ -112,6 +112,9 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
     serialize_num!(int32, i32, write_i32::<LittleEndian>);
     serialize_num!(int64, i64, write_i64::<LittleEndian>);
 
+    serialize_num!(float32, f32, write_f32::<LittleEndian>);
+    serialize_num!(float64, f64, write_f64::<LittleEndian>);
+
     fn serialize_text(self, v: &str) -> Result<()> {
         let mut buf = Vec::from(v.as_bytes());
         self.write_leb128(buf.len() as u64)?;
@@ -262,6 +265,8 @@ impl TypeSerialize {
             Type::Int16 => sleb128_encode(buf, Opcode::Int16 as i64),
             Type::Int32 => sleb128_encode(buf, Opcode::Int32 as i64),
             Type::Int64 => sleb128_encode(buf, Opcode::Int64 as i64),
+            Type::Float32 => sleb128_encode(buf, Opcode::Float32 as i64),
+            Type::Float64 => sleb128_encode(buf, Opcode::Float64 as i64),
             Type::Text => sleb128_encode(buf, Opcode::Text as i64),
             Type::Knot(id) => {
                 let ty = types::internal::find_type(*id).expect("knot TypeId not found");

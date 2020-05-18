@@ -27,8 +27,11 @@ primitive_impl!(u16, Nat16, serialize_nat16);
 primitive_impl!(u32, Nat32, serialize_nat32);
 primitive_impl!(u64, Nat64, serialize_nat64);
 
+primitive_impl!(f32, Float32, serialize_float32);
+primitive_impl!(f64, Float64, serialize_float64);
+
 // isize, usize always encode to 64bit to ensure the same behavior
-// on different platforms.
+// on different platforms. This is consistent with serde's convention
 primitive_impl!(isize, Int64, serialize_int64 as i64);
 primitive_impl!(usize, Nat64, serialize_nat64 as u64);
 

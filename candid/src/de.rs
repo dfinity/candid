@@ -302,6 +302,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Opcode::Int16 => self.deserialize_i16(visitor),
             Opcode::Int32 => self.deserialize_i32(visitor),
             Opcode::Int64 => self.deserialize_i64(visitor),
+            Opcode::Float32 => self.deserialize_f32(visitor),
+            Opcode::Float64 => self.deserialize_f64(visitor),
             Opcode::Bool => self.deserialize_bool(visitor),
             Opcode::Text => self.deserialize_string(visitor),
             Opcode::Null => self.deserialize_unit(visitor),
@@ -332,6 +334,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Opcode::Int16 => self.deserialize_i16(visitor),
             Opcode::Int32 => self.deserialize_i32(visitor),
             Opcode::Int64 => self.deserialize_i64(visitor),
+            Opcode::Float32 => self.deserialize_f32(visitor),
+            Opcode::Float64 => self.deserialize_f64(visitor),
             Opcode::Bool => self.deserialize_bool(visitor),
             Opcode::Text => self.deserialize_string(visitor),
             Opcode::Null => self.deserialize_unit(visitor),
@@ -373,6 +377,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     primitive_impl!(u32, Opcode::Nat32, self.input.read_u32::<LittleEndian>()?);
     primitive_impl!(u64, Opcode::Nat64, self.input.read_u64::<LittleEndian>()?);
     primitive_impl!(bool, Opcode::Bool, self.parse_byte()? == 1u8);
+
+    primitive_impl!(f32, Opcode::Float32, self.input.read_f32::<LittleEndian>()?);
+    primitive_impl!(f64, Opcode::Float64, self.input.read_f64::<LittleEndian>()?);
 
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
     where
@@ -526,7 +533,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     serde::forward_to_deserialize_any! {
-        char bytes byte_buf f32 f64 map
+        char bytes byte_buf map
     }
 }
 
