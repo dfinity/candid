@@ -2,12 +2,12 @@ use crate::types::{CandidType, Serializer, Type, TypeId};
 use num_bigint::{BigInt, BigUint};
 use serde::de::{Deserialize, Visitor};
 use std::convert::From;
-use std::fmt;
+use std::{fmt, io};
 
 #[derive(PartialEq, Debug)]
 pub struct Int(BigInt);
 #[derive(PartialEq, Debug)]
-pub struct Nat(BigUint);
+pub struct Nat(pub BigUint);
 
 impl From<i64> for Int {
     fn from(v: i64) -> Self {
@@ -86,5 +86,43 @@ impl<'de> Deserialize<'de> for Nat {
             }
         }
         deserializer.deserialize_any(NatVisitor)
+    }
+}
+
+impl Nat {
+    pub fn encode<W>(mut self, w: &mut W) -> crate::Result<()>
+    where
+        W: ?Sized + io::Write,
+    {
+        let zero = BigUint::from(0u8);
+        loop {
+            let mut byte = &self.0 & BigUint::from(std::u8::MAX) & BigUint::from(127u8);
+            self.0 >>= 7;
+            if self.0 != zero {
+                byte |= BigUint::from(128u8);
+            }
+            let buf = [byte.to_bytes_be()[0]];
+            w.write_all(&buf)?;
+            if self.0 == zero {
+                return Ok(());
+            }
+        }
+    }
+    pub fn decode<R>(r: &mut R) -> crate::Result<Self>
+    where
+        R: io::Read,
+    {
+        let mut result = BigUint::from(0u8);
+        let mut shift = 0;
+        loop {
+            let mut buf = [0];
+            r.read_exact(&mut buf)?;
+            let low_bits = BigUint::from(buf[0] & 127u8);
+            result |= low_bits << shift;
+            if buf[0] & 128u8 == 0 {
+                return Ok(Nat(result));
+            }
+            shift += 7;
+        }
     }
 }

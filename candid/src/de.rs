@@ -1,15 +1,14 @@
 //! Deserialize Candid binary format to Rust data structures
 
 use super::error::{Error, Result};
-use super::idl_hash;
 use super::types::internal::Opcode;
+use super::{idl_hash, Nat};
 use byteorder::{LittleEndian, ReadBytesExt};
+use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
 use serde::de::{self, Visitor};
 use std::collections::{BTreeMap, VecDeque};
 use std::convert::TryFrom;
 use std::io::Read;
-
-use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
 
 const MAGIC_NUMBER: &[u8; 4] = b"DIDL";
 
@@ -263,7 +262,12 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.check_type(Opcode::Nat)?;
-        visitor.visit_u64(self.leb128_read()?)
+        //visitor.visit_u64(self.leb128_read()?)
+        let v = Nat::decode(&mut self.input)
+            .map_err(Error::msg)
+            .map_err(Error::msg)?;
+        let value = v.0.to_str_radix(10).parse::<u64>().unwrap();
+        visitor.visit_u64(value)
     }
 }
 

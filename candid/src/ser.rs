@@ -4,9 +4,9 @@ use super::error::{Error, Result};
 use super::parser::value::IDLValue;
 use super::types;
 use super::types::{internal::Opcode, Field, Type};
+use crate::Nat;
 use byteorder::{LittleEndian, WriteBytesExt};
 use leb128::write::{signed as sleb128_encode, unsigned as leb128_encode};
-
 use std::collections::HashMap;
 use std::io;
 use std::vec::Vec;
@@ -99,7 +99,9 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
     }
     fn serialize_nat(self, v: &str) -> Result<()> {
         let v = v.parse::<u64>().unwrap();
-        self.write_leb128(v)?;
+        //self.write_leb128(v)?;
+        let v = Nat::from(v);
+        v.encode(&mut self.value)?;
         Ok(())
     }
     serialize_num!(nat8, u8, write_u8);
