@@ -81,6 +81,22 @@
 //! let res = Decode!(&bytes, List);
 //! ```
 //!
+//! ## Operating on big integers
+//! To support big integer types [`Candid::Int`](number/struct.Int.html) and [`Candid::Nat`](number/struct.Nat.html),
+//! we use the `num_bigint` crate. We provide interface to convert `i64`, `u64` and `&[u8]` to big integers.
+//! ```
+//! use candid::{Int, Nat, Encode, Decode, Result};
+//! fn bigint_examples() -> Result<()> {
+//!   let x = Int::parse(b"-10000000000000000000")?;
+//!   let bytes = Encode!(&Nat::from(1024), &x)?;
+//!   let (a, b) = Decode!(&bytes, Nat, Int)?;
+//!   assert_eq!(a, 1024.into());
+//!   assert_eq!(b, x);
+//!   Ok(())
+//! }
+//! # bigint_examples().unwrap();
+//! ```
+//!
 //! ## Operating on untyped Candid values
 //! Any valid Candid value can be manipulated in an recursive enum representation [`candid::parser::value::IDLValue`](parser/value/enum.IDLValue.html).
 //! We use `ser.value_arg(v)` and `de.get_value::<IDLValue>()` for encoding and decoding the value.

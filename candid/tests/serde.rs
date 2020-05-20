@@ -49,6 +49,18 @@ fn test_integer() {
     all_check(Nat::from(1_234_567_890), "4449444c00017dd285d8cc04");
     all_check(Int::from(-1_234_567_890), "4449444c00017caefaa7b37b");
     all_check(Box::new(Int::from(42)), "4449444c00017c2a");
+    all_check(
+        Int::parse(b"60000000000000000").unwrap(),
+        "4449444c00017c808098f4e9b5caea00",
+    );
+    all_check(
+        Nat::parse(b"60000000000000000").unwrap(),
+        "4449444c00017d808098f4e9b5ca6a",
+    );
+    all_check(
+        Int::parse(b"-60000000000000000").unwrap(),
+        "4449444c00017c8080e88b96cab5957f",
+    );
     check_error(
         || test_decode(&hex("4449444c00017c2a"), &42i64),
         "Type mismatch. Type on the wire: Int; Provided type: Int64",

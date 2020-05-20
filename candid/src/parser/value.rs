@@ -227,7 +227,7 @@ impl<'de> Deserialize<'de> for IDLValue {
                 Ok(IDLValue::Nat(value))
             }
             // Deserialize bignum
-            fn visit_bytes<E: serde::de::Error>(self, value: &[u8]) -> Result<IDLValue, E> {
+            fn visit_bytes<E: de::Error>(self, value: &[u8]) -> Result<IDLValue, E> {
                 let (tag, bytes) = value.split_at(1);
                 match tag[0] {
                     0u8 => {
@@ -240,7 +240,7 @@ impl<'de> Deserialize<'de> for IDLValue {
                         let num = v.to_str_radix(10).parse::<u64>().unwrap();
                         Ok(IDLValue::Nat(num))
                     }
-                    _ => Err(serde::de::Error::custom("unknown tag in visit_bytes")),
+                    _ => Err(de::Error::custom("unknown tag in visit_bytes")),
                 }
             }
             fn visit_string<E>(self, value: String) -> Result<IDLValue, E> {

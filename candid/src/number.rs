@@ -1,4 +1,7 @@
+//! Data structure for Candid Int and Nat types, supporting big integer with LEB128 encoding.
+
 use crate::types::{CandidType, Serializer, Type, TypeId};
+use crate::Error;
 use num_bigint::{BigInt, BigUint};
 use serde::de::{Deserialize, Visitor};
 use std::convert::From;
@@ -18,6 +21,20 @@ impl From<i64> for Int {
 impl From<u64> for Nat {
     fn from(v: u64) -> Self {
         Nat(v.into())
+    }
+}
+
+impl Int {
+    pub fn parse(v: &[u8]) -> crate::Result<Self> {
+        let res = BigInt::parse_bytes(v, 10).ok_or_else(|| Error::msg("Cannot parse BigInt"))?;
+        Ok(Int(res))
+    }
+}
+
+impl Nat {
+    pub fn parse(v: &[u8]) -> crate::Result<Self> {
+        let res = BigUint::parse_bytes(v, 10).ok_or_else(|| Error::msg("Cannot parse BigUint"))?;
+        Ok(Nat(res))
     }
 }
 
@@ -88,6 +105,8 @@ impl<'de> Deserialize<'de> for Nat {
         deserializer.deserialize_any(NatVisitor)
     }
 }
+
+// LEB128 encoding for bignum.
 
 impl Nat {
     pub fn encode<W>(&self, w: &mut W) -> crate::Result<()>
