@@ -1,4 +1,6 @@
 use crate::types::{Field, Type};
+use crate::Nat;
+use num_bigint::BigUint;
 use serde::de;
 use serde::de::{Deserialize, Visitor};
 use std::fmt;
@@ -224,6 +226,12 @@ impl<'de> Deserialize<'de> for IDLValue {
             }
             fn visit_u64<E>(self, value: u64) -> Result<IDLValue, E> {
                 Ok(IDLValue::Nat(value))
+            }
+            // Deserialize biguint
+            fn visit_bytes<E>(self, value: &[u8]) -> Result<IDLValue, E> {
+                let v = BigUint::from_bytes_le(value);
+                let num = v.to_str_radix(10).parse::<u64>().unwrap();
+                Ok(IDLValue::Nat(num))
             }
             fn visit_string<E>(self, value: String) -> Result<IDLValue, E> {
                 Ok(IDLValue::Text(value))

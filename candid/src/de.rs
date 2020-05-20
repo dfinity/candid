@@ -263,11 +263,9 @@ impl<'de> Deserializer<'de> {
     {
         self.check_type(Opcode::Nat)?;
         //visitor.visit_u64(self.leb128_read()?)
-        let v = Nat::decode(&mut self.input)
-            .map_err(Error::msg)
-            .map_err(Error::msg)?;
-        let value = v.0.to_str_radix(10).parse::<u64>().unwrap();
-        visitor.visit_u64(value)
+        let v = Nat::decode(&mut self.input).map_err(Error::msg)?;
+        let bytes = v.0.to_bytes_le();
+        visitor.visit_bytes(&bytes)
     }
 }
 

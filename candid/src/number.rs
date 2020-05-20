@@ -4,9 +4,9 @@ use serde::de::{Deserialize, Visitor};
 use std::convert::From;
 use std::{fmt, io};
 
-#[derive(PartialEq, Debug)]
-pub struct Int(BigInt);
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
+pub struct Int(pub BigInt);
+#[derive(PartialEq, Debug, Clone)]
 pub struct Nat(pub BigUint);
 
 impl From<i64> for Int {
@@ -84,6 +84,9 @@ impl<'de> Deserialize<'de> for Nat {
             fn visit_u64<E>(self, value: u64) -> Result<Nat, E> {
                 Ok(Nat(value.into()))
             }
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Nat, E> {
+                Ok(Nat(BigUint::from_bytes_le(v)))
+            }
         }
         deserializer.deserialize_any(NatVisitor)
     }
@@ -96,12 +99,13 @@ impl Nat {
     {
         let zero = BigUint::from(0u8);
         loop {
-            let mut byte = &self.0 & BigUint::from(std::u8::MAX) & BigUint::from(127u8);
+            let big_byte = &self.0 & BigUint::from(0x7fu8);
+            let mut byte = big_byte.to_bytes_le()[0];
             self.0 >>= 7;
             if self.0 != zero {
-                byte |= BigUint::from(128u8);
+                byte |= 0x80u8;
             }
-            let buf = [byte.to_bytes_be()[0]];
+            let buf = [byte];
             w.write_all(&buf)?;
             if self.0 == zero {
                 return Ok(());
@@ -117,12 +121,61 @@ impl Nat {
         loop {
             let mut buf = [0];
             r.read_exact(&mut buf)?;
-            let low_bits = BigUint::from(buf[0] & 127u8);
+            let low_bits = BigUint::from(buf[0] & 0x7fu8);
             result |= low_bits << shift;
-            if buf[0] & 128u8 == 0 {
+            if buf[0] & 0x80u8 == 0 {
                 return Ok(Nat(result));
             }
             shift += 7;
         }
+    }
+}
+
+impl Int {
+    pub fn encode<W>(mut self, w: &mut W) -> crate::Result<()>
+    where
+        W: ?Sized + io::Write,
+    {
+        let zero = BigInt::from(0);
+        loop {
+            let big_byte = &self.0 & BigInt::from(0xff);
+            let mut byte = big_byte.to_signed_bytes_le()[0];
+            self.0 >>= 6;
+            let done = self.0 == zero || self.0 == BigInt::from(-1);
+            if done {
+                byte &= 0x7f;
+            } else {
+                self.0 >>= 1;
+                byte |= 0x80;
+            }
+            let buf = [byte];
+            w.write_all(&buf)?;
+            if done {
+                return Ok(());
+            }
+        }
+    }
+    pub fn decode<R>(r: &mut R) -> crate::Result<Self>
+    where
+        R: io::Read,
+    {
+        let mut result = BigInt::from(0);
+        let mut shift = 0;
+        let mut byte;
+        loop {
+            let mut buf = [0];
+            r.read_exact(&mut buf)?;
+            byte = buf[0];
+            let low_bits = BigInt::from(byte & 0x7fu8);
+            result |= low_bits << shift;
+            shift += 7;
+            if byte & 0x80u8 == 0 {
+                break;
+            }
+        }
+        if shift % 8 != 0 && (0x40u8 & byte) == 0x40u8 {
+            result |= BigInt::from(-1) << shift;
+        }
+        Ok(Int(result))
     }
 }
