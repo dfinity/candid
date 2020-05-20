@@ -29,7 +29,6 @@ fn test_numbers() {
 fn check(num: &[u8], int_hex: &str, nat_hex: &str) {
     use std::io::Cursor;
     let v = Int(BigInt::parse_bytes(num, 10).unwrap());
-    let v_cloned = v.clone();
     let bytes = hex::decode(int_hex).unwrap();
     // Check encode
     let mut encoded = Vec::new();
@@ -38,11 +37,10 @@ fn check(num: &[u8], int_hex: &str, nat_hex: &str) {
     // Check decode
     let mut rcr = Cursor::new(encoded);
     let decoded = Int::decode(&mut rcr).unwrap();
-    assert_eq!(decoded, v_cloned);
+    assert_eq!(decoded, v);
     // Check for Nat
     if nat_hex != "" {
         let nat = Nat(BigUint::parse_bytes(num, 10).unwrap());
-        let cloned = nat.clone();
         let bytes = hex::decode(nat_hex).unwrap();
         // Check encode
         let mut encoded = Vec::new();
@@ -51,6 +49,6 @@ fn check(num: &[u8], int_hex: &str, nat_hex: &str) {
         // Check decode
         let mut rcr = Cursor::new(encoded);
         let decoded = Nat::decode(&mut rcr).unwrap();
-        assert_eq!(decoded, cloned);
+        assert_eq!(decoded, nat);
     }
 }

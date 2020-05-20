@@ -2,7 +2,7 @@
 
 use super::error::{Error, Result};
 use super::types::internal::Opcode;
-use super::{idl_hash, Nat};
+use super::{idl_hash, Int, Nat};
 use byteorder::{LittleEndian, ReadBytesExt};
 use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
 use serde::de::{self, Visitor};
@@ -250,22 +250,31 @@ impl<'de> Deserializer<'de> {
         self.field_name = Some(field);
     }
     // Customize deserailization methods
+    // Both int and nat will call visit_bytes. We reserve the first byte to
+    // be a tag to distinguish between int(0) and nat(1).
+    // This trick is necessary for deserializing IDLValue because
+    // it has only one visitor and we need a way to know who called the visitor.
     fn deserialize_int<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         self.check_type(Opcode::Int)?;
-        visitor.visit_i64(self.sleb128_read()?)
+        let v = Int::decode(&mut self.input).map_err(Error::msg)?;
+        let bytes = v.0.to_signed_bytes_le();
+        let mut tagged = vec![0u8];
+        tagged.extend_from_slice(&bytes);
+        visitor.visit_bytes(&tagged)
     }
     fn deserialize_nat<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         self.check_type(Opcode::Nat)?;
-        //visitor.visit_u64(self.leb128_read()?)
         let v = Nat::decode(&mut self.input).map_err(Error::msg)?;
         let bytes = v.0.to_bytes_le();
-        visitor.visit_bytes(&bytes)
+        let mut tagged = vec![1u8];
+        tagged.extend_from_slice(&bytes);
+        visitor.visit_bytes(&tagged)
     }
 }
 

@@ -4,7 +4,6 @@ use super::error::{Error, Result};
 use super::parser::value::IDLValue;
 use super::types;
 use super::types::{internal::Opcode, Field, Type};
-use crate::Nat;
 use byteorder::{LittleEndian, WriteBytesExt};
 use leb128::write::{signed as sleb128_encode, unsigned as leb128_encode};
 use std::collections::HashMap;
@@ -62,11 +61,6 @@ impl ValueSerializer {
     pub fn new() -> Self {
         ValueSerializer { value: Vec::new() }
     }
-
-    fn write_sleb128(&mut self, value: i64) -> Result<()> {
-        sleb128_encode(&mut self.value, value)?;
-        Ok(())
-    }
     fn write_leb128(&mut self, value: u64) -> Result<()> {
         leb128_encode(&mut self.value, value)?;
         Ok(())
@@ -92,17 +86,11 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
         self.write_leb128(v)?;
         Ok(())
     }
-    fn serialize_int(self, v: &str) -> Result<()> {
-        let v = v.parse::<i64>().unwrap();
-        self.write_sleb128(v)?;
-        Ok(())
+    fn serialize_int(self, v: &crate::Int) -> Result<()> {
+        v.encode(&mut self.value)
     }
-    fn serialize_nat(self, v: &str) -> Result<()> {
-        let v = v.parse::<u64>().unwrap();
-        //self.write_leb128(v)?;
-        let v = Nat::from(v);
-        v.encode(&mut self.value)?;
-        Ok(())
+    fn serialize_nat(self, v: &crate::Nat) -> Result<()> {
+        v.encode(&mut self.value)
     }
     serialize_num!(nat8, u8, write_u8);
     serialize_num!(nat16, u16, write_u16::<LittleEndian>);
