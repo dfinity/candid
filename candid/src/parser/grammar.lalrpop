@@ -1,6 +1,6 @@
 use super::value::{IDLField, IDLValue, IDLArgs};
 use super::types::{IDLType, PrimType, Label, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg};
-use super::lexer::{Token, LexicalError, TmpIDLField};
+use super::lexer::{Token, LexicalError, TmpIDLField, error};
 use crate::idl_hash;
 
 grammar;
@@ -46,9 +46,9 @@ pub Args: IDLArgs = "(" <SepBy<Arg, ",">> ")" => IDLArgs { args: <> };
 
 Arg: IDLValue = {
     "bool" => IDLValue::Bool(<>),
-    "+" <"number"> => IDLValue::Int(<>.parse::<i64>().unwrap()),
-    "-" <"number"> => IDLValue::Int(format!("-{}", <>).parse::<i64>().unwrap()),
-    "number" => IDLValue::Nat(<>.parse::<u64>().unwrap()),
+    "+" <"number"> =>? Ok(IDLValue::Int(<>.parse::<i64>().map_err(error)?)),
+    "-" <"number"> =>? Ok(IDLValue::Int(format!("-{}", <>).parse::<i64>().map_err(error)?)),
+    "number" =>? Ok(IDLValue::Nat(<>.parse::<u64>().map_err(error)?)),
     "text" => IDLValue::Text(<>),
     "null" => IDLValue::Null,
     "none" => IDLValue::None,
@@ -72,14 +72,14 @@ Arg: IDLValue = {
 }
 
 Field: IDLField = {
-    <n:"number"> "=" <v:Arg> => IDLField { id: n.parse::<u32>().unwrap(), val: v },
+    <n:"number"> "=" <v:Arg> =>? Ok(IDLField { id: n.parse::<u32>().map_err(|_| error("field number out of u32 range"))?, val: v }),
     <n:Name> "=" <v:Arg> => IDLField { id: idl_hash(&n), val: v },
 }
 
 VariantField: IDLField = {
     Field => <>,
     Name => IDLField { id: idl_hash(&<>), val: IDLValue::Null },
-    "number" => IDLField { id: <>.parse::<u32>().unwrap(), val: IDLValue::Null },
+    "number" =>? Ok(IDLField { id: <>.parse::<u32>().map_err(|_| error("field number out of u32 range"))?, val: IDLValue::Null }),
 }
 
 RecordField: TmpIDLField = {
@@ -125,7 +125,7 @@ PrimTyp: IDLType = {
 }
 
 FieldTyp: TypeField = {
-    <n:"number"> ":" <t:Typ> => TypeField { label: Label::Id(n.parse::<u32>().unwrap()), typ: t },
+    <n:"number"> ":" <t:Typ> =>? Ok(TypeField { label: Label::Id(n.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), typ: t }),
     <n:Name> ":" <t:Typ> => TypeField { label: Label::Named(n), typ: t },
 }
 
@@ -137,7 +137,7 @@ RecordFieldTyp: TypeField = {
 VariantFieldTyp: TypeField = {
     FieldTyp => <>,
     Name => TypeField { label: Label::Named(<>), typ: IDLType::PrimT(PrimType::Null) },
-    "number" => TypeField { label: Label::Id(<>.parse::<u32>().unwrap()), typ: IDLType::PrimT(PrimType::Null) },
+    "number" =>? Ok(TypeField { label: Label::Id(<>.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), typ: IDLType::PrimT(PrimType::Null) }),
 }
 
 FuncTyp: FuncType = {
