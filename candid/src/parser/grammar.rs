@@ -1,8 +1,8 @@
 // auto-generated: "lalrpop 0.19.0"
-// sha256: 5153bd68bb2b569d95e8116f8b8e7dd38947bf96546faef2429624e57e82da3
+// sha256: 6cbbeb4e2b91bde3434e81a4598a5bba21dd96b244d14caf63ed13918d9e6ed
 use super::value::{IDLField, IDLValue, IDLArgs};
 use super::types::{IDLType, PrimType, Label, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg};
-use super::lexer::{Token, LexicalError, TmpIDLField};
+use super::lexer::{Token, LexicalError, TmpIDLField, error};
 use crate::idl_hash;
 #[allow(unused_extern_crates)]
 extern crate lalrpop_util as __lalrpop_util;
@@ -15,7 +15,7 @@ mod __parse__Args {
 
     use super::super::value::{IDLField, IDLValue, IDLArgs};
     use super::super::types::{IDLType, PrimType, Label, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg};
-    use super::super::lexer::{Token, LexicalError, TmpIDLField};
+    use super::super::lexer::{Token, LexicalError, TmpIDLField, error};
     use crate::idl_hash;
     #[allow(unused_extern_crates)]
     extern crate lalrpop_util as __lalrpop_util;
@@ -714,13 +714,44 @@ mod __parse__Args {
                 __reduce49(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
             }
             50 => {
-                __reduce50(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
+                // Arg = "+", "number" => ActionFn(4);
+                assert!(__symbols.len() >= 2);
+                let __sym1 = __pop_Variant2(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym1.2.clone();
+                let __nt = match super::__action4::<>(__sym0, __sym1) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant4(__nt), __end));
+                (2, 28)
             }
             51 => {
-                __reduce51(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
+                // Arg = "-", "number" => ActionFn(5);
+                assert!(__symbols.len() >= 2);
+                let __sym1 = __pop_Variant2(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym1.2.clone();
+                let __nt = match super::__action5::<>(__sym0, __sym1) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant4(__nt), __end));
+                (2, 28)
             }
             52 => {
-                __reduce52(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
+                // Arg = "number" => ActionFn(6);
+                let __sym0 = __pop_Variant2(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym0.2.clone();
+                let __nt = match super::__action6::<>(__sym0) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant4(__nt), __end));
+                (1, 28)
             }
             53 => {
                 __reduce53(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
@@ -777,13 +808,37 @@ mod __parse__Args {
                 __reduce70(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
             }
             71 => {
-                __reduce71(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
+                // Field = "number", "=", Arg => ActionFn(14);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant4(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant2(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym2.2.clone();
+                let __nt = match super::__action14::<>(__sym0, __sym1, __sym2) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant21(__nt), __end));
+                (3, 35)
             }
             72 => {
                 __reduce72(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
             }
             73 => {
-                __reduce73(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
+                // FieldTyp = "number", ":", Typ => ActionFn(31);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant6(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant2(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym2.2.clone();
+                let __nt = match super::__action31::<>(__sym0, __sym1, __sym2) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
+                (3, 36)
             }
             74 => {
                 __reduce74(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
@@ -993,7 +1048,16 @@ mod __parse__Args {
                 __reduce142(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
             }
             143 => {
-                __reduce143(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
+                // VariantField = "number" => ActionFn(18);
+                let __sym0 = __pop_Variant2(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym0.2.clone();
+                let __nt = match super::__action18::<>(__sym0) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant21(__nt), __end));
+                (1, 59)
             }
             144 => {
                 __reduce144(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
@@ -1002,7 +1066,16 @@ mod __parse__Args {
                 __reduce145(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
             }
             146 => {
-                __reduce146(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
+                // VariantFieldTyp = "number" => ActionFn(37);
+                let __sym0 = __pop_Variant2(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym0.2.clone();
+                let __nt = match super::__action37::<>(__sym0) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
+                (1, 60)
             }
             147 => {
                 __reduce147(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
@@ -2187,55 +2260,6 @@ mod __parse__Args {
         __symbols.push((__start, __Symbol::Variant4(__nt), __end));
         (1, 28)
     }
-    pub(crate) fn __reduce50<
-    >(
-        __lookahead_start: Option<&usize>,
-        __symbols: &mut ::std::vec::Vec<(usize,__Symbol<>,usize)>,
-        _: ::std::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // Arg = "+", "number" => ActionFn(4);
-        assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant2(__symbols);
-        let __sym0 = __pop_Variant0(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym1.2.clone();
-        let __nt = super::__action4::<>(__sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant4(__nt), __end));
-        (2, 28)
-    }
-    pub(crate) fn __reduce51<
-    >(
-        __lookahead_start: Option<&usize>,
-        __symbols: &mut ::std::vec::Vec<(usize,__Symbol<>,usize)>,
-        _: ::std::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // Arg = "-", "number" => ActionFn(5);
-        assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant2(__symbols);
-        let __sym0 = __pop_Variant0(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym1.2.clone();
-        let __nt = super::__action5::<>(__sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant4(__nt), __end));
-        (2, 28)
-    }
-    pub(crate) fn __reduce52<
-    >(
-        __lookahead_start: Option<&usize>,
-        __symbols: &mut ::std::vec::Vec<(usize,__Symbol<>,usize)>,
-        _: ::std::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // Arg = "number" => ActionFn(6);
-        let __sym0 = __pop_Variant2(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym0.2.clone();
-        let __nt = super::__action6::<>(__sym0);
-        __symbols.push((__start, __Symbol::Variant4(__nt), __end));
-        (1, 28)
-    }
     pub(crate) fn __reduce53<
     >(
         __lookahead_start: Option<&usize>,
@@ -2529,24 +2553,6 @@ mod __parse__Args {
         __symbols.push((__start, __Symbol::Variant20(__nt), __end));
         (0, 34)
     }
-    pub(crate) fn __reduce71<
-    >(
-        __lookahead_start: Option<&usize>,
-        __symbols: &mut ::std::vec::Vec<(usize,__Symbol<>,usize)>,
-        _: ::std::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // Field = "number", "=", Arg => ActionFn(14);
-        assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant4(__symbols);
-        let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant2(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym2.2.clone();
-        let __nt = super::__action14::<>(__sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant21(__nt), __end));
-        (3, 35)
-    }
     pub(crate) fn __reduce72<
     >(
         __lookahead_start: Option<&usize>,
@@ -2564,24 +2570,6 @@ mod __parse__Args {
         let __nt = super::__action15::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant21(__nt), __end));
         (3, 35)
-    }
-    pub(crate) fn __reduce73<
-    >(
-        __lookahead_start: Option<&usize>,
-        __symbols: &mut ::std::vec::Vec<(usize,__Symbol<>,usize)>,
-        _: ::std::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // FieldTyp = "number", ":", Typ => ActionFn(31);
-        assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant6(__symbols);
-        let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant2(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym2.2.clone();
-        let __nt = super::__action31::<>(__sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant14(__nt), __end));
-        (3, 36)
     }
     pub(crate) fn __reduce74<
     >(
@@ -3666,21 +3654,6 @@ mod __parse__Args {
         __symbols.push((__start, __Symbol::Variant21(__nt), __end));
         (1, 59)
     }
-    pub(crate) fn __reduce143<
-    >(
-        __lookahead_start: Option<&usize>,
-        __symbols: &mut ::std::vec::Vec<(usize,__Symbol<>,usize)>,
-        _: ::std::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // VariantField = "number" => ActionFn(18);
-        let __sym0 = __pop_Variant2(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym0.2.clone();
-        let __nt = super::__action18::<>(__sym0);
-        __symbols.push((__start, __Symbol::Variant21(__nt), __end));
-        (1, 59)
-    }
     pub(crate) fn __reduce144<
     >(
         __lookahead_start: Option<&usize>,
@@ -3708,21 +3681,6 @@ mod __parse__Args {
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
         let __nt = super::__action36::<>(__sym0);
-        __symbols.push((__start, __Symbol::Variant14(__nt), __end));
-        (1, 60)
-    }
-    pub(crate) fn __reduce146<
-    >(
-        __lookahead_start: Option<&usize>,
-        __symbols: &mut ::std::vec::Vec<(usize,__Symbol<>,usize)>,
-        _: ::std::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // VariantFieldTyp = "number" => ActionFn(37);
-        let __sym0 = __pop_Variant2(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym0.2.clone();
-        let __nt = super::__action37::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant14(__nt), __end));
         (1, 60)
     }
@@ -3779,7 +3737,7 @@ mod __parse__IDLProg {
 
     use super::super::value::{IDLField, IDLValue, IDLArgs};
     use super::super::types::{IDLType, PrimType, Label, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg};
-    use super::super::lexer::{Token, LexicalError, TmpIDLField};
+    use super::super::lexer::{Token, LexicalError, TmpIDLField, error};
     use crate::idl_hash;
     #[allow(unused_extern_crates)]
     extern crate lalrpop_util as __lalrpop_util;
@@ -4690,13 +4648,44 @@ mod __parse__IDLProg {
                 __reduce49(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
             }
             50 => {
-                __reduce50(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
+                // Arg = "+", "number" => ActionFn(4);
+                assert!(__symbols.len() >= 2);
+                let __sym1 = __pop_Variant2(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym1.2.clone();
+                let __nt = match super::__action4::<>(__sym0, __sym1) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant4(__nt), __end));
+                (2, 28)
             }
             51 => {
-                __reduce51(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
+                // Arg = "-", "number" => ActionFn(5);
+                assert!(__symbols.len() >= 2);
+                let __sym1 = __pop_Variant2(__symbols);
+                let __sym0 = __pop_Variant0(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym1.2.clone();
+                let __nt = match super::__action5::<>(__sym0, __sym1) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant4(__nt), __end));
+                (2, 28)
             }
             52 => {
-                __reduce52(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
+                // Arg = "number" => ActionFn(6);
+                let __sym0 = __pop_Variant2(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym0.2.clone();
+                let __nt = match super::__action6::<>(__sym0) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant4(__nt), __end));
+                (1, 28)
             }
             53 => {
                 __reduce53(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
@@ -4753,13 +4742,37 @@ mod __parse__IDLProg {
                 __reduce70(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
             }
             71 => {
-                __reduce71(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
+                // Field = "number", "=", Arg => ActionFn(14);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant4(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant2(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym2.2.clone();
+                let __nt = match super::__action14::<>(__sym0, __sym1, __sym2) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant21(__nt), __end));
+                (3, 35)
             }
             72 => {
                 __reduce72(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
             }
             73 => {
-                __reduce73(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
+                // FieldTyp = "number", ":", Typ => ActionFn(31);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant6(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant2(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym2.2.clone();
+                let __nt = match super::__action31::<>(__sym0, __sym1, __sym2) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
+                (3, 36)
             }
             74 => {
                 __reduce74(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
@@ -4969,7 +4982,16 @@ mod __parse__IDLProg {
                 __reduce142(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
             }
             143 => {
-                __reduce143(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
+                // VariantField = "number" => ActionFn(18);
+                let __sym0 = __pop_Variant2(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym0.2.clone();
+                let __nt = match super::__action18::<>(__sym0) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant21(__nt), __end));
+                (1, 59)
             }
             144 => {
                 __reduce144(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
@@ -4978,7 +5000,16 @@ mod __parse__IDLProg {
                 __reduce145(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
             }
             146 => {
-                __reduce146(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
+                // VariantFieldTyp = "number" => ActionFn(37);
+                let __sym0 = __pop_Variant2(__symbols);
+                let __start = __sym0.0.clone();
+                let __end = __sym0.2.clone();
+                let __nt = match super::__action37::<>(__sym0) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant14(__nt), __end));
+                (1, 60)
             }
             147 => {
                 __reduce147(__lookahead_start, __symbols, ::std::marker::PhantomData::<()>)
@@ -6163,55 +6194,6 @@ mod __parse__IDLProg {
         __symbols.push((__start, __Symbol::Variant4(__nt), __end));
         (1, 28)
     }
-    pub(crate) fn __reduce50<
-    >(
-        __lookahead_start: Option<&usize>,
-        __symbols: &mut ::std::vec::Vec<(usize,__Symbol<>,usize)>,
-        _: ::std::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // Arg = "+", "number" => ActionFn(4);
-        assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant2(__symbols);
-        let __sym0 = __pop_Variant0(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym1.2.clone();
-        let __nt = super::__action4::<>(__sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant4(__nt), __end));
-        (2, 28)
-    }
-    pub(crate) fn __reduce51<
-    >(
-        __lookahead_start: Option<&usize>,
-        __symbols: &mut ::std::vec::Vec<(usize,__Symbol<>,usize)>,
-        _: ::std::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // Arg = "-", "number" => ActionFn(5);
-        assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant2(__symbols);
-        let __sym0 = __pop_Variant0(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym1.2.clone();
-        let __nt = super::__action5::<>(__sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant4(__nt), __end));
-        (2, 28)
-    }
-    pub(crate) fn __reduce52<
-    >(
-        __lookahead_start: Option<&usize>,
-        __symbols: &mut ::std::vec::Vec<(usize,__Symbol<>,usize)>,
-        _: ::std::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // Arg = "number" => ActionFn(6);
-        let __sym0 = __pop_Variant2(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym0.2.clone();
-        let __nt = super::__action6::<>(__sym0);
-        __symbols.push((__start, __Symbol::Variant4(__nt), __end));
-        (1, 28)
-    }
     pub(crate) fn __reduce53<
     >(
         __lookahead_start: Option<&usize>,
@@ -6505,24 +6487,6 @@ mod __parse__IDLProg {
         __symbols.push((__start, __Symbol::Variant20(__nt), __end));
         (0, 34)
     }
-    pub(crate) fn __reduce71<
-    >(
-        __lookahead_start: Option<&usize>,
-        __symbols: &mut ::std::vec::Vec<(usize,__Symbol<>,usize)>,
-        _: ::std::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // Field = "number", "=", Arg => ActionFn(14);
-        assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant4(__symbols);
-        let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant2(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym2.2.clone();
-        let __nt = super::__action14::<>(__sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant21(__nt), __end));
-        (3, 35)
-    }
     pub(crate) fn __reduce72<
     >(
         __lookahead_start: Option<&usize>,
@@ -6540,24 +6504,6 @@ mod __parse__IDLProg {
         let __nt = super::__action15::<>(__sym0, __sym1, __sym2);
         __symbols.push((__start, __Symbol::Variant21(__nt), __end));
         (3, 35)
-    }
-    pub(crate) fn __reduce73<
-    >(
-        __lookahead_start: Option<&usize>,
-        __symbols: &mut ::std::vec::Vec<(usize,__Symbol<>,usize)>,
-        _: ::std::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // FieldTyp = "number", ":", Typ => ActionFn(31);
-        assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant6(__symbols);
-        let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant2(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym2.2.clone();
-        let __nt = super::__action31::<>(__sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant14(__nt), __end));
-        (3, 36)
     }
     pub(crate) fn __reduce74<
     >(
@@ -7642,21 +7588,6 @@ mod __parse__IDLProg {
         __symbols.push((__start, __Symbol::Variant21(__nt), __end));
         (1, 59)
     }
-    pub(crate) fn __reduce143<
-    >(
-        __lookahead_start: Option<&usize>,
-        __symbols: &mut ::std::vec::Vec<(usize,__Symbol<>,usize)>,
-        _: ::std::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // VariantField = "number" => ActionFn(18);
-        let __sym0 = __pop_Variant2(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym0.2.clone();
-        let __nt = super::__action18::<>(__sym0);
-        __symbols.push((__start, __Symbol::Variant21(__nt), __end));
-        (1, 59)
-    }
     pub(crate) fn __reduce144<
     >(
         __lookahead_start: Option<&usize>,
@@ -7684,21 +7615,6 @@ mod __parse__IDLProg {
         let __start = __sym0.0.clone();
         let __end = __sym0.2.clone();
         let __nt = super::__action36::<>(__sym0);
-        __symbols.push((__start, __Symbol::Variant14(__nt), __end));
-        (1, 60)
-    }
-    pub(crate) fn __reduce146<
-    >(
-        __lookahead_start: Option<&usize>,
-        __symbols: &mut ::std::vec::Vec<(usize,__Symbol<>,usize)>,
-        _: ::std::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // VariantFieldTyp = "number" => ActionFn(37);
-        let __sym0 = __pop_Variant2(__symbols);
-        let __start = __sym0.0.clone();
-        let __end = __sym0.2.clone();
-        let __nt = super::__action37::<>(__sym0);
         __symbols.push((__start, __Symbol::Variant14(__nt), __end));
         (1, 60)
     }
@@ -7787,26 +7703,26 @@ fn __action4<
 >(
     (_, _, _): (usize, Token, usize),
     (_, __0, _): (usize, String, usize),
-) -> IDLValue
+) -> Result<IDLValue,__lalrpop_util::ParseError<usize,Token,LexicalError>>
 {
-    IDLValue::Int(__0.parse::<i64>().unwrap())
+    Ok(IDLValue::Int(__0.parse::<i64>().map_err(error)?))
 }
 
 fn __action5<
 >(
     (_, _, _): (usize, Token, usize),
     (_, __0, _): (usize, String, usize),
-) -> IDLValue
+) -> Result<IDLValue,__lalrpop_util::ParseError<usize,Token,LexicalError>>
 {
-    IDLValue::Int(format!("-{}", __0).parse::<i64>().unwrap())
+    Ok(IDLValue::Int(format!("-{}", __0).parse::<i64>().map_err(error)?))
 }
 
 fn __action6<
 >(
     (_, __0, _): (usize, String, usize),
-) -> IDLValue
+) -> Result<IDLValue,__lalrpop_util::ParseError<usize,Token,LexicalError>>
 {
-    IDLValue::Nat(__0.parse::<u64>().unwrap())
+    Ok(IDLValue::Nat(__0.parse::<u64>().map_err(error)?))
 }
 
 fn __action7<
@@ -7893,9 +7809,9 @@ fn __action14<
     (_, n, _): (usize, String, usize),
     (_, _, _): (usize, Token, usize),
     (_, v, _): (usize, IDLValue, usize),
-) -> IDLField
+) -> Result<IDLField,__lalrpop_util::ParseError<usize,Token,LexicalError>>
 {
-    IDLField { id: n.parse::<u32>().unwrap(), val: v }
+    Ok(IDLField { id: n.parse::<u32>().map_err(|_| error("field number out of u32 range"))?, val: v })
 }
 
 fn __action15<
@@ -7927,9 +7843,9 @@ fn __action17<
 fn __action18<
 >(
     (_, __0, _): (usize, String, usize),
-) -> IDLField
+) -> Result<IDLField,__lalrpop_util::ParseError<usize,Token,LexicalError>>
 {
-    IDLField { id: __0.parse::<u32>().unwrap(), val: IDLValue::Null }
+    Ok(IDLField { id: __0.parse::<u32>().map_err(|_| error("field number out of u32 range"))?, val: IDLValue::Null })
 }
 
 fn __action19<
@@ -8063,9 +7979,9 @@ fn __action31<
     (_, n, _): (usize, String, usize),
     (_, _, _): (usize, Token, usize),
     (_, t, _): (usize, IDLType, usize),
-) -> TypeField
+) -> Result<TypeField,__lalrpop_util::ParseError<usize,Token,LexicalError>>
 {
-    TypeField { label: Label::Id(n.parse::<u32>().unwrap()), typ: t }
+    Ok(TypeField { label: Label::Id(n.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), typ: t })
 }
 
 fn __action32<
@@ -8113,9 +8029,9 @@ fn __action36<
 fn __action37<
 >(
     (_, __0, _): (usize, String, usize),
-) -> TypeField
+) -> Result<TypeField,__lalrpop_util::ParseError<usize,Token,LexicalError>>
 {
-    TypeField { label: Label::Id(__0.parse::<u32>().unwrap()), typ: IDLType::PrimT(PrimType::Null) }
+    Ok(TypeField { label: Label::Id(__0.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), typ: IDLType::PrimT(PrimType::Null) })
 }
 
 fn __action38<
