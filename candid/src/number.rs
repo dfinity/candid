@@ -1,4 +1,4 @@
-//! Data structure for Candid Int and Nat types, supporting big integer with LEB128 encoding.
+//! Data structure for Candid type Int, Nat, supporting big integer with LEB128 encoding.
 
 use crate::types::{CandidType, Serializer, Type, TypeId};
 use crate::Error;
@@ -7,9 +7,9 @@ use serde::de::{Deserialize, Visitor};
 use std::convert::From;
 use std::{fmt, io};
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug)]
 pub struct Int(pub BigInt);
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug)]
 pub struct Nat(pub BigUint);
 
 impl From<i64> for Int {
@@ -114,17 +114,17 @@ impl Nat {
         W: ?Sized + io::Write,
     {
         let zero = BigUint::from(0u8);
-        let mut value = self.clone();
+        let mut value = self.0.clone();
         loop {
-            let big_byte = &value.0 & BigUint::from(0x7fu8);
+            let big_byte = &value & BigUint::from(0x7fu8);
             let mut byte = big_byte.to_bytes_le()[0];
-            value.0 >>= 7;
-            if value.0 != zero {
+            value >>= 7;
+            if value != zero {
                 byte |= 0x80u8;
             }
             let buf = [byte];
             w.write_all(&buf)?;
-            if value.0 == zero {
+            if value == zero {
                 return Ok(());
             }
         }
@@ -154,16 +154,16 @@ impl Int {
         W: ?Sized + io::Write,
     {
         let zero = BigInt::from(0);
-        let mut value = self.clone();
+        let mut value = self.0.clone();
         loop {
-            let big_byte = &value.0 & BigInt::from(0xff);
+            let big_byte = &value & BigInt::from(0xff);
             let mut byte = big_byte.to_signed_bytes_le()[0];
-            value.0 >>= 6;
-            let done = value.0 == zero || value.0 == BigInt::from(-1);
+            value >>= 6;
+            let done = value == zero || value == BigInt::from(-1);
             if done {
                 byte &= 0x7f;
             } else {
-                value.0 >>= 1;
+                value >>= 1;
                 byte |= 0x80;
             }
             let buf = [byte];

@@ -100,6 +100,17 @@ fn test_text() {
 }
 
 #[test]
+fn test_reserved() {
+    use candid::{Empty, Reserved};
+    all_check(Reserved, "4449444c000170");
+    let bytes = hex("4449444c00016f");
+    check_error(
+        || Decode!(&bytes, Empty).unwrap(),
+        "Cannot decode empty type",
+    );
+}
+
+#[test]
 fn test_option() {
     all_check(Some(Int::from(42)), "4449444c016e7c0100012a");
     all_check(Some(Some(Int::from(42))), "4449444c026e016e7c010001012a");

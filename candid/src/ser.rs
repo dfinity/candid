@@ -114,6 +114,9 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
     fn serialize_null(self, _v: ()) -> Result<()> {
         Ok(())
     }
+    fn serialize_empty(self) -> Result<()> {
+        Err(Error::msg("cannot encode empty type"))
+    }
     fn serialize_option<T: ?Sized>(self, v: Option<&T>) -> Result<()>
     where
         T: super::CandidType,
@@ -258,6 +261,8 @@ impl TypeSerialize {
             Type::Float32 => sleb128_encode(buf, Opcode::Float32 as i64),
             Type::Float64 => sleb128_encode(buf, Opcode::Float64 as i64),
             Type::Text => sleb128_encode(buf, Opcode::Text as i64),
+            Type::Reserved => sleb128_encode(buf, Opcode::Reserved as i64),
+            Type::Empty => sleb128_encode(buf, Opcode::Empty as i64),
             Type::Knot(id) => {
                 let ty = types::internal::find_type(*id).expect("knot TypeId not found");
                 let idx = self

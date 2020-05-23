@@ -55,6 +55,7 @@ pub trait Serializer: Sized {
     fn serialize_float64(self, v: f64) -> Result<(), Self::Error>;
     fn serialize_text(self, v: &str) -> Result<(), Self::Error>;
     fn serialize_null(self, v: ()) -> Result<(), Self::Error>;
+    fn serialize_empty(self) -> Result<(), Self::Error>;
     fn serialize_option<T: ?Sized>(self, v: Option<&T>) -> Result<(), Self::Error>
     where
         T: CandidType;

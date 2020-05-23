@@ -191,6 +191,9 @@ pub use error::{Error, Result};
 pub mod number;
 pub use number::{Int, Nat};
 
+pub mod reserved;
+pub use reserved::{Empty, Reserved};
+
 pub mod types;
 pub use types::CandidType;
 

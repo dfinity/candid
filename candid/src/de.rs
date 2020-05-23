@@ -276,6 +276,19 @@ impl<'de> Deserializer<'de> {
         tagged.extend_from_slice(&bytes);
         visitor.visit_bytes(&tagged)
     }
+    fn deserialize_reserved<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.check_type(Opcode::Reserved)?;
+        visitor.visit_unit()
+    }
+    fn deserialize_empty<'a, V>(&'a mut self, _visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        Err(Error::msg("Cannot decode empty type"))
+    }
 }
 
 macro_rules! primitive_impl {
@@ -318,6 +331,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Opcode::Bool => self.deserialize_bool(visitor),
             Opcode::Text => self.deserialize_string(visitor),
             Opcode::Null => self.deserialize_unit(visitor),
+            Opcode::Reserved => self.deserialize_reserved(visitor),
+            Opcode::Empty => self.deserialize_empty(visitor),
             Opcode::Vec => self.deserialize_seq(visitor),
             Opcode::Opt => self.deserialize_option(visitor),
             Opcode::Record => self.deserialize_struct("_", &[], visitor),
@@ -350,6 +365,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Opcode::Bool => self.deserialize_bool(visitor),
             Opcode::Text => self.deserialize_string(visitor),
             Opcode::Null => self.deserialize_unit(visitor),
+            Opcode::Reserved => self.deserialize_reserved(visitor),
+            Opcode::Empty => self.deserialize_empty(visitor),
             Opcode::Vec => self.deserialize_seq(visitor),
             Opcode::Opt => self.deserialize_option(visitor),
             Opcode::Record => {
