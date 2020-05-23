@@ -21,8 +21,10 @@ lalrpop = "0.19.0"
 [dependencies]
 leb128 = "0.2.4"
 serde = "1.0.106"
+byteorder = "1.3.4"
 paste = "0.1"
 num_enum = "0.4.3"
+num-bigint = "0.2.6"
 candid_derive = { path = "../candid_derive", version = "0.2.0" }
 lalrpop-util = "0.19.0"
 pretty = "0.6"
