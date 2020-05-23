@@ -137,7 +137,7 @@ Block comments nest properly (unlike in C).
 
 ### Services
 
-An *service* is a standalone actor on the platform that can communicate with other services via sending and receiving *messages*. Messages are sent to a service by invoking one of its *methods*, i.e., functions that the service provides.
+A *service* is a standalone actor on the platform that can communicate with other services via sending and receiving *messages*. Messages are sent to a service by invoking one of its *methods*, i.e., functions that the service provides.
 
 **Note:** Candid is in fact agnostic to the exact nature of services. In particular, it could be applied to a setting where services are synchronous (objects with RPCs) instead of asynchronous (actors with bidirectional message sends).
 
@@ -275,7 +275,7 @@ Text strings are represented by the type `text` and consist of a sequence of Uni
 
 #### Null
 
-The type `null` has exactly one value (the *null* value) and therefor carries no information. It can e.g. be used as a placeholder for optional fields that ought to be added to a record in future upgrades, or for *variant cases* that do not need any value, see below.
+The type `null` has exactly one value (the *null* value) and therefore carries no information. It can e.g. be used as a placeholder for optional fields that ought to be added to a record in future upgrades, or for *variant cases* that do not need any value, see below.
 ```
 <primtype> ::= ... | null | ...
 ```
