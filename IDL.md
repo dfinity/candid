@@ -39,7 +39,7 @@ exchange (names, parameter and result formats of service methods)
 
 Vanilla protocol buffers are not sufficient or well-suited for describing canisters on the Internet Computer:
 
-* They are primarily a *data description language*, not an IDL. There is syntax for defining "services", but it assumes RPCs not messaging and requires a developing a plugin (replacing the gRPC a.k.a. Stubby one) to provide a semantics.
+* They are primarily a *data description language*, not an IDL. There is syntax for defining "services", but it assumes RPCs not messaging and requires developing a plugin (replacing the gRPC a.k.a. Stubby one) to provide a semantics.
 
 * They deserialise data into abstract protobuf objects, not actual language data structures. The "message" (a.k.a. objects/records/structs) format is designed to be represented as its own abstract in-memory type.
 
