@@ -103,9 +103,11 @@ fn test_text() {
 fn test_reserved() {
     use candid::{Empty, Reserved};
     all_check(Reserved, "4449444c000170");
-    let bytes = hex("4449444c00016f");
+    let res: Result<u8, Empty> = Ok(1);
+    all_check(res, "4449444c016b02bc8a017bc5fed2016f01000001");
+    let bytes = hex("4449444c016b02bc8a017bc5fed2016f010001");
     check_error(
-        || Decode!(&bytes, Empty).unwrap(),
+        || Decode!(&bytes, Result<u8, Empty>).unwrap(),
         "Cannot decode empty type",
     );
 }

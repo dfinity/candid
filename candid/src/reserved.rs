@@ -67,7 +67,7 @@ impl<'de> Deserialize<'de> for Empty {
         impl<'de> Visitor<'de> for EmptyVisitor {
             type Value = Empty;
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("Reserved value")
+                formatter.write_str("Empty value")
             }
         }
         deserializer.deserialize_any(EmptyVisitor)
