@@ -1,4 +1,5 @@
 use crate::types::{Field, Type};
+use num_bigint::{BigInt, BigUint};
 use serde::de;
 use serde::de::{Deserialize, Visitor};
 use std::fmt;
@@ -176,8 +177,8 @@ impl crate::CandidType for IDLValue {
         match *self {
             IDLValue::Null => serializer.serialize_null(()),
             IDLValue::Bool(b) => serializer.serialize_bool(b),
-            IDLValue::Int(i) => serializer.serialize_int(i),
-            IDLValue::Nat(n) => serializer.serialize_nat(n),
+            IDLValue::Int(i) => serializer.serialize_int(&i.into()),
+            IDLValue::Nat(n) => serializer.serialize_nat(&n.into()),
             IDLValue::Text(ref s) => serializer.serialize_text(s),
             IDLValue::None => serializer.serialize_option::<Option<String>>(None),
             IDLValue::Opt(ref v) => serializer.serialize_option(Some(v.deref())),
@@ -224,6 +225,23 @@ impl<'de> Deserialize<'de> for IDLValue {
             }
             fn visit_u64<E>(self, value: u64) -> Result<IDLValue, E> {
                 Ok(IDLValue::Nat(value))
+            }
+            // Deserialize bignum
+            fn visit_bytes<E: de::Error>(self, value: &[u8]) -> Result<IDLValue, E> {
+                let (tag, bytes) = value.split_at(1);
+                match tag[0] {
+                    0u8 => {
+                        let v = BigInt::from_signed_bytes_le(bytes);
+                        let num = v.to_str_radix(10).parse::<i64>().unwrap();
+                        Ok(IDLValue::Int(num))
+                    }
+                    1u8 => {
+                        let v = BigUint::from_bytes_le(bytes);
+                        let num = v.to_str_radix(10).parse::<u64>().unwrap();
+                        Ok(IDLValue::Nat(num))
+                    }
+                    _ => Err(de::Error::custom("unknown tag in visit_bytes")),
+                }
             }
             fn visit_string<E>(self, value: String) -> Result<IDLValue, E> {
                 Ok(IDLValue::Text(value))

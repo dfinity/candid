@@ -1,29 +1,16 @@
 //! Deserialize Candid binary format to Rust data structures
 
 use super::error::{Error, Result};
-use super::idl_hash;
-use num_enum::TryFromPrimitive;
+use super::types::internal::Opcode;
+use super::{idl_hash, Int, Nat};
+use byteorder::{LittleEndian, ReadBytesExt};
+use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
 use serde::de::{self, Visitor};
 use std::collections::{BTreeMap, VecDeque};
 use std::convert::TryFrom;
 use std::io::Read;
 
-use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
-
 const MAGIC_NUMBER: &[u8; 4] = b"DIDL";
-#[derive(Debug, PartialEq, TryFromPrimitive)]
-#[repr(i64)]
-enum Opcode {
-    Null = -1,
-    Bool = -2,
-    Nat = -3,
-    Int = -4,
-    Text = -15,
-    Opt = -18,
-    Vec = -19,
-    Record = -20,
-    Variant = -21,
-}
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
 pub struct IDLDeserialize<'de> {
@@ -148,16 +135,20 @@ impl<'de> Deserializer<'de> {
     fn sleb128_read(&mut self) -> Result<i64> {
         sleb128_decode(&mut self.input).map_err(Error::msg)
     }
-    fn parse_string(&mut self, len: usize) -> Result<String> {
-        let mut buf = Vec::new();
-        buf.resize(len, 0);
-        self.input.read_exact(&mut buf)?;
-        String::from_utf8(buf).map_err(Error::msg)
-    }
     fn parse_byte(&mut self) -> Result<u8> {
         let mut buf = [0u8; 1];
         self.input.read_exact(&mut buf)?;
         Ok(buf[0])
+    }
+    fn parse_bytes(&mut self, len: usize) -> Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        buf.resize(len, 0);
+        self.input.read_exact(&mut buf)?;
+        Ok(buf)
+    }
+    fn parse_string(&mut self, len: usize) -> Result<String> {
+        let buf = self.parse_bytes(len)?;
+        String::from_utf8(buf).map_err(Error::msg)
     }
     fn parse_magic(&mut self) -> Result<()> {
         let mut buf = [0u8; 4];
@@ -258,15 +249,55 @@ impl<'de> Deserializer<'de> {
         }
         self.field_name = Some(field);
     }
+    // Customize deserailization methods
+    // Both int and nat will call visit_bytes. We reserve the first byte to
+    // be a tag to distinguish between int(0) and nat(1).
+    // This trick is necessary for deserializing IDLValue because
+    // it has only one visitor and we need a way to know who called the visitor.
+    fn deserialize_int<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.check_type(Opcode::Int)?;
+        let v = Int::decode(&mut self.input).map_err(Error::msg)?;
+        let bytes = v.0.to_signed_bytes_le();
+        let mut tagged = vec![0u8];
+        tagged.extend_from_slice(&bytes);
+        visitor.visit_bytes(&tagged)
+    }
+    fn deserialize_nat<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.check_type(Opcode::Nat)?;
+        let v = Nat::decode(&mut self.input).map_err(Error::msg)?;
+        let bytes = v.0.to_bytes_le();
+        let mut tagged = vec![1u8];
+        tagged.extend_from_slice(&bytes);
+        visitor.visit_bytes(&tagged)
+    }
+    fn deserialize_reserved<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.check_type(Opcode::Reserved)?;
+        visitor.visit_unit()
+    }
+    fn deserialize_empty<'a, V>(&'a mut self, _visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        Err(Error::msg("Cannot decode empty type"))
+    }
 }
 
 macro_rules! primitive_impl {
-    ($ty:ident, $opcode:expr, $method:ident $($cast:tt)*) => {
+    ($ty:ident, $opcode:expr, $value:expr) => {
         paste::item! {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
                 self.check_type($opcode)?;
-                visitor.[<visit_ $ty>](self.$method()? $($cast)*)
+                visitor.[<visit_ $ty>]($value)
             }
         }
     };
@@ -285,11 +316,23 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         }
         let t = self.peek_type()?;
         match t {
-            Opcode::Int => self.deserialize_i64(visitor),
-            Opcode::Nat => self.deserialize_u64(visitor),
+            Opcode::Int => self.deserialize_int(visitor),
+            Opcode::Nat => self.deserialize_nat(visitor),
+            Opcode::Nat8 => self.deserialize_u8(visitor),
+            Opcode::Nat16 => self.deserialize_u16(visitor),
+            Opcode::Nat32 => self.deserialize_u32(visitor),
+            Opcode::Nat64 => self.deserialize_u64(visitor),
+            Opcode::Int8 => self.deserialize_i8(visitor),
+            Opcode::Int16 => self.deserialize_i16(visitor),
+            Opcode::Int32 => self.deserialize_i32(visitor),
+            Opcode::Int64 => self.deserialize_i64(visitor),
+            Opcode::Float32 => self.deserialize_f32(visitor),
+            Opcode::Float64 => self.deserialize_f64(visitor),
             Opcode::Bool => self.deserialize_bool(visitor),
             Opcode::Text => self.deserialize_string(visitor),
             Opcode::Null => self.deserialize_unit(visitor),
+            Opcode::Reserved => self.deserialize_reserved(visitor),
+            Opcode::Empty => self.deserialize_empty(visitor),
             Opcode::Vec => self.deserialize_seq(visitor),
             Opcode::Opt => self.deserialize_option(visitor),
             Opcode::Record => self.deserialize_struct("_", &[], visitor),
@@ -307,11 +350,23 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         }
         let t = self.peek_type()?;
         match t {
-            Opcode::Int => self.deserialize_i64(visitor),
-            Opcode::Nat => self.deserialize_u64(visitor),
+            Opcode::Int => self.deserialize_int(visitor),
+            Opcode::Nat => self.deserialize_nat(visitor),
+            Opcode::Nat8 => self.deserialize_u8(visitor),
+            Opcode::Nat16 => self.deserialize_u16(visitor),
+            Opcode::Nat32 => self.deserialize_u32(visitor),
+            Opcode::Nat64 => self.deserialize_u64(visitor),
+            Opcode::Int8 => self.deserialize_i8(visitor),
+            Opcode::Int16 => self.deserialize_i16(visitor),
+            Opcode::Int32 => self.deserialize_i32(visitor),
+            Opcode::Int64 => self.deserialize_i64(visitor),
+            Opcode::Float32 => self.deserialize_f32(visitor),
+            Opcode::Float64 => self.deserialize_f64(visitor),
             Opcode::Bool => self.deserialize_bool(visitor),
             Opcode::Text => self.deserialize_string(visitor),
             Opcode::Null => self.deserialize_unit(visitor),
+            Opcode::Reserved => self.deserialize_reserved(visitor),
+            Opcode::Empty => self.deserialize_empty(visitor),
             Opcode::Vec => self.deserialize_seq(visitor),
             Opcode::Opt => self.deserialize_option(visitor),
             Opcode::Record => {
@@ -341,15 +396,18 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         }
     }
 
-    primitive_impl!(i8, Opcode::Int, sleb128_read as i8);
-    primitive_impl!(i16, Opcode::Int, sleb128_read as i16);
-    primitive_impl!(i32, Opcode::Int, sleb128_read as i32);
-    primitive_impl!(i64, Opcode::Int, sleb128_read);
-    primitive_impl!(u8, Opcode::Nat, leb128_read as u8);
-    primitive_impl!(u16, Opcode::Nat, leb128_read as u16);
-    primitive_impl!(u32, Opcode::Nat, leb128_read as u32);
-    primitive_impl!(u64, Opcode::Nat, leb128_read);
-    primitive_impl!(bool, Opcode::Bool, parse_byte == 1u8);
+    primitive_impl!(i8, Opcode::Int8, self.input.read_i8()?);
+    primitive_impl!(i16, Opcode::Int16, self.input.read_i16::<LittleEndian>()?);
+    primitive_impl!(i32, Opcode::Int32, self.input.read_i32::<LittleEndian>()?);
+    primitive_impl!(i64, Opcode::Int64, self.input.read_i64::<LittleEndian>()?);
+    primitive_impl!(u8, Opcode::Nat8, self.input.read_u8()?);
+    primitive_impl!(u16, Opcode::Nat16, self.input.read_u16::<LittleEndian>()?);
+    primitive_impl!(u32, Opcode::Nat32, self.input.read_u32::<LittleEndian>()?);
+    primitive_impl!(u64, Opcode::Nat64, self.input.read_u64::<LittleEndian>()?);
+    primitive_impl!(bool, Opcode::Bool, self.parse_byte()? == 1u8);
+
+    primitive_impl!(f32, Opcode::Float32, self.input.read_f32::<LittleEndian>()?);
+    primitive_impl!(f64, Opcode::Float64, self.input.read_f64::<LittleEndian>()?);
 
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
     where
@@ -503,7 +561,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     serde::forward_to_deserialize_any! {
-        char bytes byte_buf f32 f64 map
+        char bytes byte_buf map
     }
 }
 
