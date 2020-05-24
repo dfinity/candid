@@ -1,4 +1,5 @@
 use super::CandidType;
+use num_enum::TryFromPrimitive;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -23,7 +24,19 @@ pub enum Type {
     Bool,
     Nat,
     Int,
+    Nat8,
+    Nat16,
+    Nat32,
+    Nat64,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    Float32,
+    Float64,
     Text,
+    Reserved,
+    Empty,
     Knot(TypeId),
     Unknown,
     Opt(Box<Type>),
@@ -39,10 +52,40 @@ pub struct Field {
     pub ty: Type,
 }
 
+#[derive(Debug, PartialEq, TryFromPrimitive)]
+#[repr(i64)]
+pub(crate) enum Opcode {
+    Null = -1,
+    Bool = -2,
+    Nat = -3,
+    Int = -4,
+    Nat8 = -5,
+    Nat16 = -6,
+    Nat32 = -7,
+    Nat64 = -8,
+    Int8 = -9,
+    Int16 = -10,
+    Int32 = -11,
+    Int64 = -12,
+    Float32 = -13,
+    Float64 = -14,
+    Text = -15,
+    Reserved = -16,
+    Empty = -17,
+    Opt = -18,
+    Vec = -19,
+    Record = -20,
+    Variant = -21,
+}
+
 pub fn is_primitive(t: &Type) -> bool {
     use self::Type::*;
     match t {
         Null | Bool | Nat | Int | Text => true,
+        Nat8 | Nat16 | Nat32 | Nat64 => true,
+        Int8 | Int16 | Int32 | Int64 => true,
+        Float32 | Float64 => true,
+        Reserved | Empty => true,
         Unknown => panic!("Unknown type"),
         Knot(_) => true,
         Opt(_) | Vec(_) | Record(_) | Variant(_) => false,
