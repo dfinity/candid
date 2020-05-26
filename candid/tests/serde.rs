@@ -1,4 +1,4 @@
-use candid::{CandidType, Decode, Deserialize, Encode};
+use candid::{CandidType, Decode, Deserialize, Encode, Int, Nat};
 
 #[test]
 fn test_error() {
@@ -43,14 +43,52 @@ fn test_bool() {
 
 #[test]
 fn test_integer() {
-    all_check(42, "4449444c00017c2a");
-    all_check(1_234_567_890, "4449444c00017cd285d8cc04");
-    all_check(-1_234_567_890, "4449444c00017caefaa7b37b");
-    all_check(Box::new(42), "4449444c00017c2a");
-    check_error(
-        || test_decode(&hex("4449444c00017c2a"), &42u32),
-        "Type mismatch. Type on the wire: Int; Provided type: Nat",
+    all_check(Int::from(42), "4449444c00017c2a");
+    all_check(Nat::from(42), "4449444c00017d2a");
+    all_check(Int::from(1_234_567_890), "4449444c00017cd285d8cc04");
+    all_check(Nat::from(1_234_567_890), "4449444c00017dd285d8cc04");
+    all_check(Int::from(-1_234_567_890), "4449444c00017caefaa7b37b");
+    all_check(Box::new(Int::from(42)), "4449444c00017c2a");
+    all_check(
+        Int::parse(b"60000000000000000").unwrap(),
+        "4449444c00017c808098f4e9b5caea00",
     );
+    all_check(
+        Nat::parse(b"60000000000000000").unwrap(),
+        "4449444c00017d808098f4e9b5ca6a",
+    );
+    all_check(
+        Int::parse(b"-60000000000000000").unwrap(),
+        "4449444c00017c8080e88b96cab5957f",
+    );
+    check_error(
+        || test_decode(&hex("4449444c00017c2a"), &42i64),
+        "Type mismatch. Type on the wire: Int; Provided type: Int64",
+    );
+}
+
+#[test]
+fn test_fixed_number() {
+    all_check(42u8, "4449444c00017b2a");
+    all_check(42u16, "4449444c00017a2a00");
+    all_check(42u32, "4449444c0001792a000000");
+    all_check(42u64, "4449444c0001782a00000000000000");
+    all_check(42usize, "4449444c0001782a00000000000000");
+    all_check(42i8, "4449444c0001772a");
+    all_check(42i16, "4449444c0001762a00");
+    all_check(42i32, "4449444c0001752a000000");
+    all_check(42i64, "4449444c0001742a00000000000000");
+    all_check(-42i64, "4449444c000174d6ffffffffffffff");
+    all_check(-42isize, "4449444c000174d6ffffffffffffff");
+}
+
+#[test]
+fn test_float() {
+    all_check(3f32, "4449444c00017300004040");
+    all_check(3f64, "4449444c0001720000000000000840");
+    all_check(6f64, "4449444c0001720000000000001840");
+    all_check(0.5, "4449444c000172000000000000e03f");
+    all_check(-0.5, "4449444c000172000000000000e0bf");
 }
 
 #[test]
@@ -62,15 +100,28 @@ fn test_text() {
 }
 
 #[test]
+fn test_reserved() {
+    use candid::{Empty, Reserved};
+    all_check(Reserved, "4449444c000170");
+    let res: Result<u8, Empty> = Ok(1);
+    all_check(res, "4449444c016b02bc8a017bc5fed2016f01000001");
+    let bytes = hex("4449444c016b02bc8a017bc5fed2016f010001");
+    check_error(
+        || Decode!(&bytes, Result<u8, Empty>).unwrap(),
+        "Cannot decode empty type",
+    );
+}
+
+#[test]
 fn test_option() {
-    all_check(Some(42), "4449444c016e7c0100012a");
-    all_check(Some(Some(42)), "4449444c026e016e7c010001012a");
+    all_check(Some(Int::from(42)), "4449444c016e7c0100012a");
+    all_check(Some(Some(Int::from(42))), "4449444c026e016e7c010001012a");
     // Deserialize None of type Option<i32> to Option<String>
     let none_i32: Option<i32> = None;
     let none_str: Option<String> = None;
     let bytes = encode(&none_i32);
     test_decode(&bytes, &none_str);
-    all_check(none_i32, "4449444c016e7c010000");
+    all_check(none_i32, "4449444c016e75010000");
     // Deserialize \mu T.Option<T> to a non-recursive type
     let v: Option<Option<Option<i32>>> = Some(Some(None));
     test_decode(b"DIDL\x01\x6e\0\x01\0\x01\x01\0", &v);
@@ -80,10 +131,13 @@ fn test_option() {
 fn test_struct() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct A1 {
-        foo: i32,
+        foo: Int,
         bar: bool,
     }
-    let a1 = A1 { foo: 42, bar: true };
+    let a1 = A1 {
+        foo: 42.into(),
+        bar: true,
+    };
     all_check(a1, "4449444c016c02d3e3aa027e868eb7027c0100012a");
 
     // Field name hash is larger than u32
@@ -91,7 +145,10 @@ fn test_struct() {
         || {
             test_decode(
                 &hex("4449444c016c02a3e0d4b9bf86027e868eb7027c0100012a"),
-                &A1 { foo: 42, bar: true },
+                &A1 {
+                    foo: 42.into(),
+                    bar: true,
+                },
             )
         },
         "missing field `bar`",
@@ -99,16 +156,16 @@ fn test_struct() {
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct A11 {
-        foo: i32,
+        foo: Int,
         bar: bool,
         baz: A1,
     }
     all_check(
         A11 {
-            foo: 42,
+            foo: 42.into(),
             bar: true,
             baz: A1 {
-                foo: 10,
+                foo: 10.into(),
                 bar: false,
             },
         },
@@ -116,19 +173,19 @@ fn test_struct() {
     );
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
-    struct B(bool, i32);
-    all_check(B(true, 42), "4449444c016c02007e017c0100012a");
+    struct B(bool, Int);
+    all_check(B(true, 42.into()), "4449444c016c02007e017c0100012a");
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct List {
-        head: i32,
+        head: Int,
         tail: Option<Box<List>>,
     }
 
     let list = List {
-        head: 42,
+        head: 42.into(),
         tail: Some(Box::new(List {
-            head: 43,
+            head: 43.into(),
             tail: None,
         })),
     };
@@ -205,7 +262,7 @@ fn test_mutual_recursion() {
     type List = Option<ListA>;
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct ListA {
-        head: i32,
+        head: Int,
         tail: Box<List>,
     };
 
@@ -215,12 +272,16 @@ fn test_mutual_recursion() {
 
 #[test]
 fn test_vector() {
-    all_check(vec![0, 1, 2, 3], "4449444c016d7c01000400010203");
-    all_check([0, 1, 2, 3], "4449444c016d7c01000400010203");
-    let boxed_array: Box<[i32]> = Box::new([0, 1, 2, 3]);
+    let vec: Vec<Int> = [0, 1, 2, 3].iter().map(|x| Int::from(*x)).collect();
+    all_check(vec, "4449444c016d7c01000400010203");
+    all_check(
+        [Int::from(0), Int::from(1), Int::from(2), Int::from(3)],
+        "4449444c016d7c01000400010203",
+    );
+    let boxed_array: Box<[Int]> = Box::new([0.into(), 1.into(), 2.into(), 3.into()]);
     all_check(boxed_array, "4449444c016d7c01000400010203");
     all_check(
-        [(42, "text".to_string())],
+        [(Int::from(42), "text".to_string())],
         "4449444c026d016c02007c01710100012a0474657874",
     );
     all_check([[[[()]]]], "4449444c046d016d026d036d7f010001010101");
@@ -231,15 +292,28 @@ fn test_vector() {
 #[test]
 fn test_tuple() {
     all_check(
-        (42, "💩".to_string()),
+        (Int::from(42), "💩".to_string()),
         "4449444c016c02007c017101002a04f09f92a9",
     );
     let none: Option<String> = None;
     let bytes =
         hex("4449444c046c04007c017e020103026d7c6e036c02a0d2aca8047c90eddae7040201002b010302030400");
-    test_decode(&bytes, &(43, true, [2, 3, 4], none));
+    test_decode(
+        &bytes,
+        &(
+            Int::from(43),
+            true,
+            [Int::from(2), Int::from(3), Int::from(4)],
+            none,
+        ),
+    );
     check_error(
-        || test_decode(&hex("4449444c016c02007c027101002a04f09f92a9"), &(42, "💩")),
+        || {
+            test_decode(
+                &hex("4449444c016c02007c027101002a04f09f92a9"),
+                &(Int::from(42), "💩"),
+            )
+        },
         "Expect vector index 1, but get 2",
     );
 }
@@ -268,11 +342,11 @@ fn test_variant() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     enum E {
         Foo,
-        Bar(bool, i32),
-        Baz { a: i32, b: u32 },
+        Bar(bool, Int),
+        Baz { a: Int, b: Nat },
     }
 
-    let v = E::Bar(true, 42);
+    let v = E::Bar(true, 42.into());
     all_check(
         v,
         "4449444c036b03b3d3c90101bbd3c90102e6fdd5017f6c02007e017c6c02617c627d010000012a",
@@ -287,7 +361,10 @@ fn test_generics() {
         g2: E,
     }
 
-    let res = G { g1: 42, g2: true };
+    let res = G {
+        g1: Int::from(42),
+        g2: true,
+    };
     all_check(res, "4449444c016c02eab3017cebb3017e01002a01")
 }
 
@@ -297,32 +374,38 @@ fn test_multiargs() {
     assert_eq!(bytes, b"DIDL\0\0");
     Decode!(&bytes).unwrap();
 
-    let bytes = Encode!(&42, &Some(42), &Some(1), &Some(2)).unwrap();
+    let bytes = Encode!(
+        &Int::from(42),
+        &Some(Int::from(42)),
+        &Some(Int::from(1)),
+        &Some(Int::from(2))
+    )
+    .unwrap();
     assert_eq!(bytes, hex("4449444c016e7c047c0000002a012a01010102"));
 
-    let (a, b, c, d) = Decode!(&bytes, i32, Option<i32>, Option<i32>, Option<i32>).unwrap();
-    assert_eq!(a, 42);
-    assert_eq!(b, Some(42));
-    assert_eq!(c, Some(1));
-    assert_eq!(d, Some(2));
+    let (a, b, c, d) = Decode!(&bytes, Int, Option<Int>, Option<Int>, Option<Int>).unwrap();
+    assert_eq!(a, 42.into());
+    assert_eq!(b, Some(42.into()));
+    assert_eq!(c, Some(1.into()));
+    assert_eq!(d, Some(2.into()));
 
     check_error(
-        || test_decode(&bytes, &42),
+        || test_decode(&bytes, &Int::from(42)),
         "3 more values need to be deserialized",
     );
 
-    let bytes = Encode!(&[(42, "text")], &(42, "text")).unwrap();
+    let bytes = Encode!(&[(Int::from(42), "text")], &(Int::from(42), "text")).unwrap();
     assert_eq!(
         bytes,
         hex("4449444c026d016c02007c0171020001012a04746578742a0474657874")
     );
 
-    let tuple = Decode!(&bytes, Vec<(i64, &str)>, (i64, String)).unwrap();
-    assert_eq!(tuple.0, [(42, "text")]);
-    assert_eq!(tuple.1, (42, "text".to_string()));
+    let tuple = Decode!(&bytes, Vec<(Int, &str)>, (Int, String)).unwrap();
+    assert_eq!(tuple.0, [(42.into(), "text")]);
+    assert_eq!(tuple.1, (42.into(), "text".to_string()));
 
     let err = || {
-        Decode!(&bytes, Vec<(i64, &str)>, (i64, String), i32).unwrap();
+        Decode!(&bytes, Vec<(Int, &str)>, (Int, String), i32).unwrap();
         true
     };
     check_error(err, "No more values to deserialize");
