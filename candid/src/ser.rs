@@ -68,10 +68,10 @@ impl ValueSerializer {
 }
 
 macro_rules! serialize_num {
-    ($name:ident, $ty:ty, $method:expr) => {
+    ($name:ident, $ty:ty, $($method:tt)*) => {
         paste::item! {
             fn [<serialize_ $name>](self, v: $ty) -> Result<()> {
-                self.value.$method(v)?;
+                self.value.$($method)*(v)?;
                 Ok(())
             }
         }
