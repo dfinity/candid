@@ -828,7 +828,7 @@ impl<'a, A1: Deserialize<'a>, A2: Deserialize<'a>, A3: Deserialize<'a>, A4: Dese
 
 pub fn decode_args<'a, Candid: DecodeArguments<'a>>(bytes: &'a [u8]) -> Result<Candid> {
     let de = IDLDeserialize::new(bytes)?;
-    // Should we mark the Deserializer as done here?
-    let res = DecodeArguments::decode_arguments(de)?;
-    Ok(res.1)
+    let (de, res) = DecodeArguments::decode_arguments(de)?;
+    de.done()?;
+    Ok(res)
 }
