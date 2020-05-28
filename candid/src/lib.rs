@@ -38,13 +38,13 @@
 //! We also provide macros for encoding/decoding Candid message in a convenient way.
 //!
 //! ```
-//! use candid::{Encode, Decode, Result};
+//! use candid::{encode_to_vec, decode_args, Result};
 //! fn macro_example() -> Result<()> {
 //!   // Serialize two values [(42, "text")] and (42u32, "text")
-//!   let bytes: Vec<u8> = Encode!(&[(42, "text")], &(42u32, "text"))?;
+//!   let bytes: Vec<u8> = encode_to_vec((&[(42, "text")], &(42u32, "text")))?;
 //!   // Deserialize the first value as type Vec<(i32, &str)>,
 //!   // and the second value as type (u32, String)
-//!   let (a, b) = Decode!(&bytes, Vec<(i32, &str)>, (u32, String))?;
+//!   let (a, b): (Vec<(i32, &str)>, (u32, String)) = decode_args(&bytes)?;
 //!
 //!   assert_eq!(a, [(42, "text")]);
 //!   assert_eq!(b, (42u32, "text".to_string()));
@@ -52,8 +52,8 @@
 //! }
 //! # macro_example().unwrap();
 //! ```
-//! The [`Encode!`](macro.Encode.html) macro takes a sequence of Rust values, and returns a binary format `Vec<u8>` that can be sent over the wire.
-//! The [`Decode!`](macro.Decode.html) macro takes the binary message and a sequence of Rust types that you want to decode into, and returns a tuple
+//! The [`encode_to_vec`](macro.Encode.html) macro takes a sequence of Rust values, and returns a binary format `Vec<u8>` that can be sent over the wire.
+//! The [`decode_args`](macro.Decode.html) macro takes the binary message and a sequence of Rust types that you want to decode into, and returns a tuple
 //! of Rust values of the given types.
 //!
 //! Note that a fixed Candid message may be decoded in multiple Rust types. For example,
@@ -69,7 +69,7 @@
 //! This is difficult to achieve in `Serialize`, especially for enum types. Besides serialization, [`CandidType`](types/trait.CandidType.html)
 //! trait also converts Rust type to Candid type defined as [`candid::types::Type`](types/internal/enum.Type.html).
 //! ```
-//! use candid::{Encode, Decode, CandidType, Deserialize};
+//! use candid::{encode_to_vec, decode_args, CandidType, Deserialize};
 //! #[derive(CandidType, Deserialize)]
 //! struct List {
 //!     head: i32,
@@ -77,19 +77,19 @@
 //! }
 //! let list = List { head: 42, tail: None };
 //!
-//! let bytes = Encode!(&list).unwrap();
-//! let res = Decode!(&bytes, List);
+//! let bytes = encode_to_vec((&list,)).unwrap();
+//! let (res,):(List,) = decode_args(&bytes).unwrap();
 //! ```
 //!
 //! ## Operating on big integers
 //! To support big integer types [`Candid::Int`](number/struct.Int.html) and [`Candid::Nat`](number/struct.Nat.html),
 //! we use the `num_bigint` crate. We provide interface to convert `i64`, `u64` and `&[u8]` to big integers.
 //! ```
-//! use candid::{Int, Nat, Encode, Decode, Result};
+//! use candid::{Int, Nat, encode_to_vec, decode_args, Result};
 //! fn bigint_examples() -> Result<()> {
 //!   let x = Int::parse(b"-10000000000000000000")?;
-//!   let bytes = Encode!(&Nat::from(1024), &x)?;
-//!   let (a, b) = Decode!(&bytes, Nat, Int)?;
+//!   let bytes = encode_to_vec((&Nat::from(1024), &x))?;
+//!   let (a, b): (Nat, Int) = decode_args(&bytes)?;
 //!   assert_eq!(a, 1024.into());
 //!   assert_eq!(b, x);
 //!   Ok(())
