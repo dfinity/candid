@@ -76,18 +76,30 @@ pub trait RustBindings {
         &self,
         name: &str,
         arguments: &[(String, String)],
-        return_type: &str,
+        returns: &[String],
         is_query: bool,
     ) -> Result<String> {
         let id = candid_id_to_rust(name);
 
         // Add Future binding.
+        let return_type = if returns.is_empty() {
+            "".to_string()
+        } else if returns.len() == 1 {
+            returns[0].to_string()
+        } else {
+            format!("( {} )", returns.join(" , "))
+        };
+
         let return_type = if is_query {
             return_type.to_string()
         } else {
             format!(
                 "std::pin::Pin<std::boxed::Box<impl std::future::Future<Output = {}>>>",
-                return_type
+                if return_type == "" {
+                    "()"
+                } else {
+                    &return_type
+                }
             )
         };
 
@@ -335,11 +347,11 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
             .iter()
             .map(|Binding { id, typ }| match typ {
                 IDLType::FuncT(func_t) => {
-                    let return_type = if func_t.rets.is_empty() {
-                        "()".to_owned()
-                    } else {
-                        self.usage(&func_t.rets.first().unwrap())?
-                    };
+                    let return_type = func_t
+                        .rets
+                        .iter()
+                        .map(|r| self.usage(r))
+                        .collect::<Result<Vec<String>>>()?;
 
                     let arguments = func_t
                         .args
