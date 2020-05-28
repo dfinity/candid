@@ -12,13 +12,13 @@ use std::io::Read;
 
 const MAGIC_NUMBER: &[u8; 4] = b"DIDL";
 
-/// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
+/// Use this struct to deserialize a sequence of Rust values (heterogeneous) from Candid binary message.
 pub struct IDLDeserialize<'de> {
     de: Deserializer<'de>,
 }
 
 impl<'de> IDLDeserialize<'de> {
-    /// Create a new deserializer with IDL binary message.
+    /// Create a new deserializer with Candid binary message.
     pub fn new(bytes: &'de [u8]) -> Result<Self> {
         let mut de = Deserializer::from_bytes(bytes);
         de.parse_table().map_err(|e| de.dump_error_state(e))?;
@@ -826,7 +826,7 @@ impl<A1: DeserializeOwned, A2: DeserializeOwned, A3: DeserializeOwned, A4: Deser
     }
 }
 
-pub fn decode_args<IDL: DecodeArguments>(bytes: &[u8]) -> Result<IDL> {
+pub fn decode_args<Candid: DecodeArguments>(bytes: &[u8]) -> Result<Candid> {
     let de = IDLDeserialize::new(bytes)?;
     // Should we mark the Deserializer as done here?
     let res = DecodeArguments::decode_arguments(de)?;

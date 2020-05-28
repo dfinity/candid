@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::io;
 use std::vec::Vec;
 
-/// Use this struct to serialize a sequence of Rust values (heterogeneous) to IDL binary message.
+/// Use this struct to serialize a sequence of Rust values (heterogeneous) to Candid binary message.
 #[derive(Default)]
 pub struct IDLBuilder {
     type_ser: TypeSerialize,
@@ -49,14 +49,14 @@ impl IDLBuilder {
     }
 }
 
-/// A structure for serializing Rust values to IDL.
+/// A structure for serializing Rust values to Candid.
 #[derive(Default)]
 pub struct ValueSerializer {
     value: Vec<u8>,
 }
 
 impl ValueSerializer {
-    /// Creates a new IDL serializer.
+    /// Creates a new Candid serializer.
     #[inline]
     pub fn new() -> Self {
         ValueSerializer { value: Vec::new() }
@@ -159,7 +159,7 @@ impl<'a> types::Compound for Compound<'a> {
     }
 }
 
-/// A structure for serializing Rust values to IDL types.
+/// A structure for serializing Rust values to Candid types.
 #[derive(Default)]
 pub struct TypeSerialize {
     type_table: Vec<Vec<u8>>,
@@ -339,7 +339,7 @@ impl<A1: CandidType, A2: CandidType, A3: CandidType, A4: CandidType> EncodeArgum
     }
 }
 
-pub fn encode_to_vec<IDL: EncodeArguments>(arguments: IDL) -> Result<Vec<u8>> {
+pub fn encode_to_vec<Candid: EncodeArguments>(arguments: Candid) -> Result<Vec<u8>> {
     let mut ser = IDLBuilder::new();
     arguments
         .encode_arguments(&mut ser)?
