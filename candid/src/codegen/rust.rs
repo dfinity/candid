@@ -50,9 +50,15 @@ impl Config {
     }
 }
 
-struct RustLanguageBinding<'a> {
+pub struct RustLanguageBinding<'a> {
     config: &'a Config,
     prog: &'a IDLProg,
+}
+
+impl<'a> RustLanguageBinding<'a> {
+    pub fn new(prog: &'a IDLProg, config: &'a Config) -> Self {
+        Self { prog, config }
+    }
 }
 
 impl<'a> LanguageBinding for RustLanguageBinding<'a> {
@@ -281,7 +287,7 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
     }
 }
 
-/// Takes an IDL string and returns a Rust string, formatted.
+/// Takes an IDL string and returns a Rust string, unformatted.
 pub fn idl_to_rust(prog: &IDLProg, config: &Config) -> Result<String> {
     let binding = RustLanguageBinding {
         config,
