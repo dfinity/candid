@@ -374,7 +374,7 @@ fn test_generics() {
 fn test_multiargs() {
     let bytes = encode_to_vec(()).unwrap();
     assert_eq!(bytes, b"DIDL\0\0");
-    let () = decode_args(&bytes).unwrap();
+    decode_args::<()>(&bytes).unwrap();
 
     let bytes = encode_to_vec((
         &Int::from(42),
