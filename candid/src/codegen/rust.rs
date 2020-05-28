@@ -45,11 +45,7 @@ pub fn candid_id_to_rust(id: &str) -> String {
 ///
 /// The default implementation provided maps to a trait definition where functions are
 /// empty and return Future<Output = ...> if necessary.
-pub trait RustBinding {
-    fn is_actor(&self) -> bool {
-        return true;
-    }
-
+pub trait RustBindings {
     fn actor(&self, name: &str, all_functions: &[String]) -> Result<String> {
         // Make sure name is not a rust keyword.
         let name = if is_keyword(name) {
@@ -132,14 +128,14 @@ pub struct Config {
     actor_name: Option<String>,
     bigint_type: Option<String>,
     biguint_type: Option<String>,
-    bindings: Box<dyn RustBinding>,
+    bindings: Box<dyn RustBindings>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         #[derive(Clone)]
         struct RustDefaultBinding {}
-        impl RustBinding for RustDefaultBinding {}
+        impl RustBindings for RustDefaultBinding {}
         Self {
             actor_name: None,
             bigint_type: None,
@@ -162,7 +158,7 @@ impl Config {
         self.biguint_type = Some(typename);
         self
     }
-    pub fn with_bindings(mut self, bindings: Box<dyn RustBinding>) -> Self {
+    pub fn with_bindings(mut self, bindings: Box<dyn RustBindings>) -> Self {
         self.bindings = bindings;
         self
     }
