@@ -3,7 +3,7 @@
 use super::error::{Error, Result};
 use super::parser::value::IDLValue;
 use super::types;
-use super::types::{internal::Opcode, Field, Type, CandidType};
+use super::types::{internal::Opcode, CandidType, Field, Type};
 use byteorder::{LittleEndian, WriteBytesExt};
 use leb128::write::{signed as sleb128_encode, unsigned as leb128_encode};
 use std::collections::HashMap;
@@ -300,21 +300,20 @@ pub trait EncodeArguments {
     fn encode_arguments(self, ser: &mut IDLBuilder) -> Result<&mut IDLBuilder>;
 }
 
-impl<
-        A1: CandidType,
-    > EncodeArguments for (A1,)
-{
+// Is this a sensible impl?
+impl EncodeArguments for () {
+    fn encode_arguments(self, ser: &mut IDLBuilder) -> Result<&mut IDLBuilder> {
+        ser.arg(&self)
+    }
+}
+impl<A1: CandidType> EncodeArguments for (A1,) {
     fn encode_arguments(self, ser: &mut IDLBuilder) -> Result<&mut IDLBuilder> {
         let (a1,) = self;
         ser.arg(&a1)
     }
 }
 
-impl<
-    A1: CandidType,
-    A2: CandidType,
-    > EncodeArguments for (A1, A2)
-{
+impl<A1: CandidType, A2: CandidType> EncodeArguments for (A1, A2) {
     fn encode_arguments(self, ser: &mut IDLBuilder) -> Result<&mut IDLBuilder> {
         let (a1, a2) = self;
         let ser = (a1,).encode_arguments(ser)?;
@@ -322,38 +321,27 @@ impl<
     }
 }
 
-impl<
-    A1: CandidType,
-    A2: CandidType,
-    A3: CandidType,
-    > EncodeArguments for (A1, A2, A3)
-{
+impl<A1: CandidType, A2: CandidType, A3: CandidType> EncodeArguments for (A1, A2, A3) {
     fn encode_arguments(self, ser: &mut IDLBuilder) -> Result<&mut IDLBuilder> {
         let (a1, a2, a3) = self;
-        let ser = (a1,a2).encode_arguments(ser)?;
+        let ser = (a1, a2).encode_arguments(ser)?;
         ser.arg(&a3)
     }
 }
 
-impl<
-    A1: CandidType,
-    A2: CandidType,
-    A3: CandidType,
-    A4: CandidType,
-    > EncodeArguments for (A1, A2, A3, A4)
+impl<A1: CandidType, A2: CandidType, A3: CandidType, A4: CandidType> EncodeArguments
+    for (A1, A2, A3, A4)
 {
     fn encode_arguments(self, ser: &mut IDLBuilder) -> Result<&mut IDLBuilder> {
         let (a1, a2, a3, a4) = self;
-        let ser = (a1,a2,a3).encode_arguments(ser)?;
+        let ser = (a1, a2, a3).encode_arguments(ser)?;
         ser.arg(&a4)
     }
 }
 
-pub fn encode_to_vec<IDL: EncodeArguments>(arguments: IDL) -> Vec<u8> {
+pub fn encode_to_vec<IDL: EncodeArguments>(arguments: IDL) -> Result<Vec<u8>> {
     let mut ser = IDLBuilder::new();
     arguments
-        .encode_arguments(&mut ser)
-        .unwrap()
+        .encode_arguments(&mut ser)?
         .serialize_to_vec()
-        .unwrap()
 }

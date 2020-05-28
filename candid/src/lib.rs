@@ -202,10 +202,10 @@ pub use parser::types::IDLProg;
 pub use parser::value::IDLArgs;
 
 pub mod de;
-pub use de::decode_args;
+pub use de::{decode_args, DecodeArguments};
 
 pub mod ser;
-pub use ser::encode_to_vec;
+pub use ser::{encode_to_vec, EncodeArguments};
 
 // Candid hash function comes from
 // https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf

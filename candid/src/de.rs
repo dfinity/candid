@@ -5,7 +5,7 @@ use super::types::internal::Opcode;
 use super::{idl_hash, Int, Nat};
 use byteorder::{LittleEndian, ReadBytesExt};
 use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
-use serde::de::{self, Visitor, DeserializeOwned};
+use serde::de::{self, DeserializeOwned, Visitor};
 use std::collections::{BTreeMap, VecDeque};
 use std::convert::TryFrom;
 use std::io::Read;
@@ -778,62 +778,57 @@ impl<'de, 'a> de::VariantAccess<'de> for Compound<'a, 'de> {
     }
 }
 
-pub trait DecodeArguments {
-    fn decode_arguments(_de: IDLDeserialize<'_>) -> (IDLDeserialize<'_>, Self);
+pub trait DecodeArguments: Sized {
+    fn decode_arguments(_de: IDLDeserialize<'_>) -> Result<(IDLDeserialize<'_>, Self)>;
+}
+
+// Is this a sensible impl?
+impl DecodeArguments for () {
+    fn decode_arguments(mut de: IDLDeserialize<'_>) -> Result<(IDLDeserialize<'_>, ())> {
+        let a_new = de.get_value()?;
+        Ok((de, (a_new)))
+    }
 }
 
 // This is all pretty mechanical, perhaps we could use code gen?
-impl<
-    A1: DeserializeOwned,
-    > DecodeArguments for (A1,)
-{
-    fn decode_arguments(mut de: IDLDeserialize<'_>) -> (IDLDeserialize<'_>, (A1,)) {
-        let a_new = de.get_value().unwrap();
-        (de, (a_new,))
+impl<A1: DeserializeOwned> DecodeArguments for (A1,) {
+    fn decode_arguments(mut de: IDLDeserialize<'_>) -> Result<(IDLDeserialize<'_>, (A1,))> {
+        let a_new = de.get_value()?;
+        Ok((de, (a_new,)))
     }
 }
 
-impl<
-    A1: DeserializeOwned,
-    A2: DeserializeOwned,
-    > DecodeArguments for (A1, A2)
-{
-    fn decode_arguments(de: IDLDeserialize<'_>) -> (IDLDeserialize<'_>, (A1, A2)) {
-        let (mut de, (a1,)) = DecodeArguments::decode_arguments(de);
-        let a_new = de.get_value().unwrap();
-        (de, (a1, a_new))
+impl<A1: DeserializeOwned, A2: DeserializeOwned> DecodeArguments for (A1, A2) {
+    fn decode_arguments(de: IDLDeserialize<'_>) -> Result<(IDLDeserialize<'_>, (A1, A2))> {
+        let (mut de, (a1,)) = DecodeArguments::decode_arguments(de)?;
+        let a_new = de.get_value()?;
+        Ok((de, (a1, a_new)))
     }
 }
 
-impl<
-    A1: DeserializeOwned,
-    A2: DeserializeOwned,
-    A3: DeserializeOwned,
-    > DecodeArguments for (A1, A2, A3)
+impl<A1: DeserializeOwned, A2: DeserializeOwned, A3: DeserializeOwned> DecodeArguments
+    for (A1, A2, A3)
 {
-    fn decode_arguments(de: IDLDeserialize<'_>) -> (IDLDeserialize<'_>, (A1, A2, A3)) {
-        let (mut de, (a1, a2)) = DecodeArguments::decode_arguments(de);
-        let a_new = de.get_value().unwrap();
-        (de, (a1, a2, a_new))
+    fn decode_arguments(de: IDLDeserialize<'_>) -> Result<(IDLDeserialize<'_>, (A1, A2, A3))> {
+        let (mut de, (a1, a2)) = DecodeArguments::decode_arguments(de)?;
+        let a_new = de.get_value()?;
+        Ok((de, (a1, a2, a_new)))
     }
 }
 
-impl<
-    A1: DeserializeOwned,
-    A2: DeserializeOwned,
-    A3: DeserializeOwned,
-    A4: DeserializeOwned,
-    > DecodeArguments for (A1, A2, A3, A4)
+impl<A1: DeserializeOwned, A2: DeserializeOwned, A3: DeserializeOwned, A4: DeserializeOwned>
+    DecodeArguments for (A1, A2, A3, A4)
 {
-    fn decode_arguments(de: IDLDeserialize<'_>) -> (IDLDeserialize<'_>, (A1, A2, A3, A4)) {
-        let (mut de, (a1, a2, a3)) = DecodeArguments::decode_arguments(de);
-        let a_new = de.get_value().unwrap();
-        (de, (a1, a2, a3, a_new))
+    fn decode_arguments(de: IDLDeserialize<'_>) -> Result<(IDLDeserialize<'_>, (A1, A2, A3, A4))> {
+        let (mut de, (a1, a2, a3)) = DecodeArguments::decode_arguments(de)?;
+        let a_new = de.get_value()?;
+        Ok((de, (a1, a2, a3, a_new)))
     }
 }
 
-pub fn decode_args<IDL: DecodeArguments>(bytes: &[u8]) -> IDL {
-    let de = IDLDeserialize::new(bytes).unwrap();
+pub fn decode_args<IDL: DecodeArguments>(bytes: &[u8]) -> Result<IDL> {
+    let de = IDLDeserialize::new(bytes)?;
     // Should we mark the Deserializer as done here?
-    DecodeArguments::decode_arguments(de).1
+    let res = DecodeArguments::decode_arguments(de)?;
+    Ok(res.1)
 }
