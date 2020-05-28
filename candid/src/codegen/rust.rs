@@ -11,7 +11,7 @@ use crate::parser::types::{Binding, Dec, FuncType, IDLType, Label, PrimType, Typ
 use crate::{generate_code, idl_hash, IDLProg};
 
 /// Returns true if id is a rust keyword.
-fn is_keyword(id: &str) -> bool {
+pub fn is_keyword(id: &str) -> bool {
     let all_keywords = [
         "abstract", "as", "async", "await", "become", "box", "break", "const", "continue", "crate",
         "do", "dyn", "else", "enum", "extern", "false", "final", "fn", "for", "if", "impl", "in",
@@ -64,6 +64,7 @@ pub trait RustBindings {
 
     fn actor_function_body(
         &self,
+        _name: &str,
         _arguments: &[(String, String)],
         _return_type: &str,
         _is_query: bool,
@@ -73,12 +74,12 @@ pub trait RustBindings {
 
     fn actor_function(
         &self,
-        id: &str,
+        name: &str,
         arguments: &[(String, String)],
         return_type: &str,
         is_query: bool,
     ) -> Result<String> {
-        let id = candid_id_to_rust(id);
+        let id = candid_id_to_rust(name);
 
         // Add Future binding.
         let return_type = if is_query {
@@ -96,7 +97,7 @@ pub trait RustBindings {
             .collect::<Vec<String>>()
             .join(" , ");
 
-        let body = self.actor_function_body(arguments, &return_type, is_query)?;
+        let body = self.actor_function_body(name, arguments, &return_type, is_query)?;
 
         Ok(format!(
             "fn {id}( {arguments} ) {return_type} {body}",
