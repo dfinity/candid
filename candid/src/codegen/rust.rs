@@ -8,7 +8,7 @@
 use crate::codegen::LanguageBinding;
 use crate::error::{Error, Result};
 use crate::parser::types::{Binding, Dec, FuncType, IDLType, Label, PrimType, TypeField};
-use crate::{generate_code, IDLProg};
+use crate::{generate_code, idl_hash, IDLProg};
 
 /// Returns true if id is a rust keyword.
 fn is_keyword(id: &str) -> bool {
@@ -23,12 +23,130 @@ fn is_keyword(id: &str) -> bool {
     all_keywords.contains(&id)
 }
 
-#[derive(Clone, Default)]
+/// Transforms a Candid ID into a valid Rust ID (as a string).
+/// In case a string cannot be used as an ID in Rust, this will replace it with a
+/// IDL Hash value of the ID, surrounged by `_` (e.g. `_12345_`).
+/// If the string is a valid Rust
+pub fn candid_id_to_rust(id: &str) -> String {
+    // If the id is not representable in a Rust-compatible string
+    if id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
+        || id.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
+    {
+        format!("_{}_", idl_hash(&id))
+    } else if is_keyword(id) {
+        format!("r#{}", id)
+    } else {
+        id.to_string()
+    }
+}
+
+/// Allow extra bindings to be passed in for Rust generation. This is higher level
+/// bindings than languages ones.
+///
+/// The default implementation provided maps to a trait definition where functions are
+/// empty and return Future<Output = ...> if necessary.
+pub trait RustBinding {
+    fn is_actor(&self) -> bool {
+        return true;
+    }
+
+    fn actor(&self, name: &str, all_functions: &[String]) -> Result<String> {
+        // Make sure name is not a rust keyword.
+        let name = if is_keyword(name) {
+            format!("r#{}", name)
+        } else {
+            name.to_string()
+        };
+
+        let mut all_functions_str = String::new();
+        for f in all_functions {
+            all_functions_str += f;
+        }
+
+        Ok(format!("pub trait {} {{ {} }}", name, all_functions_str))
+    }
+
+    fn actor_function_body(
+        &self,
+        _arguments: &[(String, String)],
+        _return_type: &str,
+        _is_query: bool,
+    ) -> Result<String> {
+        Ok(";".to_string())
+    }
+
+    fn actor_function(
+        &self,
+        id: &str,
+        arguments: &[(String, String)],
+        return_type: &str,
+        is_query: bool,
+    ) -> Result<String> {
+        let id = candid_id_to_rust(id);
+
+        // Add Future binding.
+        let return_type = if is_query {
+            return_type.to_string()
+        } else {
+            format!(
+                "std::pin::Pin<std::boxed::Box<impl std::future::Future<Output = {}>>>",
+                return_type
+            )
+        };
+
+        let arguments_list = arguments
+            .iter()
+            .map(|(name, ty)| format!("{} : {}", name, ty))
+            .collect::<Vec<String>>()
+            .join(" , ");
+
+        let body = self.actor_function_body(arguments, &return_type, is_query)?;
+
+        Ok(format!(
+            "fn {id}( {arguments} ) {return_type} {body}",
+            id = id,
+            arguments = arguments_list,
+            body = body,
+            return_type = if return_type == "" {
+                format!("")
+            } else {
+                format!(" -> {}", return_type)
+            }
+        ))
+    }
+
+    fn record(&self, id: &str, fields: &[(String, String)]) -> Result<String> {
+        let all_fields = fields
+            .iter()
+            .map(|(name, ty)| format!("pub {} : {}", name, ty))
+            .collect::<Vec<String>>()
+            .join(" , ");
+        Ok(format!(
+            "#[derive(Clone)] pub struct {} {{ {} }}",
+            id, all_fields
+        ))
+    }
+}
+
 pub struct Config {
     actor_name: Option<String>,
     bigint_type: Option<String>,
     biguint_type: Option<String>,
-    derives: Option<String>,
+    bindings: Box<dyn RustBinding>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        #[derive(Clone)]
+        struct RustDefaultBinding {}
+        impl RustBinding for RustDefaultBinding {}
+        Self {
+            actor_name: None,
+            bigint_type: None,
+            biguint_type: None,
+            bindings: Box::new(RustDefaultBinding {}),
+        }
+    }
 }
 
 impl Config {
@@ -44,13 +162,14 @@ impl Config {
         self.biguint_type = Some(typename);
         self
     }
-    pub fn with_derives(mut self, derives: Vec<String>) -> Self {
-        self.derives = Some(derives.join(" , "));
+    pub fn with_bindings(mut self, bindings: Box<dyn RustBinding>) -> Self {
+        self.bindings = bindings;
         self
     }
 }
 
-pub struct RustLanguageBinding<'a> {
+/// The codegen binding for Rust. This is not made public.
+struct RustLanguageBinding<'a> {
     config: &'a Config,
     prog: &'a IDLProg,
 }
@@ -146,12 +265,6 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
     }
 
     fn declare(&self, id: &str, ty: &IDLType) -> Result<String> {
-        let id = if is_keyword(id) {
-            format!("r#{}", id)
-        } else {
-            id.to_string()
-        };
-
         match ty {
             IDLType::PrimT(prim) => self.declare_prim(&id, prim),
             IDLType::VarT(var) => self.declare_var(&id, var),
@@ -189,21 +302,11 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
                 };
                 let usage = self.usage(typ)?;
 
-                Ok(format!("pub {} : {} ,", field_name, usage))
+                Ok((field_name, usage))
             })
-            .collect::<Result<Vec<String>>>()?
-            .join(" ");
+            .collect::<Result<Vec<(String, String)>>>()?;
 
-        let derives = self
-            .config
-            .derives
-            .clone()
-            .unwrap_or_else(|| "Clone".to_string());
-
-        Ok(format!(
-            "#[derive({})] pub struct {} {{ {} }}",
-            derives, id, all_fields
-        ))
+        self.config.bindings.record(id, &all_fields)
     }
     fn declare_variant(&self, id: &str, fields: &[TypeField]) -> Result<String> {
         Ok(format!(
@@ -220,70 +323,51 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
         self.declare(&binding.id, &binding.typ)
     }
 
-    fn service_binding(&self, id: &str, func_t: &FuncType) -> Result<String> {
-        let id = if is_keyword(id) {
-            format!("r#{}", id)
-        } else {
-            id.to_string()
-        };
-
-        let return_type = if func_t.rets.is_empty() {
-            "()".to_owned()
-        } else {
-            self.usage(&func_t.rets.first().unwrap())?
-        };
-
-        // Add Future binding.
-        let return_type = if func_t.is_query() {
-            return_type
-        } else {
-            format!("impl std::future::Future<Output = {}>", return_type)
-        };
-
-        let arguments = func_t
-            .args
-            .iter()
-            .enumerate()
-            .map(|(i, ty)| {
-                let arg_name = format!("arg{}", i);
-                let ty = self.usage(&ty)?;
-
-                Ok(format!("{}: {}", arg_name, ty))
-            })
-            .collect::<Result<Vec<String>>>()?
-            .join(" , ");
-
-        Ok(format!(
-            "fn {id}( {arguments} ) {return_type} ;",
-            id = id,
-            arguments = arguments,
-            return_type = if return_type == "" {
-                format!("")
-            } else {
-                format!(" -> {}", return_type)
-            }
-        ))
+    fn service_binding(&self, _id: &str, _func_t: &FuncType) -> Result<String> {
+        unreachable!()
     }
 
     fn service(&self, bindings: &[Binding]) -> Result<String> {
-        let all_functions = bindings
-            .iter()
-            .map(|Binding { id, typ }| match typ {
-                IDLType::FuncT(func_t) => self.service_binding(id, func_t),
-                _ => self.usage(typ),
-            })
-            .collect::<Result<Vec<String>>>()?;
         let actor_str = self
             .config
             .actor_name
             .clone()
             .unwrap_or_else(|| "Actor".to_string());
 
-        Ok(format!(
-            "pub trait {} {{ {} }}",
-            actor_str,
-            all_functions.join(" ")
-        ))
+        let all_functions = bindings
+            .iter()
+            .map(|Binding { id, typ }| match typ {
+                IDLType::FuncT(func_t) => {
+                    let return_type = if func_t.rets.is_empty() {
+                        "()".to_owned()
+                    } else {
+                        self.usage(&func_t.rets.first().unwrap())?
+                    };
+
+                    let arguments = func_t
+                        .args
+                        .iter()
+                        .enumerate()
+                        .map(|(i, ty)| {
+                            let arg_name = format!("arg{}", i);
+                            let ty = self.usage(&ty)?;
+
+                            Ok((arg_name, ty))
+                        })
+                        .collect::<Result<Vec<(String, String)>>>()?;
+
+                    self.config.bindings.actor_function(
+                        id,
+                        &arguments,
+                        &return_type,
+                        func_t.is_query(),
+                    )
+                }
+                _ => self.usage(typ),
+            })
+            .collect::<Result<Vec<String>>>()?;
+
+        self.config.bindings.actor(&actor_str, &all_functions)
     }
 }
 
