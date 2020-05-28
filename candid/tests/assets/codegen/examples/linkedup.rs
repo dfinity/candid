@@ -1,5 +1,6 @@
 pub type UserId_2 = UserId;
 pub type UserId = principal;
+#[derive(Clone)]
 pub struct Profile_2 {
     pub id: UserId,
     pub imgUrl: String,
@@ -11,6 +12,7 @@ pub struct Profile_2 {
     pub firstName: String,
 }
 pub type Profile = Profile_2;
+#[derive(Clone)]
 pub struct NewProfile_2 {
     pub imgUrl: String,
     pub title: String,

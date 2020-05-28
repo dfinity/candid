@@ -10,10 +10,44 @@ use crate::error::{Error, Result};
 use crate::parser::types::{Binding, Dec, FuncType, IDLType, Label, PrimType, TypeField};
 use crate::{generate_code, IDLProg};
 
+/// Returns true if id is a rust keyword.
+fn is_keyword(id: &str) -> bool {
+    let all_keywords = [
+        "abstract", "as", "async", "await", "become", "box", "break", "const", "continue", "crate",
+        "do", "dyn", "else", "enum", "extern", "false", "final", "fn", "for", "if", "impl", "in",
+        "let", "loop", "macro", "match", "mod", "move", "mut", "override", "priv", "pub", "ref",
+        "return", "self", "Self", "static", "struct", "super", "trait", "true", "try", "type",
+        "typeof", "unsafe", "unsized", "use", "virtual", "where", "while", "yield",
+    ];
+
+    all_keywords.contains(&id)
+}
+
 #[derive(Clone, Default)]
 pub struct Config {
-    pub actor_name: Option<String>,
-    pub use_bigint: Option<()>,
+    actor_name: Option<String>,
+    bigint_type: Option<String>,
+    biguint_type: Option<String>,
+    derives: Option<String>,
+}
+
+impl Config {
+    pub fn with_actor_name(mut self, name: String) -> Self {
+        self.actor_name = Some(name);
+        self
+    }
+    pub fn with_bigint_type(mut self, typename: String) -> Self {
+        self.bigint_type = Some(typename);
+        self
+    }
+    pub fn with_biguint_type(mut self, typename: String) -> Self {
+        self.biguint_type = Some(typename);
+        self
+    }
+    pub fn with_derives(mut self, derives: Vec<String>) -> Self {
+        self.derives = Some(derives.join(" , "));
+        self
+    }
 }
 
 struct RustLanguageBinding<'a> {
@@ -25,8 +59,8 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
     fn usage_prim(&self, ty: &PrimType) -> Result<String> {
         Ok(match ty {
             PrimType::Nat => {
-                if self.config.use_bigint.is_some() {
-                    "num_bigint::BigUint"
+                if let Some(biguint_type) = self.config.biguint_type.as_ref() {
+                    biguint_type
                 } else {
                     "u128"
                 }
@@ -36,8 +70,8 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
             PrimType::Nat32 => "u32",
             PrimType::Nat64 => "u64",
             PrimType::Int => {
-                if self.config.use_bigint.is_some() {
-                    "num_bigint::BigInt"
+                if let Some(bigint_type) = self.config.bigint_type.as_ref() {
+                    bigint_type
                 } else {
                     "i128"
                 }
@@ -105,6 +139,24 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
         unimplemented!()
     }
 
+    fn declare(&self, id: &str, ty: &IDLType) -> Result<String> {
+        let id = if is_keyword(id) {
+            format!("r#{}", id)
+        } else {
+            id.to_string()
+        };
+
+        match ty {
+            IDLType::PrimT(prim) => self.declare_prim(&id, prim),
+            IDLType::VarT(var) => self.declare_var(&id, var),
+            IDLType::FuncT(func) => self.declare_func(&id, func),
+            IDLType::OptT(sub_t) => self.declare_opt(&id, sub_t.as_ref()),
+            IDLType::VecT(item_t) => self.declare_vec(&id, item_t.as_ref()),
+            IDLType::RecordT(fields) => self.declare_record(&id, fields),
+            IDLType::VariantT(fields) => self.declare_variant(&id, fields),
+            IDLType::ServT(serv_t) => self.declare_service(&id, serv_t),
+        }
+    }
     fn declare_prim(&self, id: &str, ty: &PrimType) -> Result<String> {
         Ok(format!("pub type {} = {};", id, self.usage_prim(ty)?))
     }
@@ -136,7 +188,12 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
             .collect::<Result<Vec<String>>>()?
             .join(" ");
 
-        Ok(format!("pub struct {} {{ {} }}", id, all_fields))
+        let derives = self.config.derives.clone().unwrap_or("Clone".to_string());
+
+        Ok(format!(
+            "#[derive({})] pub struct {} {{ {} }}",
+            derives, id, all_fields
+        ))
     }
     fn declare_variant(&self, id: &str, fields: &[TypeField]) -> Result<String> {
         Ok(format!(
@@ -154,6 +211,12 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
     }
 
     fn service_binding(&self, id: &str, func_t: &FuncType) -> Result<String> {
+        let id = if is_keyword(id) {
+            format!("r#{}", id)
+        } else {
+            id.to_string()
+        };
+
         let return_type = if func_t.rets.is_empty() {
             "()".to_owned()
         } else {
