@@ -1,4 +1,4 @@
-use candid::{CandidType, Decode, Deserialize, Encode, Int, Nat};
+use candid::{CandidType, encode_to_vec, Deserialize, decode_args, Int, Nat};
 
 #[test]
 fn test_error() {
@@ -107,7 +107,7 @@ fn test_reserved() {
     all_check(res, "4449444c016b02bc8a017bc5fed2016f01000001");
     let bytes = hex("4449444c016b02bc8a017bc5fed2016f010001");
     check_error(
-        || Decode!(&bytes, Result<u8, Empty>).unwrap(),
+        || {let _: (Result<u8, Empty>,) = decode_args(&bytes).unwrap();},
         "Cannot decode empty type",
     );
 }
@@ -370,20 +370,20 @@ fn test_generics() {
 
 #[test]
 fn test_multiargs() {
-    let bytes = Encode!().unwrap();
+    let bytes = encode_to_vec(()).unwrap();
     assert_eq!(bytes, b"DIDL\0\0");
-    Decode!(&bytes).unwrap();
+    let () = decode_args(&bytes).unwrap();
 
-    let bytes = Encode!(
+    let bytes = encode_to_vec((
         &Int::from(42),
         &Some(Int::from(42)),
         &Some(Int::from(1)),
         &Some(Int::from(2))
-    )
+    ))
     .unwrap();
     assert_eq!(bytes, hex("4449444c016e7c047c0000002a012a01010102"));
 
-    let (a, b, c, d) = Decode!(&bytes, Int, Option<Int>, Option<Int>, Option<Int>).unwrap();
+    let (a, b, c, d): (Int, Option<Int>, Option<Int>, Option<Int>) = decode_args(&bytes).unwrap();
     assert_eq!(a, 42.into());
     assert_eq!(b, Some(42.into()));
     assert_eq!(c, Some(1.into()));
@@ -394,19 +394,18 @@ fn test_multiargs() {
         "3 more values need to be deserialized",
     );
 
-    let bytes = Encode!(&[(Int::from(42), "text")], &(Int::from(42), "text")).unwrap();
+    let bytes = encode_to_vec((&[(Int::from(42), "text")], &(Int::from(42), "text"))).unwrap();
     assert_eq!(
         bytes,
         hex("4449444c026d016c02007c0171020001012a04746578742a0474657874")
     );
 
-    let tuple = Decode!(&bytes, Vec<(Int, &str)>, (Int, String)).unwrap();
+    let tuple: (Vec<(Int, &str)>, (Int, String)) = decode_args(&bytes).unwrap();
     assert_eq!(tuple.0, [(42.into(), "text")]);
     assert_eq!(tuple.1, (42.into(), "text".to_string()));
 
     let err = || {
-        Decode!(&bytes, Vec<(Int, &str)>, (Int, String), i32).unwrap();
-        true
+        let _: (Vec<(Int, &str)>, (Int, String), i32) = decode_args(&bytes).unwrap();
     };
     check_error(err, "No more values to deserialize");
 }
@@ -440,12 +439,12 @@ fn test_decode<'de, T>(bytes: &'de [u8], expected: &T)
 where
     T: PartialEq + serde::de::Deserialize<'de> + std::fmt::Debug,
 {
-    let decoded = Decode!(bytes, T).unwrap();
+    let (decoded,):(T,) = decode_args(bytes).unwrap();
     assert_eq!(decoded, *expected);
 }
 
 fn encode<T: CandidType>(value: &T) -> Vec<u8> {
-    Encode!(&value).unwrap()
+    encode_to_vec((value,)).unwrap()
 }
 
 fn check_error<F: FnOnce() -> R + std::panic::UnwindSafe, R>(f: F, str: &str) {
