@@ -784,9 +784,8 @@ pub trait DecodeArguments<'a>: Sized {
 
 // // Is this a sensible impl?
 impl <'a> DecodeArguments<'a> for () {
-    fn decode_arguments(mut de: IDLDeserialize<'a>) -> Result<(IDLDeserialize<'a>, ())> {
-        let a_new = de.get_value()?;
-        Ok((de, (a_new)))
+    fn decode_arguments(de: IDLDeserialize<'a>) -> Result<(IDLDeserialize<'a>, ())> {
+        Ok((de, ()))
     }
 }
 

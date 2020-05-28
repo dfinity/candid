@@ -303,7 +303,7 @@ pub trait EncodeArguments {
 // Is this a sensible impl?
 impl EncodeArguments for () {
     fn encode_arguments(self, ser: &mut IDLBuilder) -> Result<&mut IDLBuilder> {
-        ser.arg(&self)
+        Ok(ser)
     }
 }
 impl<A1: CandidType> EncodeArguments for (A1,) {
