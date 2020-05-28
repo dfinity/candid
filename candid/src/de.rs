@@ -5,7 +5,7 @@ use super::types::internal::Opcode;
 use super::{idl_hash, Int, Nat};
 use byteorder::{LittleEndian, ReadBytesExt};
 use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
-use serde::de::{self, Visitor, Deserialize};
+use serde::de::{self, Deserialize, Visitor};
 use std::collections::{BTreeMap, VecDeque};
 use std::convert::TryFrom;
 use std::io::Read;
@@ -783,7 +783,7 @@ pub trait DecodeArguments<'a>: Sized {
 }
 
 // // Is this a sensible impl?
-impl <'a> DecodeArguments<'a> for () {
+impl<'a> DecodeArguments<'a> for () {
     fn decode_arguments(de: IDLDeserialize<'a>) -> Result<(IDLDeserialize<'a>, ())> {
         Ok((de, ()))
     }

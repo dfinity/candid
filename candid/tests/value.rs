@@ -1,5 +1,5 @@
-use candid::parser::value::{IDLArgs, IDLField, IDLValue};
 use candid::decode_args;
+use candid::parser::value::{IDLArgs, IDLField, IDLValue};
 
 #[test]
 fn test_parser() {
@@ -91,7 +91,7 @@ fn test_encode(v: &IDLValue, expected: &[u8]) {
 }
 
 fn test_decode(bytes: &[u8], expected: &IDLValue) {
-    let (decoded,):(IDLValue,) = decode_args(bytes).unwrap();
+    let (decoded,): (IDLValue,) = decode_args(bytes).unwrap();
     assert_eq!(decoded, *expected);
 }
 

@@ -1,4 +1,4 @@
-use candid::{CandidType, encode_to_vec, Deserialize, decode_args, Int, Nat};
+use candid::{decode_args, encode_to_vec, CandidType, Deserialize, Int, Nat};
 
 #[test]
 fn test_error() {
@@ -107,7 +107,9 @@ fn test_reserved() {
     all_check(res, "4449444c016b02bc8a017bc5fed2016f01000001");
     let bytes = hex("4449444c016b02bc8a017bc5fed2016f010001");
     check_error(
-        || {let _: (Result<u8, Empty>,) = decode_args(&bytes).unwrap();},
+        || {
+            let _: (Result<u8, Empty>,) = decode_args(&bytes).unwrap();
+        },
         "Cannot decode empty type",
     );
 }
@@ -378,7 +380,7 @@ fn test_multiargs() {
         &Int::from(42),
         &Some(Int::from(42)),
         &Some(Int::from(1)),
-        &Some(Int::from(2))
+        &Some(Int::from(2)),
     ))
     .unwrap();
     assert_eq!(bytes, hex("4449444c016e7c047c0000002a012a01010102"));
@@ -439,7 +441,7 @@ fn test_decode<'de, T>(bytes: &'de [u8], expected: &T)
 where
     T: PartialEq + serde::de::Deserialize<'de> + std::fmt::Debug,
 {
-    let (decoded,):(T,) = decode_args(bytes).unwrap();
+    let (decoded,): (T,) = decode_args(bytes).unwrap();
     assert_eq!(decoded, *expected);
 }
 
