@@ -188,7 +188,11 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
             .collect::<Result<Vec<String>>>()?
             .join(" ");
 
-        let derives = self.config.derives.clone().unwrap_or("Clone".to_string());
+        let derives = self
+            .config
+            .derives
+            .clone()
+            .unwrap_or_else(|| "Clone".to_string());
 
         Ok(format!(
             "#[derive({})] pub struct {} {{ {} }}",
