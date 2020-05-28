@@ -341,7 +341,5 @@ impl<A1: CandidType, A2: CandidType, A3: CandidType, A4: CandidType> EncodeArgum
 
 pub fn encode_to_vec<Candid: EncodeArguments>(arguments: Candid) -> Result<Vec<u8>> {
     let mut ser = IDLBuilder::new();
-    arguments
-        .encode_arguments(&mut ser)?
-        .serialize_to_vec()
+    arguments.encode_arguments(&mut ser)?.serialize_to_vec()
 }
