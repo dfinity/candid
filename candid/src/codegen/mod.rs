@@ -162,7 +162,8 @@ pub trait LanguageBinding {
             + &match &prog.actor {
                 None => String::new(),
                 Some(IDLType::ServT(bindings)) => self.service(bindings)?,
-                _ => unimplemented!(),
+                Some(IDLType::VarT(_)) => unimplemented!(),
+                _ => unreachable!(),
             }
             + &self.footer()?;
 
