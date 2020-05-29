@@ -91,7 +91,7 @@ pub trait RustBindings {
         };
 
         let return_type = if is_query {
-            return_type.to_string()
+            return_type
         } else {
             format!(
                 "std::pin::Pin<std::boxed::Box<impl std::future::Future<Output = {}>>>",
@@ -181,12 +181,6 @@ impl Config {
 struct RustLanguageBinding<'a> {
     config: &'a Config,
     prog: &'a IDLProg,
-}
-
-impl<'a> RustLanguageBinding<'a> {
-    pub fn new(prog: &'a IDLProg, config: &'a Config) -> Self {
-        Self { prog, config }
-    }
 }
 
 impl<'a> LanguageBinding for RustLanguageBinding<'a> {
