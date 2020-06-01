@@ -28,7 +28,7 @@ pub fn derive_idl_type(input: TokenStream) -> TokenStream {
             }
             fn id() -> candid::types::TypeId { candid::types::TypeId::of::<#name #ty_generics>() }
 
-            fn idl_serialize<__S>(&self, __serializer: __S) -> Result<(), __S::Error>
+            fn idl_serialize<__S>(&self, __serializer: __S) -> std::result::Result<(), __S::Error>
                 where
                 __S: candid::types::Serializer,
                 {
