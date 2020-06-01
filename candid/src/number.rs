@@ -7,9 +7,9 @@ use serde::de::{Deserialize, Visitor};
 use std::convert::From;
 use std::{fmt, io};
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub struct Int(pub BigInt);
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub struct Nat(pub BigUint);
 
 impl From<i64> for Int {
