@@ -44,8 +44,8 @@ pub enum Type {
     Vec(Box<Type>),
     Record(Vec<Field>),
     Variant(Vec<Field>),
-    Func(FuncType),
-    Service(Vec<(String, FuncType)>),
+    Func(Function),
+    Service(Vec<(String, Function)>),
 }
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
@@ -56,7 +56,7 @@ pub struct Field {
 }
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
-pub struct FuncType {
+pub struct Function {
     pub modes: Vec<crate::parser::types::FuncMode>,
     pub args: Vec<Type>,
     pub rets: Vec<Type>,

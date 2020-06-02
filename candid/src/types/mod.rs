@@ -7,7 +7,7 @@
 mod impls;
 pub mod internal;
 
-pub use self::internal::{get_type, Field, Type, TypeId};
+pub use self::internal::{get_type, Field, Function, Type, TypeId};
 
 pub trait CandidType {
     // memoized type derivation

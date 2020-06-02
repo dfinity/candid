@@ -1,5 +1,5 @@
 use super::types::*;
-use crate::types::{Field, Type};
+use crate::types::{Field, Function, Type};
 use crate::{Error, Result};
 use std::collections::HashMap;
 
@@ -12,11 +12,19 @@ impl Env {
             Some(t) => Ok(t),
         }
     }
-    pub fn find_concrete_type(&self, name: &str) -> Result<&Type> {
-        Ok(match self.find_type(name)? {
-            Type::Var(id) => self.find_concrete_type(id)?,
-            t => t,
-        })
+    pub fn as_func<'a>(&'a self, t: &'a Type) -> Result<&'a Function> {
+        match t {
+            Type::Func(f) => Ok(f),
+            Type::Var(id) => self.as_func(self.find_type(id)?),
+            _ => Err(Error::msg("not a function type")),
+        }
+    }
+    pub fn as_service<'a>(&'a self, t: &'a Type) -> Result<&'a Type> {
+        match t {
+            Type::Service(_) => Ok(t),
+            Type::Var(id) => self.as_service(self.find_type(id)?),
+            _ => Err(Error::msg("not a service type")),
+        }
     }
 }
 
@@ -65,7 +73,27 @@ fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
             let fs = check_fields(env, fs)?;
             Ok(Type::Variant(fs))
         }
-        IDLType::FuncT(_) | IDLType::ServT(_) => unimplemented!(),
+        IDLType::FuncT(func) => {
+            // TODO check for modes
+            let mut t1 = Vec::new();
+            for t in func.args.iter() {
+                t1.push(check_type(env, t)?);
+            }
+            let mut t2 = Vec::new();
+            for t in func.rets.iter() {
+                t2.push(check_type(env, t)?);
+            }
+            let f = Function {
+                modes: func.modes.clone(),
+                args: t1,
+                rets: t2,
+            };
+            Ok(Type::Func(f))
+        }
+        IDLType::ServT(ms) => {
+            let ms = check_meths(env, ms)?;
+            Ok(Type::Service(ms))
+        }
     }
 }
 
@@ -102,6 +130,17 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
     Ok(res)
 }
 
+fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Function)>> {
+    let mut res = Vec::new();
+    // TODO check duplicates, sorting
+    for meth in ms.iter() {
+        let t = check_type(env, &meth.typ)?;
+        let func = env.as_func(&t)?;
+        res.push((meth.id.to_owned(), func.clone()));
+    }
+    Ok(res)
+}
+
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         match dec {
@@ -114,23 +153,22 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     }
     Ok(())
 }
-/*
-fn check_actor(env: &Env, actor: Option<IDLType>) -> Result<Option<IDLType>> {
+
+fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
     match actor {
         None => Ok(None),
-        Some(VarT(id)) => unimplemented!(),
-        Some(ServT(ms)) => {
-            let ms = check_meths(env, ms)?;
-            // TODO sort
-            Ok(Some(ms))
+        Some(typ) => {
+            let t = check_type(env, &typ)?;
+            let service = env.as_service(&t)?;
+            Ok(Some(service.clone()))
         }
     }
 }
-*/
+
 pub fn check_prog(prog: &IDLProg) -> Result<(Env, Option<Type>)> {
     let mut env = Env(HashMap::new());
     // TODO check for cycle
     check_decs(&mut env, &prog.decs)?;
-    let actor = None; //check_actor(&env, prog.actor)?;
-    Ok((env, actor))
+    let ms = check_actor(&env, &prog.actor)?;
+    Ok((env, ms))
 }
