@@ -20,9 +20,9 @@ The contributor guidelines are intended to make the contribution process easy an
 
 Before contributing, consider the following:
 
-- If you want to report an issue or request help, click **Issues**.
+- If you want to report an issue, click **Issues**.
 
-    You can also post a message to the [community forum](https://forum.dfinity.org/) or submit a [support request](mailto://support@dfinity.org).
+- If you have more general questions related to Candid and its use, post a message to the [community forum](https://forum.dfinity.org/) or submit a [support request](mailto://support@dfinity.org).
 
 - If you are reporting a bug, provide as much information about the problem as possible.
 
