@@ -164,6 +164,7 @@ impl<'a> types::Compound for Compound<'a> {
 pub struct TypeSerialize {
     type_table: Vec<Vec<u8>>,
     type_map: HashMap<Type, i32>,
+    env: HashMap<String, Type>,
     args: Vec<Type>,
     result: Vec<u8>,
 }
@@ -174,9 +175,14 @@ impl TypeSerialize {
         TypeSerialize {
             type_table: Vec::new(),
             type_map: HashMap::new(),
+            env: HashMap::new(),
             args: Vec::new(),
             result: Vec::new(),
         }
+    }
+
+    pub fn with_env(&mut self, env: HashMap<String, Type>) {
+        self.env = env;
     }
 
     #[inline]
@@ -269,6 +275,14 @@ impl TypeSerialize {
                     .type_map
                     .get(&ty)
                     .unwrap_or_else(|| panic!("knot type {:?} not found", ty));
+                sleb128_encode(buf, i64::from(*idx))
+            }
+            Type::Var(id) => {
+                let ty = self.env.get(id).expect("type variable not found");
+                let idx = self
+                    .type_map
+                    .get(&ty)
+                    .unwrap_or_else(|| panic!("var type {:?} not found", ty));
                 sleb128_encode(buf, i64::from(*idx))
             }
             _ => {

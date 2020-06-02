@@ -1,10 +1,9 @@
-use candid::parser::grammar::IDLProgParser;
-use candid::parser::lexer::Lexer;
 use candid::parser::types::{to_pretty, IDLProg};
 
 fn parse_idl(input: &str) -> IDLProg {
-    let lexer = Lexer::new(input);
-    IDLProgParser::new().parse(lexer).unwrap()
+    //let lexer = Lexer::new(input);
+    input.parse().unwrap()
+    //IDLProgParser::new().parse(lexer).unwrap()
 }
 
 #[test]
@@ -27,7 +26,7 @@ service server : {
   i : f;
 }
     "#;
-    let ast = parse_idl(&prog);
+    let ast = prog.parse::<IDLProg>().unwrap();
     let pretty = to_pretty(&ast, 80);
     println!("{}", pretty);
     let ast2 = parse_idl(&pretty);

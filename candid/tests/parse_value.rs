@@ -1,16 +1,11 @@
-use candid::parser::grammar::ArgsParser;
-use candid::parser::lexer::Lexer;
 use candid::parser::value::{IDLArgs, IDLField, IDLValue};
-use candid::parser::ParserError;
 
 fn parse_args(input: &str) -> IDLArgs {
-    let lexer = Lexer::new(input);
-    ArgsParser::new().parse(lexer).unwrap()
+    input.parse().unwrap()
 }
 
-fn parse_args_err(input: &str) -> Result<IDLArgs, ParserError> {
-    let lexer = Lexer::new(input);
-    ArgsParser::new().parse(lexer)
+fn parse_args_err(input: &str) -> candid::Result<IDLArgs> {
+    input.parse()
 }
 
 #[test]
@@ -41,10 +36,13 @@ fn parse_string_literals() {
     let args = parse_args_err("(\"\\u{d800}\")");
     assert_eq!(
         format!("{}", args.unwrap_err()),
-        "Unicode escape out of range d800"
+        "IDL parser error: Unicode escape out of range d800"
     );
     let result = parse_args_err("(\"\\q\")");
-    assert_eq!(format!("{}", result.unwrap_err()), "Unexpected character q");
+    assert_eq!(
+        format!("{}", result.unwrap_err()),
+        "IDL parser error: Unexpected character q"
+    );
 }
 
 #[test]

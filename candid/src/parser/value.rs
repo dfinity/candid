@@ -1,3 +1,4 @@
+use super::types::IDLType;
 use crate::types::{Field, Type};
 use num_bigint::{BigInt, BigUint};
 use serde::de;
@@ -52,6 +53,9 @@ impl IDLArgs {
         }
         de.done()?;
         Ok(IDLArgs { args })
+    }
+    pub fn annotate_types(&self, _types: &[IDLType]) -> crate::Result<()> {
+        Ok(())
     }
 }
 
@@ -117,7 +121,15 @@ impl fmt::Display for IDLField {
         write!(f, "{} = {}", self.id, self.val)
     }
 }
-
+/*
+impl IDLValue {
+    pub fn annotate_type(&self, ty: &IDLType) -> crate::Result<Self> {
+        match (*self, *ty) {
+            (IDLValue::Null, IDLType::PrimT(PrimType::Null)) => Ok(self.clone()),
+        }
+    }
+}
+*/
 impl crate::CandidType for IDLValue {
     fn ty() -> Type {
         unreachable!();

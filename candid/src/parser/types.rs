@@ -18,7 +18,7 @@ macro_rules! enum_to_doc {
     (pub enum $name:ident {
         $($variant:ident),*,
     }) => {
-        #[derive(Debug, Clone, PartialEq, Eq)]
+        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub enum $name {
             $($variant),*
         }
