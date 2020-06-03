@@ -118,18 +118,9 @@ impl fmt::Display for IDLField {
     }
 }
 
-impl crate::CandidType for IDLValue {
-    fn ty() -> Type {
-        unreachable!();
-    }
-    fn id() -> crate::types::TypeId {
-        unreachable!();
-    }
-    fn _ty() -> Type {
-        unreachable!();
-    }
+impl IDLValue {
     // This will only be called when the type is not provided
-    fn value_ty(&self) -> Type {
+    pub fn value_ty(&self) -> Type {
         match *self {
             IDLValue::Null => Type::Null,
             IDLValue::Bool(_) => Type::Bool,
@@ -169,6 +160,18 @@ impl crate::CandidType for IDLValue {
                 Type::Variant(vec![f])
             }
         }
+    }
+}
+
+impl crate::CandidType for IDLValue {
+    fn ty() -> Type {
+        unreachable!();
+    }
+    fn id() -> crate::types::TypeId {
+        unreachable!();
+    }
+    fn _ty() -> Type {
+        unreachable!();
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
