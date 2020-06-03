@@ -4,17 +4,24 @@ use crate::{Error, Result};
 use std::collections::HashMap;
 
 pub struct Env<'a> {
-    pub env: &'a mut TypeEnv,
+    pub te: &'a mut TypeEnv,
     pub pre: bool,
 }
-pub type TypeEnv = HashMap<String, Type>;
+#[derive(Debug, Clone, Default)]
+pub struct TypeEnv(pub HashMap<String, Type>);
 pub type ActorEnv = HashMap<String, Function>;
 
-impl<'e> Env<'e> {
-    pub fn find_type(&'e self, name: &str) -> Result<&Type> {
-        match self.env.get(name) {
+impl TypeEnv {
+    pub fn find_type(&self, name: &str) -> Result<&Type> {
+        match self.0.get(name) {
             None => Err(Error::msg(format!("Unbound type identifier {}", name))),
             Some(t) => Ok(t),
+        }
+    }
+    pub fn rec_find_type(&self, name: &str) -> Result<&Type> {
+        match self.find_type(name)? {
+            Type::Var(id) => self.rec_find_type(id),
+            t => Ok(t),
         }
     }
     pub fn as_func<'a>(&'a self, t: &'a Type) -> Result<&'a Function> {
@@ -59,7 +66,7 @@ fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
     match t {
         IDLType::PrimT(prim) => Ok(check_prim(prim)),
         IDLType::VarT(id) => {
-            env.find_type(id)?;
+            env.te.find_type(id)?;
             Ok(Type::Var(id.to_string()))
         }
         IDLType::OptT(t) => {
@@ -141,7 +148,7 @@ fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Function)>> {
     for meth in ms.iter() {
         let t = check_type(env, &meth.typ)?;
         if !env.pre {
-            let func = env.as_func(&t)?;
+            let func = env.te.as_func(&t)?;
             res.push((meth.id.to_owned(), func.clone()));
         }
     }
@@ -153,7 +160,7 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
         match dec {
             Dec::TypD(Binding { id, typ }) => {
                 let t = check_type(env, typ)?;
-                env.env.insert(id.to_string(), t);
+                env.te.0.insert(id.to_string(), t);
             }
             Dec::ImportD(_) => (),
         }
@@ -164,7 +171,7 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         if let Dec::TypD(Binding { id, typ: _ }) = dec {
-            let duplicate = env.env.insert(id.to_string(), Type::Unknown);
+            let duplicate = env.te.0.insert(id.to_string(), Type::Unknown);
             if duplicate.is_some() {
                 return Err(Error::msg(format!("duplicate binding for {}", id)));
             }
@@ -183,7 +190,7 @@ fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<ActorEnv> {
         None => Ok(HashMap::new()),
         Some(typ) => {
             let t = check_type(env, &typ)?;
-            let service = env.as_service(&t)?;
+            let service = env.te.as_service(&t)?;
             let env = service.iter().cloned().collect();
             Ok(env)
         }
@@ -191,7 +198,7 @@ fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<ActorEnv> {
 }
 
 pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<ActorEnv> {
-    let mut env = Env { env: te, pre: true };
+    let mut env = Env { te, pre: false };
     check_decs(&mut env, &prog.decs)?;
     let actor = check_actor(&env, &prog.actor)?;
     Ok(actor)

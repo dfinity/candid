@@ -97,7 +97,8 @@ pub fn is_primitive(t: &Type) -> bool {
         Float32 | Float64 => true,
         Reserved | Empty => true,
         Unknown => panic!("Unknown type"),
-        Knot(_) | Var(_) => true,
+        Var(_) => panic!("Variable"), // Var may or may not be a primitive, so don't ask me
+        Knot(_) => true,
         Opt(_) | Vec(_) | Record(_) | Variant(_) => false,
         Func(_) | Service(_) => false,
     }
