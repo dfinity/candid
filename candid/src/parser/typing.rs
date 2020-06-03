@@ -3,11 +3,16 @@ use crate::types::{Field, Function, Type};
 use crate::{Error, Result};
 use std::collections::HashMap;
 
-pub struct Env(pub HashMap<String, Type>);
+pub struct Env<'a> {
+    pub env: &'a mut TypeEnv,
+    pub pre: bool,
+}
+pub type TypeEnv = HashMap<String, Type>;
+pub type ActorEnv = HashMap<String, Function>;
 
-impl Env {
-    pub fn find_type(&self, name: &str) -> Result<&Type> {
-        match self.0.get(name) {
+impl<'e> Env<'e> {
+    pub fn find_type(&'e self, name: &str) -> Result<&Type> {
+        match self.env.get(name) {
             None => Err(Error::msg(format!("Unbound type identifier {}", name))),
             Some(t) => Ok(t),
         }
@@ -16,14 +21,14 @@ impl Env {
         match t {
             Type::Func(f) => Ok(f),
             Type::Var(id) => self.as_func(self.find_type(id)?),
-            _ => Err(Error::msg("not a function type")),
+            _ => Err(Error::msg(format!("not a function type: {:?}", t))),
         }
     }
-    pub fn as_service<'a>(&'a self, t: &'a Type) -> Result<&'a Type> {
+    pub fn as_service<'a>(&'a self, t: &'a Type) -> Result<&'a [(String, Function)]> {
         match t {
-            Type::Service(_) => Ok(t),
+            Type::Service(s) => Ok(s),
             Type::Var(id) => self.as_service(self.find_type(id)?),
-            _ => Err(Error::msg("not a service type")),
+            _ => Err(Error::msg(format!("not a service type: {:?}", t))),
         }
     }
 }
@@ -135,18 +140,20 @@ fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Function)>> {
     // TODO check duplicates, sorting
     for meth in ms.iter() {
         let t = check_type(env, &meth.typ)?;
-        let func = env.as_func(&t)?;
-        res.push((meth.id.to_owned(), func.clone()));
+        if !env.pre {
+            let func = env.as_func(&t)?;
+            res.push((meth.id.to_owned(), func.clone()));
+        }
     }
     Ok(res)
 }
 
-fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
+fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         match dec {
             Dec::TypD(Binding { id, typ }) => {
                 let t = check_type(env, typ)?;
-                env.0.insert(id.to_string(), t);
+                env.env.insert(id.to_string(), t);
             }
             Dec::ImportD(_) => (),
         }
@@ -154,21 +161,38 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
-fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
+fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
+    for dec in decs.iter() {
+        if let Dec::TypD(Binding { id, typ: _ }) = dec {
+            let duplicate = env.env.insert(id.to_string(), Type::Unknown);
+            if duplicate.is_some() {
+                return Err(Error::msg(format!("duplicate binding for {}", id)));
+            }
+        }
+    }
+    env.pre = true;
+    check_defs(env, decs)?;
+    // TODO check for cycle
+    env.pre = false;
+    check_defs(env, decs)?;
+    Ok(())
+}
+
+fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<ActorEnv> {
     match actor {
-        None => Ok(None),
+        None => Ok(HashMap::new()),
         Some(typ) => {
             let t = check_type(env, &typ)?;
             let service = env.as_service(&t)?;
-            Ok(Some(service.clone()))
+            let env = service.iter().cloned().collect();
+            Ok(env)
         }
     }
 }
 
-pub fn check_prog(prog: &IDLProg) -> Result<(Env, Option<Type>)> {
-    let mut env = Env(HashMap::new());
-    // TODO check for cycle
+pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<ActorEnv> {
+    let mut env = Env { env: te, pre: true };
     check_decs(&mut env, &prog.decs)?;
-    let ms = check_actor(&env, &prog.actor)?;
-    Ok((env, ms))
+    let actor = check_actor(&env, &prog.actor)?;
+    Ok(actor)
 }
