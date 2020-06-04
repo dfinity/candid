@@ -1,4 +1,4 @@
-use candid::{decode_args, encode_to_vec, CandidType, Deserialize, Int, Nat};
+use candid::{decode_args, decode_one, encode_args, encode_one, CandidType, Deserialize, Int, Nat};
 
 #[test]
 fn test_error() {
@@ -108,7 +108,7 @@ fn test_reserved() {
     let bytes = hex("4449444c016b02bc8a017bc5fed2016f010001");
     check_error(
         || {
-            let _: (Result<u8, Empty>,) = decode_args(&bytes).unwrap();
+            decode_one::<Result<u8, Empty>>(&bytes).unwrap();
         },
         "Cannot decode empty type",
     );
@@ -372,11 +372,11 @@ fn test_generics() {
 
 #[test]
 fn test_multiargs() {
-    let bytes = encode_to_vec(()).unwrap();
+    let bytes = encode_args(()).unwrap();
     assert_eq!(bytes, b"DIDL\0\0");
     decode_args::<()>(&bytes).unwrap();
 
-    let bytes = encode_to_vec((
+    let bytes = encode_args((
         &Int::from(42),
         &Some(Int::from(42)),
         &Some(Int::from(1)),
@@ -396,7 +396,7 @@ fn test_multiargs() {
         "3 more values need to be deserialized",
     );
 
-    let bytes = encode_to_vec((&[(Int::from(42), "text")], &(Int::from(42), "text"))).unwrap();
+    let bytes = encode_args((&[(Int::from(42), "text")], &(Int::from(42), "text"))).unwrap();
     assert_eq!(
         bytes,
         hex("4449444c026d016c02007c0171020001012a04746578742a0474657874")
@@ -441,12 +441,12 @@ fn test_decode<'de, T>(bytes: &'de [u8], expected: &T)
 where
     T: PartialEq + serde::de::Deserialize<'de> + std::fmt::Debug,
 {
-    let (decoded,): (T,) = decode_args(bytes).unwrap();
+    let decoded: T = decode_one(bytes).unwrap();
     assert_eq!(decoded, *expected);
 }
 
 fn encode<T: CandidType>(value: &T) -> Vec<u8> {
-    encode_to_vec((value,)).unwrap()
+    encode_one(value).unwrap()
 }
 
 fn check_error<F: FnOnce() -> R + std::panic::UnwindSafe, R>(f: F, str: &str) {

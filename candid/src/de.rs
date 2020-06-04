@@ -831,3 +831,8 @@ pub fn decode_args<'a, Candid: DecodeArguments<'a>>(bytes: &'a [u8]) -> Result<C
     de.done()?;
     Ok(res)
 }
+
+pub fn decode_one<'a, Candid: Deserialize<'a>>(bytes: &'a [u8]) -> Result<Candid> {
+    let (res,) = decode_args(bytes)?;
+    Ok(res)
+}

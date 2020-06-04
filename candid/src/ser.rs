@@ -296,11 +296,15 @@ impl TypeSerialize {
     }
 }
 
+/// A tuple of values, length 0-7, all of which implement the CandidType trait.
+///
+/// This trait maps single values to multiple candid arguments.
+///
+/// This exists to help [`encode_args`](fn.encode_args.html) work without macros.
 pub trait EncodeArguments {
     fn encode_arguments(self, ser: &mut IDLBuilder) -> Result<&mut IDLBuilder>;
 }
 
-// Is this a sensible impl?
 impl EncodeArguments for () {
     fn encode_arguments(self, ser: &mut IDLBuilder) -> Result<&mut IDLBuilder> {
         Ok(ser)
@@ -339,7 +343,51 @@ impl<A1: CandidType, A2: CandidType, A3: CandidType, A4: CandidType> EncodeArgum
     }
 }
 
-pub fn encode_to_vec<Candid: EncodeArguments>(arguments: Candid) -> Result<Vec<u8>> {
+/// Serializes a tuple of rust values to a list of candid arguments.
+///
+/// This is the inverse of [`decode_args`](../de/fn.decode_args.html)
+///
+/// * `arguments` - A tuple of values all of which implement the [`CandidType`](../types/trait.CandidType.html) trait
+///
+/// ```
+/// # use candid::{encode_args, decode_args, Result};
+/// # fn main() -> Result<()> {
+/// let zero_arguments = encode_args(())?;
+/// let one_argument = encode_args(("argument 1",))?;
+/// let two_arguments = encode_args(("argument 1", 2))?;
+/// let (s, i) = decode_args::<(&str, i32)>(&two_arguments)?;
+/// assert_eq!(s, "argument 1");
+/// assert_eq!(i, 2);
+/// # Ok(())
+/// # }
+/// ```
+pub fn encode_args<Tuple: EncodeArguments>(arguments: Tuple) -> Result<Vec<u8>> {
     let mut ser = IDLBuilder::new();
     arguments.encode_arguments(&mut ser)?.serialize_to_vec()
+}
+
+/// Serializes a rust value to a single candid argument.
+///
+/// Calling this is the equivalent of calling:
+/// ```
+/// # use candid::encode_args;
+/// # let argument = ();
+/// encode_args((argument,));
+/// ```
+/// Be warned that one argument of type tuple is not the same as multiple arguments:
+/// ```
+/// # use candid::{encode_one, decode_one, decode_args, Result, Error};
+/// let one_arg = encode_one((1,2)).unwrap();
+///
+/// let result: Result<(i32, i32)> = decode_args(&one_arg);
+/// assert!(result.is_err(), "❌ Type mismatch");
+///
+/// let result: Result<(i32, i32)> = decode_one(&one_arg);
+/// assert_eq!(result, Ok((1,2)), "✔ Works fine!");
+///
+/// let result: Result<((i32, i32),)> = decode_args(&one_arg);
+/// assert_eq!(result, Ok(((1,2),)), "✔ Works if you tell decode_args you expect one argument");
+/// ```
+pub fn encode_one<Candid: CandidType>(argument: Candid) -> Result<Vec<u8>> {
+    encode_args((argument,))
 }

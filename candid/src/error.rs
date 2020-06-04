@@ -7,6 +7,7 @@ use std::io;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+#[derive(PartialEq, Eq)]
 pub struct Error {
     message: String,
     states: String,
