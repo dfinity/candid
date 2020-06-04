@@ -1,4 +1,5 @@
 use candid::{Int, Nat};
+use num_traits::cast::ToPrimitive;
 
 #[test]
 fn test_numbers() {
@@ -25,8 +26,45 @@ fn test_numbers() {
     );
 }
 
+#[test]
+fn random_i64() {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    for _ in 0..10000 {
+        let x: i64 = rng.gen();
+        let mut expected = Vec::new();
+        leb128::write::signed(&mut expected, x).unwrap();
+        {
+            let mut encoded = Vec::new();
+            Int::from(x).encode(&mut encoded).unwrap();
+            assert_eq!(expected, encoded);
+        }
+        let mut readable = &expected[..];
+        let decoded = Int::decode(&mut readable).unwrap();
+        assert_eq!(decoded.0.to_i64().unwrap(), x);
+    }
+}
+
+#[test]
+fn random_u64() {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    for _ in 0..10000 {
+        let x: u64 = rng.gen();
+        let mut expected = Vec::new();
+        leb128::write::unsigned(&mut expected, x).unwrap();
+        {
+            let mut encoded = Vec::new();
+            Nat::from(x).encode(&mut encoded).unwrap();
+            assert_eq!(expected, encoded);
+        }
+        let mut readable = &expected[..];
+        let decoded = Nat::decode(&mut readable).unwrap();
+        assert_eq!(decoded.0.to_u64().unwrap(), x);
+    }
+}
+
 fn check(num: &str, int_hex: &str, nat_hex: &str) {
-    use std::io::Cursor;
     let v = num.parse::<Int>().unwrap();
     let bytes = hex::decode(int_hex).unwrap();
     // Check encode
@@ -34,7 +72,7 @@ fn check(num: &str, int_hex: &str, nat_hex: &str) {
     v.encode(&mut encoded).unwrap();
     assert_eq!(encoded, bytes);
     // Check decode
-    let mut rcr = Cursor::new(encoded);
+    let mut rcr = &encoded[..];
     let decoded = Int::decode(&mut rcr).unwrap();
     assert_eq!(decoded, v);
     // Check for Nat
@@ -46,7 +84,7 @@ fn check(num: &str, int_hex: &str, nat_hex: &str) {
         nat.encode(&mut encoded).unwrap();
         assert_eq!(encoded, bytes);
         // Check decode
-        let mut rcr = Cursor::new(encoded);
+        let mut rcr = &encoded[..];
         let decoded = Nat::decode(&mut rcr).unwrap();
         assert_eq!(decoded, nat);
     }

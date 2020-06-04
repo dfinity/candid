@@ -139,11 +139,12 @@ impl Nat {
     where
         W: ?Sized + io::Write,
     {
+        use num_traits::cast::ToPrimitive;
         let zero = BigUint::from(0u8);
         let mut value = self.0.clone();
         loop {
             let big_byte = &value & BigUint::from(0x7fu8);
-            let mut byte = big_byte.to_bytes_le()[0];
+            let mut byte = big_byte.to_u8().unwrap();
             value >>= 7;
             if value != zero {
                 byte |= 0x80u8;
@@ -179,11 +180,12 @@ impl Int {
     where
         W: ?Sized + io::Write,
     {
+        use num_traits::cast::ToPrimitive;
         let zero = BigInt::from(0);
         let mut value = self.0.clone();
         loop {
             let big_byte = &value & BigInt::from(0xff);
-            let mut byte = big_byte.to_signed_bytes_le()[0];
+            let mut byte = big_byte.to_u8().unwrap();
             value >>= 6;
             let done = value == zero || value == BigInt::from(-1);
             if done {
@@ -217,7 +219,7 @@ impl Int {
                 break;
             }
         }
-        if shift % 8 != 0 && (0x40u8 & byte) == 0x40u8 {
+        if (0x40u8 & byte) == 0x40u8 {
             result |= BigInt::from(-1) << shift;
         }
         Ok(Int(result))

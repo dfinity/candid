@@ -87,11 +87,11 @@
 //! ```
 //! use candid::{Int, Nat, Encode, Decode, Result};
 //! fn bigint_examples() -> Result<()> {
-//!   let x = Int::parse(b"-10000000000000000000")?;
+//!   let x = "-10000000000000000000".parse::<Int>()?;
 //!   let bytes = Encode!(&Nat::from(1024), &x)?;
 //!   let (a, b) = Decode!(&bytes, Nat, Int)?;
 //!   assert_eq!(a, 1024.into());
-//!   assert_eq!(b, Int::from_str("-10000000000000000000"));
+//!   assert_eq!(b, Int::parse(b"-10000000000000000000")?);
 //!   Ok(())
 //! }
 //! # bigint_examples().unwrap();
