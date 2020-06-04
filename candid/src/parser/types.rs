@@ -172,6 +172,14 @@ impl std::str::FromStr for IDLProg {
     }
 }
 
+impl std::str::FromStr for IDLType {
+    type Err = crate::Error;
+    fn from_str(str: &str) -> Result<Self> {
+        let lexer = super::lexer::Lexer::new(str);
+        Ok(super::grammar::TypParser::new().parse(lexer)?)
+    }
+}
+
 // Pretty printing
 
 pub trait ToDoc {

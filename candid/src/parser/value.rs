@@ -1,7 +1,10 @@
+use super::lexer::error;
 use crate::types::{Field, Type};
+use crate::{Error, Result};
 use crate::{Int, Nat};
 use serde::de;
 use serde::de::{Deserialize, Visitor};
+use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
 
@@ -10,14 +13,16 @@ pub enum IDLValue {
     Bool(bool),
     Null,
     Text(String),
-    Number(String),
-    Int(Int),
-    Nat(Nat),
-    None,
+    Number(String), // Undetermined number type
     Opt(Box<IDLValue>),
     Vec(Vec<IDLValue>),
     Record(Vec<IDLField>),
     Variant(Box<IDLField>),
+    // The following values can only be generated with type annotation
+    None,
+    Int(Int),
+    Nat(Nat),
+    Nat8(u8),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -37,14 +42,32 @@ impl IDLArgs {
             args: args.to_owned(),
         }
     }
-    pub fn to_bytes(&self) -> crate::Result<Vec<u8>> {
+    pub fn annotate_types<'a>(&'a mut self, types: &[Type]) -> Result<&'a mut Self> {
+        if types.len() > self.args.len() {
+            return Err(Error::msg("length mismatch for types and values"));
+        }
+        for (i, t) in types.iter().enumerate() {
+            let v = self.args[i].annotate_type(t)?;
+            self.args[i] = v;
+        }
+        Ok(self)
+    }
+    pub fn annotate_type<'a>(&'a mut self, idx: usize, t: &Type) -> Result<&'a mut Self> {
+        if idx >= self.args.len() {
+            return Err(Error::msg("index out of bounds"));
+        }
+        let v = self.args[idx].annotate_type(t)?;
+        self.args[idx] = v;
+        Ok(self)
+    }
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut idl = crate::ser::IDLBuilder::new();
         for v in self.args.iter() {
             idl.value_arg(v)?;
         }
         idl.serialize_to_vec()
     }
-    pub fn from_bytes(bytes: &[u8]) -> crate::Result<Self> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let mut de = crate::de::IDLDeserialize::new(bytes)?;
         let mut args = Vec::new();
         while !de.is_done() {
@@ -57,8 +80,8 @@ impl IDLArgs {
 }
 
 impl std::str::FromStr for IDLArgs {
-    type Err = crate::Error;
-    fn from_str(str: &str) -> Result<Self, Self::Err> {
+    type Err = Error;
+    fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
         let lexer = super::lexer::Lexer::new(str);
         Ok(super::grammar::ArgsParser::new().parse(lexer)?)
     }
@@ -86,6 +109,7 @@ impl fmt::Display for IDLValue {
             IDLValue::Number(ref str) => write!(f, "{}", str),
             IDLValue::Int(ref i) => write!(f, "{}", i),
             IDLValue::Nat(ref n) => write!(f, "{}", n),
+            IDLValue::Nat8(n) => write!(f, "{}", n),
             IDLValue::Text(ref s) => write!(f, "\"{}\"", s),
             IDLValue::None => write!(f, "none"),
             IDLValue::Opt(ref v) => write!(f, "opt {}", v),
@@ -115,6 +139,60 @@ impl fmt::Display for IDLField {
 }
 
 impl IDLValue {
+    pub fn annotate_type(&self, t: &Type) -> Result<Self> {
+        Ok(match (self, t) {
+            (IDLValue::Null, Type::Null) => IDLValue::Null,
+            (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
+            (IDLValue::Bool(b), Type::Bool) => IDLValue::Bool(*b),
+            (IDLValue::Number(str), t) => match t {
+                Type::Int => IDLValue::Int(str.parse::<Int>()?),
+                Type::Nat => IDLValue::Nat(str.parse::<Nat>()?),
+                Type::Nat8 => IDLValue::Nat8(str.parse::<u8>().map_err(error)?),
+                _ => return Err(Error::msg("not a number type")),
+            },
+            (IDLValue::Int(i), Type::Int) => IDLValue::Int(i.clone()),
+            (IDLValue::Nat(n), Type::Nat) => IDLValue::Nat(n.clone()),
+            (IDLValue::Nat8(n), Type::Nat8) => IDLValue::Nat8(*n),
+            (IDLValue::Text(s), Type::Text) => IDLValue::Text(s.to_owned()),
+            (IDLValue::None, Type::Opt(_)) => IDLValue::None,
+            (IDLValue::Opt(v), Type::Opt(ty)) => {
+                let v = v.annotate_type(ty)?;
+                IDLValue::Opt(Box::new(v))
+            }
+            (IDLValue::Vec(vec), Type::Vec(ty)) => {
+                let mut res = Vec::new();
+                for e in vec.iter() {
+                    let v = e.annotate_type(ty)?;
+                    res.push(v);
+                }
+                IDLValue::Vec(res)
+            }
+            (IDLValue::Record(vec), Type::Record(fs)) => {
+                let fs: HashMap<_, _> =
+                    fs.iter().map(|Field { hash, ty, .. }| (hash, ty)).collect();
+                let mut res = Vec::new();
+                for e in vec.iter() {
+                    let ty = fs
+                        .get(&e.id)
+                        .ok_or_else(|| Error::msg("field is not found"))?;
+                    let v = e.val.annotate_type(ty)?;
+                    res.push(IDLField { id: e.id, val: v });
+                }
+                IDLValue::Record(res)
+            }
+            (IDLValue::Variant(v), Type::Variant(fs)) => {
+                let fs: HashMap<_, _> =
+                    fs.iter().map(|Field { hash, ty, .. }| (hash, ty)).collect();
+                let ty = fs
+                    .get(&v.id)
+                    .ok_or_else(|| Error::msg("field is not found"))?;
+                let val = v.val.annotate_type(ty)?;
+                let field = IDLField { id: v.id, val };
+                IDLValue::Variant(Box::new(field))
+            }
+            _ => return Err(Error::msg("type mismatch")),
+        })
+    }
     // This will only be called when the type is not provided
     pub fn value_ty(&self) -> Type {
         match *self {
@@ -123,6 +201,7 @@ impl IDLValue {
             IDLValue::Number(_) => Type::Int,
             IDLValue::Int(_) => Type::Int,
             IDLValue::Nat(_) => Type::Nat,
+            IDLValue::Nat8(_) => Type::Nat8,
             IDLValue::Text(_) => Type::Text,
             IDLValue::None => Type::Opt(Box::new(Type::Null)),
             IDLValue::Opt(ref v) => {
@@ -170,7 +249,7 @@ impl crate::CandidType for IDLValue {
     fn _ty() -> Type {
         unreachable!();
     }
-    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    fn idl_serialize<S>(&self, serializer: S) -> std::result::Result<(), S::Error>
     where
         S: crate::types::Serializer,
     {
@@ -184,6 +263,7 @@ impl crate::CandidType for IDLValue {
             }
             IDLValue::Int(ref i) => serializer.serialize_int(i),
             IDLValue::Nat(ref n) => serializer.serialize_nat(n),
+            IDLValue::Nat8(n) => serializer.serialize_nat8(n),
             IDLValue::Text(ref s) => serializer.serialize_text(s),
             IDLValue::None => serializer.serialize_option::<Option<String>>(None),
             IDLValue::Opt(ref v) => serializer.serialize_option(Some(v.deref())),
@@ -210,8 +290,10 @@ impl crate::CandidType for IDLValue {
     }
 }
 
+type DResult<E> = std::result::Result<IDLValue, E>;
+
 impl<'de> Deserialize<'de> for IDLValue {
-    fn deserialize<D>(deserializer: D) -> Result<IDLValue, D::Error>
+    fn deserialize<D>(deserializer: D) -> DResult<D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -222,19 +304,18 @@ impl<'de> Deserialize<'de> for IDLValue {
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("any valid IDL value")
             }
-            fn visit_bool<E>(self, value: bool) -> Result<IDLValue, E> {
+            fn visit_bool<E>(self, value: bool) -> DResult<E> {
                 Ok(IDLValue::Bool(value))
             }
             /*
-            fn visit_i64<E>(self, value: i64) -> Result<IDLValue, E> {
+            fn visit_i64<E>(self, value: i64) -> DResult<E> {
                 Ok(IDLValue::Int(value))
+            }*/
+            fn visit_u8<E>(self, value: u8) -> DResult<E> {
+                Ok(IDLValue::Nat8(value))
             }
-            fn visit_u64<E>(self, value: u64) -> Result<IDLValue, E> {
-                Ok(IDLValue::Nat(value))
-            }
-            */
             // Deserialize bignum
-            fn visit_bytes<E: de::Error>(self, value: &[u8]) -> Result<IDLValue, E> {
+            fn visit_bytes<E: de::Error>(self, value: &[u8]) -> DResult<E> {
                 let (tag, bytes) = value.split_at(1);
                 match tag[0] {
                     0u8 => {
@@ -250,29 +331,29 @@ impl<'de> Deserialize<'de> for IDLValue {
                     _ => Err(de::Error::custom("unknown tag in visit_bytes")),
                 }
             }
-            fn visit_string<E>(self, value: String) -> Result<IDLValue, E> {
+            fn visit_string<E>(self, value: String) -> DResult<E> {
                 Ok(IDLValue::Text(value))
             }
-            fn visit_str<E>(self, value: &str) -> Result<IDLValue, E>
+            fn visit_str<E>(self, value: &str) -> DResult<E>
             where
                 E: serde::de::Error,
             {
                 self.visit_string(String::from(value))
             }
-            fn visit_none<E>(self) -> Result<IDLValue, E> {
+            fn visit_none<E>(self) -> DResult<E> {
                 Ok(IDLValue::None)
             }
-            fn visit_some<D>(self, deserializer: D) -> Result<IDLValue, D::Error>
+            fn visit_some<D>(self, deserializer: D) -> DResult<D::Error>
             where
                 D: serde::Deserializer<'de>,
             {
                 let v = Deserialize::deserialize(deserializer)?;
                 Ok(IDLValue::Opt(Box::new(v)))
             }
-            fn visit_unit<E>(self) -> Result<IDLValue, E> {
+            fn visit_unit<E>(self) -> DResult<E> {
                 Ok(IDLValue::Null)
             }
-            fn visit_seq<V>(self, mut visitor: V) -> Result<IDLValue, V::Error>
+            fn visit_seq<V>(self, mut visitor: V) -> DResult<V::Error>
             where
                 V: de::SeqAccess<'de>,
             {
@@ -282,7 +363,7 @@ impl<'de> Deserialize<'de> for IDLValue {
                 }
                 Ok(IDLValue::Vec(vec))
             }
-            fn visit_map<V>(self, mut visitor: V) -> Result<IDLValue, V::Error>
+            fn visit_map<V>(self, mut visitor: V) -> DResult<V::Error>
             where
                 V: de::MapAccess<'de>,
             {
@@ -301,7 +382,7 @@ impl<'de> Deserialize<'de> for IDLValue {
                 }
                 Ok(IDLValue::Record(vec))
             }
-            fn visit_enum<V>(self, data: V) -> Result<IDLValue, V::Error>
+            fn visit_enum<V>(self, data: V) -> DResult<V::Error>
             where
                 V: de::EnumAccess<'de>,
             {

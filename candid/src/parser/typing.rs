@@ -62,7 +62,7 @@ fn check_prim(prim: &PrimType) -> Type {
     }
 }
 
-fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
+pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
     match t {
         IDLType::PrimT(prim) => Ok(check_prim(prim)),
         IDLType::VarT(id) => {

@@ -14,7 +14,6 @@ extern {
         "text" => Token::Text(<String>),
         "id" => Token::Id(<String>),
         "null" => Token::Null,
-        "none" => Token::None,
         "opt" => Token::Opt,
         "vec" => Token::Vec,
         "record" => Token::Record,
@@ -51,7 +50,6 @@ Arg: IDLValue = {
     "number" => IDLValue::Number(<>),
     "text" => IDLValue::Text(<>),
     "null" => IDLValue::Null,
-    "none" => IDLValue::None,
     "opt" <Arg> => IDLValue::Opt(Box::new(<>)),
     "vec" "{" <SepBy<Arg, ";">> "}" => IDLValue::Vec(<>),
     "record" "{" <SepBy<RecordField, ";">> "}" => {
@@ -88,7 +86,7 @@ RecordField: TmpIDLField = {
 }
 
 // Type
-Typ: IDLType = {
+pub Typ: IDLType = {
     PrimTyp => <>,
     "opt" <Typ> => IDLType::OptT(Box::new(<>)),
     "vec" <Typ> => IDLType::VecT(Box::new(<>)),
