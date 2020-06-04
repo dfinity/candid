@@ -1,5 +1,5 @@
 use crate::types::{Field, Type};
-use num_bigint::{BigInt, BigUint};
+use crate::{Int, Nat};
 use serde::de;
 use serde::de::{Deserialize, Visitor};
 use std::fmt;
@@ -10,8 +10,9 @@ pub enum IDLValue {
     Bool(bool),
     Null,
     Text(String),
-    Int(i64),
-    Nat(u64),
+    Number(String),
+    Int(Int),
+    Nat(Nat),
     None,
     Opt(Box<IDLValue>),
     Vec(Vec<IDLValue>),
@@ -82,14 +83,9 @@ impl fmt::Display for IDLValue {
         match *self {
             IDLValue::Null => write!(f, "null"),
             IDLValue::Bool(b) => write!(f, "{}", b),
-            IDLValue::Int(i) => {
-                if i >= 0 {
-                    write!(f, "+{}", i)
-                } else {
-                    write!(f, "{}", i)
-                }
-            }
-            IDLValue::Nat(n) => write!(f, "{}", n),
+            IDLValue::Number(ref str) => write!(f, "{}", str),
+            IDLValue::Int(ref i) => write!(f, "{}", i),
+            IDLValue::Nat(ref n) => write!(f, "{}", n),
             IDLValue::Text(ref s) => write!(f, "\"{}\"", s),
             IDLValue::None => write!(f, "none"),
             IDLValue::Opt(ref v) => write!(f, "opt {}", v),
@@ -124,6 +120,7 @@ impl IDLValue {
         match *self {
             IDLValue::Null => Type::Null,
             IDLValue::Bool(_) => Type::Bool,
+            IDLValue::Number(_) => Type::Int,
             IDLValue::Int(_) => Type::Int,
             IDLValue::Nat(_) => Type::Nat,
             IDLValue::Text(_) => Type::Text,
@@ -181,8 +178,12 @@ impl crate::CandidType for IDLValue {
         match *self {
             IDLValue::Null => serializer.serialize_null(()),
             IDLValue::Bool(b) => serializer.serialize_bool(b),
-            IDLValue::Int(i) => serializer.serialize_int(&i.into()),
-            IDLValue::Nat(n) => serializer.serialize_nat(&n.into()),
+            IDLValue::Number(ref str) => {
+                let v = str.parse::<Int>().expect("cannot parse int");
+                serializer.serialize_int(&v)
+            }
+            IDLValue::Int(ref i) => serializer.serialize_int(i),
+            IDLValue::Nat(ref n) => serializer.serialize_nat(n),
             IDLValue::Text(ref s) => serializer.serialize_text(s),
             IDLValue::None => serializer.serialize_option::<Option<String>>(None),
             IDLValue::Opt(ref v) => serializer.serialize_option(Some(v.deref())),
@@ -224,25 +225,27 @@ impl<'de> Deserialize<'de> for IDLValue {
             fn visit_bool<E>(self, value: bool) -> Result<IDLValue, E> {
                 Ok(IDLValue::Bool(value))
             }
+            /*
             fn visit_i64<E>(self, value: i64) -> Result<IDLValue, E> {
                 Ok(IDLValue::Int(value))
             }
             fn visit_u64<E>(self, value: u64) -> Result<IDLValue, E> {
                 Ok(IDLValue::Nat(value))
             }
+            */
             // Deserialize bignum
             fn visit_bytes<E: de::Error>(self, value: &[u8]) -> Result<IDLValue, E> {
                 let (tag, bytes) = value.split_at(1);
                 match tag[0] {
                     0u8 => {
-                        let v = BigInt::from_signed_bytes_le(bytes);
-                        let num = v.to_str_radix(10).parse::<i64>().unwrap();
-                        Ok(IDLValue::Int(num))
+                        let v = Int(num_bigint::BigInt::from_signed_bytes_le(bytes));
+                        //let num = v.to_str_radix(10).parse::<i64>().unwrap();
+                        Ok(IDLValue::Int(v))
                     }
                     1u8 => {
-                        let v = BigUint::from_bytes_le(bytes);
-                        let num = v.to_str_radix(10).parse::<u64>().unwrap();
-                        Ok(IDLValue::Nat(num))
+                        let v = Nat(num_bigint::BigUint::from_bytes_le(bytes));
+                        //let num = v.to_str_radix(10).parse::<u64>().unwrap();
+                        Ok(IDLValue::Nat(v))
                     }
                     _ => Err(de::Error::custom("unknown tag in visit_bytes")),
                 }
@@ -286,8 +289,9 @@ impl<'de> Deserialize<'de> for IDLValue {
                 let mut vec = Vec::new();
                 while let Some((key, value)) = visitor.next_entry()? {
                     if let IDLValue::Nat(hash) = key {
+                        use num_traits::cast::ToPrimitive;
                         let f = IDLField {
-                            id: hash as u32,
+                            id: hash.0.to_u32().unwrap(), //.ok_or(Error::msg("field hash out of range"))?,
                             val: value,
                         };
                         vec.push(f);

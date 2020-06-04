@@ -54,11 +54,11 @@ fn parse_more_literals() {
         vec![
             IDLValue::Bool(true),
             IDLValue::Null,
-            IDLValue::Nat(42),
+            IDLValue::Nat(42.into()),
             IDLValue::Text("哈哈".to_owned()),
             IDLValue::Text("string with whitespace".to_owned()),
-            IDLValue::Int(42),
-            IDLValue::Int(-42),
+            IDLValue::Int(42.into()),
+            IDLValue::Int((-42).into()),
             IDLValue::Bool(false)
         ]
     );
@@ -74,10 +74,10 @@ fn parse_vec() {
     assert_eq!(
         args.args,
         vec![IDLValue::Vec(vec![
-            IDLValue::Nat(1),
-            IDLValue::Nat(2),
-            IDLValue::Nat(3),
-            IDLValue::Nat(4)
+            IDLValue::Nat(1.into()),
+            IDLValue::Nat(2.into()),
+            IDLValue::Nat(3.into()),
+            IDLValue::Nat(4.into())
         ])]
     );
     assert_eq!(format!("{}", args), "(vec { 1; 2; 3; 4; })");
@@ -94,7 +94,7 @@ fn parse_optional_record() {
             IDLValue::Record(vec![
                 IDLField {
                     id: 1,
-                    val: IDLValue::Nat(42)
+                    val: IDLValue::Nat(42.into())
                 },
                 IDLField {
                     id: 2,
@@ -144,7 +144,7 @@ fn parse_nested_record() {
             },
             IDLField {
                 id: 1_873_743_348,
-                val: IDLValue::Nat(42)
+                val: IDLValue::Nat(42.into())
             }
         ])]
     );

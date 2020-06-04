@@ -19,8 +19,8 @@ fn test_parser() {
 fn test_value() {
     use IDLValue::*;
     check(Bool(true), "4449444c00017e01");
-    check(Int(1_234_567_890), "4449444c00017cd285d8cc04");
-    check(Opt(Box::new(Int(42))), "4449444c016e7c0100012a");
+    check(Int(1_234_567_890.into()), "4449444c00017cd285d8cc04");
+    check(Opt(Box::new(Int(42.into()))), "4449444c016e7c0100012a");
     //check(Null, "4449444c016e7c010000");
     check(Text("Hi ☃\n".to_string()), "4449444c00017107486920e298830a");
     check(int_vec(&[0, 1, 2, 3]), "4449444c016d7c01000400010203");
@@ -28,7 +28,7 @@ fn test_value() {
         Record(vec![
             IDLField {
                 id: 0,
-                val: Int(42),
+                val: Int(42.into()),
             },
             IDLField {
                 id: 1,
@@ -45,7 +45,7 @@ fn test_value() {
             },
             IDLField {
                 id: 5_097_222,
-                val: Int(42),
+                val: Int(42.into()),
             },
         ]),
         "4449444c016c02d3e3aa027e868eb7027c0100012a",
@@ -96,7 +96,7 @@ fn test_decode(bytes: &[u8], expected: &IDLValue) {
 }
 
 fn int_vec(v: &[i64]) -> IDLValue {
-    let vec: Vec<_> = v.iter().map(|n| IDLValue::Int(*n)).collect();
+    let vec: Vec<_> = v.iter().map(|n| IDLValue::Int((*n).into())).collect();
     IDLValue::Vec(vec)
 }
 

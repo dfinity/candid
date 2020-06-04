@@ -46,9 +46,9 @@ pub Args: IDLArgs = "(" <SepBy<Arg, ",">> ")" => IDLArgs { args: <> };
 
 Arg: IDLValue = {
     "bool" => IDLValue::Bool(<>),
-    "+" <"number"> =>? Ok(IDLValue::Int(<>.parse::<i64>().map_err(error)?)),
-    "-" <"number"> =>? Ok(IDLValue::Int(format!("-{}", <>).parse::<i64>().map_err(error)?)),
-    "number" =>? Ok(IDLValue::Nat(<>.parse::<u64>().map_err(error)?)),
+    "+" <"number"> => IDLValue::Number(<>),
+    "-" <"number"> => IDLValue::Number(format!("-{}", <>)),
+    "number" => IDLValue::Number(<>),
     "text" => IDLValue::Text(<>),
     "null" => IDLValue::Null,
     "none" => IDLValue::None,

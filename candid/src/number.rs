@@ -38,6 +38,32 @@ impl Nat {
     }
 }
 
+impl std::str::FromStr for Int {
+    type Err = crate::Error;
+    fn from_str(str: &str) -> Result<Self, Self::Err> {
+        Self::parse(str.as_bytes())
+    }
+}
+
+impl std::str::FromStr for Nat {
+    type Err = crate::Error;
+    fn from_str(str: &str) -> Result<Self, Self::Err> {
+        Self::parse(str.as_bytes())
+    }
+}
+
+impl fmt::Display for Int {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0.to_str_radix(10))
+    }
+}
+
+impl fmt::Display for Nat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0.to_str_radix(10))
+    }
+}
+
 impl CandidType for Int {
     fn id() -> TypeId {
         TypeId::of::<Int>()

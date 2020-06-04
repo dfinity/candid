@@ -159,6 +159,7 @@ dependencies = [
  "lalrpop-util",
  "leb128",
  "num-bigint",
+ "num-traits",
  "num_enum",
  "paste",
  "pretty",
