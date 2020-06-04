@@ -12,7 +12,7 @@ fn parse_idl_prog() {
     let prog = r#"
 import "test.did";
 type my_type = nat8;
-type List = record { head: int; tail: List };
+type List = record { head: int; tail: opt List };
 type f = func (List, func (int32) -> (int64)) -> (opt List);
 type broker = service {
   find : (name: text) ->
