@@ -105,9 +105,9 @@
 //! ```
 //! use candid::{Result, parser::value::IDLValue};
 //! fn untyped_examples() -> Result<()> {
-//!   // Serialize Rust value Some(42) and IDLValue "hello"
+//!   // Serialize Rust value Some(42u8) and IDLValue "hello"
 //!   let bytes = candid::ser::IDLBuilder::new()
-//!     .arg(&Some(42))?
+//!     .arg(&Some(42u8))?
 //!     .value_arg(&IDLValue::Text("hello".to_string()))?
 //!     .serialize_to_vec()?;
 //!
@@ -118,7 +118,7 @@
 //!   let y = de.get_value::<&str>()?;
 //!   de.done()?;
 //!
-//!   assert_eq!(x, IDLValue::Opt(Box::new(IDLValue::Int(42))));
+//!   assert_eq!(x, IDLValue::Opt(Box::new(IDLValue::Nat8(42))));
 //!   assert_eq!(y, "hello");
 //!   Ok(())
 //! }
@@ -144,7 +144,7 @@
 //!
 //!   // Deserialize into IDLArgs
 //!   let decoded: IDLArgs = IDLArgs::from_bytes(&encoded)?;
-//!   assert_eq!(args, decoded);
+//!   assert_eq!(encoded, decoded.to_bytes()?);
 //!
 //!   // Convert IDLArgs to text format
 //!   let output: String = decoded.to_string();

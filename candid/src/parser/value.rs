@@ -24,6 +24,7 @@ pub enum IDLValue {
     Int(Int),
     Nat(Nat),
     Nat8(u8),
+    Nat32(u32),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -116,6 +117,7 @@ impl fmt::Display for IDLValue {
             IDLValue::Int(ref i) => write!(f, "{}", i),
             IDLValue::Nat(ref n) => write!(f, "{}", n),
             IDLValue::Nat8(n) => write!(f, "{}", n),
+            IDLValue::Nat32(n) => write!(f, "{}", n),
             IDLValue::Text(ref s) => write!(f, "\"{}\"", s),
             IDLValue::None => write!(f, "none"),
             IDLValue::Opt(ref v) => write!(f, "opt {}", v),
@@ -162,11 +164,13 @@ impl IDLValue {
                 Type::Int => IDLValue::Int(str.parse::<Int>()?),
                 Type::Nat => IDLValue::Nat(str.parse::<Nat>()?),
                 Type::Nat8 => IDLValue::Nat8(str.parse::<u8>().map_err(error)?),
+                Type::Nat32 => IDLValue::Nat32(str.parse::<u32>().map_err(error)?),
                 _ => return Err(Error::msg("not a number type")),
             },
             (IDLValue::Int(i), Type::Int) => IDLValue::Int(i.clone()),
             (IDLValue::Nat(n), Type::Nat) => IDLValue::Nat(n.clone()),
             (IDLValue::Nat8(n), Type::Nat8) => IDLValue::Nat8(*n),
+            (IDLValue::Nat32(n), Type::Nat32) => IDLValue::Nat32(*n),
             (IDLValue::Text(s), Type::Text) => IDLValue::Text(s.to_owned()),
             (IDLValue::None, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Opt(v), Type::Opt(ty)) => {
@@ -216,6 +220,7 @@ impl IDLValue {
             IDLValue::Int(_) => Type::Int,
             IDLValue::Nat(_) => Type::Nat,
             IDLValue::Nat8(_) => Type::Nat8,
+            IDLValue::Nat32(_) => Type::Nat32,
             IDLValue::Text(_) => Type::Text,
             IDLValue::None => Type::Opt(Box::new(Type::Null)),
             IDLValue::Opt(ref v) => {
@@ -278,6 +283,7 @@ impl crate::CandidType for IDLValue {
             IDLValue::Int(ref i) => serializer.serialize_int(i),
             IDLValue::Nat(ref n) => serializer.serialize_nat(n),
             IDLValue::Nat8(n) => serializer.serialize_nat8(n),
+            IDLValue::Nat32(n) => serializer.serialize_nat32(n),
             IDLValue::Text(ref s) => serializer.serialize_text(s),
             IDLValue::None => serializer.serialize_option::<Option<String>>(None),
             IDLValue::Opt(ref v) => serializer.serialize_option(Some(v.deref())),
@@ -327,6 +333,9 @@ impl<'de> Deserialize<'de> for IDLValue {
             }*/
             fn visit_u8<E>(self, value: u8) -> DResult<E> {
                 Ok(IDLValue::Nat8(value))
+            }
+            fn visit_u32<E>(self, value: u32) -> DResult<E> {
+                Ok(IDLValue::Nat32(value))
             }
             // Deserialize bignum
             fn visit_bytes<E: de::Error>(self, value: &[u8]) -> DResult<E> {
@@ -383,10 +392,9 @@ impl<'de> Deserialize<'de> for IDLValue {
             {
                 let mut vec = Vec::new();
                 while let Some((key, value)) = visitor.next_entry()? {
-                    if let IDLValue::Nat(hash) = key {
-                        use num_traits::cast::ToPrimitive;
+                    if let IDLValue::Nat32(hash) = key {
                         let f = IDLField {
-                            id: hash.0.to_u32().unwrap(), //.ok_or(Error::msg("field hash out of range"))?,
+                            id: hash,
                             val: value,
                         };
                         vec.push(f);
