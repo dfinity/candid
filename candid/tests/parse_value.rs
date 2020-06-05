@@ -1,5 +1,6 @@
+use candid::parser::typing::TypeEnv;
 use candid::parser::value::{IDLArgs, IDLField, IDLValue};
-use candid::types::{Field, Type};
+use candid::types::Type;
 
 fn parse_args(input: &str) -> IDLArgs {
     input.parse().unwrap()
@@ -11,13 +12,9 @@ fn parse_args_err(input: &str) -> candid::Result<IDLArgs> {
 
 fn parse_type(input: &str) -> Type {
     use candid::parser::types::IDLType;
-    use candid::parser::typing::{check_type, Env, TypeEnv};
-    let env = Env {
-        te: &mut TypeEnv(std::collections::HashMap::new()),
-        pre: false,
-    };
+    let env = TypeEnv::new();
     let ast = input.parse::<IDLType>().unwrap();
-    check_type(&env, &ast).unwrap()
+    env.ast_to_type(&ast).unwrap()
 }
 
 #[test]
@@ -61,11 +58,11 @@ fn parse_string_literals() {
 fn parse_more_literals() {
     let mut args =
         parse_args("(true, null, 4_2, \"哈哈\", \"string with whitespace\", 0x2a, -42, false)");
-    args.annotate_type(2, &Type::Nat)
+    args.annotate_type(2, &TypeEnv::new(), &Type::Nat)
         .unwrap()
-        .annotate_type(5, &Type::Int)
+        .annotate_type(5, &TypeEnv::new(), &Type::Int)
         .unwrap()
-        .annotate_type(6, &Type::Int)
+        .annotate_type(6, &TypeEnv::new(), &Type::Int)
         .unwrap();
     assert_eq!(
         args.args,
@@ -89,7 +86,7 @@ fn parse_more_literals() {
 #[test]
 fn parse_vec() {
     let mut args = parse_args("(vec{1;2;3;4})");
-    args.annotate_types(&[Type::Vec(Box::new(Type::Nat))])
+    args.annotate_types(&TypeEnv::new(), &[Type::Vec(Box::new(Type::Nat))])
         .unwrap();
     assert_eq!(
         args.args,
@@ -107,27 +104,8 @@ fn parse_vec() {
 fn parse_optional_record() {
     let mut args =
         parse_args("(opt record {}, record { 1=42;44=\"test\"; 2=false }, variant { 5=null })");
-    args.annotate_type(
-        1,
-        &Type::Record(vec![
-            Field {
-                id: "1".to_string(),
-                hash: 1,
-                ty: Type::Nat,
-            },
-            Field {
-                id: "2".to_string(),
-                hash: 2,
-                ty: Type::Bool,
-            },
-            Field {
-                id: "44".to_string(),
-                hash: 44,
-                ty: Type::Text,
-            },
-        ]),
-    )
-    .unwrap();
+    let typ = parse_type("record { 1: nat; 44: text; 2: bool }");
+    args.annotate_type(1, &TypeEnv::new(), &typ).unwrap();
     assert_eq!(
         args.args,
         vec![
@@ -166,7 +144,7 @@ fn parse_nested_record() {
     let typ = parse_type(
         "record {label: nat; 0x2b:record { test:text; msg:text }; long_label: opt null }",
     );
-    args.annotate_type(0, &typ).unwrap();
+    args.annotate_type(0, &TypeEnv::new(), &typ).unwrap();
     assert_eq!(
         args.args,
         vec![IDLValue::Record(vec![

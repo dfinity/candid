@@ -12,6 +12,23 @@ pub struct TypeEnv(pub HashMap<String, Type>);
 pub type ActorEnv = HashMap<String, Function>;
 
 impl TypeEnv {
+    pub fn new() -> Self {
+        TypeEnv(HashMap::new())
+    }
+    /// Generate TypeEnv from type definitions in .did file
+    pub fn from_candid(prog: &IDLProg) -> Result<Self> {
+        let mut env = TypeEnv::new();
+        check_prog(&mut env, prog)?;
+        Ok(env)
+    }
+    /// Convert candid AST to internal Type
+    pub fn ast_to_type(&self, ast: &super::types::IDLType) -> Result<Type> {
+        let env = Env {
+            te: &mut self.clone(),
+            pre: false,
+        };
+        check_type(&env, ast)
+    }
     pub fn find_type(&self, name: &str) -> Result<&Type> {
         match self.0.get(name) {
             None => Err(Error::msg(format!("Unbound type identifier {}", name))),

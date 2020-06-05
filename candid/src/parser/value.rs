@@ -1,4 +1,5 @@
 use super::lexer::error;
+use super::typing::TypeEnv;
 use crate::types::{Field, Type};
 use crate::{Error, Result};
 use crate::{Int, Nat};
@@ -42,21 +43,26 @@ impl IDLArgs {
             args: args.to_owned(),
         }
     }
-    pub fn annotate_types<'a>(&'a mut self, types: &[Type]) -> Result<&'a mut Self> {
+    pub fn annotate_types<'a>(&'a mut self, env: &TypeEnv, types: &[Type]) -> Result<&'a mut Self> {
         if types.len() > self.args.len() {
             return Err(Error::msg("length mismatch for types and values"));
         }
         for (i, t) in types.iter().enumerate() {
-            let v = self.args[i].annotate_type(t)?;
+            let v = self.args[i].annotate_type(env, t)?;
             self.args[i] = v;
         }
         Ok(self)
     }
-    pub fn annotate_type<'a>(&'a mut self, idx: usize, t: &Type) -> Result<&'a mut Self> {
+    pub fn annotate_type<'a>(
+        &'a mut self,
+        idx: usize,
+        env: &TypeEnv,
+        t: &Type,
+    ) -> Result<&'a mut Self> {
         if idx >= self.args.len() {
             return Err(Error::msg("index out of bounds"));
         }
-        let v = self.args[idx].annotate_type(t)?;
+        let v = self.args[idx].annotate_type(env, t)?;
         self.args[idx] = v;
         Ok(self)
     }
@@ -139,8 +145,16 @@ impl fmt::Display for IDLField {
 }
 
 impl IDLValue {
-    pub fn annotate_type(&self, t: &Type) -> Result<Self> {
+    pub fn annotate_type(&self, env: &TypeEnv, t: &Type) -> Result<Self> {
         Ok(match (self, t) {
+            (_, Type::Var(id)) => {
+                let ty = env.rec_find_type(id)?;
+                self.annotate_type(env, ty)?
+            }
+            (_, Type::Knot(id)) => {
+                let ty = crate::types::internal::find_type(*id).unwrap();
+                self.annotate_type(env, &ty)?
+            }
             (IDLValue::Null, Type::Null) => IDLValue::Null,
             (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Bool(b), Type::Bool) => IDLValue::Bool(*b),
@@ -156,13 +170,13 @@ impl IDLValue {
             (IDLValue::Text(s), Type::Text) => IDLValue::Text(s.to_owned()),
             (IDLValue::None, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Opt(v), Type::Opt(ty)) => {
-                let v = v.annotate_type(ty)?;
+                let v = v.annotate_type(env, ty)?;
                 IDLValue::Opt(Box::new(v))
             }
             (IDLValue::Vec(vec), Type::Vec(ty)) => {
                 let mut res = Vec::new();
                 for e in vec.iter() {
-                    let v = e.annotate_type(ty)?;
+                    let v = e.annotate_type(env, ty)?;
                     res.push(v);
                 }
                 IDLValue::Vec(res)
@@ -175,7 +189,7 @@ impl IDLValue {
                     let ty = fs
                         .get(&e.id)
                         .ok_or_else(|| Error::msg("field is not found"))?;
-                    let v = e.val.annotate_type(ty)?;
+                    let v = e.val.annotate_type(env, ty)?;
                     res.push(IDLField { id: e.id, val: v });
                 }
                 IDLValue::Record(res)
@@ -186,7 +200,7 @@ impl IDLValue {
                 let ty = fs
                     .get(&v.id)
                     .ok_or_else(|| Error::msg("field is not found"))?;
-                let val = v.val.annotate_type(ty)?;
+                let val = v.val.annotate_type(env, ty)?;
                 let field = IDLField { id: v.id, val };
                 IDLValue::Variant(Box::new(field))
             }
