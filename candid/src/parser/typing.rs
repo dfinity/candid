@@ -29,6 +29,15 @@ impl TypeEnv {
         };
         check_type(&env, ast)
     }
+    pub fn merge<'a>(&'a mut self, env: &TypeEnv) -> Result<&'a mut Self> {
+        for (k, v) in env.0.iter() {
+            let entry = self.0.entry(k.to_string()).or_insert_with(|| v.clone());
+            if *entry != *v {
+                return Err(Error::msg("inconsistent binding"));
+            }
+        }
+        Ok(self)
+    }
     pub fn find_type(&self, name: &str) -> Result<&Type> {
         match self.0.get(name) {
             None => Err(Error::msg(format!("Unbound type identifier {}", name))),

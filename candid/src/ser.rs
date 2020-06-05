@@ -24,12 +24,6 @@ impl IDLBuilder {
             value_ser: ValueSerializer::new(),
         }
     }
-    pub fn new_env(env: TypeEnv) -> Self {
-        IDLBuilder {
-            type_ser: TypeSerialize::new_env(env),
-            value_ser: ValueSerializer::new(),
-        }
-    }
     pub fn arg<'a, T: types::CandidType>(&'a mut self, value: &T) -> Result<&'a mut Self> {
         self.type_ser.push_type(&T::ty())?;
         value.idl_serialize(&mut self.value_ser)?;
@@ -41,14 +35,19 @@ impl IDLBuilder {
         value.idl_serialize(&mut self.value_ser)?;
         Ok(self)
     }
+    /// Annotate IDLValue with (TypeEnv, Type). Note that the TypeEnv will be added to the serializer state.
+    /// If the Type can already be resolved by previous TypeEnvs, you don't need to pass TypeEnv again.
     pub fn value_arg_with_type<'a>(
         &'a mut self,
         value: &IDLValue,
+        env: &TypeEnv,
         t: &Type,
     ) -> Result<&'a mut Self> {
         use super::CandidType;
+        let env = self.type_ser.env.merge(env)?;
+        let v = value.annotate_type(env, t)?;
         self.type_ser.push_type(t)?;
-        value.idl_serialize(&mut self.value_ser)?;
+        v.idl_serialize(&mut self.value_ser)?;
         Ok(self)
     }
     pub fn serialize<W: io::Write>(&mut self, mut writer: W) -> Result<()> {
@@ -191,22 +190,11 @@ impl TypeSerialize {
         TypeSerialize {
             type_table: Vec::new(),
             type_map: HashMap::new(),
-            env: TypeEnv(HashMap::new()),
+            env: TypeEnv::new(),
             args: Vec::new(),
             result: Vec::new(),
         }
     }
-
-    pub fn new_env(env: TypeEnv) -> Self {
-        TypeSerialize {
-            type_table: Vec::new(),
-            type_map: HashMap::new(),
-            env,
-            args: Vec::new(),
-            result: Vec::new(),
-        }
-    }
-
     #[inline]
     fn build_type(&mut self, t: &Type) -> Result<()> {
         if self.type_map.contains_key(t) {
