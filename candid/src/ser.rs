@@ -353,11 +353,14 @@ impl<A1: CandidType, A2: CandidType, A3: CandidType, A4: CandidType> EncodeArgum
 /// # use candid::{encode_args, decode_args, Result};
 /// # fn main() -> Result<()> {
 /// let zero_arguments = encode_args(())?;
+///
 /// let one_argument = encode_args(("argument 1",))?;
-/// let two_arguments = encode_args(("argument 1", 2))?;
-/// let (s, i) = decode_args::<(&str, i32)>(&two_arguments)?;
+///
+/// let two_arguments = encode_args(("argument 1", (1,2)))?;
+/// let (s, i) = decode_args::<(&str, (i32, i32))>(&two_arguments)?;
+///
 /// assert_eq!(s, "argument 1");
-/// assert_eq!(i, 2);
+/// assert_eq!(i, (1, 2));
 /// # Ok(())
 /// # }
 /// ```
@@ -366,7 +369,7 @@ pub fn encode_args<Tuple: EncodeArguments>(arguments: Tuple) -> Result<Vec<u8>> 
     arguments.encode_arguments(&mut ser)?.serialize_to_vec()
 }
 
-/// Serializes a rust value to a single candid argument.
+/// Serializes a single rust value to a single candid argument.
 ///
 /// Calling this is the equivalent of calling:
 /// ```
@@ -374,7 +377,7 @@ pub fn encode_args<Tuple: EncodeArguments>(arguments: Tuple) -> Result<Vec<u8>> 
 /// # let argument = ();
 /// encode_args((argument,));
 /// ```
-/// Be warned that one argument of type tuple is not the same as multiple arguments:
+/// Be warned that a single argument of type tuple is not the same as multiple arguments:
 /// ```
 /// # use candid::{encode_one, decode_one, decode_args, Result, Error};
 /// let one_arg = encode_one((1,2)).unwrap();
