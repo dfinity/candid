@@ -24,7 +24,13 @@ pub enum IDLValue {
     Int(Int),
     Nat(Nat),
     Nat8(u8),
+    Nat16(u16),
     Nat32(u32),
+    Nat64(u64),
+    Int8(i8),
+    Int16(i16),
+    Int32(i32),
+    Int64(i64),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -104,7 +110,13 @@ impl fmt::Display for IDLValue {
             IDLValue::Int(ref i) => write!(f, "{}", i),
             IDLValue::Nat(ref n) => write!(f, "{}", n),
             IDLValue::Nat8(n) => write!(f, "{}", n),
+            IDLValue::Nat16(n) => write!(f, "{}", n),
             IDLValue::Nat32(n) => write!(f, "{}", n),
+            IDLValue::Nat64(n) => write!(f, "{}", n),
+            IDLValue::Int8(n) => write!(f, "{}", n),
+            IDLValue::Int16(n) => write!(f, "{}", n),
+            IDLValue::Int32(n) => write!(f, "{}", n),
+            IDLValue::Int64(n) => write!(f, "{}", n),
             IDLValue::Text(ref s) => write!(f, "\"{}\"", s),
             IDLValue::None => write!(f, "none"),
             IDLValue::Opt(ref v) => write!(f, "opt {}", v),
@@ -151,13 +163,25 @@ impl IDLValue {
                 Type::Int => IDLValue::Int(str.parse::<Int>()?),
                 Type::Nat => IDLValue::Nat(str.parse::<Nat>()?),
                 Type::Nat8 => IDLValue::Nat8(str.parse::<u8>().map_err(error)?),
+                Type::Nat16 => IDLValue::Nat16(str.parse::<u16>().map_err(error)?),
                 Type::Nat32 => IDLValue::Nat32(str.parse::<u32>().map_err(error)?),
+                Type::Nat64 => IDLValue::Nat64(str.parse::<u64>().map_err(error)?),
+                Type::Int8 => IDLValue::Int8(str.parse::<i8>().map_err(error)?),
+                Type::Int16 => IDLValue::Int16(str.parse::<i16>().map_err(error)?),
+                Type::Int32 => IDLValue::Int32(str.parse::<i32>().map_err(error)?),
+                Type::Int64 => IDLValue::Int64(str.parse::<i64>().map_err(error)?),
                 _ => return Err(Error::msg("not a number type")),
             },
             (IDLValue::Int(i), Type::Int) => IDLValue::Int(i.clone()),
             (IDLValue::Nat(n), Type::Nat) => IDLValue::Nat(n.clone()),
             (IDLValue::Nat8(n), Type::Nat8) => IDLValue::Nat8(*n),
+            (IDLValue::Nat16(n), Type::Nat16) => IDLValue::Nat16(*n),
             (IDLValue::Nat32(n), Type::Nat32) => IDLValue::Nat32(*n),
+            (IDLValue::Nat64(n), Type::Nat64) => IDLValue::Nat64(*n),
+            (IDLValue::Int8(n), Type::Int8) => IDLValue::Int8(*n),
+            (IDLValue::Int16(n), Type::Int16) => IDLValue::Int16(*n),
+            (IDLValue::Int32(n), Type::Int32) => IDLValue::Int32(*n),
+            (IDLValue::Int64(n), Type::Int64) => IDLValue::Int64(*n),
             (IDLValue::Text(s), Type::Text) => IDLValue::Text(s.to_owned()),
             (IDLValue::None, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Opt(v), Type::Opt(ty)) => {
@@ -203,11 +227,17 @@ impl IDLValue {
         match *self {
             IDLValue::Null => Type::Null,
             IDLValue::Bool(_) => Type::Bool,
-            IDLValue::Number(_) => Type::Int,
+            IDLValue::Number(_) => Type::Int, // Number defaults to Int
             IDLValue::Int(_) => Type::Int,
             IDLValue::Nat(_) => Type::Nat,
             IDLValue::Nat8(_) => Type::Nat8,
+            IDLValue::Nat16(_) => Type::Nat16,
             IDLValue::Nat32(_) => Type::Nat32,
+            IDLValue::Nat64(_) => Type::Nat64,
+            IDLValue::Int8(_) => Type::Int8,
+            IDLValue::Int16(_) => Type::Int16,
+            IDLValue::Int32(_) => Type::Int32,
+            IDLValue::Int64(_) => Type::Int64,
             IDLValue::Text(_) => Type::Text,
             IDLValue::None => Type::Opt(Box::new(Type::Null)),
             IDLValue::Opt(ref v) => {
@@ -270,7 +300,13 @@ impl crate::CandidType for IDLValue {
             IDLValue::Int(ref i) => serializer.serialize_int(i),
             IDLValue::Nat(ref n) => serializer.serialize_nat(n),
             IDLValue::Nat8(n) => serializer.serialize_nat8(n),
+            IDLValue::Nat16(n) => serializer.serialize_nat16(n),
             IDLValue::Nat32(n) => serializer.serialize_nat32(n),
+            IDLValue::Nat64(n) => serializer.serialize_nat64(n),
+            IDLValue::Int8(n) => serializer.serialize_int8(n),
+            IDLValue::Int16(n) => serializer.serialize_int16(n),
+            IDLValue::Int32(n) => serializer.serialize_int32(n),
+            IDLValue::Int64(n) => serializer.serialize_int64(n),
             IDLValue::Text(ref s) => serializer.serialize_text(s),
             IDLValue::None => serializer.serialize_option::<Option<String>>(None),
             IDLValue::Opt(ref v) => serializer.serialize_option(Some(v.deref())),
@@ -299,6 +335,16 @@ impl crate::CandidType for IDLValue {
 
 type DResult<E> = std::result::Result<IDLValue, E>;
 
+macro_rules! visit_prim {
+    ($name:ident, $ty:ty) => {
+        paste::item! {
+            fn [<visit_ $ty>]<E>(self, value: $ty) -> DResult<E> {
+                Ok(IDLValue::$name(value))
+            }
+        }
+    };
+}
+
 impl<'de> Deserialize<'de> for IDLValue {
     fn deserialize<D>(deserializer: D) -> DResult<D::Error>
     where
@@ -311,31 +357,25 @@ impl<'de> Deserialize<'de> for IDLValue {
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("any valid IDL value")
             }
-            fn visit_bool<E>(self, value: bool) -> DResult<E> {
-                Ok(IDLValue::Bool(value))
-            }
-            /*
-            fn visit_i64<E>(self, value: i64) -> DResult<E> {
-                Ok(IDLValue::Int(value))
-            }*/
-            fn visit_u8<E>(self, value: u8) -> DResult<E> {
-                Ok(IDLValue::Nat8(value))
-            }
-            fn visit_u32<E>(self, value: u32) -> DResult<E> {
-                Ok(IDLValue::Nat32(value))
-            }
+            visit_prim!(Bool, bool);
+            visit_prim!(Nat8, u8);
+            visit_prim!(Nat16, u16);
+            visit_prim!(Nat32, u32);
+            visit_prim!(Nat64, u64);
+            visit_prim!(Int8, i8);
+            visit_prim!(Int16, i16);
+            visit_prim!(Int32, i32);
+            visit_prim!(Int64, i64);
             // Deserialize bignum
             fn visit_bytes<E: de::Error>(self, value: &[u8]) -> DResult<E> {
                 let (tag, bytes) = value.split_at(1);
                 match tag[0] {
                     0u8 => {
                         let v = Int(num_bigint::BigInt::from_signed_bytes_le(bytes));
-                        //let num = v.to_str_radix(10).parse::<i64>().unwrap();
                         Ok(IDLValue::Int(v))
                     }
                     1u8 => {
                         let v = Nat(num_bigint::BigUint::from_bytes_le(bytes));
-                        //let num = v.to_str_radix(10).parse::<u64>().unwrap();
                         Ok(IDLValue::Nat(v))
                     }
                     _ => Err(de::Error::custom("unknown tag in visit_bytes")),
