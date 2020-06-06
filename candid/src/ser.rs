@@ -271,6 +271,12 @@ impl TypeSerialize {
     }
 
     fn encode(&self, buf: &mut Vec<u8>, t: &Type) -> Result<()> {
+        if let Type::Var(id) = t {
+            let actual_type = self.env.rec_find_type(id)?;
+            if types::internal::is_primitive(&actual_type) {
+                return self.encode(buf, actual_type);
+            }
+        }
         match t {
             Type::Null => sleb128_encode(buf, Opcode::Null as i64),
             Type::Bool => sleb128_encode(buf, Opcode::Bool as i64),
@@ -297,12 +303,11 @@ impl TypeSerialize {
                     .unwrap_or_else(|| panic!("knot type {:?} not found", ty));
                 sleb128_encode(buf, i64::from(*idx))
             }
-            Type::Var(id) => {
-                let ty = self.env.rec_find_type(id)?;
+            Type::Var(_) => {
                 let idx = self
                     .type_map
-                    .get(&ty)
-                    .unwrap_or_else(|| panic!("var type {:?} not found", ty));
+                    .get(&t)
+                    .unwrap_or_else(|| panic!("var type {:?} not found", t));
                 sleb128_encode(buf, i64::from(*idx))
             }
             _ => {

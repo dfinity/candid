@@ -15,12 +15,6 @@ impl TypeEnv {
     pub fn new() -> Self {
         TypeEnv(HashMap::new())
     }
-    /// Generate TypeEnv from type definitions in .did file
-    pub fn from_candid(prog: &IDLProg) -> Result<Self> {
-        let mut env = TypeEnv::new();
-        check_prog(&mut env, prog)?;
-        Ok(env)
-    }
     /// Convert candid AST to internal Type
     pub fn ast_to_type(&self, ast: &super::types::IDLType) -> Result<Type> {
         let env = Env {

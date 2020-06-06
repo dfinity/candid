@@ -1,4 +1,8 @@
 use candid::parser::value::{IDLArgs, IDLField, IDLValue};
+use candid::parser::{
+    types::IDLProg,
+    typing::{check_prog, TypeEnv},
+};
 use candid::Decode;
 
 #[test]
@@ -13,6 +17,37 @@ fn test_parser() {
     parse_check(
         "(variant { cons=record{ 42; variant { cons=record{43; variant { nil=record{} }} } } })",
     );
+}
+
+#[test]
+fn test_typed_parser() {
+    let candid = r#"
+type List = List1;
+type List1 = List2;
+type List2 = opt record { head: nat8; tail: List1 };
+type byte = nat8;
+service : {
+  f : (byte, int, nat, nat8) -> (List);
+}
+"#;
+    let ast = candid.parse::<IDLProg>().unwrap();
+    let mut env = TypeEnv::new();
+    let actor = check_prog(&mut env, &ast).unwrap();
+    let method = actor.get("f").unwrap();
+    {
+        let args = "(42,42,42,42)".parse::<IDLArgs>().unwrap();
+        let encoded = args.to_bytes_with_types(&env, &method.args).unwrap();
+        let decoded = IDLArgs::from_bytes(&encoded).unwrap();
+        assert_eq!(decoded.args[0], IDLValue::Nat8(42));
+        assert_eq!(decoded.args[1], IDLValue::Int(42.into()));
+    }
+    {
+        let str = "(opt record { head = 1; tail = opt record {head = 2; tail = null}})";
+        let args = str.parse::<IDLArgs>().unwrap();
+        let encoded = args.to_bytes_with_types(&env, &method.rets).unwrap();
+        let decoded = IDLArgs::from_bytes(&encoded).unwrap();
+        assert_eq!(decoded.to_string(), "(opt record { 1158359328 = 1; 1291237008 = opt record { 1158359328 = 2; 1291237008 = none; }; })");
+    }
 }
 
 #[test]

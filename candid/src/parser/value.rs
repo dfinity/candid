@@ -44,28 +44,15 @@ impl IDLArgs {
             args: args.to_owned(),
         }
     }
-    pub fn annotate_types<'a>(&'a mut self, env: &TypeEnv, types: &[Type]) -> Result<&'a mut Self> {
-        if types.len() > self.args.len() {
+    pub fn to_bytes_with_types(&self, env: &TypeEnv, types: &[Type]) -> Result<Vec<u8>> {
+        if types.len() != self.args.len() {
             return Err(Error::msg("length mismatch for types and values"));
         }
-        for (i, t) in types.iter().enumerate() {
-            let v = self.args[i].annotate_type(env, t)?;
-            self.args[i] = v;
+        let mut idl = crate::ser::IDLBuilder::new();
+        for (i, v) in self.args.iter().enumerate() {
+            idl.value_arg_with_type(v, env, &types[i])?;
         }
-        Ok(self)
-    }
-    pub fn annotate_type<'a>(
-        &'a mut self,
-        idx: usize,
-        env: &TypeEnv,
-        t: &Type,
-    ) -> Result<&'a mut Self> {
-        if idx >= self.args.len() {
-            return Err(Error::msg("index out of bounds"));
-        }
-        let v = self.args[idx].annotate_type(env, t)?;
-        self.args[idx] = v;
-        Ok(self)
+        idl.serialize_to_vec()
     }
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut idl = crate::ser::IDLBuilder::new();
