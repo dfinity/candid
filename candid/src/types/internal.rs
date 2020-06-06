@@ -62,6 +62,17 @@ pub struct Function {
     pub rets: Vec<Type>,
 }
 
+impl Function {
+    pub fn is_query(&self) -> bool {
+        for m in self.modes.iter() {
+            if let crate::parser::types::FuncMode::Query = m {
+                return true;
+            }
+        }
+        false
+    }
+}
+
 #[derive(Debug, PartialEq, TryFromPrimitive)]
 #[repr(i64)]
 pub(crate) enum Opcode {

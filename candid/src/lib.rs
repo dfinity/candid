@@ -174,8 +174,6 @@
 //!
 //!   // Pretty-print AST and access type definitions
 //!   let pretty: String = to_pretty(&ast, 80);
-//!   let showList = to_pretty(&ast.find_type("List")?, 80);
-//!   let showMethod = to_pretty(&ast.get_method_type("g").unwrap(), 80);
 //!   Ok(())
 //! }
 //! # parser_examples().unwrap();
