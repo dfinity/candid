@@ -38,7 +38,7 @@ pub enum Type {
     Reserved,
     Empty,
     Knot(TypeId), // For recursive types from Rust
-    Var(String),  // For recursive types from Candid file
+    Var(String),  // For variables from Candid file
     Unknown,
     Opt(Box<Type>),
     Vec(Box<Type>),
