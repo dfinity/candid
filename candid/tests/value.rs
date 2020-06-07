@@ -38,15 +38,22 @@ service : {
         let args = "(42,42,42,42)".parse::<IDLArgs>().unwrap();
         let encoded = args.to_bytes_with_types(&env, &method.args).unwrap();
         let decoded = IDLArgs::from_bytes(&encoded).unwrap();
-        assert_eq!(decoded.args[0], IDLValue::Nat8(42));
-        assert_eq!(decoded.args[1], IDLValue::Int(42.into()));
+        assert_eq!(
+            decoded.args,
+            vec![
+                IDLValue::Nat8(42),
+                IDLValue::Int(42.into()),
+                IDLValue::Nat(42.into()),
+                IDLValue::Nat8(42)
+            ]
+        );
     }
     {
         let str = "(opt record { head = 1; tail = opt record {head = 2; tail = null}})";
         let args = str.parse::<IDLArgs>().unwrap();
         let encoded = args.to_bytes_with_types(&env, &method.rets).unwrap();
         let decoded = IDLArgs::from_bytes(&encoded).unwrap();
-        assert_eq!(decoded.to_string(), "(opt record { 1158359328 = 1; 1291237008 = opt record { 1158359328 = 2; 1291237008 = none; }; })");
+        assert_eq!(decoded.to_string(), "(opt record { 1158359328 = 1; 1291237008 = opt record { 1158359328 = 2; 1291237008 = null; }; })");
     }
 }
 
@@ -90,10 +97,13 @@ fn test_value() {
 #[test]
 fn test_variant() {
     use IDLValue::*;
-    let value = Variant(Box::new(IDLField {
-        id: 3_303_859,
-        val: Null,
-    }));
+    let value = Variant(
+        Box::new(IDLField {
+            id: 3_303_859,
+            val: Null,
+        }),
+        0,
+    );
     let bytes = hex("4449444c016b02b3d3c9017fe6fdd5017f010000");
     test_decode(&bytes, &value);
     let encoded = IDLArgs::new(&[value.clone()]).to_bytes().unwrap();

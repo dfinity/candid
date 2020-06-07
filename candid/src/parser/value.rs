@@ -18,7 +18,7 @@ pub enum IDLValue {
     Opt(Box<IDLValue>),
     Vec(Vec<IDLValue>),
     Record(Vec<IDLField>),
-    Variant(Box<IDLField>),
+    Variant(Box<IDLField>, u64),
     // The following values can only be generated with type annotation
     None,
     Int(Int),
@@ -118,7 +118,7 @@ impl fmt::Display for IDLValue {
             IDLValue::Int32(n) => write!(f, "{}", n),
             IDLValue::Int64(n) => write!(f, "{}", n),
             IDLValue::Text(ref s) => write!(f, "\"{}\"", s),
-            IDLValue::None => write!(f, "none"),
+            IDLValue::None => write!(f, "null"),
             IDLValue::Opt(ref v) => write!(f, "opt {}", v),
             IDLValue::Vec(ref vec) => {
                 write!(f, "vec {{ ")?;
@@ -134,7 +134,7 @@ impl fmt::Display for IDLValue {
                 }
                 write!(f, "}}")
             }
-            IDLValue::Variant(ref v) => write!(f, "variant {{ {} }}", v),
+            IDLValue::Variant(ref v, _) => write!(f, "variant {{ {} }}", v),
         }
     }
 }
@@ -209,17 +209,22 @@ impl IDLValue {
                 }
                 IDLValue::Record(res)
             }
-            (IDLValue::Variant(v), Type::Variant(fs)) => {
-                let fs: HashMap<_, _> =
-                    fs.iter().map(|Field { hash, ty, .. }| (hash, ty)).collect();
-                let ty = fs
-                    .get(&v.id)
-                    .ok_or_else(|| Error::msg("field is not found"))?;
-                let val = v.val.annotate_type(env, ty)?;
-                let field = IDLField { id: v.id, val };
-                IDLValue::Variant(Box::new(field))
+            (IDLValue::Variant(v, _), Type::Variant(fs)) => {
+                for (i, f) in fs.iter().enumerate() {
+                    if v.id == f.hash {
+                        let val = v.val.annotate_type(env, &f.ty)?;
+                        let field = IDLField { id: v.id, val };
+                        return Ok(IDLValue::Variant(Box::new(field), i as u64));
+                    }
+                }
+                return Err(Error::msg("field not found"));
             }
-            _ => return Err(Error::msg("type mismatch")),
+            _ => {
+                return Err(Error::msg(format!(
+                    "type mismatch: {} cannot be of type {:?}",
+                    self, t
+                )))
+            }
         })
     }
     // This will only be called when the type is not provided
@@ -263,7 +268,8 @@ impl IDLValue {
                     .collect();
                 Type::Record(fs)
             }
-            IDLValue::Variant(ref v) => {
+            IDLValue::Variant(ref v, idx) => {
+                assert_eq!(idx, 0);
                 let f = Field {
                     id: v.id.to_string(),
                     hash: v.id,
@@ -324,8 +330,8 @@ impl crate::CandidType for IDLValue {
                 }
                 Ok(())
             }
-            IDLValue::Variant(ref v) => {
-                let mut ser = serializer.serialize_variant(0)?;
+            IDLValue::Variant(ref v, idx) => {
+                let mut ser = serializer.serialize_variant(idx)?;
                 ser.serialize_element(&v.val)?;
                 Ok(())
             }
@@ -451,7 +457,8 @@ impl<'de> Deserialize<'de> for IDLValue {
                         _ => unreachable!(),
                     };
                     let f = IDLField { id, val };
-                    Ok(IDLValue::Variant(Box::new(f)))
+                    // TODO assign index from type
+                    Ok(IDLValue::Variant(Box::new(f), 0))
                 } else {
                     unreachable!()
                 }

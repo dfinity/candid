@@ -66,7 +66,7 @@ Arg: IDLValue = {
         fs.sort_unstable_by_key(|IDLField { id, .. }| *id);
         IDLValue::Record(fs)
      },
-    "variant" "{" <VariantField> "}" => IDLValue::Variant(Box::new(<>)),
+    "variant" "{" <VariantField> "}" => IDLValue::Variant(Box::new(<>), 0),
 }
 
 Field: IDLField = {

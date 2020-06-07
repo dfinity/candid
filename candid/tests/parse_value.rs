@@ -128,10 +128,13 @@ fn parse_optional_record() {
                     val: IDLValue::Text("test".to_owned())
                 },
             ]),
-            IDLValue::Variant(Box::new(IDLField {
-                id: 5,
-                val: IDLValue::Null
-            }))
+            IDLValue::Variant(
+                Box::new(IDLField {
+                    id: 5,
+                    val: IDLValue::Null
+                }),
+                0
+            )
         ]
     );
     assert_eq!(
