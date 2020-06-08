@@ -64,12 +64,7 @@ pub struct Function {
 
 impl Function {
     pub fn is_query(&self) -> bool {
-        for m in self.modes.iter() {
-            if let crate::parser::types::FuncMode::Query = m {
-                return true;
-            }
-        }
-        false
+        self.modes.contains(&crate::parser::types::FuncMode::Query)
     }
 }
 

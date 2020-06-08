@@ -217,6 +217,8 @@ fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<ActorEnv> {
     }
 }
 
+/// Type check IDLProg, and adds bindings to type environment. Returns
+/// a hash map for the serivce method signatures. For now, we omit import.
 pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<ActorEnv> {
     let mut env = Env { te, pre: false };
     check_decs(&mut env, &prog.decs)?;
