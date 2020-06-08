@@ -37,7 +37,7 @@ exchange (names, parameter and result formats of service methods)
 
 #### Why not Protocol Buffers or others?
 
-Vanilla protocol buffers are not sufficient or well-suited for describing Dfinity canisters:
+Vanilla protocol buffers are not sufficient or well-suited for describing canisters on the Internet Computer:
 
 * They are primarily a *data description language*, not an IDL. There is syntax for defining "services", but it assumes RPCs not messaging and requires a developing a plugin (replacing the gRPC a.k.a. Stubby one) to provide a semantics.
 
@@ -822,7 +822,7 @@ The following notation is used:
 `T` maps an Candid type to a byte sequence representing that type.
 Each type constructor is encoded as a negative opcode;
 positive numbers index auxiliary *type definitions* that define more complex types.
-We assume that the fields in a record or function type are sorted by increasing id and the methods in a service are sorted by name.
+We assume that the fields in a record or variant type are sorted by increasing id and the methods in a service are sorted by name.
 
 ```
 T : <primtype> -> i8*

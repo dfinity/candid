@@ -1,15 +1,11 @@
 extern crate proc_macro;
-extern crate proc_macro2;
-#[macro_use]
-extern crate syn;
-extern crate quote;
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as Tokens;
 use quote::quote;
 use std::collections::BTreeSet;
 use syn::punctuated::Punctuated;
-use syn::{parse_macro_input, Data, DeriveInput, GenericParam, Generics};
+use syn::{parse_macro_input, Data, DeriveInput, GenericParam, Generics, Token};
 
 #[proc_macro_derive(CandidType)]
 pub fn derive_idl_type(input: TokenStream) -> TokenStream {
@@ -26,15 +22,15 @@ pub fn derive_idl_type(input: TokenStream) -> TokenStream {
         Data::Union(_) => unimplemented!("doesn't derive union type"),
     };
     let gen = quote! {
-        impl #impl_generics candid::types::CandidType for #name #ty_generics #where_clause {
-            fn _ty() -> candid::types::Type {
+        impl #impl_generics ::candid::types::CandidType for #name #ty_generics #where_clause {
+            fn _ty() -> ::candid::types::Type {
                 #ty_body
             }
-            fn id() -> candid::types::TypeId { candid::types::TypeId::of::<#name #ty_generics>() }
+            fn id() -> ::candid::types::TypeId { ::candid::types::TypeId::of::<#name #ty_generics>() }
 
-            fn idl_serialize<__S>(&self, __serializer: __S) -> Result<(), __S::Error>
+            fn idl_serialize<__S>(&self, __serializer: __S) -> ::std::result::Result<(), __S::Error>
                 where
-                __S: candid::types::Serializer,
+                __S: ::candid::types::Serializer,
                 {
                     #ser_body
                 }
@@ -133,9 +129,9 @@ fn enum_from_ast(
     let hash = fs.iter().map(|Variant { hash, .. }| hash);
     let ty = fs.iter().map(|Variant { ty, .. }| ty);
     let ty_gen = quote! {
-        candid::types::Type::Variant(
+        ::candid::types::Type::Variant(
             vec![
-                #(candid::types::Field {
+                #(::candid::types::Field {
                     id: #id.to_owned(),
                     hash: #hash,
                     ty: #ty }
@@ -155,7 +151,7 @@ fn enum_from_ast(
             (
                 pattern,
                 quote! {
-                    #(candid::types::Compound::serialize_element(&mut ser, #id)?;)*
+                    #(::candid::types::Compound::serialize_element(&mut ser, #id)?;)*
                 },
             )
         })
@@ -176,7 +172,7 @@ fn serialize_struct(idents: &[Ident]) -> Tokens {
     let id = idents.iter().map(|ident| ident.to_token());
     quote! {
         let mut ser = __serializer.serialize_struct()?;
-        #(candid::types::Compound::serialize_element(&mut ser, &self.#id)?;)*
+        #(::candid::types::Compound::serialize_element(&mut ser, &self.#id)?;)*
         Ok(())
     }
 }
@@ -185,13 +181,13 @@ fn struct_from_ast(fields: &syn::Fields) -> (Tokens, Vec<Ident>) {
     match *fields {
         syn::Fields::Named(ref fields) => {
             let (fs, idents) = fields_from_ast(&fields.named);
-            (quote! { candid::types::Type::Record(#fs) }, idents)
+            (quote! { ::candid::types::Type::Record(#fs) }, idents)
         }
         syn::Fields::Unnamed(ref fields) => {
             let (fs, idents) = fields_from_ast(&fields.unnamed);
-            (quote! { candid::types::Type::Record(#fs) }, idents)
+            (quote! { ::candid::types::Type::Record(#fs) }, idents)
         }
-        syn::Fields::Unit => (quote! { candid::types::Type::Null }, Vec::new()),
+        syn::Fields::Unit => (quote! { ::candid::types::Type::Null }, Vec::new()),
     }
 }
 
@@ -248,7 +244,7 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (Tokens, 
     let ty = fs.iter().map(|Field { ty, .. }| ty);
     let ty_gen = quote! {
         vec![
-            #(candid::types::Field {
+            #(::candid::types::Field {
                 id: #id.to_owned(),
                 hash: #hash,
                 ty: #ty }
@@ -261,7 +257,7 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (Tokens, 
 
 fn derive_type(t: &syn::Type) -> Tokens {
     quote! {
-        <#t as candid::types::CandidType>::ty()
+        <#t as ::candid::types::CandidType>::ty()
     }
 }
 

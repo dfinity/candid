@@ -1,3 +1,4 @@
+use lalrpop_util::ParseError;
 use std::fmt;
 use std::iter::Peekable;
 use std::str::CharIndices;
@@ -26,6 +27,12 @@ impl fmt::Display for LexicalError {
                 write!(fmt, "Unclosed string literal starting at {}", pos)
             }
         }
+    }
+}
+
+pub fn error<E: ToString>(err: E) -> ParseError<usize, Token, LexicalError> {
+    ParseError::User {
+        error: LexicalError::ParseError(err.to_string()),
     }
 }
 
