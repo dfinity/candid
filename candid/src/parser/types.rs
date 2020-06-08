@@ -1,5 +1,5 @@
 use crate::idl_hash;
-use crate::{Error, Result};
+use crate::Result;
 use pretty::{BoxDoc, Doc};
 
 #[derive(Debug, Clone)]
@@ -18,7 +18,7 @@ macro_rules! enum_to_doc {
     (pub enum $name:ident {
         $($variant:ident),*,
     }) => {
-        #[derive(Debug, Clone, PartialEq, Eq)]
+        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub enum $name {
             $($variant),*
         }
@@ -124,51 +124,19 @@ pub struct IDLProg {
     pub actor: Option<IDLType>,
 }
 
-impl IDLProg {
-    pub fn find_type(&self, id: &str) -> Result<IDLType> {
-        for dec in self.decs.iter() {
-            if let Dec::TypD(bind) = dec {
-                if bind.id == *id {
-                    return Ok(bind.typ.clone());
-                }
-            }
-        }
-        Err(Error::msg(format!("cannot find variable {}", id)))
-    }
-    fn as_service(&self, t: &IDLType) -> Result<IDLType> {
-        match t {
-            IDLType::ServT(_) => Ok(t.clone()),
-            IDLType::VarT(id) => self.as_service(&self.find_type(id)?),
-            _ => Err(Error::msg("as_service failed")),
-        }
-    }
-    fn as_func(&self, t: &IDLType) -> Result<FuncType> {
-        match t {
-            IDLType::FuncT(func) => Ok(func.clone()),
-            IDLType::VarT(id) => self.as_func(&self.find_type(id)?),
-            _ => Err(Error::msg("as_func failed")),
-        }
-    }
-
-    pub fn get_method_type(&self, method_name: &str) -> Option<FuncType> {
-        let actor = self.actor.as_ref()?;
-        let t = self.as_service(&actor).ok()?;
-        if let IDLType::ServT(meths) = t {
-            for meth in meths {
-                if meth.id == *method_name {
-                    return self.as_func(&meth.typ).ok();
-                }
-            }
-        }
-        None
-    }
-}
-
 impl std::str::FromStr for IDLProg {
     type Err = crate::Error;
     fn from_str(str: &str) -> Result<Self> {
         let lexer = super::lexer::Lexer::new(str);
         Ok(super::grammar::IDLProgParser::new().parse(lexer)?)
+    }
+}
+
+impl std::str::FromStr for IDLType {
+    type Err = crate::Error;
+    fn from_str(str: &str) -> Result<Self> {
+        let lexer = super::lexer::Lexer::new(str);
+        Ok(super::grammar::TypParser::new().parse(lexer)?)
     }
 }
 

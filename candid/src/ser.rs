@@ -1,7 +1,7 @@
 //! Serialize a Rust data structure to Candid binary format
 
 use super::error::{Error, Result};
-use super::parser::value::IDLValue;
+use super::parser::{typing::TypeEnv, value::IDLValue};
 use super::types;
 use super::types::{internal::Opcode, Field, Type};
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -33,6 +33,21 @@ impl IDLBuilder {
         use super::CandidType;
         self.type_ser.push_type(&value.value_ty())?;
         value.idl_serialize(&mut self.value_ser)?;
+        Ok(self)
+    }
+    /// Annotate IDLValue with (TypeEnv, Type). Note that the TypeEnv will be added to the serializer state.
+    /// If the Type can already be resolved by previous TypeEnvs, you don't need to pass TypeEnv again.
+    pub fn value_arg_with_type<'a>(
+        &'a mut self,
+        value: &IDLValue,
+        env: &TypeEnv,
+        t: &Type,
+    ) -> Result<&'a mut Self> {
+        use super::CandidType;
+        let env = self.type_ser.env.merge(env)?;
+        let v = value.annotate_type(env, t)?;
+        self.type_ser.push_type(t)?;
+        v.idl_serialize(&mut self.value_ser)?;
         Ok(self)
     }
     pub fn serialize<W: io::Write>(&mut self, mut writer: W) -> Result<()> {
@@ -164,6 +179,7 @@ impl<'a> types::Compound for Compound<'a> {
 pub struct TypeSerialize {
     type_table: Vec<Vec<u8>>,
     type_map: HashMap<Type, i32>,
+    env: TypeEnv,
     args: Vec<Type>,
     result: Vec<u8>,
 }
@@ -174,68 +190,78 @@ impl TypeSerialize {
         TypeSerialize {
             type_table: Vec::new(),
             type_map: HashMap::new(),
+            env: TypeEnv::new(),
             args: Vec::new(),
             result: Vec::new(),
         }
     }
-
     #[inline]
     fn build_type(&mut self, t: &Type) -> Result<()> {
-        if !types::internal::is_primitive(t) && !self.type_map.contains_key(t) {
-            // This is a hack to remove (some) equivalent mu types
-            // from the type table.
-            // Someone should implement Pottier's O(nlogn) algorithm
-            // http://gallium.inria.fr/~fpottier/publis/gauthier-fpottier-icfp04.pdf
-            let unrolled = types::internal::unroll(t);
-            if let Some(idx) = self.type_map.get(&unrolled) {
-                let idx = *idx;
-                self.type_map.insert((*t).clone(), idx);
-                return Ok(());
+        if self.type_map.contains_key(t) {
+            return Ok(());
+        }
+        let actual_type = if let Type::Var(id) = t {
+            self.env.rec_find_type(id)?
+        } else {
+            t
+        }
+        .clone();
+        if types::internal::is_primitive(&actual_type) {
+            return Ok(());
+        }
+        // This is a hack to remove (some) equivalent mu types
+        // from the type table.
+        // Someone should implement Pottier's O(nlogn) algorithm
+        // http://gallium.inria.fr/~fpottier/publis/gauthier-fpottier-icfp04.pdf
+        let unrolled = types::internal::unroll(t);
+        if let Some(idx) = self.type_map.get(&unrolled) {
+            let idx = *idx;
+            self.type_map.insert((*t).clone(), idx);
+            return Ok(());
+        }
+
+        let idx = self.type_table.len();
+        self.type_map.insert((*t).clone(), idx as i32);
+        self.type_table.push(Vec::new());
+        let mut buf = Vec::new();
+        match actual_type {
+            Type::Opt(ref ty) => {
+                self.build_type(ty)?;
+                sleb128_encode(&mut buf, Opcode::Opt as i64)?;
+                self.encode(&mut buf, ty)?;
             }
-
-            let idx = self.type_table.len();
-            self.type_map.insert((*t).clone(), idx as i32);
-            self.type_table.push(Vec::new());
-            let mut buf = Vec::new();
-            match t {
-                Type::Opt(ref ty) => {
+            Type::Vec(ref ty) => {
+                self.build_type(ty)?;
+                sleb128_encode(&mut buf, Opcode::Vec as i64)?;
+                self.encode(&mut buf, ty)?;
+            }
+            Type::Record(fs) => {
+                for Field { ty, .. } in fs.iter() {
                     self.build_type(ty)?;
-                    sleb128_encode(&mut buf, Opcode::Opt as i64)?;
+                }
+
+                sleb128_encode(&mut buf, Opcode::Record as i64)?;
+                leb128_encode(&mut buf, fs.len() as u64)?;
+                for Field { hash, ty, .. } in fs.iter() {
+                    leb128_encode(&mut buf, u64::from(*hash))?;
                     self.encode(&mut buf, ty)?;
                 }
-                Type::Vec(ref ty) => {
+            }
+            Type::Variant(fs) => {
+                for Field { ty, .. } in fs.iter() {
                     self.build_type(ty)?;
-                    sleb128_encode(&mut buf, Opcode::Vec as i64)?;
+                }
+
+                sleb128_encode(&mut buf, Opcode::Variant as i64)?;
+                leb128_encode(&mut buf, fs.len() as u64)?;
+                for Field { hash, ty, .. } in fs.iter() {
+                    leb128_encode(&mut buf, u64::from(*hash))?;
                     self.encode(&mut buf, ty)?;
                 }
-                Type::Record(fs) => {
-                    for Field { ty, .. } in fs.iter() {
-                        self.build_type(ty)?;
-                    }
-
-                    sleb128_encode(&mut buf, Opcode::Record as i64)?;
-                    leb128_encode(&mut buf, fs.len() as u64)?;
-                    for Field { hash, ty, .. } in fs.iter() {
-                        leb128_encode(&mut buf, u64::from(*hash))?;
-                        self.encode(&mut buf, ty)?;
-                    }
-                }
-                Type::Variant(fs) => {
-                    for Field { ty, .. } in fs.iter() {
-                        self.build_type(ty)?;
-                    }
-
-                    sleb128_encode(&mut buf, Opcode::Variant as i64)?;
-                    leb128_encode(&mut buf, fs.len() as u64)?;
-                    for Field { hash, ty, .. } in fs.iter() {
-                        leb128_encode(&mut buf, u64::from(*hash))?;
-                        self.encode(&mut buf, ty)?;
-                    }
-                }
-                _ => panic!("unreachable"),
-            };
-            self.type_table[idx] = buf;
+            }
+            _ => unreachable!(),
         };
+        self.type_table[idx] = buf;
         Ok(())
     }
 
@@ -245,6 +271,12 @@ impl TypeSerialize {
     }
 
     fn encode(&self, buf: &mut Vec<u8>, t: &Type) -> Result<()> {
+        if let Type::Var(id) = t {
+            let actual_type = self.env.rec_find_type(id)?;
+            if types::internal::is_primitive(&actual_type) {
+                return self.encode(buf, actual_type);
+            }
+        }
         match t {
             Type::Null => sleb128_encode(buf, Opcode::Null as i64),
             Type::Bool => sleb128_encode(buf, Opcode::Bool as i64),
@@ -264,18 +296,26 @@ impl TypeSerialize {
             Type::Reserved => sleb128_encode(buf, Opcode::Reserved as i64),
             Type::Empty => sleb128_encode(buf, Opcode::Empty as i64),
             Type::Knot(id) => {
-                let ty = types::internal::find_type(*id).expect("knot TypeId not found");
+                let ty = types::internal::find_type(*id)
+                    .ok_or_else(|| Error::msg("knot TypeId not found"))?;
                 let idx = self
                     .type_map
                     .get(&ty)
-                    .unwrap_or_else(|| panic!("knot type {:?} not found", ty));
+                    .ok_or_else(|| Error::msg(format!("knot type {:?} not found", ty)))?;
+                sleb128_encode(buf, i64::from(*idx))
+            }
+            Type::Var(_) => {
+                let idx = self
+                    .type_map
+                    .get(&t)
+                    .ok_or_else(|| Error::msg(format!("var type {:?} not found", t)))?;
                 sleb128_encode(buf, i64::from(*idx))
             }
             _ => {
                 let idx = self
                     .type_map
                     .get(&t)
-                    .unwrap_or_else(|| panic!("type {:?} not found", t));
+                    .ok_or_else(|| Error::msg(format!("type {:?} not found", t)))?;
                 sleb128_encode(buf, i64::from(*idx))
             }
         }?;
