@@ -55,8 +55,14 @@ impl IDLArgs {
             return Err(Error::msg("length mismatch for types and values"));
         }
         let mut idl = crate::ser::IDLBuilder::new();
+        let empty_env = TypeEnv::new();
         for (i, v) in self.args.iter().enumerate() {
-            idl.value_arg_with_type(v, env, &types[i])?;
+            if i == 0 {
+                // env gets merged into the builder state, we only need to pass in env once.
+                idl.value_arg_with_type(v, env, &types[i])?;
+            } else {
+                idl.value_arg_with_type(v, &empty_env, &types[i])?;
+            }
         }
         idl.serialize_to_vec()
     }

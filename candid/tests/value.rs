@@ -27,7 +27,7 @@ type List1 = List2;
 type List2 = opt record { head: nat8; tail: List1 };
 type byte = nat8;
 service : {
-  f : (byte, int, nat, nat8) -> (List);
+  f : (byte, int, nat, int8) -> (List);
 }
 "#;
     let ast = candid.parse::<IDLProg>().unwrap();
@@ -44,7 +44,7 @@ service : {
                 IDLValue::Nat8(42),
                 IDLValue::Int(42.into()),
                 IDLValue::Nat(42.into()),
-                IDLValue::Nat8(42)
+                IDLValue::Int8(42)
             ]
         );
     }
