@@ -259,7 +259,7 @@ impl TypeSerialize {
                     self.encode(&mut buf, ty)?;
                 }
             }
-            _ => panic!("unreachable"),
+            _ => unreachable!(),
         };
         self.type_table[idx] = buf;
         Ok(())
@@ -296,25 +296,26 @@ impl TypeSerialize {
             Type::Reserved => sleb128_encode(buf, Opcode::Reserved as i64),
             Type::Empty => sleb128_encode(buf, Opcode::Empty as i64),
             Type::Knot(id) => {
-                let ty = types::internal::find_type(*id).expect("knot TypeId not found");
+                let ty = types::internal::find_type(*id)
+                    .ok_or_else(|| Error::msg("knot TypeId not found"))?;
                 let idx = self
                     .type_map
                     .get(&ty)
-                    .unwrap_or_else(|| panic!("knot type {:?} not found", ty));
+                    .ok_or_else(|| Error::msg(format!("knot type {:?} not found", ty)))?;
                 sleb128_encode(buf, i64::from(*idx))
             }
             Type::Var(_) => {
                 let idx = self
                     .type_map
                     .get(&t)
-                    .unwrap_or_else(|| panic!("var type {:?} not found", t));
+                    .ok_or_else(|| Error::msg(format!("var type {:?} not found", t)))?;
                 sleb128_encode(buf, i64::from(*idx))
             }
             _ => {
                 let idx = self
                     .type_map
                     .get(&t)
-                    .unwrap_or_else(|| panic!("type {:?} not found", t));
+                    .ok_or_else(|| Error::msg(format!("type {:?} not found", t)))?;
                 sleb128_encode(buf, i64::from(*idx))
             }
         }?;

@@ -18,7 +18,7 @@ pub enum IDLValue {
     Opt(Box<IDLValue>),
     Vec(Vec<IDLValue>),
     Record(Vec<IDLField>),
-    Variant(Box<IDLField>, u64),
+    Variant(Box<IDLField>, u64), // u64 represents the index from the type, defaults to 0 when parsing
     // The following values can only be generated with type annotation
     None,
     Int(Int),
@@ -170,7 +170,12 @@ impl IDLValue {
                 Type::Int16 => IDLValue::Int16(str.parse::<i16>().map_err(error)?),
                 Type::Int32 => IDLValue::Int32(str.parse::<i32>().map_err(error)?),
                 Type::Int64 => IDLValue::Int64(str.parse::<i64>().map_err(error)?),
-                _ => return Err(Error::msg("not a number type")),
+                _ => {
+                    return Err(Error::msg(format!(
+                        "type mismatch: {} can not be of type {:?}",
+                        self, t
+                    )))
+                }
             },
             (IDLValue::Int(i), Type::Int) => IDLValue::Int(i.clone()),
             (IDLValue::Nat(n), Type::Nat) => IDLValue::Nat(n.clone()),
@@ -203,7 +208,7 @@ impl IDLValue {
                 for e in vec.iter() {
                     let ty = fs
                         .get(&e.id)
-                        .ok_or_else(|| Error::msg("field is not found"))?;
+                        .ok_or_else(|| Error::msg(format!("field {} not found", e.id)))?;
                     let v = e.val.annotate_type(env, ty)?;
                     res.push(IDLField { id: e.id, val: v });
                 }
@@ -217,7 +222,7 @@ impl IDLValue {
                         return Ok(IDLValue::Variant(Box::new(field), i as u64));
                     }
                 }
-                return Err(Error::msg("field not found"));
+                return Err(Error::msg(format!("field {} not found", v.id)));
             }
             _ => {
                 return Err(Error::msg(format!(
@@ -300,7 +305,7 @@ impl crate::CandidType for IDLValue {
             IDLValue::Null => serializer.serialize_null(()),
             IDLValue::Bool(b) => serializer.serialize_bool(b),
             IDLValue::Number(ref str) => {
-                let v = str.parse::<Int>().expect("cannot parse int");
+                let v = str.parse::<Int>().map_err(serde::ser::Error::custom)?;
                 serializer.serialize_int(&v)
             }
             IDLValue::Int(ref i) => serializer.serialize_int(i),
@@ -457,7 +462,8 @@ impl<'de> Deserialize<'de> for IDLValue {
                         _ => unreachable!(),
                     };
                     let f = IDLField { id, val };
-                    // TODO assign index from type
+                    // Deserialized variant always has 0 index to ensure untyped
+                    // serialization is correct.
                     Ok(IDLValue::Variant(Box::new(f), 0))
                 } else {
                     unreachable!()

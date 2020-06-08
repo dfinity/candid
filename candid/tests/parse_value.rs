@@ -45,12 +45,12 @@ fn parse_string_literals() {
     let args = parse_args_err("(\"\\u{d800}\")");
     assert_eq!(
         format!("{}", args.unwrap_err()),
-        "IDL parser error: Unicode escape out of range d800"
+        "Candid parser error: Unicode escape out of range d800"
     );
     let result = parse_args_err("(\"\\q\")");
     assert_eq!(
         format!("{}", result.unwrap_err()),
-        "IDL parser error: Unexpected character q"
+        "Candid parser error: Unexpected character q"
     );
 }
 

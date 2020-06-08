@@ -4,6 +4,8 @@
 //!    We do not use Serde's `Serialize` trait because Candid requires serializing types along with the values.
 //!    This is difficult to achieve in `Serialize`, especially for enum types.
 
+use serde::ser::Error;
+
 mod impls;
 pub mod internal;
 
@@ -34,7 +36,7 @@ pub trait CandidType {
 }
 
 pub trait Serializer: Sized {
-    type Error;
+    type Error: Error;
     type Compound: Compound<Error = Self::Error>;
     fn serialize_bool(self, v: bool) -> Result<(), Self::Error>;
     fn serialize_int(self, v: &crate::Int) -> Result<(), Self::Error>;
