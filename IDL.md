@@ -822,7 +822,7 @@ The following notation is used:
 `T` maps an Candid type to a byte sequence representing that type.
 Each type constructor is encoded as a negative opcode;
 positive numbers index auxiliary *type definitions* that define more complex types.
-We assume that the fields in a record or function type are sorted by increasing id and the methods in a service are sorted by name.
+We assume that the fields in a record or variant type are sorted by increasing id and the methods in a service are sorted by name.
 
 ```
 T : <primtype> -> i8*
