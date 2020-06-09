@@ -624,7 +624,7 @@ record { <nat> : <datatype>; <fieldtype>;* } <: record { <nat> : <datatype'>; <f
 
 #### Variants
 
-For a specialised variants, the type of a tag can be specialised, or a tag can be removed.
+For a specialised variant, the type of a tag can be specialised, or a tag can be removed.
 ```
 
 -----------------------------------------
