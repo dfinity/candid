@@ -29,9 +29,9 @@ num-traits = "0.2.7"
 candid_derive = { path = "../candid_derive", version = "0.2.1" }
 lalrpop-util = "0.19.0"
 pretty = "0.6"
+hex = "^0.3"
 
 [dev-dependencies]
-hex = "^0.3"
 pretty_assertions = "0.6.1"
 rustfmt = "0.10.0"
 test-generator = "0.3.0"

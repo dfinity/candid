@@ -1,8 +1,35 @@
 use crate::types::{CandidType, Serializer, Type, TypeId};
+use crate::Error;
 use serde::de::{Deserialize, Visitor};
+use std::fmt;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Principal(pub Vec<u8>);
+
+// TODO this whole implementation should be replaced with the real ic-types crate
+impl Principal {
+    pub fn from_text<S: AsRef<[u8]>>(text: S) -> crate::Result<Self> {
+        let (_text_prefix, text_rest) = text.as_ref().split_at(3);
+        match hex::decode(text_rest).unwrap().as_slice().split_last() {
+            None => Err(Error::msg("Cannot parse principal")),
+            Some((_, buf)) => Ok(Principal(buf.to_vec())),
+        }
+    }
+    pub fn from_bytes<S: AsRef<[u8]>>(bytes: S) -> Principal {
+        Principal(bytes.as_ref().to_vec())
+    }
+    pub fn to_text(&self) -> String {
+        let mut buf = self.0.clone();
+        buf.push(00u8);
+        format!("ic:{}", hex::encode_upper(buf))
+    }
+}
+
+impl fmt::Display for Principal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_text())
+    }
+}
 
 impl CandidType for Principal {
     fn id() -> TypeId {

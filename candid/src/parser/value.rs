@@ -19,6 +19,7 @@ pub enum IDLValue {
     Vec(Vec<IDLValue>),
     Record(Vec<IDLField>),
     Variant(Box<IDLField>, u64), // u64 represents the index from the type, defaults to 0 when parsing
+    Principal(crate::Principal),
     // The following values can only be generated with type annotation
     None,
     Int(Int),
@@ -141,6 +142,7 @@ impl fmt::Display for IDLValue {
                 write!(f, "}}")
             }
             IDLValue::Variant(ref v, _) => write!(f, "variant {{ {} }}", v),
+            IDLValue::Principal(ref id) => write!(f, "principal \"{}\"", id),
         }
     }
 }
@@ -230,6 +232,7 @@ impl IDLValue {
                 }
                 return Err(Error::msg(format!("field {} not found", v.id)));
             }
+            (IDLValue::Principal(id), Type::Principal) => IDLValue::Principal(id.clone()),
             _ => {
                 return Err(Error::msg(format!(
                     "type mismatch: {} cannot be of type {:?}",
@@ -288,6 +291,7 @@ impl IDLValue {
                 };
                 Type::Variant(vec![f])
             }
+            IDLValue::Principal(_) => Type::Principal,
         }
     }
 }
@@ -346,6 +350,7 @@ impl crate::CandidType for IDLValue {
                 ser.serialize_element(&v.val)?;
                 Ok(())
             }
+            IDLValue::Principal(ref id) => serializer.serialize_principal(&id.0),
         }
     }
 }
@@ -394,6 +399,10 @@ impl<'de> Deserialize<'de> for IDLValue {
                     1u8 => {
                         let v = Nat(num_bigint::BigUint::from_bytes_le(bytes));
                         Ok(IDLValue::Nat(v))
+                    }
+                    2u8 => {
+                        let v = crate::Principal::from_bytes(bytes);
+                        Ok(IDLValue::Principal(v))
                     }
                     _ => Err(de::Error::custom("unknown tag in visit_bytes")),
                 }

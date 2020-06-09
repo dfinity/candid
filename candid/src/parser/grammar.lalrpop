@@ -1,7 +1,7 @@
 use super::value::{IDLField, IDLValue, IDLArgs};
 use super::types::{IDLType, PrimType, Label, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg};
 use super::lexer::{Token, LexicalError, TmpIDLField, error};
-use crate::idl_hash;
+use crate::{idl_hash, Principal};
 
 grammar;
 
@@ -25,6 +25,7 @@ extern {
         "blob" => Token::Blob,
         "type" => Token::Type,
         "import" => Token::Import,
+        "principal" => Token::Principal,
         "+" => Token::Plus,
         "-" => Token::Minus,
         "=" => Token::Equals,
@@ -67,6 +68,7 @@ Arg: IDLValue = {
         IDLValue::Record(fs)
      },
     "variant" "{" <VariantField> "}" => IDLValue::Variant(Box::new(<>), 0),
+    "principal" <"text"> =>? Ok(IDLValue::Principal(Principal::from_text(<>).map_err(error)?)),
 }
 
 Field: IDLField = {
@@ -110,6 +112,7 @@ pub Typ: IDLType = {
     },
     "func" <FuncTyp> => IDLType::FuncT(<>),
     "service" <ActorTyp> => IDLType::ServT(<>),
+    "principal" => IDLType::PrincipalT,
 }
 
 PrimTyp: IDLType = {
