@@ -237,15 +237,13 @@ pub use codegen::generate_code;
 pub mod error;
 pub use error::{Error, Result};
 
-pub mod number;
-pub use number::{Int, Nat};
-pub mod reserved;
-pub use reserved::{Empty, Reserved};
-pub mod principal;
-pub use principal::Principal;
-
 pub mod types;
 pub use types::CandidType;
+pub use types::{
+    number::{Int, Nat},
+    principal::Principal,
+    reserved::{Empty, Reserved},
+};
 
 pub mod parser;
 pub use parser::types::IDLProg;

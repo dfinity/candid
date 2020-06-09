@@ -11,6 +11,10 @@ pub mod internal;
 
 pub use self::internal::{get_type, Field, Function, Type, TypeId};
 
+pub mod number;
+pub mod principal;
+pub mod reserved;
+
 pub trait CandidType {
     // memoized type derivation
     fn ty() -> Type {

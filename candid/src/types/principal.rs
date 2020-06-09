@@ -1,4 +1,4 @@
-use crate::types::{CandidType, Serializer, Type, TypeId};
+use super::{CandidType, Serializer, Type, TypeId};
 use crate::Error;
 use serde::de::{Deserialize, Visitor};
 use std::fmt;
