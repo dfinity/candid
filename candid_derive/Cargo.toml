@@ -1,7 +1,18 @@
 [package]
 name = "candid_derive"
-version = "0.1.0"
+version = "0.2.0"
+edition = "2018"
 authors = ["DFINITY Team"]
+description = "Macros implementation of #[derive(CandidType)] for the Candid."
+homepage = "https://docs.rs/candid_derive"
+documentation = "https://docs.rs/candid_derive"
+repository = "https://github.com/dfinity/candid"
+license = "Apache-2.0"
+readme = "README.md"
+
+categories = ["encoding", "wasm"]
+keywords = ["internet-computer", "idl", "candid", "dfinity", "parser"]
+include = ["src", "README.md", "Cargo.toml", "LICENSE"]
 
 [lib]
 name = "candid_derive"
@@ -11,4 +22,3 @@ proc-macro = true
 quote = "1.0"
 syn = { version = "1.0", features = ["visit"] }
 proc-macro2 = "1.0.12"
-

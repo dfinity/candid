@@ -1,7 +1,6 @@
-extern crate pretty;
-use self::pretty::{BoxDoc, Doc};
 use crate::idl_hash;
 use crate::{Error, Result};
+use pretty::{BoxDoc, Doc};
 
 #[derive(Debug, Clone)]
 pub enum IDLType {
@@ -19,7 +18,7 @@ macro_rules! enum_to_doc {
     (pub enum $name:ident {
         $($variant:ident),*,
     }) => {
-        #[derive(Debug, Clone)]
+        #[derive(Debug, Clone, PartialEq, Eq)]
         pub enum $name {
             $($variant),*
         }

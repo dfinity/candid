@@ -5,7 +5,7 @@ use serde::{de, ser};
 use std::fmt::{self, Debug, Display};
 use std::io;
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T = ()> = std::result::Result<T, Error>;
 
 pub struct Error {
     message: String,
