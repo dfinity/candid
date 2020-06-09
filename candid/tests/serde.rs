@@ -393,7 +393,7 @@ fn test_multiargs() {
     assert_eq!(bytes, hex("4449444c016e7c047c0000002a012a01010102"));
 
     let (a, b, c, d) = Decode!(&bytes, Int, Option<Int>, Option<Int>, Option<Int>).unwrap();
-    assert_eq!(a, 42.into());
+    assert_eq!(a, 42);
     assert_eq!(b, Some(42.into()));
     assert_eq!(c, Some(1.into()));
     assert_eq!(d, Some(2.into()));

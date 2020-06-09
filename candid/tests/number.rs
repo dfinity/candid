@@ -64,6 +64,37 @@ fn random_u64() {
     }
 }
 
+#[allow(clippy::cognitive_complexity)]
+#[test]
+fn operators() {
+    macro_rules! test_type {
+        ($res: ty, $( $t: ty )*) => ($(
+            let x: $t = 1;
+            let value = <$res>::from(x + 1);
+
+            assert_eq!(value.clone() + x, 3);
+            assert_eq!(value.clone() - x, 1);
+            assert_eq!(value.clone() * x, 2);
+            assert_eq!(value.clone() / x, 2);
+            assert_eq!(value.clone() % x, 0);
+
+            assert_eq!(x + value.clone(), 3);
+            assert_eq!(x - value.clone(), 1);
+            assert_eq!(x * value.clone(), 2);
+            assert_eq!(x / value.clone(), 2);
+            assert_eq!(x % value.clone(), 0);
+
+            assert!(value.clone() < <$res>::from(x + 2));
+            assert!(<$res>::from(x + 2) > value.clone());
+            assert!(x < <$res>::from(x + 2));
+            assert!(<$res>::from(x + 2) > x);
+        )*)
+    }
+
+    test_type!( Nat, usize u8 u16 u32 u64 u128 );
+    test_type!( Int, usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 );
+}
+
 fn check(num: &str, int_hex: &str, nat_hex: &str) {
     let v = num.parse::<Int>().unwrap();
     let bytes = hex::decode(int_hex).unwrap();
