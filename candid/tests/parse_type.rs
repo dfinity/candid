@@ -1,11 +1,6 @@
-use candid::parser::grammar::IDLProgParser;
-use candid::parser::lexer::Lexer;
 use candid::parser::types::{to_pretty, IDLProg};
-
-fn parse_idl(input: &str) -> IDLProg {
-    let lexer = Lexer::new(input);
-    IDLProgParser::new().parse(lexer).unwrap()
-}
+use candid::parser::typing::{check_prog, TypeEnv};
+use std::path::Path;
 
 #[test]
 fn parse_idl_prog() {
@@ -27,9 +22,26 @@ service server : {
   i : f;
 }
     "#;
-    let ast = parse_idl(&prog);
+    let ast = prog.parse::<IDLProg>().unwrap();
     let pretty = to_pretty(&ast, 80);
     println!("{}", pretty);
-    let ast2 = parse_idl(&pretty);
+    let ast2 = pretty.parse::<IDLProg>().unwrap();
     assert_eq!(format!("{:?}", ast2), format!("{:?}", ast));
+    let mut env = TypeEnv::new();
+    let _actor = check_prog(&mut env, &ast).unwrap();
+}
+
+#[test_generator::test_resources("candid/tests/assets/candid/*.did")]
+fn compiler_test(resource: &str) {
+    let path = std::env::current_dir()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join(Path::new(resource));
+    let prog = std::fs::read_to_string(&path).unwrap();
+    let ast = prog.parse::<IDLProg>().unwrap();
+    let mut env = TypeEnv::new();
+    let actor = check_prog(&mut env, &ast).unwrap();
+    assert!(!env.0.is_empty());
+    assert!(!actor.is_empty());
 }

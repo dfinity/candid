@@ -1,16 +1,20 @@
-use candid::parser::grammar::ArgsParser;
-use candid::parser::lexer::Lexer;
+use candid::parser::typing::TypeEnv;
 use candid::parser::value::{IDLArgs, IDLField, IDLValue};
-use candid::parser::ParserError;
+use candid::types::Type;
 
 fn parse_args(input: &str) -> IDLArgs {
-    let lexer = Lexer::new(input);
-    ArgsParser::new().parse(lexer).unwrap()
+    input.parse().unwrap()
 }
 
-fn parse_args_err(input: &str) -> Result<IDLArgs, ParserError> {
-    let lexer = Lexer::new(input);
-    ArgsParser::new().parse(lexer)
+fn parse_args_err(input: &str) -> candid::Result<IDLArgs> {
+    input.parse()
+}
+
+fn parse_type(input: &str) -> Type {
+    use candid::parser::types::IDLType;
+    let env = TypeEnv::new();
+    let ast = input.parse::<IDLType>().unwrap();
+    env.ast_to_type(&ast).unwrap()
 }
 
 #[test]
@@ -41,45 +45,60 @@ fn parse_string_literals() {
     let args = parse_args_err("(\"\\u{d800}\")");
     assert_eq!(
         format!("{}", args.unwrap_err()),
-        "Unicode escape out of range d800"
+        "Candid parser error: Unicode escape out of range d800"
     );
     let result = parse_args_err("(\"\\q\")");
-    assert_eq!(format!("{}", result.unwrap_err()), "Unexpected character q");
+    assert_eq!(
+        format!("{}", result.unwrap_err()),
+        "Candid parser error: Unexpected character q"
+    );
 }
 
 #[test]
 fn parse_more_literals() {
-    let args =
-        parse_args("(true, null, 4_2, \"哈哈\", \"string with whitespace\", +0x2a, -42, false)");
+    let mut args =
+        parse_args("(true, null, 4_2, \"哈哈\", \"string with whitespace\", 0x2a, -42, false)");
+    args.args[2] = args.args[2]
+        .annotate_type(&TypeEnv::new(), &Type::Nat)
+        .unwrap();
+    args.args[5] = args.args[5]
+        .annotate_type(&TypeEnv::new(), &Type::Int)
+        .unwrap();
+    args.args[6] = args.args[6]
+        .annotate_type(&TypeEnv::new(), &Type::Int)
+        .unwrap();
     assert_eq!(
         args.args,
         vec![
             IDLValue::Bool(true),
             IDLValue::Null,
-            IDLValue::Nat(42),
+            IDLValue::Nat(42.into()),
             IDLValue::Text("哈哈".to_owned()),
             IDLValue::Text("string with whitespace".to_owned()),
-            IDLValue::Int(42),
-            IDLValue::Int(-42),
+            IDLValue::Int(42.into()),
+            IDLValue::Int((-42).into()),
             IDLValue::Bool(false)
         ]
     );
     assert_eq!(
         format!("{}", args),
-        "(true, null, 42, \"哈哈\", \"string with whitespace\", +42, -42, false)"
+        "(true, null, 42, \"哈哈\", \"string with whitespace\", 42, -42, false)"
     );
 }
 
 #[test]
 fn parse_vec() {
-    let args = parse_args("(vec{1;2;3;4})");
+    let mut args = parse_args("(vec{1;2;3;4})");
+    args.args[0] = args.args[0]
+        .annotate_type(&TypeEnv::new(), &Type::Vec(Box::new(Type::Nat)))
+        .unwrap();
     assert_eq!(
         args.args,
         vec![IDLValue::Vec(vec![
-            IDLValue::Nat(1),
-            IDLValue::Nat(2),
-            IDLValue::Nat(3),
-            IDLValue::Nat(4)
+            IDLValue::Nat(1.into()),
+            IDLValue::Nat(2.into()),
+            IDLValue::Nat(3.into()),
+            IDLValue::Nat(4.into())
         ])]
     );
     assert_eq!(format!("{}", args), "(vec { 1; 2; 3; 4; })");
@@ -87,8 +106,10 @@ fn parse_vec() {
 
 #[test]
 fn parse_optional_record() {
-    let args =
+    let mut args =
         parse_args("(opt record {}, record { 1=42;44=\"test\"; 2=false }, variant { 5=null })");
+    let typ = parse_type("record { 1: nat; 44: text; 2: bool }");
+    args.args[1] = args.args[1].annotate_type(&TypeEnv::new(), &typ).unwrap();
     assert_eq!(
         args.args,
         vec![
@@ -96,7 +117,7 @@ fn parse_optional_record() {
             IDLValue::Record(vec![
                 IDLField {
                     id: 1,
-                    val: IDLValue::Nat(42)
+                    val: IDLValue::Nat(42.into())
                 },
                 IDLField {
                     id: 2,
@@ -107,10 +128,13 @@ fn parse_optional_record() {
                     val: IDLValue::Text("test".to_owned())
                 },
             ]),
-            IDLValue::Variant(Box::new(IDLField {
-                id: 5,
-                val: IDLValue::Null
-            }))
+            IDLValue::Variant(
+                Box::new(IDLField {
+                    id: 5,
+                    val: IDLValue::Null
+                }),
+                0
+            )
         ]
     );
     assert_eq!(
@@ -121,9 +145,13 @@ fn parse_optional_record() {
 
 #[test]
 fn parse_nested_record() {
-    let args = parse_args(
+    let mut args = parse_args(
         "(record {label=42; 0x2b=record {test=\"test\"; msg=\"hello\"}; long_label=opt null})",
     );
+    let typ = parse_type(
+        "record {label: nat; 0x2b:record { test:text; msg:text }; long_label: opt null }",
+    );
+    args.args[0] = args.args[0].annotate_type(&TypeEnv::new(), &typ).unwrap();
     assert_eq!(
         args.args,
         vec![IDLValue::Record(vec![
@@ -146,7 +174,7 @@ fn parse_nested_record() {
             },
             IDLField {
                 id: 1_873_743_348,
-                val: IDLValue::Nat(42)
+                val: IDLValue::Nat(42.into())
             }
         ])]
     );

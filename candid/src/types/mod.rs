@@ -4,10 +4,12 @@
 //!    We do not use Serde's `Serialize` trait because Candid requires serializing types along with the values.
 //!    This is difficult to achieve in `Serialize`, especially for enum types.
 
+use serde::ser::Error;
+
 mod impls;
 pub mod internal;
 
-pub use self::internal::{get_type, Field, Type, TypeId};
+pub use self::internal::{get_type, Field, Function, Type, TypeId};
 
 pub trait CandidType {
     // memoized type derivation
@@ -27,10 +29,6 @@ pub trait CandidType {
     }
     fn id() -> TypeId;
     fn _ty() -> Type;
-    // only used for serialize IDLValue
-    fn value_ty(&self) -> Type {
-        unreachable!();
-    }
     // only serialize the value encoding
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -38,7 +36,7 @@ pub trait CandidType {
 }
 
 pub trait Serializer: Sized {
-    type Error;
+    type Error: Error;
     type Compound: Compound<Error = Self::Error>;
     fn serialize_bool(self, v: bool) -> Result<(), Self::Error>;
     fn serialize_int(self, v: &crate::Int) -> Result<(), Self::Error>;
