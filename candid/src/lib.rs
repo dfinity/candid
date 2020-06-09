@@ -90,7 +90,7 @@
 //!   let x = "-10000000000000000000".parse::<Int>()?;
 //!   let bytes = Encode!(&Nat::from(1024), &x)?;
 //!   let (a, b) = Decode!(&bytes, Nat, Int)?;
-//!   assert_eq!(a, 1024);
+//!   assert_eq!(a + 1, 1025);
 //!   assert_eq!(b, Int::parse(b"-10000000000000000000")?);
 //!   Ok(())
 //! }
