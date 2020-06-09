@@ -113,6 +113,15 @@ fn test_reserved() {
 }
 
 #[test]
+fn test_principal() {
+    use candid::Principal;
+    all_check(
+        Principal(vec![0xca, 0xff, 0xee]),
+        "4449444c0001680103caffee",
+    );
+}
+
+#[test]
 fn test_option() {
     all_check(Some(Int::from(42)), "4449444c016e7c0100012a");
     all_check(Some(Some(Int::from(42))), "4449444c026e016e7c010001012a");

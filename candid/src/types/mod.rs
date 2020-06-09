@@ -60,6 +60,7 @@ pub trait Serializer: Sized {
     fn serialize_struct(self) -> Result<Self::Compound, Self::Error>;
     fn serialize_vec(self, len: usize) -> Result<Self::Compound, Self::Error>;
     fn serialize_variant(self, index: u64) -> Result<Self::Compound, Self::Error>;
+    fn serialize_principal(self, v: &[u8]) -> Result<(), Self::Error>;
 }
 
 pub trait Compound {

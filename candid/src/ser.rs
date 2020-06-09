@@ -80,6 +80,11 @@ impl ValueSerializer {
         leb128_encode(&mut self.value, value)?;
         Ok(())
     }
+    fn write(&mut self, bytes: &[u8]) -> Result<()> {
+        use std::io::Write;
+        self.value.write_all(bytes)?;
+        Ok(())
+    }
 }
 
 macro_rules! serialize_num {
@@ -98,7 +103,7 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
     type Compound = Compound<'a>;
     fn serialize_bool(self, v: bool) -> Result<()> {
         let v = if v { 1 } else { 0 };
-        self.write_leb128(v)?;
+        self.write(&[v])?;
         Ok(())
     }
     fn serialize_int(self, v: &crate::Int) -> Result<()> {
@@ -131,6 +136,12 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
     }
     fn serialize_empty(self) -> Result<()> {
         Err(Error::msg("cannot encode empty type"))
+    }
+    fn serialize_principal(self, blob: &[u8]) -> Result<()> {
+        self.write(&[1])?;
+        self.write_leb128(blob.len() as u64)?;
+        self.write(blob)?;
+        Ok(())
     }
     fn serialize_option<T: ?Sized>(self, v: Option<&T>) -> Result<()>
     where
@@ -295,6 +306,7 @@ impl TypeSerialize {
             Type::Text => sleb128_encode(buf, Opcode::Text as i64),
             Type::Reserved => sleb128_encode(buf, Opcode::Reserved as i64),
             Type::Empty => sleb128_encode(buf, Opcode::Empty as i64),
+            Type::Principal => sleb128_encode(buf, Opcode::Principal as i64),
             Type::Knot(id) => {
                 let ty = types::internal::find_type(*id)
                     .ok_or_else(|| Error::msg("knot TypeId not found"))?;

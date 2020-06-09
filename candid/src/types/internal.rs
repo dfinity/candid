@@ -46,6 +46,7 @@ pub enum Type {
     Variant(Vec<Field>),
     Func(Function),
     Service(Vec<(String, Function)>),
+    Principal,
 }
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
@@ -92,6 +93,7 @@ pub(crate) enum Opcode {
     Vec = -19,
     Record = -20,
     Variant = -21,
+    Principal = -24,
 }
 
 pub fn is_primitive(t: &Type) -> bool {
@@ -107,6 +109,7 @@ pub fn is_primitive(t: &Type) -> bool {
         Knot(_) => true,
         Opt(_) | Vec(_) | Record(_) | Variant(_) => false,
         Func(_) | Service(_) => false,
+        Principal => true,
     }
 }
 

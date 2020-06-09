@@ -250,9 +250,10 @@ impl<'de> Deserializer<'de> {
         self.field_name = Some(field);
     }
     // Customize deserailization methods
-    // Both int and nat will call visit_bytes. We reserve the first byte to
-    // be a tag to distinguish between int(0) and nat(1).
-    // This trick is necessary for deserializing IDLValue because
+    // Several deserialize functions will call visit_bytes.
+    // We reserve the first byte to be a tag to distinguish between different callers:
+    // int(0), nat(1), principal(2)
+    // This is necessary for deserializing IDLValue because
     // it has only one visitor and we need a way to know who called the visitor.
     fn deserialize_int<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
@@ -276,6 +277,22 @@ impl<'de> Deserializer<'de> {
         tagged.extend_from_slice(&bytes);
         visitor.visit_bytes(&tagged)
     }
+    fn deserialize_principal<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.check_type(Opcode::Principal)?;
+        let bit = self.parse_byte()?;
+        if bit != 1u8 {
+            return Err(Error::msg("Opaque reference not supported"));
+        }
+        let len = self.leb128_read()? as usize;
+        let vec = self.parse_bytes(len)?;
+        let mut tagged = vec![2u8];
+        tagged.extend_from_slice(&vec);
+        visitor.visit_bytes(&tagged)
+    }
+
     fn deserialize_reserved<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -338,6 +355,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Opcode::Opt => self.deserialize_option(visitor),
             Opcode::Record => self.deserialize_struct("_", &[], visitor),
             Opcode::Variant => self.deserialize_enum("_", &[], visitor),
+            Opcode::Principal => self.deserialize_principal(visitor),
         }
     }
 
@@ -394,6 +412,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 }
                 visitor.visit_enum(Compound::new(&mut self, Style::Enum { len, fs }))
             }
+            Opcode::Principal => self.deserialize_principal(visitor),
         }
     }
 
