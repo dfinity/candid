@@ -37,12 +37,15 @@ pub enum Type {
     Text,
     Reserved,
     Empty,
-    Knot(TypeId),
+    Knot(TypeId), // For recursive types from Rust
+    Var(String),  // For variables from Candid file
     Unknown,
     Opt(Box<Type>),
     Vec(Box<Type>),
     Record(Vec<Field>),
     Variant(Vec<Field>),
+    Func(Function),
+    Service(Vec<(String, Function)>),
 }
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
@@ -50,6 +53,19 @@ pub struct Field {
     pub id: String,
     pub hash: u32,
     pub ty: Type,
+}
+
+#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+pub struct Function {
+    pub modes: Vec<crate::parser::types::FuncMode>,
+    pub args: Vec<Type>,
+    pub rets: Vec<Type>,
+}
+
+impl Function {
+    pub fn is_query(&self) -> bool {
+        self.modes.contains(&crate::parser::types::FuncMode::Query)
+    }
 }
 
 #[derive(Debug, PartialEq, TryFromPrimitive)]
@@ -87,8 +103,10 @@ pub fn is_primitive(t: &Type) -> bool {
         Float32 | Float64 => true,
         Reserved | Empty => true,
         Unknown => panic!("Unknown type"),
+        Var(_) => panic!("Variable"), // Var may or may not be a primitive, so don't ask me
         Knot(_) => true,
         Opt(_) | Vec(_) | Record(_) | Variant(_) => false,
+        Func(_) | Service(_) => false,
     }
 }
 
@@ -124,18 +142,20 @@ thread_local! {
     static ENV: RefCell<HashMap<TypeId, Type>> = RefCell::new(HashMap::new());
 }
 
-pub fn find_type(id: TypeId) -> Option<Type> {
+pub(crate) fn find_type(id: TypeId) -> Option<Type> {
     ENV.with(|e| match e.borrow().get(&id) {
         None => None,
         Some(t) => Some((*t).clone()),
     })
 }
 
-pub fn show_env() {
+// only for debugging
+#[allow(dead_code)]
+pub(crate) fn show_env() {
     ENV.with(|e| println!("{:?}", e.borrow()));
 }
 
-pub fn env_add(id: TypeId, t: Type) {
+pub(crate) fn env_add(id: TypeId, t: Type) {
     ENV.with(|e| drop(e.borrow_mut().insert(id, t)))
 }
 
