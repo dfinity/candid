@@ -12,6 +12,7 @@ pub enum IDLType {
     RecordT(Vec<TypeField>),
     VariantT(Vec<TypeField>),
     ServT(Vec<Binding>),
+    PrincipalT,
 }
 
 macro_rules! enum_to_doc {
@@ -206,6 +207,7 @@ impl ToDoc for IDLType {
             IDLType::RecordT(ref fs) => Doc::text("record ").append(fields_to_doc(fs)),
             IDLType::VariantT(ref fs) => Doc::text("variant ").append(fields_to_doc(fs)),
             IDLType::ServT(ref serv) => Doc::text("service ").append(meths_to_doc(serv)),
+            IDLType::PrincipalT => Doc::text("principal"),
         }
         .nest(2)
         .group()

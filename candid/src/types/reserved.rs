@@ -1,6 +1,6 @@
 //! Data structure for Candid type Reserved and Empty.
 
-use crate::types::{CandidType, Serializer, Type, TypeId};
+use super::{CandidType, Serializer, Type, TypeId};
 use serde::de::{Deserialize, Visitor};
 use std::fmt;
 

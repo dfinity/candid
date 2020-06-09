@@ -62,6 +62,7 @@ pub enum Token {
     Type,
     Import,
     Opt,
+    Principal,
     Id(String),
     Text(String),
     Number(String),
@@ -272,6 +273,7 @@ impl<'input> Iterator for Lexer<'input> {
                     "blob" => Ok((Token::Blob, 4)),
                     "type" => Ok((Token::Type, 4)),
                     "import" => Ok((Token::Import, 6)),
+                    "principal" => Ok((Token::Principal, 9)),
                     id => Ok((Token::Id(id.to_string()), id.len())),
                 };
                 Some(tok.map(|(token, len)| (i, token, i + len)))
