@@ -327,7 +327,7 @@ macro_rules! define_op_assign {
         // Implement A * B
         impl $imp<$scalar> for $res {
             #[inline]
-            fn $method(&mut self, other: $scalar) -> () {
+            fn $method(&mut self, other: $scalar) {
                 $imp::$method(&mut self.0, other)
             }
         }
@@ -380,7 +380,7 @@ macro_rules! define_op_0_assign {
         // Implement A * B
         impl $imp<$scalar> for $res {
             #[inline]
-            fn $method(&mut self, other: $scalar) -> () {
+            fn $method(&mut self, other: $scalar) {
                 $imp::$method(&mut self.0, other.0)
             }
         }
@@ -432,12 +432,12 @@ impl std::ops::Add<i32> for Nat {
 
     #[inline]
     fn add(self, other: i32) -> Self {
-        (self.0 + &(other as u32)).into()
+        (self.0 + (other as u32)).into()
     }
 }
 impl std::ops::AddAssign<i32> for Nat {
     #[inline]
-    fn add_assign(&mut self, other: i32) -> () {
+    fn add_assign(&mut self, other: i32) {
         self.0 += other as u32
     }
 }
@@ -447,12 +447,12 @@ impl std::ops::Sub<i32> for Nat {
 
     #[inline]
     fn sub(self, other: i32) -> Self {
-        (self.0 - &(other as u32)).into()
+        (self.0 - (other as u32)).into()
     }
 }
 impl std::ops::SubAssign<i32> for Nat {
     #[inline]
-    fn sub_assign(&mut self, other: i32) -> () {
+    fn sub_assign(&mut self, other: i32) {
         self.0 -= other as u32
     }
 }
@@ -462,12 +462,12 @@ impl std::ops::Mul<i32> for Nat {
 
     #[inline]
     fn mul(self, other: i32) -> Self {
-        (self.0 * &(other as u32)).into()
+        (self.0 * (other as u32)).into()
     }
 }
 impl std::ops::MulAssign<i32> for Nat {
     #[inline]
-    fn mul_assign(&mut self, other: i32) -> () {
+    fn mul_assign(&mut self, other: i32) {
         self.0 *= other as u32
     }
 }
@@ -477,12 +477,12 @@ impl std::ops::Div<i32> for Nat {
 
     #[inline]
     fn div(self, other: i32) -> Self {
-        (self.0 / &(other as u32)).into()
+        (self.0 / (other as u32)).into()
     }
 }
 impl std::ops::DivAssign<i32> for Nat {
     #[inline]
-    fn div_assign(&mut self, other: i32) -> () {
+    fn div_assign(&mut self, other: i32) {
         self.0 /= other as u32
     }
 }
@@ -492,12 +492,12 @@ impl std::ops::Rem<i32> for Nat {
 
     #[inline]
     fn rem(self, other: i32) -> Self {
-        (self.0 % &(other as u32)).into()
+        (self.0 % (other as u32)).into()
     }
 }
 impl std::ops::RemAssign<i32> for Nat {
     #[inline]
-    fn rem_assign(&mut self, other: i32) -> () {
+    fn rem_assign(&mut self, other: i32) {
         self.0 %= other as u32
     }
 }

@@ -64,6 +64,7 @@ fn random_u64() {
     }
 }
 
+#[allow(clippy::cognitive_complexity)]
 #[test]
 fn operators() {
     macro_rules! test_type {
