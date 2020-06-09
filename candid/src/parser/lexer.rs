@@ -61,7 +61,6 @@ pub enum Token {
     Blob,
     Type,
     Import,
-    None,
     Opt,
     Id(String),
     Text(String),
@@ -261,7 +260,6 @@ impl<'input> Iterator for Lexer<'input> {
                 let tok = match res.as_str() {
                     "true" => Ok((Token::Boolean(true), 4)),
                     "false" => Ok((Token::Boolean(false), 5)),
-                    "none" => Ok((Token::None, 4)),
                     "null" => Ok((Token::Null, 4)),
                     "opt" => Ok((Token::Opt, 3)),
                     "vec" => Ok((Token::Vec, 3)),

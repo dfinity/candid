@@ -1,7 +1,7 @@
 fn main() {
     lalrpop::Configuration::new()
-        .generate_in_source_tree()
+        .use_cargo_dir_conventions()
         .emit_rerun_directives(true)
-        .process()
+        .process_file("src/parser/grammar.lalrpop")
         .unwrap();
 }

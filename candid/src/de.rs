@@ -292,12 +292,13 @@ impl<'de> Deserializer<'de> {
 }
 
 macro_rules! primitive_impl {
-    ($ty:ident, $opcode:expr, $value:expr) => {
+    ($ty:ident, $opcode:expr, $($value:tt)*) => {
         paste::item! {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
                 self.check_type($opcode)?;
-                visitor.[<visit_ $ty>]($value)
+                let value = self.input.$($value)*()?;
+                visitor.[<visit_ $ty>](value)
             }
         }
     };
@@ -396,18 +397,25 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         }
     }
 
-    primitive_impl!(i8, Opcode::Int8, self.input.read_i8()?);
-    primitive_impl!(i16, Opcode::Int16, self.input.read_i16::<LittleEndian>()?);
-    primitive_impl!(i32, Opcode::Int32, self.input.read_i32::<LittleEndian>()?);
-    primitive_impl!(i64, Opcode::Int64, self.input.read_i64::<LittleEndian>()?);
-    primitive_impl!(u8, Opcode::Nat8, self.input.read_u8()?);
-    primitive_impl!(u16, Opcode::Nat16, self.input.read_u16::<LittleEndian>()?);
-    primitive_impl!(u32, Opcode::Nat32, self.input.read_u32::<LittleEndian>()?);
-    primitive_impl!(u64, Opcode::Nat64, self.input.read_u64::<LittleEndian>()?);
-    primitive_impl!(bool, Opcode::Bool, self.parse_byte()? == 1u8);
+    primitive_impl!(i8, Opcode::Int8, read_i8);
+    primitive_impl!(i16, Opcode::Int16, read_i16::<LittleEndian>);
+    primitive_impl!(i32, Opcode::Int32, read_i32::<LittleEndian>);
+    primitive_impl!(i64, Opcode::Int64, read_i64::<LittleEndian>);
+    primitive_impl!(u8, Opcode::Nat8, read_u8);
+    primitive_impl!(u16, Opcode::Nat16, read_u16::<LittleEndian>);
+    primitive_impl!(u32, Opcode::Nat32, read_u32::<LittleEndian>);
+    primitive_impl!(u64, Opcode::Nat64, read_u64::<LittleEndian>);
+    primitive_impl!(f32, Opcode::Float32, read_f32::<LittleEndian>);
+    primitive_impl!(f64, Opcode::Float64, read_f64::<LittleEndian>);
 
-    primitive_impl!(f32, Opcode::Float32, self.input.read_f32::<LittleEndian>()?);
-    primitive_impl!(f64, Opcode::Float64, self.input.read_f64::<LittleEndian>()?);
+    fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.check_type(Opcode::Bool)?;
+        let value = self.parse_byte()? == 1u8;
+        visitor.visit_bool(value)
+    }
 
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
     where

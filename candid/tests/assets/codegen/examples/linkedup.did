@@ -1,0 +1,36 @@
+type UserId_2 = UserId;
+type UserId = principal;
+type Profile_2 =
+ record {
+   "company": text;
+   "education": text;
+   "experience": text;
+   "firstName": text;
+   "id": UserId;
+   "imgUrl": text;
+   "lastName": text;
+   "title": text;
+ };
+type Profile = Profile_2;
+type NewProfile_2 =
+ record {
+   "company": text;
+   "education": text;
+   "experience": text;
+   "firstName": text;
+   "imgUrl": text;
+   "lastName": text;
+   "title": text;
+ };
+type NewProfile = NewProfile_2;
+service : {
+  "connect": (UserId_2) -> ();
+  "create": (NewProfile) -> ();
+  "get": (UserId_2) -> (Profile) query;
+  "getConnections": (UserId_2) -> (vec Profile);
+  "getOwnId": () -> (UserId_2) query;
+  "healthcheck": () -> (bool);
+  "isConnected": (UserId_2) -> (bool);
+  "search": (text) -> (vec Profile) query;
+  "update": (Profile) -> ();
+}

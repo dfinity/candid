@@ -5,7 +5,7 @@ use serde::{de, ser};
 use std::fmt::{self, Debug, Display};
 use std::io;
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T = ()> = std::result::Result<T, Error>;
 
 pub struct Error {
     message: String,
@@ -29,13 +29,13 @@ impl Error {
 
 impl ser::Error for Error {
     fn custom<T: Display>(msg: T) -> Self {
-        Error::msg(msg.to_string())
+        Error::msg(format!("Serialize error: {}", msg))
     }
 }
 
 impl de::Error for Error {
     fn custom<T: Display>(msg: T) -> Self {
-        Error::msg(msg.to_string())
+        Error::msg(format!("Deserialize error: {}", msg))
     }
 }
 
@@ -69,6 +69,6 @@ impl From<io::Error> for Error {
 
 impl From<crate::parser::ParserError> for Error {
     fn from(e: crate::parser::ParserError) -> Error {
-        Error::msg(format!("IDL parser error: {}", e))
+        Error::msg(format!("Candid parser error: {}", e))
     }
 }
