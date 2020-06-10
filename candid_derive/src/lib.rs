@@ -111,7 +111,10 @@ fn enum_from_ast(
         .iter()
         .map(|variant| {
             let id = variant.ident.clone();
-            let hash = idl_hash(&id.to_string());
+            let hash = match get_rename_attrs(&variant.attrs) {
+                Some(ref rename) => idl_hash(rename),
+                None => idl_hash(&id.to_string()),
+            };
             let (ty, idents) = struct_from_ast(&variant.fields);
             Variant {
                 ident: id,
@@ -229,15 +232,28 @@ fn get_serde_meta_items(attr: &syn::Attribute) -> Result<Vec<syn::NestedMeta>, (
     }
 }
 
-fn get_field_rename(field: &syn::Field) -> Option<String> {
-    use syn::Meta::{List, NameValue, Path};
-    use syn::NestedMeta::{Lit, Meta};
-    for item in field.attrs.iter().flat_map(get_serde_meta_items).flatten() {
+fn get_rename_attrs(attrs: &[syn::Attribute]) -> Option<String> {
+    use syn::Meta::{List, NameValue};
+    use syn::NestedMeta::Meta;
+    for item in attrs.iter().flat_map(get_serde_meta_items).flatten() {
         match &item {
-            // #[serde(rename = "foo"]
+            // #[serde(rename = "foo")]
             Meta(NameValue(m)) if m.path.is_ident("rename") => {
                 if let syn::Lit::Str(lit) = &m.lit {
                     return Some(lit.value());
+                }
+            }
+            // #[serde(rename(serialize = "foo"))]
+            Meta(List(metas)) if metas.path.is_ident("rename") => {
+                for item in metas.nested.iter() {
+                    match item {
+                        Meta(NameValue(m)) if m.path.is_ident("serialize") => {
+                            if let syn::Lit::Str(lit) = &m.lit {
+                                return Some(lit.value());
+                            }
+                        }
+                        _ => continue,
+                    }
                 }
             }
             _ => continue,
@@ -252,7 +268,7 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (Tokens, 
         .enumerate()
         .map(|(i, field)| {
             let (ident, hash) = match field.ident {
-                Some(ref ident) => match get_field_rename(field) {
+                Some(ref ident) => match get_rename_attrs(&field.attrs) {
                     Some(ref renamed) => (Ident::Named(ident.clone()), idl_hash(renamed)),
                     None => (Ident::Named(ident.clone()), idl_hash(&ident.to_string())),
                 },
