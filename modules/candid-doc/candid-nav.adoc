@@ -1,2 +1,0 @@
-* xref:IDL.adoc[Candid Specification]
-** link:https://docs.rs/candid/0.2.4/candid[Candid Rust crate]
