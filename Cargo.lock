@@ -154,6 +154,7 @@ version = "0.2.6"
 dependencies = [
  "byteorder",
  "candid_derive",
+ "crc8",
  "hex",
  "lalrpop",
  "lalrpop-util",
@@ -199,6 +200,12 @@ name = "constant_time_eq"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
+
+[[package]]
+name = "crc8"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b31d2174830f395fd7e413c2f8a119252de36356982f805f495269331e97559e"
 
 [[package]]
 name = "crossbeam-utils"
