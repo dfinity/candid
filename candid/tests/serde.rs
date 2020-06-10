@@ -363,6 +363,32 @@ fn test_variant() {
 }
 
 #[test]
+fn test_field_rename() {
+    #[derive(CandidType, Deserialize, PartialEq, Debug)]
+    struct S {
+        #[serde(rename = "a")]
+        field1: i8,
+        #[serde(rename = "b")]
+        field2: u8,
+    }
+    let v = S {
+        field1: 42,
+        field2: 42,
+    };
+    all_check(v, "4449444c016c026177627b01002a2a");
+
+    #[derive(CandidType, Deserialize, PartialEq, Debug)]
+    enum E {
+        #[serde(rename = "a")]
+        Field1(i8),
+        #[serde(rename = "b")]
+        Field2(u8),
+    }
+    let v = E::Field1(42);
+    all_check(v, "4449444c016c026177627b01002a2a");
+}
+
+#[test]
 fn test_generics() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct G<T, E> {

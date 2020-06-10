@@ -82,7 +82,7 @@
 //! ```
 //!
 //! ## Operating on big integers
-//! To support big integer types [`Candid::Int`](number/struct.Int.html) and [`Candid::Nat`](number/struct.Nat.html),
+//! To support big integer types [`Candid::Int`](types/number/struct.Int.html) and [`Candid::Nat`](types/number/struct.Nat.html),
 //! we use the `num_bigint` crate. We provide interface to convert `i64`, `u64`, `&str` and `&[u8]` to big integers.
 //! ```
 //! use candid::{Int, Nat, Encode, Decode, Result};

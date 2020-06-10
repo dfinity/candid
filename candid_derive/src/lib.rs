@@ -219,13 +219,43 @@ struct Field {
     ty: Tokens,
 }
 
+fn get_serde_meta_items(attr: &syn::Attribute) -> Result<Vec<syn::NestedMeta>, ()> {
+    if !attr.path.is_ident("serde") {
+        return Ok(Vec::new());
+    }
+    match attr.parse_meta() {
+        Ok(syn::Meta::List(meta)) => Ok(meta.nested.into_iter().collect()),
+        _ => Err(()),
+    }
+}
+
+fn get_field_rename(field: &syn::Field) -> Option<String> {
+    use syn::Meta::{List, NameValue, Path};
+    use syn::NestedMeta::{Lit, Meta};
+    for item in field.attrs.iter().flat_map(get_serde_meta_items).flatten() {
+        match &item {
+            // #[serde(rename = "foo"]
+            Meta(NameValue(m)) if m.path.is_ident("rename") => {
+                if let syn::Lit::Str(lit) = &m.lit {
+                    return Some(lit.value());
+                }
+            }
+            _ => continue,
+        }
+    }
+    None
+}
+
 fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (Tokens, Vec<Ident>) {
     let mut fs: Vec<_> = fields
         .iter()
         .enumerate()
         .map(|(i, field)| {
             let (ident, hash) = match field.ident {
-                Some(ref ident) => (Ident::Named(ident.clone()), idl_hash(&ident.to_string())),
+                Some(ref ident) => match get_field_rename(field) {
+                    Some(ref renamed) => (Ident::Named(ident.clone()), idl_hash(renamed)),
+                    None => (Ident::Named(ident.clone()), idl_hash(&ident.to_string())),
+                },
                 None => (Ident::Unnamed(i as u32), i as u32),
             };
             Field {
