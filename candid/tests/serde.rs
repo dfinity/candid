@@ -381,21 +381,11 @@ fn test_field_rename() {
     enum E1 {
         #[serde(rename = "a")]
         Field1,
-        #[serde(rename(serialize = "b"))]
+        #[serde(rename(serialize = "b", deserialize = "b"))]
         Field2,
     }
-    let v = E1::Field1;
-    all_check(v, "4449444c016b02617f627f010000");
-    /*
-    #[derive(CandidType, Deserialize, PartialEq, Debug)]
-    enum E2 {
-        #[serde(rename = "a")]
-        Field1(i8),
-        #[serde(rename(serialize = "b"))]
-        Field2(u8),
-    }
-    let v = E2::Field1(42);
-    all_check(v, "4449444c036b02610162026c0100776c01007b0100002a");*/
+    let v = E1::Field2;
+    all_check(v, "4449444c016b02617f627f010001");
 }
 
 #[test]
