@@ -71,15 +71,20 @@
 //! ```
 //! use candid::{Encode, Decode, CandidType, Deserialize};
 //! #[derive(CandidType, Deserialize)]
-//! struct List {
-//!     head: i32,
-//!     tail: Option<Box<List>>,
+//! enum List {
+//!     #[serde(rename = "nil")]
+//!     Nil,
+//!     Cons(i32, Box<List>),
 //! }
-//! let list = List { head: 42, tail: None };
+//! let list = List::Cons(42, Box::new(List::Nil));
 //!
 //! let bytes = Encode!(&list).unwrap();
 //! let res = Decode!(&bytes, List);
 //! ```
+//! We also support serde's rename attributes for each field, namely `#[serde(rename = "foo")]`
+//! and `#[serde(rename(serialize = "foo", deserialize = "foo"))]`.
+//! This is useful when interoperating between Rust and Motoko canisters involving variant types, because
+//! they use different naming conventions for field names.
 //!
 //! ## Operating on big integers
 //! To support big integer types [`Candid::Int`](types/number/struct.Int.html) and [`Candid::Nat`](types/number/struct.Nat.html),
