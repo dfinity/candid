@@ -113,6 +113,15 @@ fn test_reserved() {
 }
 
 #[test]
+fn test_principal() {
+    use candid::Principal;
+    all_check(
+        Principal::from_text("ic:caffee00").unwrap(),
+        "4449444c0001680103caffee",
+    );
+}
+
+#[test]
 fn test_option() {
     all_check(Some(Int::from(42)), "4449444c016e7c0100012a");
     all_check(Some(Some(Int::from(42))), "4449444c026e016e7c010001012a");
@@ -384,7 +393,7 @@ fn test_multiargs() {
     assert_eq!(bytes, hex("4449444c016e7c047c0000002a012a01010102"));
 
     let (a, b, c, d) = Decode!(&bytes, Int, Option<Int>, Option<Int>, Option<Int>).unwrap();
-    assert_eq!(a, 42.into());
+    assert_eq!(a, 42);
     assert_eq!(b, Some(42.into()));
     assert_eq!(c, Some(1.into()));
     assert_eq!(d, Some(2.into()));

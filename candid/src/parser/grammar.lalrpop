@@ -1,7 +1,7 @@
 use super::value::{IDLField, IDLValue, IDLArgs};
 use super::types::{IDLType, PrimType, Label, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg};
 use super::lexer::{Token, LexicalError, TmpIDLField, error};
-use crate::idl_hash;
+use crate::{idl_hash, Principal};
 
 grammar;
 
@@ -14,7 +14,6 @@ extern {
         "text" => Token::Text(<String>),
         "id" => Token::Id(<String>),
         "null" => Token::Null,
-        "none" => Token::None,
         "opt" => Token::Opt,
         "vec" => Token::Vec,
         "record" => Token::Record,
@@ -26,6 +25,7 @@ extern {
         "blob" => Token::Blob,
         "type" => Token::Type,
         "import" => Token::Import,
+        "principal" => Token::Principal,
         "+" => Token::Plus,
         "-" => Token::Minus,
         "=" => Token::Equals,
@@ -46,12 +46,11 @@ pub Args: IDLArgs = "(" <SepBy<Arg, ",">> ")" => IDLArgs { args: <> };
 
 Arg: IDLValue = {
     "bool" => IDLValue::Bool(<>),
-    "+" <"number"> =>? Ok(IDLValue::Int(<>.parse::<i64>().map_err(error)?)),
-    "-" <"number"> =>? Ok(IDLValue::Int(format!("-{}", <>).parse::<i64>().map_err(error)?)),
-    "number" =>? Ok(IDLValue::Nat(<>.parse::<u64>().map_err(error)?)),
+    "+" <"number"> => IDLValue::Number(<>),
+    "-" <"number"> => IDLValue::Number(format!("-{}", <>)),
+    "number" => IDLValue::Number(<>),
     "text" => IDLValue::Text(<>),
     "null" => IDLValue::Null,
-    "none" => IDLValue::None,
     "opt" <Arg> => IDLValue::Opt(Box::new(<>)),
     "vec" "{" <SepBy<Arg, ";">> "}" => IDLValue::Vec(<>),
     "record" "{" <SepBy<RecordField, ";">> "}" => {
@@ -68,7 +67,8 @@ Arg: IDLValue = {
         fs.sort_unstable_by_key(|IDLField { id, .. }| *id);
         IDLValue::Record(fs)
      },
-    "variant" "{" <VariantField> "}" => IDLValue::Variant(Box::new(<>)),
+    "variant" "{" <VariantField> "}" => IDLValue::Variant(Box::new(<>), 0),
+    "principal" <"text"> =>? Ok(IDLValue::Principal(Principal::from_text(<>).map_err(error)?)),
 }
 
 Field: IDLField = {
@@ -88,7 +88,7 @@ RecordField: TmpIDLField = {
 }
 
 // Type
-Typ: IDLType = {
+pub Typ: IDLType = {
     PrimTyp => <>,
     "opt" <Typ> => IDLType::OptT(Box::new(<>)),
     "vec" <Typ> => IDLType::VecT(Box::new(<>)),
@@ -112,6 +112,7 @@ Typ: IDLType = {
     },
     "func" <FuncTyp> => IDLType::FuncT(<>),
     "service" <ActorTyp> => IDLType::ServT(<>),
+    "principal" => IDLType::PrincipalT,
 }
 
 PrimTyp: IDLType = {
