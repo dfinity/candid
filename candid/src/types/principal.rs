@@ -1,5 +1,6 @@
 use super::{CandidType, Serializer, Type, TypeId};
 use crate::Error;
+use crc8::Crc8;
 use serde::de::{Deserialize, Visitor};
 use std::fmt;
 
@@ -12,15 +13,25 @@ impl Principal {
         let (_text_prefix, text_rest) = text.as_ref().split_at(3);
         match hex::decode(text_rest).unwrap().as_slice().split_last() {
             None => Err(Error::msg("Cannot parse principal")),
-            Some((_, buf)) => Ok(Principal(buf.to_vec())),
+            Some((last, buf)) => {
+                let mut crc8 = Crc8::create_msb(0x07);
+                let checksum: u8 = crc8.calc(buf, buf.len() as i32, 0);
+                if *last == checksum {
+                    Ok(Principal(buf.to_vec()))
+                } else {
+                    Err(Error::msg("Bad checksum"))
+                }
+            }
         }
     }
     pub fn from_bytes<S: AsRef<[u8]>>(bytes: S) -> Principal {
         Principal(bytes.as_ref().to_vec())
     }
     pub fn to_text(&self) -> String {
+        let mut crc8 = Crc8::create_msb(0x07);
+        let checksum: u8 = crc8.calc(&self.0, self.0.len() as i32, 0);
         let mut buf = self.0.clone();
-        buf.push(00u8);
+        buf.push(checksum);
         format!("ic:{}", hex::encode_upper(buf))
     }
 }
