@@ -116,7 +116,7 @@ fn test_reserved() {
 fn test_principal() {
     use candid::Principal;
     all_check(
-        Principal::from_text("ic:caffee00").unwrap(),
+        Principal::from_text("ic:caffee59").unwrap(),
         "4449444c0001680103caffee",
     );
 }
@@ -360,6 +360,32 @@ fn test_variant() {
         v,
         "4449444c036b03b3d3c90101bbd3c90102e6fdd5017f6c02007e017c6c02617c627d010000012a",
     );
+}
+
+#[test]
+fn test_field_rename() {
+    #[derive(CandidType, Deserialize, PartialEq, Debug)]
+    struct S {
+        #[serde(rename = "a")]
+        field1: i8,
+        #[serde(rename(serialize = "b", deserialize = "b"))]
+        field2: u8,
+    }
+    let v = S {
+        field1: 42,
+        field2: 42,
+    };
+    all_check(v, "4449444c016c026177627b01002a2a");
+
+    #[derive(CandidType, Deserialize, PartialEq, Debug)]
+    enum E1 {
+        #[serde(rename = "a")]
+        Field1,
+        #[serde(rename(serialize = "b", deserialize = "b"))]
+        Field2,
+    }
+    let v = E1::Field2;
+    all_check(v, "4449444c016b02617f627f010001");
 }
 
 #[test]
