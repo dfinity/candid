@@ -94,6 +94,14 @@ impl std::str::FromStr for IDLArgs {
     }
 }
 
+impl std::str::FromStr for IDLValue {
+    type Err = Error;
+    fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
+        let lexer = super::lexer::Lexer::new(str);
+        Ok(super::grammar::ArgParser::new().parse(lexer)?)
+    }
+}
+
 impl fmt::Display for IDLArgs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "(")?;
