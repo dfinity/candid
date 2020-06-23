@@ -49,12 +49,9 @@ impl<'de> IDLDeserialize<'de> {
         self.de.types.is_empty()
     }
     /// Return error if there are unprocessed bytes in the input.
-    pub fn done(self) -> Result<()> {
-        if !self.de.types.is_empty() {
-            return Err(Error::msg(format!(
-                "{} more values need to be deserialized",
-                self.de.types.len()
-            )));
+    pub fn done(mut self) -> Result<()> {
+        while !self.is_done() {
+            self.get_value::<crate::parser::value::IDLValue>()?;
         }
         if !self.de.input.is_empty() {
             return Err(Error::msg("Trailing value after finishing deserialization"))

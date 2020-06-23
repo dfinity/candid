@@ -424,10 +424,8 @@ fn test_multiargs() {
     assert_eq!(c, Some(1.into()));
     assert_eq!(d, Some(2.into()));
 
-    check_error(
-        || test_decode(&bytes, &Int::from(42)),
-        "3 more values need to be deserialized",
-    );
+    // okay to decode fewer values from the message
+    assert_eq!(Decode!(&bytes, Int).unwrap(), 42);
 
     let bytes = Encode!(&[(Int::from(42), "text")], &(Int::from(42), "text")).unwrap();
     assert_eq!(
