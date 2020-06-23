@@ -489,7 +489,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        visitor.visit_newtype_struct(self)
+        self.deserialize_seq(visitor)
+        //visitor.visit_newtype_struct(self)
     }
     fn deserialize_seq<V>(mut self, visitor: V) -> Result<V::Value>
     where

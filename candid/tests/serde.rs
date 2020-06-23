@@ -137,6 +137,19 @@ fn test_option() {
 }
 
 #[test]
+fn test_newtype() {
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct X(i32);
+    all_check(X(42), "4449444c016c01007501002a000000");
+    
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    enum Y {
+        A(i32)
+    }
+    all_check(Y::A(42), "4449444c026b0141016c0100750100002a000000");
+}
+
+#[test]
 fn test_struct() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct A1 {
