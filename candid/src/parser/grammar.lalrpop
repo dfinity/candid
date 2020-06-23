@@ -44,7 +44,7 @@ extern {
 // Value
 pub Args: IDLArgs = "(" <SepBy<Arg, ",">> ")" => IDLArgs { args: <> };
 
-Arg: IDLValue = {
+pub Arg: IDLValue = {
     "bool" => IDLValue::Bool(<>),
     "+" <"number"> => IDLValue::Number(<>),
     "-" <"number"> => IDLValue::Number(format!("-{}", <>)),
