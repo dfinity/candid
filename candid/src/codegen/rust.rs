@@ -267,6 +267,10 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
         unimplemented!()
     }
 
+    fn usage_principal(&self) -> Result<String> {
+        Ok("principal".to_string())
+    }
+
     fn declare(&self, id: &str, ty: &IDLType) -> Result<String> {
         match ty {
             IDLType::PrimT(prim) => self.declare_prim(&id, prim),
@@ -277,7 +281,7 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
             IDLType::RecordT(fields) => self.declare_record(&id, fields),
             IDLType::VariantT(fields) => self.declare_variant(&id, fields),
             IDLType::ServT(serv_t) => self.declare_service(&id, serv_t),
-            IDLType::PrincipalT => self.declare_var(&id, "principal"),
+            IDLType::PrincipalT => self.declare_principal(&id),
         }
     }
     fn declare_prim(&self, id: &str, ty: &PrimType) -> Result<String> {
@@ -321,6 +325,9 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
     }
     fn declare_service(&self, id: &str, ty: &[Binding]) -> Result<String> {
         Ok(format!("pub type {} = {};", id, self.usage_service(ty)?))
+    }
+    fn declare_principal(&self, id: &str) -> Result<String> {
+        self.declare_var(id, "principal")
     }
 
     fn declaration_binding(&self, binding: &Binding) -> Result<String> {

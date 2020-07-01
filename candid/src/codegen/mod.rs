@@ -8,6 +8,9 @@
 use crate::parser::types::{Binding, Dec, FuncType, IDLType, PrimType, TypeField};
 use crate::IDLProg;
 
+pub mod javascript;
+pub use javascript::idl_to_javascript;
+
 pub mod rust;
 pub use rust::idl_to_rust;
 
@@ -47,7 +50,7 @@ pub trait LanguageBinding {
             IDLType::RecordT(fields) => self.usage_record(fields),
             IDLType::VariantT(fields) => self.usage_variant(fields),
             IDLType::ServT(serv_t) => self.usage_service(serv_t),
-            IDLType::PrincipalT => Ok("principal".to_string()),
+            IDLType::PrincipalT => self.usage_principal(),
         }
     }
 
@@ -74,6 +77,9 @@ pub trait LanguageBinding {
 
     /// String to use when using a service type as a right hand side.
     fn usage_service(&self, ty: &[Binding]) -> Result<String>;
+
+    /// String to use when using a service type as a right hand side.
+    fn usage_principal(&self) -> Result<String>;
 
     /// String to use when declaring a type. This receives the ID of the type,
     /// and the right hand side of the type itself. By default it forwards it to a
@@ -115,6 +121,9 @@ pub trait LanguageBinding {
 
     /// Function called when declaring a service type.
     fn declare_service(&self, id: &str, ty: &[Binding]) -> Result<String>;
+
+    /// Function called when declaring a service type.
+    fn declare_principal(&self, id: &str) -> Result<String>;
 
     /// Function called when an import statement is used.
     fn declaration_import(&self, _module: &str) -> Result<String> {
