@@ -28,7 +28,7 @@ num-bigint = "0.2"
 num-traits = "0.2.7"
 candid_derive = { path = "../candid_derive", version = "0.2.2" }
 lalrpop-util = "0.19.0"
-pretty = "0.6"
+pretty = "0.10.0"
 hex = "0.3"
 crc8 = "0.1"
 

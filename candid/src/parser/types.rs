@@ -1,6 +1,6 @@
 use crate::idl_hash;
 use crate::Result;
-use pretty::{BoxDoc, Doc};
+use pretty::RcDoc;
 
 #[derive(Debug, Clone)]
 pub enum IDLType {
@@ -24,9 +24,9 @@ macro_rules! enum_to_doc {
             $($variant),*
         }
         impl $name {
-            fn to_doc(&self) -> Doc<'_, BoxDoc<'_, ()>> {
+            fn to_doc(&self) -> RcDoc<()> {
                 match self {
-                    $($name::$variant => Doc::text(stringify!($variant).to_lowercase())),*
+                    $($name::$variant => RcDoc::text(stringify!($variant).to_lowercase())),*
                 }
             }
             pub fn str_to_enum(str: &str) -> Option<Self> {
@@ -144,7 +144,7 @@ impl std::str::FromStr for IDLType {
 // Pretty printing
 
 pub trait ToDoc {
-    fn to_doc(&self) -> Doc<'_, BoxDoc<'_, ()>>;
+    fn to_doc(&self) -> RcDoc<()>;
 }
 
 pub fn to_pretty<T>(doc: &T, width: usize) -> String
@@ -157,17 +157,17 @@ where
 }
 
 impl ToDoc for IDLProg {
-    fn to_doc(&self) -> Doc<'_, BoxDoc<'_, ()>> {
-        let doc = Doc::concat(
+    fn to_doc(&self) -> RcDoc<()> {
+        let doc = RcDoc::concat(
             self.decs
                 .iter()
-                .map(|d| d.to_doc().append(Doc::text(";").append(Doc::newline()))),
+                .map(|d| d.to_doc().append(RcDoc::text(";").append(RcDoc::line()))),
         );
         if self.actor.is_some() {
             let actor = self.actor.as_ref().unwrap();
-            let doc = doc.append(Doc::text("service : "));
+            let doc = doc.append(RcDoc::text("service : "));
             match actor {
-                IDLType::VarT(ref var) => doc.append(Doc::text(var.to_string())),
+                IDLType::VarT(ref var) => doc.append(RcDoc::text(var.to_string())),
                 IDLType::ServT(ref meths) => doc.append(meths_to_doc(meths)),
                 _ => unreachable!(),
             }
@@ -178,18 +178,18 @@ impl ToDoc for IDLProg {
 }
 
 impl ToDoc for Dec {
-    fn to_doc(&self) -> Doc<'_, BoxDoc<'_, ()>> {
+    fn to_doc(&self) -> RcDoc<()> {
         match *self {
-            Dec::TypD(ref b) => Doc::text("type ").append(b.to_doc()),
-            Dec::ImportD(ref file) => Doc::text(format!("import \"{}\"", file)),
+            Dec::TypD(ref b) => RcDoc::text("type ").append(b.to_doc()),
+            Dec::ImportD(ref file) => RcDoc::text(format!("import \"{}\"", file)),
         }
     }
 }
 
 impl ToDoc for Binding {
-    fn to_doc(&self) -> Doc<'_, BoxDoc<'_, ()>> {
-        Doc::text(format!("{} =", self.id))
-            .append(Doc::space())
+    fn to_doc(&self) -> RcDoc<()> {
+        RcDoc::text(format!("{} =", self.id))
+            .append(RcDoc::space())
             .append(self.typ.to_doc())
             .nest(2)
             .group()
@@ -197,17 +197,19 @@ impl ToDoc for Binding {
 }
 
 impl ToDoc for IDLType {
-    fn to_doc(&self) -> Doc<'_, BoxDoc<'_, ()>> {
+    fn to_doc(&self) -> RcDoc<()> {
         match self {
             IDLType::PrimT(p) => p.to_doc(),
-            IDLType::VarT(var) => Doc::text(var),
-            IDLType::FuncT(func) => Doc::text("func").append(Doc::space()).append(func.to_doc()),
-            IDLType::OptT(ref t) => Doc::text("opt").append(Doc::space()).append(t.to_doc()),
-            IDLType::VecT(ref t) => Doc::text("vec").append(Doc::space()).append(t.to_doc()),
-            IDLType::RecordT(ref fs) => Doc::text("record ").append(fields_to_doc(fs)),
-            IDLType::VariantT(ref fs) => Doc::text("variant ").append(fields_to_doc(fs)),
-            IDLType::ServT(ref serv) => Doc::text("service ").append(meths_to_doc(serv)),
-            IDLType::PrincipalT => Doc::text("principal"),
+            IDLType::VarT(var) => RcDoc::text(var),
+            IDLType::FuncT(func) => RcDoc::text("func")
+                .append(RcDoc::space())
+                .append(func.to_doc()),
+            IDLType::OptT(ref t) => RcDoc::text("opt").append(RcDoc::space()).append(t.to_doc()),
+            IDLType::VecT(ref t) => RcDoc::text("vec").append(RcDoc::space()).append(t.to_doc()),
+            IDLType::RecordT(ref fs) => RcDoc::text("record ").append(fields_to_doc(fs)),
+            IDLType::VariantT(ref fs) => RcDoc::text("variant ").append(fields_to_doc(fs)),
+            IDLType::ServT(ref serv) => RcDoc::text("service ").append(meths_to_doc(serv)),
+            IDLType::PrincipalT => RcDoc::text("principal"),
         }
         .nest(2)
         .group()
@@ -215,67 +217,69 @@ impl ToDoc for IDLType {
 }
 
 impl ToDoc for FuncType {
-    fn to_doc(&self) -> Doc<'_, BoxDoc<'_, ()>> {
+    fn to_doc(&self) -> RcDoc<()> {
         args_to_doc(&self.args)
-            .append(Doc::space())
-            .append(Doc::text("-> "))
+            .append(RcDoc::space())
+            .append(RcDoc::text("-> "))
             .append(args_to_doc(&self.rets))
-            .append(Doc::concat(
-                self.modes.iter().map(|m| Doc::space().append(m.to_doc())),
+            .append(RcDoc::concat(
+                self.modes.iter().map(|m| RcDoc::space().append(m.to_doc())),
             ))
     }
 }
 
 impl ToDoc for TypeField {
-    fn to_doc(&self) -> Doc<'_, BoxDoc<'_, ()>> {
-        let colon = Doc::text(":").append(Doc::space());
+    fn to_doc(&self) -> RcDoc<()> {
+        let colon = RcDoc::text(":").append(RcDoc::space());
         let doc = match &self.label {
-            Label::Id(n) => Doc::as_string(n).append(colon),
-            Label::Named(name) => Doc::text(name).append(colon),
-            Label::Unnamed(_) => Doc::nil(),
+            Label::Id(n) => RcDoc::as_string(n).append(colon),
+            Label::Named(name) => RcDoc::text(name).append(colon),
+            Label::Unnamed(_) => RcDoc::nil(),
         };
         doc.append(self.typ.to_doc()).nest(2).group()
     }
 }
 
-fn fields_to_doc(fields: &[TypeField]) -> Doc<'_, BoxDoc<'_, ()>> {
-    Doc::text("{")
+fn fields_to_doc(fields: &[TypeField]) -> RcDoc<()> {
+    RcDoc::text("{")
         .append(
-            Doc::concat(
+            RcDoc::concat(
                 fields
                     .iter()
-                    .map(|f| Doc::space().append(f.to_doc()).append(Doc::text(";"))),
+                    .map(|f| RcDoc::space().append(f.to_doc()).append(RcDoc::text(";"))),
             )
             .nest(2)
             .group(),
         )
-        .append(Doc::space())
-        .append(Doc::text("}"))
+        .append(RcDoc::space())
+        .append(RcDoc::text("}"))
 }
 
-fn meths_to_doc(meths: &[Binding]) -> Doc<'_, BoxDoc<'_, ()>> {
-    Doc::text("{")
-        .append(Doc::concat(meths.iter().map(|meth| {
-            let doc = Doc::newline().append(Doc::text(format!("{}:", meth.id)));
+fn meths_to_doc(meths: &[Binding]) -> RcDoc<()> {
+    RcDoc::text("{")
+        .append(RcDoc::concat(meths.iter().map(|meth| {
+            let doc = RcDoc::line().append(RcDoc::text(format!("{}:", meth.id)));
             let doc = match meth.typ {
-                IDLType::VarT(ref var) => doc.append(Doc::space().append(Doc::text(var))),
-                IDLType::FuncT(ref func) => doc.append(Doc::space().append(func.to_doc()).nest(2)),
+                IDLType::VarT(ref var) => doc.append(RcDoc::space().append(RcDoc::text(var))),
+                IDLType::FuncT(ref func) => {
+                    doc.append(RcDoc::space().append(func.to_doc()).nest(2))
+                }
                 _ => unreachable!(),
             }
             .nest(2)
             .group();
-            doc.append(Doc::text(";"))
+            doc.append(RcDoc::text(";"))
         })))
-        .append(Doc::space())
-        .append(Doc::text("}"))
+        .append(RcDoc::space())
+        .append(RcDoc::text("}"))
 }
 
-fn args_to_doc(args: &[IDLType]) -> Doc<'_, BoxDoc<'_, ()>> {
-    Doc::text("(")
+fn args_to_doc(args: &[IDLType]) -> RcDoc<()> {
+    RcDoc::text("(")
         .append(
-            Doc::intersperse(
+            RcDoc::intersperse(
                 args.iter().map(|arg| arg.to_doc()),
-                Doc::text(",").append(Doc::space()),
+                RcDoc::text(",").append(RcDoc::space()),
             )
             .nest(1)
             .group(),
