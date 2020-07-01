@@ -55,7 +55,7 @@ impl<'a> JavaScriptLanguageBinding<'a> {
             self.config
                 .local_idl_var_name
                 .clone()
-                .unwrap_or("IDL".to_string()),
+                .unwrap_or_else(|| "IDL".to_string()),
             v
         )
     }
