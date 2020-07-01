@@ -4,9 +4,8 @@ use crate::parser::types::{Binding, Dec, FuncMode, FuncType, IDLType, Label, Pri
 use crate::{generate_code, idl_hash, IDLProg};
 
 /// Transforms a Candid ID into a valid JavaScript ID (as a string).
-/// In case a string cannot be used as an ID in Rust, this will replace it with a
+/// In case a string cannot be used as an ID in JavaScript, this will replace it with a
 /// IDL Hash value of the ID, surrounged by `_` (e.g. `_12345_`).
-/// If the string is a valid Rust
 pub fn candid_id_to_javascript(id: &str) -> String {
     // If the id is not representable in a Rust-compatible string
     if id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
@@ -18,6 +17,8 @@ pub fn candid_id_to_javascript(id: &str) -> String {
     }
 }
 
+/// The type of Module to generate, ie. an ES6 module (`export default ...`),
+/// or a CommonJS module (`exports = ...`, for Node).
 pub enum Module {
     Es6 = 0,
     CommonJS = 1,
@@ -30,8 +31,14 @@ impl Default for Module {
 }
 
 #[derive(Default)]
+/// The configuration of the code generator.
 pub struct Config {
-    library_name: Option<String>,
+    /// The local variable name to use for IDL. By default we don't rename it. Some people
+    /// might want to write the output inlined with their code, in which case IDL could
+    /// shadow another variable.
+    local_idl_var_name: Option<String>,
+
+    /// The type of module to generate.
     module: Module,
 }
 
@@ -46,7 +53,7 @@ impl<'a> JavaScriptLanguageBinding<'a> {
         format!(
             "{}.{}",
             self.config
-                .library_name
+                .local_idl_var_name
                 .clone()
                 .unwrap_or("IDL".to_string()),
             v
@@ -65,7 +72,7 @@ impl<'a> LanguageBinding for JavaScriptLanguageBinding<'a> {
             "{} function({{ {} }}) {{\n",
             prefix,
             self.config
-                .library_name
+                .local_idl_var_name
                 .clone()
                 .map_or_else(|| "IDL".to_string(), |x| format!("IDL: {}", x))
         );
@@ -230,10 +237,6 @@ impl<'a> LanguageBinding for JavaScriptLanguageBinding<'a> {
         self.declare(&binding.id, &binding.typ)
     }
 
-    fn service_binding(&self, _id: &str, _func_t: &FuncType) -> Result<String> {
-        unreachable!()
-    }
-
     fn service(&self, bindings: &[Binding]) -> Result<String> {
         let all_functions = bindings
             .iter()
@@ -280,9 +283,13 @@ impl<'a> LanguageBinding for JavaScriptLanguageBinding<'a> {
             all_functions.join("\n"),
         ))
     }
+
+    fn service_binding(&self, _id: &str, _func_t: &FuncType) -> Result<String> {
+        unreachable!()
+    }
 }
 
-/// Takes an IDL string and returns a Rust string, unformatted.
+/// Takes an IDL string and returns a JavaScript string, semi-formatted.
 pub fn idl_to_javascript(prog: &IDLProg, config: &Config) -> Result<String> {
     let binding = JavaScriptLanguageBinding {
         config,
