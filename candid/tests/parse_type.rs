@@ -24,11 +24,15 @@ service server : {
     "#;
     let ast = prog.parse::<IDLProg>().unwrap();
     let pretty = to_pretty(&ast, 80);
-    println!("{}", pretty);
     let ast2 = pretty.parse::<IDLProg>().unwrap();
     assert_eq!(format!("{:?}", ast2), format!("{:?}", ast));
     let mut env = TypeEnv::new();
-    let _actor = check_prog(&mut env, &ast).unwrap();
+    let actor = check_prog(&mut env, &ast).unwrap();
+    let js = candid::bindings::javascript::to_doc(&env, &actor, &ast)
+        .pretty(80)
+        .to_string();
+    println!("{}", js);
+    assert!(false);
 }
 
 #[test_generator::test_resources("candid/tests/assets/candid/*.did")]

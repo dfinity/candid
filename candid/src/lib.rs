@@ -239,6 +239,8 @@ pub use serde::Deserialize;
 pub mod codegen;
 pub use codegen::generate_code;
 
+pub mod bindings;
+
 pub mod error;
 pub use error::{Error, Result};
 
