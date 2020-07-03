@@ -91,7 +91,7 @@ fn pp_function(func: &Function) -> RcDoc {
     let rets = pp_args(&func.rets);
     let modes = pp_modes(&func.modes);
     let items = [args, rets, modes];
-    let doc = concat(items.iter().map(|e| e.clone()), ",");
+    let doc = concat(items.iter().cloned(), ",");
     enclose("(", doc, ")")
 }
 
