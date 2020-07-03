@@ -50,7 +50,6 @@ fn compiler_test(resource: &str) {
     let mut env = TypeEnv::new();
     let actor = check_prog(&mut env, &ast).unwrap();
     assert!(!env.0.is_empty());
-    assert!(!actor.is_empty());
 
     let js_path = src_path.with_extension("js");
     let mut mint = Mint::new(js_path.parent().unwrap());

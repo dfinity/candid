@@ -5,8 +5,8 @@
   const o = IDL.Opt(o);
   return IDL.Service({
     'f' : IDL.Func([IDL.Nat], [h], []),
-    'g' : IDL.Func([IDL.Int8], [IDL.Int8], []),
-    'h' : IDL.Func([IDL.Int8], [IDL.Int8], []),
+    'g' : f,
+    'h' : g,
     'o' : IDL.Func([o], [o], [])
   });
 }

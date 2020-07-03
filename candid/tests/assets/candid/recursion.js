@@ -4,7 +4,7 @@
   const list = IDL.Opt(node);
   const node = IDL.Record({'head' : IDL.Nat, 'tail' : list});
   const s = IDL.Service({
-    'f' : IDL.Func([s], [], []),
+    'f' : t,
     'g' : IDL.Func([list], [B, tree, stream], [])
   });
   const stream = IDL.Opt(
@@ -15,8 +15,5 @@
     'branch' : IDL.Record({'val' : IDL.Int, 'left' : tree, 'right' : tree}),
     'leaf' : IDL.Int
   });
-  return IDL.Service({
-    'f' : IDL.Func([s], [], []),
-    'g' : IDL.Func([list], [B, tree, stream], [])
-  });
+  return s;
 }

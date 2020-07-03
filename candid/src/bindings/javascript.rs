@@ -1,5 +1,5 @@
 use crate::parser::types::IDLProg;
-use crate::parser::typing::{ActorEnv, TypeEnv};
+use crate::parser::typing::TypeEnv;
 use crate::types::{Field, Function, Type};
 use pretty::RcDoc;
 
@@ -110,11 +110,11 @@ fn pp_modes(modes: &[crate::parser::types::FuncMode]) -> RcDoc {
     enclose("[", doc, "]")
 }
 
-fn pp_service(serv: &[(String, Function)]) -> RcDoc {
+fn pp_service(serv: &[(String, Type)]) -> RcDoc {
     let doc = concat(
         serv.iter().map(|(id, func)| {
-            let func_doc = str("IDL.Func").append(pp_function(func));
-            quote_ident(id).append(kwd(":")).append(func_doc)
+            //let func_doc = str("IDL.Func").append(pp_function(func));
+            quote_ident(id).append(kwd(":")).append(pp_ty(func))
         }),
         ",",
     );
@@ -132,20 +132,17 @@ fn pp_env(env: &TypeEnv) -> RcDoc {
     }))
 }
 
-fn pp_actor(actor: &ActorEnv) -> RcDoc {
-    let doc = concat(
-        actor.iter().map(|(id, func)| {
-            let func_doc = str("IDL.Func").append(pp_function(func));
-            quote_ident(id).append(kwd(":")).append(func_doc)
-        }),
-        ",",
-    );
-    kwd("return")
-        .append("IDL.Service")
-        .append(enclose("({", doc, "});"))
+fn pp_actor(actor: &Option<Type>) -> RcDoc {
+    let doc = match actor {
+        None => RcDoc::nil(),
+        Some(ty @ Type::Service(_)) => pp_ty(ty),
+        Some(ty @ Type::Var(_)) => pp_ty(ty),
+        _ => unreachable!(),
+    };
+    kwd("return").append(doc).append(";")
 }
 
-pub fn to_doc<'a>(te: &'a TypeEnv, actor: &'a ActorEnv, _prog: &'a IDLProg) -> RcDoc<'a> {
+pub fn to_doc<'a>(te: &'a TypeEnv, actor: &'a Option<Type>, _prog: &'a IDLProg) -> RcDoc<'a> {
     let defs = pp_env(te);
     let actor = pp_actor(actor);
     let doc = defs.append(actor);

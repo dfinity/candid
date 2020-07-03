@@ -10,7 +10,6 @@ pub struct Env<'a> {
 
 #[derive(Debug, Clone, Default)]
 pub struct TypeEnv(pub BTreeMap<String, Type>);
-pub type ActorEnv = BTreeMap<String, Function>;
 
 impl TypeEnv {
     pub fn new() -> Self {
@@ -52,12 +51,20 @@ impl TypeEnv {
             _ => Err(Error::msg(format!("not a function type: {:?}", t))),
         }
     }
-    pub fn as_service<'a>(&'a self, t: &'a Type) -> Result<&'a [(String, Function)]> {
+    pub fn as_service<'a>(&'a self, t: &'a Type) -> Result<&'a [(String, Type)]> {
         match t {
             Type::Service(s) => Ok(s),
             Type::Var(id) => self.as_service(self.find_type(id)?),
             _ => Err(Error::msg(format!("not a service type: {:?}", t))),
         }
+    }
+    pub fn as_method<'a>(&'a self, t: &'a Type, id: &'a str) -> Result<&'a Function> {
+        for (meth, ty) in self.as_service(t)?.iter() {
+            if meth == id {
+                return self.as_func(ty);
+            }
+        }
+        Err(Error::msg(format!("cannot find method {}", id)))
     }
 }
 
@@ -164,15 +171,15 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
     Ok(res)
 }
 
-fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Function)>> {
+fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
     let mut res = Vec::new();
     // TODO check duplicates, sorting
     for meth in ms.iter() {
         let t = check_type(env, &meth.typ)?;
         if !env.pre {
-            let func = env.te.as_func(&t)?;
-            res.push((meth.id.to_owned(), func.clone()));
+            env.te.as_func(&t)?;
         }
+        res.push((meth.id.to_owned(), t));
     }
     Ok(res)
 }
@@ -207,23 +214,21 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
-fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<ActorEnv> {
+fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
     match actor {
-        None => Ok(BTreeMap::new()),
+        None => Ok(None),
         Some(typ) => {
             let t = check_type(env, &typ)?;
-            let service = env.te.as_service(&t)?;
-            let env = service.iter().cloned().collect();
-            Ok(env)
+            env.te.as_service(&t)?;
+            Ok(Some(t))
         }
     }
 }
 
 /// Type check IDLProg, and adds bindings to type environment. Returns
 /// a hash map for the serivce method signatures. For now, we omit import.
-pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<ActorEnv> {
+pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<Option<Type>> {
     let mut env = Env { te, pre: false };
     check_decs(&mut env, &prog.decs)?;
-    let actor = check_actor(&env, &prog.actor)?;
-    Ok(actor)
+    check_actor(&env, &prog.actor)
 }

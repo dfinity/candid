@@ -45,7 +45,7 @@ pub enum Type {
     Record(Vec<Field>),
     Variant(Vec<Field>),
     Func(Function),
-    Service(Vec<(String, Function)>),
+    Service(Vec<(String, Type)>),
     Principal,
 }
 
