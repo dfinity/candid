@@ -186,8 +186,8 @@
 //!
 //!   // Type checking
 //!   let mut env = TypeEnv::new();
-//!   let actor = check_prog(&mut env, &ast)?;
-//!   let method = actor.get("g").unwrap();
+//!   let actor = check_prog(&mut env, &ast)?.unwrap();
+//!   let method = env.get_method(&actor, "g").unwrap();
 //!   assert_eq!(method.is_query(), true);
 //!   assert_eq!(method.args, vec![Type::Var("List".to_string())]);
 //!   Ok(())
@@ -214,8 +214,8 @@
 //!   "#;
 //!   let ast = did_file.parse::<IDLProg>()?;
 //!   let mut env = TypeEnv::new();
-//!   let actor = check_prog(&mut env, &ast)?;
-//!   let method = actor.get("f").unwrap();
+//!   let actor = check_prog(&mut env, &ast)?.unwrap();
+//!   let method = env.get_method(&actor, "f").unwrap();
 //!
 //!   // Serialize arguments with candid types
 //!   let args = "(42, 42, 42, 42)".parse::<IDLArgs>()?;

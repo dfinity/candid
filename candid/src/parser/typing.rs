@@ -58,7 +58,7 @@ impl TypeEnv {
             _ => Err(Error::msg(format!("not a service type: {:?}", t))),
         }
     }
-    pub fn as_method<'a>(&'a self, t: &'a Type, id: &'a str) -> Result<&'a Function> {
+    pub fn get_method<'a>(&'a self, t: &'a Type, id: &'a str) -> Result<&'a Function> {
         for (meth, ty) in self.as_service(t)?.iter() {
             if meth == id {
                 return self.as_func(ty);

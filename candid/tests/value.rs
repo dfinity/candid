@@ -35,7 +35,7 @@ service : {
     let ast = candid.parse::<IDLProg>().unwrap();
     let mut env = TypeEnv::new();
     let actor = check_prog(&mut env, &ast).unwrap().unwrap();
-    let method = env.as_method(&actor, "f").unwrap();
+    let method = env.get_method(&actor, "f").unwrap();
     {
         let args = "(42,42,42,42)".parse::<IDLArgs>().unwrap();
         let encoded = args.to_bytes_with_types(&env, &method.args).unwrap();
