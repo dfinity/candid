@@ -90,11 +90,8 @@ fn pp_function(func: &Function) -> RcDoc {
     let args = pp_args(&func.args);
     let rets = pp_args(&func.rets);
     let modes = pp_modes(&func.modes);
-    let doc = args
-        .append(kwd(","))
-        .append(rets)
-        .append(kwd(","))
-        .append(modes);
+    let items = [args, rets, modes];
+    let doc = concat(items.iter().map(|e| e.clone()), ",");
     enclose("(", doc, ")")
 }
 

@@ -27,8 +27,9 @@ type List = List1;
 type List1 = List2;
 type List2 = opt record { head: nat8; tail: List1 };
 type byte = nat8;
+type f = func (byte, int, nat, int8) -> (List);
 service : {
-  f : (byte, int, nat, int8) -> (List);
+  f : f;
 }
 "#;
     let ast = candid.parse::<IDLProg>().unwrap();
