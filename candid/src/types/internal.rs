@@ -56,6 +56,12 @@ pub struct Field {
     pub ty: Type,
 }
 
+impl Field {
+    pub fn is_named(&self) -> bool {
+        crate::idl_hash(&self.id) == self.hash
+    }
+}
+
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Function {
     pub modes: Vec<crate::parser::types::FuncMode>,

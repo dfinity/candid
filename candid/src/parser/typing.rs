@@ -1,19 +1,20 @@
 use super::types::*;
 use crate::types::{Field, Function, Type};
 use crate::{Error, Result};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 pub struct Env<'a> {
     pub te: &'a mut TypeEnv,
     pub pre: bool,
 }
+
 #[derive(Debug, Clone, Default)]
-pub struct TypeEnv(pub HashMap<String, Type>);
-pub type ActorEnv = HashMap<String, Function>;
+pub struct TypeEnv(pub BTreeMap<String, Type>);
+pub type ActorEnv = BTreeMap<String, Function>;
 
 impl TypeEnv {
     pub fn new() -> Self {
-        TypeEnv(HashMap::new())
+        TypeEnv(BTreeMap::new())
     }
     /// Convert candid AST to internal Type
     pub fn ast_to_type(&self, ast: &super::types::IDLType) -> Result<Type> {
@@ -208,7 +209,7 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
 
 fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<ActorEnv> {
     match actor {
-        None => Ok(HashMap::new()),
+        None => Ok(BTreeMap::new()),
         Some(typ) => {
             let t = check_type(env, &typ)?;
             let service = env.te.as_service(&t)?;

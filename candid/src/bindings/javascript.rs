@@ -36,41 +36,49 @@ fn str(str: &str) -> RcDoc {
 fn ident(id: &str) -> RcDoc {
     kwd(id)
 }
+fn quote_ident(id: &str) -> RcDoc {
+    str("'").append(id).append("'").append(RcDoc::space())
+}
 
 fn pp_ty(ty: &Type) -> RcDoc {
     use Type::*;
     match *ty {
-        Null => str("Null"),
-        Bool => str("Bool"),
-        Nat => str("Nat"),
-        Int => str("Int"),
-        Nat8 => str("Nat8"),
-        Nat16 => str("Nat16"),
-        Nat32 => str("Nat32"),
-        Nat64 => str("Nat64"),
-        Int8 => str("Int8"),
-        Int16 => str("Int16"),
-        Int32 => str("Int32"),
-        Int64 => str("Int64"),
-        Float32 => str("Float32"),
-        Float64 => str("Float64"),
-        Text => str("Text"),
-        Reserved => str("Reserved"),
-        Empty => str("Empty"),
+        Null => str("IDL.Null"),
+        Bool => str("IDL.Bool"),
+        Nat => str("IDL.Nat"),
+        Int => str("IDL.Int"),
+        Nat8 => str("IDL.Nat8"),
+        Nat16 => str("IDL.Nat16"),
+        Nat32 => str("IDL.Nat32"),
+        Nat64 => str("IDL.Nat64"),
+        Int8 => str("IDL.Int8"),
+        Int16 => str("IDL.Int16"),
+        Int32 => str("IDL.Int32"),
+        Int64 => str("IDL.Int64"),
+        Float32 => str("IDL.Float32"),
+        Float64 => str("IDL.Float64"),
+        Text => str("IDL.Text"),
+        Reserved => str("IDL.Reserved"),
+        Empty => str("IDL.Empty"),
         Var(ref s) => str(s),
-        Principal => str("Principal"),
-        Opt(ref t) => str("Opt").append(enclose("(", pp_ty(t), ")")),
-        Vec(ref t) => str("Vec").append(enclose("(", pp_ty(t), ")")),
-        Record(ref fs) => str("Record").append(pp_fields(fs)),
-        Variant(ref fs) => str("Variant").append(pp_fields(fs)),
-        Func(ref func) => str("Func").append(pp_function(func)),
-        Service(ref serv) => str("Service").append(pp_service(serv)),
+        Principal => str("IDL.Principal"),
+        Opt(ref t) => str("IDL.Opt").append(enclose("(", pp_ty(t), ")")),
+        Vec(ref t) => str("IDL.Vec").append(enclose("(", pp_ty(t), ")")),
+        Record(ref fs) => str("IDL.Record").append(pp_fields(fs)),
+        Variant(ref fs) => str("IDL.Variant").append(pp_fields(fs)),
+        Func(ref func) => str("IDL.Func").append(pp_function(func)),
+        Service(ref serv) => str("IDL.Service").append(pp_service(serv)),
         _ => unreachable!(),
     }
 }
 
 fn pp_field(field: &Field) -> RcDoc {
-    ident(&field.id).append(kwd(":")).append(pp_ty(&field.ty))
+    let name = if field.is_named() {
+        quote_ident(&field.id)
+    } else {
+        str("_").append(&field.id).append("_")
+    };
+    name.append(kwd(":")).append(pp_ty(&field.ty))
 }
 
 fn pp_fields(fs: &[Field]) -> RcDoc {
@@ -96,15 +104,20 @@ fn pp_args(args: &[Type]) -> RcDoc {
 }
 
 fn pp_modes(modes: &[crate::parser::types::FuncMode]) -> RcDoc {
-    let doc = concat(modes.iter().map(|m| m.to_doc()), ",");
+    let doc = concat(
+        modes
+            .iter()
+            .map(|m| str("'").append(m.to_doc()).append("'")),
+        ",",
+    );
     enclose("[", doc, "]")
 }
 
 fn pp_service(serv: &[(String, Function)]) -> RcDoc {
     let doc = concat(
         serv.iter().map(|(id, func)| {
-            let func_doc = str("Func").append(pp_function(func));
-            ident(id).append(kwd(":")).append(func_doc)
+            let func_doc = str("IDL.Func").append(pp_function(func));
+            quote_ident(id).append(kwd(":")).append(func_doc)
         }),
         ",",
     );
@@ -125,14 +138,14 @@ fn pp_env(env: &TypeEnv) -> RcDoc {
 fn pp_actor(actor: &ActorEnv) -> RcDoc {
     let doc = concat(
         actor.iter().map(|(id, func)| {
-            let func_doc = str("Func").append(pp_function(func));
-            ident(id).append(kwd(":")).append(func_doc)
+            let func_doc = str("IDL.Func").append(pp_function(func));
+            quote_ident(id).append(kwd(":")).append(func_doc)
         }),
         ",",
     );
     kwd("return")
-        .append("Service")
-        .append(enclose("({", doc, "})"))
+        .append("IDL.Service")
+        .append(enclose("({", doc, "});"))
 }
 
 pub fn to_doc<'a>(te: &'a TypeEnv, actor: &'a ActorEnv, _prog: &'a IDLProg) -> RcDoc<'a> {
