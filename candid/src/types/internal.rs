@@ -58,6 +58,7 @@ pub struct Field {
 
 impl Field {
     pub fn is_named(&self) -> bool {
+        // TODO make this more robust
         crate::idl_hash(&self.id) == self.hash
     }
 }

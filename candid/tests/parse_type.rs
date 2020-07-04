@@ -35,23 +35,29 @@ service server : {
     println!("{}", js);
 }
 
-#[test_generator::test_resources("candid/tests/assets/candid/*.did")]
+#[test_generator::test_resources("candid/tests/assets/*.did")]
 fn compiler_test(resource: &str) {
-    let src_path = std::env::current_dir()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(Path::new(resource));
+    let base_path = std::env::current_dir().unwrap().join("tests/assets");
+    let golden_path = base_path.join("ok");
+    let mut mint = Mint::new(golden_path.clone());
 
-    let prog = std::fs::read_to_string(&src_path).unwrap();
+    let filename = Path::new(Path::new(resource).file_name().unwrap());
+    let candid_path = base_path.join(filename);
+
+    let prog = std::fs::read_to_string(&candid_path).unwrap();
     let ast = prog.parse::<IDLProg>().unwrap();
     let mut env = TypeEnv::new();
-    let actor = check_prog(&mut env, &ast).unwrap();
-    assert!(!env.0.is_empty());
-
-    let js_path = src_path.with_extension("js");
-    let mut mint = Mint::new(js_path.parent().unwrap());
-    let mut js_output = mint.new_goldenfile(js_path.file_name().unwrap()).unwrap();
-    let js = javascript::to_doc(&env, &actor);
-    write!(js_output, "{}", js).unwrap();
+    match check_prog(&mut env, &ast) {
+        Ok(actor) => {
+            let mut js_output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
+            let js = javascript::to_doc(&env, &actor);
+            writeln!(js_output, "{}", js).unwrap();
+        }
+        Err(e) => {
+            let mut fail_output = mint
+                .new_goldenfile(filename.with_extension("fail"))
+                .unwrap();
+            writeln!(fail_output, "{}", e.to_string()).unwrap();
+        }
+    }
 }
