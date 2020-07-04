@@ -1,8 +1,9 @@
 ({ IDL }) => {
+  const o = IDL.Rec();
   const f = IDL.Func([IDL.Int8], [IDL.Int8], []);
-  const g = f;
   const h = IDL.Func([f], [f], []);
-  const o = IDL.Opt(o);
+  const g = f;
+  o.fill(IDL.Opt(o));
   return IDL.Service({
     'f' : IDL.Func([IDL.Nat], [h], []),
     'g' : f,

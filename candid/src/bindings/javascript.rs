@@ -1,7 +1,94 @@
-use crate::parser::types::IDLProg;
 use crate::parser::typing::TypeEnv;
 use crate::types::{Field, Function, Type};
 use pretty::RcDoc;
+use std::collections::BTreeSet;
+
+// Gather type definitions mentioned in actor, returns the type names in topological order
+fn chase_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> crate::Result<Vec<&'a str>> {
+    let mut seen = BTreeSet::new();
+    let mut res = Vec::new();
+    fn chase<'a>(
+        seen: &mut BTreeSet<&'a str>,
+        res: &mut Vec<&'a str>,
+        env: &'a TypeEnv,
+        t: &'a Type,
+    ) -> crate::Result<()> {
+        use Type::*;
+        match t {
+            Var(id) => {
+                if seen.insert(id) {
+                    let t = env.find_type(id)?;
+                    chase(seen, res, env, t)?;
+                    res.push(id);
+                }
+            }
+            Opt(ty) | Vec(ty) => chase(seen, res, env, ty)?,
+            Record(fs) | Variant(fs) => {
+                for f in fs.iter() {
+                    chase(seen, res, env, &f.ty)?;
+                }
+            }
+            Func(f) => {
+                for ty in f.args.iter().chain(f.rets.iter()) {
+                    chase(seen, res, env, ty)?;
+                }
+            }
+            Service(ms) => {
+                for (_, ty) in ms.iter() {
+                    chase(seen, res, env, ty)?;
+                }
+            }
+            _ => (),
+        }
+        Ok(())
+    }
+    chase(&mut seen, &mut res, env, actor)?;
+    Ok(res)
+}
+
+fn infer_rec<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> crate::Result<BTreeSet<&'a str>> {
+    let mut seen = BTreeSet::new();
+    let mut res = BTreeSet::new();
+    fn go<'a>(
+        seen: &mut BTreeSet<&'a str>,
+        res: &mut BTreeSet<&'a str>,
+        env: &'a TypeEnv,
+        t: &'a Type,
+    ) -> crate::Result<()> {
+        use Type::*;
+        match t {
+            Var(id) => {
+                if seen.insert(id) {
+                    res.insert(id);
+                }
+            }
+            Opt(ty) | Vec(ty) => go(seen, res, env, ty)?,
+            Record(fs) | Variant(fs) => {
+                for f in fs.iter() {
+                    go(seen, res, env, &f.ty)?;
+                }
+            }
+            Func(f) => {
+                for ty in f.args.iter().chain(f.rets.iter()) {
+                    go(seen, res, env, ty)?;
+                }
+            }
+            Service(ms) => {
+                for (_, ty) in ms.iter() {
+                    go(seen, res, env, ty)?;
+                }
+            }
+            _ => (),
+        }
+        Ok(())
+    }
+    for var in def_list.iter() {
+        let t = env.0.get(*var).unwrap();
+        go(&mut seen, &mut res, env, &t)?;
+        seen.insert(var);
+    }
+    Ok(res)
+}
 
 fn enclose<'a>(left: &'a str, doc: RcDoc<'a>, right: &'a str) -> RcDoc<'a> {
     RcDoc::text(left)
@@ -112,39 +199,68 @@ fn pp_modes(modes: &[crate::parser::types::FuncMode]) -> RcDoc {
 
 fn pp_service(serv: &[(String, Type)]) -> RcDoc {
     let doc = concat(
-        serv.iter().map(|(id, func)| {
-            //let func_doc = str("IDL.Func").append(pp_function(func));
-            quote_ident(id).append(kwd(":")).append(pp_ty(func))
-        }),
+        serv.iter()
+            .map(|(id, func)| quote_ident(id).append(kwd(":")).append(pp_ty(func))),
         ",",
     );
     enclose("({", doc, "})")
 }
 
-fn pp_env(env: &TypeEnv) -> RcDoc {
-    RcDoc::concat(env.0.iter().map(|(id, ty)| {
+fn pp_defs<'a>(
+    env: &'a TypeEnv,
+    def_list: &'a [&'a str],
+    recs: &'a BTreeSet<&'a str>,
+) -> RcDoc<'a> {
+    let recs_doc = RcDoc::concat(recs.iter().map(|id| {
         kwd("const")
             .append(ident(id))
-            .append(kwd("="))
-            .append(pp_ty(ty))
-            .append(";")
+            .append("= IDL.Rec();")
             .append(RcDoc::hardline())
-    }))
+    }));
+    let defs = RcDoc::concat(def_list.iter().map(|id| {
+        let ty = env.find_type(id).unwrap();
+        if recs.contains(id) {
+            str(id)
+                .append(".fill")
+                .append(enclose("(", pp_ty(ty), ");"))
+        } else {
+            kwd("const")
+                .append(ident(id))
+                .append(kwd("="))
+                .append(pp_ty(ty))
+                .append(";")
+        }
+        .append(RcDoc::hardline())
+    }));
+    recs_doc.append(defs)
 }
 
-fn pp_actor(actor: &Option<Type>) -> RcDoc {
-    let doc = match actor {
-        None => RcDoc::nil(),
-        Some(ty @ Type::Service(_)) => pp_ty(ty),
-        Some(ty @ Type::Var(_)) => pp_ty(ty),
+fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
+    let doc = match ty {
+        Type::Service(_) => pp_ty(ty),
+        Type::Var(id) => {
+            if recs.contains(&*id.clone()) {
+                str(id).append(".getType()")
+            } else {
+                str(id)
+            }
+        }
         _ => unreachable!(),
     };
     kwd("return").append(doc).append(";")
 }
 
-pub fn to_doc<'a>(te: &'a TypeEnv, actor: &'a Option<Type>, _prog: &'a IDLProg) -> RcDoc<'a> {
-    let defs = pp_env(te);
-    let actor = pp_actor(actor);
-    let doc = defs.append(actor);
-    str("({ IDL }) => ").append(enclose("{", doc, "}"))
+pub fn to_doc(env: &TypeEnv, actor: &Option<Type>) -> String {
+    match actor {
+        None => "".to_string(),
+        Some(actor) => {
+            let def_list = chase_actor(env, actor).unwrap();
+            let recs = infer_rec(env, &def_list).unwrap();
+            let defs = pp_defs(env, &def_list, &recs);
+            let actor = pp_actor(actor, &recs);
+            let body = defs.append(actor);
+            let doc = str("({ IDL }) => ").append(enclose("{", body, "}"));
+            doc.pretty(80).to_string()
+        }
+    }
 }

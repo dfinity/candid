@@ -31,9 +31,7 @@ service server : {
     assert_eq!(format!("{:?}", ast2), format!("{:?}", ast));
     let mut env = TypeEnv::new();
     let actor = check_prog(&mut env, &ast).unwrap();
-    let js = candid::bindings::javascript::to_doc(&env, &actor, &ast)
-        .pretty(80)
-        .to_string();
+    let js = candid::bindings::javascript::to_doc(&env, &actor);
     println!("{}", js);
 }
 
@@ -54,8 +52,6 @@ fn compiler_test(resource: &str) {
     let js_path = src_path.with_extension("js");
     let mut mint = Mint::new(js_path.parent().unwrap());
     let mut js_output = mint.new_goldenfile(js_path.file_name().unwrap()).unwrap();
-    let js = javascript::to_doc(&env, &actor, &ast)
-        .pretty(80)
-        .to_string();
+    let js = javascript::to_doc(&env, &actor);
     write!(js_output, "{}", js).unwrap();
 }
