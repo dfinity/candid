@@ -46,6 +46,7 @@ fn chase_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> crate::Result<Vec<&'a s
     Ok(res)
 }
 
+// Given a topologically sorted def_list, infer which types are recursive
 fn infer_rec<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> crate::Result<BTreeSet<&'a str>> {
     let mut seen = BTreeSet::new();
     let mut res = BTreeSet::new();
@@ -88,6 +89,24 @@ fn infer_rec<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> crate::Result<BTr
         seen.insert(var);
     }
     Ok(res)
+}
+
+// The definition of tuple is language specific.
+fn is_tuple(t: &Type) -> bool {
+    match t {
+        Type::Record(ref fs) => {
+            if fs.is_empty() {
+                return false;
+            }
+            for (i, field) in fs.iter().enumerate() {
+                if field.hash != (i as u32) {
+                    return false;
+                }
+            }
+            true
+        }
+        _ => false,
+    }
 }
 
 fn enclose<'a>(left: &'a str, doc: RcDoc<'a>, right: &'a str) -> RcDoc<'a> {
@@ -151,7 +170,14 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Principal => str("IDL.Principal"),
         Opt(ref t) => str("IDL.Opt").append(enclose("(", pp_ty(t), ")")),
         Vec(ref t) => str("IDL.Vec").append(enclose("(", pp_ty(t), ")")),
-        Record(ref fs) => str("IDL.Record").append(pp_fields(fs)),
+        Record(ref fs) => {
+            if is_tuple(ty) {
+                let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
+                str("IDL.Tuple").append(enclose("(", tuple, ")"))
+            } else {
+                str("IDL.Record").append(pp_fields(fs))
+            }
+        }
         Variant(ref fs) => str("IDL.Variant").append(pp_fields(fs)),
         Func(ref func) => str("IDL.Func").append(pp_function(func)),
         Service(ref serv) => str("IDL.Service").append(pp_service(serv)),
