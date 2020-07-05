@@ -38,8 +38,7 @@ service server : {
 #[test_generator::test_resources("candid/tests/assets/*.did")]
 fn compiler_test(resource: &str) {
     let base_path = std::env::current_dir().unwrap().join("tests/assets");
-    let golden_path = base_path.join("ok");
-    let mut mint = Mint::new(golden_path);
+    let mut mint = Mint::new(base_path.join("ok"));
 
     let filename = Path::new(Path::new(resource).file_name().unwrap());
     let candid_path = base_path.join(filename);

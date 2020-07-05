@@ -141,15 +141,19 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
 fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
     let mut res = Vec::new();
     {
-        let mut prev = None;
+        let mut prev: Option<&TypeField> = None;
         for f in fs.iter() {
             let id = f.label.get_id();
             if let Some(prev) = prev {
-                if id == prev {
-                    return Err(Error::msg("field name hash collision"));
+                if id == prev.label.get_id() {
+                    return Err(Error::msg(format!(
+                        "field '{}' hash collision with '{}'",
+                        f.to_doc().pretty(80),
+                        prev.to_doc().pretty(80),
+                    )));
                 }
             }
-            prev = Some(id);
+            prev = Some(f);
         }
     }
     for f in fs.iter() {
@@ -176,8 +180,12 @@ fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
     // TODO check duplicates, sorting
     for meth in ms.iter() {
         let t = check_type(env, &meth.typ)?;
-        if !env.pre {
-            env.te.as_func(&t)?;
+        if !env.pre && env.te.as_func(&t).is_err() {
+            return Err(Error::msg(format!(
+                "method {} has a non-function type {}",
+                meth.id,
+                meth.typ.to_doc().pretty(80)
+            )));
         }
         res.push((meth.id.to_owned(), t));
     }
