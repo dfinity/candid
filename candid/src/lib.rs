@@ -260,6 +260,8 @@ pub use parser::value::IDLArgs;
 pub mod de;
 pub mod ser;
 
+mod pretty;
+
 // Candid hash function comes from
 // https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf
 // Not public API. Only used by tests.

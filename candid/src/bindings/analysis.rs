@@ -1,0 +1,94 @@
+use crate::parser::typing::TypeEnv;
+use crate::types::Type;
+use std::collections::BTreeSet;
+
+// Gather type definitions mentioned in actor, returns the type names in topological order
+pub fn chase_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> crate::Result<Vec<&'a str>> {
+    let mut seen = BTreeSet::new();
+    let mut res = Vec::new();
+    fn chase<'a>(
+        seen: &mut BTreeSet<&'a str>,
+        res: &mut Vec<&'a str>,
+        env: &'a TypeEnv,
+        t: &'a Type,
+    ) -> crate::Result<()> {
+        use Type::*;
+        match t {
+            Var(id) => {
+                if seen.insert(id) {
+                    let t = env.find_type(id)?;
+                    chase(seen, res, env, t)?;
+                    res.push(id);
+                }
+            }
+            Opt(ty) | Vec(ty) => chase(seen, res, env, ty)?,
+            Record(fs) | Variant(fs) => {
+                for f in fs.iter() {
+                    chase(seen, res, env, &f.ty)?;
+                }
+            }
+            Func(f) => {
+                for ty in f.args.iter().chain(f.rets.iter()) {
+                    chase(seen, res, env, ty)?;
+                }
+            }
+            Service(ms) => {
+                for (_, ty) in ms.iter() {
+                    chase(seen, res, env, ty)?;
+                }
+            }
+            _ => (),
+        }
+        Ok(())
+    }
+    chase(&mut seen, &mut res, env, actor)?;
+    Ok(res)
+}
+
+// Given a topologically sorted def_list, infer which types are recursive
+pub fn infer_rec<'a>(
+    env: &'a TypeEnv,
+    def_list: &'a [&'a str],
+) -> crate::Result<BTreeSet<&'a str>> {
+    let mut seen = BTreeSet::new();
+    let mut res = BTreeSet::new();
+    fn go<'a>(
+        seen: &mut BTreeSet<&'a str>,
+        res: &mut BTreeSet<&'a str>,
+        env: &'a TypeEnv,
+        t: &'a Type,
+    ) -> crate::Result<()> {
+        use Type::*;
+        match t {
+            Var(id) => {
+                if seen.insert(id) {
+                    res.insert(id);
+                }
+            }
+            Opt(ty) | Vec(ty) => go(seen, res, env, ty)?,
+            Record(fs) | Variant(fs) => {
+                for f in fs.iter() {
+                    go(seen, res, env, &f.ty)?;
+                }
+            }
+            Func(f) => {
+                for ty in f.args.iter().chain(f.rets.iter()) {
+                    go(seen, res, env, ty)?;
+                }
+            }
+            Service(ms) => {
+                for (_, ty) in ms.iter() {
+                    go(seen, res, env, ty)?;
+                }
+            }
+            _ => (),
+        }
+        Ok(())
+    }
+    for var in def_list.iter() {
+        let t = env.0.get(*var).unwrap();
+        go(&mut seen, &mut res, env, &t)?;
+        seen.insert(var);
+    }
+    Ok(res)
+}

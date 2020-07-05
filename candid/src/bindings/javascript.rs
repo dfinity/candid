@@ -1,95 +1,9 @@
+use super::analysis::{chase_actor, infer_rec};
 use crate::parser::typing::TypeEnv;
+use crate::pretty::*;
 use crate::types::{Field, Function, Type};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
-
-// Gather type definitions mentioned in actor, returns the type names in topological order
-fn chase_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> crate::Result<Vec<&'a str>> {
-    let mut seen = BTreeSet::new();
-    let mut res = Vec::new();
-    fn chase<'a>(
-        seen: &mut BTreeSet<&'a str>,
-        res: &mut Vec<&'a str>,
-        env: &'a TypeEnv,
-        t: &'a Type,
-    ) -> crate::Result<()> {
-        use Type::*;
-        match t {
-            Var(id) => {
-                if seen.insert(id) {
-                    let t = env.find_type(id)?;
-                    chase(seen, res, env, t)?;
-                    res.push(id);
-                }
-            }
-            Opt(ty) | Vec(ty) => chase(seen, res, env, ty)?,
-            Record(fs) | Variant(fs) => {
-                for f in fs.iter() {
-                    chase(seen, res, env, &f.ty)?;
-                }
-            }
-            Func(f) => {
-                for ty in f.args.iter().chain(f.rets.iter()) {
-                    chase(seen, res, env, ty)?;
-                }
-            }
-            Service(ms) => {
-                for (_, ty) in ms.iter() {
-                    chase(seen, res, env, ty)?;
-                }
-            }
-            _ => (),
-        }
-        Ok(())
-    }
-    chase(&mut seen, &mut res, env, actor)?;
-    Ok(res)
-}
-
-// Given a topologically sorted def_list, infer which types are recursive
-fn infer_rec<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> crate::Result<BTreeSet<&'a str>> {
-    let mut seen = BTreeSet::new();
-    let mut res = BTreeSet::new();
-    fn go<'a>(
-        seen: &mut BTreeSet<&'a str>,
-        res: &mut BTreeSet<&'a str>,
-        env: &'a TypeEnv,
-        t: &'a Type,
-    ) -> crate::Result<()> {
-        use Type::*;
-        match t {
-            Var(id) => {
-                if seen.insert(id) {
-                    res.insert(id);
-                }
-            }
-            Opt(ty) | Vec(ty) => go(seen, res, env, ty)?,
-            Record(fs) | Variant(fs) => {
-                for f in fs.iter() {
-                    go(seen, res, env, &f.ty)?;
-                }
-            }
-            Func(f) => {
-                for ty in f.args.iter().chain(f.rets.iter()) {
-                    go(seen, res, env, ty)?;
-                }
-            }
-            Service(ms) => {
-                for (_, ty) in ms.iter() {
-                    go(seen, res, env, ty)?;
-                }
-            }
-            _ => (),
-        }
-        Ok(())
-    }
-    for var in def_list.iter() {
-        let t = env.0.get(*var).unwrap();
-        go(&mut seen, &mut res, env, &t)?;
-        seen.insert(var);
-    }
-    Ok(res)
-}
 
 // The definition of tuple is language specific.
 fn is_tuple(t: &Type) -> bool {
@@ -107,43 +21,6 @@ fn is_tuple(t: &Type) -> bool {
         }
         _ => false,
     }
-}
-
-fn enclose<'a>(left: &'a str, doc: RcDoc<'a>, right: &'a str) -> RcDoc<'a> {
-    RcDoc::text(left)
-        .append(RcDoc::line_())
-        .append(doc)
-        .nest(2)
-        .append(RcDoc::line_())
-        .append(right)
-        .group()
-}
-
-fn concat<'a, D>(docs: D, sep: &'a str) -> RcDoc<'a>
-where
-    D: Iterator<Item = RcDoc<'a>>,
-{
-    RcDoc::intersperse(
-        docs,
-        if sep != " " {
-            RcDoc::text(sep).append(RcDoc::line())
-        } else {
-            RcDoc::space()
-        },
-    )
-}
-
-fn kwd<U: std::fmt::Display + ?Sized>(str: &U) -> RcDoc {
-    RcDoc::as_string(str).append(RcDoc::space())
-}
-fn str(str: &str) -> RcDoc {
-    RcDoc::text(str)
-}
-fn ident(id: &str) -> RcDoc {
-    kwd(id)
-}
-fn quote_ident(id: &str) -> RcDoc {
-    str("'").append(id).append("'").append(RcDoc::space())
 }
 
 fn pp_ty(ty: &Type) -> RcDoc {

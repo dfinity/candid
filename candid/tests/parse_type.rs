@@ -1,6 +1,7 @@
 use candid::bindings::javascript;
 use candid::parser::types::{to_pretty, IDLProg};
 use candid::parser::typing::{check_prog, TypeEnv};
+use candid::types::Type;
 use goldenfile::Mint;
 use std::io::Write;
 use std::path::Path;
@@ -35,6 +36,12 @@ service server : {
     println!("{}", js);
 }
 
+fn compile(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
+    let prog = std::fs::read_to_string(&file)?;
+    let ast = prog.parse::<IDLProg>()?;
+    check_prog(env, &ast)
+}
+
 #[test_generator::test_resources("candid/tests/assets/*.did")]
 fn compiler_test(resource: &str) {
     let base_path = std::env::current_dir().unwrap().join("tests/assets");
@@ -43,10 +50,8 @@ fn compiler_test(resource: &str) {
     let filename = Path::new(Path::new(resource).file_name().unwrap());
     let candid_path = base_path.join(filename);
 
-    let prog = std::fs::read_to_string(&candid_path).unwrap();
-    let ast = prog.parse::<IDLProg>().unwrap();
     let mut env = TypeEnv::new();
-    match check_prog(&mut env, &ast) {
+    match compile(&mut env, &candid_path) {
         Ok(actor) => {
             let mut js_output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
             let js = javascript::to_doc(&env, &actor);
