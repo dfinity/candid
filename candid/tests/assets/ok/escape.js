@@ -5,5 +5,5 @@
     '\"\'' : IDL.Nat,
     '\\\n\'\"' : IDL.Nat
   });
-  return IDL.Service({'\n\'\"\'\'\"\"\r\t' : IDL.Func([t], [], [])});
+  return IDL.Service({ '\n\'\"\'\'\"\"\r\t' : IDL.Func([t], [], []) });
 }

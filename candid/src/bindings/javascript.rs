@@ -66,14 +66,17 @@ fn pp_field(field: &Field) -> RcDoc {
     let name = if field.is_named() {
         quote_ident(&field.id)
     } else {
-        str("_").append(&field.id).append("_")
+        str("_")
+            .append(&field.id)
+            .append("_")
+            .append(RcDoc::space())
     };
     name.append(kwd(":")).append(pp_ty(&field.ty))
 }
 
 fn pp_fields(fs: &[Field]) -> RcDoc {
     let fields = concat(fs.iter().map(pp_field), ",");
-    enclose("({", fields, "})")
+    enclose_space("({", fields, "})")
 }
 
 fn pp_function(func: &Function) -> RcDoc {
@@ -106,7 +109,7 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
             .map(|(id, func)| quote_ident(id).append(kwd(":")).append(pp_ty(func))),
         ",",
     );
-    enclose("({", doc, "})")
+    enclose_space("({", doc, "})")
 }
 
 fn pp_defs<'a>(
@@ -114,13 +117,11 @@ fn pp_defs<'a>(
     def_list: &'a [&'a str],
     recs: &'a BTreeSet<&'a str>,
 ) -> RcDoc<'a> {
-    let recs_doc = RcDoc::concat(recs.iter().map(|id| {
-        kwd("const")
-            .append(ident(id))
-            .append("= IDL.Rec();")
-            .append(RcDoc::hardline())
-    }));
-    let defs = RcDoc::concat(def_list.iter().map(|id| {
+    let recs_doc = lines(
+        recs.iter()
+            .map(|id| kwd("const").append(ident(id)).append("= IDL.Rec();")),
+    );
+    let defs = lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         if recs.contains(id) {
             str(id)
@@ -133,7 +134,6 @@ fn pp_defs<'a>(
                 .append(pp_ty(ty))
                 .append(";")
         }
-        .append(RcDoc::hardline())
     }));
     recs_doc.append(defs)
 }
@@ -163,7 +163,7 @@ pub fn to_doc(env: &TypeEnv, actor: &Option<Type>) -> String {
             let actor = pp_actor(actor, &recs);
             let body = defs.append(actor);
             let doc = str("({ IDL }) => ").append(enclose("{", body, "}"));
-            doc.pretty(80).to_string()
+            doc.pretty(LINE_WIDTH).to_string()
         }
     }
 }

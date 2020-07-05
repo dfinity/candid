@@ -1,9 +1,9 @@
 ({ IDL }) => {
   return IDL.Service({
-    'foo' : IDL.Func([IDL.Record({_2_: IDL.Int})], [], []),
-    'bar' : IDL.Func([IDL.Record({'2' : IDL.Int})], [], []),
+    'foo' : IDL.Func([IDL.Record({ _2_ : IDL.Int })], [], []),
+    'bar' : IDL.Func([IDL.Record({ '2' : IDL.Int })], [], []),
     'baz' : IDL.Func(
-      [IDL.Record({_2_: IDL.Int, '2' : IDL.Nat})],
+      [IDL.Record({ _2_ : IDL.Int, '2' : IDL.Nat })],
       [IDL.Record({})],
       []
     ),
@@ -13,6 +13,6 @@
       [IDL.Tuple(IDL.Text, IDL.Nat)],
       []
     ),
-    'bib' : IDL.Func([IDL.Tuple(IDL.Int)], [IDL.Variant({_0_: IDL.Int})], [])
+    'bib' : IDL.Func([IDL.Tuple(IDL.Int)], [IDL.Variant({ _0_ : IDL.Int })], [])
   });
 }

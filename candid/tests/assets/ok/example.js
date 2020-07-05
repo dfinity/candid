@@ -1,20 +1,20 @@
 ({ IDL }) => {
   const List = IDL.Rec();
   const my_type = IDL.Principal;
-  List.fill(IDL.Opt(IDL.Record({'head' : IDL.Int, 'tail' : List})));
+  List.fill(IDL.Opt(IDL.Record({ 'head' : IDL.Int, 'tail' : List })));
   const nested = IDL.Record({
-    _0_: IDL.Nat,
-    _1_: IDL.Nat,
-    _2_: IDL.Tuple(IDL.Nat, IDL.Int),
-    _3_: IDL.Record({_0_: IDL.Nat, _42_: IDL.Nat, _43_: IDL.Nat8}),
-    _40_: IDL.Nat,
-    _41_: IDL.Variant({
-      _42_: IDL.Null,
+    _0_ : IDL.Nat,
+    _1_ : IDL.Nat,
+    _2_ : IDL.Tuple(IDL.Nat, IDL.Int),
+    _3_ : IDL.Record({ _0_ : IDL.Nat, _42_ : IDL.Nat, _43_ : IDL.Nat8 }),
+    _40_ : IDL.Nat,
+    _41_ : IDL.Variant({
+      _42_ : IDL.Null,
       'A' : IDL.Null,
       'B' : IDL.Null,
       'C' : IDL.Null
     }),
-    _42_: IDL.Nat
+    _42_ : IDL.Nat
   });
   const broker = IDL.Service({
     'find' : IDL.Func(
@@ -43,10 +43,10 @@
     'h' : IDL.Func(
       [
         IDL.Vec(IDL.Opt(IDL.Text)),
-        IDL.Variant({'A' : IDL.Nat, 'B' : IDL.Opt(IDL.Text)}),
+        IDL.Variant({ 'A' : IDL.Nat, 'B' : IDL.Opt(IDL.Text) }),
         IDL.Opt(List)
       ],
-      [IDL.Record({_42_: IDL.Record({}), 'id' : IDL.Nat})],
+      [IDL.Record({ _42_ : IDL.Record({}), 'id' : IDL.Nat })],
       []
     ),
     'i' : f
