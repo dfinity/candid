@@ -14,17 +14,15 @@ pub fn enclose<'a>(left: &'a str, doc: RcDoc<'a>, right: &'a str) -> RcDoc<'a> {
 }
 
 pub fn enclose_space<'a>(left: &'a str, doc: RcDoc<'a>, right: &'a str) -> RcDoc<'a> {
-    // TODO: find a better way to check for empty doc
-    if doc.pretty(80).to_string() == "" {
-        RcDoc::text(left).append(right)
-    } else {
-        RcDoc::text(left)
+    match *doc {
+        pretty::Doc::Nil => RcDoc::text(left).append(right),
+        _ => RcDoc::text(left)
             .append(RcDoc::line())
             .append(doc)
             .nest(INDENT_SPACE)
             .append(RcDoc::line())
             .append(right)
-            .group()
+            .group(),
     }
 }
 

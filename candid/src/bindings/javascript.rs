@@ -162,7 +162,7 @@ pub fn to_doc(env: &TypeEnv, actor: &Option<Type>) -> String {
             let defs = pp_defs(env, &def_list, &recs);
             let actor = pp_actor(actor, &recs);
             let body = defs.append(actor);
-            let doc = str("({ IDL }) => ").append(enclose("{", body, "}"));
+            let doc = str("({ IDL }) => ").append(enclose_space("{", body, "}"));
             doc.pretty(LINE_WIDTH).to_string()
         }
     }
