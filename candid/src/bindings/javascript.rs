@@ -153,7 +153,7 @@ fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
     kwd("return").append(doc).append(";")
 }
 
-pub fn to_doc(env: &TypeEnv, actor: &Option<Type>) -> String {
+pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     match actor {
         None => "".to_string(),
         Some(actor) => {

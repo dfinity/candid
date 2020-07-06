@@ -2,7 +2,8 @@ use crate::parser::typing::TypeEnv;
 use crate::types::Type;
 use std::collections::BTreeSet;
 
-// Gather type definitions mentioned in actor, returns the type names in topological order
+/// Gather type definitions mentioned in actor, return the non-recursive type names in topological order.
+/// Recursive types can appear in any order.
 pub fn chase_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> crate::Result<Vec<&'a str>> {
     let mut seen = BTreeSet::new();
     let mut res = Vec::new();
@@ -45,7 +46,7 @@ pub fn chase_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> crate::Result<Vec<&
     Ok(res)
 }
 
-// Given a topologically sorted def_list, infer which types are recursive
+/// Given a `def_list` produced by the `chase_actor` function, infer which types are recursive
 pub fn infer_rec<'a>(
     env: &'a TypeEnv,
     def_list: &'a [&'a str],
