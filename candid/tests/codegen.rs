@@ -39,5 +39,5 @@ fn rust_test(resource: &str) {
     let actual = run_formatter(actual);
     let expected = run_formatter(expected);
 
-    //assert_eq!(actual, expected);
+    assert_eq!(actual, expected);
 }
