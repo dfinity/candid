@@ -13,8 +13,8 @@
   });
   return IDL.Service({
     '' : IDL.Func([IDL.Nat], [IDL.Nat], []),
-    '👀' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
     '✈️  🚗 ⛱️ ' : IDL.Func([], [], ['oneway']),
+    '👀' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
     '函数名' : IDL.Func([A], [B], [])
   });
 }

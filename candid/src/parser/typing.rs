@@ -124,7 +124,7 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
                 t2.push(check_type(env, t)?);
             }
             if func.modes.len() > 1 {
-                return Err(Error::msg("cannot have more thaan one mode"));
+                return Err(Error::msg("cannot have more than one mode"));
             }
             if func.modes.len() == 1
                 && func.modes[0] == crate::parser::types::FuncMode::Oneway
