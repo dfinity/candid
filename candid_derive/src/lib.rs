@@ -43,8 +43,8 @@ pub fn derive_idl_type(input: TokenStream) -> TokenStream {
 #[inline]
 fn idl_hash(id: &str) -> u32 {
     let mut s: u32 = 0;
-    for c in id.chars() {
-        s = s.wrapping_mul(223).wrapping_add(c as u32);
+    for c in id.as_bytes().iter() {
+        s = s.wrapping_mul(223).wrapping_add(*c as u32);
     }
     s
 }

@@ -1,0 +1,6 @@
+type f = func (int8) -> (int8);
+type s = service {
+  f : f;
+};
+service : f
+

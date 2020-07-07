@@ -27,14 +27,15 @@ type List = List1;
 type List1 = List2;
 type List2 = opt record { head: nat8; tail: List1 };
 type byte = nat8;
+type f = func (byte, int, nat, int8) -> (List);
 service : {
-  f : (byte, int, nat, int8) -> (List);
+  f : f;
 }
 "#;
     let ast = candid.parse::<IDLProg>().unwrap();
     let mut env = TypeEnv::new();
-    let actor = check_prog(&mut env, &ast).unwrap();
-    let method = actor.get("f").unwrap();
+    let actor = check_prog(&mut env, &ast).unwrap().unwrap();
+    let method = env.get_method(&actor, "f").unwrap();
     {
         let args = "(42,42,42,42)".parse::<IDLArgs>().unwrap();
         let encoded = args.to_bytes_with_types(&env, &method.args).unwrap();

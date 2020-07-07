@@ -1,0 +1,10 @@
+service Foo: 
+{
+  foo : (record {2 : int}) -> ();
+  bar : (record {"2" : int}) -> ();
+  baz : (record {2: int; "2": nat}) -> (record {});
+  bab : (two: int, "2": nat) -> ();
+  bas : (record { int; int }) -> (record {1:nat; 0:text});
+  bib : (record { int }) -> (variant { 0:int });
+}
+

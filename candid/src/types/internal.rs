@@ -45,7 +45,7 @@ pub enum Type {
     Record(Vec<Field>),
     Variant(Vec<Field>),
     Func(Function),
-    Service(Vec<(String, Function)>),
+    Service(Vec<(String, Type)>),
     Principal,
 }
 
@@ -54,6 +54,13 @@ pub struct Field {
     pub id: String,
     pub hash: u32,
     pub ty: Type,
+}
+
+impl Field {
+    pub fn is_named(&self) -> bool {
+        // TODO make this more robust
+        crate::idl_hash(&self.id) == self.hash
+    }
 }
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]

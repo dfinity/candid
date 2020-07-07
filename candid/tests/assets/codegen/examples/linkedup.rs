@@ -24,23 +24,23 @@ pub struct NewProfile_2 {
 }
 pub type NewProfile = NewProfile_2;
 pub trait Actor {
-    fn connect(
-        arg0: UserId_2,
-    ) -> std::pin::Pin<std::boxed::Box<impl std::future::Future<Output = ()>>>;
-    fn create(
-        arg0: NewProfile,
-    ) -> std::pin::Pin<std::boxed::Box<impl std::future::Future<Output = ()>>>;
     fn get(arg0: UserId_2) -> Profile;
     fn getConnections(
         arg0: UserId_2,
-    ) -> std::pin::Pin<std::boxed::Box<impl std::future::Future<Output = Vec<Profile>>>>;
-    fn getOwnId() -> UserId_2;
-    fn healthcheck() -> std::pin::Pin<std::boxed::Box<impl std::future::Future<Output = bool>>>;
+    ) -> std::pin::Pin<std::boxed::Box<impl std::future::Future<Output = Vec<Profile>>>>;    
+    fn connect(
+        arg0: UserId_2,
+    ) -> std::pin::Pin<std::boxed::Box<impl std::future::Future<Output = ()>>>;
+    fn search(arg0: String) -> Vec<Profile>;
+    fn create(
+        arg0: NewProfile,
+    ) -> std::pin::Pin<std::boxed::Box<impl std::future::Future<Output = ()>>>;
     fn isConnected(
         arg0: UserId_2,
     ) -> std::pin::Pin<std::boxed::Box<impl std::future::Future<Output = bool>>>;
-    fn search(arg0: String) -> Vec<Profile>;
     fn update(
         arg0: Profile,
     ) -> std::pin::Pin<std::boxed::Box<impl std::future::Future<Output = ()>>>;
+    fn getOwnId() -> UserId_2;
+    fn healthcheck() -> std::pin::Pin<std::boxed::Box<impl std::future::Future<Output = bool>>>;
 }

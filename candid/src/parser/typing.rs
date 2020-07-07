@@ -1,19 +1,19 @@
 use super::types::*;
 use crate::types::{Field, Function, Type};
 use crate::{Error, Result};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub struct Env<'a> {
     pub te: &'a mut TypeEnv,
     pub pre: bool,
 }
+
 #[derive(Debug, Clone, Default)]
-pub struct TypeEnv(pub HashMap<String, Type>);
-pub type ActorEnv = HashMap<String, Function>;
+pub struct TypeEnv(pub BTreeMap<String, Type>);
 
 impl TypeEnv {
     pub fn new() -> Self {
-        TypeEnv(HashMap::new())
+        TypeEnv(BTreeMap::new())
     }
     /// Convert candid AST to internal Type
     pub fn ast_to_type(&self, ast: &super::types::IDLType) -> Result<Type> {
@@ -51,12 +51,20 @@ impl TypeEnv {
             _ => Err(Error::msg(format!("not a function type: {:?}", t))),
         }
     }
-    pub fn as_service<'a>(&'a self, t: &'a Type) -> Result<&'a [(String, Function)]> {
+    pub fn as_service<'a>(&'a self, t: &'a Type) -> Result<&'a [(String, Type)]> {
         match t {
             Type::Service(s) => Ok(s),
             Type::Var(id) => self.as_service(self.find_type(id)?),
             _ => Err(Error::msg(format!("not a service type: {:?}", t))),
         }
+    }
+    pub fn get_method<'a>(&'a self, t: &'a Type, id: &'a str) -> Result<&'a Function> {
+        for (meth, ty) in self.as_service(t)?.iter() {
+            if meth == id {
+                return self.as_func(ty);
+            }
+        }
+        Err(Error::msg(format!("cannot find method {}", id)))
     }
 }
 
@@ -107,7 +115,6 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
         }
         IDLType::PrincipalT => Ok(Type::Principal),
         IDLType::FuncT(func) => {
-            // TODO check for modes
             let mut t1 = Vec::new();
             for t in func.args.iter() {
                 t1.push(check_type(env, t)?);
@@ -115,6 +122,15 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
             let mut t2 = Vec::new();
             for t in func.rets.iter() {
                 t2.push(check_type(env, t)?);
+            }
+            if func.modes.len() > 1 {
+                return Err(Error::msg("cannot have more than one mode"));
+            }
+            if func.modes.len() == 1
+                && func.modes[0] == crate::parser::types::FuncMode::Oneway
+                && !t2.is_empty()
+            {
+                return Err(Error::msg("oneway function has non-unit return type"));
             }
             let f = Function {
                 modes: func.modes.clone(),
@@ -133,15 +149,20 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
 fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
     let mut res = Vec::new();
     {
-        let mut prev = None;
+        let mut prev: Option<&TypeField> = None;
         for f in fs.iter() {
             let id = f.label.get_id();
+            // println!("{:?} {}", f.label, f.label.get_id());
             if let Some(prev) = prev {
-                if id == prev {
-                    return Err(Error::msg("field name hash collision"));
+                if id == prev.label.get_id() {
+                    return Err(Error::msg(format!(
+                        "field '{}' hash collision with '{}'",
+                        f.to_doc().pretty(80),
+                        prev.to_doc().pretty(80),
+                    )));
                 }
             }
-            prev = Some(id);
+            prev = Some(f);
         }
     }
     for f in fs.iter() {
@@ -163,15 +184,28 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
     Ok(res)
 }
 
-fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Function)>> {
+fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
     let mut res = Vec::new();
-    // TODO check duplicates, sorting
+    let mut prev = None;
     for meth in ms.iter() {
-        let t = check_type(env, &meth.typ)?;
-        if !env.pre {
-            let func = env.te.as_func(&t)?;
-            res.push((meth.id.to_owned(), func.clone()));
+        if let Some(prev) = prev {
+            if prev == meth.id {
+                return Err(Error::msg(format!(
+                    "duplicate binding for {} in service",
+                    meth.id
+                )));
+            }
         }
+        let t = check_type(env, &meth.typ)?;
+        if !env.pre && env.te.as_func(&t).is_err() {
+            return Err(Error::msg(format!(
+                "method {} is a non-function type {}",
+                meth.id,
+                meth.typ.to_doc().pretty(80)
+            )));
+        }
+        res.push((meth.id.to_owned(), t));
+        prev = Some(meth.id.clone());
     }
     Ok(res)
 }
@@ -189,6 +223,29 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
+fn check_cycle(env: &TypeEnv) -> Result<()> {
+    fn has_cycle<'a>(seen: &mut BTreeSet<&'a str>, env: &'a TypeEnv, t: &'a Type) -> Result<bool> {
+        match t {
+            Type::Var(id) => {
+                if seen.insert(id) {
+                    let ty = env.find_type(id)?;
+                    has_cycle(seen, env, ty)
+                } else {
+                    Ok(true)
+                }
+            }
+            _ => Ok(false),
+        }
+    }
+    for (id, ty) in env.0.iter() {
+        let mut seen = BTreeSet::new();
+        if has_cycle(&mut seen, env, ty)? {
+            return Err(Error::msg(format!("{} has cyclic type definition", id)));
+        }
+    }
+    Ok(())
+}
+
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         if let Dec::TypD(Binding { id, typ: _ }) = dec {
@@ -200,29 +257,27 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     }
     env.pre = true;
     check_defs(env, decs)?;
-    // TODO check for cycle
+    check_cycle(env.te)?;
     env.pre = false;
     check_defs(env, decs)?;
     Ok(())
 }
 
-fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<ActorEnv> {
+fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
     match actor {
-        None => Ok(HashMap::new()),
+        None => Ok(None),
         Some(typ) => {
             let t = check_type(env, &typ)?;
-            let service = env.te.as_service(&t)?;
-            let env = service.iter().cloned().collect();
-            Ok(env)
+            env.te.as_service(&t)?;
+            Ok(Some(t))
         }
     }
 }
 
 /// Type check IDLProg, and adds bindings to type environment. Returns
 /// a hash map for the serivce method signatures. For now, we omit import.
-pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<ActorEnv> {
+pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<Option<Type>> {
     let mut env = Env { te, pre: false };
     check_decs(&mut env, &prog.decs)?;
-    let actor = check_actor(&env, &prog.actor)?;
-    Ok(actor)
+    check_actor(&env, &prog.actor)
 }

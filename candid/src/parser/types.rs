@@ -24,7 +24,7 @@ macro_rules! enum_to_doc {
             $($variant),*
         }
         impl $name {
-            fn to_doc(&self) -> RcDoc<()> {
+            pub(crate) fn to_doc(&self) -> RcDoc<()> {
                 match self {
                     $($name::$variant => RcDoc::text(stringify!($variant).to_lowercase())),*
                 }

@@ -186,8 +186,8 @@
 //!
 //!   // Type checking
 //!   let mut env = TypeEnv::new();
-//!   let actor = check_prog(&mut env, &ast)?;
-//!   let method = actor.get("g").unwrap();
+//!   let actor = check_prog(&mut env, &ast)?.unwrap();
+//!   let method = env.get_method(&actor, "g").unwrap();
 //!   assert_eq!(method.is_query(), true);
 //!   assert_eq!(method.args, vec![Type::Var("List".to_string())]);
 //!   Ok(())
@@ -214,8 +214,8 @@
 //!   "#;
 //!   let ast = did_file.parse::<IDLProg>()?;
 //!   let mut env = TypeEnv::new();
-//!   let actor = check_prog(&mut env, &ast)?;
-//!   let method = actor.get("f").unwrap();
+//!   let actor = check_prog(&mut env, &ast)?.unwrap();
+//!   let method = env.get_method(&actor, "f").unwrap();
 //!
 //!   // Serialize arguments with candid types
 //!   let args = "(42, 42, 42, 42)".parse::<IDLArgs>()?;
@@ -239,6 +239,8 @@ pub use serde::Deserialize;
 pub mod codegen;
 pub use codegen::generate_code;
 
+pub mod bindings;
+
 pub mod error;
 pub use error::{Error, Result};
 
@@ -252,21 +254,24 @@ pub use types::{
 
 pub mod parser;
 pub use parser::types::IDLProg;
-pub use parser::typing::{check_prog, ActorEnv, TypeEnv};
+pub use parser::typing::{check_prog, TypeEnv};
 pub use parser::value::IDLArgs;
 
 pub mod de;
 pub mod ser;
 
+mod pretty;
+
 // Candid hash function comes from
 // https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf
 // Not public API. Only used by tests.
+// Remember to update the same function in candid_derive if you change this function.
 #[doc(hidden)]
 #[inline]
 pub fn idl_hash(id: &str) -> u32 {
     let mut s: u32 = 0;
-    for c in id.chars() {
-        s = s.wrapping_mul(223).wrapping_add(c as u32);
+    for c in id.as_bytes().iter() {
+        s = s.wrapping_mul(223).wrapping_add(*c as u32);
     }
     s
 }
