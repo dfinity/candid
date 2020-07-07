@@ -101,6 +101,21 @@ impl Label {
     }
 }
 
+impl std::fmt::Display for Label {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Label::Id(n) | Label::Unnamed(n) => write!(f, "{}", n),
+            Label::Named(id) => write!(f, "{}", id),
+        }
+    }
+}
+
+impl PartialEq for Label {
+    fn eq(&self, other: &Self) -> bool {
+        self.get_id() == other.get_id()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TypeField {
     pub label: Label,

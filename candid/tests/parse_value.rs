@@ -1,5 +1,5 @@
-use candid::parser::typing::TypeEnv;
 use candid::parser::value::{IDLArgs, IDLField, IDLValue};
+use candid::parser::{types::Label, typing::TypeEnv};
 use candid::types::Type;
 
 fn parse_args(input: &str) -> IDLArgs {
@@ -116,21 +116,21 @@ fn parse_optional_record() {
             IDLValue::Opt(Box::new(IDLValue::Record(vec![]))),
             IDLValue::Record(vec![
                 IDLField {
-                    id: 1,
+                    id: Label::Id(1),
                     val: IDLValue::Nat(42.into())
                 },
                 IDLField {
-                    id: 2,
+                    id: Label::Id(2),
                     val: IDLValue::Bool(false)
                 },
                 IDLField {
-                    id: 44,
+                    id: Label::Id(44),
                     val: IDLValue::Text("test".to_owned())
                 },
             ]),
             IDLValue::Variant(
                 Box::new(IDLField {
-                    id: 5,
+                    id: Label::Id(5),
                     val: IDLValue::Null
                 }),
                 0
@@ -156,29 +156,29 @@ fn parse_nested_record() {
         args.args,
         vec![IDLValue::Record(vec![
             IDLField {
-                id: 43,
+                id: Label::Id(43),
                 val: IDLValue::Record(vec![
                     IDLField {
-                        id: 5_446_209,
+                        id: Label::Named("msg".to_owned()),
                         val: IDLValue::Text("hello".to_owned())
                     },
                     IDLField {
-                        id: 1_291_438_162,
+                        id: Label::Named("test".to_owned()),
                         val: IDLValue::Text("test".to_owned())
                     }
                 ])
             },
             IDLField {
-                id: 1_350_385_585,
+                id: Label::Named("long_label".to_owned()),
                 val: IDLValue::Opt(Box::new(IDLValue::Null))
             },
             IDLField {
-                id: 1_873_743_348,
+                id: Label::Named("label".to_owned()),
                 val: IDLValue::Nat(42.into())
             }
         ])]
     );
-    assert_eq!(format!("{}", args), "(record { 43 = record { 5446209 = \"hello\"; 1291438162 = \"test\"; }; 1350385585 = opt null; 1873743348 = 42; })");
+    assert_eq!(format!("{}", args), "(record { 43 = record { msg = \"hello\"; test = \"test\"; }; long_label = opt null; label = 42; })");
 }
 
 #[test]
@@ -189,6 +189,6 @@ fn parse_shorthand() {
     let args = parse_args("(variant { 0x2a }, variant { label })");
     assert_eq!(
         format!("{}", args),
-        "(variant { 42 = null }, variant { 1873743348 = null })"
+        "(variant { 42 = null }, variant { label = null })"
     );
 }

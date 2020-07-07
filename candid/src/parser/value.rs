@@ -1,4 +1,5 @@
 use super::lexer::error;
+use super::types::Label;
 use super::typing::TypeEnv;
 use crate::types::{Field, Type};
 use crate::{Error, Result};
@@ -36,7 +37,7 @@ pub enum IDLValue {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct IDLField {
-    pub id: u32,
+    pub id: Label,
     pub val: IDLValue,
 }
 
@@ -223,18 +224,24 @@ impl IDLValue {
                 let mut res = Vec::new();
                 for e in vec.iter() {
                     let ty = fs
-                        .get(&e.id)
+                        .get(&e.id.get_id())
                         .ok_or_else(|| Error::msg(format!("field {} not found", e.id)))?;
                     let v = e.val.annotate_type(env, ty)?;
-                    res.push(IDLField { id: e.id, val: v });
+                    res.push(IDLField {
+                        id: e.id.clone(),
+                        val: v,
+                    });
                 }
                 IDLValue::Record(res)
             }
             (IDLValue::Variant(v, _), Type::Variant(fs)) => {
                 for (i, f) in fs.iter().enumerate() {
-                    if v.id == f.hash {
+                    if v.id.get_id() == f.hash {
                         let val = v.val.annotate_type(env, &f.ty)?;
-                        let field = IDLField { id: v.id, val };
+                        let field = IDLField {
+                            id: v.id.clone(),
+                            val,
+                        };
                         return Ok(IDLValue::Variant(Box::new(field), i as u64));
                     }
                 }
@@ -284,7 +291,7 @@ impl IDLValue {
                     .iter()
                     .map(|IDLField { id, val }| Field {
                         id: id.to_string(),
-                        hash: *id,
+                        hash: id.get_id(),
                         ty: val.value_ty(),
                     })
                     .collect();
@@ -294,7 +301,7 @@ impl IDLValue {
                 assert_eq!(idx, 0);
                 let f = Field {
                     id: v.id.to_string(),
-                    hash: v.id,
+                    hash: v.id.get_id(),
                     ty: v.val.value_ty(),
                 };
                 Type::Variant(vec![f])
@@ -455,7 +462,7 @@ impl<'de> Deserialize<'de> for IDLValue {
                 while let Some((key, value)) = visitor.next_entry()? {
                     if let IDLValue::Nat32(hash) = key {
                         let f = IDLField {
-                            id: hash,
+                            id: Label::Id(hash),
                             val: value,
                         };
                         vec.push(f);
@@ -484,7 +491,10 @@ impl<'de> Deserialize<'de> for IDLValue {
                         "newtype" => visitor.newtype_variant()?,
                         _ => unreachable!(),
                     };
-                    let f = IDLField { id, val };
+                    let f = IDLField {
+                        id: Label::Id(id),
+                        val,
+                    };
                     // Deserialized variant always has 0 index to ensure untyped
                     // serialization is correct.
                     Ok(IDLValue::Variant(Box::new(f), 0))
