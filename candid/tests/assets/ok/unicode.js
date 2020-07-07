@@ -12,9 +12,9 @@
     '1⃣️2⃣️3⃣️' : IDL.Null
   });
   return IDL.Service({
-    '函数名' : IDL.Func([A], [B], []),
     '' : IDL.Func([IDL.Nat], [IDL.Nat], []),
     '👀' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
-    '✈️  🚗 ⛱️ ' : IDL.Func([], [], ['oneway'])
+    '✈️  🚗 ⛱️ ' : IDL.Func([], [], ['oneway']),
+    '函数名' : IDL.Func([A], [B], [])
   });
 }

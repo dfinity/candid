@@ -1,7 +1,7 @@
 use super::types::*;
 use crate::types::{Field, Function, Type};
 use crate::{Error, Result};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub struct Env<'a> {
     pub te: &'a mut TypeEnv,
@@ -115,7 +115,6 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
         }
         IDLType::PrincipalT => Ok(Type::Principal),
         IDLType::FuncT(func) => {
-            // TODO check for modes
             let mut t1 = Vec::new();
             for t in func.args.iter() {
                 t1.push(check_type(env, t)?);
@@ -123,6 +122,15 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
             let mut t2 = Vec::new();
             for t in func.rets.iter() {
                 t2.push(check_type(env, t)?);
+            }
+            if func.modes.len() > 1 {
+                return Err(Error::msg("cannot have more thaan one mode"));
+            }
+            if func.modes.len() == 1
+                && func.modes[0] == crate::parser::types::FuncMode::Oneway
+                && !t2.is_empty()
+            {
+                return Err(Error::msg("oneway function has non-unit return type"));
             }
             let f = Function {
                 modes: func.modes.clone(),
@@ -144,6 +152,7 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
         let mut prev: Option<&TypeField> = None;
         for f in fs.iter() {
             let id = f.label.get_id();
+            // println!("{:?} {}", f.label, f.label.get_id());
             if let Some(prev) = prev {
                 if id == prev.label.get_id() {
                     return Err(Error::msg(format!(
@@ -177,17 +186,26 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
 
 fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
     let mut res = Vec::new();
-    // TODO check duplicates, sorting
+    let mut prev = None;
     for meth in ms.iter() {
+        if let Some(prev) = prev {
+            if prev == meth.id {
+                return Err(Error::msg(format!(
+                    "duplicate binding for {} in service",
+                    meth.id
+                )));
+            }
+        }
         let t = check_type(env, &meth.typ)?;
         if !env.pre && env.te.as_func(&t).is_err() {
             return Err(Error::msg(format!(
-                "method {} has a non-function type {}",
+                "method {} is a non-function type {}",
                 meth.id,
                 meth.typ.to_doc().pretty(80)
             )));
         }
         res.push((meth.id.to_owned(), t));
+        prev = Some(meth.id.clone());
     }
     Ok(res)
 }
@@ -205,6 +223,29 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
+fn check_cycle(env: &TypeEnv) -> Result<()> {
+    fn has_cycle<'a>(seen: &mut BTreeSet<&'a str>, env: &'a TypeEnv, t: &'a Type) -> Result<bool> {
+        match t {
+            Type::Var(id) => {
+                if seen.insert(id) {
+                    let ty = env.find_type(id)?;
+                    has_cycle(seen, env, ty)
+                } else {
+                    Ok(true)
+                }
+            }
+            _ => Ok(false),
+        }
+    }
+    for (id, ty) in env.0.iter() {
+        let mut seen = BTreeSet::new();
+        if has_cycle(&mut seen, env, ty)? {
+            return Err(Error::msg(format!("{} has cyclic type definition", id)));
+        }
+    }
+    Ok(())
+}
+
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         if let Dec::TypD(Binding { id, typ: _ }) = dec {
@@ -216,7 +257,7 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     }
     env.pre = true;
     check_defs(env, decs)?;
-    // TODO check for cycle
+    check_cycle(env.te)?;
     env.pre = false;
     check_defs(env, decs)?;
     Ok(())

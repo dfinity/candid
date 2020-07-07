@@ -157,7 +157,11 @@ FuncMode: FuncMode = {
 }
 
 ActorTyp: Vec<Binding> = {
-    "{" <SepBy<MethTyp, ";">> "}" => <>
+    "{" <SepBy<MethTyp, ";">> "}" => {
+        let mut fs = <>;
+        fs.sort_unstable_by_key(|Binding { id, .. }| idl_hash(id));
+        fs
+    }
 }
 
 MethTyp: Binding = {
