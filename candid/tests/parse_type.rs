@@ -30,10 +30,6 @@ service server : {
     let pretty = to_pretty(&ast, 80);
     let ast2 = pretty.parse::<IDLProg>().unwrap();
     assert_eq!(format!("{:?}", ast2), format!("{:?}", ast));
-    let mut env = TypeEnv::new();
-    let actor = check_prog(&mut env, &ast).unwrap();
-    let js = javascript::compile(&env, &actor);
-    println!("{}", js);
 }
 
 fn compile(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {

@@ -265,6 +265,7 @@ mod pretty;
 // Candid hash function comes from
 // https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf
 // Not public API. Only used by tests.
+// Remember to update the same function in candid_derive if you change this function.
 #[doc(hidden)]
 #[inline]
 pub fn idl_hash(id: &str) -> u32 {
