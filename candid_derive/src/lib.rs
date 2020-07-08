@@ -50,7 +50,8 @@ fn idl_hash(id: &str) -> u32 {
 }
 
 struct Variant {
-    ident: syn::Ident,
+    real_ident: syn::Ident,
+    renamed_ident: syn::Ident,
     hash: u32,
     ty: Tokens,
     members: Vec<Ident>,
@@ -111,13 +112,14 @@ fn enum_from_ast(
         .iter()
         .map(|variant| {
             let id = variant.ident.clone();
-            let hash = match get_rename_attrs(&variant.attrs) {
-                Some(ref rename) => idl_hash(rename),
-                None => idl_hash(&id.to_string()),
+            let (renamed_ident, hash) = match get_rename_attrs(&variant.attrs) {
+                Some(ref rename) => (syn::parse_str(rename).unwrap(), idl_hash(rename)),
+                None => (id.clone(), idl_hash(&id.to_string())),
             };
             let (ty, idents) = struct_from_ast(&variant.fields);
             Variant {
-                ident: id,
+                real_ident: id,
+                renamed_ident,
                 hash,
                 ty,
                 members: idents,
@@ -128,23 +130,23 @@ fn enum_from_ast(
     assert_eq!(unique.len(), fs.len());
     fs.sort_unstable_by_key(|Variant { hash, .. }| *hash);
 
-    let id = fs.iter().map(|Variant { ident, .. }| ident.to_string());
-    let hash = fs.iter().map(|Variant { hash, .. }| hash);
+    let id = fs
+        .iter()
+        .map(|Variant { renamed_ident, .. }| renamed_ident.to_string());
     let ty = fs.iter().map(|Variant { ty, .. }| ty);
     let ty_gen = quote! {
         ::candid::types::Type::Variant(
             vec![
                 #(::candid::types::Field {
                     id: ::candid::types::Label::Named(#id.to_owned()),
-                    hash: #hash,
                     ty: #ty }
                 ),*
             ]
         )
     };
 
-    let id = fs.iter().map(|Variant { ident, .. }| {
-        syn::parse_str::<Tokens>(&format!("{}::{}", name, ident)).unwrap()
+    let id = fs.iter().map(|Variant { real_ident, .. }| {
+        syn::parse_str::<Tokens>(&format!("{}::{}", name, real_ident)).unwrap()
     });
     let index = 0..fs.len() as u64;
     let (pattern, members): (Vec<_>, Vec<_>) = fs
@@ -217,7 +219,8 @@ impl std::fmt::Display for Ident {
 }
 
 struct Field {
-    ident: Ident,
+    real_ident: Ident,
+    renamed_ident: Ident,
     hash: u32,
     ty: Tokens,
 }
@@ -267,15 +270,22 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (Tokens, 
         .iter()
         .enumerate()
         .map(|(i, field)| {
-            let (ident, hash) = match field.ident {
-                Some(ref ident) => match get_rename_attrs(&field.attrs) {
-                    Some(ref renamed) => (Ident::Named(ident.clone()), idl_hash(renamed)),
-                    None => (Ident::Named(ident.clone()), idl_hash(&ident.to_string())),
-                },
-                None => (Ident::Unnamed(i as u32), i as u32),
+            let (real_ident, renamed_ident, hash) = match field.ident {
+                Some(ref ident) => {
+                    let real_ident = Ident::Named(ident.clone());
+                    match get_rename_attrs(&field.attrs) {
+                        Some(ref renamed) => {
+                            let renamed_ident = Ident::Named(syn::parse_str(renamed).unwrap());
+                            (real_ident, renamed_ident, idl_hash(renamed))
+                        }
+                        None => (real_ident.clone(), real_ident, idl_hash(&ident.to_string())),
+                    }
+                }
+                None => (Ident::Unnamed(i as u32), Ident::Unnamed(i as u32), i as u32),
             };
             Field {
-                ident,
+                real_ident,
+                renamed_ident,
                 hash,
                 ty: derive_type(&field.ty),
             }
@@ -285,25 +295,27 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (Tokens, 
     assert_eq!(unique.len(), fs.len());
     fs.sort_unstable_by_key(|Field { hash, .. }| *hash);
 
-    let id = fs.iter().map(|Field { ident, .. }| {
-        let id_str = ident.to_string();
-        match ident {
+    let id = fs.iter().map(|Field { renamed_ident, .. }| {
+        let id_str = renamed_ident.to_string();
+        match renamed_ident {
+            // TODO
             Ident::Named(_) => quote! { ::candid::types::Label::Named(#id_str.to_string()) },
             Ident::Unnamed(ref i) => quote! { ::candid::types::Label::Id(#i) },
         }
     });
-    let hash = fs.iter().map(|Field { hash, .. }| hash);
     let ty = fs.iter().map(|Field { ty, .. }| ty);
     let ty_gen = quote! {
         vec![
             #(::candid::types::Field {
                 id: #id,
-                hash: #hash,
                 ty: #ty }
             ),*
         ]
     };
-    let idents: Vec<Ident> = fs.iter().map(|Field { ident, .. }| ident.clone()).collect();
+    let idents: Vec<Ident> = fs
+        .iter()
+        .map(|Field { real_ident, .. }| real_ident.clone())
+        .collect();
     (ty_gen, idents)
 }
 

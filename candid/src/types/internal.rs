@@ -91,7 +91,6 @@ impl std::hash::Hash for Label {
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Field {
     pub id: Label,
-    pub hash: u32, // hash is necessary to support field rename attributes
     pub ty: Type,
 }
 
@@ -160,18 +159,16 @@ pub fn unroll(t: &Type) -> Type {
         Vec(ref t) => Vec(Box::new(unroll(t))),
         Record(fs) => Record(
             fs.iter()
-                .map(|Field { id, hash, ty }| Field {
+                .map(|Field { id, ty }| Field {
                     id: id.clone(),
-                    hash: *hash,
                     ty: unroll(ty),
                 })
                 .collect(),
         ),
         Variant(fs) => Variant(
             fs.iter()
-                .map(|Field { id, hash, ty }| Field {
+                .map(|Field { id, ty }| Field {
                     id: id.clone(),
-                    hash: *hash,
                     ty: unroll(ty),
                 })
                 .collect(),

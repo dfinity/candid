@@ -1,5 +1,5 @@
 use candid::types::{get_type, Label, Type};
-use candid::{idl_hash, CandidType, Int};
+use candid::{CandidType, Int};
 
 #[test]
 fn test_primitive() {
@@ -84,7 +84,6 @@ fn test_variant() {
 fn field(id: &str, ty: Type) -> candid::types::Field {
     candid::types::Field {
         id: Label::Named(id.to_string()),
-        hash: idl_hash(id),
         ty,
     }
 }
@@ -92,7 +91,6 @@ fn field(id: &str, ty: Type) -> candid::types::Field {
 fn unnamed_field(id: u32, ty: Type) -> candid::types::Field {
     candid::types::Field {
         id: Label::Id(id),
-        hash: id,
         ty,
     }
 }

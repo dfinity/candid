@@ -218,8 +218,10 @@ impl IDLValue {
                 IDLValue::Vec(res)
             }
             (IDLValue::Record(vec), Type::Record(fs)) => {
-                let fs: HashMap<_, _> =
-                    fs.iter().map(|Field { hash, ty, .. }| (hash, ty)).collect();
+                let fs: HashMap<_, _> = fs
+                    .iter()
+                    .map(|Field { id, ty }| (id.get_id(), ty))
+                    .collect();
                 let mut res = Vec::new();
                 for e in vec.iter() {
                     let ty = fs
@@ -235,7 +237,7 @@ impl IDLValue {
             }
             (IDLValue::Variant(v, _), Type::Variant(fs)) => {
                 for (i, f) in fs.iter().enumerate() {
-                    if v.id.get_id() == f.hash {
+                    if v.id.get_id() == f.id.get_id() {
                         let val = v.val.annotate_type(env, &f.ty)?;
                         let field = IDLField {
                             id: v.id.clone(),
@@ -290,7 +292,6 @@ impl IDLValue {
                     .iter()
                     .map(|IDLField { id, val }| Field {
                         id: id.clone(),
-                        hash: id.get_id(),
                         ty: val.value_ty(),
                     })
                     .collect();
@@ -300,7 +301,6 @@ impl IDLValue {
                 assert_eq!(idx, 0);
                 let f = Field {
                     id: v.id.clone(),
-                    hash: v.id.get_id(),
                     ty: v.val.value_ty(),
                 };
                 Type::Variant(vec![f])

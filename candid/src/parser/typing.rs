@@ -168,7 +168,6 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
         let ty = check_type(env, &f.typ)?;
         let field = Field {
             id: f.label.clone(),
-            hash: f.label.get_id(),
             ty,
         };
         res.push(field);
