@@ -13,44 +13,38 @@
 //! We are using a builder pattern to encode/decode Candid messages, see [`candid::ser::IDLBuilder`](ser/struct.IDLBuilder.html) for serialization and [`candid::de::IDLDeserialize`](de/struct.IDLDeserialize.html) for deserialization.
 //!
 //! ```
-//! fn builder_example() -> Result<(), candid::Error> {
-//!   // Serialize 10 numbers to Candid binary format
-//!   let mut ser = candid::ser::IDLBuilder::new();
-//!   for i in 0..10 {
-//!     ser.arg(&i)?;
-//!   }
-//!   let bytes: Vec<u8> = ser.serialize_to_vec()?;
-//!
-//!   // Deserialize Candid message and verify the values match
-//!   let mut de = candid::de::IDLDeserialize::new(&bytes)?;
-//!   let mut i = 0;
-//!   while !de.is_done() {
-//!     let x = de.get_value::<i32>()?;
-//!     assert_eq!(x, i);
-//!     i += 1;
-//!   }
-//!   de.done()?;
-//!   Ok(())
+//! // Serialize 10 numbers to Candid binary format
+//! let mut ser = candid::ser::IDLBuilder::new();
+//! for i in 0..10 {
+//!   ser.arg(&i)?;
 //! }
-//! # builder_example().unwrap();
+//! let bytes: Vec<u8> = ser.serialize_to_vec()?;
+//!
+//! // Deserialize Candid message and verify the values match
+//! let mut de = candid::de::IDLDeserialize::new(&bytes)?;
+//! let mut i = 0;
+//! while !de.is_done() {
+//!   let x = de.get_value::<i32>()?;
+//!   assert_eq!(x, i);
+//!   i += 1;
+//! }
+//! de.done()?;
+//! # Ok::<(), candid::Error>(())
 //! ```
 //!
 //! We also provide macros for encoding/decoding Candid message in a convenient way.
 //!
 //! ```
-//! use candid::{Encode, Decode, Result};
-//! fn macro_example() -> Result<()> {
-//!   // Serialize two values [(42, "text")] and (42u32, "text")
-//!   let bytes: Vec<u8> = Encode!(&[(42, "text")], &(42u32, "text"))?;
-//!   // Deserialize the first value as type Vec<(i32, &str)>,
-//!   // and the second value as type (u32, String)
-//!   let (a, b) = Decode!(&bytes, Vec<(i32, &str)>, (u32, String))?;
+//! use candid::{Encode, Decode};
+//! // Serialize two values [(42, "text")] and (42u32, "text")
+//! let bytes: Vec<u8> = Encode!(&[(42, "text")], &(42u32, "text"))?;
+//! // Deserialize the first value as type Vec<(i32, &str)>,
+//! // and the second value as type (u32, String)
+//! let (a, b) = Decode!(&bytes, Vec<(i32, &str)>, (u32, String))?;
 //!
-//!   assert_eq!(a, [(42, "text")]);
-//!   assert_eq!(b, (42u32, "text".to_string()));
-//!   Ok(())
-//! }
-//! # macro_example().unwrap();
+//! assert_eq!(a, [(42, "text")]);
+//! assert_eq!(b, (42u32, "text".to_string()));
+//! # Ok::<(), candid::Error>(())
 //! ```
 //! The [`Encode!`](macro.Encode.html) macro takes a sequence of Rust values, and returns a binary format `Vec<u8>` that can be sent over the wire.
 //! The [`Decode!`](macro.Decode.html) macro takes the binary message and a sequence of Rust types that you want to decode into, and returns a tuple
@@ -71,6 +65,7 @@
 //! ```
 //! use candid::{Encode, Decode, CandidType, Deserialize};
 //! #[derive(CandidType, Deserialize)]
+//! # #[derive(Debug, PartialEq)]
 //! enum List {
 //!     #[serde(rename = "nil")]
 //!     Nil,
@@ -78,28 +73,30 @@
 //! }
 //! let list = List::Cons(42, Box::new(List::Nil));
 //!
-//! let bytes = Encode!(&list).unwrap();
-//! let res = Decode!(&bytes, List);
+//! let bytes = Encode!(&list)?;
+//! let res = Decode!(&bytes, List)?;
+//! assert_eq!(res, list);
+//! # Ok::<(), candid::Error>(())
 //! ```
 //! We also support serde's rename attributes for each field, namely `#[serde(rename = "foo")]`
 //! and `#[serde(rename(serialize = "foo", deserialize = "foo"))]`.
 //! This is useful when interoperating between Rust and Motoko canisters involving variant types, because
 //! they use different naming conventions for field names.
 //!
+//! Note that if you are deriving `Deserialize` trait from Candid, you need to import `serde` as a dependency in
+//! your project, as the derived implementation will refer to the `serde` crate.
+//!
 //! ## Operating on big integers
 //! To support big integer types [`Candid::Int`](types/number/struct.Int.html) and [`Candid::Nat`](types/number/struct.Nat.html),
 //! we use the `num_bigint` crate. We provide interface to convert `i64`, `u64`, `&str` and `&[u8]` to big integers.
 //! ```
-//! use candid::{Int, Nat, Encode, Decode, Result};
-//! fn bigint_examples() -> Result<()> {
-//!   let x = "-10000000000000000000".parse::<Int>()?;
-//!   let bytes = Encode!(&Nat::from(1024), &x)?;
-//!   let (a, b) = Decode!(&bytes, Nat, Int)?;
-//!   assert_eq!(a + 1, 1025);
-//!   assert_eq!(b, Int::parse(b"-10000000000000000000")?);
-//!   Ok(())
-//! }
-//! # bigint_examples().unwrap();
+//! use candid::{Int, Nat, Encode, Decode};
+//! let x = "-10000000000000000000".parse::<Int>()?;
+//! let bytes = Encode!(&Nat::from(1024), &x)?;
+//! let (a, b) = Decode!(&bytes, Nat, Int)?;
+//! assert_eq!(a + 1, 1025);
+//! assert_eq!(b, Int::parse(b"-10000000000000000000")?);
+//! # Ok::<(), candid::Error>(())
 //! ```
 //!
 //! ## Operating on untyped Candid values
@@ -108,26 +105,23 @@
 //! The use of Rust value and `IDLValue` can be intermixed.
 //!
 //! ```
-//! use candid::{Result, parser::value::IDLValue};
-//! fn untyped_examples() -> Result<()> {
-//!   // Serialize Rust value Some(42u8) and IDLValue "hello"
-//!   let bytes = candid::ser::IDLBuilder::new()
+//! use candid::parser::value::IDLValue;
+//! // Serialize Rust value Some(42u8) and IDLValue "hello"
+//! let bytes = candid::ser::IDLBuilder::new()
 //!     .arg(&Some(42u8))?
 //!     .value_arg(&IDLValue::Text("hello".to_string()))?
 //!     .serialize_to_vec()?;
 //!
-//!   // Deserialize the first Rust value into IDLValue,
-//!   // and the second IDLValue into Rust value
-//!   let mut de = candid::de::IDLDeserialize::new(&bytes)?;
-//!   let x = de.get_value::<IDLValue>()?;
-//!   let y = de.get_value::<&str>()?;
-//!   de.done()?;
+//! // Deserialize the first Rust value into IDLValue,
+//! // and the second IDLValue into Rust value
+//! let mut de = candid::de::IDLDeserialize::new(&bytes)?;
+//! let x = de.get_value::<IDLValue>()?;
+//! let y = de.get_value::<&str>()?;
+//! de.done()?;
 //!
-//!   assert_eq!(x, IDLValue::Opt(Box::new(IDLValue::Nat8(42))));
-//!   assert_eq!(y, "hello");
-//!   Ok(())
-//! }
-//! # untyped_examples().unwrap();
+//! assert_eq!(x, IDLValue::Opt(Box::new(IDLValue::Nat8(42))));
+//! assert_eq!(y, "hello");
+//! # Ok::<(), candid::Error>(())
 //! ```
 //!
 //! We provide a data structure [`candid::IDLArgs`](parser/value/struct.IDLArgs.html) to represent a sequence of `IDLValue`s,
@@ -135,29 +129,26 @@
 //! We also provide a parser to parse Candid values in text format.
 //!
 //! ```
-//! use candid::{IDLArgs, Result};
-//! fn untyped_examples() -> Result<()> {
-//!   // Candid values represented in text format
-//!   let text_value = r#"
+//! use candid::IDLArgs;
+//! // Candid values represented in text format
+//! let text_value = r#"
 //!      (42, opt true, vec {1;2;3},
 //!       opt record {label="text"; 42="haha"})
-//!   "#;
+//! "#;
 //!
-//!   // Parse text format into IDLArgs for serialization
-//!   let args: IDLArgs = text_value.parse()?;
-//!   let encoded: Vec<u8> = args.to_bytes()?;
+//! // Parse text format into IDLArgs for serialization
+//! let args: IDLArgs = text_value.parse()?;
+//! let encoded: Vec<u8> = args.to_bytes()?;
 //!
-//!   // Deserialize into IDLArgs
-//!   let decoded: IDLArgs = IDLArgs::from_bytes(&encoded)?;
-//!   assert_eq!(encoded, decoded.to_bytes()?);
+//! // Deserialize into IDLArgs
+//! let decoded: IDLArgs = IDLArgs::from_bytes(&encoded)?;
+//! assert_eq!(encoded, decoded.to_bytes()?);
 //!
-//!   // Convert IDLArgs to text format
-//!   let output: String = decoded.to_string();
-//!   let parsed_args: IDLArgs = output.parse()?;
-//!   assert_eq!(args, parsed_args);
-//!   Ok(())
-//! }
-//! # untyped_examples().unwrap();
+//! // Convert IDLArgs to text format
+//! let output: String = decoded.to_string();
+//! let parsed_args: IDLArgs = output.parse()?;
+//! assert_eq!(args, parsed_args);
+//! # Ok::<(), candid::Error>(())
 //! ```
 //! Note that when parsing Candid values, we assume the number literals are always of type `Int`.
 //! This can be changed by providing the type of the method arguments, which can usually be obtained
@@ -167,32 +158,29 @@
 //! We provide a parser and type checker for Candid files specifying the service interface.
 //!
 //! ```
-//! use candid::{IDLProg, Result, parser::types::to_pretty, TypeEnv, check_prog, types::Type};
-//! fn parser_examples() -> Result<()> {
-//!   // .did file for actor signature. Most likely generated by dfx
-//!   let did_file = r#"
+//! use candid::{IDLProg, TypeEnv, check_prog, types::Type};
+//! let did_file = r#"
 //!     type List = opt record { head: int; tail: List };
+//!     type byte = nat8;
 //!     service : {
-//!       f : (x: blob, opt bool) -> (variant { A; B; C });
+//!       f : (byte, int, nat, int8) -> (List);
 //!       g : (List) -> (int) query;
 //!     }
-//!   "#;
+//! "#;
 //!
-//!   // Parse did file into an AST
-//!   let ast: IDLProg = did_file.parse()?;
+//! // Parse did file into an AST
+//! let ast: IDLProg = did_file.parse()?;
 //!
-//!   // Pretty-print AST
-//!   let pretty: String = to_pretty(&ast, 80);
+//! // Pretty-print AST
+//! let pretty: String = candid::parser::types::to_pretty(&ast, 80);
 //!
-//!   // Type checking
-//!   let mut env = TypeEnv::new();
-//!   let actor = check_prog(&mut env, &ast)?.unwrap();
-//!   let method = env.get_method(&actor, "g").unwrap();
-//!   assert_eq!(method.is_query(), true);
-//!   assert_eq!(method.args, vec![Type::Var("List".to_string())]);
-//!   Ok(())
-//! }
-//! # parser_examples().unwrap();
+//! // Type checking
+//! let mut env = TypeEnv::new();
+//! let actor: Type = check_prog(&mut env, &ast)?.unwrap();
+//! let method = env.get_method(&actor, "g").unwrap();
+//! assert_eq!(method.is_query(), true);
+//! assert_eq!(method.args, vec![Type::Var("List".to_string())]);
+//! # Ok::<(), candid::Error>(())
 //! ```
 //!
 //! ## Serializing untyped Candid values with type annotations.
@@ -202,34 +190,32 @@
 //! There is no need to use types for deserialization as the types are available in the Candid message.
 //!
 //! ```
-//! use candid::{IDLProg, Result, TypeEnv, check_prog, IDLArgs, parser::value::IDLValue};
-//! fn typed_serialize() -> Result<()> {
-//!   // Parse candid file
-//!   let did_file = r#"
-//!     type List = opt record { head: int; tail: List };
-//!     type byte = nat8;
-//!     service : {
-//!       f : (byte, int, nat, int8) -> (List);
-//!     }
-//!   "#;
-//!   let ast = did_file.parse::<IDLProg>()?;
-//!   let mut env = TypeEnv::new();
-//!   let actor = check_prog(&mut env, &ast)?.unwrap();
-//!   let method = env.get_method(&actor, "f").unwrap();
-//!
-//!   // Serialize arguments with candid types
-//!   let args = "(42, 42, 42, 42)".parse::<IDLArgs>()?;
-//!   let encoded = args.to_bytes_with_types(&env, &method.args)?;
-//!   let decoded = IDLArgs::from_bytes(&encoded)?;
-//!   assert_eq!(decoded.args,
-//!     vec![IDLValue::Nat8(42),
-//!          IDLValue::Int(42.into()),
-//!          IDLValue::Nat(42.into()),
-//!          IDLValue::Int8(42)
-//!     ]);
-//!   Ok(())
-//! }
-//! # typed_serialize().unwrap();
+//! use candid::{IDLArgs, parser::value::IDLValue};
+//! # use candid::{IDLProg, TypeEnv, check_prog};
+//! # let did_file = r#"
+//! #    type List = opt record { head: int; tail: List };
+//! #    type byte = nat8;
+//! #    service : {
+//! #      f : (byte, int, nat, int8) -> (List);
+//! #      g : (List) -> (int) query;
+//! #    }
+//! # "#;
+//! # let ast = did_file.parse::<IDLProg>()?;
+//! # let mut env = TypeEnv::new();
+//! # let actor = check_prog(&mut env, &ast)?.unwrap();
+//! // Get method type f : (byte, int, nat, int8) -> (List)
+//! let method = env.get_method(&actor, "f").unwrap();
+//! let args = "(42, 42, 42, 42)".parse::<IDLArgs>()?;
+//! // Serialize arguments with candid types
+//! let encoded = args.to_bytes_with_types(&env, &method.args)?;
+//! let decoded = IDLArgs::from_bytes(&encoded)?;
+//! assert_eq!(decoded.args,
+//!        vec![IDLValue::Nat8(42),
+//!             IDLValue::Int(42.into()),
+//!             IDLValue::Nat(42.into()),
+//!             IDLValue::Int8(42)
+//!            ]);
+//! # Ok::<(), candid::Error>(())
 //! ```
 //!
 
