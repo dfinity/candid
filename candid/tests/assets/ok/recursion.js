@@ -1,4 +1,4 @@
-({ IDL }) => {
+export default ({ IDL }) => {
   const B = IDL.Rec();
   const list = IDL.Rec();
   const s = IDL.Rec();

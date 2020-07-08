@@ -1,4 +1,4 @@
-({ IDL }) => {
+export default ({ IDL }) => {
   const List = IDL.Rec();
   const my_type = IDL.Principal;
   List.fill(IDL.Opt(IDL.Record({ 'head' : IDL.Int, 'tail' : List })));

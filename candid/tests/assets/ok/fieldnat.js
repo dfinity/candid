@@ -1,4 +1,4 @@
-({ IDL }) => {
+export default ({ IDL }) => {
   return IDL.Service({
     'bab' : IDL.Func([IDL.Int, IDL.Nat], [], []),
     'bar' : IDL.Func([IDL.Record({ '2' : IDL.Int })], [], []),
