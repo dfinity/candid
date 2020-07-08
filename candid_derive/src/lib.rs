@@ -295,14 +295,15 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (Tokens, 
     assert_eq!(unique.len(), fs.len());
     fs.sort_unstable_by_key(|Field { hash, .. }| *hash);
 
-    let id = fs.iter().map(|Field { renamed_ident, .. }| {
-        let id_str = renamed_ident.to_string();
-        match renamed_ident {
-            // TODO
-            Ident::Named(_) => quote! { ::candid::types::Label::Named(#id_str.to_string()) },
+    let id = fs
+        .iter()
+        .map(|Field { renamed_ident, .. }| match renamed_ident {
+            Ident::Named(ref id) => {
+                let name = id.to_string();
+                quote! { ::candid::types::Label::Named(#name.to_string()) }
+            }
             Ident::Unnamed(ref i) => quote! { ::candid::types::Label::Id(#i) },
-        }
-    });
+        });
     let ty = fs.iter().map(|Field { ty, .. }| ty);
     let ty_gen = quote! {
         vec![
