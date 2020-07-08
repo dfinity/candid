@@ -1,6 +1,6 @@
 [package]
 name = "candid_derive"
-version = "0.2.4"
+version = "0.3.0"
 edition = "2018"
 authors = ["DFINITY Team"]
 description = "Macros implementation of #[derive(CandidType)] for the Candid."
