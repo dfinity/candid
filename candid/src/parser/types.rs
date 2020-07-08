@@ -1,4 +1,4 @@
-use crate::idl_hash;
+use crate::types::Label;
 use crate::Result;
 use pretty::RcDoc;
 
@@ -81,38 +81,6 @@ impl FuncType {
             }
         }
         false
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Label {
-    Id(u32),
-    Named(String),
-    Unnamed(u32),
-}
-
-impl Label {
-    pub fn get_id(&self) -> u32 {
-        match *self {
-            Label::Id(n) => n,
-            Label::Named(ref n) => idl_hash(n),
-            Label::Unnamed(n) => n,
-        }
-    }
-}
-
-impl std::fmt::Display for Label {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Label::Id(n) | Label::Unnamed(n) => write!(f, "{}", n),
-            Label::Named(id) => write!(f, "{}", id),
-        }
-    }
-}
-
-impl PartialEq for Label {
-    fn eq(&self, other: &Self) -> bool {
-        self.get_id() == other.get_id()
     }
 }
 

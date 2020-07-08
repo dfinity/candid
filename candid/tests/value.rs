@@ -1,8 +1,9 @@
-use candid::parser::value::{IDLArgs, IDLField, IDLValue};
 use candid::parser::{
-    types::{IDLProg, Label},
+    types::IDLProg,
     typing::{check_prog, TypeEnv},
+    value::{IDLArgs, IDLField, IDLValue},
 };
+use candid::types::Label;
 use candid::Decode;
 
 #[test]

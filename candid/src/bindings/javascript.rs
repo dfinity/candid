@@ -1,7 +1,7 @@
 use super::analysis::{chase_actor, infer_rec};
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
-use crate::types::{Field, Function, Type};
+use crate::types::{Field, Function, Label, Type};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
 
@@ -13,7 +13,7 @@ fn is_tuple(t: &Type) -> bool {
                 return false;
             }
             for (i, field) in fs.iter().enumerate() {
-                if field.hash != (i as u32) {
+                if field.id.get_id() != (i as u32) {
                     return false;
                 }
             }
@@ -62,16 +62,20 @@ fn pp_ty(ty: &Type) -> RcDoc {
     }
 }
 
-fn pp_field(field: &Field) -> RcDoc {
-    let name = if field.is_named() {
-        quote_ident(&field.id)
-    } else {
-        str("_")
-            .append(&field.id)
+fn pp_label(id: &Label) -> RcDoc {
+    match id {
+        Label::Named(str) => quote_ident(str),
+        Label::Id(n) | Label::Unnamed(n) => str("_")
+            .append(RcDoc::as_string(n))
             .append("_")
-            .append(RcDoc::space())
-    };
-    name.append(kwd(":")).append(pp_ty(&field.ty))
+            .append(RcDoc::space()),
+    }
+}
+
+fn pp_field(field: &Field) -> RcDoc {
+    pp_label(&field.id)
+        .append(kwd(":"))
+        .append(pp_ty(&field.ty))
 }
 
 fn pp_fields(fs: &[Field]) -> RcDoc {

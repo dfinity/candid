@@ -1,6 +1,6 @@
+use candid::parser::typing::TypeEnv;
 use candid::parser::value::{IDLArgs, IDLField, IDLValue};
-use candid::parser::{types::Label, typing::TypeEnv};
-use candid::types::Type;
+use candid::types::{Label, Type};
 
 fn parse_args(input: &str) -> IDLArgs {
     input.parse().unwrap()

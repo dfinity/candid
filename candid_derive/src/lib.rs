@@ -135,7 +135,7 @@ fn enum_from_ast(
         ::candid::types::Type::Variant(
             vec![
                 #(::candid::types::Field {
-                    id: #id.to_owned(),
+                    id: ::candid::types::Label::Named(#id.to_owned()),
                     hash: #hash,
                     ty: #ty }
                 ),*
@@ -285,13 +285,19 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (Tokens, 
     assert_eq!(unique.len(), fs.len());
     fs.sort_unstable_by_key(|Field { hash, .. }| *hash);
 
-    let id = fs.iter().map(|Field { ident, .. }| ident.to_string());
+    let id = fs.iter().map(|Field { ident, .. }| {
+        let id_str = ident.to_string();
+        match ident {
+            Ident::Named(_) => quote! { ::candid::types::Label::Named(#id_str.to_string()) },
+            Ident::Unnamed(ref i) => quote! { ::candid::types::Label::Id(#i) },
+        }
+    });
     let hash = fs.iter().map(|Field { hash, .. }| hash);
     let ty = fs.iter().map(|Field { ty, .. }| ty);
     let ty_gen = quote! {
         vec![
             #(::candid::types::Field {
-                id: #id.to_owned(),
+                id: #id,
                 hash: #hash,
                 ty: #ty }
             ),*

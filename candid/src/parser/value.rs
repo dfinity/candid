@@ -1,7 +1,6 @@
 use super::lexer::error;
-use super::types::Label;
 use super::typing::TypeEnv;
-use crate::types::{Field, Type};
+use crate::types::{Field, Label, Type};
 use crate::{Error, Result};
 use crate::{Int, Nat};
 use serde::de;
@@ -290,7 +289,7 @@ impl IDLValue {
                 let fs: Vec<_> = vec
                     .iter()
                     .map(|IDLField { id, val }| Field {
-                        id: id.to_string(),
+                        id: id.clone(),
                         hash: id.get_id(),
                         ty: val.value_ty(),
                     })
@@ -300,7 +299,7 @@ impl IDLValue {
             IDLValue::Variant(ref v, idx) => {
                 assert_eq!(idx, 0);
                 let f = Field {
-                    id: v.id.to_string(),
+                    id: v.id.clone(),
                     hash: v.id.get_id(),
                     ty: v.val.value_ty(),
                 };

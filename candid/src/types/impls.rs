@@ -153,12 +153,12 @@ where
         Type::Variant(vec![
             // Make sure the field id is sorted by idl_hash
             Field {
-                id: "Ok".to_owned(),
+                id: Label::Named("Ok".to_owned()),
                 hash: 17724u32,
                 ty: T::ty(),
             },
             Field {
-                id: "Err".to_owned(),
+                id: Label::Named("Err".to_owned()),
                 hash: 3_456_837u32,
                 ty: E::ty(),
             },
@@ -227,7 +227,7 @@ macro_rules! tuple_impls {
                 fn id() -> TypeId { TypeId::of::<($($name,)+)>() }
                 fn _ty() -> Type {
                     Type::Record(vec![
-                        $(Field{ id: $n.to_string(), hash: $n, ty: $name::ty() },)+
+                        $(Field{ id: Label::Id($n), hash: $n, ty: $name::ty() },)+
                     ])
                 }
                 fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>

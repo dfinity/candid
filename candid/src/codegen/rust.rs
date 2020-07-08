@@ -7,7 +7,8 @@
 //! natural/integer numbers.
 use crate::codegen::LanguageBinding;
 use crate::error::{Error, Result};
-use crate::parser::types::{Binding, Dec, FuncType, IDLType, Label, PrimType, TypeField};
+use crate::parser::types::{Binding, Dec, FuncType, IDLType, PrimType, TypeField};
+use crate::types::Label;
 use crate::{generate_code, idl_hash, IDLProg};
 
 /// Returns true if id is a rust keyword.
