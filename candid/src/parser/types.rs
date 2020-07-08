@@ -1,4 +1,4 @@
-use crate::idl_hash;
+use crate::types::Label;
 use crate::Result;
 use pretty::RcDoc;
 
@@ -81,23 +81,6 @@ impl FuncType {
             }
         }
         false
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Label {
-    Id(u32),
-    Named(String),
-    Unnamed(u32),
-}
-
-impl Label {
-    pub fn get_id(&self) -> u32 {
-        match *self {
-            Label::Id(n) => n,
-            Label::Named(ref n) => idl_hash(n),
-            Label::Unnamed(n) => n,
-        }
     }
 }
 

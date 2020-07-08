@@ -1,4 +1,4 @@
-({ IDL }) => {
+export default ({ IDL }) => {
   const o = IDL.Rec();
   const f = IDL.Func([IDL.Int8], [IDL.Int8], []);
   const h = IDL.Func([f], [f], []);

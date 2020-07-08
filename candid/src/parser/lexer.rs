@@ -69,11 +69,6 @@ pub enum Token {
     Boolean(bool),
 }
 
-pub struct TmpIDLField {
-    pub has_id: bool,
-    pub inner: super::value::IDLField,
-}
-
 fn hex_to_char(hex: &str) -> Result<char, LexicalError> {
     let c = u32::from_str_radix(hex, 16).map_err(|_| LexicalError::ParseError(hex.to_owned()))?;
     std::char::from_u32(c).ok_or(LexicalError::OutOfRangeUnicode(c))

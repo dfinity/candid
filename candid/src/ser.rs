@@ -253,8 +253,8 @@ impl TypeSerialize {
 
                 sleb128_encode(&mut buf, Opcode::Record as i64)?;
                 leb128_encode(&mut buf, fs.len() as u64)?;
-                for Field { hash, ty, .. } in fs.iter() {
-                    leb128_encode(&mut buf, u64::from(*hash))?;
+                for Field { id, ty } in fs.iter() {
+                    leb128_encode(&mut buf, u64::from(id.get_id()))?;
                     self.encode(&mut buf, ty)?;
                 }
             }
@@ -265,8 +265,8 @@ impl TypeSerialize {
 
                 sleb128_encode(&mut buf, Opcode::Variant as i64)?;
                 leb128_encode(&mut buf, fs.len() as u64)?;
-                for Field { hash, ty, .. } in fs.iter() {
-                    leb128_encode(&mut buf, u64::from(*hash))?;
+                for Field { id, ty } in fs.iter() {
+                    leb128_encode(&mut buf, u64::from(id.get_id()))?;
                     self.encode(&mut buf, ty)?;
                 }
             }

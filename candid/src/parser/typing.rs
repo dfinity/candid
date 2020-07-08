@@ -152,7 +152,6 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
         let mut prev: Option<&TypeField> = None;
         for f in fs.iter() {
             let id = f.label.get_id();
-            // println!("{:?} {}", f.label, f.label.get_id());
             if let Some(prev) = prev {
                 if id == prev.label.get_id() {
                     return Err(Error::msg(format!(
@@ -167,17 +166,9 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
     }
     for f in fs.iter() {
         let ty = check_type(env, &f.typ)?;
-        let field = match f.label {
-            Label::Id(n) | Label::Unnamed(n) => Field {
-                id: n.to_string(),
-                hash: n,
-                ty,
-            },
-            Label::Named(ref str) => Field {
-                id: str.to_string(),
-                hash: crate::idl_hash(str),
-                ty,
-            },
+        let field = Field {
+            id: f.label.clone(),
+            ty,
         };
         res.push(field);
     }

@@ -9,7 +9,7 @@ use serde::ser::Error;
 mod impls;
 pub mod internal;
 
-pub use self::internal::{get_type, Field, Function, Type, TypeId};
+pub use self::internal::{get_type, Field, Function, Label, Type, TypeId};
 
 pub mod number;
 pub mod principal;

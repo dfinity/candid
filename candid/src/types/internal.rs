@@ -1,4 +1,5 @@
 use super::CandidType;
+use crate::idl_hash;
 use num_enum::TryFromPrimitive;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -49,18 +50,48 @@ pub enum Type {
     Principal,
 }
 
-#[derive(Debug, PartialEq, Hash, Eq, Clone)]
-pub struct Field {
-    pub id: String,
-    pub hash: u32,
-    pub ty: Type,
+#[derive(Debug, Eq, Clone)]
+pub enum Label {
+    Id(u32),
+    Named(String),
+    Unnamed(u32),
 }
 
-impl Field {
-    pub fn is_named(&self) -> bool {
-        // TODO make this more robust
-        crate::idl_hash(&self.id) == self.hash
+impl Label {
+    pub fn get_id(&self) -> u32 {
+        match *self {
+            Label::Id(n) => n,
+            Label::Named(ref n) => idl_hash(n),
+            Label::Unnamed(n) => n,
+        }
     }
+}
+
+impl std::fmt::Display for Label {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Label::Id(n) | Label::Unnamed(n) => write!(f, "{}", n),
+            Label::Named(id) => write!(f, "{}", id),
+        }
+    }
+}
+
+impl PartialEq for Label {
+    fn eq(&self, other: &Self) -> bool {
+        self.get_id() == other.get_id()
+    }
+}
+
+impl std::hash::Hash for Label {
+    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {
+        self.get_id();
+    }
+}
+
+#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+pub struct Field {
+    pub id: Label,
+    pub ty: Type,
 }
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
@@ -128,18 +159,16 @@ pub fn unroll(t: &Type) -> Type {
         Vec(ref t) => Vec(Box::new(unroll(t))),
         Record(fs) => Record(
             fs.iter()
-                .map(|Field { id, hash, ty }| Field {
-                    id: id.to_string(),
-                    hash: *hash,
+                .map(|Field { id, ty }| Field {
+                    id: id.clone(),
                     ty: unroll(ty),
                 })
                 .collect(),
         ),
         Variant(fs) => Variant(
             fs.iter()
-                .map(|Field { id, hash, ty }| Field {
-                    id: id.to_string(),
-                    hash: *hash,
+                .map(|Field { id, ty }| Field {
+                    id: id.clone(),
                     ty: unroll(ty),
                 })
                 .collect(),

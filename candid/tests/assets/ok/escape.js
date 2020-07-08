@@ -1,4 +1,4 @@
-({ IDL }) => {
+export default ({ IDL }) => {
   const t = IDL.Record({
     '\"' : IDL.Nat,
     '\'' : IDL.Nat,

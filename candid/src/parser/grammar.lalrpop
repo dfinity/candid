@@ -1,7 +1,7 @@
 use super::value::{IDLField, IDLValue, IDLArgs};
-use super::types::{IDLType, PrimType, Label, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg};
-use super::lexer::{Token, LexicalError, TmpIDLField, error};
-use crate::{idl_hash, Principal};
+use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg};
+use super::lexer::{Token, LexicalError, error};
+use crate::{idl_hash, Principal, types::Label};
 
 grammar;
 
@@ -55,36 +55,39 @@ pub Arg: IDLValue = {
     "vec" "{" <SepBy<Arg, ";">> "}" => IDLValue::Vec(<>),
     "record" "{" <SepBy<RecordField, ";">> "}" => {
         let mut id: u32 = 0;
-        let mut fs: Vec<IDLField> = <>.iter().map(|f| {
-          if f.has_id {
-            id = f.inner.id + 1;
-            f.inner.clone()
-          } else {
-            id = id + 1;
-            IDLField { id: id - 1, val: f.inner.val.clone() }
+        let mut fs: Vec<IDLField> = <>.into_iter().map(|f| {
+          match f.id {
+            Label::Unnamed(_) => {
+              id = id + 1;
+              IDLField { id: Label::Unnamed(id - 1), val: f.val }
+            }
+            _ => {
+              id = f.id.get_id() + 1;
+              f
+            }
           }
         }).collect();
-        fs.sort_unstable_by_key(|IDLField { id, .. }| *id);
+        fs.sort_unstable_by_key(|IDLField { id, .. }| id.get_id());
         IDLValue::Record(fs)
-     },
+    },
     "variant" "{" <VariantField> "}" => IDLValue::Variant(Box::new(<>), 0),
     "principal" <"text"> =>? Ok(IDLValue::Principal(Principal::from_text(<>).map_err(error)?)),
 }
 
 Field: IDLField = {
-    <n:"number"> "=" <v:Arg> =>? Ok(IDLField { id: n.parse::<u32>().map_err(|_| error("field number out of u32 range"))?, val: v }),
-    <n:Name> "=" <v:Arg> => IDLField { id: idl_hash(&n), val: v },
+    <n:"number"> "=" <v:Arg> =>? Ok(IDLField { id: Label::Id(n.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), val: v }),
+    <n:Name> "=" <v:Arg> => IDLField { id: Label::Named(n), val: v },
 }
 
 VariantField: IDLField = {
     Field => <>,
-    Name => IDLField { id: idl_hash(&<>), val: IDLValue::Null },
-    "number" =>? Ok(IDLField { id: <>.parse::<u32>().map_err(|_| error("field number out of u32 range"))?, val: IDLValue::Null }),
+    Name => IDLField { id: Label::Named(<>), val: IDLValue::Null },
+    "number" =>? Ok(IDLField { id: Label::Id(<>.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), val: IDLValue::Null }),
 }
 
-RecordField: TmpIDLField = {
-    Field => TmpIDLField { has_id: true, inner: <> },
-    Arg => TmpIDLField { has_id: false, inner: IDLField { id:0, val:<> } },
+RecordField: IDLField = {
+    Field => <>,
+    Arg => IDLField { id: Label::Unnamed(0), val:<> },
 }
 
 // Type

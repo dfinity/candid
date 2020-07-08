@@ -1,8 +1,9 @@
-use candid::parser::value::{IDLArgs, IDLField, IDLValue};
 use candid::parser::{
     types::IDLProg,
     typing::{check_prog, TypeEnv},
+    value::{IDLArgs, IDLField, IDLValue},
 };
+use candid::types::Label;
 use candid::Decode;
 
 #[test]
@@ -71,11 +72,11 @@ fn test_value() {
     check(
         Record(vec![
             IDLField {
-                id: 0,
+                id: Label::Id(0),
                 val: Int(42.into()),
             },
             IDLField {
-                id: 1,
+                id: Label::Id(1),
                 val: Text("💩".to_string()),
             },
         ]),
@@ -84,11 +85,11 @@ fn test_value() {
     check(
         Record(vec![
             IDLField {
-                id: 4_895_187,
+                id: Label::Id(4_895_187),
                 val: Bool(true),
             },
             IDLField {
-                id: 5_097_222,
+                id: Label::Id(5_097_222),
                 val: Int(42.into()),
             },
         ]),
@@ -101,7 +102,7 @@ fn test_variant() {
     use IDLValue::*;
     let value = Variant(
         Box::new(IDLField {
-            id: 3_303_859,
+            id: Label::Id(3_303_859),
             val: Null,
         }),
         0,
