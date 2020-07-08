@@ -218,14 +218,11 @@ impl IDLValue {
                 IDLValue::Vec(res)
             }
             (IDLValue::Record(vec), Type::Record(fs)) => {
-                let fs: HashMap<_, _> = fs
-                    .iter()
-                    .map(|Field { id, ty }| (id.get_id(), ty))
-                    .collect();
+                let fs: HashMap<_, _> = fs.iter().map(|Field { id, ty }| (id, ty)).collect();
                 let mut res = Vec::new();
                 for e in vec.iter() {
                     let ty = fs
-                        .get(&e.id.get_id())
+                        .get(&e.id)
                         .ok_or_else(|| Error::msg(format!("field {} not found", e.id)))?;
                     let v = e.val.annotate_type(env, ty)?;
                     res.push(IDLField {
@@ -237,7 +234,7 @@ impl IDLValue {
             }
             (IDLValue::Variant(v, _), Type::Variant(fs)) => {
                 for (i, f) in fs.iter().enumerate() {
-                    if v.id.get_id() == f.id.get_id() {
+                    if v.id == f.id {
                         let val = v.val.annotate_type(env, &f.ty)?;
                         let field = IDLField {
                             id: v.id.clone(),
