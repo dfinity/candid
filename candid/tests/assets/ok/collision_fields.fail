@@ -1,1 +1,1 @@
-field '2: nat' hash collision with 'nat'
+Candid parser error: label '2' hash collision with '2'

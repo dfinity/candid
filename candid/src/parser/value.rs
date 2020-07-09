@@ -52,7 +52,7 @@ impl IDLArgs {
         }
     }
     pub fn to_bytes_with_types(&self, env: &TypeEnv, types: &[Type]) -> Result<Vec<u8>> {
-        if types.len() != self.args.len() {
+        if types.len() > self.args.len() {
             return Err(Error::msg("length mismatch for types and values"));
         }
         let mut idl = crate::ser::IDLBuilder::new();

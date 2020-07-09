@@ -146,24 +146,29 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
     }
 }
 
-fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
-    let mut res = Vec::new();
-    {
-        let mut prev: Option<&TypeField> = None;
-        for f in fs.iter() {
-            let id = f.label.get_id();
-            if let Some(prev) = prev {
-                if id == prev.label.get_id() {
-                    return Err(Error::msg(format!(
-                        "field '{}' hash collision with '{}'",
-                        f.to_doc().pretty(80),
-                        prev.to_doc().pretty(80),
-                    )));
-                }
+pub fn check_unique<'a, I, T>(sorted: I) -> Result<()>
+where
+    T: 'a + PartialEq + std::fmt::Display,
+    I: Iterator<Item = &'a T>,
+{
+    let mut prev: Option<&T> = None;
+    for lab in sorted {
+        if let Some(prev) = prev {
+            if lab == prev {
+                return Err(Error::msg(format!(
+                    "label '{}' hash collision with '{}'",
+                    lab, prev,
+                )));
             }
-            prev = Some(f);
         }
+        prev = Some(lab);
     }
+    Ok(())
+}
+
+fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
+    // field label duplication is checked in the parser
+    let mut res = Vec::new();
     for f in fs.iter() {
         let ty = check_type(env, &f.typ)?;
         let field = Field {
@@ -176,17 +181,9 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
 }
 
 fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
+    // binding duplication is checked in the parser
     let mut res = Vec::new();
-    let mut prev = None;
     for meth in ms.iter() {
-        if let Some(prev) = prev {
-            if prev == meth.id {
-                return Err(Error::msg(format!(
-                    "duplicate binding for {} in service",
-                    meth.id
-                )));
-            }
-        }
         let t = check_type(env, &meth.typ)?;
         if !env.pre && env.te.as_func(&t).is_err() {
             return Err(Error::msg(format!(
@@ -196,7 +193,6 @@ fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
             )));
         }
         res.push((meth.id.to_owned(), t));
-        prev = Some(meth.id.clone());
     }
     Ok(res)
 }
