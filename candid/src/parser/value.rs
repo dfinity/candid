@@ -52,17 +52,17 @@ impl IDLArgs {
         }
     }
     pub fn to_bytes_with_types(&self, env: &TypeEnv, types: &[Type]) -> Result<Vec<u8>> {
-        if types.len() != self.args.len() {
-            return Err(Error::msg("length mismatch for types and values"));
+        if types.len() > self.args.len() {
+            return Err(Error::msg("wrong number of argument values"));
         }
         let mut idl = crate::ser::IDLBuilder::new();
         let empty_env = TypeEnv::new();
-        for (i, v) in self.args.iter().enumerate() {
+        for (i, (v, ty)) in self.args.iter().zip(types.iter()).enumerate() {
             if i == 0 {
                 // env gets merged into the builder state, we only need to pass in env once.
-                idl.value_arg_with_type(v, env, &types[i])?;
+                idl.value_arg_with_type(v, env, ty)?;
             } else {
-                idl.value_arg_with_type(v, &empty_env, &types[i])?;
+                idl.value_arg_with_type(v, &empty_env, ty)?;
             }
         }
         idl.serialize_to_vec()
@@ -73,6 +73,17 @@ impl IDLArgs {
             idl.value_arg(v)?;
         }
         idl.serialize_to_vec()
+    }
+    pub fn from_bytes_with_types(bytes: &[u8], env: &TypeEnv, types: &[Type]) -> Result<Self> {
+        let mut de = crate::de::IDLDeserialize::new(bytes)?;
+        let mut args = Vec::new();
+        for ty in types.iter() {
+            let v = de.get_value::<IDLValue>()?;
+            let v = v.annotate_type(env, ty)?;
+            args.push(v);
+        }
+        de.done()?;
+        Ok(IDLArgs { args })
     }
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let mut de = crate::de::IDLDeserialize::new(bytes)?;
@@ -218,16 +229,17 @@ impl IDLValue {
                 IDLValue::Vec(res)
             }
             (IDLValue::Record(vec), Type::Record(fs)) => {
-                let fs: HashMap<_, _> = fs.iter().map(|Field { id, ty }| (id, ty)).collect();
+                let fields: HashMap<_, _> =
+                    vec.iter().map(|IDLField { id, val }| (id, val)).collect();
                 let mut res = Vec::new();
-                for e in vec.iter() {
-                    let ty = fs
-                        .get(&e.id)
-                        .ok_or_else(|| Error::msg(format!("field {} not found", e.id)))?;
-                    let v = e.val.annotate_type(env, ty)?;
+                for Field { id, ty } in fs.iter() {
+                    let val = fields
+                        .get(&id)
+                        .ok_or_else(|| Error::msg(format!("field {} not found", id)))?;
+                    let val = val.annotate_type(env, ty)?;
                     res.push(IDLField {
-                        id: e.id.clone(),
-                        val: v,
+                        id: id.clone(),
+                        val,
                     });
                 }
                 IDLValue::Record(res)
@@ -237,7 +249,7 @@ impl IDLValue {
                     if v.id == f.id {
                         let val = v.val.annotate_type(env, &f.ty)?;
                         let field = IDLField {
-                            id: v.id.clone(),
+                            id: f.id.clone(),
                             val,
                         };
                         return Ok(IDLValue::Variant(Box::new(field), i as u64));

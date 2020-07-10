@@ -179,6 +179,11 @@ fn parse_nested_record() {
         ])]
     );
     assert_eq!(format!("{}", args), "(record { 43 = record { msg = \"hello\"; test = \"test\"; }; long_label = opt null; label = 42; })");
+    let skip_typ = parse_type("record { label: nat }");
+    args.args[0] = args.args[0]
+        .annotate_type(&TypeEnv::new(), &skip_typ)
+        .unwrap();
+    assert_eq!(format!("{}", args), "(record { label = 42; })");
 }
 
 #[test]

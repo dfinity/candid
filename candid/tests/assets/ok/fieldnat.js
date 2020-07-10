@@ -19,4 +19,4 @@ export default ({ IDL }) => {
     ),
     'foo' : IDL.Func([IDL.Record({ _2_ : IDL.Int })], [], [])
   });
-}
+};

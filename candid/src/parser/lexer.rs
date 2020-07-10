@@ -19,7 +19,7 @@ impl fmt::Display for LexicalError {
         match self {
             LexicalError::Eof => write!(fmt, "Unexpected eof"),
             LexicalError::UnknownChar(c) => write!(fmt, "Unexpected character {}", c),
-            LexicalError::ParseError(s) => write!(fmt, "Error parsing {}", s),
+            LexicalError::ParseError(s) => write!(fmt, "{}", s),
             LexicalError::OutOfRangeUnicode(u) => {
                 write!(fmt, "Unicode escape out of range {:x?}", u)
             }

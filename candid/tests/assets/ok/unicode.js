@@ -17,4 +17,4 @@ export default ({ IDL }) => {
     '👀' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
     '函数名' : IDL.Func([A], [B], [])
   });
-}
+};

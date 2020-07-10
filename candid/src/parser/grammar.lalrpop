@@ -1,4 +1,5 @@
 use super::value::{IDLField, IDLValue, IDLArgs};
+use super::typing::check_unique;
 use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg};
 use super::lexer::{Token, LexicalError, error};
 use crate::{idl_hash, Principal, types::Label};
@@ -53,7 +54,7 @@ pub Arg: IDLValue = {
     "null" => IDLValue::Null,
     "opt" <Arg> => IDLValue::Opt(Box::new(<>)),
     "vec" "{" <SepBy<Arg, ";">> "}" => IDLValue::Vec(<>),
-    "record" "{" <SepBy<RecordField, ";">> "}" => {
+    "record" "{" <SepBy<RecordField, ";">> "}" =>? {
         let mut id: u32 = 0;
         let mut fs: Vec<IDLField> = <>.into_iter().map(|f| {
           match f.id {
@@ -68,7 +69,8 @@ pub Arg: IDLValue = {
           }
         }).collect();
         fs.sort_unstable_by_key(|IDLField { id, .. }| id.get_id());
-        IDLValue::Record(fs)
+        check_unique(fs.iter().map(|f| &f.id)).map_err(error)?;
+        Ok(IDLValue::Record(fs))
     },
     "variant" "{" <VariantField> "}" => IDLValue::Variant(Box::new(<>), 0),
     "principal" <"text"> =>? Ok(IDLValue::Principal(Principal::from_text(<>).map_err(error)?)),
@@ -96,7 +98,7 @@ pub Typ: IDLType = {
     "opt" <Typ> => IDLType::OptT(Box::new(<>)),
     "vec" <Typ> => IDLType::VecT(Box::new(<>)),
     "blob" => IDLType::VecT(Box::new(IDLType::PrimT(PrimType::Nat8))),
-    "record" "{" <SepBy<RecordFieldTyp, ";">> "}" => {
+    "record" "{" <SepBy<RecordFieldTyp, ";">> "}" =>? {
         let mut id: u32 = 0;
         let mut fs: Vec<TypeField> = <>.iter().map(|f| {
           let label = match f.label {
@@ -106,12 +108,14 @@ pub Typ: IDLType = {
           TypeField { label, typ: f.typ.clone() }
         }).collect();
         fs.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
-        IDLType::RecordT(fs)
+        check_unique(fs.iter().map(|f| &f.label)).map_err(error)?;
+        Ok(IDLType::RecordT(fs))
     },
-    "variant" "{" <SepBy<VariantFieldTyp, ";">> "}" => {
+    "variant" "{" <SepBy<VariantFieldTyp, ";">> "}" =>? {
         let mut fs = <>;
         fs.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
-        IDLType::VariantT(fs)
+        check_unique(fs.iter().map(|f| &f.label)).map_err(error)?;
+        Ok(IDLType::VariantT(fs))
     },
     "func" <FuncTyp> => IDLType::FuncT(<>),
     "service" <ActorTyp> => IDLType::ServT(<>),
@@ -160,10 +164,12 @@ FuncMode: FuncMode = {
 }
 
 ActorTyp: Vec<Binding> = {
-    "{" <SepBy<MethTyp, ";">> "}" => {
+    "{" <SepBy<MethTyp, ";">> "}" =>? {
         let mut fs = <>;
         fs.sort_unstable_by_key(|Binding { id, .. }| idl_hash(id));
-        fs
+        let labs: Vec<_> = fs.iter().map(|f| Label::Named(f.id.clone())).collect();
+        check_unique(labs.iter()).map_err(error)?;
+        Ok(fs)
     }
 }
 

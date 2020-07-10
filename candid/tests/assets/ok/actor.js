@@ -10,4 +10,4 @@ export default ({ IDL }) => {
     'h' : g,
     'o' : IDL.Func([o], [o], [])
   });
-}
+};
