@@ -53,16 +53,16 @@ impl IDLArgs {
     }
     pub fn to_bytes_with_types(&self, env: &TypeEnv, types: &[Type]) -> Result<Vec<u8>> {
         if types.len() > self.args.len() {
-            return Err(Error::msg("length mismatch for types and values"));
+            return Err(Error::msg("wrong number of argument values"));
         }
         let mut idl = crate::ser::IDLBuilder::new();
         let empty_env = TypeEnv::new();
-        for (i, v) in self.args.iter().enumerate() {
+        for (i, (v, ty)) in self.args.iter().zip(types.iter()).enumerate() {
             if i == 0 {
                 // env gets merged into the builder state, we only need to pass in env once.
-                idl.value_arg_with_type(v, env, &types[i])?;
+                idl.value_arg_with_type(v, env, ty)?;
             } else {
-                idl.value_arg_with_type(v, &empty_env, &types[i])?;
+                idl.value_arg_with_type(v, &empty_env, ty)?;
             }
         }
         idl.serialize_to_vec()
@@ -162,15 +162,15 @@ impl fmt::Display for IDLField {
 }
 
 impl IDLValue {
-    pub fn annotate_type(&self, env: &TypeEnv, t: &Type) -> Result<Self> {
+    pub fn annotate_arg_type(&self, env: &TypeEnv, t: &Type) -> Result<Self> {
         Ok(match (self, t) {
             (_, Type::Var(id)) => {
                 let ty = env.rec_find_type(id)?;
-                self.annotate_type(env, ty)?
+                self.annotate_arg_type(env, ty)?
             }
             (_, Type::Knot(id)) => {
                 let ty = crate::types::internal::find_type(*id).unwrap();
-                self.annotate_type(env, &ty)?
+                self.annotate_arg_type(env, &ty)?
             }
             (IDLValue::Null, Type::Null) => IDLValue::Null,
             (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
@@ -206,28 +206,29 @@ impl IDLValue {
             (IDLValue::Text(s), Type::Text) => IDLValue::Text(s.to_owned()),
             (IDLValue::None, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Opt(v), Type::Opt(ty)) => {
-                let v = v.annotate_type(env, ty)?;
+                let v = v.annotate_arg_type(env, ty)?;
                 IDLValue::Opt(Box::new(v))
             }
             (IDLValue::Vec(vec), Type::Vec(ty)) => {
                 let mut res = Vec::new();
                 for e in vec.iter() {
-                    let v = e.annotate_type(env, ty)?;
+                    let v = e.annotate_arg_type(env, ty)?;
                     res.push(v);
                 }
                 IDLValue::Vec(res)
             }
             (IDLValue::Record(vec), Type::Record(fs)) => {
-                let fs: HashMap<_, _> = fs.iter().map(|Field { id, ty }| (id, ty)).collect();
+                let fields: HashMap<_, _> =
+                    vec.iter().map(|IDLField { id, val }| (id, val)).collect();
                 let mut res = Vec::new();
-                for e in vec.iter() {
-                    let ty = fs
-                        .get(&e.id)
-                        .ok_or_else(|| Error::msg(format!("field {} not found", e.id)))?;
-                    let v = e.val.annotate_type(env, ty)?;
+                for Field { id, ty } in fs.iter() {
+                    let val = fields
+                        .get(&id)
+                        .ok_or_else(|| Error::msg(format!("field {} not found", id)))?;
+                    let val = val.annotate_arg_type(env, ty)?;
                     res.push(IDLField {
-                        id: e.id.clone(),
-                        val: v,
+                        id: id.clone(),
+                        val,
                     });
                 }
                 IDLValue::Record(res)
@@ -235,7 +236,7 @@ impl IDLValue {
             (IDLValue::Variant(v, _), Type::Variant(fs)) => {
                 for (i, f) in fs.iter().enumerate() {
                     if v.id == f.id {
-                        let val = v.val.annotate_type(env, &f.ty)?;
+                        let val = v.val.annotate_arg_type(env, &f.ty)?;
                         let field = IDLField {
                             id: v.id.clone(),
                             val,

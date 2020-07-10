@@ -59,13 +59,13 @@ fn parse_more_literals() {
     let mut args =
         parse_args("(true, null, 4_2, \"哈哈\", \"string with whitespace\", 0x2a, -42, false)");
     args.args[2] = args.args[2]
-        .annotate_type(&TypeEnv::new(), &Type::Nat)
+        .annotate_arg_type(&TypeEnv::new(), &Type::Nat)
         .unwrap();
     args.args[5] = args.args[5]
-        .annotate_type(&TypeEnv::new(), &Type::Int)
+        .annotate_arg_type(&TypeEnv::new(), &Type::Int)
         .unwrap();
     args.args[6] = args.args[6]
-        .annotate_type(&TypeEnv::new(), &Type::Int)
+        .annotate_arg_type(&TypeEnv::new(), &Type::Int)
         .unwrap();
     assert_eq!(
         args.args,
@@ -90,7 +90,7 @@ fn parse_more_literals() {
 fn parse_vec() {
     let mut args = parse_args("(vec{1;2;3;4})");
     args.args[0] = args.args[0]
-        .annotate_type(&TypeEnv::new(), &Type::Vec(Box::new(Type::Nat)))
+        .annotate_arg_type(&TypeEnv::new(), &Type::Vec(Box::new(Type::Nat)))
         .unwrap();
     assert_eq!(
         args.args,
@@ -109,7 +109,9 @@ fn parse_optional_record() {
     let mut args =
         parse_args("(opt record {}, record { 1=42;44=\"test\"; 2=false }, variant { 5=null })");
     let typ = parse_type("record { 1: nat; 44: text; 2: bool }");
-    args.args[1] = args.args[1].annotate_type(&TypeEnv::new(), &typ).unwrap();
+    args.args[1] = args.args[1]
+        .annotate_arg_type(&TypeEnv::new(), &typ)
+        .unwrap();
     assert_eq!(
         args.args,
         vec![
@@ -151,7 +153,9 @@ fn parse_nested_record() {
     let typ = parse_type(
         "record {label: nat; 0x2b:record { test:text; msg:text }; long_label: opt null }",
     );
-    args.args[0] = args.args[0].annotate_type(&TypeEnv::new(), &typ).unwrap();
+    args.args[0] = args.args[0]
+        .annotate_arg_type(&TypeEnv::new(), &typ)
+        .unwrap();
     assert_eq!(
         args.args,
         vec![IDLValue::Record(vec![
