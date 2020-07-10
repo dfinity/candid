@@ -74,6 +74,17 @@ impl IDLArgs {
         }
         idl.serialize_to_vec()
     }
+    pub fn from_bytes_with_types(bytes: &[u8], env: &TypeEnv, types: &[Type]) -> Result<Self> {
+        let mut de = crate::de::IDLDeserialize::new(bytes)?;
+        let mut args = Vec::new();
+        for ty in types.iter() {
+            let v = de.get_value::<IDLValue>()?;
+            let v = v.annotate_type(env, ty)?;
+            args.push(v);
+        }
+        de.done()?;
+        Ok(IDLArgs { args })
+    }
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let mut de = crate::de::IDLDeserialize::new(bytes)?;
         let mut args = Vec::new();
@@ -162,15 +173,15 @@ impl fmt::Display for IDLField {
 }
 
 impl IDLValue {
-    pub fn annotate_arg_type(&self, env: &TypeEnv, t: &Type) -> Result<Self> {
+    pub fn annotate_type(&self, env: &TypeEnv, t: &Type) -> Result<Self> {
         Ok(match (self, t) {
             (_, Type::Var(id)) => {
                 let ty = env.rec_find_type(id)?;
-                self.annotate_arg_type(env, ty)?
+                self.annotate_type(env, ty)?
             }
             (_, Type::Knot(id)) => {
                 let ty = crate::types::internal::find_type(*id).unwrap();
-                self.annotate_arg_type(env, &ty)?
+                self.annotate_type(env, &ty)?
             }
             (IDLValue::Null, Type::Null) => IDLValue::Null,
             (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
@@ -206,13 +217,13 @@ impl IDLValue {
             (IDLValue::Text(s), Type::Text) => IDLValue::Text(s.to_owned()),
             (IDLValue::None, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Opt(v), Type::Opt(ty)) => {
-                let v = v.annotate_arg_type(env, ty)?;
+                let v = v.annotate_type(env, ty)?;
                 IDLValue::Opt(Box::new(v))
             }
             (IDLValue::Vec(vec), Type::Vec(ty)) => {
                 let mut res = Vec::new();
                 for e in vec.iter() {
-                    let v = e.annotate_arg_type(env, ty)?;
+                    let v = e.annotate_type(env, ty)?;
                     res.push(v);
                 }
                 IDLValue::Vec(res)
@@ -225,7 +236,7 @@ impl IDLValue {
                     let val = fields
                         .get(&id)
                         .ok_or_else(|| Error::msg(format!("field {} not found", id)))?;
-                    let val = val.annotate_arg_type(env, ty)?;
+                    let val = val.annotate_type(env, ty)?;
                     res.push(IDLField {
                         id: id.clone(),
                         val,
@@ -236,9 +247,9 @@ impl IDLValue {
             (IDLValue::Variant(v, _), Type::Variant(fs)) => {
                 for (i, f) in fs.iter().enumerate() {
                     if v.id == f.id {
-                        let val = v.val.annotate_arg_type(env, &f.ty)?;
+                        let val = v.val.annotate_type(env, &f.ty)?;
                         let field = IDLField {
-                            id: v.id.clone(),
+                            id: f.id.clone(),
                             val,
                         };
                         return Ok(IDLValue::Variant(Box::new(field), i as u64));
