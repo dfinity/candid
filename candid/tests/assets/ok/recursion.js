@@ -27,4 +27,4 @@ export default ({ IDL }) => {
     IDL.Service({ 'f' : t, 'g' : IDL.Func([list], [B, tree, stream], []) })
   );
   return s.getType();
-}
+};

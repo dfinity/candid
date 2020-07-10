@@ -6,4 +6,4 @@ export default ({ IDL }) => {
     '\\\n\'\"' : IDL.Nat
   });
   return IDL.Service({ '\n\'\"\'\'\"\"\r\t' : IDL.Func([t], [], []) });
-}
+};
