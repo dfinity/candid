@@ -65,3 +65,10 @@ pub fn quote_ident(id: &str) -> RcDoc {
         .append("'")
         .append(RcDoc::space())
 }
+
+pub fn doublequote_ident(id: &str) -> RcDoc {
+    str("\"")
+        .append(format!("{}", id.escape_debug()))
+        .append("\"")
+        .append(RcDoc::space())
+}
