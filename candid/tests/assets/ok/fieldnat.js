@@ -5,18 +5,18 @@ export default ({ IDL }) => {
     'bas' : IDL.Func(
       [IDL.Tuple(IDL.Int, IDL.Int)],
       [IDL.Tuple(IDL.Text, IDL.Nat)],
-      []
+      [],
     ),
     'baz' : IDL.Func(
       [IDL.Record({ _2_ : IDL.Int, '2' : IDL.Nat })],
       [IDL.Record({})],
-      []
+      [],
     ),
     'bib' : IDL.Func(
       [IDL.Tuple(IDL.Int)],
       [IDL.Variant({ _0_ : IDL.Int })],
-      []
+      [],
     ),
-    'foo' : IDL.Func([IDL.Record({ _2_ : IDL.Int })], [], [])
+    'foo' : IDL.Func([IDL.Record({ _2_ : IDL.Int })], [], []),
   });
 };

@@ -4,5 +4,5 @@ service : {
   "bas" : (record { int; int }) -> (record { text; nat });
   "baz" : (record { 2 : int; "2" : nat }) -> (record {});
   "bib" : (record { int }) -> (variant { 0 : int });
-  "foo" : (record { 2 : int }) -> ()
+  "foo" : (record { 2 : int }) -> ();
 }

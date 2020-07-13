@@ -85,11 +85,9 @@ fn pp_function(func: &Function) -> RcDoc {
     let rets = pp_args(&func.rets);
     let modes = pp_modes(&func.modes);
     args.append(" ->")
+        .append(RcDoc::space())
+        .append(rets.append(modes))
         .nest(INDENT_SPACE)
-        .append(RcDoc::softline())
-        .append(rets)
-        .append(modes)
-        .group()
 }
 
 fn pp_args(args: &[Type]) -> RcDoc {

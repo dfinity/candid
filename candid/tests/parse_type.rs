@@ -50,13 +50,13 @@ fn compiler_test(resource: &str) {
     match compile(&mut env, &candid_path) {
         Ok(actor) => {
             {
-                let mut output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
-                let content = javascript::compile(&env, &actor);
+                let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
+                let content = candid_export::compile(&env, &actor);
                 writeln!(output, "{}", content).unwrap();
             }
             {
-                let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
-                let content = candid_export::compile(&env, &actor);
+                let mut output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
+                let content = javascript::compile(&env, &actor);
                 writeln!(output, "{}", content).unwrap();
             }
         }

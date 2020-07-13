@@ -12,9 +12,9 @@ export default ({ IDL }) => {
       _42_ : IDL.Null,
       'A' : IDL.Null,
       'B' : IDL.Null,
-      'C' : IDL.Null
+      'C' : IDL.Null,
     }),
-    _42_ : IDL.Nat
+    _42_ : IDL.Nat,
   });
   const broker = IDL.Service({
     'find' : IDL.Func(
@@ -22,33 +22,33 @@ export default ({ IDL }) => {
       [
         IDL.Service({
           'up' : IDL.Func([], [], []),
-          'current' : IDL.Func([], [IDL.Nat32], [])
-        })
+          'current' : IDL.Func([], [IDL.Nat32], []),
+        }),
       ],
-      []
-    )
+      [],
+    ),
   });
   const f = IDL.Func(
     [List, IDL.Func([IDL.Int32], [IDL.Int64], [])],
     [IDL.Opt(List)],
-    []
+    [],
   );
   return IDL.Service({
     'f' : IDL.Func([IDL.Vec(IDL.Nat8), IDL.Opt(IDL.Bool)], [], ['oneway']),
     'g' : IDL.Func(
       [my_type, List, IDL.Opt(List), nested],
       [IDL.Int, broker],
-      ['query']
+      ['query'],
     ),
     'h' : IDL.Func(
       [
         IDL.Vec(IDL.Opt(IDL.Text)),
         IDL.Variant({ 'A' : IDL.Nat, 'B' : IDL.Opt(IDL.Text) }),
-        IDL.Opt(List)
+        IDL.Opt(List),
       ],
       [IDL.Record({ _42_ : IDL.Record({}), 'id' : IDL.Nat })],
-      []
+      [],
     ),
-    'i' : f
+    'i' : f,
   });
 };

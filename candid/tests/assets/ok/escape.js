@@ -3,7 +3,7 @@ export default ({ IDL }) => {
     '\"' : IDL.Nat,
     '\'' : IDL.Nat,
     '\"\'' : IDL.Nat,
-    '\\\n\'\"' : IDL.Nat
+    '\\\n\'\"' : IDL.Nat,
   });
   return IDL.Service({ '\n\'\"\'\'\"\"\r\t' : IDL.Func([t], [], []) });
 };
