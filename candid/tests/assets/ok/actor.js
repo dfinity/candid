@@ -8,6 +8,6 @@ export default ({ IDL }) => {
     'f' : IDL.Func([IDL.Nat], [h], []),
     'g' : f,
     'h' : g,
-    'o' : IDL.Func([o], [o], [])
+    'o' : IDL.Func([o], [o], []),
   });
 };

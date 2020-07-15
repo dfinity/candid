@@ -89,7 +89,7 @@ fn pp_function(func: &Function) -> RcDoc {
     let modes = pp_modes(&func.modes);
     let items = [args, rets, modes];
     let doc = concat(items.iter().cloned(), ",");
-    enclose("(", doc, ")")
+    enclose("(", doc, ")").nest(INDENT_SPACE)
 }
 
 fn pp_args(args: &[Type]) -> RcDoc {

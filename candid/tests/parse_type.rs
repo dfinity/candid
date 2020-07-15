@@ -1,4 +1,4 @@
-use candid::bindings::javascript;
+use candid::bindings::{candid as candid_export, javascript};
 use candid::parser::types::{to_pretty, IDLProg};
 use candid::parser::typing::{check_prog, TypeEnv};
 use candid::types::Type;
@@ -49,9 +49,16 @@ fn compiler_test(resource: &str) {
     let mut env = TypeEnv::new();
     match compile(&mut env, &candid_path) {
         Ok(actor) => {
-            let mut js_output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
-            let js = javascript::compile(&env, &actor);
-            writeln!(js_output, "{}", js).unwrap();
+            {
+                let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
+                let content = candid_export::compile(&env, &actor);
+                writeln!(output, "{}", content).unwrap();
+            }
+            {
+                let mut output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
+                let content = javascript::compile(&env, &actor);
+                writeln!(output, "{}", content).unwrap();
+            }
         }
         Err(e) => {
             let mut fail_output = mint

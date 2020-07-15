@@ -12,14 +12,14 @@ export default ({ IDL }) => {
   tree.fill(
     IDL.Variant({
       'branch' : IDL.Record({ 'val' : IDL.Int, 'left' : tree, 'right' : tree }),
-      'leaf' : IDL.Int
+      'leaf' : IDL.Int,
     })
   );
   stream.fill(
     IDL.Opt(
       IDL.Record({
         'head' : IDL.Nat,
-        'next' : IDL.Func([], [stream], ['query'])
+        'next' : IDL.Func([], [stream], ['query']),
       })
     )
   );
