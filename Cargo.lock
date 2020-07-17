@@ -150,10 +150,31 @@ checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
 
 [[package]]
 name = "candid"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "465583378b060fb80e77affc1852e559216b50d44fbb55700b709a9a55b4abd2"
+dependencies = [
+ "byteorder",
+ "candid_derive 0.2.3",
+ "crc8",
+ "hex",
+ "lalrpop",
+ "lalrpop-util",
+ "leb128",
+ "num-bigint",
+ "num-traits",
+ "num_enum",
+ "paste",
+ "pretty 0.6.0",
+ "serde",
+]
+
+[[package]]
+name = "candid"
 version = "0.4.2"
 dependencies = [
  "byteorder",
- "candid_derive",
+ "candid_derive 0.3.0",
  "crc8",
  "goldenfile",
  "hex",
@@ -164,7 +185,7 @@ dependencies = [
  "num-traits",
  "num_enum",
  "paste",
- "pretty",
+ "pretty 0.10.0",
  "pretty_assertions",
  "rand 0.7.3",
  "rustfmt",
@@ -174,11 +195,29 @@ dependencies = [
 
 [[package]]
 name = "candid_derive"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15f0a0d352f5766e0543708756c7ea67465931e0399e5bdec06e5628ce6aef41"
+dependencies = [
+ "proc-macro2 1.0.18",
+ "quote 1.0.7",
+ "syn 1.0.30",
+]
+
+[[package]]
+name = "candid_derive"
 version = "0.3.0"
 dependencies = [
  "proc-macro2 1.0.18",
  "quote 1.0.7",
  "syn 1.0.30",
+]
+
+[[package]]
+name = "candid_relate"
+version = "0.1.0"
+dependencies = [
+ "candid 0.3.1",
 ]
 
 [[package]]
@@ -635,12 +674,21 @@ checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
 name = "pretty"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a56d86bc49febc96f6490313636a7ba6acc75d8f9fed502b6fb790e24a172890"
+dependencies = [
+ "typed-arena 1.7.0",
+]
+
+[[package]]
+name = "pretty"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ad9940b913ee56ddd94aec2d3cd179dd47068236f42a1a6415ccf9d880ce2a61"
 dependencies = [
  "arrayvec",
- "typed-arena",
+ "typed-arena 2.0.1",
 ]
 
 [[package]]
@@ -1217,6 +1265,12 @@ checksum = "ffc92d160b1eef40665be3a05630d003936a3bc7da7421277846c2613e92c71a"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "typed-arena"
+version = "1.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9b2228007eba4120145f785df0f6c92ea538f5a3635a612ecf4e334c8c1446d"
 
 [[package]]
 name = "typed-arena"
