@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-pub use ::candid::types::{Type, Label, TypeField as Field};
+pub use ::candid::types::{Type, Label, Field};
 pub use ::candid::parser::value::IDLValue as Value;
 
 /// Represents editing an "input type" into an "output type".
@@ -9,6 +9,8 @@ pub use ::candid::parser::value::IDLValue as Value;
 pub enum TypeEdit<R> {
     /// use "input type"
     Skip,
+    /// Encountered an Unknown type.
+    Unknown,
     /// ignore "input type" and use given type
     Put(Type),
     /// edit param to an Opt type (no effect o/w)
@@ -42,40 +44,55 @@ pub fn rc_type_diff(t1: &Box<Type>, t2: &Box<Type>) -> RcTypeEdit {
 }
 
 pub fn type_diff(t1: &Type, t2: &Type) -> TypeEdit<RcTypeEdit> {
-    use candid::parser::types::IDLType::*;
+    use candid::types::Type::*;
     match (t1, t2) {
-        (&PrincipalT, &PrincipalT) => {
-            TypeEdit::Skip
-        },
-        (&PrimT(ref p1), &PrimT(ref p2)) => {
-            if p1 == p2 {
-                TypeEdit::Skip
-            }
-            else {
-                TypeEdit::Put(t2.clone())
-            }
-        },
-        (&VarT(ref x), &VarT(ref y)) => {
+        (Null, Null) => TypeEdit::Skip,
+        (Bool, Bool) => TypeEdit::Skip,
+        (Nat, Nat) => TypeEdit::Skip,
+        (Principal, Principal) => TypeEdit::Skip,
+        (Unknown, _) => TypeEdit::Unknown,
+        (_, Unknown) => TypeEdit::Unknown,
+/* to do -- reflexive cases: TypeEdit::Skip,
+        Int,
+        Nat8,
+        Nat16,
+        Nat32,
+        Nat64,
+        Int8,
+        Int16,
+        Int32,
+        Int64,
+        Float32,
+        Float64,
+        Text,
+        Reserved,
+        Empty,
+*/
+        (&Var(ref x), &Var(ref y)) => {
             if x == y {
                 TypeEdit::Skip
             } else {
-                TypeEdit::Put(VarT(y.clone()))
+                TypeEdit::Put(Var(y.clone()))
             }
         },
-        (&OptT(ref t1), &OptT(ref t2)) => {
+        (&Opt(ref t1), &Opt(ref t2)) => {
             let r = rc_type_diff(&t1, &t2);
             TypeEdit::Opt(r)
         },
-        (&VecT(ref t1), &VecT(ref t2)) => {
+        (&Vec(ref t1), &Vec(ref t2)) => {
             let r = rc_type_diff(&t1, &t2);
             TypeEdit::Vec(r)
         },
-        (&RecordT(ref fs1), &RecordT(ref fs2)) => {
+        (&Record(ref fs1), &Record(ref fs2)) => {
             TypeEdit::Record(fields_diff(&fs1, &fs2))
         },
-        (&VariantT(ref fs1), &VariantT(ref fs2)) => {
+        (&Variant(ref fs1), &Variant(ref fs2)) => {
             TypeEdit::Variant(fields_diff(&fs1, &fs2))
         },
+        (Func(_), _) => unimplemented!(),
+        (_, Func(_)) => unimplemented!(),
+        (Service(_), _) => unimplemented!(),
+        (_, Service(_)) => unimplemented!(),
         (_, _) => {
             // by default, do the least incremental edit:
             TypeEdit::Put(t2.clone())

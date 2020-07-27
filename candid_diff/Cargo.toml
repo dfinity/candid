@@ -16,3 +16,6 @@ include = ["src", "README.md", "Cargo.toml", "LICENSE"]
 
 [lib]
 name = "candid_diff"
+
+[dependencies]
+candid = { path = "../candid" }
