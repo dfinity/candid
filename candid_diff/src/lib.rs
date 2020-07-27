@@ -2,9 +2,9 @@ extern crate candid;
 
 use std::rc::Rc;
 
-pub type Type = candid::parser::types::IDLType;
-pub type Label = candid::parser::types::Label;
-pub type Field = candid::parser::types::TypeField;
+pub type Type = candid::types::Type;
+//pub type Label = candid::types::Label;
+//pub type Field = candid::types::TypeField;
 
 pub type Value = candid::parser::value::IDLValue;
 
@@ -16,8 +16,6 @@ pub enum TypeEdit<R> {
     Skip,
     /// ignore "input type" and use given type
     Put(Type),
-    /// binary edit sequence
-    Seq(R, R),
     /// edit param to an Opt type (no effect o/w)
     Opt(R),
     /// edit param to Vec type
@@ -88,6 +86,12 @@ pub fn type_diff(t1: &Type, t2: &Type) -> TypeEdit<RcTypeEdit> {
             TypeEdit::Put(t2.clone())
         }
     }
+}
+
+#[test]
+fn test_type_diff() {
+    assset_equal!(type_diff(&PrincipalT, &PrincipalT), Skip);
+    assset_equal!(type_diff(&PrimT, &PrimT), Skip);
 }
 
 
