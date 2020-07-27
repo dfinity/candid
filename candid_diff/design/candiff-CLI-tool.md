@@ -1,4 +1,4 @@
-` CLI tool
+# Tool design (`candiff`)
 
 The `candid_diff` package exposes the `candiff` tool for scripting Candid value comparisons that have human-readable error messages.
 
