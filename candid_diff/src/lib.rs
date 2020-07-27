@@ -1,12 +1,7 @@
-extern crate candid;
-
 use std::rc::Rc;
 
-pub type Type = candid::types::Type;
-//pub type Label = candid::types::Label;
-//pub type Field = candid::types::TypeField;
-
-pub type Value = candid::parser::value::IDLValue;
+pub use ::candid::types::{Type, Label, TypeField as Field};
+pub use ::candid::parser::value::IDLValue as Value;
 
 /// Represents editing an "input type" into an "output type".
 ///

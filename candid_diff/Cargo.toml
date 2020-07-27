@@ -1,5 +1,5 @@
 [package]
-name = "candid_relate"
+name = "candid_diff"
 version = "0.1.0"
 edition = "2018"
 authors = ["DFINITY Team"]
@@ -15,7 +15,4 @@ keywords = ["internet-computer", "candid", "dfinity", "delta", "diff"]
 include = ["src", "README.md", "Cargo.toml", "LICENSE"]
 
 [lib]
-name = "candid_relate"
-
-[dependencies]
-candid = "0.3.0"
+name = "candid_diff"
