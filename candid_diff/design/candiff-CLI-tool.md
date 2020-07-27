@@ -9,14 +9,14 @@ The tool compares input and output canister messages to those recorded earlier, 
 - General-purpose debugging / development tool for Candid data
 - In CI scripts: summarize deviations from expected responses
 
-## Candid input format
+## Candiff input format
 
 Accept binary and text options for Candid data to compare:
 
 - raw candid (what `raw` means for `dfx` input/output)
 - candid text format
 
-## Candid output format
+## Candiff output format
  
 - No default output when diff is empty
 - Human-readable default output when diff is non-empty
