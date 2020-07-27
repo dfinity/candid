@@ -40,14 +40,23 @@ information on values without a common type.
 Two cases:
 
 - Type invariant: Both values have a common type.
-- Type varies: Values have unrelated types.
+- Type varies: Values have non-identical types, related by an edit.
+
+In both cases (type invariant and varying), the user may provide the
+types that they know, or not, and these types may or may not be
+correct.
 
 The first case is our main use case, where one value and the common
-type come from some trusted files, in a CI environment.
+type come from some trusted files, in a CI environment.  In this case,
+we want to see if the first value is really classified by the expected
+type (if given), and that second value is the same as the first or
+not; if the values differ, we want to get a nice summary of how to
+edit the first into the second.
 
-In the second case, we may or may not know the associated types, and
-knowing the expected type(s) can help provide more useful output
-(probably); still, that's not our main use case.
+Other use cases are extra.  For instance, when the type varies in the
+second value, the two values are classified by distinct types, and
+comparing those types may also be helpful (optionally, and if
+possible).
 
 ### Data
 
