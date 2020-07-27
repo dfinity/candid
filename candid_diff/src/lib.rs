@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+pub use ::candid::Nat;
 pub use ::candid::types::{Type, Label, Field};
 pub use ::candid::parser::value::IDLValue as Value;
 
@@ -7,12 +8,12 @@ pub use ::candid::parser::value::IDLValue as Value;
 ///
 /// only handle first-order types for now (no functions/services yet)
 pub enum TypeEdit<R> {
-    /// use "input type"
+    /// empty change.
     Skip,
-    /// Encountered an Unknown type.
-    Unknown,
-    /// ignore "input type" and use given type
+    /// full change: ignore "input type" and use given type.
     Put(Type),
+    /// encountered an Unknown type.
+    Unknown,
     /// edit param to an Opt type (no effect o/w)
     Opt(R),
     /// edit param to Vec type
@@ -27,7 +28,7 @@ pub struct RcTypeEdit ( Rc<TypeEdit<RcTypeEdit>> );
 
 /// edit a field set: put some fields' types, drop others
 pub struct FieldsEdit<R> {
-    put: Vec<(Label, TypeEdit<R>)>,
+    edit: Vec<(Label, TypeEdit<R>)>,
     drop: Vec<Label>,
 }
 
@@ -106,13 +107,43 @@ fn test_type_diff() {
     assset_equal!(type_diff(&PrimT, &PrimT), Skip);
 }
 
-
-pub struct ValueEdit {
-    // to do -- something similar to TypeEdit, but for values (not types)
+#[derive(Debug, PartialEq, Clone)]
+pub enum VecEdit<R> {
+    /// insert into position, shifting the following (backward)
+    InsertValue(Nat, Value),
+    /// edit value at position, leaving others in place
+    EditValue(Nat, R),
+    /// remove at given position, shifting the following (forward)
+    RemoveValue(Nat),
 }
 
+/// edit a record's fields: edit some fields' values, drop others
+#[derive(Debug, PartialEq, Clone)]
+pub struct RecordEdits<R> {
+    edit: Vec<(Label, R)>,
+    drop: Vec<Label>,
+}
 
-pub fn value_diff(v1: &Value, v2: &Value, t: Type) -> ValueEdit {
+pub struct RcValueEdit ( Rc<ValueEdit<RcValueEdit>> );
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ValueEdit<R> {
+    /// empty change
+    Skip,
+    /// full change: overwrite with new value.
+    Put(Value),
+    /// edit the sub-value (ignore unchanged Opt label).
+    Opt(R),
+    /// edit the vector, in a sequence of vector edits.
+    Vec(Vec<VecEdit<R>>),
+    /// edit the record, field-wise; ignore unchanged fields.
+    Record(RecordEdits<R>),
+    /// edit the variant payload (ignore unchanged label).
+    Variant(R),
+}
+
+/// Compare the values, with optional (common) type.
+pub fn value_diff(v1: &Value, v2: &Value, t: Option<Type>) -> RcValueEdit {
     // to do
     drop((v1, v2, t));
     unimplemented!()
