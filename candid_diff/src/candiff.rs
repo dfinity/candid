@@ -10,7 +10,12 @@ extern crate env_logger;
 extern crate structopt;
 use structopt::StructOpt;
 
-use candid_diff::Value;
+use candid::parser::typing::{check_type, Env, TypeEnv};
+use candid::parser::types::IDLType;
+
+use candid_diff::{
+    //Type,
+    Value};
 
 /// candiff
 #[derive(StructOpt, Debug)]
@@ -58,6 +63,8 @@ enum CliCommand {
         #[structopt(short = "i", long = "input-format", default_value = "text")]
         format: CliFormat,
         input: String,
+        #[structopt(short = "t", long = "input-type")]
+        input_type: Option<String>,
         /// Output format uses Debug formatter
         #[structopt(short = "d", long = "debug-output")]
         debug_output: bool,
@@ -100,11 +107,44 @@ fn main() {
     );
     trace!("{:?}", &cliopt.command);
     match cliopt.command {
-        CliCommand::EchoValue{ format, input, debug_output } => {
+        CliCommand::EchoValue{ format, input, input_type, debug_output } => {
             match format {
                 CliFormat::Text => {
+                    let ty = match input_type {
+                        None => {
+                            warn!("No input type provided; All numbers remain textual.");
+                            None
+                        }
+                        Some(t) => match t.parse::<IDLType>() {
+                            Ok(ty) => { trace!("input_type = {:?}", ty); Some(ty) }
+                            Err(e) => { error!("{}", e); None }
+                        }
+                    };
                     match Value::from_str(&input) {
                         Ok(v) => {
+                            // check the type, and then annotate the value with that type, possibly transforming it
+                            let v = match ty {
+                                None => { v }
+                                Some(ty) => {
+                                    // to do -- check a program file and get the type env
+                                    let te = &mut TypeEnv::new();
+                                    trace!("check_type ...");
+                                    match check_type(&Env{te, pre:false}, &ty) {
+                                        Err(e) => {
+                                            error!("{}", e); v
+                                        }
+                                        Ok(ty) => {
+                                            trace!("annotate_type ...");
+                                            match v.annotate_type(&TypeEnv::new(), &ty) {
+                                                Ok(v) => v,
+                                                Err(e) => {
+                                                    error!("{}", e); v
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            };
                             trace!("{:?}", v);
                             if debug_output {
                                 println!("{:?}", v)
@@ -168,7 +208,7 @@ fn main() {
 
 /// Unit tests for command line interface (move elsewhere?)
 #[cfg(test)]
-mod cli {
+mod candiff_cli {
     use predicates::prelude::*;
     use assert_cmd::Command;
 
@@ -179,120 +219,150 @@ mod cli {
         cmd.assert().success();
     }
 
-    #[test]
-    fn echo_number() {
-        let mut cmd = Command::cargo_bin("candiff").unwrap();
-        cmd.arg("echo").arg("1");
-        cmd.assert()
-            .stdout(predicate::eq(b"1\n" as &[u8]))
-            .success();
+    fn candiff() -> Command {
+        Command::cargo_bin("candiff").unwrap()
+    }
+    
+    mod echo {
+        use super::*;
+
+        #[test]
+        fn number() {
+            let mut cmd = candiff();
+            cmd.arg("echo").arg("1");
+            cmd.assert()
+                .stdout(predicate::eq(b"1\n" as &[u8]))
+                .success();
+        }
+
+        #[test]
+        fn number_debug() {
+            let mut cmd = candiff();
+            cmd.arg("echo").arg("1").arg("-d");
+            cmd.assert()
+                .stdout(predicate::eq(b"Number(\"1\")\n" as &[u8]))
+                .success();
+        }
+
+        #[test]
+        fn nat_debug() {
+            let mut cmd = candiff();
+            cmd.arg("echo").arg("1").arg("-t nat").arg("-d");
+            cmd.assert()
+                .stdout(predicate::eq(b"Nat(Nat(BigUint { data: [1] }))\n" as &[u8]))
+                .success();
+        }
+
+        #[test]
+        fn int_debug() {
+            let mut cmd = candiff();
+            cmd.arg("echo").arg("1").arg("-t int").arg("-d");
+            cmd.assert()
+                .stdout(predicate::eq(b"Int(Int(BigInt { sign: Plus, data: BigUint { data: [1] } }))\n" as &[u8]))
+                .success();
+        }
+
+        #[test]
+        fn vec_num() {
+            let mut cmd = candiff();
+            cmd.arg("echo").arg("vec {1; 2}");
+            cmd.assert()
+                .stdout(predicate::eq(b"vec { 1; 2; }\n" as &[u8]))
+                .success();
+        }
+
+        #[test]
+        fn variant_num() {
+            let mut cmd = candiff();
+            cmd.arg("echo").arg("variant { 1 = 2 }");
+            cmd.assert()
+                .stdout(predicate::eq(b"variant { 1 = 2 }\n" as &[u8]))
+                .success();
+        }
+
+        #[test]
+        fn variant_label() {
+            let mut cmd = candiff();
+            cmd.arg("echo").arg("variant { xyz = 2 }");
+            cmd.assert()
+                .stdout(predicate::eq(b"variant { xyz = 2 }\n" as &[u8]))
+                .success();
+        }
     }
 
-    #[test]
-    fn echo_number_debug() {
-        let mut cmd = Command::cargo_bin("candiff").unwrap();
-        cmd.arg("echo").arg("1").arg("-d");
-        cmd.assert()
-            .stdout(predicate::eq(b"Number(\"1\")\n" as &[u8]))
-            .success();
-    }
+    mod diff {
+        use super::*;
 
-    #[test]
-    fn echo_vec_num() {
-        let mut cmd = Command::cargo_bin("candiff").unwrap();
-        cmd.arg("echo").arg("vec {1; 2}");
-        cmd.assert()
-            .stdout(predicate::eq(b"vec { 1; 2; }\n" as &[u8]))
-            .success();
-    }
+        #[test]
+        fn true_true() {
+            let mut cmd = candiff();
+            cmd.arg("diff").arg("true").arg("true");
+            cmd.assert()
+                .stdout(predicate::eq(b"" as &[u8]))
+                .success();
+        }
 
-    #[test]
-    fn echo_variant_num() {
-        let mut cmd = Command::cargo_bin("candiff").unwrap();
-        cmd.arg("echo").arg("variant { 1 = 2 }");
-        cmd.assert()
-            .stdout(predicate::eq(b"variant { 1 = 2 }\n" as &[u8]))
-            .success();
-    }
+        #[test]
+        fn true_false() {
+            let mut cmd = candiff();
+            cmd.arg("diff").arg("true").arg("false");
+            cmd.assert()
+                .stdout(predicate::eq(b"Put(Bool(false))\n" as &[u8]))
+                .success();
+        }
 
-    #[test]
-    fn echo_variant_label() {
-        let mut cmd = Command::cargo_bin("candiff").unwrap();
-        cmd.arg("echo").arg("variant { xyz = 2 }");
-        cmd.assert()
-            .stdout(predicate::eq(b"variant { xyz = 2 }\n" as &[u8]))
-            .success();
-    }
+        #[test]
+        fn false_true() {
+            let mut cmd = candiff();
+            cmd.arg("diff").arg("false").arg("true");
+            cmd.assert()
+                .stdout(predicate::eq(b"Put(Bool(true))\n" as &[u8]))
+                .success();
+        }
 
-    #[test]
-    fn diff_true_true() {
-        let mut cmd = Command::cargo_bin("candiff").unwrap();
-        cmd.arg("diff").arg("true").arg("true");
-        cmd.assert()
-            .stdout(predicate::eq(b"" as &[u8]))
-            .success();
-    }
+        #[test]
+        fn one_one() {
+            let mut cmd = candiff();
+            cmd.arg("diff").arg("1").arg("1");
+            cmd.assert()
+                .stdout(predicate::eq(b"" as &[u8]))
+                .success();
+        }
 
-    #[test]
-    fn diff_true_false() {
-        let mut cmd = Command::cargo_bin("candiff").unwrap();
-        cmd.arg("diff").arg("true").arg("false");
-        cmd.assert()
-            .stdout(predicate::eq(b"Put(Bool(false))\n" as &[u8]))
-            .success();
-    }
+        #[test]
+        fn one_two() {
+            let mut cmd = candiff();
+            cmd.arg("diff").arg("1").arg("2");
+            cmd.assert()
+                .stdout(predicate::eq(b"Put(Number(\"2\"))\n" as &[u8]))
+                .success();
+        }
 
-    #[test]
-    fn diff_false_true() {
-        let mut cmd = Command::cargo_bin("candiff").unwrap();
-        cmd.arg("diff").arg("false").arg("true");
-        cmd.assert()
-            .stdout(predicate::eq(b"Put(Bool(true))\n" as &[u8]))
-            .success();
-    }
+        #[test]
+        fn null_null() {
+            let mut cmd = candiff();
+            cmd.arg("diff").arg("null").arg("null");
+            cmd.assert()
+                .stdout(predicate::eq(b"" as &[u8]))
+                .success();
+        }
 
-    #[test]
-    fn diff_1_1() {
-        let mut cmd = Command::cargo_bin("candiff").unwrap();
-        cmd.arg("diff").arg("1").arg("1");
-        cmd.assert()
-            .stdout(predicate::eq(b"" as &[u8]))
-            .success();
-    }
+        #[test]
+        fn text_empty_empty() {
+            let mut cmd = candiff();
+            cmd.arg("diff").arg("\"\"").arg("\"\"");
+            cmd.assert()
+                .stdout(predicate::eq(b"" as &[u8]))
+                .success();
+        }
 
-    #[test]
-    fn diff_1_2() {
-        let mut cmd = Command::cargo_bin("candiff").unwrap();
-        cmd.arg("diff").arg("1").arg("2");
-        cmd.assert()
-            .stdout(predicate::eq(b"Put(Number(\"2\"))\n" as &[u8]))
-            .success();
-    }
-
-    #[test]
-    fn diff_null_null() {
-        let mut cmd = Command::cargo_bin("candiff").unwrap();
-        cmd.arg("diff").arg("null").arg("null");
-        cmd.assert()
-            .stdout(predicate::eq(b"" as &[u8]))
-            .success();
-    }
-
-    #[test]
-    fn diff_text_empty_empty() {
-        let mut cmd = Command::cargo_bin("candiff").unwrap();
-        cmd.arg("diff").arg("\"\"").arg("\"\"");
-        cmd.assert()
-            .stdout(predicate::eq(b"" as &[u8]))
-            .success();
-    }
-
-    #[test]
-    fn diff_text_a_text_b() {
-        let mut cmd = Command::cargo_bin("candiff").unwrap();
-        cmd.arg("diff").arg("\"a\"").arg("\"b\"");
-        cmd.assert()
-            .stdout(predicate::eq(b"Put(Text(\"b\"))\n" as &[u8]))
-            .success();
+        #[test]
+        fn text_a_text_b() {
+            let mut cmd = candiff();
+            cmd.arg("diff").arg("\"a\"").arg("\"b\"");
+            cmd.assert()
+                .stdout(predicate::eq(b"Put(Text(\"b\"))\n" as &[u8]))
+                .success();
+        }
     }
 }
