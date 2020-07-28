@@ -1,3 +1,8 @@
+// Logging:
+#[macro_use]
+extern crate log;
+extern crate env_logger;
+
 use std::rc::Rc;
 
 pub use ::candid::Nat;
@@ -154,11 +159,17 @@ pub fn value_diff(v1: &Value, v2: &Value, t: Option<Type>) -> RcValueEdit {
 }
 
 /// Compare the values, with optional (common) type.
-pub fn value_diff_rec(v1: &Value, v2: &Value, t: Option<Type>) -> ValueEdit<RcValueEdit> {
+pub fn value_diff_rec(v1: &Value, v2: &Value, _t: Option<Type>) -> ValueEdit<RcValueEdit> {
     use Value::*;
-    use ValueEdit::*;
+    use ValueEdit::{Put, Skip};
 
     match (v1, v2) {
+        (Opt(x), Opt(y)) => {
+            ValueEdit::Opt(value_diff(&**x, &**y, Option::None))
+        }
+        (Opt(_x), _) => {
+            Put(v2.clone())
+        }
         (Bool(b1), Bool(b2)) => {
             if b1 == b2 {
                 Skip
@@ -166,10 +177,35 @@ pub fn value_diff_rec(v1: &Value, v2: &Value, t: Option<Type>) -> ValueEdit<RcVa
                 Put(v2.clone())
             }
         }
+        (Null, Null) => Skip,
+        (Text(x), Text(y)) =>
+            if x == y { Skip } else { Put(v2.clone()) }
+        (Number(x), Number(y)) => {
+            // to do -- double-check this case
+            if x == y { Skip } else { trace!("x"); Put(v2.clone()) }
+        }
+        (Int(x), Int(y)) =>
+            if x == y { Skip } else { Put(v2.clone()) }
+        (Nat(x), Nat(y)) =>
+            if x == y { Skip } else { Put(v2.clone()) }
+        (Nat8(x), Nat8(y)) =>
+            if x == y { Skip } else { Put(v2.clone()) }
+        (Nat16(x), Nat16(y)) =>
+            if x == y { Skip } else { Put(v2.clone()) }
+        (Nat32(x), Nat32(y)) =>
+            if x == y { Skip } else { Put(v2.clone()) }
+        (Nat64(x), Nat64(y)) =>
+            if x == y { Skip } else { Put(v2.clone()) }
+        (Int8(x), Int8(y)) =>
+            if x == y { Skip } else { Put(v2.clone()) }
+        (Int16(x), Int16(y)) =>
+            if x == y { Skip } else { Put(v2.clone()) }
+        (Int32(x), Int32(y)) =>
+            if x == y { Skip } else { Put(v2.clone()) }
+        (Int64(x), Int64(y)) =>
+            if x == y { Skip } else { Put(v2.clone()) }
         _ => {
-            // to do
-            drop((v1, v2, t));
-            unimplemented!()
+            Put(v2.clone())
         }
     }
 }
