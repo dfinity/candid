@@ -7,6 +7,7 @@ pub use ::candid::parser::value::IDLValue as Value;
 /// Represents editing an "input type" into an "output type".
 ///
 /// only handle first-order types for now (no functions/services yet)
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum TypeEdit<R> {
     /// empty change.
     Skip,
@@ -24,9 +25,11 @@ pub enum TypeEdit<R> {
     Variant(FieldsEdit<R>),
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RcTypeEdit ( Rc<TypeEdit<RcTypeEdit>> );
 
 /// edit a field set: put some fields' types, drop others
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FieldsEdit<R> {
     edit: Vec<(Label, TypeEdit<R>)>,
     drop: Vec<Label>,
@@ -103,8 +106,10 @@ pub fn type_diff(t1: &Type, t2: &Type) -> TypeEdit<RcTypeEdit> {
 
 #[test]
 fn test_type_diff() {
-    assset_equal!(type_diff(&PrincipalT, &PrincipalT), Skip);
-    assset_equal!(type_diff(&PrimT, &PrimT), Skip);
+    use TypeEdit::*;
+    use Type::*;
+    assert_eq!(type_diff(&Principal, &Principal), Skip);
+    assert_eq!(type_diff(&Bool, &Bool), Skip);
 }
 
 #[derive(Debug, PartialEq, Clone)]
