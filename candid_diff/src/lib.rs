@@ -26,7 +26,7 @@ pub enum TypeEdit<R> {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct RcTypeEdit ( Rc<TypeEdit<RcTypeEdit>> );
+pub struct RcTypeEdit ( pub Rc<TypeEdit<RcTypeEdit>> );
 
 /// edit a field set: put some fields' types, drop others
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -129,7 +129,8 @@ pub struct RecordEdits<R> {
     drop: Vec<Label>,
 }
 
-pub struct RcValueEdit ( Rc<ValueEdit<RcValueEdit>> );
+#[derive(Debug, PartialEq, Clone)]
+pub struct RcValueEdit ( pub Rc<ValueEdit<RcValueEdit>> );
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ValueEdit<R> {
@@ -149,7 +150,33 @@ pub enum ValueEdit<R> {
 
 /// Compare the values, with optional (common) type.
 pub fn value_diff(v1: &Value, v2: &Value, t: Option<Type>) -> RcValueEdit {
-    // to do
-    drop((v1, v2, t));
-    unimplemented!()
+    RcValueEdit(Rc::new(value_diff_rec(v1, v2, t)))
+}
+
+/// Compare the values, with optional (common) type.
+pub fn value_diff_rec(v1: &Value, v2: &Value, t: Option<Type>) -> ValueEdit<RcValueEdit> {
+    use Value::*;
+    use ValueEdit::*;
+
+    match (v1, v2) {
+        (Bool(b1), Bool(b2)) => {
+            if b1 == b2 {
+                Skip
+            } else {
+                Put(v2.clone())
+            }
+        }
+        _ => {
+            // to do
+            drop((v1, v2, t));
+            unimplemented!()
+        }
+    }
+}
+
+pub fn value_edit_is_skip(edit:&RcValueEdit) -> bool {
+    match *edit.0 {
+        ValueEdit::Skip => true,
+        _ => false,
+    }
 }
