@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2018"
 authors = ["DFINITY Team"]
 description = "Operations that relate generic Candid values and types."
-homepage = "https://docs.rs/candid_relate"
-documentation = "https://docs.rs/candid_relate"
+homepage = "https://docs.rs/candid_diff"
+documentation = "https://docs.rs/candid_diff"
 repository = "https://github.com/dfinity/candid"
 license = "Apache-2.0"
 readme = "README.md"
@@ -19,3 +19,12 @@ name = "candid_diff"
 
 [dependencies]
 candid = { path = "../candid" }
+clap = "2.33"
+structopt = "0.3"
+log = "0.4"
+env_logger = "0.6"
+
+[[bin]]
+name = "candiff"
+path = "src/candiff.rs"
+
