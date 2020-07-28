@@ -198,7 +198,7 @@ mod cli {
     }
 
     #[test]
-    fn echo_vec_nat() {
+    fn echo_vec_num() {
         let mut cmd = Command::cargo_bin("candiff").unwrap();
         cmd.arg("echo").arg("vec {1; 2}");
         cmd.assert()
