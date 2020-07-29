@@ -127,6 +127,10 @@ pub enum VecEdit<R> {
     RemoveValue(Nat),
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct RcVecEdit ( pub Rc<VecEdit<RcValueEdit>> );
+
+
 /// edit a record's fields: edit some fields' values, drop others
 #[derive(Debug, PartialEq, Clone)]
 pub struct RecordEdits<R> {
@@ -154,18 +158,62 @@ pub enum ValueEdit<R> {
 }
 
 /// Compare the values, with optional (common) type.
-pub fn value_diff(v1: &Value, v2: &Value, t: Option<Type>) -> RcValueEdit {
+pub fn value_diff(v1: &Value, v2: &Value, t: &Option<Type>) -> RcValueEdit {
     RcValueEdit(Rc::new(value_diff_rec(v1, v2, t)))
 }
 
+/// Simple algorithm for computing a naive edit
+///
+/// Limitations: 
+///  - No alignment; over-uses in-place edits.
+///  - No removal edits used within the output (yet).
+///  - All insertions at the end (if any).
+///
+pub fn vec_diff_simple(v1: &Vec<Value>, v2: &Vec<Value>, ty: &Option<Type>) -> Vec<VecEdit<RcValueEdit>> {
+    let mut edits = vec![];
+    let prefix_len = v1.len().max(v2.len());
+    let ty = match ty {
+        None => None,
+        Some(Type::Vec(t)) => Some((**t).clone()),
+        _ => {error!("invalid type"); None}
+    };
+    for i in 0..prefix_len {
+        let edit = value_diff(&v1[i], &v2[i], &ty);
+        if ! value_edit_is_skip(&edit) {
+            edits.push(VecEdit::EditValue(Nat::from(i), edit))
+        }
+    };
+    if v1.len() > v2.len() {
+        for i in prefix_len..v1.len() {
+            edits.push(VecEdit::InsertValue(Nat::from(i), v1[i].clone()))
+        }
+    }
+    else if v2.len() > v1.len() {
+        for i in prefix_len..v2.len() {
+            edits.push(VecEdit::InsertValue(Nat::from(i), v2[i].clone()))
+        }
+    }
+    edits
+}
+
 /// Compare the values, with optional (common) type.
-pub fn value_diff_rec(v1: &Value, v2: &Value, _t: Option<Type>) -> ValueEdit<RcValueEdit> {
+pub fn value_diff_rec(v1: &Value, v2: &Value, _t: &Option<Type>) -> ValueEdit<RcValueEdit> {
     use Value::*;
     use ValueEdit::{Put, Skip};
 
     match (v1, v2) {
         (Opt(x), Opt(y)) => {
-            ValueEdit::Opt(value_diff(&**x, &**y, Option::None))
+            ValueEdit::Opt(value_diff(&**x, &**y,
+                                      // to do
+                                      &Option::None))
+        }
+        (Vec(x), Vec(y)) => {
+            let edits = vec_diff_simple(x, y, &Option::None);
+            if edits.len() > 0 {
+                ValueEdit::Vec(edits)
+            } else {
+                Skip
+            }
         }
         (Opt(_x), _) => {
             Put(v2.clone())
@@ -182,10 +230,11 @@ pub fn value_diff_rec(v1: &Value, v2: &Value, _t: Option<Type>) -> ValueEdit<RcV
             if x == y { Skip } else { Put(v2.clone()) }
         (Number(x), Number(y)) => {
             // to do -- double-check this case
-            if x == y { Skip } else { trace!("x"); Put(v2.clone()) }
-        }
-        (Int(x), Int(y)) =>
             if x == y { Skip } else { Put(v2.clone()) }
+        }
+        (Int(x), Int(y)) => {
+            if x == y { Skip } else { Put(v2.clone()) }
+        }
         (Nat(x), Nat(y)) =>
             if x == y { Skip } else { Put(v2.clone()) }
         (Nat8(x), Nat8(y)) =>

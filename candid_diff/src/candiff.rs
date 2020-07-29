@@ -63,6 +63,7 @@ enum CliCommand {
         #[structopt(short = "i", long = "input-format", default_value = "text")]
         format: CliFormat,
         input: String,
+        /// Optional input type
         #[structopt(short = "t", long = "input-type")]
         input_type: Option<String>,
         /// Output format uses Debug formatter
@@ -77,6 +78,12 @@ enum CliCommand {
         format: CliFormat,
         input1: String,
         input2: String,
+        /// Optional (common) input type
+        #[structopt(short = "t", long = "input-type")]
+        input_type: Option<String>,
+        /// Output format uses Debug formatter
+        #[structopt(short = "d", long = "debug-output")]
+        debug_output: bool,
     },
 
     #[structopt(
@@ -166,7 +173,7 @@ fn main() {
                 }
             }
         }
-        CliCommand::DiffValue{ format, input1, input2 } => {
+        CliCommand::DiffValue{ format, input1, input2, input_type, debug_output } => {
             match format {
                 CliFormat::Text => {
                     match (Value::from_str(&input1),
@@ -175,15 +182,63 @@ fn main() {
                         (Err(e1), _) => { error!("First value failed to parse (only): {}\n", e1) },
                         (_, Err(e2)) => { error!("Second value failed to parse (only): {}\n", e2) },
                         (Ok(v1), Ok(v2)) => {
+                            let input_type = match input_type {
+                                None => {
+                                    warn!("No input type provided; All numbers remain textual.");
+                                    None
+                                }
+                                Some(t) => match t.parse::<IDLType>() {
+                                    Ok(ty) => { trace!("input_type = {:?}", ty); Some(ty) }
+                                    Err(e) => { error!("{}", e); None }
+                                }
+                            };
                             trace!("value_1 = {:?}", v1);
                             trace!("value_2 = {:?}", v2);
-                            let edit = candid_diff::value_diff(&v1, &v2, None);
+                            // check the type, and then annotate the value with that type, possibly transforming it
+                            let (v1, v2, input_type) = match input_type {
+                                None => { (v1, v2, None) }
+                                Some(ty) => {
+                                    // to do -- check a program file and get the type env
+                                    let te = &mut TypeEnv::new();
+                                    trace!("check_type ...");
+                                    match check_type(&Env{te, pre:false}, &ty) {
+                                        Err(e) => {
+                                            error!("{}", e); (v1, v2, None)
+                                        }
+                                        Ok(ty) => {
+                                            trace!("annotate_type for first value ...");
+                                            let v1 = match v1.annotate_type(&TypeEnv::new(), &ty) {
+                                                Ok(v) => v,
+                                                Err(e) => {
+                                                    error!("{}", e); v1
+                                                }
+                                            };
+                                            trace!("annotate_type for second value ...");
+                                            let v2 = match v2.annotate_type(&TypeEnv::new(), &ty) {
+                                                Ok(v) => v,
+                                                Err(e) => {
+                                                    error!("{}", e); v2
+                                                }
+                                            };
+                                            (v1, v2, Some(ty))
+                                        }
+                                    }
+                                }
+                            };
+                            trace!("annotated_value_1 = {:?}", v1);
+                            trace!("annotated_value_2 = {:?}", v2);
+                            let edit = candid_diff::value_diff(&v1, &v2, &input_type);
                             trace!("value_diff = {:?}", edit.0);
                             if candid_diff::value_edit_is_skip(&edit) {
                                 debug!("equal values; no change.")
                             } else {
                                 // to do -- more minimal textual output format for edits
-                                println!("{:?}", edit.0)
+                                if debug_output {
+                                    println!("{:?}", edit.0)
+                                } else {
+                                    warn!("using debug output; no textual format yet. to do.");
+                                    println!("{:?}", edit.0)
+                                }
                             }
                         }
                     }
@@ -222,7 +277,7 @@ mod candiff_cli {
     fn candiff() -> Command {
         Command::cargo_bin("candiff").unwrap()
     }
-    
+
     mod echo {
         use super::*;
 
@@ -335,6 +390,24 @@ mod candiff_cli {
             cmd.arg("diff").arg("1").arg("2");
             cmd.assert()
                 .stdout(predicate::eq(b"Put(Number(\"2\"))\n" as &[u8]))
+                .success();
+        }
+
+        #[test]
+        fn neg_one_neg_one_typed() {
+            let mut cmd = candiff();
+            cmd.arg("diff").arg("vec { -1 }").arg("vec { -1 }").arg("-t vec int");
+            cmd.assert()
+                .stdout(predicate::eq(b"" as &[u8]))
+                .success();
+        }
+
+        #[test]
+        fn neg_one_neg_one_untyped() {
+            let mut cmd = candiff();
+            cmd.arg("diff").arg("vec { -1 }").arg("vec { -1 }").arg("-d");
+            cmd.assert()
+                .stdout(predicate::eq(b"" as &[u8]))
                 .success();
         }
 
