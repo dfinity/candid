@@ -25,6 +25,7 @@ log = "0.4"
 env_logger = "0.6"
 assert_cmd = "1.0.1"
 predicates = "1.0.5"
+pretty = "0.10.0"
 
 [[bin]]
 name = "candiff"

@@ -140,6 +140,7 @@ pub struct RecordEdits<R> {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct RcValueEdit ( pub Rc<ValueEdit<RcValueEdit>> );
+pub type ValueEditRc = ValueEdit<RcValueEdit>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ValueEdit<R> {
@@ -156,6 +157,43 @@ pub enum ValueEdit<R> {
     /// edit the variant payload (ignore unchanged label).
     Variant(R),
 }
+
+pub mod pretty {
+    use super::*;
+    use candid::pretty::*;
+    use ::pretty::RcDoc;
+    use candid::parser::value::pretty::*;
+
+    pub fn value_edit(edit: &RcValueEdit) -> RcDoc {
+        use ValueEdit::*;
+        match &*edit.0 {
+            Skip => str("skip"),
+            Put(v) => kwd("put").append(
+                enclose_space("{", pp_value(&v), "}")),
+            Opt(ve) => kwd("opt").append(
+                enclose_space("{", value_edit(&ve), "}")),
+            Vec(edits) => kwd("vec").append(
+                enclose_space("{", vec_edits(&edits), "}")),
+            Record(edits) => kwd("record").append(
+                enclose_space("{", record_edits(&edits), "}")),
+            Variant(ve) => kwd("variant").append(
+                enclose_space("{", value_edit(&ve), "}")),
+        }
+    }
+
+    pub fn vec_edit(edit: &VecEdit<RcValueEdit>) -> RcDoc {
+        unimplemented!()
+    }
+
+    pub fn vec_edits(edits: &Vec<VecEdit<RcValueEdit>>) -> RcDoc {
+        unimplemented!()
+    }
+
+    pub fn record_edits(edits: &RecordEdits<RcValueEdit>) -> RcDoc {
+        unimplemented!()
+    }
+}
+
 
 /// Compare the values, with optional (common) type.
 pub fn value_diff(v1: &Value, v2: &Value, t: &Option<Type>) -> RcValueEdit {

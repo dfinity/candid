@@ -319,6 +319,60 @@ impl IDLValue {
     }
 }
 
+pub mod pretty {
+    use super::*;
+    use crate::pretty::*;
+
+    use ::pretty::RcDoc;
+
+    pub fn pp_label(id: &Label) -> RcDoc {
+        match id {
+            Label::Named(id) => str("\"")
+                .append(format!("{}", id.escape_debug()))
+                .append("\""),
+            Label::Id(n) | Label::Unnamed(n) => RcDoc::as_string(n),
+        }
+    }
+
+    pub fn pp_idl_field(field: &IDLField) -> RcDoc {
+        pp_label(&field.id)
+            .append(kwd(" ="))
+            .append(pp_value(&field.val))
+    }
+
+    pub fn pp_idl_fields(fields: &Vec<IDLField>) -> RcDoc {
+        concat(fields.iter().map(|f| pp_idl_field(f)), ";")
+    }
+
+    pub fn pp_variant_field(field: &IDLField) -> RcDoc {
+        pp_label(&field.id)
+            .append(kwd(" ="))
+            .append(pp_value(&field.val))
+    }
+
+    pub fn pp_value(v: &IDLValue) -> RcDoc {
+        use super::IDLValue::*;
+        match &*v {
+            Bool(true) => kwd("true"),
+            Bool(false) => kwd("false"),
+            Null => kwd("null"),
+            Number(t) => str(t),
+            Record(fields) =>
+                kwd("record").append(
+                    enclose_space("{",
+                                  pp_idl_fields(&fields),
+                                  "}")),
+            Variant(v, _) =>
+                kwd("variant").append(
+                    enclose_space("{",
+                                  pp_variant_field(&v),
+                                  "}")),
+            // to do -- the other cases
+            _ => unimplemented!("{:?}", v)
+        }
+    }
+}
+
 impl crate::CandidType for IDLValue {
     fn ty() -> Type {
         unreachable!();

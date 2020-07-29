@@ -15,6 +15,7 @@ use candid::parser::types::IDLType;
 
 use candid_diff::{
     //Type,
+    pretty,
     Value};
 
 /// candiff
@@ -236,8 +237,7 @@ fn main() {
                                 if debug_output {
                                     println!("{:?}", edit.0)
                                 } else {
-                                    warn!("using debug output; no textual format yet. to do.");
-                                    println!("{:?}", edit.0)
+                                    println!("{}", pretty::value_edit(&edit).pretty(80))
                                 }
                             }
                         }
