@@ -6,6 +6,6 @@ fn main() {
         .unwrap();
 
     // Make sure we only rerun the build script if we need to.
-    println!("cargo:rerun-if-changed=src/parser/grammar.lalrpop");
-    println!("cargo:rerun-if-changed=build.rs");
+    eprintln!("cargo:rerun-if-changed=src/parser/grammar.lalrpop");
+    eprintln!("cargo:rerun-if-changed=build.rs");
 }
