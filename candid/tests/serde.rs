@@ -116,8 +116,8 @@ fn test_reserved() {
 fn test_principal() {
     use candid::Principal;
     all_check(
-        Principal::from_text("n7urw-bkejf-ceyaa-bnaaq-hsx75-y").unwrap(),
-        "4449444c000168010c4449444c0001680103caffee",
+        Principal::from_text("w7x7r-cok77-xa").unwrap(),
+        "4449444c0001680103caffee",
     );
 }
 
