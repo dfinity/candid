@@ -64,9 +64,6 @@ impl Principal {
         write!(string_format, "{}", s).unwrap();
         string_format
     }
-    pub fn as_bytes(&self) -> &[u8] {
-        self.0.as_slice()
-    }
 }
 
 impl fmt::Display for Principal {
