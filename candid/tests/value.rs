@@ -18,7 +18,7 @@ fn test_parser() {
     parse_check(
         "(variant { cons=record{ 42; variant { cons=record{43; variant { nil=record{} }} } } })",
     );
-    parse_check("(principal \"ic:caffee59\")");
+    parse_check("(principal \"w7x7r-cok77-xa\")");
 }
 
 #[test]
