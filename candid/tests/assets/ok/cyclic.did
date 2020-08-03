@@ -4,4 +4,4 @@ type C = A;
 type X = Y;
 type Y = Z;
 type Z = A;
-service : { "f" : (A, B, C, X, Y, Z) -> () }
+service : { f : (A, B, C, X, Y, Z) -> () }

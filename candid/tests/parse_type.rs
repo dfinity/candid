@@ -52,6 +52,9 @@ fn compiler_test(resource: &str) {
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
                 let content = candid_export::compile(&env, &actor);
+                // Type check output
+                let ast = content.parse::<IDLProg>().unwrap();
+                check_prog(&mut TypeEnv::new(), &ast).unwrap();
                 writeln!(output, "{}", content).unwrap();
             }
             {
