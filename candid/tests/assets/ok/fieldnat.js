@@ -17,6 +17,10 @@ export default ({ IDL }) => {
         [IDL.Variant({ _0_ : IDL.Int })],
         [],
       ),
-    'foo' : IDL.Func([IDL.Record({ _2_ : IDL.Int })], [], []),
+    'foo' : IDL.Func(
+        [IDL.Record({ _2_ : IDL.Int })],
+        [IDL.Record({ _2_ : IDL.Int, '_2' : IDL.Int })],
+        [],
+      ),
   });
 };
