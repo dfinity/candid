@@ -369,10 +369,7 @@ pub mod pretty {
             Int64(i) => RcDoc::as_string(i),
             Number(t) => str(t),
             Text(t) => RcDoc::as_string(format!("{:?}", t)), // to do -- enough quoting here?
-            Opt(v) => kwd("opt").append(
-                enclose_space("{",
-                              pp_value(v),
-                              "}")),
+            Opt(v) => kwd("opt").append(enclose_space("{", pp_value(v), "}")),
             Vec(vs) => {
                 let mut body = RcDoc::nil();
                 let mut is_first = true;
@@ -384,21 +381,12 @@ pub mod pretty {
                     }
                     body = body.append(pp_value(v).append(RcDoc::text(";")))
                 }
-                kwd("vec").append(
-                enclose_space("{", body, "}"))
-            },
-            Record(fields) =>
-                kwd("record").append(
-                    enclose_space("{",
-                                  pp_idl_fields(&fields),
-                                  "}")),
-            Variant(v, _) =>
-                kwd("variant").append(
-                    enclose_space("{",
-                                  pp_variant_field(&v),
-                                  "}")),
+                kwd("vec").append(enclose_space("{", body, "}"))
+            }
+            Record(fields) => kwd("record").append(enclose_space("{", pp_idl_fields(&fields), "}")),
+            Variant(v, _) => kwd("variant").append(enclose_space("{", pp_variant_field(&v), "}")),
             // to do -- the other cases
-            _ => unimplemented!("{:?}", v)
+            _ => unimplemented!("{:?}", v),
         }
     }
 }
