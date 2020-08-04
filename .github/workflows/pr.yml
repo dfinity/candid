@@ -4,6 +4,12 @@ on:
     branches:
       - master
   pull_request:
+    paths:
+      - 'rust/**'
+
+defaults:
+  run:
+    working-directory: rust
 
 jobs:
   tests:
