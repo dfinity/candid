@@ -193,4 +193,66 @@ mod diff {
             ))
             .success();
     }
+
+    #[test]
+    fn refl_opt_nat() {
+        let v1 = "opt 1";
+        let v2 = "opt 1";
+        let mut cmd = candiff();
+        cmd.arg("diff").arg(v1).arg(v2).arg("-t opt nat");
+        cmd.assert()
+            .stdout(predicate::eq(
+                b"" as &[u8],
+            ))
+            .success();
+    }
+
+    #[test]
+    fn refl_record_nat_nat() {
+        let v1 = "record {1=1;2=2}";
+        let v2 = "record {1=1;2=2}";
+        let mut cmd = candiff();
+        cmd.arg("diff").arg(v1).arg(v2).arg("-t record {1:nat;2:nat;}");
+        cmd.assert()
+            .stdout(predicate::eq(
+                b"" as &[u8],
+            ))
+            .success();
+    }
+
+    #[test]
+    fn record_ignore_extra() {
+        let v1 = "record {1=1;2=2}";
+        let v2 = "record {1=1;2=2;3=3}";
+        let mut cmd = candiff();
+        cmd.arg("diff").arg(v1).arg(v2).arg("-t record {1:nat;2:nat;}");
+        cmd.assert()
+            .stdout(predicate::eq(
+                b"" as &[u8],
+            ))
+            .success();
+        // no diff because the type ignores the extra field `3=3`
+    }
+
+    #[test]
+    fn record_error_missing() {
+        let v1 = "record {1=1;2=2}";
+        let v2 = "record {1=1;2=2;3=3}";
+        let mut cmd = candiff();
+        cmd.arg("diff").arg(v1).arg(v2).arg("-t record {1:nat;2:nat;3:nat}");
+        cmd.assert().failure(); // failure because the type annotation is wrong for the first value
+    }
+
+    #[test]
+    fn record_put_missing_field() {
+        let v1 = "record {1=1;2=2}";
+        let v2 = "record {1=1;2=2;3=3}";
+        let mut cmd = candiff();
+        cmd.arg("diff").arg(v1).arg(v2);
+        cmd.assert()
+            .stdout(predicate::eq(
+                b"record { edit { 3 put { 3 } }; }\n" as &[u8],
+            ))
+            .success(); // no type checking; no error
+    }
 }

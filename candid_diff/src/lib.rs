@@ -6,7 +6,9 @@ extern crate env_logger;
 use std::rc::Rc;
 
 pub use ::candid::parser::value::IDLValue as Value;
-pub use ::candid::types::{Field, Label, Type};
+pub use ::candid::parser::value::IDLField as Field;
+
+pub use ::candid::types::{Field as TypeField, Label, Type};
 pub use ::candid::Nat;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -138,6 +140,43 @@ pub fn value_diff(v1: &Value, v2: &Value, t: &Option<Type>) -> RcValueEdit {
     RcValueEdit(Rc::new(value_diff_rec(v1, v2, t)))
 }
 
+pub fn record_diff(
+    fs1: &Vec<Field>,
+    fs2: &Vec<Field>,
+    fts: Option<&Vec<TypeField>>,
+) -> Vec<RecordEdit<RcValueEdit>> {
+    let mut edits = vec![];
+    for f1 in fs1.iter() {
+        let mut found_f1 = false;
+        for f2 in fs2.iter() {
+            if f1.id == f2.id {
+                found_f1 = true;
+                let edit_f12 = value_diff(&f1.val, &f2.val, &Option::None); // to do -- give field type
+                if !value_edit_is_skip(&edit_f12) {
+                    edits.push(RecordEdit::EditValue(f1.id.clone(), edit_f12));
+                }
+                break;
+            }
+        }
+        if !found_f1 {
+            edits.push(RecordEdit::DropValue(f1.id.clone()))
+        }
+    }
+    for f2 in fs2.iter() {
+        let mut found_f2 = false;
+        for f1 in fs1.iter() {
+            if f1.id == f2.id {
+                found_f2 = true;
+                break;
+            }
+        }
+        if !found_f2 {
+            edits.push(RecordEdit::EditValue(f2.id.clone(), RcValueEdit(Rc::new(ValueEdit::Put(f2.val.clone())))))
+        }
+    }
+    edits
+}
+
 /// Simple algorithm for computing a naive edit
 ///
 /// Limitations:
@@ -185,15 +224,22 @@ pub fn value_diff_rec(v1: &Value, v2: &Value, _t: &Option<Type>) -> ValueEdit<Rc
 
     match (v1, v2) {
         (Opt(x), Opt(y)) => {
-            ValueEdit::Opt(value_diff(
+            let d = value_diff(
                 &**x,
                 &**y,
                 // to do
                 &Option::None,
-            ))
+            );
+            if value_edit_is_skip(&d) { Skip } else
+            { ValueEdit::Opt(d) }
+        }
+        (Record(fs1), Record(fs2)) => {
+            let edits = record_diff(fs1, fs2, Option::None); // to do -- give field types
+            if edits.len() == 0 { Skip } else
+            { ValueEdit::Record(edits) }
         }
         (Vec(x), Vec(y)) => {
-            let edits = vec_diff_simple(x, y, &Option::None);
+            let edits = vec_diff_simple(x, y, &Option::None); // to do -- give type
             if edits.len() > 0 {
                 ValueEdit::Vec(edits)
             } else {

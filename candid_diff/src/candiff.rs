@@ -107,6 +107,7 @@ fn init_log(level_filter: log::LevelFilter) {
 }
 
 fn main() {
+    let mut type_consistency_holds = true;
     let cliopt = CliOpt::from_args();
     init_log(
         match (cliopt.log_trace, cliopt.log_debug, cliopt.log_quiet) {
@@ -154,6 +155,7 @@ fn main() {
                                     match check_type(&Env { te, pre: false }, &ty) {
                                         Err(e) => {
                                             error!("{}", e);
+                                            type_consistency_holds = false;
                                             v
                                         }
                                         Ok(ty) => {
@@ -161,6 +163,7 @@ fn main() {
                                             match v.annotate_type(&TypeEnv::new(), &ty) {
                                                 Ok(v) => v,
                                                 Err(e) => {
+                                                    type_consistency_holds = false;
                                                     error!("{}", e);
                                                     v
                                                 }
@@ -232,6 +235,7 @@ fn main() {
                                     trace!("check_type ...");
                                     match check_type(&Env { te, pre: false }, &ty) {
                                         Err(e) => {
+                                            type_consistency_holds = false;
                                             error!("{}", e);
                                             (v1, v2, None)
                                         }
@@ -240,6 +244,7 @@ fn main() {
                                             let v1 = match v1.annotate_type(&TypeEnv::new(), &ty) {
                                                 Ok(v) => v,
                                                 Err(e) => {
+                                                    type_consistency_holds = false;
                                                     error!("{}", e);
                                                     v1
                                                 }
@@ -248,6 +253,7 @@ fn main() {
                                             let v2 = match v2.annotate_type(&TypeEnv::new(), &ty) {
                                                 Ok(v) => v,
                                                 Err(e) => {
+                                                    type_consistency_holds = false;
                                                     error!("{}", e);
                                                     v2
                                                 }
@@ -290,4 +296,13 @@ fn main() {
             info!("done")
         }
     }
+
+    // did we find a type error? if so, give error code.
+    std::process::exit(
+        if type_consistency_holds {
+            0
+        } else {
+            -1
+        }
+    )
 }
