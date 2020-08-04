@@ -10,13 +10,14 @@ extern crate env_logger;
 extern crate structopt;
 use structopt::StructOpt;
 
-use candid::parser::typing::{check_type, Env, TypeEnv};
 use candid::parser::types::IDLType;
+use candid::parser::typing::{check_type, Env, TypeEnv};
 
 use candid_diff::{
     //Type,
     pretty,
-    Value};
+    Value,
+};
 
 /// candiff
 #[derive(StructOpt, Debug)]
@@ -50,15 +51,17 @@ impl FromStr for CliFormat {
         match s {
             "raw" => Ok(CliFormat::Raw),
             "text" => Ok(CliFormat::Text),
-            s => Err(format!("format not recognized: {}", s))
-
+            s => Err(format!("format not recognized: {}", s)),
         }
     }
 }
 
 #[derive(StructOpt, Debug)]
 enum CliCommand {
-    #[structopt(name = "echo", about = "Pretty print a single value in a standard way.")]
+    #[structopt(
+        name = "echo",
+        about = "Pretty print a single value in a standard way."
+    )]
     EchoValue {
         /// Input format
         #[structopt(short = "i", long = "input-format", default_value = "text")]
@@ -115,7 +118,12 @@ fn main() {
     );
     trace!("{:?}", &cliopt.command);
     match cliopt.command {
-        CliCommand::EchoValue{ format, input, input_type, debug_output } => {
+        CliCommand::EchoValue {
+            format,
+            input,
+            input_type,
+            debug_output,
+        } => {
             match format {
                 CliFormat::Text => {
                     let ty = match input_type {
@@ -124,29 +132,37 @@ fn main() {
                             None
                         }
                         Some(t) => match t.parse::<IDLType>() {
-                            Ok(ty) => { trace!("input_type = {:?}", ty); Some(ty) }
-                            Err(e) => { error!("{}", e); None }
-                        }
+                            Ok(ty) => {
+                                trace!("input_type = {:?}", ty);
+                                Some(ty)
+                            }
+                            Err(e) => {
+                                error!("{}", e);
+                                None
+                            }
+                        },
                     };
                     match Value::from_str(&input) {
                         Ok(v) => {
                             // check the type, and then annotate the value with that type, possibly transforming it
                             let v = match ty {
-                                None => { v }
+                                None => v,
                                 Some(ty) => {
                                     // to do -- check a program file and get the type env
                                     let te = &mut TypeEnv::new();
                                     trace!("check_type ...");
-                                    match check_type(&Env{te, pre:false}, &ty) {
+                                    match check_type(&Env { te, pre: false }, &ty) {
                                         Err(e) => {
-                                            error!("{}", e); v
+                                            error!("{}", e);
+                                            v
                                         }
                                         Ok(ty) => {
                                             trace!("annotate_type ...");
                                             match v.annotate_type(&TypeEnv::new(), &ty) {
                                                 Ok(v) => v,
                                                 Err(e) => {
-                                                    error!("{}", e); v
+                                                    error!("{}", e);
+                                                    v
                                                 }
                                             }
                                         }
@@ -159,12 +175,10 @@ fn main() {
                             } else {
                                 println!("{}", v)
                             }
-                        },
-                        Err(e) => {
-                            error!("{}", e)
                         }
+                        Err(e) => error!("{}", e),
                     }
-                },
+                }
                 CliFormat::Raw => {
                     // how is it encoded as a string?
                     // base64?
@@ -174,14 +188,22 @@ fn main() {
                 }
             }
         }
-        CliCommand::DiffValue{ format, input1, input2, input_type, debug_output } => {
+        CliCommand::DiffValue {
+            format,
+            input1,
+            input2,
+            input_type,
+            debug_output,
+        } => {
             match format {
                 CliFormat::Text => {
-                    match (Value::from_str(&input1),
-                           Value::from_str(&input2)) {
-                        (Err(e1), Err(e2)) => { error!("Both values failed to parse:\nFirst: {}\nSecond: {}", e1, e2) },
-                        (Err(e1), _) => { error!("First value failed to parse (only): {}\n", e1) },
-                        (_, Err(e2)) => { error!("Second value failed to parse (only): {}\n", e2) },
+                    match (Value::from_str(&input1), Value::from_str(&input2)) {
+                        (Err(e1), Err(e2)) => error!(
+                            "Both values failed to parse:\nFirst: {}\nSecond: {}",
+                            e1, e2
+                        ),
+                        (Err(e1), _) => error!("First value failed to parse (only): {}\n", e1),
+                        (_, Err(e2)) => error!("Second value failed to parse (only): {}\n", e2),
                         (Ok(v1), Ok(v2)) => {
                             let input_type = match input_type {
                                 None => {
@@ -189,36 +211,45 @@ fn main() {
                                     None
                                 }
                                 Some(t) => match t.parse::<IDLType>() {
-                                    Ok(ty) => { trace!("input_type = {:?}", ty); Some(ty) }
-                                    Err(e) => { error!("{}", e); None }
-                                }
+                                    Ok(ty) => {
+                                        trace!("input_type = {:?}", ty);
+                                        Some(ty)
+                                    }
+                                    Err(e) => {
+                                        error!("{}", e);
+                                        None
+                                    }
+                                },
                             };
                             trace!("value_1 = {:?}", v1);
                             trace!("value_2 = {:?}", v2);
                             // check the type, and then annotate the value with that type, possibly transforming it
                             let (v1, v2, input_type) = match input_type {
-                                None => { (v1, v2, None) }
+                                None => (v1, v2, None),
                                 Some(ty) => {
                                     // to do -- check a program file and get the type env
                                     let te = &mut TypeEnv::new();
                                     trace!("check_type ...");
-                                    match check_type(&Env{te, pre:false}, &ty) {
+                                    match check_type(&Env { te, pre: false }, &ty) {
                                         Err(e) => {
-                                            error!("{}", e); (v1, v2, None)
+                                            error!("{}", e);
+                                            (v1, v2, None)
                                         }
                                         Ok(ty) => {
                                             trace!("annotate_type for first value ...");
                                             let v1 = match v1.annotate_type(&TypeEnv::new(), &ty) {
                                                 Ok(v) => v,
                                                 Err(e) => {
-                                                    error!("{}", e); v1
+                                                    error!("{}", e);
+                                                    v1
                                                 }
                                             };
                                             trace!("annotate_type for second value ...");
                                             let v2 = match v2.annotate_type(&TypeEnv::new(), &ty) {
                                                 Ok(v) => v,
                                                 Err(e) => {
-                                                    error!("{}", e); v2
+                                                    error!("{}", e);
+                                                    v2
                                                 }
                                             };
                                             (v1, v2, Some(ty))

@@ -5,9 +5,9 @@ extern crate env_logger;
 
 use std::rc::Rc;
 
-pub use ::candid::Nat;
-pub use ::candid::types::{Type, Label, Field};
 pub use ::candid::parser::value::IDLValue as Value;
+pub use ::candid::types::{Field, Label, Type};
+pub use ::candid::Nat;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum VecEdit<R> {
@@ -20,8 +20,7 @@ pub enum VecEdit<R> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct RcVecEdit ( pub Rc<VecEdit<RcValueEdit>> );
-
+pub struct RcVecEdit(pub Rc<VecEdit<RcValueEdit>>);
 
 /// edit a record's fields: edit some fields' values, drop others
 #[derive(Debug, PartialEq, Clone)]
@@ -31,7 +30,7 @@ pub struct RecordEdits<R> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct RcValueEdit ( pub Rc<ValueEdit<RcValueEdit>> );
+pub struct RcValueEdit(pub Rc<ValueEdit<RcValueEdit>>);
 pub type ValueEditRc = ValueEdit<RcValueEdit>;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -52,39 +51,40 @@ pub enum ValueEdit<R> {
 
 pub mod pretty {
     use super::*;
-    use candid::pretty::*;
     use ::pretty::RcDoc;
     use candid::parser::value::pretty::*;
+    use candid::pretty::*;
 
     pub fn value_edit(edit: &RcValueEdit) -> RcDoc {
         use ValueEdit::*;
         match &*edit.0 {
             Skip => str("skip"),
-            Put(v) => kwd("put").append(
-                enclose_space("{", pp_value(&v), "}")),
-            Opt(ve) => kwd("opt").append(
-                enclose_space("{", value_edit(&ve), "}")),
-            Vec(edits) => kwd("vec").append(
-                enclose_space("{", vec_edits(&edits), "}")),
-            Record(edits) => kwd("record").append(
-                enclose_space("{", record_edits(&edits), "}")),
-            Variant(ve) => kwd("variant").append(
-                enclose_space("{", value_edit(&ve), "}")),
+            Put(v) => kwd("put").append(enclose_space("{", pp_value(&v), "}")),
+            Opt(ve) => kwd("opt").append(enclose_space("{", value_edit(&ve), "}")),
+            Vec(edits) => kwd("vec").append(enclose_space("{", vec_edits(&edits), "}")),
+            Record(edits) => kwd("record").append(enclose_space("{", record_edits(&edits), "}")),
+            Variant(ve) => kwd("variant").append(enclose_space("{", value_edit(&ve), "}")),
         }
     }
 
     pub fn vec_edit(edit: &VecEdit<RcValueEdit>) -> RcDoc {
         use VecEdit::*;
         match edit {
-            InsertValue(n, v) =>
-                kwd("insert").append(
-                    enclose_space("{", RcDoc::as_string(n).append(RcDoc::space()).append(pp_value(v)), "}")),
-            EditValue(n, v) =>
-                kwd("edit").append(
-                    enclose_space("{", RcDoc::as_string(n).append(RcDoc::space()).append(value_edit(v)), "}")),
-            RemoveValue(n) =>
-                kwd("remove").append(
-                    enclose_space("{", RcDoc::as_string(n), "}")),
+            InsertValue(n, v) => kwd("insert").append(enclose_space(
+                "{",
+                RcDoc::as_string(n)
+                    .append(RcDoc::space())
+                    .append(pp_value(v)),
+                "}",
+            )),
+            EditValue(n, v) => kwd("edit").append(enclose_space(
+                "{",
+                RcDoc::as_string(n)
+                    .append(RcDoc::space())
+                    .append(value_edit(v)),
+                "}",
+            )),
+            RemoveValue(n) => kwd("remove").append(enclose_space("{", RcDoc::as_string(n), "}")),
         }
     }
 
@@ -95,8 +95,7 @@ pub mod pretty {
             if is_first {
                 is_first = false;
                 body = vec_edit(edit).append(str(";"))
-            }
-            else {
+            } else {
                 body = body.append(RcDoc::line());
                 body = body.append(vec_edit(edit)).append(str(";"));
             };
@@ -108,7 +107,6 @@ pub mod pretty {
         unimplemented!()
     }
 }
-
 
 /// Compare the values, with optional (common) type.
 pub fn value_diff(v1: &Value, v2: &Value, t: &Option<Type>) -> RcValueEdit {
@@ -122,26 +120,32 @@ pub fn value_diff(v1: &Value, v2: &Value, t: &Option<Type>) -> RcValueEdit {
 ///  - No removal edits used within the output (yet).
 ///  - All insertions at the end (if any).
 ///
-pub fn vec_diff_simple(v1: &Vec<Value>, v2: &Vec<Value>, ty: &Option<Type>) -> Vec<VecEdit<RcValueEdit>> {
+pub fn vec_diff_simple(
+    v1: &Vec<Value>,
+    v2: &Vec<Value>,
+    ty: &Option<Type>,
+) -> Vec<VecEdit<RcValueEdit>> {
     let mut edits = vec![];
     let prefix_len = v1.len().min(v2.len());
     let ty = match ty {
         None => None,
         Some(Type::Vec(t)) => Some((**t).clone()),
-        _ => {error!("invalid type"); None}
+        _ => {
+            error!("invalid type");
+            None
+        }
     };
     for i in 0..prefix_len {
         let edit = value_diff(&v1[i], &v2[i], &ty);
-        if ! value_edit_is_skip(&edit) {
+        if !value_edit_is_skip(&edit) {
             edits.push(VecEdit::EditValue(Nat::from(i), edit))
         }
-    };
+    }
     if v1.len() > v2.len() {
         for i in prefix_len..v1.len() {
             edits.push(VecEdit::InsertValue(Nat::from(i), v1[i].clone()))
         }
-    }
-    else if v2.len() > v1.len() {
+    } else if v2.len() > v1.len() {
         for i in prefix_len..v2.len() {
             edits.push(VecEdit::InsertValue(Nat::from(i), v2[i].clone()))
         }
@@ -156,9 +160,12 @@ pub fn value_diff_rec(v1: &Value, v2: &Value, _t: &Option<Type>) -> ValueEdit<Rc
 
     match (v1, v2) {
         (Opt(x), Opt(y)) => {
-            ValueEdit::Opt(value_diff(&**x, &**y,
-                                      // to do
-                                      &Option::None))
+            ValueEdit::Opt(value_diff(
+                &**x,
+                &**y,
+                // to do
+                &Option::None,
+            ))
         }
         (Vec(x), Vec(y)) => {
             let edits = vec_diff_simple(x, y, &Option::None);
@@ -168,9 +175,7 @@ pub fn value_diff_rec(v1: &Value, v2: &Value, _t: &Option<Type>) -> ValueEdit<Rc
                 Skip
             }
         }
-        (Opt(_x), _) => {
-            Put(v2.clone())
-        }
+        (Opt(_x), _) => Put(v2.clone()),
         (Bool(b1), Bool(b2)) => {
             if b1 == b2 {
                 Skip
@@ -179,40 +184,96 @@ pub fn value_diff_rec(v1: &Value, v2: &Value, _t: &Option<Type>) -> ValueEdit<Rc
             }
         }
         (Null, Null) => Skip,
-        (Text(x), Text(y)) =>
-            if x == y { Skip } else { Put(v2.clone()) }
+        (Text(x), Text(y)) => {
+            if x == y {
+                Skip
+            } else {
+                Put(v2.clone())
+            }
+        }
         (Number(x), Number(y)) => {
             // to do -- double-check this case
-            if x == y { Skip } else { Put(v2.clone()) }
+            if x == y {
+                Skip
+            } else {
+                Put(v2.clone())
+            }
         }
         (Int(x), Int(y)) => {
-            if x == y { Skip } else { Put(v2.clone()) }
+            if x == y {
+                Skip
+            } else {
+                Put(v2.clone())
+            }
         }
-        (Nat(x), Nat(y)) =>
-            if x == y { Skip } else { Put(v2.clone()) }
-        (Nat8(x), Nat8(y)) =>
-            if x == y { Skip } else { Put(v2.clone()) }
-        (Nat16(x), Nat16(y)) =>
-            if x == y { Skip } else { Put(v2.clone()) }
-        (Nat32(x), Nat32(y)) =>
-            if x == y { Skip } else { Put(v2.clone()) }
-        (Nat64(x), Nat64(y)) =>
-            if x == y { Skip } else { Put(v2.clone()) }
-        (Int8(x), Int8(y)) =>
-            if x == y { Skip } else { Put(v2.clone()) }
-        (Int16(x), Int16(y)) =>
-            if x == y { Skip } else { Put(v2.clone()) }
-        (Int32(x), Int32(y)) =>
-            if x == y { Skip } else { Put(v2.clone()) }
-        (Int64(x), Int64(y)) =>
-            if x == y { Skip } else { Put(v2.clone()) }
-        _ => {
-            Put(v2.clone())
+        (Nat(x), Nat(y)) => {
+            if x == y {
+                Skip
+            } else {
+                Put(v2.clone())
+            }
         }
+        (Nat8(x), Nat8(y)) => {
+            if x == y {
+                Skip
+            } else {
+                Put(v2.clone())
+            }
+        }
+        (Nat16(x), Nat16(y)) => {
+            if x == y {
+                Skip
+            } else {
+                Put(v2.clone())
+            }
+        }
+        (Nat32(x), Nat32(y)) => {
+            if x == y {
+                Skip
+            } else {
+                Put(v2.clone())
+            }
+        }
+        (Nat64(x), Nat64(y)) => {
+            if x == y {
+                Skip
+            } else {
+                Put(v2.clone())
+            }
+        }
+        (Int8(x), Int8(y)) => {
+            if x == y {
+                Skip
+            } else {
+                Put(v2.clone())
+            }
+        }
+        (Int16(x), Int16(y)) => {
+            if x == y {
+                Skip
+            } else {
+                Put(v2.clone())
+            }
+        }
+        (Int32(x), Int32(y)) => {
+            if x == y {
+                Skip
+            } else {
+                Put(v2.clone())
+            }
+        }
+        (Int64(x), Int64(y)) => {
+            if x == y {
+                Skip
+            } else {
+                Put(v2.clone())
+            }
+        }
+        _ => Put(v2.clone()),
     }
 }
 
-pub fn value_edit_is_skip(edit:&RcValueEdit) -> bool {
+pub fn value_edit_is_skip(edit: &RcValueEdit) -> bool {
     match *edit.0 {
         ValueEdit::Skip => true,
         _ => false,

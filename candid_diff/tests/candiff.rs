@@ -1,5 +1,5 @@
-use predicates::prelude::*;
 use assert_cmd::Command;
+use predicates::prelude::*;
 
 #[test]
 fn help() {
@@ -47,7 +47,9 @@ mod echo {
         let mut cmd = candiff();
         cmd.arg("echo").arg("1").arg("-t int").arg("-d");
         cmd.assert()
-            .stdout(predicate::eq(b"Int(Int(BigInt { sign: Plus, data: BigUint { data: [1] } }))\n" as &[u8]))
+            .stdout(predicate::eq(
+                b"Int(Int(BigInt { sign: Plus, data: BigUint { data: [1] } }))\n" as &[u8],
+            ))
             .success();
     }
 
@@ -86,9 +88,7 @@ mod diff {
     fn true_true() {
         let mut cmd = candiff();
         cmd.arg("diff").arg("true").arg("true");
-        cmd.assert()
-            .stdout(predicate::eq(b"" as &[u8]))
-            .success();
+        cmd.assert().stdout(predicate::eq(b"" as &[u8])).success();
     }
 
     #[test]
@@ -113,9 +113,7 @@ mod diff {
     fn one_one() {
         let mut cmd = candiff();
         cmd.arg("diff").arg("1").arg("1");
-        cmd.assert()
-            .stdout(predicate::eq(b"" as &[u8]))
-            .success();
+        cmd.assert().stdout(predicate::eq(b"" as &[u8])).success();
     }
 
     #[test]
@@ -130,37 +128,35 @@ mod diff {
     #[test]
     fn neg_one_neg_one_typed() {
         let mut cmd = candiff();
-        cmd.arg("diff").arg("vec { -1 }").arg("vec { -1 }").arg("-t vec int");
-        cmd.assert()
-            .stdout(predicate::eq(b"" as &[u8]))
-            .success();
+        cmd.arg("diff")
+            .arg("vec { -1 }")
+            .arg("vec { -1 }")
+            .arg("-t vec int");
+        cmd.assert().stdout(predicate::eq(b"" as &[u8])).success();
     }
 
     #[test]
     fn neg_one_neg_one_untyped() {
         let mut cmd = candiff();
-        cmd.arg("diff").arg("vec { -1 }").arg("vec { -1 }").arg("-d");
-        cmd.assert()
-            .stdout(predicate::eq(b"" as &[u8]))
-            .success();
+        cmd.arg("diff")
+            .arg("vec { -1 }")
+            .arg("vec { -1 }")
+            .arg("-d");
+        cmd.assert().stdout(predicate::eq(b"" as &[u8])).success();
     }
 
     #[test]
     fn null_null() {
         let mut cmd = candiff();
         cmd.arg("diff").arg("null").arg("null");
-        cmd.assert()
-            .stdout(predicate::eq(b"" as &[u8]))
-            .success();
+        cmd.assert().stdout(predicate::eq(b"" as &[u8])).success();
     }
 
     #[test]
     fn text_empty_empty() {
         let mut cmd = candiff();
         cmd.arg("diff").arg("\"\"").arg("\"\"");
-        cmd.assert()
-            .stdout(predicate::eq(b"" as &[u8]))
-            .success();
+        cmd.assert().stdout(predicate::eq(b"" as &[u8])).success();
     }
 
     #[test]
@@ -179,7 +175,9 @@ mod diff {
         let mut cmd = candiff();
         cmd.arg("diff").arg(v1).arg(v2).arg("-t vec vec nat");
         cmd.assert()
-            .stdout(predicate::eq(b"vec { edit { 1 vec { edit { 1 put { 3 } }; } }; }\n" as &[u8]))
+            .stdout(predicate::eq(
+                b"vec { edit { 1 vec { edit { 1 put { 3 } }; } }; }\n" as &[u8],
+            ))
             .success();
     }
 
@@ -190,7 +188,9 @@ mod diff {
         let mut cmd = candiff();
         cmd.arg("diff").arg(v1).arg(v2).arg("-t vec vec nat");
         cmd.assert()
-            .stdout(predicate::eq(b"vec { edit { 2 vec { insert { 2 2 }; } }; }\n" as &[u8]))
+            .stdout(predicate::eq(
+                b"vec { edit { 2 vec { insert { 2 2 }; } }; }\n" as &[u8],
+            ))
             .success();
     }
 }
