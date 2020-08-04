@@ -5,8 +5,8 @@ extern crate env_logger;
 
 use std::rc::Rc;
 
-pub use ::candid::parser::value::IDLValue as Value;
 pub use ::candid::parser::value::IDLField as Field;
+pub use ::candid::parser::value::IDLValue as Value;
 
 pub use ::candid::types::{Field as TypeField, Label, Type};
 pub use ::candid::Nat;
@@ -110,12 +110,10 @@ pub mod pretty {
         match edit {
             EditValue(l, v) => kwd("edit").append(enclose_space(
                 "{",
-                pp_label(l)
-                    .append(RcDoc::space())
-                    .append(value_edit(v)),
+                pp_label(l).append(RcDoc::space()).append(value_edit(v)),
                 "}",
             )),
-            DropValue(l) => kwd("drop").append(pp_label(l))
+            DropValue(l) => kwd("drop").append(pp_label(l)),
         }
     }
 
@@ -171,7 +169,10 @@ pub fn record_diff(
             }
         }
         if !found_f2 {
-            edits.push(RecordEdit::EditValue(f2.id.clone(), RcValueEdit(Rc::new(ValueEdit::Put(f2.val.clone())))))
+            edits.push(RecordEdit::EditValue(
+                f2.id.clone(),
+                RcValueEdit(Rc::new(ValueEdit::Put(f2.val.clone()))),
+            ))
         }
     }
     edits
@@ -230,13 +231,19 @@ pub fn value_diff_rec(v1: &Value, v2: &Value, _t: &Option<Type>) -> ValueEdit<Rc
                 // to do
                 &Option::None,
             );
-            if value_edit_is_skip(&d) { Skip } else
-            { ValueEdit::Opt(d) }
+            if value_edit_is_skip(&d) {
+                Skip
+            } else {
+                ValueEdit::Opt(d)
+            }
         }
         (Record(fs1), Record(fs2)) => {
             let edits = record_diff(fs1, fs2, Option::None); // to do -- give field types
-            if edits.len() == 0 { Skip } else
-            { ValueEdit::Record(edits) }
+            if edits.len() == 0 {
+                Skip
+            } else {
+                ValueEdit::Record(edits)
+            }
         }
         (Vec(x), Vec(y)) => {
             let edits = vec_diff_simple(x, y, &Option::None); // to do -- give type

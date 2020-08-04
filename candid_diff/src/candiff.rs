@@ -298,11 +298,5 @@ fn main() {
     }
 
     // did we find a type error? if so, give error code.
-    std::process::exit(
-        if type_consistency_holds {
-            0
-        } else {
-            -1
-        }
-    )
+    std::process::exit(if type_consistency_holds { 0 } else { -1 })
 }

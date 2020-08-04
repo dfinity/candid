@@ -200,11 +200,7 @@ mod diff {
         let v2 = "opt 1";
         let mut cmd = candiff();
         cmd.arg("diff").arg(v1).arg(v2).arg("-t opt nat");
-        cmd.assert()
-            .stdout(predicate::eq(
-                b"" as &[u8],
-            ))
-            .success();
+        cmd.assert().stdout(predicate::eq(b"" as &[u8])).success();
     }
 
     #[test]
@@ -212,12 +208,11 @@ mod diff {
         let v1 = "record {1=1;2=2}";
         let v2 = "record {1=1;2=2}";
         let mut cmd = candiff();
-        cmd.arg("diff").arg(v1).arg(v2).arg("-t record {1:nat;2:nat;}");
-        cmd.assert()
-            .stdout(predicate::eq(
-                b"" as &[u8],
-            ))
-            .success();
+        cmd.arg("diff")
+            .arg(v1)
+            .arg(v2)
+            .arg("-t record {1:nat;2:nat;}");
+        cmd.assert().stdout(predicate::eq(b"" as &[u8])).success();
     }
 
     #[test]
@@ -225,12 +220,11 @@ mod diff {
         let v1 = "record {1=1;2=2}";
         let v2 = "record {1=1;2=2;3=3}";
         let mut cmd = candiff();
-        cmd.arg("diff").arg(v1).arg(v2).arg("-t record {1:nat;2:nat;}");
-        cmd.assert()
-            .stdout(predicate::eq(
-                b"" as &[u8],
-            ))
-            .success();
+        cmd.arg("diff")
+            .arg(v1)
+            .arg(v2)
+            .arg("-t record {1:nat;2:nat;}");
+        cmd.assert().stdout(predicate::eq(b"" as &[u8])).success();
         // no diff because the type ignores the extra field `3=3`
     }
 
@@ -239,7 +233,10 @@ mod diff {
         let v1 = "record {1=1;2=2}";
         let v2 = "record {1=1;2=2;3=3}";
         let mut cmd = candiff();
-        cmd.arg("diff").arg(v1).arg(v2).arg("-t record {1:nat;2:nat;3:nat}");
+        cmd.arg("diff")
+            .arg(v1)
+            .arg(v2)
+            .arg("-t record {1:nat;2:nat;3:nat}");
         cmd.assert().failure(); // failure because the type annotation is wrong for the first value
     }
 
