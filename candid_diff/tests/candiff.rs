@@ -259,11 +259,7 @@ mod diff {
         let v2 = "variant { 1 = 1 }";
         let mut cmd = candiff();
         cmd.arg("diff").arg(v1).arg(v2);
-        cmd.assert()
-            .stdout(predicate::eq(
-                b"" as &[u8],
-            ))
-            .success();
+        cmd.assert().stdout(predicate::eq(b"" as &[u8])).success();
     }
 
     #[test]
@@ -273,9 +269,7 @@ mod diff {
         let mut cmd = candiff();
         cmd.arg("diff").arg(v1).arg(v2);
         cmd.assert()
-            .stdout(predicate::eq(
-                b"variant { put { 2 } }\n" as &[u8],
-            ))
+            .stdout(predicate::eq(b"variant { put { 2 } }\n" as &[u8]))
             .success();
     }
 }

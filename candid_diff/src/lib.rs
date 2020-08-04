@@ -237,7 +237,7 @@ pub fn value_diff_rec(v1: &Value, v2: &Value, _t: &Option<Type>) -> ValueEdit<Rc
                 ValueEdit::Opt(d)
             }
         }
-        (Variant(f1,_), Variant(f2,_)) => {
+        (Variant(f1, _), Variant(f2, _)) => {
             if f1.id == f2.id {
                 let edit = value_diff(&f1.val, &f2.val, &Option::None);
                 if value_edit_is_skip(&edit) {
@@ -248,7 +248,7 @@ pub fn value_diff_rec(v1: &Value, v2: &Value, _t: &Option<Type>) -> ValueEdit<Rc
             } else {
                 Put(v2.clone())
             }
-        },
+        }
         (Record(fs1), Record(fs2)) => {
             let edits = record_diff(fs1, fs2, Option::None); // to do -- give field types
             if edits.len() == 0 {
