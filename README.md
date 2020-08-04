@@ -8,7 +8,7 @@ the data they exchange, with type safety and extensibility.
 
 ## Specifications
 
-The [spec/](spec/) directory contains Candid specifications, including the language specification, soundness proof and integration with other languages.
+The [spec](spec/) directory contains Candid specifications, including the language specification, soundness proof and integration with other languages.
 
 ## Implementations
 
