@@ -39,7 +39,7 @@ exchange (names, parameter and result formats of service methods)
 
 Vanilla protocol buffers are not sufficient or well-suited for describing canisters on the Internet Computer:
 
-* They are primarily a *data description language*, not an IDL. There is syntax for defining "services", but it assumes RPCs not messaging and requires a developing a plugin (replacing the gRPC a.k.a. Stubby one) to provide a semantics.
+* They are primarily a *data description language*, not an IDL. There is syntax for defining "services", but it assumes RPCs not messaging and requires developing a plugin (replacing the gRPC a.k.a. Stubby one) to provide semantics.
 
 * They deserialise data into abstract protobuf objects, not actual language data structures. The "message" (a.k.a. objects/records/structs) format is designed to be represented as its own abstract in-memory type.
 
@@ -137,7 +137,7 @@ Block comments nest properly (unlike in C).
 
 ### Services
 
-An *service* is a standalone actor on the platform that can communicate with other services via sending and receiving *messages*. Messages are sent to a service by invoking one of its *methods*, i.e., functions that the service provides.
+A *service* is a standalone actor on the platform that can communicate with other services via sending and receiving *messages*. Messages are sent to a service by invoking one of its *methods*, i.e., functions that the service provides.
 
 **Note:** Candid is in fact agnostic to the exact nature of services. In particular, it could be applied to a setting where services are synchronous (objects with RPCs) instead of asynchronous (actors with bidirectional message sends).
 
@@ -166,7 +166,7 @@ Identifiers cannot be keywords of the Candid grammar. In case a name is needed t
 
 #### Example
 ```
-service {
+service : {
   addUser : (name : text, age : nat8) -> (id : nat64);
   userName : (id : nat64) -> (text) query;
   userAge : (id : nat64) -> (nat8) query;
@@ -179,7 +179,7 @@ service {
 
 *Functions* are endpoints for communication.   A typical function invocation is a bidirectional communication, with *parameters* and *results*, a.k.a. request and response. A `oneway` function invocation is a uni-directional communication with zero or more parameters but no results, intended for fire-and-forget scenarios.
 
-**Note:** Candid is in fact agnostic to the question whether communication via functions is synchronous (like RPCs) or asynchronous (like messaging with callbacks as response continuations). However, it assumes that all invocations have the same semantics, i.e., there is no need to distinguish between both.
+**Note:** Candid is in fact agnostic to the question of whether communication via functions is synchronous (like RPCs) or asynchronous (like messaging with callbacks as response continuations). However, it assumes that all invocations have the same semantics, i.e., there is no need to distinguish between both.
 
 **Note:** In a synchronous interpretation of functions, invocation of a oneway function would return immediately, without waiting for completion of the service-side invocation of the function. In an asynchronous interpretation of functions, the invocation of a `oneway` function does not accept a callback (to invoke on completion).
 
@@ -275,7 +275,7 @@ Text strings are represented by the type `text` and consist of a sequence of Uni
 
 #### Null
 
-The type `null` has exactly one value (the *null* value) and therefor carries no information. It can e.g. be used as a placeholder for optional fields that ought to be added to a record in future upgrades, or for *variant cases* that do not need any value, see below.
+The type `null` has exactly one value (the *null* value) and therefore carries no information. It can e.g. be used as a placeholder for optional fields that ought to be added to a record in future upgrades, or for *variant cases* that do not need any value, see below.
 ```
 <primtype> ::= ... | null | ...
 ```
@@ -510,13 +510,13 @@ An import refers to another interface file by URL. The semantics is that of text
 
 ##### Example
 
-File `A.dfn`:
+File `A.did`:
 ```
 type A = service { f : () -> () };
 ```
-File `B.dfn`:
+File `B.did`:
 ```
-import "A.dfn"
+import "A.did"
 service B : A ;
 ```
 
@@ -624,7 +624,7 @@ record { <nat> : <datatype>; <fieldtype>;* } <: record { <nat> : <datatype'>; <f
 
 #### Variants
 
-For a specialised variants, the type of a tag can be specialised, or a tag can be removed.
+For a specialised variant, the type of a tag can be specialised, or a tag can be removed.
 ```
 
 -----------------------------------------
@@ -822,7 +822,7 @@ The following notation is used:
 `T` maps an Candid type to a byte sequence representing that type.
 Each type constructor is encoded as a negative opcode;
 positive numbers index auxiliary *type definitions* that define more complex types.
-We assume that the fields in a record or function type are sorted by increasing id and the methods in a service are sorted by name.
+We assume that the fields in a record or variant type are sorted by increasing id and the methods in a service are sorted by name.
 
 ```
 T : <primtype> -> i8*
