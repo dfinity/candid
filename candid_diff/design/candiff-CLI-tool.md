@@ -1,8 +1,10 @@
 # Tool design (`candiff`)
 
-The `candid_diff` package exposes the `candiff` tool for scripting Candid value comparisons that have human-readable error messages.
+The `candid_diff` crate provides the `candiff` tool.
 
-The tool compares input and output canister messages to those recorded earlier, from earlier run(s).
+The `candiff` tool compares candid data, and gives with human-readable output.
+
+Rather than compare two values textually, the tool is structural, like Candid itself.
 
 ## Use cases
 
@@ -27,13 +29,12 @@ The human-readable diff answers the question:
 
 ## Data and type changes
 
-Rather than compare two values textually, the tool is structural, like Candid itself.
-
-The tool does not attempt to compare candid values that do not share a
-common type, but we do not know if this the case or not, a priori.
-When provided, this common type helps inform the output information,
-but it is not required.  When absent, the tool gives less helpful
-information on values without a common type.
+The tool is structural, like Candid itself.  It does not attempt to
+compare candid values that do not share a common type, but we do not
+know if this the case or not, a priori.  When provided, this common
+type helps inform the output information, but it is not required.
+When absent, the tool gives less helpful information on values without
+a common type.
 
 ### Typing
 

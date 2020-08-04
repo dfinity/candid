@@ -1,11 +1,11 @@
-# Candid Derive
+# Candiff
 
 ![](https://github.com/dfinity/candid/workflows/Rust/badge.svg)
 
-[Candid](https://github.com/dfinity/candid/tree/master/IDL.md) is an interface description language (IDL) for interacting with _canisters_ (also known as _services_ or _actors_) running on the Internet Computer.
+The `candid_diff` crate provides the `candiff` tool.
 
-Macros implementation of `#[derive(CandidType)]` to convert Rust data types to Candid types. This crate should be considered as an implementation detail, and not be used directly, only via the `candid` crate.
+The `candiff` tool compares candid data, and gives with human-readable output.
 
-# Usage
+Rather than compare two values textually, the tool is structural, like Candid itself.
 
-See [the docs here](https://docs.rs/candid_derive).
+See `design/` for more.
