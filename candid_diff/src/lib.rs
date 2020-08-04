@@ -24,14 +24,10 @@ pub struct RcVecEdit(pub Rc<VecEdit<RcValueEdit>>);
 
 /// edit a record's fields: edit some fields' values, drop others
 #[derive(Debug, PartialEq, Clone)]
-pub struct RecordEdits<R> {
-    edit: Vec<(Label, R)>,
-    drop: Vec<Label>,
+pub enum RecordEdit<R> {
+    EditValue(Label, R),
+    DropValue(Label),
 }
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct RcValueEdit(pub Rc<ValueEdit<RcValueEdit>>);
-pub type ValueEditRc = ValueEdit<RcValueEdit>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ValueEdit<R> {
@@ -44,10 +40,14 @@ pub enum ValueEdit<R> {
     /// edit the vector, in a sequence of vector edits.
     Vec(Vec<VecEdit<R>>),
     /// edit the record, field-wise; ignore unchanged fields.
-    Record(RecordEdits<R>),
+    Record(Vec<RecordEdit<R>>),
     /// edit the variant payload (ignore unchanged label).
     Variant(R),
 }
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RcValueEdit(pub Rc<ValueEdit<RcValueEdit>>);
+pub type ValueEditRc = ValueEdit<RcValueEdit>;
 
 pub mod pretty {
     use super::*;
@@ -103,8 +103,33 @@ pub mod pretty {
         body
     }
 
-    pub fn record_edits(edits: &RecordEdits<RcValueEdit>) -> RcDoc {
-        unimplemented!()
+    pub fn record_edit(edit: &RecordEdit<RcValueEdit>) -> RcDoc {
+        use RecordEdit::*;
+        match edit {
+            EditValue(l, v) => kwd("edit").append(enclose_space(
+                "{",
+                pp_label(l)
+                    .append(RcDoc::space())
+                    .append(value_edit(v)),
+                "}",
+            )),
+            DropValue(l) => kwd("drop").append(pp_label(l))
+        }
+    }
+
+    pub fn record_edits(edits: &Vec<RecordEdit<RcValueEdit>>) -> RcDoc {
+        let mut body = RcDoc::nil();
+        let mut is_first = true;
+        for edit in edits.iter() {
+            if is_first {
+                is_first = false;
+                body = record_edit(edit).append(str(";"))
+            } else {
+                body = body.append(RcDoc::line());
+                body = body.append(record_edit(edit)).append(str(";"));
+            };
+        }
+        body
     }
 }
 
