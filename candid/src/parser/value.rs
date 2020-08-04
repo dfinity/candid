@@ -340,7 +340,7 @@ pub mod pretty {
             .append(pp_value(&field.val))
     }
 
-    pub fn pp_idl_fields(fields: &Vec<IDLField>) -> RcDoc {
+    pub fn pp_idl_fields(fields: &[IDLField]) -> RcDoc {
         concat(fields.iter().map(|f| pp_idl_field(f)), ";")
     }
 
