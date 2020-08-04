@@ -362,7 +362,7 @@ mod candiff_cli {
             let mut cmd = candiff();
             cmd.arg("diff").arg("true").arg("false");
             cmd.assert()
-                .stdout(predicate::eq(b"Put(Bool(false))\n" as &[u8]))
+                .stdout(predicate::eq(b"put { false }\n" as &[u8]))
                 .success();
         }
 
@@ -371,7 +371,7 @@ mod candiff_cli {
             let mut cmd = candiff();
             cmd.arg("diff").arg("false").arg("true");
             cmd.assert()
-                .stdout(predicate::eq(b"Put(Bool(true))\n" as &[u8]))
+                .stdout(predicate::eq(b"put { true }\n" as &[u8]))
                 .success();
         }
 
@@ -389,7 +389,7 @@ mod candiff_cli {
             let mut cmd = candiff();
             cmd.arg("diff").arg("1").arg("2");
             cmd.assert()
-                .stdout(predicate::eq(b"Put(Number(\"2\"))\n" as &[u8]))
+                .stdout(predicate::eq(b"put { 2 }\n" as &[u8]))
                 .success();
         }
 
@@ -434,7 +434,18 @@ mod candiff_cli {
             let mut cmd = candiff();
             cmd.arg("diff").arg("\"a\"").arg("\"b\"");
             cmd.assert()
-                .stdout(predicate::eq(b"Put(Text(\"b\"))\n" as &[u8]))
+                .stdout(predicate::eq(b"put { \"b\" }\n" as &[u8]))
+                .success();
+        }
+
+        #[test]
+        fn vec_nat_put() {
+            let v1 = "vec { vec { 0; 0; } ; vec{ 1 ; 1; } ; vec {2; 2;} ; }";
+            let v2 = "vec { vec { 0; 0; } ; vec{ 1 ; 3; } ; vec {2; 2;} ; }";
+            let mut cmd = candiff();
+            cmd.arg("diff").arg(v1).arg(v2).arg("-t vec vec nat");
+            cmd.assert()
+                .stdout(predicate::eq(b"vec { edit { 1 vec { edit { 1 put { 3 } } } } }\n" as &[u8]))
                 .success();
         }
     }

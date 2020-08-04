@@ -186,7 +186,23 @@ pub mod pretty {
     }
 
     pub fn vec_edits(edits: &Vec<VecEdit<RcValueEdit>>) -> RcDoc {
-        unimplemented!()
+        use VecEdit::*;
+        let mut body = RcDoc::nil();
+        for edit in edits.iter() {
+            let doc = match edit {
+                InsertValue(n, v) =>
+                    kwd("insert").append(
+                        enclose_space("{", RcDoc::as_string(n).append(RcDoc::space()).append(pp_value(v)), "}")),
+                EditValue(n, v) =>
+                    kwd("edit").append(
+                        enclose_space("{", RcDoc::as_string(n).append(RcDoc::space()).append(value_edit(v)), "}")),
+                RemoveValue(n) =>
+                    kwd("remove").append(
+                        enclose_space("{", RcDoc::as_string(n), "}")),
+            };
+            body = body.append(doc);
+        }
+        body
     }
 
     pub fn record_edits(edits: &RecordEdits<RcValueEdit>) -> RcDoc {
@@ -202,7 +218,7 @@ pub fn value_diff(v1: &Value, v2: &Value, t: &Option<Type>) -> RcValueEdit {
 
 /// Simple algorithm for computing a naive edit
 ///
-/// Limitations: 
+/// Limitations:
 ///  - No alignment; over-uses in-place edits.
 ///  - No removal edits used within the output (yet).
 ///  - All insertions at the end (if any).

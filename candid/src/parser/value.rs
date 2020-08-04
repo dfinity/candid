@@ -353,10 +353,40 @@ pub mod pretty {
     pub fn pp_value(v: &IDLValue) -> RcDoc {
         use super::IDLValue::*;
         match &*v {
-            Bool(true) => kwd("true"),
-            Bool(false) => kwd("false"),
-            Null => kwd("null"),
+            Bool(true) => str("true"),
+            Bool(false) => str("false"),
+            Null => str("null"),
+            None => str("none"),
+            Int(i) => RcDoc::as_string(i),
+            Nat(n) => RcDoc::as_string(n),
+            Nat8(n) => RcDoc::as_string(n),
+            Nat16(n) => RcDoc::as_string(n),
+            Nat32(n) => RcDoc::as_string(n),
+            Nat64(n) => RcDoc::as_string(n),
+            Int8(i) => RcDoc::as_string(i),
+            Int16(i) => RcDoc::as_string(i),
+            Int32(i) => RcDoc::as_string(i),
+            Int64(i) => RcDoc::as_string(i),
             Number(t) => str(t),
+            Text(t) => RcDoc::as_string(format!("{:?}", t)), // to do -- enough quoting here?
+            Opt(v) => kwd("opt").append(
+                enclose_space("{",
+                              pp_value(v),
+                              "}")),
+            Vec(vs) => {
+                let mut body = RcDoc::nil();
+                let mut is_first = true;
+                for v in vs.iter() {
+                    if is_first {
+                        is_first = false;
+                    } else {
+                        body = body.append(RcDoc::space())
+                    }
+                    body = body.append(pp_value(v).append(RcDoc::text(";")))
+                }
+                kwd("vec").append(
+                enclose_space("{", body, "}"))
+            },
             Record(fields) =>
                 kwd("record").append(
                     enclose_space("{",
