@@ -198,8 +198,16 @@ pub mod pretty {
 
     pub fn vec_edits(edits: &Vec<VecEdit<RcValueEdit>>) -> RcDoc {
         let mut body = RcDoc::nil();
+        let mut is_first = true;
         for edit in edits.iter() {
-            body = body.append(vec_edit(edit));
+            if is_first {
+                is_first = false;
+                body = vec_edit(edit).append(str(";"))
+            }
+            else {
+                body = body.append(RcDoc::line());
+                body = body.append(vec_edit(edit)).append(str(";"));
+            };
         }
         body
     }
@@ -224,7 +232,7 @@ pub fn value_diff(v1: &Value, v2: &Value, t: &Option<Type>) -> RcValueEdit {
 ///
 pub fn vec_diff_simple(v1: &Vec<Value>, v2: &Vec<Value>, ty: &Option<Type>) -> Vec<VecEdit<RcValueEdit>> {
     let mut edits = vec![];
-    let prefix_len = v1.len().max(v2.len());
+    let prefix_len = v1.len().min(v2.len());
     let ty = match ty {
         None => None,
         Some(Type::Vec(t)) => Some((**t).clone()),

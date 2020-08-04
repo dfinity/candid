@@ -445,7 +445,18 @@ mod candiff_cli {
             let mut cmd = candiff();
             cmd.arg("diff").arg(v1).arg(v2).arg("-t vec vec nat");
             cmd.assert()
-                .stdout(predicate::eq(b"vec { edit { 1 vec { edit { 1 put { 3 } } } } }\n" as &[u8]))
+                .stdout(predicate::eq(b"vec { edit { 1 vec { edit { 1 put { 3 } }; } }; }\n" as &[u8]))
+                .success();
+        }
+
+        #[test]
+        fn vec_nat_insert() {
+            let v1 = "vec { vec { 0; 0; } ; vec{ 1 ; 1; } ; vec {2; 2;} ; }";
+            let v2 = "vec { vec { 0; 0; } ; vec{ 1 ; 1; } ; vec {2; 2; 2} ; }";
+            let mut cmd = candiff();
+            cmd.arg("diff").arg(v1).arg(v2).arg("-t vec vec nat");
+            cmd.assert()
+                .stdout(predicate::eq(b"vec { edit { 2 vec { insert { 2 2 }; } }; }\n" as &[u8]))
                 .success();
         }
     }
