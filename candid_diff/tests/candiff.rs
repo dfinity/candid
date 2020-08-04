@@ -252,4 +252,30 @@ mod diff {
             ))
             .success(); // no type checking; no error
     }
+
+    #[test]
+    fn variant_refl() {
+        let v1 = "variant { 1 = 1 }";
+        let v2 = "variant { 1 = 1 }";
+        let mut cmd = candiff();
+        cmd.arg("diff").arg(v1).arg(v2);
+        cmd.assert()
+            .stdout(predicate::eq(
+                b"" as &[u8],
+            ))
+            .success();
+    }
+
+    #[test]
+    fn variant_put_2() {
+        let v1 = "variant { 1 = 1 }";
+        let v2 = "variant { 1 = 2 }";
+        let mut cmd = candiff();
+        cmd.arg("diff").arg(v1).arg(v2);
+        cmd.assert()
+            .stdout(predicate::eq(
+                b"variant { put { 2 } }\n" as &[u8],
+            ))
+            .success();
+    }
 }
