@@ -182,25 +182,24 @@ pub mod pretty {
     }
 
     pub fn vec_edit(edit: &VecEdit<RcValueEdit>) -> RcDoc {
-        unimplemented!()
+        use VecEdit::*;
+        match edit {
+            InsertValue(n, v) =>
+                kwd("insert").append(
+                    enclose_space("{", RcDoc::as_string(n).append(RcDoc::space()).append(pp_value(v)), "}")),
+            EditValue(n, v) =>
+                kwd("edit").append(
+                    enclose_space("{", RcDoc::as_string(n).append(RcDoc::space()).append(value_edit(v)), "}")),
+            RemoveValue(n) =>
+                kwd("remove").append(
+                    enclose_space("{", RcDoc::as_string(n), "}")),
+        }
     }
 
     pub fn vec_edits(edits: &Vec<VecEdit<RcValueEdit>>) -> RcDoc {
-        use VecEdit::*;
         let mut body = RcDoc::nil();
         for edit in edits.iter() {
-            let doc = match edit {
-                InsertValue(n, v) =>
-                    kwd("insert").append(
-                        enclose_space("{", RcDoc::as_string(n).append(RcDoc::space()).append(pp_value(v)), "}")),
-                EditValue(n, v) =>
-                    kwd("edit").append(
-                        enclose_space("{", RcDoc::as_string(n).append(RcDoc::space()).append(value_edit(v)), "}")),
-                RemoveValue(n) =>
-                    kwd("remove").append(
-                        enclose_space("{", RcDoc::as_string(n), "}")),
-            };
-            body = body.append(doc);
+            body = body.append(vec_edit(edit));
         }
         body
     }
