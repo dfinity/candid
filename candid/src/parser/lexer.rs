@@ -243,7 +243,7 @@ impl<'input> Iterator for Lexer<'input> {
                     Some(Ok((i, Token::Number(res), i + len)))
                 }
             }
-            Some((i, c)) if c.is_ascii_alphabetic() => {
+            Some((i, c)) if c.is_ascii_alphabetic() || c == '_' => {
                 // Parse keywords and identifiers
                 let mut res = c.to_string();
                 while let Some((_, c)) = self.peek() {

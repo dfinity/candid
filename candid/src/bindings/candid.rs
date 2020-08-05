@@ -18,6 +18,72 @@ fn is_tuple(t: &Type) -> bool {
     }
 }
 
+static KEYWORDS: [&str; 29] = [
+    "import",
+    "service",
+    "func",
+    "type",
+    "opt",
+    "vec",
+    "record",
+    "variant",
+    "blob",
+    "principal",
+    "nat",
+    "nat8",
+    "nat16",
+    "nat32",
+    "nat64",
+    "int",
+    "int8",
+    "int16",
+    "int32",
+    "int64",
+    "float32",
+    "float64",
+    "bool",
+    "text",
+    "null",
+    "reserved",
+    "empty",
+    "oneway",
+    "query",
+];
+
+fn is_keyword(id: &str) -> bool {
+    KEYWORDS.contains(&id)
+}
+
+fn is_valid_as_id(id: &str) -> bool {
+    if id.is_empty() || !id.is_ascii() {
+        return false;
+    }
+    for (i, c) in id.char_indices() {
+        if i == 0 {
+            if !c.is_ascii_alphabetic() && c != '_' {
+                return false;
+            }
+        } else if !c.is_ascii_alphanumeric() && c != '_' {
+            return false;
+        }
+    }
+    true
+}
+
+fn needs_quote(id: &str) -> bool {
+    !is_valid_as_id(id) || is_keyword(id)
+}
+
+fn pp_text(id: &str) -> RcDoc {
+    if needs_quote(id) {
+        str("\"")
+            .append(format!("{}", id.escape_debug()))
+            .append("\"")
+    } else {
+        str(id)
+    }
+}
+
 fn pp_ty(ty: &Type) -> RcDoc {
     use Type::*;
     match *ty {
@@ -59,9 +125,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
 
 pub fn pp_label(id: &Label) -> RcDoc {
     match id {
-        Label::Named(id) => str("\"")
-            .append(format!("{}", id.escape_debug()))
-            .append("\""),
+        Label::Named(id) => pp_text(id),
         Label::Id(n) | Label::Unnamed(n) => RcDoc::as_string(n),
     }
 }
@@ -107,7 +171,7 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
                 Type::Var(_) => pp_ty(func),
                 _ => unreachable!(),
             };
-            doublequote_ident(id).append(kwd(":")).append(func_doc)
+            pp_text(id).append(kwd(" :")).append(func_doc)
         }),
         ";",
     );
