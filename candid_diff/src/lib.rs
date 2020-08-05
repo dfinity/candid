@@ -208,8 +208,8 @@ pub fn vec_diff_simple(
             edits.push(VecEdit::InsertValue(i, v1i.clone()))
         }
     } else {
-        for i in prefix_len..v2.len() {
-            edits.push(VecEdit::InsertValue(i, v2[i].clone()))
+        for (i, v2i) in v2.iter().enumerate().skip(prefix_len) {
+            edits.push(VecEdit::InsertValue(i, v2i.clone()))
         }
     }
     edits
