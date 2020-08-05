@@ -1,0 +1,33 @@
+[package]
+name = "candid_diff"
+version = "0.1.0"
+edition = "2018"
+authors = ["DFINITY Team"]
+description = "Operations that relate generic Candid values and types."
+homepage = "https://docs.rs/candid_diff"
+documentation = "https://docs.rs/candid_diff"
+repository = "https://github.com/dfinity/candid"
+license = "Apache-2.0"
+readme = "README.md"
+
+categories = ["encoding", "wasm"]
+keywords = ["internet-computer", "candid", "dfinity", "delta", "diff"]
+include = ["src", "README.md", "Cargo.toml", "LICENSE"]
+
+[lib]
+name = "candid_diff"
+
+[dependencies]
+candid = { path = "../candid" }
+clap = "2.33"
+structopt = "0.3"
+log = "0.4"
+env_logger = "0.6"
+assert_cmd = "1.0.1"
+predicates = "1.0.5"
+pretty = "0.10.0"
+
+[[bin]]
+name = "candiff"
+path = "src/candiff.rs"
+

@@ -2,4 +2,5 @@
 members = [
     "candid",
     "candid_derive",
+    "candid_diff",
 ]
