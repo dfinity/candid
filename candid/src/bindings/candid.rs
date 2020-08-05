@@ -57,7 +57,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
     }
 }
 
-fn pp_label(id: &Label) -> RcDoc {
+pub fn pp_label(id: &Label) -> RcDoc {
     match id {
         Label::Named(id) => str("\"")
             .append(format!("{}", id.escape_debug()))

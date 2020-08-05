@@ -325,14 +325,7 @@ pub mod pretty {
 
     use ::pretty::RcDoc;
 
-    pub fn pp_label(id: &Label) -> RcDoc {
-        match id {
-            Label::Named(id) => str("\"")
-                .append(format!("{}", id.escape_debug()))
-                .append("\""),
-            Label::Id(n) | Label::Unnamed(n) => RcDoc::as_string(n),
-        }
-    }
+    pub use crate::bindings::candid::pp_label;
 
     pub fn pp_idl_field(field: &IDLField) -> RcDoc {
         pp_label(&field.id)
