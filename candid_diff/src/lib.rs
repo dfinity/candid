@@ -87,7 +87,7 @@ pub mod pretty {
         }
     }
 
-    pub fn vec_edits(edits: &Vec<VecEdit<RcValueEdit>>) -> RcDoc {
+    pub fn vec_edits(edits: &[VecEdit<RcValueEdit>]) -> RcDoc {
         let mut body = RcDoc::nil();
         let mut is_first = true;
         for edit in edits.iter() {
@@ -114,7 +114,7 @@ pub mod pretty {
         }
     }
 
-    pub fn record_edits(edits: &Vec<RecordEdit<RcValueEdit>>) -> RcDoc {
+    pub fn record_edits(edits: &[RecordEdit<RcValueEdit>]) -> RcDoc {
         let mut body = RcDoc::nil();
         let mut is_first = true;
         for edit in edits.iter() {
@@ -136,9 +136,9 @@ pub fn value_diff(v1: &Value, v2: &Value, t: &Option<Type>) -> RcValueEdit {
 }
 
 pub fn record_diff(
-    fs1: &Vec<Field>,
-    fs2: &Vec<Field>,
-    _fts: Option<&Vec<TypeField>>,
+    fs1: &[Field],
+    fs2: &[Field],
+    _fts: Option<&[TypeField]>,
 ) -> Vec<RecordEdit<RcValueEdit>> {
     let mut edits = vec![];
     for f1 in fs1.iter() {
@@ -183,8 +183,8 @@ pub fn record_diff(
 ///  - All insertions at the end (if any).
 ///
 pub fn vec_diff_simple(
-    v1: &Vec<Value>,
-    v2: &Vec<Value>,
+    v1: &[Value],
+    v2: &[Value],
     ty: &Option<Type>,
 ) -> Vec<VecEdit<RcValueEdit>> {
     let mut edits = vec![];
@@ -207,7 +207,7 @@ pub fn vec_diff_simple(
         for i in prefix_len..v1.len() {
             edits.push(VecEdit::InsertValue(i, v1[i].clone()))
         }
-    } else if v2.len() > v1.len() {
+    } else {
         for i in prefix_len..v2.len() {
             edits.push(VecEdit::InsertValue(i, v2[i].clone()))
         }
