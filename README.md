@@ -18,7 +18,6 @@ This repository contains some of the implementations developed by DFINITY.
 * [Rust](rust/): A serialization library based on Serde, and a compiler for generating bindings for other languages.
 * Motoko: Compiler support for importing/export Candid files.
 * JavaScript: As part of the [JavaScript User Library](https://www.npmjs.com/package/@dfinity/agent), we provide a library for serialization of native JavaScript values, and a visitor class for extending Candid for building generic tools such as UI and random testing.
-* More to come...
 
 A list of community maintained Candid libraries:
 
