@@ -204,8 +204,8 @@ pub fn vec_diff_simple(
         }
     }
     if v1.len() > v2.len() {
-        for i in prefix_len..v1.len() {
-            edits.push(VecEdit::InsertValue(i, v1[i].clone()))
+        for (i, v1i) in v1.iter().enumerate().skip(prefix_len) {
+            edits.push(VecEdit::InsertValue(i, v1i.clone()))
         }
     } else {
         for i in prefix_len..v2.len() {
