@@ -37,9 +37,6 @@ struct CliOpt {
 }
 #[derive(StructOpt, Debug)]
 enum CliFormat {
-    #[structopt(name = "raw", about = "raw (binary, non-textual) format.")]
-    Raw,
-
     #[structopt(name = "text", about = "textual format.")]
     Text,
 }
@@ -49,7 +46,6 @@ impl FromStr for CliFormat {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "raw" => Ok(CliFormat::Raw),
             "text" => Ok(CliFormat::Text),
             s => Err(format!("format not recognized: {}", s)),
         }
@@ -182,13 +178,6 @@ fn main() {
                         Err(e) => error!("{}", e),
                     }
                 }
-                CliFormat::Raw => {
-                    // how is it encoded as a string?
-                    // base64?
-                    // always take binary from stdin?
-                    // something else?
-                    unimplemented!()
-                }
             }
         }
         CliCommand::DiffValue {
@@ -270,7 +259,6 @@ fn main() {
                             if candid_diff::value_edit_is_skip(&edit) {
                                 debug!("equal values; no change.")
                             } else {
-                                // to do -- more minimal textual output format for edits
                                 if debug_output {
                                     println!("{:?}", edit.0)
                                 } else {
@@ -279,13 +267,6 @@ fn main() {
                             }
                         }
                     }
-                }
-                CliFormat::Raw => {
-                    // how is it encoded as a string?
-                    // base64?
-                    // always take binary from stdin?
-                    // something else?
-                    unimplemented!()
                 }
             }
         }
