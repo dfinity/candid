@@ -1,7 +1,4 @@
-// Logging:
-#[macro_use]
-extern crate log;
-extern crate env_logger;
+use log::error;
 
 use std::rc::Rc;
 
