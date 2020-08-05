@@ -258,12 +258,10 @@ fn main() {
                             trace!("value_diff = {:?}", edit.0);
                             if candid_diff::value_edit_is_skip(&edit) {
                                 debug!("equal values; no change.")
+                            } else if debug_output {
+                                println!("{:?}", edit.0)
                             } else {
-                                if debug_output {
-                                    println!("{:?}", edit.0)
-                                } else {
-                                    println!("{}", pretty::value_edit(&edit).pretty(80))
-                                }
+                                println!("{}", pretty::value_edit(&edit).pretty(80))
                             }
                         }
                     }
