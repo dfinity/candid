@@ -346,8 +346,7 @@ pub mod pretty {
     pub fn pp_value(v: &IDLValue) -> RcDoc {
         use super::IDLValue::*;
         match &*v {
-            Bool(true) => str("true"),
-            Bool(false) => str("false"),
+            Bool(b) => RcDoc::as_string(b),
             Null => str("null"),
             None => str("none"),
             Int(i) => RcDoc::as_string(i),

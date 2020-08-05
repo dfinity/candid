@@ -14,11 +14,11 @@ pub use ::candid::Nat;
 #[derive(Debug, PartialEq, Clone)]
 pub enum VecEdit<R> {
     /// insert into position, shifting the following (backward)
-    InsertValue(Nat, Value),
+    InsertValue(usize, Value),
     /// edit value at position, leaving others in place
-    EditValue(Nat, R),
+    EditValue(usize, R),
     /// remove at given position, shifting the following (forward)
-    RemoveValue(Nat),
+    RemoveValue(usize),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -203,16 +203,16 @@ pub fn vec_diff_simple(
     for i in 0..prefix_len {
         let edit = value_diff(&v1[i], &v2[i], &ty);
         if !value_edit_is_skip(&edit) {
-            edits.push(VecEdit::EditValue(Nat::from(i), edit))
+            edits.push(VecEdit::EditValue(i, edit))
         }
     }
     if v1.len() > v2.len() {
         for i in prefix_len..v1.len() {
-            edits.push(VecEdit::InsertValue(Nat::from(i), v1[i].clone()))
+            edits.push(VecEdit::InsertValue(i, v1[i].clone()))
         }
     } else if v2.len() > v1.len() {
         for i in prefix_len..v2.len() {
-            edits.push(VecEdit::InsertValue(Nat::from(i), v2[i].clone()))
+            edits.push(VecEdit::InsertValue(i, v2[i].clone()))
         }
     }
     edits
