@@ -248,7 +248,7 @@ pub fn value_diff_rec(v1: &Value, v2: &Value, _t: &Option<Type>) -> ValueEdit<Rc
         }
         (Record(fs1), Record(fs2)) => {
             let edits = record_diff(fs1, fs2, Option::None); // to do -- give field types
-            if edits.len() == 0 {
+            if edits.is_empty() {
                 Skip
             } else {
                 ValueEdit::Record(edits)
