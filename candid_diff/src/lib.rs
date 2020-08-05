@@ -256,10 +256,10 @@ pub fn value_diff_rec(v1: &Value, v2: &Value, _t: &Option<Type>) -> ValueEdit<Rc
         }
         (Vec(x), Vec(y)) => {
             let edits = vec_diff_simple(x, y, &Option::None); // to do -- give type
-            if edits.len() > 0 {
-                ValueEdit::Vec(edits)
-            } else {
+            if edits.is_empty() {
                 Skip
+            } else {
+                ValueEdit::Vec(edits)
             }
         }
         (Bool(b1), Bool(b2)) => {
