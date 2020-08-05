@@ -182,11 +182,7 @@ pub fn record_diff(
 ///  - No removal edits used within the output (yet).
 ///  - All insertions at the end (if any).
 ///
-pub fn vec_diff_simple(
-    v1: &[Value],
-    v2: &[Value],
-    ty: &Option<Type>,
-) -> Vec<VecEdit<RcValueEdit>> {
+pub fn vec_diff_simple(v1: &[Value], v2: &[Value], ty: &Option<Type>) -> Vec<VecEdit<RcValueEdit>> {
     let mut edits = vec![];
     let prefix_len = v1.len().min(v2.len());
     let ty = match ty {
