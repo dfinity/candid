@@ -6,10 +6,14 @@ The `candiff` tool compares candid data, and gives with human-readable output.
 
 Rather than compare two values textually, the tool is structural, like Candid itself.
 
+Optionally, the tool type-checks the values that it compares, and signals errors when they value to check against the given type.
+
 ## Use cases
 
 - General-purpose debugging / development tool for Candid data
 - In CI scripts: summarize deviations from expected responses
+- Reference implementation for parsing and sanity-checking Candid values.  See https://github.com/dfinity-lab/motoko/issues/1748
+
 
 ## Candiff input format
 
