@@ -28,7 +28,7 @@ jobs:
     - name: Cache cargo build
       uses: actions/cache@v1
       with:
-        path: target
+        path: rust/target
         key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
       run: cargo build
