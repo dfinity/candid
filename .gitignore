@@ -1,4 +1,4 @@
-rust/target/
+target/
 
 # IDEs
 .idea/
