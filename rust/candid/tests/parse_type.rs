@@ -38,7 +38,7 @@ fn compile(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
     check_prog(env, &ast)
 }
 
-#[test_generator::test_resources("candid/tests/assets/*.did")]
+#[test_generator::test_resources("rust/candid/tests/assets/*.did")]
 fn compiler_test(resource: &str) {
     let base_path = std::env::current_dir().unwrap().join("tests/assets");
     let mut mint = Mint::new(base_path.join("ok"));
