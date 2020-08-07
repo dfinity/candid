@@ -26,11 +26,8 @@ Encoding tests for primitive types
 
 (nat) blob "DIDL\00\01\7d\00" true "nat: 0";
 (nat) blob "DIDL\00\01\7d\7f" true "nat: 0x7f";
-(nat) blob "DIDL\00\01\7d\80\00" true "nat: leb (two bytes)";
+(nat) blob "DIDL\00\01\7d\80\01" true "nat: leb (two bytes)";
 (nat) blob "DIDL\00\01\7d\ff\7f" true "nat: leb (two bytes, all bits)";
 (nat) blob "DIDL\00\01\7d\80" false "nat: leb too short";
-(nat) blob "DIDL\00\01\7d\80\01" true "nat: leb overlong";
-
-
-
+(nat) blob "DIDL\00\01\7d\80\00" false "nat: leb overlong";
 
