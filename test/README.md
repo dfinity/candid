@@ -42,10 +42,11 @@ The test suite contains these kind of files:
    ```
    to allow any number of type definitions followed by encoding tests with grammar
    ```
-   <argseq>  ::= ( <argtype>,* )
    <test> = <argseq> <input> <outcome>
+   <argseq>  ::= ( <argtype>,* )
    <input> =  <text> | blob <text>
    <outcome> = true | false
+   <desc> = <text>?
    ```
    where
      * `<argseq>` describes the type to decode the value at
@@ -53,6 +54,8 @@ The test suite contains these kind of files:
        format (`blob <text>)`
      * `<outcome>` describes the expected outcome of decoding the input:
        decoding should either succeed (`true`) or fail (`false`)
+     * `<desc>` is an optional description of the test, potentially useful in
+       error messages
 
 A Candid implementation conforms to this test suite if
 
