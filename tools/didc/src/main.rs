@@ -1,4 +1,5 @@
-use candid::{check_prog, types::Type, IDLArgs, IDLProg, Result, TypeEnv};
+use candid::{check_prog, types::Type, IDLArgs, IDLProg, TypeEnv};
+use exitfailure::ExitFailure;
 use std::path::{Path, PathBuf};
 use structopt::clap::{arg_enum, AppSettings};
 use structopt::StructOpt;
@@ -38,21 +39,22 @@ arg_enum! {
     }
 }
 
-fn check_file(env: &mut TypeEnv, file: &Path) -> Result<Option<Type>> {
-    let prog = std::fs::read_to_string(file)?;
+fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
+    let prog = std::fs::read_to_string(file)
+        .map_err(|_| candid::Error::msg(format!("could not read file {}", file.display())))?;
     let ast = prog.parse::<IDLProg>()?;
     check_prog(env, &ast)
 }
 
-fn main() {
+fn main() -> Result<(), ExitFailure> {
     match Command::from_args() {
         Command::Check { input } => {
             let mut env = TypeEnv::new();
-            check_file(&mut env, &input).unwrap();
+            check_file(&mut env, &input)?;
         }
         Command::Bind { input, format } => {
             let mut env = TypeEnv::new();
-            let actor = check_file(&mut env, &input).unwrap();
+            let actor = check_file(&mut env, &input)?;
             let content = match format {
                 Binding::JS => candid::bindings::javascript::compile(&env, &actor),
                 Binding::Candid => candid::bindings::candid::compile(&env, &actor),
@@ -60,7 +62,7 @@ fn main() {
             println!("{}", content);
         }
         Command::Encode { args, pretty, .. } => {
-            let bytes = args.to_bytes().unwrap();
+            let bytes = args.to_bytes()?;
             let hex = if pretty {
                 pretty_hex::pretty_hex(&bytes)
             } else {
@@ -69,9 +71,10 @@ fn main() {
             println!("{}", hex);
         }
         Command::Decode { blob, .. } => {
-            let bytes = hex::decode(&blob).unwrap();
-            let value = IDLArgs::from_bytes(&bytes).unwrap();
+            let bytes = hex::decode(&blob)?;
+            let value = IDLArgs::from_bytes(&bytes)?;
             println!("{}", value);
         }
     };
+    Ok(())
 }
