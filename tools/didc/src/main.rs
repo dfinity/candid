@@ -1,4 +1,4 @@
-use candid::{check_prog, parser::types::IDLType, types::Type, IDLArgs, IDLProg, TypeEnv};
+use candid::{check_prog, parser::types::IDLTypes, types::Type, IDLArgs, IDLProg, TypeEnv};
 use exitfailure::ExitFailure;
 use std::path::{Path, PathBuf};
 use structopt::clap::AppSettings;
@@ -33,10 +33,31 @@ enum Command {
 
 #[derive(StructOpt, Debug)]
 struct TypeAnnotation {
-    #[structopt(name = "type", short, long)]
-    ty: Option<IDLType>,
-    #[structopt(short, long, requires("type"))]
+    #[structopt(name = "types", short, long)]
+    tys: Option<IDLTypes>,
+    #[structopt(short, long, requires("types"))]
     defs: Option<PathBuf>,
+}
+
+impl TypeAnnotation {
+    fn annotate_types(&self, args: IDLArgs) -> candid::Result<IDLArgs> {
+        match &self.tys {
+            None => Ok(args),
+            Some(tys) => {
+                let mut env = TypeEnv::new();
+                if let Some(ref file) = self.defs {
+                    check_file(&mut env, file)?;
+                }
+                let mut res = Vec::new();
+                for (v, ty) in args.args.iter().zip(tys.args.iter()) {
+                    let ty = env.ast_to_type(ty)?;
+                    let v = v.annotate_type(&env, &ty)?;
+                    res.push(v);
+                }
+                Ok(IDLArgs { args: res })
+            }
+        }
+    }
 }
 
 fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
@@ -62,7 +83,12 @@ fn main() -> Result<(), ExitFailure> {
             };
             println!("{}", content);
         }
-        Command::Encode { args, pretty, .. } => {
+        Command::Encode {
+            args,
+            pretty,
+            annotate,
+        } => {
+            let args = annotate.annotate_types(args)?;
             let bytes = args.to_bytes()?;
             let hex = if pretty {
                 pretty_hex::pretty_hex(&bytes)
@@ -71,9 +97,10 @@ fn main() -> Result<(), ExitFailure> {
             };
             println!("{}", hex);
         }
-        Command::Decode { blob, .. } => {
+        Command::Decode { blob, annotate } => {
             let bytes = hex::decode(&blob)?;
             let value = IDLArgs::from_bytes(&bytes)?;
+            let value = annotate.annotate_types(value)?;
             println!("{}", value);
         }
     };

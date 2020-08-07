@@ -1,6 +1,6 @@
 use super::value::{IDLField, IDLValue, IDLArgs};
 use super::typing::check_unique;
-use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg};
+use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg, IDLTypes};
 use super::lexer::{Token, LexicalError, error};
 use crate::{idl_hash, Principal, types::Label};
 
@@ -93,6 +93,8 @@ RecordField: IDLField = {
 }
 
 // Type
+pub Typs: IDLTypes = "(" <SepBy<Typ, ",">> ")" => IDLTypes { args:<> };
+
 pub Typ: IDLType = {
     PrimTyp => <>,
     "opt" <Typ> => IDLType::OptT(Box::new(<>)),
