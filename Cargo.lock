@@ -155,7 +155,7 @@ dependencies = [
  "candid_derive",
  "crc32fast",
  "goldenfile",
- "hex",
+ "hex 0.3.2",
  "lalrpop",
  "lalrpop-util",
  "leb128",
@@ -248,6 +248,17 @@ dependencies = [
  "proc-macro2 1.0.19",
  "quote 1.0.7",
  "syn 1.0.36",
+]
+
+[[package]]
+name = "didc"
+version = "0.1.0"
+dependencies = [
+ "candid",
+ "clap",
+ "hex 0.4.2",
+ "pretty-hex",
+ "structopt",
 ]
 
 [[package]]
@@ -417,6 +428,12 @@ name = "hex"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
+
+[[package]]
+name = "hex"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "644f9158b2f133fd50f5fb3242878846d9eb792e445c893805ff0e3824006e35"
 
 [[package]]
 name = "humantime"
@@ -668,6 +685,12 @@ dependencies = [
  "arrayvec",
  "typed-arena",
 ]
+
+[[package]]
+name = "pretty-hex"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be91bcc43e73799dc46a6c194a55e7aae1d86cc867c860fd4a436019af21bd8c"
 
 [[package]]
 name = "proc-macro-crate"
