@@ -1,4 +1,4 @@
-use candid::{check_prog, types::Type, IDLArgs, IDLProg, TypeEnv, parser::types::IDLType};
+use candid::{check_prog, parser::types::IDLType, types::Type, IDLArgs, IDLProg, TypeEnv};
 use exitfailure::ExitFailure;
 use std::path::{Path, PathBuf};
 use structopt::clap::AppSettings;
