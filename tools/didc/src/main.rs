@@ -1,7 +1,7 @@
-use candid::{check_prog, types::Type, IDLArgs, IDLProg, TypeEnv};
+use candid::{check_prog, types::Type, IDLArgs, IDLProg, TypeEnv, parser::types::IDLType};
 use exitfailure::ExitFailure;
 use std::path::{Path, PathBuf};
-use structopt::clap::{arg_enum, AppSettings};
+use structopt::clap::AppSettings;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -12,31 +12,31 @@ enum Command {
     #[structopt(about = "Binding for different languages")]
     Bind {
         input: PathBuf,
-        #[structopt(short, long, possible_values = &Binding::variants(), case_insensitive = true)]
-        format: Binding,
+        #[structopt(short, long, possible_values = &["js", "did"], case_insensitive = true)]
+        format: String,
     },
     #[structopt(about = "Encode candid value")]
     Encode {
         args: IDLArgs,
-        #[structopt(name = "type", short, long)]
-        type_opt: Option<PathBuf>,
+        #[structopt(flatten)]
+        annotate: TypeAnnotation,
         #[structopt(short, long)]
         pretty: bool,
     },
     #[structopt(about = "Decode candid binary data")]
     Decode {
         blob: String,
-        #[structopt(name = "type", short, long)]
-        type_opt: Option<PathBuf>,
+        #[structopt(flatten)]
+        annotate: TypeAnnotation,
     },
 }
 
-arg_enum! {
-    #[derive(Debug)]
-    enum Binding {
-        JS,
-        Candid,
-    }
+#[derive(StructOpt, Debug)]
+struct TypeAnnotation {
+    #[structopt(name = "type", short, long)]
+    ty: Option<IDLType>,
+    #[structopt(short, long, requires("type"))]
+    defs: Option<PathBuf>,
 }
 
 fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
@@ -55,9 +55,10 @@ fn main() -> Result<(), ExitFailure> {
         Command::Bind { input, format } => {
             let mut env = TypeEnv::new();
             let actor = check_file(&mut env, &input)?;
-            let content = match format {
-                Binding::JS => candid::bindings::javascript::compile(&env, &actor),
-                Binding::Candid => candid::bindings::candid::compile(&env, &actor),
+            let content = match format.as_str() {
+                "js" => candid::bindings::javascript::compile(&env, &actor),
+                "did" => candid::bindings::candid::compile(&env, &actor),
+                _ => unreachable!(),
             };
             println!("{}", content);
         }

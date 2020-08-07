@@ -286,6 +286,7 @@ dependencies = [
  "candid",
  "clap",
  "exitfailure",
+ "failure",
  "hex 0.4.2",
  "pretty-hex",
  "structopt",
