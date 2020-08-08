@@ -284,6 +284,7 @@ name = "didc"
 version = "0.1.0"
 dependencies = [
  "candid",
+ "candid_diff",
  "clap",
  "exitfailure",
  "failure",

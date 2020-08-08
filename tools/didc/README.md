@@ -17,7 +17,7 @@ SUBCOMMANDS:
 
 ## Examples
 
-```bash
+```
 $ didc encode '(42, vec {1;2;-3})'
 4449444c016d7c027c002a0301027d
 
@@ -35,9 +35,12 @@ $ didc decode '4449444c016d7c027c002a0301027d'
 $ didc decode '4449444c016d7c027c002a0301027d' -t '(int)'
 (42)
 
+$ didc diff '(record{1;2;3}, 42)' '(record{1;5;9}, 42)'
+record { edit { 1 put { 5 } }; edit { 2 put { 9 } }; }
+skip
+
 $ didc bind hello.did -f js
 export default ({ IDL }) => {
   return IDL.Service({ 'greet' : IDL.Func([IDL.Text], [IDL.Text], []) });
 };
 ```
- 

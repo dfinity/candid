@@ -1,10 +1,10 @@
-use candid::{check_prog, parser::types::IDLTypes, types::Type, IDLArgs, IDLProg, TypeEnv};
+use candid::{check_prog, parser::types::IDLTypes, types::Type, Error, IDLArgs, IDLProg, TypeEnv};
 use exitfailure::ExitFailure;
 use std::path::{Path, PathBuf};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt)]
 #[structopt(global_settings = &[AppSettings::ColoredHelp, AppSettings::DeriveDisplayOrder])]
 enum Command {
     #[structopt(about = "Type check Candid file")]
@@ -15,7 +15,7 @@ enum Command {
         #[structopt(short, long, possible_values = &["js", "did"], case_insensitive = true)]
         format: String,
     },
-    #[structopt(about = "Encode candid value")]
+    #[structopt(about = "Encode Candid value")]
     Encode {
         args: IDLArgs,
         #[structopt(flatten)]
@@ -23,15 +23,22 @@ enum Command {
         #[structopt(short, long)]
         pretty: bool,
     },
-    #[structopt(about = "Decode candid binary data")]
+    #[structopt(about = "Decode Candid binary data")]
     Decode {
         blob: String,
         #[structopt(flatten)]
         annotate: TypeAnnotation,
     },
+    #[structopt(about = "Diff two Candid values")]
+    Diff {
+        value1: IDLArgs,
+        value2: IDLArgs,
+        #[structopt(flatten)]
+        annotate: TypeAnnotation,
+    },
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt)]
 struct TypeAnnotation {
     #[structopt(name = "types", short, long)]
     tys: Option<IDLTypes>,
@@ -44,6 +51,9 @@ impl TypeAnnotation {
         match &self.tys {
             None => Ok(args),
             Some(tys) => {
+                if tys.args.len() > args.args.len() {
+                    return Err(Error::msg("Too many types"));
+                }
                 let mut env = TypeEnv::new();
                 if let Some(ref file) = self.defs {
                     check_file(&mut env, file)?;
@@ -62,7 +72,7 @@ impl TypeAnnotation {
 
 fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
     let prog = std::fs::read_to_string(file)
-        .map_err(|_| candid::Error::msg(format!("could not read file {}", file.display())))?;
+        .map_err(|_| Error::msg(format!("could not read file {}", file.display())))?;
     let ast = prog.parse::<IDLProg>()?;
     check_prog(env, &ast)
 }
@@ -102,6 +112,21 @@ fn main() -> Result<(), ExitFailure> {
             let value = IDLArgs::from_bytes(&bytes)?;
             let value = annotate.annotate_types(value)?;
             println!("{}", value);
+        }
+        Command::Diff {
+            value1,
+            value2,
+            annotate,
+        } => {
+            let vs1 = annotate.annotate_types(value1)?.args;
+            let vs2 = annotate.annotate_types(value2)?.args;
+            if vs1.len() != vs2.len() {
+                return Err(Error::msg("value length mismatch").into());
+            }
+            for (v1, v2) in vs1.iter().zip(vs2.iter()) {
+                let edit = candid_diff::value_diff(&v1, &v2, &None);
+                println!("{}", candid_diff::pretty::value_edit(&edit).pretty(80));
+            }
         }
     };
     Ok(())

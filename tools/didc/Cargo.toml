@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 candid = { path = "../../rust/candid" }
+candid_diff = { path = "../candid_diff" }
 clap = "2.33"
 structopt = "0.3"
 pretty-hex = "0.1"
