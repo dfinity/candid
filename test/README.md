@@ -42,7 +42,7 @@ The test suite contains these kind of files:
    ```
    to allow any number of type definitions followed by encoding tests with grammar
    ```
-   <test> = <argseq> <input> <outcome>
+   <test> = <argseq> <input> <outcome> <desc>
    <argseq>  ::= ( <argtype>,* )
    <input> =  <text> | blob <text>
    <outcome> = true | false
