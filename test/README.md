@@ -34,7 +34,7 @@ The test suite contains these kind of files:
    Implementations should reject parsing them.
 
  * `<name>.test.did`:
-   A set of Candid tests, written in a grammar that extens the Candid type and value grammar:
+   A set of Candid tests, written in a grammar that extends the Candid type and value grammar:
 
    The root production is
    ```
