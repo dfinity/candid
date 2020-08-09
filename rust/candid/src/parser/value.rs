@@ -51,6 +51,19 @@ impl IDLArgs {
             args: args.to_owned(),
         }
     }
+    pub fn annotate_types(self, env: &TypeEnv, types: &[Type]) -> Result<Self> {
+        if types.len() > self.args.len() {
+            return Err(Error::msg("wrong number of argument values"));
+        }
+        let mut args = Vec::new();
+        for (v, ty) in self.args.iter().zip(types.iter()) {
+            let v = v.annotate_type(env, &ty)?;
+            args.push(v);
+        }
+        Ok(IDLArgs { args })
+    }
+    /// Encode IDLArgs with the given types. Note that this is not equivalent to
+    /// `idl_args.annotate_types(env, types).to_bytes()` for recursive types.
     pub fn to_bytes_with_types(&self, env: &TypeEnv, types: &[Type]) -> Result<Vec<u8>> {
         if types.len() > self.args.len() {
             return Err(Error::msg("wrong number of argument values"));
