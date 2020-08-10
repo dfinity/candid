@@ -52,10 +52,10 @@ The test suite contains these kind of files:
    <desc> ::=  <text>?
    ```
    where the four forms assert
-        * that the input can be decoded/parsed at that type
-        * that the input cannot be decoded/parsed at that type
-	* that the two inputs values decode/parse to the same value
-	* that the two inputs values decode/parse to different values.
+    * that the input can be decoded/parsed at that type
+    * that the input cannot be decoded/parsed at that type
+    * that the two inputs values decode/parse to the same value
+    * that the two inputs values decode/parse to different values.
 
    The last two forms refer to the host language's equality, and are useful to
    assert that due to subtyping, certain information is ignored.
