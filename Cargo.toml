@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "candid",
-    "candid_derive",
-    "candid_diff",
+    "rust/candid",
+    "rust/candid_derive",
+    "tools/candid_diff",
 ]
