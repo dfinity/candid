@@ -8,11 +8,12 @@ the data they exchange, with type safety and extensibility.
 
 ## Specifications
 
-The [spec](spec/) directory contains Candid specifications, including the language specification, soundness proof and integration with other languages.
+The [spec](spec/) directory contains Candid specifications, including the language specification and soundness proof.
 
 ## Implementations
 
 Candid supports several different programming languages. 
+
 This repository contains some of the implementations developed by DFINITY.
 
 * [Rust](rust/): A serialization library based on Serde, and a compiler for generating bindings for other languages.
