@@ -34,8 +34,6 @@ pretty = "0.10.0"
 hex = "0.3"
 
 [dev-dependencies]
-pretty_assertions = "0.6.1"
 goldenfile = "1.1.0"
-rustfmt = "0.10.0"
 test-generator = "0.3.0"
 rand = "0.7"

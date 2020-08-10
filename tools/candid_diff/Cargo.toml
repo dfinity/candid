@@ -18,7 +18,7 @@ include = ["src", "README.md", "Cargo.toml", "LICENSE"]
 name = "candid_diff"
 
 [dependencies]
-candid = { path = "../candid" }
+candid = { path = "../../rust/candid" }
 clap = "2.33"
 structopt = "0.3"
 log = "0.4"
