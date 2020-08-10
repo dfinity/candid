@@ -42,26 +42,42 @@ The test suite contains these kind of files:
    ```
    to allow any number of type definitions followed by encoding tests with grammar
    ```
-   <test> = <argseq> <input> <outcome> <desc>
-   <argseq>  ::= ( <argtype>,* )
-   <input> =  <text> | blob <text>
-   <outcome> = true | false
-   <desc> = <text>?
+   <test> ::=
+      | assert <input> : <tuptype> <desc>
+      | assert <input> !: <tuptype> <desc>
+      | assert <input> == <input> : <tuptype> <desc>
+      | assert <input> != <input> : <tuptype> <desc>
+   <input> ::= <text> | blob <text>
+   <desc> ::=  <text>?
    ```
-   where
-     * `<argseq>` describes the type to decode the value at
-     * `<input>` describes input in textual notation (`<text>`) or binary
-       format (`blob <text>)`
-     * `<outcome>` describes the expected outcome of decoding the input:
-       decoding should either succeed (`true`) or fail (`false`)
-     * `<desc>` is an optional description of the test, potentially useful in
-       error messages
+   where the four forms assert
+        * that the input can be decoded/parsed at that type
+        * that the input cannot be decoded/parsed at that type
+	* that the two inputs values decode/parse to the same value
+	* that the two inputs values decode/parse to different values.
+
+   The last two forms refer to the host language's equality, and are useful to
+   assert that due to subtyping, certain information is ignored.
+
+   The `<input>` describes input in textual notation (`<text>`) or binary
+   format (`blob <text>`).
+
+   A `<desc>` is an optional description of the test, potentially useful in
+   the test suite output.
 
 A Candid implementation conforms to this test suite if
 
  * its service parser (if present) accepts all `*.good.did` files and rejects
    all `*.bad.did` files in this directory.
- * it can parse all binary input from all `*.test.did` files at the given types
- * it can parse all test input from all `*.test.did` files at the given types
-   (if it supports parsing the textual representation).
- 
+ * all tests from all `*.test.did` files succeed.
+
+Candid implementations that do not support parsing service files can ignore the
+`*.good.did` and `*.bad.did` files.
+
+Candid implementations that do not support parsing the textual prepresentation
+can ignore those tests where all inputs are textual. They should treat a test
+that compares textual and binary values as plain decoding assertions on the
+binary value.
+
+For example, `assert blob "DIDL\00\01\7e\00" == (true) : (bool)` should be
+treated as `assert blob "DIDL\00\01\7e\00" : (bool)` by such an implementation.
