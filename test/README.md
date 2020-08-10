@@ -8,7 +8,8 @@ This test suite covers
 
  * parsing Candid service descriptions
  * given a Candid type, decoding binary Candid data, asserting success or failure
- * given a Candid type, decoding textual Candid data, asserting success or failure
+ * given a Candid type, parsing textual Candid data, asserting success or failure
+ * comparing such decoded/parsed values, using the Host language’s notion of equality.
 
 Because this test data necessarily has to be host-language agnostic, it is not
 possible to
