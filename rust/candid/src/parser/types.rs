@@ -15,6 +15,11 @@ pub enum IDLType {
     PrincipalT,
 }
 
+#[derive(Debug, Clone)]
+pub struct IDLTypes {
+    pub args: Vec<IDLType>,
+}
+
 macro_rules! enum_to_doc {
     (pub enum $name:ident {
         $($variant:ident),*,
@@ -121,6 +126,14 @@ impl std::str::FromStr for IDLType {
     fn from_str(str: &str) -> Result<Self> {
         let lexer = super::lexer::Lexer::new(str);
         Ok(super::grammar::TypParser::new().parse(lexer)?)
+    }
+}
+
+impl std::str::FromStr for IDLTypes {
+    type Err = crate::Error;
+    fn from_str(str: &str) -> Result<Self> {
+        let lexer = super::lexer::Lexer::new(str);
+        Ok(super::grammar::TypsParser::new().parse(lexer)?)
     }
 }
 
