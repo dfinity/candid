@@ -12,8 +12,7 @@ The [spec](spec/) directory contains Candid specifications, including the langua
 
 ## Implementations
 
-Candid supports several different programming languages. 
-
+Candid supports several different programming languages.
 This repository contains some of the implementations developed by DFINITY.
 
 * [Rust](rust/): A serialization library based on Serde, and a compiler for generating bindings for other languages.
@@ -28,7 +27,8 @@ A list of community maintained Candid libraries:
 
 ## Tools
 
-Coming soon
+* [didc](tools/didc): Candid CLI
+* [candiff](tools/candid_diff): Diff Candid values structurally
 
 ## Contribution
 
