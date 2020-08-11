@@ -37,7 +37,7 @@ fn parse_literals() {
             IDLValue::Float64(42.42f64)
         ]
     );
-    assert_eq!(format!("{}", args), "(true, null, 42, 4.2e1, 4.242e1)");
+    assert_eq!(format!("{}", args), "(true, null, 42, 42, 42.42)");
 }
 
 #[test]
