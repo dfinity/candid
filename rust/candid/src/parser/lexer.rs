@@ -208,6 +208,7 @@ impl<'input> Iterator for Lexer<'input> {
             Some((i, ';')) => Some(Ok((i, Token::Semi, i + 1))),
             Some((i, ',')) => Some(Ok((i, Token::Comma, i + 1))),
             Some((i, ':')) => Some(Ok((i, Token::Colon, i + 1))),
+            Some((i, '.')) => Some(Ok((i, Token::Dot, i + 1))),
             Some((i, '=')) => Some(Ok((i, Token::Equals, i + 1))),
             Some((i, '+')) => Some(Ok((i, Token::Plus, i + 1))),
             Some((i, '-')) => match self.peek() {

@@ -26,9 +26,18 @@ fn parse_bool_lit() {
 
 #[test]
 fn parse_literals() {
-    let args = parse_args(" (true, null )");
-    assert_eq!(args.args, vec![IDLValue::Bool(true), IDLValue::Null]);
-    assert_eq!(format!("{}", args), "(true, null)");
+    let args = parse_args(" (true, null, 42, 42., 42.42)");
+    assert_eq!(
+        args.args,
+        vec![
+            IDLValue::Bool(true),
+            IDLValue::Null,
+            IDLValue::Number("42".to_owned()),
+            IDLValue::Float64(42f64),
+            IDLValue::Float64(42.42f64)
+        ]
+    );
+    assert_eq!(format!("{}", args), "(true, null, 42, 42, 42.42)");
 }
 
 #[test]
