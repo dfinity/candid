@@ -15,6 +15,7 @@ pub enum IDLValue {
     Null,
     Text(String),
     Number(String), // Undetermined number type
+    Float64(f64),
     Opt(Box<IDLValue>),
     Vec(Vec<IDLValue>),
     Record(Vec<IDLField>),
@@ -32,6 +33,7 @@ pub enum IDLValue {
     Int16(i16),
     Int32(i32),
     Int64(i64),
+    Float32(f32),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -156,6 +158,8 @@ impl fmt::Display for IDLValue {
             IDLValue::Int16(n) => write!(f, "{}", n),
             IDLValue::Int32(n) => write!(f, "{}", n),
             IDLValue::Int64(n) => write!(f, "{}", n),
+            IDLValue::Float32(n) => write!(f, "{:e}", n),
+            IDLValue::Float64(n) => write!(f, "{:e}", n),
             IDLValue::Text(ref s) => write!(f, "\"{}\"", s),
             IDLValue::None => write!(f, "null"),
             IDLValue::Opt(ref v) => write!(f, "opt {}", v),
@@ -227,6 +231,9 @@ impl IDLValue {
             (IDLValue::Int16(n), Type::Int16) => IDLValue::Int16(*n),
             (IDLValue::Int32(n), Type::Int32) => IDLValue::Int32(*n),
             (IDLValue::Int64(n), Type::Int64) => IDLValue::Int64(*n),
+            (IDLValue::Float64(n), Type::Float64) => IDLValue::Float64(*n),
+            (IDLValue::Float32(n), Type::Float32) => IDLValue::Float32(*n),
+            (IDLValue::Float64(n), Type::Float32) => IDLValue::Float32(*n as f32),
             (IDLValue::Text(s), Type::Text) => IDLValue::Text(s.to_owned()),
             (IDLValue::None, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Opt(v), Type::Opt(ty)) => {
@@ -295,6 +302,8 @@ impl IDLValue {
             IDLValue::Int16(_) => Type::Int16,
             IDLValue::Int32(_) => Type::Int32,
             IDLValue::Int64(_) => Type::Int64,
+            IDLValue::Float32(_) => Type::Float32,
+            IDLValue::Float64(_) => Type::Float64,
             IDLValue::Text(_) => Type::Text,
             IDLValue::None => Type::Opt(Box::new(Type::Null)),
             IDLValue::Opt(ref v) => {
@@ -372,6 +381,8 @@ pub mod pretty {
             Int16(i) => RcDoc::as_string(i),
             Int32(i) => RcDoc::as_string(i),
             Int64(i) => RcDoc::as_string(i),
+            Float32(f) => RcDoc::as_string(f), // todo
+            Float64(f) => RcDoc::as_string(f),
             Number(t) => str(t),
             Text(t) => RcDoc::as_string(format!("{:?}", t)), // to do -- enough quoting here?
             Opt(v) => kwd("opt").append(enclose_space("{", pp_value(v), "}")),
@@ -428,6 +439,8 @@ impl crate::CandidType for IDLValue {
             IDLValue::Int16(n) => serializer.serialize_int16(n),
             IDLValue::Int32(n) => serializer.serialize_int32(n),
             IDLValue::Int64(n) => serializer.serialize_int64(n),
+            IDLValue::Float32(f) => serializer.serialize_float32(f),
+            IDLValue::Float64(f) => serializer.serialize_float64(f),
             IDLValue::Text(ref s) => serializer.serialize_text(s),
             IDLValue::None => serializer.serialize_option::<Option<String>>(None),
             IDLValue::Opt(ref v) => serializer.serialize_option(Some(v.deref())),
@@ -477,7 +490,7 @@ impl<'de> Deserialize<'de> for IDLValue {
         impl<'de> Visitor<'de> for IDLValueVisitor {
             type Value = IDLValue;
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("any valid IDL value")
+                formatter.write_str("any valid Candid value")
             }
             visit_prim!(Bool, bool);
             visit_prim!(Nat8, u8);
@@ -488,6 +501,8 @@ impl<'de> Deserialize<'de> for IDLValue {
             visit_prim!(Int16, i16);
             visit_prim!(Int32, i32);
             visit_prim!(Int64, i64);
+            visit_prim!(Float32, f32);
+            visit_prim!(Float64, f64);
             // Deserialize bignum
             fn visit_bytes<E: de::Error>(self, value: &[u8]) -> DResult<E> {
                 let (tag, bytes) = value.split_at(1);
