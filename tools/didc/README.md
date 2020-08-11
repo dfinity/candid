@@ -1,6 +1,6 @@
 # Candid CLI
 
-A general-purpose tool for Candid.
+A multi-purpose tool for Candid.
 
 ```
 didc 0.1.0
