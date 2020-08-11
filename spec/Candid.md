@@ -72,7 +72,7 @@ This is a summary of the grammar proposed:
 <methtype>  ::= <name> : (<functype> | <id>)
 <functype>  ::= <tuptype> -> <tuptype> <funcann>*
 <funcann>   ::= oneway | query
-<tuptype>   ::= ( <argtype>* )
+<tuptype>   ::= ( <argtype>,* )
 <argtype>   ::= <datatype>
 <fieldtype> ::= <nat> : <datatype>
 <datatype>  ::= <id> | <primtype> | <constype> | <reftype>
