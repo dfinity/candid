@@ -170,8 +170,8 @@ fn main() -> Result<(), ExitFailure> {
                 return Err(Error::msg("value length mismatch").into());
             }
             for (v1, v2) in vs1.iter().zip(vs2.iter()) {
-                let edit = candid_diff::value_diff(&v1, &v2, &None);
-                println!("{}", candid_diff::pretty::value_edit(&edit).pretty(80));
+                let edit = candiff::value_diff(&v1, &v2, &None);
+                println!("{}", candiff::pretty::value_edit(&edit).pretty(80));
             }
         }
     };
