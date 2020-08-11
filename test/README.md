@@ -11,15 +11,10 @@ This test suite covers
  * given a Candid type, parsing textual Candid data, asserting success or failure
  * comparing such decoded/parsed values, using the Host language’s notion of equality.
 
-Because this test data necessarily has to be host-language agnostic, it is not
-possible to
-
- * assert the decoded value, as it would be host-language specific
- * cover encoding, as it would require specifying a host-language value,
-   and also because Candid encoding is not canonical
-
-Implementers are advised to extend this test suite with randomzied
-round-tripping tests (host value → candid → host value).
+The test suite currently does not cover _encoding_, because the Candid binary
+format is not canonical.  Implementers are advised to extend this test suite
+with randomzied round-tripping tests (host value → candid → host value) to
+cover encoding as well.
 
 Format
 ======
@@ -54,8 +49,10 @@ The test suite contains these kind of files:
    where the four forms assert
     * that the input can be decoded/parsed at that type
     * that the input cannot be decoded/parsed at that type
-    * that the two inputs values decode/parse to the same value
-    * that the two inputs values decode/parse to different values.
+    * that the two inputs values decode/parse successfully,
+      and the results are equal.
+    * that the two inputs values decode/parse successfully,
+      and the results are not equal.
 
    The last two forms refer to the host language's equality, and are useful to
    assert that due to subtyping, certain information is ignored.
