@@ -208,7 +208,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "candid_diff"
+name = "candiff"
 version = "0.1.0"
 dependencies = [
  "assert_cmd",
@@ -284,7 +284,7 @@ name = "didc"
 version = "0.1.0"
 dependencies = [
  "candid",
- "candid_diff",
+ "candiff",
  "clap",
  "exitfailure",
  "failure",

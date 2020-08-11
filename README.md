@@ -28,7 +28,7 @@ A list of community maintained Candid libraries:
 ## Tools
 
 * [didc](tools/didc): Candid CLI
-* [candiff](tools/candid_diff): Diff Candid values structurally
+* [candiff](tools/candiff): Diff Candid values structurally
 
 ## Contribution
 

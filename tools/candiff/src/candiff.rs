@@ -13,7 +13,7 @@ use structopt::StructOpt;
 use candid::parser::types::IDLType;
 use candid::parser::typing::{check_type, Env, TypeEnv};
 
-use candid_diff::{
+use candiff::{
     //Type,
     pretty,
     Value,
@@ -254,9 +254,9 @@ fn main() {
                             };
                             trace!("annotated_value_1 = {:?}", v1);
                             trace!("annotated_value_2 = {:?}", v2);
-                            let edit = candid_diff::value_diff(&v1, &v2, &input_type);
+                            let edit = candiff::value_diff(&v1, &v2, &input_type);
                             trace!("value_diff = {:?}", edit.0);
-                            if candid_diff::value_edit_is_skip(&edit) {
+                            if candiff::value_edit_is_skip(&edit) {
                                 debug!("equal values; no change.")
                             } else if debug_output {
                                 println!("{:?}", edit.0)

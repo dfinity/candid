@@ -2,7 +2,7 @@
 
 ![](https://github.com/dfinity/candid/workflows/Rust/badge.svg)
 
-The `candid_diff` crate provides the `candiff` tool.
+The `candiff` crate provides the `candiff` CLI tool.
 
 The `candiff` tool compares candid data, and gives with human-readable output.
 
