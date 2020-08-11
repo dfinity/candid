@@ -70,8 +70,9 @@ This is a summary of the grammar proposed:
 
 <actortype> ::= { <methtype>;* }
 <methtype>  ::= <name> : (<functype> | <id>)
-<functype>  ::= ( <argtype>,* ) -> ( <argtype>,* ) <funcann>*
+<functype>  ::= <tuptype> -> <tuptype> <funcann>*
 <funcann>   ::= oneway | query
+<tuptype>   ::= ( <argtype>,* )
 <argtype>   ::= <datatype>
 <fieldtype> ::= <nat> : <datatype>
 <datatype>  ::= <id> | <primtype> | <constype> | <reftype>
