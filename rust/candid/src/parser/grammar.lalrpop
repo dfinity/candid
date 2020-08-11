@@ -35,6 +35,7 @@ extern {
         "{" => Token::LBrace,
         "}" => Token::RBrace,
         "," => Token::Comma,
+        "." => Token::Dot,
         ";" => Token::Semi,
         ":" => Token::Colon,
         "->" => Token::Arrow,
@@ -50,6 +51,11 @@ pub Arg: IDLValue = {
     "+" <"number"> => IDLValue::Number(<>),
     "-" <"number"> => IDLValue::Number(format!("-{}", <>)),
     "number" => IDLValue::Number(<>),
+    <"number"> "." =>? Ok(IDLValue::Float64(<>.parse::<f64>().map_err(|_| error("not float"))?)),
+    <n:"number"> "." <f:"number"> =>? {
+        let float = format!("{}.{}", n, f);
+        Ok(IDLValue::Float64(float.parse::<f64>().map_err(|_| error("not float"))?))
+    },
     "text" => IDLValue::Text(<>),
     "null" => IDLValue::Null,
     "opt" <Arg> => IDLValue::Opt(Box::new(<>)),
