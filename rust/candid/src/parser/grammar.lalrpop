@@ -1,6 +1,7 @@
 use super::value::{IDLField, IDLValue, IDLArgs};
 use super::typing::check_unique;
 use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg, IDLTypes};
+use super::test::{Assert, Assertion, Input, Test};
 use super::lexer::{Token, LexicalError, error};
 use crate::{idl_hash, Principal, types::Label};
 
@@ -38,6 +39,7 @@ extern {
         "." => Token::Dot,
         ";" => Token::Semi,
         ":" => Token::Colon,
+        "!" => Token::Bang,
         "->" => Token::Arrow,
     }
 }
@@ -48,14 +50,7 @@ pub Args: IDLArgs = "(" <SepBy<Arg, ",">> ")" => IDLArgs { args: <> };
 
 pub Arg: IDLValue = {
     "bool" => IDLValue::Bool(<>),
-    "+" <"number"> => IDLValue::Number(<>),
-    "-" <"number"> => IDLValue::Number(format!("-{}", <>)),
-    "number" => IDLValue::Number(<>),
-    <"number"> "." =>? Ok(IDLValue::Float64(<>.parse::<f64>().map_err(|_| error("not float"))?)),
-    <n:"number"> "." <f:"number"> =>? {
-        let float = format!("{}.{}", n, f);
-        Ok(IDLValue::Float64(float.parse::<f64>().map_err(|_| error("not float"))?))
-    },
+    NumLiteral => <>,
     "text" => IDLValue::Text(<>),
     "null" => IDLValue::Null,
     "opt" <Arg> => IDLValue::Opt(Box::new(<>)),
@@ -82,6 +77,24 @@ pub Arg: IDLValue = {
     "principal" <"text"> =>? Ok(IDLValue::Principal(Principal::from_text(<>).map_err(error)?)),
 }
 
+NumLiteral: IDLValue = {
+    <neg:"-"?> <pos:"+"?> <n:"number"> <frac:("." "number"?)?> =>? {
+        let num = match (neg, pos) {
+            (Some(_), None) => format!("-{}", n),
+            (None, Some(_)) => n,
+            (Some(_), Some(_)) => return Err(error("sign error")),
+            (None, None) => n,
+        };
+        match frac {
+            None => Ok(IDLValue::Number(num)),
+            Some((_, None)) => Ok(IDLValue::Float64(num.parse::<f64>().map_err(|_| error("not float"))?)),
+            Some((_, Some(f))) => {
+                Ok(IDLValue::Float64(format!("{}.{}", num, f).parse::<f64>().map_err(|_| error("not float"))?))
+            }
+        }
+    }
+}
+
 Field: IDLField = {
     <n:"number"> "=" <v:Arg> =>? Ok(IDLField { id: Label::Id(n.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), val: v }),
     <n:Name> "=" <v:Arg> => IDLField { id: Label::Named(n), val: v },
@@ -99,7 +112,7 @@ RecordField: IDLField = {
 }
 
 // Type
-pub Typs: IDLTypes = "(" <SepBy<Typ, ",">> ")" => IDLTypes { args:<> };
+pub Typs: IDLTypes = TupTyp => IDLTypes { args:<> };
 
 pub Typ: IDLType = {
     PrimTyp => <>,
@@ -156,8 +169,10 @@ VariantFieldTyp: TypeField = {
     "number" =>? Ok(TypeField { label: Label::Id(<>.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), typ: IDLType::PrimT(PrimType::Null) }),
 }
 
+TupTyp: Vec<IDLType> = "(" <SepBy<ArgTyp, ",">> ")" => <>;
+
 FuncTyp: FuncType = {
-    "(" <args:SepBy<ArgTyp, ",">> ")" "->" "(" <rets:SepBy<ArgTyp, ",">> ")" <modes:FuncMode*> =>
+    <args:TupTyp> "->" <rets:TupTyp> <modes:FuncMode*> =>
         FuncType { modes, args, rets },
 }
 
@@ -199,6 +214,30 @@ Actor: IDLType = {
 
 pub IDLProg: IDLProg = {
     <decs:SepBy<Def, ";">> <actor:Actor?> => IDLProg { decs, actor }
+}
+
+// Test file
+
+Input: Input = {
+    "text" => Input::Text(<>),
+    "blob" <"text"> => Input::Blob(<>),
+}
+
+Assert: Assert = <id:"id"> <assert:Assertion> <desc:"text"?> =>? {
+    if id != "assert" {
+        Err(error("not an assert"))
+    } else { Ok(Assert { assert, desc }) }
+};
+
+Assertion: Assertion = {
+    <input:Input> ":" <typ:TupTyp> => Assertion::Decode(input, typ),
+    <input:Input> "!" ":" <typ:TupTyp> => Assertion::NotDecode(input, typ),
+    <left:Input> "=" "=" <right:Input> ":" <typ:TupTyp> => Assertion::Equal(left, right, typ),
+    <left:Input> "!" "=" <right:Input> ":" <typ:TupTyp> => Assertion::NotEqual(left, right, typ),
+}
+
+pub Test: Test = {
+    <defs:SepBy<Def, ";">> <asserts:SepBy<Assert, ";">> => Test { defs, asserts },
 }
 
 // Common util

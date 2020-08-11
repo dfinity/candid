@@ -62,6 +62,7 @@ pub enum Token {
     Type,
     Import,
     Opt,
+    Bang,
     Principal,
     Id(String),
     Text(String),
@@ -210,6 +211,7 @@ impl<'input> Iterator for Lexer<'input> {
             Some((i, ':')) => Some(Ok((i, Token::Colon, i + 1))),
             Some((i, '.')) => Some(Ok((i, Token::Dot, i + 1))),
             Some((i, '=')) => Some(Ok((i, Token::Equals, i + 1))),
+            Some((i, '!')) => Some(Ok((i, Token::Bang, i + 1))),
             Some((i, '+')) => Some(Ok((i, Token::Plus, i + 1))),
             Some((i, '-')) => match self.peek() {
                 Some((_, '>')) => {
