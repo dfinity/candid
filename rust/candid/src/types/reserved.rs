@@ -4,7 +4,7 @@ use super::{CandidType, Serializer, Type, TypeId};
 use serde::de::{Deserialize, Visitor};
 use std::fmt;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Reserved;
 #[derive(PartialEq, Debug)]
 pub enum Empty {}

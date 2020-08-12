@@ -34,6 +34,7 @@ pub enum IDLValue {
     Int32(i32),
     Int64(i64),
     Float32(f32),
+    Reserved(crate::Reserved),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -162,6 +163,7 @@ impl fmt::Display for IDLValue {
             IDLValue::Float64(n) => write!(f, "{}", n),
             IDLValue::Text(ref s) => write!(f, "\"{}\"", s),
             IDLValue::None => write!(f, "null"),
+            IDLValue::Reserved(_) => write!(f, "reserved"),
             IDLValue::Opt(ref v) => write!(f, "opt {}", v),
             IDLValue::Vec(ref vec) => {
                 write!(f, "vec {{ ")?;
@@ -200,6 +202,7 @@ impl IDLValue {
                 let ty = crate::types::internal::find_type(*id).unwrap();
                 self.annotate_type(env, &ty)?
             }
+            (_, Type::Reserved) => IDLValue::Reserved(crate::Reserved {}),
             (IDLValue::Null, Type::Null) => IDLValue::Null,
             (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Bool(b), Type::Bool) => IDLValue::Bool(*b),
@@ -306,6 +309,7 @@ impl IDLValue {
             IDLValue::Float64(_) => Type::Float64,
             IDLValue::Text(_) => Type::Text,
             IDLValue::None => Type::Opt(Box::new(Type::Null)),
+            IDLValue::Reserved(_) => Type::Reserved,
             IDLValue::Opt(ref v) => {
                 let t = v.deref().value_ty();
                 Type::Opt(Box::new(t))
@@ -464,6 +468,7 @@ impl crate::CandidType for IDLValue {
                 Ok(())
             }
             IDLValue::Principal(ref id) => serializer.serialize_principal(&id.0),
+            IDLValue::Reserved(_) => serializer.serialize_null(()),
         }
     }
 }

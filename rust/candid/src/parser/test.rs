@@ -52,24 +52,24 @@ pub fn check(test: Test) -> Result<()> {
     check_prog(&mut env, &prog)?;
     let mut count = 0;
     for (i, assert) in test.asserts.iter().enumerate() {
-        print!("Checking {}:{:?}\t\t", i, assert.desc);
+        print!("Checking {}:{:?}...", i + 1, assert.desc);
         let mut types = Vec::new();
         for ty in assert.typ.iter() {
             types.push(env.ast_to_type(ty)?);
         }
         let input = assert.left.parse(&env, &types);
-        let pass = if assert.pass {
-            input.is_ok()
+        let pass = if let Some(right) = &assert.right {
+            let left = input?;
+            let right = right.parse(&env, &types)?;
+            let is_equal = left == right;
+            assert.pass == is_equal
         } else {
-            input.is_err()
+            assert.pass == input.is_ok()
         };
         if pass {
             count += 1;
             println!("[pass]");
         } else {
-            /*if let Input::Blob(s) = &assert.left {
-                println!("{}", hex::encode(s))
-            }*/
             println!("[fail]");
         }
     }
