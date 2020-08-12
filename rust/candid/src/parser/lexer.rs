@@ -201,7 +201,8 @@ impl<'input> Iterator for Lexer<'input> {
     type Item = Spanned<Token, usize, LexicalError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let token = match self.next_char() {
+        self.consume_whitespace();
+        match self.next_char() {
             Some((i, '(')) => Some(Ok((i, Token::LParen, i + 1))),
             Some((i, ')')) => Some(Ok((i, Token::RParen, i + 1))),
             Some((i, '{')) => Some(Ok((i, Token::LBrace, i + 1))),
@@ -221,6 +222,39 @@ impl<'input> Iterator for Lexer<'input> {
                 _ => Some(Ok((i, Token::Minus, i + 1))),
             },
             Some((i, '"')) => Some(self.read_string_literal(i)),
+            Some((_, '/')) => {
+                match self.peek() {
+                    Some((_, '/')) => {
+                        // line comment
+                        self.next_char();
+                        while let Some((_, c)) = self.next_char() {
+                            if c == '\n' || c == '\r' {
+                                break;
+                            }
+                        }
+                        self.next()
+                    }
+                    Some((_, '*')) => {
+                        // multiline comment
+                        // TODO handle nested comments
+                        self.next_char();
+                        let mut seen_star = false;
+                        loop {
+                            if let Some((_, c)) = self.next_char() {
+                                print!("{}", c);
+                                if seen_star && c == '/' {
+                                    break;
+                                }
+                                seen_star = c == '*';
+                            } else {
+                                return Some(Err(LexicalError::Eof));
+                            }
+                        }
+                        self.next()
+                    }
+                    _ => Some(Err(LexicalError::UnknownChar('/'))),
+                }
+            }
             Some((i, c)) if c.is_ascii_digit() => {
                 if let Some((_, 'x')) = self.peek() {
                     if c == '0' {
@@ -237,7 +271,7 @@ impl<'input> Iterator for Lexer<'input> {
                         };
                         Some(Ok((i, Token::Number(res), i + len)))
                     } else {
-                        return Some(Err(LexicalError::UnknownChar('x')));
+                        Some(Err(LexicalError::UnknownChar('x')))
                     }
                 } else {
                     // Parse decimal number
@@ -278,8 +312,6 @@ impl<'input> Iterator for Lexer<'input> {
             }
             Some((_, c)) => Some(Err(LexicalError::ParseError(c.to_string()))),
             None => None,
-        };
-        self.consume_whitespace();
-        token
+        }
     }
 }
