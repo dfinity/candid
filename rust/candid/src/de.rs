@@ -429,7 +429,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.check_type(Opcode::Bool)?;
-        let value = self.parse_byte()? == 1u8;
+        let byte = self.parse_byte()?;
+        if byte > 1u8 {
+            return Err(de::Error::custom("not a boolean value"));
+        }
+        let value = byte == 1u8;
         visitor.visit_bool(value)
     }
 

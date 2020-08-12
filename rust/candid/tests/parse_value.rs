@@ -51,6 +51,16 @@ fn parse_string_literals() {
             IDLValue::Text("\n\rd".to_owned()),
         ]
     );
+    let args = parse_args("(blob \"DIDL\\00\\01\\7d\\80\\00\")");
+    assert_eq!(
+        format!("{}", args),
+        "(vec { 68; 73; 68; 76; 0; 1; 125; 128; 0; })"
+    );
+    let args = parse_args_err("\"DIDL\\00\\01\\7d\\80\\00\"");
+    assert_eq!(
+        format!("{}", args.unwrap_err()),
+        "Candid parser error: Not valid unicode text"
+    );
     let args = parse_args_err("(\"\\u{d800}\")");
     assert_eq!(
         format!("{}", args.unwrap_err()),

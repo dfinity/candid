@@ -1,7 +1,7 @@
 use super::value::{IDLField, IDLValue, IDLArgs};
 use super::typing::check_unique;
 use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg, IDLTypes};
-use super::test::{Assert, Assertion, Input, Test};
+use super::test::{Assert, Input, Test};
 use super::lexer::{Token, LexicalError, error};
 use crate::{idl_hash, Principal, types::Label};
 
@@ -14,6 +14,7 @@ extern {
         "number" => Token::Number(<String>),
         "bool" => Token::Boolean(<bool>),
         "text" => Token::Text(<String>),
+        "bytes" => Token::Bytes(<Vec<u8>>),
         "id" => Token::Id(<String>),
         "null" => Token::Null,
         "opt" => Token::Opt,
@@ -52,6 +53,10 @@ pub Arg: IDLValue = {
     "bool" => IDLValue::Bool(<>),
     NumLiteral => <>,
     "text" => IDLValue::Text(<>),
+    "bytes" => {
+        let values: Vec<_> = <>.into_iter().map(|v| IDLValue::Nat8(v)).collect();
+        IDLValue::Vec(values)
+    },
     "null" => IDLValue::Null,
     "opt" <Arg> => IDLValue::Opt(Box::new(<>)),
     "vec" "{" <SepBy<Arg, ";">> "}" => IDLValue::Vec(<>),
@@ -220,20 +225,20 @@ pub IDLProg: IDLProg = {
 
 Input: Input = {
     "text" => Input::Text(<>),
-    "blob" <"text"> => Input::Blob(<>),
+    "bytes" => Input::Blob(<>),
 }
 
-Assert: Assert = <id:"id"> <assert:Assertion> <desc:"text"?> =>? {
+Assert: Assert = <id:"id"> <assert:Assertion> =>? {
     if id != "assert" {
         Err(error("not an assert"))
-    } else { Ok(Assert { assert, desc }) }
+    } else { Ok(assert) }
 };
 
-Assertion: Assertion = {
-    <input:Input> ":" <typ:TupTyp> => Assertion::Decode(input, typ),
-    <input:Input> "!" ":" <typ:TupTyp> => Assertion::NotDecode(input, typ),
-    <left:Input> "=" "=" <right:Input> ":" <typ:TupTyp> => Assertion::Equal(left, right, typ),
-    <left:Input> "!" "=" <right:Input> ":" <typ:TupTyp> => Assertion::NotEqual(left, right, typ),
+Assertion: Assert = {
+    <left:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: None, typ, pass: true, desc },
+    <left:Input> "!" ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: None, typ, pass: false, desc },
+    <left:Input> "=" "=" <right:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: Some(right), typ, pass: true, desc },
+    <left:Input> "!" "=" <right:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: Some(right), typ, pass: false, desc },
 }
 
 pub Test: Test = {
