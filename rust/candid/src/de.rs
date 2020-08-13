@@ -249,7 +249,7 @@ impl<'de> Deserializer<'de> {
     // Customize deserailization methods
     // Several deserialize functions will call visit_bytes.
     // We reserve the first byte to be a tag to distinguish between different callers:
-    // int(0), nat(1), principal(2)
+    // int(0), nat(1), principal(2), reserved(3)
     // This is necessary for deserializing IDLValue because
     // it has only one visitor and we need a way to know who called the visitor.
     fn deserialize_int<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
@@ -295,7 +295,8 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.check_type(Opcode::Reserved)?;
-        visitor.visit_unit()
+        let tagged = vec![3u8];
+        visitor.visit_bytes(&tagged)
     }
     fn deserialize_empty<'a, V>(&'a mut self, _visitor: V) -> Result<V::Value>
     where

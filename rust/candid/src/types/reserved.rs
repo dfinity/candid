@@ -53,6 +53,9 @@ impl<'de> Deserialize<'de> for Reserved {
             fn visit_unit<E>(self) -> Result<Reserved, E> {
                 Ok(Reserved)
             }
+            fn visit_bytes<E>(self, _v: &[u8]) -> Result<Reserved, E> {
+                Ok(Reserved)
+            }
         }
         deserializer.deserialize_any(ReservedVisitor)
     }
@@ -67,7 +70,7 @@ impl<'de> Deserialize<'de> for Empty {
         impl<'de> Visitor<'de> for EmptyVisitor {
             type Value = Empty;
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("Empty value")
+                formatter.write_str("Cannot decode empty value")
             }
         }
         deserializer.deserialize_any(EmptyVisitor)
