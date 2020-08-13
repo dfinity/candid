@@ -29,9 +29,11 @@ extern {
         "type" => Token::Type,
         "import" => Token::Import,
         "principal" => Token::Principal,
-        "+" => Token::Plus,
-        "-" => Token::Minus,
+        "sign" => Token::Sign(<char>),
         "=" => Token::Equals,
+        "==" => Token::TestEqual,
+        "!=" => Token::NotEqual,
+        "!:" => Token::NotDecode,
         "(" => Token::LParen,
         ")" => Token::RParen,
         "{" => Token::LBrace,
@@ -40,7 +42,6 @@ extern {
         "." => Token::Dot,
         ";" => Token::Semi,
         ":" => Token::Colon,
-        "!" => Token::Bang,
         "->" => Token::Arrow,
     }
 }
@@ -83,12 +84,11 @@ pub Arg: IDLValue = {
 }
 
 NumLiteral: IDLValue = {
-    <neg:"-"?> <pos:"+"?> <n:"number"> <frac:("." "number"?)?> =>? {
-        let num = match (neg, pos) {
-            (Some(_), None) => format!("-{}", n),
-            (None, Some(_)) => n,
-            (Some(_), Some(_)) => return Err(error("sign error")),
-            (None, None) => n,
+    <sign:"sign"?> <n:"number"> <frac:("." "number"?)?> =>? {
+        let num = match sign {
+            Some('-') => format!("-{}", n),
+            Some('+') | None => n,
+            _ => return Err(error("sign error")),
         };
         match frac {
             None => Ok(IDLValue::Number(num)),
@@ -236,9 +236,9 @@ Assert: Assert = <id:"id"> <assert:Assertion> =>? {
 
 Assertion: Assert = {
     <left:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: None, typ, pass: true, desc },
-    <left:Input> "!" ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: None, typ, pass: false, desc },
-    <left:Input> "=" "=" <right:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: Some(right), typ, pass: true, desc },
-    <left:Input> "!" "=" <right:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: Some(right), typ, pass: false, desc },
+    <left:Input> "!:" <typ:TupTyp> <desc:"text"?> => Assert { left, right: None, typ, pass: false, desc },
+    <left:Input> "==" <right:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: Some(right), typ, pass: true, desc },
+    <left:Input> "!=" <right:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: Some(right), typ, pass: false, desc },
 }
 
 pub Test: Test = {

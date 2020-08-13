@@ -40,8 +40,6 @@ pub fn error<E: ToString>(err: E) -> ParseError<usize, Token, LexicalError> {
 pub enum Token {
     Equals,
     Dot,
-    Plus,
-    Minus,
     LParen,
     RParen,
     LBrace,
@@ -62,8 +60,11 @@ pub enum Token {
     Type,
     Import,
     Opt,
-    Bang,
+    TestEqual,
+    NotEqual,
+    NotDecode,
     Principal,
+    Sign(char),
     Id(String),
     Text(String),
     Bytes(Vec<u8>),
@@ -232,15 +233,25 @@ impl<'input> Iterator for Lexer<'input> {
             Some((i, ',')) => Some(Ok((i, Token::Comma, i + 1))),
             Some((i, ':')) => Some(Ok((i, Token::Colon, i + 1))),
             Some((i, '.')) => Some(Ok((i, Token::Dot, i + 1))),
-            Some((i, '=')) => Some(Ok((i, Token::Equals, i + 1))),
-            Some((i, '!')) => Some(Ok((i, Token::Bang, i + 1))),
-            Some((i, '+')) => Some(Ok((i, Token::Plus, i + 1))),
+            Some((i, '=')) => match self.peek() {
+                Some((_, '=')) => {
+                    self.next_char();
+                    Some(Ok((i, Token::TestEqual, i + 2)))
+                }
+                _ => Some(Ok((i, Token::Equals, i + 1))),
+            },
+            Some((i, '!')) => match self.next_char() {
+                Some((_, ':')) => Some(Ok((i, Token::NotDecode, i + 2))),
+                Some((_, '=')) => Some(Ok((i, Token::NotEqual, i + 2))),
+                _ => Some(Err(LexicalError::UnknownChar('!'))),
+            },
+            Some((i, '+')) => Some(Ok((i, Token::Sign('+'), i + 1))),
             Some((i, '-')) => match self.peek() {
                 Some((_, '>')) => {
                     self.next_char();
                     Some(Ok((i, Token::Arrow, i + 2)))
                 }
-                _ => Some(Ok((i, Token::Minus, i + 1))),
+                _ => Some(Ok((i, Token::Sign('-'), i + 1))),
             },
             Some((i, '"')) => Some(self.read_string_literal(i, true)),
             Some((_, '/')) => {
