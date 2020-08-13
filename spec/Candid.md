@@ -15,7 +15,6 @@ exchange (names, parameter and result formats of service methods)
 * Simple and canonical constructs (C-like; algebraically: sums, products, exponentials)
 * Extensible, backwards-compatible
 * Well-formedness is checkable and guaranteed by the platform
-* Deterministic mapping to serialised representation
 * Human-readable and machine-readable
 * Declarative, usable as input to binding code generators
 
