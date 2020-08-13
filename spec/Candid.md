@@ -15,7 +15,6 @@ exchange (names, parameter and result formats of service methods)
 * Simple and canonical constructs (C-like; algebraically: sums, products, exponentials)
 * Extensible, backwards-compatible
 * Well-formedness is checkable and guaranteed by the platform
-* Deterministic mapping to serialised representation
 * Human-readable and machine-readable
 * Declarative, usable as input to binding code generators
 
@@ -814,7 +813,7 @@ The following notation is used:
 * `.` is the empty byte sequence
 * `x1 x2` is concatenation
 * `t^N`, `t+`, `t*`, `t?` are sequences of `N`, `N>0`, `N>=0`, or `N<=1` repetitions, respectively
-* `leb128` and `sleb128` are the shortest unsigned and signed [LEB128](https://en.wikipedia.org/wiki/LEB128) encodings of a number, respectively
+* `leb128` and `sleb128` are the unsigned and signed [LEB128](https://en.wikipedia.org/wiki/LEB128) encodings of a number, respectively
 * `utf8` is the UTF-8 encoding of a text string (not 0-terminated)
 
 
