@@ -7,9 +7,9 @@ edition = "2018"
 [dependencies]
 candid = { path = "../../rust/candid" }
 candiff = { path = "../candiff" }
-clap = "2.33"
-structopt = "0.3"
-pretty-hex = "0.1"
-hex = "0.4"
-failure = "0.1.2"
+clap = "2.33.3"
+structopt = "0.3.16"
+pretty-hex = "0.1.1"
+hex = "0.4.2"
+failure = "0.1.8"
 exitfailure = "0.5.1"
