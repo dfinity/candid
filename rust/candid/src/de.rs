@@ -138,6 +138,9 @@ impl<'de> Deserializer<'de> {
         Ok(buf[0])
     }
     fn parse_bytes(&mut self, len: usize) -> Result<Vec<u8>> {
+        if self.input.len() < len {
+            return Err(Error::msg("unexpected end of message"));
+        }
         let mut buf = Vec::new();
         buf.resize(len, 0);
         self.input.read_exact(&mut buf)?;
@@ -249,7 +252,7 @@ impl<'de> Deserializer<'de> {
     // Customize deserailization methods
     // Several deserialize functions will call visit_bytes.
     // We reserve the first byte to be a tag to distinguish between different callers:
-    // int(0), nat(1), principal(2)
+    // int(0), nat(1), principal(2), reserved(3)
     // This is necessary for deserializing IDLValue because
     // it has only one visitor and we need a way to know who called the visitor.
     fn deserialize_int<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
@@ -295,7 +298,8 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.check_type(Opcode::Reserved)?;
-        visitor.visit_unit()
+        let tagged = vec![3u8];
+        visitor.visit_bytes(&tagged)
     }
     fn deserialize_empty<'a, V>(&'a mut self, _visitor: V) -> Result<V::Value>
     where
@@ -429,7 +433,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.check_type(Opcode::Bool)?;
-        let value = self.parse_byte()? == 1u8;
+        let byte = self.parse_byte()?;
+        if byte > 1u8 {
+            return Err(de::Error::custom("not a boolean value"));
+        }
+        let value = byte == 1u8;
         visitor.visit_bool(value)
     }
 

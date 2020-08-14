@@ -40,8 +40,6 @@ pub fn error<E: ToString>(err: E) -> ParseError<usize, Token, LexicalError> {
 pub enum Token {
     Equals,
     Dot,
-    Plus,
-    Minus,
     LParen,
     RParen,
     LBrace,
@@ -62,9 +60,14 @@ pub enum Token {
     Type,
     Import,
     Opt,
+    TestEqual,
+    NotEqual,
+    NotDecode,
     Principal,
+    Sign(char),
     Id(String),
     Text(String),
+    Bytes(Vec<u8>),
     Number(String),
     Boolean(bool),
 }
@@ -158,8 +161,10 @@ impl<'input> Lexer<'input> {
     fn read_string_literal(
         &mut self,
         start_position: usize,
+        validate: bool,
     ) -> Spanned<Token, usize, LexicalError> {
         let mut result = String::new();
+        let mut needs_validation = false;
         let end_position: usize;
         loop {
             match self.next_char() {
@@ -184,7 +189,13 @@ impl<'input> Lexer<'input> {
                     c if c.is_ascii_hexdigit() => {
                         let mut hex = c.to_string();
                         hex.push(self.read_next()?);
-                        result.push(hex_to_char(&hex)?);
+                        let byte = u8::from_str_radix(&hex, 16)
+                            .map_err(|_| LexicalError::ParseError(hex.to_owned()))?;
+                        // According to https://webassembly.github.io/spec/core/text/values.html#strings
+                        // \hex escape can break utf8 unicode.
+                        needs_validation = true;
+                        let bytes = unsafe { result.as_mut_vec() };
+                        bytes.push(byte);
                     }
                     c => return Err(LexicalError::UnknownChar(c)),
                 },
@@ -192,7 +203,19 @@ impl<'input> Lexer<'input> {
                 None => return Err(LexicalError::NonTerminatedString(start_position)),
             }
         }
-        Ok((start_position, Token::Text(result), end_position))
+        if !validate {
+            Ok((
+                start_position,
+                Token::Bytes(result.into_bytes()),
+                end_position,
+            ))
+        } else if needs_validation && String::from_utf8(result.as_bytes().to_vec()).is_err() {
+            Err(LexicalError::ParseError(
+                "Not valid unicode text".to_owned(),
+            ))
+        } else {
+            Ok((start_position, Token::Text(result), end_position))
+        }
     }
 }
 
@@ -200,7 +223,8 @@ impl<'input> Iterator for Lexer<'input> {
     type Item = Spanned<Token, usize, LexicalError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let token = match self.next_char() {
+        self.consume_whitespace();
+        match self.next_char() {
             Some((i, '(')) => Some(Ok((i, Token::LParen, i + 1))),
             Some((i, ')')) => Some(Ok((i, Token::RParen, i + 1))),
             Some((i, '{')) => Some(Ok((i, Token::LBrace, i + 1))),
@@ -209,16 +233,59 @@ impl<'input> Iterator for Lexer<'input> {
             Some((i, ',')) => Some(Ok((i, Token::Comma, i + 1))),
             Some((i, ':')) => Some(Ok((i, Token::Colon, i + 1))),
             Some((i, '.')) => Some(Ok((i, Token::Dot, i + 1))),
-            Some((i, '=')) => Some(Ok((i, Token::Equals, i + 1))),
-            Some((i, '+')) => Some(Ok((i, Token::Plus, i + 1))),
+            Some((i, '=')) => match self.peek() {
+                Some((_, '=')) => {
+                    self.next_char();
+                    Some(Ok((i, Token::TestEqual, i + 2)))
+                }
+                _ => Some(Ok((i, Token::Equals, i + 1))),
+            },
+            Some((i, '!')) => match self.next_char() {
+                Some((_, ':')) => Some(Ok((i, Token::NotDecode, i + 2))),
+                Some((_, '=')) => Some(Ok((i, Token::NotEqual, i + 2))),
+                _ => Some(Err(LexicalError::UnknownChar('!'))),
+            },
+            Some((i, '+')) => Some(Ok((i, Token::Sign('+'), i + 1))),
             Some((i, '-')) => match self.peek() {
                 Some((_, '>')) => {
                     self.next_char();
                     Some(Ok((i, Token::Arrow, i + 2)))
                 }
-                _ => Some(Ok((i, Token::Minus, i + 1))),
+                _ => Some(Ok((i, Token::Sign('-'), i + 1))),
             },
-            Some((i, '"')) => Some(self.read_string_literal(i)),
+            Some((i, '"')) => Some(self.read_string_literal(i, true)),
+            Some((_, '/')) => {
+                match self.peek() {
+                    Some((_, '/')) => {
+                        // line comment
+                        self.next_char();
+                        while let Some((_, c)) = self.next_char() {
+                            if c == '\n' || c == '\r' {
+                                break;
+                            }
+                        }
+                        self.next()
+                    }
+                    Some((_, '*')) => {
+                        // multiline comment
+                        // TODO handle nested comments
+                        self.next_char();
+                        let mut seen_star = false;
+                        loop {
+                            if let Some((_, c)) = self.next_char() {
+                                if seen_star && c == '/' {
+                                    break;
+                                }
+                                seen_star = c == '*';
+                            } else {
+                                return Some(Err(LexicalError::Eof));
+                            }
+                        }
+                        self.next()
+                    }
+                    _ => Some(Err(LexicalError::UnknownChar('/'))),
+                }
+            }
             Some((i, c)) if c.is_ascii_digit() => {
                 if let Some((_, 'x')) = self.peek() {
                     if c == '0' {
@@ -235,7 +302,7 @@ impl<'input> Iterator for Lexer<'input> {
                         };
                         Some(Ok((i, Token::Number(res), i + len)))
                     } else {
-                        return Some(Err(LexicalError::UnknownChar('x')));
+                        Some(Err(LexicalError::UnknownChar('x')))
                     }
                 } else {
                     // Parse decimal number
@@ -266,7 +333,16 @@ impl<'input> Iterator for Lexer<'input> {
                     "service" => Ok((Token::Service, 7)),
                     "oneway" => Ok((Token::Oneway, 6)),
                     "query" => Ok((Token::Query, 5)),
-                    "blob" => Ok((Token::Blob, 4)),
+                    "blob" => {
+                        self.consume_whitespace();
+                        match self.peek() {
+                            Some((_, c)) if c == '"' => {
+                                self.next_char();
+                                return Some(self.read_string_literal(i, false));
+                            }
+                            _ => Ok((Token::Blob, 4)),
+                        }
+                    }
                     "type" => Ok((Token::Type, 4)),
                     "import" => Ok((Token::Import, 6)),
                     "principal" => Ok((Token::Principal, 9)),
@@ -276,8 +352,6 @@ impl<'input> Iterator for Lexer<'input> {
             }
             Some((_, c)) => Some(Err(LexicalError::ParseError(c.to_string()))),
             None => None,
-        };
-        self.consume_whitespace();
-        token
+        }
     }
 }

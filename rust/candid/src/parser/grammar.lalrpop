@@ -1,6 +1,7 @@
 use super::value::{IDLField, IDLValue, IDLArgs};
 use super::typing::check_unique;
 use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg, IDLTypes};
+use super::test::{Assert, Input, Test};
 use super::lexer::{Token, LexicalError, error};
 use crate::{idl_hash, Principal, types::Label};
 
@@ -13,6 +14,7 @@ extern {
         "number" => Token::Number(<String>),
         "bool" => Token::Boolean(<bool>),
         "text" => Token::Text(<String>),
+        "bytes" => Token::Bytes(<Vec<u8>>),
         "id" => Token::Id(<String>),
         "null" => Token::Null,
         "opt" => Token::Opt,
@@ -27,9 +29,11 @@ extern {
         "type" => Token::Type,
         "import" => Token::Import,
         "principal" => Token::Principal,
-        "+" => Token::Plus,
-        "-" => Token::Minus,
+        "sign" => Token::Sign(<char>),
         "=" => Token::Equals,
+        "==" => Token::TestEqual,
+        "!=" => Token::NotEqual,
+        "!:" => Token::NotDecode,
         "(" => Token::LParen,
         ")" => Token::RParen,
         "{" => Token::LBrace,
@@ -48,15 +52,12 @@ pub Args: IDLArgs = "(" <SepBy<Arg, ",">> ")" => IDLArgs { args: <> };
 
 pub Arg: IDLValue = {
     "bool" => IDLValue::Bool(<>),
-    "+" <"number"> => IDLValue::Number(<>),
-    "-" <"number"> => IDLValue::Number(format!("-{}", <>)),
-    "number" => IDLValue::Number(<>),
-    <"number"> "." =>? Ok(IDLValue::Float64(<>.parse::<f64>().map_err(|_| error("not float"))?)),
-    <n:"number"> "." <f:"number"> =>? {
-        let float = format!("{}.{}", n, f);
-        Ok(IDLValue::Float64(float.parse::<f64>().map_err(|_| error("not float"))?))
-    },
+    NumLiteral => <>,
     "text" => IDLValue::Text(<>),
+    "bytes" => {
+        let values: Vec<_> = <>.into_iter().map(|v| IDLValue::Nat8(v)).collect();
+        IDLValue::Vec(values)
+    },
     "null" => IDLValue::Null,
     "opt" <Arg> => IDLValue::Opt(Box::new(<>)),
     "vec" "{" <SepBy<Arg, ";">> "}" => IDLValue::Vec(<>),
@@ -82,6 +83,23 @@ pub Arg: IDLValue = {
     "principal" <"text"> =>? Ok(IDLValue::Principal(Principal::from_text(<>).map_err(error)?)),
 }
 
+NumLiteral: IDLValue = {
+    <sign:"sign"?> <n:"number"> <frac:("." "number"?)?> =>? {
+        let num = match sign {
+            Some('-') => format!("-{}", n),
+            Some('+') | None => n,
+            _ => return Err(error("sign error")),
+        };
+        match frac {
+            None => Ok(IDLValue::Number(num)),
+            Some((_, None)) => Ok(IDLValue::Float64(num.parse::<f64>().map_err(|_| error("not float"))?)),
+            Some((_, Some(f))) => {
+                Ok(IDLValue::Float64(format!("{}.{}", num, f).parse::<f64>().map_err(|_| error("not float"))?))
+            }
+        }
+    }
+}
+
 Field: IDLField = {
     <n:"number"> "=" <v:Arg> =>? Ok(IDLField { id: Label::Id(n.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), val: v }),
     <n:Name> "=" <v:Arg> => IDLField { id: Label::Named(n), val: v },
@@ -99,7 +117,7 @@ RecordField: IDLField = {
 }
 
 // Type
-pub Typs: IDLTypes = "(" <SepBy<Typ, ",">> ")" => IDLTypes { args:<> };
+pub Typs: IDLTypes = TupTyp => IDLTypes { args:<> };
 
 pub Typ: IDLType = {
     PrimTyp => <>,
@@ -156,8 +174,10 @@ VariantFieldTyp: TypeField = {
     "number" =>? Ok(TypeField { label: Label::Id(<>.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), typ: IDLType::PrimT(PrimType::Null) }),
 }
 
+TupTyp: Vec<IDLType> = "(" <SepBy<ArgTyp, ",">> ")" => <>;
+
 FuncTyp: FuncType = {
-    "(" <args:SepBy<ArgTyp, ",">> ")" "->" "(" <rets:SepBy<ArgTyp, ",">> ")" <modes:FuncMode*> =>
+    <args:TupTyp> "->" <rets:TupTyp> <modes:FuncMode*> =>
         FuncType { modes, args, rets },
 }
 
@@ -199,6 +219,30 @@ Actor: IDLType = {
 
 pub IDLProg: IDLProg = {
     <decs:SepBy<Def, ";">> <actor:Actor?> => IDLProg { decs, actor }
+}
+
+// Test file
+
+Input: Input = {
+    "text" => Input::Text(<>),
+    "bytes" => Input::Blob(<>),
+}
+
+Assert: Assert = <id:"id"> <assert:Assertion> =>? {
+    if id != "assert" {
+        Err(error("not an assert"))
+    } else { Ok(assert) }
+};
+
+Assertion: Assert = {
+    <left:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: None, typ, pass: true, desc },
+    <left:Input> "!:" <typ:TupTyp> <desc:"text"?> => Assert { left, right: None, typ, pass: false, desc },
+    <left:Input> "==" <right:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: Some(right), typ, pass: true, desc },
+    <left:Input> "!=" <right:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: Some(right), typ, pass: false, desc },
+}
+
+pub Test: Test = {
+    <defs:SepBy<Def, ";">> <asserts:SepBy<Assert, ";">> => Test { defs, asserts },
 }
 
 // Common util
