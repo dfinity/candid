@@ -138,6 +138,9 @@ impl<'de> Deserializer<'de> {
         Ok(buf[0])
     }
     fn parse_bytes(&mut self, len: usize) -> Result<Vec<u8>> {
+        if self.input.len() < len {
+            return Err(Error::msg("unexpected end of message"));
+        }
         let mut buf = Vec::new();
         buf.resize(len, 0);
         self.input.read_exact(&mut buf)?;

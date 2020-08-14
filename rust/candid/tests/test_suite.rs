@@ -1,6 +1,6 @@
 use candid::parser::test::{check, Test};
 
-#[test_generator::test_resources("test/prim.test.did")]
+#[test_generator::test_resources("test/*.test.did")]
 fn decode_test(resource: &str) {
     let path = std::env::current_dir()
         .unwrap()
