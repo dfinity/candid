@@ -33,6 +33,15 @@ impl Input {
             Input::Blob(ref bytes) => Ok(IDLArgs::from_bytes_with_types(bytes, env, types)?),
         }
     }
+    fn check_round_trip(&self, v: &IDLArgs, env: &TypeEnv, types: &[Type]) -> Result<bool> {
+        match self {
+            Input::Blob(ref blob) => {
+                let bytes = v.to_bytes_with_types(&env, &types)?;
+                Ok(*blob == bytes)
+            }
+            Input::Text(ref s) => Ok(*s == v.to_string()),
+        }
+    }
 }
 
 impl std::str::FromStr for Test {
@@ -58,13 +67,22 @@ pub fn check(test: Test) -> Result<()> {
             types.push(env.ast_to_type(ty)?);
         }
         let input = assert.left.parse(&env, &types);
-        let pass = if let Some(right) = &assert.right {
+        let pass = if let Some(assert_right) = &assert.right {
             let left = input?;
-            let right = right.parse(&env, &types)?;
+            let right = assert_right.parse(&env, &types)?;
+            if !assert.left.check_round_trip(&left, &env, &types)?
+                || !assert_right.check_round_trip(&right, &env, &types)?
+            {
+                print!("[round-trip failed] ");
+            }
             let is_equal = left == right;
             assert.pass == is_equal
         } else {
-            assert.pass == input.is_ok()
+            let res = assert.pass == input.is_ok();
+            if assert.pass && !assert.left.check_round_trip(&input?, &env, &types)? {
+                print!("[round-trip failed] ");
+            }
+            res
         };
         if pass {
             count += 1;
