@@ -171,3 +171,51 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
         }
     }
 }
+
+use crate::parser::test::{Input, Test};
+
+impl Input {
+    fn js_parse<'a>(&self, ty: RcDoc<'a>) -> RcDoc<'a> {
+        match self {
+            Input::Blob(bytes) => {
+                let hex = str("Buffer.from('")
+                    .append(RcDoc::as_string(hex::encode(&bytes)))
+                    .append("', 'hex')");
+                let items = [ty, hex];
+                let params = concat(items.iter().cloned(), ",");
+                str("IDL.decode").append(enclose("(", params, ")"))
+            }
+            _ => RcDoc::nil(),
+        }
+    }
+}
+
+pub fn test_generate(test: Test) -> String {
+    let mut res = String::new();
+    let env = TypeEnv::new();
+    let mut types = Vec::new();
+    for (i, assert) in test.asserts.iter().enumerate() {
+        let desc = match &assert.desc {
+            Some(desc) => format!("{}:{}", i + 1, desc),
+            None => format!("{}", i + 1),
+        };
+        let desc = RcDoc::text(desc);
+        types.clear();
+        for ty in assert.typ.iter() {
+            types.push(env.ast_to_type(ty).unwrap());
+        }
+        let ty = pp_args(&types);
+        let test_func = assert.left.js_parse(ty);
+        let body = if assert.pass {
+            enclose("expect(", test_func, ")").append(".toEqual(expect.anything());")
+        } else {
+            enclose("expect(", str("() => ").append(test_func), ")").append(".toThrow();")
+        };
+        let doc = str("test('")
+            .append(desc)
+            .append("', () => ")
+            .append(enclose_space("{", body, "}"));
+        res = res + &doc.pretty(LINE_WIDTH).to_string() + "\n";
+    }
+    res
+}
