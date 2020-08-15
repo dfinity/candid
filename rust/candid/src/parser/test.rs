@@ -20,6 +20,16 @@ pub struct Assert {
     pub desc: Option<String>,
 }
 
+impl Assert {
+    pub fn desc(&self) -> String {
+        match &self.desc {
+            None => "",
+            Some(desc) => desc,
+        }
+        .to_string()
+    }
+}
+
 #[derive(Debug)]
 pub enum Input {
     Text(String),
@@ -27,7 +37,7 @@ pub enum Input {
 }
 
 impl Input {
-    fn parse(&self, env: &TypeEnv, types: &[Type]) -> Result<IDLArgs> {
+    pub fn parse(&self, env: &TypeEnv, types: &[Type]) -> Result<IDLArgs> {
         match self {
             Input::Text(ref s) => s.parse::<IDLArgs>()?.annotate_types(env, types),
             Input::Blob(ref bytes) => Ok(IDLArgs::from_bytes_with_types(bytes, env, types)?),
@@ -61,7 +71,7 @@ pub fn check(test: Test) -> Result<()> {
     check_prog(&mut env, &prog)?;
     let mut count = 0;
     for (i, assert) in test.asserts.iter().enumerate() {
-        print!("Checking {}:{:?}...", i + 1, assert.desc);
+        print!("Checking {} {}...", i + 1, assert.desc());
         let mut types = Vec::new();
         for ty in assert.typ.iter() {
             types.push(env.ast_to_type(ty)?);

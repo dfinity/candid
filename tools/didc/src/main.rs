@@ -12,11 +12,19 @@ enum Command {
         /// Specifies did file for type checking
         input: PathBuf,
     },
-    /// Binding for different languages
+    /// Generate binding for different languages
     Bind {
         /// Specifies did file for code generation
         input: PathBuf,
-        #[structopt(short, long, possible_values = &["js", "did"], case_insensitive = true)]
+        #[structopt(short, long, possible_values = &["js", "did"])]
+        /// Specifies target language
+        target: String,
+    },
+    /// Generate test suites for different languages
+    Test {
+        /// Specifies .test.did file for test suites generation
+        input: PathBuf,
+        #[structopt(short, long, possible_values = &["js", "did"], default_value = "js")]
         /// Specifies target language
         target: String,
     },
@@ -119,6 +127,20 @@ fn main() -> Result<(), ExitFailure> {
             let content = match target.as_str() {
                 "js" => candid::bindings::javascript::compile(&env, &actor),
                 "did" => candid::bindings::candid::compile(&env, &actor),
+                _ => unreachable!(),
+            };
+            println!("{}", content);
+        }
+        Command::Test { input, target } => {
+            let test = std::fs::read_to_string(&input)
+                .map_err(|_| Error::msg(format!("could not read file {}", input.display())))?;
+            let ast = test.parse::<candid::parser::test::Test>()?;
+            let content = match target.as_str() {
+                "js" => candid::bindings::javascript::test_generate(ast),
+                "did" => {
+                    candid::parser::test::check(ast)?;
+                    "".to_string()
+                }
                 _ => unreachable!(),
             };
             println!("{}", content);
