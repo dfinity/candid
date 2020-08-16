@@ -11,13 +11,30 @@ pub struct Test {
     pub asserts: Vec<Assert>,
 }
 
-#[derive(Debug)]
 pub struct Assert {
     pub left: Input,
     pub right: Option<Input>,
     pub typ: TupType,
     pub pass: bool,
     pub desc: Option<String>,
+}
+
+pub enum Input {
+    Text(String),
+    Blob(Vec<u8>),
+}
+
+/// Generate assertions for host value
+pub struct HostTest {
+    pub desc: String,
+    pub asserts: Vec<HostAssert>,
+}
+pub enum HostAssert {
+    // The encoded bytes does not need to match the target implementation
+    Encode(IDLArgs, Vec<Type>, Vec<u8>),
+    NotEncode(IDLArgs, Vec<Type>),
+    Decode(Vec<u8>, Vec<Type>, IDLArgs),
+    NotDecode(Vec<u8>, Vec<Type>),
 }
 
 impl Assert {
@@ -28,12 +45,6 @@ impl Assert {
         }
         .to_string()
     }
-}
-
-#[derive(Debug)]
-pub enum Input {
-    Text(String),
-    Blob(Vec<u8>),
 }
 
 impl Input {
@@ -59,6 +70,54 @@ impl std::str::FromStr for Test {
     fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
         let lexer = super::lexer::Lexer::new(str);
         Ok(super::grammar::TestParser::new().parse(lexer)?)
+    }
+}
+
+impl HostTest {
+    pub fn from_assert(assert: &Assert, env: &TypeEnv, types: &[Type]) -> Self {
+        use HostAssert::*;
+        let types = types.to_vec();
+        let mut asserts = Vec::new();
+        match &assert.left {
+            Input::Text(s) => {
+                // Without type annotation, numbers are all of type int.
+                // Assertion may not pass.
+                let parsed = s.parse::<IDLArgs>();
+                if parsed.is_err() {
+                    let desc = format!("(skip) {}", assert.desc());
+                    return HostTest { desc, asserts };
+                }
+                let parsed = parsed.unwrap();
+                if assert.pass {
+                    let bytes = parsed.to_bytes_with_types(env, &types).unwrap();
+                    asserts.push(Encode(parsed, types, bytes));
+                } else {
+                    match assert.right {
+                        None => asserts.push(NotEncode(parsed, types)),
+                        Some(_) => {
+                            let bytes = parsed.to_bytes_with_types(env, &types).unwrap();
+                            asserts.push(Encode(parsed, types, bytes));
+                        }
+                    }
+                }
+                let desc = format!("(encode?) {}", assert.desc());
+                HostTest { desc, asserts }
+            }
+            Input::Blob(bytes) => {
+                let args = IDLArgs::from_bytes_with_types(bytes, env, &types);
+                let bytes = bytes.to_vec();
+                if assert.pass {
+                    let args = args.unwrap();
+                    asserts.push(Decode(bytes, types, args));
+                } else {
+                    asserts.push(NotDecode(bytes, types));
+                }
+                HostTest {
+                    desc: assert.desc(),
+                    asserts,
+                }
+            }
+        }
     }
 }
 

@@ -353,20 +353,14 @@ pub mod pretty {
 
     pub use crate::bindings::candid::pp_label;
 
-    fn pp_idl_field(field: &IDLField) -> RcDoc {
+    fn pp_field(field: &IDLField) -> RcDoc {
         pp_label(&field.id)
             .append(kwd(" ="))
             .append(pp_value(&field.val))
     }
 
-    fn pp_record_fields(fields: &[IDLField]) -> RcDoc {
-        concat(fields.iter().map(|f| pp_idl_field(f)), ";")
-    }
-
-    fn pp_variant_field(field: &IDLField) -> RcDoc {
-        pp_label(&field.id)
-            .append(kwd(" ="))
-            .append(pp_value(&field.val))
+    fn pp_fields(fields: &[IDLField]) -> RcDoc {
+        concat(fields.iter().map(|f| pp_field(f)), ";")
     }
 
     pub fn pp_value(v: &IDLValue) -> RcDoc {
@@ -377,10 +371,8 @@ pub mod pretty {
                 let body = concat(vs.iter().map(|v| pp_value(v)), ";");
                 kwd("vec").append(enclose_space("{", body, "}"))
             }
-            Record(fields) => {
-                kwd("record").append(enclose_space("{", pp_record_fields(&fields), "}"))
-            }
-            Variant(v, _) => kwd("variant").append(enclose_space("{", pp_variant_field(&v), "}")),
+            Record(fields) => kwd("record").append(enclose_space("{", pp_fields(&fields), "}")),
+            Variant(v, _) => kwd("variant").append(enclose_space("{", pp_field(&v), "}")),
             _ => RcDoc::as_string(v),
         }
     }

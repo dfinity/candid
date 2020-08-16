@@ -172,100 +172,107 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     }
 }
 
-use crate::parser::test::{Input, Test};
-
 pub mod value {
     use super::pp_label;
     use crate::parser::value::{IDLArgs, IDLField, IDLValue};
     use crate::pretty::*;
     use pretty::RcDoc;
 
-    fn pp_idl_field(field: &IDLField) -> RcDoc {
+    fn pp_field(field: &IDLField) -> RcDoc {
         pp_label(&field.id)
-            .append(kwd(" ="))
+            .append(": ")
             .append(pp_value(&field.val))
     }
 
-    fn pp_record_fields(fields: &[IDLField]) -> RcDoc {
-        concat(fields.iter().map(|f| pp_idl_field(f)), ";")
-    }
-
-    fn pp_variant_field(field: &IDLField) -> RcDoc {
-        pp_label(&field.id)
-            .append(kwd(" ="))
-            .append(pp_value(&field.val))
+    fn pp_fields(fields: &[IDLField]) -> RcDoc {
+        concat(fields.iter().map(|f| pp_field(f)), ",")
     }
 
     pub fn pp_value(v: &IDLValue) -> RcDoc {
         use IDLValue::*;
         match &*v {
-            Opt(v) => kwd("opt").append(enclose_space("{", pp_value(v), "}")),
+            Number(_) | Int(_) | Nat(_) | Int64(_) | Nat64(_) => {
+                RcDoc::text(format!("new BigNumber('{}')", v))
+            }
+            Principal(id) => RcDoc::text(format!("Principal.fromText('{}')", id)),
+            Text(s) => RcDoc::text(format!("'{}'", s.escape_debug())),
+            None => RcDoc::text("[]"),
+            Opt(v) => enclose_space("[", pp_value(v), "]"),
             Vec(vs) => {
                 let body = concat(vs.iter().map(|v| pp_value(v)), ";");
-                kwd("vec").append(enclose_space("{", body, "}"))
+                enclose_space("[", body, "]")
             }
-            Record(fields) => {
-                kwd("record").append(enclose_space("{", pp_record_fields(&fields), "}"))
-            }
-            Variant(v, _) => kwd("variant").append(enclose_space("{", pp_variant_field(&v), "}")),
+            Record(fields) => enclose_space("{", pp_fields(&fields), "}"),
+            Variant(v, _) => enclose_space("{", pp_field(&v), "}"),
             _ => RcDoc::as_string(v),
         }
     }
 
     pub fn pp_args(args: &IDLArgs) -> RcDoc {
         let body = concat(args.args.iter().map(pp_value), ",");
-        enclose("(", body, ")")
+        enclose("[", body, "]")
     }
 }
 
-impl Input {
-    fn js_generate<'a>(&self, ty: RcDoc<'a>) -> RcDoc<'a> {
-        match self {
-            Input::Blob(bytes) => {
-                let hex = str("Buffer.from('")
-                    .append(RcDoc::as_string(hex::encode(&bytes)))
-                    .append("', 'hex')");
-                let items = [ty, hex];
-                let params = concat(items.iter().cloned(), ",");
-                str("IDL.decode").append(enclose("(", params, ")"))
-            }
-            _ => RcDoc::nil(),
-        }
-    }
-}
+use crate::parser::test::{HostAssert, HostTest, Test};
 
 pub fn test_generate(test: Test) -> String {
-    let mut res = r#"// AUTO-GENERATED. DO NOT EDIT.
+    let header = r#"// AUTO-GENERATED. DO NOT EDIT.
+// tslint:disable
+import BigNumber from 'bignumber.js';
 import * as IDL from './idl';
 import { Buffer } from 'buffer/';
-"#
-    .to_string();
+import { Principal } from './principal';
+"#;
+    let mut res = header.to_string();
     let env = TypeEnv::new();
-    let mut types = Vec::new();
     for (i, assert) in test.asserts.iter().enumerate() {
-        let desc = RcDoc::text(format!("{} {}", i + 1, assert.desc()));
-        types.clear();
+        let mut types = Vec::new();
         for ty in assert.typ.iter() {
             types.push(env.ast_to_type(ty).unwrap());
         }
-        let ty = pp_args(&types);
-        let test_func = assert.left.js_generate(ty);
-        let body = if assert.pass {
-            let left = assert.left.parse(&env, &types).unwrap();
-            let _value = value::pp_args(&left);
-            enclose("expect(", test_func, ")")
-                .append(".toEqual")
-                .append(enclose("(", str("expect.anything()"), ");"))
-        } else {
-            let test_func = str("() => ").append(test_func);
-            enclose("expect(", test_func, ")").append(".toThrow();")
-        };
-        let doc = str("test('")
-            .append(desc)
+        let host = HostTest::from_assert(assert, &env, &types);
+        let mut expects = Vec::new();
+        for cmd in host.asserts.iter() {
+            use HostAssert::*;
+            let test_func = match cmd {
+                Encode(args, tys, _) | NotEncode(args, tys) => {
+                    let vals = value::pp_args(&args);
+                    let tys = pp_args(&tys);
+                    let items = [tys, vals];
+                    let params = concat(items.iter().cloned(), ",");
+                    str("IDL.encode").append(enclose("(", params, ")"))
+                }
+                Decode(bytes, tys, _) | NotDecode(bytes, tys) => {
+                    let hex = str("Buffer.from('")
+                        .append(RcDoc::as_string(hex::encode(&bytes)))
+                        .append("', 'hex')");
+                    let tys = pp_args(&tys);
+                    let items = [tys, hex];
+                    let params = concat(items.iter().cloned(), ",");
+                    str("IDL.decode").append(enclose("(", params, ")"))
+                }
+            };
+            let expect = match cmd {
+                Encode(_, _, _) => enclose("expect(", test_func, ")")
+                    .append(".toEqual")
+                    .append(enclose("(", str("expect.anything()"), ");")),
+                Decode(_, _, vals) => enclose("expect(", test_func, ")")
+                    .append(".toEqual")
+                    .append(enclose("(", value::pp_args(&vals), ");")),
+                NotEncode(_, _) | NotDecode(_, _) => {
+                    enclose("expect(", str("() => ").append(test_func), ")").append(".toThrow();")
+                }
+            };
+            expects.push(expect);
+        }
+        let body = RcDoc::intersperse(expects.iter().cloned(), RcDoc::hardline());
+        let body = str("test('")
+            .append(format!("{} {}", i + 1, host.desc))
             .append("', () => ")
             .append(enclose_space("{", body, "});"))
             .append(RcDoc::hardline());
-        res = res + &doc.pretty(LINE_WIDTH).to_string();
+        res += &body.pretty(LINE_WIDTH).to_string();
     }
     res
 }
