@@ -236,14 +236,14 @@ import { Principal } from './principal';
         for cmd in host.asserts.iter() {
             use HostAssert::*;
             let test_func = match cmd {
-                Encode(args, tys, _) | NotEncode(args, tys) => {
+                Encode(args, tys, _, _) | NotEncode(args, tys) => {
                     let vals = value::pp_args(&args);
                     let tys = pp_args(&tys);
                     let items = [tys, vals];
                     let params = concat(items.iter().cloned(), ",");
                     str("IDL.encode").append(enclose("(", params, ")"))
                 }
-                Decode(bytes, tys, _) | NotDecode(bytes, tys) => {
+                Decode(bytes, tys, _, _) | NotDecode(bytes, tys) => {
                     let hex = str("Buffer.from('")
                         .append(RcDoc::as_string(hex::encode(&bytes)))
                         .append("', 'hex')");
@@ -253,17 +253,21 @@ import { Principal } from './principal';
                     str("IDL.decode").append(enclose("(", params, ")"))
                 }
             };
-            let expect = match cmd {
-                Encode(_, _, _) => enclose("expect(", test_func, ")")
-                    .append(".toEqual")
-                    .append(enclose("(", str("expect.anything()"), ");")),
-                Decode(_, _, vals) => enclose("expect(", test_func, ")")
-                    .append(".toEqual")
-                    .append(enclose("(", value::pp_args(&vals), ");")),
+            let (test_func, predicate) = match cmd {
+                Encode(_, _, true, _) | Decode(_, _, true, _) => (test_func, str(".toEqual")),
+                Encode(_, _, false, _) | Decode(_, _, false, _) => (test_func, str(".not.toEqual")),
                 NotEncode(_, _) | NotDecode(_, _) => {
-                    enclose("expect(", str("() => ").append(test_func), ")").append(".toThrow();")
+                    (str("() => ").append(test_func), str(".toThrow"))
                 }
             };
+            let expected = match cmd {
+                Encode(_, _, _, _bytes) => str("expect.anything()"),
+                Decode(_, _, _, vals) => value::pp_args(&vals),
+                NotEncode(_, _) | NotDecode(_, _) => RcDoc::nil(),
+            };
+            let expect = enclose("expect(", test_func, ")")
+                .append(predicate)
+                .append(enclose("(", expected, ");"));
             expects.push(expect);
         }
         let body = RcDoc::intersperse(expects.iter().cloned(), RcDoc::hardline());

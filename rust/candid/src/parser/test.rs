@@ -30,10 +30,10 @@ pub struct HostTest {
     pub asserts: Vec<HostAssert>,
 }
 pub enum HostAssert {
-    // The encoded bytes does not need to match the target implementation
-    Encode(IDLArgs, Vec<Type>, Vec<u8>),
+    // The encoded bytes is not unique
+    Encode(IDLArgs, Vec<Type>, bool, Vec<u8>),
     NotEncode(IDLArgs, Vec<Type>),
-    Decode(Vec<u8>, Vec<Type>, IDLArgs),
+    Decode(Vec<u8>, Vec<Type>, bool, IDLArgs),
     NotDecode(Vec<u8>, Vec<Type>),
 }
 
@@ -88,29 +88,38 @@ impl HostTest {
                     return HostTest { desc, asserts };
                 }
                 let parsed = parsed.unwrap();
-                if assert.pass {
-                    let bytes = parsed.to_bytes_with_types(env, &types).unwrap();
-                    asserts.push(Encode(parsed, types, bytes));
+                if !assert.pass && assert.right.is_none() {
+                    asserts.push(NotEncode(parsed, types));
                 } else {
-                    match assert.right {
-                        None => asserts.push(NotEncode(parsed, types)),
-                        Some(_) => {
-                            let bytes = parsed.to_bytes_with_types(env, &types).unwrap();
-                            asserts.push(Encode(parsed, types, bytes));
-                        }
-                    }
+                    let bytes = parsed.to_bytes_with_types(env, &types).unwrap();
+                    asserts.push(Encode(parsed.clone(), types.clone(), true, bytes.clone()));
+                    let vals = parsed.annotate_types(env, &types).unwrap();
+                    asserts.push(Decode(bytes, types, true, vals));
                 }
                 let desc = format!("(encode?) {}", assert.desc());
                 HostTest { desc, asserts }
             }
             Input::Blob(bytes) => {
-                let args = IDLArgs::from_bytes_with_types(bytes, env, &types);
                 let bytes = bytes.to_vec();
-                if assert.pass {
-                    let args = args.unwrap();
-                    asserts.push(Decode(bytes, types, args));
-                } else {
+                if !assert.pass && assert.right.is_none() {
                     asserts.push(NotDecode(bytes, types));
+                } else {
+                    let args = IDLArgs::from_bytes_with_types(&bytes, env, &types).unwrap();
+                    asserts.push(Decode(bytes.clone(), types.clone(), true, args));
+                    if let Some(right) = &assert.right {
+                        let expected = right.parse(env, &types).unwrap();
+                        if let Input::Blob(blob) = right {
+                            asserts.push(Decode(
+                                blob.to_vec(),
+                                types.clone(),
+                                true,
+                                expected.clone(),
+                            ));
+                        }
+                        if !assert.pass {
+                            asserts.push(Decode(bytes, types, assert.pass, expected));
+                        }
+                    }
                 }
                 HostTest {
                     desc: assert.desc(),
