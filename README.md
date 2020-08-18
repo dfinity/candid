@@ -34,8 +34,16 @@ A list of community maintained Candid libraries:
 
 We provide a [test suite](test/) to check Candid implementations for compliance.
 
-## Contribution
+## Release
 
-The Internet Computer is a new technology stack that is unhackable, fast, scales to billions of users around the world, and supports a new kind of autonomous software that promises to reverse Big Tech’s monopolization of the internet. It allows developers to take on the monopolization of the internet, and return the internet back to its free and open roots. We're committed to connecting those who believe the same through our events, content, and discussions.
+To make a release in this repo:
+
+* Update `Changelog.md` and merge the PR into master.
+* `git tag 2020-04-01 -m "2020-04-01"`
+* `git push origin 2020-04-01`
+
+The tag is always today's date. As the repo contains several targets, it is hard to give a version to the tag.
+
+## Contribution
 
 See our [CONTRIBUTING](.github/CONTRIBUTING.md) and [CODE OF CONDUCT](.github/CODE_OF_CONDUCT.md) to get started.
