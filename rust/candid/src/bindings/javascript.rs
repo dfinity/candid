@@ -159,7 +159,12 @@ fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     match actor {
-        None => "".to_string(),
+        None => {
+            let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
+            let recs = infer_rec(env, &def_list).unwrap();
+            let doc = pp_defs(env, &def_list, &recs);
+            doc.pretty(LINE_WIDTH).to_string()
+        }
         Some(actor) => {
             let def_list = chase_actor(env, actor).unwrap();
             let recs = infer_rec(env, &def_list).unwrap();
@@ -169,5 +174,143 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let doc = str("export default ({ IDL }) => ").append(enclose_space("{", body, "};"));
             doc.pretty(LINE_WIDTH).to_string()
         }
+    }
+}
+
+pub mod value {
+    use super::pp_label;
+    use crate::parser::value::{IDLArgs, IDLField, IDLValue};
+    use crate::pretty::*;
+    use pretty::RcDoc;
+
+    fn pp_field(field: &IDLField) -> RcDoc {
+        pp_label(&field.id)
+            .append(": ")
+            .append(pp_value(&field.val))
+    }
+
+    fn pp_fields(fields: &[IDLField]) -> RcDoc {
+        concat(fields.iter().map(|f| pp_field(f)), ",")
+    }
+
+    pub fn pp_value(v: &IDLValue) -> RcDoc {
+        use IDLValue::*;
+        match &*v {
+            Number(_) | Int(_) | Nat(_) | Int64(_) | Nat64(_) => {
+                RcDoc::text(format!("new BigNumber('{}')", v))
+            }
+            Reserved => RcDoc::text("null"),
+            Principal(id) => RcDoc::text(format!("Principal.fromText('{}')", id)),
+            Text(s) => RcDoc::text(format!("'{}'", s.escape_debug())),
+            None => RcDoc::text("[]"),
+            Opt(v) => enclose_space("[", pp_value(v), "]"),
+            Vec(vs) => {
+                let body = concat(vs.iter().map(|v| pp_value(v)), ";");
+                enclose_space("[", body, "]")
+            }
+            Record(fields) => enclose_space("{", pp_fields(&fields), "}"),
+            Variant(v, _) => enclose_space("{", pp_field(&v), "}"),
+            _ => RcDoc::as_string(v),
+        }
+    }
+
+    pub fn pp_args(args: &IDLArgs) -> RcDoc {
+        let body = concat(args.args.iter().map(pp_value), ",");
+        enclose("[", body, "]")
+    }
+}
+
+pub mod test {
+    use super::value;
+    use crate::parser::test::{HostAssert, HostTest, Test};
+    use crate::pretty::*;
+    use crate::TypeEnv;
+    use pretty::RcDoc;
+
+    fn pp_hex(bytes: &[u8]) -> RcDoc {
+        str("Buffer.from('")
+            .append(RcDoc::as_string(hex::encode(bytes)))
+            .append("', 'hex')")
+    }
+    fn pp_encode<'a>(args: &'a crate::IDLArgs, tys: &'a [crate::types::Type]) -> RcDoc<'a> {
+        let vals = value::pp_args(&args);
+        let tys = super::pp_args(&tys);
+        let items = [tys, vals];
+        let params = concat(items.iter().cloned(), ",");
+        str("IDL.encode").append(enclose("(", params, ")"))
+    }
+
+    fn pp_decode<'a>(bytes: &'a [u8], tys: &'a [crate::types::Type]) -> RcDoc<'a> {
+        let hex = pp_hex(&bytes);
+        let tys = super::pp_args(&tys);
+        let items = [tys, hex];
+        let params = concat(items.iter().cloned(), ",");
+        str("IDL.decode").append(enclose("(", params, ")"))
+    }
+
+    pub fn test_generate(test: Test) -> String {
+        let header = r#"// AUTO-GENERATED. DO NOT EDIT.
+// tslint:disable
+import BigNumber from 'bignumber.js';
+import * as IDL from './idl';
+import { Buffer } from 'buffer/';
+import { Principal } from './principal';
+"#;
+        let mut res = header.to_string();
+        let mut env = TypeEnv::new();
+        crate::check_prog(
+            &mut env,
+            &crate::IDLProg {
+                decs: test.defs,
+                actor: None,
+            },
+        )
+        .unwrap();
+        res += &super::compile(&env, &None);
+        for (i, assert) in test.asserts.iter().enumerate() {
+            let mut types = Vec::new();
+            for ty in assert.typ.iter() {
+                types.push(env.ast_to_type(ty).unwrap());
+            }
+            let host = HostTest::from_assert(assert, &env, &types);
+            let mut expects = Vec::new();
+            for cmd in host.asserts.iter() {
+                use HostAssert::*;
+                let test_func = match cmd {
+                    Encode(args, tys, _, _) | NotEncode(args, tys) => {
+                        let items = [super::pp_args(&tys), pp_encode(&args, &tys)];
+                        let params = concat(items.iter().cloned(), ",");
+                        str("IDL.decode").append(enclose("(", params, ")"))
+                    }
+                    Decode(bytes, tys, _, _) | NotDecode(bytes, tys) => pp_decode(&bytes, &tys),
+                };
+                let (test_func, predicate) = match cmd {
+                    Encode(_, _, true, _) | Decode(_, _, true, _) => (test_func, str(".toEqual")),
+                    Encode(_, _, false, _) | Decode(_, _, false, _) => {
+                        (test_func, str(".not.toEqual"))
+                    }
+                    NotEncode(_, _) | NotDecode(_, _) => {
+                        (str("() => ").append(test_func), str(".toThrow"))
+                    }
+                };
+                let expected = match cmd {
+                    Encode(_, tys, _, bytes) => pp_decode(&bytes, &tys), //pp_hex(&bytes),
+                    Decode(_, _, _, vals) => value::pp_args(&vals),
+                    NotEncode(_, _) | NotDecode(_, _) => RcDoc::nil(),
+                };
+                let expect = enclose("expect(", test_func, ")")
+                    .append(predicate)
+                    .append(enclose("(", expected, ");"));
+                expects.push(expect);
+            }
+            let body = RcDoc::intersperse(expects.iter().cloned(), RcDoc::hardline());
+            let body = str("test('")
+                .append(format!("{} {}", i + 1, host.desc))
+                .append("', () => ")
+                .append(enclose_space("{", body, "});"))
+                .append(RcDoc::hardline());
+            res += &body.pretty(LINE_WIDTH).to_string();
+        }
+        res
     }
 }

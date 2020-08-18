@@ -353,61 +353,33 @@ pub mod pretty {
 
     pub use crate::bindings::candid::pp_label;
 
-    pub fn pp_idl_field(field: &IDLField) -> RcDoc {
+    fn pp_field(field: &IDLField) -> RcDoc {
         pp_label(&field.id)
             .append(kwd(" ="))
             .append(pp_value(&field.val))
     }
 
-    pub fn pp_idl_fields(fields: &[IDLField]) -> RcDoc {
-        concat(fields.iter().map(|f| pp_idl_field(f)), ";")
-    }
-
-    pub fn pp_variant_field(field: &IDLField) -> RcDoc {
-        pp_label(&field.id)
-            .append(kwd(" ="))
-            .append(pp_value(&field.val))
+    fn pp_fields(fields: &[IDLField]) -> RcDoc {
+        concat(fields.iter().map(|f| pp_field(f)), ";")
     }
 
     pub fn pp_value(v: &IDLValue) -> RcDoc {
         use super::IDLValue::*;
         match &*v {
-            Bool(b) => RcDoc::as_string(b),
-            Null => str("null"),
-            None => str("none"),
-            Int(i) => RcDoc::as_string(i),
-            Nat(n) => RcDoc::as_string(n),
-            Nat8(n) => RcDoc::as_string(n),
-            Nat16(n) => RcDoc::as_string(n),
-            Nat32(n) => RcDoc::as_string(n),
-            Nat64(n) => RcDoc::as_string(n),
-            Int8(i) => RcDoc::as_string(i),
-            Int16(i) => RcDoc::as_string(i),
-            Int32(i) => RcDoc::as_string(i),
-            Int64(i) => RcDoc::as_string(i),
-            Float32(f) => RcDoc::as_string(f), // todo
-            Float64(f) => RcDoc::as_string(f),
-            Number(t) => str(t),
-            Text(t) => RcDoc::as_string(format!("{:?}", t)), // to do -- enough quoting here?
             Opt(v) => kwd("opt").append(enclose_space("{", pp_value(v), "}")),
             Vec(vs) => {
-                let mut body = RcDoc::nil();
-                let mut is_first = true;
-                for v in vs.iter() {
-                    if is_first {
-                        is_first = false;
-                    } else {
-                        body = body.append(RcDoc::space())
-                    }
-                    body = body.append(pp_value(v).append(RcDoc::text(";")))
-                }
+                let body = concat(vs.iter().map(|v| pp_value(v)), ";");
                 kwd("vec").append(enclose_space("{", body, "}"))
             }
-            Record(fields) => kwd("record").append(enclose_space("{", pp_idl_fields(&fields), "}")),
-            Variant(v, _) => kwd("variant").append(enclose_space("{", pp_variant_field(&v), "}")),
-            // to do -- the other cases
-            _ => unimplemented!("{:?}", v),
+            Record(fields) => kwd("record").append(enclose_space("{", pp_fields(&fields), "}")),
+            Variant(v, _) => kwd("variant").append(enclose_space("{", pp_field(&v), "}")),
+            _ => RcDoc::as_string(v),
         }
+    }
+
+    pub fn pp_args(args: &IDLArgs) -> RcDoc {
+        let body = concat(args.args.iter().map(pp_value), ",");
+        enclose("(", body, ")")
     }
 }
 
