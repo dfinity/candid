@@ -30,6 +30,10 @@ A list of community maintained Candid libraries:
 * [didc](tools/didc): Candid CLI
 * [candiff](tools/candiff): Diff Candid values structurally
 
+## Tests
+
+We provide a [test suite](test/) to check Candid implementations for compliance.
+
 ## Contribution
 
 The Internet Computer is a new technology stack that is unhackable, fast, scales to billions of users around the world, and supports a new kind of autonomous software that promises to reverse Big Tech’s monopolization of the internet. It allows developers to take on the monopolization of the internet, and return the internet back to its free and open roots. We're committed to connecting those who believe the same through our events, content, and discussions.
