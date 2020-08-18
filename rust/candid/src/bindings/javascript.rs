@@ -159,7 +159,12 @@ fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     match actor {
-        None => "".to_string(),
+        None => {
+            let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
+            let recs = infer_rec(env, &def_list).unwrap();
+            let doc = pp_defs(env, &def_list, &recs);
+            doc.pretty(LINE_WIDTH).to_string()
+        }
         Some(actor) => {
             let def_list = chase_actor(env, actor).unwrap();
             let recs = infer_rec(env, &def_list).unwrap();
@@ -252,7 +257,16 @@ import { Buffer } from 'buffer/';
 import { Principal } from './principal';
 "#;
         let mut res = header.to_string();
-        let env = TypeEnv::new();
+        let mut env = TypeEnv::new();
+        crate::check_prog(
+            &mut env,
+            &crate::IDLProg {
+                decs: test.defs,
+                actor: None,
+            },
+        )
+        .unwrap();
+        res += &super::compile(&env, &None);
         for (i, assert) in test.asserts.iter().enumerate() {
             let mut types = Vec::new();
             for ty in assert.typ.iter() {
