@@ -1,10 +1,10 @@
 name: Release
 
 on:
+  pull_request:
   push:
     tags:
       - '*'
-    branch: release
 
 jobs:
   publish:
