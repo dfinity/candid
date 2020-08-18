@@ -39,8 +39,10 @@ We provide a [test suite](test/) to check Candid implementations for compliance.
 To make a release in this repo:
 
 * Update `Changelog.md` and merge the PR into master.
-* `git tag 0.4.2 -m "Rust 0.4.2"`
-* `git push origin 0.4.2`
+* `git tag 2020-04-01 -m "2020-04-01"`
+* `git push origin 2020-04-01`
+
+The tag is always today's date. As the repo contains several targets, it is hard to give a version to the tag.
 
 ## Contribution
 
