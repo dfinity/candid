@@ -194,6 +194,7 @@ pub mod value {
             Number(_) | Int(_) | Nat(_) | Int64(_) | Nat64(_) => {
                 RcDoc::text(format!("new BigNumber('{}')", v))
             }
+            Reserved => RcDoc::text("null"),
             Principal(id) => RcDoc::text(format!("Principal.fromText('{}')", id)),
             Text(s) => RcDoc::text(format!("'{}'", s.escape_debug())),
             None => RcDoc::text("[]"),
@@ -214,69 +215,88 @@ pub mod value {
     }
 }
 
-use crate::parser::test::{HostAssert, HostTest, Test};
+pub mod test {
+    use super::value;
+    use crate::parser::test::{HostAssert, HostTest, Test};
+    use crate::pretty::*;
+    use crate::TypeEnv;
+    use pretty::RcDoc;
 
-pub fn test_generate(test: Test) -> String {
-    let header = r#"// AUTO-GENERATED. DO NOT EDIT.
+    fn pp_hex(bytes: &[u8]) -> RcDoc {
+        str("Buffer.from('")
+            .append(RcDoc::as_string(hex::encode(bytes)))
+            .append("', 'hex')")
+    }
+    fn pp_encode<'a>(args: &'a crate::IDLArgs, tys: &'a [crate::types::Type]) -> RcDoc<'a> {
+        let vals = value::pp_args(&args);
+        let tys = super::pp_args(&tys);
+        let items = [tys, vals];
+        let params = concat(items.iter().cloned(), ",");
+        str("IDL.encode").append(enclose("(", params, ")"))
+    }
+
+    fn pp_decode<'a>(bytes: &'a [u8], tys: &'a [crate::types::Type]) -> RcDoc<'a> {
+        let hex = pp_hex(&bytes);
+        let tys = super::pp_args(&tys);
+        let items = [tys, hex];
+        let params = concat(items.iter().cloned(), ",");
+        str("IDL.decode").append(enclose("(", params, ")"))
+    }
+
+    pub fn test_generate(test: Test) -> String {
+        let header = r#"// AUTO-GENERATED. DO NOT EDIT.
 // tslint:disable
 import BigNumber from 'bignumber.js';
 import * as IDL from './idl';
 import { Buffer } from 'buffer/';
 import { Principal } from './principal';
 "#;
-    let mut res = header.to_string();
-    let env = TypeEnv::new();
-    for (i, assert) in test.asserts.iter().enumerate() {
-        let mut types = Vec::new();
-        for ty in assert.typ.iter() {
-            types.push(env.ast_to_type(ty).unwrap());
+        let mut res = header.to_string();
+        let env = TypeEnv::new();
+        for (i, assert) in test.asserts.iter().enumerate() {
+            let mut types = Vec::new();
+            for ty in assert.typ.iter() {
+                types.push(env.ast_to_type(ty).unwrap());
+            }
+            let host = HostTest::from_assert(assert, &env, &types);
+            let mut expects = Vec::new();
+            for cmd in host.asserts.iter() {
+                use HostAssert::*;
+                let test_func = match cmd {
+                    Encode(args, tys, _, _) | NotEncode(args, tys) => {
+                        let items = [super::pp_args(&tys), pp_encode(&args, &tys)];
+                        let params = concat(items.iter().cloned(), ",");
+                        str("IDL.decode").append(enclose("(", params, ")"))
+                    }
+                    Decode(bytes, tys, _, _) | NotDecode(bytes, tys) => pp_decode(&bytes, &tys),
+                };
+                let (test_func, predicate) = match cmd {
+                    Encode(_, _, true, _) | Decode(_, _, true, _) => (test_func, str(".toEqual")),
+                    Encode(_, _, false, _) | Decode(_, _, false, _) => {
+                        (test_func, str(".not.toEqual"))
+                    }
+                    NotEncode(_, _) | NotDecode(_, _) => {
+                        (str("() => ").append(test_func), str(".toThrow"))
+                    }
+                };
+                let expected = match cmd {
+                    Encode(_, tys, _, bytes) => pp_decode(&bytes, &tys), //pp_hex(&bytes),
+                    Decode(_, _, _, vals) => value::pp_args(&vals),
+                    NotEncode(_, _) | NotDecode(_, _) => RcDoc::nil(),
+                };
+                let expect = enclose("expect(", test_func, ")")
+                    .append(predicate)
+                    .append(enclose("(", expected, ");"));
+                expects.push(expect);
+            }
+            let body = RcDoc::intersperse(expects.iter().cloned(), RcDoc::hardline());
+            let body = str("test('")
+                .append(format!("{} {}", i + 1, host.desc))
+                .append("', () => ")
+                .append(enclose_space("{", body, "});"))
+                .append(RcDoc::hardline());
+            res += &body.pretty(LINE_WIDTH).to_string();
         }
-        let host = HostTest::from_assert(assert, &env, &types);
-        let mut expects = Vec::new();
-        for cmd in host.asserts.iter() {
-            use HostAssert::*;
-            let test_func = match cmd {
-                Encode(args, tys, _, _) | NotEncode(args, tys) => {
-                    let vals = value::pp_args(&args);
-                    let tys = pp_args(&tys);
-                    let items = [tys, vals];
-                    let params = concat(items.iter().cloned(), ",");
-                    str("IDL.encode").append(enclose("(", params, ")"))
-                }
-                Decode(bytes, tys, _, _) | NotDecode(bytes, tys) => {
-                    let hex = str("Buffer.from('")
-                        .append(RcDoc::as_string(hex::encode(&bytes)))
-                        .append("', 'hex')");
-                    let tys = pp_args(&tys);
-                    let items = [tys, hex];
-                    let params = concat(items.iter().cloned(), ",");
-                    str("IDL.decode").append(enclose("(", params, ")"))
-                }
-            };
-            let (test_func, predicate) = match cmd {
-                Encode(_, _, true, _) | Decode(_, _, true, _) => (test_func, str(".toEqual")),
-                Encode(_, _, false, _) | Decode(_, _, false, _) => (test_func, str(".not.toEqual")),
-                NotEncode(_, _) | NotDecode(_, _) => {
-                    (str("() => ").append(test_func), str(".toThrow"))
-                }
-            };
-            let expected = match cmd {
-                Encode(_, _, _, _bytes) => str("expect.anything()"),
-                Decode(_, _, _, vals) => value::pp_args(&vals),
-                NotEncode(_, _) | NotDecode(_, _) => RcDoc::nil(),
-            };
-            let expect = enclose("expect(", test_func, ")")
-                .append(predicate)
-                .append(enclose("(", expected, ");"));
-            expects.push(expect);
-        }
-        let body = RcDoc::intersperse(expects.iter().cloned(), RcDoc::hardline());
-        let body = str("test('")
-            .append(format!("{} {}", i + 1, host.desc))
-            .append("', () => ")
-            .append(enclose_space("{", body, "});"))
-            .append(RcDoc::hardline());
-        res += &body.pretty(LINE_WIDTH).to_string();
+        res
     }
-    res
 }

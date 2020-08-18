@@ -136,7 +136,7 @@ fn main() -> Result<(), ExitFailure> {
                 .map_err(|_| Error::msg(format!("could not read file {}", input.display())))?;
             let ast = test.parse::<candid::parser::test::Test>()?;
             let content = match target.as_str() {
-                "js" => candid::bindings::javascript::test_generate(ast),
+                "js" => candid::bindings::javascript::test::test_generate(ast),
                 "did" => {
                     candid::parser::test::check(ast)?;
                     "".to_string()

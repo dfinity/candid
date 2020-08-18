@@ -93,6 +93,7 @@ impl HostTest {
                 } else {
                     let bytes = parsed.to_bytes_with_types(env, &types).unwrap();
                     asserts.push(Encode(parsed.clone(), types.clone(), true, bytes.clone()));
+                    // round tripping
                     let vals = parsed.annotate_types(env, &types).unwrap();
                     asserts.push(Decode(bytes, types, true, vals));
                 }
@@ -105,7 +106,9 @@ impl HostTest {
                     asserts.push(NotDecode(bytes, types));
                 } else {
                     let args = IDLArgs::from_bytes_with_types(&bytes, env, &types).unwrap();
-                    asserts.push(Decode(bytes.clone(), types.clone(), true, args));
+                    asserts.push(Decode(bytes.clone(), types.clone(), true, args.clone()));
+                    // round tripping
+                    asserts.push(Encode(args, types.clone(), true, bytes.clone()));
                     if let Some(right) = &assert.right {
                         let expected = right.parse(env, &types).unwrap();
                         if let Input::Blob(blob) = right {
