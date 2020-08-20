@@ -205,7 +205,7 @@ pub mod value {
             None => RcDoc::text("[]"),
             Opt(v) => enclose_space("[", pp_value(v), "]"),
             Vec(vs) => {
-                let body = concat(vs.iter().map(|v| pp_value(v)), ";");
+                let body = concat(vs.iter().map(|v| pp_value(v)), ",");
                 enclose_space("[", body, "]")
             }
             Record(fields) => enclose_space("{", pp_fields(&fields), "}"),

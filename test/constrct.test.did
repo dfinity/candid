@@ -1,0 +1,57 @@
+/*
+Encoding tests for construct types
+*/
+
+// Type definitions
+type Opt = opt Opt;
+type Vec = vec Vec;
+
+// Type table
+assert blob "DIDL\00\00"               : () "empty table";
+assert blob "DIDL\01\6e\6f\00"         : () "unused type";
+assert blob "DIDL\02\6e\6f\6e\6f\00"   : () "repeated types";
+assert blob "DIDL\01\6e\00\00"         : () "recursive type";
+assert blob "DIDL\01\6e\00"           !: () "type too short";
+assert blob "DIDL\01\00\00"           !: () "vacuous type";
+assert blob "DIDL\02\6e\01\00\00"     !: () "vacuous type";
+assert blob "DIDL\01\6e\01\00"        !: () "table entry out of range";
+assert blob "DIDL\00\01\00"           !: () "arg entry out of range";
+assert blob "DIDL\01\7f\00"           !: () "primitive type in the table";
+assert blob "DIDL\01\6e\6f\6e\6f\00"  !: () "table too long";
+
+// option
+assert blob "DIDL\01\6e\7c\01\00\00" == "(null)"                     : (opt int) "opt: null";
+assert blob "DIDL\01\6e\7c\01\00\01\2a" == "(opt 42)"                : (opt int) "opt: 42";
+assert blob "DIDL\01\6e\7c\01\00\02\2a"                             !: (opt int) "opt: out of range";
+assert blob "DIDL\01\6e\7c\01\00\ff"                                !: (opt int) "opt: out of range";
+assert blob "DIDL\01\6e\7c\01\00\01"                                !: (opt int) "opt: too short";
+assert blob "DIDL\01\6e\7c\01\00\00\2a"                             !: (opt int) "opt: too long";
+assert blob "DIDL\02\6e\01\6e\7c\01\00\01\01\2a" == "(opt opt 42)"   : (opt opt int) "opt: nested";
+assert blob "DIDL\01\6e\00\01\00\01\01\00" == "(opt opt null)"       : (Opt) "opt: recursion";
+assert blob "DIDL\01\6e\00\01\00\01\01\00" == "(opt opt null)"       : (opt opt opt int) "opt: recursion with nested type";
+assert blob "DIDL\02\6e\01\6e\00\01\00\01\01\00" == "(opt opt null)" : (Opt) "opt: mutual recursion";
+
+// vector
+assert blob "DIDL\01\6d\7c\01\00\00" == "(vec {})"                          : (vec int) "vec: empty";
+assert blob "DIDL\01\6d\7c\01\00\02\01\02" == "(vec { 1; 2 })"              : (vec int) "vec";
+assert blob "DIDL\01\6d\7b\01\00\02\01\02" == "(blob \"\01\02\")"           : (vec nat8) "vec: blob";
+assert blob "DIDL\01\6d\00\01\00\00" == "(vec {})"                          : (Vec) "vec: recursive vector";
+assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (Vec) "vec: infinite tree";
+assert blob "DIDL\01\6d\7f\01\00\e8\07"                                     : (vec null) "vec: space bomb";
+assert "(vec { 1; -1 })"                                                   !: (vec nat) "vec: type mismatch";
+assert blob "DIDL\01\6d\7c\01\00"                                          !: (vec int) "vec: too short";
+assert blob "DIDL\01\6d\7c\01\00\02\01"                                    !: (vec int) "vec: too short";
+assert blob "DIDL\01\6d\7c\01\00\01\01\02"                                 !: (vec int) "vec: too long";
+
+// record
+assert blob "DIDL\01\6c\00\01\00" == "(record {})"                                : (record {}) "record: empty";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 1 = 42 })"               : (record {1:int}) "record";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { whatever = 0 })"         : (record {}) "record: ignore fields";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a"                                       !: (record {2:int}) "record: missing field";
+assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01" == "(record {42; true})"      : (record {int; bool}) "record: tuple";
+assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01" == "(record {1=true})"        : (record {1:bool}) "record: ignore fields";
+assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01"                              !: (record {bool; int}) "record: type mismatch";
+assert blob "DIDL\01\6c\02\01\7c\00\7e\01\00\2a\01"                              !: (record {1:int; 0:bool}) "record: unsorted";
+assert blob "DIDL\01\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\7c\01\00\01\2a"
+    == "(record { foo = 42; bar = true})"                                  : (record {foo:int; bar:bool}) "record: named fields";
+assert blob "DIDL\01\6c\01\80\e4\97\d0\12\7c\01\00\2a"   !: (record {}) "record: field hash larger than u32";
