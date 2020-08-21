@@ -108,6 +108,8 @@ struct Deserializer<'de> {
     // field_name tells deserialize_identifier which field name to process.
     // This field should always be set by set_field_name function.
     field_name: Option<FieldLabel>,
+    // The record nesting depth should be bounded by the length of table to avoid infinite loop.
+    record_nesting_depth: usize,
 }
 
 impl<'de> Deserializer<'de> {
@@ -118,6 +120,7 @@ impl<'de> Deserializer<'de> {
             types: VecDeque::new(),
             current_type: VecDeque::new(),
             field_name: None,
+            record_nesting_depth: 0,
         }
     }
 
@@ -354,6 +357,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             return self.deserialize_identifier(visitor);
         }
         let t = self.peek_type()?;
+        if t != Opcode::Record {
+            self.record_nesting_depth = 0;
+        }
         match t {
             Opcode::Int => self.deserialize_int(visitor),
             Opcode::Nat => self.deserialize_nat(visitor),
@@ -389,6 +395,15 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             return self.deserialize_identifier(visitor);
         }
         let t = self.peek_type()?;
+        match t {
+            Opcode::Record => {
+                if self.record_nesting_depth > self.table.len() {
+                    return Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"));
+                }
+                self.record_nesting_depth += 1;
+            }
+            _ => self.record_nesting_depth = 0,
+        }
         match t {
             Opcode::Int => self.deserialize_int(visitor),
             Opcode::Nat => self.deserialize_nat(visitor),
@@ -563,6 +578,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        if self.record_nesting_depth > self.table.len() {
+            return Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"));
+        }
+        self.record_nesting_depth += 1;
         self.check_type(Opcode::Record)?;
         let len = self.pop_current_type()?.get_u32()?;
         let mut fs = BTreeMap::new();

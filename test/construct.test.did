@@ -67,9 +67,8 @@ assert blob "DIDL\01\6c\02\01\7c\00\7e\01\00\2a\01"                             
 assert blob "DIDL\01\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\7c\01\00\01\2a"
     == "(record { foo = 42; bar = true})"                                         : (record {foo:int; bar:bool}) "record: named fields";
 assert blob "DIDL\01\6c\01\cd\84\b0\05\7f\01\00" == "(record { \"☃\" = null })"   : (record { "☃":null }) "record: unicode field";
-assert blob "DIDL\01\6c\01\80\e4\97\d0\12\7c\01\00\2a"      !: (record {}) "record: field hash larger than u32";
-// TODO
-// assert blob "DIDL\01\6c\01\00\00\01\00"                  !: (EmptyRecord) "record: empty recursion";
+assert blob "DIDL\01\6c\01\80\e4\97\d0\12\7c\01\00\2a"                         !: (record {}) "record: field hash larger than u32";
+assert blob "DIDL\01\6c\01\00\00\01\00"                                        !: (EmptyRecord) "record: empty recursion";
 assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a"                               !: (record {int}) "record: value too short";
 assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01\00"                         !: (record {int}) "record: value too long";
 assert blob "DIDL\01\6c\02\00\7c\01\01\00\2a\01"                               !: (record {}) "record: type too short";
