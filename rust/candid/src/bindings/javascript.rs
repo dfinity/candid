@@ -183,6 +183,22 @@ pub mod value {
     use crate::pretty::*;
     use pretty::RcDoc;
 
+    fn is_tuple(v: &IDLValue) -> bool {
+        match v {
+            IDLValue::Record(ref fs) => {
+                if fs.is_empty() {
+                    return false;
+                }
+                for (i, field) in fs.iter().enumerate() {
+                    if field.id.get_id() != (i as u32) {
+                        return false;
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
     fn pp_field(field: &IDLField) -> RcDoc {
         pp_label(&field.id)
             .append(": ")
@@ -208,7 +224,14 @@ pub mod value {
                 let body = concat(vs.iter().map(|v| pp_value(v)), ",");
                 enclose_space("[", body, "]")
             }
-            Record(fields) => enclose_space("{", pp_fields(&fields), "}"),
+            Record(fields) => {
+                if is_tuple(v) {
+                    let tuple = concat(fields.iter().map(|f| pp_value(&f.val)), ",");
+                    enclose_space("[", tuple, "]")
+                } else {
+                    enclose_space("{", pp_fields(&fields), "}")
+                }
+            }
             Variant(v, _) => enclose_space("{", pp_field(&v), "}"),
             _ => RcDoc::as_string(v),
         }

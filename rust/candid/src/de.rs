@@ -181,9 +181,16 @@ impl<'de> Deserializer<'de> {
                     let obj_len = u32::try_from(self.leb128_read()?)
                         .map_err(|_| Error::msg(Error::msg("length out of u32")))?;
                     buf.push(RawValue::U(obj_len));
+                    let mut prev_hash = None;
                     for _ in 0..obj_len {
                         let hash = u32::try_from(self.leb128_read()?)
                             .map_err(|_| Error::msg(Error::msg("field hash out of u32")))?;
+                        if let Some(prev_hash) = prev_hash {
+                            if prev_hash >= hash {
+                                return Err(Error::msg("field id is not sorted"));
+                            }
+                        }
+                        prev_hash = Some(hash);
                         buf.push(RawValue::U(hash));
                         let ty = self.sleb128_read()?;
                         validate_type_range(ty, len)?;
@@ -729,7 +736,8 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
     {
         match self.style {
             Style::Enum { len, ref fs } => {
-                let index = self.de.leb128_read()? as u32;
+                let index = u32::try_from(self.de.leb128_read()?)
+                    .map_err(|_| Error::msg("variant index out of u32"))?;
                 if index >= len {
                     return Err(Error::msg(format!(
                         "variant index {} larger than length {}",

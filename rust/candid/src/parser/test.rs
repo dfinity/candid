@@ -106,9 +106,9 @@ impl HostTest {
                     asserts.push(NotDecode(bytes, types));
                 } else {
                     let args = IDLArgs::from_bytes_with_types(&bytes, env, &types).unwrap();
-                    asserts.push(Decode(bytes.clone(), types.clone(), true, args.clone()));
+                    asserts.push(Decode(bytes.clone(), types.clone(), true, args));
                     // round tripping
-                    asserts.push(Encode(args, types.clone(), true, bytes.clone()));
+                    // asserts.push(Encode(args, types.clone(), true, bytes.clone()));
                     if let Some(right) = &assert.right {
                         let expected = right.parse(env, &types).unwrap();
                         if let Input::Blob(blob) = right {
