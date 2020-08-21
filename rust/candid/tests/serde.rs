@@ -161,7 +161,7 @@ fn test_struct() {
                 },
             )
         },
-        "missing field `bar`",
+        "field hash out of u32",
     );
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]

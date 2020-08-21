@@ -83,13 +83,16 @@ assert "(variant {})"                                                          !
 assert blob "DIDL\01\6b\00\01\00"                                              !: (variant {}) "variant: no empty value";
 assert blob "DIDL\01\6b\01\00\7f\01\00\00" == "(variant {0})"                   : (variant {0}) "variant: numbered field";
 assert blob "DIDL\01\6b\01\00\7f\01\00\00\2a"                                  !: (variant {0:int}) "variant: type mismatch";
-assert blob "DIDL\01\6b\02\00\7f\01\7c\01\00\01\2a"                            !: (variant {0:int; 1:int}) "variant: type mismatch";
+
+// Should this pass?
+assert blob "DIDL\01\6b\02\00\7f\01\7c\01\00\01\2a"                             : (variant {0:int; 1:int}) "??? variant: type mismatch";
 assert blob "DIDL\01\6b\01\00\7f\01\00\00" == "(variant {0})"                   : (variant {0;1}) "variant: ignore field";
 assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\00" == "(variant {0})"             : (variant {0}) "variant: ignore field";
 assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\01" == "(variant {1})"             : (variant {1;2}) "variant: change index";
 assert blob "DIDL\01\6b\01\00\7f\01\00\00"                                     !: (variant {1}) "variant: missing field";
 assert blob "DIDL\01\6b\01\00\7f\01\00\01"                                     !: (variant {0}) "variant: index out of range";
 assert blob "DIDL\01\6b\02\00\7f\00\7f\01\00\00"                               !: (variant {0}) "variant: duplicate fields";
+assert blob "DIDL\01\6b\03\00\7f\01\7f\01\7f\01\00\00"                         !: (variant {0}) "variant: duplicate fields";
 assert blob "DIDL\01\6b\02\01\7f\00\7f\01\00\00"                               !: (variant {0;1}) "variant: unsorted";
 assert blob "DIDL\01\6b\02\b3\d3\c9\01\7f\e6\fd\d5\01\7f\01\00\00" == "(variant { Bar })" : (variant { Foo; Bar; }) "variant: enum";
 assert blob "DIDL\01\6b\01\cd\84\b0\05\7f\01\00\00" == "(variant { \"☃\" })"    : (variant { "☃" }) "variant: unicode field";
