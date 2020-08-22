@@ -50,7 +50,7 @@ impl Assert {
 impl Input {
     pub fn parse(&self, env: &TypeEnv, types: &[Type]) -> Result<IDLArgs> {
         match self {
-            Input::Text(ref s) => s.parse::<IDLArgs>()?.annotate_types(env, types),
+            Input::Text(ref s) => s.parse::<IDLArgs>()?.annotate_types(true, env, types),
             Input::Blob(ref bytes) => Ok(IDLArgs::from_bytes_with_types(bytes, env, types)?),
         }
     }
@@ -94,7 +94,7 @@ impl HostTest {
                     let bytes = parsed.to_bytes_with_types(env, &types).unwrap();
                     asserts.push(Encode(parsed.clone(), types.clone(), true, bytes.clone()));
                     // round tripping
-                    let vals = parsed.annotate_types(env, &types).unwrap();
+                    let vals = parsed.annotate_types(true, env, &types).unwrap();
                     asserts.push(Decode(bytes, types, true, vals));
                 }
                 let desc = format!("(encode?) {}", assert.desc());

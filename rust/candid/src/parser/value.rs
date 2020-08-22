@@ -54,19 +54,19 @@ impl IDLArgs {
             args: args.to_owned(),
         }
     }
-    pub fn annotate_types(self, env: &TypeEnv, types: &[Type]) -> Result<Self> {
+    pub fn annotate_types(self, from_parser: bool, env: &TypeEnv, types: &[Type]) -> Result<Self> {
         if types.len() > self.args.len() {
             return Err(Error::msg("wrong number of argument values"));
         }
         let mut args = Vec::new();
         for (v, ty) in self.args.iter().zip(types.iter()) {
-            let v = v.annotate_type(env, &ty)?;
+            let v = v.annotate_type(from_parser, env, &ty)?;
             args.push(v);
         }
         Ok(IDLArgs { args })
     }
     /// Encode IDLArgs with the given types. Note that this is not equivalent to
-    /// `idl_args.annotate_types(env, types).to_bytes()` for recursive types.
+    /// `idl_args.annotate_types(true, env, types).to_bytes()` for recursive types.
     pub fn to_bytes_with_types(&self, env: &TypeEnv, types: &[Type]) -> Result<Vec<u8>> {
         if types.len() > self.args.len() {
             return Err(Error::msg("wrong number of argument values"));
@@ -95,7 +95,7 @@ impl IDLArgs {
         let mut args = Vec::new();
         for ty in types.iter() {
             let v = de.get_value::<IDLValue>()?;
-            let v = v.annotate_type(env, ty)?;
+            let v = v.annotate_type(false, env, ty)?;
             args.push(v);
         }
         de.done()?;
@@ -192,21 +192,21 @@ impl fmt::Display for IDLField {
 }
 
 impl IDLValue {
-    pub fn annotate_type(&self, env: &TypeEnv, t: &Type) -> Result<Self> {
+    /// Anotate `IDLValue` with the given type, allowing subtyping. If `IDLValue` is parser from
+    /// string, we need to set `from_parser` to true to enable converting numbers to the expected types.
+    pub fn annotate_type(&self, from_parser: bool, env: &TypeEnv, t: &Type) -> Result<Self> {
         Ok(match (self, t) {
             (_, Type::Var(id)) => {
                 let ty = env.rec_find_type(id)?;
-                self.annotate_type(env, ty)?
+                self.annotate_type(from_parser, env, ty)?
             }
             (_, Type::Knot(id)) => {
                 let ty = crate::types::internal::find_type(*id).unwrap();
-                self.annotate_type(env, &ty)?
+                self.annotate_type(from_parser, env, &ty)?
             }
-            (_, Type::Reserved) => IDLValue::Reserved,
-            (IDLValue::Null, Type::Null) => IDLValue::Null,
-            (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
-            (IDLValue::Bool(b), Type::Bool) => IDLValue::Bool(*b),
-            (IDLValue::Number(str), t) => match t {
+            (IDLValue::Null, Type::Opt(_)) if from_parser => IDLValue::None,
+            (IDLValue::Float64(n), Type::Float32) if from_parser => IDLValue::Float32(*n as f32),
+            (IDLValue::Number(str), t) if from_parser => match t {
                 Type::Int => IDLValue::Int(str.parse::<Int>()?),
                 Type::Nat => IDLValue::Nat(str.parse::<Nat>()?),
                 Type::Nat8 => IDLValue::Nat8(str.parse::<u8>().map_err(error)?),
@@ -224,6 +224,9 @@ impl IDLValue {
                     )))
                 }
             },
+            (_, Type::Reserved) => IDLValue::Reserved,
+            (IDLValue::Null, Type::Null) => IDLValue::Null,
+            (IDLValue::Bool(b), Type::Bool) => IDLValue::Bool(*b),
             (IDLValue::Int(i), Type::Int) => IDLValue::Int(i.clone()),
             (IDLValue::Nat(n), Type::Nat) => IDLValue::Nat(n.clone()),
             (IDLValue::Nat8(n), Type::Nat8) => IDLValue::Nat8(*n),
@@ -236,17 +239,16 @@ impl IDLValue {
             (IDLValue::Int64(n), Type::Int64) => IDLValue::Int64(*n),
             (IDLValue::Float64(n), Type::Float64) => IDLValue::Float64(*n),
             (IDLValue::Float32(n), Type::Float32) => IDLValue::Float32(*n),
-            (IDLValue::Float64(n), Type::Float32) => IDLValue::Float32(*n as f32),
             (IDLValue::Text(s), Type::Text) => IDLValue::Text(s.to_owned()),
             (IDLValue::None, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Opt(v), Type::Opt(ty)) => {
-                let v = v.annotate_type(env, ty)?;
+                let v = v.annotate_type(from_parser, env, ty)?;
                 IDLValue::Opt(Box::new(v))
             }
             (IDLValue::Vec(vec), Type::Vec(ty)) => {
                 let mut res = Vec::new();
                 for e in vec.iter() {
-                    let v = e.annotate_type(env, ty)?;
+                    let v = e.annotate_type(from_parser, env, ty)?;
                     res.push(v);
                 }
                 IDLValue::Vec(res)
@@ -259,7 +261,7 @@ impl IDLValue {
                     let val = fields
                         .get(&id)
                         .ok_or_else(|| Error::msg(format!("field {} not found", id)))?;
-                    let val = val.annotate_type(env, ty)?;
+                    let val = val.annotate_type(from_parser, env, ty)?;
                     res.push(IDLField {
                         id: id.clone(),
                         val,
@@ -270,7 +272,7 @@ impl IDLValue {
             (IDLValue::Variant(v, _), Type::Variant(fs)) => {
                 for (i, f) in fs.iter().enumerate() {
                     if v.id == f.id {
-                        let val = v.val.annotate_type(env, &f.ty)?;
+                        let val = v.val.annotate_type(from_parser, env, &f.ty)?;
                         let field = IDLField {
                             id: f.id.clone(),
                             val,

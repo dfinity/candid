@@ -45,7 +45,7 @@ impl IDLBuilder {
     ) -> Result<&'a mut Self> {
         use super::CandidType;
         let env = self.type_ser.env.merge(env)?;
-        let v = value.annotate_type(env, t)?;
+        let v = value.annotate_type(true, env, t)?;
         self.type_ser.push_type(t)?;
         v.idl_serialize(&mut self.value_ser)?;
         Ok(self)

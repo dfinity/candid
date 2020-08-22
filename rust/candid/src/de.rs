@@ -190,7 +190,7 @@ impl<'de> Deserializer<'de> {
                             .map_err(|_| Error::msg(Error::msg("field hash out of u32")))?;
                         if let Some(prev_hash) = prev_hash {
                             if prev_hash >= hash {
-                                return Err(Error::msg("field id is not sorted"));
+                                return Err(Error::msg("field id collision or not sorted"));
                             }
                         }
                         prev_hash = Some(hash);
