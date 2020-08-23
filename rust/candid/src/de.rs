@@ -338,7 +338,7 @@ macro_rules! primitive_impl {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
                 self.check_type($opcode)?;
-                let value = self.input.$($value)*()?;
+                let value = self.input.$($value)*().map_err(|_| Error::msg(format!("cannot read {} value", stringify!($opcode))))?;
                 visitor.[<visit_ $ty>](value)
             }
         }
