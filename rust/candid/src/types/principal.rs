@@ -98,7 +98,7 @@ impl<'de> Deserialize<'de> for Principal {
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 formatter.write_str("Principal value")
             }
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E> {
+            fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E> {
                 Ok(Principal(v[1..].to_vec()))
             }
         }

@@ -287,7 +287,7 @@ impl<'de> Deserializer<'de> {
         let bytes = v.0.to_signed_bytes_le();
         let mut tagged = vec![0u8];
         tagged.extend_from_slice(&bytes);
-        visitor.visit_bytes(&tagged)
+        visitor.visit_byte_buf(tagged)
     }
     fn deserialize_nat<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
@@ -298,7 +298,7 @@ impl<'de> Deserializer<'de> {
         let bytes = v.0.to_bytes_le();
         let mut tagged = vec![1u8];
         tagged.extend_from_slice(&bytes);
-        visitor.visit_bytes(&tagged)
+        visitor.visit_byte_buf(tagged)
     }
     fn deserialize_principal<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
@@ -313,7 +313,7 @@ impl<'de> Deserializer<'de> {
         let vec = self.parse_bytes(len)?;
         let mut tagged = vec![2u8];
         tagged.extend_from_slice(&vec);
-        visitor.visit_bytes(&tagged)
+        visitor.visit_byte_buf(tagged)
     }
 
     fn deserialize_reserved<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
@@ -322,7 +322,7 @@ impl<'de> Deserializer<'de> {
     {
         self.check_type(Opcode::Reserved)?;
         let tagged = vec![3u8];
-        visitor.visit_bytes(&tagged)
+        visitor.visit_byte_buf(tagged)
     }
     fn deserialize_empty<'a, V>(&'a mut self, _visitor: V) -> Result<V::Value>
     where
