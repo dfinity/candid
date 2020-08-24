@@ -156,7 +156,7 @@ fn main() {
                                         }
                                         Ok(ty) => {
                                             trace!("annotate_type ...");
-                                            match v.annotate_type(&TypeEnv::new(), &ty) {
+                                            match v.annotate_type(true, &TypeEnv::new(), &ty) {
                                                 Ok(v) => v,
                                                 Err(e) => {
                                                     type_consistency_holds = false;
@@ -230,7 +230,11 @@ fn main() {
                                         }
                                         Ok(ty) => {
                                             trace!("annotate_type for first value ...");
-                                            let v1 = match v1.annotate_type(&TypeEnv::new(), &ty) {
+                                            let v1 = match v1.annotate_type(
+                                                true,
+                                                &TypeEnv::new(),
+                                                &ty,
+                                            ) {
                                                 Ok(v) => v,
                                                 Err(e) => {
                                                     type_consistency_holds = false;
@@ -239,7 +243,11 @@ fn main() {
                                                 }
                                             };
                                             trace!("annotate_type for second value ...");
-                                            let v2 = match v2.annotate_type(&TypeEnv::new(), &ty) {
+                                            let v2 = match v2.annotate_type(
+                                                true,
+                                                &TypeEnv::new(),
+                                                &ty,
+                                            ) {
                                                 Ok(v) => v,
                                                 Err(e) => {
                                                     type_consistency_holds = false;

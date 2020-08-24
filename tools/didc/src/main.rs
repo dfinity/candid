@@ -184,8 +184,8 @@ fn main() -> Result<(), ExitFailure> {
                 // Either we assume the types are in decode mode, or forbid the use of --method in diff
                 let (env, types) = annotate.get_types(Mode::Decode)?;
                 (
-                    values1.annotate_types(&env, &types)?.args,
-                    values2.annotate_types(&env, &types)?.args,
+                    values1.annotate_types(true, &env, &types)?.args,
+                    values2.annotate_types(true, &env, &types)?.args,
                 )
             };
             if vs1.len() != vs2.len() {

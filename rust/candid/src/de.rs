@@ -64,7 +64,7 @@ impl<'de> IDLDeserialize<'de> {
 #[derive(Clone, Debug)]
 enum RawValue {
     I(i64),
-    U(u64),
+    U(u32),
 }
 impl RawValue {
     fn get_i64(&self) -> Result<i64> {
@@ -73,14 +73,20 @@ impl RawValue {
             _ => Err(Error::msg(format!("get_i64 fail: {:?}", *self))),
         }
     }
-    fn get_u64(&self) -> Result<u64> {
+    fn get_u32(&self) -> Result<u32> {
         match *self {
             RawValue::U(u) => Ok(u),
-            _ => Err(Error::msg(format!("get_u64 fail: {:?}", *self))),
+            _ => Err(Error::msg(format!("get_u32 fail: {:?}", *self))),
         }
     }
 }
-
+fn validate_type_range(ty: i64, len: u64) -> Result<()> {
+    if ty >= 0 && (ty as u64) < len || Opcode::try_from(ty).is_ok() {
+        Ok(())
+    } else {
+        Err(Error::msg(format!("unknown type {}", ty)))
+    }
+}
 #[derive(Debug)]
 enum FieldLabel {
     Named(&'static str),
@@ -102,6 +108,8 @@ struct Deserializer<'de> {
     // field_name tells deserialize_identifier which field name to process.
     // This field should always be set by set_field_name function.
     field_name: Option<FieldLabel>,
+    // The record nesting depth should be bounded by the length of table to avoid infinite loop.
+    record_nesting_depth: usize,
 }
 
 impl<'de> Deserializer<'de> {
@@ -112,6 +120,7 @@ impl<'de> Deserializer<'de> {
             types: VecDeque::new(),
             current_type: VecDeque::new(),
             field_name: None,
+            record_nesting_depth: 0,
         }
     }
 
@@ -167,14 +176,28 @@ impl<'de> Deserializer<'de> {
             buf.push(RawValue::I(ty));
             match Opcode::try_from(ty) {
                 Ok(Opcode::Opt) | Ok(Opcode::Vec) => {
-                    buf.push(RawValue::I(self.sleb128_read()?));
+                    let ty = self.sleb128_read()?;
+                    validate_type_range(ty, len)?;
+                    buf.push(RawValue::I(ty));
                 }
                 Ok(Opcode::Record) | Ok(Opcode::Variant) => {
-                    let obj_len = self.leb128_read()?;
+                    let obj_len = u32::try_from(self.leb128_read()?)
+                        .map_err(|_| Error::msg(Error::msg("length out of u32")))?;
                     buf.push(RawValue::U(obj_len));
+                    let mut prev_hash = None;
                     for _ in 0..obj_len {
-                        buf.push(RawValue::U(self.leb128_read()?));
-                        buf.push(RawValue::I(self.sleb128_read()?));
+                        let hash = u32::try_from(self.leb128_read()?)
+                            .map_err(|_| Error::msg(Error::msg("field hash out of u32")))?;
+                        if let Some(prev_hash) = prev_hash {
+                            if prev_hash >= hash {
+                                return Err(Error::msg("field id collision or not sorted"));
+                            }
+                        }
+                        prev_hash = Some(hash);
+                        buf.push(RawValue::U(hash));
+                        let ty = self.sleb128_read()?;
+                        validate_type_range(ty, len)?;
+                        buf.push(RawValue::I(ty));
                     }
                 }
                 _ => {
@@ -315,7 +338,7 @@ macro_rules! primitive_impl {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
                 self.check_type($opcode)?;
-                let value = self.input.$($value)*()?;
+                let value = self.input.$($value)*().map_err(|_| Error::msg(format!("cannot read {} value", stringify!($opcode))))?;
                 visitor.[<visit_ $ty>](value)
             }
         }
@@ -334,6 +357,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             return self.deserialize_identifier(visitor);
         }
         let t = self.peek_type()?;
+        if t != Opcode::Record {
+            self.record_nesting_depth = 0;
+        }
         match t {
             Opcode::Int => self.deserialize_int(visitor),
             Opcode::Nat => self.deserialize_nat(visitor),
@@ -370,6 +396,15 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         }
         let t = self.peek_type()?;
         match t {
+            Opcode::Record => {
+                if self.record_nesting_depth > self.table.len() {
+                    return Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"));
+                }
+                self.record_nesting_depth += 1;
+            }
+            _ => self.record_nesting_depth = 0,
+        }
+        match t {
             Opcode::Int => self.deserialize_int(visitor),
             Opcode::Nat => self.deserialize_nat(visitor),
             Opcode::Nat8 => self.deserialize_u8(visitor),
@@ -391,10 +426,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Opcode::Opt => self.deserialize_option(visitor),
             Opcode::Record => {
                 self.check_type(Opcode::Record)?;
-                let len = self.pop_current_type()?.get_u64()? as u32;
+                let len = self.pop_current_type()?.get_u32()?;
                 let mut fs = BTreeMap::new();
                 for i in 0..len {
-                    let hash = self.current_type[2 * i as usize].get_u64()? as u32;
+                    let hash = self.current_type[2 * i as usize].get_u32()?;
                     if fs.insert(hash, None) != None {
                         return Err(Error::msg(format!("hash collision {}", hash)));
                     }
@@ -403,10 +438,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             }
             Opcode::Variant => {
                 self.check_type(Opcode::Variant)?;
-                let len = self.pop_current_type()?.get_u64()? as u32;
+                let len = self.pop_current_type()?.get_u32()?;
                 let mut fs = BTreeMap::new();
                 for i in 0..len {
-                    let hash = self.current_type[2 * i as usize].get_u64()? as u32;
+                    let hash = self.current_type[2 * i as usize].get_u32()?;
                     if fs.insert(hash, None) != None {
                         return Err(Error::msg(format!("hash collision {}", hash)));
                     }
@@ -473,8 +508,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             // Skip the type T of Option<T>
             self.pop_current_type()?;
             visitor.visit_none()
-        } else {
+        } else if bit == 1u8 {
             visitor.visit_some(self)
+        } else {
+            Err(de::Error::custom("not an option value"))
         }
     }
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
@@ -502,14 +539,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         match self.parse_type()? {
             Opcode::Vec => {
-                let len = self.leb128_read()? as u32;
+                let len = self.leb128_read()?;
                 let value = visitor.visit_seq(Compound::new(&mut self, Style::Vector { len }));
                 // Skip the type T of Vec<T>.
                 self.pop_current_type()?;
                 value
             }
             Opcode::Record => {
-                let len = self.pop_current_type()?.get_u64()? as u32;
+                let len = self.pop_current_type()?.get_u32()?;
                 visitor.visit_seq(Compound::new(&mut self, Style::Tuple { len, index: 0 }))
             }
             _ => Err(Error::msg("seq only takes vector or tuple")),
@@ -541,8 +578,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        if self.record_nesting_depth > self.table.len() {
+            return Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"));
+        }
+        self.record_nesting_depth += 1;
         self.check_type(Opcode::Record)?;
-        let len = self.pop_current_type()?.get_u64()? as u32;
+        let len = self.pop_current_type()?.get_u32()?;
         let mut fs = BTreeMap::new();
         for s in fields.iter() {
             if fs.insert(idl_hash(s), Some(*s)) != None {
@@ -563,7 +604,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.check_type(Opcode::Variant)?;
-        let len = self.pop_current_type()?.get_u64()? as u32;
+        let len = self.pop_current_type()?.get_u32()?;
         let mut fs = BTreeMap::new();
         for s in variants.iter() {
             if fs.insert(idl_hash(s), Some(*s)) != None {
@@ -604,7 +645,7 @@ enum Style {
         index: u32,
     },
     Vector {
-        len: u32,
+        len: u64, // non-vector length can only be u32, because field ids is u32.
     },
     Struct {
         len: u32,
@@ -642,7 +683,7 @@ impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
                 if *index == *len {
                     return Ok(None);
                 }
-                let t_idx = self.de.pop_current_type()?.get_u64()? as u32;
+                let t_idx = self.de.pop_current_type()?.get_u32()?;
                 if t_idx != *index {
                     return Err(Error::msg(format!(
                         "Expect vector index {}, but get {}",
@@ -681,7 +722,7 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                     return Ok(None);
                 }
                 *len -= 1;
-                let hash = self.de.pop_current_type()?.get_u64()? as u32;
+                let hash = self.de.pop_current_type()?.get_u32()?;
                 match fs.get(&hash) {
                     Some(None) => self.de.set_field_name(FieldLabel::Id(hash)),
                     Some(Some(field)) => self.de.set_field_name(FieldLabel::Named(field)),
@@ -714,7 +755,8 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
     {
         match self.style {
             Style::Enum { len, ref fs } => {
-                let index = self.de.leb128_read()? as u32;
+                let index = u32::try_from(self.de.leb128_read()?)
+                    .map_err(|_| Error::msg("variant index out of u32"))?;
                 if index >= len {
                     return Err(Error::msg(format!(
                         "variant index {} larger than length {}",
@@ -723,7 +765,7 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
                 }
                 let mut index_ty = None;
                 for i in 0..len {
-                    let hash = self.de.pop_current_type()?.get_u64()? as u32;
+                    let hash = self.de.pop_current_type()?.get_u32()?;
                     let ty = self.de.pop_current_type()?;
                     if i == index {
                         match fs.get(&hash) {

@@ -47,6 +47,7 @@ fn test_integer() {
     all_check(Nat::from(42), "4449444c00017d2a");
     all_check(Int::from(1_234_567_890), "4449444c00017cd285d8cc04");
     all_check(Nat::from(1_234_567_890), "4449444c00017dd285d8cc04");
+    all_check(Nat::from(5_000_000_000u64), "4449444c00017d80e497d012");
     all_check(Int::from(-1_234_567_890), "4449444c00017caefaa7b37b");
     all_check(Box::new(Int::from(42)), "4449444c00017c2a");
     all_check(
@@ -160,7 +161,7 @@ fn test_struct() {
                 },
             )
         },
-        "missing field `bar`",
+        "field hash out of u32",
     );
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
