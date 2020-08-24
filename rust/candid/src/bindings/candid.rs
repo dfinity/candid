@@ -84,7 +84,7 @@ fn pp_text(id: &str) -> RcDoc {
     }
 }
 
-fn pp_ty(ty: &Type) -> RcDoc {
+pub fn pp_ty(ty: &Type) -> RcDoc {
     use Type::*;
     match *ty {
         Null => str("null"),

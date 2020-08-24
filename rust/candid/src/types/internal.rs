@@ -50,6 +50,12 @@ pub enum Type {
     Principal,
 }
 
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", crate::bindings::candid::pp_ty(&self).pretty(80))
+    }
+}
+
 #[derive(Debug, Eq, Clone)]
 pub enum Label {
     Id(u32),

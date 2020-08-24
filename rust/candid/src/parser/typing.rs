@@ -48,14 +48,14 @@ impl TypeEnv {
         match t {
             Type::Func(f) => Ok(f),
             Type::Var(id) => self.as_func(self.find_type(id)?),
-            _ => Err(Error::msg(format!("not a function type: {:?}", t))),
+            _ => Err(Error::msg(format!("not a function type: {}", t))),
         }
     }
     pub fn as_service<'a>(&'a self, t: &'a Type) -> Result<&'a [(String, Type)]> {
         match t {
             Type::Service(s) => Ok(s),
             Type::Var(id) => self.as_service(self.find_type(id)?),
-            _ => Err(Error::msg(format!("not a service type: {:?}", t))),
+            _ => Err(Error::msg(format!("not a service type: {}", t))),
         }
     }
     pub fn get_method<'a>(&'a self, t: &'a Type, id: &'a str) -> Result<&'a Function> {
