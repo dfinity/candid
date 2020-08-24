@@ -190,7 +190,12 @@ fn struct_from_ast(fields: &syn::Fields) -> (Tokens, Vec<Ident>) {
         }
         syn::Fields::Unnamed(ref fields) => {
             let (fs, idents) = fields_from_ast(&fields.unnamed);
-            (quote! { ::candid::types::Type::Record(#fs) }, idents)
+            if idents.len() == 1 {
+                let newtype = derive_type(&fields.unnamed[0].ty);
+                (quote! { #newtype }, idents)
+            } else {
+                (quote! { ::candid::types::Type::Record(#fs) }, idents)
+            }
         }
         syn::Fields::Unit => (quote! { ::candid::types::Type::Null }, Vec::new()),
     }
