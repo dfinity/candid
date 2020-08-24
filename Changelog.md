@@ -1,6 +1,19 @@
 
 # Changelog
 
+## 2020-08-24
+
+### Rust (0.5.3)
+
+* Fix deserialization to validate type table and detect infinite loop in `type T = record { T }`
+* Fix serialization for newtype struct
+* Display trait for pretty printing `types::Type`
+
+### Tests
+
+* More test suites for prim and construct types
+* Tools for emitting JavaScript tests from Candid test suites
+
 ## 2020-08-18
 
 ### Tools
