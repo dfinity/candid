@@ -1,6 +1,6 @@
 [package]
 name = "candid"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2018"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
@@ -28,7 +28,7 @@ paste = "1.0.0"
 num_enum = "0.5.1"
 num-bigint = "0.3.0"
 num-traits = "0.2.12"
-candid_derive = { path = "../candid_derive", version = "=0.3.0" }
+candid_derive = { path = "../candid_derive", version = "=0.4.0" }
 lalrpop-util = "0.19.0"
 pretty = "0.10.0"
 hex = "0.4.2"
