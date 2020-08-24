@@ -219,7 +219,7 @@ impl IDLValue {
                 Type::Int64 => IDLValue::Int64(str.parse::<i64>().map_err(error)?),
                 _ => {
                     return Err(Error::msg(format!(
-                        "type mismatch: {} can not be of type {:?}",
+                        "type mismatch: {} can not be of type {}",
                         self, t
                     )))
                 }
@@ -285,7 +285,7 @@ impl IDLValue {
             (IDLValue::Principal(id), Type::Principal) => IDLValue::Principal(id.clone()),
             _ => {
                 return Err(Error::msg(format!(
-                    "type mismatch: {} cannot be of type {:?}",
+                    "type mismatch: {} cannot be of type {}",
                     self, t
                 )))
             }
