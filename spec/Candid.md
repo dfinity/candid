@@ -1,8 +1,8 @@
 # Candid Specification
 
-Version: 0.1.0
+Version: 0.1.1
 
-Date: May 4, 2020
+Date: Aug 25, 2020
 
 ## Motivation
 
@@ -144,9 +144,10 @@ A *service* is a standalone actor on the platform that can communicate with othe
 
 #### Structure
 
-A service's signature is described by an *actor type*, which defines the list of *methods* that the service provides. 
-A service can optionally provide *initialization parameters* for creating services dynamically with the same signature.
-Each method is described by its *name* and a *function type* describing its signature. The function type can also be given by referring to a type definition naming a function reference type.
+A service's signature is described by an *actor type*, which defines the list of *methods* that the service provides. Each method is described by its *name* and a *function type* describing its signature. The function type can also be given by referring to a type definition naming a function reference type.
+
+There are two stages of a service: uninitialize and installed. An uninitialized service takes *initialization parameters*
+for installing service on the platform. Once it is installed, the parameters are removed from the service signature. 
 
 ```
 <actortype> ::= { <methtype>;* } | <tuptype> -> { <methtype>;* }
@@ -805,6 +806,7 @@ Likewise, there are two forms of Candid values for function references:
 * `ref(r)` indicates an opaque reference, understood only by the underlying system.
 * `pub(s,n)`, indicates the public method name `n` of the service referenced by `s`.
 
+Note that service references for uninitialized services are not supported at the moment.
 
 #### Notation
 
@@ -1006,6 +1008,7 @@ Note:
 
 To enable convenient debugging, we also specify a text format for Candid values.
 The types of these values are assumed to be known from context, so the syntax does not attempt to be self-describing.
+Note that service references for uninitialized services are not supported at the moment.
 
 ```
 <val> ::=
