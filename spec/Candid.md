@@ -862,7 +862,7 @@ T(func (<datatype1>*) -> (<datatype2>*) <funcann>*) =
   sleb128(-22) T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*) // 0x6a
 T(service (<datatype>*) -> {<methtype>*}) =
   sleb128(-23) T*(<datatype>) T*(<methtype>*)                     // 0x69
-T(principal)= sleb128(-24)                                        // 0x68
+T(principal) = sleb128(-24)                                       // 0x68
 
 T : <methtype> -> i8*
 T(<name>:<datatype>) = leb128(|utf8(<name>)|) i8*(utf8(<name>)) I(<datatype>)
