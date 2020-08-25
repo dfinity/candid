@@ -1,5 +1,5 @@
 use candid::{check_prog, parser::types::IDLTypes, types::Type, Error, IDLArgs, IDLProg, TypeEnv};
-use exitfailure::ExitFailure;
+use anyhow::Result;
 use std::path::{Path, PathBuf};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
@@ -115,7 +115,7 @@ fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
     check_prog(env, &ast)
 }
 
-fn main() -> Result<(), ExitFailure> {
+fn main() -> Result<()> {
     match Command::from_args() {
         Command::Check { input } => {
             let mut env = TypeEnv::new();
