@@ -67,7 +67,7 @@ This is a summary of the grammar proposed:
 <def>   ::= type <id> = <datatype> | import <text>
 <actor> ::= service <id>? : (<actortype> | <id>)
 
-<actortype> ::= { <methtype>;* }
+<actortype> ::= { <methtype>;* } | <tuptype> -> { <methtype>;* }
 <methtype>  ::= <name> : (<functype> | <id>)
 <functype>  ::= <tuptype> -> <tuptype> <funcann>*
 <funcann>   ::= oneway | query
@@ -144,10 +144,12 @@ A *service* is a standalone actor on the platform that can communicate with othe
 
 #### Structure
 
-A service's signature is described by an *actor type*, which defines the list of *methods* that the service provides. Each method is described by its *name* and a *function type* describing its signature. The function type can also be given by referring to a type definition naming a function reference type.
+A service's signature is described by an *actor type*, which defines the list of *methods* that the service provides. 
+A service can optionally provide *initialization parameters* for creating services dynamically with the same signature.
+Each method is described by its *name* and a *function type* describing its signature. The function type can also be given by referring to a type definition naming a function reference type.
 
 ```
-<actortype> ::= { <methtype>;* }
+<actortype> ::= { <methtype>;* } | <tuptype> -> { <methtype>;* }
 <methtype>  ::= <name> : (<functype> | <id>)
 ```
 We identify `<methtype>` lists in an actor type up to reordering.
@@ -432,9 +434,9 @@ type tree = variant {
 
 A third form of value are *references*. They represent first-class handles to (possibly remote) *functions*, *services*, or *principals*.
 
-#### Actor References
+#### Service References
 
-An *actor reference* points to a service and is described by an actor type. Through this, services can communicate connections to other services.
+A *service reference* points to a service and is described by an actor type. Through this, services can communicate connections to other services.
 
 ```
 <reftype> ::= ... | service <actortype>
@@ -547,7 +549,7 @@ For upgrading data structures passed between service and client, it is important
 
 That is, outbound message results can only be replaced with a subtype (more fields) in an upgrade, while inbound message parameters can only be replaced with a supertype (fewer fields). This corresponds to the notions of co-variance and contra-variance in type systems.
 
-Subtyping applies recursively to the types of the fields themselves. Moreover, the directions get *inverted* for inbound function and actor references, in compliance with standard rules.
+Subtyping applies recursively to the types of the fields themselves. Moreover, the directions get *inverted* for inbound function and service references, in compliance with standard rules.
 
 ### Rules
 
@@ -856,8 +858,8 @@ T(<nat>:<datatype>) = leb128(<nat>) I(<datatype>)
 T : <reftype> -> i8*
 T(func (<datatype1>*) -> (<datatype2>*) <funcann>*) =
   sleb128(-22) T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*) // 0x6a
-T(service {<methtype>*}) =
-  sleb128(-23) T*(<methtype>*)                                    // 0x69
+T(service (<datatype>*) -> {<methtype>*}) =
+  sleb128(-23) T*(<datatype>) T*(<methtype>*)                     // 0x69
 T(principal)= sleb128(-24)                                        // 0x68
 
 T : <methtype> -> i8*
