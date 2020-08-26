@@ -1,5 +1,5 @@
-use candid::{check_prog, parser::types::IDLTypes, types::Type, Error, IDLArgs, IDLProg, TypeEnv};
 use anyhow::Result;
+use candid::{check_prog, parser::types::IDLTypes, types::Type, Error, IDLArgs, IDLProg, TypeEnv};
 use std::path::{Path, PathBuf};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
