@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 pub use ::candid::parser::value::IDLField as Field;
 pub use ::candid::parser::value::IDLValue as Value;
+pub use ::candid::parser::value::IDLArgs as ArgTuple;
 
 pub use ::candid::types::{Field as TypeField, Label, Type};
 pub use ::candid::Nat;
