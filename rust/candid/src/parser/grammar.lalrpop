@@ -2,19 +2,19 @@ use super::value::{IDLField, IDLValue, IDLArgs};
 use super::typing::check_unique;
 use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg, IDLTypes};
 use super::test::{Assert, Input, Test};
-use super::lexer::{Token, LexicalError, error};
+use super::token::{Token, error};
 use crate::{idl_hash, Principal, types::Label};
 
 grammar;
 
 extern {
     type Location = usize;
-    type Error = LexicalError;
+    type Error = String;
     enum Token {
         "number" => Token::Number(<String>),
         "bool" => Token::Boolean(<bool>),
         "text" => Token::Text(<String>),
-        "bytes" => Token::Bytes(<Vec<u8>>),
+        //"bytes" => Token::Bytes(<Vec<u8>>),
         "id" => Token::Id(<String>),
         "null" => Token::Null,
         "opt" => Token::Opt,
@@ -29,7 +29,7 @@ extern {
         "type" => Token::Type,
         "import" => Token::Import,
         "principal" => Token::Principal,
-        "sign" => Token::Sign(<char>),
+        //"sign" => Token::Sign(<char>),
         "=" => Token::Equals,
         "==" => Token::TestEqual,
         "!=" => Token::NotEqual,
@@ -54,10 +54,10 @@ pub Arg: IDLValue = {
     "bool" => IDLValue::Bool(<>),
     NumLiteral => <>,
     "text" => IDLValue::Text(<>),
-    "bytes" => {
-        let values: Vec<_> = <>.into_iter().map(|v| IDLValue::Nat8(v)).collect();
-        IDLValue::Vec(values)
-    },
+    //"bytes" => {
+    //    let values: Vec<_> = <>.into_iter().map(|v| IDLValue::Nat8(v)).collect();
+    //    IDLValue::Vec(values)
+    //},
     "null" => IDLValue::Null,
     "opt" <Arg> => IDLValue::Opt(Box::new(<>)),
     "vec" "{" <SepBy<Arg, ";">> "}" => IDLValue::Vec(<>),
@@ -84,12 +84,8 @@ pub Arg: IDLValue = {
 }
 
 NumLiteral: IDLValue = {
-    <sign:"sign"?> <n:"number"> <frac:("." "number"?)?> =>? {
-        let num = match sign {
-            Some('-') => format!("-{}", n),
-            Some('+') | None => n,
-            _ => return Err(error("sign error")),
-        };
+    <n:"number"> <frac:("." "number"?)?> =>? {
+        let num = n;
         match frac {
             None => Ok(IDLValue::Number(num)),
             Some((_, None)) => Ok(IDLValue::Float64(num.parse::<f64>().map_err(|_| error("not float"))?)),
@@ -159,7 +155,7 @@ PrimTyp: IDLType = {
 }
 
 FieldTyp: TypeField = {
-    <n:"number"> ":" <t:Typ> =>? Ok(TypeField { label: Label::Id(n.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), typ: t }),
+    <n:Sp<"number">> ":" <t:Typ> =>? Ok(TypeField { label: Label::Id(n.0.parse::<u32>().map_err(|_| error(format!("field number {} out of u32 range at {}:{}", n.0, n.1, n.2)))?), typ: t }),
     <n:Name> ":" <t:Typ> => TypeField { label: Label::Named(n), typ: t },
 }
 
@@ -225,7 +221,7 @@ pub IDLProg: IDLProg = {
 
 Input: Input = {
     "text" => Input::Text(<>),
-    "bytes" => Input::Blob(<>),
+    //"bytes" => Input::Blob(<>),
 }
 
 Assert: Assert = <id:"id"> <assert:Assertion> =>? {
@@ -252,6 +248,7 @@ Name: String = {
 }
 
 // Also allows trailing separator
+#[inline]
 SepBy<T, S>: Vec<T> = {
     <v:(<T> S)*> <e:T?> => match e {
         None => v,
@@ -262,3 +259,7 @@ SepBy<T, S>: Vec<T> = {
         }
     }
 };
+
+#[inline]
+Sp<T>: (T, usize, usize) =
+    <l: @L> <t: T> <r: @R> => (t, l, r);
