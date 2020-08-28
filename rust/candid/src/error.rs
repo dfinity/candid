@@ -68,8 +68,8 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<crate::parser::ParserError> for Error {
-    fn from(e: crate::parser::ParserError) -> Error {
+impl From<crate::parser::token::ParserError> for Error {
+    fn from(e: crate::parser::token::ParserError) -> Error {
         Error::msg(format!("Candid parser error: {}", e))
     }
 }

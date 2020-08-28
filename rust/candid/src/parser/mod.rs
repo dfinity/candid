@@ -11,5 +11,3 @@ pub mod value;
 pub mod typing;
 
 pub mod test;
-
-pub type ParserError = lalrpop_util::ParseError<usize, token::Token, String>;

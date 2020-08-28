@@ -56,20 +56,20 @@ fn parse_string_literals() {
         format!("{}", args),
         "(vec { 68; 73; 68; 76; 0; 1; 125; 128; 0; })"
     );
-    let args = parse_args_err("\"DIDL\\00\\01\\7d\\80\\00\"");
+    let args = parse_args_err("(\"DIDL\\00\\01\\7d\\80\\00\")");
     assert_eq!(
         format!("{}", args.unwrap_err()),
-        "Candid parser error: Not valid unicode text"
+        "Candid parser error: Not valid unicode text at 1:22"
     );
     let args = parse_args_err("(\"\\u{d800}\")");
     assert_eq!(
         format!("{}", args.unwrap_err()),
-        "Candid parser error: Unicode escape out of range d800"
+        "Candid parser error: Unicode escape out of range d800 at 1:11"
     );
     let result = parse_args_err("(\"\\q\")");
     assert_eq!(
         format!("{}", result.unwrap_err()),
-        "Candid parser error: Unexpected character q"
+        "Candid parser error: unknown escape character q at 1:5"
     );
 }
 

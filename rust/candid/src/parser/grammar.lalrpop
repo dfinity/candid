@@ -2,14 +2,14 @@ use super::value::{IDLField, IDLValue, IDLArgs};
 use super::typing::check_unique;
 use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg, IDLTypes};
 use super::test::{Assert, Input, Test};
-use super::token::{Token, error};
+use super::token::{Token, error, error2, unescape_text, LexicalError, Span};
 use crate::{idl_hash, Principal, types::Label};
 
 grammar;
 
 extern {
     type Location = usize;
-    type Error = String;
+    type Error = LexicalError;
     enum Token {
         "number" => Token::Number(<String>),
         "bool" => Token::Boolean(<bool>),
@@ -53,11 +53,11 @@ pub Args: IDLArgs = "(" <SepBy<Arg, ",">> ")" => IDLArgs { args: <> };
 pub Arg: IDLValue = {
     "bool" => IDLValue::Bool(<>),
     NumLiteral => <>,
-    "text" => IDLValue::Text(<>),
-    //"bytes" => {
-    //    let values: Vec<_> = <>.into_iter().map(|v| IDLValue::Nat8(v)).collect();
-    //    IDLValue::Vec(values)
-    //},
+    Text => IDLValue::Text(<>),
+    Bytes => {
+        let values: Vec<_> = <>.into_iter().map(|v| IDLValue::Nat8(v)).collect();
+        IDLValue::Vec(values)
+    },
     "null" => IDLValue::Null,
     "opt" <Arg> => IDLValue::Opt(Box::new(<>)),
     "vec" "{" <SepBy<Arg, ";">> "}" => IDLValue::Vec(<>),
@@ -80,7 +80,15 @@ pub Arg: IDLValue = {
         Ok(IDLValue::Record(fs))
     },
     "variant" "{" <VariantField> "}" => IDLValue::Variant(Box::new(<>), 0),
-    "principal" <"text"> =>? Ok(IDLValue::Principal(Principal::from_text(<>).map_err(error)?)),
+    "principal" <Text> =>? Ok(IDLValue::Principal(Principal::from_text(<>).map_err(error)?)),
+}
+
+Text: String = {
+    Sp<"text"> =>? Ok(unescape_text(&<>.0, &<>.1, true)?),
+}
+
+Bytes: Vec<u8> = {
+    "blob" <Sp<"text">> =>? Ok(unescape_text(&<>.0, &<>.1, false)?.into_bytes()),
 }
 
 NumLiteral: IDLValue = {
@@ -155,7 +163,7 @@ PrimTyp: IDLType = {
 }
 
 FieldTyp: TypeField = {
-    <n:Sp<"number">> ":" <t:Typ> =>? Ok(TypeField { label: Label::Id(n.0.parse::<u32>().map_err(|_| error(format!("field number {} out of u32 range at {}:{}", n.0, n.1, n.2)))?), typ: t }),
+    <n:Sp<"number">> ":" <t:Typ> =>? Ok(TypeField { label: Label::Id(n.0.parse::<u32>().map_err(|_| error2(format!("field number {} out of u32 range", n.0), n.1))?), typ: t }),
     <n:Name> ":" <t:Typ> => TypeField { label: Label::Named(n), typ: t },
 }
 
@@ -205,7 +213,7 @@ MethTyp: Binding = {
 // Type declarations
 Def: Dec = {
     "type" <id:"id"> "=" <t:Typ> => Dec::TypD(Binding { id: id, typ: t }),
-    "import" <"text"> => Dec::ImportD(<>),
+    "import" <Text> => Dec::ImportD(<>),
 }
 
 Actor: IDLType = {
@@ -220,8 +228,8 @@ pub IDLProg: IDLProg = {
 // Test file
 
 Input: Input = {
-    "text" => Input::Text(<>),
-    //"bytes" => Input::Blob(<>),
+    Text => Input::Text(<>),
+    Bytes => Input::Blob(<>),
 }
 
 Assert: Assert = <id:"id"> <assert:Assertion> =>? {
@@ -231,10 +239,10 @@ Assert: Assert = <id:"id"> <assert:Assertion> =>? {
 };
 
 Assertion: Assert = {
-    <left:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: None, typ, pass: true, desc },
-    <left:Input> "!:" <typ:TupTyp> <desc:"text"?> => Assert { left, right: None, typ, pass: false, desc },
-    <left:Input> "==" <right:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: Some(right), typ, pass: true, desc },
-    <left:Input> "!=" <right:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: Some(right), typ, pass: false, desc },
+    <left:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: None, typ, pass: true, desc },
+    <left:Input> "!:" <typ:TupTyp> <desc:Text?> => Assert { left, right: None, typ, pass: false, desc },
+    <left:Input> "==" <right:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: Some(right), typ, pass: true, desc },
+    <left:Input> "!=" <right:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: Some(right), typ, pass: false, desc },
 }
 
 pub Test: Test = {
@@ -244,7 +252,7 @@ pub Test: Test = {
 // Common util
 Name: String = {
     "id" => <>,
-    "text" => <>,
+    Text => <>,
 }
 
 // Also allows trailing separator
@@ -261,5 +269,5 @@ SepBy<T, S>: Vec<T> = {
 };
 
 #[inline]
-Sp<T>: (T, usize, usize) =
-    <l: @L> <t: T> <r: @R> => (t, l, r);
+Sp<T>: (T, Span) =
+    <l: @L> <t: T> <r: @R> => (t, Span(l, r));
