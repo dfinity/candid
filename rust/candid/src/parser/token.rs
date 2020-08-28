@@ -129,7 +129,6 @@ pub(crate) fn unescape_text(str: &str, span: &Span, validate: bool) -> Result<St
                 '\'' => result.push('\''),
                 'u' => {
                     next(&mut iter, &span, Some('{'))?;
-                    //let hex: String = iter.by_ref().take_while(|c| *c != '}').collect();
                     let mut hex = String::new();
                     loop {
                         match iter.next() {
