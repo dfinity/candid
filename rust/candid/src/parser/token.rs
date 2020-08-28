@@ -12,8 +12,6 @@ pub enum Token {
     UnexpectedToken,
     #[token("=")]
     Equals,
-    #[token(".")]
-    Dot,
     #[token("(")]
     LParen,
     #[token(")")]
@@ -65,13 +63,16 @@ pub enum Token {
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
     Id(String),
     #[regex("\"([^\"\\\\]|\\\\.)*\"", parse_text)]
-    //#[regex("\"(?:[^\"]|\\\\\")*\"", parse_text)]
     Text(String),
-    Bytes(Vec<u8>),
-    //Sign(char),
-    #[regex("[+-]?[0-9][_0-9]*", parse_number)]
-    #[regex("0x[0-9a-fA-F][_0-9a-fA-F]*", parse_hex)]
-    Number(String),
+    #[regex("[+-]", |lex| lex.slice().chars().next())]
+    Sign(char),
+    #[regex("[0-9][_0-9]*", parse_number)]
+    Decimal(String),
+    #[regex("0[xX][0-9a-fA-F][_0-9a-fA-F]*", parse_number)]
+    Hex(String),
+    #[regex("[0-9]*\\.[0-9]*", parse_float)]
+    #[regex("[0-9]*(\\.[0-9]*)?[eE][+-]?[0-9]+", parse_float)]
+    Float(String),
     #[regex("true|false", |lex| lex.slice().parse())]
     Boolean(bool),
 }
@@ -88,12 +89,16 @@ fn parse_text(lex: &mut Lexer<Token>) -> String {
 }
 
 fn parse_number(lex: &mut Lexer<Token>) -> String {
-    lex.slice().chars().filter(|c| *c != '_').collect()
+    let iter = lex.slice().chars().filter(|c| *c != '_');
+    if lex.slice().starts_with("0x") {
+        iter.skip(2).collect()
+    } else {
+        iter.collect()
+    }
 }
 
-fn parse_hex(lex: &mut Lexer<Token>) -> Option<String> {
-    let num: String = lex.slice()[2..].chars().filter(|c| *c != '_').collect();
-    num_bigint::BigInt::parse_bytes(num.as_bytes(), 16).map(|n| n.to_str_radix(10))
+fn parse_float(lex: &mut Lexer<Token>) -> String {
+    lex.slice().to_string()
 }
 
 pub(crate) type ParserError = ParseError<usize, Token, LexicalError>;

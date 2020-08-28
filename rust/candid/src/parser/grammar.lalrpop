@@ -11,10 +11,11 @@ extern {
     type Location = usize;
     type Error = LexicalError;
     enum Token {
-        "number" => Token::Number(<String>),
+        "decimal" => Token::Decimal(<String>),
+        "hex" => Token::Hex(<String>),
+        "float" => Token::Float(<String>),
         "bool" => Token::Boolean(<bool>),
         "text" => Token::Text(<String>),
-        //"bytes" => Token::Bytes(<Vec<u8>>),
         "id" => Token::Id(<String>),
         "null" => Token::Null,
         "opt" => Token::Opt,
@@ -29,7 +30,7 @@ extern {
         "type" => Token::Type,
         "import" => Token::Import,
         "principal" => Token::Principal,
-        //"sign" => Token::Sign(<char>),
+        "sign" => Token::Sign(<char>),
         "=" => Token::Equals,
         "==" => Token::TestEqual,
         "!=" => Token::NotEqual,
@@ -39,7 +40,6 @@ extern {
         "{" => Token::LBrace,
         "}" => Token::RBrace,
         "," => Token::Comma,
-        "." => Token::Dot,
         ";" => Token::Semi,
         ":" => Token::Colon,
         "->" => Token::Arrow,
@@ -91,28 +91,43 @@ Bytes: Vec<u8> = {
     "blob" <Sp<"text">> =>? Ok(unescape_text(&<>.0, &<>.1, false)?.into_bytes()),
 }
 
+Number: String = {
+    "decimal" => <>,
+    "hex" => num_bigint::BigInt::parse_bytes(<>.as_bytes(), 16).unwrap().to_str_radix(10),
+}
+
 NumLiteral: IDLValue = {
-    <n:"number"> <frac:("." "number"?)?> =>? {
-        let num = n;
-        match frac {
-            None => Ok(IDLValue::Number(num)),
-            Some((_, None)) => Ok(IDLValue::Float64(num.parse::<f64>().map_err(|_| error("not float"))?)),
-            Some((_, Some(f))) => {
-                Ok(IDLValue::Float64(format!("{}.{}", num, f).parse::<f64>().map_err(|_| error("not float"))?))
-            }
-        }
-    }
+    <sign:"sign"?> <n:Number> => {
+        let num = match sign {
+            Some('-') => format!("-{}", n),
+            _ => n,
+        };
+        IDLValue::Number(num)
+    },
+    <sign:"sign"?> <n:"float"> =>? {
+        let num = match sign {
+            Some('-') => format!("-{}", n),
+            _ => n,
+        };
+        let f = num.parse::<f64>().map_err(|_| error("not a float"))?;
+        Ok(IDLValue::Float64(f))
+    },
+}
+
+FieldId: u32 = {
+    Sp<"decimal"> =>? <>.0.parse::<u32>().map_err(|_| error2("field id out of u32 range", <>.1)),
+    Sp<"hex"> =>? u32::from_str_radix(&<>.0, 16).map_err(|_| error2("field id out of u32 range", <>.1)),
 }
 
 Field: IDLField = {
-    <n:"number"> "=" <v:Arg> =>? Ok(IDLField { id: Label::Id(n.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), val: v }),
+    <n:FieldId> "=" <v:Arg> =>? Ok(IDLField { id: Label::Id(n), val: v }),
     <n:Name> "=" <v:Arg> => IDLField { id: Label::Named(n), val: v },
 }
 
 VariantField: IDLField = {
     Field => <>,
     Name => IDLField { id: Label::Named(<>), val: IDLValue::Null },
-    "number" =>? Ok(IDLField { id: Label::Id(<>.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), val: IDLValue::Null }),
+    FieldId =>? Ok(IDLField { id: Label::Id(<>), val: IDLValue::Null }),
 }
 
 RecordField: IDLField = {
@@ -163,7 +178,7 @@ PrimTyp: IDLType = {
 }
 
 FieldTyp: TypeField = {
-    <n:Sp<"number">> ":" <t:Typ> =>? Ok(TypeField { label: Label::Id(n.0.parse::<u32>().map_err(|_| error2(format!("field number {} out of u32 range", n.0), n.1))?), typ: t }),
+    <n:FieldId> ":" <t:Typ> =>? Ok(TypeField { label: Label::Id(n), typ: t }),
     <n:Name> ":" <t:Typ> => TypeField { label: Label::Named(n), typ: t },
 }
 
@@ -175,7 +190,7 @@ RecordFieldTyp: TypeField = {
 VariantFieldTyp: TypeField = {
     FieldTyp => <>,
     Name => TypeField { label: Label::Named(<>), typ: IDLType::PrimT(PrimType::Null) },
-    "number" =>? Ok(TypeField { label: Label::Id(<>.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), typ: IDLType::PrimT(PrimType::Null) }),
+    FieldId =>? Ok(TypeField { label: Label::Id(<>), typ: IDLType::PrimT(PrimType::Null) }),
 }
 
 TupTyp: Vec<IDLType> = "(" <SepBy<ArgTyp, ",">> ")" => <>;
