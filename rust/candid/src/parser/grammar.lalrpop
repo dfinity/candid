@@ -2,7 +2,7 @@ use super::value::{IDLField, IDLValue, IDLArgs};
 use super::typing::check_unique;
 use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg, IDLTypes};
 use super::test::{Assert, Input, Test};
-use super::token::{Token, error, error2, unescape_text, LexicalError, Span};
+use super::token::{Token, error, error2, LexicalError, Span};
 use crate::{idl_hash, Principal, types::Label};
 
 grammar;
@@ -84,11 +84,17 @@ pub Arg: IDLValue = {
 }
 
 Text: String = {
-    Sp<"text"> =>? Ok(unescape_text(&<>.0, &<>.1, true)?),
+    Sp<"text"> =>? {
+        if String::from_utf8(<>.0.as_bytes().to_vec()).is_err() {
+          Err(error2("Not valid unicode text", <>.1))
+        } else {
+          Ok(<>.0)
+        }
+    }
 }
 
 Bytes: Vec<u8> = {
-    "blob" <Sp<"text">> =>? Ok(unescape_text(&<>.0, &<>.1, false)?.into_bytes()),
+    "blob" <"text"> => <>.into_bytes(),
 }
 
 Number: String = {

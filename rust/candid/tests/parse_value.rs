@@ -47,7 +47,7 @@ fn parse_literals() {
 
 #[test]
 fn parse_string_literals() {
-    let args = parse_args("(\"\", \"\\u{10ffff}\\n\", \"\\0a\\0dd\")");
+    let args = parse_args(r#"("", "\u{10ffff}\n", "\0a\0dd")"#);
     assert_eq!(
         args.args,
         vec![
@@ -69,12 +69,12 @@ fn parse_string_literals() {
     let args = parse_args_err("(\"\\u{d800}\")");
     assert_eq!(
         format!("{}", args.unwrap_err()),
-        "Candid parser error: Unicode escape out of range d800 at 1:11"
+        "Candid parser error: Unicode escape out of range d800 at 2:10"
     );
     let result = parse_args_err("(\"\\q\")");
     assert_eq!(
         format!("{}", result.unwrap_err()),
-        "Candid parser error: unknown escape character q at 1:5"
+        "Candid parser error: Unknown escape character q at 2:4"
     );
 }
 

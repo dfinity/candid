@@ -62,7 +62,9 @@ pub enum Token {
     Principal,
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
     Id(String),
-    #[regex("\"([^\"\\\\]|\\\\.)*\"", parse_text)]
+    #[token("\"")]
+    StartString,
+    //#[regex("\"([^\"\\\\]|\\\\.)*\"", parse_text)]
     Text(String),
     #[regex("[+-]", |lex| lex.slice().chars().next())]
     Sign(char),
@@ -77,15 +79,26 @@ pub enum Token {
     Boolean(bool),
 }
 
+#[derive(Logos, Debug, Clone, PartialEq, Eq)]
+enum Text {
+    #[error]
+    Error,
+    #[regex(r#"[^\\"]+"#)]
+    Text,
+    #[regex(r"\\.")]
+    EscapeCharacter,
+    #[regex(r"\\u\{[0-9a-fA-F]+\}")]
+    Codepoint,
+    #[regex(r"\\[0-9a-fA-F][0-9a-fA-F]")]
+    Byte,
+    #[token("\"")]
+    EndString,
+}
+
 impl std::fmt::Display for Token {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(fmt, "{:?}", self)
     }
-}
-
-fn parse_text(lex: &mut Lexer<Token>) -> String {
-    let text = lex.slice();
-    text[1..text.len() - 1].to_string()
 }
 
 fn parse_number(lex: &mut Lexer<Token>) -> String {
@@ -102,80 +115,6 @@ fn parse_float(lex: &mut Lexer<Token>) -> String {
 }
 
 pub(crate) type ParserError = ParseError<usize, Token, LexicalError>;
-
-fn next<I>(iter: &mut I, span: &Span, expect: Option<char>) -> Result<char, ParserError>
-where
-    I: Iterator<Item = char>,
-{
-    match iter.next() {
-        None => Err(error2("Unexpected end of string", span.clone())),
-        Some(c) => match expect {
-            Some(expect) if c != expect => Err(error2(
-                format!("expect {}, but found {}", expect, c),
-                span.clone(),
-            )),
-            _ => Ok(c),
-        },
-    }
-}
-
-pub(crate) fn unescape_text(str: &str, span: &Span, validate: bool) -> Result<String, ParserError> {
-    let mut iter = str.chars();
-    let mut result = String::new();
-    let mut needs_validation = false;
-    while let Some(c) = iter.next() {
-        match c {
-            '\\' => match next(&mut iter, span, None)? {
-                'n' => result.push('\n'),
-                'r' => result.push('\r'),
-                't' => result.push('\t'),
-                '\\' => result.push('\\'),
-                '"' => result.push('"'),
-                '\'' => result.push('\''),
-                'u' => {
-                    next(&mut iter, &span, Some('{'))?;
-                    let mut hex = String::new();
-                    loop {
-                        match iter.next() {
-                            Some(c) if c.is_ascii_hexdigit() => hex.push(c),
-                            Some(c) if c == '}' => break,
-                            _ => return Err(error2("unknown unicode escape", span.clone())),
-                        }
-                    }
-                    let c =
-                        u32::from_str_radix(&hex, 16).map_err(|_| error2(&hex, span.clone()))?;
-                    let c = std::char::from_u32(c).ok_or_else(|| {
-                        error2(format!("Unicode escape out of range {}", hex), span.clone())
-                    })?;
-                    result.push(c);
-                }
-                c if c.is_ascii_hexdigit() => {
-                    let mut hex = c.to_string();
-                    hex.push(next(&mut iter, &span, None)?);
-                    let byte =
-                        u8::from_str_radix(&hex, 16).map_err(|_| error2(hex, span.clone()))?;
-                    // According to https://webassembly.github.io/spec/core/text/values.html#strings
-                    // \hex escape can break utf8 unicode.
-                    needs_validation = true;
-                    let bytes = unsafe { result.as_mut_vec() };
-                    bytes.push(byte);
-                }
-                c => {
-                    return Err(error2(
-                        format!("unknown escape character {}", c),
-                        span.clone(),
-                    ))
-                }
-            },
-            c => result.push(c),
-        }
-    }
-    if validate && needs_validation && String::from_utf8(result.as_bytes().to_vec()).is_err() {
-        Err(error2("Not valid unicode text", span.clone()))
-    } else {
-        Ok(result)
-    }
-}
 
 pub struct Tokenizer<'input> {
     lex: Lexer<'input, Token>,
@@ -196,6 +135,11 @@ impl std::fmt::Display for Span {
         } else {
             write!(fmt, " at {}:{}", self.0, self.1)
         }
+    }
+}
+impl From<std::ops::Range<usize>> for Span {
+    fn from(r: std::ops::Range<usize>) -> Self {
+        Span(r.start, r.end)
     }
 }
 
@@ -237,10 +181,82 @@ impl<'input> Iterator for Tokenizer<'input> {
         match token {
             Token::UnexpectedToken => {
                 let err = format!("Unknown token {}", self.lex.slice());
-                Some(Err(LexicalError {
-                    err,
-                    span: Span(span.start, span.end),
-                }))
+                Some(Err(LexicalError::new(err, span.into())))
+            }
+            Token::StartString => {
+                let mut result = String::new();
+                let mut lex = self.lex.to_owned().morph::<Text>();
+                loop {
+                    use self::Text::*;
+                    match lex.next() {
+                        Some(Text) => result += lex.slice(),
+                        Some(EscapeCharacter) => match lex.slice().chars().nth(1).unwrap() {
+                            'n' => result.push('\n'),
+                            'r' => result.push('\r'),
+                            't' => result.push('\t'),
+                            '\\' => result.push('\\'),
+                            '"' => result.push('"'),
+                            '\'' => result.push('\''),
+                            c => {
+                                return Some(Err(LexicalError::new(
+                                    format!("Unknown escape character {}", c),
+                                    lex.span().into(),
+                                )))
+                            }
+                        },
+                        Some(Codepoint) => {
+                            let slice = lex.slice();
+                            let hex = &slice[3..slice.len() - 1];
+                            match u32::from_str_radix(hex, 16)
+                                .map_err(|_| {
+                                    LexicalError::new("Not a valid hex escape", lex.span().into())
+                                })
+                                .and_then(|c| {
+                                    std::char::from_u32(c).ok_or_else(|| {
+                                        LexicalError::new(
+                                            format!("Unicode escape out of range {}", hex),
+                                            lex.span().into(),
+                                        )
+                                    })
+                                }) {
+                                Ok(c) => result.push(c),
+                                Err(e) => return Some(Err(e)),
+                            }
+                        }
+                        Some(Byte) => {
+                            let hex = &lex.slice()[1..];
+                            match u8::from_str_radix(hex, 16) {
+                                Ok(byte) => {
+                                    // According to https://webassembly.github.io/spec/core/text/values.html#strings
+                                    // \xx escape can break utf8 unicode.
+                                    let bytes = unsafe { result.as_mut_vec() };
+                                    bytes.push(byte);
+                                }
+                                Err(_) => {
+                                    return Some(Err(LexicalError::new(
+                                        "Not a valid hex escape",
+                                        lex.span().into(),
+                                    )))
+                                }
+                            }
+                        }
+                        Some(EndString) => break,
+                        Some(Error) => {
+                            return Some(Err(LexicalError::new(
+                                format!("Unexpected string {}", lex.slice()),
+                                lex.span().into(),
+                            )))
+                        }
+                        None => {
+                            return Some(Err(LexicalError::new(
+                                "Unclosed string",
+                                lex.span().into(),
+                            )))
+                        }
+                    }
+                }
+                self.lex = lex.morph::<Token>();
+                Some(Ok((span.start, Token::Text(result), self.lex.span().end)))
             }
             _ => Some(Ok((span.start, token, span.end))),
         }
