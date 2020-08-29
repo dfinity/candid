@@ -7,7 +7,9 @@ pub enum Token {
     // line comment
     #[regex("//[^\n]*", logos::skip)]
     // block comment (unnested)
-    #[regex("/\\*(?:[^*]|\\*[^/])*\\*/", logos::skip)]
+    //#[regex("/\\*(?:[^*]|\\*[^/])*\\*/", logos::skip)]
+    #[token("/*")]
+    StartComment,
     #[error]
     UnexpectedToken,
     #[token("=")]
@@ -77,6 +79,16 @@ pub enum Token {
     Float(String),
     #[regex("true|false", |lex| lex.slice().parse())]
     Boolean(bool),
+}
+
+#[derive(Logos, Debug, Clone, PartialEq, Eq)]
+enum Comment {
+    #[error]
+    Skip,
+    #[token("*/")]
+    End,
+    #[token("/*")]
+    Start,
 }
 
 #[derive(Logos, Debug, Clone, PartialEq, Eq)]
@@ -182,6 +194,30 @@ impl<'input> Iterator for Tokenizer<'input> {
             Token::UnexpectedToken => {
                 let err = format!("Unknown token {}", self.lex.slice());
                 Some(Err(LexicalError::new(err, span.into())))
+            }
+            Token::StartComment => {
+                let mut lex = self.lex.to_owned().morph::<Comment>();
+                let mut nesting = 1;
+                loop {
+                    match lex.next() {
+                        Some(Comment::Skip) => continue,
+                        Some(Comment::End) => {
+                            nesting -= 1;
+                            if nesting == 0 {
+                                break;
+                            }
+                        }
+                        Some(Comment::Start) => nesting += 1,
+                        None => {
+                            return Some(Err(LexicalError::new(
+                                "Unclosed comment",
+                                lex.span().into(),
+                            )))
+                        }
+                    }
+                }
+                self.lex = lex.morph::<Token>();
+                self.next()
             }
             Token::StartString => {
                 let mut result = String::new();
