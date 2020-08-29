@@ -162,8 +162,7 @@ pub Typ: IDLType = {
         check_unique(fs.iter().map(|f| &f.label)).map_err(error)?;
         Ok(IDLType::RecordT(fs))
     },
-    "variant" "{" <SepBy<VariantFieldTyp, ";">> "}" =>? {
-        let mut fs = <>;
+    "variant" "{" <mut fs:SepBy<VariantFieldTyp, ";">> "}" =>? {
         fs.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
         check_unique(fs.iter().map(|f| &f.label)).map_err(error)?;
         Ok(IDLType::VariantT(fs))
@@ -217,8 +216,7 @@ FuncMode: FuncMode = {
 }
 
 ActorTyp: Vec<Binding> = {
-    "{" <SepBy<MethTyp, ";">> "}" =>? {
-        let mut fs = <>;
+    "{" <mut fs:SepBy<MethTyp, ";">> "}" =>? {
         fs.sort_unstable_by_key(|Binding { id, .. }| idl_hash(id));
         let labs: Vec<_> = fs.iter().map(|f| Label::Named(f.id.clone())).collect();
         check_unique(labs.iter()).map_err(error)?;
@@ -279,10 +277,9 @@ Name: String = {
 // Also allows trailing separator
 #[inline]
 SepBy<T, S>: Vec<T> = {
-    <v:(<T> S)*> <e:T?> => match e {
+    <mut v:(<T> S)*> <e:T?> => match e {
         None => v,
         Some(e) => {
-            let mut v = v;
             v.push(e);
             v
         }
