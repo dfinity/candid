@@ -120,8 +120,6 @@ fn parse_number(lex: &mut Lexer<Token>) -> String {
     }
 }
 
-pub(crate) type ParserError = ParseError<usize, Token, LexicalError>;
-
 pub struct Tokenizer<'input> {
     lex: Lexer<'input, Token>,
 }
@@ -139,7 +137,11 @@ pub struct LexicalError {
 }
 impl std::fmt::Display for LexicalError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(fmt, "{} at {:?}", self.err, self.span)
+        if self.span.start == 0 && self.span.end == 0 {
+            write!(fmt, "{}", self.err)
+        } else {
+            write!(fmt, "{} at {:?}", self.err, self.span)
+        }
     }
 }
 impl LexicalError {
@@ -151,13 +153,13 @@ impl LexicalError {
     }
 }
 
-pub fn error<E: ToString>(err: E) -> ParseError<usize, Token, LexicalError> {
+pub(crate) type ParserError = ParseError<usize, Token, LexicalError>;
+pub fn error<E: ToString>(err: E) -> ParserError {
     ParseError::User {
         error: LexicalError::new(err, 0..0),
     }
 }
-
-pub fn error2<E: ToString>(err: E, span: Span) -> ParseError<usize, Token, LexicalError> {
+pub fn error2<E: ToString>(err: E, span: Span) -> ParserError {
     ParseError::User {
         error: LexicalError::new(err, span),
     }
