@@ -154,6 +154,7 @@ impl LexicalError {
 }
 
 pub(crate) type ParserError = ParseError<usize, Token, LexicalError>;
+#[allow(clippy::all)]
 pub fn error<E: ToString>(err: E) -> ParserError {
     ParseError::User {
         error: LexicalError::new(err, 0..0),
