@@ -138,30 +138,14 @@ impl<'input> Tokenizer<'input> {
     }
 }
 
-#[derive(Clone)]
-pub struct Span(pub usize, pub usize);
-impl std::fmt::Display for Span {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.0 == self.1 && self.1 == 0 {
-            write!(fmt, "")
-        } else {
-            write!(fmt, " at {}:{}", self.0, self.1)
-        }
-    }
-}
-impl From<std::ops::Range<usize>> for Span {
-    fn from(r: std::ops::Range<usize>) -> Self {
-        Span(r.start, r.end)
-    }
-}
-
+pub type Span = std::ops::Range<usize>;
 pub struct LexicalError {
     err: String,
     span: Span,
 }
 impl std::fmt::Display for LexicalError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(fmt, "{}{}", self.err, self.span)
+        write!(fmt, "{} at {:?}", self.err, self.span)
     }
 }
 impl LexicalError {
@@ -175,7 +159,7 @@ impl LexicalError {
 
 pub fn error<E: ToString>(err: E) -> ParseError<usize, Token, LexicalError> {
     ParseError::User {
-        error: LexicalError::new(err, Span(0, 0)),
+        error: LexicalError::new(err, 0..0),
     }
 }
 
@@ -193,7 +177,7 @@ impl<'input> Iterator for Tokenizer<'input> {
         match token {
             Token::UnexpectedToken => {
                 let err = format!("Unknown token {}", self.lex.slice());
-                Some(Err(LexicalError::new(err, span.into())))
+                Some(Err(LexicalError::new(err, span)))
             }
             Token::StartComment => {
                 let mut lex = self.lex.to_owned().morph::<Comment>();
@@ -209,10 +193,7 @@ impl<'input> Iterator for Tokenizer<'input> {
                         }
                         Some(Comment::Start) => nesting += 1,
                         None => {
-                            return Some(Err(LexicalError::new(
-                                "Unclosed comment",
-                                lex.span().into(),
-                            )))
+                            return Some(Err(LexicalError::new("Unclosed comment", lex.span())))
                         }
                     }
                 }
@@ -236,7 +217,7 @@ impl<'input> Iterator for Tokenizer<'input> {
                             c => {
                                 return Some(Err(LexicalError::new(
                                     format!("Unknown escape character {}", c),
-                                    lex.span().into(),
+                                    lex.span(),
                                 )))
                             }
                         },
@@ -245,13 +226,13 @@ impl<'input> Iterator for Tokenizer<'input> {
                             let hex = &slice[3..slice.len() - 1];
                             match u32::from_str_radix(hex, 16)
                                 .map_err(|_| {
-                                    LexicalError::new("Not a valid hex escape", lex.span().into())
+                                    LexicalError::new("Not a valid hex escape", lex.span())
                                 })
                                 .and_then(|c| {
                                     std::char::from_u32(c).ok_or_else(|| {
                                         LexicalError::new(
                                             format!("Unicode escape out of range {}", hex),
-                                            lex.span().into(),
+                                            lex.span(),
                                         )
                                     })
                                 }) {
@@ -271,7 +252,7 @@ impl<'input> Iterator for Tokenizer<'input> {
                                 Err(_) => {
                                     return Some(Err(LexicalError::new(
                                         "Not a valid hex escape",
-                                        lex.span().into(),
+                                        lex.span(),
                                     )))
                                 }
                             }
@@ -280,15 +261,10 @@ impl<'input> Iterator for Tokenizer<'input> {
                         Some(Error) => {
                             return Some(Err(LexicalError::new(
                                 format!("Unexpected string {}", lex.slice()),
-                                lex.span().into(),
+                                lex.span(),
                             )))
                         }
-                        None => {
-                            return Some(Err(LexicalError::new(
-                                "Unclosed string",
-                                lex.span().into(),
-                            )))
-                        }
+                        None => return Some(Err(LexicalError::new("Unclosed string", lex.span()))),
                     }
                 }
                 self.lex = lex.morph::<Token>();

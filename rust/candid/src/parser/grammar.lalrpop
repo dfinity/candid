@@ -288,4 +288,4 @@ SepBy<T, S>: Vec<T> = {
 
 #[inline]
 Sp<T>: (T, Span) =
-    <l: @L> <t: T> <r: @R> => (t, Span(l, r));
+    <l: @L> <t: T> <r: @R> => (t, l..r);

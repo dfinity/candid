@@ -64,17 +64,17 @@ fn parse_string_literals() {
     let args = parse_args_err("(\"DIDL\\00\\01\\7d\\80\\00\")");
     assert_eq!(
         format!("{}", args.unwrap_err()),
-        "Candid parser error: Not valid unicode text at 1:22"
+        "Candid parser error: Not valid unicode text at 1..22"
     );
     let args = parse_args_err("(\"\\u{d800}\")");
     assert_eq!(
         format!("{}", args.unwrap_err()),
-        "Candid parser error: Unicode escape out of range d800 at 2:10"
+        "Candid parser error: Unicode escape out of range d800 at 2..10"
     );
     let result = parse_args_err("(\"\\q\")");
     assert_eq!(
         format!("{}", result.unwrap_err()),
-        "Candid parser error: Unknown escape character q at 2:4"
+        "Candid parser error: Unknown escape character q at 2..4"
     );
 }
 
