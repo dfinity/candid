@@ -32,6 +32,7 @@ enum Command {
     },
     /// Encode Candid value
     Encode {
+        #[structopt(parse(try_from_str = parse_args))]
         /// Specifies Candid textual format for encoding
         args: IDLArgs,
         #[structopt(flatten)]
@@ -110,6 +111,20 @@ impl TypeAnnotation {
     }
 }
 
+fn parse_args(str: &str) -> Result<IDLArgs, Error> {
+    match str.parse::<IDLArgs>() {
+        Ok(args) => Ok(args),
+        Err(e) => {
+            let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
+            let config = term::Config::default();
+            let file = SimpleFile::new("candid arguments", str);
+            let diag = as_diagnostic(e);
+            term::emit(&mut writer.lock(), &config, &file, &diag)?;
+            std::process::exit(1);
+        }
+    }
+}
+
 fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
     let prog = std::fs::read_to_string(file)
         .map_err(|_| Error::msg(format!("could not read file {}", file.display())))?;
@@ -136,11 +151,12 @@ fn main() -> Result<()> {
 
     match Command::from_args() {
         Command::Check { input } => {
-            let file = SimpleFile::new(input.to_str().unwrap(), std::fs::read_to_string(&input)?);
             let mut env = TypeEnv::new();
             match check_file(&mut env, &input) {
                 Ok(_) => (),
                 Err(e) => {
+                    let file =
+                        SimpleFile::new(input.to_str().unwrap(), std::fs::read_to_string(&input)?);
                     let diag = as_diagnostic(e);
                     term::emit(&mut writer.lock(), &config, &file, &diag)?;
                 }
