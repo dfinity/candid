@@ -65,9 +65,9 @@ This is a summary of the grammar proposed:
 ```
 <prog>  ::= <def>;* <actor>;?
 <def>   ::= type <id> = <datatype> | import <text>
-<actor> ::= service <id>? : (<actortype> | <id>)
+<actor> ::= service <id>? : (<tuptype> ->)? (<actortype> | <id>)
 
-<actortype> ::= { <methtype>;* } | <tuptype> -> { <methtype>;* }
+<actortype> ::= { <methtype>;* }
 <methtype>  ::= <name> : (<functype> | <id>)
 <functype>  ::= <tuptype> -> <tuptype> <funcann>*
 <funcann>   ::= oneway | query
@@ -139,6 +139,9 @@ Block comments nest properly (unlike in C).
 
 A *service* is a standalone actor on the platform that can communicate with other services via sending and receiving *messages*. Messages are sent to a service by invoking one of its *methods*, i.e., functions that the service provides.
 
+For the main service, there are two kinds of services: service constructor (or uninitialized service) and running service (or initialized service).
+A service constructor takes *initialization parameters* for installing the service on the platform. Once it is initialized, the service becomes a running service. We can initialize a service constructor to multiple running services.
+
 **Note:** Candid is in fact agnostic to the exact nature of services. In particular, it could be applied to a setting where services are synchronous (objects with RPCs) instead of asynchronous (actors with bidirectional message sends).
 
 
@@ -146,11 +149,8 @@ A *service* is a standalone actor on the platform that can communicate with othe
 
 A service's signature is described by an *actor type*, which defines the list of *methods* that the service provides. Each method is described by its *name* and a *function type* describing its signature. The function type can also be given by referring to a type definition naming a function reference type.
 
-There are two stages of a service: uninitialize and installed. An uninitialized service takes *initialization parameters*
-for installing service on the platform. Once it is installed, the parameters are removed from the service signature. 
-
 ```
-<actortype> ::= { <methtype>;* } | <tuptype> -> { <methtype>;* }
+<actortype> ::= { <methtype>;* }
 <methtype>  ::= <name> : (<functype> | <id>)
 ```
 We identify `<methtype>` lists in an actor type up to reordering.
@@ -806,8 +806,6 @@ Likewise, there are two forms of Candid values for function references:
 * `ref(r)` indicates an opaque reference, understood only by the underlying system.
 * `pub(s,n)`, indicates the public method name `n` of the service referenced by `s`.
 
-Note that service references for uninitialized services are not supported at the moment.
-
 #### Notation
 
 `T` and `M` create a byte sequence described below in terms of natural storage types (`i<N>` for `N = 8, 16, 32, 64`, `f<N>` for `N = 32, 64`). The bytes are sequenced according to increasing significance (least significant byte first, a.k.a. little-endian).
@@ -860,8 +858,8 @@ T(<nat>:<datatype>) = leb128(<nat>) I(<datatype>)
 T : <reftype> -> i8*
 T(func (<datatype1>*) -> (<datatype2>*) <funcann>*) =
   sleb128(-22) T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*) // 0x6a
-T(service (<datatype>*) -> {<methtype>*}) =
-  sleb128(-23) T*(<datatype>) T*(<methtype>*)                     // 0x69
+T(service {<methtype>*}) =
+  sleb128(-23) T*(<methtype>*)                                    // 0x69
 T(principal) = sleb128(-24)                                       // 0x68
 
 T : <methtype> -> i8*
@@ -1008,7 +1006,6 @@ Note:
 
 To enable convenient debugging, we also specify a text format for Candid values.
 The types of these values are assumed to be known from context, so the syntax does not attempt to be self-describing.
-Note that service references for uninitialized services are not supported at the moment.
 
 ```
 <val> ::=
