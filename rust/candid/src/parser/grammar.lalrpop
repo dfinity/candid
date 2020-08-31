@@ -2,7 +2,7 @@ use super::value::{IDLField, IDLValue, IDLArgs};
 use super::typing::check_unique;
 use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg, IDLTypes};
 use super::test::{Assert, Input, Test};
-use super::lexer::{Token, LexicalError, error};
+use super::token::{Token, error, error2, LexicalError, Span};
 use crate::{idl_hash, Principal, types::Label};
 
 grammar;
@@ -11,10 +11,11 @@ extern {
     type Location = usize;
     type Error = LexicalError;
     enum Token {
-        "number" => Token::Number(<String>),
+        "decimal" => Token::Decimal(<String>),
+        "hex" => Token::Hex(<String>),
+        "float" => Token::Float(<String>),
         "bool" => Token::Boolean(<bool>),
         "text" => Token::Text(<String>),
-        "bytes" => Token::Bytes(<Vec<u8>>),
         "id" => Token::Id(<String>),
         "null" => Token::Null,
         "opt" => Token::Opt,
@@ -39,7 +40,6 @@ extern {
         "{" => Token::LBrace,
         "}" => Token::RBrace,
         "," => Token::Comma,
-        "." => Token::Dot,
         ";" => Token::Semi,
         ":" => Token::Colon,
         "->" => Token::Arrow,
@@ -53,8 +53,8 @@ pub Args: IDLArgs = "(" <SepBy<Arg, ",">> ")" => IDLArgs { args: <> };
 pub Arg: IDLValue = {
     "bool" => IDLValue::Bool(<>),
     NumLiteral => <>,
-    "text" => IDLValue::Text(<>),
-    "bytes" => {
+    Text => IDLValue::Text(<>),
+    Bytes => {
         let values: Vec<_> = <>.into_iter().map(|v| IDLValue::Nat8(v)).collect();
         IDLValue::Vec(values)
     },
@@ -80,35 +80,60 @@ pub Arg: IDLValue = {
         Ok(IDLValue::Record(fs))
     },
     "variant" "{" <VariantField> "}" => IDLValue::Variant(Box::new(<>), 0),
-    "principal" <"text"> =>? Ok(IDLValue::Principal(Principal::from_text(<>).map_err(error)?)),
+    "principal" <Text> =>? Ok(IDLValue::Principal(Principal::from_text(<>).map_err(error)?)),
 }
 
-NumLiteral: IDLValue = {
-    <sign:"sign"?> <n:"number"> <frac:("." "number"?)?> =>? {
-        let num = match sign {
-            Some('-') => format!("-{}", n),
-            Some('+') | None => n,
-            _ => return Err(error("sign error")),
-        };
-        match frac {
-            None => Ok(IDLValue::Number(num)),
-            Some((_, None)) => Ok(IDLValue::Float64(num.parse::<f64>().map_err(|_| error("not float"))?)),
-            Some((_, Some(f))) => {
-                Ok(IDLValue::Float64(format!("{}.{}", num, f).parse::<f64>().map_err(|_| error("not float"))?))
-            }
+Text: String = {
+    Sp<"text"> =>? {
+        if std::str::from_utf8(<>.0.as_bytes()).is_err() {
+          Err(error2("Not valid unicode text", <>.1))
+        } else {
+          Ok(<>.0)
         }
     }
 }
 
+Bytes: Vec<u8> = {
+    "blob" <"text"> => <>.into_bytes(),
+}
+
+Number: String = {
+    "decimal" => <>,
+    "hex" => num_bigint::BigInt::parse_bytes(<>.as_bytes(), 16).unwrap().to_str_radix(10),
+}
+
+NumLiteral: IDLValue = {
+    <sign:"sign"?> <n:Number> => {
+        let num = match sign {
+            Some('-') => format!("-{}", n),
+            _ => n,
+        };
+        IDLValue::Number(num)
+    },
+    <sign:"sign"?> <n:"float"> =>? {
+        let num = match sign {
+            Some('-') => format!("-{}", n),
+            _ => n,
+        };
+        let f = num.parse::<f64>().map_err(|_| error("not a float"))?;
+        Ok(IDLValue::Float64(f))
+    },
+}
+
+FieldId: u32 = {
+    Sp<"decimal"> =>? <>.0.parse::<u32>().map_err(|_| error2("field id out of u32 range", <>.1)),
+    Sp<"hex"> =>? u32::from_str_radix(&<>.0, 16).map_err(|_| error2("field id out of u32 range", <>.1)),
+}
+
 Field: IDLField = {
-    <n:"number"> "=" <v:Arg> =>? Ok(IDLField { id: Label::Id(n.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), val: v }),
+    <n:FieldId> "=" <v:Arg> =>? Ok(IDLField { id: Label::Id(n), val: v }),
     <n:Name> "=" <v:Arg> => IDLField { id: Label::Named(n), val: v },
 }
 
 VariantField: IDLField = {
     Field => <>,
     Name => IDLField { id: Label::Named(<>), val: IDLValue::Null },
-    "number" =>? Ok(IDLField { id: Label::Id(<>.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), val: IDLValue::Null }),
+    FieldId =>? Ok(IDLField { id: Label::Id(<>), val: IDLValue::Null }),
 }
 
 RecordField: IDLField = {
@@ -137,8 +162,7 @@ pub Typ: IDLType = {
         check_unique(fs.iter().map(|f| &f.label)).map_err(error)?;
         Ok(IDLType::RecordT(fs))
     },
-    "variant" "{" <SepBy<VariantFieldTyp, ";">> "}" =>? {
-        let mut fs = <>;
+    "variant" "{" <mut fs:SepBy<VariantFieldTyp, ";">> "}" =>? {
         fs.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
         check_unique(fs.iter().map(|f| &f.label)).map_err(error)?;
         Ok(IDLType::VariantT(fs))
@@ -159,7 +183,7 @@ PrimTyp: IDLType = {
 }
 
 FieldTyp: TypeField = {
-    <n:"number"> ":" <t:Typ> =>? Ok(TypeField { label: Label::Id(n.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), typ: t }),
+    <n:FieldId> ":" <t:Typ> =>? Ok(TypeField { label: Label::Id(n), typ: t }),
     <n:Name> ":" <t:Typ> => TypeField { label: Label::Named(n), typ: t },
 }
 
@@ -171,7 +195,7 @@ RecordFieldTyp: TypeField = {
 VariantFieldTyp: TypeField = {
     FieldTyp => <>,
     Name => TypeField { label: Label::Named(<>), typ: IDLType::PrimT(PrimType::Null) },
-    "number" =>? Ok(TypeField { label: Label::Id(<>.parse::<u32>().map_err(|_| error("field number out of u32 range"))?), typ: IDLType::PrimT(PrimType::Null) }),
+    FieldId =>? Ok(TypeField { label: Label::Id(<>), typ: IDLType::PrimT(PrimType::Null) }),
 }
 
 TupTyp: Vec<IDLType> = "(" <SepBy<ArgTyp, ",">> ")" => <>;
@@ -192,8 +216,7 @@ FuncMode: FuncMode = {
 }
 
 ActorTyp: Vec<Binding> = {
-    "{" <SepBy<MethTyp, ";">> "}" =>? {
-        let mut fs = <>;
+    "{" <mut fs:SepBy<MethTyp, ";">> "}" =>? {
         fs.sort_unstable_by_key(|Binding { id, .. }| idl_hash(id));
         let labs: Vec<_> = fs.iter().map(|f| Label::Named(f.id.clone())).collect();
         check_unique(labs.iter()).map_err(error)?;
@@ -209,7 +232,7 @@ MethTyp: Binding = {
 // Type declarations
 Def: Dec = {
     "type" <id:"id"> "=" <t:Typ> => Dec::TypD(Binding { id: id, typ: t }),
-    "import" <"text"> => Dec::ImportD(<>),
+    "import" <Text> => Dec::ImportD(<>),
 }
 
 Actor: IDLType = {
@@ -224,8 +247,8 @@ pub IDLProg: IDLProg = {
 // Test file
 
 Input: Input = {
-    "text" => Input::Text(<>),
-    "bytes" => Input::Blob(<>),
+    Text => Input::Text(<>),
+    Bytes => Input::Blob(<>),
 }
 
 Assert: Assert = <id:"id"> <assert:Assertion> =>? {
@@ -235,10 +258,10 @@ Assert: Assert = <id:"id"> <assert:Assertion> =>? {
 };
 
 Assertion: Assert = {
-    <left:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: None, typ, pass: true, desc },
-    <left:Input> "!:" <typ:TupTyp> <desc:"text"?> => Assert { left, right: None, typ, pass: false, desc },
-    <left:Input> "==" <right:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: Some(right), typ, pass: true, desc },
-    <left:Input> "!=" <right:Input> ":" <typ:TupTyp> <desc:"text"?> => Assert { left, right: Some(right), typ, pass: false, desc },
+    <left:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: None, typ, pass: true, desc },
+    <left:Input> "!:" <typ:TupTyp> <desc:Text?> => Assert { left, right: None, typ, pass: false, desc },
+    <left:Input> "==" <right:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: Some(right), typ, pass: true, desc },
+    <left:Input> "!=" <right:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: Some(right), typ, pass: false, desc },
 }
 
 pub Test: Test = {
@@ -248,17 +271,21 @@ pub Test: Test = {
 // Common util
 Name: String = {
     "id" => <>,
-    "text" => <>,
+    Text => <>,
 }
 
 // Also allows trailing separator
+#[inline]
 SepBy<T, S>: Vec<T> = {
-    <v:(<T> S)*> <e:T?> => match e {
+    <mut v:(<T> S)*> <e:T?> => match e {
         None => v,
         Some(e) => {
-            let mut v = v;
             v.push(e);
             v
         }
     }
 };
+
+#[inline]
+Sp<T>: (T, Span) =
+    <l: @L> <t: T> <r: @R> => (t, l..r);

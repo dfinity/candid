@@ -1,5 +1,7 @@
+use anyhow::Result;
 use candid::{check_prog, parser::types::IDLTypes, types::Type, Error, IDLArgs, IDLProg, TypeEnv};
-use exitfailure::ExitFailure;
+use codespan_reporting::files::SimpleFile;
+use codespan_reporting::term::{self, termcolor::StandardStream};
 use std::path::{Path, PathBuf};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
@@ -30,6 +32,7 @@ enum Command {
     },
     /// Encode Candid value
     Encode {
+        #[structopt(parse(try_from_str = parse_args))]
         /// Specifies Candid textual format for encoding
         args: IDLArgs,
         #[structopt(flatten)]
@@ -108,6 +111,20 @@ impl TypeAnnotation {
     }
 }
 
+fn parse_args(str: &str) -> Result<IDLArgs, Error> {
+    match str.parse::<IDLArgs>() {
+        Ok(args) => Ok(args),
+        Err(e) => {
+            let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
+            let config = term::Config::default();
+            let file = SimpleFile::new("candid arguments", str);
+            let diag = as_diagnostic(e);
+            term::emit(&mut writer.lock(), &config, &file, &diag)?;
+            std::process::exit(1);
+        }
+    }
+}
+
 fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
     let prog = std::fs::read_to_string(file)
         .map_err(|_| Error::msg(format!("could not read file {}", file.display())))?;
@@ -115,11 +132,35 @@ fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
     check_prog(env, &ast)
 }
 
-fn main() -> Result<(), ExitFailure> {
+use codespan_reporting::diagnostic::{Diagnostic, Label};
+fn as_diagnostic(err: candid::Error) -> Diagnostic<()> {
+    if err.span.start == 0 && err.span.end == 0 {
+        Diagnostic::error().with_message(err.message)
+    } else {
+        Diagnostic::error()
+            .with_message("Syntax error")
+            .with_labels(vec![
+                Label::primary((), err.span.clone()).with_message(err.message)
+            ])
+    }
+}
+
+fn main() -> Result<()> {
+    let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
+    let config = term::Config::default();
+
     match Command::from_args() {
         Command::Check { input } => {
             let mut env = TypeEnv::new();
-            check_file(&mut env, &input)?;
+            match check_file(&mut env, &input) {
+                Ok(_) => (),
+                Err(e) => {
+                    let file =
+                        SimpleFile::new(input.to_str().unwrap(), std::fs::read_to_string(&input)?);
+                    let diag = as_diagnostic(e);
+                    term::emit(&mut writer.lock(), &config, &file, &diag)?;
+                }
+            }
         }
         Command::Bind { input, target } => {
             let mut env = TypeEnv::new();

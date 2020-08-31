@@ -4,12 +4,10 @@
 
 pub mod grammar;
 
-pub mod lexer;
+pub mod token;
 pub mod types;
 pub mod value;
 
 pub mod typing;
 
 pub mod test;
-
-pub type ParserError = lalrpop_util::ParseError<usize, lexer::Token, lexer::LexicalError>;

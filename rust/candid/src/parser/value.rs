@@ -1,4 +1,4 @@
-use super::lexer::error;
+use super::token::error;
 use super::typing::TypeEnv;
 use crate::types::{Field, Label, Type};
 use crate::{Error, Result};
@@ -116,7 +116,7 @@ impl IDLArgs {
 impl std::str::FromStr for IDLArgs {
     type Err = Error;
     fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
-        let lexer = super::lexer::Lexer::new(str);
+        let lexer = super::token::Tokenizer::new(str);
         Ok(super::grammar::ArgsParser::new().parse(lexer)?)
     }
 }
@@ -124,7 +124,7 @@ impl std::str::FromStr for IDLArgs {
 impl std::str::FromStr for IDLValue {
     type Err = Error;
     fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
-        let lexer = super::lexer::Lexer::new(str);
+        let lexer = super::token::Tokenizer::new(str);
         Ok(super::grammar::ArgParser::new().parse(lexer)?)
     }
 }

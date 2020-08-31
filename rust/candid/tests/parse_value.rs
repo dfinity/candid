@@ -26,7 +26,7 @@ fn parse_bool_lit() {
 
 #[test]
 fn parse_literals() {
-    let args = parse_args(" (true, null, 42, 42., 42.42)");
+    let args = parse_args(" (true, null, 42, 42., +42.42, -42e5, 42.42e-5)");
     assert_eq!(
         args.args,
         vec![
@@ -34,15 +34,20 @@ fn parse_literals() {
             IDLValue::Null,
             IDLValue::Number("42".to_owned()),
             IDLValue::Float64(42f64),
-            IDLValue::Float64(42.42f64)
+            IDLValue::Float64(42.42f64),
+            IDLValue::Float64(-42e5f64),
+            IDLValue::Float64(42.42e-5f64),
         ]
     );
-    assert_eq!(format!("{}", args), "(true, null, 42, 42, 42.42)");
+    assert_eq!(
+        format!("{}", args),
+        "(true, null, 42, 42, 42.42, -4200000, 0.0004242)"
+    );
 }
 
 #[test]
 fn parse_string_literals() {
-    let args = parse_args("(\"\", \"\\u{10ffff}\\n\", \"\\0a\\0dd\")");
+    let args = parse_args(r#"("", "\u{10ffff}\n", "\0a\0dd")"#);
     assert_eq!(
         args.args,
         vec![
@@ -56,20 +61,20 @@ fn parse_string_literals() {
         format!("{}", args),
         "(vec { 68; 73; 68; 76; 0; 1; 125; 128; 0; })"
     );
-    let args = parse_args_err("\"DIDL\\00\\01\\7d\\80\\00\"");
+    let args = parse_args_err("(\"DIDL\\00\\01\\7d\\80\\00\")");
     assert_eq!(
         format!("{}", args.unwrap_err()),
-        "Candid parser error: Not valid unicode text"
+        "Candid parser error: Not valid unicode text at 1..22"
     );
     let args = parse_args_err("(\"\\u{d800}\")");
     assert_eq!(
         format!("{}", args.unwrap_err()),
-        "Candid parser error: Unicode escape out of range d800"
+        "Candid parser error: Unicode escape out of range d800 at 2..10"
     );
     let result = parse_args_err("(\"\\q\")");
     assert_eq!(
         format!("{}", result.unwrap_err()),
-        "Candid parser error: Unexpected character q"
+        "Candid parser error: Unknown escape character q at 2..4"
     );
 }
 
