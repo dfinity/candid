@@ -171,9 +171,6 @@
 //! // Parse did file into an AST
 //! let ast: IDLProg = did_file.parse()?;
 //!
-//! // Pretty-print AST
-//! let pretty: String = candid::parser::types::to_pretty(&ast, 80);
-//!
 //! // Type checking
 //! let mut env = TypeEnv::new();
 //! let actor: Type = check_prog(&mut env, &ast)?.unwrap();
@@ -221,9 +218,6 @@
 
 pub use candid_derive::CandidType;
 pub use serde::Deserialize;
-
-pub mod codegen;
-pub use codegen::generate_code;
 
 pub mod bindings;
 

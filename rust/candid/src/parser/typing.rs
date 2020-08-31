@@ -187,9 +187,8 @@ fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
         let t = check_type(env, &meth.typ)?;
         if !env.pre && env.te.as_func(&t).is_err() {
             return Err(Error::msg(format!(
-                "method {} is a non-function type {}",
-                meth.id,
-                meth.typ.to_doc().pretty(80)
+                "method {} is a non-function type {:?}",
+                meth.id, meth.typ
             )));
         }
         res.push((meth.id.to_owned(), t));
