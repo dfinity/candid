@@ -131,9 +131,14 @@ impl<'input> Tokenizer<'input> {
 }
 
 pub type Span = std::ops::Range<usize>;
+#[derive(Clone, Debug)]
+pub struct Spanned<T> {
+    pub span: Span,
+    pub value: T,
+}
 pub struct LexicalError {
-    err: String,
-    span: Span,
+    pub err: String,
+    pub span: Span,
 }
 impl std::fmt::Display for LexicalError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -2,6 +2,7 @@
 
 use serde::{de, ser};
 
+use crate::parser::token;
 use std::fmt::{self, Debug, Display};
 use std::io;
 
@@ -9,8 +10,9 @@ pub type Result<T = ()> = std::result::Result<T, Error>;
 
 #[derive(Clone)]
 pub struct Error {
-    message: String,
+    pub message: String,
     states: String,
+    pub span: token::Span,
 }
 
 impl Error {
@@ -18,12 +20,21 @@ impl Error {
         Error {
             message: msg.to_string(),
             states: "".to_owned(),
+            span: 0..0,
+        }
+    }
+    pub fn msg_span<T: Display>(msg: T, span: token::Span) -> Self {
+        Error {
+            message: msg.to_string(),
+            states: "".to_owned(),
+            span,
         }
     }
     pub fn with_states(self, msg: String) -> Self {
         Error {
             message: self.message,
             states: msg,
+            span: 0..0,
         }
     }
 }
@@ -68,8 +79,19 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<crate::parser::token::ParserError> for Error {
-    fn from(e: crate::parser::token::ParserError) -> Error {
-        Error::msg(format!("Candid parser error: {}", e))
+impl From<token::ParserError> for Error {
+    fn from(e: token::ParserError) -> Error {
+        use lalrpop_util::ParseError::*;
+        let msg = format!("Candid parser error: {}", e);
+        match e {
+            User { error } => Error::msg_span(msg, error.span),
+            InvalidToken { location } => Error::msg_span(msg, location..location + 1),
+            UnrecognizedEOF {
+                location,
+                expected: _,
+            } => Error::msg_span(msg, location..location + 1),
+            UnrecognizedToken { token, expected: _ } => Error::msg_span(msg, token.0..token.2),
+            ExtraToken { token } => Error::msg_span(msg, token.0..token.2),
+        }
     }
 }
