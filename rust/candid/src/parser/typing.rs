@@ -1,7 +1,10 @@
 use super::types::*;
+use super::value::IDLValue;
 use crate::types::{Field, Function, Type};
-use crate::{Error, Result};
+use crate::{Error, Int, Nat, Result};
+use num_bigint::{BigInt, BigUint};
 use std::collections::{BTreeMap, BTreeSet};
+use std::str::FromStr;
 
 pub struct Env<'a> {
     pub te: &'a mut TypeEnv,
@@ -258,6 +261,90 @@ fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
             env.te.as_service(&t)?;
             Ok(Some(t))
         }
+    }
+}
+
+pub(crate) fn interpret_number(number: IDLValue, typ: IDLType) -> Result<IDLValue> {
+    let number = match number {
+        IDLValue::Number(number) => number,
+        _ => {
+            return Err(Error::msg("Non-number in type annotated value"));
+        }
+    };
+
+    fn error<E: ToString>(err: E) -> Error {
+        Error::msg(err.to_string())
+    }
+
+    match typ {
+        IDLType::PrimT(prim_typ) => {
+            match prim_typ {
+                PrimType::Nat => {
+                    let biguint = BigUint::from_str(number.as_str()).map_err(error)?;
+                    Ok(IDLValue::Nat(Nat(biguint)))
+                }
+                PrimType::Int => {
+                    let bigint = BigInt::from_str(number.as_str()).map_err(error)?;
+                    Ok(IDLValue::Int(Int(bigint)))
+                }
+                // NOTE: Concrete syntax for numbers is not specified in candid spec, but the
+                // syntax accepted by the lexer is basically ('0x' hexdigit+) and (digit+), which
+                // should be accepted by Rust's numeric type parsers. So we're just using Rust's
+                // parsers below. The lexer doesn't have a float token so we convert decimals to
+                // floats below when the type annotation is a float.
+                PrimType::Nat8 => {
+                    let val = number.parse().map_err(error)?;
+                    Ok(IDLValue::Nat8(val))
+                }
+                PrimType::Nat16 => {
+                    let val = number.parse().map_err(error)?;
+                    Ok(IDLValue::Nat16(val))
+                }
+                PrimType::Nat32 => {
+                    let val = number.parse().map_err(error)?;
+                    Ok(IDLValue::Nat32(val))
+                }
+                PrimType::Nat64 => {
+                    let val = number.parse().map_err(error)?;
+                    Ok(IDLValue::Nat64(val))
+                }
+                PrimType::Int8 => {
+                    let val = number.parse().map_err(error)?;
+                    Ok(IDLValue::Int8(val))
+                }
+                PrimType::Int16 => {
+                    let val = number.parse().map_err(error)?;
+                    Ok(IDLValue::Int16(val))
+                }
+                PrimType::Int32 => {
+                    let val = number.parse().map_err(error)?;
+                    Ok(IDLValue::Int32(val))
+                }
+                PrimType::Int64 => {
+                    let val = number.parse().map_err(error)?;
+                    Ok(IDLValue::Int64(val))
+                }
+                PrimType::Float32 => {
+                    let val = number.parse().map_err(error)?;
+                    Ok(IDLValue::Float32(val))
+                }
+                PrimType::Float64 => {
+                    let val = number.parse().map_err(error)?;
+                    Ok(IDLValue::Float64(val))
+                }
+
+                PrimType::Bool
+                | PrimType::Text
+                | PrimType::Null
+                | PrimType::Reserved
+                | PrimType::Empty => Err(Error::msg(
+                    "Numbers can only be annotated with a number type",
+                )),
+            }
+        }
+        _ => Err(Error::msg(
+            "Numbers can only be annotated with a number type",
+        )),
     }
 }
 

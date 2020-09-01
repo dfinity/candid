@@ -1,5 +1,5 @@
 use super::value::{IDLField, IDLValue, IDLArgs};
-use super::typing::check_unique;
+use super::typing::{check_unique, interpret_number};
 use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg, IDLTypes};
 use super::test::{Assert, Input, Test};
 use super::token::{Token, error, error2, LexicalError, Span};
@@ -81,6 +81,7 @@ pub Arg: IDLValue = {
     },
     "variant" "{" <VariantField> "}" => IDLValue::Variant(Box::new(<>), 0),
     "principal" <Text> =>? Ok(IDLValue::Principal(Principal::from_text(<>).map_err(error)?)),
+    AnnVal => <>,
 }
 
 Text: String = {
@@ -100,6 +101,11 @@ Bytes: Vec<u8> = {
 Number: String = {
     "decimal" => <>,
     "hex" => num_bigint::BigInt::parse_bytes(<>.as_bytes(), 16).unwrap().to_str_radix(10),
+}
+
+AnnVal: IDLValue = {
+    "(" <Arg> ")" => <>,
+    "(" <arg:Arg> ":" <typ:Typ> ")" =>? Ok(interpret_number(arg, typ).map_err(error)?),
 }
 
 NumLiteral: IDLValue = {

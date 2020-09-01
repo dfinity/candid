@@ -1,6 +1,11 @@
 use candid::parser::typing::TypeEnv;
 use candid::parser::value::{IDLArgs, IDLField, IDLValue};
-use candid::types::{Label, Type};
+use candid::types::number::Nat;
+use candid::{
+    types::{Label, Type},
+    Int,
+};
+use num_bigint::BigInt;
 
 fn parse_args(input: &str) -> IDLArgs {
     input.parse().unwrap()
@@ -221,4 +226,30 @@ fn parse_shorthand() {
     assert_eq!(format!("{}", args), "(\n  record {\n    42;\n    record {};\n    true;\n    record { 0 = 42; 42 = 42; 43 = 42; 44 = 42 };\n    opt 42;\n  },\n)");
     let args = parse_args("(variant { 0x2a }, variant { label })");
     assert_eq!(format!("{}", args), "(variant { 42 }, variant { label })");
+}
+
+#[test]
+fn parse_annval() {
+    let args = parse_args("((1))");
+    assert_eq!(
+        args,
+        IDLArgs {
+            args: vec![IDLValue::Number("1".to_string())]
+        }
+    );
+
+    let args =
+        parse_args("((1 : nat), (123 : int), (456 : int32), (789 : float32), (1011 : float64))");
+    assert_eq!(
+        args,
+        IDLArgs {
+            args: vec![
+                IDLValue::Nat(Nat::from(1i32)),
+                IDLValue::Int(Int(BigInt::from(123i32))),
+                IDLValue::Int32(456),
+                IDLValue::Float32(789f32),
+                IDLValue::Float64(1011f64)
+            ]
+        }
+    );
 }
