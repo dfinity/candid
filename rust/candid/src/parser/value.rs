@@ -435,7 +435,7 @@ impl crate::CandidType for IDLValue {
                 ser.serialize_element(&v.val)?;
                 Ok(())
             }
-            IDLValue::Principal(ref id) => serializer.serialize_principal(&id.0),
+            IDLValue::Principal(ref id) => serializer.serialize_principal(id.as_slice()),
             IDLValue::Reserved => serializer.serialize_null(()),
         }
     }
@@ -489,7 +489,8 @@ impl<'de> Deserialize<'de> for IDLValue {
                         Ok(IDLValue::Nat(v))
                     }
                     2u8 => {
-                        let v = crate::Principal::from_bytes(bytes);
+                        use std::convert::TryFrom;
+                        let v = crate::Principal::try_from(bytes).map_err(E::custom)?;
                         Ok(IDLValue::Principal(v))
                     }
                     3u8 => Ok(IDLValue::Reserved),
