@@ -1,4 +1,4 @@
-use super::lexer::error;
+use super::token::error;
 use super::typing::TypeEnv;
 use crate::types::{Field, Label, Type};
 use crate::{Error, Result};
@@ -116,7 +116,7 @@ impl IDLArgs {
 impl std::str::FromStr for IDLArgs {
     type Err = Error;
     fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
-        let lexer = super::lexer::Lexer::new(str);
+        let lexer = super::token::Tokenizer::new(str);
         Ok(super::grammar::ArgsParser::new().parse(lexer)?)
     }
 }
@@ -124,70 +124,20 @@ impl std::str::FromStr for IDLArgs {
 impl std::str::FromStr for IDLValue {
     type Err = Error;
     fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
-        let lexer = super::lexer::Lexer::new(str);
+        let lexer = super::token::Tokenizer::new(str);
         Ok(super::grammar::ArgParser::new().parse(lexer)?)
     }
 }
 
 impl fmt::Display for IDLArgs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "(")?;
-        let len = self.args.len();
-        for i in 0..len {
-            write!(f, "{}", self.args[i])?;
-            if i < len - 1 {
-                write!(f, ", ")?;
-            }
-        }
-        write!(f, ")")
+        write!(f, "{}", pretty::pp_args(&self).pretty(80))
     }
 }
 
 impl fmt::Display for IDLValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            IDLValue::Null => write!(f, "null"),
-            IDLValue::Bool(b) => write!(f, "{}", b),
-            IDLValue::Number(ref str) => write!(f, "{}", str),
-            IDLValue::Int(ref i) => write!(f, "{}", i),
-            IDLValue::Nat(ref n) => write!(f, "{}", n),
-            IDLValue::Nat8(n) => write!(f, "{}", n),
-            IDLValue::Nat16(n) => write!(f, "{}", n),
-            IDLValue::Nat32(n) => write!(f, "{}", n),
-            IDLValue::Nat64(n) => write!(f, "{}", n),
-            IDLValue::Int8(n) => write!(f, "{}", n),
-            IDLValue::Int16(n) => write!(f, "{}", n),
-            IDLValue::Int32(n) => write!(f, "{}", n),
-            IDLValue::Int64(n) => write!(f, "{}", n),
-            IDLValue::Float32(n) => write!(f, "{}", n),
-            IDLValue::Float64(n) => write!(f, "{}", n),
-            IDLValue::Text(ref s) => write!(f, "\"{}\"", s),
-            IDLValue::None => write!(f, "null"),
-            IDLValue::Reserved => write!(f, "reserved"),
-            IDLValue::Opt(ref v) => write!(f, "opt {}", v),
-            IDLValue::Vec(ref vec) => {
-                write!(f, "vec {{ ")?;
-                for e in vec.iter() {
-                    write!(f, "{}; ", e)?;
-                }
-                write!(f, "}}")
-            }
-            IDLValue::Record(ref fs) => {
-                write!(f, "record {{ ")?;
-                for e in fs.iter() {
-                    write!(f, "{}; ", e)?;
-                }
-                write!(f, "}}")
-            }
-            IDLValue::Variant(ref v, _) => write!(f, "variant {{ {} }}", v),
-            IDLValue::Principal(ref id) => write!(f, "principal \"{}\"", id),
-        }
-    }
-}
-
-impl fmt::Display for IDLField {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} = {}", self.id, self.val)
+        write!(f, "{}", pretty::pp_value(&self).pretty(80))
     }
 }
 
@@ -219,7 +169,7 @@ impl IDLValue {
                 Type::Int64 => IDLValue::Int64(str.parse::<i64>().map_err(error)?),
                 _ => {
                     return Err(Error::msg(format!(
-                        "type mismatch: {} can not be of type {:?}",
+                        "type mismatch: {} can not be of type {}",
                         self, t
                     )))
                 }
@@ -285,7 +235,7 @@ impl IDLValue {
             (IDLValue::Principal(id), Type::Principal) => IDLValue::Principal(id.clone()),
             _ => {
                 return Err(Error::msg(format!(
-                    "type mismatch: {} cannot be of type {:?}",
+                    "type mismatch: {} cannot be of type {}",
                     self, t
                 )))
             }
@@ -355,27 +305,71 @@ pub mod pretty {
 
     pub use crate::bindings::candid::pp_label;
 
-    fn pp_field(field: &IDLField) -> RcDoc {
-        pp_label(&field.id)
-            .append(kwd(" ="))
-            .append(pp_value(&field.val))
+    // The definition of tuple is language specific.
+    fn is_tuple(t: &IDLValue) -> bool {
+        match t {
+            IDLValue::Record(ref fs) => {
+                for (i, field) in fs.iter().enumerate() {
+                    if field.id.get_id() != (i as u32) {
+                        return false;
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn pp_field(field: &IDLField, is_variant: bool) -> RcDoc {
+        let val_doc = if is_variant && field.val == IDLValue::Null {
+            RcDoc::nil()
+        } else {
+            kwd(" =").append(pp_value(&field.val))
+        };
+        pp_label(&field.id).append(val_doc)
     }
 
     fn pp_fields(fields: &[IDLField]) -> RcDoc {
-        concat(fields.iter().map(|f| pp_field(f)), ";")
+        let fs = concat(fields.iter().map(|f| pp_field(f, false)), ";");
+        enclose_space("{", fs, "}")
     }
 
     pub fn pp_value(v: &IDLValue) -> RcDoc {
         use super::IDLValue::*;
         match &*v {
-            Opt(v) => kwd("opt").append(enclose_space("{", pp_value(v), "}")),
+            Null => RcDoc::as_string("null"),
+            Bool(b) => RcDoc::as_string(b),
+            Number(ref s) => RcDoc::as_string(s),
+            Int(ref i) => RcDoc::as_string(i),
+            Nat(ref n) => RcDoc::as_string(n),
+            Nat8(n) => RcDoc::as_string(n),
+            Nat16(n) => RcDoc::as_string(n),
+            Nat32(n) => RcDoc::as_string(n),
+            Nat64(n) => RcDoc::as_string(n),
+            Int8(n) => RcDoc::as_string(n),
+            Int16(n) => RcDoc::as_string(n),
+            Int32(n) => RcDoc::as_string(n),
+            Int64(n) => RcDoc::as_string(n),
+            Float32(n) => RcDoc::as_string(n),
+            Float64(n) => RcDoc::as_string(n),
+            Text(ref s) => RcDoc::as_string(format!("\"{}\"", s)),
+            None => RcDoc::as_string("null"),
+            Reserved => RcDoc::as_string("reserved"),
+            Principal(ref id) => RcDoc::as_string(format!("principal \"{}\"", id)),
+            Opt(v) => kwd("opt").append(pp_value(v)),
             Vec(vs) => {
                 let body = concat(vs.iter().map(|v| pp_value(v)), ";");
                 kwd("vec").append(enclose_space("{", body, "}"))
             }
-            Record(fields) => kwd("record").append(enclose_space("{", pp_fields(&fields), "}")),
-            Variant(v, _) => kwd("variant").append(enclose_space("{", pp_field(&v), "}")),
-            _ => RcDoc::as_string(v),
+            Record(fields) => {
+                if is_tuple(v) {
+                    let tuple = concat(fields.iter().map(|f| pp_value(&f.val)), ";");
+                    kwd("record").append(enclose_space("{", tuple, "}"))
+                } else {
+                    kwd("record").append(pp_fields(&fields))
+                }
+            }
+            Variant(v, _) => kwd("variant").append(enclose_space("{", pp_field(&v, true), "}")),
         }
     }
 

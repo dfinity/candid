@@ -56,11 +56,11 @@ service : {
         let args = str.parse::<IDLArgs>().unwrap();
         let encoded = args.to_bytes_with_types(&env, &method.rets).unwrap();
         let decoded = IDLArgs::from_bytes(&encoded).unwrap();
-        assert_eq!(decoded.to_string(), "(opt record { 1158359328 = 1; 1291237008 = opt record { 1158359328 = 2; 1291237008 = null; }; })");
+        assert_eq!(decoded.to_string(), "(\n  opt record {\n    1158359328 = 1;\n    1291237008 = opt record { 1158359328 = 2; 1291237008 = null };\n  },\n)");
         let decoded = IDLArgs::from_bytes_with_types(&encoded, &env, &method.rets).unwrap();
         assert_eq!(
             decoded.to_string(),
-            "(opt record { head = 1; tail = opt record { head = 2; tail = null; }; })"
+            "(opt record { head = 1; tail = opt record { head = 2; tail = null } })"
         );
         let decoded = IDLArgs::from_bytes_with_types(&encoded, &env, &[]).unwrap();
         assert_eq!(decoded.to_string(), "()");

@@ -58,7 +58,7 @@ mod echo {
         let mut cmd = candiff();
         cmd.arg("echo").arg("vec {1; 2}");
         cmd.assert()
-            .stdout(predicate::eq(b"vec { 1; 2; }\n" as &[u8]))
+            .stdout(predicate::eq(b"vec { 1; 2 }\n" as &[u8]))
             .success();
     }
 

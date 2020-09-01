@@ -116,7 +116,7 @@ pub struct IDLProg {
 impl std::str::FromStr for IDLProg {
     type Err = crate::Error;
     fn from_str(str: &str) -> Result<Self> {
-        let lexer = super::lexer::Lexer::new(str);
+        let lexer = super::token::Tokenizer::new(str);
         Ok(super::grammar::IDLProgParser::new().parse(lexer)?)
     }
 }
@@ -124,7 +124,7 @@ impl std::str::FromStr for IDLProg {
 impl std::str::FromStr for IDLType {
     type Err = crate::Error;
     fn from_str(str: &str) -> Result<Self> {
-        let lexer = super::lexer::Lexer::new(str);
+        let lexer = super::token::Tokenizer::new(str);
         Ok(super::grammar::TypParser::new().parse(lexer)?)
     }
 }
@@ -132,7 +132,7 @@ impl std::str::FromStr for IDLType {
 impl std::str::FromStr for IDLTypes {
     type Err = crate::Error;
     fn from_str(str: &str) -> Result<Self> {
-        let lexer = super::lexer::Lexer::new(str);
+        let lexer = super::token::Tokenizer::new(str);
         Ok(super::grammar::TypsParser::new().parse(lexer)?)
     }
 }

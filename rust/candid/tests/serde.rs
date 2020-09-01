@@ -268,6 +268,19 @@ fn test_extra_fields() {
 }
 
 #[test]
+fn test_newtype() {
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct X(i32);
+    all_check(X(42), "4449444c0001752a000000");
+
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    enum Y {
+        A(i32),
+    }
+    all_check(Y::A(42), "4449444c016b0141750100002a000000");
+}
+
+#[test]
 fn test_mutual_recursion() {
     type List = Option<ListA>;
     #[derive(PartialEq, Debug, Deserialize, CandidType)]

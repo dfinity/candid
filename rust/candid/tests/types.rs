@@ -14,6 +14,9 @@ fn test_primitive() {
 #[test]
 fn test_struct() {
     #[derive(Debug, CandidType)]
+    struct Newtype(Int);
+    assert_eq!(Newtype::ty(), Type::Int,);
+    #[derive(Debug, CandidType)]
     struct A {
         foo: Int,
         bar: bool,
@@ -59,6 +62,7 @@ fn test_variant() {
         Foo,
         Bar(bool, i32),
         Baz { a: i32, b: u32 },
+        Newtype(bool),
     }
 
     let v = E::Bar(true, 42);
@@ -77,6 +81,7 @@ fn test_variant() {
                 Type::Record(vec![field("a", Type::Int32), field("b", Type::Nat32)])
             ),
             field("Foo", Type::Null),
+            field("Newtype", Type::Bool),
         ])
     );
 }

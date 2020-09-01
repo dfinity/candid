@@ -84,7 +84,7 @@ fn pp_text(id: &str) -> RcDoc {
     }
 }
 
-fn pp_ty(ty: &Type) -> RcDoc {
+pub fn pp_ty(ty: &Type) -> RcDoc {
     use Type::*;
     match *ty {
         Null => str("null"),
@@ -199,7 +199,7 @@ fn pp_actor(ty: &Type) -> RcDoc {
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     match actor {
-        None => "".to_string(),
+        None => pp_defs(env).pretty(LINE_WIDTH).to_string(),
         Some(actor) => {
             let defs = pp_defs(env);
             let actor = pp_actor(actor);
