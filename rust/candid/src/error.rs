@@ -26,7 +26,7 @@ impl Error {
         match self {
             Error::Parse(e) => {
                 use lalrpop_util::ParseError::*;
-                let diag = Diagnostic::error().with_message("parser error");
+                let mut diag = Diagnostic::error().with_message("parser error");
                 let mut labels = Vec::new();
                 let msg = format!("{}", e);
                 match e {
@@ -42,8 +42,12 @@ impl Error {
                     } => {
                         labels.push(Label::primary((), *location..location + 1).with_message(msg));
                     }
-                    UnrecognizedToken { token, expected: _ } => {
-                        labels.push(Label::primary((), token.0..token.2).with_message(msg))
+                    UnrecognizedToken { token, expected } => {
+                        let msg = format!("Unrecognized token {:?}", token.1);
+                        let mut expects = vec!["expect one of".to_owned()];
+                        expects.extend_from_slice(expected);
+                        labels.push(Label::primary((), token.0..token.2).with_message(msg));
+                        diag = diag.with_notes(expects);
                     }
                     ExtraToken { token } => {
                         labels.push(Label::primary((), token.0..token.2).with_message(msg))
