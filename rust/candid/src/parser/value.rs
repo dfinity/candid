@@ -305,14 +305,33 @@ pub mod pretty {
 
     pub use crate::bindings::candid::pp_label;
 
-    fn pp_field(field: &IDLField) -> RcDoc {
-        pp_label(&field.id)
-            .append(kwd(" ="))
-            .append(pp_value(&field.val))
+    // The definition of tuple is language specific.
+    fn is_tuple(t: &IDLValue) -> bool {
+        match t {
+            IDLValue::Record(ref fs) => {
+                for (i, field) in fs.iter().enumerate() {
+                    if field.id.get_id() != (i as u32) {
+                        return false;
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn pp_field(field: &IDLField, is_variant: bool) -> RcDoc {
+        let val_doc = if is_variant && field.val == IDLValue::Null {
+            RcDoc::nil()
+        } else {
+            kwd(" =").append(pp_value(&field.val))
+        };
+        pp_label(&field.id).append(val_doc)
     }
 
     fn pp_fields(fields: &[IDLField]) -> RcDoc {
-        concat(fields.iter().map(|f| pp_field(f)), ";")
+        let fs = concat(fields.iter().map(|f| pp_field(f, false)), ";");
+        enclose_space("{", fs, "}")
     }
 
     pub fn pp_value(v: &IDLValue) -> RcDoc {
@@ -342,8 +361,15 @@ pub mod pretty {
                 let body = concat(vs.iter().map(|v| pp_value(v)), ";");
                 kwd("vec").append(enclose_space("{", body, "}"))
             }
-            Record(fields) => kwd("record").append(enclose_space("{", pp_fields(&fields), "}")),
-            Variant(v, _) => kwd("variant").append(enclose_space("{", pp_field(&v), "}")),
+            Record(fields) => {
+                if is_tuple(v) {
+                    let tuple = concat(fields.iter().map(|f| pp_value(&f.val)), ";");
+                    kwd("record").append(enclose_space("{", tuple, "}"))
+                } else {
+                    kwd("record").append(pp_fields(&fields))
+                }
+            }
+            Variant(v, _) => kwd("variant").append(enclose_space("{", pp_field(&v, true), "}")),
         }
     }
 

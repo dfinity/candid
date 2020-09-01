@@ -165,7 +165,7 @@ fn parse_optional_record() {
     );
     assert_eq!(
         format!("{}", args),
-        "(opt record {}, record { 1 = 42; 2 = false; 44 = \"test\" }, variant { 5 = null })"
+        "(opt record {}, record { 1 = 42; 2 = false; 44 = \"test\" }, variant { 5 })"
     );
 }
 
@@ -218,10 +218,7 @@ fn parse_nested_record() {
 fn parse_shorthand() {
     let args =
         parse_args("(record { 42; record {}; true; record { 42; 0x2a=42; 42; 42 }; opt 42 })");
-    assert_eq!(format!("{}", args), "(\n  record {\n    0 = 42;\n    1 = record {};\n    2 = true;\n    3 = record { 0 = 42; 42 = 42; 43 = 42; 44 = 42 };\n    4 = opt 42;\n  },\n)");
+    assert_eq!(format!("{}", args), "(\n  record {\n    42;\n    record {};\n    true;\n    record { 0 = 42; 42 = 42; 43 = 42; 44 = 42 };\n    opt 42;\n  },\n)");
     let args = parse_args("(variant { 0x2a }, variant { label })");
-    assert_eq!(
-        format!("{}", args),
-        "(variant { 42 = null }, variant { label = null })"
-    );
+    assert_eq!(format!("{}", args), "(variant { 42 }, variant { label })");
 }
