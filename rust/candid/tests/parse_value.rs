@@ -59,7 +59,7 @@ fn parse_string_literals() {
     let args = parse_args("(blob \"DIDL\\00\\01\\7d\\80\\00\")");
     assert_eq!(
         format!("{}", args),
-        "(vec { 68; 73; 68; 76; 0; 1; 125; 128; 0; })"
+        "(vec { 68; 73; 68; 76; 0; 1; 125; 128; 0 })"
     );
     let args = parse_args_err("(\"DIDL\\00\\01\\7d\\80\\00\")");
     assert_eq!(
@@ -125,7 +125,7 @@ fn parse_vec() {
             IDLValue::Nat(4.into())
         ])]
     );
-    assert_eq!(format!("{}", args), "(vec { 1; 2; 3; 4; })");
+    assert_eq!(format!("{}", args), "(vec { 1; 2; 3; 4 })");
 }
 
 #[test]
@@ -165,17 +165,17 @@ fn parse_optional_record() {
     );
     assert_eq!(
         format!("{}", args),
-        "(opt record { }, record { 1 = 42; 2 = false; 44 = \"test\"; }, variant { 5 = null })"
+        "(opt record {}, record { 1 = 42; 2 = false; 44 = \"test\" }, variant { 5 })"
     );
 }
 
 #[test]
 fn parse_nested_record() {
     let mut args = parse_args(
-        "(record {label=42; 0x2b=record {test=\"test\"; msg=\"hello\"}; long_label=opt null})",
+        "(record {label=42; 0x2b=record {test=\"test\"; \"opt\"=\"hello\"}; long_label=opt null})",
     );
     let typ = parse_type(
-        "record {label: nat; 0x2b:record { test:text; msg:text }; long_label: opt null }",
+        "record {label: nat; 0x2b:record { test:text; \"opt\":text }; long_label: opt null }",
     );
     args.args[0] = args.args[0]
         .annotate_type(true, &TypeEnv::new(), &typ)
@@ -187,7 +187,7 @@ fn parse_nested_record() {
                 id: Label::Id(43),
                 val: IDLValue::Record(vec![
                     IDLField {
-                        id: Label::Named("msg".to_owned()),
+                        id: Label::Named("opt".to_owned()),
                         val: IDLValue::Text("hello".to_owned())
                     },
                     IDLField {
@@ -206,22 +206,19 @@ fn parse_nested_record() {
             }
         ])]
     );
-    assert_eq!(format!("{}", args), "(record { 43 = record { msg = \"hello\"; test = \"test\"; }; long_label = opt null; label = 42; })");
+    assert_eq!(format!("{}", args), "(\n  record {\n    43 = record { \"opt\" = \"hello\"; test = \"test\" };\n    long_label = opt null;\n    label = 42;\n  },\n)");
     let skip_typ = parse_type("record { label: nat }");
     args.args[0] = args.args[0]
         .annotate_type(true, &TypeEnv::new(), &skip_typ)
         .unwrap();
-    assert_eq!(format!("{}", args), "(record { label = 42; })");
+    assert_eq!(format!("{}", args), "(record { label = 42 })");
 }
 
 #[test]
 fn parse_shorthand() {
     let args =
         parse_args("(record { 42; record {}; true; record { 42; 0x2a=42; 42; 42 }; opt 42 })");
-    assert_eq!(format!("{}", args), "(record { 0 = 42; 1 = record { }; 2 = true; 3 = record { 0 = 42; 42 = 42; 43 = 42; 44 = 42; }; 4 = opt 42; })");
+    assert_eq!(format!("{}", args), "(\n  record {\n    42;\n    record {};\n    true;\n    record { 0 = 42; 42 = 42; 43 = 42; 44 = 42 };\n    opt 42;\n  },\n)");
     let args = parse_args("(variant { 0x2a }, variant { label })");
-    assert_eq!(
-        format!("{}", args),
-        "(variant { 42 = null }, variant { label = null })"
-    );
+    assert_eq!(format!("{}", args), "(variant { 42 }, variant { label })");
 }
