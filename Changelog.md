@@ -6,11 +6,12 @@
 ### Rust (0.5.4)
 
 * Support type annotations in parsing Candid values
-* New lexer using the `logos` crate
-* Use `codespan-reporting` to report Rust-like parsing errors
 * Support float e notation
 * Support nested comments
 * Pretty print decoded candid values
+* New lexer using the `logos` crate
+* Use `ic-types` for Principal
+* Use `codespan-reporting` to report Rust-like parsing errors
 
 ## 2020-08-24
 
@@ -29,7 +30,7 @@
 
 ### Tools
 
-* Publish `didc` and `candiff` binary as asserts in the release
+* Publish `didc` and `candiff` binary in the release
 * Generate JS tests from the Candid test suites
 
 ## 2020-08-14
