@@ -81,7 +81,7 @@ pub Arg: IDLValue = {
     },
     "variant" "{" <VariantField> "}" => IDLValue::Variant(Box::new(<>), 0),
     "principal" <Text> =>? Ok(IDLValue::Principal(Principal::from_text(<>).map_err(error)?)),
-    AnnVal => <>,
+    "(" <AnnVal> ")" => <>,
 }
 
 Text: String = {
@@ -104,8 +104,8 @@ Number: String = {
 }
 
 AnnVal: IDLValue = {
-    "(" <Arg> ")" => <>,
-    "(" <arg:Arg> ":" <typ:Typ> ")" =>? Ok(interpret_number(arg, typ).map_err(error)?),
+    <Arg> => <>,
+    <arg:Arg> ":" <typ:Typ> =>? Ok(interpret_number(arg, typ).map_err(error)?),
 }
 
 NumLiteral: IDLValue = {
