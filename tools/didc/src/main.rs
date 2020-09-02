@@ -1,7 +1,8 @@
 use anyhow::Result;
-use candid::{check_prog, parser::types::IDLTypes, types::Type, Error, IDLArgs, IDLProg, TypeEnv};
-use codespan_reporting::files::SimpleFile;
-use codespan_reporting::term::{self, termcolor::StandardStream};
+use candid::{
+    check_prog, parser::types::IDLTypes, pretty_parse, types::Type, Error, IDLArgs, IDLProg,
+    TypeEnv,
+};
 use std::path::{Path, PathBuf};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
@@ -50,7 +51,9 @@ enum Command {
     },
     /// Diff two Candid values
     Diff {
+        #[structopt(parse(try_from_str = parse_args))]
         values1: IDLArgs,
+        #[structopt(parse(try_from_str = parse_args))]
         values2: IDLArgs,
         #[structopt(flatten)]
         annotate: TypeAnnotation,
@@ -60,6 +63,7 @@ enum Command {
 #[derive(StructOpt)]
 struct TypeAnnotation {
     #[structopt(name = "types", short, long)]
+    #[structopt(parse(try_from_str = parse_types))]
     /// Annotates values with Candid types
     tys: Option<IDLTypes>,
     #[structopt(short, long, conflicts_with("types"), requires("defs"))]
@@ -112,55 +116,24 @@ impl TypeAnnotation {
 }
 
 fn parse_args(str: &str) -> Result<IDLArgs, Error> {
-    match str.parse::<IDLArgs>() {
-        Ok(args) => Ok(args),
-        Err(e) => {
-            let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
-            let config = term::Config::default();
-            let file = SimpleFile::new("candid arguments", str);
-            let diag = as_diagnostic(e);
-            term::emit(&mut writer.lock(), &config, &file, &diag)?;
-            std::process::exit(1);
-        }
-    }
+    pretty_parse("candid arguments", str)
+}
+fn parse_types(str: &str) -> Result<IDLTypes, Error> {
+    pretty_parse("type annotations", str)
 }
 
 fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
     let prog = std::fs::read_to_string(file)
         .map_err(|_| Error::msg(format!("could not read file {}", file.display())))?;
-    let ast = prog.parse::<IDLProg>()?;
+    let ast = pretty_parse::<IDLProg>(file.to_str().unwrap(), &prog)?;
     check_prog(env, &ast)
 }
 
-use codespan_reporting::diagnostic::{Diagnostic, Label};
-fn as_diagnostic(err: candid::Error) -> Diagnostic<()> {
-    if err.span.start == 0 && err.span.end == 0 {
-        Diagnostic::error().with_message(err.message)
-    } else {
-        Diagnostic::error()
-            .with_message("Syntax error")
-            .with_labels(vec![
-                Label::primary((), err.span.clone()).with_message(err.message)
-            ])
-    }
-}
-
 fn main() -> Result<()> {
-    let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
-    let config = term::Config::default();
-
     match Command::from_args() {
         Command::Check { input } => {
             let mut env = TypeEnv::new();
-            match check_file(&mut env, &input) {
-                Ok(_) => (),
-                Err(e) => {
-                    let file =
-                        SimpleFile::new(input.to_str().unwrap(), std::fs::read_to_string(&input)?);
-                    let diag = as_diagnostic(e);
-                    term::emit(&mut writer.lock(), &config, &file, &diag)?;
-                }
-            }
+            check_file(&mut env, &input)?;
         }
         Command::Bind { input, target } => {
             let mut env = TypeEnv::new();
@@ -175,7 +148,7 @@ fn main() -> Result<()> {
         Command::Test { input, target } => {
             let test = std::fs::read_to_string(&input)
                 .map_err(|_| Error::msg(format!("could not read file {}", input.display())))?;
-            let ast = test.parse::<candid::parser::test::Test>()?;
+            let ast = pretty_parse::<candid::parser::test::Test>(input.to_str().unwrap(), &test)?;
             let content = match target.as_str() {
                 "js" => candid::bindings::javascript::test::test_generate(ast),
                 "did" => {
