@@ -48,7 +48,7 @@ extern {
 
 
 // Value
-pub Args: IDLArgs = "(" <SepBy<Arg, ",">> ")" => IDLArgs { args: <> };
+pub Args: IDLArgs = "(" <SepBy<AnnVal, ",">> ")" => IDLArgs { args: <> };
 
 pub Arg: IDLValue = {
     "bool" => IDLValue::Bool(<>),

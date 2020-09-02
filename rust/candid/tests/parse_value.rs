@@ -1,11 +1,6 @@
 use candid::parser::typing::TypeEnv;
 use candid::parser::value::{IDLArgs, IDLField, IDLValue};
-use candid::types::number::Nat;
-use candid::{
-    types::{Label, Type},
-    Int,
-};
-use num_bigint::BigInt;
+use candid::types::{Label, Type};
 
 fn parse_args(input: &str) -> IDLArgs {
     input.parse().unwrap()
@@ -237,19 +232,22 @@ fn parse_annval() {
             args: vec![IDLValue::Number("1".to_string())]
         }
     );
-
-    let args =
-        parse_args("((1 : nat), (123 : int), (456 : int32), (789 : float32), (1011 : float64))");
+    let args = parse_args("(1 : nat, (123 : int), 456 : int32, 789. : float32, 1011.0 : float64)");
     assert_eq!(
         args,
         IDLArgs {
             args: vec![
-                IDLValue::Nat(Nat::from(1i32)),
-                IDLValue::Int(Int(BigInt::from(123i32))),
+                IDLValue::Nat(1.into()),
+                IDLValue::Int(123.into()),
                 IDLValue::Int32(456),
                 IDLValue::Float32(789f32),
                 IDLValue::Float64(1011f64)
             ]
         }
+    );
+    let result = parse_args_err("(vec {1;2;3;-4;5;6;7} : vec nat)");
+    assert_eq!(
+        format!("{}", result.unwrap_err()),
+        "Candid parser error: Cannot parse BigUint"
     );
 }
