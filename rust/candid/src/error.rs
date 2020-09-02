@@ -27,38 +27,49 @@ impl Error {
             Error::Parse(e) => {
                 use lalrpop_util::ParseError::*;
                 let mut diag = Diagnostic::error().with_message("parser error");
-                let mut labels = Vec::new();
-                let msg = format!("{}", e);
-                match e {
-                    User { error } => labels.push(
-                        Label::primary((), error.span.clone()).with_message(error.err.clone()),
-                    ),
-                    InvalidToken { location } => {
-                        labels.push(Label::primary((), *location..location + 1).with_message(msg))
+                let label = match e {
+                    User { error } => {
+                        Label::primary((), error.span.clone()).with_message(&error.err)
                     }
-                    UnrecognizedEOF {
-                        location,
-                        expected: _,
-                    } => {
-                        labels.push(Label::primary((), *location..location + 1).with_message(msg));
+                    InvalidToken { location } => {
+                        Label::primary((), *location..location + 1).with_message("Invalid token")
+                    }
+                    UnrecognizedEOF { location, expected } => {
+                        diag = diag.with_notes(report_expected(&expected));
+                        Label::primary((), *location..location + 1).with_message("Unexpected EOF")
                     }
                     UnrecognizedToken { token, expected } => {
-                        let msg = format!("Unrecognized token {:?}", token.1);
-                        let mut expects = vec!["expect one of".to_owned()];
-                        expects.extend_from_slice(expected);
-                        labels.push(Label::primary((), token.0..token.2).with_message(msg));
-                        diag = diag.with_notes(expects);
+                        diag = diag.with_notes(report_expected(&expected));
+                        Label::primary((), token.0..token.2).with_message("Unexpected token")
                     }
                     ExtraToken { token } => {
-                        labels.push(Label::primary((), token.0..token.2).with_message(msg))
+                        Label::primary((), token.0..token.2).with_message("Extra token")
                     }
-                }
-                diag.with_labels(labels)
+                };
+                diag.with_labels(vec![label])
             }
             Error::Deserialize(e, _) => Diagnostic::error().with_message(e),
             Error::Custom(e) => Diagnostic::error().with_message(e),
         }
     }
+}
+
+fn report_expected(expected: &[String]) -> Vec<String> {
+    if expected.is_empty() {
+        return Vec::new();
+    }
+    use pretty::RcDoc;
+    let doc: RcDoc<()> = RcDoc::intersperse(
+        expected.iter().map(RcDoc::text),
+        RcDoc::text(",").append(RcDoc::softline()),
+    );
+    let header = if expected.len() == 1 {
+        "Expects"
+    } else {
+        "Expects one of"
+    };
+    let doc = RcDoc::text(header).append(RcDoc::softline().append(doc));
+    vec![doc.pretty(70).to_string()]
 }
 
 impl ser::Error for Error {

@@ -50,7 +50,9 @@ enum Command {
     },
     /// Diff two Candid values
     Diff {
+        #[structopt(parse(try_from_str = parse_args))]
         values1: IDLArgs,
+        #[structopt(parse(try_from_str = parse_args))]
         values2: IDLArgs,
         #[structopt(flatten)]
         annotate: TypeAnnotation,
@@ -60,6 +62,7 @@ enum Command {
 #[derive(StructOpt)]
 struct TypeAnnotation {
     #[structopt(name = "types", short, long)]
+    #[structopt(parse(try_from_str = parse_types))]
     /// Annotates values with Candid types
     tys: Option<IDLTypes>,
     #[structopt(short, long, conflicts_with("types"), requires("defs"))]
@@ -111,41 +114,37 @@ impl TypeAnnotation {
     }
 }
 
+fn parse<T>(name: &str, str: &str) -> Result<T, candid::Error>
+where
+    T: std::str::FromStr<Err = candid::Error>,
+{
+    str.parse::<T>().or_else(|e| {
+        let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
+        let config = term::Config::default();
+        let file = SimpleFile::new(name, str);
+        term::emit(&mut writer.lock(), &config, &file, &e.report())?;
+        Err(e)
+    })
+}
 fn parse_args(str: &str) -> Result<IDLArgs, Error> {
-    match str.parse::<IDLArgs>() {
-        Ok(args) => Ok(args),
-        Err(e) => {
-            let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
-            let config = term::Config::default();
-            let file = SimpleFile::new("candid arguments", str);
-            term::emit(&mut writer.lock(), &config, &file, &e.report())?;
-            std::process::exit(1);
-        }
-    }
+    parse("candid arguments", str)
+}
+fn parse_types(str: &str) -> Result<IDLTypes, Error> {
+    parse("type annotations", str)
 }
 
 fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
     let prog = std::fs::read_to_string(file)
         .map_err(|_| Error::msg(format!("could not read file {}", file.display())))?;
-    let ast = prog.parse::<IDLProg>()?;
+    let ast = parse::<IDLProg>(file.to_str().unwrap(), &prog)?;
     check_prog(env, &ast)
 }
 
 fn main() -> Result<()> {
-    let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
-    let config = term::Config::default();
-
     match Command::from_args() {
         Command::Check { input } => {
             let mut env = TypeEnv::new();
-            match check_file(&mut env, &input) {
-                Ok(_) => (),
-                Err(e) => {
-                    let file =
-                        SimpleFile::new(input.to_str().unwrap(), std::fs::read_to_string(&input)?);
-                    term::emit(&mut writer.lock(), &config, &file, &e.report())?;
-                }
-            }
+            check_file(&mut env, &input)?;
         }
         Command::Bind { input, target } => {
             let mut env = TypeEnv::new();
