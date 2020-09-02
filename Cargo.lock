@@ -282,7 +282,6 @@ dependencies = [
  "candid",
  "candiff",
  "clap",
- "codespan-reporting",
  "hex",
  "pretty-hex",
  "structopt",

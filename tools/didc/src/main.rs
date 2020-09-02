@@ -1,7 +1,8 @@
 use anyhow::Result;
-use candid::{check_prog, parser::types::IDLTypes, types::Type, Error, IDLArgs, IDLProg, TypeEnv};
-use codespan_reporting::files::SimpleFile;
-use codespan_reporting::term::{self, termcolor::StandardStream};
+use candid::{
+    check_prog, parser::types::IDLTypes, pretty_parse, types::Type, Error, IDLArgs, IDLProg,
+    TypeEnv,
+};
 use std::path::{Path, PathBuf};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
@@ -114,29 +115,17 @@ impl TypeAnnotation {
     }
 }
 
-fn parse<T>(name: &str, str: &str) -> Result<T, candid::Error>
-where
-    T: std::str::FromStr<Err = candid::Error>,
-{
-    str.parse::<T>().or_else(|e| {
-        let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
-        let config = term::Config::default();
-        let file = SimpleFile::new(name, str);
-        term::emit(&mut writer.lock(), &config, &file, &e.report())?;
-        Err(e)
-    })
-}
 fn parse_args(str: &str) -> Result<IDLArgs, Error> {
-    parse("candid arguments", str)
+    pretty_parse("candid arguments", str)
 }
 fn parse_types(str: &str) -> Result<IDLTypes, Error> {
-    parse("type annotations", str)
+    pretty_parse("type annotations", str)
 }
 
 fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
     let prog = std::fs::read_to_string(file)
         .map_err(|_| Error::msg(format!("could not read file {}", file.display())))?;
-    let ast = parse::<IDLProg>(file.to_str().unwrap(), &prog)?;
+    let ast = pretty_parse::<IDLProg>(file.to_str().unwrap(), &prog)?;
     check_prog(env, &ast)
 }
 
@@ -159,7 +148,7 @@ fn main() -> Result<()> {
         Command::Test { input, target } => {
             let test = std::fs::read_to_string(&input)
                 .map_err(|_| Error::msg(format!("could not read file {}", input.display())))?;
-            let ast = test.parse::<candid::parser::test::Test>()?;
+            let ast = pretty_parse::<candid::parser::test::Test>(input.to_str().unwrap(), &test)?;
             let content = match target.as_str() {
                 "js" => candid::bindings::javascript::test::test_generate(ast),
                 "did" => {

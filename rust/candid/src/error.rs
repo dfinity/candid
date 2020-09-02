@@ -4,6 +4,8 @@ use serde::{de, ser};
 
 use crate::parser::token;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
+use codespan_reporting::files::SimpleFile;
+use codespan_reporting::term::{self, termcolor::StandardStream};
 use std::fmt::{self, Debug, Display};
 use std::io;
 
@@ -116,4 +118,17 @@ impl From<token::ParserError> for Error {
     fn from(e: token::ParserError) -> Error {
         Error::Parse(e)
     }
+}
+
+pub fn pretty_parse<T>(name: &str, str: &str) -> Result<T>
+where
+    T: std::str::FromStr<Err = Error>,
+{
+    str.parse::<T>().or_else(|e| {
+        let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
+        let config = term::Config::default();
+        let file = SimpleFile::new(name, str);
+        term::emit(&mut writer.lock(), &config, &file, &e.report())?;
+        Err(e)
+    })
 }
