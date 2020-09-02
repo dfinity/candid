@@ -1,6 +1,17 @@
 
 # Changelog
 
+## 2020-09-02
+
+### Rust (0.5.4)
+
+* Support type annotations in parsing Candid values
+* New lexer using the `logos` crate
+* Use `codespan-reporting` to report Rust-like parsing errors
+* Support float e notation
+* Support nested comments
+* Pretty print decoded candid values
+
 ## 2020-08-24
 
 ### Rust (0.5.3)
