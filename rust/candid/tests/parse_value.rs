@@ -222,3 +222,32 @@ fn parse_shorthand() {
     let args = parse_args("(variant { 0x2a }, variant { label })");
     assert_eq!(format!("{}", args), "(variant { 42 }, variant { label })");
 }
+
+#[test]
+fn parse_annval() {
+    let args = parse_args("((1))");
+    assert_eq!(
+        args,
+        IDLArgs {
+            args: vec![IDLValue::Number("1".to_string())]
+        }
+    );
+    let args = parse_args("(1 : nat, (123 : int), 456 : int32, 789. : float32, 1011.0 : float64)");
+    assert_eq!(
+        args,
+        IDLArgs {
+            args: vec![
+                IDLValue::Nat(1.into()),
+                IDLValue::Int(123.into()),
+                IDLValue::Int32(456),
+                IDLValue::Float32(789f32),
+                IDLValue::Float64(1011f64)
+            ]
+        }
+    );
+    let result = parse_args_err("(vec {1;2;3;-4;5;6;7} : vec nat)");
+    assert_eq!(
+        format!("{}", result.unwrap_err()),
+        "Candid parser error: Cannot parse BigUint"
+    );
+}

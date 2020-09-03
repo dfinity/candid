@@ -194,7 +194,10 @@ impl<'input> Iterator for Tokenizer<'input> {
                         }
                         Some(Comment::Start) => nesting += 1,
                         None => {
-                            return Some(Err(LexicalError::new("Unclosed comment", lex.span())))
+                            return Some(Err(LexicalError::new(
+                                "Unclosed comment",
+                                span.start..lex.span().end,
+                            )))
                         }
                     }
                 }
@@ -265,7 +268,12 @@ impl<'input> Iterator for Tokenizer<'input> {
                                 lex.span(),
                             )))
                         }
-                        None => return Some(Err(LexicalError::new("Unclosed string", lex.span()))),
+                        None => {
+                            return Some(Err(LexicalError::new(
+                                "Unclosed string",
+                                span.start..lex.span().end,
+                            )))
+                        }
                     }
                 }
                 self.lex = lex.morph::<Token>();

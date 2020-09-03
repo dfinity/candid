@@ -228,7 +228,7 @@ pub use codegen::generate_code;
 pub mod bindings;
 
 pub mod error;
-pub use error::{Error, Result};
+pub use error::{pretty_parse, Error, Result};
 
 pub mod types;
 pub use types::CandidType;
