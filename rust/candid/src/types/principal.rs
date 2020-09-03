@@ -2,9 +2,9 @@ use super::{CandidType, Serializer, Type, TypeId};
 
 pub type Principal = ic_types::principal::Principal;
 
-impl CandidType for Principal {
+impl CandidType for ic_types::principal::Principal {
     fn id() -> TypeId {
-        TypeId::of::<Principal>()
+        TypeId::of::<ic_types::principal::Principal>()
     }
     fn _ty() -> Type {
         Type::Principal
