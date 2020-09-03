@@ -435,7 +435,7 @@ impl crate::CandidType for IDLValue {
                 ser.serialize_element(&v.val)?;
                 Ok(())
             }
-            IDLValue::Principal(ref id) => serializer.serialize_principal(&id.0),
+            IDLValue::Principal(ref id) => serializer.serialize_principal(id.as_slice()),
             IDLValue::Reserved => serializer.serialize_null(()),
         }
     }
@@ -477,7 +477,7 @@ impl<'de> Deserialize<'de> for IDLValue {
             visit_prim!(Float32, f32);
             visit_prim!(Float64, f64);
             // Deserialize Candid specific types: Bignumber, principal, reversed
-            fn visit_bytes<E: de::Error>(self, value: &[u8]) -> DResult<E> {
+            fn visit_byte_buf<E: de::Error>(self, value: Vec<u8>) -> DResult<E> {
                 let (tag, bytes) = value.split_at(1);
                 match tag[0] {
                     0u8 => {
@@ -489,11 +489,12 @@ impl<'de> Deserialize<'de> for IDLValue {
                         Ok(IDLValue::Nat(v))
                     }
                     2u8 => {
-                        let v = crate::Principal::from_bytes(bytes);
+                        use std::convert::TryFrom;
+                        let v = crate::Principal::try_from(bytes).map_err(E::custom)?;
                         Ok(IDLValue::Principal(v))
                     }
                     3u8 => Ok(IDLValue::Reserved),
-                    _ => Err(de::Error::custom("unknown tag in visit_bytes")),
+                    _ => Err(de::Error::custom("unknown tag in visit_byte_buf")),
                 }
             }
             fn visit_string<E>(self, value: String) -> DResult<E> {

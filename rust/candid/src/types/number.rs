@@ -130,7 +130,7 @@ impl<'de> Deserialize<'de> for Int {
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("Int value")
             }
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<Int, E> {
+            fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Int, E> {
                 Ok(Int(BigInt::from_signed_bytes_le(&v[1..])))
             }
         }
@@ -149,7 +149,7 @@ impl<'de> Deserialize<'de> for Nat {
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("Nat value")
             }
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<Nat, E> {
+            fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Nat, E> {
                 Ok(Nat(BigUint::from_bytes_le(&v[1..])))
             }
         }
