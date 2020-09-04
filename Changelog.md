@@ -3,14 +3,14 @@
 
 ## 2020-09-02
 
-### Rust (0.5.4)
+### Rust (0.6.0)
 
+* Use `ic-types` for Principal (breaking change)
 * Support type annotations in parsing Candid values
 * Support float e notation
 * Support nested comments
 * Pretty print decoded candid values
 * New lexer using the `logos` crate
-* Use `ic-types` for Principal
 * Use `codespan-reporting` to report Rust-like parsing errors
 
 ## 2020-08-24
