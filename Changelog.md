@@ -1,6 +1,12 @@
 
 # Changelog
 
+## 2020-09-10
+
+### Rust (0.6.1)
+
+* Add `encode_args` and `decode_args` functions to encode/decode sequence of arguments.
+
 ## 2020-09-02
 
 ### Rust (0.6.0)
