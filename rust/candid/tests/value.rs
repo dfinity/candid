@@ -4,7 +4,7 @@ use candid::parser::{
     value::{IDLArgs, IDLField, IDLValue},
 };
 use candid::types::Label;
-use candid::Decode;
+use candid::{decode_args, decode_one, Decode};
 
 #[test]
 fn test_parser() {
@@ -147,8 +147,12 @@ fn test_encode(v: &IDLValue, expected: &[u8]) {
 }
 
 fn test_decode(bytes: &[u8], expected: &IDLValue) {
-    let decoded = Decode!(bytes, IDLValue).unwrap();
-    assert_eq!(decoded, *expected);
+    let decoded_macro = Decode!(bytes, IDLValue).unwrap();
+    let (decoded_fn,): (IDLValue,) = decode_args(bytes).unwrap();
+    let decoded_one: IDLValue = decode_one(bytes).unwrap();
+    assert_eq!(decoded_macro, *expected);
+    assert_eq!(decoded_fn, *expected);
+    assert_eq!(decoded_one, *expected);
 }
 
 fn int_vec(v: &[i64]) -> IDLValue {
