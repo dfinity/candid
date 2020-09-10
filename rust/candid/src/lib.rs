@@ -32,6 +32,21 @@
 //! # Ok::<(), candid::Error>(())
 //! ```
 //!
+//! Candid provides functions for encoding/decoding a Candid message in a type-safe way.
+//!
+//! ```
+//! use candid::{encode_args, decode_args};
+//! // Serialize two values [(42, "text")] and (42u32, "text")
+//! let bytes: Vec<u8> = encode_args((&[(42, "text")], &(42u32, "text")))?;
+//! // Deserialize the first value as type Vec<(i32, &str)>,
+//! // and the second value as type (u32, String)
+//! let (a, b): (Vec<(i32, &str)>, (u32, String)) = decode_args(&bytes)?;
+//!
+//! assert_eq!(a, [(42, "text")]);
+//! assert_eq!(b, (42u32, "text".to_string()));
+//! # Ok::<(), candid::Error>(())
+//! ```
+//!
 //! We also provide macros for encoding/decoding Candid message in a convenient way.
 //!
 //! ```
@@ -46,6 +61,7 @@
 //! assert_eq!(b, (42u32, "text".to_string()));
 //! # Ok::<(), candid::Error>(())
 //! ```
+//!
 //! The [`Encode!`](macro.Encode.html) macro takes a sequence of Rust values, and returns a binary format `Vec<u8>` that can be sent over the wire.
 //! The [`Decode!`](macro.Decode.html) macro takes the binary message and a sequence of Rust types that you want to decode into, and returns a tuple
 //! of Rust values of the given types.
@@ -244,7 +260,9 @@ pub use parser::typing::{check_prog, TypeEnv};
 pub use parser::value::IDLArgs;
 
 pub mod de;
+pub use de::{decode_args, decode_one};
 pub mod ser;
+pub use ser::{encode_args, encode_one};
 
 pub mod pretty;
 

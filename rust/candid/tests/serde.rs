@@ -1,4 +1,4 @@
-use candid::{CandidType, Decode, Deserialize, Encode, Int, Nat};
+use candid::{encode_one, CandidType, Decode, Deserialize, Encode, Int, Nat};
 
 #[test]
 fn test_error() {
@@ -492,7 +492,11 @@ where
 }
 
 fn encode<T: CandidType>(value: &T) -> Vec<u8> {
-    Encode!(&value).unwrap()
+    let encode_one = encode_one(value).unwrap();
+    let encode_macro = Encode!(&value).unwrap();
+
+    assert_eq!(encode_one, encode_macro);
+    encode_fn
 }
 
 fn check_error<F: FnOnce() -> R + std::panic::UnwindSafe, R>(f: F, str: &str) {
