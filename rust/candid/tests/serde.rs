@@ -496,7 +496,7 @@ fn encode<T: CandidType>(value: &T) -> Vec<u8> {
     let encode_macro = Encode!(&value).unwrap();
 
     assert_eq!(encode_one, encode_macro);
-    encode_fn
+    encode_one
 }
 
 fn check_error<F: FnOnce() -> R + std::panic::UnwindSafe, R>(f: F, str: &str) {
