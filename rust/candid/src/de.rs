@@ -1,5 +1,3 @@
-#![allow(unused_attributes)]
-#![rustfmt::skip::macros(decode_impl)]
 //! Deserialize Candid binary format to Rust data structures
 
 use super::error::{Error, Result};
@@ -887,15 +885,98 @@ decode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G);
 decode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H);
 decode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I);
 decode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J);
-decode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K);
-decode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l: L);
-decode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l: L, m: M);
-decode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l: L, m: M, n: N);
 decode_impl!(
-    a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l: L, m: M, n: N, o: O
+    a: A,
+    b: B,
+    c: C,
+    d: D,
+    e: E,
+    f: F,
+    g: G,
+    h: H,
+    i: I,
+    j: J,
+    k: K
 );
 decode_impl!(
-    a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l: L, m: M, n: N, o: O, p: P
+    a: A,
+    b: B,
+    c: C,
+    d: D,
+    e: E,
+    f: F,
+    g: G,
+    h: H,
+    i: I,
+    j: J,
+    k: K,
+    l: L
+);
+decode_impl!(
+    a: A,
+    b: B,
+    c: C,
+    d: D,
+    e: E,
+    f: F,
+    g: G,
+    h: H,
+    i: I,
+    j: J,
+    k: K,
+    l: L,
+    m: M
+);
+decode_impl!(
+    a: A,
+    b: B,
+    c: C,
+    d: D,
+    e: E,
+    f: F,
+    g: G,
+    h: H,
+    i: I,
+    j: J,
+    k: K,
+    l: L,
+    m: M,
+    n: N
+);
+decode_impl!(
+    a: A,
+    b: B,
+    c: C,
+    d: D,
+    e: E,
+    f: F,
+    g: G,
+    h: H,
+    i: I,
+    j: J,
+    k: K,
+    l: L,
+    m: M,
+    n: N,
+    o: O
+);
+decode_impl!(
+    a: A,
+    b: B,
+    c: C,
+    d: D,
+    e: E,
+    f: F,
+    g: G,
+    h: H,
+    i: I,
+    j: J,
+    k: K,
+    l: L,
+    m: M,
+    n: N,
+    o: O,
+    p: P
 );
 
 /// Decode a series of arguments, represented as a tuple. There is a maximum of 16 arguments

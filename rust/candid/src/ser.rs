@@ -1,5 +1,3 @@
-#![allow(unused_attributes)]
-#![rustfmt::skip::macros(encode_impl)]
 //! Serialize a Rust data structure to Candid binary format
 
 use super::error::{Error, Result};
@@ -392,15 +390,98 @@ encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G);
 encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H);
 encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I);
 encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J);
-encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K);
-encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l: L);
-encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l: L, m: M);
-encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l: L, m: M, n: N);
 encode_impl!(
-    a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l: L, m: M, n: N, o: O
+    a: A,
+    b: B,
+    c: C,
+    d: D,
+    e: E,
+    f: F,
+    g: G,
+    h: H,
+    i: I,
+    j: J,
+    k: K
 );
 encode_impl!(
-    a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l: L, m: M, n: N, o: O, p: P
+    a: A,
+    b: B,
+    c: C,
+    d: D,
+    e: E,
+    f: F,
+    g: G,
+    h: H,
+    i: I,
+    j: J,
+    k: K,
+    l: L
+);
+encode_impl!(
+    a: A,
+    b: B,
+    c: C,
+    d: D,
+    e: E,
+    f: F,
+    g: G,
+    h: H,
+    i: I,
+    j: J,
+    k: K,
+    l: L,
+    m: M
+);
+encode_impl!(
+    a: A,
+    b: B,
+    c: C,
+    d: D,
+    e: E,
+    f: F,
+    g: G,
+    h: H,
+    i: I,
+    j: J,
+    k: K,
+    l: L,
+    m: M,
+    n: N
+);
+encode_impl!(
+    a: A,
+    b: B,
+    c: C,
+    d: D,
+    e: E,
+    f: F,
+    g: G,
+    h: H,
+    i: I,
+    j: J,
+    k: K,
+    l: L,
+    m: M,
+    n: N,
+    o: O
+);
+encode_impl!(
+    a: A,
+    b: B,
+    c: C,
+    d: D,
+    e: E,
+    f: F,
+    g: G,
+    h: H,
+    i: I,
+    j: J,
+    k: K,
+    l: L,
+    m: M,
+    n: N,
+    o: O,
+    p: P
 );
 
 /// Serialize an encoding of a tuple and write it to a [Write] buffer.
