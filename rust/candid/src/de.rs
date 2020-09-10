@@ -1001,6 +1001,7 @@ where
 {
     let mut de = IDLDeserialize::new(bytes)?;
     let res = ArgumentDecoder::decode(&mut de)?;
+    de.done()?;
     Ok(res)
 }
 
