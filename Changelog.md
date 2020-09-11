@@ -1,15 +1,15 @@
 
 # Changelog
 
-## 2020-09-10
+## 2020-09-10 (Rust 0.6.2)
 
-### Rust (0.6.1)
+* Fix a bug when decoding many record values.
+
+## 2020-09-10 (Rust 0.6.1)
 
 * Add `encode_args` and `decode_args` functions to encode/decode sequence of arguments.
 
-## 2020-09-02
-
-### Rust (0.6.0)
+## 2020-09-02 (Rust 0.6.0)
 
 * Use `ic-types` for Principal (breaking change)
 * Support type annotations in parsing Candid values
