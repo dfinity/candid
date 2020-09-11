@@ -59,6 +59,7 @@ assert blob "DIDL\01\6d\7c\01\00\01\01\02"                                 !: (v
 
 // record
 assert blob "DIDL\01\6c\00\01\00" == "(record {})"                                : (record {}) "record: empty";
+assert blob "DIDL\01\6c\00\03\00\00\00" == "(record {}, record {}, record {})"    : (record {}, record {}, record {}) "record: multiple records";
 assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 1 = 42 })"               : (record {1:int}) "record";
 assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { whatever = 0 })"         : (record {}) "record: ignore fields";
 assert blob "DIDL\01\6c\01\01\7c\01\00\2a"                                       !: (record {2:int}) "record: missing field";

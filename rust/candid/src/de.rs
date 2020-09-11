@@ -29,6 +29,7 @@ impl<'de> IDLDeserialize<'de> {
     where
         T: de::Deserialize<'de>,
     {
+        self.de.record_nesting_depth = 0;
         let ty = self
             .de
             .types
