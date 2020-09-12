@@ -846,12 +846,19 @@ impl<'de, 'a> de::VariantAccess<'de> for Compound<'a, 'de> {
 
 /// Allow decoding of any sized argument.
 pub trait ArgumentDecoder<'a>: Sized {
+    /// The types returned when decoding [Self] using [decode_one].
+    type FirstArg;
+
     /// Decodes a value of type [Self], modifying the deserializer (values are consumed).
     fn decode(de: &mut IDLDeserialize<'a>) -> Result<Self>;
 }
 
 /// Decode an empty tuple.
 impl<'a> ArgumentDecoder<'a> for () {
+    /// There is loss of type information when using `(())`, but that's expected and an
+    /// edge case.
+    type FirstArg = ();
+
     fn decode(_de: &mut IDLDeserialize<'a>) -> Result<()> {
         Ok(())
     }
@@ -859,17 +866,21 @@ impl<'a> ArgumentDecoder<'a> for () {
 
 // Create implementation of [ArgumentDecoder] for up to 16 value tuples.
 macro_rules! decode_impl {
-    ( $($id: ident : $typename: ident),* ) => {
-        impl<'a, $( $typename ),*> ArgumentDecoder<'a> for ($($typename,)*)
+    ( $id1: ident : $typename1: ident $(, $id: ident : $typename: ident)* ) => {
+        impl<'a, $typename1, $( $typename ),*> ArgumentDecoder<'a> for ($typename1, $($typename,)*)
         where
+            $typename1: Deserialize<'a>,
             $( $typename: Deserialize<'a> ),*
         {
+            type FirstArg = $typename1;
+
             fn decode(de: &mut IDLDeserialize<'a>) -> Result<Self> {
+                let $id1: $typename1 = de.get_value()?;
                 $(
                 let $id: $typename = de.get_value()?;
                 )*
 
-                Ok(($( $id, )*))
+                Ok(($id1, $( $id, )*))
             }
         }
     }
