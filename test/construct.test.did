@@ -56,6 +56,7 @@ assert "(vec { 1; -1 })"                                                   !: (v
 assert blob "DIDL\01\6d\7c\01\00"                                          !: (vec int) "vec: too short";
 assert blob "DIDL\01\6d\7c\01\00\02\01"                                    !: (vec int) "vec: too short";
 assert blob "DIDL\01\6d\7c\01\00\01\01\02"                                 !: (vec int) "vec: too long";
+assert blob "DIDL\02\6d\01\6c\00\01\00\05"                                  : (vec record {}) "vec of records";
 
 // record
 assert blob "DIDL\01\6c\00\01\00" == "(record {})"                                : (record {}) "record: empty";
