@@ -29,7 +29,6 @@ impl<'de> IDLDeserialize<'de> {
     where
         T: de::Deserialize<'de>,
     {
-        self.de.record_nesting_depth = 0;
         let ty = self
             .de
             .types
@@ -396,14 +395,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             return self.deserialize_identifier(visitor);
         }
         let t = self.peek_type()?;
-        match t {
-            Opcode::Record => {
-                if self.record_nesting_depth > self.table.len() {
-                    return Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"));
-                }
-                self.record_nesting_depth += 1;
-            }
-            _ => self.record_nesting_depth = 0,
+        if t != Opcode::Record {
+            self.record_nesting_depth = 0;
         }
         match t {
             Opcode::Int => self.deserialize_int(visitor),
@@ -426,6 +419,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Opcode::Vec => self.deserialize_seq(visitor),
             Opcode::Opt => self.deserialize_option(visitor),
             Opcode::Record => {
+                let old_nesting = self.record_nesting_depth;
+                self.record_nesting_depth += 1;
+                if self.record_nesting_depth > self.table.len() {
+                    return Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"));
+                }
                 self.check_type(Opcode::Record)?;
                 let len = self.pop_current_type()?.get_u32()?;
                 let mut fs = BTreeMap::new();
@@ -435,7 +433,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                         return Err(Error::msg(format!("hash collision {}", hash)));
                     }
                 }
-                visitor.visit_map(Compound::new(&mut self, Style::Struct { len, fs }))
+                let res = visitor.visit_map(Compound::new(&mut self, Style::Struct { len, fs }));
+                self.record_nesting_depth = old_nesting;
+                res
             }
             Opcode::Variant => {
                 self.check_type(Opcode::Variant)?;
@@ -579,10 +579,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        let old_nesting = self.record_nesting_depth;
+        self.record_nesting_depth += 1;
         if self.record_nesting_depth > self.table.len() {
             return Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"));
         }
-        self.record_nesting_depth += 1;
         self.check_type(Opcode::Record)?;
         let len = self.pop_current_type()?.get_u32()?;
         let mut fs = BTreeMap::new();
@@ -592,6 +593,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             }
         }
         let value = visitor.visit_map(Compound::new(&mut self, Style::Struct { len, fs }))?;
+        self.record_nesting_depth = old_nesting;
         Ok(value)
     }
 
