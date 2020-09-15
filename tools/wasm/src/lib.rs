@@ -1,6 +1,6 @@
+use candid::{check_prog, IDLProg, TypeEnv};
 use cfg_if::cfg_if;
 use wasm_bindgen::prelude::*;
-use candid::{IDLProg, check_prog, TypeEnv};
 
 cfg_if! {
     // When the `console_error_panic_hook` feature is enabled, we can call the
