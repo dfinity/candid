@@ -4,4 +4,8 @@ members = [
     "rust/candid_derive",
     "tools/candiff",
     "tools/didc",
+    "tools/wasm",
 ]
+
+[profile.release.package.didc-wasm]
+opt-level = "s"
