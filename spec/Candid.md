@@ -1,8 +1,8 @@
 # Candid Specification
 
-Version: 0.1.0
+Version: 0.1.1
 
-Date: May 4, 2020
+Date: Aug 25, 2020
 
 ## Motivation
 
@@ -65,7 +65,7 @@ This is a summary of the grammar proposed:
 ```
 <prog>  ::= <def>;* <actor>;?
 <def>   ::= type <id> = <datatype> | import <text>
-<actor> ::= service <id>? : (<actortype> | <id>)
+<actor> ::= service <id>? : (<tuptype> ->)? (<actortype> | <id>)
 
 <actortype> ::= { <methtype>;* }
 <methtype>  ::= <name> : (<functype> | <id>)
@@ -138,6 +138,9 @@ Block comments nest properly (unlike in C).
 ### Services
 
 A *service* is a standalone actor on the platform that can communicate with other services via sending and receiving *messages*. Messages are sent to a service by invoking one of its *methods*, i.e., functions that the service provides.
+
+For the main service, there are two kinds of services: service constructor (or uninitialized service) and running service (or initialized service).
+A service constructor takes *initialization parameters* for installing the service on the platform. Once it is initialized, the service becomes a running service. We can initialize a service constructor to multiple running services.
 
 **Note:** Candid is in fact agnostic to the exact nature of services. In particular, it could be applied to a setting where services are synchronous (objects with RPCs) instead of asynchronous (actors with bidirectional message sends).
 
@@ -432,9 +435,9 @@ type tree = variant {
 
 A third form of value are *references*. They represent first-class handles to (possibly remote) *functions*, *services*, or *principals*.
 
-#### Actor References
+#### Service References
 
-An *actor reference* points to a service and is described by an actor type. Through this, services can communicate connections to other services.
+A *service reference* points to a service and is described by an actor type. Through this, services can communicate connections to other services.
 
 ```
 <reftype> ::= ... | service <actortype>
@@ -547,7 +550,7 @@ For upgrading data structures passed between service and client, it is important
 
 That is, outbound message results can only be replaced with a subtype (more fields) in an upgrade, while inbound message parameters can only be replaced with a supertype (fewer fields). This corresponds to the notions of co-variance and contra-variance in type systems.
 
-Subtyping applies recursively to the types of the fields themselves. Moreover, the directions get *inverted* for inbound function and actor references, in compliance with standard rules.
+Subtyping applies recursively to the types of the fields themselves. Moreover, the directions get *inverted* for inbound function and service references, in compliance with standard rules.
 
 ### Rules
 
@@ -803,7 +806,6 @@ Likewise, there are two forms of Candid values for function references:
 * `ref(r)` indicates an opaque reference, understood only by the underlying system.
 * `pub(s,n)`, indicates the public method name `n` of the service referenced by `s`.
 
-
 #### Notation
 
 `T` and `M` create a byte sequence described below in terms of natural storage types (`i<N>` for `N = 8, 16, 32, 64`, `f<N>` for `N = 32, 64`). The bytes are sequenced according to increasing significance (least significant byte first, a.k.a. little-endian).
@@ -858,7 +860,7 @@ T(func (<datatype1>*) -> (<datatype2>*) <funcann>*) =
   sleb128(-22) T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*) // 0x6a
 T(service {<methtype>*}) =
   sleb128(-23) T*(<methtype>*)                                    // 0x69
-T(principal)= sleb128(-24)                                        // 0x68
+T(principal) = sleb128(-24)                                       // 0x68
 
 T : <methtype> -> i8*
 T(<name>:<datatype>) = leb128(|utf8(<name>)|) i8*(utf8(<name>)) I(<datatype>)

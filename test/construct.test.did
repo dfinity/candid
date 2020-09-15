@@ -56,6 +56,7 @@ assert "(vec { 1; -1 })"                                                   !: (v
 assert blob "DIDL\01\6d\7c\01\00"                                          !: (vec int) "vec: too short";
 assert blob "DIDL\01\6d\7c\01\00\02\01"                                    !: (vec int) "vec: too short";
 assert blob "DIDL\01\6d\7c\01\00\01\01\02"                                 !: (vec int) "vec: too long";
+assert blob "DIDL\02\6d\01\6c\00\01\00\05"                                  : (vec record {}) "vec of records";
 
 // record
 assert blob "DIDL\01\6c\00\01\00" == "(record {})"                                : (record {}) "record: empty";
@@ -75,6 +76,7 @@ assert blob "DIDL\01\6c\01\80\e4\97\d0\12\7c\01\00\2a"                         !
 assert blob "DIDL\04\6c\01\00\01\6c\01\00\02\6c\01\00\03\6c\00\01\00"
     == "(record { record { record { record {} } } })"                           : (record{record{record{record{}}}}) "record: nested";
 assert blob "DIDL\01\6c\01\00\00\01\00"                                        !: (EmptyRecord) "record: empty recursion";
+assert blob "DIDL\02\6d\01\6c\01\00\01\01\00\01"                               !: (vec EmptyRecord) "vec of empty records";
 assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a"                               !: (record {int}) "record: value too short";
 assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01\00"                         !: (record {int}) "record: value too long";
 assert blob "DIDL\01\6c\02\00\7c\01\01\00\2a\01"                               !: (record {}) "record: type too short";
