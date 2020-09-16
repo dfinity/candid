@@ -6,19 +6,25 @@ use crate::parser::token;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term::{self, termcolor::StandardStream};
-use std::fmt::{self, Debug, Display};
 use std::io;
+use thiserror::Error;
 
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
+#[derive(Debug, Error, Eq, PartialEq)]
 pub enum Error {
-    Parse(token::ParserError),
+    #[error("Candid parser error: {0:}")]
+    Parse(#[from] token::ParserError),
+
+    #[error("Deserialize error: {0}")]
     Deserialize(String, String),
+
+    #[error("{0}")]
     Custom(String),
 }
 
 impl Error {
-    pub fn msg<T: Display>(msg: T) -> Self {
+    pub fn msg<T: ToString>(msg: T) -> Self {
         Error::Custom(msg.to_string())
     }
     pub fn with_states(&self, states: String) -> Self {
@@ -75,48 +81,20 @@ fn report_expected(expected: &[String]) -> Vec<String> {
 }
 
 impl ser::Error for Error {
-    fn custom<T: Display>(msg: T) -> Self {
+    fn custom<T: std::fmt::Display>(msg: T) -> Self {
         Error::msg(format!("Serialize error: {}", msg))
     }
 }
 
 impl de::Error for Error {
-    fn custom<T: Display>(msg: T) -> Self {
+    fn custom<T: std::fmt::Display>(msg: T) -> Self {
         Error::msg(format!("Deserialize error: {}", msg))
-    }
-}
-
-impl Display for Error {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Parse(e) => formatter.write_str(&format!("Candid parser error: {}", e)),
-            Error::Deserialize(e, _) => formatter.write_str(e),
-            Error::Custom(e) => formatter.write_str(e),
-        }
-    }
-}
-
-impl Debug for Error {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Display::fmt(self, formatter)
-    }
-}
-
-impl std::error::Error for Error {
-    fn description(&self) -> &str {
-        "candid error"
     }
 }
 
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Error {
         Error::msg(format!("io error: {}", e))
-    }
-}
-
-impl From<token::ParserError> for Error {
-    fn from(e: token::ParserError) -> Error {
-        Error::Parse(e)
     }
 }
 
