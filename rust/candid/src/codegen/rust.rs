@@ -278,6 +278,7 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
             IDLType::RecordT(fields) => self.declare_record(&id, fields),
             IDLType::VariantT(fields) => self.declare_variant(&id, fields),
             IDLType::ServT(serv_t) => self.declare_service(&id, serv_t),
+            IDLType::ClassT(_, _) => unreachable!(),
             IDLType::PrincipalT => self.declare_var(&id, "principal"),
         }
     }

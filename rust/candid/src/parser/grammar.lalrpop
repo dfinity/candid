@@ -246,12 +246,17 @@ Def: Dec = {
 }
 
 Actor: IDLType = {
-    "service" "id"? ":" <t:ActorTyp> => IDLType::ServT(t),
-    "service" "id"? ":" <t:"id"> => IDLType::VarT(t),
+    ActorTyp => IDLType::ServT(<>),
+    "id" => IDLType::VarT(<>),
+}
+
+MainActor: IDLType = {
+    "service" "id"? ":" <t:Actor> => <>,
+    "service" "id"? ":" <args:TupTyp> "->" <t:Actor> => IDLType::ClassT(args, Box::new(t)),
 }
 
 pub IDLProg: IDLProg = {
-    <decs:SepBy<Def, ";">> <actor:Actor?> => IDLProg { decs, actor }
+    <decs:SepBy<Def, ";">> <actor:MainActor?> => IDLProg { decs, actor }
 }
 
 // Test file

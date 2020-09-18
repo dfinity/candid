@@ -58,7 +58,8 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Variant(ref fs) => str("IDL.Variant").append(pp_fields(fs)),
         Func(ref func) => str("IDL.Func").append(pp_function(func)),
         Service(ref serv) => str("IDL.Service").append(pp_service(serv)),
-        _ => unreachable!(),
+        Class(_, _) => unreachable!(),
+        Knot(_) | Unknown => unreachable!(),
     }
 }
 
@@ -143,7 +144,7 @@ fn pp_defs<'a>(
 }
 
 fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
-    let doc = match ty {
+    match ty {
         Type::Service(_) => pp_ty(ty),
         Type::Var(id) => {
             if recs.contains(&*id.clone()) {
@@ -152,9 +153,13 @@ fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
                 str(id)
             }
         }
+        // TODO
+        Type::Class(_, t) => {
+            eprintln!("service constructor is treated as instantiated service");
+            pp_actor(t, recs)
+        }
         _ => unreachable!(),
-    };
-    kwd("return").append(doc).append(";")
+    }
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
@@ -169,7 +174,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let def_list = chase_actor(env, actor).unwrap();
             let recs = infer_rec(env, &def_list).unwrap();
             let defs = pp_defs(env, &def_list, &recs);
-            let actor = pp_actor(actor, &recs);
+            let actor = kwd("return").append(pp_actor(actor, &recs)).append(";");
             let body = defs.append(actor);
             let doc = str("export default ({ IDL }) => ").append(enclose_space("{", body, "};"));
             doc.pretty(LINE_WIDTH).to_string()

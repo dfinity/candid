@@ -1,0 +1,2 @@
+type List = opt record { int; List };
+service : (int, List) -> { get : () -> (List); set : (List) -> (List) }

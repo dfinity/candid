@@ -119,7 +119,8 @@ pub fn pp_ty(ty: &Type) -> RcDoc {
         Variant(ref fs) => kwd("variant").append(pp_fields(fs, true)),
         Func(ref func) => kwd("func").append(pp_function(func)),
         Service(ref serv) => kwd("service").append(pp_service(serv)),
-        _ => unreachable!(),
+        Class(_, _) => unreachable!(),
+        Knot(_) | Unknown => unreachable!(),
     }
 }
 
@@ -189,12 +190,15 @@ fn pp_defs(env: &TypeEnv) -> RcDoc {
 }
 
 fn pp_actor(ty: &Type) -> RcDoc {
-    let doc = match ty {
+    match ty {
         Type::Service(ref serv) => pp_service(serv),
         Type::Var(_) => pp_ty(ty),
+        Type::Class(ref args, ref t) => pp_args(args)
+            .append(" ->")
+            .append(RcDoc::space())
+            .append(pp_actor(t)),
         _ => unreachable!(),
-    };
-    kwd("service :").append(doc)
+    }
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
@@ -202,7 +206,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
         None => pp_defs(env).pretty(LINE_WIDTH).to_string(),
         Some(actor) => {
             let defs = pp_defs(env);
-            let actor = pp_actor(actor);
+            let actor = kwd("service :").append(pp_actor(actor));
             let doc = defs.append(actor);
             doc.pretty(LINE_WIDTH).to_string()
         }

@@ -143,6 +143,7 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
             let ms = check_meths(env, ms)?;
             Ok(Type::Service(ms))
         }
+        IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
     }
 }
 
@@ -253,6 +254,15 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
 fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
     match actor {
         None => Ok(None),
+        Some(IDLType::ClassT(ts, t)) => {
+            let mut args = Vec::new();
+            for arg in ts.iter() {
+                args.push(check_type(env, arg)?);
+            }
+            let serv = check_type(env, t)?;
+            env.te.as_service(&serv)?;
+            Ok(Some(Type::Class(args, Box::new(serv))))
+        }
         Some(typ) => {
             let t = check_type(env, &typ)?;
             env.te.as_service(&t)?;
