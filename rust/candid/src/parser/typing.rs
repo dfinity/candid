@@ -143,6 +143,16 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
             let ms = check_meths(env, ms)?;
             Ok(Type::Service(ms))
         }
+        IDLType::ClassT(ts, t) => {
+            let mut args = Vec::new();
+            for arg in ts.iter() {
+                args.push(check_type(env, arg)?);
+            }
+            let serv = check_type(env, t)?;
+            let ms = env.te.as_service(&serv)?;
+            // TODO
+            Ok(Type::Service(ms.to_vec()))
+        }
     }
 }
 

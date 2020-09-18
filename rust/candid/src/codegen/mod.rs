@@ -47,6 +47,7 @@ pub trait LanguageBinding {
             IDLType::RecordT(fields) => self.usage_record(fields),
             IDLType::VariantT(fields) => self.usage_variant(fields),
             IDLType::ServT(serv_t) => self.usage_service(serv_t),
+            IDLType::ClassT(_, _) => unreachable!(),
             IDLType::PrincipalT => Ok("principal".to_string()),
         }
     }
@@ -88,6 +89,7 @@ pub trait LanguageBinding {
             IDLType::RecordT(fields) => self.declare_record(id, fields),
             IDLType::VariantT(fields) => self.declare_variant(id, fields),
             IDLType::ServT(serv_t) => self.declare_service(id, serv_t),
+            IDLType::ClassT(_, _) => unreachable!(),
             IDLType::PrincipalT => Ok("principal".to_string()),
         }
     }
