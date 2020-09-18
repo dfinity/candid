@@ -192,7 +192,10 @@ fn pp_actor(ty: &Type) -> RcDoc {
     match ty {
         Type::Service(ref serv) => pp_service(serv),
         Type::Var(_) => pp_ty(ty),
-        Type::Class(ref args, ref t) => pp_args(args).append(" ->").append(RcDoc::space()).append(pp_actor(t)),
+        Type::Class(ref args, ref t) => pp_args(args)
+            .append(" ->")
+            .append(RcDoc::space())
+            .append(pp_actor(t)),
         _ => unreachable!(),
     }
 }
