@@ -119,7 +119,8 @@ pub fn pp_ty(ty: &Type) -> RcDoc {
         Variant(ref fs) => kwd("variant").append(pp_fields(fs, true)),
         Func(ref func) => kwd("func").append(pp_function(func)),
         Service(ref serv) => kwd("service").append(pp_service(serv)),
-        _ => unreachable!(),
+        Class(_, _) => unreachable!(),
+        Knot(_) | Unknown => unreachable!(),
     }
 }
 
