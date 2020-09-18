@@ -47,6 +47,7 @@ pub enum Type {
     Variant(Vec<Field>),
     Func(Function),
     Service(Vec<(String, Type)>),
+    Class(Vec<Type>, Box<Type>),
     Principal,
 }
 
@@ -152,7 +153,7 @@ pub fn is_primitive(t: &Type) -> bool {
         Var(_) => panic!("Variable"), // Var may or may not be a primitive, so don't ask me
         Knot(_) => true,
         Opt(_) | Vec(_) | Record(_) | Variant(_) => false,
-        Func(_) | Service(_) => false,
+        Func(_) | Service(_) | Class(_, _) => false,
         Principal => true,
     }
 }
