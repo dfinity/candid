@@ -153,9 +153,8 @@ fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
                 str(id)
             }
         }
-        // TODO
         Type::Class(_, t) => {
-            eprintln!("service constructor is treated as instantiated service");
+            //TODO service constructor is treated as instantiated service
             pp_actor(t, recs)
         }
         _ => unreachable!(),
@@ -322,7 +321,7 @@ import { Principal } from './principal';
                     }
                 };
                 let expected = match cmd {
-                    Encode(_, tys, _, bytes) => pp_decode(&bytes, &tys), //pp_hex(&bytes),
+                    Encode(_, tys, _, bytes) => pp_decode(&bytes, &tys),
                     Decode(_, _, _, vals) => value::pp_args(&vals),
                     NotEncode(_, _) | NotDecode(_, _) => RcDoc::nil(),
                 };
