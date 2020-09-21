@@ -119,7 +119,14 @@ pub fn pp_ty(ty: &Type) -> RcDoc {
         Variant(ref fs) => kwd("variant").append(pp_fields(fs, true)),
         Func(ref func) => kwd("func").append(pp_function(func)),
         Service(ref serv) => kwd("service").append(pp_service(serv)),
-        Class(ref args, ref t) => pp_args(&args).append(pp_ty(t)),
+        Class(ref args, ref t) => {
+            let doc = pp_args(&args).append(" ->").append(RcDoc::space());
+            match t.as_ref() {
+                Service(ref serv) => doc.append(pp_service(serv)),
+                Var(ref s) => doc.append(s),
+                _ => unreachable!(),
+            }
+        }
         Knot(_) | Unknown => unreachable!(),
     }
 }
@@ -192,11 +199,7 @@ fn pp_defs(env: &TypeEnv) -> RcDoc {
 fn pp_actor(ty: &Type) -> RcDoc {
     match ty {
         Type::Service(ref serv) => pp_service(serv),
-        Type::Var(_) => pp_ty(ty),
-        Type::Class(ref args, ref t) => pp_args(args)
-            .append(" ->")
-            .append(RcDoc::space())
-            .append(pp_actor(t)),
+        Type::Var(_) | Type::Class(_, _) => pp_ty(ty),
         _ => unreachable!(),
     }
 }

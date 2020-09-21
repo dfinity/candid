@@ -55,6 +55,7 @@ impl TypeEnv {
         match t {
             Type::Service(s) => Ok(s),
             Type::Var(id) => self.as_service(self.find_type(id)?),
+            Type::Class(_, ty) => self.as_service(&ty),
             _ => Err(Error::msg(format!("not a service type: {}", t))),
         }
     }
