@@ -5,5 +5,6 @@ export default ({ IDL }) => {
     '\"\'' : IDL.Nat,
     '\\\n\'\"' : IDL.Nat,
   });
+  const __init = [];
   return IDL.Service({ '\n\'\"\'\'\"\"\r\t' : IDL.Func([t], [], []) });
 };

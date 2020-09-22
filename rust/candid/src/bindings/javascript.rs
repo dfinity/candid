@@ -173,6 +173,17 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let def_list = chase_actor(env, actor).unwrap();
             let recs = infer_rec(env, &def_list).unwrap();
             let defs = pp_defs(env, &def_list, &recs);
+            let init = if let Type::Class(args, _) = actor {
+                pp_args(args)
+            } else {
+                str("[]")
+            };
+            // TODO export __init
+            let init = kwd("const __init =")
+                .append(init)
+                .append(";")
+                .append(RcDoc::hardline());
+            let defs = defs.append(init);
             let actor = kwd("return").append(pp_actor(actor, &recs)).append(";");
             let body = defs.append(actor);
             let doc = str("export default ({ IDL }) => ").append(enclose_space("{", body, "};"));
