@@ -1,0 +1,6 @@
+type s =
+ service {
+   next: () -> (s);
+ };
+service : (s) -> s
+
