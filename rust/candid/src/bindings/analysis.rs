@@ -34,6 +34,12 @@ pub fn chase_type<'a>(
                 chase_type(seen, res, env, ty)?;
             }
         }
+        Class(args, t) => {
+            for arg in args.iter() {
+                chase_type(seen, res, env, arg)?;
+            }
+            chase_type(seen, res, env, t)?;
+        }
         _ => (),
     }
     Ok(())
@@ -83,6 +89,12 @@ pub fn infer_rec<'a>(
                 for (_, ty) in ms.iter() {
                     go(seen, res, env, ty)?;
                 }
+            }
+            Class(args, t) => {
+                for arg in args.iter() {
+                    go(seen, res, env, arg)?;
+                }
+                go(seen, res, env, t)?;
             }
             _ => (),
         }
