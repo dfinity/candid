@@ -1,4 +1,4 @@
-use super::analysis::{chase_actor, infer_rec};
+use super::analysis::{chase_actor, chase_types, infer_rec};
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
 use crate::types::{Field, Function, Label, Type};
@@ -153,10 +153,7 @@ fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
                 str(id)
             }
         }
-        Type::Class(_, t) => {
-            //TODO service constructor is treated as instantiated service
-            pp_actor(t, recs)
-        }
+        Type::Class(_, t) => pp_actor(t, recs),
         _ => unreachable!(),
     }
 }
@@ -173,20 +170,24 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let def_list = chase_actor(env, actor).unwrap();
             let recs = infer_rec(env, &def_list).unwrap();
             let defs = pp_defs(env, &def_list, &recs);
-            let init = if let Type::Class(args, _) = actor {
-                pp_args(args)
+            let init = if let Type::Class(ref args, _) = actor {
+                args.as_slice()
             } else {
-                str("[]")
+                &[][..]
             };
-            // TODO export __init
-            let init = kwd("const __init =")
-                .append(init)
-                .append(";")
-                .append(RcDoc::hardline());
-            let defs = defs.append(init);
             let actor = kwd("return").append(pp_actor(actor, &recs)).append(";");
             let body = defs.append(actor);
             let doc = str("export default ({ IDL }) => ").append(enclose_space("{", body, "};"));
+            // export init args
+            let init_defs = chase_types(env, &init).unwrap();
+            let init_recs = infer_rec(env, &init_defs).unwrap();
+            let init_defs_doc = pp_defs(env, &init_defs, &init_recs);
+            let init_doc = kwd("return").append(pp_args(&init)).append(";");
+            let init_doc = init_defs_doc.append(init_doc);
+            let init_doc =
+                str("export init ({ IDL }) => ").append(enclose_space("{", init_doc, "};"));
+            let init_doc = init_doc.pretty(LINE_WIDTH).to_string();
+            let doc = doc.append(RcDoc::hardline()).append(init_doc);
             doc.pretty(LINE_WIDTH).to_string()
         }
     }

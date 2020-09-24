@@ -33,7 +33,6 @@ export default ({ IDL }) => {
       [IDL.Opt(List)],
       [],
     );
-  const __init = [];
   return IDL.Service({
     'f' : IDL.Func([IDL.Vec(IDL.Nat8), IDL.Opt(IDL.Bool)], [], ['oneway']),
     'g' : IDL.Func(
@@ -53,3 +52,4 @@ export default ({ IDL }) => {
     'i' : f,
   });
 };
+export init ({ IDL }) => { return []; };

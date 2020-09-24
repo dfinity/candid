@@ -1,5 +1,4 @@
 export default ({ IDL }) => {
-  const __init = [];
   return IDL.Service({
     'bab' : IDL.Func([IDL.Int, IDL.Nat], [], []),
     'bar' : IDL.Func([IDL.Record({ '2' : IDL.Int })], [], []),
@@ -25,3 +24,4 @@ export default ({ IDL }) => {
       ),
   });
 };
+export init ({ IDL }) => { return []; };
