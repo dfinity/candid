@@ -4,7 +4,6 @@ export default ({ IDL }) => {
   const h = IDL.Func([f], [f], []);
   const g = f;
   o.fill(IDL.Opt(o));
-  const __init = [];
   return IDL.Service({
     'f' : IDL.Func([IDL.Nat], [h], []),
     'g' : f,
@@ -12,3 +11,4 @@ export default ({ IDL }) => {
     'o' : IDL.Func([o], [o], []),
   });
 };
+export init ({ IDL }) => { return []; };

@@ -11,7 +11,6 @@ export default ({ IDL }) => {
     '  空的  ' : IDL.Null,
     '1⃣️2⃣️3⃣️' : IDL.Null,
   });
-  const __init = [];
   return IDL.Service({
     '' : IDL.Func([IDL.Nat], [IDL.Nat], []),
     '✈️  🚗 ⛱️ ' : IDL.Func([], [], ['oneway']),
@@ -19,3 +18,4 @@ export default ({ IDL }) => {
     '函数名' : IDL.Func([A], [B], []),
   });
 };
+export init ({ IDL }) => { return []; };

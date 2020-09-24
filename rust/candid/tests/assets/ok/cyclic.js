@@ -6,6 +6,6 @@ export default ({ IDL }) => {
   const Z = A;
   const Y = Z;
   const X = Y;
-  const __init = [];
   return IDL.Service({ 'f' : IDL.Func([A, B, C, X, Y, Z], [], []) });
 };
+export init ({ IDL }) => { return []; };

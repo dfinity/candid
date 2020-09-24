@@ -54,6 +54,15 @@ pub fn chase_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> crate::Result<Vec<&
     Ok(res)
 }
 
+pub fn chase_types<'a>(env: &'a TypeEnv, tys: &'a [Type]) -> crate::Result<Vec<&'a str>> {
+    let mut seen = BTreeSet::new();
+    let mut res = Vec::new();
+    for t in tys.iter() {
+        chase_type(&mut seen, &mut res, env, &t)?;
+    }
+    Ok(res)
+}
+
 /// Given a `def_list` produced by the `chase_actor` function, infer which types are recursive
 pub fn infer_rec<'a>(
     env: &'a TypeEnv,

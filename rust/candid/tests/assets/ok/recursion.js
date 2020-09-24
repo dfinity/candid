@@ -26,6 +26,6 @@ export default ({ IDL }) => {
   s.fill(
     IDL.Service({ 'f' : t, 'g' : IDL.Func([list], [B, tree, stream], []) })
   );
-  const __init = [];
   return s.getType();
 };
+export init ({ IDL }) => { return []; };
