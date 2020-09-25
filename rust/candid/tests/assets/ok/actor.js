@@ -11,4 +11,4 @@ export default ({ IDL }) => {
     'o' : IDL.Func([o], [o], []),
   });
 };
-export init ({ IDL }) => { return []; };
+export const init = ({ IDL }) => { return []; };

@@ -24,4 +24,4 @@ export default ({ IDL }) => {
       ),
   });
 };
-export init ({ IDL }) => { return []; };
+export const init = ({ IDL }) => { return []; };

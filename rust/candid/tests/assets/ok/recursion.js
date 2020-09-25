@@ -28,4 +28,4 @@ export default ({ IDL }) => {
   );
   return s.getType();
 };
-export init ({ IDL }) => { return []; };
+export const init = ({ IDL }) => { return []; };
