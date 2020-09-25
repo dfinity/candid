@@ -8,4 +8,4 @@ export default ({ IDL }) => {
   const X = Y;
   return IDL.Service({ 'f' : IDL.Func([A, B, C, X, Y, Z], [], []) });
 };
-export init ({ IDL }) => { return []; };
+export const init = ({ IDL }) => { return []; };

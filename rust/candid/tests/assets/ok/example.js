@@ -52,4 +52,4 @@ export default ({ IDL }) => {
     'i' : f,
   });
 };
-export init ({ IDL }) => { return []; };
+export const init = ({ IDL }) => { return []; };

@@ -6,7 +6,7 @@ export default ({ IDL }) => {
     'set' : IDL.Func([List], [List], []),
   });
 };
-export init ({ IDL }) => {
+export const init = ({ IDL }) => {
   const List = IDL.Rec();
   List.fill(IDL.Opt(IDL.Tuple(IDL.Int, List)));
   return [IDL.Int, List];

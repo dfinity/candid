@@ -185,7 +185,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let init_doc = kwd("return").append(pp_args(&init)).append(";");
             let init_doc = init_defs_doc.append(init_doc);
             let init_doc =
-                str("export init ({ IDL }) => ").append(enclose_space("{", init_doc, "};"));
+                str("export const init = ({ IDL }) => ").append(enclose_space("{", init_doc, "};"));
             let init_doc = init_doc.pretty(LINE_WIDTH).to_string();
             let doc = doc.append(RcDoc::hardline()).append(init_doc);
             doc.pretty(LINE_WIDTH).to_string()

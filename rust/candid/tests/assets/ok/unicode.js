@@ -18,4 +18,4 @@ export default ({ IDL }) => {
     '函数名' : IDL.Func([A], [B], []),
   });
 };
-export init ({ IDL }) => { return []; };
+export const init = ({ IDL }) => { return []; };
