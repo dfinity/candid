@@ -673,8 +673,8 @@ Such extensibility also extends to *higher-order* examples, where functions them
 ```
 type t = {x : nat};
 service : {
-  h1 : (f1 : () -> t) -> ();      // might call f() and expects a t
-  h2 : (f2 : t -> ()) -> ();      // might call f({x = 5})
+  h1 : (f1 : () -> t) -> ();      // might call f1() and expects a t
+  h2 : (f2 : t -> ()) -> ();      // might call f2({x = 5})
 }
 ```
 If type `t` is later extended with a new optional field, then an existing client passing some function to `f1` or `f2` that is not yet aware of this change will still work correctly.
@@ -777,7 +777,7 @@ A later step might legally re-add a field of the same name but with a different 
 A client having missed the intermediate step will have to upgrade directly from the original to the newest version of the type.
 If two option type do not match up, its value will be treated as `null`.
 
-In practice, users are strongly discouraged to ever remove a record field or ariant tag and later re-add it with a different meaning.
+In practice, users are strongly discouraged to ever remove a record field or a variant tag and later re-add it with a different meaning.
 However, there is no general way for the type system to prevent this, since it cannot know the history of a type definition.
 Consequently, the rule above is needed for technical more than for practical reasons.
 Implementations of static upgrade checking are encouraged to warn if this rule is used.
@@ -803,7 +803,7 @@ record { <fieldtype>;* } <: record { <fieldtype'>;* }
 ----------------------------------------------------------------------------------------------
 record { <fieldtype>;* } <: record { <nat> : opt <datatype'>; <fieldtype'>;* }
 ```
-*Note:* This rule is unusual form a regular subtyping perspective, but necessary in practice.
+*Note:* This rule is unusual from a regular subtyping perspective, but necessary in practice.
 Together with the previous rule, it allows extending any record with optional fields in an upgrade, regardless of how it is used.
 Any party not aware of the extension will treat the field as `null`.
 
@@ -828,7 +828,7 @@ opt variant { <fieldtype>;* } <: opt variant { <fieldtype'>;* }
 ----------------------------------------------------------------------------------------------
 opt variant { <nat> : opt <datatype>; <fieldtype>;* } <: opt variant { <fieldtype'>;* }
 ```
-*Note:* This rule is unusual form a regular subtyping perspective, but it is the dual to the one for records.
+*Note:* This rule is unusual from a regular subtyping perspective, but it is the dual to the one for records.
 Together with the previous rule, it allows extending any optional variant with new tags in an upgrade, regardless of how it is used.
 Any party not aware of the extension will treat the new case as `null`.
 
@@ -912,7 +912,7 @@ opt <datatype> <: opt <datatype'>
   ~> \x.join_opt (\y.
        if (exists <datatype''>.
           y : <datatype''> /\
-          <datatype''> <: <datatype> /\
+          <datatype''> <: <datatype'> /\
           <datatype''> <: <datatype> ~> f)
        then ?(f y)
        else null)
@@ -927,7 +927,7 @@ The effect of this rule is that decoders do not need to perform a subtype check 
 Instead, they can simply try to deserialise, and if they encounter a mismatch abort, to the innermost option type, returning `null`.
 
 *Note:* The working assumption is that the type describing its incoming value is typically *principal*, i.e., the most precise type assignable to the value (in a sense that could be made precise).
-In that case, `<datatype''>` will equal `<datatype>` and deserialisation succeeds exactly if the types match.
+In that case, `<datatype''>` equals `<datatype>` and deserialization succeeds exactly if the types match.
 For example, to be principal, an empty vector would need to have type `vec empty`, `null` could only have type `null`, and a variant would only be allowed to include tags that actually occur in the value.
 
 However, in practice it would be costly to enforce the requirement that all type descriptions in a serialised value are principal, for both encoder (who would need to compute the principal type) and decoders (who would need to check it).
