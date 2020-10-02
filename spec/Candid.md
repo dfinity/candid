@@ -804,8 +804,9 @@ record { <nat> : <datatype>; <fieldtype>;* } <: record { <nat> : <datatype'>; <f
 
 In order to be able to evolve and extend record types that also occur in inbound position (i.e., are used both as function results and function parameters), the subtype relation also supports *removing* fields from records, provided they are optional.
 ```
+<nat> not in <fieldtype>;*
 record { <fieldtype>;* } <: record { <fieldtype'>;* }
-----------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 record { <fieldtype>;* } <: record { <nat> : opt <datatype'>; <fieldtype'>;* }
 ```
 *Note:* This rule is unusual from a regular subtyping perspective, but necessary in practice.
@@ -829,8 +830,9 @@ variant { <nat> : <datatype>; <fieldtype>;* } <: variant { <nat> : <datatype'>; 
 
 In order to be able to evolve and extend variant types that also occur in outbound position (i.e., are used both as function results and function parameters), the subtype relation also supports *adding* tags to variants, provided the variant itself is optional.
 ```
+<nat> not in <fieldtype'>;*
 opt variant { <fieldtype>;* } <: opt variant { <fieldtype'>;* }
-----------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------
 opt variant { <nat> : opt <datatype>; <fieldtype>;* } <: opt variant { <fieldtype'>;* }
 ```
 *Note:* This rule is unusual from a regular subtyping perspective, but it is the dual to the one for records.
@@ -952,8 +954,9 @@ record { <fieldtype>;* } <: record { <fieldtype'>;* } ~> f2
 record { <nat> : <datatype>; <fieldtype>;* } <: record { <nat> : <datatype'>; <fieldtype'>;* }
   ~> \x.{f2 x with <nat> = f1 x.<nat>}
 
+<nat> not in <fieldtype>;*
 record { <fieldtype>;* } <: record { <fieldtype'>;* } ~> f
-----------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 record { <fieldtype>;* } <: record { <nat> : opt <datatype'>; <fieldtype'>;* }
   ~> \x.{f x with <nat> = null}
 ```
@@ -972,8 +975,9 @@ variant { <fieldtype>;* } <: variant { <fieldtype'>;* } ~> f2
 variant { <nat> : <datatype>; <fieldtype>;* } <: variant { <nat> : <datatype'>; <fieldtype'>;* }
   ~> \x.case x of <nat> y => <nat> (f1 y) | _ => f2 x
 
+<nat> not in <fieldtype'>;*
 opt variant { <fieldtype>;* } <: opt variant { <fieldtype'>;* } ~> f
-----------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------
 opt variant { <nat> : opt <datatype>; <fieldtype>;* } <: opt variant { <fieldtype'>;* }
   ~> \x.join_opt (map_opt (\y.case y of <nat> z => null | _ => ?(f x)))
 ```
