@@ -677,8 +677,8 @@ service : {
   h2 : (f2 : t -> ()) -> ();      // might call f2({x = 5})
 }
 ```
-If type `t` is later extended with a new optional field, then an existing client passing some function to `f1` or `f2` that is not yet aware of this change will still work correctly.
-This works at any order, for example, `t` can safely be extended with a new optional field in the following scenario:
+If type `t` is later extended with a new optional field, then an existing client passing some function for `f1` or `f2` that is not yet aware of this change will still work correctly.
+This applies at any order, for example, `t` can safely be extended with a new optional field in the following scenario:
 ```
 type t = {x : nat};
 type f = t -> ();
@@ -707,6 +707,11 @@ To summarize, the subtyping relation for validating upgrades is designed with th
 * Non-coercive Deserialisation: Deserialisation of a value is invariant across super- and sub-types.
 
 * Type Erasure: Deserialised values do not require carrying dynamic type information on the language side.
+
+* No covert channels: Serialisation never includes any fields in the value that the sender is not aware of. Specifically, when passing on a value to a third party that the sender previously received itself, then that will only contain fields that the sender intends to send out per its type.
+
+However, something has to give, so one seemingly desirable property that is not maintained is *transitive coherence*, i.e., when deserialising and reserialising a value and then deserialising that again at a different supertype, it might yield another result than it would if the original value was deserialised at the later supertype.
+However, the only possible difference can be one of getting `null` for an option vs a non-null value.
 
 
 ### Rules
