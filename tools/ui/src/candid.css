@@ -1,0 +1,74 @@
+.signature {
+    font-size: 15px;
+    font-weight: 400;
+    margin: 5px;
+}
+.argument, .result, .status, .composite {
+    background-color: #F9F9F9;
+    border: 1px solid #E5E5E5;
+    color: #545454;
+    font-family: monospace;
+    font-size: 15px;
+    font-weight: 400;          
+    height: auto;
+    margin-right: 10px;
+    margin-bottom: 10px;
+}
+.open {
+    margin: 5px;
+}
+.reject {
+    border: 1px solid #cc0000;
+}
+.result {
+    display: none;
+}
+.error {
+    color: #cc0000;
+}
+.status {
+    color: #cc0000;
+    display: none;
+}
+.left {
+    text-align: left;
+    width: 84%;
+    display: inline-block;
+    overflow-wrap: break-word;
+}
+.right {
+    text-align: right;
+    width: 15%;
+    display: inline-block;
+}
+.btn {
+    background-color: #02ADEA;
+    border-color: #02ADEA;
+    border-radius: .25rem;
+    color: #FFF;
+    font-family: sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    margin: 5px;
+}
+.popup-form {
+    border: 1px solid #E5E5E5;
+    padding-top: 10px;
+    padding-left: 10px;
+}
+.console {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    font-family: monospace;
+    background-color: #F9F9F9;
+    color: #545454;
+}
+.console-line {
+    overflow-wrap: break-word;
+    flex: 0;
+    flex-basis: auto;
+    border: 0;
+    margin-left: 5px;
+    margin-bottom: 5px;
+}
