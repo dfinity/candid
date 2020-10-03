@@ -1,20 +1,25 @@
-# ui
+# Candid UI
 
-Welcome to your new ui project and to the internet computer development community. By default, creating a new project adds this README and some template files to your project directory. You can edit these template files to customize your project and to include your own code to speed up the development cycle.
+This canister generates a front-end UI for any canister running on the Internet Computer. 
 
-To get started, you might want to explore the project directory structure and the default configuration file. Working with this project in your development environment will not affect any production deployment or identity tokens.
+The backend `didjs` is build with the [Rust CDK](https://github.com/dfinity/cdk-rs) and the [Candid](rust/) crate to convert did file into JavaScript.
+The frontend `ui` fetches the Candid interface from the running canister (currently only canisters built by Motoko expose the Candid interface) and renders the UI based on the interface signature.
 
-To learn more before you start working with ui, see the following documentation available online:
+## Build
 
-- [Quick Start](https://sdk.dfinity.org/docs/quickstart/quickstart.html)
-- [SDK Developer Tools](https://sdk.dfinity.org/docs/developers-guide/sdk-guide.html)
-- [Motoko Programming Language Guide](https://sdk.dfinity.org/docs/language-guide/motoko.html)
-- [Motoko Language Quick Reference](https://sdk.dfinity.org/docs/language-guide/language-manual.html)
-
-If you want to start working on your project right away, you might want to try the following commands:
+You need `dfx`, `cargo`, `npm` and `wasm-opt` for building the canister.
 
 ```bash
 cd ui/
-dfx help
-dfx config --help
+npm install
+dfx start --background
+dfx canister create --all
+dfx build
+dfx canister install --all
 ```
+
+## Usage
+
+Open the `ui` canister in a browser and supply the id parameter in the URL to render a specific canister,
+e.g., `localhost:8000/?canisterId=ui-canister-id&id=target-canister-id` for local dev, 
+or `ui-canister-id.ic0.app/?id=target-canister-id` for Sodium network.
