@@ -692,7 +692,9 @@ service : {
 
 To summarize, the subtyping relation for validating upgrades is designed with the following design goals in mind:
 
-* Soundness: Subtyping implies that no deserialisation can fail.
+* Soundness: Subtyping implies that deserialisation at a supertype cannot fail.
+
+* Completeness: Subtyping covers all cases of successful deserialisation.
 
 * Transitivity: Subtyping implies that deserialisation cannot fail even across multiple upgrades.
 
@@ -704,9 +706,7 @@ To summarize, the subtyping relation for validating upgrades is designed with th
 
 * Simple Deserialisation: Deserialisation does not require (sub)type checks other than the type-directed traversal of the value blob.
 
-* Non-coercive Deserialisation: Deserialisation of a value is invariant across super- and sub-types.
-
-* Type Erasure: Deserialised values do not require carrying dynamic type information on the language side.
+* Type Erasure: Deserialised values do not require carrying dynamic type information on the language side. In particular, service and function references can be represented without type information.
 
 * No covert channels: Serialisation never includes any fields in the value that the sender is not aware of. Specifically, when passing on a value to a third party that the sender previously received itself, then that will only contain fields that the sender intends to send out per its type.
 
@@ -898,10 +898,6 @@ empty <: <datatype> ~> \_.unreachable
 ```
 <datatype> <: <datatype'> ~> f
 ---------------------------------------------------
-opt <datatype> <: opt <datatype'> ~> \x.map_opt f x
-
-<datatype> <: <datatype'> ~> f
----------------------------------------------------
 vec <datatype> <: vec <datatype'> ~> \x.map_vec f x
 
 not (null <: <datatype>)
@@ -913,32 +909,26 @@ not (null <: <datatype>)
 ------------------------------------------
 <datatype> <: opt <datatype'> ~> \x.?(f x)
 
-not (<datatype> <: <datatype'>)
+<datatype''> <: <datatype>
+<datatype''> <: <datatype'> ~> f
 ---------------------------------
 opt <datatype> <: opt <datatype'>
-  ~> \x.join_opt (\y.
-       if (exists <datatype''>.
-          y : <datatype''> /\
-          <datatype''> <: <datatype'> /\
-          <datatype''> <: <datatype> ~> f)
-       then ?(f y)
-       else null)
+  ~> \x.case y of () => null | ?y => if f y = _|_ then null else ?(f y)
 ```
-where
-```
-v : <datatype>  iff  M(v : <datatype>) is defined
-```
-The last rule *optimistically* tries to decode an option value when the types are not statically known to match.
-It succceeds if there would have been a valid type for the value (written `v : t`) that is a subtype of both types.
-The effect of this rule is that decoders do not need to perform a subtype check during deserialisation.
-Instead, they can simply try to deserialise, and if they encounter a mismatch abort, to the innermost option type, returning `null`.
+The last rule covers both cases of subtyping on options.
+It *optimistically* tries to decode an option value
+and succceeds if there would have been a valid type `<datatype''>` for the input value that is a subtype of both types.
+(As formulated, the rule would be non-deterministic in the choice of `<datatype''>`, but the intention is to pick the largest type that makes `f y` succeed if possible. We take the liberty to hand-wave over the formulation of this detail here.)
 
-*Note:* The working assumption is that the type describing its incoming value is typically *principal*, i.e., the most precise type assignable to the value (in a sense that could be made precise).
+The effect of this rule is that decoders do not actually need to perform separate subtype checks during deserialisation.
+Instead, they can simply try to deserialise, and if they encounter a mismatch abort to the innermost option type, returning `null`.
+
+*Note:* The working assumption is that the type describing an incoming value ought to be *principal*, i.e., the most precise type assignable to the value (in a sense that could be made precise).
 In that case, `<datatype''>` equals `<datatype>` and deserialization succeeds exactly if the types match.
-For example, to be principal, an empty vector would need to have type `vec empty`, `null` could only have type `null`, and a variant would only be allowed to include tags that actually occur in the value.
 
 However, in practice it would be costly to enforce the requirement that all type descriptions in a serialised value are principal, for both encoder (who would need to compute the principal type) and decoders (who would need to check it).
-Consequently, the semantics allows for the possibility that the encoder ascribes a less specific value with some redundant information, and allows the decoder to ignore redundant information like the element type of empty arrays, of null options, or unused variant tags.
+For example, to be principal, an empty vector would need to have type `vec empty`, `null` could only have type `null`, and a variant would only be allowed to include tags that actually occur in the value.
+Consequently, the semantics allows for the possibility that the encoder ascribes a less specific type `<datatype>` with some redundant information, and allows the decoder to ignore redundant information (by going to `<datatype''>`) like the element type of empty arrays, of null options, or unused variant tags.
 
 
 #### Records
@@ -979,8 +969,9 @@ variant { <nat> : <datatype>; <fieldtype>;* } <: variant { <nat> : <datatype'>; 
 opt variant { <fieldtype>;* } <: opt variant { <fieldtype'>;* } ~> f
 ---------------------------------------------------------------------------------------
 opt variant { <nat> : opt <datatype>; <fieldtype>;* } <: opt variant { <fieldtype'>;* }
-  ~> \x.join_opt (map_opt (\y.case y of <nat> z => null | _ => ?(f x)))
+  ~> \x.case x of null => null | ?y => case y of <nat> z => null | _ => ?(f x)
 ```
+(As formulated, the last rule overlaps with the general rule for options, thus again making deserialisation non-deterministic. The intention is to prefer the rule that produces a non-null result if possible. Once more, we take the liberty to hand-wave over a precise formulation.)
 
 
 #### Functions
