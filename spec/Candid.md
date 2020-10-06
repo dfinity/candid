@@ -710,7 +710,7 @@ To summarize, the subtyping relation for validating upgrades is designed with th
 
 * No covert channels: Serialisation never includes any fields in the value that the sender is not aware of. Specifically, when passing on a value to a third party that the sender previously received itself, then that will only contain fields that the sender intends to send out per its type.
 
-However, something has to give, so one seemingly desirable property that is not maintained is *transitive coherence*, i.e., when deserialising and reserialising a value and then deserialising that again at a different supertype, it might yield another result than it would if the original value was deserialised at the later supertype.
+However, something has to give, so one seemingly desirable property that is not maintained is *transitive coherence*, i.e., given a value serialized at some type, deserialized and serialized at a supertype, and then again deserialized at a supertype of the supertype may yield a diferent result than deserialised directly at the later supertype.
 However, the only possible difference can be one of getting `null` for an option vs a non-null value.
 
 
@@ -782,7 +782,7 @@ A later step might legally re-add a field of the same name but with a different 
 A client having missed the intermediate step will have to upgrade directly from the original to the newest version of the type.
 If two option type do not match up, its value will be treated as `null`.
 
-In practice, users are strongly discouraged to ever remove a record field or a variant tag and later re-add it with a different meaning.
+In practice, users are strongly discouraged to ever remove an optional record field or a variant tag and later re-add it with a different meaning. Instead of removing an optional record field, it should be replaced with `opt empty`, to prevent re-use of that field.
 However, there is no general way for the type system to prevent this, since it cannot know the history of a type definition.
 Consequently, the rule above is needed for technical more than for practical reasons.
 Implementations of static upgrade checking are encouraged to warn if this rule is used.
