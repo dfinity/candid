@@ -770,7 +770,7 @@ The premise means that the rule does not apply when the constituent type is itse
 
 Q: The negated nature of this premise isn't really compatible with parametric polymorphism. Is that a problem? We could always introduce a supertype of all non-nullable types and rephrase it with that.
 
-Finally, in order to maintain *transitivity* of subtyping, an unusual rule allows, in fact, *any* type to be regarded as a subtype of an option.
+Finally, in order to maintain *transitivity* of subtyping, two unusual rules allow, in fact, *any* type to be regarded as a subtype of an option.
 ```
 not (<datatype> <: opt <datatype'>)
 ---------------------------------
