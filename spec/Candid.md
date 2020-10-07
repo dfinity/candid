@@ -781,7 +781,7 @@ not (<datatype> <: <datatype'>)
 ---------------------------------
 opt <datatype> <: opt <datatype'>
 ```
-*Note:* This rule is necessary in the presence of the unusual record and variant rules shown below. Without it, certain upgrades may generally be valid one step at a time, but not taken together, which could cause problems for clients catching up with multiple upgrades.
+*Note:* These rules are necessary in the presence of the unusual record and variant rules shown below. Without them, certain upgrades may generally be valid one step at a time, but not taken together, which could cause problems for clients catching up with multiple upgrades.
 For example, given a record type `record {666 : opt nat}` it is valid to remove the field `666` by the rule below and evolve the type to `record { 666 : nat }` and then to `record {}`.
 A later step might legally re-add a field of the same name but with a different type, producing, e.g.,`record {666 : opt text}`.
 A client having missed some of the  intermediate steps will have to upgrade directly to the newest version of the type.
