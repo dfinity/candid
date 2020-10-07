@@ -781,7 +781,7 @@ A later step might legally re-add a field of the same name but with a different 
 A client having missed some of the  intermediate steps will have to upgrade directly to the newest version of the type.
 If the type cannot be decoded, its value will be treated as `null`.
 
-In practice, users are strongly discouraged to ever remove an record field or a variant tag and later re-add it with a different meaning. Instead of removing an optional record field, it should be replaced with `opt empty`, to prevent re-use of that field.
+In practice, users are strongly discouraged to ever remove a record field or a variant tag and later re-add it with a different meaning. Instead of removing an optional record field, it should be replaced with `opt empty`, to prevent re-use of that field.
 However, there is no general way for the type system to prevent this, since it cannot know the history of a type definition.
 Consequently, the rule above is needed for technical more than for practical reasons.
 Implementations of static upgrade checking are encouraged to warn if this rule is used.
