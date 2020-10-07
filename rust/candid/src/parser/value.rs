@@ -334,6 +334,8 @@ pub mod pretty {
         enclose_space("{", fs, "}")
     }
 
+    const MAX_VEC_ELEMENTS: usize = 20;
+
     pub fn pp_value(v: &IDLValue) -> RcDoc {
         use super::IDLValue::*;
         match &*v {
@@ -360,16 +362,24 @@ pub mod pretty {
             Vec(vs) => {
                 if let Some(IDLValue::Nat8(_)) = vs.first() {
                     let mut s = String::new();
-                    for v in vs.iter() {
+                    for v in vs.iter().take(MAX_VEC_ELEMENTS) {
                         match v {
                             IDLValue::Nat8(v) => s.push_str(&format!("\\{:02x}", v)),
                             _ => unreachable!(),
                         }
                     }
+                    if vs.len() > MAX_VEC_ELEMENTS {
+                        s.push_str("...");
+                    }
                     RcDoc::text(format!("blob \"{}\"", s))
                 } else {
-                    let body = concat(vs.iter().map(|v| pp_value(v)), ";");
-                    kwd("vec").append(enclose_space("{", body, "}"))
+                    let body = concat(vs.iter().take(MAX_VEC_ELEMENTS).map(|v| pp_value(v)), ";");
+                    let omitted = if vs.len() > MAX_VEC_ELEMENTS {
+                        " ..."
+                    } else {
+                        ""
+                    };
+                    kwd("vec").append(enclose_space("{", body.append(omitted), "}"))
                 }
             }
             Record(fields) => {
