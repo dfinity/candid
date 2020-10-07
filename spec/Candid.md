@@ -955,14 +955,7 @@ variant { <fieldtype>;* } <: variant { <fieldtype'>;* } ~> f2
 ------------------------------------------------------------------------------------------------
 variant { <nat> : <datatype>; <fieldtype>;* } <: variant { <nat> : <datatype'>; <fieldtype'>;* }
   ~> \x.case x of <nat> y => <nat> (f1 y) | _ => f2 x
-
-<nat> not in <fieldtype'>;*
-opt variant { <fieldtype>;* } <: opt variant { <fieldtype'>;* } ~> f
----------------------------------------------------------------------------------------
-opt variant { <nat> : opt <datatype>; <fieldtype>;* } <: opt variant { <fieldtype'>;* }
-  ~> \x.case x of null => null | ?y => case y of <nat> z => null | _ => ?(f x)
 ```
-(As formulated, the last rule overlaps with the general rule for options, thus again making deserialisation non-deterministic. The intention is to prefer the rule that produces a non-null result if possible. Once more, we take the liberty to hand-wave over a precise formulation.)
 
 
 #### Functions
