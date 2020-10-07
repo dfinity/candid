@@ -59,7 +59,7 @@ fn parse_string_literals() {
     let args = parse_args("(blob \"DIDL\\00\\01\\7d\\80\\00\")");
     assert_eq!(
         format!("{}", args),
-        "(vec { 68; 73; 68; 76; 0; 1; 125; 128; 0 })"
+        r#"(blob "\44\49\44\4c\00\01\7d\80\00")"#
     );
     let args = parse_args_err("(\"DIDL\\00\\01\\7d\\80\\00\")");
     assert_eq!(
