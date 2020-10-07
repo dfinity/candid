@@ -1,6 +1,6 @@
 # Candid Specification
 
-Version: 0.1.1
+Version: 0.2
 
 Date: Aug 25, 2020
 
