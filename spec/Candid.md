@@ -770,19 +770,24 @@ The premise means that the rule does not apply when the constituent type is itse
 
 Q: The negated nature of this premise isn't really compatible with parametric polymorphism. Is that a problem? We could always introduce a supertype of all non-nullable types and rephrase it with that.
 
-Finally, in order to maintain *transitivity* of subtyping, an unusual rule allows, in fact, *any* option type to be regarded as a subtype of any other.
+Finally, in order to maintain *transitivity* of subtyping, two unusual rules allow, in fact, *any* type to be regarded as a subtype of an option.
 ```
+not (<datatype> <: opt <datatype'>)
+---------------------------------
+opt <datatype> <: opt <datatype'>
+
+not (null <: <datatype>)
 not (<datatype> <: <datatype'>)
 ---------------------------------
 opt <datatype> <: opt <datatype'>
 ```
-*Note:* This rule is necessary in the presence of the unusual record and variant rules shown below. Without it, certain upgrades may generally be valid one step at a time, but not taken together, which could cause problems for clients catching up with multiple upgrades.
-For example, given a record type `record {666 : opt nat}` it is valid to remove the field `666` by the rule below and evolve the type to `record {}`.
+*Note:* These rules are necessary in the presence of the unusual record and variant rules shown below. Without them, certain upgrades may generally be valid one step at a time, but not taken together, which could cause problems for clients catching up with multiple upgrades.
+For example, given a record type `record {666 : opt nat}` it is valid to remove the field `666` by the rule below and evolve the type to `record { 666 : nat }` and then to `record {}`.
 A later step might legally re-add a field of the same name but with a different type, producing, e.g.,`record {666 : opt text}`.
-A client having missed the intermediate step will have to upgrade directly from the original to the newest version of the type.
-If two option type do not match up, its value will be treated as `null`.
+A client having missed some of the  intermediate steps will have to upgrade directly to the newest version of the type.
+If the type cannot be decoded, its value will be treated as `null`.
 
-In practice, users are strongly discouraged to ever remove an optional record field or a variant tag and later re-add it with a different meaning. Instead of removing an optional record field, it should be replaced with `opt empty`, to prevent re-use of that field.
+In practice, users are strongly discouraged to ever remove a record field or a variant tag and later re-add it with a different meaning. Instead of removing an optional record field, it should be replaced with `opt empty`, to prevent re-use of that field.
 However, there is no general way for the type system to prevent this, since it cannot know the history of a type definition.
 Consequently, the rule above is needed for technical more than for practical reasons.
 Implementations of static upgrade checking are encouraged to warn if this rule is used.
@@ -904,9 +909,16 @@ not (null <: <datatype>)
 <datatype''> <: <datatype'> ~> f
 ---------------------------------
 opt <datatype> <: opt <datatype'>
-  ~> \x.case y of () => null | ?y => if f y = _|_ then null else ?(f y)
+  ~> \x.case x of () => null | ?y => if f y = _|_ then null else ?(f y)
+
+not (null <: <datatype>)
+<datatype''> <: <datatype>
+<datatype''> <: <datatype'> ~> f
+---------------------------------
+<datatype> <: opt <datatype'>
+  ~> \x.if f x = _|_ then null else ?(f x)
 ```
-The last rule covers both cases of subtyping on options.
+The last two rules cover both cases of subtyping on options.
 It *optimistically* tries to decode an option value
 and succceeds if there would have been a valid type `<datatype''>` for the input value that is a subtype of both types.
 (As formulated, the rule would be non-deterministic in the choice of `<datatype''>`, but the intention is to pick the largest type that makes `f y` succeed if possible. We take the liberty to hand-wave over the formulation of this detail here.)
