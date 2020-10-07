@@ -828,16 +828,7 @@ variant { <fieldtype>;* } <: variant { <fieldtype'>;* }
 variant { <nat> : <datatype>; <fieldtype>;* } <: variant { <nat> : <datatype'>; <fieldtype'>;* }
 ```
 
-In order to be able to evolve and extend variant types that also occur in outbound position (i.e., are used both as function results and function parameters), the subtype relation also supports *adding* tags to variants, provided the variant itself is optional.
-```
-<nat> not in <fieldtype'>;*
-opt variant { <fieldtype>;* } <: opt variant { <fieldtype'>;* }
----------------------------------------------------------------------------------------
-opt variant { <nat> : opt <datatype>; <fieldtype>;* } <: opt variant { <fieldtype'>;* }
-```
-*Note:* This rule is unusual from a regular subtyping perspective, but it is the dual to the one for records.
-Together with the previous rule, it allows extending any optional variant with new tags in an upgrade, regardless of how it is used.
-Any party not aware of the extension will treat the new case as `null`.
+*Note:* By virtue of the rules around `opt` above, it is possible to evolve and extend variant types that also occur in outbound position (i.e., are used both as function results and function parameters) by *adding* tags to variants, provided the variant itself is optional (e.g.  `opt variant { 0 : nat; 1 : bool } <: opt variant { 1 : bool }`). Any party not aware of the extension will treat the new case as `null`.
 
 
 #### Functions
@@ -964,14 +955,7 @@ variant { <fieldtype>;* } <: variant { <fieldtype'>;* } ~> f2
 ------------------------------------------------------------------------------------------------
 variant { <nat> : <datatype>; <fieldtype>;* } <: variant { <nat> : <datatype'>; <fieldtype'>;* }
   ~> \x.case x of <nat> y => <nat> (f1 y) | _ => f2 x
-
-<nat> not in <fieldtype'>;*
-opt variant { <fieldtype>;* } <: opt variant { <fieldtype'>;* } ~> f
----------------------------------------------------------------------------------------
-opt variant { <nat> : opt <datatype>; <fieldtype>;* } <: opt variant { <fieldtype'>;* }
-  ~> \x.case x of null => null | ?y => case y of <nat> z => null | _ => ?(f x)
 ```
-(As formulated, the last rule overlaps with the general rule for options, thus again making deserialisation non-deterministic. The intention is to prefer the rule that produces a non-null result if possible. Once more, we take the liberty to hand-wave over a precise formulation.)
 
 
 #### Functions
