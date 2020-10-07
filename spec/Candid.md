@@ -772,8 +772,14 @@ Q: The negated nature of this premise isn't really compatible with parametric po
 
 Finally, in order to maintain *transitivity* of subtyping, an unusual rule allows, in fact, *any* type to be regarded as a subtype of an option.
 ```
+not (<datatype> <: opt <datatype'>)
 ---------------------------------
-<datatype> <: opt <datatype'>
+opt <datatype> <: opt <datatype'>
+
+not (null <: <datatype>)
+not (<datatype> <: <datatype'>)
+---------------------------------
+opt <datatype> <: opt <datatype'>
 ```
 *Note:* This rule is necessary in the presence of the unusual record and variant rules shown below. Without it, certain upgrades may generally be valid one step at a time, but not taken together, which could cause problems for clients catching up with multiple upgrades.
 For example, given a record type `record {666 : opt nat}` it is valid to remove the field `666` by the rule below and evolve the type to `record { 666 : nat }` and then to `record {}`.
