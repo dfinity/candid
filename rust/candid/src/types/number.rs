@@ -77,15 +77,31 @@ impl std::str::FromStr for Nat {
     }
 }
 
+pub(crate) fn pp_num_str(s: &str) -> String {
+    let mut groups = Vec::new();
+    for chunk in s.as_bytes().rchunks(3) {
+        let str = String::from_utf8_lossy(chunk);
+        groups.push(str);
+    }
+    groups.reverse();
+    if "-" == groups.first().unwrap() {
+        "-".to_string() + &groups[1..].join("_")
+    } else {
+        groups.join("_")
+    }
+}
+
 impl fmt::Display for Int {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.to_str_radix(10))
+        let s = self.0.to_str_radix(10);
+        f.write_str(&pp_num_str(&s))
     }
 }
 
 impl fmt::Display for Nat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.to_str_radix(10))
+        let s = self.0.to_str_radix(10);
+        f.write_str(&pp_num_str(&s))
     }
 }
 
