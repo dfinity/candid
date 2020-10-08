@@ -360,11 +360,11 @@ pub mod pretty {
             Principal(ref id) => RcDoc::as_string(format!("principal \"{}\"", id)),
             Opt(v) => kwd("opt").append(pp_value(v)),
             Vec(vs) => {
-                if let Some(IDLValue::Nat8(_)) = vs.first() {
+                if let Some(Nat8(_)) = vs.first() {
                     let mut s = String::new();
                     for v in vs.iter().take(MAX_VEC_ELEMENTS) {
                         match v {
-                            IDLValue::Nat8(v) => s.push_str(&format!("\\{:02x}", v)),
+                            Nat8(v) => s.push_str(&format!("\\{:02x}", v)),
                             _ => unreachable!(),
                         }
                     }
