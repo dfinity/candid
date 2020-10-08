@@ -27,6 +27,19 @@ fn test_numbers() {
 }
 
 #[test]
+fn pretty_print_numbers() {
+    assert_eq!(format!("{}", Nat::from(42)), "42");
+    assert_eq!(format!("{}", Nat::from(100)), "100");
+    assert_eq!(format!("{}", Nat::from(100000)), "100_000");
+    assert_eq!(format!("{}", Nat::from(1_234_567_890)), "1_234_567_890");
+    assert_eq!(format!("{}", Int::from(0)), "0");
+    assert_eq!(format!("{}", Int::from(-1)), "-1");
+    assert_eq!(format!("{}", Int::from(-123)), "-123");
+    assert_eq!(format!("{}", Int::from(-12345678)), "-12_345_678");
+    assert_eq!(format!("{}", Int::from(12345678)), "12_345_678");
+}
+
+#[test]
 fn random_i64() {
     use rand::Rng;
     let mut rng = rand::thread_rng();

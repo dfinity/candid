@@ -26,7 +26,7 @@ fn test_typed_parser() {
     let candid = r#"
 type List = List1;
 type List1 = List2;
-type List2 = opt record { head: nat8; tail: List1 };
+type List2 = opt record { head: int16; tail: List1 };
 type byte = nat8;
 type f = func (byte, int, nat, int8) -> (List);
 service : {
@@ -52,15 +52,15 @@ service : {
         );
     }
     {
-        let str = "(opt record { head = 1; tail = opt record {head = 2; tail = null}})";
+        let str = "(opt record { head = 1000; tail = opt record {head = -2000; tail = null}})";
         let args = str.parse::<IDLArgs>().unwrap();
         let encoded = args.to_bytes_with_types(&env, &method.rets).unwrap();
         let decoded = IDLArgs::from_bytes(&encoded).unwrap();
-        assert_eq!(decoded.to_string(), "(\n  opt record {\n    1158359328 = 1;\n    1291237008 = opt record { 1158359328 = 2; 1291237008 = null };\n  },\n)");
+        assert_eq!(decoded.to_string(), "(\n  opt record {\n    1_158_359_328 = 1_000;\n    1_291_237_008 = opt record { 1_158_359_328 = -2_000; 1_291_237_008 = null };\n  },\n)");
         let decoded = IDLArgs::from_bytes_with_types(&encoded, &env, &method.rets).unwrap();
         assert_eq!(
             decoded.to_string(),
-            "(opt record { head = 1; tail = opt record { head = 2; tail = null } })"
+            "(opt record { head = 1_000; tail = opt record { head = -2_000; tail = null } })"
         );
         let decoded = IDLArgs::from_bytes_with_types(&encoded, &env, &[]).unwrap();
         assert_eq!(decoded.to_string(), "()");

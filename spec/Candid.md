@@ -1,6 +1,6 @@
 # Candid Specification
 
-Version: 0.1.1
+Version: 0.1.2
 
 Date: Aug 25, 2020
 
@@ -98,12 +98,8 @@ This is a summary of the grammar proposed:
   | principal
 
 <name> ::= <id> | <text>
-<id>   ::= (A..Z|a..z|_)(A..Z|a..z|_|0..9)*
-<text> ::= "<char>*"
-<nat>  ::= (0..9)(_? 0..9)* | 0x(0..9|a..f|A..F)(_? 0..9|a..f|A..F)*
 ```
-
-A `<char>` is a *Unicode scalar value* (i.e., a codepoint that is not a surrogate part).
+See [below](#values) for the definitions of `<id>`, `<nat>`, and `<text>`.
 
 
 #### Syntactic Shorthands
@@ -538,6 +534,96 @@ An *interface description* consists of a sequence of imports and type definition
 The optional name given to the service in an interface description is immaterial; it only serves as documentation.
 
 
+## Values
+
+To enable convenient debugging, the following grammar specifies a text format for values.
+The types of these values are assumed to be known from context, so the syntax does not attempt to be self-describing.
+
+```
+<val> ::=
+  | <primval> | <consval> | <refval>
+  | ( <annval> )
+
+<annval> ::=
+  | <val>
+  | <val> : <datatype>
+
+<primval> ::=
+  | <nat> | <int> | <float>
+  | <text>
+  | true | false
+  | null
+
+<consval> ::=
+  | opt <val>
+  | vec { <annval>;* }
+  | record { <fieldval>;* }
+  | variant { <fieldval> }
+
+<fieldval> ::= <nat> = <annval>
+
+<refval> ::=
+  | service <text>             (canister URI)
+  | func <text> . <id>         (canister URI and message name)
+  | principal <text>           (principal URI)
+
+<arg> ::= ( <annval>,* )
+
+<letter> ::= A..Z | a..z
+<digit>  ::= 0..9
+<id>     ::= (<letter> | _)(<letter> | <digit> | _)*
+
+<sign>   ::= + | -
+<hex>    ::= <digit> | A..F | a..f
+<num>    ::= <digit>(_? <digit>)*
+<hexnum> ::= <hex>(_? <hex>)*
+<nat>    ::= <num> | 0x<hexnum>
+<int>    ::= <sign>? <num>
+<float>  ::=
+  | <sign>? <num> . <num>?
+  | <sign>? <num> (. <frac>?)? (e | E) <sign>? <num>
+  | <sign>? 0x<hexnum> . <hexnum>?
+  | <sign>? 0x<hexnum> (. <hexnum>?)? (p | P) <sign>? <num>
+
+<text>   ::= " <char>* "
+<char>   ::=
+  | <utf8>
+  | \ <hex> <hex>
+  | \ <escape>
+  | \u{ <hexnum> }
+<escape>  ::= n | r | t | \ | " | '
+<utf8>    ::= <ascii> | <utf8enc>
+<ascii>   ::= '\20'..'\7e' except " or \
+<utf8enc> ::=
+  | '\c2'..'\df' <utf8cont>
+  | '\e0' '\a0'..'\bf' <utf8cont>
+  | '\ed' '\80'..'\9f' <utf8cont>
+  | '\e1'..'\ec' <utf8cont> <utf8cont>
+  | '\ee'..'\xef' <utf8cont> <utf8cont>
+  | '\f0' '\90'..'\bf' <utf8cont> <utf8cont>
+  | '\f4' '\80'..'\8f' <utf8cont> <utf8cont>
+  | '\f1'..'\f3' <utf8cont> <utf8cont> <utf8cont>
+<utf8cont> ::= '\80'..'\bf'
+```
+A `<char>` is a *Unicode scalar value* (i.e., a codepoint that is not a surrogate part).
+
+
+#### Syntactic Shorthands
+
+Analoguous to types, a few syntactic shorthands are supported that can be reduced to the basic value forms:
+
+```
+<consval> ::= ...
+  | blob <text>            := vec { N;* }  where N* are of bytes in the string, interpreted [as in the WebAssembly textual format](https://webassembly.github.io/spec/core/text/values.html#strings)
+
+<fieldval> ::= ...
+  | <name> = <annval>      :=  <hash(name)> = <annval>
+  | <annval>               :=  N = <annval>  where N is either 0 or previous + 1  (only in records)
+  | <nat>                  :=  <nat> = null   (only in variants)
+  | <name>                 :=  <name> = null  (only in variants)
+```
+
+
 ## Upgrading and Subtyping
 
 Interfaces are allowed to evolve over time in a manner that is *robust*, i.e., cannot break existing client code. To capture this notion precisely, a service of type `T` is *upgradable* to a version with another type `T'` if and only if `T'` is *structural subtype* of `T`, written `T' <: T`. This defines that `T'` is more *specialised* than `T`. (Note: A more specialised type is less general, i.e., denotes a smaller set of possible values, thus the direction of the subtype ordering, even though a subtype record can have *more* fields.)
@@ -551,6 +637,82 @@ For upgrading data structures passed between service and client, it is important
 That is, outbound message results can only be replaced with a subtype (more fields) in an upgrade, while inbound message parameters can only be replaced with a supertype (fewer fields). This corresponds to the notions of co-variance and contra-variance in type systems.
 
 Subtyping applies recursively to the types of the fields themselves. Moreover, the directions get *inverted* for inbound function and service references, in compliance with standard rules.
+
+In addition to the usual subtyping rules, the subtyping relation has some more unusual rules.
+In particular, it also allows fields to be *added* to inbound values (and conversely, removed from outbound ones), as long as they are optional.
+Similarly, it allows *removing* cases from inbound values (and conversely, adding them to outbound ones), as long as the variant itself is optional.
+In all these cases, a receiver who cannot handle the tag or field will simply see `null`.
+This allows for maximal flexibility when evolving an interface over time, while still remaining sound.
+
+
+### Examples
+
+For example, a representative case is an interface of the following form:
+```
+// Version 1
+type t = {x : nat};
+service : {
+  produce : () -> t;
+  consume : t -> ();
+}
+```
+The subtyping rules allow extending type `t` with additional fields later, as long as they are given optional type:
+```
+// Version 2
+type t = {x : nat; y : opt nat};
+service : {
+  produce : () -> t;
+  consume : t -> ();
+}
+```
+Under normal subtyping rules, this wouldn't be allowed, because such record extension isn't usually compatible (sound) when `t` occurs in inbound position, such as with the `consume` function.
+There might be existing clients that are not aware of the new fields, and would fail to provide them.
+However, by restricting such fields to option types, and interpreting them as `null` when missing, such a mismatch is bridged.
+
+Such extensibility also extends to *higher-order* examples, where functions themselves become parameters:
+```
+type t = {x : nat};
+service : {
+  h1 : (f1 : () -> t) -> ();      // might call f1() and expects a t
+  h2 : (f2 : t -> ()) -> ();      // might call f2({x = 5})
+}
+```
+If type `t` is later extended with a new optional field, then an existing client passing some function for `f1` or `f2` that is not yet aware of this change will still work correctly.
+This applies at any order, for example, `t` can safely be extended with a new optional field in the following scenario:
+```
+type t = {x : nat};
+type f = t -> ();
+type g = () -> t;
+service : {
+  h : (f, g) -> ();    // might compose f(g())
+}
+```
+
+### Design Goals
+
+To summarize, the subtyping relation for validating upgrades is designed with the following design goals in mind:
+
+* Soundness: Subtyping implies that deserialisation at a supertype cannot fail.
+
+* Completeness: Subtyping covers all cases of successful deserialisation.
+
+* Transitivity: Subtyping implies that deserialisation cannot fail even across multiple upgrades.
+
+* Record Extensibility: Records are upgradable by adding new (optional) fields, even when they appear in both outbound and inbound positions, such that round-trips always remain possible.
+
+* Higher-order Extensibility: Subtyping extends to higher-order cases, where functions become parameters, so that there is no unique owner for their input/output contract.
+
+* Language Injectivity: Subtyping does not depend on version or role annotations in interfaces that have no counterpart in source languages, i.e., an interface description can be generated from source-level types without special features or cross-version knowledge.
+
+* Simple Deserialisation: Deserialisation does not require (sub)type checks other than the type-directed traversal of the value blob.
+
+* Type Erasure: Deserialised values do not require carrying dynamic type information on the language side. In particular, service and function references can be represented without type information.
+
+* No covert channels: Serialisation never includes any fields in the value that the sender is not aware of. Specifically, when passing on a value to a third party that the sender previously received itself, then that will only contain fields that the sender intends to send out per its type.
+
+However, something has to give, so one seemingly desirable property that is not maintained is *transitive coherence*, i.e., given a value serialized at some type, deserialized and serialized at a supertype, and then again deserialized at a supertype of the supertype may yield a diferent result than deserialised directly at the later supertype.
+However, the only possible difference can be one of getting `null` for an option vs a non-null value.
+
 
 ### Rules
 
@@ -608,6 +770,28 @@ The premise means that the rule does not apply when the constituent type is itse
 
 Q: The negated nature of this premise isn't really compatible with parametric polymorphism. Is that a problem? We could always introduce a supertype of all non-nullable types and rephrase it with that.
 
+Finally, in order to maintain *transitivity* of subtyping, two unusual rules allow, in fact, *any* type to be regarded as a subtype of an option.
+```
+not (<datatype> <: opt <datatype'>)
+---------------------------------
+opt <datatype> <: opt <datatype'>
+
+not (null <: <datatype>)
+not (<datatype> <: <datatype'>)
+---------------------------------
+opt <datatype> <: opt <datatype'>
+```
+*Note:* These rules are necessary in the presence of the unusual record and variant rules shown below. Without them, certain upgrades may generally be valid one step at a time, but not taken together, which could cause problems for clients catching up with multiple upgrades.
+For example, given a record type `record {666 : opt nat}` it is valid to remove the field `666` by the rule below and evolve the type to `record { 666 : nat }` and then to `record {}`.
+A later step might legally re-add a field of the same name but with a different type, producing, e.g.,`record {666 : opt text}`.
+A client having missed some of the  intermediate steps will have to upgrade directly to the newest version of the type.
+If the type cannot be decoded, its value will be treated as `null`.
+
+In practice, users are strongly discouraged to ever remove a record field or a variant tag and later re-add it with a different meaning. Instead of removing an optional record field, it should be replaced with `opt empty`, to prevent re-use of that field.
+However, there is no general way for the type system to prevent this, since it cannot know the history of a type definition.
+Consequently, the rule above is needed for technical more than for practical reasons.
+Implementations of static upgrade checking are encouraged to warn if this rule is used.
+
 
 #### Records
 
@@ -623,7 +807,17 @@ record { <fieldtype>;* } <: record { <fieldtype'>;* }
 record { <nat> : <datatype>; <fieldtype>;* } <: record { <nat> : <datatype'>; <fieldtype'>;* }
 ```
 
-**NOTE**: There is a need for a mechanism to also remove fields (which means adding a field when a record appears as an argument). The precise mechanism is still work in progress.
+In order to be able to evolve and extend record types that also occur in inbound position (i.e., are used both as function results and function parameters), the subtype relation also supports *removing* fields from records, provided they are optional.
+```
+<nat> not in <fieldtype>;*
+record { <fieldtype>;* } <: record { <fieldtype'>;* }
+------------------------------------------------------------------------------
+record { <fieldtype>;* } <: record { <nat> : opt <datatype'>; <fieldtype'>;* }
+```
+*Note:* This rule is unusual from a regular subtyping perspective, but necessary in practice.
+Together with the previous rule, it allows extending any record with optional fields in an upgrade, regardless of how it is used.
+Any party not aware of the extension will treat the field as `null`.
+
 
 #### Variants
 
@@ -638,6 +832,9 @@ variant { <fieldtype>;* } <: variant { <fieldtype'>;* }
 ------------------------------------------------------------------------------------------------
 variant { <nat> : <datatype>; <fieldtype>;* } <: variant { <nat> : <datatype'>; <fieldtype'>;* }
 ```
+
+*Note:* By virtue of the rules around `opt` above, it is possible to evolve and extend variant types that also occur in outbound position (i.e., are used both as function results and function parameters) by *adding* tags to variants, provided the variant itself is optional (e.g.  `opt variant { 0 : nat; 1 : bool } <: opt variant { 1 : bool }`). Any party not aware of the extension will treat the new case as `null`.
+
 
 #### Functions
 
@@ -669,7 +866,7 @@ service { <name> : <functype>; <methtype>;* } <: service { <name> : <functype'>;
 
 ### Elaboration
 
-To define the actual coercion function, we extend the subtyping relation to a ternary *elaboration* relation `T <: T' ~> f`, where `f` is a suitable coercion function of type `T -> T'`.
+To define the actual coercion function used during deserialisation of a value, we extend the subtyping relation to a ternary *elaboration* relation `T <: T' ~> f`, where `f` is a suitable coercion function of type `T -> T'`.
 
 
 #### Primitive Types
@@ -697,10 +894,6 @@ empty <: <datatype> ~> \_.unreachable
 ```
 <datatype> <: <datatype'> ~> f
 ---------------------------------------------------
-opt <datatype> <: opt <datatype'> ~> \x.map_opt f x
-
-<datatype> <: <datatype'> ~> f
----------------------------------------------------
 vec <datatype> <: vec <datatype'> ~> \x.map_vec f x
 
 not (null <: <datatype>)
@@ -711,7 +904,34 @@ not (null <: <datatype>)
 <datatype> <: <datatype'> ~> f
 ------------------------------------------
 <datatype> <: opt <datatype'> ~> \x.?(f x)
+
+<datatype''> <: <datatype>
+<datatype''> <: <datatype'> ~> f
+---------------------------------
+opt <datatype> <: opt <datatype'>
+  ~> \x.case x of () => null | ?y => if f y = _|_ then null else ?(f y)
+
+not (null <: <datatype>)
+<datatype''> <: <datatype>
+<datatype''> <: <datatype'> ~> f
+---------------------------------
+<datatype> <: opt <datatype'>
+  ~> \x.if f x = _|_ then null else ?(f x)
 ```
+The last two rules cover both cases of subtyping on options.
+It *optimistically* tries to decode an option value
+and succceeds if there would have been a valid type `<datatype''>` for the input value that is a subtype of both types.
+(As formulated, the rule would be non-deterministic in the choice of `<datatype''>`, but the intention is to pick the largest type that makes `f y` succeed if possible. We take the liberty to hand-wave over the formulation of this detail here.)
+
+The effect of this rule is that decoders do not actually need to perform separate subtype checks during deserialisation.
+Instead, they can simply try to deserialise, and if they encounter a mismatch abort to the innermost option type, returning `null`.
+
+*Note:* The working assumption is that the type describing an incoming value ought to be *principal*, i.e., the most precise type assignable to the value (in a sense that could be made precise).
+In that case, `<datatype''>` equals `<datatype>` and deserialization succeeds exactly if the types match.
+
+However, in practice it would be costly to enforce the requirement that all type descriptions in a serialised value are principal, for both encoder (who would need to compute the principal type) and decoders (who would need to check it).
+For example, to be principal, an empty vector would need to have type `vec empty`, `null` could only have type `null`, and a variant would only be allowed to include tags that actually occur in the value.
+Consequently, the semantics allows for the possibility that the encoder ascribes a less specific type `<datatype>` with some redundant information, and allows the decoder to ignore redundant information (by going to `<datatype''>`) like the element type of empty arrays, of null options, or unused variant tags.
 
 
 #### Records
@@ -726,7 +946,14 @@ record { <fieldtype>;* } <: record { <fieldtype'>;* } ~> f2
 ----------------------------------------------------------------------------------------------
 record { <nat> : <datatype>; <fieldtype>;* } <: record { <nat> : <datatype'>; <fieldtype'>;* }
   ~> \x.{f2 x with <nat> = f1 x.<nat>}
+
+<nat> not in <fieldtype>;*
+record { <fieldtype>;* } <: record { <fieldtype'>;* } ~> f
+------------------------------------------------------------------------------
+record { <fieldtype>;* } <: record { <nat> : opt <datatype'>; <fieldtype'>;* }
+  ~> \x.{f x with <nat> = null}
 ```
+
 
 #### Variants
 
@@ -741,6 +968,7 @@ variant { <fieldtype>;* } <: variant { <fieldtype'>;* } ~> f2
 variant { <nat> : <datatype>; <fieldtype>;* } <: variant { <nat> : <datatype'>; <fieldtype'>;* }
   ~> \x.case x of <nat> y => <nat> (f1 y) | _ => f2 x
 ```
+
 
 #### Functions
 
@@ -770,7 +998,6 @@ service { <name> : <functype>; <methtype>;* } <: service { <name> : <functype'>;
 ## Open Questions
 
 * Support default field values?
-* Better upgradability for variants?
 * Support generic type definitions?
 * Namespaces for imports?
 
@@ -1000,56 +1227,3 @@ The same representation is used for function results.
 Note:
 
 * It is unspecified how the pair (B,R) representing a serialised value is bundled together in an external environment.
-
-
-## Text Format
-
-To enable convenient debugging, we also specify a text format for Candid values.
-The types of these values are assumed to be known from context, so the syntax does not attempt to be self-describing.
-
-```
-<val> ::=
-  | <primval> | <consval> | <refval>
-  | ( <annval> )
-
-<annval> ::=
-  | <val>
-  | <val> : <datatype>
-
-<primval> ::=
-  | <nat> | <int> | <float>     (TODO: same as Motoko grammar plus sign)
-  | <text>                      (TODO: same as Motoko grammar)
-  | true | false
-  | null
-
-<consval> ::=
-  | opt <val>
-  | vec { <annval>;* }
-  | record { <fieldval>;* }
-  | variant { <fieldval> }
-
-<fieldval> ::= <nat> = <annval>
-
-<refval> ::=
-  | service <text>             (canister URI)
-  | func <text> . <id>         (canister URI and message name)
-  | principal <text>           (principal URI)
-
-<arg> ::= ( <annval>,* )
-
-```
-
-#### Syntactic Shorthands
-
-Analoguous to types, a few syntactic shorthands are supported that can be reduced to the basic value forms:
-
-```
-<consval> ::= ...
-  | blob <text>            := vec { N;* }  where N* are of bytes in the string, interpreted [as in the WebAssembly textual format](https://webassembly.github.io/spec/core/text/values.html#strings)
-
-<fieldval> ::= ...
-  | <name> = <annval>      :=  <hash(name)> = <annval>
-  | <annval>               :=  N = <annval>  where N is either 0 or previous + 1  (only in records)
-  | <nat>                  :=  <nat> = null   (only in variants)
-  | <name>                 :=  <name> = null  (only in variants)
-```
