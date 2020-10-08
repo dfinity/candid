@@ -356,8 +356,5 @@ pub fn value_diff_rec(v1: &Value, v2: &Value, _t: &Option<Type>) -> ValueEdit<Rc
 }
 
 pub fn value_edit_is_skip(edit: &RcValueEdit) -> bool {
-    match *edit.0 {
-        ValueEdit::Skip => true,
-        _ => false,
-    }
+    matches!(*edit.0, ValueEdit::Skip)
 }
