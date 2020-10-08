@@ -1,8 +1,8 @@
 use super::token::error;
 use super::typing::TypeEnv;
+use crate::types::number::{pp_num_str, Int, Nat};
 use crate::types::{Field, Label, Type};
 use crate::{Error, Result};
-use crate::{Int, Nat};
 use serde::de;
 use serde::de::{Deserialize, Visitor};
 use std::collections::HashMap;
@@ -334,6 +334,8 @@ pub mod pretty {
         enclose_space("{", fs, "}")
     }
 
+    const MAX_VEC_ELEMENTS: usize = 20;
+
     pub fn pp_value(v: &IDLValue) -> RcDoc {
         use super::IDLValue::*;
         match &*v {
@@ -343,13 +345,13 @@ pub mod pretty {
             Int(ref i) => RcDoc::as_string(i),
             Nat(ref n) => RcDoc::as_string(n),
             Nat8(n) => RcDoc::as_string(n),
-            Nat16(n) => RcDoc::as_string(n),
-            Nat32(n) => RcDoc::as_string(n),
-            Nat64(n) => RcDoc::as_string(n),
+            Nat16(n) => RcDoc::text(pp_num_str(&n.to_string())),
+            Nat32(n) => RcDoc::text(pp_num_str(&n.to_string())),
+            Nat64(n) => RcDoc::text(pp_num_str(&n.to_string())),
             Int8(n) => RcDoc::as_string(n),
-            Int16(n) => RcDoc::as_string(n),
-            Int32(n) => RcDoc::as_string(n),
-            Int64(n) => RcDoc::as_string(n),
+            Int16(n) => RcDoc::text(pp_num_str(&n.to_string())),
+            Int32(n) => RcDoc::text(pp_num_str(&n.to_string())),
+            Int64(n) => RcDoc::text(pp_num_str(&n.to_string())),
             Float32(n) => RcDoc::as_string(n),
             Float64(n) => RcDoc::as_string(n),
             Text(ref s) => RcDoc::as_string(format!("\"{}\"", s)),
@@ -358,8 +360,27 @@ pub mod pretty {
             Principal(ref id) => RcDoc::as_string(format!("principal \"{}\"", id)),
             Opt(v) => kwd("opt").append(pp_value(v)),
             Vec(vs) => {
-                let body = concat(vs.iter().map(|v| pp_value(v)), ";");
-                kwd("vec").append(enclose_space("{", body, "}"))
+                if let Some(Nat8(_)) = vs.first() {
+                    let mut s = String::new();
+                    for v in vs.iter().take(MAX_VEC_ELEMENTS) {
+                        match v {
+                            Nat8(v) => s.push_str(&format!("\\{:02x}", v)),
+                            _ => unreachable!(),
+                        }
+                    }
+                    if vs.len() > MAX_VEC_ELEMENTS {
+                        s.push_str("...");
+                    }
+                    RcDoc::text(format!("blob \"{}\"", s))
+                } else {
+                    let body = concat(vs.iter().take(MAX_VEC_ELEMENTS).map(|v| pp_value(v)), ";");
+                    let omitted = if vs.len() > MAX_VEC_ELEMENTS {
+                        " ..."
+                    } else {
+                        ""
+                    };
+                    kwd("vec").append(enclose_space("{", body.append(omitted), "}"))
+                }
             }
             Record(fields) => {
                 if is_tuple(v) {

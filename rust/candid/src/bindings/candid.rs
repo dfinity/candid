@@ -134,7 +134,7 @@ pub fn pp_ty(ty: &Type) -> RcDoc {
 pub fn pp_label(id: &Label) -> RcDoc {
     match id {
         Label::Named(id) => pp_text(id),
-        Label::Id(n) | Label::Unnamed(n) => RcDoc::as_string(n),
+        Label::Id(_) | Label::Unnamed(_) => RcDoc::as_string(id),
     }
 }
 
