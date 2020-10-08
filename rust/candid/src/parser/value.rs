@@ -334,7 +334,7 @@ pub mod pretty {
         enclose_space("{", fs, "}")
     }
 
-    const MAX_VEC_ELEMENTS: usize = 20;
+    const MAX_ELEMENTS_FOR_PRETTY_PRINT: usize = 10;
 
     pub fn pp_value(v: &IDLValue) -> RcDoc {
         use super::IDLValue::*;
@@ -362,24 +362,23 @@ pub mod pretty {
             Vec(vs) => {
                 if let Some(Nat8(_)) = vs.first() {
                     let mut s = String::new();
-                    for v in vs.iter().take(MAX_VEC_ELEMENTS) {
+                    for v in vs.iter() {
                         match v {
                             Nat8(v) => s.push_str(&format!("\\{:02x}", v)),
                             _ => unreachable!(),
                         }
                     }
-                    if vs.len() > MAX_VEC_ELEMENTS {
-                        s.push_str("...");
-                    }
                     RcDoc::text(format!("blob \"{}\"", s))
+                } else if vs.len() > MAX_ELEMENTS_FOR_PRETTY_PRINT {
+                        let body = vs
+                            .iter()
+                            .map(|v| v.to_string())
+                            .collect::<std::vec::Vec<_>>()
+                            .join("; ");
+                        RcDoc::text(format!("vec {{ {} }}", body))
                 } else {
-                    let body = concat(vs.iter().take(MAX_VEC_ELEMENTS).map(|v| pp_value(v)), ";");
-                    let omitted = if vs.len() > MAX_VEC_ELEMENTS {
-                        " ..."
-                    } else {
-                        ""
-                    };
-                    kwd("vec").append(enclose_space("{", body.append(omitted), "}"))
+                    let body = concat(vs.iter().map(|v| pp_value(v)), ";");
+                    kwd("vec").append(enclose_space("{", body, "}"))
                 }
             }
             Record(fields) => {
