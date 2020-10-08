@@ -1,0 +1,3 @@
+service : {
+    did_to_js : (text) -> (opt text) query;
+}
