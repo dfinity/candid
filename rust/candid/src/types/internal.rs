@@ -77,7 +77,9 @@ impl Label {
 impl std::fmt::Display for Label {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Label::Id(n) | Label::Unnamed(n) => write!(f, "{}", n),
+            Label::Id(n) | Label::Unnamed(n) => {
+                write!(f, "{}", super::number::pp_num_str(&n.to_string()))
+            }
             Label::Named(id) => write!(f, "{}", id),
         }
     }
