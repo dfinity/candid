@@ -29,6 +29,7 @@ A list of community maintained Candid libraries:
 
 * [didc](tools/didc): Candid CLI
 * [candiff](tools/candiff): Diff Candid values structurally
+* [ui](tools/ui): Candid UI canister
 
 ## Tests
 
