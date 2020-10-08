@@ -370,12 +370,12 @@ pub mod pretty {
                     }
                     RcDoc::text(format!("blob \"{}\"", s))
                 } else if vs.len() > MAX_ELEMENTS_FOR_PRETTY_PRINT {
-                        let body = vs
-                            .iter()
-                            .map(|v| v.to_string())
-                            .collect::<std::vec::Vec<_>>()
-                            .join("; ");
-                        RcDoc::text(format!("vec {{ {} }}", body))
+                    let body = vs
+                        .iter()
+                        .map(|v| v.to_string())
+                        .collect::<std::vec::Vec<_>>()
+                        .join("; ");
+                    RcDoc::text(format!("vec {{ {} }}", body))
                 } else {
                     let body = concat(vs.iter().map(|v| pp_value(v)), ";");
                     kwd("vec").append(enclose_space("{", body, "}"))
