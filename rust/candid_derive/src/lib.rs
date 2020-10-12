@@ -11,8 +11,13 @@ pub fn derive_idl_type(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn candid_type(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn candid_method(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = parse_macro_input!(attr as syn::AttributeArgs);
     let fun = parse_macro_input!(item as syn::ItemFn);
-    func::candid_type(attrs, fun).into()
+    func::candid_method(attrs, fun).into()
+}
+
+#[proc_macro]
+pub fn export_service(_: TokenStream) -> TokenStream {
+    func::export_service().into()
 }

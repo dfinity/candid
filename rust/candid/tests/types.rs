@@ -1,5 +1,7 @@
+#![allow(dead_code)]
+
 use candid::types::{get_type, Label, Type};
-use candid::{CandidType, Int};
+use candid::{candid_method, CandidType, Int};
 
 #[test]
 fn test_primitive() {
@@ -84,6 +86,40 @@ fn test_variant() {
             field("Newtype", Type::Bool),
         ])
     );
+}
+
+#[test]
+fn test_func() {
+    #[candid_method(query, rename = "TEST")]
+    fn test(a: String, b: i32) -> (String, i32) {
+        (a, b)
+    }
+    #[derive(CandidType)]
+    struct List {
+        head: i8,
+        tail: Box<List>,
+    }
+
+    #[derive(CandidType)]
+    enum A {
+        A1(u16),
+        A2(List),
+        A3(String, candid::Principal),
+    }
+
+    #[candid_method(query)]
+    fn id_struct(a: (List,)) -> List {
+        a.0
+    }
+
+    #[candid_method]
+    fn id_variant(a: A) -> A {
+        a
+    }
+
+    candid::export_service!();
+    println!("{}", export_service());
+    assert!(false);
 }
 
 fn field(id: &str, ty: Type) -> candid::types::Field {
