@@ -119,7 +119,7 @@ fn test_func() {
 
     candid::export_service!();
     println!("{}", export_service());
-    assert!(false);
+    //assert!(false);
 }
 
 fn field(id: &str, ty: Type) -> candid::types::Field {
