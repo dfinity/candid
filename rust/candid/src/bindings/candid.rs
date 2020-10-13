@@ -112,7 +112,7 @@ pub fn pp_ty(ty: &Type) -> RcDoc {
                 _ => unreachable!(),
             }
         }
-        Knot(id) => RcDoc::text(format!("{}", id)),
+        Knot(ref id) => RcDoc::text(format!("{}", id)),
         Unknown => unreachable!(),
     }
 }

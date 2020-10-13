@@ -150,8 +150,8 @@ impl IDLValue {
                 let ty = env.rec_find_type(id)?;
                 self.annotate_type(from_parser, env, ty)?
             }
-            (_, Type::Knot(id)) => {
-                let ty = crate::types::internal::find_type(*id).unwrap();
+            (_, Type::Knot(ref id)) => {
+                let ty = crate::types::internal::find_type(id).unwrap();
                 self.annotate_type(from_parser, env, &ty)?
             }
             (IDLValue::Null, Type::Opt(_)) if from_parser => IDLValue::None,

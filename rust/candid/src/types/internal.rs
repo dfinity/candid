@@ -8,27 +8,28 @@ use std::fmt;
 // This is a re-implementation of std::any::TypeId to get rid of 'static constraint.
 // The current TypeId doesn't consider lifetime while computing the hash, which is
 // totally fine for Candid type, as we don't care about lifetime at all.
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct TypeId {
     id: usize,
-    name: &'static str,
+    name: String,
 }
 impl TypeId {
     pub fn of<T: ?Sized>() -> Self {
+        let name = std::any::type_name::<T>();
+        let name = name.rsplit("::").next().unwrap();
+        let name: String = name
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+            .collect();
         TypeId {
             id: TypeId::of::<T> as usize,
-            name: std::any::type_name::<T>(),
+            name,
         }
     }
 }
 impl std::fmt::Display for TypeId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = self.name.rsplit("::").next().unwrap();
-        let name: String = name
-            .chars()
-            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-            .collect();
-        write!(f, "{}_{}", name, self.id)
+        write!(f, "{}", self.name)
     }
 }
 
@@ -260,7 +261,7 @@ pub fn is_primitive(t: &Type) -> bool {
 pub fn unroll(t: &Type) -> Type {
     use self::Type::*;
     match t {
-        Knot(id) => find_type(*id).unwrap(),
+        Knot(ref id) => find_type(id).unwrap(),
         Opt(ref t) => Opt(Box::new(unroll(t))),
         Vec(ref t) => Vec(Box::new(unroll(t))),
         Record(fs) => Record(
@@ -288,8 +289,8 @@ thread_local! {
     static NAME: RefCell<HashMap<Type, TypeId>> = RefCell::new(HashMap::new());
 }
 
-pub(crate) fn find_type(id: TypeId) -> Option<Type> {
-    ENV.with(|e| match e.borrow().get(&id) {
+pub(crate) fn find_type(id: &TypeId) -> Option<Type> {
+    ENV.with(|e| match e.borrow().get(id) {
         None => None,
         Some(t) => Some((*t).clone()),
     })
@@ -302,7 +303,7 @@ pub(crate) fn show_env() {
 }
 
 pub(crate) fn env_add(id: TypeId, t: Type) {
-    ENV.with(|e| drop(e.borrow_mut().insert(id, t.clone())));
+    ENV.with(|e| drop(e.borrow_mut().insert(id.clone(), t.clone())));
     NAME.with(|n| n.borrow_mut().insert(t, id));
 }
 
