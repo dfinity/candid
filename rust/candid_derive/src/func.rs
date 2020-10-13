@@ -41,17 +41,25 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> TokenStream {
     quote! { #fun }
 }
 
+fn generate_arg(name: TokenStream, ty: &str) -> TokenStream {
+    let ty = syn::parse_str::<Type>(ty).unwrap();
+    quote! {
+        let t = env.add::<#ty>();
+        #name.push(t);
+    }
+}
+
 pub(crate) fn export_service() -> TokenStream {
     let methods = METHODS.lock().unwrap().take();
     if let Some(meths) = methods {
         let gen_tys = meths.iter().map(|(name, Method { args, rets, modes })| {
             let args = args
                 .iter()
-                .map(|t| syn::parse_str::<Type>(t).unwrap())
+                .map(|t| generate_arg(quote! { args }, t))
                 .collect::<Vec<_>>();
             let rets = rets
                 .iter()
-                .map(|t| syn::parse_str::<Type>(t).unwrap())
+                .map(|t| generate_arg(quote! { rets }, t))
                 .collect::<Vec<_>>();
             let modes = match modes.as_ref() {
                 "query" => quote! { vec![::candid::parser::types::FuncMode::Query] },
@@ -60,22 +68,23 @@ pub(crate) fn export_service() -> TokenStream {
             quote! {
                 {
                     let mut args = Vec::new();
-                    #(args.push(<#args as ::candid::types::CandidType>::ty());)*
+                    #(#args)*
                     let mut rets = Vec::new();
-                    #(rets.push(<#rets as ::candid::types::CandidType>::ty());)*
-                    let func = ::candid::types::Function { args, rets, modes: #modes };
-                    service.push((#name.to_string(), ::candid::types::Type::Func(func)));
+                    #(#rets)*
+                    let func = Function { args, rets, modes: #modes };
+                    service.push((#name.to_string(), Type::Func(func)));
                 }
             }
         });
         let res = quote! {
             fn export_service() -> String {
+                use ::candid::types::{CandidType, Function, Type};
                 let mut service = Vec::new();
+                let mut env = ::candid::types::internal::TypeContainer::new();
                 #(#gen_tys)*
-                let ty = ::candid::types::Type::Service(service);
-                let env = ::candid::TypeEnv::new();
+                let ty = Type::Service(service);
                 let actor = Some(ty);
-                let result = ::candid::bindings::candid::compile(&env, &actor);
+                let result = ::candid::bindings::candid::compile(&env.env, &actor);
                 format!("{}", result)
             }
         };

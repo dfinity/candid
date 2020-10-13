@@ -88,33 +88,38 @@ fn test_variant() {
     );
 }
 
+#[derive(CandidType)]
+pub struct List<T> {
+    head: T,
+    tail: Box<List<T>>,
+}
+
 #[test]
 fn test_func() {
     #[candid_method(query, rename = "TEST")]
     fn test(a: String, b: i32) -> (String, i32) {
         (a, b)
     }
-    #[derive(CandidType)]
-    struct List {
-        head: i8,
-        tail: Box<List>,
-    }
 
-    #[derive(CandidType)]
-    enum A {
-        A1(u16),
-        A2(List),
-        A3(String, candid::Principal),
+    mod internal {
+        #[derive(candid::CandidType)]
+        pub enum A {
+            A1 { a: u16, b: i32 },
+            A2(super::List<i8>),
+            A3(String, candid::Principal),
+        }
     }
 
     #[candid_method(query)]
-    fn id_struct(a: (List,)) -> List {
-        a.0
+    fn id_struct(_: (List<u8>,)) -> Box<List<u8>> {
+        unreachable!()
     }
 
+    use internal::A;
+
     #[candid_method]
-    fn id_variant(a: A) -> A {
-        a
+    fn id_variant(_: &[internal::A]) -> A {
+        unreachable!()
     }
 
     candid::export_service!();

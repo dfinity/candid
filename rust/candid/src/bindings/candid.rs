@@ -3,21 +3,6 @@ use crate::pretty::*;
 use crate::types::{Field, Function, Label, Type};
 use pretty::RcDoc;
 
-// The definition of tuple is language specific.
-fn is_tuple(t: &Type) -> bool {
-    match t {
-        Type::Record(ref fs) => {
-            for (i, field) in fs.iter().enumerate() {
-                if field.id.get_id() != (i as u32) {
-                    return false;
-                }
-            }
-            true
-        }
-        _ => false,
-    }
-}
-
 static KEYWORDS: [&str; 29] = [
     "import",
     "service",
@@ -109,7 +94,7 @@ pub fn pp_ty(ty: &Type) -> RcDoc {
         Opt(ref t) => kwd("opt").append(pp_ty(t)),
         Vec(ref t) => kwd("vec").append(pp_ty(t)),
         Record(ref fs) => {
-            if is_tuple(ty) {
+            if ty.is_tuple() {
                 let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ";");
                 kwd("record").append(enclose_space("{", tuple, "}"))
             } else {
@@ -127,7 +112,7 @@ pub fn pp_ty(ty: &Type) -> RcDoc {
                 _ => unreachable!(),
             }
         }
-        Knot(id) => RcDoc::text(format!("{:?}", id)),
+        Knot(id) => RcDoc::text(format!("{}", id)),
         Unknown => unreachable!(),
     }
 }

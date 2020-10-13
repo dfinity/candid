@@ -3,18 +3,99 @@ use crate::idl_hash;
 use num_enum::TryFromPrimitive;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt;
 
 // This is a re-implementation of std::any::TypeId to get rid of 'static constraint.
 // The current TypeId doesn't consider lifetime while computing the hash, which is
-// totally fine for IDL type, as we don't care about lifetime at all.
+// totally fine for Candid type, as we don't care about lifetime at all.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct TypeId {
     id: usize,
+    name: &'static str,
 }
 impl TypeId {
     pub fn of<T: ?Sized>() -> Self {
         TypeId {
             id: TypeId::of::<T> as usize,
+            name: std::any::type_name::<T>(),
+        }
+    }
+}
+impl std::fmt::Display for TypeId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = self.name.rsplit("::").next().unwrap();
+        let name: String = name
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+            .collect();
+        write!(f, "{}_{}", name, self.id)
+    }
+}
+
+/// Used for candid_derive::export_service to generate TypeEnv from Type
+#[derive(Default)]
+pub struct TypeContainer {
+    pub env: crate::TypeEnv,
+}
+impl TypeContainer {
+    pub fn new() -> Self {
+        TypeContainer {
+            env: crate::TypeEnv::new(),
+        }
+    }
+    pub fn add<T: CandidType>(&mut self) -> Type {
+        let t = T::ty();
+        self.go(&t)
+    }
+    fn go(&mut self, t: &Type) -> Type {
+        match t {
+            Type::Opt(ref t) => Type::Opt(Box::new(self.go(t))),
+            Type::Vec(ref t) => Type::Vec(Box::new(self.go(t))),
+            Type::Record(fs) => {
+                let res = Type::Record(
+                    fs.iter()
+                        .map(|Field { id, ty }| Field {
+                            id: id.clone(),
+                            ty: self.go(ty),
+                        })
+                        .collect(),
+                );
+                if t.is_tuple() {
+                    return res;
+                }
+                let id = NAME.with(|n| n.borrow().get(t).cloned());
+                if let Some(id) = id {
+                    self.env.0.insert(id.to_string(), res);
+                    Type::Var(id.to_string())
+                } else {
+                    // if the type of part of an enum, the id won't be recorded.
+                    // we want to inline the type in this case.
+                    res
+                }
+            }
+            Type::Variant(fs) => {
+                let res = Type::Variant(
+                    fs.iter()
+                        .map(|Field { id, ty }| Field {
+                            id: id.clone(),
+                            ty: self.go(ty),
+                        })
+                        .collect(),
+                );
+                let id = NAME.with(|n| n.borrow().get(t).cloned());
+                if let Some(id) = id {
+                    self.env.0.insert(id.to_string(), res);
+                    Type::Var(id.to_string())
+                } else {
+                    res
+                }
+            }
+            Type::Knot(id) => {
+                let name = id.to_string();
+                Type::Var(name)
+            }
+            // TODO Func, service
+            _ => t.clone(),
         }
     }
 }
@@ -50,8 +131,22 @@ pub enum Type {
     Class(Vec<Type>, Box<Type>),
     Principal,
 }
-
-impl std::fmt::Display for Type {
+impl Type {
+    pub(crate) fn is_tuple(&self) -> bool {
+        match self {
+            Type::Record(ref fs) => {
+                for (i, field) in fs.iter().enumerate() {
+                    if field.id.get_id() != (i as u32) {
+                        return false;
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+}
+impl fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", crate::bindings::candid::pp_ty(&self).pretty(80))
     }
@@ -188,6 +283,7 @@ pub fn unroll(t: &Type) -> Type {
 
 thread_local! {
     static ENV: RefCell<HashMap<TypeId, Type>> = RefCell::new(HashMap::new());
+    static NAME: RefCell<HashMap<Type, TypeId>> = RefCell::new(HashMap::new());
 }
 
 pub(crate) fn find_type(id: TypeId) -> Option<Type> {
@@ -204,7 +300,8 @@ pub(crate) fn show_env() {
 }
 
 pub(crate) fn env_add(id: TypeId, t: Type) {
-    ENV.with(|e| drop(e.borrow_mut().insert(id, t)))
+    ENV.with(|e| drop(e.borrow_mut().insert(id, t.clone())));
+    NAME.with(|n| n.borrow_mut().insert(t, id));
 }
 
 pub fn get_type<T>(_v: &T) -> Type
