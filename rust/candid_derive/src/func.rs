@@ -44,8 +44,7 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> TokenStream {
 fn generate_arg(name: TokenStream, ty: &str) -> TokenStream {
     let ty = syn::parse_str::<Type>(ty).unwrap();
     quote! {
-        let t = env.add::<#ty>();
-        #name.push(t);
+        #name.push(env.add::<#ty>());
     }
 }
 
@@ -77,7 +76,7 @@ pub(crate) fn export_service() -> TokenStream {
             }
         });
         let res = quote! {
-            fn export_service() -> String {
+            fn __export_service() -> String {
                 use ::candid::types::{CandidType, Function, Type};
                 let mut service = Vec::new();
                 let mut env = ::candid::types::internal::TypeContainer::new();

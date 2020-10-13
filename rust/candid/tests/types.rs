@@ -91,7 +91,7 @@ fn test_variant() {
 #[derive(CandidType)]
 pub struct List<T> {
     head: T,
-    tail: Box<List<T>>,
+    tail: Option<Box<List<T>>>,
 }
 
 #[test]
@@ -102,11 +102,28 @@ fn test_func() {
     }
 
     mod internal {
-        #[derive(candid::CandidType)]
+        use candid::CandidType;
+        #[derive(CandidType)]
+        pub struct List<T> {
+            head: T,
+            tail: Option<Box<List<T>>>,
+        }
+        #[derive(CandidType)]
+        pub struct Wrap(List<i8>);
+        #[derive(CandidType)]
+        pub struct NamedStruct {
+            a: u16,
+            b: i32,
+        }
+        #[derive(CandidType)]
         pub enum A {
-            A1 { a: u16, b: i32 },
-            A2(super::List<i8>),
-            A3(String, candid::Principal),
+            A1(super::List<i8>, Box<List<i8>>, Wrap),
+            A2(String, candid::Principal),
+            A3(candid::Int),
+            // This struct happens to have the same candid type as NamedStruct
+            A4 { a: u16, b: i32 },
+            A5(NamedStruct),
+            A6 { b: i32, c: u16 },
         }
     }
 
@@ -118,12 +135,12 @@ fn test_func() {
     use internal::A;
 
     #[candid_method]
-    fn id_variant(_: &[internal::A]) -> A {
+    fn id_variant(_: &[internal::A]) -> ((A,), A) {
         unreachable!()
     }
 
     candid::export_service!();
-    println!("{}", export_service());
+    println!("{}", __export_service());
     //assert!(false);
 }
 

@@ -68,7 +68,7 @@ impl TypeContainer {
                     self.env.0.insert(id.to_string(), res);
                     Type::Var(id.to_string())
                 } else {
-                    // if the type of part of an enum, the id won't be recorded.
+                    // if the type is part of an enum, the id won't be recorded.
                     // we want to inline the type in this case.
                     res
                 }
@@ -92,6 +92,8 @@ impl TypeContainer {
             }
             Type::Knot(id) => {
                 let name = id.to_string();
+                let ty = ENV.with(|e| e.borrow().get(id).unwrap().clone());
+                self.env.0.insert(id.to_string(), ty);
                 Type::Var(name)
             }
             // TODO Func, service
