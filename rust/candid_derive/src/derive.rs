@@ -1,3 +1,4 @@
+use super::idl_hash;
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::BTreeSet;
@@ -33,15 +34,6 @@ pub(crate) fn derive_idl_type(input: DeriveInput) -> TokenStream {
     };
     //panic!(gen.to_string());
     gen
-}
-
-#[inline]
-fn idl_hash(id: &str) -> u32 {
-    let mut s: u32 = 0;
-    for c in id.as_bytes().iter() {
-        s = s.wrapping_mul(223).wrapping_add(*c as u32);
-    }
-    s
 }
 
 struct Variant {

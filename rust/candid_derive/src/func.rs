@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 use syn::{AttributeArgs, ItemFn, ReturnType, Signature, Type};
@@ -17,7 +17,6 @@ lazy_static! {
 }
 
 pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> TokenStream {
-    use quote::ToTokens;
     let attrs = get_candid_attribute(&attrs);
     let sig = &fun.sig;
     if !sig.generics.params.is_empty() {
@@ -25,18 +24,26 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> TokenStream {
     }
     let ident = sig.ident.to_string();
     let name = attrs.rename.as_ref().unwrap_or_else(|| &ident).clone();
-    let modes = attrs.method_type;
+    let modes = attrs.method_type.unwrap_or_else(|| "update".to_string());
     let (args, rets) = get_args(sig);
-    let args = args
+    let args: Vec<String> = args
         .iter()
         .map(|t| format!("{}", t.to_token_stream()))
         .collect();
-    let rets = rets
+    let rets: Vec<String> = rets
         .iter()
         .map(|t| format!("{}", t.to_token_stream()))
         .collect();
+    if modes == "oneway" && !rets.is_empty() {
+        unimplemented!("oneway function should have no return value");
+    }
     if let Some(map) = METHODS.lock().unwrap().as_mut() {
-        map.insert(name, Method { args, rets, modes });
+        if map
+            .insert(name.clone(), Method { args, rets, modes })
+            .is_some()
+        {
+            unimplemented!("duplicate method name {}", name);
+        }
     }
     quote! { #fun }
 }
@@ -62,7 +69,9 @@ pub(crate) fn export_service() -> TokenStream {
                 .collect::<Vec<_>>();
             let modes = match modes.as_ref() {
                 "query" => quote! { vec![::candid::parser::types::FuncMode::Query] },
-                _ => quote! { vec![] },
+                "oneway" => quote! { vec![::candid::parser::types::FuncMode::Oneway] },
+                "update" => quote! { vec![] },
+                _ => unreachable!(),
             };
             quote! {
                 {
@@ -81,6 +90,7 @@ pub(crate) fn export_service() -> TokenStream {
                 let mut service = Vec::new();
                 let mut env = ::candid::types::internal::TypeContainer::new();
                 #(#gen_tys)*
+                service.sort_unstable_by_key(|(name, _)| ::candid::idl_hash(name));
                 let ty = Type::Service(service);
                 let actor = Some(ty);
                 let result = ::candid::bindings::candid::compile(&env.env, &actor);
@@ -114,7 +124,7 @@ fn get_args(sig: &Signature) -> (Vec<Type>, Vec<Type>) {
 
 struct CandidAttribute {
     rename: Option<String>,
-    method_type: String,
+    method_type: Option<String>,
 }
 
 fn get_candid_attribute(attrs: &[syn::NestedMeta]) -> CandidAttribute {
@@ -122,19 +132,23 @@ fn get_candid_attribute(attrs: &[syn::NestedMeta]) -> CandidAttribute {
     use syn::NestedMeta::Meta;
     let mut res = CandidAttribute {
         rename: None,
-        method_type: "update".to_string(),
+        method_type: None,
     };
     for attr in attrs.iter() {
         match &attr {
-            Meta(NameValue(m)) if m.path.is_ident("rename") => {
+            Meta(NameValue(m)) if m.path.is_ident("rename") && res.rename.is_none() => {
                 if let syn::Lit::Str(lit) = &m.lit {
                     res.rename = Some(lit.value());
                 }
             }
-            Meta(Path(p)) if p.get_ident().is_some() => {
-                res.method_type = p.get_ident().unwrap().to_string();
+            Meta(Path(p)) if res.method_type.is_none() => {
+                let mode = p.get_ident().unwrap().to_string();
+                match mode.as_ref() {
+                    "query" | "update" | "oneway" => res.method_type = Some(mode),
+                    m => unimplemented!("unknown mode {}", m),
+                }
             }
-            _ => unimplemented!("unknown attr"),
+            _ => unimplemented!("unknown or conflicting attribute {:?}", attr),
         }
     }
     res

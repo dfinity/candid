@@ -96,7 +96,7 @@ pub struct List<T> {
 
 #[test]
 fn test_func() {
-    #[candid_method(query, rename = "TEST")]
+    #[candid_method(query, rename = "🐂")]
     fn test(a: String, b: i32) -> (String, i32) {
         (a, b)
     }
@@ -127,16 +127,18 @@ fn test_func() {
             A7 { b: i32, c: u16 },
         }
     }
-
-    #[candid_method(query)]
-    fn id_struct(_: (List<u8>,)) -> Result<List<u8>, candid::Empty> {
+    use internal::A;
+    #[candid::candid_method]
+    fn id_variant(_: &[A]) -> Result<((A,), A), String> {
+        unreachable!()
+    }
+    #[candid_method(oneway)]
+    fn oneway(_: &str) -> () {
         unreachable!()
     }
 
-    use internal::A;
-
-    #[candid_method]
-    fn id_variant(_: &[internal::A]) -> Result<((A,), A), String> {
+    #[candid_method(query)]
+    fn id_struct(_: (List<u8>,)) -> Result<List<u8>, candid::Empty> {
         unreachable!()
     }
 
@@ -158,11 +160,14 @@ type Result = variant { Ok : List; Err : empty };
 type Result_1 = variant { Ok : record { record { A }; A }; Err : text };
 type Wrap = record { head : int8; tail : opt Box };
 service : {
-  TEST : (text, int32) -> (text, int32) query;
-  id_struct : (record { List }) -> (Result) query;
   id_variant : (vec A) -> (Result_1);
+  id_struct : (record { List }) -> (Result) query;
+  "🐂" : (text, int32) -> (text, int32) query;
+  "oneway" : (text) -> () oneway;
 }"#;
     assert_eq!(expected, __export_service());
+    //println!("{}", __export_service());
+    //assert!(false);
 }
 
 fn field(id: &str, ty: Type) -> candid::types::Field {

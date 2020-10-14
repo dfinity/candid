@@ -21,3 +21,12 @@ pub fn candid_method(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn export_service(_: TokenStream) -> TokenStream {
     func::export_service().into()
 }
+
+#[inline]
+pub(crate) fn idl_hash(id: &str) -> u32 {
+    let mut s: u32 = 0;
+    for c in id.as_bytes().iter() {
+        s = s.wrapping_mul(223).wrapping_add(*c as u32);
+    }
+    s
+}
