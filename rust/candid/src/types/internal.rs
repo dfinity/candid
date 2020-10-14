@@ -11,16 +11,11 @@ use std::fmt;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct TypeId {
     id: usize,
-    name: String,
+    pub name: &'static str,
 }
 impl TypeId {
     pub fn of<T: ?Sized>() -> Self {
         let name = std::any::type_name::<T>();
-        let name = name.rsplit("::").next().unwrap();
-        let name: String = name
-            .chars()
-            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-            .collect();
         TypeId {
             id: TypeId::of::<T> as usize,
             name,
@@ -29,7 +24,45 @@ impl TypeId {
 }
 impl std::fmt::Display for TypeId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name)
+        let name = NAME.with(|n| n.borrow_mut().get(&self));
+        write!(f, "{}", name)
+    }
+}
+
+#[derive(Default)]
+struct TypeName {
+    type_name: HashMap<TypeId, String>,
+    name_index: HashMap<String, usize>,
+}
+impl TypeName {
+    fn get(&mut self, id: &TypeId) -> String {
+        match self.type_name.get(id) {
+            Some(n) => n.to_string(),
+            None => {
+                // The format of id.name is unspecified, and doesn't guarantee to be unique.
+                // Splitting by "::" is not ideal, as we can get types like std::Box<lib::List>, HashMap<lib::K, V>
+                let name = id.name.split('<').next().unwrap();
+                let name = name.rsplit("::").next().unwrap();
+                let name = name
+                    .chars()
+                    .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                    .collect::<String>()
+                    .trim_end_matches('_')
+                    .to_string();
+                let res = match self.name_index.get_mut(&name) {
+                    None => {
+                        self.name_index.insert(name.clone(), 0);
+                        name
+                    }
+                    Some(v) => {
+                        *v += 1;
+                        format!("{}_{}", name, v)
+                    }
+                };
+                self.type_name.insert(id.clone(), res.clone());
+                res
+            }
+        }
     }
 }
 
@@ -64,7 +97,7 @@ impl TypeContainer {
                 if t.is_tuple() {
                     return res;
                 }
-                let id = NAME.with(|n| n.borrow().get(t).cloned());
+                let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
                     self.env.0.insert(id.to_string(), res);
                     Type::Var(id.to_string())
@@ -83,7 +116,7 @@ impl TypeContainer {
                         })
                         .collect(),
                 );
-                let id = NAME.with(|n| n.borrow().get(t).cloned());
+                let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
                     self.env.0.insert(id.to_string(), res);
                     Type::Var(id.to_string())
@@ -97,7 +130,7 @@ impl TypeContainer {
                 self.env.0.insert(id.to_string(), ty);
                 Type::Var(name)
             }
-            // TODO Func, service
+            // TODO walk through func, service, class
             _ => t.clone(),
         }
     }
@@ -286,7 +319,9 @@ pub fn unroll(t: &Type) -> Type {
 
 thread_local! {
     static ENV: RefCell<HashMap<TypeId, Type>> = RefCell::new(HashMap::new());
-    static NAME: RefCell<HashMap<Type, TypeId>> = RefCell::new(HashMap::new());
+    // only used for TypeContainer
+    static ID: RefCell<HashMap<Type, TypeId>> = RefCell::new(HashMap::new());
+    static NAME: RefCell<TypeName> = RefCell::new(Default::default());
 }
 
 pub(crate) fn find_type(id: &TypeId) -> Option<Type> {
@@ -303,8 +338,23 @@ pub(crate) fn show_env() {
 }
 
 pub(crate) fn env_add(id: TypeId, t: Type) {
-    ENV.with(|e| drop(e.borrow_mut().insert(id.clone(), t.clone())));
-    NAME.with(|n| n.borrow_mut().insert(t, id));
+    ENV.with(|e| drop(e.borrow_mut().insert(id, t)));
+}
+
+pub(crate) fn env_id(id: TypeId, t: Type) {
+    // prefer shorter type names
+    let new_len = id.name.len();
+    ID.with(|n| {
+        let mut n = n.borrow_mut();
+        match n.get_mut(&t) {
+            None => drop(n.insert(t, id)),
+            Some(v) => {
+                if new_len < v.name.len() {
+                    *v = id;
+                }
+            }
+        }
+    });
 }
 
 pub fn get_type<T>(_v: &T) -> Type

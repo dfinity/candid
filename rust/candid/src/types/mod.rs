@@ -27,7 +27,8 @@ pub trait CandidType {
         } else {
             self::internal::env_add(id.clone(), Type::Unknown);
             let t = Self::_ty();
-            self::internal::env_add(id, t.clone());
+            self::internal::env_add(id.clone(), t.clone());
+            self::internal::env_id(id, t.clone());
             t
         }
     }

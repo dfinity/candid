@@ -123,19 +123,20 @@ fn test_func() {
             // This struct happens to have the same candid type as NamedStruct
             A4 { a: u16, b: i32 },
             A5(NamedStruct),
-            A6 { b: i32, c: u16 },
+            A6(Box<NamedStruct>),
+            A7 { b: i32, c: u16 },
         }
     }
 
     #[candid_method(query)]
-    fn id_struct(_: (List<u8>,)) -> Box<List<u8>> {
+    fn id_struct(_: (List<u8>,)) -> Result<List<u8>, candid::Empty> {
         unreachable!()
     }
 
     use internal::A;
 
     #[candid_method]
-    fn id_variant(_: &[internal::A]) -> ((A,), A) {
+    fn id_variant(_: &[internal::A]) -> Result<((A,), A), String> {
         unreachable!()
     }
 
