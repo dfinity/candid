@@ -133,7 +133,7 @@ fn test_func() {
         unreachable!()
     }
     #[candid_method(oneway)]
-    fn oneway(_: &str) -> () {
+    fn oneway(_: &str) {
         unreachable!()
     }
 
