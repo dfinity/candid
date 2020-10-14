@@ -41,6 +41,7 @@ impl TypeName {
             None => {
                 // The format of id.name is unspecified, and doesn't guarantee to be unique.
                 // Splitting by "::" is not ideal, as we can get types like std::Box<lib::List>, HashMap<lib::K, V>
+                // This is not a problem for correctness, but I may get misleading names.
                 let name = id.name.split('<').next().unwrap();
                 let name = name.rsplit("::").next().unwrap();
                 let name = name

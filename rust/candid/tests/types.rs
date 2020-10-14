@@ -141,8 +141,28 @@ fn test_func() {
     }
 
     candid::export_service!();
-    println!("{}", __export_service());
-    //assert!(false);
+    let expected = r#"type A = variant {
+  A1 : record { List_1; Wrap; Wrap };
+  A2 : record { text; principal };
+  A3 : int;
+  A4 : NamedStruct;
+  A5 : NamedStruct;
+  A6 : NamedStruct;
+  A7 : record { b : int32; c : nat16 };
+};
+type Box = record { head : int8; tail : opt Box };
+type List = record { head : nat8; tail : opt List };
+type List_1 = record { head : int8; tail : opt List_1 };
+type NamedStruct = record { a : nat16; b : int32 };
+type Result = variant { Ok : List; Err : empty };
+type Result_1 = variant { Ok : record { record { A }; A }; Err : text };
+type Wrap = record { head : int8; tail : opt Box };
+service : {
+  TEST : (text, int32) -> (text, int32) query;
+  id_struct : (record { List }) -> (Result) query;
+  id_variant : (vec A) -> (Result_1);
+}"#;
+    assert_eq!(expected, __export_service());
 }
 
 fn field(id: &str, ty: Type) -> candid::types::Field {
