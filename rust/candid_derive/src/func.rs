@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
-use syn::{AttributeArgs, ItemFn, ReturnType, Signature, Type};
+use syn::{AttributeArgs, Error, ItemFn, Result, ReturnType, Signature, Type};
 
 struct Method {
     args: Vec<String>,
@@ -16,11 +16,14 @@ lazy_static! {
         Mutex::new(Some(Default::default()));
 }
 
-pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> TokenStream {
-    let attrs = get_candid_attribute(&attrs);
+pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenStream> {
+    let attrs = get_candid_attribute(&attrs)?;
     let sig = &fun.sig;
     if !sig.generics.params.is_empty() {
-        unimplemented!("doesn't support generic parameters");
+        return Err(Error::new_spanned(
+            &sig.generics,
+            "candid_method doesn't support generic parameters",
+        ));
     }
     let ident = sig.ident.to_string();
     let name = attrs.rename.as_ref().unwrap_or_else(|| &ident).clone();
@@ -35,17 +38,23 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> TokenStream {
         .map(|t| format!("{}", t.to_token_stream()))
         .collect();
     if modes == "oneway" && !rets.is_empty() {
-        unimplemented!("oneway function should have no return value");
+        return Err(Error::new_spanned(
+            &sig.output,
+            "oneway function should have no return value",
+        ));
     }
     if let Some(map) = METHODS.lock().unwrap().as_mut() {
         if map
             .insert(name.clone(), Method { args, rets, modes })
             .is_some()
         {
-            unimplemented!("duplicate method name {}", name);
+            return Err(Error::new_spanned(
+                &sig.ident,
+                format!("duplicate method name {}", name),
+            ));
         }
     }
-    quote! { #fun }
+    Ok(quote! { #fun })
 }
 
 fn generate_arg(name: TokenStream, ty: &str) -> TokenStream {
@@ -108,7 +117,7 @@ fn get_args(sig: &Signature) -> (Vec<Type>, Vec<Type>) {
     let mut args = Vec::new();
     for arg in &sig.inputs {
         match arg {
-            syn::FnArg::Receiver(_) => unimplemented!("self function"),
+            syn::FnArg::Receiver(_) => continue, // skip self argument
             syn::FnArg::Typed(syn::PatType { ty, .. }) => args.push(ty.as_ref().clone()),
         }
     }
@@ -127,7 +136,7 @@ struct CandidAttribute {
     method_type: Option<String>,
 }
 
-fn get_candid_attribute(attrs: &[syn::NestedMeta]) -> CandidAttribute {
+fn get_candid_attribute(attrs: &[syn::NestedMeta]) -> Result<CandidAttribute> {
     use syn::Meta::{NameValue, Path};
     use syn::NestedMeta::Meta;
     let mut res = CandidAttribute {
@@ -145,11 +154,11 @@ fn get_candid_attribute(attrs: &[syn::NestedMeta]) -> CandidAttribute {
                 let mode = p.get_ident().unwrap().to_string();
                 match mode.as_ref() {
                     "query" | "update" | "oneway" => res.method_type = Some(mode),
-                    m => unimplemented!("unknown mode {}", m),
+                    _ => return Err(Error::new_spanned(p, "unknown mode")),
                 }
             }
-            _ => unimplemented!("unknown or conflicting attribute {:?}", attr),
+            _ => return Err(Error::new_spanned(attr, "unknown or conflicting attribute")),
         }
     }
-    res
+    Ok(res)
 }

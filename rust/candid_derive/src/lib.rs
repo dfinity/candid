@@ -14,7 +14,7 @@ pub fn derive_idl_type(input: TokenStream) -> TokenStream {
 pub fn candid_method(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = parse_macro_input!(attr as syn::AttributeArgs);
     let fun = parse_macro_input!(item as syn::ItemFn);
-    func::candid_method(attrs, fun).into()
+    func::candid_method(attrs, fun).map_or_else(|e| e.to_compile_error().into(), Into::into)
 }
 
 #[proc_macro]
