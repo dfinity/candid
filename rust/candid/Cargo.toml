@@ -39,3 +39,6 @@ thiserror = "1.0.20"
 goldenfile = "1.1.0"
 test-generator = "0.3.0"
 rand = "0.7.3"
+
+[features]
+cdk = ["candid_derive/cdk"]

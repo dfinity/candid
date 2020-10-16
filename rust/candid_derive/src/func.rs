@@ -1,3 +1,4 @@
+use super::candid_path;
 use lazy_static::lazy_static;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
@@ -63,6 +64,7 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenSt
 
 pub(crate) fn export_service() -> TokenStream {
     if let Some(meths) = METHODS.lock().unwrap().as_mut() {
+        let candid = candid_path();
         let gen_tys = meths.iter().map(|(name, Method { args, rets, modes })| {
             let args = args
                 .iter()
@@ -73,8 +75,8 @@ pub(crate) fn export_service() -> TokenStream {
                 .map(|t| generate_arg(quote! { rets }, t))
                 .collect::<Vec<_>>();
             let modes = match modes.as_ref() {
-                "query" => quote! { vec![::candid::parser::types::FuncMode::Query] },
-                "oneway" => quote! { vec![::candid::parser::types::FuncMode::Oneway] },
+                "query" => quote! { vec![#candid::parser::types::FuncMode::Query] },
+                "oneway" => quote! { vec![#candid::parser::types::FuncMode::Oneway] },
                 "update" => quote! { vec![] },
                 _ => unreachable!(),
             };
@@ -91,14 +93,14 @@ pub(crate) fn export_service() -> TokenStream {
         });
         let res = quote! {
             fn __export_service() -> String {
-                use ::candid::types::{CandidType, Function, Type};
+                use #candid::types::{CandidType, Function, Type};
                 let mut service = Vec::<(String, Type)>::new();
-                let mut env = ::candid::types::internal::TypeContainer::new();
+                let mut env = #candid::types::internal::TypeContainer::new();
                 #(#gen_tys)*
-                service.sort_unstable_by_key(|(name, _)| ::candid::idl_hash(name));
+                service.sort_unstable_by_key(|(name, _)| #candid::idl_hash(name));
                 let ty = Type::Service(service);
                 let actor = Some(ty);
-                let result = ::candid::bindings::candid::compile(&env.env, &actor);
+                let result = #candid::bindings::candid::compile(&env.env, &actor);
                 format!("{}", result)
             }
         };
