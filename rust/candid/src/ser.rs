@@ -307,8 +307,8 @@ impl TypeSerialize {
             Type::Reserved => sleb128_encode(buf, Opcode::Reserved as i64),
             Type::Empty => sleb128_encode(buf, Opcode::Empty as i64),
             Type::Principal => sleb128_encode(buf, Opcode::Principal as i64),
-            Type::Knot(id) => {
-                let ty = types::internal::find_type(*id)
+            Type::Knot(ref id) => {
+                let ty = types::internal::find_type(id)
                     .ok_or_else(|| Error::msg("knot TypeId not found"))?;
                 let idx = self
                     .type_map

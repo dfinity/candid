@@ -1,5 +1,7 @@
+#![allow(dead_code)]
+
 use candid::types::{get_type, Label, Type};
-use candid::{CandidType, Int};
+use candid::{candid_method, CandidType, Int};
 
 #[test]
 fn test_primitive() {
@@ -84,6 +86,111 @@ fn test_variant() {
             field("Newtype", Type::Bool),
         ])
     );
+}
+
+#[derive(CandidType)]
+pub struct List<T> {
+    head: T,
+    tail: Option<Box<List<T>>>,
+}
+
+#[test]
+fn test_func() {
+    #[candid_method(query, rename = "🐂")]
+    fn test(a: String, b: i32) -> (String, i32) {
+        (a, b)
+    }
+
+    mod internal {
+        use candid::CandidType;
+        #[derive(CandidType)]
+        pub struct List<T> {
+            head: T,
+            tail: Option<Box<List<T>>>,
+        }
+        #[derive(CandidType)]
+        pub struct Wrap(List<i8>);
+        #[derive(CandidType)]
+        pub struct NamedStruct {
+            a: u16,
+            b: i32,
+        }
+        #[derive(CandidType)]
+        pub enum A {
+            A1(super::List<i8>, Box<List<i8>>, Wrap),
+            A2(String, candid::Principal),
+            A3(candid::Int),
+            // This struct happens to have the same candid type as NamedStruct
+            A4 { a: u16, b: i32 },
+            A5(NamedStruct),
+            A6(Box<NamedStruct>),
+            A7 { b: i32, c: u16 },
+        }
+    }
+    use internal::A;
+    #[candid::candid_method]
+    fn id_variant(_: &[internal::A]) -> Result<((A,), A), String> {
+        unreachable!()
+    }
+    #[candid_method(oneway)]
+    fn oneway(_: &str) {
+        unreachable!()
+    }
+
+    #[candid_method(query)]
+    fn id_struct(_: (List<u8>,)) -> Result<List<u8>, candid::Empty> {
+        unreachable!()
+    }
+
+    candid::export_service!();
+    let expected = r#"type A = variant {
+  A1 : record { List_1; Wrap; Wrap };
+  A2 : record { text; principal };
+  A3 : int;
+  A4 : NamedStruct;
+  A5 : NamedStruct;
+  A6 : NamedStruct;
+  A7 : record { b : int32; c : nat16 };
+};
+type Box = record { head : int8; tail : opt Box };
+type List = record { head : nat8; tail : opt List };
+type List_1 = record { head : int8; tail : opt List_1 };
+type NamedStruct = record { a : nat16; b : int32 };
+type Result = variant { Ok : List; Err : empty };
+type Result_1 = variant { Ok : record { record { A }; A }; Err : text };
+type Wrap = record { head : int8; tail : opt Box };
+service : {
+  id_variant : (vec A) -> (Result_1);
+  id_struct : (record { List }) -> (Result) query;
+  "🐂" : (text, int32) -> (text, int32) query;
+  "oneway" : (text) -> () oneway;
+}"#;
+    assert_eq!(expected, __export_service());
+    //println!("{}", __export_service());
+    //assert!(false);
+}
+
+#[test]
+fn test_counter() {
+    struct Service {
+        counter: usize,
+    }
+    impl Service {
+        fn init() -> Self {
+            Service { counter: 0 }
+        }
+        #[candid_method]
+        fn inc(&mut self) {
+            self.counter += 1;
+        }
+        #[candid_method(query)]
+        fn read(&self) -> usize {
+            self.counter
+        }
+    }
+    candid::export_service!();
+    let expected = "service : { inc : () -> (); read : () -> (nat64) query }";
+    assert_eq!(expected, __export_service());
 }
 
 fn field(id: &str, ty: Type) -> candid::types::Field {

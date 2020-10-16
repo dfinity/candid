@@ -235,7 +235,7 @@
 //! ```
 //!
 
-pub use candid_derive::CandidType;
+pub use candid_derive::{candid_method, export_service, CandidType};
 pub use serde::Deserialize;
 
 pub mod codegen;
