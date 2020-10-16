@@ -129,7 +129,7 @@ fn test_func() {
     }
     use internal::A;
     #[candid::candid_method]
-    fn id_variant(_: &[A]) -> Result<((A,), A), String> {
+    fn id_variant(_: &[internal::A]) -> Result<((A,), A), String> {
         unreachable!()
     }
     #[candid_method(oneway)]
@@ -168,6 +168,29 @@ service : {
     assert_eq!(expected, __export_service());
     //println!("{}", __export_service());
     //assert!(false);
+}
+
+#[test]
+fn test_counter() {
+    struct Service {
+        counter: usize,
+    }
+    impl Service {
+        fn init() -> Self {
+            Service { counter: 0 }
+        }
+        #[candid_method]
+        fn inc(&mut self) {
+            self.counter += 1;
+        }
+        #[candid_method(query)]
+        fn read(&self) -> usize {
+            self.counter
+        }
+    }
+    candid::export_service!();
+    let expected = "service : { inc : () -> (); read : () -> (nat64) query }";
+    assert_eq!(expected, __export_service());
 }
 
 fn field(id: &str, ty: Type) -> candid::types::Field {

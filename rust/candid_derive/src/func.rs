@@ -11,6 +11,10 @@ struct Method {
     modes: String,
 }
 
+// There is no official way to communicate information across proc macro invocations.
+// lazy_static works for now, but may get incomplete info with incremental compilation.
+// See https://github.com/rust-lang/rust/issues/44034
+// Hopefully, we can have an attribute on impl, then we don't need global state.
 lazy_static! {
     static ref METHODS: Mutex<Option<BTreeMap<String, Method>>> =
         Mutex::new(Some(Default::default()));
@@ -28,7 +32,7 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenSt
     let ident = sig.ident.to_string();
     let name = attrs.rename.as_ref().unwrap_or_else(|| &ident).clone();
     let modes = attrs.method_type.unwrap_or_else(|| "update".to_string());
-    let (args, rets) = get_args(sig);
+    let (args, rets) = get_args(sig)?;
     let args: Vec<String> = args
         .iter()
         .map(|t| format!("{}", t.to_token_stream()))
@@ -57,16 +61,8 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenSt
     Ok(quote! { #fun })
 }
 
-fn generate_arg(name: TokenStream, ty: &str) -> TokenStream {
-    let ty = syn::parse_str::<Type>(ty).unwrap();
-    quote! {
-        #name.push(env.add::<#ty>());
-    }
-}
-
 pub(crate) fn export_service() -> TokenStream {
-    let methods = METHODS.lock().unwrap().take();
-    if let Some(meths) = methods {
+    if let Some(meths) = METHODS.lock().unwrap().as_mut() {
         let gen_tys = meths.iter().map(|(name, Method { args, rets, modes })| {
             let args = args
                 .iter()
@@ -96,7 +92,7 @@ pub(crate) fn export_service() -> TokenStream {
         let res = quote! {
             fn __export_service() -> String {
                 use ::candid::types::{CandidType, Function, Type};
-                let mut service = Vec::new();
+                let mut service = Vec::<(String, Type)>::new();
                 let mut env = ::candid::types::internal::TypeContainer::new();
                 #(#gen_tys)*
                 service.sort_unstable_by_key(|(name, _)| ::candid::idl_hash(name));
@@ -106,18 +102,30 @@ pub(crate) fn export_service() -> TokenStream {
                 format!("{}", result)
             }
         };
+        meths.clear();
         //panic!(res.to_string());
         res
     } else {
-        panic!("export_service! called more than once")
+        unreachable!()
     }
 }
 
-fn get_args(sig: &Signature) -> (Vec<Type>, Vec<Type>) {
+fn generate_arg(name: TokenStream, ty: &str) -> TokenStream {
+    let ty = syn::parse_str::<Type>(ty).unwrap();
+    quote! {
+        #name.push(env.add::<#ty>());
+    }
+}
+
+fn get_args(sig: &Signature) -> Result<(Vec<Type>, Vec<Type>)> {
     let mut args = Vec::new();
     for arg in &sig.inputs {
         match arg {
-            syn::FnArg::Receiver(_) => continue, // skip self argument
+            syn::FnArg::Receiver(r) => {
+                if r.reference.is_none() {
+                    return Err(Error::new_spanned(arg, "only works for borrowed self"));
+                }
+            }
             syn::FnArg::Typed(syn::PatType { ty, .. }) => args.push(ty.as_ref().clone()),
         }
     }
@@ -128,7 +136,7 @@ fn get_args(sig: &Signature) -> (Vec<Type>, Vec<Type>) {
             _ => vec![ty.as_ref().clone()],
         },
     };
-    (args, rets)
+    Ok((args, rets))
 }
 
 struct CandidAttribute {

@@ -68,6 +68,14 @@ impl TypeName {
 }
 
 /// Used for candid_derive::export_service to generate TypeEnv from Type
+/// It performs a global rewriting of Type to resolve:
+/// * Duplicate type names in different modules/namespaces.
+/// * Given different names to instantiated polymorphic types.
+/// * Find the type name of a recursive node `Knot(TypeId)` and convert to `Var` node.
+/// There are some drawbacks of this approach:
+/// * The type name is based on `type_name::<T>()`, whose format is unspecified and long. We use some regex to shorten the name.
+/// * Several Rust types can map to the same Candid type, and we only get to remember one name (currently we choose the shortest name). As a result, some of the type names in Rust is lost.
+/// * Unless we do equivalence checking, recursive types can be unrolled and assigned to multiple names.
 #[derive(Default)]
 pub struct TypeContainer {
     pub env: crate::TypeEnv,
@@ -131,7 +139,20 @@ impl TypeContainer {
                 self.env.0.insert(id.to_string(), ty);
                 Type::Var(name)
             }
-            // TODO walk through func, service, class
+            Type::Func(func) => Type::Func(Function {
+                modes: func.modes.clone(),
+                args: func.args.iter().map(|arg| self.go(arg)).collect(),
+                rets: func.rets.iter().map(|arg| self.go(arg)).collect(),
+            }),
+            Type::Service(serv) => Type::Service(
+                serv.iter()
+                    .map(|(id, t)| (id.clone(), self.go(t)))
+                    .collect(),
+            ),
+            Type::Class(inits, ref ty) => Type::Class(
+                inits.iter().map(|t| self.go(t)).collect(),
+                Box::new(self.go(ty)),
+            ),
             _ => t.clone(),
         }
     }
