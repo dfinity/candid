@@ -67,11 +67,13 @@ impl TypeName {
     }
 }
 
-/// Used for candid_derive::export_service to generate TypeEnv from Type
-/// It performs a global rewriting of Type to resolve:
+/// Used for `candid_derive::export_service` to generate `TypeEnv` from `Type`.
+///
+/// It performs a global rewriting of `Type` to resolve:
 /// * Duplicate type names in different modules/namespaces.
-/// * Given different names to instantiated polymorphic types.
+/// * Give different names to instantiated polymorphic types.
 /// * Find the type name of a recursive node `Knot(TypeId)` and convert to `Var` node.
+///
 /// There are some drawbacks of this approach:
 /// * The type name is based on `type_name::<T>()`, whose format is unspecified and long. We use some regex to shorten the name.
 /// * Several Rust types can map to the same Candid type, and we only get to remember one name (currently we choose the shortest name). As a result, some of the type names in Rust is lost.
