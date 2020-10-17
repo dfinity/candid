@@ -326,11 +326,9 @@ fn derive_type(t: &syn::Type) -> TokenStream {
 
 fn add_trait_bounds(mut generics: Generics) -> Generics {
     for param in &mut generics.params {
+        let candid = candid_path();
         if let GenericParam::Type(ref mut type_param) = *param {
-            #[cfg(feature = "cdk")]
-            let bound = syn::parse_str("::ic_cdk::candid::types::CandidType").unwrap();
-            #[cfg(not(feature = "cdk"))]
-            let bound = syn::parse_str("::candid::types::CandidType").unwrap();
+            let bound = syn::parse_quote! { #candid::types::CandidType };
             type_param.bounds.push(bound);
         }
     }
