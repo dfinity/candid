@@ -1,4 +1,4 @@
-use super::idl_hash;
+use super::{candid_path, idl_hash};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::BTreeSet;
@@ -6,6 +6,7 @@ use syn::punctuated::Punctuated;
 use syn::{Data, DeriveInput, GenericParam, Generics, Token};
 
 pub(crate) fn derive_idl_type(input: DeriveInput) -> TokenStream {
+    let candid = candid_path();
     let name = input.ident;
     let generics = add_trait_bounds(input.generics);
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
@@ -18,15 +19,15 @@ pub(crate) fn derive_idl_type(input: DeriveInput) -> TokenStream {
         Data::Union(_) => unimplemented!("doesn't derive union type"),
     };
     let gen = quote! {
-        impl #impl_generics ::candid::types::CandidType for #name #ty_generics #where_clause {
-            fn _ty() -> ::candid::types::Type {
+        impl #impl_generics #candid::types::CandidType for #name #ty_generics #where_clause {
+            fn _ty() -> #candid::types::Type {
                 #ty_body
             }
-            fn id() -> ::candid::types::TypeId { ::candid::types::TypeId::of::<#name #ty_generics>() }
+            fn id() -> #candid::types::TypeId { #candid::types::TypeId::of::<#name #ty_generics>() }
 
             fn idl_serialize<__S>(&self, __serializer: __S) -> ::std::result::Result<(), __S::Error>
                 where
-                __S: ::candid::types::Serializer,
+                __S: #candid::types::Serializer,
                 {
                     #ser_body
                 }
@@ -121,11 +122,12 @@ fn enum_from_ast(
         .iter()
         .map(|Variant { renamed_ident, .. }| renamed_ident.to_string());
     let ty = fs.iter().map(|Variant { ty, .. }| ty);
+    let candid = candid_path();
     let ty_gen = quote! {
-        ::candid::types::Type::Variant(
+        #candid::types::Type::Variant(
             vec![
-                #(::candid::types::Field {
-                    id: ::candid::types::Label::Named(#id.to_owned()),
+                #(#candid::types::Field {
+                    id: #candid::types::Label::Named(#id.to_owned()),
                     ty: #ty }
                 ),*
             ]
@@ -143,7 +145,7 @@ fn enum_from_ast(
             (
                 pattern,
                 quote! {
-                    #(::candid::types::Compound::serialize_element(&mut ser, #id)?;)*
+                    #(#candid::types::Compound::serialize_element(&mut ser, #id)?;)*
                 },
             )
         })
@@ -161,19 +163,21 @@ fn enum_from_ast(
 }
 
 fn serialize_struct(idents: &[Ident]) -> TokenStream {
+    let candid = candid_path();
     let id = idents.iter().map(|ident| ident.to_token());
     quote! {
         let mut ser = __serializer.serialize_struct()?;
-        #(::candid::types::Compound::serialize_element(&mut ser, &self.#id)?;)*
+        #(#candid::types::Compound::serialize_element(&mut ser, &self.#id)?;)*
         Ok(())
     }
 }
 
 fn struct_from_ast(fields: &syn::Fields) -> (TokenStream, Vec<Ident>) {
+    let candid = candid_path();
     match *fields {
         syn::Fields::Named(ref fields) => {
             let (fs, idents) = fields_from_ast(&fields.named);
-            (quote! { ::candid::types::Type::Record(#fs) }, idents)
+            (quote! { #candid::types::Type::Record(#fs) }, idents)
         }
         syn::Fields::Unnamed(ref fields) => {
             let (fs, idents) = fields_from_ast(&fields.unnamed);
@@ -181,10 +185,10 @@ fn struct_from_ast(fields: &syn::Fields) -> (TokenStream, Vec<Ident>) {
                 let newtype = derive_type(&fields.unnamed[0].ty);
                 (quote! { #newtype }, idents)
             } else {
-                (quote! { ::candid::types::Type::Record(#fs) }, idents)
+                (quote! { #candid::types::Type::Record(#fs) }, idents)
             }
         }
-        syn::Fields::Unit => (quote! { ::candid::types::Type::Null }, Vec::new()),
+        syn::Fields::Unit => (quote! { #candid::types::Type::Null }, Vec::new()),
     }
 }
 
@@ -258,6 +262,7 @@ fn get_rename_attrs(attrs: &[syn::Attribute]) -> Option<String> {
 }
 
 fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (TokenStream, Vec<Ident>) {
+    let candid = candid_path();
     let mut fs: Vec<_> = fields
         .iter()
         .enumerate()
@@ -292,14 +297,14 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (TokenStr
         .map(|Field { renamed_ident, .. }| match renamed_ident {
             Ident::Named(ref id) => {
                 let name = id.to_string();
-                quote! { ::candid::types::Label::Named(#name.to_string()) }
+                quote! { #candid::types::Label::Named(#name.to_string()) }
             }
-            Ident::Unnamed(ref i) => quote! { ::candid::types::Label::Id(#i) },
+            Ident::Unnamed(ref i) => quote! { #candid::types::Label::Id(#i) },
         });
     let ty = fs.iter().map(|Field { ty, .. }| ty);
     let ty_gen = quote! {
         vec![
-            #(::candid::types::Field {
+            #(#candid::types::Field {
                 id: #id,
                 ty: #ty }
             ),*
@@ -313,15 +318,17 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (TokenStr
 }
 
 fn derive_type(t: &syn::Type) -> TokenStream {
+    let candid = candid_path();
     quote! {
-        <#t as ::candid::types::CandidType>::ty()
+        <#t as #candid::types::CandidType>::ty()
     }
 }
 
 fn add_trait_bounds(mut generics: Generics) -> Generics {
     for param in &mut generics.params {
+        let candid = candid_path();
         if let GenericParam::Type(ref mut type_param) = *param {
-            let bound = syn::parse_str("::candid::types::CandidType").unwrap();
+            let bound = syn::parse_quote! { #candid::types::CandidType };
             type_param.bounds.push(bound);
         }
     }
