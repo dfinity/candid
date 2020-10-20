@@ -33,7 +33,7 @@ pub(crate) fn idl_hash(id: &str) -> u32 {
 
 #[cfg(feature = "cdk")]
 pub(crate) fn candid_path() -> proc_macro2::TokenStream {
-    quote::quote! { ::ic_cdk::candid }
+    quote::quote! { ::ic_cdk::export::candid }
 }
 
 #[cfg(not(feature = "cdk"))]
