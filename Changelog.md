@@ -1,9 +1,29 @@
 
 # Changelog
 
-## 2020-09-10 (Rust 0.6.2)
+## 2020-10-20
 
-* Fix a bug when decoding many record values.
+### Spec
+
+* Add service initialization parameters [#88](https://github.com/dfinity/candid/pull/88)
+* Reverse subtyping on records and variants [#110](https://github.com/dfinity/candid/pull/110)
+
+### Rust (0.6.4 -- 0.6.8)
+
+* Support service constructor
+* Export `init` types in JS binding for service constructor
+* Improve pretty-printing for Candid values: underscore for numerals, blob shorthand for `vec nat8`.
+* Disable pretty-printing for large vectors.
+* Add attribute `#[candid_method]` to derive Candid types for functions.
+* Add a feature flag `cdk` to generate candid path specifically for Rust CDK.
+
+### Tools
+
+* Candid UI canister to render a web UI for all running canisters on the network.
+
+## 2020-09-10 (Rust 0.6.2 -- 0.6.3)
+
+* Fix a bug when decoding nested record values.
 
 ## 2020-09-10 (Rust 0.6.1)
 
