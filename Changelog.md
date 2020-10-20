@@ -6,7 +6,7 @@
 ### Spec
 
 * Add service initialization parameters [#88](https://github.com/dfinity/candid/pull/88)
-* Reverse subtyping on records and variants. [#110](https://github.com/dfinity/candid/pull/110)
+* Reverse subtyping on records and variants [#110](https://github.com/dfinity/candid/pull/110)
 
 ### Rust (0.6.4 -- 0.6.8)
 
