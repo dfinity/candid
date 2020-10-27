@@ -1127,6 +1127,11 @@ Note:
 `M` maps an Candid value to a byte sequence representing that value. The definition is indexed by type.
 We assume that the fields in a record value are sorted by increasing id.
 
+Given a fixed type, we guarantee that there is a one-to-one mapping between the Candid value and the byte sequence.
+This property ensures that we can use `M` for message authentication when both the sender and receiver agree on the same type. 
+As a corollary, the `leb128` and `sleb128` encodings should be deterministic for serialization, 
+preferably using the shortest encoding. For deserialization, we can decode any valid `leb128` or `sleb128` encoding.
+
 ```
 M : <val> -> <primtype> -> i8*
 M(n : nat)      = leb128(n)
