@@ -53,8 +53,8 @@ impl IDLBuilder {
     pub fn serialize<W: io::Write>(&mut self, mut writer: W) -> Result<()> {
         writer.write_all(b"DIDL")?;
         self.type_ser.serialize()?;
-        writer.write_all(&self.type_ser.result)?;
-        writer.write_all(&self.value_ser.value)?;
+        writer.write_all(self.type_ser.get_result())?;
+        writer.write_all(self.value_ser.get_result())?;
         Ok(())
     }
     pub fn serialize_to_vec(&mut self) -> Result<Vec<u8>> {
@@ -75,6 +75,9 @@ impl ValueSerializer {
     #[inline]
     pub fn new() -> Self {
         ValueSerializer { value: Vec::new() }
+    }
+    pub fn get_result(&self) -> &[u8] {
+        &self.value
     }
     fn write_leb128(&mut self, value: u64) -> Result<()> {
         leb128_encode(&mut self.value, value)?;
@@ -205,6 +208,9 @@ impl TypeSerialize {
             args: Vec::new(),
             result: Vec::new(),
         }
+    }
+    pub fn get_result(&self) -> &[u8] {
+        &self.result
     }
     #[inline]
     fn build_type(&mut self, t: &Type) -> Result<()> {
