@@ -154,7 +154,7 @@ impl IDLValue {
                 let ty = crate::types::internal::find_type(id).unwrap();
                 self.annotate_type(from_parser, env, &ty)?
             }
-            (IDLValue::Null, Type::Opt(_)) if from_parser => IDLValue::None,
+            (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Float64(n), Type::Float32) if from_parser => IDLValue::Float32(*n as f32),
             (IDLValue::Number(str), t) if from_parser => match t {
                 Type::Int => IDLValue::Int(str.parse::<Int>()?),
