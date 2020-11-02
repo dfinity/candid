@@ -915,14 +915,14 @@ Any value decodes at type `reserved`, producing the canonical value of type `res
 <v> :? reserved ~> null : reserved
 ```
 
-NB: No rule needed for type `empty`, because there are no values of that type. By definition, `<v> !: empty`.
+NB: No rule needed for type `empty`, because there are no values of that type. By construction, `<v> !: empty`.
 
 #### Vectors
 
 Only vectors decode at vector types, and only if all elements decode successfully.
 
 ```
-<v> :? <t'> ~> <v'>
+<v> :? <t> ~> <v'>
 ------------------------------------------
 vec { <v>;* } :? vec <t> ~> vec { <v'>;* }
 ```
@@ -937,19 +937,19 @@ null :? opt <t> ~> null
 
 An optional value decodes at an option type, if the value decodes at the constituent type:
 ```
-<v> :? <t'> ~> <v'>
+<v> :? <t> ~> <v'>
 -----------------------
 opt <v> :? opt <t> ~> opt <v'>
 ```
 
 If an optional value _fails_ to decode at an optional type, the result is `null`, not failure:
 ```
-<v> !: <t'>
+<v> !: <t>
 -----------------------
 opt <v> :? opt <t> ~> null
 ```
 
-Decoding a non-null, non-optional and non-reserved value at an option type implicitly wraps it in `opt`:
+Decoding a non-null, non-optional and non-reserved value at an option type treats it as an optional value:
 ```
 <v> ≠ null
 <v> ≠ (null : reserved)
@@ -964,7 +964,7 @@ opt <v> :? opt <t> ~> <v'>
 
 Only records decode at record type. Missing fields of option type turn into `null`.
 
-In the following rule, the `<nat1>*` field names are those present in both the value and the type, `<nat2>*` field names only in the value, `<nat3>` only in the type.
+In the following rule, the `<nat1>*` field names are those present in both the value and the type, the `<nat2>*` field names only those in the value, and `<nat3>*` are those only in the type.
 ```
 <v1> :? <t1> ~> <v1'>
 --------------------------------------------------------------------------------------------------------------------------------------------
@@ -977,13 +977,13 @@ record { <nat1> = <v1>;* <nat2> = <v2>;* } :? record {  <nat1> = <t1>;* <nat3> =
 ```
 <v> :? <t> ~> <v'>
 ----------------------------------------------------------------------------------
-variant { <nat> = <v> } :? variant { <nat> = <t>;* _ } ~> variant { <nat> = <v'> }
+variant { <nat> = <v> } :? variant { <nat> = <t>; _;* } ~> variant { <nat> = <v'> }
 ```
 
 
 #### References
 
-Function and services references decode as they are
+Function and services references decode unconditoinally
 
 ```
 -------------------------------------------------------
@@ -996,13 +996,13 @@ service <text> :? service <actortype> ~> service <text>
 ```
 
 ```
--------------------------------------------------------
+-------------------------------------------------
 principal <text> :? principal ~> principal <text>
 ```
 
 #### Tuple types
 
-Whole argument and result sequences are decoded with the same rules are tuple-like records. In particular, extra arguments are ignored, and optional arguments treated as `null` if decoding fails, and missing optional arguments treated at `null`:
+Whole argument and result sequences are decoded with the same rules are tuple-like records. In particular, extra arguments are ignored, and optional parameters read as as `null` if the argument is missing or fails to decode:
 
 ```
 record {<v>;*} :? record {<t>;*} ~> record {<v'>,*}
@@ -1013,11 +1013,16 @@ record {<v>;*} :? record {<t>;*} ~> record {<v'>,*}
 
 ## Properties
 
-The relations above have certain properties. To express them, we need the relation `V : T`, expressing that `V` has inherently type `T`. Instead of listing the rules of that relation, we define it via the first property below;
+The relations above have certain properties. To express them, we need the relation `V : T`, expressing that `V` has inherently type `T`. Instead of defining this relation on its own, we take the first property below as its definition:
 
 * Correctness and completeness of decoding:
   ```
-  (v : T) ⟺ (v :? T ~> v)
+  (v : T) ⟺ (∃ v'. v' :? T ~> v)
+  ```
+
+* Roundtripping:
+  ```
+  (v : T) ⟺ v :? T ~> v
   ```
 
 * Uniqueness of decoding:
@@ -1039,24 +1044,23 @@ The relations above have certain properties. To express them, we need the relati
   ```
   T <: T2, T2 <: T3
   v1 : T
-  v :? T2 ~> v2
-  v :? T3 ~> v3
+  v1 :? T2 ~> v2
+  v1 :? T3 ~> v3
   v2 :? T3 ~> v3'
   ```
   does not imply `v3 = v3'`.
 
-  Can prove that `R(v3,v3')` for the smallest homomorphic relation `R` that is reflexive and satsified `∀ v. R(opt v, null)`.
+  However, it implies that `R(v3,v3')`, where `R` is the smallest homomorphic, reflexive relation `R` that satisfies `∀ v. R(opt v, null)`.
 
-Other design goals are not satisfied (or hard to express forally).
+Other design goals are not satisfied (or hard to express formally?):
 
 * Completeness of subtyping:
 
-  It seems the fomulation could be that if all values of a type `T` decode at type `T'`, then `T` is a subtype of `T'`.
+  It seems the formulation could be that if all values of a type `T` decode at type `T'`, then `T` is a subtype of `T'`.
   ```
-  (∀ v : T. ∃ v'. v :? T ~> v') =>, T <: T'
+  (∀ v : T. ∃ v'. v :? T ~> v') ⇒ T <: T'
   ```
-
-  But we don't have `opt empty <: null`, or `Empty <: t` where `type Empty = rec { Empty }`…
+  But for example we do not have `opt empty <: null`, or `Empty <: t` where `type Empty = rec { Empty }`. Nor do we relate arbitray function types.
 
 
 ## Binary Format
