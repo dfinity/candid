@@ -875,7 +875,7 @@ not (∃ v'. <v> :? <t> ~> v')
 <v> !: <t >
 ```
 
-Here `V` models an untyped values, and form an abstract data model of both the message in transit (`V`), as well as the the message . In the following, we re-use the syntax of the textual representation, with the following changes to make it free of overloading:
+Here `V` models untyped values, which form an abstract data model of both the message in transit (`V`), as well as the the message. In the following, we re-use the syntax of the textual representation, with the following changes to make it free of overloading:
 
  * Number literals (`<primval>`) must be immediately enclosed with an `<annval>` that clarifies the precise number type.
  * The value of type `reserved` is expressed as `(null : reserved)`.
@@ -983,7 +983,7 @@ variant { <nat> = <v> } :? variant { <nat> = <t>; _;* } ~> variant { <nat> = <v'
 
 #### References
 
-Function and services references decode unconditoinally
+Function and services references decode unconditionally
 
 ```
 -------------------------------------------------------
@@ -1002,7 +1002,7 @@ principal <text> :? principal ~> principal <text>
 
 #### Tuple types
 
-Whole argument and result sequences are decoded with the same rules are tuple-like records. In particular, extra arguments are ignored, and optional parameters read as as `null` if the argument is missing or fails to decode:
+Whole argument and result sequences are decoded with the same rules as tuple-like records. In particular, extra arguments are ignored, and optional parameters read as as `null` if the argument is missing or fails to decode:
 
 ```
 record {<v>;*} :? record {<t>;*} ~> record {<v'>,*}
@@ -1046,13 +1046,13 @@ The relations above have certain properties. To express them, we need the relati
 
 * Transitivity of subtyping:
   ```
-  T <: T2, T2 <: T3 ⇒ T <: T3
+  T1 <: T2, T2 <: T3 ⇒ T1 <: T3
   ```
 
 * Transitive coherence does not hold:
   ```
-  T <: T2, T2 <: T3
-  v1 : T
+  T1 <: T2, T2 <: T3
+  v1 : T1
   v1 :? T3 ~> v3
   v1 :? T2 ~> v2, v2 :? T3 ~> v3'
   ```
@@ -1313,5 +1313,4 @@ These measures allow the serialisation format to be extended with new types in t
 * Support default field values?
 * Support generic type definitions?
 * Namespaces for imports?
-
 
