@@ -8,7 +8,10 @@ fn decode_test(resource: &str) {
         .join(resource);
     let test = std::fs::read_to_string(path).unwrap();
     let ast = test.parse::<Test>().unwrap();
-    check(ast).unwrap();
+    match check(ast) {
+        Ok(()) => (),
+        Err(err) => println!("Failed: {}", err)
+    }
 }
 
 #[test_generator::test_resources("test/*.test.did")]
