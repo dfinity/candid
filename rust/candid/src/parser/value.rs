@@ -154,7 +154,6 @@ impl IDLValue {
                 let ty = crate::types::internal::find_type(id).unwrap();
                 self.annotate_type(from_parser, env, &ty)?
             }
-            (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Float64(n), Type::Float32) if from_parser => IDLValue::Float32(*n as f32),
             (IDLValue::Number(str), t) if from_parser => match t {
                 Type::Int => IDLValue::Int(str.parse::<Int>()?),
@@ -191,10 +190,27 @@ impl IDLValue {
             (IDLValue::Float64(n), Type::Float64) => IDLValue::Float64(*n),
             (IDLValue::Float32(n), Type::Float32) => IDLValue::Float32(*n),
             (IDLValue::Text(s), Type::Text) => IDLValue::Text(s.to_owned()),
+            (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
+            (IDLValue::Reserved, Type::Opt(_)) => {
+                return Err(Error::msg(format!(
+                    "type mismatch: reserved cannot be of type {}",
+                    t
+                )))
+            }
             (IDLValue::None, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Opt(v), Type::Opt(ty)) => {
-                let v = v.annotate_type(from_parser, env, ty)?;
-                IDLValue::Opt(Box::new(v))
+                // liberal decoding of optionals
+                match v.annotate_type(from_parser, env, ty) {
+                    Ok(v) => IDLValue::Opt(Box::new(v)),
+                    Err(_) => IDLValue::None
+                }
+            }
+            // Try consituent type
+            (v, Type::Opt(ty)) => {
+                match v.annotate_type(from_parser, env, ty) {
+                    Ok(v) => IDLValue::Opt(Box::new(v)),
+                    Err(_) => IDLValue::None
+                }
             }
             (IDLValue::Vec(vec), Type::Vec(ty)) => {
                 let mut res = Vec::new();
