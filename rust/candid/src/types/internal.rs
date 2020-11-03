@@ -205,6 +205,13 @@ impl Type {
             _ => false,
         }
     }
+
+    pub(crate) fn is_opt(&self) -> bool {
+        match self {
+            Type::Opt(_) =>true,
+            _ => false,
+        }
+    }
 }
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

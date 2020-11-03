@@ -110,6 +110,7 @@ assert blob "DIDL\01\6e\7e\01\00\01\01" == "(null)"  : (opt nat) "opt true : opt
 assert blob "DIDL\01\6e\7e\01\00\01\02"             !: (opt nat) "opt bool <: opt nat with invalid boolean value";
 assert blob "DIDL\02\6e\01\6e\7e\01\00\01\01\01" == "(null)"  : (opt nat) "opt opt true : opt opt bool <: opt nat";
 assert blob "DIDL\02\6e\01\6e\7e\01\00\01\01\01" == "(opt null)"  : (opt opt nat) "opt opt true : opt opt bool <: opt opt nat";
+assert blob "DIDL\01\6c\00\01\00" == "(record { foo = null })" : (record { foo : opt bool }) "missing optional field";
 
 // variant
 assert "(variant {})"                                                          !: (variant {}) "variant: no empty value";

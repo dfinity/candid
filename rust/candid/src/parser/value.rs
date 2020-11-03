@@ -221,9 +221,12 @@ impl IDLValue {
                     vec.iter().map(|IDLField { id, val }| (id, val)).collect();
                 let mut res = Vec::new();
                 for Field { id, ty } in fs.iter() {
-                    let val = fields
-                        .get(&id)
-                        .ok_or_else(|| Error::msg(format!("field {} not found", id)))?;
+                    let val = fields.get(&id);
+                    let val = if ty.is_opt() {
+                        val.unwrap_or(&&IDLValue::Null)
+                    } else {
+                        val.ok_or_else(|| Error::msg(format!("required field {} not found", id)))?
+                    };
                     let val = val.annotate_type(from_parser, env, ty)?;
                     res.push(IDLField {
                         id: id.clone(),
