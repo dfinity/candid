@@ -1032,7 +1032,16 @@ The relations above have certain properties. To express them, we need the relati
 
 * Soundness of subtyping:
   ```
-  v : T, T <: T' ⇒ ∃ v'. v :? T ~> v'
+  T <: T' ⇒ ∀ v : T. ∃ v'. v :? T ~> v'
+  ```
+
+* Higher-order soundness of subtyping
+  See <./IDL-Soundness.md>, with the following instanstatiations:
+  ```
+  s1 ~> s2 ≔ s2 <: s1
+  t1 <: t2 ≔ (∀ v. t1: v :? t2 ~> _)
+  s1 in t1 <: s2 in t2 ≔ (to be done)
+  s1 <:h s2 ≔ (host-language dependent)
   ```
 
 * Transitivity of subtyping:
@@ -1044,9 +1053,8 @@ The relations above have certain properties. To express them, we need the relati
   ```
   T <: T2, T2 <: T3
   v1 : T
-  v1 :? T2 ~> v2
   v1 :? T3 ~> v3
-  v2 :? T3 ~> v3'
+  v1 :? T2 ~> v2, v2 :? T3 ~> v3'
   ```
   does not imply `v3 = v3'`.
 
