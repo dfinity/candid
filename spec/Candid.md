@@ -1065,18 +1065,7 @@ The relations above have certain properties. To express them, we need the relati
 
   However, it implies that `R(v3,v3')`, where `R` is the smallest homomorphic, reflexive relation `R` that satisfies `∀ v. R(opt v, null)`.
 
-Other design goals are not satisfied (or hard to express formally?):
-
-* Completeness of subtyping:
-
-  A rigorous formulation of completeness could be that `<:` is the largest transitive and sound relation (in the above sense), i.e. that
-  ```
-  (∀ v. v ~> _ : T ⇒ v' ~> _ : T') ⇒ T <: T'
-  ```
-  This does not hold as state, because of counter examples involving the empty type. For example we do not have `opt empty <: null`, or `Empty <: t` where `type Empty = rec { Empty }`
-
-  Nor do we relate arbitray function types (where decoding always succeeds).
-
+The goal of “subtyping completeness” has not been cast into a formal formulation yet.
 
 ## Binary Format
 
