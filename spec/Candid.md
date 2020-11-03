@@ -807,12 +807,13 @@ record { <fieldtype>;* } <: record { <fieldtype'>;* }
 record { <nat> : <datatype>; <fieldtype>;* } <: record { <nat> : <datatype'>; <fieldtype'>;* }
 ```
 
-In order to be able to evolve and extend record types that also occur in inbound position (i.e., are used both as function results and function parameters), the subtype relation also supports *removing* fields from records, provided they are optional.
+In order to be able to evolve and extend record types that also occur in inbound position (i.e., are used both as function results and function parameters), the subtype relation also supports *removing* fields from records, provided they are optional (or `reserved`).
 ```
 <nat> not in <fieldtype>;*
 record { <fieldtype>;* } <: record { <fieldtype'>;* }
+opt empty <: <datatype'>
 ------------------------------------------------------------------------------
-record { <fieldtype>;* } <: record { <nat> : opt <datatype'>; <fieldtype'>;* }
+record { <fieldtype>;* } <: record { <nat> : <datatype'>; <fieldtype'>;* }
 ```
 *Note:* This rule is unusual from a regular subtyping perspective, but necessary in practice.
 Together with the previous rule, it allows extending any record with optional fields in an upgrade, regardless of how it is used.
