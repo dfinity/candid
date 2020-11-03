@@ -1056,11 +1056,13 @@ Other design goals are not satisfied (or hard to express formally?):
 
 * Completeness of subtyping:
 
-  It seems the formulation could be that if all values of a type `T` decode at type `T'`, then `T` is a subtype of `T'`.
+  A rigorous formulation of completeness could be that `<:` is the largest transitive and sound relation (in the above sense), i.e. that
   ```
-  (∀ v : T. ∃ v'. v :? T ~> v') ⇒ T <: T'
+  (∀ v. v :? T ~> _ ⇒ v :? T' ~> _) ⇒ T <: T'
   ```
-  But for example we do not have `opt empty <: null`, or `Empty <: t` where `type Empty = rec { Empty }`. Nor do we relate arbitray function types.
+  This does not hold as state, because of counter examples involving the empty type. For example we do not have `opt empty <: null`, or `Empty <: t` where `type Empty = rec { Empty }`
+
+  Nor do we relate arbitray function types (where decoding always succeeds).
 
 
 ## Binary Format
