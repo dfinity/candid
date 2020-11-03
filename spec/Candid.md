@@ -77,14 +77,17 @@ This is a summary of the grammar proposed:
 <datatype>  ::= <id> | <primtype> | <constype> | <reftype>
 
 <primtype>  ::=
-  | nat | nat8 | nat16 | nat32 | nat64
-  | int | int8 | int16 | int32 | int64
-  | float32 | float64
+  | <numtype>
   | bool
   | text
   | null
   | reserved
   | empty
+
+<numtype>  ::=
+  | nat | nat8 | nat16 | nat32 | nat64
+  | int | int8 | int16 | int32 | int64
+  | float32 | float64
 
 <constype>  ::=
   | opt <datatype>
@@ -230,13 +233,17 @@ The content of message arguments and results is *data*. Three basic forms of *da
 
 *Primitive types* describe the possible forms of primitive data.
 
+The primitive types that describe numbers are separted out in the grammar:
+```
+<primtype> ::= <numtype> | ...
+```
 
 #### Natural Numbers
 
 The type `nat` describes a natural number (unsigned integer) of unlimited range. There are also variants limited to 8, 16, 32, or 64 bit value range with fixed-size representations.
 
 ```
-<primtype> ::= nat | nat8 | nat16 | nat32 | nat64 | ...
+<numtype> ::= nat | nat8 | nat16 | nat32 | nat64 | ...
 ```
 **Note:** Values of type `nat` have variable length representations in the  binary serialisation format, and hence take up space proportional to (the logarithm of) their value. As long as typical values are small, they may hence be more space-efficient than the fixed size types.
 
@@ -245,7 +252,7 @@ The type `nat` describes a natural number (unsigned integer) of unlimited range.
 The type `int` describes an integer number (signed) of unlimited range. There are also variants limited to 8, 16, 32, or 64 bit value range with fixed-size representations.
 
 ```
-<primtype> ::= ... | int | int8 | int16 | int32 | int64 | ...
+<numtype> ::= ... | int | int8 | int16 | int32 | int64 | ...
 ```
 **Note:** Values of type `nat` have variable length representations in the binary serialisation format, and hence take up space proportional to (the logarithm of) their value. As long as typical values are small, they may hence be more space-efficient than the fixed size types.
 
@@ -254,7 +261,7 @@ The type `int` describes an integer number (signed) of unlimited range. There ar
 Floating-point values are represented in IEEE 754 binary format and are supported in single precision (32 bit) and double precision (64 bit).
 
 ```
-<primtype> ::= ... | float32 | float64 | ...
+<numtype> ::= ... | float32 | float64
 ```
 
 #### Boolean
@@ -865,150 +872,147 @@ service { <methtype>;* } <: service { <methtype'>;* }
 service { <name> : <functype>; <methtype>;* } <: service { <name> : <functype'>; <methtype'>;* }
 ```
 
-### Decoding
+### Coercing
 
-This subtyping is implemented when decoding a Candid value. We provide a ternary relation `V :? T ~> V'` to describe when a value `V` can be decoded at type `T` to a value `V'` of type `T`.
+This subtyping is implemented during the deserialization of Candid at an expected type. As as described in [Section Deserialisation](#deserialization), the binary value is conceptually first _decoded_ into an abstract value, and then _coerced_ to the expected type.
 
-The binary relation `V !: T` describes that a value cannot be decoded at type `T`, and is defined as
-```
-not (∃ v'. <v> :? <t> ~> v')
-------
-<v> !: <t >
-```
+This section describes the covercion, as ternary relation `V ~> V' : T` to describe when a value `V` can be coerced to a value `V'` of type `T`. The fields `V` and `T` can be understood as inputs and `V'` as the output of this relation.
 
-Here `V` models untyped values, which form an abstract data model of both the message in transit (`V`), as well as the the message. In the following, we re-use the syntax of the textual representation, with the following changes to make it free of overloading:
+Here `V` models untyped values, which form an abstract data model of both the message in transit (`V`), as well as the result of the coercion (`V'`). In the following, we re-use the syntax of the textual representation, with the following changes to make it free of overloading:
 
  * Number literals (`<primval>`) must be immediately enclosed with an `<annval>` that clarifies the precise number type.
- * The value of type `reserved` is expressed as `(null : reserved)`.
+ * The canonical value of type `reserved` is expressed as `(null : reserved)`.
  * No other use of `<annval>`.
 
 #### Primitive Types
 
-Values of primitive types decode successfully at their own type:
+Values of primitive types coerce successfully at their own type:
 ```
-<t> ∈ {nat, int, nat8, nat16, nat32, nat64, int8, int16, int32, int64, float32, float64 }
--------------------------------------
-(<x> : <t>) :? <t> ~> (<x> : <t>)
+--------------------------------------------------
+(<x> : <numtype>) ~> (<x> : <numtype>) : <numtype>
 
---------------------
-true :? bool ~> true
+-------------------
+true ~> true : bool
 
 ----------------------
-false :? bool ~> false
+false ~> false : bool
 
-------------------------
-<text> :? text ~> <text>
+-----------------------
+<text> ~> <text> : text
 
 ------------------------
 null :? null ~> null
 ```
 
-Values of type `nat` decode at type `int`:
+Values of type `nat` coerce successfully at type `int`:
 ```
----------------------------------
-(<x> : nat) :? int ~> (<x> : int)
-```
-
-Any value decodes at type `reserved`, producing the canonical value of type `reserved`:
-
-```
-------------------------------
-<v> :? reserved ~> null : reserved
+--------------------------------
+(<x> : nat) ~> (<x> : int) : int
 ```
 
-NB: No rule needed for type `empty`, because there are no values of that type. By construction, `<v> !: empty`.
+Any value coerces at type `reserved`, producing the canonical value of type `reserved`:
+
+```
+-----------------------------------
+<v> ~> (null : reserved) : reserved
+```
+
+NB: No rule is needed for type `empty`, because there are no values of that type. By construction, `<v> ~> _ : empty` will not hold.
 
 #### Vectors
 
-Only vectors decode at vector types, and only if all elements decode successfully.
+Only vectors coerce at vector types, and only if all elements coerce successfully.
 
 ```
-<v> :? <t> ~> <v'>
-------------------------------------------
-vec { <v>;* } :? vec <t> ~> vec { <v'>;* }
+<v>  ~> <v'> : <t>
+-----------------------------------------
+vec { <v>;* } ~> vec { <v'>;* } : vec <t>
 ```
 
 #### Options
 
-The null value decodes at any option type:
+The null value coerce at any option type:
 ```
------------------------
-null :? opt <t> ~> null
-```
-
-An optional value decodes at an option type, if the value decodes at the constituent type:
-```
-<v> :? <t> ~> <v'>
------------------------
-opt <v> :? opt <t> ~> opt <v'>
+----------------------
+null ~> null : opt <t>
 ```
 
-If an optional value _fails_ to decode at an optional type, the result is `null`, not failure:
+An optional value coerces at an option type, if the constituent value coerces at the constituent type:
 ```
-<v> !: <t>
------------------------
-opt <v> :? opt <t> ~> null
+<v> ~> <v'> : <t>
+-----------------------------
+opt <v> ~> opt <v'> : opt <t>
 ```
 
-Decoding a non-null, non-optional and non-reserved value at an option type treats it as an optional value:
+If an optional value _fails_ to coerce at an optional type, the result is `null`, not failure:
+```
+not (<v> ~> _ : <t>)
+-------------------------
+opt <v> ~> null : opt <t>
+```
+
+Coercing a non-null, non-optional and non-reserved value at an option type treats it as an optional value:
 ```
 <v> ≠ null
 <v> ≠ (null : reserved)
 <v> ≠ opt _
-opt <v> :? opt <t> ~> <v'>
------------------------
-<v> :? opt <t> ~> <v'>
+opt <v> ~> <v'> : opt <t>
+-------------------------
+<v> ~> <v'> : opt <t>
 ```
 
 
 #### Records
 
-Only records decode at record type. Missing fields of option type turn into `null`.
+Only records coerce at record type. Missing fields of option or reserved type turn into `null`.
 
 In the following rule, the `<nat1>*` field names are those present in both the value and the type, the `<nat2>*` field names only those in the value, and `<nat3>*` are those only in the type.
 ```
-<v1> :? <t1> ~> <v1'>
---------------------------------------------------------------------------------------------------------------------------------------------
-record { <nat1> = <v1>;* <nat2> = <v2>;* } :? record {  <nat1> = <t1>;* <nat3> = opt <t2>;* } ~> record { <nat1> = <v1'>;* <nat3> = null;* }
+<v1> ~> <v1'> : <t1>
+<t3> = opt _ ∨ <t3> = reserved
+---------------------------------------------------------------------------------------------------------------------------------------
+record { <nat1> = <v1>;* <nat2> = <v2>;* } ~> record { <nat1> = <v1'>;* <nat3> = null;* } : record {  <nat1> = <t1>;* <nat3> = <t3>;* }
 ```
 
 
 #### Variants
 
+Only a variant value with an expected tag coerces at variant type.
+
 ```
-<v> :? <t> ~> <v'>
+<v> ~> <v'> : <t>
 ----------------------------------------------------------------------------------
-variant { <nat> = <v> } :? variant { <nat> = <t>; _;* } ~> variant { <nat> = <v'> }
+variant { <nat> = <v> } ~> variant { <nat> = <v'> } : variant { <nat> = <t>; _;* }
 ```
 
 
 #### References
 
-Function and services references decode unconditionally
+Function and services references coerce unconditionally
 
 ```
--------------------------------------------------------
-func <text>.<id> :? func <functype> ~> func <text>.<id>
-```
-
-```
--------------------------------------------------------
-service <text> :? service <actortype> ~> service <text>
+------------------------------------------------------
+func <text>.<id> ~> func <text>.<id> : func <functype>
 ```
 
 ```
--------------------------------------------------
-principal <text> :? principal ~> principal <text>
+------------------------------------------------------
+service <text> ~> service <text> : service <actortype>
+```
+
+```
+------------------------------------------------
+principal <text> ~> principal <text> : principal
 ```
 
 #### Tuple types
 
-Whole argument and result sequences are decoded with the same rules as tuple-like records. In particular, extra arguments are ignored, and optional parameters read as as `null` if the argument is missing or fails to decode:
+Whole argument and result sequences are coerced with the same rules as tuple-like records. In particular, extra arguments are ignored, and optional parameters read as as `null` if the argument is missing or fails to coerce:
 
 ```
-record {<v>;*} :? record {<t>;*} ~> record {<v'>,*}
----------------------------------------------------
-(<v>,*) :? (<t>,*) ~> (<v'>,*)
+record {<v>;*} ~> record {<v'>,*} : record {<t>;*}
+--------------------------------------------------
+(<v>,*) ~> (<v'>,*) : (<t>,*)
 ```
 
 
@@ -1018,29 +1022,29 @@ The relations above have certain properties. To express them, we need the relati
 
 * Correctness and completeness of decoding:
   ```
-  (v : T) ⟺ (∃ v'. v' :? T ~> v)
+  (v : T) ⟺ (∃ v'. v' ~> v : T)
   ```
 
 * Roundtripping:
   ```
-  (v : T) ⟺ v :? T ~> v
+  (v : T) ⟺ v ~> v : T
   ```
 
 * Uniqueness of decoding:
   ```
-  v :? T ~> v1, v :? T ~> v2 ⇒ v1 = v2
+  v ~> v1 : T, v ~> v2 : T ⇒ v1 = v2
   ```
 
 * Soundness of subtyping:
   ```
-  T <: T' ⇒ ∀ v : T. ∃ v'. v :? T ~> v'
+  T <: T' ⇒ ∀ v : T. ∃ v'. v ~> v' : T
   ```
 
 * Higher-order soundness of subtyping
-  See <./IDL-Soundness.md>, with the following instanstatiations:
+  See <./IDL-Soundness.md>, with the following instantiations:
   ```
   s1 ~> s2 ≔ s2 <: s1
-  t1 <: t2 ≔ (∀ v. t1: v :? t2 ~> _)
+  t1 <: t2 ≔ (∀ v. v : t1 ⇒ v ~> _:? t2 )
   s1 in t1 <: s2 in t2 ≔ (to be done)
   s1 <:h s2 ≔ (host-language dependent)
   ```
@@ -1054,8 +1058,8 @@ The relations above have certain properties. To express them, we need the relati
   ```
   T1 <: T2, T2 <: T3
   v1 : T1
-  v1 :? T3 ~> v3
-  v1 :? T2 ~> v2, v2 :? T3 ~> v3'
+  v1 ~> v3 : T3
+  v1 ~> v2 : T2, v2 ~> v2 : T3
   ```
   does not imply `v3 = v3'`.
 
@@ -1067,7 +1071,7 @@ Other design goals are not satisfied (or hard to express formally?):
 
   A rigorous formulation of completeness could be that `<:` is the largest transitive and sound relation (in the above sense), i.e. that
   ```
-  (∀ v. v :? T ~> _ ⇒ v :? T' ~> _) ⇒ T <: T'
+  (∀ v. v ~> _ : T ⇒ v' ~> _ : T') ⇒ T <: T'
   ```
   This does not hold as state, because of counter examples involving the empty type. For example we do not have `opt empty <: null`, or `Empty <: t` where `type Empty = rec { Empty }`
 
@@ -1294,9 +1298,9 @@ Note:
 Deserialisation at an expected type sequence `(<t'>,*)` proceeds by
 
  * checking for the magic number `DIDL`
- * using the inverse of the `T` function to parse the type definitions `(<t>*)`
- * using the inverse of the `M` function, indexed by `ts`, to parse the values `(<v>*)`
- * use the decoding relation `(<v>,*) :? (<t'>,*) ~> (<v'>,*)` to try to understand the parsed values at the expected type.
+ * using the inverse of the `T` function to decode the type definitions `(<t>*)`
+ * using the inverse of the `M` function, indexed by `ts`, to decode the values `(<v>*)`
+ * use the coercion relation `(<v>,*) ~> (<v'>,*) : (<t'>,*)` to try to understand the decoded values at the expected type.
 
 ### Deserialisation of future types
 
