@@ -192,12 +192,7 @@ impl IDLValue {
             (IDLValue::Text(s), Type::Text) => IDLValue::Text(s.to_owned()),
             // opt parsing. NB: Always succeds!
             (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
-            (IDLValue::Reserved, Type::Opt(_)) => {
-                return Err(Error::msg(format!(
-                    "type mismatch: reserved cannot be of type {}",
-                    t
-                )))
-            }
+            (IDLValue::Reserved, Type::Opt(_)) => IDLValue::None,
             (IDLValue::None, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Opt(v), Type::Opt(ty)) => {
                 // liberal decoding of optionals
