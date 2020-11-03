@@ -22,6 +22,8 @@ fn js_test(resource: &str) {
         .join("../../")
         .join(resource);
     let test = std::fs::read_to_string(path).unwrap();
-    let ast = test.parse::<Test>().unwrap();
-    println!("{}", test_generate(ast));
+    match test.parse::<Test>() {
+        Ok(ast) => println!("{}", test_generate(ast)),
+        Err(err) => println!("Failed: {}", err)
+    }
 }
