@@ -894,13 +894,13 @@ Values of primitive types coerce successfully at their own type:
 -------------------
 true ~> true : bool
 
-----------------------
+---------------------
 false ~> false : bool
 
 -----------------------
 <text> ~> <text> : text
 
-------------------------
+--------------------
 null :? null ~> null
 ```
 
@@ -924,7 +924,7 @@ NB: No rule is needed for type `empty`, because there are no values of that type
 Only vectors coerce at vector types, and only if all elements coerce successfully.
 
 ```
-<v>  ~> <v'> : <t>
+<v> ~> <v'> : <t>
 -----------------------------------------
 vec { <v>;* } ~> vec { <v'>;* } : vec <t>
 ```
