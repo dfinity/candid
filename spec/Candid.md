@@ -872,11 +872,11 @@ service { <methtype>;* } <: service { <methtype'>;* }
 service { <name> : <functype>; <methtype>;* } <: service { <name> : <functype'>; <methtype'>;* }
 ```
 
-### Coercing
+### Coercion
 
-This subtyping is implemented during the deserialization of Candid at an expected type. As as described in [Section Deserialisation](#deserialization), the binary value is conceptually first _decoded_ into an abstract value, and then _coerced_ to the expected type.
+This subtyping is implemented during the deserialization of Candid at an expected type. As described in [Section Deserialisation](#deserialization), the binary value is conceptually first _decoded_ into an abstract value, and then _coerced_ to the expected type.
 
-This section describes the covercion, as ternary relation `V ~> V' : T` to describe when a value `V` can be coerced to a value `V'` of type `T`. The fields `V` and `T` can be understood as inputs and `V'` as the output of this relation.
+This section describes the covercion, as a ternary relation `V ~> V' : T` to describe when a value `V` can be coerced to a value `V'` of type `T`. The fields `V` and `T` can be understood as inputs and `V'` as the output of this relation.
 
 Here `V` models untyped values, which form an abstract data model of both the message in transit (`V`), as well as the result of the coercion (`V'`). In the following, we re-use the syntax of the textual representation, with the following changes to make it free of overloading:
 
@@ -900,8 +900,8 @@ false ~> false : bool
 -----------------------
 <text> ~> <text> : text
 
---------------------
-null :? null ~> null
+-------------------
+null ~> null : null 
 ```
 
 Values of type `nat` coerce successfully at type `int`:
@@ -969,7 +969,7 @@ Only records coerce at record type. Missing fields of option or reserved type tu
 In the following rule, the `<nat1>*` field names are those present in both the value and the type, the `<nat2>*` field names only those in the value, and `<nat3>*` are those only in the type.
 ```
 <v1> ~> <v1'> : <t1>
-<t3> = opt _ ∨ <t3> = reserved
+opt empty <: <t3>
 ---------------------------------------------------------------------------------------------------------------------------------------
 record { <nat1> = <v1>;* <nat2> = <v2>;* } ~> record { <nat1> = <v1'>;* <nat3> = null;* } : record {  <nat1> = <t1>;* <nat3> = <t3>;* }
 ```
@@ -1032,7 +1032,7 @@ The relations above have certain properties. To express them, we need the relati
 
 * Uniqueness of decoding:
   ```
-  v ~> v1 : T, v ~> v2 : T ⇒ v1 = v2
+  v ~> v1 : T ∧ v ~> v2 : T ⇒ v1 = v2
   ```
 
 * Soundness of subtyping:
@@ -1044,7 +1044,7 @@ The relations above have certain properties. To express them, we need the relati
   See <./IDL-Soundness.md>, with the following instantiations:
   ```
   s1 ~> s2 ≔ s2 <: s1
-  t1 <: t2 ≔ (∀ v. v : t1 ⇒ v ~> _:? t2 )
+  t1 <: t2 ≔ (∀ v. v : t1 ⇒ v ~> _ : t2 )
   s1 in t1 <: s2 in t2 ≔ (to be done)
   s1 <:h s2 ≔ (host-language dependent)
   ```
@@ -1318,4 +1318,3 @@ These measures allow the serialisation format to be extended with new types in t
 * Support default field values?
 * Support generic type definitions?
 * Namespaces for imports?
-
