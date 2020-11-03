@@ -224,6 +224,8 @@ impl IDLValue {
                     let val = fields.get(&id);
                     let val = if ty.is_opt() {
                         val.unwrap_or(&&IDLValue::Null)
+                    } else if ty.is_reserved() {
+                        val.unwrap_or(&&IDLValue::Reserved)
                     } else {
                         val.ok_or_else(|| Error::msg(format!("required field {} not found", id)))?
                     };
