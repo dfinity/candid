@@ -190,6 +190,7 @@ impl IDLValue {
             (IDLValue::Float64(n), Type::Float64) => IDLValue::Float64(*n),
             (IDLValue::Float32(n), Type::Float32) => IDLValue::Float32(*n),
             (IDLValue::Text(s), Type::Text) => IDLValue::Text(s.to_owned()),
+            // opt parsing. NB: Always succeds!
             (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Reserved, Type::Opt(_)) => {
                 return Err(Error::msg(format!(
