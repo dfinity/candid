@@ -77,14 +77,17 @@ This is a summary of the grammar proposed:
 <datatype>  ::= <id> | <primtype> | <constype> | <reftype>
 
 <primtype>  ::=
-  | nat | nat8 | nat16 | nat32 | nat64
-  | int | int8 | int16 | int32 | int64
-  | float32 | float64
+  | <numtype>
   | bool
   | text
   | null
   | reserved
   | empty
+
+<numtype>  ::=
+  | nat | nat8 | nat16 | nat32 | nat64
+  | int | int8 | int16 | int32 | int64
+  | float32 | float64
 
 <constype>  ::=
   | opt <datatype>
@@ -230,13 +233,17 @@ The content of message arguments and results is *data*. Three basic forms of *da
 
 *Primitive types* describe the possible forms of primitive data.
 
+The primitive types that describe numbers are separted out in the grammar:
+```
+<primtype> ::= <numtype> | ...
+```
 
 #### Natural Numbers
 
 The type `nat` describes a natural number (unsigned integer) of unlimited range. There are also variants limited to 8, 16, 32, or 64 bit value range with fixed-size representations.
 
 ```
-<primtype> ::= nat | nat8 | nat16 | nat32 | nat64 | ...
+<numtype> ::= nat | nat8 | nat16 | nat32 | nat64 | ...
 ```
 **Note:** Values of type `nat` have variable length representations in the  binary serialisation format, and hence take up space proportional to (the logarithm of) their value. As long as typical values are small, they may hence be more space-efficient than the fixed size types.
 
@@ -245,7 +252,7 @@ The type `nat` describes a natural number (unsigned integer) of unlimited range.
 The type `int` describes an integer number (signed) of unlimited range. There are also variants limited to 8, 16, 32, or 64 bit value range with fixed-size representations.
 
 ```
-<primtype> ::= ... | int | int8 | int16 | int32 | int64 | ...
+<numtype> ::= ... | int | int8 | int16 | int32 | int64 | ...
 ```
 **Note:** Values of type `nat` have variable length representations in the binary serialisation format, and hence take up space proportional to (the logarithm of) their value. As long as typical values are small, they may hence be more space-efficient than the fixed size types.
 
@@ -254,7 +261,7 @@ The type `int` describes an integer number (signed) of unlimited range. There ar
 Floating-point values are represented in IEEE 754 binary format and are supported in single precision (32 bit) and double precision (64 bit).
 
 ```
-<primtype> ::= ... | float32 | float64 | ...
+<numtype> ::= ... | float32 | float64
 ```
 
 #### Boolean
@@ -807,12 +814,13 @@ record { <fieldtype>;* } <: record { <fieldtype'>;* }
 record { <nat> : <datatype>; <fieldtype>;* } <: record { <nat> : <datatype'>; <fieldtype'>;* }
 ```
 
-In order to be able to evolve and extend record types that also occur in inbound position (i.e., are used both as function results and function parameters), the subtype relation also supports *removing* fields from records, provided they are optional.
+In order to be able to evolve and extend record types that also occur in inbound position (i.e., are used both as function results and function parameters), the subtype relation also supports *removing* fields from records, provided they are optional (or `reserved`).
 ```
 <nat> not in <fieldtype>;*
 record { <fieldtype>;* } <: record { <fieldtype'>;* }
+opt empty <: <datatype'>
 ------------------------------------------------------------------------------
-record { <fieldtype>;* } <: record { <nat> : opt <datatype'>; <fieldtype'>;* }
+record { <fieldtype>;* } <: record { <nat> : <datatype'>; <fieldtype'>;* }
 ```
 *Note:* This rule is unusual from a regular subtyping perspective, but necessary in practice.
 Together with the previous rule, it allows extending any record with optional fields in an upgrade, regardless of how it is used.
@@ -864,143 +872,200 @@ service { <methtype>;* } <: service { <methtype'>;* }
 service { <name> : <functype>; <methtype>;* } <: service { <name> : <functype'>; <methtype'>;* }
 ```
 
-### Elaboration
+### Coercion
 
-To define the actual coercion function used during deserialisation of a value, we extend the subtyping relation to a ternary *elaboration* relation `T <: T' ~> f`, where `f` is a suitable coercion function of type `T -> T'`.
+This subtyping is implemented during the deserialization of Candid at an expected type. As described in [Section Deserialisation](#deserialization), the binary value is conceptually first _decoded_ into an abstract value, and then _coerced_ to the expected type.
 
+This section describes the coercion, as a ternary relation `V ~> V' : T` to describe when a value `V` can be coerced to a value `V'` of type `T`. The fields `V` and `T` can be understood as inputs and `V'` as the output of this relation.
+
+Here `V` models untyped values, which form an abstract data model of both the message in transit (`V`), as well as the result of the coercion (`V'`). In the following, we re-use the syntax of the textual representation, with the following changes to make it free of overloading:
+
+ * Number literals (`<primval>`) must be immediately enclosed with an `<annval>` that clarifies the precise number type.
+ * The canonical value of type `reserved` is expressed as `(null : reserved)`.
+ * No other use of `<annval>`.
 
 #### Primitive Types
 
+Values of primitive types coerce successfully at their own type:
+```
+--------------------------------------------------
+(<x> : <numtype>) ~> (<x> : <numtype>) : <numtype>
+
+-------------------
+true ~> true : bool
+
+---------------------
+false ~> false : bool
+
+-----------------------
+<text> ~> <text> : text
+
+-------------------
+null ~> null : null 
 ```
 
+Values of type `nat` coerce successfully at type `int`:
+```
 --------------------------------
-<primtype> <: <primtype> ~> \x.x
-
-
-------------------
-Nat <: Int ~> \x.x
-
-
-------------------------------
-<datatype> <: reserved ~> \x.x
-
-
-------------------------------
-empty <: <datatype> ~> \_.unreachable
+(<x> : nat) ~> (<x> : int) : int
 ```
 
-#### Options and Vectors
+Any value coerces at type `reserved`, producing the canonical value of type `reserved`:
 
 ```
-<datatype> <: <datatype'> ~> f
----------------------------------------------------
-vec <datatype> <: vec <datatype'> ~> \x.map_vec f x
-
-not (null <: <datatype>)
----------------------------------
-null <: opt <datatype> ~> \x.null
-
-not (null <: <datatype>)
-<datatype> <: <datatype'> ~> f
-------------------------------------------
-<datatype> <: opt <datatype'> ~> \x.?(f x)
-
-<datatype''> <: <datatype>
-<datatype''> <: <datatype'> ~> f
----------------------------------
-opt <datatype> <: opt <datatype'>
-  ~> \x.case x of () => null | ?y => if f y = _|_ then null else ?(f y)
-
-not (null <: <datatype>)
-<datatype''> <: <datatype>
-<datatype''> <: <datatype'> ~> f
----------------------------------
-<datatype> <: opt <datatype'>
-  ~> \x.if f x = _|_ then null else ?(f x)
+-----------------------------------
+<v> ~> (null : reserved) : reserved
 ```
-The last two rules cover both cases of subtyping on options.
-It *optimistically* tries to decode an option value
-and succceeds if there would have been a valid type `<datatype''>` for the input value that is a subtype of both types.
-(As formulated, the rule would be non-deterministic in the choice of `<datatype''>`, but the intention is to pick the largest type that makes `f y` succeed if possible. We take the liberty to hand-wave over the formulation of this detail here.)
 
-The effect of this rule is that decoders do not actually need to perform separate subtype checks during deserialisation.
-Instead, they can simply try to deserialise, and if they encounter a mismatch abort to the innermost option type, returning `null`.
+NB: No rule is needed for type `empty`, because there are no values of that type. By construction, `<v> ~> _ : empty` will not hold.
 
-*Note:* The working assumption is that the type describing an incoming value ought to be *principal*, i.e., the most precise type assignable to the value (in a sense that could be made precise).
-In that case, `<datatype''>` equals `<datatype>` and deserialization succeeds exactly if the types match.
+#### Vectors
 
-However, in practice it would be costly to enforce the requirement that all type descriptions in a serialised value are principal, for both encoder (who would need to compute the principal type) and decoders (who would need to check it).
-For example, to be principal, an empty vector would need to have type `vec empty`, `null` could only have type `null`, and a variant would only be allowed to include tags that actually occur in the value.
-Consequently, the semantics allows for the possibility that the encoder ascribes a less specific type `<datatype>` with some redundant information, and allows the decoder to ignore redundant information (by going to `<datatype''>`) like the element type of empty arrays, of null options, or unused variant tags.
+Only vectors coerce at vector types, and only if all elements coerce successfully.
+
+```
+<v> ~> <v'> : <t>
+-----------------------------------------
+vec { <v>;* } ~> vec { <v'>;* } : vec <t>
+```
+
+#### Options
+
+The null value coerce at any option type:
+```
+----------------------
+null ~> null : opt <t>
+```
+
+An optional value coerces at an option type, if the constituent value coerces at the constituent type:
+```
+<v> ~> <v'> : <t>
+-----------------------------
+opt <v> ~> opt <v'> : opt <t>
+```
+
+If an optional value _fails_ to coerce at an optional type, the result is `null`, not failure:
+```
+not (<v> ~> _ : <t>)
+-------------------------
+opt <v> ~> null : opt <t>
+```
+
+Coercing a non-null, non-optional and non-reserved value at an option type treats it as an optional value:
+```
+<v> ≠ null
+<v> ≠ (null : reserved)
+<v> ≠ opt _
+opt <v> ~> <v'> : opt <t>
+-------------------------
+<v> ~> <v'> : opt <t>
+```
 
 
 #### Records
 
+Only records coerce at record type. Missing fields of option or reserved type turn into `null`.
+
+In the following rule, the `<nat1>*` field names are those present in both the value and the type, the `<nat2>*` field names only those in the value, and `<nat3>*` are those only in the type.
 ```
-
-------------------------------------------------
-record { <fieldtype'>;* } <: record { } ~> \x.{}
-
-<datatype> <: <datatype'> ~> f1
-record { <fieldtype>;* } <: record { <fieldtype'>;* } ~> f2
-----------------------------------------------------------------------------------------------
-record { <nat> : <datatype>; <fieldtype>;* } <: record { <nat> : <datatype'>; <fieldtype'>;* }
-  ~> \x.{f2 x with <nat> = f1 x.<nat>}
-
-<nat> not in <fieldtype>;*
-record { <fieldtype>;* } <: record { <fieldtype'>;* } ~> f
-------------------------------------------------------------------------------
-record { <fieldtype>;* } <: record { <nat> : opt <datatype'>; <fieldtype'>;* }
-  ~> \x.{f x with <nat> = null}
+<v1> ~> <v1'> : <t1>
+opt empty <: <t3>
+---------------------------------------------------------------------------------------------------------------------------------------
+record { <nat1> = <v1>;* <nat2> = <v2>;* } ~> record { <nat1> = <v1'>;* <nat3> = null;* } : record {  <nat1> = <t1>;* <nat3> = <t3>;* }
 ```
 
 
 #### Variants
 
+Only a variant value with an expected tag coerces at variant type.
+
 ```
-
--------------------------------------------------
-variant { } <: variant { <fieldtype'>;* } ~> \x.x
-
-<datatype> <: <datatype'> ~> f1
-variant { <fieldtype>;* } <: variant { <fieldtype'>;* } ~> f2
-------------------------------------------------------------------------------------------------
-variant { <nat> : <datatype>; <fieldtype>;* } <: variant { <nat> : <datatype'>; <fieldtype'>;* }
-  ~> \x.case x of <nat> y => <nat> (f1 y) | _ => f2 x
+<v> ~> <v'> : <t>
+----------------------------------------------------------------------------------
+variant { <nat> = <v> } ~> variant { <nat> = <v'> } : variant { <nat> = <t>; _;* }
 ```
 
 
-#### Functions
+#### References
+
+Function and services references coerce unconditionally
 
 ```
-record { N1':<datatype1'>;* } <: record { N1:<datatype1>;* } ~> f1
-record { N2:<datatype2>;* } <: record { N2':<datatype2'>;* } ~> f2
-------------------------------------------------------------------------------------------------------------------
-func ( <datatype1>,* ) -> ( <datatype2>,* ) <funcann>* <: func ( <datatype1'>,* ) -> ( <datatype2'>,* ) <funcann>*
-  ~> \x.\y.f2 (x (f1 y))
+------------------------------------------------------
+func <text>.<id> ~> func <text>.<id> : func <functype>
 ```
 
-#### Services
-
+```
+------------------------------------------------------
+service <text> ~> service <text> : service <actortype>
 ```
 
--------------------------------------------------
-service { <methtype'>;* } <: service { } ~> \x.{}
+```
+------------------------------------------------
+principal <text> ~> principal <text> : principal
+```
 
-<functype> <: <functype'> ~> f1
-service { <methtype>;* } <: service { <methtype'>;* } ~> f2
-------------------------------------------------------------------------------------------------
-service { <name> : <functype>; <methtype>;* } <: service { <name> : <functype'>; <methtype'>;* }
-  ~> \x.{f1 x; <name> = f2 x.<name>}
+#### Tuple types
+
+Whole argument and result sequences are coerced with the same rules as tuple-like records. In particular, extra arguments are ignored, and optional parameters read as as `null` if the argument is missing or fails to coerce:
+
+```
+record {<v>;*} ~> record {<v'>,*} : record {<t>;*}
+--------------------------------------------------
+(<v>,*) ~> (<v'>,*) : (<t>,*)
 ```
 
 
-## Open Questions
+## Properties
 
-* Support default field values?
-* Support generic type definitions?
-* Namespaces for imports?
+The relations above have certain properties. To express them, we need the relation `V : T`, expressing that `V` has inherently type `T`. Instead of defining this relation on its own, we take the first property below as its definition:
 
+* Correctness and completeness of decoding:
+  ```
+  (v : T) ⟺ (∃ v'. v' ~> v : T)
+  ```
+
+* Roundtripping:
+  ```
+  (v : T) ⟺ v ~> v : T
+  ```
+
+* Uniqueness of decoding:
+  ```
+  v ~> v1 : T ∧ v ~> v2 : T ⇒ v1 = v2
+  ```
+
+* Soundness of subtyping:
+  ```
+  T <: T' ⇒ ∀ v : T. ∃ v'. v ~> v' : T
+  ```
+
+* Higher-order soundness of subtyping
+  See <./IDL-Soundness.md>, with the following instantiations:
+  ```
+  s1 ~> s2 ≔ s2 <: s1
+  t1 <: t2 ≔ (∀ v. v : t1 ⇒ v ~> _ : t2 )
+  s1 in t1 <: s2 in t2 ≔ (to be done)
+  s1 <:h s2 ≔ (host-language dependent)
+  ```
+
+* Transitivity of subtyping:
+  ```
+  T1 <: T2, T2 <: T3 ⇒ T1 <: T3
+  ```
+
+* Transitive coherence does not hold:
+  ```
+  T1 <: T2, T2 <: T3
+  v1 : T1
+  v1 ~> v3 : T3
+  v1 ~> v2 : T2, v2 ~> v2 : T3
+  ```
+  does not imply `v3 = v3'`.
+
+  However, it implies that `R(v3,v3')`, where `R` is the smallest homomorphic, reflexive relation `R` that satisfies `∀ v. R(opt v, null)`.
+
+The goal of “subtyping completeness” has not been cast into a formal formulation yet.
 
 ## Binary Format
 
@@ -1195,17 +1260,6 @@ Note:
 * It is unspecified how references *r* are represented, neither internally nor externally. When binding to Wasm, their internal representation is expected to be based on Wasm reference types, i.e., `anyref` or subtypes thereof. It is up to the system how to represent or translate the reference table on the wire.
 
 
-### Deserialisation
-
-Deserialisation is the parallel application of the inverse functions of `T`, `M`, and `R` defined above, with the following mechanism for robustness towards future extensions:
-
-* A serialised type may be headed by an opcode other than the ones defined above (i.e., less than -24). Any such opcode is followed by an LEB128-encoded count, and then a number of bytes corresponding to this count. A type represented that way is called a *future type*.
-
-* A value corresponding to a future type is called a *future value*. It is represented by two LEB128-encoded counts, *m* and *n*, followed by a *m* bytes in the memory representation M and accompanied by *n* corresponding references in R.
-
-These measures allow the serialisation format to be extended with new types in the future, as long as their representation and the representation of the corresponding values include a length prefix matching the above scheme, and thereby allowing an older deserialiser not understanding them to skip over them. The subtyping rules ensure that upgradability is maintained in this situation, i.e., an old deserialiser has no need to understand the encoded data.
-
-
 ### Parameters and Results
 
 `A` defines the argument mapping. Essentially, an argument list is serialised into the triple (T,M,R) as if it was a single closed record. T and M are combined into a single byte stream B, where they are preceded by the string "DIDL" as a magic number and a possible list of type definitions.
@@ -1227,3 +1281,29 @@ The same representation is used for function results.
 Note:
 
 * It is unspecified how the pair (B,R) representing a serialised value is bundled together in an external environment.
+
+### Deserialisation
+
+Deserialisation at an expected type sequence `(<t'>,*)` proceeds by
+
+ * checking for the magic number `DIDL`
+ * using the inverse of the `T` function to decode the type definitions `(<t>*)`
+ * using the inverse of the `M` function, indexed by `(<t>*)`, to decode the values `(<v>*)`
+ * use the coercion relation `(<v>,*) ~> (<v'>,*) : (<t'>,*)` to try to understand the decoded values at the expected type.
+
+### Deserialisation of future types
+
+Deserialisation uses the following mechanism for robustness towards future extensions:
+
+* A serialised type may be headed by an opcode other than the ones defined above (i.e., less than -24). Any such opcode is followed by an LEB128-encoded count, and then a number of bytes corresponding to this count. A type represented that way is called a *future type*.
+
+* A value corresponding to a future type is called a *future value*. It is represented by two LEB128-encoded counts, *m* and *n*, followed by a *m* bytes in the memory representation M and accompanied by *n* corresponding references in R.
+
+These measures allow the serialisation format to be extended with new types in the future, as long as their representation and the representation of the corresponding values include a length prefix matching the above scheme, and thereby allowing an older deserialiser not understanding them to skip over them. The subtyping rules ensure that upgradability is maintained in this situation, i.e., an old deserialiser has no need to understand the encoded data.
+
+
+## Open Questions
+
+* Support default field values?
+* Support generic type definitions?
+* Namespaces for imports?
