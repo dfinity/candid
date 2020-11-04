@@ -260,3 +260,52 @@ tuple_impls! {
     15 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14)
     16 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14 15 T15)
 }
+
+impl CandidType for std::time::SystemTime {
+    fn id() -> TypeId {
+        TypeId::of::<std::time::SystemTime>()
+    }
+
+    fn _ty() -> Type {
+        Type::Record(vec![
+            Field {
+                id: Label::Named("nanos_since_epoch".to_owned()),
+                ty: u32::ty(),
+            },
+            Field {
+                id: Label::Named("secs_since_epoch".to_owned()),
+                ty: u64::ty(),
+            },
+        ])
+    }
+
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::Error;
+
+        let duration_since_epoch = self
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|_| S::Error::custom("SystemTime must be later than UNIX_EPOCH"))?;
+
+        let secs: u64 = duration_since_epoch.as_secs();
+        let nanos: u32 = duration_since_epoch.subsec_nanos();
+
+        let mut ser = serializer.serialize_struct()?;
+        ser.serialize_element(&nanos)?;
+        ser.serialize_element(&secs)?;
+
+        Ok(())
+    }
+}
+
+#[test]
+fn test_systemtime() {
+    use crate::{Decode, Encode};
+
+    let now = std::time::SystemTime::now();
+    let encoded = Encode!(&now).unwrap();
+    let decoded = Decode!(&encoded, std::time::SystemTime).unwrap();
+    assert_eq!(now, decoded);
+}
