@@ -944,11 +944,14 @@ An optional value coerces at an option type, if the constituent value coerces at
 opt <v> ~> opt <v'> : opt <t>
 ```
 
-If an optional value _fails_ to coerce at an optional type, the result is `null`, not failure:
+If an optional value _fails_ to coerce at an optional type, or the value is `reserved`, the result is `null`, not failure:
 ```
 not (<v> ~> _ : <t>)
 -------------------------
 opt <v> ~> null : opt <t>
+
+-----------------------------------
+(null : reserved) ~> null : opt <t>
 ```
 
 Coercing a non-null, non-optional and non-reserved value at an option type treats it as an optional value:
