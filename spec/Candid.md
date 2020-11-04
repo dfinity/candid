@@ -876,7 +876,7 @@ service { <name> : <functype>; <methtype>;* } <: service { <name> : <functype'>;
 
 This subtyping is implemented during the deserialization of Candid at an expected type. As described in [Section Deserialisation](#deserialization), the binary value is conceptually first _decoded_ into an abstract value, and then _coerced_ to the expected type.
 
-This section describes the covercion, as a ternary relation `V ~> V' : T` to describe when a value `V` can be coerced to a value `V'` of type `T`. The fields `V` and `T` can be understood as inputs and `V'` as the output of this relation.
+This section describes the coercion, as a ternary relation `V ~> V' : T` to describe when a value `V` can be coerced to a value `V'` of type `T`. The fields `V` and `T` can be understood as inputs and `V'` as the output of this relation.
 
 Here `V` models untyped values, which form an abstract data model of both the message in transit (`V`), as well as the result of the coercion (`V'`). In the following, we re-use the syntax of the textual representation, with the following changes to make it free of overloading:
 
@@ -1288,7 +1288,7 @@ Deserialisation at an expected type sequence `(<t'>,*)` proceeds by
 
  * checking for the magic number `DIDL`
  * using the inverse of the `T` function to decode the type definitions `(<t>*)`
- * using the inverse of the `M` function, indexed by `ts`, to decode the values `(<v>*)`
+ * using the inverse of the `M` function, indexed by `(<t>*)`, to decode the values `(<v>*)`
  * use the coercion relation `(<v>,*) ~> (<v'>,*) : (<t'>,*)` to try to understand the decoded values at the expected type.
 
 ### Deserialisation of future types
