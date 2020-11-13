@@ -1,6 +1,17 @@
 
 # Changelog
 
+## 2020-11-05
+
+### Spec
+
+* Rewrite description of deserialization [#128](https://github.com/dfinity/candid/pull/128)
+
+### Rust (0.6.9 -- 0.6.10)
+
+* Add result getter for serializer
+* Implement CandidType for std::time::SystemTime and Duration
+
 ## 2020-10-20
 
 ### Spec

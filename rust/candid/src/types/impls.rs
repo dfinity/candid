@@ -300,6 +300,39 @@ impl CandidType for std::time::SystemTime {
     }
 }
 
+impl CandidType for std::time::Duration {
+    fn id() -> TypeId {
+        TypeId::of::<std::time::Duration>()
+    }
+
+    fn _ty() -> Type {
+        Type::Record(vec![
+            Field {
+                id: Label::Named("secs".to_owned()),
+                ty: u64::ty(),
+            },
+            Field {
+                id: Label::Named("nanos".to_owned()),
+                ty: u32::ty(),
+            },
+        ])
+    }
+
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        let secs: u64 = self.as_secs();
+        let nanos: u32 = self.subsec_nanos();
+
+        let mut ser = serializer.serialize_struct()?;
+        ser.serialize_element(&secs)?;
+        ser.serialize_element(&nanos)?;
+
+        Ok(())
+    }
+}
+
 #[test]
 fn test_systemtime() {
     use crate::{Decode, Encode};
@@ -308,4 +341,16 @@ fn test_systemtime() {
     let encoded = Encode!(&now).unwrap();
     let decoded = Decode!(&encoded, std::time::SystemTime).unwrap();
     assert_eq!(now, decoded);
+}
+
+#[test]
+fn test_duration() {
+    use crate::{Decode, Encode};
+    use std::time::{Duration, SystemTime};
+
+    let now = SystemTime::now();
+    let duration = now.duration_since(SystemTime::UNIX_EPOCH).unwrap();
+    let encoded = Encode!(&duration).unwrap();
+    let decoded = Decode!(&encoded, Duration).unwrap();
+    assert_eq!(duration, decoded);
 }
