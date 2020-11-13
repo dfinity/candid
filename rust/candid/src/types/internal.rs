@@ -208,14 +208,14 @@ impl Type {
 
     pub(crate) fn is_opt(&self) -> bool {
         match self {
-            Type::Opt(_) =>true,
+            Type::Opt(_) => true,
             _ => false,
         }
     }
 
     pub(crate) fn is_reserved(&self) -> bool {
         match self {
-            Type::Reserved =>true,
+            Type::Reserved => true,
             _ => false,
         }
     }

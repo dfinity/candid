@@ -29,7 +29,7 @@ impl From<BigUint> for Nat {
 impl From<Nat> for Int {
     #[inline(always)]
     fn from(n: Nat) -> Self {
-        let i : BigInt = n.0.into();
+        let i: BigInt = n.0.into();
         i.into()
     }
 }

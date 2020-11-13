@@ -198,16 +198,14 @@ impl IDLValue {
                 // liberal decoding of optionals
                 match v.annotate_type(from_parser, env, ty) {
                     Ok(v) => IDLValue::Opt(Box::new(v)),
-                    Err(_) => IDLValue::None
+                    Err(_) => IDLValue::None,
                 }
             }
             // Try consituent type
-            (v, Type::Opt(ty)) => {
-                match v.annotate_type(from_parser, env, ty) {
-                    Ok(v) => IDLValue::Opt(Box::new(v)),
-                    Err(_) => IDLValue::None
-                }
-            }
+            (v, Type::Opt(ty)) => match v.annotate_type(from_parser, env, ty) {
+                Ok(v) => IDLValue::Opt(Box::new(v)),
+                Err(_) => IDLValue::None,
+            },
             (IDLValue::Vec(vec), Type::Vec(ty)) => {
                 let mut res = Vec::new();
                 for e in vec.iter() {
