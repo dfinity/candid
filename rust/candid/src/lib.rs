@@ -284,7 +284,7 @@ pub fn idl_hash(id: &str) -> u32 {
 #[macro_export]
 macro_rules! Encode {
     ( $($x:expr),* ) => {{
-        let mut builder = candid::ser::IDLBuilder::new();
+        let mut builder = $crate::ser::IDLBuilder::new();
         Encode!(@PutValue builder $($x,)*)
     }};
     ( @PutValue $builder:ident $x:expr, $($tail:expr,)* ) => {{
@@ -301,7 +301,7 @@ macro_rules! Encode {
 #[macro_export]
 macro_rules! Decode {
     ( $hex:expr $(,$ty:ty)* ) => {{
-        candid::de::IDLDeserialize::new($hex)
+        $crate::de::IDLDeserialize::new($hex)
             .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
                       .and_then(|res| de.done().and(Ok(res))))
     }};
