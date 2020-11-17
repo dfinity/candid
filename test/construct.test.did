@@ -132,6 +132,8 @@ assert blob "DIDL\01\6b\01\00\7f\01\00\01"                                     !
 assert blob "DIDL\01\6b\02\00\7f\00\7f\01\00\00"                               !: (variant {0}) "variant: duplicate fields";
 assert blob "DIDL\01\6b\03\00\7f\01\7f\01\7f\01\00\00"                         !: (variant {0}) "variant: duplicate fields";
 assert blob "DIDL\01\6b\02\01\7f\00\7f\01\00\00"                               !: (variant {0;1}) "variant: unsorted";
+assert blob "DIDL\01\6b\02\00\7f\01\7f\ff\ff\ff\ff\0F\7f\01\00\00"              : (variant {0;1;4294967295}) "variant: ok with maxInt";
+assert blob "DIDL\01\6b\03\00\7f\ff\ff\ff\ff\0F\7f\01\7f\01\00\00"             !: (variant {0;1;4294967295}) "variant: unsorted with maxInt";
 assert blob "DIDL\01\6b\02\b3\d3\c9\01\7f\e6\fd\d5\01\7f\01\00\00" == "(variant { Bar })" : (variant { Foo; Bar; }) "variant: enum";
 assert blob "DIDL\01\6b\01\cd\84\b0\05\7f\01\00\00" == "(variant { \"☃\" })"    : (variant { "☃" }) "variant: unicode field";
 assert blob "DIDL\01\6b\02\bc\8a\01\71\c5\fe\d2\01\71\01\00\00\04\67\6f\6f\64"
