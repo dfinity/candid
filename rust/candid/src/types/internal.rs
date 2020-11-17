@@ -206,21 +206,21 @@ impl Type {
         }
     }
 
-    pub(crate) fn is_null(&self, env : &crate::TypeEnv) -> bool {
+    pub(crate) fn is_null(&self, env: &crate::TypeEnv) -> bool {
         match unroll1(self, env) {
             Type::Null => true,
             _ => false,
         }
     }
 
-    pub(crate) fn is_opt(&self, env : &crate::TypeEnv) -> bool {
+    pub(crate) fn is_opt(&self, env: &crate::TypeEnv) -> bool {
         match unroll1(self, env) {
             Type::Opt(_) => true,
             _ => false,
         }
     }
 
-    pub(crate) fn is_reserved(&self, env : &crate::TypeEnv) -> bool {
+    pub(crate) fn is_reserved(&self, env: &crate::TypeEnv) -> bool {
         match unroll1(self, env) {
             Type::Reserved => true,
             _ => false,
@@ -336,13 +336,13 @@ pub fn is_primitive(t: &Type) -> bool {
     }
 }
 
-pub fn unroll1(t: &Type, env : &crate::TypeEnv) -> Type {
+pub fn unroll1(t: &Type, env: &crate::TypeEnv) -> Type {
     use self::Type::*;
     // This is only safe after type-checking and ruling out non-productive type recursion
     match t {
         Knot(ref id) => find_type(id).unwrap(),
         Var(id) => unroll1(env.rec_find_type(id).unwrap(), env),
-        t => (*t).clone()
+        t => (*t).clone(),
     }
 }
 
