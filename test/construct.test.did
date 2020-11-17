@@ -99,11 +99,12 @@ assert blob "DIDL\02\6e\01\6e\7e\01\00\01\00" == "(opt null)"                   
 assert blob "DIDL\02\6e\01\6e\7e\01\00\01\01\00" == "(opt opt false)"           : (opt opt bool) "opt: parsing opt opt false : opt opt bool";
 
 // opt subtype to constituent
-assert blob "DIDL\00\01\7e\00" == "(opt false)"                                 : (opt bool) "opt: parsing true : opt bool";
-assert blob "DIDL\00\01\7e\01" == "(opt true)"                                  : (opt bool) "opt: parsing false : opt bool";
-assert blob "DIDL\00\01\7e\02"                                                 !: (opt bool) "opt: parsing invalid bool at opt bool";
-assert blob "DIDL\01\6e\7f\01\00\00" == "(null)"                                : (opt opt null) "opt: parsing (null : opt null) at opt opt null gives null, not opt null";
-assert blob "DIDL\00\01\7e\01" == "(null)"                                      : (Opt) "opt: parsing (true : bool) at fix opt works";
+assert blob "DIDL\00\01\7e\00" == "(opt false)"   : (opt bool) "opt: parsing false : opt bool";
+assert blob "DIDL\00\01\7e\01" == "(opt true)"    : (opt bool) "opt: parsing true : opt bool";
+assert blob "DIDL\00\01\7e\02"                   !: (opt bool) "opt: parsing invalid bool at opt bool";
+assert blob "DIDL\01\6e\7f\01\00\00" == "(null)"  : (opt opt null) "opt: parsing (null : opt null) at opt opt null gives null, not opt null";
+assert blob "DIDL\00\01\7e\01" == "(null)"        : (opt opt bool) "opt: parsing true : opt opt bool gives null";
+assert blob "DIDL\00\01\7e\01" == "(null)"        : (opt opt Opt) "opt: parsing (true : bool) at fix opt gives null";
 
 // special opt subtyping
 assert blob "DIDL\00\01\70" == "(null)"  : (opt nat) "reserved <: opt nat";

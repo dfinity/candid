@@ -202,10 +202,14 @@ impl IDLValue {
                 }
             }
             // Try consituent type
-            (v, Type::Opt(ty)) => match v.annotate_type(from_parser, env, ty) {
-                Ok(v) => IDLValue::Opt(Box::new(v)),
-                Err(_) => IDLValue::None,
-            },
+            (v, Type::Opt(ty)) if !ty.is_opt(env) && !ty.is_null(env) && !ty.is_reserved(env) => {
+                match v.annotate_type(from_parser, env, ty) {
+                    Ok(v) => IDLValue::Opt(Box::new(v)),
+                    Err(_) => IDLValue::None,
+                }
+            }
+            // Fallback
+            (_, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Vec(vec), Type::Vec(ty)) => {
                 let mut res = Vec::new();
                 for e in vec.iter() {
@@ -220,9 +224,9 @@ impl IDLValue {
                 let mut res = Vec::new();
                 for Field { id, ty } in fs.iter() {
                     let val = fields.get(&id);
-                    let val = if ty.is_opt() {
+                    let val = if ty.is_opt(env) {
                         val.unwrap_or(&&IDLValue::Null)
-                    } else if ty.is_reserved() {
+                    } else if ty.is_reserved(env) {
                         val.unwrap_or(&&IDLValue::Reserved)
                     } else {
                         val.ok_or_else(|| Error::msg(format!("required field {} not found", id)))?
