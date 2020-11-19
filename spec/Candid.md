@@ -751,31 +751,39 @@ Additional rules apply to `empty` and `reserved`, which makes these a bottom res
 empty <: <datatype>
 ```
 
-#### Options and Vectors
+#### Vectors
 
-An option or vector type can be specialised via its constituent type.
+A vector type can be specialised via its constituent type.
 ```
-<datatype> <: <datatype'>
----------------------------------
-opt <datatype> <: opt <datatype'>
-
 <datatype> <: <datatype'>
 ---------------------------------
 vec <datatype> <: vec <datatype'>
 ```
-Furthermore, an option type can be specialised to either `null` or to its constituent type:
+
+#### Options
+
+An option type can be specialised via its constituent type.
+```
+<datatype> <: <datatype'>
+---------------------------------
+opt <datatype> <: opt <datatype'>
+```
+
+Furthermore, an option type can be specialised to `null`:
 ```
 ------------------------
 null <: opt <datatype>
+```
 
-not (null <: <datatype>)
+It can also be specialised to its constituent type, unless that type is itself optional:
+
+```
+not (null <: <datatype'>)
 <datatype> <: <datatype'>
 -----------------------------
 <datatype> <: opt <datatype'>
 ```
 The premise means that the rule does not apply when the constituent type is itself `null`, an option or `reserved`. That restriction is necessary so that there is no ambiguity. For example, otherwise there would be two ways to interpret `null` when going from `opt nat` to `opt opt nat`, either as `null` or as `?null`.
-
-Q: The negated nature of this premise isn't really compatible with parametric polymorphism. Is that a problem? We could always introduce a supertype of all non-nullable types and rephrase it with that.
 
 Finally, in order to maintain *transitivity* of subtyping, two unusual rules allow, in fact, *any* type to be regarded as a subtype of an option.
 ```
@@ -944,11 +952,14 @@ An optional value coerces at an option type, if the constituent value coerces at
 opt <v> ~> opt <v'> : opt <t>
 ```
 
-If an optional value _fails_ to coerce at an optional type, the result is `null`, not failure:
+If an optional value _fails_ to coerce at an optional type, or the value is `reserved`, the result is `null`, not failure:
 ```
 not (<v> ~> _ : <t>)
 -------------------------
 opt <v> ~> null : opt <t>
+
+-----------------------------------
+(null : reserved) ~> null : opt <t>
 ```
 
 Coercing a non-null, non-optional and non-reserved value at an option type treats it as an optional value:
@@ -956,6 +967,7 @@ Coercing a non-null, non-optional and non-reserved value at an option type treat
 <v> ≠ null
 <v> ≠ (null : reserved)
 <v> ≠ opt _
+not (null <: <t>)
 opt <v> ~> <v'> : opt <t>
 -------------------------
 <v> ~> <v'> : opt <t>
