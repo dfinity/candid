@@ -6,6 +6,8 @@ Encoding tests for construct types
 type Opt = opt Opt;
 type Vec = vec Vec;
 type EmptyRecord = record { EmptyRecord };
+type OptRec = opt record { OptRec };
+
 type List = opt record { head : int; tail : List };
 type List1 = opt List2;
 type List2 = record { head : int; tail : List1 };
@@ -104,7 +106,8 @@ assert blob "DIDL\00\01\7e\01" == "(opt true)"    : (opt bool) "opt: parsing tru
 assert blob "DIDL\00\01\7e\02"                   !: (opt bool) "opt: parsing invalid bool at opt bool";
 assert blob "DIDL\01\6e\7f\01\00\00" == "(null)"  : (opt opt null) "opt: parsing (null : opt null) at opt opt null gives null, not opt null";
 assert blob "DIDL\00\01\7e\01" == "(null)"        : (opt opt bool) "opt: parsing true : opt opt bool gives null";
-assert blob "DIDL\00\01\7e\01" == "(null)"        : (opt opt Opt) "opt: parsing (true : bool) at fix opt gives null";
+assert blob "DIDL\00\01\7e\01" == "(null)"        : (Opt) "opt: parsing (true : bool) at \"fix opt\" gives null";
+assert blob "DIDL\01\6c\01\00\00\01\00" == "(null)"        : (OptRec) "opt: parsing \"fix record\" at \"fix record opt\" gives null";
 
 // special opt subtyping
 assert blob "DIDL\00\01\70" == "(null)"  : (opt nat) "reserved <: opt nat";
