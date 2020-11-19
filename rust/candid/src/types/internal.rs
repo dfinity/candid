@@ -207,24 +207,15 @@ impl Type {
     }
 
     pub(crate) fn is_null(&self, env: &crate::TypeEnv) -> bool {
-        match unroll1(self, env) {
-            Type::Null => true,
-            _ => false,
-        }
+        matches!(unroll1(self, env), Type::Null)
     }
 
     pub(crate) fn is_opt(&self, env: &crate::TypeEnv) -> bool {
-        match unroll1(self, env) {
-            Type::Opt(_) => true,
-            _ => false,
-        }
+        matches!(unroll1(self, env), Type::Opt(_))
     }
 
     pub(crate) fn is_reserved(&self, env: &crate::TypeEnv) -> bool {
-        match unroll1(self, env) {
-            Type::Reserved => true,
-            _ => false,
-        }
+        matches!(unroll1(self, env), Type::Reserved)
     }
 }
 impl fmt::Display for Type {
