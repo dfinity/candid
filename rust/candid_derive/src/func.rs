@@ -31,7 +31,7 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenSt
         ));
     }
     let ident = sig.ident.to_string();
-    let name = attrs.rename.as_ref().unwrap_or_else(|| &ident).clone();
+    let name = attrs.rename.as_ref().unwrap_or(&ident).clone();
     let modes = attrs.method_type.unwrap_or_else(|| "update".to_string());
     let (args, rets) = get_args(sig)?;
     let args: Vec<String> = args

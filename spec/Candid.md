@@ -882,7 +882,7 @@ service { <name> : <functype>; <methtype>;* } <: service { <name> : <functype'>;
 
 ### Coercion
 
-This subtyping is implemented during the deserialization of Candid at an expected type. As described in [Section Deserialisation](#deserialization), the binary value is conceptually first _decoded_ into an abstract value, and then _coerced_ to the expected type.
+This subtyping is implemented during the deserialisation of Candid at an expected type. As described in [Section Deserialisation](#deserialisation), the binary value is conceptually first _decoded_ into an abstract value, and then _coerced_ to the expected type.
 
 This section describes the coercion, as a ternary relation `V ~> V' : T` to describe when a value `V` can be coerced to a value `V'` of type `T`. The fields `V` and `T` can be understood as inputs and `V'` as the output of this relation.
 
