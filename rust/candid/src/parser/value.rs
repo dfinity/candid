@@ -194,21 +194,18 @@ impl IDLValue {
             (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Reserved, Type::Opt(_)) => IDLValue::None,
             (IDLValue::None, Type::Opt(_)) => IDLValue::None,
-            (IDLValue::Opt(v), Type::Opt(ty)) => {
-                // liberal decoding of optionals
-                match v.annotate_type(from_parser, env, ty) {
-                    Ok(v) => IDLValue::Opt(Box::new(v)),
-                    Err(_) => IDLValue::None,
-                }
-            }
-            // Try consituent type
+            // liberal decoding of optionals
+            (IDLValue::Opt(v), Type::Opt(ty)) => v
+                .annotate_type(from_parser, env, ty)
+                .map(|v| IDLValue::Opt(Box::new(v)))
+                .unwrap_or(IDLValue::None),
+            // try consituent type
             (v, Type::Opt(ty)) if !matches!(env.trace_type(ty)?, Type::Null|Type::Reserved|Type::Opt(_)) => {
-                match v.annotate_type(from_parser, env, ty) {
-                    Ok(v) => IDLValue::Opt(Box::new(v)),
-                    Err(_) => IDLValue::None,
-                }
+                v.annotate_type(from_parser, env, ty)
+                    .map(|v| IDLValue::Opt(Box::new(v)))
+                    .unwrap_or(IDLValue::None)
             }
-            // Fallback
+            // fallback
             (_, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Vec(vec), Type::Vec(ty)) => {
                 let mut res = Vec::new();
@@ -226,9 +223,9 @@ impl IDLValue {
                     let val = fields
                         .get(&id)
                         .cloned()
-                        .or_else(|| match env.trace_type(ty) {
-                            Ok(Type::Opt(_)) => Some(&IDLValue::Null),
-                            Ok(Type::Reserved) => Some(&IDLValue::Reserved),
+                        .or_else(|| match env.trace_type(ty).unwrap() {
+                            Type::Opt(_) => Some(&IDLValue::None),
+                            Type::Reserved => Some(&IDLValue::Reserved),
                             _ => None,
                         })
                         .ok_or_else(|| Error::msg(format!("required field {} not found", id)))?;
