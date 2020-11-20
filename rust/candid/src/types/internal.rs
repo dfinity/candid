@@ -205,18 +205,6 @@ impl Type {
             _ => false,
         }
     }
-
-    pub(crate) fn is_null(&self, env: &crate::TypeEnv) -> bool {
-        matches!(unroll1(self, env), Type::Null)
-    }
-
-    pub(crate) fn is_opt(&self, env: &crate::TypeEnv) -> bool {
-        matches!(unroll1(self, env), Type::Opt(_))
-    }
-
-    pub(crate) fn is_reserved(&self, env: &crate::TypeEnv) -> bool {
-        matches!(unroll1(self, env), Type::Reserved)
-    }
 }
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -327,16 +315,6 @@ pub fn is_primitive(t: &Type) -> bool {
     }
 }
 
-pub fn unroll1(t: &Type, env: &crate::TypeEnv) -> Type {
-    use self::Type::*;
-    // This is only safe after type-checking and ruling out non-productive type recursion
-    match t {
-        Knot(ref id) => find_type(id).unwrap(),
-        Var(id) => unroll1(env.rec_find_type(id).unwrap(), env),
-        t => (*t).clone(),
-    }
-}
-
 pub fn unroll(t: &Type) -> Type {
     use self::Type::*;
     match t {
@@ -373,7 +351,7 @@ thread_local! {
 pub(crate) fn find_type(id: &TypeId) -> Option<Type> {
     ENV.with(|e| match e.borrow().get(id) {
         None => None,
-        Some(t) => Some((*t).clone()),
+        Some(t) => Some(t.clone()),
     })
 }
 

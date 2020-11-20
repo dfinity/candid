@@ -190,7 +190,7 @@ impl IDLValue {
             (IDLValue::Float64(n), Type::Float64) => IDLValue::Float64(*n),
             (IDLValue::Float32(n), Type::Float32) => IDLValue::Float32(*n),
             (IDLValue::Text(s), Type::Text) => IDLValue::Text(s.to_owned()),
-            // opt parsing. NB: Always succeds!
+            // opt parsing. NB: Always succeeds!
             (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Reserved, Type::Opt(_)) => IDLValue::None,
             (IDLValue::None, Type::Opt(_)) => IDLValue::None,
@@ -202,7 +202,7 @@ impl IDLValue {
                 }
             }
             // Try consituent type
-            (v, Type::Opt(ty)) if !ty.is_opt(env) && !ty.is_null(env) && !ty.is_reserved(env) => {
+            (v, Type::Opt(ty)) if !matches!(env.trace_type(ty)?, Type::Null|Type::Reserved|Type::Opt(_)) => {
                 match v.annotate_type(from_parser, env, ty) {
                     Ok(v) => IDLValue::Opt(Box::new(v)),
                     Err(_) => IDLValue::None,
@@ -223,14 +223,15 @@ impl IDLValue {
                     vec.iter().map(|IDLField { id, val }| (id, val)).collect();
                 let mut res = Vec::new();
                 for Field { id, ty } in fs.iter() {
-                    let val = fields.get(&id);
-                    let val = if ty.is_opt(env) {
-                        val.unwrap_or(&&IDLValue::Null)
-                    } else if ty.is_reserved(env) {
-                        val.unwrap_or(&&IDLValue::Reserved)
-                    } else {
-                        val.ok_or_else(|| Error::msg(format!("required field {} not found", id)))?
-                    };
+                    let val = fields
+                        .get(&id)
+                        .cloned()
+                        .or_else(|| match env.trace_type(ty) {
+                            Ok(Type::Opt(_)) => Some(&IDLValue::Null),
+                            Ok(Type::Reserved) => Some(&IDLValue::Reserved),
+                            _ => None,
+                        })
+                        .ok_or_else(|| Error::msg(format!("required field {} not found", id)))?;
                     let val = val.annotate_type(from_parser, env, ty)?;
                     res.push(IDLField {
                         id: id.clone(),
