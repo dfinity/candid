@@ -49,7 +49,7 @@ assert blob "DIDL\02\6e\01\6e\00\01\00\01\01\00" == "(opt opt null)" : (Opt) "op
 // vector
 assert blob "DIDL\01\6d\7c\01\00\00" == "(vec {})"                          : (vec int) "vec: empty";
 assert blob "DIDL\01\6d\7c\01\00\02\01\02" == "(vec { 1; 2 })"              : (vec int) "vec";
-assert blob "DIDL\01\6d\7b\01\00\02\01\02" == "(blob \"\01\02\")"           : (vec nat8) "vec: blob";
+assert blob "DIDL\01\6d\7b\01\00\02\01\02" == "(blob \"\\01\\02\")"         : (vec nat8) "vec: blob";
 assert blob "DIDL\01\6d\00\01\00\00" == "(vec {})"                          : (Vec) "vec: recursive vector";
 assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (Vec) "vec: tree";
 assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (vec vec empty) "vec: non-recursive tree";
@@ -116,6 +116,7 @@ assert blob "DIDL\01\6e\7e\01\00\01\01" == "(null)"  : (opt nat) "opt true : opt
 assert blob "DIDL\01\6e\7e\01\00\01\02"             !: (opt nat) "opt bool <: opt nat with invalid boolean value";
 assert blob "DIDL\02\6e\01\6e\7e\01\00\01\01\01" == "(null)"  : (opt nat) "opt opt true : opt opt bool <: opt nat";
 assert blob "DIDL\02\6e\01\6e\7e\01\00\01\01\01" == "(opt null)"  : (opt opt nat) "opt opt true : opt opt bool <: opt opt nat";
+assert blob "DIDL\02\6e\01\6b\01\00\7e\01\00\01\00\01" == "(null)"  : (opt variant { 0 : int }) "opt: recovered coercion error under variant";
 
 // special record field rules
 assert blob "DIDL\01\6c\00\01\00" == "(record { foo = null })" : (record { foo : opt bool }) "missing optional field";
