@@ -1,0 +1,21 @@
+name: JavaScript
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  node-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Use Node.js
+      uses: actions/setup-node@v1
+      with:
+        node-version: '14'
+    - run: npm install
+    - run: npm run build
+    - run: npm run test
+    - run: npm run prettier
+    - run: npm run lint
