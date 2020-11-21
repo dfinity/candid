@@ -233,7 +233,7 @@ The content of message arguments and results is *data*. Three basic forms of *da
 
 *Primitive types* describe the possible forms of primitive data.
 
-The primitive types that describe numbers are separted out in the grammar:
+The primitive types that describe numbers are separated out in the grammar:
 ```
 <primtype> ::= <numtype> | ...
 ```
@@ -364,13 +364,13 @@ hash(id) = ( Sum_(i=0..k) utf8(id)[i] * 223^(k-i) ) mod 2^32 where k = |utf8(id)
 
 This expansion implies that a hash collision between field names within a single record is disallowed.
 
-This hash function has the the following useful properties:
+This hash function has the following useful properties:
 
  * Collisions are sufficiently rare. It has [no collisions for names up to length 4](https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf).
 
  * It is rather simple to implement, compared to, say, a cryptographic hash function (we do not need resistence against collision attacks).
 
-The hash function does not have the property that every numeric value can be turned into a human-readable preimage. Host languages that cannot support numeric field names will have to come up with a suitable encoding textual encoding of numeric field names, as well as of field names that are not valid in the host langauge.
+The hash function does not have the property that every numeric value can be turned into a human-readable preimage. Host languages that cannot support numeric field names will have to come up with a suitable textual encoding of numeric field names, as well as of field names that are not valid in the host langauge.
 
 
 ##### Shorthand: Tuple Fields
@@ -621,7 +621,7 @@ Analoguous to types, a few syntactic shorthands are supported that can be reduce
 
 ```
 <consval> ::= ...
-  | blob <text>            := vec { N;* }  where N* are of bytes in the string, interpreted [as in the WebAssembly textual format](https://webassembly.github.io/spec/core/text/values.html#strings)
+  | blob <text>            := vec { N;* }  where N;* is the sequence of bytes in the string, interpreted [as in the WebAssembly textual format](https://webassembly.github.io/spec/core/text/values.html#strings)
 
 <fieldval> ::= ...
   | <name> = <annval>      :=  <hash(name)> = <annval>
@@ -633,7 +633,7 @@ Analoguous to types, a few syntactic shorthands are supported that can be reduce
 
 ## Upgrading and Subtyping
 
-Interfaces are allowed to evolve over time in a manner that is *robust*, i.e., cannot break existing client code. To capture this notion precisely, a service of type `T` is *upgradable* to a version with another type `T'` if and only if `T'` is *structural subtype* of `T`, written `T' <: T`. This defines that `T'` is more *specialised* than `T`. (Note: A more specialised type is less general, i.e., denotes a smaller set of possible values, thus the direction of the subtype ordering, even though a subtype record can have *more* fields.)
+Interfaces are allowed to evolve over time in a manner that is *robust*, i.e., cannot break existing client code. To capture this notion precisely, a service of type `T` is *upgradable* to a version with another type `T'` if and only if `T'` is a *structural subtype* of `T`, written `T' <: T`. This relation expresses that `T'` is more *specialised* than `T`. (Note: A more specialised type is less general, i.e., denotes a smaller set of possible values, thus the direction of the subtype ordering, even though a subtype record can have *more* fields.)
 
 For upgrading data structures passed between service and client, it is important to distinguish the direction in which the data flows, as the upgrading requirements are opposite to each other:
 
@@ -643,7 +643,7 @@ For upgrading data structures passed between service and client, it is important
 
 That is, outbound message results can only be replaced with a subtype (more fields) in an upgrade, while inbound message parameters can only be replaced with a supertype (fewer fields). This corresponds to the notions of co-variance and contra-variance in type systems.
 
-Subtyping applies recursively to the types of the fields themselves. Moreover, the directions get *inverted* for inbound function and service references, in compliance with standard rules.
+Subtyping applies recursively to the types of the fields themselves. Moreover, the orientation of subtyping is *inverted* for inbound function and service references, in compliance with standard rules.
 
 In addition to the usual subtyping rules, the subtyping relation has some more unusual rules.
 In particular, it also allows fields to be *added* to inbound values (and conversely, removed from outbound ones), as long as they are optional.
@@ -882,7 +882,7 @@ service { <name> : <functype>; <methtype>;* } <: service { <name> : <functype'>;
 
 ### Coercion
 
-This subtyping is implemented during the deserialization of Candid at an expected type. As described in [Section Deserialisation](#deserialization), the binary value is conceptually first _decoded_ into an abstract value, and then _coerced_ to the expected type.
+This subtyping is implemented during the deserialisation of Candid at an expected type. As described in [Section Deserialisation](#deserialisation), the binary value is conceptually first _decoded_ into an abstract value, and then _coerced_ to the expected type.
 
 This section describes the coercion, as a ternary relation `V ~> V' : T` to describe when a value `V` can be coerced to a value `V'` of type `T`. The fields `V` and `T` can be understood as inputs and `V'` as the output of this relation.
 
