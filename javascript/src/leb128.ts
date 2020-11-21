@@ -48,9 +48,7 @@ export function lebDecode(pipe: Pipe): BigNumber {
 
   do {
     byte = safeRead(pipe, 1)[0];
-    value = value.plus(
-      new BigNumber(byte & 0x7f).multipliedBy(new BigNumber(2).pow(shift)),
-    );
+    value = value.plus(new BigNumber(byte & 0x7f).multipliedBy(new BigNumber(2).pow(shift)));
     shift += 7;
   } while (byte >= 0x80);
 
@@ -71,10 +69,7 @@ export function slebEncode(value: BigNumber | number): Buffer {
   while (true) {
     const i = getLowerBytes(value);
     value = value.idiv(0x80);
-    if (
-      (isNeg && value.eq(0) && (i & 0x40) !== 0) ||
-      (!isNeg && value.eq(0) && (i & 0x40) === 0)
-    ) {
+    if ((isNeg && value.eq(0) && (i & 0x40) !== 0) || (!isNeg && value.eq(0) && (i & 0x40) === 0)) {
       pipe.write([i]);
       break;
     } else {
@@ -116,20 +111,14 @@ export function slebDecode(pipe: Pipe): BigNumber {
   return value.negated().minus(1);
 }
 
-export function writeUIntLE(
-  value: BigNumber | number,
-  byteLength: number,
-): Buffer {
+export function writeUIntLE(value: BigNumber | number, byteLength: number): Buffer {
   if ((value instanceof BigNumber && value.isNegative()) || value < 0) {
     throw new Error('Cannot write negative values.');
   }
   return writeIntLE(value, byteLength);
 }
 
-export function writeIntLE(
-  value: BigNumber | number,
-  byteLength: number,
-): Buffer {
+export function writeIntLE(value: BigNumber | number, byteLength: number): Buffer {
   if (typeof value === 'number') {
     value = new BigNumber(value);
   }

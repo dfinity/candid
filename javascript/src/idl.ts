@@ -4,13 +4,7 @@ import BigNumber from 'bignumber.js';
 import Pipe = require('buffer-pipe');
 import { Buffer } from 'buffer/';
 import { idlLabelToId } from './hash';
-import {
-  lebDecode,
-  lebEncode,
-  safeRead,
-  slebDecode,
-  slebEncode,
-} from './leb128';
+import { lebDecode, lebEncode, safeRead, slebDecode, slebEncode } from './leb128';
 import { readIntLE, readUIntLE, writeIntLE, writeUIntLE } from './leb128';
 
 // tslint:disable:max-line-length
@@ -42,11 +36,7 @@ const enum IDLTypeIds {
 
 const magicNumber = 'DIDL';
 
-function zipWith<TX, TY, TR>(
-  xs: TX[],
-  ys: TY[],
-  f: (a: TX, b: TY) => TR,
-): TR[] {
+function zipWith<TX, TY, TR>(xs: TX[], ys: TY[], f: (a: TX, b: TY) => TR): TR[] {
   return xs.map((x, i) => f(x, ys[i]));
 }
 
@@ -151,29 +141,14 @@ export abstract class Visitor<D, R> {
   public visitOpt<T>(t: OptClass<T>, ty: Type<T>, data: D): R {
     return this.visitConstruct(t, data);
   }
-  public visitRecord(
-    t: RecordClass,
-    fields: Array<[string, Type]>,
-    data: D,
-  ): R {
+  public visitRecord(t: RecordClass, fields: [string, Type][], data: D): R {
     return this.visitConstruct(t, data);
   }
-  public visitTuple<T extends any[]>(
-    t: TupleClass<T>,
-    components: Type[],
-    data: D,
-  ): R {
-    const fields: Array<[string, Type]> = components.map((ty, i) => [
-      `_${i}_`,
-      ty,
-    ]);
+  public visitTuple<T extends any[]>(t: TupleClass<T>, components: Type[], data: D): R {
+    const fields: [string, Type][] = components.map((ty, i) => [`_${i}_`, ty]);
     return this.visitRecord(t, fields, data);
   }
-  public visitVariant(
-    t: VariantClass,
-    fields: Array<[string, Type]>,
-    data: D,
-  ): R {
+  public visitVariant(t: VariantClass, fields: [string, Type][], data: D): R {
     return this.visitConstruct(t, data);
   }
   public visitRec<T>(t: RecClass<T>, ty: ConstructType<T>, data: D): R {
@@ -238,9 +213,7 @@ export abstract class Type<T = any> {
 export abstract class PrimitiveType<T = any> extends Type<T> {
   public checkType(t: Type): Type {
     if (this.name !== t.name) {
-      throw new Error(
-        `type mismatch: type on the wire ${t.name}, expect type ${this.name}`,
-      );
+      throw new Error(`type mismatch: type on the wire ${t.name}, expect type ${this.name}`);
     }
     return t;
   }
@@ -259,9 +232,7 @@ export abstract class ConstructType<T = any> extends Type<T> {
       }
       return ty;
     }
-    throw new Error(
-      `type mismatch: type on the wire ${t.name}, expect type ${this.name}`,
-    );
+    throw new Error(`type mismatch: type on the wire ${t.name}, expect type ${this.name}`);
   }
   public encodeType(typeTable: TypeTable) {
     return typeTable.indexOf(this.name);
@@ -752,10 +723,7 @@ export class OptClass<T> extends ConstructType<[T] | []> {
   }
 
   public covariant(x: any): x is [T] | [] {
-    return (
-      Array.isArray(x) &&
-      (x.length === 0 || (x.length === 1 && this._type.covariant(x[0])))
-    );
+    return Array.isArray(x) && (x.length === 0 || (x.length === 1 && this._type.covariant(x[0])));
   }
 
   public encodeValue(x: [T] | []) {
@@ -811,13 +779,11 @@ export class OptClass<T> extends ConstructType<[T] | []> {
  * @param {Object} [fields] - mapping of function name to Type
  */
 export class RecordClass extends ConstructType<Record<string, any>> {
-  protected readonly _fields: Array<[string, Type]>;
+  protected readonly _fields: [string, Type][];
 
   constructor(fields: Record<string, Type> = {}) {
     super();
-    this._fields = Object.entries(fields).sort(
-      (a, b) => idlLabelToId(a[0]) - idlLabelToId(b[0]),
-    );
+    this._fields = Object.entries(fields).sort((a, b) => idlLabelToId(a[0]) - idlLabelToId(b[0]));
   }
 
   public accept<D, R>(v: Visitor<D, R>, d: D): R {
@@ -873,10 +839,7 @@ export class RecordClass extends ConstructType<Record<string, any>> {
     const x: Record<string, any> = {};
     let idx = 0;
     for (const [hash, type] of record._fields) {
-      if (
-        idx >= this._fields.length ||
-        idlLabelToId(this._fields[idx][0]) !== idlLabelToId(hash)
-      ) {
+      if (idx >= this._fields.length || idlLabelToId(this._fields[idx][0]) !== idlLabelToId(hash)) {
         // skip field
         type.decodeValue(b, type);
         continue;
@@ -897,19 +860,13 @@ export class RecordClass extends ConstructType<Record<string, any>> {
   }
 
   public display() {
-    const fields = this._fields.map(
-      ([key, value]) => key + ':' + value.display(),
-    );
+    const fields = this._fields.map(([key, value]) => key + ':' + value.display());
     return `record {${fields.join('; ')}}`;
   }
 
   public valueToString(x: Record<string, any>) {
     const values = this._fields.map(([key]) => x[key]);
-    const fields = zipWith(
-      this._fields,
-      values,
-      ([k, c], d) => k + '=' + c.valueToString(d),
-    );
+    const fields = zipWith(this._fields, values, ([k, c], d) => k + '=' + c.valueToString(d));
     return `record {${fields.join('; ')}}`;
   }
 }
@@ -972,9 +929,7 @@ export class TupleClass<T extends any[]> extends RecordClass {
   }
 
   public valueToString(values: any[]) {
-    const fields = zipWith(this._components, values, (c, d) =>
-      c.valueToString(d),
-    );
+    const fields = zipWith(this._components, values, (c, d) => c.valueToString(d));
     return `record {${fields.join('; ')}}`;
   }
 }
@@ -984,13 +939,11 @@ export class TupleClass<T extends any[]> extends RecordClass {
  * @param {Object} [fields] - mapping of function name to Type
  */
 export class VariantClass extends ConstructType<Record<string, any>> {
-  private readonly _fields: Array<[string, Type]>;
+  private readonly _fields: [string, Type][];
 
   constructor(fields: Record<string, Type> = {}) {
     super();
-    this._fields = Object.entries(fields).sort(
-      (a, b) => idlLabelToId(a[0]) - idlLabelToId(b[0]),
-    );
+    this._fields = Object.entries(fields).sort((a, b) => idlLabelToId(a[0]) - idlLabelToId(b[0]));
   }
 
   public accept<D, R>(v: Visitor<D, R>, d: D): R {
@@ -1208,11 +1161,7 @@ export class FuncClass extends ConstructType<[PrincipalId, string]> {
     return '(' + types.map((t, i) => t.valueToString(v[i])).join(', ') + ')';
   }
 
-  constructor(
-    public argTypes: Type[],
-    public retTypes: Type[],
-    public annotations: string[] = [],
-  ) {
+  constructor(public argTypes: Type[], public retTypes: Type[], public annotations: string[] = []) {
     super();
   }
 
@@ -1221,11 +1170,7 @@ export class FuncClass extends ConstructType<[PrincipalId, string]> {
   }
   public covariant(x: any): x is [PrincipalId, string] {
     return (
-      Array.isArray(x) &&
-      x.length === 2 &&
-      x[0] &&
-      x[0]._isPrincipal &&
-      typeof x[1] === 'string'
+      Array.isArray(x) && x.length === 2 && x[0] && x[0]._isPrincipal && typeof x[1] === 'string'
     );
   }
 
@@ -1250,14 +1195,9 @@ export class FuncClass extends ConstructType<[PrincipalId, string]> {
     const retLen = lebEncode(this.retTypes.length);
     const rets = Buffer.concat(this.retTypes.map(arg => arg.encodeType(T)));
     const annLen = lebEncode(this.annotations.length);
-    const anns = Buffer.concat(
-      this.annotations.map(a => this.encodeAnnotation(a)),
-    );
+    const anns = Buffer.concat(this.annotations.map(a => this.encodeAnnotation(a)));
 
-    T.add(
-      this,
-      Buffer.concat([opCode, argLen, args, retLen, rets, annLen, anns]),
-    );
+    T.add(this, Buffer.concat([opCode, argLen, args, retLen, rets, annLen, anns]));
   }
 
   public decodeValue(b: Pipe): [PrincipalId, string] {
@@ -1306,12 +1246,10 @@ export class FuncClass extends ConstructType<[PrincipalId, string]> {
 }
 
 export class ServiceClass extends ConstructType<PrincipalId> {
-  public readonly _fields: Array<[string, FuncClass]>;
+  public readonly _fields: [string, FuncClass][];
   constructor(fields: Record<string, FuncClass>) {
     super();
-    this._fields = Object.entries(fields).sort(
-      (a, b) => idlLabelToId(a[0]) - idlLabelToId(b[0]),
-    );
+    this._fields = Object.entries(fields).sort((a, b) => idlLabelToId(a[0]) - idlLabelToId(b[0]));
   }
   public accept<D, R>(v: Visitor<D, R>, d: D): R {
     return v.visitService(this, d);
@@ -1357,7 +1295,7 @@ export class ServiceClass extends ConstructType<PrincipalId> {
  * Encode a array of values
  * @returns {Buffer} serialised value
  */
-export function encode(argTypes: Array<Type<any>>, args: any[]) {
+export function encode(argTypes: Type<any>[], args: any[]) {
   if (args.length < argTypes.length) {
     throw Error('Wrong number of message arguments');
   }
@@ -1372,9 +1310,7 @@ export function encode(argTypes: Array<Type<any>>, args: any[]) {
   const vals = Buffer.concat(
     zipWith(argTypes, args, (t, x) => {
       if (!t.covariant(x)) {
-        throw new Error(
-          `Invalid ${t.display()} argument: "${JSON.stringify(x)}"`,
-        );
+        throw new Error(`Invalid ${t.display()} argument: "${JSON.stringify(x)}"`);
       }
 
       return t.encodeValue(x);
@@ -1401,8 +1337,8 @@ export function decode(retTypes: Type[], bytes: Buffer): any[] {
     throw new Error('Wrong magic number: ' + magic);
   }
 
-  function readTypeTable(pipe: Pipe): [Array<[IDLTypeIds, any]>, number[]] {
-    const typeTable: Array<[IDLTypeIds, any]> = [];
+  function readTypeTable(pipe: Pipe): [[IDLTypeIds, any][], number[]] {
+    const typeTable: [IDLTypeIds, any][] = [];
     const len = lebDecode(pipe).toNumber();
 
     for (let i = 0; i < len; i++) {
