@@ -1,6 +1,8 @@
 module.exports = {
   bail: false,
-  setupFiles: [],
+  setupFiles: [
+    "./test-setup",
+  ],
   setupFilesAfterEnv: [
     "jest-expect-message",
   ],

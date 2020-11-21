@@ -2,11 +2,10 @@
 import BigNumber from 'bignumber.js';
 import Pipe = require('buffer-pipe');
 import { Buffer } from 'buffer/';
-import { Principal as PrincipalId } from './principal';
-import { JsonValue } from './types';
-import { idlLabelToId } from './utils/hash';
-import { lebDecode, lebEncode, safeRead, slebDecode, slebEncode } from './utils/leb128';
-import { readIntLE, readUIntLE, writeIntLE, writeUIntLE } from './utils/leb128';
+import { Principal as PrincipalId } from '@dfinity/agent';
+import { idlLabelToId } from './hash';
+import { lebDecode, lebEncode, safeRead, slebDecode, slebEncode } from './leb128';
+import { readIntLE, readUIntLE, writeIntLE, writeUIntLE } from './leb128';
 
 // tslint:disable:max-line-length
 /**
@@ -1327,7 +1326,7 @@ export function encode(argTypes: Array<Type<any>>, args: any[]) {
  * @param bytes - hex-encoded string, or buffer.
  * @returns Value deserialised to JS type
  */
-export function decode(retTypes: Type[], bytes: Buffer): JsonValue[] {
+export function decode(retTypes: Type[], bytes: Buffer): any[] {
   const b = new Pipe(bytes);
 
   if (bytes.byteLength < magicNumber.length) {
