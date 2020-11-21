@@ -19,7 +19,4 @@ jobs:
       with:
         node-version: '14'
     - run: npm install
-    - run: npm run build
-    - run: npm run test
-    - run: npm run prettier
-    - run: npm run lint
+    - run: npm run ci
