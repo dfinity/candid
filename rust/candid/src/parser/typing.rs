@@ -44,6 +44,13 @@ impl TypeEnv {
             t => Ok(t),
         }
     }
+    pub fn trace_type<'a>(&'a self, t: &'a Type) -> Result<Type> {
+        match t {
+            Type::Var(id) => self.trace_type(self.find_type(id)?),
+            Type::Knot(ref id) => self.trace_type(&crate::types::internal::find_type(id).unwrap()),
+            t => Ok(t.clone()),
+        }
+    }
     pub fn as_func<'a>(&'a self, t: &'a Type) -> Result<&'a Function> {
         match t {
             Type::Func(f) => Ok(f),

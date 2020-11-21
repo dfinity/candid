@@ -288,7 +288,7 @@ macro_rules! Encode {
         Encode!(@PutValue builder $($x,)*)
     }};
     ( @PutValue $builder:ident $x:expr, $($tail:expr,)* ) => {{
-        $builder.arg($x).and_then(|mut builder| Encode!(@PutValue builder $($tail,)*))
+        $builder.arg($x).and_then(|builder| Encode!(@PutValue builder $($tail,)*))
     }};
     ( @PutValue $builder:ident ) => {{
         $builder.serialize_to_vec()

@@ -351,7 +351,7 @@ thread_local! {
 pub(crate) fn find_type(id: &TypeId) -> Option<Type> {
     ENV.with(|e| match e.borrow().get(id) {
         None => None,
-        Some(t) => Some((*t).clone()),
+        Some(t) => Some(t.clone()),
     })
 }
 

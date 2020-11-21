@@ -26,6 +26,14 @@ impl From<BigUint> for Nat {
     }
 }
 
+impl From<Nat> for Int {
+    #[inline(always)]
+    fn from(n: Nat) -> Self {
+        let i: BigInt = n.0.into();
+        i.into()
+    }
+}
+
 impl From<Int> for BigInt {
     #[inline(always)]
     fn from(i: Int) -> Self {

@@ -154,7 +154,6 @@ impl IDLValue {
                 let ty = crate::types::internal::find_type(id).unwrap();
                 self.annotate_type(from_parser, env, &ty)?
             }
-            (IDLValue::Null, Type::Opt(_)) if from_parser => IDLValue::None,
             (IDLValue::Float64(n), Type::Float32) if from_parser => IDLValue::Float32(*n as f32),
             (IDLValue::Number(str), t) if from_parser => match t {
                 Type::Int => IDLValue::Int(str.parse::<Int>()?),
@@ -177,8 +176,9 @@ impl IDLValue {
             (_, Type::Reserved) => IDLValue::Reserved,
             (IDLValue::Null, Type::Null) => IDLValue::Null,
             (IDLValue::Bool(b), Type::Bool) => IDLValue::Bool(*b),
-            (IDLValue::Int(i), Type::Int) => IDLValue::Int(i.clone()),
             (IDLValue::Nat(n), Type::Nat) => IDLValue::Nat(n.clone()),
+            (IDLValue::Int(i), Type::Int) => IDLValue::Int(i.clone()),
+            (IDLValue::Nat(n), Type::Int) => IDLValue::Int(n.clone().into()),
             (IDLValue::Nat8(n), Type::Nat8) => IDLValue::Nat8(*n),
             (IDLValue::Nat16(n), Type::Nat16) => IDLValue::Nat16(*n),
             (IDLValue::Nat32(n), Type::Nat32) => IDLValue::Nat32(*n),
@@ -190,11 +190,23 @@ impl IDLValue {
             (IDLValue::Float64(n), Type::Float64) => IDLValue::Float64(*n),
             (IDLValue::Float32(n), Type::Float32) => IDLValue::Float32(*n),
             (IDLValue::Text(s), Type::Text) => IDLValue::Text(s.to_owned()),
+            // opt parsing. NB: Always succeeds!
+            (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
+            (IDLValue::Reserved, Type::Opt(_)) => IDLValue::None,
             (IDLValue::None, Type::Opt(_)) => IDLValue::None,
-            (IDLValue::Opt(v), Type::Opt(ty)) => {
-                let v = v.annotate_type(from_parser, env, ty)?;
-                IDLValue::Opt(Box::new(v))
+            // liberal decoding of optionals
+            (IDLValue::Opt(v), Type::Opt(ty)) => v
+                .annotate_type(from_parser, env, ty)
+                .map(|v| IDLValue::Opt(Box::new(v)))
+                .unwrap_or(IDLValue::None),
+            // try consituent type
+            (v, Type::Opt(ty)) if !matches!(env.trace_type(ty)?, Type::Null|Type::Reserved|Type::Opt(_)) => {
+                v.annotate_type(from_parser, env, ty)
+                    .map(|v| IDLValue::Opt(Box::new(v)))
+                    .unwrap_or(IDLValue::None)
             }
+            // fallback
+            (_, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Vec(vec), Type::Vec(ty)) => {
                 let mut res = Vec::new();
                 for e in vec.iter() {
@@ -210,7 +222,13 @@ impl IDLValue {
                 for Field { id, ty } in fs.iter() {
                     let val = fields
                         .get(&id)
-                        .ok_or_else(|| Error::msg(format!("field {} not found", id)))?;
+                        .cloned()
+                        .or_else(|| match env.trace_type(ty).unwrap() {
+                            Type::Opt(_) => Some(&IDLValue::None),
+                            Type::Reserved => Some(&IDLValue::Reserved),
+                            _ => None,
+                        })
+                        .ok_or_else(|| Error::msg(format!("required field {} not found", id)))?;
                     let val = val.annotate_type(from_parser, env, ty)?;
                     res.push(IDLField {
                         id: id.clone(),
