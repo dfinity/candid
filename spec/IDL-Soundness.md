@@ -116,7 +116,7 @@ A solution with canonical subtyping (transitive, contravariant) is sound.
 
 Assume a reflexivie and transitive relation `t1 <: t2`.
 
-Define `(t1' -> t2') <: (t1 -> t2) ⟺ (t1 <: t1') ∧ (t2' <: t2')`
+Define `(t1' -> t2') <: (t1 -> t2) ⟺ (t1 <: t1') ∧ (t2' <: t2)`
 
 Assume that
  * `s1 ~> s2` only if `s2 <: s1` (it can be more restrictive)
