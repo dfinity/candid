@@ -35,6 +35,9 @@ let
           pkgs.niv
         ];
 
+        # This helps with using GUI programs like coqide
+        LOCALE_ARCHIVE = pkgs.stdenv.lib.optionalString pkgs.stdenv.isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
+
         # allow building this as a derivation, so that CI can biuld and cache
         # the dependencies of shell
         phases = ["installPhase" "fixupPhase"];
