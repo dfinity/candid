@@ -125,8 +125,84 @@ Section IDL.
        forall A B s1 s2,
        In st (HasType A s1) -> In st (HasRef B A s2) -> s1 <:: s2 .
     
-    Lemma invariant_StateSound:
+    Lemma invariant_implies_StateSound:
       forall st, invariant st -> StateSound st.
+    Proof.
+      intros st Hinvariant.
+      intros A t1 t2 B HCanSend.
+      destruct HCanSend.
+      * pose proof (Hinvariant B A (t2 --> t2') (t1 --> t1') H0 H) as H1.
+        apply service_subtype_sound in H1.
+        apply H1.
+      * pose proof (Hinvariant A B (t2 --> t2') (t1 --> t1') H0 H) as H1.
+        apply service_subtype_sound in H1.
+        apply H1.
+    Qed.
+
+    Lemma invariant_Add_HasType:
+      forall st A s1,
+      invariant st ->
+      (forall B s2, In st (HasRef B A s2) -> s1 <:: s2) ->
+      invariant (Add st (HasType A s1)).
+    Proof.
+       intros st A s1 Hinv HA.
+       intros A' B s1' s2 HHasType HHasRef.
+       inversion HHasType; clear HHasType; inversion HHasRef; clear HHasRef; subst.
+       * eapply Hinv; eassumption.
+       * inversion H1.
+       * inversion H; subst; clear H.
+         eapply HA; eassumption.
+       * inversion H; subst; clear H.
+         inversion H1; subst; clear H1.
+    Qed.
+
+    Lemma invariant_Add_HasRef:
+      forall st A B s2,
+      invariant st ->
+      (forall s1, In st (HasType B s1) -> s1 <:: s2) ->
+      invariant (Add st (HasRef A B s2)).
+    Proof.
+       intros st A B s2 Hinv HA.
+       intros A' B' s1' s2' HHasRef HHasType.
+       inversion HHasType; clear HHasType; inversion HHasRef; clear HHasRef; subst.
+       * eapply Hinv; eassumption.
+       * inversion H1.
+       * inversion H; subst; clear H.
+         eapply HA; eassumption.
+       * inversion H; subst; clear H.
+         inversion H1; subst; clear H1.
+    Qed.
+
+    Lemma invariant_is_invariant:
+      forall st1 st2, step st1 st2 -> invariant st1 -> invariant st2.
+    Proof.
+      intros st1 st2 Hstep Hinv.
+      induction Hstep.
+      * (* NewService *)
+        apply invariant_Add_HasType.
+        - apply Hinv.
+        - intros  B s2 HB.
+          eapply H in HB.
+          inversion HB.
+      * (* EvolveService *) 
+        admit.
+      * (* LearnService *)
+        apply invariant_Add_HasRef.
+        - apply Hinv.
+        - intros s2 HHasType.
+          (* Uniqueness of HasType, reflexivity *)
+          admit.
+      * (* TransmitService *) 
+        apply invariant_Add_HasRef.
+        - apply Hinv.
+        - intros s3 HC.
+        admit.
+      * (* HostSubtyping *)
+        apply invariant_Add_HasRef.
+        - admit.
+        - intros s3 HB.
+          admit.
     Admitted.
+
 
 End IDL.
