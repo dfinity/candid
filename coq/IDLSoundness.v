@@ -14,6 +14,7 @@ Arguments Add {U}.
 Arguments Empty_set {U}.
 
 Require Import Coq.Relations.Relation_Operators.
+Require Import Coq.Relations.Relation_Definitions.
 
 Set Bullet Behavior "Strict Subproofs".
  
@@ -98,5 +99,34 @@ Section IDL.
 
   Definition IDLSound : Prop :=
     forall s, clos_refl_trans _ step Empty_set s -> StateSound s.
+    
+   (* Now we continue with the soundness proof for canonical subtyping.
+      TODO: Modularize this development, instead of continuing in the same Section *)
+     
+    Hypothesis decodesAt_refl: reflexive _ decodesAt.
+    Hypothesis decodesAt_trans: transitive _ decodesAt.
+
+    Variable service_subtyping : S -> S -> Prop.
+    Notation "s1 <:: s2" := (service_subtyping s1 s2) (at level 70, no associativity).
+    Hypothesis service_subtype_sound:
+     forall t1 t1' t2 t2',
+       (t1 --> t1') <:: (t2 --> t2') ->
+       t1' <: t2' /\ t2 <: t1.
+
+    Hypothesis evolves_correctly:
+     forall s1 s2, s2 <:: s1 -> s1 ~> s2.
+    Hypothesis compositional:
+      forall t1 t2 s1 s2,
+      t1 <: t2 -> s1 ∈ t1 <: s2 ∈ t2 -> s1 <:: s2.
+    Hypothesis host_subtyping_sound:
+     forall s1 s2, s2 <<: s1 -> s1 <:: s2.
+    
+    Definition invariant (st : State) :=
+       forall A B s1 s2,
+       In st (HasType A s1) -> In st (HasRef B A s2) -> s1 <:: s2 .
+    
+    Lemma invariant_StateSound:
+      forall st, invariant st -> StateSound st.
+    Admitted.
 
 End IDL.
