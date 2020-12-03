@@ -80,6 +80,20 @@ Inductive Coerces : V -> V -> T -> Prop :=
     v1 ~> SomeV v2 :: OptT t
 where "v1 ~> v2 :: t" := (Coerces v1 v2 t).
 
+(* The is_not_opt_like_type definition is only introduced because
+   Coq (and not only coq) does not like hyptheses like ~(null <: t)
+*)
+Lemma is_not_opt_like_type_correct:
+  forall t,
+  is_not_opt_like_type t <-> ~ (NullT <: t).
+Proof.
+  intros. destruct t; simpl; intuition.
+  * inversion H0.
+  * inversion H0.
+  * apply H. constructor.
+  * apply H. constructor.
+Qed.
+
 Theorem coercion_correctness:
   forall v1 v2 t, v1 ~> v2 :: t -> v2 :: t.
 Proof.
@@ -149,5 +163,4 @@ Proof.
     - intuition.
     - firstorder.
   * inversion H3; subst; clear H3; try easy.
-Guarded.
 Qed.
