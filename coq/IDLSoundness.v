@@ -112,13 +112,12 @@ Section IDL.
   Hypothesis decodesAt_refl: reflexive _ decodesAt.
   Hypothesis decodesAt_trans: transitive _ decodesAt.
 
-  Variable service_subtyping : S -> S -> Prop.
+  Definition service_subtyping (s1 s2 : S) : Prop :=
+    let '(t1 --> t1') := s1 in
+    let '(t2 --> t2') := s2 in
+    t1' <: t2' /\ t2 <: t1.
   Notation "s1 <:: s2" := (service_subtyping s1 s2) (at level 70, no associativity).
-  Hypothesis service_subtype_sound:
-   forall t1 t1' t2 t2',
-     (t1 --> t1') <:: (t2 --> t2') <->
-     t1' <: t2' /\ t2 <: t1.
-
+  
   Hypothesis evolves_correctly:
    forall s1 s2, s1 ~> s2 -> s2 <:: s1.
   Hypothesis compositional:
@@ -137,14 +136,12 @@ Section IDL.
   Lemma service_subtype_refl: reflexive _ service_subtyping.
   Proof.
     intros [t1 t1'].
-    rewrite service_subtype_sound.
     split; apply decodesAt_refl.
   Qed.
 
   Lemma service_subtype_trans: transitive _ service_subtyping.
   Proof.
     intros [t1 t1'] [t2 t2'] [t3 t3'] H1 H2.
-    rewrite service_subtype_sound in *.
     destruct H1, H2.
     split; eapply decodesAt_trans; eassumption.
   Qed.
@@ -165,10 +162,8 @@ Section IDL.
     intros A t1 t2 B HCanSend.
     destruct HCanSend.
     * pose proof (Hinvariant B A (t2 --> t2') (t1 --> t1') H0 H) as H1.
-      apply service_subtype_sound in H1.
       apply H1.
     * pose proof (Hinvariant A B (t2 --> t2') (t1 --> t1') H0 H) as H1.
-      apply service_subtype_sound in H1.
       apply H1.
   Qed.
 
