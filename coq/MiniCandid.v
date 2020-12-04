@@ -9,7 +9,9 @@ Require Import Coq.Relations.Relation_Definitions.
 Require Import Coq.Relations.Operators_Properties.
 
 Set Bullet Behavior "Strict Subproofs".
+Set Default Goal Selector "!".
 
+Require Import candid.NamedCases.
 
 (* Types are coinductive (we do not want to model the graph structure explicilty) *)
 CoInductive T :=
@@ -34,16 +36,24 @@ Definition is_not_opt_like_type (t : T) : Prop :=
 
 Reserved Infix "<:" (at level 80, no associativity).
 CoInductive Subtype : T -> T -> Prop :=
-  | ReflST : forall t, t <: t
-  | NatIntST : NatT <: IntT
-  | NullOptST : forall t, NullT <: OptT t
+  | ReflST :
+    forall Case_ReflSL : CaseName,
+    forall t, t <: t
+  | NatIntST :
+    forall Case_NatIntSL : CaseName,
+    NatT <: IntT
+  | NullOptST :
+    forall Case_NullOptST : CaseName,
+    forall t, NullT <: OptT t
   | OptST :
+    forall Case_OptST : CaseName,
     forall t1 t2,
     (* This additional restriction added to fix https://github.com/dfinity/candid/issues/146 *)
     (is_not_opt_like_type t1 <-> is_not_opt_like_type t2) -> 
     t1 <: t2 ->
     OptT t1 <: OptT t2
   | ConstituentOptST :
+    forall Case_ConstituentOptST : CaseName,
     forall t1 t2,
     is_not_opt_like_type t2 ->
     t1 <: t2 -> t1 <: OptT t2
@@ -51,11 +61,21 @@ where "t1 <: t2" := (Subtype t1 t2).
 
 
 Inductive HasType : V -> T -> Prop :=
-  | NatHT: forall n, NatV n :: NatT
-  | IntHT: forall n, IntV n :: IntT
-  | NullHT: NullV :: NullT
-  | NullOptHT: forall t, NullV :: OptT t
-  | OptHT: forall v t, v :: t -> SomeV v :: OptT t
+  | NatHT:
+    forall Case_NatHT : CaseName,
+    forall n, NatV n :: NatT
+  | IntHT:
+    forall Case_IntHT : CaseName,
+    forall n, IntV n :: IntT
+  | NullHT:
+    forall Case_NullHT : CaseName,
+    NullV :: NullT
+  | NullOptHT:
+    forall Case_NullOptHT : CaseName,
+    forall t, NullV :: OptT t
+  | OptHT:
+    forall Case_OptHT : CaseName,
+    forall v t, v :: t -> SomeV v :: OptT t
 where "v :: t" := (HasType v t).
 
 Definition is_not_opt_like_value (v : V) : Prop :=
@@ -68,13 +88,27 @@ Definition is_not_opt_like_value (v : V) : Prop :=
 
 Reserved Notation "v1 ~> v2 :: t" (at level 80, v2 at level 50, no associativity).
 Inductive Coerces : V -> V -> T -> Prop :=
-  | NatC: forall n, (NatV n ~> NatV n :: NatT)
-  | IntC: forall n, (IntV n ~> IntV n :: IntT)
-  | NatIntC: forall n i, i = Z.of_nat n -> (NatV n ~> IntV i :: IntT)
-  | NullC: NullV ~> NullV :: NullT
-  | NullOptC: forall t, NullV ~> NullV :: OptT t
-  | SomeOptC: forall v1 v2 t, v1 ~> v2 :: t -> SomeV v1 ~> SomeV v2 :: OptT t
-  | ConstituentOptC: forall v1 v2 t,
+  | NatC: 
+    forall Case_NatC : CaseName,
+    forall n, (NatV n ~> NatV n :: NatT)
+  | IntC:
+    forall Case_IntC : CaseName,
+    forall n, (IntV n ~> IntV n :: IntT)
+  | NatIntC:
+    forall Case_NatIntC : CaseName,
+    forall n i, i = Z.of_nat n -> (NatV n ~> IntV i :: IntT)
+  | NullC:
+    forall Case_NullC : CaseName,
+    NullV ~> NullV :: NullT
+  | NullOptC:
+    forall Case_NullOptC : CaseName,
+    forall t, NullV ~> NullV :: OptT t
+  | SomeOptC:
+    forall Case_SomeOptC : CaseName,
+    forall v1 v2 t, v1 ~> v2 :: t -> SomeV v1 ~> SomeV v2 :: OptT t
+  | ConstituentOptC:
+    forall Case_ConstituentC : CaseName,
+    forall v1 v2 t,
     is_not_opt_like_value v1 ->
     v1 ~> v2 :: t ->
     v1 ~> SomeV v2 :: OptT t
@@ -90,8 +124,8 @@ Proof.
   intros. destruct t; simpl; intuition.
   * inversion H0.
   * inversion H0.
-  * apply H. constructor.
-  * apply H. constructor.
+  * apply H. named_constructor.
+  * apply H. named_constructor.
 Qed.
 
 Theorem coercion_correctness:
@@ -122,14 +156,13 @@ Theorem soundness_of_subtyping:
 Proof.
   intros t1 t2 Hsub v HvT. revert t2 Hsub.
   induction HvT; intros t1 Hsub; inversion Hsub; subst; clear Hsub;
-    try (eexists;constructor; fail).
-  * eexists. constructor. reflexivity. 
+    try (eexists;constructor; try constructor; fail).
   * inversion H0; subst; clear H0; simpl in H; inversion H.
-    - eexists. constructor; try constructor.
-    - eexists. constructor; try constructor; reflexivity.
+    - eexists. named_constructor; [constructor|named_constructor].
+    - eexists. named_constructor; [constructor|named_constructor;reflexivity].
   * inversion H0; subst; clear H0; simpl in H; inversion H.
-    econstructor. econstructor. constructor. constructor.
-  * specialize (IHHvT t (ReflST _)).
+    econstructor. econstructor; named_constructor.
+  * specialize (IHHvT t (ReflST _ _)).
     destruct IHHvT as [v2 Hv2].
     eexists; econstructor; try eassumption.
   * specialize (IHHvT _ H1).
@@ -139,7 +172,7 @@ Proof.
 Qed.
 
 Theorem subtyping_refl: reflexive _ Subtype.
-Proof. intros x. apply ReflST. Qed.
+Proof. intros x. apply ReflST; constructor. Qed.
 
 Lemma is_not_opt_like_type_contravariant:
   forall t1 t2,
@@ -152,15 +185,27 @@ Proof.
   intros t1 t2 t3 H1 H2.
   inversion H1; subst; clear H1;
   inversion H2; subst; clear H2;
+    name_cases;
     try (constructor; easy).
-  * constructor. assumption.
-    eapply Hyp; [econstructor|assumption].
-  * constructor.
+  [Case_NatIntSL_Case_ConstituentOptST]: {
+    named_constructor.
+    - assumption.
+    - eapply Hyp; [named_econstructor | assumption].
+  }
+  [Case_OptST_Case_OptST0]: {
+    named_constructor.
     - intuition.
     - eapply Hyp; eassumption.
-  * inversion H3; subst; clear H3; simpl in H0; contradiction.
-  * constructor.
+  }
+  [Case_OptST_Case_ConstituentOptST]: {
+    inversion H3; subst; clear H3; simpl in H0; contradiction.
+  }
+  [Case_ConstituentOptST_Case_OptST]: {
+    named_constructor.
     - intuition.
     - firstorder.
-  * inversion H3; subst; clear H3; try easy.
+  }
+  [Case_ConstituentOptST_Case_ConstituentOptST0]: {
+    inversion H3; subst; clear H3; try easy.
+  }
 Qed.
