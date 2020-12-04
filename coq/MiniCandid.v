@@ -140,10 +140,7 @@ Lemma is_not_opt_like_type_correct:
   is_not_opt_like_type t <-> ~ (NullT <: t).
 Proof.
   intros. destruct t; simpl; intuition.
-  all: try inversion H0.
-  * apply H; named_constructor.
-  * apply H; named_constructor.
-  * apply H; named_constructor.
+  all: try inversion H0; (apply H; named_constructor).
 Qed.
 
 Theorem coercion_correctness:
