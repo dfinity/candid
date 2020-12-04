@@ -18,7 +18,9 @@ CoInductive T :=
   | NatT: T
   | IntT: T
   | NullT : T
-  | OptT : T -> T.
+  | OptT : T -> T
+  | VoidT : T
+  .
 
 Inductive V :=
   | NatV : nat -> V
@@ -57,8 +59,10 @@ CoInductive Subtype : T -> T -> Prop :=
     forall t1 t2,
     is_not_opt_like_type t2 ->
     t1 <: t2 -> t1 <: OptT t2
+  | VoidST :
+    forall Case_VoidST : CaseName,
+    forall t, VoidT <: t
 where "t1 <: t2" := (Subtype t1 t2).
-
 
 Inductive HasType : V -> T -> Prop :=
   | NatHT:
@@ -122,10 +126,9 @@ Lemma is_not_opt_like_type_correct:
   is_not_opt_like_type t <-> ~ (NullT <: t).
 Proof.
   intros. destruct t; simpl; intuition.
-  * inversion H0.
-  * inversion H0.
-  * apply H. named_constructor.
-  * apply H. named_constructor.
+  all: try inversion H0.
+  * apply H; named_constructor.
+  * apply H; named_constructor.
 Qed.
 
 Theorem coercion_correctness:
