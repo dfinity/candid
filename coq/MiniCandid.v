@@ -20,19 +20,22 @@ CoInductive T :=
   | NullT : T
   | OptT : T -> T
   | VoidT : T
+  | ReservedT : T
   .
 
 Inductive V :=
   | NatV : nat -> V
   | IntV : Z -> V
   | NullV : V
-  | SomeV : V -> V.
-
+  | SomeV : V -> V
+  | ReservedV : V
+  .
 
 Definition is_not_opt_like_type (t : T) : Prop :=
   match t with
   | NullT => False
   | OptT _ => False
+  | ReservedT => False
   | _ => True
   end.
 
@@ -62,6 +65,9 @@ CoInductive Subtype : T -> T -> Prop :=
   | VoidST :
     forall Case_VoidST : CaseName,
     forall t, VoidT <: t
+  | ReservedST :
+    forall Case_ReservedST : CaseName,
+    forall t, t <: ReservedT
 where "t1 <: t2" := (Subtype t1 t2).
 
 Inductive HasType : V -> T -> Prop :=
@@ -80,12 +86,16 @@ Inductive HasType : V -> T -> Prop :=
   | OptHT:
     forall Case_OptHT : CaseName,
     forall v t, v :: t -> SomeV v :: OptT t
+  | ReservedHT:
+    forall Case_ReservedHT : CaseName,
+    ReservedV :: ReservedT
 where "v :: t" := (HasType v t).
 
 Definition is_not_opt_like_value (v : V) : Prop :=
   match v with
   | NullV => False
   | SomeV _ => False
+  | ReservedV => False
   | _ => True
   end.
 
@@ -116,6 +126,10 @@ Inductive Coerces : V -> V -> T -> Prop :=
     is_not_opt_like_value v1 ->
     v1 ~> v2 :: t ->
     v1 ~> SomeV v2 :: OptT t
+  | ReservedC:
+    forall Case_ReservedC : CaseName,
+    forall v1,
+    v1 ~> ReservedV :: ReservedT
 where "v1 ~> v2 :: t" := (Coerces v1 v2 t).
 
 (* The is_not_opt_like_type definition is only introduced because
@@ -127,6 +141,7 @@ Lemma is_not_opt_like_type_correct:
 Proof.
   intros. destruct t; simpl; intuition.
   all: try inversion H0.
+  * apply H; named_constructor.
   * apply H; named_constructor.
   * apply H; named_constructor.
 Qed.
@@ -159,19 +174,33 @@ Theorem soundness_of_subtyping:
 Proof.
   intros t1 t2 Hsub v HvT. revert t2 Hsub.
   induction HvT; intros t1 Hsub; inversion Hsub; subst; clear Hsub;
+    name_cases;
     try (eexists;constructor; try constructor; fail).
-  * inversion H0; subst; clear H0; simpl in H; inversion H.
+  [Case_NatHT_Case_ConstituentOptST]: {
+    inversion H0; subst; clear H0; simpl in H; inversion H.
     - eexists. named_constructor; [constructor|named_constructor].
     - eexists. named_constructor; [constructor|named_constructor;reflexivity].
-  * inversion H0; subst; clear H0; simpl in H; inversion H.
-    econstructor. econstructor; named_constructor.
-  * specialize (IHHvT t (ReflST _ _)).
+  }
+  [Case_IntHT_Case_ConstituentOptST]: {
+    inversion H0; subst; clear H0; simpl in H; inversion H.
+    econstructor. named_econstructor; named_constructor.
+  }
+  [Case_OptHT_Case_ReflSL]: {
+    specialize (IHHvT t (ReflST _ _)).
     destruct IHHvT as [v2 Hv2].
-    eexists; econstructor; try eassumption.
-  * specialize (IHHvT _ H1).
+    eexists. named_econstructor; try eassumption.
+  }
+  [Case_OptHT_Case_OptST]: {
+    specialize (IHHvT _ H1).
     destruct IHHvT as [v2 Hv2].
-    eexists; econstructor; eassumption.
-  * inversion H0; subst; clear H0; simpl in H; inversion H.
+    eexists; named_econstructor; eassumption.
+  }
+  [Case_OptHT_Case_ConstituentOptST]: {
+    inversion H0; subst; clear H0; simpl in H; inversion H.
+  }
+  [Case_ReservedHT_Case_ConstituentOptST]: {
+    inversion H0; subst; clear H0; simpl in H; inversion H.
+  }
 Qed.
 
 Theorem subtyping_refl: reflexive _ Subtype.
@@ -210,5 +239,8 @@ Proof.
   }
   [Case_ConstituentOptST_Case_ConstituentOptST0]: {
     inversion H3; subst; clear H3; try easy.
+  }
+  [Case_ReservedST_Case_ConstituentOptST]: {
+    inversion H0; subst; clear H0; inversion H.
   }
 Qed.
