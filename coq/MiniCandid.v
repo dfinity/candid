@@ -11,7 +11,9 @@ Require Import Coq.Relations.Operators_Properties.
 Set Bullet Behavior "Strict Subproofs".
 Set Default Goal Selector "!".
 
+(* Loads the idiosyncratic CaseNames extension *)
 Require Import candid.NamedCases.
+Set Printing Goal Names. (* Coqide doesn’t use it yet, will be in 8.13 *)
 
 (* Types are coinductive (we do not want to model the graph structure explicilty) *)
 CoInductive T :=
@@ -31,6 +33,8 @@ Inductive V :=
   | ReservedV : V
   .
 
+(* This is a stand in for `~(null <: t)` in places
+where <: is not allowed yet. *)
 Definition is_not_opt_like_type (t : T) : Prop :=
   match t with
   | NullT => False
@@ -42,52 +46,52 @@ Definition is_not_opt_like_type (t : T) : Prop :=
 Reserved Infix "<:" (at level 80, no associativity).
 CoInductive Subtype : T -> T -> Prop :=
   | ReflST :
-    forall Case_ReflSL : CaseName,
+    case reflSL,
     forall t, t <: t
   | NatIntST :
-    forall Case_NatIntSL : CaseName,
+    case natIntSL,
     NatT <: IntT
   | NullOptST :
-    forall Case_NullOptST : CaseName,
+    case nullOptST,
     forall t, NullT <: OptT t
   | OptST :
-    forall Case_OptST : CaseName,
+    case optST,
     forall t1 t2,
     (* This additional restriction added to fix https://github.com/dfinity/candid/issues/146 *)
     (is_not_opt_like_type t1 <-> is_not_opt_like_type t2) -> 
     t1 <: t2 ->
     OptT t1 <: OptT t2
   | ConstituentOptST :
-    forall Case_ConstituentOptST : CaseName,
+    case constituentOptST,
     forall t1 t2,
     is_not_opt_like_type t2 ->
     t1 <: t2 -> t1 <: OptT t2
   | VoidST :
-    forall Case_VoidST : CaseName,
+    case voidST,
     forall t, VoidT <: t
   | ReservedST :
-    forall Case_ReservedST : CaseName,
+    case reservedST,
     forall t, t <: ReservedT
 where "t1 <: t2" := (Subtype t1 t2).
 
 Inductive HasType : V -> T -> Prop :=
   | NatHT:
-    forall Case_NatHT : CaseName,
+    case natHT,
     forall n, NatV n :: NatT
   | IntHT:
-    forall Case_IntHT : CaseName,
+    case intHT,
     forall n, IntV n :: IntT
   | NullHT:
-    forall Case_NullHT : CaseName,
+    case nullHT,
     NullV :: NullT
   | NullOptHT:
-    forall Case_NullOptHT : CaseName,
+    case nullOptHT,
     forall t, NullV :: OptT t
   | OptHT:
-    forall Case_OptHT : CaseName,
+    case optHT,
     forall v t, v :: t -> SomeV v :: OptT t
   | ReservedHT:
-    forall Case_ReservedHT : CaseName,
+    case reservedHT,
     ReservedV :: ReservedT
 where "v :: t" := (HasType v t).
 
@@ -103,31 +107,33 @@ Definition is_not_opt_like_value (v : V) : Prop :=
 Reserved Notation "v1 ~> v2 :: t" (at level 80, v2 at level 50, no associativity).
 Inductive Coerces : V -> V -> T -> Prop :=
   | NatC: 
-    forall Case_NatC : CaseName,
-    forall n, (NatV n ~> NatV n :: NatT)
+    case natC,
+    forall n, NatV n ~> NatV n :: NatT
   | IntC:
-    forall Case_IntC : CaseName,
-    forall n, (IntV n ~> IntV n :: IntT)
+    case intC,
+    forall n, IntV n ~> IntV n :: IntT
   | NatIntC:
-    forall Case_NatIntC : CaseName,
+    case natIntC,
     forall n i, i = Z.of_nat n -> (NatV n ~> IntV i :: IntT)
   | NullC:
-    forall Case_NullC : CaseName,
+    case nullC,
     NullV ~> NullV :: NullT
   | NullOptC:
-    forall Case_NullOptC : CaseName,
+    case nullOptC,
     forall t, NullV ~> NullV :: OptT t
   | SomeOptC:
-    forall Case_SomeOptC : CaseName,
-    forall v1 v2 t, v1 ~> v2 :: t -> SomeV v1 ~> SomeV v2 :: OptT t
+    case someOptC,
+    forall v1 v2 t,
+    v1 ~> v2 :: t ->
+    SomeV v1 ~> SomeV v2 :: OptT t
   | ConstituentOptC:
-    forall Case_ConstituentC : CaseName,
+    case constituentC,
     forall v1 v2 t,
     is_not_opt_like_value v1 ->
     v1 ~> v2 :: t ->
     v1 ~> SomeV v2 :: OptT t
   | ReservedC:
-    forall Case_ReservedC : CaseName,
+    case reservedC,
     forall v1,
     v1 ~> ReservedV :: ReservedT
 where "v1 ~> v2 :: t" := (Coerces v1 v2 t).
@@ -173,29 +179,29 @@ Proof.
   induction HvT; intros t1 Hsub; inversion Hsub; subst; clear Hsub;
     name_cases;
     try (eexists;constructor; try constructor; fail).
-  [Case_NatHT_Case_ConstituentOptST]: {
+  [natHT_constituentOptST]: {
     inversion H0; subst; clear H0; simpl in H; inversion H.
     - eexists. named_constructor; [constructor|named_constructor].
     - eexists. named_constructor; [constructor|named_constructor;reflexivity].
   }
-  [Case_IntHT_Case_ConstituentOptST]: {
+  [intHT_constituentOptST]: {
     inversion H0; subst; clear H0; simpl in H; inversion H.
     econstructor. named_econstructor; [constructor|named_constructor].
   }
-  [Case_OptHT_Case_ReflSL]: {
+  [optHT_reflSL]: {
     specialize (IHHvT t (ReflST _ _)).
     destruct IHHvT as [v2 Hv2].
     eexists. named_econstructor; try eassumption.
   }
-  [Case_OptHT_Case_OptST]: {
+  [optHT_optST]: {
     specialize (IHHvT _ H1).
     destruct IHHvT as [v2 Hv2].
     eexists; named_econstructor; eassumption.
   }
-  [Case_OptHT_Case_ConstituentOptST]: {
+  [optHT_constituentOptST]: {
     inversion H0; subst; clear H0; simpl in H; inversion H.
   }
-  [Case_ReservedHT_Case_ConstituentOptST]: {
+  [reservedHT_constituentOptST]: {
     inversion H0; subst; clear H0; simpl in H; inversion H.
   }
 Qed.
@@ -216,28 +222,28 @@ Proof.
   inversion H2; subst; clear H2;
     name_cases;
     try (constructor; easy).
-  [Case_NatIntSL_Case_ConstituentOptST]: {
+  [natIntSL_constituentOptST]: {
     named_constructor.
     - assumption.
     - eapply Hyp; [named_econstructor | assumption].
   }
-  [Case_OptST_Case_OptST0]: {
+  [optST_optST0]: {
     named_constructor.
     - intuition.
     - eapply Hyp; eassumption.
   }
-  [Case_OptST_Case_ConstituentOptST]: {
+  [optST_constituentOptST]: {
     inversion H3; subst; clear H3; simpl in H0; contradiction.
   }
-  [Case_ConstituentOptST_Case_OptST]: {
+  [constituentOptST_optST]: {
     named_constructor.
     - intuition.
     - firstorder.
   }
-  [Case_ConstituentOptST_Case_ConstituentOptST0]: {
+  [constituentOptST_constituentOptST0]: {
     inversion H3; subst; clear H3; try easy.
   }
-  [Case_ReservedST_Case_ConstituentOptST]: {
+  [reservedST_constituentOptST]: {
     inversion H0; subst; clear H0; inversion H.
   }
 Qed.

@@ -12,10 +12,8 @@ Existing Instance CaseNameI.
 Require Import Coq.Strings.String.
 Import StringSyntax.
 
-(*
-Require Import candid.StringToIdent.
-*)
 
+(* Horribly manual string manipulations *)
 Ltac2 strcpy := fun s1 s2 o =>
     let rec go := fun n =>
       match Int.lt n (String.length s2) with
@@ -29,6 +27,9 @@ Ltac2 concat := fun s1 s2 =>
     strcpy s s1 0;
     strcpy s s2 (Int.add (String.length s1) 1);
     s.
+
+(* Combines the names of hyptheses of type CaseName *)
+(* Writen in Ltac2 because I could not mangle identifier names in Ltac1 *)
 Ltac2 rec combine_case_names () :=
   repeat (lazy_match! goal with
   | [ h1 : CaseName, h2 : CaseName |- _ ] =>
@@ -40,6 +41,8 @@ Ltac2 rec combine_case_names () :=
   | [ |- _ ] => fail
   end).
 
+(* Removes all CaseName hypotheses, and renames the goal based on their names *)
+(* Writen in Ltac1 because I could not figure ou thow to use refine in Ltac2 *)
 Ltac name_cases := 
   [> (
     ltac2:(combine_case_names ());
@@ -48,23 +51,22 @@ Ltac name_cases :=
     | _ => idtac "Could not find a CaseName assumption"; fail
     end
   )..].
-  
-  
+
+(* To be used instead of constructor when the first assumption is 
+   one of those CaseName assumptions *)
 Ltac named_constructor :=
   constructor;[ apply CaseNameI | idtac .. ].
 Ltac named_econstructor :=
   econstructor;[ apply CaseNameI | idtac .. ].
 
-(* 
-Notation "''case'' x , t" := (forall x : CaseName, t)
-  (at level 10, x at level 1000, t at level 1000).
-*)
+Notation "'case' x , t" := (forall x : CaseName, t)
+  (at level 200).
 
 Section Example.
 
   Inductive Test :=
-    | Foo: forall foo : CaseName, Test
-    | Bar: forall bar : CaseName, Test.
+    | Foo: case foo, Test
+    | Bar: case bar, Test.
 
   Goal Test -> Test.
     intros.
