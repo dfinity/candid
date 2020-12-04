@@ -51,9 +51,9 @@ Ltac name_cases :=
   
   
 Ltac named_constructor :=
-  constructor; only 1: apply CaseNameI.
+  constructor;[ apply CaseNameI | idtac .. ].
 Ltac named_econstructor :=
-  econstructor; only 1: apply CaseNameI.
+  econstructor;[ apply CaseNameI | idtac .. ].
 
 (* 
 Notation "''case'' x , t" := (forall x : CaseName, t)

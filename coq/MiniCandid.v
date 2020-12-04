@@ -183,7 +183,7 @@ Proof.
   }
   [Case_IntHT_Case_ConstituentOptST]: {
     inversion H0; subst; clear H0; simpl in H; inversion H.
-    econstructor. named_econstructor; named_constructor.
+    econstructor. named_econstructor; [constructor|named_constructor].
   }
   [Case_OptHT_Case_ReflSL]: {
     specialize (IHHvT t (ReflST _ _)).
