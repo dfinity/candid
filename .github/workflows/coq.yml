@@ -1,0 +1,19 @@
+name: Coq
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v12
+      #- run: nix-build s coq
+      # The above would also build the shell, includling niv.
+      # This would be useful behaviour if our CI seeds some cache.
+      # Until then this would just be wasteful, so lets only
+      # build the Coq files:
+      - run: nix-build -A theories coq
