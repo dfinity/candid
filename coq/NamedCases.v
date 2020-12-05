@@ -13,44 +13,50 @@ Require Import Coq.Strings.String.
 Import StringSyntax.
 
 
-(* Horribly manual string manipulations *)
-Ltac2 strcpy := fun s1 s2 o =>
+Ltac2 name_cases () :=
+  (* Horribly manual string manipulations. Does this mean I should
+     go to the Ocaml level?
+  *)
+  let strcpy s1 s2 o :=
     let rec go := fun n =>
       match Int.lt n (String.length s2) with
       | true => String.set s1 (Int.add o n) (String.get s2 n); go (Int.add n 1)
       | false => ()
       end
-    in go 0.
-Ltac2 concat := fun s1 s2 => 
+    in go 0
+  in
+  let concat := fun s1 s2 => 
     let l := Int.add (Int.add (String.length s1) (String.length s2)) 1 in
     let s := String.make l (Char.of_int 95) in
     strcpy s s1 0;
     strcpy s s2 (Int.add (String.length s1) 1);
-    s.
-
-(* Combines the names of hyptheses of type CaseName *)
-(* Writen in Ltac2 because I could not mangle identifier names in Ltac1 *)
-Ltac2 rec combine_case_names () :=
-  repeat (lazy_match! goal with
-  | [ h1 : CaseName, h2 : CaseName |- _ ] =>
-    let h := concat (Ident.to_string h1) (Ident.to_string h2) in
-    (* Message.print (Message.of_string h); *)
-    let h := Option.get (Ident.of_string h) in
-    Std.clear [h1; h2];
-    assert ($h : CaseName) by apply CaseNameI
-  | [ |- _ ] => fail
-  end).
+    s
+  in
+  Control.enter (let rec go () :=
+    lazy_match! goal with
+    | [ h1 : CaseName, h2 : CaseName |- _ ] =>
+      (* Multiple case names? Combine them (and recurse) *)
+      let h := concat (Ident.to_string h1) (Ident.to_string h2) in
+      Std.clear [h1; h2];
+      let h := Option.get (Ident.of_string h) in
+      assert ($h := CaseNameI);
+      go ()
+    | [ _ : CaseName |- _ ] =>
+      (* A single case name? Set current goal name accordigly. *)
+      ltac1:(
+        (* How to do this in ltac2? *)
+        lazymatch goal with
+        | [ H : CaseName |- _ ] => refine ?[H]; clear H
+        end
+      )
+    | [ |- _ ] =>
+      Control.backtrack_tactic_failure "Did not find any CaseName hypotheses"
+    end
+  in go).
 
 (* Removes all CaseName hypotheses, and renames the goal based on their names *)
 (* Writen in Ltac1 because I could not figure ou thow to use refine in Ltac2 *)
-Ltac name_cases := 
-  [> (
-    ltac2:(combine_case_names ());
-    lazymatch goal with
-    | [ H : CaseName |- _ ] => refine ?[H]; clear H
-    | _ => idtac "Could not find a CaseName assumption"; fail
-    end
-  )..].
+Ltac name_cases := ltac2:(name_cases ()).
 
 (* To be used instead of constructor when the first assumption is 
    one of those CaseName assumptions *)
@@ -67,7 +73,7 @@ Section Example.
   Inductive Test :=
     | Foo: case foo, Test
     | Bar: case bar, Test.
-
+  
   Goal Test -> Test.
     intros.
     destruct H; name_cases.
@@ -82,6 +88,7 @@ Section Example.
   Goal Test -> Test -> Test.
     intros.
     destruct H; destruct H0; name_cases.
+    Show Existentials.
     [foo_foo0]: {
       named_constructor.
     }
@@ -100,7 +107,6 @@ Section Example.
   Goal Test -> Test -> Test -> Test.
     intros.
     destruct H; destruct H0; destruct H1; name_cases.
-    Show Existentials.
     [foo_foo0_bar]: {
       named_constructor.
     }
@@ -114,5 +120,10 @@ Section Example.
     * named_constructor.
     * named_constructor.
   Qed.
+
+  Goal True.
+    (* The tactic fails if it does not find case names *)
+    Fail name_cases.
+  Abort.
 
 End Example.
