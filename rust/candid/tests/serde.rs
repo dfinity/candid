@@ -281,6 +281,43 @@ fn test_newtype() {
 }
 
 #[test]
+fn test_keyword_label() {
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct A {
+        r#return: Vec<u8>,
+    };
+    all_check(
+        A {
+            r#return: vec![1, 2, 3],
+        },
+        "4449444c026c01b0c9b649016d7b010003010203",
+    );
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct B {
+        #[serde(rename = "return")]
+        dontcare: Vec<u8>,
+    };
+    all_check(
+        B {
+            dontcare: vec![1, 2, 3],
+        },
+        "4449444c026c01b0c9b649016d7b010003010203",
+    );
+    #[allow(non_camel_case_types)]
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    enum E {
+        r#return,
+    };
+    all_check(E::r#return, "4449444c016b01b0c9b6497f010000");
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    enum E2 {
+        #[serde(rename = "return")]
+        Dontcare,
+    };
+    all_check(E2::Dontcare, "4449444c016b01b0c9b6497f010000");
+}
+
+#[test]
 fn test_mutual_recursion() {
     type List = Option<ListA>;
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
