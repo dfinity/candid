@@ -1,19 +1,14 @@
 (** Fun stuff trying to emulate Isar-style case names *)
 
-From Ltac2 Require Import Ltac2.
-From Ltac2 Require Option.
-Set Default Proof Mode "Classic".
-
 Inductive CaseName := CaseNameI.
 
 Existing Class CaseName.
 Existing Instance CaseNameI.
 
-Require Import Coq.Strings.String.
-Import StringSyntax.
-
-
-Ltac2 name_cases () :=
+From Ltac2 Require Import Ltac2.
+From Ltac2 Require Option.
+Set Default Proof Mode "Classic".
+Ltac name_cases := ltac2:(
   (* Horribly manual string manipulations. Does this mean I should
      go to the Ocaml level?
   *)
@@ -52,21 +47,16 @@ Ltac2 name_cases () :=
     | [ |- _ ] =>
       Control.backtrack_tactic_failure "Did not find any CaseName hypotheses"
     end
-  in go).
-
-(* Removes all CaseName hypotheses, and renames the goal based on their names *)
-(* Writen in Ltac1 because I could not figure ou thow to use refine in Ltac2 *)
-Ltac name_cases := ltac2:(name_cases ()).
+  in go)
+).
 
 (* To be used instead of constructor when the first assumption is 
    one of those CaseName assumptions *)
-Ltac named_constructor :=
-  constructor;[ apply CaseNameI | idtac .. ].
-Ltac named_econstructor :=
-  econstructor;[ apply CaseNameI | idtac .. ].
+Ltac clear_names := try exact CaseNameI.
+Ltac named_constructor  := constructor; [ exact CaseNameI | idtac .. ].
+Ltac named_econstructor := econstructor; [ exact CaseNameI | idtac .. ].
 
-Notation "'case' x , t" := (forall x : CaseName, t)
-  (at level 200).
+Notation "'case' x , t" := (forall {x : CaseName}, t) (at level 200).
 
 Section Example.
 
@@ -127,3 +117,152 @@ Section Example.
   Abort.
 
 End Example.
+
+Require Import Coq.Lists.List.
+Section Example2.
+  (* From https://softwarefoundations.cis.upenn.edu/lf-current/IndProp.html *)
+
+ Import ListNotations.
+
+ Inductive reg_exp (T : Type) : Type :=
+  | EmptySet
+  | EmptyStr
+  | Char (t : T)
+  | App (r1 r2 : reg_exp T)
+  | Union (r1 r2 : reg_exp T)
+  | Star (r : reg_exp T).
+  Arguments EmptySet {T}.
+  Arguments EmptyStr {T}.
+  Arguments Char {T} _.
+  Arguments App {T} _ _.
+  Arguments Union {T} _ _.
+  Arguments Star {T} _.
+ 
+  Reserved Notation "s =~ re" (at level 80).
+  Inductive exp_match {T} : list T -> reg_exp T -> Prop :=
+    | MEmpty:
+      case empty,
+      [] =~ EmptyStr
+    | MChar:
+      case char,
+      forall x,
+      [x] =~ (Char x)
+    | MApp:
+      case app,
+      forall s1 re1 s2 re2
+      (H1 : s1 =~ re1)
+      (H2 : s2 =~ re2),
+      (s1 ++ s2) =~ (App re1 re2)
+    | MUnionL:
+      case unionL,
+      forall s1 re1 re2
+      (H1 : s1 =~ re1),
+      s1 =~ (Union re1 re2)
+    | MUnionR:
+      case unionR,
+      forall re1 s2 re2
+      (H2 : s2 =~ re2),
+      s2 =~ (Union re1 re2)
+    | MStar0:
+      case star0,
+      forall re,
+      [] =~ (Star re)
+    | MStarApp:
+      case starApp,
+      forall s1 s2 re
+      (H1 : s1 =~ re)
+      (H2 : s2 =~ (Star re)),
+      (s1 ++ s2) =~ (Star re)
+    where "s =~ re" := (exp_match s re).
+  
+  Lemma star_app0: forall T (s1 s2 : list T) (re : reg_exp T),
+    s1 =~ Star re ->
+    s2 =~ Star re ->
+    s1 ++ s2 =~ Star re.
+  Proof.
+    intros T s1 s2 re H1.
+    remember (Star re) as re'.
+     generalize dependent s2.
+    induction H1.
+    - (* MEmpty *) discriminate.
+    - (* MChar *) discriminate.
+    - (* MApp *) discriminate.
+    - (* MUnionL *) discriminate.
+    - (* MUnionR *) discriminate.
+    - (* MStar0 *)
+      injection Heqre' as Heqre''. intros s H. apply H.
+    - (* MStarApp *)
+      injection Heqre' as Heqre''.
+      intros s3 H1. rewrite <- app_assoc.
+      apply MStarApp.
+      + trivial.
+      + apply H1_.
+      + apply IHexp_match2.
+        * rewrite Heqre''. reflexivity.
+        * apply H1.
+  Qed.
+
+  Lemma star_app2: forall T (s1 s2 : list T) (re : reg_exp T),
+    s1 =~ Star re ->
+    s2 =~ Star re ->
+    s1 ++ s2 =~ Star re.
+  Proof.
+    intros T s1 s2 re H1.
+    remember (Star re) as re'.
+     generalize dependent s2.
+    induction H1; name_cases; try discriminate.
+    [starApp]: {
+      injection Heqre' as Heqre''.
+      intros s3 H1. rewrite <- app_assoc.
+      apply MStarApp; clear_names.
+      + apply H1_.
+      + apply IHexp_match2.
+        * rewrite Heqre''. reflexivity.
+        * apply H1.
+     }
+    [star0]: {
+      injection Heqre' as Heqre''. intros s H. apply H.
+    }
+  Qed.
+  
+  Inductive Palindrome {T} : list T -> Prop :=
+  | EmptyPalin:
+    case emptyP,
+    Palindrome []
+  | SingletonPalin:
+    case singletonP,
+    forall x,
+    Palindrome [x]
+  | GrowPalin:
+    case growP,
+    forall l x,
+    Palindrome l -> Palindrome ([x] ++ l ++ [x])
+  .
+  
+  Lemma palindrome_star_of_two:
+    forall T (s : list T) a b,
+    Palindrome s -> s =~ Star (App (Char a) (Char b)) ->
+    s = [] \/ a = b.
+  Proof.
+    intros T s x y  HPalin HRe.
+    induction HPalin; inversion HRe; name_cases.
+    Show Existentials.
+    [emptyP_star0]: {
+      left. reflexivity.
+    }
+    [emptyP_starApp]: {
+       left. reflexivity.
+    }
+    [singletonP_starApp]: {
+      inversion HRe; clear HRe.
+      inversion H5; clear H5.
+      inversion H10; clear H10.
+      inversion H11; clear H11.
+      subst.
+      inversion H3.
+    }
+    [growP_starApp]: {
+      admit.
+    }
+  Admitted.
+End Example2.   
