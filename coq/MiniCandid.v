@@ -262,6 +262,7 @@ Qed.
 
 End NoOpportunisticDecoding.
 
+Require Import FunInd.
 
 Module OpportunisticDecoding.
 (*
@@ -295,29 +296,38 @@ coercion function, and we can separately try to prove that it corresponds
 to the relation.
  *)
 
+Definition recover x := match x with
+  | None => Some NullV
+  | Some x => Some (SomeV x)
+ end.
 
-Require Import FunInd.
-Function coerce (n : nat) (v1 : V) (t : T) : option V :=
-  match n with  | 0 => None (* out of fuel *) | S n => 
-    match v1, t with
-    | NatV n, NatT => Some (NatV n)
-    | IntV n, IntT => Some (IntV n)
-    | NatV n, IntT => Some (IntV (Z.of_nat n))
-    | NullV, NullT => Some NullV
-    | NullV, OptT t => Some NullV
-    | SomeV v, OptT t => option_map SomeV (coerce n v t)
-    | ReservedV, OptT t => Some NullV
-    | v, OptT t =>
-      if is_opt_like_type t
-      then None
-      else option_map SomeV (coerce n v t)
-    | v, ReservedT => Some ReservedV
-    | v, t => None
-    end
+Function coerce (v1 : V) (t : T) : option V :=
+  match v1, t with
+  | NatV n, NatT => Some (NatV n)
+  | IntV n, IntT => Some (IntV n)
+  | NatV n, IntT => Some (IntV (Z.of_nat n))
+  | NullV, NullT => Some NullV
+  | SomeV v, OptT t => recover (coerce v t)
+  
+  (* This is the rule we would like to have, but 
+     in order to please the termination checker,
+     we have to duplicate all non-opt rules as opt-rules
+  | v, OptT t =>
+    if is_opt_like_type t
+    then None
+    else option_map SomeV (coerce n v t)
+  *)
+  | NatV n, OptT NatT => recover (Some (NatV n))
+  | IntV n, OptT IntT => recover (Some (IntV n))
+  | NatV n, OptT IntT => recover (Some (IntV (Z.of_nat n)))
+  (* OptT never fails (this subsumes NullV and ReservedV) *)
+  | v, OptT _ => Some NullV
+
+  | v, ReservedT => Some ReservedV
+  | v, t => None
   end.
   
-Definition Coerces (v1 v2 : V) (t : T) : Prop :=
-  exists n, coerce n v1 t = Some v2.
+Definition Coerces (v1 v2 : V) (t : T) : Prop := coerce v1 t = Some v2.
 Notation "v1 ~> v2 :: t" := (Coerces v1 v2 t) (at level 80, v2 at level 50, no associativity).
 
 (* TODO: derive intro and elim rules *)
@@ -338,38 +348,34 @@ Theorem coercion_correctness:
   forall v1 v2 t, v1 ~> v2 :: t -> v2 :: t.
 Proof.
   intros.
-  inversion H as [n Hcoerce]; clear H.
-  revert v1 v2 t Hcoerce.
-  induction n; intros v1 v2 t Hcoerce;
-    functional inversion Hcoerce; subst;
-    try (named_constructor; fail).
-  * destruct (coerce n v t1) eqn:Heq; simpl in H0; inversion H0; subst; clear H0.
-    specialize (IHn _ _ _ Heq).
-    named_constructor; assumption. 
-  * destruct (coerce n v1 t1) eqn:Heq; simpl in H0; inversion H0; subst; clear H0.
-    specialize (IHn _ _ _ Heq).
-    named_constructor; assumption. 
+  revert v2 t H.
+  induction v1;
+  intros v2 t Hcoerce;
+    unfold Coerces in Hcoerce;
+    functional inversion Hcoerce; simpl in *; subst; clear Hcoerce;
+    try (named_constructor; named_constructor; fail).
+  * destruct (coerce v1 t1) eqn:Heq; simpl in *; inversion H0; subst; clear H0.
+    - specialize (IHv1 _ _ Heq).
+      named_constructor; assumption. 
+    - named_constructor.
 Qed.
 
 Theorem coercion_roundtrip:
   forall v t, v :: t -> v ~> v :: t.
 Proof.
-  intros. induction H; 
-    try (exists 1; reflexivity).
-  * destruct IHHasType as [n Hcoerce].
-    exists (S n). simpl. rewrite Hcoerce. reflexivity.
+  intros.
+  induction H; try reflexivity.
+  * unfold Coerces in *. simpl. rewrite IHHasType. reflexivity.
 Qed.
 
 Theorem coercion_uniqueness:
   forall v v1 v2 t, v ~> v1 :: t -> v ~> v2 :: t -> v1 = v2.
 Proof.
-  intros.
-  revert v2 H0.
-  induction H; intros v2' Hother;
-    try (inversion Hother; subst; clear Hother; try congruence; firstorder congruence).
-  * destruct Hother as [n Hother].
-    admit.
-Admitted.
+  intro v.
+  induction v; intros v1 v2 t Heq1 Heq;
+    unfold Coerces in *;
+    congruence.
+Qed.
 
 Theorem soundness_of_subtyping:
   forall t1 t2,
@@ -379,25 +385,25 @@ Proof.
   intros t1 t2 Hsub v HvT. revert t2 Hsub.
   induction HvT; intros t1 Hsub; inversion Hsub; subst; clear Hsub;
     name_cases;
-    try (eexists;constructor; try constructor; fail).
+    try (eexists;reflexivity).
+  Show Existentials.
   [natHT_optST]: {
-    admit.
+    destruct t2; eexists; reflexivity.
   }
   [intHT_optST]: {
-    admit.
+    destruct t2; eexists; reflexivity.
   }
   [optHT_reflSL]: {
     specialize (IHHvT t (ReflST _ _)).
     destruct IHHvT as [v2 Hv2].
-    eexists. named_econstructor; try eassumption.
+    eexists. unfold Coerces in *. simpl. rewrite Hv2. reflexivity.
   }
   [optHT_optST]: {
-    admit.
+    (* specialize (IHHvT t2 (ReflST _ _)).*)
+    unfold Coerces. simpl.
+    destruct (coerce v t2) eqn:Heq; eexists; reflexivity.
   }
-  [reservedHT_optST]: {
-    admit.
-  }
-Admitted.
+Qed.
 
 Theorem subtyping_refl: reflexive _ Subtype.
 Proof. intros x. apply ReflST; constructor. Qed.
