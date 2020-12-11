@@ -1,6 +1,22 @@
 
 # Changelog
 
+## 2020-12-07
+
+### Spec
+
+* Bug fix for opt subtyping
+* Formalize definitions of IDL-soundness in Coq
+
+### Rust (0.6.11)
+
+* Support the opt subtyping rules
+* Allow using Rust keyword as field label
+
+### Tests
+
+* Add opt subtyping tests
+
 ## 2020-11-05
 
 ### Spec

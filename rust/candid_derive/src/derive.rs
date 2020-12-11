@@ -2,6 +2,7 @@ use super::{candid_path, idl_hash};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::BTreeSet;
+use syn::ext::IdentExt;
 use syn::punctuated::Punctuated;
 use syn::{Data, DeriveInput, GenericParam, Generics, Token};
 
@@ -101,8 +102,11 @@ fn enum_from_ast(
         .map(|variant| {
             let id = variant.ident.clone();
             let (renamed_ident, hash) = match get_rename_attrs(&variant.attrs) {
-                Some(ref rename) => (syn::parse_str(rename).unwrap(), idl_hash(rename)),
-                None => (id.clone(), idl_hash(&id.to_string())),
+                Some(ref rename) => (
+                    proc_macro2::Ident::new(rename, proc_macro2::Span::call_site()),
+                    idl_hash(rename),
+                ),
+                None => (id.clone(), idl_hash(&id.unraw().to_string())),
             };
             let (ty, idents) = struct_from_ast(&variant.fields);
             Variant {
@@ -120,7 +124,7 @@ fn enum_from_ast(
 
     let id = fs
         .iter()
-        .map(|Variant { renamed_ident, .. }| renamed_ident.to_string());
+        .map(|Variant { renamed_ident, .. }| renamed_ident.unraw().to_string());
     let ty = fs.iter().map(|Variant { ty, .. }| ty);
     let candid = candid_path();
     let ty_gen = quote! {
@@ -272,10 +276,16 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (TokenStr
                     let real_ident = Ident::Named(ident.clone());
                     match get_rename_attrs(&field.attrs) {
                         Some(ref renamed) => {
-                            let renamed_ident = Ident::Named(syn::parse_str(renamed).unwrap());
+                            let ident =
+                                proc_macro2::Ident::new(renamed, proc_macro2::Span::call_site());
+                            let renamed_ident = Ident::Named(ident);
                             (real_ident, renamed_ident, idl_hash(renamed))
                         }
-                        None => (real_ident.clone(), real_ident, idl_hash(&ident.to_string())),
+                        None => (
+                            real_ident.clone(),
+                            real_ident,
+                            idl_hash(&ident.unraw().to_string()),
+                        ),
                     }
                 }
                 None => (Ident::Unnamed(i as u32), Ident::Unnamed(i as u32), i as u32),
@@ -296,7 +306,7 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (TokenStr
         .iter()
         .map(|Field { renamed_ident, .. }| match renamed_ident {
             Ident::Named(ref id) => {
-                let name = id.to_string();
+                let name = id.unraw().to_string();
                 quote! { #candid::types::Label::Named(#name.to_string()) }
             }
             Ident::Unnamed(ref i) => quote! { #candid::types::Label::Id(#i) },
