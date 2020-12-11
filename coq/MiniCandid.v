@@ -356,13 +356,11 @@ Proof. unfold Coerces. intros. simpl. rewrite H. reflexivity. Qed.
 
 Lemma OpportunisticOptC:
     forall v1 t,
-    ~ (exists v2, v1 ~> v2 :: t) ->
+    v1 ~/> :: t ->
     SomeV v1 ~> NullV :: OptT t.
 Proof.
-  unfold Coerces. simpl. intros.
-  destruct (coerce v1 t).
-  * contradiction H. eexists. reflexivity.
-  * reflexivity.
+  unfold Coerces; unfold DoesNotCoerce. simpl. intros.
+  rewrite H; reflexivity.
 Qed.
 
 Lemma ReservedOptC:
@@ -384,14 +382,12 @@ Lemma OpportunisticConstituentOptC:
     forall v1 t,
     is_not_opt_like_value v1 ->
     is_opt_like_type t = false ->
-    ~ (exists v2, v1 ~> v2 :: t) ->
+    v1 ~/> :: t ->
     v1 ~> NullV :: OptT t.
 Proof.
-  unfold Coerces. simpl. intros.
-  destruct v1, t; simpl in *; try contradiction; try congruence;
-    contradiction H1; eexists; reflexivity.
+  unfold Coerces; unfold DoesNotCoerce. simpl. intros.
+  destruct v1, t; simpl in *; try contradiction; try congruence.
 Qed.
-
 
 Lemma ReservedC: forall v, v ~> ReservedV :: ReservedT.
 Proof. unfold Coerces. intros. destruct v; reflexivity. Qed.
