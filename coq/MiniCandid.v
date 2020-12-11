@@ -2,6 +2,8 @@
 MiniCandid: A formalization of the core ideas of Candid
 *)
 
+Require Import FunInd.
+
 Require Import Coq.ZArith.BinInt.
 Require Import Coq.Init.Datatypes.
 
@@ -34,8 +36,7 @@ Inductive V :=
   | ReservedV : V
   .
 
-(* This is a stand in for `~(null <: t)` in places
-where <: is not allowed yet. *)
+(* This is a stand in for `null <: t` in places where <: is not allowed yet. *)
 Definition is_opt_like_type (t : T) : bool :=
   match t with
   | NullT => true
@@ -43,7 +44,8 @@ Definition is_opt_like_type (t : T) : bool :=
   | ReservedT => true
   | _ => false
   end.
-  
+
+
 Definition is_not_opt_like_value (v : V) : Prop :=
 match v with
 | NullV => False
@@ -78,8 +80,8 @@ where "v :: t" := (HasType v t).
 Module NoOpportunisticDecoding.
 
 (*
-This is the variant without `t <: opt t'`, where
-things can be simple and inductive.
+This is the variant without `t <: opt t'`, but with `t <: opt t`.
+Here things are simple and inductive.
 *)
 
 Reserved Infix "<:" (at level 80, no associativity).
@@ -112,7 +114,6 @@ CoInductive Subtype : T -> T -> Prop :=
     case reservedST,
     forall t, t <: ReservedT
 where "t1 <: t2" := (Subtype t1 t2).
-
 
 
 Reserved Notation "v1 ~> v2 :: t" (at level 80, v2 at level 50, no associativity).
@@ -149,10 +150,7 @@ Inductive Coerces : V -> V -> T -> Prop :=
     v1 ~> ReservedV :: ReservedT
 where "v1 ~> v2 :: t" := (Coerces v1 v2 t).
 
-(* The is_not_opt_like_type definition is only introduced because
-   Coq (and not only coq) does not like hyptheses like ~(null <: t)
-*)
-Lemma is_not_opt_like_type_correct:
+Lemma is_opt_like_type_correct:
   forall t,
   is_opt_like_type t = true <-> NullT <: t.
 Proof.
@@ -262,11 +260,9 @@ Qed.
 
 End NoOpportunisticDecoding.
 
-Require Import FunInd.
-
 Module OpportunisticDecoding.
 (*
-This is the variant with `t <: opt t'.
+This is the variant with the opportunistic `t <: opt t'` rule.
 *)
 
 Reserved Infix "<:" (at level 80, no associativity).
@@ -290,10 +286,11 @@ CoInductive Subtype : T -> T -> Prop :=
 where "t1 <: t2" := (Subtype t1 t2).
 
 (*
-The coercion relation is not strictly positive, so we have to implement
-it as a function that recurses on the value. This is essentially
-coercion function, and we can separately try to prove that it corresponds
-to the relation.
+The coercion relation is not strictly positive, and thus can’t be an inductive
+relations, so we have to implement it as a function that recurses on the value.
+
+This is essentially coercion function, and we can separately try to prove that
+it corresponds to the relation.
  *)
 
 Definition recover x := match x with
@@ -311,7 +308,7 @@ Function coerce (v1 : V) (t : T) : option V :=
   
   (* This is the rule we would like to have, but 
      in order to please the termination checker,
-     we have to duplicate all non-opt rules as opt-rules
+     we have to duplicate all non-opt rules in their opt variant
   | v, OptT t =>
     if is_opt_like_type t
     then None
@@ -330,12 +327,136 @@ Function coerce (v1 : V) (t : T) : option V :=
 Definition Coerces (v1 v2 : V) (t : T) : Prop := coerce v1 t = Some v2.
 Notation "v1 ~> v2 :: t" := (Coerces v1 v2 t) (at level 80, v2 at level 50, no associativity).
 
-(* TODO: derive intro and elim rules *)
-
-(* The is_not_opt_like_type definition is only introduced because
-   Coq (and not only coq) does not like hyptheses like ~(null <: t)
+(*
+Now we can prove that this indeed implements the inductive relation in the spec:
 *)
-Lemma is_not_opt_like_type_correct:
+
+Lemma NatC: forall n, NatV n ~> NatV n :: NatT.
+Proof. intros. reflexivity. Qed.
+
+Lemma IntC: forall n, IntV n ~> IntV n :: IntT.
+Proof. intros. reflexivity. Qed.
+
+Lemma NatIntC: forall n i, i = Z.of_nat n -> NatV n ~> IntV i :: IntT.
+Proof. intros. subst. reflexivity. Qed.
+
+Lemma NullC: NullV ~> NullV :: NullT.
+Proof. intros. reflexivity. Qed.
+
+Lemma NullOptC: forall t, NullV ~> NullV :: OptT t.
+Proof. intros. reflexivity. Qed.
+
+Lemma SomeOptC: forall v1 v2 t,
+    v1 ~> v2 :: t ->
+    SomeV v1 ~> SomeV v2 :: OptT t.
+Proof. unfold Coerces. intros. simpl. rewrite H. reflexivity. Qed.
+
+Lemma OpportunisticOptC:
+    forall v1 t,
+    ~ (exists v2, v1 ~> v2 :: t) ->
+    SomeV v1 ~> NullV :: OptT t.
+Proof.
+  unfold Coerces. simpl. intros.
+  destruct (coerce v1 t).
+  * contradiction H. eexists. reflexivity.
+  * reflexivity.
+Qed.
+
+Lemma ReservedOptC:
+  forall t, ReservedV ~> NullV :: OptT t.
+Proof. intros. reflexivity. Qed.
+
+Lemma ConstituentOptC:
+    forall v1 v2 t,
+    is_not_opt_like_value v1 ->
+    is_opt_like_type t = false ->
+    v1 ~> v2 :: t ->
+    v1 ~> SomeV v2 :: OptT t.
+Proof.
+  unfold Coerces. simpl. intros.
+  destruct v1, t; simpl in *; try contradiction; try congruence.
+Qed.
+
+Lemma OpportunisticConstituentOptC:
+    forall v1 t,
+    is_not_opt_like_value v1 ->
+    is_opt_like_type t = false ->
+    ~ (exists v2, v1 ~> v2 :: t) ->
+    v1 ~> NullV :: OptT t.
+Proof.
+  unfold Coerces. simpl. intros.
+  destruct v1, t; simpl in *; try contradiction; try congruence;
+    contradiction H1; eexists; reflexivity.
+Qed.
+
+
+Lemma ReservedC: forall v, v ~> ReservedV :: ReservedT.
+Proof. unfold Coerces. intros. destruct v; reflexivity. Qed.
+
+(*
+Now the induction theorem. As always, ugly and bit.
+Note that negative assumptions don’t give you a P predicate.
+*)
+
+Lemma Coerces_ind:
+  forall P,
+  (case natC, forall n, P (NatV n) (NatV n) NatT) ->
+  (case intC, forall n, P (IntV n) (IntV n) IntT) ->
+  (case natIntC, forall n, P (NatV n) (IntV (Z.of_nat n)) IntT) ->
+  (case nullC, P NullV NullV NullT) ->
+  (case nullOptC, forall t, P NullV  NullV (OptT t)) ->
+  (case someOptC, forall v1 v2 t,
+    v1 ~> v2 :: t -> P v1 v2 t -> P (SomeV v1) (SomeV v2) (OptT t)) ->
+  (case opportunisticOptC,
+      forall v1 t, ~ (exists v2, v1 ~> v2 :: t) -> P (SomeV v1) NullV (OptT t)) ->
+  (case reservedOptC,
+    forall t, P ReservedV NullV (OptT t)) ->
+  (case constituentOptC,
+    forall v1 v2 t,
+    is_not_opt_like_value v1 ->
+    is_opt_like_type t = false ->
+    v1 ~> v2 :: t ->
+    P v1 v2 t -> 
+    P v1 (SomeV v2) (OptT t)) ->
+  (case opportunisticConstituentOptC,
+    forall v1 t,
+    is_not_opt_like_value v1 ->
+    is_opt_like_type t = true \/
+    ~ (exists v2, v1 ~> v2 :: t) ->
+    P v1 NullV (OptT t)) ->
+  (case reservedC, forall v, P v ReservedV ReservedT) ->
+  (forall v1 v2 t, v1 ~> v2 :: t -> P v1 v2 t).
+Proof.
+  unfold Coerces.
+  intros P NatC IntC NatIntC NullC NullOptC SomeOptC OpportunisticOptC ReservedOptC ConstituentOptC OpportunisticConstituentOptC ReservedC v1.
+  induction v1; intros v2 t Hcoerces; destruct t.
+  all: try (inversion Hcoerces; subst; clear Hcoerces; intuition; fail). 
+  all: simpl in Hcoerces.
+  * destruct t;
+    inversion Hcoerces; subst; clear Hcoerces.
+    + apply ConstituentOptC; clear_names; simpl; intuition.
+    + apply ConstituentOptC; clear_names; simpl; intuition.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; firstorder congruence.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy.
+      right; intros [? ?]; congruence.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
+  * destruct t;
+    inversion Hcoerces; subst; clear Hcoerces.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; firstorder congruence.
+    + apply ConstituentOptC; clear_names; simpl; intuition.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; firstorder congruence.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy.
+      right; intros [? ?]; congruence.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
+  * destruct (coerce v1 t) eqn:Heq; simpl in Hcoerces; inversion Hcoerces; subst; clear Hcoerces.
+    + apply SomeOptC; clear_names; intuition.
+    + apply OpportunisticOptC; clear_names.
+      intros [v2 H]. congruence.
+Qed.
+
+Lemma is_opt_like_type_correct:
   forall t,
   is_opt_like_type t = true <-> NullT <: t.
 Proof.
@@ -399,7 +520,6 @@ Proof.
     eexists. unfold Coerces in *. simpl. rewrite Hv2. reflexivity.
   }
   [optHT_optST]: {
-    (* specialize (IHHvT t2 (ReflST _ _)).*)
     unfold Coerces. simpl.
     destruct (coerce v t2) eqn:Heq; eexists; reflexivity.
   }
@@ -410,7 +530,7 @@ Proof. intros x. apply ReflST; constructor. Qed.
 
 Lemma is_not_opt_like_type_contravariant:
   forall t1 t2,
-     is_opt_like_type t1 = false -> t2 <: t1 -> is_opt_like_type t2 = false.
+  is_opt_like_type t1 = false -> t2 <: t1 -> is_opt_like_type t2 = false.
 Proof. intros. destruct t1, t2; easy. Qed.
 
 Theorem subtyping_trans: transitive _ Subtype.
