@@ -1,5 +1,5 @@
 (coq.theory
  (name "candid")
  (synopsis "Coq for candid")
- (modules IDLSoundness MiniCandid NamedCases)
+ (modules IDLSoundness MiniCandid NamedCases NamedCasesDemo)
 )
