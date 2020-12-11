@@ -327,6 +327,9 @@ Function coerce (v1 : V) (t : T) : option V :=
 Definition Coerces (v1 v2 : V) (t : T) : Prop := coerce v1 t = Some v2.
 Notation "v1 ~> v2 :: t" := (Coerces v1 v2 t) (at level 80, v2 at level 50, no associativity).
 
+Definition DoesNotCoerce (v1 : V) (t : T) : Prop := coerce v1 t = None.
+Notation "v1 ~/> :: t" := (DoesNotCoerce v1 t) (at level 80, no associativity).
+
 (*
 Now we can prove that this indeed implements the inductive relation in the spec:
 *)
@@ -408,7 +411,7 @@ Lemma Coerces_ind:
   (case someOptC, forall v1 v2 t,
     v1 ~> v2 :: t -> P v1 v2 t -> P (SomeV v1) (SomeV v2) (OptT t)) ->
   (case opportunisticOptC,
-      forall v1 t, ~ (exists v2, v1 ~> v2 :: t) -> P (SomeV v1) NullV (OptT t)) ->
+      forall v1 t, v1 ~/> :: t -> P (SomeV v1) NullV (OptT t)) ->
   (case reservedOptC,
     forall t, P ReservedV NullV (OptT t)) ->
   (case constituentOptC,
@@ -421,13 +424,12 @@ Lemma Coerces_ind:
   (case opportunisticConstituentOptC,
     forall v1 t,
     is_not_opt_like_value v1 ->
-    is_opt_like_type t = true \/
-    ~ (exists v2, v1 ~> v2 :: t) ->
+    is_opt_like_type t = true \/ v1 ~/> :: t ->
     P v1 NullV (OptT t)) ->
   (case reservedC, forall v, P v ReservedV ReservedT) ->
   (forall v1 v2 t, v1 ~> v2 :: t -> P v1 v2 t).
 Proof.
-  unfold Coerces.
+  unfold Coerces. unfold DoesNotCoerce.
   intros P NatC IntC NatIntC NullC NullOptC SomeOptC OpportunisticOptC ReservedOptC ConstituentOptC OpportunisticConstituentOptC ReservedC v1.
   induction v1; intros v2 t Hcoerces; destruct t.
   all: try (inversion Hcoerces; subst; clear Hcoerces; intuition; fail). 
@@ -438,8 +440,7 @@ Proof.
     + apply ConstituentOptC; clear_names; simpl; intuition.
     + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; firstorder congruence.
     + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
-    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy.
-      right; intros [? ?]; congruence.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
     + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
   * destruct t;
     inversion Hcoerces; subst; clear Hcoerces.
@@ -447,13 +448,11 @@ Proof.
     + apply ConstituentOptC; clear_names; simpl; intuition.
     + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; firstorder congruence.
     + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
-    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy.
-      right; intros [? ?]; congruence.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
     + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
   * destruct (coerce v1 t) eqn:Heq; simpl in Hcoerces; inversion Hcoerces; subst; clear Hcoerces.
     + apply SomeOptC; clear_names; intuition.
-    + apply OpportunisticOptC; clear_names.
-      intros [v2 H]. congruence.
+    + apply OpportunisticOptC; clear_names; easy.
 Qed.
 
 Lemma is_opt_like_type_correct:
