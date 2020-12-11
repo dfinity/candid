@@ -968,9 +968,18 @@ Coercing a non-null, non-optional and non-reserved value at an option type treat
 <v> ≠ (null : reserved)
 <v> ≠ opt _
 not (null <: <t>)
-opt <v> ~> <v'> : opt <t>
+<v> ~> <v'> : <t>
 -------------------------
-<v> ~> <v'> : opt <t>
+<v> ~> opt <v'> : opt <t>
+```
+Again, failure to coerce the value turns into `null`:
+```
+<v> ≠ null
+<v> ≠ (null : reserved)
+<v> ≠ opt _
+null <: <t> ∨ not (<v> ~> _ : <t>)
+----------------------------------
+<v> ~> null : opt <t>
 ```
 
 
