@@ -434,19 +434,20 @@ Proof.
     inversion Hcoerces; subst; clear Hcoerces.
     + apply ConstituentOptC; clear_names; simpl; intuition.
     + apply ConstituentOptC; clear_names; simpl; intuition.
-    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; firstorder congruence.
-    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
-    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
-    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
   * destruct t;
     inversion Hcoerces; subst; clear Hcoerces.
-    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; firstorder congruence.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; intuition. 
     + apply ConstituentOptC; clear_names; simpl; intuition.
-    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; firstorder congruence.
-    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
-    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
-    + apply OpportunisticConstituentOptC; clear_names; simpl; try easy; intuition.
-  * destruct (coerce v1 t) eqn:Heq; simpl in Hcoerces; inversion Hcoerces; subst; clear Hcoerces.
+    + apply OpportunisticConstituentOptC; clear_names; simpl; intuition. 
+    + apply OpportunisticConstituentOptC; clear_names; simpl; intuition. 
+    + apply OpportunisticConstituentOptC; clear_names; simpl; intuition. 
+    + apply OpportunisticConstituentOptC; clear_names; simpl; intuition. 
+  * destruct (coerce v1 t) eqn:Heq; simpl in Hcoerces;
+    inversion Hcoerces; subst; clear Hcoerces.
     + apply SomeOptC; clear_names; intuition.
     + apply OpportunisticOptC; clear_names; easy.
 Qed.
