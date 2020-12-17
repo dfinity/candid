@@ -571,7 +571,7 @@ The types of these values are assumed to be known from context, so the syntax do
 
 <refval> ::=
   | service <text>             (canister URI)
-  | func <text> . <id>         (canister URI and message name)
+  | func <text> . <name>         (canister URI and message name)
   | principal <text>           (principal URI)
 
 <arg> ::= ( <annval>,* )
