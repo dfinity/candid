@@ -21,6 +21,8 @@ pub enum IDLValue {
     Record(Vec<IDLField>),
     Variant(Box<IDLField>, u64), // u64 represents the index from the type, defaults to 0 when parsing
     Principal(crate::Principal),
+    Service(crate::Principal),
+    Func(crate::Principal, String),
     // The following values can only be generated with type annotation
     None,
     Int(Int),
@@ -251,6 +253,8 @@ impl IDLValue {
                 return Err(Error::msg(format!("field {} not found", v.id)));
             }
             (IDLValue::Principal(id), Type::Principal) => IDLValue::Principal(id.clone()),
+            (IDLValue::Service(_), Type::Service(_)) => self.clone(),
+            (IDLValue::Func(_, _), Type::Func(_)) => self.clone(),
             _ => {
                 return Err(Error::msg(format!(
                     "type mismatch: {} cannot be of type {}",
@@ -311,6 +315,15 @@ impl IDLValue {
                 Type::Variant(vec![f])
             }
             IDLValue::Principal(_) => Type::Principal,
+            IDLValue::Service(_) => Type::Service(Vec::new()),
+            IDLValue::Func(_, _) => {
+                let f = crate::types::Function {
+                    modes: Vec::new(),
+                    args: Vec::new(),
+                    rets: Vec::new(),
+                };
+                Type::Func(f)
+            }
         }
     }
 }
@@ -376,6 +389,8 @@ pub mod pretty {
             None => RcDoc::as_string("null"),
             Reserved => RcDoc::as_string("reserved"),
             Principal(ref id) => RcDoc::as_string(format!("principal \"{}\"", id)),
+            Service(ref id) => RcDoc::as_string(format!("service \"{}\"", id)),
+            Func(ref id, ref meth) => RcDoc::as_string(format!("func \"{}\".\"{}\"", id, meth)),
             Opt(v) => kwd("opt").append(pp_value(v)),
             Vec(vs) => {
                 if let Some(Nat8(_)) = vs.first() {
@@ -474,6 +489,8 @@ impl crate::CandidType for IDLValue {
                 Ok(())
             }
             IDLValue::Principal(ref id) => serializer.serialize_principal(id.as_slice()),
+            IDLValue::Service(ref id) => serializer.serialize_principal(id.as_slice()),
+            IDLValue::Func(ref id, ref meth) => serializer.serialize_function(id.as_slice(), meth),
             IDLValue::Reserved => serializer.serialize_null(()),
         }
     }
@@ -514,9 +531,10 @@ impl<'de> Deserialize<'de> for IDLValue {
             visit_prim!(Int64, i64);
             visit_prim!(Float32, f32);
             visit_prim!(Float64, f64);
-            // Deserialize Candid specific types: Bignumber, principal, reversed
+            // Deserialize Candid specific types: Bignumber, principal, reversed, service, function
             fn visit_byte_buf<E: de::Error>(self, value: Vec<u8>) -> DResult<E> {
-                let (tag, bytes) = value.split_at(1);
+                use std::convert::TryFrom;
+                let (tag, mut bytes) = value.split_at(1);
                 match tag[0] {
                     0u8 => {
                         let v = Int(num_bigint::BigInt::from_signed_bytes_le(bytes));
@@ -527,9 +545,22 @@ impl<'de> Deserialize<'de> for IDLValue {
                         Ok(IDLValue::Nat(v))
                     }
                     2u8 => {
-                        use std::convert::TryFrom;
                         let v = crate::Principal::try_from(bytes).map_err(E::custom)?;
                         Ok(IDLValue::Principal(v))
+                    }
+                    4u8 => {
+                        let v = crate::Principal::try_from(bytes).map_err(E::custom)?;
+                        Ok(IDLValue::Service(v))
+                    }
+                    5u8 => {
+                        use std::io::Read;
+                        let len = leb128::read::unsigned(&mut bytes).map_err(E::custom)? as usize;
+                        let mut buf = Vec::new();
+                        buf.resize(len, 0);
+                        bytes.read_exact(&mut buf).map_err(E::custom)?;
+                        let meth = String::from_utf8(buf).map_err(E::custom)?;
+                        let id = crate::Principal::try_from(bytes).map_err(E::custom)?;
+                        Ok(IDLValue::Func(id, meth))
                     }
                     3u8 => Ok(IDLValue::Reserved),
                     _ => Err(de::Error::custom("unknown tag in visit_byte_buf")),
