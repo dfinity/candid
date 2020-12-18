@@ -80,8 +80,11 @@ impl RawValue {
         }
     }
 }
+fn is_primitive_type(ty: i64) -> bool {
+    ty < 0 && (ty >= -17 || ty == -24)
+}
 fn validate_type_range(ty: i64, len: u64) -> Result<()> {
-    if ty >= 0 && (ty as u64) < len || Opcode::try_from(ty).is_ok() {
+    if ty >= 0 && (ty as u64) < len || is_primitive_type(ty) {
         Ok(())
     } else {
         Err(Error::msg(format!("unknown type {}", ty)))
