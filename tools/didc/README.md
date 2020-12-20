@@ -22,7 +22,7 @@ SUBCOMMANDS:
 $ didc encode '(42, vec {1;2;-3})'
 4449444c016d7c027c002a0301027d
 
-$ didc encode '(42, vec {1;2;-3})' -t '(nat, vec int32)' -p
+$ didc encode '(42, vec {1;2;-3})' -t '(nat, vec int32)' -f pretty
 Length: 24 (0x18) bytes
 0000:   44 49 44 4c  01 6d 75 02  7d 00 2a 03  01 00 00 00   DIDL.mu.}.*.....
 0010:   02 00 00 00  fd ff ff ff                             ........
@@ -31,7 +31,7 @@ $ didc encode '("text")' -d hello.did -m greet
 4449444c0001710474657874
 
 $ didc encode '("text")' -d list.did -t '(list)'
-Error: type mismatch: "text" can not be of type Opt(Var("node"))
+Error: type mismatch: "text" can not be of type opt node
 
 $ didc decode '4449444c016d7c027c002a0301027d'
 (42, vec { 1; 2; -3; })

@@ -22,9 +22,8 @@ assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03\66\6f\6f\00\01\01\01\03\ca\ff\ee
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\02\03\66\6f\6f\00\04\66\6f\6f\32\00\01\01\01\03\ca\ff\ee"
   == "(service \"w7x7r-cok77-xa\")" : (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service";
 
-// TODO: should this fail?
-//assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03\66\6f\6f\68\01\01\01\03\ca\ff\ee" !: (service {}) "service { foo: principal }";
-//assert blob "DIDL\02\6e\7e\69\01\03\66\6f\6f\00\01\01\01\03\ca\ff\ee" !: (service {}) "service { foo: opt bool }";
+//assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03\66\6f\6f\68\01\01\01\03\ca\ff\ee" !: (service { foo: () -> () }) "service { foo: principal }";
+//assert blob "DIDL\02\6e\7e\69\01\03\66\6f\6f\00\01\01\01\03\ca\ff\ee" !: (service { foo: () -> () }) "service { foo: opt bool }";
 
 assert blob "DIDL\01\6a\00\00\00\01\00\01\01\03\ca\ff\ee\01\61"
   == "(func \"w7x7r-cok77-xa\".\"a\")"          : (func () -> ()) "func: quote name";
@@ -34,6 +33,7 @@ assert blob "DIDL\01\6a\01\68\01\7d\00\01\00\01\01\03\ca\ff\ee\03\66\6f\6f"
   == "(func \"w7x7r-cok77-xa\".foo)"            : (func (principal) -> (nat)) "func";
 assert blob "DIDL\01\6a\01\71\01\7d\01\01\01\00\01\01\03\ca\ff\ee\03\66\6f\6f"
   == "(func \"w7x7r-cok77-xa\".foo)"            : (func (text) -> (nat) query) "func: query";
+assert blob "DIDL\01\6a\01\71\01\7d\01\80\01\01\00\01\01\03\ca\ff\ee\03\66\6f\6f" !: (func (text) -> (nat) query) "func: unknown annotation";
 assert blob "DIDL\00\01\6a\01\01\03\ca\ff\ee\01\61" !: (func () -> ()) "func: not primitive";
 assert blob "DIDL\00\01\6a\01\03\ca\ff\ee\01\61"    !: (func () -> ()) "func: no tag";
 assert blob "DIDL\01\6a\01\69\01\7d\00\01\00\01\01\03\ca\ff\ee\03\66\6f\6f" !: (func (service {}) -> (nat)) "func: service not in type table";

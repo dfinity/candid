@@ -365,6 +365,14 @@ pub mod pretty {
         enclose_space("{", fs, "}")
     }
 
+    pub fn pp_char(v: u8) -> String {
+        if v >= 0x20 && v <= 0x7e && v != 0x22 && v != 0x5c {
+            std::char::from_u32(v as u32).unwrap().to_string()
+        } else {
+            format!("\\{:02x}", v)
+        }
+    }
+
     const MAX_ELEMENTS_FOR_PRETTY_PRINT: usize = 10;
 
     pub fn pp_value(v: &IDLValue) -> RcDoc {
@@ -397,7 +405,7 @@ pub mod pretty {
                     let mut s = String::new();
                     for v in vs.iter() {
                         match v {
-                            Nat8(v) => s.push_str(&format!("\\{:02x}", v)),
+                            Nat8(v) => s.push_str(&pp_char(*v)),
                             _ => unreachable!(),
                         }
                     }

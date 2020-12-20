@@ -38,9 +38,9 @@ enum Command {
         args: IDLArgs,
         #[structopt(flatten)]
         annotate: TypeAnnotation,
-        #[structopt(short, long)]
-        /// Pretty-prints hex string
-        pretty: bool,
+        #[structopt(short, long, possible_values = &["hex", "pretty", "blob"], default_value = "hex")]
+        /// Specifies hex format
+        format: String,
     },
     /// Decode Candid binary data
     Decode {
@@ -161,7 +161,7 @@ fn main() -> Result<()> {
         }
         Command::Encode {
             args,
-            pretty,
+            format,
             annotate,
         } => {
             let bytes = if annotate.is_empty() {
@@ -170,10 +170,17 @@ fn main() -> Result<()> {
                 let (env, types) = annotate.get_types(Mode::Encode)?;
                 args.to_bytes_with_types(&env, &types)?
             };
-            let hex = if pretty {
-                pretty_hex::pretty_hex(&bytes)
-            } else {
-                hex::encode(&bytes)
+            let hex = match format.as_str() {
+                "hex" => hex::encode(&bytes),
+                "pretty" => pretty_hex::pretty_hex(&bytes),
+                "blob" => {
+                    let mut res = String::new();
+                    for ch in bytes.iter() {
+                        res.push_str(&candid::parser::value::pretty::pp_char(*ch));
+                    }
+                    res
+                }
+                _ => unreachable!(),
             };
             println!("{}", hex);
         }
