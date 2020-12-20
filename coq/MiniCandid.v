@@ -4,8 +4,11 @@ MiniCandid: A formalization of the core ideas of Candid
 
 Require Import FunInd.
 
+Require Import Psatz.
+
 Require Import Coq.ZArith.BinInt.
 Require Import Coq.Init.Datatypes.
+Require Import Coq.Lists.List.
 
 Require Import Coq.Relations.Relation_Operators.
 Require Import Coq.Relations.Relation_Definitions.
@@ -24,6 +27,7 @@ CoInductive T :=
   | IntT: T
   | NullT : T
   | OptT : T -> T
+  | VecT : T -> T
   | VoidT : T
   | ReservedT : T
   .
@@ -33,6 +37,7 @@ Inductive V :=
   | IntV : Z -> V
   | NullV : V
   | SomeV : V -> V
+  | VecV : list V -> V
   | ReservedV : V
   .
 
@@ -71,6 +76,9 @@ Inductive HasType : V -> T -> Prop :=
   | OptHT:
     case optHT,
     forall v t, v :: t -> SomeV v :: OptT t
+  | VecHT:
+    case vecHT,
+    forall vs t, (forall n, n < length vs -> nth n vs NullV :: t) -> VecV vs :: VecT t
   | ReservedHT:
     case reservedHT,
     ReservedV :: ReservedT
@@ -87,10 +95,10 @@ Here things are simple and inductive.
 Reserved Infix "<:" (at level 80, no associativity).
 CoInductive Subtype : T -> T -> Prop :=
   | ReflST :
-    case reflSL,
+    case reflST,
     forall t, t <: t
   | NatIntST :
-    case natIntSL,
+    case natIntST,
     NatT <: IntT
   | NullOptST :
     case nullOptST,
@@ -107,6 +115,11 @@ CoInductive Subtype : T -> T -> Prop :=
     forall t1 t2,
     is_opt_like_type t2 = false ->
     t1 <: t2 -> t1 <: OptT t2
+  | VecST :
+    case vecST,
+    forall t1 t2,
+    t1 <: t2 ->
+    VecT t1 <: VecT t2
   | VoidST :
     case voidST,
     forall t, VoidT <: t
@@ -144,6 +157,12 @@ Inductive Coerces : V -> V -> T -> Prop :=
     is_not_opt_like_value v1 ->
     v1 ~> v2 :: t ->
     v1 ~> SomeV v2 :: OptT t
+  | VecC:
+    case vecC,
+    forall vs1 vs2 t,
+    length vs1 = length vs2 ->
+    (forall n, n < length vs1 -> nth n vs1 NullV ~> nth n vs2 NullV :: t) ->
+    VecV vs1 ~> VecV vs2 :: VecT t
   | ReservedC:
     case reservedC,
     forall v1,
@@ -162,13 +181,36 @@ Qed.
 Theorem coercion_correctness:
   forall v1 v2 t, v1 ~> v2 :: t -> v2 :: t.
 Proof.
-  intros. induction H; constructor; assumption.
+  intros. induction H; try (named_constructor; assumption); name_cases.
+  [vecC]: {
+    named_constructor.
+    intros.
+    apply H1. lia.
+  }
 Qed.
 
 Theorem coercion_roundtrip:
   forall v t, v :: t -> v ~> v :: t.
 Proof.
-  intros. induction H; constructor; intuition.
+  intros. induction H; try (constructor; intuition); name_cases.
+Qed.
+
+Lemma nths_ext:
+  forall A (l1 l2 : list A) d,
+  length l1 = length l2 ->
+  (forall n, n < length l1 -> nth n l1 d = nth n l2 d) ->
+  l1 = l2.
+Proof.
+  intros A l1. induction l1; intros l2 d Heq Hnth.
+  * destruct l2; inversion Heq. reflexivity.
+  * destruct l2; inversion Heq.
+    f_equal.
+    - specialize (Hnth 0 ltac:(simpl;lia)).
+      simpl in Hnth. assumption.
+    - eapply IHl1; try assumption.
+      intros n Hle.
+      specialize (Hnth (S n) ltac:(simpl;lia)).
+      simpl in Hnth. eassumption.
 Qed.
 
 Theorem coercion_uniqueness:
@@ -177,7 +219,16 @@ Proof.
   intros.
   revert v2 H0.
   induction H; intros v2' Hother;
-    try (inversion Hother; subst; clear Hother; try congruence; firstorder congruence).
+    try (inversion Hother; subst; clear Hother; try congruence; firstorder congruence);
+    name_cases.
+  [vecC]: {
+    inversion Hother; subst; clear Hother.
+    apply f_equal.
+    eapply nths_ext; try congruence.
+    intros n Hle.
+    apply H1; try congruence.
+    apply H6; congruence.
+  }
 Qed.
 
 Theorem soundness_of_subtyping:
@@ -196,9 +247,9 @@ Proof.
   }
   [intHT_constituentOptST]: {
     inversion H0; subst; clear H0; simpl in H; inversion H.
-    econstructor. named_econstructor; [constructor|named_constructor].
+    eexists. named_econstructor; [constructor|named_constructor].
   }
-  [optHT_reflSL]: {
+  [optHT_reflST]: {
     specialize (IHHvT t (ReflST _ _)).
     destruct IHHvT as [v2 Hv2].
     eexists. named_econstructor; try eassumption.
@@ -210,6 +261,64 @@ Proof.
   }
   [optHT_constituentOptST]: {
     inversion H0; subst; clear H0; simpl in H; inversion H.
+  }
+  [vecHT_vecST]: {
+    clear H.
+    assert (Hv2 : forall n : nat, n < length vs -> exists v2 : V, nth n vs NullV ~> v2 :: t2) by intuition.
+    clear H0 H2.
+    induction vs.
+    * exists (VecV nil). named_constructor; try reflexivity. intuition. simpl in H. lia.
+    * lapply IHvs.
+      - intros. destruct H as [v2 HC].
+        inversion HC; subst; clear HC.
+        destruct (Hv2 0 ltac:(simpl;lia)) as [va HCa].
+        exists (VecV (va :: vs2)).
+        named_constructor.
+        + simpl; congruence.
+        + intros. simpl in H.
+          destruct n.
+          ** apply HCa.
+          ** apply H3. lia.
+     - intros.
+       specialize (Hv2 (S n) ltac:(simpl;lia)).
+       firstorder.
+  }
+  [vecHT_reflST]: {
+    eexists. named_constructor. 
+    * reflexivity.
+    * intros.
+      apply coercion_roundtrip.
+      apply H.
+      assumption.
+  }
+  [vecHT_constituentOptST]: {
+    inversion H2; subst; clear H2; simpl in H1; inversion H1.
+    * eexists.
+      named_constructor; try reflexivity.
+      named_constructor; try reflexivity.
+      intros. apply coercion_roundtrip. apply H. assumption.
+    * enough (exists v2 : V, VecV vs ~> v2 :: VecT t0)
+        by (destruct H2; eexists; named_constructor; try reflexivity; apply H2).
+      assert (Hv2 : forall n : nat, n < length vs -> exists v2 : V, nth n vs NullV ~> v2 :: t0) by intuition.
+      clear H H0 H1 vecST H4 t.
+      {
+      induction vs.
+      * exists (VecV nil). named_constructor; try reflexivity. intuition. simpl in H. lia.
+      * lapply IHvs.
+        - intros. destruct H as [v2 HC].
+          inversion HC; subst; clear HC.
+          destruct (Hv2 0 ltac:(simpl;lia)) as [va HCa].
+          exists (VecV (va :: vs2)).
+          named_constructor.
+          + simpl; congruence.
+          + intros. simpl in H.
+            destruct n.
+            ** apply HCa.
+            ** apply H3. lia.
+       - intros.
+         specialize (Hv2 (S n) ltac:(simpl;lia)).
+         firstorder.
+       }
   }
   [reservedHT_constituentOptST]: {
     inversion H0; subst; clear H0; simpl in H; inversion H.
@@ -232,7 +341,7 @@ Proof.
   inversion H2; subst; clear H2;
     name_cases;
     try (constructor; easy).
-  [natIntSL_constituentOptST]: {
+  [natIntST_constituentOptST]: {
     named_constructor.
     - assumption.
     - eapply Hyp; [named_econstructor | assumption].
@@ -255,6 +364,16 @@ Proof.
   }
   [reservedST_constituentOptST]: {
     inversion H0; subst; clear H0; inversion H.
+  }
+  [vecST_vecST0]: {
+    named_constructor.
+    eapply Hyp; eassumption.
+  }
+  [vecST_constituentOptST]: {
+    named_constructor; try assumption.
+    inversion H1; subst; clear H1; try easy.
+    - named_constructor; assumption.
+    - named_constructor. eapply Hyp; eassumption.
   }
 Qed.
 
