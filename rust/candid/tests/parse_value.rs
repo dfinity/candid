@@ -245,6 +245,6 @@ fn parse_annval() {
     let result = parse_args_err("(vec {1;2;3;-4;5;6;7} : vec nat)");
     assert_eq!(
         format!("{}", result.unwrap_err()),
-        "Candid parser error: Cannot parse BigUint"
+        "Candid parser error: Cannot parse BigUint at 1..21"
     );
 }
