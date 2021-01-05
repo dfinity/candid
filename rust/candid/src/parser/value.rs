@@ -366,7 +366,7 @@ pub mod pretty {
     }
 
     pub fn pp_char(v: u8) -> String {
-        if v >= 0x20 && v <= 0x7e && v != 0x22 && v != 0x5c {
+        if (0x20..=0x7e).contains(&v) && v != 0x22 && v != 0x5c {
             std::char::from_u32(v as u32).unwrap().to_string()
         } else {
             format!("\\{:02x}", v)
