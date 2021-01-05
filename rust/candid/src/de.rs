@@ -173,15 +173,15 @@ impl<'de> Deserializer<'de> {
     fn parse_table(&mut self) -> Result<()> {
         self.parse_magic()?;
         let len = self.leb128_read()? as usize;
-        let mut expects: Vec<i64> = vec![0; len];
+        let mut expect_func = std::collections::HashSet::new();
         for i in 0..len {
             let mut buf = Vec::new();
             let ty = self.sleb128_read()?;
             buf.push(RawValue::I(ty));
-            if expects[i] < 0 && expects[i] != ty {
+            if expect_func.contains(&i) && ty != -22 {
                 return Err(Error::msg(format!(
-                    "Expect opcode {}, but got {}",
-                    expects[i], ty
+                    "Expect function opcode, but got {}",
+                    ty
                 )));
             }
             match Opcode::try_from(ty) {
@@ -234,7 +234,7 @@ impl<'de> Deserializer<'de> {
                             if idx < self.table.len() && self.table[idx][0] != RawValue::I(-22) {
                                 return Err(Error::msg("not a function type"));
                             } else {
-                                expects[idx] = -22;
+                                expect_func.insert(idx);
                             }
                         } else {
                             return Err(Error::msg("not a function type"));
