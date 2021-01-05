@@ -32,7 +32,7 @@ fn test_error() {
         "io error: failed to fill whole buffer",
     );
     // Out of bounds type index
-    check_error(|| test_decode(b"DIDL\0\x01\0\x01", &42), "Unknown opcode 0");
+    check_error(|| test_decode(b"DIDL\0\x01\0\x01", &42), "unknown type 0");
 }
 
 #[test]

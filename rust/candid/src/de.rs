@@ -61,7 +61,7 @@ impl<'de> IDLDeserialize<'de> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum RawValue {
     I(i64),
     U(u32),
@@ -83,8 +83,8 @@ impl RawValue {
 fn is_primitive_type(ty: i64) -> bool {
     ty < 0 && (ty >= -17 || ty == -24)
 }
-fn validate_type_range(ty: i64, len: u64) -> Result<()> {
-    if ty >= 0 && (ty as u64) < len || is_primitive_type(ty) {
+fn validate_type_range(ty: i64, len: usize) -> Result<()> {
+    if ty >= 0 && (ty as usize) < len || is_primitive_type(ty) {
         Ok(())
     } else {
         Err(Error::msg(format!("unknown type {}", ty)))
@@ -172,11 +172,18 @@ impl<'de> Deserializer<'de> {
     // Parse magic number, type table, and type seq from input.
     fn parse_table(&mut self) -> Result<()> {
         self.parse_magic()?;
-        let len = self.leb128_read()?;
-        for _i in 0..len {
+        let len = self.leb128_read()? as usize;
+        let mut expects: Vec<i64> = vec![0; len];
+        for i in 0..len {
             let mut buf = Vec::new();
             let ty = self.sleb128_read()?;
             buf.push(RawValue::I(ty));
+            if expects[i] < 0 && expects[i] != ty {
+                return Err(Error::msg(format!(
+                    "Expect opcode {}, but got {}",
+                    expects[i], ty
+                )));
+            }
             match Opcode::try_from(ty) {
                 Ok(Opcode::Opt) | Ok(Opcode::Vec) => {
                     let ty = self.sleb128_read()?;
@@ -221,6 +228,17 @@ impl<'de> Deserializer<'de> {
                         prev_hash = Some(hash);
                         let ty = self.sleb128_read()?;
                         validate_type_range(ty, len)?;
+                        // Check for method type
+                        if ty >= 0 {
+                            let idx = ty as usize;
+                            if idx < self.table.len() && self.table[idx][0] != RawValue::I(-22) {
+                                return Err(Error::msg("not a function type"));
+                            } else {
+                                expects[idx] = -22;
+                            }
+                        } else {
+                            return Err(Error::msg("not a function type"));
+                        }
                     }
                 }
                 Ok(Opcode::Func) => {
@@ -256,6 +274,7 @@ impl<'de> Deserializer<'de> {
         let len = self.leb128_read()?;
         for _i in 0..len {
             let ty = self.sleb128_read()?;
+            validate_type_range(ty, self.table.len())?;
             self.types.push_back(RawValue::I(ty));
         }
         Ok(())
