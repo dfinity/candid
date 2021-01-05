@@ -520,7 +520,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let old_nesting = self.record_nesting_depth;
                 self.record_nesting_depth += 1;
                 if self.record_nesting_depth > self.table.len() {
-                    return Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"));
+                    return Err(Error::msg(format!("There is an infinite loop in the record definition, the type is isomorphic to an empty type {}/{}", self.record_nesting_depth, self.table.len())));
                 }
                 self.check_type(Opcode::Record)?;
                 let len = self.pop_current_type()?.get_u32()?;
@@ -682,7 +682,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         let old_nesting = self.record_nesting_depth;
         self.record_nesting_depth += 1;
         if self.record_nesting_depth > self.table.len() {
-            return Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"));
+            return Err(Error::msg(format!("There is an infinite loop in the record definition, the type is isomorphic to an empty type {}/{}", self.record_nesting_depth, self.table.len())));
         }
         self.check_type(Opcode::Record)?;
         let len = self.pop_current_type()?.get_u32()?;
