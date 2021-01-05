@@ -96,7 +96,7 @@ pub trait RustBindings {
         } else {
             format!(
                 "std::pin::Pin<std::boxed::Box<impl std::future::Future<Output = {}>>>",
-                if return_type == "" {
+                if return_type.is_empty() {
                     "()"
                 } else {
                     &return_type
@@ -117,7 +117,7 @@ pub trait RustBindings {
             id = id,
             arguments = arguments_list,
             body = body,
-            return_type = if return_type == "" {
+            return_type = if return_type.is_empty() {
                 format!("")
             } else {
                 format!(" -> {}", return_type)

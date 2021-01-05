@@ -61,7 +61,7 @@ impl<'de> IDLDeserialize<'de> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum RawValue {
     I(i64),
     U(u32),
@@ -80,8 +80,11 @@ impl RawValue {
         }
     }
 }
-fn validate_type_range(ty: i64, len: u64) -> Result<()> {
-    if ty >= 0 && (ty as u64) < len || Opcode::try_from(ty).is_ok() {
+fn is_primitive_type(ty: i64) -> bool {
+    ty < 0 && (ty >= -17 || ty == -24)
+}
+fn validate_type_range(ty: i64, len: usize) -> Result<()> {
+    if ty >= 0 && (ty as usize) < len || is_primitive_type(ty) {
         Ok(())
     } else {
         Err(Error::msg(format!("unknown type {}", ty)))
@@ -169,11 +172,18 @@ impl<'de> Deserializer<'de> {
     // Parse magic number, type table, and type seq from input.
     fn parse_table(&mut self) -> Result<()> {
         self.parse_magic()?;
-        let len = self.leb128_read()?;
-        for _i in 0..len {
+        let len = self.leb128_read()? as usize;
+        let mut expect_func = std::collections::HashSet::new();
+        for i in 0..len {
             let mut buf = Vec::new();
             let ty = self.sleb128_read()?;
             buf.push(RawValue::I(ty));
+            if expect_func.contains(&i) && ty != -22 {
+                return Err(Error::msg(format!(
+                    "Expect function opcode, but got {}",
+                    ty
+                )));
+            }
             match Opcode::try_from(ty) {
                 Ok(Opcode::Opt) | Ok(Opcode::Vec) => {
                     let ty = self.sleb128_read()?;
@@ -200,6 +210,58 @@ impl<'de> Deserializer<'de> {
                         buf.push(RawValue::I(ty));
                     }
                 }
+                Ok(Opcode::Service) => {
+                    let obj_len = u32::try_from(self.leb128_read()?)
+                        .map_err(|_| Error::msg(Error::msg("length out of u32")))?;
+                    // Push one element to the table to ensure it's a non-primitive type
+                    buf.push(RawValue::U(obj_len));
+                    let mut prev_hash = None;
+                    for _ in 0..obj_len {
+                        let mlen = self.leb128_read()? as usize;
+                        let meth = self.parse_string(mlen)?;
+                        let hash = crate::idl_hash(&meth);
+                        if let Some(prev_hash) = prev_hash {
+                            if prev_hash >= hash {
+                                return Err(Error::msg("method name collision or not sorted"));
+                            }
+                        }
+                        prev_hash = Some(hash);
+                        let ty = self.sleb128_read()?;
+                        validate_type_range(ty, len)?;
+                        // Check for method type
+                        if ty >= 0 {
+                            let idx = ty as usize;
+                            if idx < self.table.len() && self.table[idx][0] != RawValue::I(-22) {
+                                return Err(Error::msg("not a function type"));
+                            } else {
+                                expect_func.insert(idx);
+                            }
+                        } else {
+                            return Err(Error::msg("not a function type"));
+                        }
+                    }
+                }
+                Ok(Opcode::Func) => {
+                    let arg_len = self.leb128_read()?;
+                    // Push one element to the table to ensure it's a non-primitive type
+                    buf.push(RawValue::U(arg_len as u32));
+                    for _ in 0..arg_len {
+                        let ty = self.sleb128_read()?;
+                        validate_type_range(ty, len)?;
+                    }
+                    let ret_len = self.leb128_read()?;
+                    for _ in 0..ret_len {
+                        let ty = self.sleb128_read()?;
+                        validate_type_range(ty, len)?;
+                    }
+                    let ann_len = self.leb128_read()?;
+                    for _ in 0..ann_len {
+                        let ann = self.parse_byte()?;
+                        if ann > 2u8 {
+                            return Err(Error::msg("Unknown function annotation"));
+                        }
+                    }
+                }
                 _ => {
                     return Err(Error::msg(format!(
                         "Unsupported op_code {} in type table",
@@ -212,6 +274,7 @@ impl<'de> Deserializer<'de> {
         let len = self.leb128_read()?;
         for _i in 0..len {
             let ty = self.sleb128_read()?;
+            validate_type_range(ty, self.table.len())?;
             self.types.push_back(RawValue::I(ty));
         }
         Ok(())
@@ -300,22 +363,55 @@ impl<'de> Deserializer<'de> {
         tagged.extend_from_slice(&bytes);
         visitor.visit_byte_buf(tagged)
     }
-    fn deserialize_principal<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        self.check_type(Opcode::Principal)?;
+    fn decode_principal(&mut self) -> Result<Vec<u8>> {
         let bit = self.parse_byte()?;
         if bit != 1u8 {
             return Err(Error::msg("Opaque reference not supported"));
         }
         let len = self.leb128_read()? as usize;
-        let vec = self.parse_bytes(len)?;
+        self.parse_bytes(len)
+    }
+    fn deserialize_principal<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.check_type(Opcode::Principal)?;
+        let vec = self.decode_principal()?;
         let mut tagged = vec![2u8];
         tagged.extend_from_slice(&vec);
         visitor.visit_byte_buf(tagged)
     }
-
+    fn deserialize_service<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.check_type(Opcode::Service)?;
+        self.pop_current_type()?;
+        let vec = self.decode_principal()?;
+        let mut tagged = vec![4u8];
+        tagged.extend_from_slice(&vec);
+        visitor.visit_byte_buf(tagged)
+    }
+    fn deserialize_function<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.check_type(Opcode::Func)?;
+        self.pop_current_type()?;
+        let bit = self.parse_byte()?;
+        if bit != 1u8 {
+            return Err(Error::msg("Opaque reference not supported"));
+        }
+        let vec = self.decode_principal()?;
+        let len = self.leb128_read()? as usize;
+        let meth = self.parse_bytes(len)?;
+        let mut tagged = vec![5u8];
+        // TODO: find a better way
+        leb128::write::unsigned(&mut tagged, len as u64)?;
+        tagged.extend_from_slice(&meth);
+        tagged.extend_from_slice(&vec);
+        visitor.visit_byte_buf(tagged)
+    }
     fn deserialize_reserved<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -383,6 +479,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Opcode::Record => self.deserialize_struct("_", &[], visitor),
             Opcode::Variant => self.deserialize_enum("_", &[], visitor),
             Opcode::Principal => self.deserialize_principal(visitor),
+            Opcode::Service => self.deserialize_service(visitor),
+            Opcode::Func => self.deserialize_function(visitor),
         }
     }
 
@@ -450,6 +548,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 visitor.visit_enum(Compound::new(&mut self, Style::Enum { len, fs }))
             }
             Opcode::Principal => self.deserialize_principal(visitor),
+            Opcode::Service => self.deserialize_service(visitor),
+            Opcode::Func => self.deserialize_function(visitor),
         }
     }
 

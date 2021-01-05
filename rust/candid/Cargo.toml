@@ -32,7 +32,7 @@ num-bigint = "0.3.0"
 num-traits = "0.2.12"
 paste = "1.0.0"
 pretty = "0.10.0"
-serde = "1.0.115"
+serde = { version = "1.0.118", features = ["derive"] }
 thiserror = "1.0.20"
 
 [dev-dependencies]

@@ -2,7 +2,7 @@ use super::value::{IDLField, IDLValue, IDLArgs};
 use super::typing::{check_unique, TypeEnv};
 use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg, IDLTypes};
 use super::test::{Assert, Input, Test};
-use super::token::{Token, error, error2, LexicalError, Span};
+use super::token::{Token, error2, LexicalError, Span};
 use crate::{idl_hash, Principal, types::Label};
 
 grammar;
@@ -40,6 +40,7 @@ extern {
         "{" => Token::LBrace,
         "}" => Token::RBrace,
         "," => Token::Comma,
+        "." => Token::Dot,
         ";" => Token::Semi,
         ":" => Token::Colon,
         "->" => Token::Arrow,
@@ -61,9 +62,10 @@ pub Arg: IDLValue = {
     "null" => IDLValue::Null,
     "opt" <Arg> => IDLValue::Opt(Box::new(<>)),
     "vec" "{" <SepBy<Arg, ";">> "}" => IDLValue::Vec(<>),
-    "record" "{" <SepBy<RecordField, ";">> "}" =>? {
+    "record" "{" <Sp<SepBy<RecordField, ";">>> "}" =>? {
         let mut id: u32 = 0;
-        let mut fs: Vec<IDLField> = <>.into_iter().map(|f| {
+        let span = <>.1.clone();
+        let mut fs: Vec<IDLField> = <>.0.into_iter().map(|f| {
           match f.id {
             Label::Unnamed(_) => {
               id = id + 1;
@@ -76,11 +78,16 @@ pub Arg: IDLValue = {
           }
         }).collect();
         fs.sort_unstable_by_key(|IDLField { id, .. }| id.get_id());
-        check_unique(fs.iter().map(|f| &f.id)).map_err(error)?;
+        check_unique(fs.iter().map(|f| &f.id)).map_err(|e| error2(e, span))?;
         Ok(IDLValue::Record(fs))
     },
     "variant" "{" <VariantField> "}" => IDLValue::Variant(Box::new(<>), 0),
-    "principal" <Text> =>? Ok(IDLValue::Principal(Principal::from_text(<>).map_err(error)?)),
+    "principal" <Sp<Text>> =>? Ok(IDLValue::Principal(Principal::from_text(&<>.0).map_err(|e| error2(e, <>.1))?)),
+    "service" <Sp<Text>> =>? Ok(IDLValue::Service(Principal::from_text(&<>.0).map_err(|e| error2(e, <>.1))?)),
+    "func" <id:Sp<Text>> "." <meth:Name> =>? {
+      let id = Principal::from_text(&id.0).map_err(|e| error2(e, id.1))?;
+      Ok(IDLValue::Func(id, meth))
+    },
     "(" <AnnVal> ")" => <>,
 }
 
@@ -105,10 +112,10 @@ Number: String = {
 
 AnnVal: IDLValue = {
     <Arg> => <>,
-    <arg:Arg> ":" <typ:Typ> =>? {
+    <arg:Sp<Arg>> ":" <typ:Sp<Typ>> =>? {
         let env = TypeEnv::new();
-        let typ = env.ast_to_type(&typ).map_err(error)?;
-        arg.annotate_type(true, &env, &typ).map_err(error)
+        let typ = env.ast_to_type(&typ.0).map_err(|e| error2(e, typ.1))?;
+        arg.0.annotate_type(true, &env, &typ).map_err(|e| error2(e, arg.1))
     }
 }
 
@@ -120,12 +127,13 @@ NumLiteral: IDLValue = {
         };
         IDLValue::Number(num)
     },
-    <sign:"sign"?> <n:"float"> =>? {
+    <sign:"sign"?> <n:Sp<"float">> =>? {
+        let span = n.1.clone();
         let num = match sign {
-            Some('-') => format!("-{}", n),
-            _ => n,
+            Some('-') => format!("-{}", n.0),
+            _ => n.0,
         };
-        let f = num.parse::<f64>().map_err(|_| error("not a float"))?;
+        let f = num.parse::<f64>().map_err(|_| error2("not a float", span))?;
         Ok(IDLValue::Float64(f))
     },
 }
@@ -159,9 +167,10 @@ pub Typ: IDLType = {
     "opt" <Typ> => IDLType::OptT(Box::new(<>)),
     "vec" <Typ> => IDLType::VecT(Box::new(<>)),
     "blob" => IDLType::VecT(Box::new(IDLType::PrimT(PrimType::Nat8))),
-    "record" "{" <SepBy<RecordFieldTyp, ";">> "}" =>? {
+    "record" "{" <Sp<SepBy<RecordFieldTyp, ";">>> "}" =>? {
         let mut id: u32 = 0;
-        let mut fs: Vec<TypeField> = <>.iter().map(|f| {
+        let span = <>.1.clone();
+        let mut fs: Vec<TypeField> = <>.0.iter().map(|f| {
           let label = match f.label {
               Label::Unnamed(_) => { id = id + 1; Label::Unnamed(id - 1) },
               ref l => { id = l.get_id() + 1; l.clone() },
@@ -169,13 +178,14 @@ pub Typ: IDLType = {
           TypeField { label, typ: f.typ.clone() }
         }).collect();
         fs.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
-        check_unique(fs.iter().map(|f| &f.label)).map_err(error)?;
+        check_unique(fs.iter().map(|f| &f.label)).map_err(|e| error2(e, span))?;
         Ok(IDLType::RecordT(fs))
     },
-    "variant" "{" <mut fs:SepBy<VariantFieldTyp, ";">> "}" =>? {
-        fs.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
-        check_unique(fs.iter().map(|f| &f.label)).map_err(error)?;
-        Ok(IDLType::VariantT(fs))
+    "variant" "{" <mut fs:Sp<SepBy<VariantFieldTyp, ";">>> "}" =>? {
+        let span = fs.1.clone();
+        fs.0.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
+        check_unique(fs.0.iter().map(|f| &f.label)).map_err(|e| error2(e, span))?;
+        Ok(IDLType::VariantT(fs.0))
     },
     "func" <FuncTyp> => IDLType::FuncT(<>),
     "service" <ActorTyp> => IDLType::ServT(<>),
@@ -226,11 +236,12 @@ FuncMode: FuncMode = {
 }
 
 ActorTyp: Vec<Binding> = {
-    "{" <mut fs:SepBy<MethTyp, ";">> "}" =>? {
-        fs.sort_unstable_by_key(|Binding { id, .. }| idl_hash(id));
-        let labs: Vec<_> = fs.iter().map(|f| Label::Named(f.id.clone())).collect();
-        check_unique(labs.iter()).map_err(error)?;
-        Ok(fs)
+    "{" <mut fs:Sp<SepBy<MethTyp, ";">>> "}" =>? {
+        let span = fs.1.clone();
+        fs.0.sort_unstable_by_key(|Binding { id, .. }| idl_hash(id));
+        let labs: Vec<_> = fs.0.iter().map(|f| Label::Named(f.id.clone())).collect();
+        check_unique(labs.iter()).map_err(|e| error2(e, span))?;
+        Ok(fs.0)
     }
 }
 
@@ -266,9 +277,9 @@ Input: Input = {
     Bytes => Input::Blob(<>),
 }
 
-Assert: Assert = <id:"id"> <assert:Assertion> =>? {
-    if id != "assert" {
-        Err(error("not an assert"))
+Assert: Assert = <id:Sp<"id">> <assert:Assertion> =>? {
+    if id.0 != "assert" {
+        Err(error2("not an assert", id.1))
     } else { Ok(assert) }
 };
 

@@ -120,7 +120,7 @@ fn check(num: &str, int_hex: &str, nat_hex: &str) {
     let decoded = Int::decode(&mut rcr).unwrap();
     assert_eq!(decoded, v);
     // Check for Nat
-    if nat_hex != "" {
+    if !nat_hex.is_empty() {
         let nat = num.parse::<Nat>().unwrap();
         let bytes = hex::decode(nat_hex).unwrap();
         // Check encode
