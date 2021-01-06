@@ -350,6 +350,18 @@ fn test_vector() {
 }
 
 #[test]
+fn test_hashmap() {
+    use std::collections::{BTreeMap, HashMap};
+    let map: HashMap<_, _> = vec![("a".to_string(), 1)].into_iter().collect();
+    all_check(map, "4449444c026d016c0200710175010001016101000000");
+    let bmap: BTreeMap<_, _> = vec![(1, 101), (2, 102), (3, 103)].into_iter().collect();
+    all_check(
+        bmap,
+        "4449444c026d016c0200750175010003010000006500000002000000660000000300000067000000",
+    );
+}
+
+#[test]
 fn test_tuple() {
     all_check(
         (Int::from(42), "💩".to_string()),

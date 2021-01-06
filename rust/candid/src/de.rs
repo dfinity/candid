@@ -639,7 +639,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         self.deserialize_unit(visitor)
     }
     fn deserialize_newtype_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
@@ -668,11 +667,22 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             _ => Err(Error::msg("seq only takes vector or tuple")),
         }
     }
-    fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value>
+    fn deserialize_map<V>(mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         self.record_nesting_depth = 0;
+        self.check_type(Opcode::Vec)?;
+        let len = self.leb128_read()?;
+        let ty = self.peek_current_type()?.clone();
+        let value = visitor.visit_map(Compound::new(&mut self, Style::Map { len, ty }));
+        self.pop_current_type()?;
+        value
+    }
+    fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
         self.deserialize_seq(visitor)
     }
     fn deserialize_tuple_struct<V>(
@@ -684,7 +694,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         self.deserialize_seq(visitor)
     }
     fn deserialize_struct<V>(
@@ -755,7 +764,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     serde::forward_to_deserialize_any! {
-        char bytes byte_buf map
+        char bytes byte_buf
     }
 }
 
@@ -775,6 +784,10 @@ enum Style {
     Enum {
         len: u32,
         fs: BTreeMap<u32, Option<&'static str>>,
+    },
+    Map {
+        len: u64,
+        ty: RawValue,
     },
 }
 
@@ -855,14 +868,33 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                 }
                 seed.deserialize(&mut *self.de).map(Some)
             }
-            _ => Err(Error::msg("expect struct")),
+            Style::Map { ref mut len, .. } => {
+                // This only comes from deserialize_map
+                if *len == 0 {
+                    return Ok(None);
+                }
+                self.de.check_type(Opcode::Record)?;
+                assert_eq!(2, self.de.pop_current_type()?.get_u32()?);
+                assert_eq!(0, self.de.pop_current_type()?.get_u32()?);
+                *len -= 1;
+                seed.deserialize(&mut *self.de).map(Some)
+            }
+            _ => Err(Error::msg("expect struct or map")),
         }
     }
     fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value>
     where
         V: de::DeserializeSeed<'de>,
     {
-        seed.deserialize(&mut *self.de)
+        match self.style {
+            Style::Map { ref ty, .. } => {
+                assert_eq!(1, self.de.pop_current_type()?.get_u32()?);
+                let res = seed.deserialize(&mut *self.de);
+                self.de.current_type.push_front(ty.clone());
+                res
+            }
+            _ => seed.deserialize(&mut *self.de),
+        }
     }
 }
 

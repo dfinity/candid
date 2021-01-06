@@ -112,6 +112,81 @@ where
     }
 }
 
+macro_rules! map_impl {
+    ($ty:ident < K $(: $kbound1:ident $(+ $kbound2:ident)*)*, V $(, $typaram:ident : $bound:ident)* >) => {
+        impl<K, V $(, $typaram)*> CandidType for $ty<K, V $(, $typaram)*>
+        where
+            K: CandidType $(+ $kbound1 $(+ $kbound2)*)*,
+            V: CandidType,
+            $($typaram: $bound,)*
+        {
+            fn id() -> TypeId { TypeId::of::<Self>() }
+            fn _ty() -> Type {
+                let tuple = Type::Record(vec![
+                    Field {
+                        id: Label::Id(0),
+                        ty: K::ty(),
+                    },
+                    Field {
+                        id: Label::Id(1),
+                        ty: V::ty(),
+                    },
+                ]);
+                Type::Vec(Box::new(tuple))
+            }
+            fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+            where
+                S: Serializer,
+            {
+                let mut ser = serializer.serialize_vec(self.len())?;
+                for e in self.iter() {
+                    Compound::serialize_element(&mut ser, &e)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+use std::collections::{BTreeMap, HashMap};
+use std::hash::{BuildHasher, Hash};
+map_impl!(BTreeMap<K: Ord, V>);
+map_impl!(HashMap<K: Eq + Hash, V, H: BuildHasher>);
+
+/*
+impl<K, V, H> CandidType for std::collections::HashMap<K, V, H>
+where
+    K: Eq + std::hash::Hash + CandidType,
+    V: CandidType,
+    H: std::hash::BuildHasher,
+{
+    fn id() -> TypeId {
+        TypeId::of::<Self>()
+    }
+    fn _ty() -> Type {
+        let tuple = Type::Record(vec![
+            Field {
+                id: Label::Id(0),
+                ty: K::ty(),
+            },
+            Field {
+                id: Label::Id(1),
+                ty: V::ty(),
+            },
+        ]);
+        Type::Vec(Box::new(tuple))
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        let mut ser = serializer.serialize_vec(self.len())?;
+        for e in self.iter() {
+            Compound::serialize_element(&mut ser, &e)?;
+        }
+        Ok(())
+    }
+}*/
+
 macro_rules! array_impls {
     ($($len:tt)+) => {
         $(
