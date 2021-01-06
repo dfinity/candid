@@ -4,7 +4,6 @@ use super::{CandidType, Compound, Serializer};
 macro_rules! primitive_impl {
     ($t:ty, $id:tt, $method:ident $($cast:tt)*) => {
         impl CandidType for $t {
-            fn id() -> TypeId { TypeId::of::<$t>() }
             fn _ty() -> Type { Type::$id }
             fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error> where S: Serializer {
                 serializer.$method(*self $($cast)*)
@@ -36,9 +35,6 @@ primitive_impl!(isize, Int64, serialize_int64 as i64);
 primitive_impl!(usize, Nat64, serialize_nat64 as u64);
 
 impl CandidType for String {
-    fn id() -> TypeId {
-        TypeId::of::<String>()
-    }
     fn _ty() -> Type {
         Type::Text
     }
@@ -54,9 +50,6 @@ impl<T: Sized> CandidType for Option<T>
 where
     T: CandidType,
 {
-    fn id() -> TypeId {
-        TypeId::of::<Option<T>>()
-    }
     fn _ty() -> Type {
         Type::Opt(Box::new(T::ty()))
     }
@@ -72,9 +65,6 @@ impl<T> CandidType for Vec<T>
 where
     T: CandidType,
 {
-    fn id() -> TypeId {
-        TypeId::of::<Vec<T>>()
-    }
     fn _ty() -> Type {
         Type::Vec(Box::new(T::ty()))
     }
@@ -94,9 +84,6 @@ impl<T> CandidType for [T]
 where
     T: CandidType,
 {
-    fn id() -> TypeId {
-        TypeId::of::<[T]>()
-    }
     fn _ty() -> Type {
         Type::Vec(Box::new(T::ty()))
     }
@@ -120,7 +107,6 @@ macro_rules! map_impl {
             V: CandidType,
             $($typaram: $bound,)*
         {
-            fn id() -> TypeId { TypeId::of::<Self>() }
             fn _ty() -> Type {
                 let tuple = Type::Record(vec![
                     Field {
@@ -152,48 +138,12 @@ use std::hash::{BuildHasher, Hash};
 map_impl!(BTreeMap<K: Ord, V>);
 map_impl!(HashMap<K: Eq + Hash, V, H: BuildHasher>);
 
-/*
-impl<K, V, H> CandidType for std::collections::HashMap<K, V, H>
-where
-    K: Eq + std::hash::Hash + CandidType,
-    V: CandidType,
-    H: std::hash::BuildHasher,
-{
-    fn id() -> TypeId {
-        TypeId::of::<Self>()
-    }
-    fn _ty() -> Type {
-        let tuple = Type::Record(vec![
-            Field {
-                id: Label::Id(0),
-                ty: K::ty(),
-            },
-            Field {
-                id: Label::Id(1),
-                ty: V::ty(),
-            },
-        ]);
-        Type::Vec(Box::new(tuple))
-    }
-    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
-    where
-        S: Serializer,
-    {
-        let mut ser = serializer.serialize_vec(self.len())?;
-        for e in self.iter() {
-            Compound::serialize_element(&mut ser, &e)?;
-        }
-        Ok(())
-    }
-}*/
-
 macro_rules! array_impls {
     ($($len:tt)+) => {
         $(
             impl<T> CandidType for [T; $len]
             where T: CandidType,
             {
-                fn id() -> TypeId { TypeId::of::<[T; $len]>() }
                 fn _ty() -> Type { Type::Vec(Box::new(T::ty())) }
                 fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
                 where S: Serializer,
@@ -221,9 +171,6 @@ where
     T: CandidType,
     E: CandidType,
 {
-    fn id() -> TypeId {
-        TypeId::of::<Result<T, E>>()
-    }
     fn _ty() -> Type {
         Type::Variant(vec![
             // Make sure the field id is sorted by idl_hash
@@ -258,9 +205,6 @@ impl<T> CandidType for Box<T>
 where
     T: ?Sized + CandidType,
 {
-    fn id() -> TypeId {
-        TypeId::of::<Box<T>>()
-    }
     fn _ty() -> Type {
         T::ty()
     }
@@ -297,7 +241,6 @@ macro_rules! tuple_impls {
             where
                 $($name: CandidType,)+
             {
-                fn id() -> TypeId { TypeId::of::<($($name,)+)>() }
                 fn _ty() -> Type {
                     Type::Record(vec![
                         $(Field{ id: Label::Id($n), ty: $name::ty() },)+
@@ -337,10 +280,6 @@ tuple_impls! {
 }
 
 impl CandidType for std::time::SystemTime {
-    fn id() -> TypeId {
-        TypeId::of::<std::time::SystemTime>()
-    }
-
     fn _ty() -> Type {
         Type::Record(vec![
             Field {
@@ -353,7 +292,6 @@ impl CandidType for std::time::SystemTime {
             },
         ])
     }
-
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
         S: Serializer,
@@ -376,10 +314,6 @@ impl CandidType for std::time::SystemTime {
 }
 
 impl CandidType for std::time::Duration {
-    fn id() -> TypeId {
-        TypeId::of::<std::time::Duration>()
-    }
-
     fn _ty() -> Type {
         Type::Record(vec![
             Field {
@@ -392,7 +326,6 @@ impl CandidType for std::time::Duration {
             },
         ])
     }
-
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
         S: Serializer,
