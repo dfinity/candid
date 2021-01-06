@@ -460,6 +460,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             return self.deserialize_identifier(visitor);
         }
         let t = self.peek_type()?;
+        if t != Opcode::Record {
+            self.record_nesting_depth = 0;
+        }
         match t {
             Opcode::Int => self.deserialize_int(visitor),
             Opcode::Nat => self.deserialize_nat(visitor),
@@ -497,6 +500,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             return self.deserialize_identifier(visitor);
         }
         let t = self.peek_type()?;
+        if t != Opcode::Record {
+            self.record_nesting_depth = 0;
+        }
         match t {
             Opcode::Int => self.deserialize_int(visitor),
             Opcode::Nat => self.deserialize_nat(visitor),
