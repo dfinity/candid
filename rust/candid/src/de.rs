@@ -345,6 +345,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.check_type(Opcode::Int)?;
         let v = Int::decode(&mut self.input).map_err(Error::msg)?;
         let bytes = v.0.to_signed_bytes_le();
@@ -356,6 +357,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.check_type(Opcode::Nat)?;
         let v = Nat::decode(&mut self.input).map_err(Error::msg)?;
         let bytes = v.0.to_bytes_le();
@@ -375,6 +377,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.check_type(Opcode::Principal)?;
         let vec = self.decode_principal()?;
         let mut tagged = vec![2u8];
@@ -385,6 +388,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.check_type(Opcode::Service)?;
         self.pop_current_type()?;
         let vec = self.decode_principal()?;
@@ -396,6 +400,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.check_type(Opcode::Func)?;
         self.pop_current_type()?;
         let bit = self.parse_byte()?;
@@ -416,6 +421,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.check_type(Opcode::Reserved)?;
         let tagged = vec![3u8];
         visitor.visit_byte_buf(tagged)
@@ -433,6 +439,7 @@ macro_rules! primitive_impl {
         paste::item! {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
+                self.record_nesting_depth = 0;
                 self.check_type($opcode)?;
                 let value = self.input.$($value)*().map_err(|_| Error::msg(format!("cannot read {} value", stringify!($opcode))))?;
                 visitor.[<visit_ $ty>](value)
@@ -536,6 +543,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 res
             }
             Opcode::Variant => {
+                self.record_nesting_depth = 0;
                 self.check_type(Opcode::Variant)?;
                 let len = self.pop_current_type()?.get_u32()?;
                 let mut fs = BTreeMap::new();
@@ -568,6 +576,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.check_type(Opcode::Bool)?;
         let byte = self.parse_byte()?;
         if byte > 1u8 {
@@ -581,6 +590,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.check_type(Opcode::Text)?;
         let len = self.leb128_read()? as usize;
         let value = self.parse_string(len)?;
@@ -591,6 +601,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.check_type(Opcode::Text)?;
         let len = self.leb128_read()? as usize;
         let value: Result<&str> =
@@ -603,6 +614,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.check_type(Opcode::Opt)?;
         let bit = self.parse_byte()?;
         if bit == 0u8 {
@@ -619,6 +631,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.check_type(Opcode::Null)?;
         visitor.visit_unit()
     }
@@ -626,6 +639,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.deserialize_unit(visitor)
     }
     fn deserialize_newtype_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
@@ -638,6 +652,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         match self.parse_type()? {
             Opcode::Vec => {
                 let len = self.leb128_read()?;
@@ -657,6 +672,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.deserialize_seq(visitor)
     }
     fn deserialize_tuple_struct<V>(
@@ -668,6 +684,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.deserialize_seq(visitor)
     }
     fn deserialize_struct<V>(
@@ -706,6 +723,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.record_nesting_depth = 0;
         self.check_type(Opcode::Variant)?;
         let len = self.pop_current_type()?.get_u32()?;
         let mut fs = BTreeMap::new();
