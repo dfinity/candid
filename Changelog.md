@@ -1,6 +1,19 @@
 
 # Changelog
 
+## 2021-01-06
+
+### Rust (0.6.12)
+
+* Support reference types
+* Support more native Rust types: HashMap, HashSet, BTreeMap, BTreeSet, i128, u128
+* Bug fix for empty record detection when deserializing to native Rust types
+
+### Other
+
+* Test suites for reference types
+* `didc encode` supports outputing blob format
+
 ## 2020-12-07
 
 ### Spec
