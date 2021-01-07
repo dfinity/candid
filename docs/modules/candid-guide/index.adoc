@@ -93,7 +93,7 @@ The method `reverse` expects a single parameter of type `text` and returns one v
 
 The method `divMod` expects and returns two values, all of type `int`. In its signature, we use the ability to name the parameters and result values.
 
-CAUTION
+[CAUTION]
 ====
 Naming the parameters or results of a method is purely for documentation purposes, but does not actually change the method’s type, or the values being passed. Parameter and results are identified by their _position_, independent of the name.
 
