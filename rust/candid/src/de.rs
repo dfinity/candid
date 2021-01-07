@@ -572,6 +572,30 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     primitive_impl!(f32, Opcode::Float32, read_f32::<LittleEndian>);
     primitive_impl!(f64, Opcode::Float64, read_f64::<LittleEndian>);
 
+    fn deserialize_i128<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        use std::convert::TryInto;
+        self.record_nesting_depth = 0;
+        self.check_type(Opcode::Int)?;
+        let v = Int::decode(&mut self.input).map_err(Error::msg)?;
+        let value: i128 = v.0.try_into().map_err(Error::msg)?;
+        visitor.visit_i128(value)
+    }
+
+    fn deserialize_u128<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        use std::convert::TryInto;
+        self.record_nesting_depth = 0;
+        self.check_type(Opcode::Nat)?;
+        let v = Nat::decode(&mut self.input).map_err(Error::msg)?;
+        let value: u128 = v.0.try_into().map_err(Error::msg)?;
+        visitor.visit_u128(value)
+    }
+
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,

@@ -75,12 +75,14 @@ fn test_fixed_number() {
     all_check(42u32, "4449444c0001792a000000");
     all_check(42u64, "4449444c0001782a00000000000000");
     all_check(42usize, "4449444c0001782a00000000000000");
+    all_check(42u128, "4449444c00017d2a");
     all_check(42i8, "4449444c0001772a");
     all_check(42i16, "4449444c0001762a00");
     all_check(42i32, "4449444c0001752a000000");
     all_check(42i64, "4449444c0001742a00000000000000");
     all_check(-42i64, "4449444c000174d6ffffffffffffff");
     all_check(-42isize, "4449444c000174d6ffffffffffffff");
+    all_check(42i128, "4449444c00017c2a");
 }
 
 #[test]

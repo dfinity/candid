@@ -34,6 +34,29 @@ primitive_impl!(f64, Float64, serialize_float64);
 primitive_impl!(isize, Int64, serialize_int64 as i64);
 primitive_impl!(usize, Nat64, serialize_nat64 as u64);
 
+impl CandidType for i128 {
+    fn _ty() -> Type {
+        Type::Int
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_int(&crate::Int::from(*self))
+    }
+}
+impl CandidType for u128 {
+    fn _ty() -> Type {
+        Type::Nat
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_nat(&crate::Nat::from(*self))
+    }
+}
+
 impl CandidType for String {
     fn _ty() -> Type {
         Type::Text
