@@ -32,7 +32,9 @@ pub trait CandidType {
             t
         }
     }
-    fn id() -> TypeId;
+    fn id() -> TypeId {
+        TypeId::of::<Self>()
+    }
     fn _ty() -> Type;
     // only serialize the value encoding
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
