@@ -350,8 +350,8 @@ fn test_vector() {
 }
 
 #[test]
-fn test_hashmap() {
-    use std::collections::{BTreeMap, HashMap};
+fn test_collection() {
+    use std::collections::{BTreeMap, BTreeSet, HashMap};
     let map: HashMap<_, _> = vec![("a".to_string(), 1)].into_iter().collect();
     all_check(map, "4449444c026d016c0200710175010001016101000000");
     let bmap: BTreeMap<_, _> = vec![(1, 101), (2, 102), (3, 103)].into_iter().collect();
@@ -359,6 +359,8 @@ fn test_hashmap() {
         bmap,
         "4449444c026d016c0200750175010003010000006500000002000000660000000300000067000000",
     );
+    let bset: BTreeSet<_> = vec![1, 2, 3].into_iter().collect();
+    all_check(bset, "4449444c016d75010003010000000200000003000000");
 }
 
 #[test]

@@ -133,10 +133,35 @@ macro_rules! map_impl {
         }
     }
 }
-use std::collections::{BTreeMap, HashMap};
+macro_rules! set_impl {
+    ($ty:ident < K $(: $kbound1:ident $(+ $kbound2:ident)*)* $(, $typaram:ident : $bound:ident)* >) => {
+        impl<K $(, $typaram)*> CandidType for $ty<K $(, $typaram)*>
+        where
+            K: CandidType $(+ $kbound1 $(+ $kbound2)*)*,
+            $($typaram: $bound,)*
+        {
+            fn _ty() -> Type {
+                Type::Vec(Box::new(K::ty()))
+            }
+            fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+            where
+                S: Serializer,
+            {
+                let mut ser = serializer.serialize_vec(self.len())?;
+                for e in self.iter() {
+                    Compound::serialize_element(&mut ser, &e)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{BuildHasher, Hash};
 map_impl!(BTreeMap<K: Ord, V>);
+set_impl!(BTreeSet<K: Ord>);
 map_impl!(HashMap<K: Eq + Hash, V, H: BuildHasher>);
+set_impl!(HashSet<K: Eq + Hash, H: BuildHasher>);
 
 macro_rules! array_impls {
     ($($len:tt)+) => {
