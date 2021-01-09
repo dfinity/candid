@@ -9,6 +9,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
 
+const MAX_ELEMENTS_FOR_PRETTY_PRINT: usize = 10;
+
 #[derive(PartialEq, Clone)]
 pub enum IDLValue {
     Bool(bool),
@@ -139,7 +141,11 @@ impl fmt::Display for IDLArgs {
 
 impl fmt::Display for IDLValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", pretty::pp_value(&self).pretty(80))
+        write!(
+            f,
+            "{}",
+            pretty::pp_value(MAX_ELEMENTS_FOR_PRETTY_PRINT, &self).pretty(80)
+        )
     }
 }
 
@@ -352,17 +358,17 @@ pub mod pretty {
         }
     }
 
-    fn pp_field(field: &IDLField, is_variant: bool) -> RcDoc {
+    fn pp_field(depth: usize, field: &IDLField, is_variant: bool) -> RcDoc {
         let val_doc = if is_variant && field.val == IDLValue::Null {
             RcDoc::nil()
         } else {
-            kwd(" =").append(pp_value(&field.val))
+            kwd(" =").append(pp_value(depth - 1, &field.val))
         };
         pp_label(&field.id).append(val_doc)
     }
 
-    fn pp_fields(fields: &[IDLField]) -> RcDoc {
-        let fs = concat(fields.iter().map(|f| pp_field(f, false)), ";");
+    fn pp_fields(depth: usize, fields: &[IDLField]) -> RcDoc {
+        let fs = concat(fields.iter().map(|f| pp_field(depth, f, false)), ";");
         enclose_space("{", fs, "}")
     }
 
@@ -374,41 +380,49 @@ pub mod pretty {
         }
     }
 
-    const MAX_ELEMENTS_FOR_PRETTY_PRINT: usize = 10;
-
-    pub fn pp_value(v: &IDLValue) -> RcDoc {
+    pub fn pp_value(depth: usize, v: &IDLValue) -> RcDoc {
         use super::IDLValue::*;
+        if depth == 0 {
+            return RcDoc::as_string(format!("{:?}", v));
+        }
         match v {
             Null | None | Reserved | Bool(_) | Number(_) | Int(_) | Nat(_) | Nat8(_) | Nat16(_)
             | Nat32(_) | Nat64(_) | Int8(_) | Int16(_) | Int32(_) | Int64(_) | Float32(_)
             | Float64(_) | Principal(_) | Service(_) => RcDoc::as_string(format!("{:?}", v)),
             Text(ref s) => RcDoc::as_string(format!("\"{}\"", s)),
             Func(id, meth) => RcDoc::as_string(format!("func \"{}\".", id)).append(pp_text(meth)),
-            Opt(v) => kwd("opt").append(pp_value(v)),
+            Opt(v) => kwd("opt").append(pp_value(depth - 1, v)),
             Vec(vs) => {
                 if let Some(Nat8(_)) = vs.first() {
                     RcDoc::as_string(format!("{:?}", v))
                 } else if vs.len() > MAX_ELEMENTS_FOR_PRETTY_PRINT {
                     RcDoc::as_string(format!("{:?}", v))
                 } else {
-                    let body = concat(vs.iter().map(|v| pp_value(v)), ";");
+                    let body = concat(vs.iter().map(|v| pp_value(depth - 1, v)), ";");
                     kwd("vec").append(enclose_space("{", body, "}"))
                 }
             }
             Record(fields) => {
                 if is_tuple(v) {
-                    let tuple = concat(fields.iter().map(|f| pp_value(&f.val)), ";");
+                    let tuple = concat(fields.iter().map(|f| pp_value(depth - 1, &f.val)), ";");
                     kwd("record").append(enclose_space("{", tuple, "}"))
                 } else {
-                    kwd("record").append(pp_fields(&fields))
+                    kwd("record").append(pp_fields(depth, &fields))
                 }
             }
-            Variant(v, _) => kwd("variant").append(enclose_space("{", pp_field(&v, true), "}")),
+            Variant(v, _) => {
+                kwd("variant").append(enclose_space("{", pp_field(depth, &v, true), "}"))
+            }
         }
     }
 
     pub fn pp_args(args: &IDLArgs) -> RcDoc {
-        let body = concat(args.args.iter().map(pp_value), ",");
+        let body = concat(
+            args.args
+                .iter()
+                .map(|v| pp_value(MAX_ELEMENTS_FOR_PRETTY_PRINT, v)),
+            ",",
+        );
         enclose("(", body, ")")
     }
 }
@@ -472,12 +486,24 @@ impl fmt::Debug for IDLValue {
             }
             Record(fs) => {
                 write!(f, "record {{")?;
-                for e in fs.iter() {
-                    write!(f, " {:?};", e)?;
+                for (i, e) in fs.iter().enumerate() {
+                    if e.id.get_id() == i as u32 {
+                        write!(f, " {:?};", e.val)?;
+                    } else {
+                        write!(f, " {:?};", e)?;
+                    }
                 }
                 write!(f, "}}")
             }
-            Variant(v, _) => write!(f, "variant {{ {:?}}}", v),
+            Variant(v, _) => {
+                write!(f, "variant {{ ")?;
+                if v.val == Null {
+                    write!(f, "{}", v.id)?;
+                } else {
+                    write!(f, "{:?}", v)?;
+                }
+                write!(f, " }}")
+            }
         }
     }
 }
