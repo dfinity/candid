@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub enum IDLValue {
     Bool(bool),
     Null,
@@ -39,13 +39,13 @@ pub enum IDLValue {
     Reserved,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct IDLField {
     pub id: Label,
     pub val: IDLValue,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct IDLArgs {
     pub args: Vec<IDLValue>,
 }
@@ -335,9 +335,10 @@ pub mod pretty {
     use ::pretty::RcDoc;
 
     pub use crate::bindings::candid::pp_label;
+    use crate::bindings::candid::pp_text;
 
     // The definition of tuple is language specific.
-    fn is_tuple(t: &IDLValue) -> bool {
+    pub(crate) fn is_tuple(t: &IDLValue) -> bool {
         match t {
             IDLValue::Record(ref fs) => {
                 for (i, field) in fs.iter().enumerate() {
@@ -377,28 +378,12 @@ pub mod pretty {
 
     pub fn pp_value(v: &IDLValue) -> RcDoc {
         use super::IDLValue::*;
-        match &*v {
-            Null => RcDoc::as_string("null"),
-            Bool(b) => RcDoc::as_string(b),
-            Number(ref s) => RcDoc::as_string(s),
-            Int(ref i) => RcDoc::as_string(i),
-            Nat(ref n) => RcDoc::as_string(n),
-            Nat8(n) => RcDoc::as_string(n),
-            Nat16(n) => RcDoc::text(pp_num_str(&n.to_string())),
-            Nat32(n) => RcDoc::text(pp_num_str(&n.to_string())),
-            Nat64(n) => RcDoc::text(pp_num_str(&n.to_string())),
-            Int8(n) => RcDoc::as_string(n),
-            Int16(n) => RcDoc::text(pp_num_str(&n.to_string())),
-            Int32(n) => RcDoc::text(pp_num_str(&n.to_string())),
-            Int64(n) => RcDoc::text(pp_num_str(&n.to_string())),
-            Float32(n) => RcDoc::as_string(n),
-            Float64(n) => RcDoc::as_string(n),
+        match v {
+            Null | None | Reserved | Bool(_) | Number(_) | Int(_) | Nat(_) | Nat8(_) | Nat16(_)
+            | Nat32(_) | Nat64(_) | Int8(_) | Int16(_) | Int32(_) | Int64(_) | Float32(_)
+            | Float64(_) | Principal(_) | Service(_) => RcDoc::as_string(format!("{:?}", v)),
             Text(ref s) => RcDoc::as_string(format!("\"{}\"", s)),
-            None => RcDoc::as_string("null"),
-            Reserved => RcDoc::as_string("reserved"),
-            Principal(ref id) => RcDoc::as_string(format!("principal \"{}\"", id)),
-            Service(ref id) => RcDoc::as_string(format!("service \"{}\"", id)),
-            Func(ref id, ref meth) => RcDoc::as_string(format!("func \"{}\".\"{}\"", id, meth)),
+            Func(id, meth) => RcDoc::as_string(format!("func \"{}\".", id)).append(pp_text(meth)),
             Opt(v) => kwd("opt").append(pp_value(v)),
             Vec(vs) => {
                 if let Some(Nat8(_)) = vs.first() {
@@ -437,6 +422,80 @@ pub mod pretty {
     pub fn pp_args(args: &IDLArgs) -> RcDoc {
         let body = concat(args.args.iter().map(pp_value), ",");
         enclose("(", body, ")")
+    }
+}
+
+impl fmt::Debug for IDLArgs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.args.len() == 1 {
+            write!(f, "({:?})", self.args[0])
+        } else {
+            let mut tup = f.debug_tuple("");
+            for arg in self.args.iter() {
+                tup.field(arg);
+            }
+            tup.finish()
+        }
+    }
+}
+impl fmt::Debug for IDLValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use IDLValue::*;
+        match self {
+            Null => write!(f, "null"),
+            Bool(b) => write!(f, "{}", b),
+            Number(n) => write!(f, "{}", n),
+            Int(i) => write!(f, "{}", i),
+            Nat(n) => write!(f, "{}", n),
+            Nat8(n) => write!(f, "{}", n),
+            Nat16(n) => write!(f, "{}", pp_num_str(&n.to_string())),
+            Nat32(n) => write!(f, "{}", pp_num_str(&n.to_string())),
+            Nat64(n) => write!(f, "{}", pp_num_str(&n.to_string())),
+            Int8(n) => write!(f, "{}", n),
+            Int16(n) => write!(f, "{}", pp_num_str(&n.to_string())),
+            Int32(n) => write!(f, "{}", pp_num_str(&n.to_string())),
+            Int64(n) => write!(f, "{}", pp_num_str(&n.to_string())),
+            Float32(n) => write!(f, "{}", n),
+            Float64(n) => write!(f, "{}", n),
+            Text(s) => write!(f, "\"{:?}\"", s),
+            None => write!(f, "null"),
+            Reserved => write!(f, "reserved"),
+            Principal(id) => write!(f, "principal \"{}\"", id),
+            Service(id) => write!(f, "service \"{}\"", id),
+            Func(id, meth) => write!(f, "func \"{}\".\"{}\"", id, meth),
+            Opt(v) => write!(f, "opt {:?}", v),
+            Vec(vs) => {
+                if let Some(Nat8(_)) = vs.first() {
+                    write!(f, "blob \"")?;
+                    for v in vs.iter() {
+                        match v {
+                            Nat8(v) => write!(f, "{}", &pretty::pp_char(*v))?,
+                            _ => unreachable!(),
+                        }
+                    }
+                    write!(f, "\"")
+                } else {
+                    write!(f, "vec {{")?;
+                    for v in vs.iter() {
+                        write!(f, " {:?};", v)?
+                    }
+                    write!(f, "}}")
+                }
+            }
+            Record(fs) => {
+                write!(f, "record {{")?;
+                for e in fs.iter() {
+                    write!(f, " {:?};", e)?;
+                }
+                write!(f, "}}")
+            }
+            Variant(v, _) => write!(f, "variant {{ {:?}}}", v),
+        }
+    }
+}
+impl fmt::Debug for IDLField {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} = {:?}", self.id, self.val)
     }
 }
 

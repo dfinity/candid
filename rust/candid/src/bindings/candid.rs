@@ -59,7 +59,7 @@ fn needs_quote(id: &str) -> bool {
     !is_valid_as_id(id) || is_keyword(id)
 }
 
-fn pp_text(id: &str) -> RcDoc {
+pub(crate) fn pp_text(id: &str) -> RcDoc {
     if needs_quote(id) {
         str("\"")
             .append(format!("{}", id.escape_debug()))

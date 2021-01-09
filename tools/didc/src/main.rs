@@ -48,6 +48,9 @@ enum Command {
         blob: String,
         #[structopt(flatten)]
         annotate: TypeAnnotation,
+        #[structopt(short, long)]
+        /// Pretty print the result
+        pretty: bool,
     },
     /// Diff two Candid values
     Diff {
@@ -184,7 +187,11 @@ fn main() -> Result<()> {
             };
             println!("{}", hex);
         }
-        Command::Decode { blob, annotate } => {
+        Command::Decode {
+            blob,
+            annotate,
+            pretty,
+        } => {
             let bytes = hex::decode(&blob)?;
             let value = if annotate.is_empty() {
                 IDLArgs::from_bytes(&bytes)?
@@ -192,7 +199,11 @@ fn main() -> Result<()> {
                 let (env, types) = annotate.get_types(Mode::Decode)?;
                 IDLArgs::from_bytes_with_types(&bytes, &env, &types)?
             };
-            println!("{}", value);
+            if pretty {
+                println!("{}", value);
+            } else {
+                println!("{:?}", value);
+            }
         }
         Command::Diff {
             values1,
