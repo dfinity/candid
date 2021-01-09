@@ -341,7 +341,6 @@ pub mod pretty {
     use ::pretty::RcDoc;
 
     pub use crate::bindings::candid::pp_label;
-    use crate::bindings::candid::pp_text;
 
     // The definition of tuple is language specific.
     pub(crate) fn is_tuple(t: &IDLValue) -> bool {
@@ -386,11 +385,27 @@ pub mod pretty {
             return RcDoc::as_string(format!("{:?}", v));
         }
         match v {
-            Null | None | Reserved | Bool(_) | Number(_) | Int(_) | Nat(_) | Nat8(_) | Nat16(_)
-            | Nat32(_) | Nat64(_) | Int8(_) | Int16(_) | Int32(_) | Int64(_) | Float32(_)
-            | Float64(_) | Principal(_) | Service(_) => RcDoc::as_string(format!("{:?}", v)),
+            Null
+            | None
+            | Reserved
+            | Bool(_)
+            | Number(_)
+            | Int(_)
+            | Nat(_)
+            | Nat8(_)
+            | Nat16(_)
+            | Nat32(_)
+            | Nat64(_)
+            | Int8(_)
+            | Int16(_)
+            | Int32(_)
+            | Int64(_)
+            | Float32(_)
+            | Float64(_)
+            | Principal(_)
+            | Service(_)
+            | Func(_, _) => RcDoc::as_string(format!("{:?}", v)),
             Text(ref s) => RcDoc::as_string(format!("\"{}\"", s)),
-            Func(id, meth) => RcDoc::as_string(format!("func \"{}\".", id)).append(pp_text(meth)),
             Opt(v) => kwd("opt").append(pp_value(depth - 1, v)),
             Vec(vs) => {
                 if let Some(Nat8(_)) = vs.first() {
@@ -464,7 +479,12 @@ impl fmt::Debug for IDLValue {
             Reserved => write!(f, "reserved"),
             Principal(id) => write!(f, "principal \"{}\"", id),
             Service(id) => write!(f, "service \"{}\"", id),
-            Func(id, meth) => write!(f, "func \"{}\".\"{}\"", id, meth),
+            Func(id, meth) => write!(
+                f,
+                "func \"{}\".{}",
+                id,
+                crate::bindings::candid::ident_string(meth)
+            ),
             Opt(v) => write!(f, "opt {:?}", v),
             Vec(vs) => {
                 if let Some(Nat8(_)) = vs.first() {
