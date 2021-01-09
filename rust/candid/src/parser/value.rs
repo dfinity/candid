@@ -385,26 +385,6 @@ pub mod pretty {
             return RcDoc::as_string(format!("{:?}", v));
         }
         match v {
-            Null
-            | None
-            | Reserved
-            | Bool(_)
-            | Number(_)
-            | Int(_)
-            | Nat(_)
-            | Nat8(_)
-            | Nat16(_)
-            | Nat32(_)
-            | Nat64(_)
-            | Int8(_)
-            | Int16(_)
-            | Int32(_)
-            | Int64(_)
-            | Float32(_)
-            | Float64(_)
-            | Principal(_)
-            | Service(_)
-            | Func(_, _) => RcDoc::as_string(format!("{:?}", v)),
             Text(ref s) => RcDoc::as_string(format!("\"{}\"", s)),
             Opt(v) => kwd("opt").append(pp_value(depth - 1, v)),
             Vec(vs) => {
@@ -428,6 +408,7 @@ pub mod pretty {
             Variant(v, _) => {
                 kwd("variant").append(enclose_space("{", pp_field(depth, &v, true), "}"))
             }
+            _ => RcDoc::as_string(format!("{:?}", v)),
         }
     }
 
