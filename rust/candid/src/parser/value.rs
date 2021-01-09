@@ -387,21 +387,9 @@ pub mod pretty {
             Opt(v) => kwd("opt").append(pp_value(v)),
             Vec(vs) => {
                 if let Some(Nat8(_)) = vs.first() {
-                    let mut s = String::new();
-                    for v in vs.iter() {
-                        match v {
-                            Nat8(v) => s.push_str(&pp_char(*v)),
-                            _ => unreachable!(),
-                        }
-                    }
-                    RcDoc::text(format!("blob \"{}\"", s))
+                    RcDoc::as_string(format!("{:?}", v))
                 } else if vs.len() > MAX_ELEMENTS_FOR_PRETTY_PRINT {
-                    let body = vs
-                        .iter()
-                        .map(|v| v.to_string())
-                        .collect::<std::vec::Vec<_>>()
-                        .join("; ");
-                    RcDoc::text(format!("vec {{ {} }}", body))
+                    RcDoc::as_string(format!("{:?}", v))
                 } else {
                     let body = concat(vs.iter().map(|v| pp_value(v)), ";");
                     kwd("vec").append(enclose_space("{", body, "}"))
