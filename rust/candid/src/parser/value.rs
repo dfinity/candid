@@ -9,7 +9,9 @@ use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
 
-#[derive(Debug, PartialEq, Clone)]
+const MAX_ELEMENTS_FOR_PRETTY_PRINT: usize = 10;
+
+#[derive(PartialEq, Clone)]
 pub enum IDLValue {
     Bool(bool),
     Null,
@@ -39,13 +41,13 @@ pub enum IDLValue {
     Reserved,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct IDLField {
     pub id: Label,
     pub val: IDLValue,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct IDLArgs {
     pub args: Vec<IDLValue>,
 }
@@ -139,7 +141,11 @@ impl fmt::Display for IDLArgs {
 
 impl fmt::Display for IDLValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", pretty::pp_value(&self).pretty(80))
+        write!(
+            f,
+            "{}",
+            pretty::pp_value(MAX_ELEMENTS_FOR_PRETTY_PRINT, &self).pretty(80)
+        )
     }
 }
 
@@ -337,7 +343,7 @@ pub mod pretty {
     pub use crate::bindings::candid::pp_label;
 
     // The definition of tuple is language specific.
-    fn is_tuple(t: &IDLValue) -> bool {
+    pub(crate) fn is_tuple(t: &IDLValue) -> bool {
         match t {
             IDLValue::Record(ref fs) => {
                 for (i, field) in fs.iter().enumerate() {
@@ -351,17 +357,17 @@ pub mod pretty {
         }
     }
 
-    fn pp_field(field: &IDLField, is_variant: bool) -> RcDoc {
+    fn pp_field(depth: usize, field: &IDLField, is_variant: bool) -> RcDoc {
         let val_doc = if is_variant && field.val == IDLValue::Null {
             RcDoc::nil()
         } else {
-            kwd(" =").append(pp_value(&field.val))
+            kwd(" =").append(pp_value(depth - 1, &field.val))
         };
         pp_label(&field.id).append(val_doc)
     }
 
-    fn pp_fields(fields: &[IDLField]) -> RcDoc {
-        let fs = concat(fields.iter().map(|f| pp_field(f, false)), ";");
+    fn pp_fields(depth: usize, fields: &[IDLField]) -> RcDoc {
+        let fs = concat(fields.iter().map(|f| pp_field(depth, f, false)), ";");
         enclose_space("{", fs, "}")
     }
 
@@ -373,70 +379,138 @@ pub mod pretty {
         }
     }
 
-    const MAX_ELEMENTS_FOR_PRETTY_PRINT: usize = 10;
-
-    pub fn pp_value(v: &IDLValue) -> RcDoc {
+    pub fn pp_value(depth: usize, v: &IDLValue) -> RcDoc {
         use super::IDLValue::*;
-        match &*v {
-            Null => RcDoc::as_string("null"),
-            Bool(b) => RcDoc::as_string(b),
-            Number(ref s) => RcDoc::as_string(s),
-            Int(ref i) => RcDoc::as_string(i),
-            Nat(ref n) => RcDoc::as_string(n),
-            Nat8(n) => RcDoc::as_string(n),
-            Nat16(n) => RcDoc::text(pp_num_str(&n.to_string())),
-            Nat32(n) => RcDoc::text(pp_num_str(&n.to_string())),
-            Nat64(n) => RcDoc::text(pp_num_str(&n.to_string())),
-            Int8(n) => RcDoc::as_string(n),
-            Int16(n) => RcDoc::text(pp_num_str(&n.to_string())),
-            Int32(n) => RcDoc::text(pp_num_str(&n.to_string())),
-            Int64(n) => RcDoc::text(pp_num_str(&n.to_string())),
-            Float32(n) => RcDoc::as_string(n),
-            Float64(n) => RcDoc::as_string(n),
+        if depth == 0 {
+            return RcDoc::as_string(format!("{:?}", v));
+        }
+        match v {
             Text(ref s) => RcDoc::as_string(format!("\"{}\"", s)),
-            None => RcDoc::as_string("null"),
-            Reserved => RcDoc::as_string("reserved"),
-            Principal(ref id) => RcDoc::as_string(format!("principal \"{}\"", id)),
-            Service(ref id) => RcDoc::as_string(format!("service \"{}\"", id)),
-            Func(ref id, ref meth) => RcDoc::as_string(format!("func \"{}\".\"{}\"", id, meth)),
-            Opt(v) => kwd("opt").append(pp_value(v)),
+            Opt(v) => kwd("opt").append(pp_value(depth - 1, v)),
             Vec(vs) => {
                 if let Some(Nat8(_)) = vs.first() {
-                    let mut s = String::new();
-                    for v in vs.iter() {
-                        match v {
-                            Nat8(v) => s.push_str(&pp_char(*v)),
-                            _ => unreachable!(),
-                        }
-                    }
-                    RcDoc::text(format!("blob \"{}\"", s))
+                    RcDoc::as_string(format!("{:?}", v))
                 } else if vs.len() > MAX_ELEMENTS_FOR_PRETTY_PRINT {
-                    let body = vs
-                        .iter()
-                        .map(|v| v.to_string())
-                        .collect::<std::vec::Vec<_>>()
-                        .join("; ");
-                    RcDoc::text(format!("vec {{ {} }}", body))
+                    RcDoc::as_string(format!("{:?}", v))
                 } else {
-                    let body = concat(vs.iter().map(|v| pp_value(v)), ";");
+                    let body = concat(vs.iter().map(|v| pp_value(depth - 1, v)), ";");
                     kwd("vec").append(enclose_space("{", body, "}"))
                 }
             }
             Record(fields) => {
                 if is_tuple(v) {
-                    let tuple = concat(fields.iter().map(|f| pp_value(&f.val)), ";");
+                    let tuple = concat(fields.iter().map(|f| pp_value(depth - 1, &f.val)), ";");
                     kwd("record").append(enclose_space("{", tuple, "}"))
                 } else {
-                    kwd("record").append(pp_fields(&fields))
+                    kwd("record").append(pp_fields(depth, &fields))
                 }
             }
-            Variant(v, _) => kwd("variant").append(enclose_space("{", pp_field(&v, true), "}")),
+            Variant(v, _) => {
+                kwd("variant").append(enclose_space("{", pp_field(depth, &v, true), "}"))
+            }
+            _ => RcDoc::as_string(format!("{:?}", v)),
         }
     }
 
     pub fn pp_args(args: &IDLArgs) -> RcDoc {
-        let body = concat(args.args.iter().map(pp_value), ",");
+        let body = concat(
+            args.args
+                .iter()
+                .map(|v| pp_value(MAX_ELEMENTS_FOR_PRETTY_PRINT, v)),
+            ",",
+        );
         enclose("(", body, ")")
+    }
+}
+
+impl fmt::Debug for IDLArgs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.args.len() == 1 {
+            write!(f, "({:?})", self.args[0])
+        } else {
+            let mut tup = f.debug_tuple("");
+            for arg in self.args.iter() {
+                tup.field(arg);
+            }
+            tup.finish()
+        }
+    }
+}
+impl fmt::Debug for IDLValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use IDLValue::*;
+        match self {
+            Null => write!(f, "null"),
+            Bool(b) => write!(f, "{}", b),
+            Number(n) => write!(f, "{}", n),
+            Int(i) => write!(f, "{}", i),
+            Nat(n) => write!(f, "{}", n),
+            Nat8(n) => write!(f, "{}", n),
+            Nat16(n) => write!(f, "{}", pp_num_str(&n.to_string())),
+            Nat32(n) => write!(f, "{}", pp_num_str(&n.to_string())),
+            Nat64(n) => write!(f, "{}", pp_num_str(&n.to_string())),
+            Int8(n) => write!(f, "{}", n),
+            Int16(n) => write!(f, "{}", pp_num_str(&n.to_string())),
+            Int32(n) => write!(f, "{}", pp_num_str(&n.to_string())),
+            Int64(n) => write!(f, "{}", pp_num_str(&n.to_string())),
+            Float32(n) => write!(f, "{}", n),
+            Float64(n) => write!(f, "{}", n),
+            Text(s) => write!(f, "{:?}", s),
+            None => write!(f, "null"),
+            Reserved => write!(f, "reserved"),
+            Principal(id) => write!(f, "principal \"{}\"", id),
+            Service(id) => write!(f, "service \"{}\"", id),
+            Func(id, meth) => write!(
+                f,
+                "func \"{}\".{}",
+                id,
+                crate::bindings::candid::ident_string(meth)
+            ),
+            Opt(v) => write!(f, "opt {:?}", v),
+            Vec(vs) => {
+                if let Some(Nat8(_)) = vs.first() {
+                    write!(f, "blob \"")?;
+                    for v in vs.iter() {
+                        match v {
+                            Nat8(v) => write!(f, "{}", &pretty::pp_char(*v))?,
+                            _ => unreachable!(),
+                        }
+                    }
+                    write!(f, "\"")
+                } else {
+                    write!(f, "vec {{")?;
+                    for v in vs.iter() {
+                        write!(f, " {:?};", v)?
+                    }
+                    write!(f, "}}")
+                }
+            }
+            Record(fs) => {
+                write!(f, "record {{")?;
+                for (i, e) in fs.iter().enumerate() {
+                    if e.id.get_id() == i as u32 {
+                        write!(f, " {:?};", e.val)?;
+                    } else {
+                        write!(f, " {:?};", e)?;
+                    }
+                }
+                write!(f, "}}")
+            }
+            Variant(v, _) => {
+                write!(f, "variant {{ ")?;
+                if v.val == Null {
+                    write!(f, "{}", v.id)?;
+                } else {
+                    write!(f, "{:?}", v)?;
+                }
+                write!(f, " }}")
+            }
+        }
+    }
+}
+impl fmt::Debug for IDLField {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} = {:?}", self.id, self.val)
     }
 }
 
