@@ -64,6 +64,7 @@ The philosophy behind this set of types is that they are sufficient to describe 
 
 Furthermore, the set of types is chosen to allow a resonably intuitive mapping to the respective host language (Motoko, Rust, JavaScript, etc.), thus settling on very canonic choices.
 
+[#candid-service-descriptions]
 === Candid service descriptions
 
 With these candid types, we now can describe a service. Such a service description file can be written by hand, but typically it is generated from the service implementation, as described later.
@@ -153,34 +154,296 @@ Services can safely evolve in the following ways:
  * Existing parameter types may be _changed_, but only to a _supertype_ of the previous type.
  * Existing result types may be _changed_, but only to a _subtype_ of the previous type.
 
-See the reference sections for what types are supertypes and subtypes of a given type.
+See the reference sections the supertypes and subtypes of a given type.
 
-TODO: Example.
+[TIP]
+====
+Consider a serivce with the following API:
+....
+service counter : {
+  add : (nat) -> ();
+  subtract : (nat) -> ();
+  get : () -> (int) query;
+  subscribe : (func (int) -> ()) -> ();
+}
+....
+This can evolve to the following interface:
+....
+type timestamp = nat;
+service counter : {
+  set : (nat) -> ();
+  add : (int) -> (new_val : nat);
+  subtract : (nat, trap_on_underflow : opt bool) -> (new_val : nat);
+  get : () -> (nat, last_change : timestamp) query;
+  subscribe : (func (nat) -> (unregister : opt bool)) -> ();
+}
+....
+====
 
-
+[#textual-values]
 === Candid textual values
+
+The main purpose of Candid is to connect programs written in some host language (Motoko, Rust, JavaScript, etc.), and developers therefore usually do not have to deal with “Candid values” per se: They work with, say, JavaScript values that are then, transparently and seamelessly, transported to a canister written in Rust, where they show up as Rust values.
+
+Nevertheless there are use cases where it is helpful to see the Candid values per se, e.g. for logging, debugging, or command-line interaction with services. In this cases, the _textual presentation_ for Candid values can be used.
+
+The syntax is similar to that of candid types. A typical candid value might read
+....
+(record {
+  first_name = "John";
+  last_name = "Doe";
+  age = 14;
+  membership_status = variant { active };
+  email_addresses =
+    vec { "john@doe.com"; "john.doe@example.com" };
+})
+....
+
+[NOTE]
+====
+The Candid _binary_ format does not include the actual field names, merely numeric _hashes_. So pretty-printing such a value without knowledge of the expected type will not include the field names of records and variants. The above value might then be printed as
+....
+(record {4846783 = 14; 456245371 = variant {373703110}; 1443915007 = vec {"john@doe.com"; "john.doe@example.com"}; 2797692922 = "John"; 3046132756 = "Doe"})
+....
+====
 
 === Generating service descriptions
 
-=== Other tools around candid
+In the <<candid-service-descriptions,section above>> you learned how to write a Candid service description from scratch. But often, that is not even needed! Depending on the language you use to implement your service, you can get the Candid service description generated from your code.
+
+For example, in Motoko, you can write a canister as
+....
+actor {
+  var v : Int = 0;
+  public func add(d : Nat) : async () { v += d; };
+  public func subtract(d : Nat) : async () { v -= d; };
+  public query func get() : async Int { v };
+  public func subscribe(handler : func (Int) -> async ()) { … }
+}
+....
+and it will have the interface shown above.
+
+In other languages, like Rust, you can still develop your service while only
+touching Rust types, but for now you still have to write the Candid interface description manually.
+
+In either case it is helpful to know the mapping between host language types and Candid types; this mapping is describeed in the <<reference, reference section>>.
+
+=== Candid tools and libraries
+
+The Motoko language has built-in support for Candid.
+
+To create Candid services or clients in Rust, you can use the https://crates.io/crates/candid[Candid crate].
+
+The https://github.com/dfinity/agent-js/[Internet Computer agent library for JavaScript] includes support for Candid.
+
+Community-supported libaries for Candid exist for https://hackage.haskell.org/package/candid[Haskell], https://github.com/chenyan2002/ic-elm/[Elm] and https://github.com/seniorjoinu/candid-kt[Kotlin].
+
+The https://github.com/dfinity/candid/tree/master/tools/ui[Candid UI] creates a Web interface from the Candid interface of any canister.
+
 
 [#how-do-i]
 == How do I…
 
+Now that you have a good overview of Candid and its various moving parts, this section gives you concrete instructions to achieve certain tasks.
+
 === Interact with canisters on the command line?
+
+The `dfx` tool provides the `dfx canister call` command, which understands <<textual-values,Candid textual values>>:
+....
+dfx canister call msgt2-6nlzx-xq add_entry ("John Doe", record { street = "Hauptstraße", city = "Zürich" })
+....
+
+See TODO to read more about how to use the `dfx` tool.
 
 === Interact with canisters via Candid UI?
 
 === Use Candid as a Motoko canister developer?
 
+If you are writing a service from scratch in Motoko, then you need to take no special actions: The Motoko compiler will translate the signature of your Canister’s top-level actor or actor class into a Candid description, and the `dfx` build tool will make sure it ends up where it needs to be.
+
+If you want to implement a _specific_ interface, for example because you want to interact with a service that expects your canister to have that interface, you can consult the 
+reference below to figure which Motoko types to use to achieve this effect. In the future, this will be simplified.
+
 === Use Candid as Rust canister developer?
+
+TODO: Someone who implements rust canisters should write this section.
 
 === Use Candid as a JavaScript front-end developer?
 
-=== Use Candid from other languages
+TODO: Someone who implements Frontends should write this section
 
 [#reference]
 == Reference
 
 This section lists all the types supported by Candid, including their type syntax, the syntax for the textual representation, their upgrading rules and the corresponding types in Rust, Motoko and Javascript.
+
+We only list the particular subtypes and supertypes in each section, and do not repeat everyt that that the type `empty` is a subtype of any type, and that the types `reserved` and `opt t` are supertypes of any types. See the sections on these types for more details.
+
+[#type-text]
+=== `text`
+
+The `text` type is used for human readable text. More precisely, its values are sequences of unicode code points (excluding surrogate parts).
+
+Type syntax::
+
+`text`
+
+Textual syntax::
+
+....
+""
+"Hello"
+"Escaped characters: \n \r \t \\ \" \'"
+"Unicode escapes: \u{2603} is ☃"
+"Raw bytes (must be utf8): \E2\98\83 is also ☃"
+....
+
+Corresponding Motoko type::
+
+`Text`
+
+Corresponding Rust type::
+
+`String`
+
+Corresponding JavaScript values::
+
+TODO:
+
+[#type-blob]
+=== `blob`
+
+The `blob` type can be used for binary data, i.e. sequences of bytes. It is interchangable with `vec nat8`, i.e. interfaces written in terms of `blob` and interfaces written in terms of `vec nat8` are compatible.
+
+Type syntax::
+
+`blob`
+
+Textual syntax::
+
+`blob <text>`, where `<text>` is a text literal (see <<type-text,above>>), with all characters representing their utf8 encoding, and arbitray byte sequences (`"\CA\FF\FE"`).
+
+Subtypes::
+
+`vec nat8`, and all subtypes of that.
+
+Supertypes::
+
+`vec nat8`, and all supertypes of that.
+
+Corresponding Motoko type::
+
+`Blob`
+
+Corresponding Rust type::
+
+`Vec<u8>`
+
+Corresponding JavaScript values::
+
+TODO:
+
+[#type-nat]
+=== `nat`
+
+[#type-int]
+=== `int`
+
+[#type-natN]
+[#type-intN]
+=== `natN` and `intN`
+
+[#type-bool]
+=== `bool`
+
+[#type-vec]
+=== `vec t`
+
+The `vec` type representes vectors (sequences, lists, arrays): A value of type `vec t` contains zero or more values of type `t` in a specific order
+
+Type syntax::
+
+`vec bool`, `vec nat8`, `vec vec text`,…
+
+Textual syntax::
+
+....
+vec {}
+vec { "john@doe.com"; "john.doe@example.com" };
+....
+
+Subtypes::
+
+* Whenever `t` is a subtype of `t'`, then `vec t` is a subtype of `vec t'`.
+* `blob` is a subtype of `vec nat8`
+
+Supertypes::
+
+* Whenever `t` is a supertype of `t'`, then `vec t` is a supertype of `vec t'`.
+* `blob` is a supertype of `vec nat8`
+
+Corresponding Motoko type::
+
+`[T]`, where the Motoko type `T` corresponds to `t`
+
+Corresponding Rust type::
+
+`Vec<T>`, where the Rust type `T` corresponds to `t`
+
+Corresponding JavaScript values::
+
+TODO:
+
+=== `opt`
+
+=== `record`
+
+=== `variant`
+
+=== `func`
+
+=== `service`
+
+=== `principal`
+
+=== `null`
+
+=== `reserved`
+
+=== `empty`
+
+The `empty` type is the type without values, and is the subtype of any other type.
+
+Type syntax::
+
+`empty`
+
+Textual syntax::
+
+None, as this type has no values
+
+Supertypes::
+
+Any type
+
+Corresponding Motoko type::
+
+`None`
+
+Corresponding Rust type::
+
+TODO
+
+Corresponding JavaScript values::
+
+TODO
+
+Practical uses of the `empty` type are relatively rare.
+It could be used to mark a method as “never returns successful”:
+....
+service : {
+  always_fails () -> (empty)
+}
+....
+
 
