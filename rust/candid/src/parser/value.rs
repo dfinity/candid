@@ -455,7 +455,7 @@ impl fmt::Debug for IDLValue {
             Int64(n) => write!(f, "{}", pp_num_str(&n.to_string())),
             Float32(n) => write!(f, "{}", n),
             Float64(n) => write!(f, "{}", n),
-            Text(s) => write!(f, "\"{:?}\"", s),
+            Text(s) => write!(f, "{:?}", s),
             None => write!(f, "null"),
             Reserved => write!(f, "reserved"),
             Principal(id) => write!(f, "principal \"{}\"", id),
