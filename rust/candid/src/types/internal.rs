@@ -4,6 +4,7 @@ use num_enum::TryFromPrimitive;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
+use crate::Deserialize;
 
 // This is a re-implementation of std::any::TypeId to get rid of 'static constraint.
 // The current TypeId doesn't consider lifetime while computing the hash, which is
@@ -212,7 +213,7 @@ impl fmt::Display for Type {
     }
 }
 
-#[derive(Debug, Eq, Clone)]
+#[derive(Debug, Eq, Clone, Deserialize)]
 pub enum Label {
     Id(u32),
     Named(String),

@@ -1,22 +1,33 @@
 use crate::types::Label;
 use crate::Result;
 use pretty::RcDoc;
+use crate::{CandidType, Deserialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq, Hash)]
 pub enum IDLType {
+    #[serde(rename(serialize = "prim", deserialize = "prim"))]
     PrimT(PrimType),
+    #[serde(rename(serialize = "var", deserialize = "var"))]
     VarT(String),
+    #[serde(rename(serialize = "func", deserialize = "func"))]
     FuncT(FuncType),
+    #[serde(rename(serialize = "opt", deserialize = "opt"))]
     OptT(Box<IDLType>),
+    #[serde(rename(serialize = "vec", deserialize = "vec"))]
     VecT(Box<IDLType>),
+    #[serde(rename(serialize = "record", deserialize = "record"))]
     RecordT(Vec<TypeField>),
+    #[serde(rename(serialize = "variant", deserialize = "variant"))]
     VariantT(Vec<TypeField>),
+    #[serde(rename(serialize = "service", deserialize = "service"))]
     ServT(Vec<Binding>),
+    #[serde(rename(serialize = "class", deserialize = "class"))]
     ClassT(Vec<IDLType>, Box<IDLType>),
+    #[serde(rename(serialize = "principal", deserialize = "principal"))]
     PrincipalT,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq, Hash)]
 pub struct IDLTypes {
     pub args: Vec<IDLType>,
 }
@@ -25,7 +36,7 @@ macro_rules! enum_to_doc {
     (pub enum $name:ident {
         $($variant:ident),*,
     }) => {
-        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
         pub enum $name {
             $($variant),*
         }
@@ -72,7 +83,7 @@ pub enum FuncMode {
     Query,
 }}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq, Hash)]
 pub struct FuncType {
     pub modes: Vec<FuncMode>,
     pub args: Vec<IDLType>,
@@ -90,25 +101,25 @@ impl FuncType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq, Hash)]
 pub struct TypeField {
     pub label: Label,
     pub typ: IDLType,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq, Hash)]
 pub enum Dec {
     TypD(Binding),
     ImportD(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq, Hash)]
 pub struct Binding {
     pub id: String,
     pub typ: IDLType,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq, Hash)]
 pub struct IDLProg {
     pub decs: Vec<Dec>,
     pub actor: Option<IDLType>,
