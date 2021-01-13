@@ -61,7 +61,7 @@ pub Arg: IDLValue = {
     },
     "null" => IDLValue::Null,
     "opt" <Arg> => IDLValue::Opt(Box::new(<>)),
-    "vec" "{" <SepBy<Arg, ";">> "}" => IDLValue::Vec(<>),
+    "vec" "{" <SepBy<AnnVal, ";">> "}" => IDLValue::Vec(<>),
     "record" "{" <Sp<SepBy<RecordField, ";">>> "}" =>? {
         let mut id: u32 = 0;
         let span = <>.1.clone();
@@ -144,8 +144,8 @@ FieldId: u32 = {
 }
 
 Field: IDLField = {
-    <n:FieldId> "=" <v:Arg> =>? Ok(IDLField { id: Label::Id(n), val: v }),
-    <n:Name> "=" <v:Arg> => IDLField { id: Label::Named(n), val: v },
+    <n:FieldId> "=" <v:AnnVal> =>? Ok(IDLField { id: Label::Id(n), val: v }),
+    <n:Name> "=" <v:AnnVal> => IDLField { id: Label::Named(n), val: v },
 }
 
 VariantField: IDLField = {
@@ -156,7 +156,7 @@ VariantField: IDLField = {
 
 RecordField: IDLField = {
     Field => <>,
-    Arg => IDLField { id: Label::Unnamed(0), val:<> },
+    AnnVal => IDLField { id: Label::Unnamed(0), val:<> },
 }
 
 // Type
