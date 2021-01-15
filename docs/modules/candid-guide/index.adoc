@@ -532,7 +532,7 @@ Type syntax::
 `vec bool`, `vec nat8`, `vec vec text`,…
 
 Textual syntax::
-
++
 ....
 vec {}
 vec { "john@doe.com"; "john.doe@example.com" };
@@ -659,10 +659,13 @@ Subtypes::
 Subtypes of a record are record types that have additional fields (of any type), where some field’s types are changed to subtypes, or where optional fields are removed. It is, however, bad practice to remove optional fields in method results; you can change their type to `opt empty` to indicate that this field is no longer used.
 +
 For example, if you have a function returning a record of type
++
 ....
 record { first_name : text; second_name : text; score : int }
 ....
++
 you can evolve that to a function returning a record of type
++
 ....
 record { first_name : text; second_name : text; score : nat; country : text }
 ....
@@ -675,10 +678,13 @@ Supertypes of a record are record types with any some fields removed, some field
 The latter is what allows you to extend your argument records with additional arguments. Clients using the old interface will not include the field in their record, which will decode as `null`.
 +
 For example, if you have a function expecting a record of type
++
 ....
 record { first_name : text; second_name : text; score : nat }
 ....
++
 you can evolve that to a function expecting a record of type
++
 ....
 record { first_name : text; score: int; country : opt text }
 ....
@@ -748,13 +754,17 @@ Subtypes::
 Subtypes of a variant type are variant types with some tags removed, and the type of some tags themselves changed to a subtype.
 +
 If you want to be able to _add_ new tags in variants in a method result, you can do so if the variant it itself wrapped in `opt …`. This requires planning ahead! When you design an interface, instead of writing
++
 ....
 service { get_member_status (member_id : nat) -> (variant {active; expired}); }
 ....
++
 better use
++
 ....
 service { get_member_status (member_id : nat) -> (opt variant {active; expired}); }
 ....
++
 This way, if you later need to add a `honory` membership status, you can expand the list of statuses. Old clients will receive unknown fields as `null`.
 
 Supertypes::
@@ -765,6 +775,7 @@ Supertypes of a variant types are variants with additional tags, and maybe the t
 Corresponding Motoko type::
 
 Variant types are represented as Motoko variant types, e.g.
++
 ....
 type Shape = {
   #dot : ();
@@ -773,6 +784,7 @@ type Shape = {
   #_2669435721_ : Text;
 };
 ....
++
 Note that if the type of a tag is `null`, this corresponds to `()` in Motoko, to preserve the mapping between the respecitve idiomatic ways to model enumerations as variants.
 
 Corresponding Rust type::
