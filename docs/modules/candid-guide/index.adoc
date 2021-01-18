@@ -702,14 +702,16 @@ Subtypes of a record are record types that have additional fields (of any type),
 For example, if you have a function returning a record of type
 +
 ....
-record { first_name : text; second_name : text; score : int }
+record { first_name : text; middle_name : opt text; second_name : text; score : int }
 ....
 +
 you can evolve that to a function returning a record of type
 +
 ....
-record { first_name : text; second_name : text; score : nat; country : text }
+record { first_name : text; middle_name : opt empty; second_name : text; score : nat; country : text }
 ....
++
+where we have deprecated the `middle_name` field, change the type of `score` and added the `country` field.
 
 
 Supertypes::
