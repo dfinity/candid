@@ -749,6 +749,7 @@ Type syntax::
 variant {}
 variant { ok : nat; error : text }
 variant { "name with spaces" : nat; "unicode, too: ☃" : bool }
+variant { spring; summer; fall; winter }
 ....
 
 Textual syntax::
@@ -756,6 +757,7 @@ Textual syntax::
 ....
 variant { ok = 42 }
 variant { "unicode, too: ☃" = true }
+variant { fall }
 ....
 
 Subtypes::
