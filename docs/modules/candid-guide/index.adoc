@@ -64,7 +64,7 @@ Candid is a strongly typed system with a set of types that canonically cover mos
 
 All types are described in detail in the <<reference, reference section>>.
 
-The philosophy behind this set of types is that they are sufficient to describe the _structure_ of data, so that information can be encoded, passed around and decoded, but intentionally do not describe _semantics_ constraints beyond what’s needed to describe the representation (e.g. no way to express that a numer should be even, or that the elements of a vector are sorted).
+The philosophy behind this set of types is that they are sufficient to describe the _structure_ of data, so that information can be encoded, passed around and decoded, but intentionally do not describe _semantic_ constraints beyond what’s needed to describe the representation (e.g. no way to express that a number should be even, that a vector has a certain length, or that the elements of a vector are sorted).
 
 Furthermore, the set of types is chosen to allow a natural mapping to the respective host language (Motoko, Rust, JavaScript, etc.), settling on reasonable, canonical choices.
 
@@ -77,7 +77,7 @@ The simplest service description is
 ....
 service : {}
 ....
-and describes a service with no public methods. This is not very useful, so lets add a simple method:
+and describes a service with no public methods. This is not very useful, so let's add a simple method:
 ....
 service : {
   ping : () -> ();
@@ -102,11 +102,11 @@ The method `divMod` expects and returns two values, all of type `int`. In its si
 ====
 Naming the parameters or results of a method is purely for documentation purposes, but does not actually change the method’s type, or the values being passed. Parameter and results are identified by their _position_, independent of the name.
 
-In particular, Candid will does not prevent you from changing the type to
+In particular, Candid does not prevent you from changing the type to
 ....
   divMod : (dividend : nat, divisor : nat) -> (mod : nat, div : nat);
 ....
-or passing the above `divMod` to a service expeting a method that returns `mod` first.
+or passing the above `divMod` to a service expecting a method that returns `mod` first.
 
 This is thus very different from named _record_ fields, which are semantically relevant.
 ====
@@ -120,7 +120,7 @@ type address = record {
   country : text;
 };
 service address_book : {
-  set_address: (name : text, address) -> ();
+  set_address: (name : text, addr : address) -> ();
   get_address: (name : text) -> (opt address) query;
 }
 ....
@@ -131,17 +131,17 @@ In the last example, we also see the use of the `query` annotation. This Interne
 
 === Encoding and decoding
 
-The point of Candid is to allow seamless invocation of service methods, passing arguments encoded to a binary format and transferred by an underlying transporation method (such as messages into or within the Internet Computer), and decoded on the other side.
+The point of Candid is to allow seamless invocation of service methods, passing arguments encoded to a binary format and transferred by an underlying transportation method (such as messages into or within the Internet Computer), and decoded on the other side.
 
-As a Candid user, you do not have to worry about the details of this binary format. If you plan to _implemnet_ Candid yourself (e.g. for a new host language), you can consult the Candid specification for details. However, some aspects of the format are worth knowing:
+As a Candid user, you do not have to worry about the details of this binary format. If you plan to _implement_ Candid yourself (e.g. for a new host language), you can consult the Candid specification for details. However, some aspects of the format are worth knowing:
 
 * The Candid binary format starts with `DIDL…` (or, in hex, `4449444c…`). If you see this in some low-level log output, you are very likely observing a Candid-encoded value.
 
 * The Candid binary format always encodes _sequences_ of values, because methods parameters and results are sequences of types.
 
-* The binary format is quite compact. A `(vec nat64)` with 125000 entries takes 1000007 bytes.
+* The binary format is quite compact. A `(vec nat64)` with 125 000 entries takes 1 000 007 bytes.
 
-* The binary is self-describing, and includes a (condended) description of type of the values therein. This allows the receiving side to detect if a message was sent at a different, incompatible type.
+* The binary is self-describing, and includes a (condensed) description of type of the values therein. This allows the receiving side to detect if a message was sent at a different, incompatible type.
 
 * As long as the sending side serializes the arguments at the same type that the receiving side expects them, deserialization will succeed.
 
@@ -165,7 +165,7 @@ See the reference sections the supertypes and subtypes of a given type.
 
 [TIP]
 ====
-Consider a serivce with the following API:
+Consider a service with the following API:
 ....
 service counter : {
   add : (nat) -> ();
@@ -228,7 +228,7 @@ actor {
   public func subscribe(handler : func (Int) -> async ()) { … }
 }
 ....
-and it will have the interface shown above.
+and the compiler can automatically generate the interface shown above.
 
 In other languages, like Rust, you can still develop your service while only
 touching Rust types, but for now you still have to write the Candid interface description manually.
@@ -237,7 +237,7 @@ In either case it is helpful to know the mapping between host language types and
 
 === Candid tools and libraries
 
-The Motoko language has built-in support for Candid.
+The Motoko language has built-in support for Candid and uses it implicitly.
 
 To create Candid services or clients in Rust, you can use the https://crates.io/crates/candid[Candid crate].
 
@@ -253,7 +253,7 @@ The https://github.com/dfinity/candid/tree/master/tools/ui[Candid UI] creates a 
 
 Now that you have a good overview of Candid and its various moving parts, this section gives you concrete instructions to achieve certain tasks.
 
-=== Interact with canisters on the command line?
+=== How do I interact with canisters on the command line?
 
 The `dfx` tool provides the `dfx canister call` command, which understands <<textual-values,Candid textual values>>:
 ....
@@ -262,24 +262,26 @@ dfx canister call msgt2-6nlzx-xq add_entry ("John Doe", record { street = "Haupt
 
 See TODO to read more about how to use the `dfx` tool.
 
-=== Interact with canisters via Candid UI?
+=== How do I interact with canisters via Candid UI?
 
-=== Use Candid as a Motoko canister developer?
+TODO
+
+=== How do I use Candid as a Motoko canister developer?
 
 If you are writing a service from scratch in Motoko, then you need to take no special actions: The Motoko compiler will translate the signature of your Canister’s top-level actor or actor class into a Candid description, and the `dfx` build tool will make sure it ends up where it needs to be.
 
 If you want to implement a _specific_ interface, for example because you want to interact with a service that expects your canister to have that interface, you can consult the 
 reference below to figure which Motoko types to use to achieve this effect. In the future, this will be simplified.
 
-=== Use Candid as Rust canister developer?
+=== How do I use Candid as Rust canister developer?
 
 TODO: Someone who implements rust canisters should write this section.
 
-=== Use Candid as a JavaScript front-end developer?
+=== How do I use Candid as a JavaScript front-end developer?
 
 TODO: Someone who implements Frontends should write this section
 
-=== Implement Candid?
+=== How do I implement Candid?
 
 If you want to create a new Candid implementation, this document will not suffice. In this case, consult the https://github.com/dfinity/candid/blob/master/spec/Candid.md[Candid specification].
 
@@ -466,13 +468,13 @@ Corresponding JavaScript values::
 TODO
 
 [#type-floatN]
-=== Type float16 and float32
+=== Type float32 and float64
 
-The types `float16`, `float32` represent IEEE 754 floating point numbers, in single precision (32 bit) and double precision (64 bit).
+The types `float32`, `float64` represent IEEE 754 floating point numbers, in single precision (32 bit) and double precision (64 bit).
 
 Type syntax::
 
-`float16`, `float32`
+`float32`, `float64`
 
 Textual syntax::
 
@@ -494,7 +496,7 @@ Corresponding Motoko type::
 
 `float64` corresponds to `Float`.
 +
-`float32` does _not_ have a representation in Motoko. Candid interfaces using `float32` cannot be served from or used from Motoko programs.
+`float32` does _not_ currently have a representation in Motoko. Candid interfaces using `float32` cannot be served from or used from Motoko programs.
 
 Corresponding Rust type::
 
@@ -507,7 +509,7 @@ TODO
 [#type-bool]
 === Type bool
 
-The type of truths values.
+The type of truth values.
 
 Type syntax::
 
@@ -598,7 +600,7 @@ The canonical rules for subtyping with `opt` are:
 * `null` is a subtype of `opt t'`.
 * `t` is a subtype of `opt t` (unless `t` itself is `null`, `opt …` or `reserved`)
 +
-In addition, for technical reasons related to upgrading and higher-order services, _every_ type is a subtype of `opt t`. Users are advised, however, to not directly make use of that rule.
+In addition, for technical reasons related to upgrading and higher-order services, _every_ type is a subtype of `opt t`, yielding `null` if the types do not match. Users are advised, however, to not directly make use of that rule.
 
 Supertypes::
 
@@ -680,9 +682,9 @@ record { first_name : text; second_name : text; score : nat; country : text }
 
 Supertypes::
 
-Supertypes of a record are record types with any some fields removed, some fields’ types changed to supertypes, or with optional fields added.
+Supertypes of a record are record types with some fields removed, some fields’ types changed to supertypes, or with optional fields added.
 +
-The latter is what allows you to extend your argument records with additional arguments. Clients using the old interface will not include the field in their record, which will decode as `null`.
+The latter is what allows you to extend your argument records with additional fields. Clients using the old interface will not include the field in their record, which will decode as `null`.
 +
 For example, if you have a function expecting a record of type
 +
@@ -720,14 +722,14 @@ A `variant` type represents a value that is from exactly one of the given cases,
 ....
 type shape = variant {
   dot : null;
-  circle : record { radius : float64 };
+  circle : float64;
   rectangle : record { width : float64; height : float64 };
   "💬" : text;
 };
 ....
 is either a dot, or a circle (with a radius), or a rectangle (with dimensions) or a speech bubble (with a text, and showing off unicode label names).
 
-The lables in variants are, just like the labels in records, actually numbers, and string labels refer to their hash value.
+The tags in variants are, just like the labels in records, actually numbers, and string tags refer to their hash value.
 
 Often, some or all of the the tags do not carry data. It is idiomatic to then use the `null` type, as in the `dot` above. In fact, Candid encourages this by allowing you to omit the `: null` type annotation in variants, so
 ....
@@ -760,7 +762,7 @@ Subtypes::
 
 Subtypes of a variant type are variant types with some tags removed, and the type of some tags themselves changed to a subtype.
 +
-If you want to be able to _add_ new tags in variants in a method result, you can do so if the variant it itself wrapped in `opt …`. This requires planning ahead! When you design an interface, instead of writing
+If you want to be able to _add_ new tags in variants in a method result, you can do so if the variant is itself wrapped in `opt …`. This requires planning ahead! When you design an interface, instead of writing
 +
 ....
 service { get_member_status (member_id : nat) -> (variant {active; expired}); }
@@ -786,7 +788,7 @@ Variant types are represented as Motoko variant types, e.g.
 ....
 type Shape = {
   #dot : ();
-  #circle : { radius : Float };
+  #circle : Float;
   #rectangle : { width : Float; height : Float };
   #_2669435721_ : Text;
 };
@@ -806,7 +808,7 @@ TODO
 [#type-func]
 === Type func (…) -> (…)
 
-Candid is designed to support higher-order use cases, where a service may receive or provide references to other serivces and their methods. The `func` type lies at the code or this: It indicates the function’s _signature_ (argument and results types, annotations), and values of this type are references to functions with that signature.
+Candid is designed to support higher-order use cases, where a service may receive or provide references to other serivces or their methods, e.g., as callbacks. The `func` type is central to this: It indicates the function’s _signature_ (argument and results types, annotations), and values of this type are references to functions with that signature.
 
 Type syntax::
 +
@@ -822,7 +824,7 @@ See the <<candid-service-descriptions,note on function parameter names>>.
 +
 The supported annotation are:
 +
-* `query` indicates that the referenced function is a query method, meaning it can does not alter the state of its canister, and that it can be invoked using the cheaper “query call” mechanism.
+* `query` indicates that the referenced function is a query method, meaning it does not alter the state of its canister, and that it can be invoked using the cheaper “query call” mechanism.
 * `oneway` indicates that this function returns no response, intended for fire-and-forget scenarios.
 
 Textual syntax::
@@ -842,8 +844,8 @@ The following modifications to a function type change it to a subtype (cf. the r
  * The result type list may be extended
  * The parameter type list may be shortened.
  * The parameter type list may be extended with optional arguments (type `opt …`).
- * Existing parameter types may be change to to a supertype.
- * Existing result types may be _changed_ to a subtype(!).
+ * Existing parameter types may be changed to to a _supertype_(!).
+ * Existing result types may be changed to a subtype.
 
 Supertypes::
 
@@ -852,8 +854,8 @@ Dually, the following modifications to a function type change it to a supertype:
  * The result type list may be shortened
  * The result type list may be extended with optional arguments (type `opt …`)
  * The parameter type list may be extended.
- * Existing parameter types may be change to to a subtype.
- * Existing result types may be changed to a supertype(!).
+ * Existing parameter types may be change to to a subtype(!).
+ * Existing result types may be changed to a supertype.
 
 Corresponding Motoko type::
 
@@ -1015,7 +1017,7 @@ Textual syntax::
 
 Subtypes::
 
-Any type
+All types
 
 Corresponding Motoko type::
 
@@ -1056,6 +1058,7 @@ service { foo : (record { first_name : text; last_name : text}) -> () }
 ....
 does the right thing, and you don’t even need to keep a record of the removed argument around.
 
+NOTE: In general, it is not recommended to remove arguments from methods. Usually it is preferable to introduce a new method that omits the argument.
 
 
 [#type-empty]
@@ -1073,7 +1076,7 @@ None, as this type has no values
 
 Supertypes::
 
-Any type
+All types
 
 Corresponding Motoko type::
 
@@ -1094,5 +1097,4 @@ service : {
   always_fails () -> (empty)
 }
 ....
-
 
