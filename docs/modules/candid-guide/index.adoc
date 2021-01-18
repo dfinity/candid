@@ -268,7 +268,9 @@ TODO
 
 === How do I use Candid as a Motoko canister developer?
 
-If you are writing a service from scratch in Motoko, then you need to take no special actions: The Motoko compiler will translate the signature of your Canister’s top-level actor or actor class into a Candid description, and the `dfx` build tool will make sure it ends up where it needs to be.
+If you are writing a service from scratch in Motoko, then you need to take no special action: The Motoko compiler will translate the signature of your Canister’s top-level actor or actor class into a Candid description, and the `dfx` build tool will make sure it ends up where it needs to be.
+
+For example, in a multi-canister project, dfx will ensure that any clients of your Motoko service will import the generated Candid description of that service.
 
 If you want to implement a _specific_ interface, for example because you want to interact with a service that expects your canister to have that interface, you can consult the 
 reference below to figure which Motoko types to use to achieve this effect. In the future, this will be simplified.
