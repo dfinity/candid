@@ -311,7 +311,7 @@ Textual syntax::
 ""
 "Hello"
 "Escaped characters: \n \r \t \\ \" \'"
-"Unicode escapes: \u{2603} is ☃"
+"Unicode escapes: \u{2603} is ☃ and \u{221E} is ∞"
 "Raw bytes (must be utf8): \E2\98\83 is also ☃"
 ....
 
