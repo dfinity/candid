@@ -876,8 +876,9 @@ The following modifications to a function type change it to a subtype (cf. the r
  * The result type list may be extended
  * The parameter type list may be shortened.
  * The parameter type list may be extended with optional arguments (type `opt …`).
- * Existing parameter types may be changed to to a _supertype_(!).
+ * Existing parameter types may be changed to to a _supertype_ (!). In other words: The function type is _contravariant_ in the argument type.
  * Existing result types may be changed to a subtype.
+
 
 Supertypes::
 
@@ -886,7 +887,7 @@ Dually, the following modifications to a function type change it to a supertype:
  * The result type list may be shortened
  * The result type list may be extended with optional arguments (type `opt …`)
  * The parameter type list may be extended.
- * Existing parameter types may be change to to a subtype(!).
+ * Existing parameter types may be change to to a _subtype_ (!). In other words: The function type is _contravariant_ in the argument type.
  * Existing result types may be changed to a supertype.
 
 Corresponding Motoko type::
