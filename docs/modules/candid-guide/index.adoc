@@ -150,7 +150,7 @@ As a Candid user, you do not have to worry about the details of this binary form
 
 Services evolve over time: They gain new methods, existing methods return more data, or expect additional arguments. Usually, service authors want to do that without breaking existing clients.
 
-Candid supports such evolution by defining precise rules that indicate when the new service type will still be able to communicate with all other parties that are using the previous interface description. The underlying formalim is that of _subtyping_.
+Candid supports such evolution by defining precise rules that indicate when the new service type will still be able to communicate with all other parties that are using the previous interface description. The underlying formalism is that of _subtyping_.
 
 Services can safely evolve in the following ways:
 
