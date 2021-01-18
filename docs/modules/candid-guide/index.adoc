@@ -11,7 +11,7 @@ If you are about to _implement_ Candid, want to learn about its internals or its
 
 == What is Candid?
 
-Candid is an _Interface description language_, and is used to describe the public interface of a service (such as a canister running on the Internet Computer). It is language agnostic, and thus allows seamless interoperation between services and front-ends written in different programming languages (Motoko, Rust, JavaScript, etc.)
+Candid is an _Interface description language_, and is used to describe the public interface of a service (such as a canister running on the Internet Computer). It is language agnostic, and thus allows interoperation between services and front-ends written in different programming languages (Motoko, Rust, JavaScript, etc.)
 
 A typical interface description in Candid might look as follows:
 ....
