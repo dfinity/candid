@@ -7,7 +7,7 @@
 Welcome to the Candid’s user guide. This document will explain what Candid is, what it can do for you, and how you use it.
 
 NOTE: The primary target audience is Candid _users_, i.e. canister and front-end developers.
-If you are about to _implement_ Candid, want to learn about its internals or its meta-theory, you should look at the [Candid specification].
+If you are about to _implement_ Candid, want to learn about its internals or its meta-theory, you should look at the https://github.com/dfinity/candid/blob/master/spec/Candid.md[Candid specification].
 
 == What is Candid?
 
@@ -145,6 +145,7 @@ As a Candid user, you do not have to worry about the details of this binary form
 
 * As long as the sending side serializes the arguments at the same type that the receiving side expects them, deserialization will succeed.
 
+[#upgrades]
 === Service upgrades
 
 Services evolve over time: They gain new methods, existing methods return more data, or expect additional arguments. Usually, service authors want to do that without breaking existing clients.
@@ -278,6 +279,12 @@ TODO: Someone who implements rust canisters should write this section.
 
 TODO: Someone who implements Frontends should write this section
 
+=== Implement Candid?
+
+If you want to create a new Candid implementation, this document will not suffice. In this case, consult the https://github.com/dfinity/candid/blob/master/spec/Candid.md[Candid specification].
+
+Additionally, the official https://github.com/dfinity/candid/tree/master/test[Candid test data] is useful to make sure your implementation is compatible with Candid, even in slightly more obscure corner cases.
+
 [#reference]
 == Reference
 
@@ -288,7 +295,7 @@ TIP: Subtypes are the types you can change your method _results_ to, and superty
 We only list the particular subtypes and supertypes in each section, and do not repeat every time that that the type `empty` is a subtype of any type, and that the types `reserved` and `opt t` are supertypes of any types. See the sections on these types for more details.
 
 [#type-text]
-=== `text`
+=== Type text
 
 The `text` type is used for human readable text. More precisely, its values are sequences of unicode code points (excluding surrogate parts).
 
@@ -319,7 +326,7 @@ Corresponding JavaScript values::
 TODO:
 
 [#type-blob]
-=== `blob`
+=== Type blob
 
 The `blob` type can be used for binary data, i.e. sequences of bytes. It is interchangable with `vec nat8`, i.e. interfaces written in terms of `blob` and interfaces written in terms of `vec nat8` are compatible.
 
@@ -352,7 +359,7 @@ Corresponding JavaScript values::
 TODO:
 
 [#type-nat]
-=== `nat`
+=== Type nat
 
 The `nat` type contains all natural (non-negative) numbers. It is unbounded, and can represent arbitrary large numbers.  The on-wire encoding is LEB128, so small numbers are still efficiently represented.
 
@@ -387,7 +394,7 @@ TODO
 
 
 [#type-int]
-=== `int`
+=== Type int
 
 The `int` type contains all integral, i.e. whole, numbers. It is unbounded, and can represent arbitrary small or large numbers. The on-wire encoding is SLEB128, so small numbers are still efficiently represented.
 
@@ -428,7 +435,7 @@ TODO
 
 [#type-natN]
 [#type-intN]
-=== `natN` and `intN`
+=== Type natN and intN
 
 The types `nat8`, `nat16`, `nat32`, `nat64`, `int8`, `int16`, `int32` and `nat64` represent numbers with a representation of that many bits, and can be used in more “low-level” interface.
 
@@ -459,7 +466,7 @@ Corresponding JavaScript values::
 TODO
 
 [#type-floatN]
-=== `float16` and `float32`
+=== Type float16 and float32
 
 The types `float16`, `float32` represent IEEE 754 floating point numbers, in single precision (32 bit) and double precision (64 bit).
 
@@ -498,7 +505,7 @@ Corresponding JavaScript values::
 TODO
 
 [#type-bool]
-=== `bool`
+=== Type bool
 
 The type of truths values.
 
@@ -523,7 +530,7 @@ Corresponding JavaScript values::
 TODO
 
 [#type-vec]
-=== `vec t`
+=== Type vec t
 
 The `vec` type representes vectors (sequences, lists, arrays): A value of type `vec t` contains zero or more values of type `t` in a specific order
 
@@ -561,7 +568,7 @@ Corresponding JavaScript values::
 TODO:
 
 [#type-opt]
-=== `opt t`
+=== Type opt t
 
 The `opt t` type contains of the values of type `t`, plus the special `null` value. It is used to express that some value is optional, i.e. it may be present, or there may be no value.
 
@@ -610,7 +617,7 @@ Corresponding JavaScript values::
 TODO:
 
 [#type-record]
-=== `record { n : t, … }`
+=== Type record { n : t, … }
 
 A `record` type is a collection of labeled values. For example,
 ....
@@ -691,7 +698,7 @@ record { first_name : text; score: int; country : opt text }
 
 Corresponding Motoko type::
 
-If the record type looks like it could refer to a tuple (i.e. consecutive labels starting at 0), a motoko tuple type (e.g. `(T1, T2, T3)`) is used. Else, a motok record `({ first_name  :Text, second_name : Text })` is used.
+If the record type looks like it could refer to a tuple (i.e. consecutive labels starting at 0), a Motoko tuple type (e.g. `(T1, T2, T3)`) is used. Else, a Motoko record `({ first_name  :Text, second_name : Text })` is used.
 +
 If the field name is a reserved name in Motoko, an undescore is appended. So `record { if : bool }` corresponds to `{ if_ : Bool  }`.
 +
@@ -707,7 +714,7 @@ TODO
 
 
 [#type-variant]
-=== `variant { n : t, … }`
+=== Type variant { n : t, … }
 
 A `variant` type represents a value that is from exactly one of the given cases, or _tags_. So a value of the type
 ....
@@ -797,16 +804,174 @@ TODO
 
 
 [#type-func]
-=== `func`
+=== Type func (…) -> (…)
+
+Candid is designed to support higher-order use cases, where a service may receive or provide references to other serivces and their methods. The `func` type lies at the code or this: It indicates the function’s _signature_ (argument and results types, annotations), and values of this type are references to functions with that signature.
+
+Type syntax::
++
+....
+func () -> ()
+func (text) -> (text)
+func (dividend : nat, divisor : nat) -> (div : nat, mod : nat);
+func () -> (int) query
+func (func (int) -> ()) -> ()
+....
++
+See the <<candid-service-descriptions,note on function parameter names>>.
++
+The supported annotation are:
++
+* `query` indicates that the referenced function is a query method, meaning it can does not alter the state of its canister, and that it can be invoked using the cheaper “query call” mechanism.
+* `oneway` indicates that this function returns no response, intended for fire-and-forget scenarios.
+
+Textual syntax::
+
+At the moment, only public methods of services, which are identified by their principal, are supported:
++
+....
+func "w7x7r-cok77-xa".hello
+func "w7x7r-cok77-xa"."☃"
+func "aaaaa-aa".create_canister
+....
+
+Subtypes::
+
+The following modifications to a function type change it to a subtype (cf. the rules in <<upgrades>>):
++
+ * The result type list may be extended
+ * The parameter type list may be shortened.
+ * The parameter type list may be extended with optional arguments (type `opt …`).
+ * Existing parameter types may be change to to a supertype.
+ * Existing result types may be _changed_ to a subtype(!).
+
+Supertypes::
+
+Dually, the following modifications to a function type change it to a supertype:
++
+ * The result type list may be shortened
+ * The result type list may be extended with optional arguments (type `opt …`)
+ * The parameter type list may be extended.
+ * Existing parameter types may be change to to a subtype.
+ * Existing result types may be changed to a supertype(!).
+
+Corresponding Motoko type::
+
+Candid function types correspond to `shared` Motoko functions, with the result type wrapped in `async`. Arguments resp. results become tuples, unless there is exactly one, in which case it is used directly:
++
+....
+type F0 = func () -> ();
+type F1 = func (text) -> (text);
+type F2 = func (text, bool) -> () oneway;
+type F3 = func (text) -> () oneway;
+type F4 = func () -> (text) query;
+....
+corresponds in Motoko to
+....
+type F0 = shared () -> async ();
+type F1 = shared Text -> async Text;
+type F2 = shared (Text, Bool) -> ();
+type F3 = shared query () -> async Text;
+....
+
+Corresponding Rust type::
+
+TODO
+
+Corresponding JavaScript values::
+
+TODO
 
 [#type-service]
-=== `service`
+=== Type service {…}
+
+Services may want to pass around references to not just individual functions (using the <<type-func,`func` type>>), but references to whole services. In this case, Candid types can be used to declare the complete interface of such a service.
+
+Type syntax::
++
+....
+service {
+  add : (nat) -> ();
+  subtract : (nat) -> ();
+  get : () -> (int) query;
+  subscribe : (func (int) -> ()) -> ();
+}
+....
++
+See Section “<<candid-service-descriptions>>” for more details on the syntax of a service type.
+
+Textual syntax::
++
+....
+service "w7x7r-cok77-xa"
+service "zwigo-aiaaa-aaaaa-qaa3a-cai"
+service "aaaaa-aa"
+....
+
+Subtypes::
+
+The subtypes of a service type are those service types that possibly have additional method, and where the type of existing methods is changed to a subtype.
++
+This is exactly the notion that shows up in Section “<<upgrades,safe upgrades>>”.
+
+Supertypes::
+
+The supertypes of a service type are those service types that may have some methods removed, and the type of existing methods are changed to a supertype.
+
+Corresponding Motoko type::
+
+Service types in Candid correspond directly to `actor` types in Motoko:
++
+....
+actor {
+  add : shared Nat -> async ()
+  subtract : shared Nat -> async ();
+  get : shared query () -> async Int;
+  subscribe : shared (shared Int -> async ()) -> async ();
+}
+....
+
+Corresponding Rust type::
+
+TODO
+
+Corresponding JavaScript values::
+
+TODO
 
 [#type-principal]
-=== `principal`
+=== Type principal
+
+The Internet computer uses _principals_ as the common scheme to idnetify canisters, users and other entities.
+
+Type syntax::
+
+`principal`
+
+
+Textual syntax::
++
+....
+principal "w7x7r-cok77-xa"
+principal "zwigo-aiaaa-aaaaa-qaa3a-cai"
+principal "aaaaa-aa"
+....
+
+
+Corresponding Motoko type::
+
+`Principal`
+
+Corresponding Rust type::
+
+TODO
+
+Corresponding JavaScript values::
+
+TODO
 
 [#type-null]
-=== `null`
+=== Type null
 
 The `null` type is the type of the value `null`, and a subtype of all the `opt t` types. It is also the idiomatic choice when using <<type-variant,variants>> to model enumerations.
 
@@ -836,7 +1001,7 @@ TODO
 
 
 [#type-reserved]
-=== `reserved`
+=== Type reserved
 
 The `reserved` type is a type with one (uninformative) value `reserved`, and is the supertype of all other types.
 
@@ -894,7 +1059,7 @@ does the right thing, and you don’t even need to keep a record of the removed 
 
 
 [#type-empty]
-=== `empty`
+=== Type empty
 
 The `empty` type is the type without values, and is the subtype of any other type.
 
