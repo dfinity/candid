@@ -718,7 +718,7 @@ Supertypes::
 
 Supertypes of a record are record types with some fields removed, some fields’ types changed to supertypes, or with optional fields added.
 +
-The latter is what allows you to extend your argument records with additional fields. Clients using the old interface will not include the field in their record, which will decode as `null`.
+The latter is what allows you to extend your argument records with additional fields. Clients using the old interface will not include the field in their record, which will decode, when expected in the upgraded service, as `null`.
 +
 For example, if you have a function expecting a record of type
 +
