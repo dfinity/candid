@@ -11,9 +11,9 @@ If you are about to _implement_ Candid, want to learn about its internals or its
 
 == What is Candid?
 
-Candid is an _Interface description language_, and is used to describe the public interface of a service (such a caniter running on the Internet Computer). It is language agnostic, and thus allows seamless interoperation between services and front-ends written different programming languages (Motoko, Rust, JavaScript, etc.)
+Candid is an _Interface description language_, and is used to describe the public interface of a service (such as a canister running on the Internet Computer). It is language agnostic, and thus allows seamless interoperation between services and front-ends written in different programming languages (Motoko, Rust, JavaScript, etc.)
 
-A typical interface description in Candid looks as follows:
+A typical interface description in Candid might look as follows:
 ....
 service counter : {
   add : (nat) -> ();
@@ -23,7 +23,7 @@ service counter : {
 }
 ....
 
-This says that the described service has four public methods. Two to change the value of a a counter, one to read the current value, and one that can be used to pass a method, presumably to be invoked upon each change of the counter.
+This says that the described service has four public methods. Two to change the value of a counter, one to read the current value, and one that can be used to pass a callback method, presumably to be invoked upon each change of the counter as a notification.
 
 Every method has a sequence of argument and result types, and Internet-Computer specific annotations (such as `query`) are supported.
 
@@ -41,9 +41,9 @@ At first glance one may think that prior technologies, like JSON, XML, Protobuf 
 
 * Candid defines what is a “safe upgrade” in a sound and compositional way.
 
-* Candid is inherently higher order: You can pass not just plain data, but also references to services and methods, which is an important feature on the Intenet Computer. Furthermore, Candid’s notion of safe upgrades takes such higher-order use into account.
+* Candid is inherently higher order: You can pass not just plain data, but also references to services and methods, which is an important feature on the Internet Computer. Furthermore, Candid’s notion of safe upgrades takes such higher-order use into account.
 
-* Candid as built-in support for Internet-Computer specific features, such as the `query` annotation.
+* Candid has built-in support for Internet-Computer specific features, such as the `query` annotation.
 
 == Concepts and workflows
 
@@ -66,12 +66,12 @@ All types are described in detail in the <<reference, reference section>>.
 
 The philosophy behind this set of types is that they are sufficient to describe the _structure_ of data, so that information can be encoded, passed around and decoded, but intentionally do not describe _semantics_ constraints beyond what’s needed to describe the representation (e.g. no way to express that a numer should be even, or that the elements of a vector are sorted).
 
-Furthermore, the set of types is chosen to allow a resonably intuitive mapping to the respective host language (Motoko, Rust, JavaScript, etc.), thus settling on very canonic choices.
+Furthermore, the set of types is chosen to allow a natural mapping to the respective host language (Motoko, Rust, JavaScript, etc.), settling on reasonable, canonical choices.
 
 [#candid-service-descriptions]
 === Candid service descriptions
 
-With these candid types, we now can describe a service. Such a service description file can be written by hand, but typically it is generated from the service implementation, as described later.
+With these Candid types, we now can describe a service. Such a service description file can be written by hand, but typically it is generated from a service implementation, as described later.
 
 The simplest service description is
 ....
