@@ -531,6 +531,36 @@ Corresponding JavaScript values::
 
 TODO
 
+[#type-null]
+=== Type null
+
+The `null` type is the type of the value `null`, thus a subtype of all the `opt t` types. It is also the idiomatic choice when using <<type-variant,variants>> to model enumerations.
+
+Type syntax::
+
+`null`
+
+Textual syntax::
+
+`null`
+
+Supertypes::
+
+All `opt t` types.
+
+Corresponding Motoko type::
+
+`Null`
+
+Corresponding Rust type::
+
+TODO
+
+Corresponding JavaScript values::
+
+TODO
+
+
 [#type-vec]
 === Type vec t
 
@@ -973,36 +1003,6 @@ TODO
 Corresponding JavaScript values::
 
 TODO
-
-[#type-null]
-=== Type null
-
-The `null` type is the type of the value `null`, and a subtype of all the `opt t` types. It is also the idiomatic choice when using <<type-variant,variants>> to model enumerations.
-
-Type syntax::
-
-`null`
-
-Textual syntax::
-
-`null`
-
-Supertypes::
-
-All `opt t` types.
-
-Corresponding Motoko type::
-
-`Null`
-
-Corresponding Rust type::
-
-TODO
-
-Corresponding JavaScript values::
-
-TODO
-
 
 [#type-reserved]
 === Type reserved
