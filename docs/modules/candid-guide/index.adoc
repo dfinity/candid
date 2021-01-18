@@ -457,7 +457,7 @@ Same as `nat` (for `natN`) resp. `int` (for `intN`).
 
 Corresponding Motoko type::
 
-`natN` translate by default to `NatN`, but can also correspond got `WordN`
+`natN` translates by default to `NatN`, but can also correspond to `WordN` when required.
 +
 `intN` translate to `IntN`.
 
@@ -566,7 +566,7 @@ TODO
 [#type-vec]
 === Type vec t
 
-The `vec` type representes vectors (sequences, lists, arrays): A value of type `vec t` contains zero or more values of type `t` in a specific order
+The `vec` type represents vectors (sequences, lists, arrays): A value of type `vec t` contains a sequence of zero or more values of type `t`.
 
 Type syntax::
 
