@@ -125,7 +125,7 @@ service address_book : {
 }
 ....
 
-These type definitions merely name an _existing_ type, they do not define a new type. It does not matter whether you use `address` in the function signature, or write out the records. In orther words, Candid uses _structural_ typing.
+These type definitions merely abbreviate an _existing_ type, they do not define a new type. It does not matter whether you use `address` in the function signature, or write out the records. Also, two abbreviations with different names but equivalent definitions, describe the same type and are interchangeable. In other words, Candid uses _structural_ typing.
 
 In the last example, we also see the use of the `query` annotation. This Internet-Computer specific annotation indicates that the method `get_address` can be invoked using a query call (TODO: reference general documentation about query calls here)
 
@@ -1097,4 +1097,3 @@ service : {
   always_fails () -> (empty)
 }
 ....
-
