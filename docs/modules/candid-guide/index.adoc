@@ -161,7 +161,7 @@ Services can safely evolve in the following ways:
  * Existing parameter types may be _changed_, but only to a _supertype_ of the previous type.
  * Existing result types may be _changed_, but only to a _subtype_ of the previous type.
 
-See the reference sections the supertypes and subtypes of a given type.
+See the reference sections that define the supertypes and subtypes of a given type.
 
 [TIP]
 ====
@@ -190,9 +190,9 @@ service counter : {
 [#textual-values]
 === Candid textual values
 
-The main purpose of Candid is to connect programs written in some host language (Motoko, Rust, JavaScript, etc.), and developers therefore usually do not have to deal with “Candid values” per se: They work with, say, JavaScript values that are then, transparently and seamelessly, transported to a canister written in Rust, where they show up as Rust values.
+The main purpose of Candid is to connect programs written in some host language (Motoko, Rust, JavaScript, etc.), and developers therefore usually do not have to deal with “Candid values” per se: They work with, say, JavaScript values that are then, transparently and seamlessly, transported to a canister written in Rust, where they show up as Rust values.
 
-Nevertheless there are use cases where it is helpful to see the Candid values per se, e.g. for logging, debugging, or command-line interaction with services. In this cases, the _textual presentation_ for Candid values can be used.
+Nevertheless there are use cases where it is helpful to see the Candid values per se, e.g. for logging, debugging, or command-line interaction with services. In these scenarios, the _textual presentation_ for Candid values can be used.
 
 The syntax is similar to that of candid types. A typical candid value might read
 ....
@@ -233,7 +233,7 @@ and the compiler can automatically generate the interface shown above.
 In other languages, like Rust, you can still develop your service while only
 touching Rust types, but for now you still have to write the Candid interface description manually.
 
-In either case it is helpful to know the mapping between host language types and Candid types; this mapping is describeed in the <<reference, reference section>>.
+In either case it is helpful to know the mapping between host language types and Candid types; this mapping is described in the <<reference, reference section>>.
 
 === Candid tools and libraries
 
