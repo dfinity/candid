@@ -604,11 +604,11 @@ TODO:
 [#type-opt]
 === Type opt t
 
-The `opt t` type contains of the values of type `t`, plus the special `null` value. It is used to express that some value is optional, i.e. it may be present, or there may be no value.
+The `opt t` type contains all the values of type `t`, plus the special `null` value. It is used to express that some value is optional, i.e. it may be present as some value of type `t`, or absent as the value `null`.
 
 The `opt` type can be nested (e.g. `opt opt text`), and the values `null` and `opt null` are distinct values.
 
-The `opt` type plays a crucial role in the evolution of Candid interfaces, and has atypical subtyping rules; see below.
+The `opt` type plays a crucial role in the evolution of Candid interfaces, and has special subtyping rules; see below.
 
 Type syntax::
 
@@ -663,7 +663,7 @@ type address = record {
 };
 ....
 gives the name `address` to the type of records that have textual fields `street`, `city` and `country` and a numerical field `zip_code`. The order of fields in the record type declaration does not matter.
-
+Each field can have a different type (unlike vectors).
 The label of a record field can also be a 32-bit natural number, as in
 ....
 type address2 = record {
@@ -697,7 +697,7 @@ record { "a"; "tuple"; null }
 
 Subtypes::
 
-Subtypes of a record are record types that have additional fields (of any type), where some field’s types are changed to subtypes, or where optional fields are removed. It is, however, bad practice to remove optional fields in method results; you can change their type to `opt empty` to indicate that this field is no longer used.
+Subtypes of a record are record types that have additional fields (of any type), where some field’s types are changed to subtypes, or where optional fields are removed. It is, however, bad practice to remove optional fields in method results; you can change a field's type to `opt empty` to indicate that this field is no longer used.
 +
 For example, if you have a function returning a record of type
 +
@@ -759,7 +759,7 @@ type shape = variant {
   "💬" : text;
 };
 ....
-is either a dot, or a circle (with a radius), or a rectangle (with dimensions) or a speech bubble (with a text, and showing off unicode label names).
+is either a dot, or a circle (with a radius), or a rectangle (with dimensions) or a speech bubble (with some text). The speech bubble illustrates use of a unicode label name (💬).
 
 The tags in variants are, just like the labels in records, actually numbers, and string tags refer to their hash value.
 
@@ -828,7 +828,7 @@ type Shape = {
 };
 ....
 +
-Note that if the type of a tag is `null`, this corresponds to `()` in Motoko, to preserve the mapping between the respecitve idiomatic ways to model enumerations as variants.
+Note that if the type of a tag is `null`, this corresponds to `()` in Motoko, to preserve the mapping between the respective idiomatic ways to model enumerations as variants.
 
 Corresponding Rust type::
 
