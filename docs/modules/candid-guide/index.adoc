@@ -891,7 +891,7 @@ Dually, the following modifications to a function type change it to a supertype:
 
 Corresponding Motoko type::
 
-Candid function types correspond to `shared` Motoko functions, with the result type wrapped in `async`. Arguments resp. results become tuples, unless there is exactly one, in which case it is used directly:
+Candid function types correspond to `shared` Motoko functions, with the result type wrapped in `async` (unless they are annotated with `oneway`, then the result type is simply `()`).  Arguments resp. results become tuples, unless there is exactly one, in which case it is used directly:
 +
 ....
 type F0 = func () -> ();
