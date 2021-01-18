@@ -675,7 +675,7 @@ type address2 = record {
 ....
 In fact, textual labels are treated as their _field hash_, and incidentially, `address` and `address2` are – to Candid – the same types.
 
-If you omit the label, Candid numbers automatically assigns sequentially increasing labels. This leads to the following short syntax, which is typically used to represent pairs and tuples. The type `record { text; text; opt bool }` is equivalent to `record { 0 : text;  1: text;  2: opt bool }`
+If you omit the label, Candid automatically assigns sequentially increasing labels. This leads to the following short syntax, which is typically used to represent pairs and tuples. The type `record { text; text; opt bool }` is equivalent to `record { 0 : text;  1: text;  2: opt bool }`
 
 Type syntax::
 +
@@ -947,7 +947,7 @@ service "aaaaa-aa"
 
 Subtypes::
 
-The subtypes of a service type are those service types that possibly have additional method, and where the type of existing methods is changed to a subtype.
+The subtypes of a service type are those service types that possibly have additional methods, and where the type of an existing method is changed to a subtype.
 +
 This is exactly the notion that shows up in Section “<<upgrades,safe upgrades>>”.
 
@@ -979,7 +979,7 @@ TODO
 [#type-principal]
 === Type principal
 
-The Internet computer uses _principals_ as the common scheme to idnetify canisters, users and other entities.
+The Internet computer uses _principals_ as the common scheme to identify canisters, users and other entities.
 
 Type syntax::
 
