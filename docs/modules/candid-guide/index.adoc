@@ -1055,7 +1055,7 @@ service { foo : (first_name : text, middle_name : reserved, last_name : text) ->
 to indicate that `foo` used to take a second argument, but you no longer care about that.
 
 
-You can also avoid this problem if you use the idiom where function with possibly changing arguments take a single record, i.e.
+You can avoid this pitfall by adopting the pattern any function that is anticipated to have changing arguments, or whose arguments can only be distinguished by position, not type,  is declared to take a single record, i.e.
 ....
 service { foo : (record { first_name : text; middle_name : text; last_name : text}) -> () }
 ....
