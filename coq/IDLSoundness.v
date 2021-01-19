@@ -17,6 +17,8 @@ Require Import Coq.Relations.Relation_Operators.
 Require Import Coq.Relations.Relation_Definitions.
 Require Import Coq.Relations.Operators_Properties.
 
+Require Import candid.NamedCases.
+
 Set Bullet Behavior "Strict Subproofs".
 
 Section IDL.
@@ -41,8 +43,8 @@ Section IDL.
   Variable evolves : S -> S -> Prop.
   Notation "s1 ~> s2" := (evolves s1 s2) (at level 70, no associativity).
 
-  Variable hostSubtyping : S -> S -> Prop.
-  Notation "s1 <<: s2" := (hostSubtyping s1 s2) (at level 70, no associativity).
+  Variable hostSubtypeOf : S -> S -> Prop.
+  Notation "s1 <<: s2" := (hostSubtypeOf s1 s2) (at level 70, no associativity).
 
   (* Service Identifiers *)
   Variable I : Set.
@@ -60,36 +62,45 @@ Section IDL.
     (forall i' s, ~ In st (HasRef i' i s)).
 
   Inductive CanSend : State -> I -> T -> T -> I -> Prop :=
-    | CanCall: forall st A B t1 t1' t2 t2',
+    | CanCall:
+      case canCall,
+      forall st A B t1 t1' t2 t2',
       In st (HasRef A B (t1 --> t1')) ->
       In st (HasType B (t2 --> t2')) ->
       CanSend st A t1 t2 B
-    | CanReply: forall st A B t1 t1' t2 t2',
+    | CanReply:
+      case canReply,
+      forall st A B t1 t1' t2 t2',
       In st (HasRef B A (t1 --> t1')) ->
       In st (HasType A (t2 --> t2')) ->
       CanSend st A t2' t1' B.
 
   Inductive step : State -> State -> Prop :=
     | NewService :
+      case newService,
       forall (i : I) (s : S) st,
       FreshIn i st ->
       step st (Add st (HasType i s))
     | EvolveService :
+      case evolveService,
       forall (i : I) (s1 s2 : S) st,
       ~ In st (HasType i s1) ->
       s1 ~> s2 ->
       step (Add st (HasType i s1)) (Add st (HasType i s2))
     | LearnService :
+      case learnService,
       forall (i1 i2 : I) (s: S) st,
       In st (HasType i1 s) ->
       step st (Add st (HasRef i2 i1 s))
     | TransmitService :
+      case transmitService,
       forall (A B C : I) (s1 s2 : S) (t1 t2 : T) st,
       In st (HasRef A C s1) ->
       CanSend st A t1 t2 B ->
       (s1 ∈ t1 <: s2 ∈ t2) ->
       step st (Add st (HasRef B C s2))
     | HostSubtyping :
+      case hostSubtyping,
       forall (A B : I) (s1 s2 : S) st,
       s1 <<: s2 ->
       step (Add st (HasRef A B s1)) (Add st (HasRef A B s2))
@@ -160,11 +171,15 @@ Section IDL.
   Proof.
     intros st Hinvariant.
     intros A t1 t2 B HCanSend.
-    destruct HCanSend.
-    * pose proof (Hinvariant B A (t2 --> t2') (t1 --> t1') H0 H) as H1.
+    destruct HCanSend; name_cases.
+    [canCall]: {
+      pose proof (Hinvariant B A (t2 --> t2') (t1 --> t1') H0 H) as H1.
       apply H1.
-    * pose proof (Hinvariant A B (t2 --> t2') (t1 --> t1') H0 H) as H1.
+    }
+    [canReply]: {
+      pose proof (Hinvariant A B (t2 --> t2') (t1 --> t1') H0 H) as H1.
       apply H1.
+    }
   Qed.
 
   Lemma invariant_Add_HasType:
@@ -290,8 +305,8 @@ Section IDL.
     forall st1 st2, step st1 st2 -> unique st1 -> unique st2.
   Proof.
     intros st1 st2 Hstep Huniq.
-    induction Hstep.
-    * (* NewService *)
+    induction Hstep; name_cases.
+    [newService]: {
       intros A' s1' s2' HType1 HType2.
       inversion HType1; subst; clear HType1;
       inversion HType2; subst; clear HType2.
@@ -303,7 +318,8 @@ Section IDL.
       - inversion H1; subst; clear H1;
         inversion H0; subst; clear H0.
         reflexivity.
-    * (* EvolveService *)
+    }
+    [evolveService]: {
       intros A' s1' s2' HType1 HType2.
       inversion HType1; subst; clear HType1;
       inversion HType2; subst; clear HType2.
@@ -325,35 +341,41 @@ Section IDL.
       - inversion H1; subst; clear H1;
         inversion H2; subst; clear H0.
         reflexivity.
-    * (* LearnService *)
+    }
+    [learnService]: {
       rewrite unique_Add_HasRef in *.
       assumption.
-    * (* TransmitService *)
+    }
+    [transmitService]: {
       rewrite unique_Add_HasRef in *.
       assumption.
-    * (* HostSubtyping *)
+    }
+    [hostSubtyping]: {
       rewrite unique_Add_HasRef in *.
       assumption.
+    }
   Qed.
 
   Lemma step_preserves_invariant:
     forall st1 st2, step st1 st2 -> unique st1 -> invariant st1 -> invariant st2.
   Proof.
     intros st1 st2 Hstep Huniq Hinv.
-    induction Hstep.
-    * (* NewService *)
+    induction Hstep; name_cases.
+    [newService]: {
       apply invariant_Add_HasType.
       - apply Hinv.
       - intros  B s2 HB.
         eapply H in HB.
         inversion HB.
-    * (* EvolveService *)
+    }
+    [evolveService]: {
       eapply invariant_Change_HasType.
       - apply Hinv.
       - intros B s3 HB Hsub.
         apply evolves_correctly in H0.
         eapply service_subtype_trans; eassumption.
-    * (* LearnService *)
+    }
+    [learnService]: {
       apply invariant_Add_HasRef.
       - apply Hinv.
       - intros s2 HHasType.
@@ -361,7 +383,8 @@ Section IDL.
         replace s2 with s.
         + apply service_subtype_refl.
         + eapply Huniq; eassumption.
-    * (* TransmitService *)
+    }
+    [transmitService]: {
       apply invariant_Add_HasRef.
       - apply Hinv.
       - intros s3 HC.
@@ -370,12 +393,14 @@ Section IDL.
         assert (t1 <: t2) by (eapply HSound; apply H0).
         assert (s1 <:: s2) by (eapply compositional;  eassumption).
         eapply service_subtype_trans; eassumption.
-    * (* HostSubtyping *)
+    }
+    [hostSubtyping]: {
       eapply invariant_Change_HasRef.
       - apply Hinv.
       - intros s3 HB Hsub.
         apply host_subtyping_sound in H.
         eapply service_subtype_trans; eassumption.
+    }
   Qed.
 
   Lemma canonical_soundness: IDLSound.
