@@ -32,7 +32,9 @@ pub trait CandidType {
             t
         }
     }
-    fn id() -> TypeId;
+    fn id() -> TypeId {
+        TypeId::of::<Self>()
+    }
     fn _ty() -> Type;
     // only serialize the value encoding
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
@@ -66,6 +68,7 @@ pub trait Serializer: Sized {
     fn serialize_vec(self, len: usize) -> Result<Self::Compound, Self::Error>;
     fn serialize_variant(self, index: u64) -> Result<Self::Compound, Self::Error>;
     fn serialize_principal(self, v: &[u8]) -> Result<(), Self::Error>;
+    fn serialize_function(self, v: &[u8], meth: &str) -> Result<(), Self::Error>;
 }
 
 pub trait Compound {

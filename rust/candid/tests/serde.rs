@@ -32,7 +32,7 @@ fn test_error() {
         "io error: failed to fill whole buffer",
     );
     // Out of bounds type index
-    check_error(|| test_decode(b"DIDL\0\x01\0\x01", &42), "Unknown opcode 0");
+    check_error(|| test_decode(b"DIDL\0\x01\0\x01", &42), "unknown type 0");
 }
 
 #[test]
@@ -75,12 +75,14 @@ fn test_fixed_number() {
     all_check(42u32, "4449444c0001792a000000");
     all_check(42u64, "4449444c0001782a00000000000000");
     all_check(42usize, "4449444c0001782a00000000000000");
+    all_check(42u128, "4449444c00017d2a");
     all_check(42i8, "4449444c0001772a");
     all_check(42i16, "4449444c0001762a00");
     all_check(42i32, "4449444c0001752a000000");
     all_check(42i64, "4449444c0001742a00000000000000");
     all_check(-42i64, "4449444c000174d6ffffffffffffff");
     all_check(-42isize, "4449444c000174d6ffffffffffffff");
+    all_check(42i128, "4449444c00017c2a");
 }
 
 #[test]
@@ -347,6 +349,20 @@ fn test_vector() {
     all_check([[[[()]]]], "4449444c046d016d026d036d7f010001010101");
     // Space bomb!
     all_check(vec![(); 1000], "4449444c016d7f0100e807");
+}
+
+#[test]
+fn test_collection() {
+    use std::collections::{BTreeMap, BTreeSet, HashMap};
+    let map: HashMap<_, _> = vec![("a".to_string(), 1)].into_iter().collect();
+    all_check(map, "4449444c026d016c0200710175010001016101000000");
+    let bmap: BTreeMap<_, _> = vec![(1, 101), (2, 102), (3, 103)].into_iter().collect();
+    all_check(
+        bmap,
+        "4449444c026d016c0200750175010003010000006500000002000000660000000300000067000000",
+    );
+    let bset: BTreeSet<_> = vec![1, 2, 3].into_iter().collect();
+    all_check(bset, "4449444c016d75010003010000000200000003000000");
 }
 
 #[test]

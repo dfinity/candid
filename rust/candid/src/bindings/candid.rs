@@ -59,14 +59,16 @@ fn needs_quote(id: &str) -> bool {
     !is_valid_as_id(id) || is_keyword(id)
 }
 
-fn pp_text(id: &str) -> RcDoc {
+pub(crate) fn ident_string(id: &str) -> String {
     if needs_quote(id) {
-        str("\"")
-            .append(format!("{}", id.escape_debug()))
-            .append("\"")
+        format!("\"{}\"", id.escape_debug())
     } else {
-        str(id)
+        id.to_string()
     }
+}
+
+fn pp_text(id: &str) -> RcDoc {
+    RcDoc::text(ident_string(id))
 }
 
 pub fn pp_ty(ty: &Type) -> RcDoc {

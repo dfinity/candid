@@ -295,6 +295,8 @@ pub(crate) enum Opcode {
     Vec = -19,
     Record = -20,
     Variant = -21,
+    Func = -22,
+    Service = -23,
     Principal = -24,
 }
 

@@ -24,6 +24,8 @@ pub enum Token {
     Semi,
     #[token(",")]
     Comma,
+    #[token(".", priority = 10)]
+    Dot,
     #[token(":")]
     Colon,
     #[token("->")]

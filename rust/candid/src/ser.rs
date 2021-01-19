@@ -146,6 +146,11 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
         self.write(blob)?;
         Ok(())
     }
+    fn serialize_function(self, blob: &[u8], meth: &str) -> Result<()> {
+        self.write(&[1])?;
+        self.serialize_principal(blob)?;
+        self.serialize_text(meth)
+    }
     fn serialize_option<T: ?Sized>(self, v: Option<&T>) -> Result<()>
     where
         T: super::CandidType,
@@ -274,6 +279,42 @@ impl TypeSerialize {
                 for Field { id, ty } in fs.iter() {
                     leb128_encode(&mut buf, u64::from(id.get_id()))?;
                     self.encode(&mut buf, ty)?;
+                }
+            }
+            Type::Service(ref ms) => {
+                for (_, ty) in ms.iter() {
+                    self.build_type(ty)?;
+                }
+                sleb128_encode(&mut buf, Opcode::Service as i64)?;
+                leb128_encode(&mut buf, ms.len() as u64)?;
+                for (id, ty) in ms.iter() {
+                    let mut name = Vec::from(id.as_bytes());
+                    leb128_encode(&mut buf, name.len() as u64)?;
+                    buf.append(&mut name);
+                    self.encode(&mut buf, ty)?;
+                }
+            }
+            Type::Func(ref func) => {
+                for ty in func.args.iter().chain(func.rets.iter()) {
+                    self.build_type(ty)?;
+                }
+                sleb128_encode(&mut buf, Opcode::Func as i64)?;
+                leb128_encode(&mut buf, func.args.len() as u64)?;
+                for ty in func.args.iter() {
+                    self.encode(&mut buf, ty)?;
+                }
+                leb128_encode(&mut buf, func.rets.len() as u64)?;
+                for ty in func.rets.iter() {
+                    self.encode(&mut buf, ty)?;
+                }
+                leb128_encode(&mut buf, func.modes.len() as u64)?;
+                for m in func.modes.iter() {
+                    use crate::parser::types::FuncMode;
+                    let m = match m {
+                        FuncMode::Query => 1,
+                        FuncMode::Oneway => 2,
+                    };
+                    sleb128_encode(&mut buf, m)?;
                 }
             }
             _ => unreachable!(),
