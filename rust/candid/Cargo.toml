@@ -34,6 +34,7 @@ paste = "1.0.0"
 pretty = "0.10.0"
 serde = { version = "1.0.118", features = ["derive"] }
 thiserror = "1.0.20"
+arbitrary = "0.4.7"
 
 [dev-dependencies]
 goldenfile = "1.1.0"

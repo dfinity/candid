@@ -25,6 +25,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee67c11feeac938fae061b232e38e0b6d94f97a9df10e6271319325ac4c56a86"
 
 [[package]]
+name = "arbitrary"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db55d72333851e17d572bec876e390cd3b11eb1ef53ae821dd9f3b653d2b4569"
+
+[[package]]
 name = "arrayref"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -144,6 +150,7 @@ checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
 name = "candid"
 version = "0.6.13"
 dependencies = [
+ "arbitrary",
  "byteorder",
  "candid_derive",
  "codespan-reporting",
@@ -280,11 +287,13 @@ name = "didc"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arbitrary",
  "candid",
  "candiff",
  "clap",
  "hex",
  "pretty-hex",
+ "rand",
  "structopt",
 ]
 

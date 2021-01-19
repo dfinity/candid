@@ -52,6 +52,11 @@ enum Command {
         /// Disable pretty printing
         flat: bool,
     },
+    /// Generate random Candid values
+    Random {
+        #[structopt(flatten)]
+        annotate: TypeAnnotation,
+    },
     /// Diff two Candid values
     Diff {
         #[structopt(parse(try_from_str = parse_args))]
@@ -204,6 +209,15 @@ fn main() -> Result<()> {
             } else {
                 println!("{:?}", value);
             }
+        }
+        Command::Random { annotate } => {
+            use rand::Rng;
+            let mut rng = rand::thread_rng();
+            let seed: Vec<u8> = (0..2048).map(|_| rng.gen::<u8>()).collect();
+            let mut u = arbitrary::Unstructured::new(&seed);
+            let (env, types) = annotate.get_types(Mode::Encode)?;
+            let value = IDLArgs::any(&mut u, &env, &types)?;
+            println!("{}", value);
         }
         Command::Diff {
             values1,
