@@ -58,7 +58,7 @@ pub mod pretty {
         use ValueEdit::*;
         match &*edit.0 {
             Skip => str("skip"),
-            Put(v) => kwd("put").append(enclose_space("{", pp_value(&v), "}")),
+            Put(v) => kwd("put").append(enclose_space("{", pp_value(20, &v), "}")),
             Opt(ve) => kwd("opt").append(enclose_space("{", value_edit(&ve), "}")),
             Vec(edits) => kwd("vec").append(enclose_space("{", vec_edits(&edits), "}")),
             Record(edits) => kwd("record").append(enclose_space("{", record_edits(&edits), "}")),
@@ -73,7 +73,7 @@ pub mod pretty {
                 "{",
                 RcDoc::as_string(n)
                     .append(RcDoc::space())
-                    .append(pp_value(v)),
+                    .append(pp_value(20, v)),
                 "}",
             )),
             EditValue(n, v) => kwd("edit").append(enclose_space(

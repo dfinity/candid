@@ -29,7 +29,7 @@ mod echo {
         let mut cmd = candiff();
         cmd.arg("echo").arg("1").arg("-d");
         cmd.assert()
-            .stdout(predicate::eq(b"Number(\"1\")\n" as &[u8]))
+            .stdout(predicate::eq(b"1\n" as &[u8]))
             .success();
     }
 
@@ -38,7 +38,7 @@ mod echo {
         let mut cmd = candiff();
         cmd.arg("echo").arg("1").arg("-t nat").arg("-d");
         cmd.assert()
-            .stdout(predicate::eq(b"Nat(Nat(BigUint { data: [1] }))\n" as &[u8]))
+            .stdout(predicate::eq(b"1\n" as &[u8]))
             .success();
     }
 
@@ -47,9 +47,7 @@ mod echo {
         let mut cmd = candiff();
         cmd.arg("echo").arg("1").arg("-t int").arg("-d");
         cmd.assert()
-            .stdout(predicate::eq(
-                b"Int(Int(BigInt { sign: Plus, data: BigUint { data: [1] } }))\n" as &[u8],
-            ))
+            .stdout(predicate::eq(b"1\n" as &[u8]))
             .success();
     }
 

@@ -1,6 +1,10 @@
 
 # Changelog
 
+## 2021-01-12 (Rust 0.6.13)
+
+* Better pretty printer for Candid value
+
 ## 2021-01-06
 
 ### Rust (0.6.12)
