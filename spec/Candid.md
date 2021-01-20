@@ -884,20 +884,22 @@ service { <name> : <functype>; <methtype>;* } <: service { <name> : <functype'>;
 
 This subtyping is implemented during the deserialisation of Candid at an expected type. As described in [Section Deserialisation](#deserialisation), the binary value is conceptually first _decoded_ into an abstract value, and then _coerced_ to the expected type.
 
-This section describes the coercion, as a ternary relation `V ~> V' : T` to describe when a value `V` can be coerced to a value `V'` of type `T`. The fields `V` and `T` can be understood as inputs and `V'` as the output of this relation.
+In the following, we use `V` as an abstract data model of both the message in transit (`V`), as well as the result of the coercion (`V'`).  We re-use the syntax of the textual representation.
 
-Here `V` models untyped values, which form an abstract data model of both the message in transit (`V`), as well as the result of the coercion (`V'`). In the following, we re-use the syntax of the textual representation, with the following changes to make it free of overloading:
+Since messages are self-describing, i.e. carry type description, the rules below can refer to the given type of the message using the `<annval>` syntax (i.e. `(v : t)`) if the type matters. This is used in particular
+ * To resolve overloading in number literals (`<primval>`)
+ * To express the canonical value of type `reserved` as `(null : reserved)`.
+ * To do coercion-time subtyping checks in the rule for `opt`
 
- * Number literals (`<primval>`) must be immediately enclosed with an `<annval>` that clarifies the precise number type.
- * The canonical value of type `reserved` is expressed as `(null : reserved)`.
- * No other use of `<annval>`.
+This section describes the coercion as a ternary relation `V ~> V' : T` to describe that a value `V` can be coerced to a value `V'` of type `T`. The fields `V` and `T` can be understood as inputs and `V'` as the output of this relation. This relation is defined only when the type of `V` is a subtype of `T`.
+
 
 #### Primitive Types
 
 Values of primitive types coerce successfully at their own type:
 ```
---------------------------------------------------
-(<x> : <numtype>) ~> (<x> : <numtype>) : <numtype>
+------------------------------------
+(<x> : <numtype>) ~> <x> : <numtype>
 
 -------------------
 true ~> true : bool
@@ -909,20 +911,20 @@ false ~> false : bool
 <text> ~> <text> : text
 
 -------------------
-null ~> null : null 
+null ~> null : null
 ```
 
 Values of type `nat` coerce successfully at type `int`:
 ```
---------------------------------
-(<x> : nat) ~> (<x> : int) : int
+------------------------
+(<x> : nat) ~> <x> : int
 ```
 
 Any value coerces at type `reserved`, producing the canonical value of type `reserved`:
 
 ```
------------------------------------
-<v> ~> (null : reserved) : reserved
+----------------------
+<v> ~> null : reserved
 ```
 
 NB: No rule is needed for type `empty`, because there are no values of that type. By construction, `<v> ~> _ : empty` will not hold.
@@ -945,22 +947,22 @@ The null value coerce at any option type:
 null ~> null : opt <t>
 ```
 
-An optional value coerces at an option type, if the constituent value coerces at the constituent type:
+An optional value coerces at an option type, if the constituent value has a suitable type:
 ```
-<v> ~> <v'> : <t>
------------------------------
-opt <v> ~> opt <v'> : opt <t>
+<t> <: <t'>
+<v> ~> <v'> : <t'>
+--------------------------------------
+opt (<v> : <t>) ~> opt <v'> : opt <t'>
 ```
 
-If an optional value _fails_ to coerce at an optional type, or the value is `reserved`, the result is `null`, not failure:
+If an optional value does not have a subtype of the expected type, the result is `null`:
 ```
-not (<v> ~> _ : <t>)
--------------------------
-opt <v> ~> null : opt <t>
+not (<t> <: <t'>)
+----------------------------------
+opt (<v> : <t>) ~> null : opt <t'>
+```
 
------------------------------------
-(null : reserved) ~> null : opt <t>
-```
+NOTE: The two rules above imply that a Candid decoder has to be able to decide the subtyping relation at runtime.
 
 Coercing a non-null, non-optional and non-reserved value at an option type treats it as an optional value:
 ```
@@ -972,7 +974,6 @@ opt <v> ~> <v'> : opt <t>
 -------------------------
 <v> ~> <v'> : opt <t>
 ```
-
 
 #### Records
 
@@ -1000,7 +1001,7 @@ variant { <nat> = <v> } ~> variant { <nat> = <v'> } : variant { <nat> = <t>; _;*
 
 #### References
 
-Function and services references coerce unconditionally
+Function and services references coerce unconditionally (note that coercion is only applied when the input value has a subtype of the expected type):
 
 ```
 ------------------------------------------------------
@@ -1030,7 +1031,7 @@ record {<v>;*} ~> record {<v'>,*} : record {<t>;*}
 
 ## Properties
 
-The relations above have certain properties. To express them, we need the relation `V : T`, expressing that `V` has inherently type `T`. Instead of defining this relation on its own, we take the first property below as its definition:
+The relations above have certain properties. To express them, we need the relation `V : T`, expressing that `V` has inherently type `T`. Instead of defining this relation on its own, we take the roundtripping property below as its definition:
 
 * Correctness and completeness of decoding:
   ```
@@ -1066,7 +1067,7 @@ The relations above have certain properties. To express them, we need the relati
   T1 <: T2, T2 <: T3 ⇒ T1 <: T3
   ```
 
-* Transitive coherence does not hold:
+* NB: Transitive coherence does not hold:
   ```
   T1 <: T2, T2 <: T3
   v1 : T1
@@ -1299,9 +1300,10 @@ Note:
 Deserialisation at an expected type sequence `(<t'>,*)` proceeds by
 
  * checking for the magic number `DIDL`
- * using the inverse of the `T` function to decode the type definitions `(<t>*)`
+ * using the inverse of the `T` function to decode the type definitions `(<t>,*)`
+ * check that `(<t>,*) <: (<t'>,*)`, else fail
  * using the inverse of the `M` function, indexed by `(<t>*)`, to decode the values `(<v>*)`
- * use the coercion relation `(<v>,*) ~> (<v'>,*) : (<t'>,*)` to try to understand the decoded values at the expected type.
+ * use the coercion relation `(<v>,*) ~> (<v'>,*) : (<t'>,*)` to understand the decoded values at the expected type.
 
 ### Deserialisation of future types
 
