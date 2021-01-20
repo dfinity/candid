@@ -886,7 +886,7 @@ This subtyping is implemented during the deserialisation of Candid at an expecte
 
 In the following, we use `V` as an abstract data model of both the message in transit (`V`), as well as the result of the coercion (`V'`).  We re-use the syntax of the textual representation.
 
-Since messages are self-describing, i.e. carry type description, the rules below can refer to the given type of the message using the `<annval>` syntax (i.e. `(v : t)`) if the type matters. This is used in particular
+Since messages are self-describing, i.e. carry a type description, the rules below can refer to the given type of the message using the `<annval>` syntax (i.e. `(v : t)`) if the type matters. This is used in particular
  * To resolve overloading in number literals (`<primval>`)
  * To express the canonical value of type `reserved` as `(null : reserved)`.
  * To do coercion-time subtyping checks in the rule for `opt`
