@@ -11,3 +11,6 @@ pub mod value;
 pub mod typing;
 
 pub mod test;
+
+pub mod pretty;
+mod random;

@@ -184,7 +184,7 @@ fn main() -> Result<()> {
                 "blob" => {
                     let mut res = String::new();
                     for ch in bytes.iter() {
-                        res.push_str(&candid::parser::value::pretty::pp_char(*ch));
+                        res.push_str(&candid::parser::pretty::pp_char(*ch));
                     }
                     res
                 }
