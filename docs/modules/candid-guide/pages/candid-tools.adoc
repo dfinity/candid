@@ -1,0 +1,14 @@
+= Tools and libraries
+
+This section provides links to Candid tools and libraries for currently-supported host languages.
+
+* The Motoko language has built-in support for Candid and the compiler uses it implicitly.
+
+* To create Candid services or clients in Rust, you can use the https://crates.io/crates/candid[Candid crate].
+
+* The https://github.com/dfinity/agent-js/[Internet Computer agent library for JavaScript] includes support for Candid.
+
+* Community-supported libraries for Candid also exist for https://hackage.haskell.org/package/candid[Haskell], https://github.com/chenyan2002/ic-elm/[Elm] and https://github.com/seniorjoinu/candid-kt[Kotlin].
+
+* The https://github.com/dfinity/candid/tree/master/tools/ui[Candid UI] creates a Web interface from the Candid interface of any canister.
+

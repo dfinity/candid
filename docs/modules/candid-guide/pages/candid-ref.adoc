@@ -1,0 +1,8 @@
+= Reference
+
+This section provides links to Candid tools and libraries for currently supported host languages and detailed reference information about Candid supported types.
+
+If you are looking for more information before you start working with Candid, check out the following related resources:
+
+* link:https://www.youtube.com/watch?v=O2KaWRtsqHg[How Candid provides a common language for application interfaces (video)]
+

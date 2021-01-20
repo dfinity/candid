@@ -1,0 +1,39 @@
+= How to
+
+Now that you have a good overview of Candid and its various moving parts, this section gives you concrete instructions to achieve certain tasks.
+
+== How do I interact with canisters on the command line?
+
+The `+dfx+` tool provides the `dfx canister call` command, which understands <<textual-values,Candid textual values>>:
+....
+dfx canister call msgt2-6nlzx-xq add_entry ("John Doe", record { street = "Hauptstraße", city = "Zürich" })
+....
+
+See TODO to read more about how to use the `dfx` tool.
+
+== How do I interact with canisters via Candid UI?
+
+TODO
+
+== How do I use Candid as a Motoko canister developer?
+
+If you are writing a service from scratch in Motoko, then you need to take no special action: The Motoko compiler will translate the signature of your Canister’s top-level actor or actor class into a Candid description, and the `dfx` build tool will make sure it ends up where it needs to be.
+
+For example, in a multi-canister project, dfx will ensure that any clients of your Motoko service will import the generated Candid description of that service.
+
+If you want to implement a _specific_ interface, for example because you want to interact with a service that expects your canister to have that interface, you can consult the 
+reference below to figure which Motoko types to use to achieve this effect. In the future, this will be simplified.
+
+== How do I use Candid as Rust canister developer?
+
+TODO: Someone who implements rust canisters should write this section.
+
+== How do I use Candid as a JavaScript front-end developer?
+
+TODO: Someone who implements Frontends should write this section
+
+== How do I implement Candid?
+
+If you want to create a new Candid implementation, this document will not suffice. In this case, consult the https://github.com/dfinity/candid/blob/master/spec/Candid.md[Candid specification].
+
+Additionally, the official https://github.com/dfinity/candid/tree/master/test[Candid test data] is useful to make sure your implementation is compatible with Candid, even in slightly more obscure corner cases.
