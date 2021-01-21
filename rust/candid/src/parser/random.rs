@@ -49,6 +49,7 @@ impl IDLArgs {
 impl TypeEnv {
     /// Return the upper bound of the depth
     fn depth(&self, limit: usize, t: &Type) -> usize {
+        // TODO memoize
         use Type::*;
         if limit == 0 {
             return 1;
@@ -71,6 +72,31 @@ impl TypeEnv {
             _ => 1,
         }
     }
+    /// lower bound for size
+    fn size(&self, limit: usize, t: &Type) -> usize {
+        use Type::*;
+        if limit == 0 {
+            return 1;
+        }
+        match t {
+            Var(id) => {
+                let ty = self.rec_find_type(id).unwrap();
+                self.depth(limit, &ty)
+            }
+            Empty => 0,
+            Opt(t) => self.size(limit - 1, t),
+            Vec(t) => self.size(limit - 1, t),
+            Record(fs) => fs
+                .iter()
+                .map(|Field { ty, .. }| self.size(limit - 1, ty))
+                .sum(),
+            Variant(fs) => fs
+                .iter()
+                .map(|Field { ty, .. }| self.size(limit - 1, ty))
+                .min(),
+            _ => 1,
+        }
+    }
 }
 
 fn arbitrary_variant(u: &mut Unstructured, weight: &[usize]) -> Result<usize> {
@@ -83,10 +109,8 @@ fn arbitrary_variant(u: &mut Unstructured, weight: &[usize]) -> Result<usize> {
         })
         .collect();
     let selected = u.int_in_range(0..=prefix_sum[prefix_sum.len() - 1] - 1)?;
-    println!("{} {:?}", selected, prefix_sum);
     for (i, e) in prefix_sum.iter().enumerate() {
         if selected < *e {
-            println!("{}", i);
             return Ok(i);
         }
     }
