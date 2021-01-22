@@ -4,7 +4,7 @@ use crate::types::{Field, Type};
 use crate::Result;
 use arbitrary::Unstructured;
 use std::cell::Cell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 const MAX_DEPTH: usize = 20;
 
@@ -58,65 +58,44 @@ impl IDLArgs {
 }
 
 impl TypeEnv {
-    /// Return the upper bound of the depth
-    fn depth(&self, limit: usize, t: &Type) -> usize {
-        // TODO memoize
+    /// Upper bound of type size. Returns None if infinite.
+    fn size_helper(&self, seen: &mut HashSet<String>, t: &Type) -> Option<usize> {
         use Type::*;
-        if limit == 0 {
-            return 1;
-        }
-        match t {
+        Some(match t {
             Var(id) => {
-                let ty = self.rec_find_type(id).unwrap();
-                self.depth(limit, &ty)
+                if seen.insert(id.to_string()) {
+                    let ty = self.rec_find_type(id).unwrap();
+                    self.size_helper(seen, &ty)?
+                } else {
+                    return None;
+                }
             }
             Empty => 0,
-            Opt(t) => 1 + self.depth(limit - 1, t),
-            Vec(t) => 1 + self.depth(limit - 1, t),
-            Record(fs) | Variant(fs) => {
-                1 + fs
-                    .iter()
-                    .map(|Field { ty, .. }| self.depth(limit - 1, ty))
-                    .max()
-                    .unwrap_or(0)
-            }
-            _ => 1,
-        }
-    }
-    /// lower and upper bound for size
-    fn size(&self, limit: usize, t: &Type) -> (usize, usize) {
-        use Type::*;
-        if limit == 0 {
-            return (1, 1);
-        }
-        match t {
-            Var(id) => {
-                let ty = self.rec_find_type(id).unwrap();
-                self.size(limit, &ty)
-            }
-            Empty => (0, 0),
-            Opt(t) => {
-                let (_, u) = self.size(limit - 1, t);
-                (1, 1 + u)
-            }
-            Vec(t) => {
-                let (_, u) = self.size(limit - 1, t);
-                (1, 1 + u * 2)
-            }
+            Opt(t) => 1 + self.size_helper(seen, t)?,
+            Vec(t) => 1 + self.size_helper(seen, t)? * 2,
             Record(fs) => {
-                let iter = fs.iter().map(|Field { ty, .. }| self.size(limit - 1, ty));
-                let l: usize = iter.clone().map(|e| e.0).sum();
-                let r: usize = iter.map(|e| e.1).sum();
-                (1 + l, 1 + r)
+                let mut sum = 0;
+                for Field { ty, .. } in fs.iter() {
+                    sum += self.size_helper(seen, ty)?;
+                }
+                1 + sum
             }
             Variant(fs) => {
-                let iter = fs.iter().map(|Field { ty, .. }| self.size(limit - 1, ty));
-                let l = std::cmp::max(1, iter.clone().map(|e| e.0).min().unwrap());
-                let r = iter.map(|e| e.1).max().unwrap();
-                (1 + l, 1 + r)
+                let mut max = 0;
+                for Field { ty, .. } in fs.iter() {
+                    let s = self.size_helper(seen, ty)?;
+                    if s > max {
+                        max = s;
+                    };
+                }
+                1 + max
             }
-            _ => (1, 1),
-        }
+            _ => 1,
+        })
+    }
+    fn size(&self, t: &Type) -> Option<usize> {
+        let mut seen = HashSet::new();
+        self.size_helper(&mut seen, t)
     }
 }
 
@@ -141,11 +120,11 @@ fn arbitrary_variant(u: &mut Unstructured, weight: &[usize]) -> Result<usize> {
 impl IDLValue {
     pub fn any(u: &mut Unstructured, config: &GenConfig, env: &TypeEnv, ty: &Type) -> Result<Self> {
         config.dec(1);
-        println!("{} {}", config.depth.get(), config.size.get());
         Ok(match ty {
             Type::Var(id) => {
                 let ty = env.rec_find_type(id)?;
                 config.inc();
+                config.size.set(config.size.get() + 1);
                 Self::any(u, config, env, &ty)?
             }
             Type::Null => IDLValue::Null,
@@ -155,8 +134,12 @@ impl IDLValue {
                 let v = u.int_in_range(config.range.0..=config.range.1)?;
                 IDLValue::Nat(v.into())
             }
+            Type::Int => {
+                let v = u.int_in_range(config.range.0..=config.range.1)?;
+                IDLValue::Int(v.into())
+            }
             //Type::Nat => IDLValue::Nat(u.arbitrary::<u128>()?.into()),
-            Type::Int => IDLValue::Int(u.arbitrary::<i128>()?.into()),
+            //Type::Int => IDLValue::Int(u.arbitrary::<i128>()?.into()),
             Type::Nat8 => IDLValue::Nat8(u.arbitrary()?),
             Type::Nat16 => IDLValue::Nat16(u.arbitrary()?),
             Type::Nat32 => IDLValue::Nat32(u.arbitrary()?),
@@ -173,7 +156,7 @@ impl IDLValue {
                 let depths = if config.depth.get() == 0 || config.size.get() == 0 {
                     [1, 0]
                 } else {
-                    [1, env.depth(MAX_DEPTH, t)]
+                    [1, env.size(t).unwrap_or(MAX_DEPTH)]
                 };
                 let idx = arbitrary_variant(u, &depths)?;
                 if idx == 0 {
@@ -185,8 +168,9 @@ impl IDLValue {
                 }
             }
             Type::Vec(t) => {
-                let (lower, _) = env.size(MAX_DEPTH, t);
-                let max_len = config.size.get() / (lower * 2);
+                let elem_size = env.size(t).unwrap_or(MAX_DEPTH);
+                println!("{} {}", elem_size, config.size.get());
+                let max_len = config.size.get() / elem_size;
                 let len = u.int_in_range(0..=max_len)?;
                 let mut vec = Vec::with_capacity(len);
                 for _ in 0..len {
@@ -209,7 +193,9 @@ impl IDLValue {
                 IDLValue::Record(res)
             }
             Type::Variant(fs) => {
-                let choices = fs.iter().map(|Field { ty, .. }| env.depth(MAX_DEPTH, ty));
+                let choices = fs
+                    .iter()
+                    .map(|Field { ty, .. }| env.size(ty).unwrap_or(MAX_DEPTH));
                 let sizes: Vec<_> = if config.depth.get() == 0 || config.size.get() == 0 {
                     let min = choices.clone().min().unwrap_or(0);
                     choices.map(|d| if d > min { 0 } else { d }).collect()
