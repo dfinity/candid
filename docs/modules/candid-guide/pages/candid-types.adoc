@@ -4,10 +4,8 @@ This section lists all the types supported by Candid.
 For each type, the reference includes the following information:
 
 * Type syntax and the syntax for the textual representation of the type.
-* Upgrade rules for the type.
+* Upgrade rules for each type are given in terms of the possible _subtypes_ and _supertypes_ of a type.
 * Corresponding types in Rust, Motoko and Javascript.
-
-== Subtypes and supertypes
 
 Subtypes are the types you can change your method _results_ to.
 Supertypes are the types that you can change your method _arguments_ to.
@@ -16,7 +14,7 @@ You should note that this reference only lists the specific subtypes and superty
 It does not repeat common information about subtypes and supertypes that can apply to any type. 
 For example, the reference does not list `+empty+` as a subtype because it can be a subtype of any other type.
 Similarly, the types `+reserved+` and `+opt t+` are not listed as supertypes of specific types because they are supertypes of any type. 
-The `+empty+`, `+reserved+`, and `+opt t+` types are discussed separately, independent of other types.
+For details about the subtyping rules for the `+empty+`, `+reserved+`, and `+opt t+` types, see the <<type-empty,`+empty+` type>>, the <<type-reserved,`+reserved+` type>>, and the <<type-opt,`+opt t+` type>> sections.
 
 [#type-text]
 == Type text
