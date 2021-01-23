@@ -64,7 +64,7 @@ fn test_integer() {
     );
     check_error(
         || test_decode(&hex("4449444c00017c2a"), &42i64),
-        "Type mismatch. Type on the wire: Int; Provided type: Int64",
+        "Type mismatch. Type on the wire: Int; Expected type: Int64",
     );
 }
 

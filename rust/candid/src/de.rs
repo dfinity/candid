@@ -321,7 +321,7 @@ impl<'de> Deserializer<'de> {
         let wire_type = self.parse_type()?;
         if wire_type != expected {
             return Err(Error::msg(format!(
-                "Type mismatch. Type on the wire: {:?}; Provided type: {:?}",
+                "Type mismatch. Type on the wire: {:?}; Expected type: {:?}",
                 wire_type, expected
             )));
         }
