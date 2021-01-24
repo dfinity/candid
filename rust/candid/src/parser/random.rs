@@ -1,43 +1,61 @@
 use super::typing::TypeEnv;
 use super::value::{IDLArgs, IDLField, IDLValue};
 use crate::types::{Field, Type};
+use crate::Deserialize;
 use crate::Result;
 use arbitrary::Unstructured;
 use std::collections::HashSet;
 
 const MAX_DEPTH: usize = 20;
 
+#[derive(Debug, Deserialize)]
 pub struct GenConfig {
-    range: (isize, isize),
-    text: &'static str, // regex or pattern
-    depth: isize,
-    size: isize,
+    range: Option<(isize, isize)>,
+    text: Option<String>, // regex or pattern
+    value: Option<IDLValue>,
+    depth: Option<isize>,
+    size: Option<isize>,
 }
-
 impl Default for GenConfig {
     fn default() -> Self {
         GenConfig {
-            range: (0, 100),
-            text: "ascii",
-            depth: 5,
-            size: 100,
+            range: Some((0, 100)),
+            text: Some("ascii".to_string()),
+            value: None,
+            depth: Some(5),
+            size: Some(100),
         }
     }
 }
-impl GenConfig {
-    pub fn any(&mut self, u: &mut Unstructured, env: &TypeEnv, ty: &Type) -> Result<IDLValue> {
+pub struct GenState<'a> {
+    config: GenConfig,
+    env: &'a TypeEnv,
+    depth: isize,
+    size: isize,
+}
+impl<'a> GenState<'a> {
+    fn new(config: GenConfig, env: &'a TypeEnv) -> Self {
+        GenState {
+            depth: config.depth.unwrap_or(5),
+            size: config.size.unwrap_or(50),
+            config,
+            env,
+        }
+    }
+    pub fn any(&mut self, u: &mut Unstructured, ty: &Type) -> Result<IDLValue> {
         self.size -= 1;
         Ok(match ty {
             Type::Var(id) => {
-                let ty = env.rec_find_type(id)?;
+                let ty = self.env.rec_find_type(id)?;
                 self.size += 1;
-                self.any(u, env, &ty)?
+                self.any(u, &ty)?
             }
             Type::Null => IDLValue::Null,
             Type::Reserved => IDLValue::Reserved,
             Type::Bool => IDLValue::Bool(u.arbitrary()?),
             Type::Int => {
-                let v = u.int_in_range(self.range.0..=self.range.1)?;
+                let v =
+                    u.int_in_range(self.config.range.unwrap().0..=self.config.range.unwrap().1)?;
                 IDLValue::Int(v.into())
             }
             Type::Nat => IDLValue::Nat(u.arbitrary::<u128>()?.into()),
@@ -58,26 +76,26 @@ impl GenConfig {
                 let depths = if self.depth <= 0 || self.size <= 0 {
                     [1, 0]
                 } else {
-                    [1, env.size(t).unwrap_or(MAX_DEPTH)]
+                    [1, self.env.size(t).unwrap_or(MAX_DEPTH)]
                 };
                 let idx = arbitrary_variant(u, &depths)?;
                 if idx == 0 {
                     IDLValue::None
                 } else {
                     self.depth -= 1;
-                    let res = IDLValue::Opt(Box::new(self.any(u, env, t)?));
+                    let res = IDLValue::Opt(Box::new(self.any(u, t)?));
                     self.depth += 1;
                     res
                 }
             }
             Type::Vec(t) => {
-                let elem_size = env.size(t).unwrap_or(MAX_DEPTH);
+                let elem_size = self.env.size(t).unwrap_or(MAX_DEPTH);
                 let max_len = std::cmp::max(0, self.size) as usize / elem_size;
                 let len = u.int_in_range(0..=max_len)?;
                 let mut vec = Vec::with_capacity(len);
                 for _ in 0..len {
                     self.depth -= 1;
-                    let e = self.any(u, env, t)?;
+                    let e = self.any(u, t)?;
                     self.depth += 1;
                     vec.push(e);
                 }
@@ -87,7 +105,7 @@ impl GenConfig {
                 let mut res = Vec::new();
                 for Field { id, ty } in fs.iter() {
                     self.depth -= 1;
-                    let val = self.any(u, env, ty)?;
+                    let val = self.any(u, ty)?;
                     self.depth += 1;
                     res.push(IDLField {
                         id: id.clone(),
@@ -99,7 +117,7 @@ impl GenConfig {
             Type::Variant(fs) => {
                 let choices = fs
                     .iter()
-                    .map(|Field { ty, .. }| env.size(ty).unwrap_or(MAX_DEPTH));
+                    .map(|Field { ty, .. }| self.env.size(ty).unwrap_or(MAX_DEPTH));
                 let sizes: Vec<_> = if self.depth <= 0 || self.size <= 0 {
                     let min = choices.clone().min().unwrap_or(0);
                     choices.map(|d| if d > min { 0 } else { d }).collect()
@@ -109,7 +127,7 @@ impl GenConfig {
                 let idx = arbitrary_variant(u, &sizes)?;
                 let Field { id, ty } = &fs[idx];
                 self.depth -= 1;
-                let val = self.any(u, env, ty)?;
+                let val = self.any(u, ty)?;
                 self.depth += 1;
                 let field = IDLField {
                     id: id.clone(),
@@ -126,8 +144,9 @@ impl IDLArgs {
     pub fn any(u: &mut Unstructured, env: &TypeEnv, types: &[Type]) -> Result<Self> {
         let mut args = Vec::new();
         for t in types.iter() {
-            let mut config = GenConfig::default();
-            let v = config.any(u, env, t)?;
+            let config = GenConfig::default();
+            let mut state = GenState::new(config, env);
+            let v = state.any(u, t)?;
             args.push(v);
         }
         Ok(IDLArgs { args })
