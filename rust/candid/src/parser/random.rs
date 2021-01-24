@@ -4,6 +4,7 @@ use crate::types::{Field, Type};
 use crate::Deserialize;
 use crate::Result;
 use arbitrary::Unstructured;
+use serde_dhall::{from_simple_value, SimpleValue};
 use std::collections::HashSet;
 
 const MAX_DEPTH: usize = 20;
@@ -29,15 +30,18 @@ impl Default for GenConfig {
 }
 pub struct GenState<'a> {
     config: GenConfig,
+    tree: SimpleValue,
     env: &'a TypeEnv,
     depth: isize,
     size: isize,
 }
 impl<'a> GenState<'a> {
-    fn new(config: GenConfig, env: &'a TypeEnv) -> Self {
+    fn new(tree: SimpleValue, env: &'a TypeEnv) -> Self {
+        let config = GenConfig::default();
         GenState {
             depth: config.depth.unwrap_or(5),
             size: config.size.unwrap_or(50),
+            tree,
             config,
             env,
         }
@@ -141,11 +145,15 @@ impl<'a> GenState<'a> {
 }
 
 impl IDLArgs {
-    pub fn any(u: &mut Unstructured, env: &TypeEnv, types: &[Type]) -> Result<Self> {
+    pub fn any(
+        u: &mut Unstructured,
+        tree: SimpleValue,
+        env: &TypeEnv,
+        types: &[Type],
+    ) -> Result<Self> {
+        let mut state = GenState::new(tree, env);
         let mut args = Vec::new();
         for t in types.iter() {
-            let config = GenConfig::default();
-            let mut state = GenState::new(config, env);
             let v = state.any(u, t)?;
             args.push(v);
         }
@@ -154,14 +162,16 @@ impl IDLArgs {
 }
 
 impl TypeEnv {
-    /// Upper bound of type size. Returns None if infinite.
+    /// Approxiamte upper bound for IDLValue size of type t. Returns None if infinite.
     fn size_helper(&self, seen: &mut HashSet<String>, t: &Type) -> Option<usize> {
         use Type::*;
         Some(match t {
             Var(id) => {
                 if seen.insert(id.to_string()) {
                     let ty = self.rec_find_type(id).unwrap();
-                    self.size_helper(seen, &ty)?
+                    let res = self.size_helper(seen, &ty)?;
+                    seen.remove(id);
+                    res
                 } else {
                     return None;
                 }

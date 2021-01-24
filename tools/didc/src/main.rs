@@ -212,21 +212,13 @@ fn main() -> Result<()> {
         }
         Command::Random { annotate } => {
             use rand::Rng;
-            use serde_dhall::{from_simple_value, SimpleValue};
+            use serde_dhall::SimpleValue;
             let mut rng = rand::thread_rng();
             let seed: Vec<u8> = (0..2048).map(|_| rng.gen::<u8>()).collect();
             let mut u = arbitrary::Unstructured::new(&seed);
             let (env, types) = annotate.get_types(Mode::Encode)?;
             let config = serde_dhall::from_file("random.dhall").parse::<SimpleValue>()?;
-            let my_config = match config {
-                SimpleValue::Record(map) => {
-                    let v = map.get("vec").unwrap().clone();
-                    from_simple_value::<candid::parser::random::GenConfig>(v)?
-                }
-                _ => unreachable!(),
-            };
-            println!("{:?}", my_config);
-            let value = IDLArgs::any(&mut u, &env, &types)?;
+            let value = IDLArgs::any(&mut u, config, &env, &types)?;
             println!("{}", value);
         }
         Command::Diff {
