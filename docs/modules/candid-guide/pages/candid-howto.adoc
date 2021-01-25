@@ -59,7 +59,7 @@ reference below to figure which Motoko types to use to achieve this effect. In t
 
 == Use Candid as Rust canister developer?
 
-TODO: Someone who implements rust canisters should write this section.
+TODO: Someone who implements Rust canisters should write this section.
 
 == Use Candid as a JavaScript front-end developer?
 
