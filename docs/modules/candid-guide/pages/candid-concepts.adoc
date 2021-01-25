@@ -208,7 +208,7 @@ service counter : {
 ....
 ====
 
-[#textual-values]
+[[textual-values]]
 == Candid textual values
 
 The main purpose of Candid is to connect programs written in some host language—Motoko, Rust, or JavaScript, for example—with the {IC}.
@@ -259,9 +259,10 @@ actor {
 
 When you compile this program, the {proglang} compiler automatically generates a Candid service description file with the interface shown above.
 
-In other languages, like Rust, you can still develop your service using the types that are native to that language, for example, using native Rust types.
+In other languages, like Rust or C, you can still develop your service using the types that are native to that language, for example, using native Rust types.
 After you develop a service in a language like Rust, however, there's currently no way to automatically generate the service description in Candid. 
-Therefore, you currently would need to write the Candid interface description manually.
+Therefore, if you write a program for a service in Rust or C, you need to write the Candid interface description manually following the conventions described in the link:https://github.com/dfinity/candid[Candid specification].
+
 For examples of how to write Candid service descriptions for Rust programs, see the link:https://github.com/dfinity/cdk-rs/tree/next/examples[Rust CDK examples] and the link:rust-guide:rust-intro{outfilesuffix}[Rust tutorials].
 
 Regardless of the host language you use, it is important to know the mapping between host language types and Candid types.
