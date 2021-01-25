@@ -1,6 +1,9 @@
 = Reference
 
-This section provides links to Candid tools and libraries for currently supported host languages and detailed reference information about Candid supported types.
+This section provides detailed reference information about Candid supported types and links to Candid tools and libraries for currently supported host languages.
+
+* link:candid-type{outfilesuffix}[Supported types]
+* link:candid-tools{outfilesuffix}[Tools and libraries]
 
 If you are looking for more information before you start working with Candid, check out the following related resources:
 
