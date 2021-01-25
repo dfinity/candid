@@ -211,6 +211,7 @@ fn main() -> Result<()> {
             }
         }
         Command::Random { annotate } => {
+            use candid::parser::configs::Configs;
             use rand::Rng;
             use serde_dhall::SimpleValue;
             let mut rng = rand::thread_rng();
@@ -218,6 +219,7 @@ fn main() -> Result<()> {
             let mut u = arbitrary::Unstructured::new(&seed);
             let (env, types) = annotate.get_types(Mode::Encode)?;
             let config = serde_dhall::from_file("random.dhall").parse::<SimpleValue>()?;
+            let config = Configs::from_dhall(config);
             let value = IDLArgs::any(&mut u, config, &env, &types)?;
             println!("{}", value);
         }

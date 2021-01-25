@@ -1,10 +1,10 @@
+use super::configs::Configs;
 use super::typing::TypeEnv;
 use super::value::{IDLArgs, IDLField, IDLValue};
 use crate::types::{Field, Type};
 use crate::Deserialize;
 use crate::Result;
 use arbitrary::Unstructured;
-use serde_dhall::{from_simple_value, SimpleValue};
 use std::collections::HashSet;
 
 const MAX_DEPTH: usize = 20;
@@ -14,6 +14,7 @@ pub struct GenConfig {
     range: Option<(isize, isize)>,
     text: Option<String>, // regex or pattern
     value: Option<IDLValue>,
+    // Only work for global scope
     depth: Option<isize>,
     size: Option<isize>,
 }
@@ -30,21 +31,21 @@ impl Default for GenConfig {
 }
 pub struct GenState<'a> {
     config: GenConfig,
-    tree: SimpleValue,
+    tree: Configs,
     env: &'a TypeEnv,
     depth: isize,
     size: isize,
 }
 impl<'a> GenState<'a> {
-    fn new(tree: SimpleValue, env: &'a TypeEnv) -> Self {
-        let config = GenConfig::default();
-        GenState {
+    fn new(tree: Configs, env: &'a TypeEnv) -> Result<Self> {
+        let config = tree.get::<GenConfig>("default")?; //GenConfig::default();
+        Ok(GenState {
             depth: config.depth.unwrap_or(5),
             size: config.size.unwrap_or(50),
             tree,
             config,
             env,
-        }
+        })
     }
     pub fn any(&mut self, u: &mut Unstructured, ty: &Type) -> Result<IDLValue> {
         self.size -= 1;
@@ -145,13 +146,8 @@ impl<'a> GenState<'a> {
 }
 
 impl IDLArgs {
-    pub fn any(
-        u: &mut Unstructured,
-        tree: SimpleValue,
-        env: &TypeEnv,
-        types: &[Type],
-    ) -> Result<Self> {
-        let mut state = GenState::new(tree, env);
+    pub fn any(u: &mut Unstructured, tree: Configs, env: &TypeEnv, types: &[Type]) -> Result<Self> {
+        let mut state = GenState::new(tree, env)?;
         let mut args = Vec::new();
         for t in types.iter() {
             let v = state.any(u, t)?;

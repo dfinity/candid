@@ -12,5 +12,6 @@ pub mod typing;
 
 pub mod test;
 
+pub mod configs;
 pub mod pretty;
 pub mod random;
