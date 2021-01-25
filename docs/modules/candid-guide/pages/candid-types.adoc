@@ -14,7 +14,11 @@ You should note that this reference only lists the specific subtypes and superty
 It does not repeat common information about subtypes and supertypes that can apply to any type. 
 For example, the reference does not list `+empty+` as a subtype because it can be a subtype of any other type.
 Similarly, the types `+reserved+` and `+opt t+` are not listed as supertypes of specific types because they are supertypes of any type. 
-For details about the subtyping rules for the `+empty+`, `+reserved+`, and `+opt t+` types, see the <<type-empty,`+empty+` type>>, the <<type-reserved,`+reserved+` type>>, and the <<type-opt,`+opt t+` type>> sections.
+For details about the subtyping rules for the `+empty+`, `+reserved+`, and `+opt t+` types, see the following sections:
+
+* <<type-empty, `+empty+`>>
+* <<type-reserved, `+reserved+`>>
+* <<type-opt,`+opt t+`>>
 
 [#type-text]
 == Type text
@@ -50,7 +54,7 @@ TODO:
 [#type-blob]
 == Type blob
 
-The `blob` type can be used for binary data, i.e. sequences of bytes. It is interchangable with `vec nat8`, i.e. interfaces written in terms of `blob` and interfaces written in terms of `vec nat8` are compatible.
+The `+blob+` type can be used for binary data, that is, sequences of bytes. It is interchangable with `+vec nat8+`. Therefore, interfaces written in terms of `+blob+` and interfaces written in terms of `+vec nat8+` are compatible.
 
 Type syntax::
 
@@ -161,7 +165,7 @@ TODO
 
 The types `nat8`, `nat16`, `nat32`, `nat64`, `int8`, `int16`, `int32` and `nat64` represent numbers with a representation of that many bits, and can be used in more “low-level” interface.
 
-The range of `natN` is \(\{0 \ldots 2^{N}-1\}\), and the range of `intN` is \(\{-2^{N-1} \ldots 2^{N-1}-1\}\).
+The range of `natN` is \(\{0 \ldots 2^\{N\}-1\}\), and the range of `intN` is \(\{-2^\{N-1\} \ldots 2^\{N-1\}-1\}\).
 
 The on-wire representation is exactly that many bits long. So for small values, `nat` is more space-efficent than `nat64`.
 
