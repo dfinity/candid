@@ -1,39 +1,72 @@
 = How to
 
-Now that you have a good overview of Candid and its various moving parts, this section gives you concrete instructions to achieve certain tasks.
+As discussed in link:[], Candid provides a language-agnostic way to interact with canisters.
+By using Candid, you can specify input argument values and display return values from canister methods regardless of whether you interact with the {IC} from a terminal using the `+dfx+` command-line interface, through a web browser, or from a program written in JavaScript, {proglang}, Rust, or other language.
+Now that you are familiar with what Candid is and how it works, this section provides instructions for how to use it in some common scenarios.
 
-== How do I interact with canisters on the command line?
+[[idl-syntax]]
+== Pass arguments in a terminal 
 
-The `+dfx+` tool provides the `dfx canister call` command, which understands <<textual-values,Candid textual values>>:
+One of the most common ways you interact with canisters and the {IC} is by using the {company} Canister SDK `+dfx+` command-line interface.
+
+The `+dfx+` tool provides the `+dfx canister call+` command to call a specific deployed canister—essentially a service that runs on the {IC}—and, if applicable, a method for that service.
+
+When you run the `+dfx canister call+` command, you can pass arguments to a method by specifying them as link:candid-concepts{outfilesuffix}#textual-values[Candid textual values].
+
+When you pass Candid textual values on the command-line, you can specify multiple argument values separated by commas (`+,+`) and wrapped inside parentheses.
+For example, specifying `+(42, true)+` represents two argument values, where the first argument is the number `+42+` and the second argument is a boolean value of `+true+`.
+
+The following example illustrates using the `+dfx canister call+` command to call the `+msgt2-6nlzx-xq+` canister service and pass arguments for the `+add_entry+` method:
 ....
 dfx canister call msgt2-6nlzx-xq add_entry ("John Doe", record { street = "Hauptstraße", city = "Zürich" })
 ....
 
-See TODO to read more about how to use the `dfx` tool.
+For more information about using `+dfx+` and the `+dfx canister call+` command, see link:developers-guide:cli-reference{outfilesuffix}[Command-line reference] and link:developers-guide/cli-reference/dfx-canister{outfilesuffix}[dfx canister] documentation.
 
-== How do I interact with canisters via Candid UI?
+[[candid-ui]]
+== Interact with a service from a browser
 
-TODO
+The Candid interface description language provides a common language for specifying the signature of a canister service.
+Based on the type signature of that service, Candid provides a web interface—the Candid UI—that allows you to call canister functions for testing and debugging from a web browser without writing any front-end code.
 
-== How do I use Candid as a Motoko canister developer?
+To use the Candid web interface to test canister functions:
 
-If you are writing a service from scratch in Motoko, then you need to take no special action: The Motoko compiler will translate the signature of your Canister’s top-level actor or actor class into a Candid description, and the `dfx` build tool will make sure it ends up where it needs to be.
+. Deploy your project using the `+dfx canister install+` command and copy the canister identifier associated with the main program for your application.
+. Open a browser and navigate to the address and port number specified in the `+dfx.json+` configuration file.
++
+By default, the `+local+` network binds to the `+127.0.0.1:8000+` address and port number.
+. Add the `+candid+` endpoint to access the Candid web interface followed by the required `canisterId` parameter and canister identifier.
++
+For example, the full URL should look similar to the following but with the `+canister_identifier+` that was returned by the `+dfx canister install+` command:
++
+....
+http://127.0.0.1:8000/candid?canisterId=<YOUR-CANISTER-IDENTIFIER>
+....
+. Review the list of function calls and types defined in the program.
+. Type a value of the appropriate type for a function or click *Random* to generate a value, then click *Call* or *Query* to see the result.
++
+Note that depending on the data type, the Candid interface might display additional configuration settings for testing functions. 
+For example, if a function takes an array, you might need to specify the number of items in the array before entering values.
 
-For example, in a multi-canister project, dfx will ensure that any clients of your Motoko service will import the generated Candid description of that service.
+== Use Candid as a Motoko canister developer?
+
+If you are writing a service from scratch in Motoko, then you need to take no special action: The Motoko compiler will translate the signature of your Canister’s top-level actor or actor class into a Candid description, and the `+dfx build+` command ensures that the service description ends up where it needs to be.
+
+For example, in a multi-canister project, `+dfx+` ensure that any clients of your Motoko service import the generated Candid description of that service.
 
 If you want to implement a _specific_ interface, for example because you want to interact with a service that expects your canister to have that interface, you can consult the 
 reference below to figure which Motoko types to use to achieve this effect. In the future, this will be simplified.
 
-== How do I use Candid as Rust canister developer?
+== Use Candid as Rust canister developer?
 
 TODO: Someone who implements rust canisters should write this section.
 
-== How do I use Candid as a JavaScript front-end developer?
+== Use Candid as a JavaScript front-end developer?
 
 TODO: Someone who implements Frontends should write this section
 
-== How do I implement Candid?
+== Create a new Candid implementation
 
-If you want to create a new Candid implementation, this document will not suffice. In this case, consult the https://github.com/dfinity/candid/blob/master/spec/Candid.md[Candid specification].
+If you want to create a Candid implementation to support a language or tool for which an implementation is not currently available, this document will not suffice. Instead, you should consult the https://github.com/dfinity/candid/blob/master/spec/Candid.md[Candid specification].
 
 Additionally, the official https://github.com/dfinity/candid/tree/master/test[Candid test data] is useful to make sure your implementation is compatible with Candid, even in slightly more obscure corner cases.
