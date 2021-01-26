@@ -882,140 +882,91 @@ service { <name> : <functype>; <methtype>;* } <: service { <name> : <functype'>;
 
 ### Coercion
 
-This subtyping is implemented during the deserialisation of Candid at an expected type. As described in [Section Deserialisation](#deserialisation), the binary value is conceptually first _decoded_ into an abstract value, and then _coerced_ to the expected type.
+This subtyping is implemented during the deserialisation of Candid at an expected type. As described in [Section Deserialisation](#deserialisation), the binary value is conceptually first _decoded_ into the actual type and a value of that type, and then that value is _coerced_ into the expected type.
 
-In the following, we use `V` as an abstract data model of both the message in transit (`V`), as well as the result of the coercion (`V'`).  We re-use the syntax of the textual representation.
+To model this, we defined, for every `t1, t2` with `t1 <: t2`, the function `c[t1<:t2] : t1 -> t2`. This function maps values of type `t1` to values of type `t2`, and is indeed total.
 
-Since messages are self-describing, i.e. carry a type description, the rules below can refer to the given type of the message using the `<annval>` syntax (i.e. `(v : t)`) if the type matters. This is used in particular
- * To resolve overloading in number literals (`<primval>`)
- * To express the canonical value of type `reserved` as `(null : reserved)`.
- * To do coercion-time subtyping checks in the rule for `opt`
-
-This section describes the coercion as a ternary relation `V ~> V' : T` to describe that a value `V` can be coerced to a value `V'` of type `T`. The fields `V` and `T` can be understood as inputs and `V'` as the output of this relation. This relation is defined only when the type of `V` is a subtype of `T`.
-
+to describe these values, we re-use the syntax of the textual representation, and use the the `<annval>` syntax (i.e. `(v : t)`) if necessary to resolve overloading.
 
 #### Primitive Types
 
-Values of primitive types coerce successfully at their own type:
+On primitve types, coercion is the identity:
 ```
-------------------------------------
-(<x> : <numtype>) ~> <x> : <numtype>
-
--------------------
-true ~> true : bool
-
----------------------
-false ~> false : bool
-
------------------------
-<text> ~> <text> : text
-
--------------------
-null ~> null : null
+c[<t> <: <t>](x) = x    for every <t> ∈ <numtype>, bool, text, null
 ```
 
-Values of type `nat` coerce successfully at type `int`:
+Values of type `nat` coerce at type `int`:
 ```
-------------------------
-(<x> : nat) ~> <x> : int
-```
-
-Any value coerces at type `reserved`, producing the canonical value of type `reserved`:
-
-```
-----------------------
-<v> ~> null : reserved
+c[nat <: int](x) = x
 ```
 
-NB: No rule is needed for type `empty`, because there are no values of that type. By construction, `<v> ~> _ : empty` will not hold.
+Coercion into `reserved` is the constant map (this is arbitrarily using `null` as “the” value of `reserved`):
+```
+c[<t> <: reserved](_) = null
+```
+NB: No rule is needed for type `empty`, because there are no values of that type. By construction, `c[empty <: <t>]` is the unique function on the empty domain.
 
 #### Vectors
 
-Only vectors coerce at vector types, and only if all elements coerce successfully.
-
+Vectors coerce pointwise:
 ```
-<v> ~> <v'> : <t>
------------------------------------------
-vec { <v>;* } ~> vec { <v'>;* } : vec <t>
+c[vec <t> <: vec <t'>]( vec { <v>;* } ) = vec { c[<t> <: <t'>](<v>);* }
 ```
 
 #### Options
 
-The null value coerce at any option type:
+The null type coerces into any option type:
 ```
-----------------------
-null ~> null : opt <t>
-```
-
-An optional value coerces at an option type, if the constituent value has a suitable type:
-```
-<t> <: <t'>
-<v> ~> <v'> : <t'>
---------------------------------------
-opt (<v> : <t>) ~> opt <v'> : opt <t'>
+c[null <: opt <t>](null) = null
 ```
 
-If an optional value does not have a subtype of the expected type, the result is `null`:
+An optional value coerces at an option type, if the constituent value has a suitable type, and else goes to `null`:
 ```
-not (<t> <: <t'>)
-----------------------------------
-opt (<v> : <t>) ~> null : opt <t'>
+c[opt <t> <: opt <t'>](null) = null
+c[opt <t> <: opt <t'>](opt <v>) = opt c[<t> <: <t'>](v')  if <t> <: <t'>
+c[opt <t> <: opt <t'>](opt <v>) = null                    if not(<t> <: <t'>)
 ```
 
-NOTE: The two rules above imply that a Candid decoder has to be able to decide the subtyping relation at runtime.
+NOTE: These rules above imply that a Candid decoder has to be able to decide the subtyping relation at runtime.
 
 Coercing a non-null, non-optional and non-reserved value at an option type treats it as an optional value:
 ```
-<v> ≠ null
-<v> ≠ (null : reserved)
-<v> ≠ opt _
-not (null <: <t>)
-opt <v> ~> <v'> : opt <t>
--------------------------
-<v> ~> <v'> : opt <t>
+c[<t> <: opt <t'>](<v>) = opt c[<t> <: <t'>](v')  if not (null <: <t>) and <t> <: <t'>
+c[<t> <: opt <t'>](<v>) = null                    if not (null <: <t>) and not (<t> <: <t'>)
+c[reserved <: opt <t'>](<v>) = null
 ```
 
 #### Records
 
-Only records coerce at record type. Missing fields of option or reserved type turn into `null`.
+In the following rule:
 
-In the following rule, the `<nat1>*` field names are those present in both the value and the type, the `<nat2>*` field names only those in the value, and `<nat3>*` are those only in the type.
-```
-<v1> ~> <v1'> : <t1>
-opt empty <: <t3>
----------------------------------------------------------------------------------------------------------------------------------------
-record { <nat1> = <v1>;* <nat2> = <v2>;* } ~> record { <nat1> = <v1'>;* <nat3> = null;* } : record {  <nat1> = <t1>;* <nat3> = <t3>;* }
-```
+ * The `<nat1>*` field names are those present in both the actual and expected type. The values are coerced.
+ * the `<nat2>*` field names those only in the actual type. The values are ignored.
+ * the `<nat3>*` field names are those only in the expected type, which therefore must be of optional or reserved type. The `null` value is used for these.
 
+```
+c[record { <nat1> = <t1>;* <nat2> = <t2>;* } <: record { <nat1> = <t1'>;* <nat3> = <t3>;* }](record { <nat1> = <v1>;* <nat2> = <v2>;* })
+    = record { <nat1> = c[<t1> <: <t1'>](<v1'>);* <nat3> = null;* }
+```
 
 #### Variants
 
 Only a variant value with an expected tag coerces at variant type.
 
 ```
-<v> ~> <v'> : <t>
-----------------------------------------------------------------------------------
-variant { <nat> = <v> } ~> variant { <nat> = <v'> } : variant { <nat> = <t>; _;* }
+c[variant { <nat> = <t>;* _;* } <: variant { <nat> = <t'>;* _;* }](variant { <natN> = <v> })
+    = variant { <natN> = c[<tN> <: <t'N>](<v>) }
 ```
 
 
 #### References
 
-Function and services references coerce unconditionally (note that coercion is only applied when the input value has a subtype of the expected type):
+Function and services reference values are untyped, so the coercion function is the identity here:
 
 ```
-------------------------------------------------------
-func <text>.<id> ~> func <text>.<id> : func <functype>
-```
-
-```
-------------------------------------------------------
-service <text> ~> service <text> : service <actortype>
-```
-
-```
-------------------------------------------------
-principal <text> ~> principal <text> : principal
+c[func <functype> <: func <functype'>](func <text>.<id>) = func <text>.<id>
+c[service <actortype> <: service <actortype'>](service <text>) = service <text>
+c[principal <: principal](principal <text>) = principal <text>
 ```
 
 #### Tuple types
@@ -1023,60 +974,58 @@ principal <text> ~> principal <text> : principal
 Whole argument and result sequences are coerced with the same rules as tuple-like records. In particular, extra arguments are ignored, and optional parameters read as as `null` if the argument is missing or fails to coerce:
 
 ```
-record {<v>;*} ~> record {<v'>,*} : record {<t>;*}
---------------------------------------------------
-(<v>,*) ~> (<v'>,*) : (<t>,*)
+c[(<t>,*) <: (<t'>,*)]((<v>,*)) = (<v'>,*)
+    if c[record {<t>;*} ~> record {<t'>,*}](record {<v>;*}) = record {<v'>;*}
 ```
 
 
 ## Properties
 
-The relations above have certain properties. To express them, we need the relation `V : T`, expressing that `V` has inherently type `T`. Instead of defining this relation on its own, we take the roundtripping property below as its definition:
+The relations above have certain properties. As in the previous section, `<v> : <t>` means that <v> has inherently type `<t>`.
 
-* Correctness and completeness of decoding:
+* Reflexivity of subtyping:
   ```
-  (v : T) ⟺ (∃ v'. v' ~> v : T)
+  <t> <: <t>
+  ```
+
+* Transitivity of subtyping:
+  ```
+  <t> <: <t'>, <t'> <: <t''> ⇒ <t> <: <t'>
   ```
 
 * Roundtripping:
   ```
-  (v : T) ⟺ v ~> v : T
+  (<v> : <t>) ⟺ c[<t> <: <t>](<v>) = <v>
   ```
 
-* Uniqueness of decoding:
+* Soundness of subtyping (or, alternatively, well-definedness of coercion)
   ```
-  v ~> v1 : T ∧ v ~> v2 : T ⇒ v1 = v2
-  ```
-
-* Soundness of subtyping:
-  ```
-  T <: T' ⇒ ∀ v : T. ∃ v'. v ~> v' : T
+  <t> <: <t'> ⇒ ∀ <v> : <t>. v[<t> <: <t'>](<v>) : <t'>
   ```
 
 * Higher-order soundness of subtyping
   See <./IDL-Soundness.md>, with the following instantiations:
   ```
   s1 ~> s2 ≔ s2 <: s1
-  t1 <: t2 ≔ (∀ v. v : t1 ⇒ v ~> _ : t2 )
+  t1 <: t2 ≔ t1 <: t2
   s1 in t1 <: s2 in t2 ≔ (to be done)
   s1 <:h s2 ≔ (host-language dependent)
   ```
 
-* Transitivity of subtyping:
-  ```
-  T1 <: T2, T2 <: T3 ⇒ T1 <: T3
-  ```
-
 * NB: Transitive coherence does not hold:
   ```
-  T1 <: T2, T2 <: T3
-  v1 : T1
-  v1 ~> v3 : T3
-  v1 ~> v2 : T2, v2 ~> v2 : T3
+  <t1> <: <t2>, <t2> <: <t3>
   ```
-  does not imply `v3 = v3'`.
+  does not imply
+  ```
+  c[<t1> <: <t3>] = c[<t2> <: <t3>] ⚬ c[<t1> <: <t2>]
+  ```
 
-  However, it implies that `R(v3,v3')`, where `R` is the smallest homomorphic, reflexive relation `R` that satisfies `∀ v. R(opt v, null)`.
+  However, it implies
+  ```
+  c[<t1> <: <t3>] ⊒ c[<t2> <: <t3>] ⚬ c[<t1> <: <t2>]
+  ```
+  where ⊒ is the smallest homomorphic, reflexive relation `R` that satisfies `∀ v. R(opt v, null)`.
 
 The goal of “subtyping completeness” has not been cast into a formal formulation yet.
 
@@ -1302,8 +1251,8 @@ Deserialisation at an expected type sequence `(<t'>,*)` proceeds by
  * checking for the magic number `DIDL`
  * using the inverse of the `T` function to decode the type definitions `(<t>,*)`
  * check that `(<t>,*) <: (<t'>,*)`, else fail
- * using the inverse of the `M` function, indexed by `(<t>*)`, to decode the values `(<v>*)`
- * use the coercion relation `(<v>,*) ~> (<v'>,*) : (<t'>,*)` to understand the decoded values at the expected type.
+ * using the inverse of the `M` function, indexed by `(<t>*,)`, to decode the values `(<v>*,)`
+ * use the coercion function `c[(<t>,*) <: (<t'>,*)]((<v>*,))` to understand the decoded values at the expected type.
 
 ### Deserialisation of future types
 
