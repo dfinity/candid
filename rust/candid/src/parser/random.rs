@@ -4,6 +4,7 @@ use super::value::{IDLArgs, IDLField, IDLValue};
 use crate::types::{Field, Type};
 use crate::Deserialize;
 use crate::Result;
+use arbitrary::unstructured::Int;
 use arbitrary::Unstructured;
 use std::collections::HashSet;
 
@@ -11,10 +12,9 @@ const MAX_DEPTH: usize = 20;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct GenConfig {
-    range: Option<(isize, isize)>,
+    range: Option<(i64, i64)>,
     text: Option<String>, // regex or pattern
     value: Option<IDLValue>,
-    // Only work for global scope
     depth: Option<isize>,
     size: Option<isize>,
 }
@@ -43,7 +43,7 @@ impl GenConfig {
 }
 
 pub struct GenState<'a> {
-    tree: Configs,
+    tree: &'a Configs,
     env: &'a TypeEnv,
     // state
     path: Vec<String>,
@@ -52,7 +52,7 @@ pub struct GenState<'a> {
     size: isize,
 }
 impl<'a> GenState<'a> {
-    fn new(tree: Configs, env: &'a TypeEnv) -> Result<Self> {
+    fn new(tree: &'a Configs, env: &'a TypeEnv) -> Result<Self> {
         let config = tree.get::<GenConfig>(&["default".to_string()]).unwrap(); //GenConfig::default();
         Ok(GenState {
             depth: config.depth.unwrap_or(5),
@@ -82,21 +82,16 @@ impl<'a> GenState<'a> {
             Type::Null => IDLValue::Null,
             Type::Reserved => IDLValue::Reserved,
             Type::Bool => IDLValue::Bool(u.arbitrary()?),
-            Type::Int => {
-                let v =
-                    u.int_in_range(self.config.range.unwrap().0..=self.config.range.unwrap().1)?;
-                IDLValue::Int(v.into())
-            }
-            Type::Nat => IDLValue::Nat(u.arbitrary::<u128>()?.into()),
-            //Type::Int => IDLValue::Int(u.arbitrary::<i128>()?.into()),
-            Type::Nat8 => IDLValue::Nat8(u.arbitrary()?),
-            Type::Nat16 => IDLValue::Nat16(u.arbitrary()?),
-            Type::Nat32 => IDLValue::Nat32(u.arbitrary()?),
-            Type::Nat64 => IDLValue::Nat64(u.arbitrary()?),
-            Type::Int8 => IDLValue::Int8(u.arbitrary()?),
-            Type::Int16 => IDLValue::Int16(u.arbitrary()?),
-            Type::Int32 => IDLValue::Int32(u.arbitrary()?),
-            Type::Int64 => IDLValue::Int64(u.arbitrary()?),
+            Type::Int => IDLValue::Int(arbitrary_num::<i128>(u, self.config.range)?.into()),
+            Type::Nat => IDLValue::Nat(arbitrary_num::<u128>(u, self.config.range)?.into()),
+            Type::Nat8 => IDLValue::Nat8(arbitrary_num(u, self.config.range)?),
+            Type::Nat16 => IDLValue::Nat16(arbitrary_num(u, self.config.range)?),
+            Type::Nat32 => IDLValue::Nat32(arbitrary_num(u, self.config.range)?),
+            Type::Nat64 => IDLValue::Nat64(arbitrary_num(u, self.config.range)?),
+            Type::Int8 => IDLValue::Int8(arbitrary_num(u, self.config.range)?),
+            Type::Int16 => IDLValue::Int16(arbitrary_num(u, self.config.range)?),
+            Type::Int32 => IDLValue::Int32(arbitrary_num(u, self.config.range)?),
+            Type::Int64 => IDLValue::Int64(arbitrary_num(u, self.config.range)?),
             Type::Float32 => IDLValue::Float32(u.arbitrary()?),
             Type::Float64 => IDLValue::Float64(u.arbitrary()?),
             Type::Text => IDLValue::Text(u.arbitrary()?),
@@ -178,10 +173,15 @@ impl<'a> GenState<'a> {
 }
 
 impl IDLArgs {
-    pub fn any(u: &mut Unstructured, tree: Configs, env: &TypeEnv, types: &[Type]) -> Result<Self> {
-        let mut state = GenState::new(tree, env)?;
+    pub fn any(
+        u: &mut Unstructured,
+        tree: &Configs,
+        env: &TypeEnv,
+        types: &[Type],
+    ) -> Result<Self> {
         let mut args = Vec::new();
         for t in types.iter() {
+            let mut state = GenState::new(tree, env)?;
             let v = state.any(u, t)?;
             args.push(v);
         }
@@ -231,6 +231,25 @@ impl TypeEnv {
         let mut seen = HashSet::new();
         self.size_helper(&mut seen, t)
     }
+}
+
+fn arbitrary_num<
+    T: num_traits::Bounded + Int + std::convert::TryFrom<i64> + arbitrary::Arbitrary,
+>(
+    u: &mut Unstructured,
+    range: Option<(i64, i64)>,
+) -> Result<T> {
+    use std::convert::TryInto;
+    Ok(match range {
+        None => u.arbitrary::<T>()?,
+        Some((l, r)) => {
+            let min = T::min_value();
+            let max = T::max_value();
+            let l: T = l.try_into().unwrap_or(min);
+            let r: T = r.try_into().unwrap_or(max);
+            u.int_in_range(l..=r)?
+        }
+    })
 }
 
 fn arbitrary_variant(u: &mut Unstructured, weight: &[usize]) -> Result<usize> {

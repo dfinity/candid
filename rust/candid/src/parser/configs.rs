@@ -10,8 +10,7 @@ impl Configs {
     }
     fn get_helper(&self, path: &[String]) -> Option<&SimpleValue> {
         let mut result = &self.0;
-        let mut iter = path.iter();
-        while let Some(elem) = iter.next() {
+        for elem in path.iter() {
             if let SimpleValue::Record(map) = result {
                 result = map.get(elem)?;
             } else {
