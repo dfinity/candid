@@ -26,11 +26,10 @@ For details about the subtyping rules for the `+empty+`, `+reserved+`, and `+opt
 The `+text+` type is used for human readable text. More precisely, its values are sequences of unicode code points (excluding surrogate parts).
 
 Type syntax::
-
-`+text+`
+  `+text+`
 
 Textual syntax::
-+
+
 ....
 ""
 "Hello"
@@ -49,12 +48,14 @@ Corresponding Rust type::
 
 Corresponding JavaScript values::
 
-TODO:
+`String`
 
 [#type-blob]
 == Type blob
 
-The `+blob+` type can be used for binary data, that is, sequences of bytes. It is interchangable with `+vec nat8+`. Therefore, interfaces written in terms of `+blob+` and interfaces written in terms of `+vec nat8+` are compatible.
+The `+blob+` type can be used for binary data, that is, sequences of bytes. 
+It is interchangable with `+vec nat8+`. 
+Therefore, interfaces written in terms of `+blob+` and interfaces written in terms of `+vec nat8+` are compatible.
 
 Type syntax::
 
@@ -62,7 +63,7 @@ Type syntax::
 
 Textual syntax::
 
-`blob <text>`, where `<text>` is a text literal (see <<type-text,above>>), with all characters representing their utf8 encoding, and arbitray byte sequences (`"\CA\FF\FE"`).
+`blob <text>`, where `<text>` is a text literal (see <<type-text,Text>>), with all characters representing their utf8 encoding, and arbitrary byte sequences (`"\CA\FF\FE"`).
 
 Subtypes::
 
@@ -82,7 +83,7 @@ Corresponding Rust type::
 
 Corresponding JavaScript values::
 
-TODO:
+TODO
 
 [#type-nat]
 == Type nat
@@ -94,13 +95,12 @@ Type syntax::
 `nat`
 
 Textual syntax::
-+
+
 ....
 1234
 1_000_000
 0xDEAD_BEEF
 ....
-
 
 Supertypes::
 
@@ -116,7 +116,7 @@ TODO
 
 Corresponding JavaScript values::
 
-TODO
+`Number`
 
 
 [#type-int]
