@@ -923,17 +923,17 @@ c[null <: opt <t>](null) = null
 An optional value coerces at an option type, if the constituent value has a suitable type, and else goes to `null`:
 ```
 c[opt <t> <: opt <t'>](null) = null
-c[opt <t> <: opt <t'>](opt <v>) = opt c[<t> <: <t'>](v')  if <t> <: <t'>
-c[opt <t> <: opt <t'>](opt <v>) = null                    if not(<t> <: <t'>)
+c[opt <t> <: opt <t'>](opt <v>) = opt c[<t> <: <t'>](v)  if <t> <: <t'>
+c[opt <t> <: opt <t'>](opt <v>) = null                   if not(<t> <: <t'>)
 ```
 
 NOTE: These rules above imply that a Candid decoder has to be able to decide the subtyping relation at runtime.
 
 Coercing a non-null, non-optional and non-reserved value at an option type treats it as an optional value:
 ```
-c[<t> <: opt <t'>](<v>) = opt c[<t> <: <t'>](v')  if not (null <: <t>) and <t> <: <t'>
-c[<t> <: opt <t'>](<v>) = null                    if not (null <: <t>) and not (<t> <: <t'>)
-c[reserved <: opt <t'>](<v>) = null
+c[<t> <: opt <t'>](<v>) = opt c[<t> <: <t'>](v)  if not (null <: <t>) and <t> <: <t'>
+c[<t> <: opt <t'>](_)   = null                   if not (null <: <t>) and not (<t> <: <t'>)
+c[reserved <: opt <t'>](_) = null
 ```
 
 #### Records
@@ -946,7 +946,7 @@ In the following rule:
 
 ```
 c[record { <nat1> = <t1>;* <nat2> = <t2>;* } <: record { <nat1> = <t1'>;* <nat3> = <t3>;* }](record { <nat1> = <v1>;* <nat2> = <v2>;* })
-    = record { <nat1> = c[<t1> <: <t1'>](<v1'>);* <nat3> = null;* }
+    = record { <nat1> = c[<t1> <: <t1'>](<v1>);* <nat3> = null;* }
 ```
 
 #### Variants
