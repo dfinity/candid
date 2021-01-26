@@ -1,4 +1,4 @@
-use super::configs::Configs;
+use super::configs::{path_name, Configs};
 use super::typing::TypeEnv;
 use super::value::{IDLArgs, IDLField, IDLValue};
 use crate::types::{Field, Type};
@@ -9,7 +9,7 @@ use std::collections::HashSet;
 
 const MAX_DEPTH: usize = 20;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct GenConfig {
     range: Option<(isize, isize)>,
     text: Option<String>, // regex or pattern
@@ -29,31 +29,55 @@ impl Default for GenConfig {
         }
     }
 }
+impl GenConfig {
+    pub fn update(&self, config: GenConfig) -> GenConfig {
+        let old = self.clone();
+        GenConfig {
+            range: config.range.or(old.range),
+            text: config.text.or(old.text),
+            value: config.value.or(old.value),
+            depth: config.depth.or(old.depth),
+            size: config.size.or(old.size),
+        }
+    }
+}
+
 pub struct GenState<'a> {
-    config: GenConfig,
     tree: Configs,
     env: &'a TypeEnv,
+    // state
+    path: Vec<String>,
+    config: GenConfig,
     depth: isize,
     size: isize,
 }
 impl<'a> GenState<'a> {
     fn new(tree: Configs, env: &'a TypeEnv) -> Result<Self> {
-        let config = tree.get::<GenConfig>("default")?; //GenConfig::default();
+        let config = tree.get::<GenConfig>(&["default".to_string()]).unwrap(); //GenConfig::default();
         Ok(GenState {
             depth: config.depth.unwrap_or(5),
             size: config.size.unwrap_or(50),
             tree,
             config,
             env,
+            path: Vec::new(),
         })
     }
     pub fn any(&mut self, u: &mut Unstructured, ty: &Type) -> Result<IDLValue> {
+        self.path.push(path_name(ty));
+        let old_config = self.config.clone();
+        if let Some(conf) = self.tree.get::<GenConfig>(&self.path) {
+            self.config = self.config.update(conf);
+            //println!("{:?} {:?}", self.path, self.config);
+        }
         self.size -= 1;
-        Ok(match ty {
+        let res = Ok(match ty {
             Type::Var(id) => {
                 let ty = self.env.rec_find_type(id)?;
                 self.size += 1;
-                self.any(u, &ty)?
+                let res = self.any(u, &ty)?;
+                self.path.pop();
+                res
             }
             Type::Null => IDLValue::Null,
             Type::Reserved => IDLValue::Reserved,
@@ -89,6 +113,7 @@ impl<'a> GenState<'a> {
                 } else {
                     self.depth -= 1;
                     let res = IDLValue::Opt(Box::new(self.any(u, t)?));
+                    self.path.pop();
                     self.depth += 1;
                     res
                 }
@@ -101,6 +126,7 @@ impl<'a> GenState<'a> {
                 for _ in 0..len {
                     self.depth -= 1;
                     let e = self.any(u, t)?;
+                    self.path.pop();
                     self.depth += 1;
                     vec.push(e);
                 }
@@ -110,7 +136,9 @@ impl<'a> GenState<'a> {
                 let mut res = Vec::new();
                 for Field { id, ty } in fs.iter() {
                     self.depth -= 1;
+                    self.path.push(id.to_string());
                     let val = self.any(u, ty)?;
+                    self.path.pop();
                     self.depth += 1;
                     res.push(IDLField {
                         id: id.clone(),
@@ -132,7 +160,9 @@ impl<'a> GenState<'a> {
                 let idx = arbitrary_variant(u, &sizes)?;
                 let Field { id, ty } = &fs[idx];
                 self.depth -= 1;
+                self.path.push(id.to_string());
                 let val = self.any(u, ty)?;
+                self.path.pop();
                 self.depth += 1;
                 let field = IDLField {
                     id: id.clone(),
@@ -141,7 +171,9 @@ impl<'a> GenState<'a> {
                 IDLValue::Variant(Box::new(field), idx as u64)
             }
             _ => unimplemented!(),
-        })
+        });
+        self.config = old_config;
+        res
     }
 }
 
