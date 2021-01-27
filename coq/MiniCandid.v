@@ -463,8 +463,7 @@ Proof.
     coerce t1 t2 v1 = v1)
     by (intros; apply H; intuition; try apply ReflST; clear_names).
   apply (coerce_nice_ind (fun t1 t2 v1 v2 => t2 = t1 -> v2 = v1));
-    intros; name_cases; subst; simpl in *; try congruence.
-  Show Existentials.
+    intros; name_cases; subst; simpl in *; try solve [congruence].
   [optSomeC]: {apply f_equal. apply H0. congruence. }
   [opportunisticOptC]: {
     inversion H0; subst; clear H0. contradiction H; apply ReflST; clear_names.
@@ -712,7 +711,6 @@ Proof.
   induction HvT; intros t1 Hsub; inversion Hsub; subst; clear Hsub;
     name_cases;
     try (eexists;reflexivity).
-  Show Existentials.
   [natHT_optST]: {
     destruct t2; eexists; reflexivity.
   }
