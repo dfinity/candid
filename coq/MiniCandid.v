@@ -169,19 +169,16 @@ Function coerce (t1 : T) (t2 : T) (v1 : V) : V :=
     then SomeV (coerce t1 t2 v)
     else NullV
   
-  (* This is the rule we would like to have, but 
-     in order to please the termination checker,
-     we have to duplicate all non-opt rules in their opt variant
-  | v, t1, OptT t2 =>
-    if not (is_opt_like_type t) && t <: t2
-    then SomeV (coerce v t1 t2)
+  (* We’d prefer the equation from coerce_consituent_eq below,
+     but that will not satisfy the termination checker,
+     so let’s repeat all the above ruls for OptT again.
   *)
   | NatV n, NatT, OptT NatT => SomeV (NatV n)
   | IntV n, IntT, OptT IntT => SomeV (IntV n)
   | NatV n, NatT, OptT IntT => SomeV (IntV (Z.of_nat n))
   | FuncV r, FuncT ta1 tr1, OptT (FuncT ta2 tr2) =>
     if ta2 <:? ta1
-    then if tr1 <:? tr2 then  SomeV (FuncV r) else NullV else NullV
+    then if tr1 <:? tr2 then SomeV (FuncV r) else NullV else NullV
 
   | v, t, ReservedT => ReservedV
 
@@ -189,6 +186,42 @@ Function coerce (t1 : T) (t2 : T) (v1 : V) : V :=
   | _, _, _ => NullV
   end.
 
+(* We can prove the desired equation at least as an equality *)
+Lemma coerce_consituent_eq:
+  forall v t1 t2,
+  v :: t1 ->
+  is_opt_like_type t1 = false ->
+  coerce t1 (OptT t2) v =
+    if t1 <:? t2
+    then if is_opt_like_type t2
+    then NullV
+    else SomeV (coerce t1 t2 v)
+    else NullV.
+Proof.
+  intros v t1 t2 HHT His_opt_like.
+  inversion HHT; subst; clear HHT; inversion His_opt_like; clear His_opt_like; name_cases.
+  [natHT]: {
+    destruct (NatT <:? t2) as [HST | HNotST].
+    - inversion HST; subst; clear HST; simpl; reflexivity.
+    - destruct t2; try reflexivity; contradict HNotST; named_constructor.
+  }
+  [intHT]: {
+    destruct (IntT <:? t2) as [HST | HNotST].
+    - inversion HST; subst; clear HST; simpl; reflexivity.
+    - destruct t2; try reflexivity; contradict HNotST; named_constructor.
+  }
+  [funcHT]: {
+    destruct (FuncT t0 t3 <:? t2) as [HST | HNotST].
+    - inversion HST; subst; clear HST; simpl;try reflexivity.
+      * repeat rewrite subtype_dec_refl. reflexivity. 
+      * repeat rewrite subtype_dec_true by assumption. reflexivity. 
+    - destruct t2; try reflexivity.
+      simpl.
+      destruct (t2_1 <:? t0); try reflexivity.
+      destruct (t3 <:? t2_2); try reflexivity.
+      contradict HNotST; named_constructor; assumption.
+  }
+Qed.
 
 (* Let’s try to create a suitable induction principle for this function *)
 Lemma coerce_nice_ind:
@@ -201,6 +234,7 @@ Lemma coerce_nice_ind:
   (case optNullC, forall t1 t2, P (OptT t1) (OptT t2) NullV NullV) ->
   (case optSomeC, forall t1 t2 v1 v2,
     t1 <: t2 ->
+    v1 :: t1 ->
     P t1 t2 v1 v2 ->
     P (OptT t1) (OptT t2) (SomeV v1) (SomeV v2)) ->
   (case opportunisticOptC, forall t1 t2 v1,
@@ -213,6 +247,7 @@ Lemma coerce_nice_ind:
     is_opt_like_type t1 = false ->
     is_opt_like_type t2 = false ->
     t1 <: t2 ->
+    v1 :: t1 ->
     P t1 t2 v1 v2 ->
     P t1 (OptT t2) v1 (SomeV v2)) ->
   (case opportunisticConstituentOptC,
@@ -238,6 +273,10 @@ Proof.
     [reflST]: { apply NatC; clear_names. }
     [natIntST]: { apply NatIntC; clear_names. }
     [optST]: {
+      (* oddly,
+        rewrite coerce_consituent_eq by (try named_constructor; reflexivity).
+        does not seem to lead to a simpler proof here.
+      *)
       destruct (is_opt_like_type t0) eqn:His_opt_like.
       * destruct t0; inversion His_opt_like; simpl; clear His_opt_like;
         apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
@@ -285,10 +324,12 @@ Proof.
           - simpl. repeat rewrite subtype_dec_refl.
             apply ConstituentOptC; clear_names; simpl; try (intuition;fail).
             ** apply ReflST; clear_names; apply ReflST; clear_names.
+            ** named_constructor.
             ** apply FuncC; clear_names; apply ReflST; clear_names.
           - simpl. repeat rewrite subtype_dec_true by assumption.
             apply ConstituentOptC; clear_names; simpl; try (intuition;fail).
-            named_constructor; assumption.
+            ** named_constructor; assumption.
+            ** named_constructor.
         + destruct t4; inversion His_opt_like; clear His_opt_like.
           - apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
           - apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
@@ -354,7 +395,7 @@ Proof.
     by (intros; apply H; intuition; try apply ReflST; clear_names).
   apply (coerce_nice_ind (fun t1 t2 v1 v2 => t2 = t1 -> v2 = v1));
     intros; name_cases; try solve [subst; simpl in *; congruence].
-  [optSomeC]: {apply f_equal. apply H0. congruence. }
+  [optSomeC]: {apply f_equal. apply H1. congruence. }
   [opportunisticOptC]: {
     inversion H0; subst; clear H0. contradiction H; apply ReflST; clear_names.
   }
@@ -375,3 +416,281 @@ Lemma is_not_opt_like_type_contravariant:
   forall t1 t2,
   is_opt_like_type t1 = false -> t2 <: t1 -> is_opt_like_type t2 = false.
 Proof. intros. destruct t1, t2; easy. Qed.
+
+(*
+To work towards IDL soundness, we need a predicate for “Value v contains
+a function reference at function type t.”. Moreover, this contains
+relation should indicate the position in the value in a way that
+the positions match up even after coercions.
+
+We allow spurious The constructors on this path; this models
+the consituent-to-opt rule.
+*)
+
+(* This needs to be extended once we have sequences and records *)
+Inductive Path :=
+  | Here : Path
+  | The : Path -> Path
+  .
+
+Fixpoint val_idx (v : V) (p : Path) : option V :=
+  match p with
+  | Here => Some v
+  | The p =>
+    match v with
+    | SomeV v => val_idx v p
+    | _ => None
+    end
+  end.
+
+Fixpoint val_idx' (v : V) (p : Path) : option V :=
+  match p with
+  | Here => Some v
+  | The p =>
+    match v with
+    | SomeV v => val_idx' v p
+    | NullV => None
+    | ReservedV => None
+    | _ => val_idx' v p
+    end
+  end.
+
+
+Fixpoint typ_idx (t : T) (p : Path) : option T :=
+  match p with
+  | Here => Some t
+  | The p =>
+    match t with
+    | OptT t => typ_idx t p
+    | _ => typ_idx t p
+    end
+  end.
+
+Fixpoint typ_idx' (t : T) (p : Path) : option T :=
+  match p with
+  | Here => Some t
+  | The p =>
+    match t with
+    | OptT t => typ_idx' t p
+    | NullT => None
+    | ReservedT => None
+    | _ => typ_idx' t p
+    end
+  end.
+
+Lemma path_preserves_types:
+  forall v v' t t' p,
+  v :: t ->
+  val_idx v p = Some v' ->
+  typ_idx t p = Some t' ->
+  v' :: t'.
+Admitted.
+
+Lemma path_preserves_types':
+  forall v v' t t' p,
+  v :: t ->
+  val_idx' v p = Some v' ->
+  typ_idx' t p = Some t' ->
+  v' :: t'.
+Proof.
+  intros v v' t t' p.
+  revert v v' t t'.
+  induction p.
+  * intros v v' t t' HHT Hval_idx Htyp_idx.
+    inversion Hval_idx; subst; clear Hval_idx;
+    inversion Htyp_idx; subst; clear Htyp_idx.
+    assumption.
+  * intros v v' t t' HHT Hval_idx Htyp_idx.
+    inversion Hval_idx; subst; clear Hval_idx;
+    inversion Htyp_idx; subst; clear Htyp_idx.
+    inversion HHT; subst; clear HHT; name_cases.
+    all: try congruence.
+    all: try solve
+      [eapply IHp; [|eassumption|eassumption]; try assumption; named_constructor].
+Qed.
+
+Lemma all_paths_typed:
+  forall v v' t p,
+  v :: t ->
+  val_idx' v p = Some v' ->
+  exists t', typ_idx' t p = Some t'.
+Proof.
+  intros v v' t p.
+  revert v v' t.
+  induction p.
+  * intros v v' t HHT Hval_idx.
+    inversion Hval_idx; subst; clear Hval_idx.
+    eexists. reflexivity.
+  * intros v v' t HHT Hval_idx.
+    inversion Hval_idx; subst; clear Hval_idx.
+    inversion HHT; subst; clear HHT; name_cases.
+    all: try congruence.
+    Show Existentials.
+    [natHT]: {
+      specialize (IHp _ _ NatT ltac:(named_constructor) H0).
+      destruct IHp as [t' Htyp_idx].
+      eexists.
+      simpl. eassumption.
+    }
+    [intHT]: {
+      specialize (IHp _ _ IntT ltac:(named_constructor) H0).
+      destruct IHp as [t' Htyp_idx].
+      eexists.
+      simpl. eassumption.
+    }
+    [optHT]: {
+      specialize (IHp _ _ t0 H H0).
+      destruct IHp as [t' Htyp_idx].
+      eexists.
+      simpl. eassumption.
+    }
+    [funcHT]: {
+      specialize (IHp _ _ (FuncT t1 t2) ltac:(named_constructor) H0).
+      destruct IHp as [t' Htyp_idx].
+      eexists.
+      simpl. eassumption.
+    }
+Qed.
+
+(*
+Because of our subtyping relation, when we coerce,
+we may be introducing some SomeV. This corresponds to
+adding some Paths.
+
+Inductive add_thes : Path -> Path -> Prop :=
+  | HereAT : add_thes Here Here
+  | UnderTheAT: forall p1 p2, add_thes p1 p2 -> add_thes (The p1) (The p2)
+  | AddTheAT: forall p1 p2, add_thes p1 p2 -> add_thes p1 (The p2).
+*)
+
+Lemma no_new_values:
+  forall t1 t2 v1,
+  t1 <: t2 ->
+  v1 :: t1 ->
+  forall p iv2 it2,
+  val_idx (coerce t1 t2 v1) p = Some iv2 ->
+  typ_idx t2 p = Some it2 ->
+  exists iv1 it1,
+   val_idx v1 p = Some iv1 /\
+   typ_idx t1 p = Some it1 /\
+   it1 <: it2 /\
+   iv1 :: it1 /\
+   coerce it1 it2 iv1 = iv2.
+Proof.
+  apply (coerce_nice_ind (fun t1 t2 v1 v2 =>
+    forall p iv2 it2,
+    val_idx v2 p = Some iv2 ->
+    typ_idx t2 p = Some it2 ->
+    exists iv1 it1,
+     val_idx v1 p = Some iv1 /\
+     typ_idx t1 p = Some it1 /\
+     it1 <: it2 /\
+     iv1 :: it1 /\
+     coerce it1 it2 iv1 = iv2
+  )); intros; name_cases.
+  [natC]: {
+    destruct p;
+    inversion H; subst; clear H;
+    inversion H0; subst; clear H0.
+    * eexists; eexists.
+      repeat split.
+      - named_constructor.
+      - named_constructor.
+    * simpl.
+      eexists; eexists.
+      repeat split.
+      - eassumption.
+      - eassumption.
+      - named_constructor.
+      - named_constructor.
+  }
+  [intC]: {
+    destruct p2;
+    inversion H; subst; clear H;
+    inversion H0; subst; clear H0.
+    eexists; eexists; eexists.
+    repeat split.
+    - constructor.
+    - reflexivity.
+    - reflexivity.
+    - named_constructor.
+    - named_constructor.
+    - reflexivity.
+  }
+  [natIntC]: {
+    destruct p2;
+    inversion H; subst; clear H;
+    inversion H0; subst; clear H0.
+    eexists; eexists; eexists.
+    repeat split.
+    - constructor.
+    - reflexivity.
+    - reflexivity.
+    - named_constructor.
+    - named_constructor.
+    - reflexivity.
+  }
+  [nullC]: {
+    destruct p2;
+    inversion H; subst; clear H;
+    inversion H0; subst; clear H0.
+    eexists; eexists; eexists.
+    repeat split.
+    - constructor.
+    - reflexivity.
+    - reflexivity.
+    - named_constructor.
+    - named_constructor.
+    - reflexivity.
+  }
+  [nullOptC]: {
+    destruct p2;
+    inversion H; subst; clear H;
+    inversion H0; subst; clear H0.
+    eexists; eexists; eexists.
+    repeat split.
+    - constructor.
+    - reflexivity.
+    - reflexivity.
+    - named_constructor.
+    - named_constructor.
+    - reflexivity.
+  }
+  [optNullC]: {
+    destruct p2;
+    inversion H; subst; clear H;
+    inversion H0; subst; clear H0.
+    eexists; eexists; eexists.
+    repeat split.
+    - constructor.
+    - reflexivity.
+    - reflexivity.
+    - named_constructor.
+    - named_constructor.
+    - reflexivity.
+  }
+  [optSomeC]: {
+    destruct p2;
+    inversion H2; subst; clear H2;
+    inversion H3; subst; clear H3.
+    * 
+      specialize (H1 Here v2 t2 ltac:(destruct v2; reflexivity) ltac:(destruct v2; reflexivity)).
+      destruct H1 as [p1 [iv1 [it1 Hi]]].
+      exists (The Here); exists (SomeV iv1); exists (OptT it1).
+      repeat split.
+      - 
+      - named_constructor. 
+      - named_constructor; assumption.
+      - simpl. rewrite subtype_dec_true by assumption. intuition.
+      - named_constructor.
+      - named_constructor; assumption.
+      - simpl. rewrite subtype_dec_true by assumption. simpl.
+  }
+  Show Existentials.
+  
+  
+
+Definition
+  passesThrough
+
+
