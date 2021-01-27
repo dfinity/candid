@@ -480,13 +480,6 @@ Fixpoint typ_idx' (t : T) (p : Path) : option T :=
     end
   end.
 
-Lemma path_preserves_types:
-  forall v v' t t' p,
-  v :: t ->
-  val_idx v p = Some v' ->
-  typ_idx t p = Some t' ->
-  v' :: t'.
-Admitted. (* Did that once... *)
 
 Lemma path_preserves_types':
   forall v v' t t' p,
