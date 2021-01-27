@@ -64,33 +64,50 @@ impl<'a> GenState<'a> {
             path: Vec::new(),
         })
     }
-    // Update state and return the old config state
-    fn push_state(&mut self, ty: &Type) -> GenConfig {
-        self.path.push(path_name(ty));
-        self.depth -= 1;
-        self.size -= 1;
+    // Update state and return the old config state. Label and var type are cost free.
+    fn push_state(&mut self, ty: &Type, label: Option<String>) -> GenConfig {
+        let elem = if let Some(lab) = label {
+            lab
+        } else {
+            match ty {
+                Type::Var(_) => (),
+                _ => {
+                    self.depth -= 1;
+                    self.size -= 1;
+                }
+            }
+            path_name(ty)
+        };
         let old_config = self.config.clone();
+        self.path.push(elem);
         if let Some(config) = self.tree.get::<GenConfig>(&self.path) {
             self.config = self.config.update(config);
         }
         old_config
     }
-    fn pop_state(&mut self, old_config: GenConfig) {
+    fn pop_state(&mut self, old_config: GenConfig, ty: &Type, is_label: bool) {
+        if !is_label {
+            match ty {
+                Type::Var(_) => (),
+                _ => {
+                    self.depth += 1;
+                }
+            }
+        }
         self.path.pop();
-        self.depth += 1;
         self.config = old_config;
     }
     pub fn any(&mut self, u: &mut Unstructured, ty: &Type) -> Result<IDLValue> {
-        let old_config = self.push_state(ty);
+        let old_config = self.push_state(ty, None);
+        if let Some(v) = &self.config.value {
+            let v = v.clone();
+            self.pop_state(old_config, ty, false);
+            return Ok(v);
+        }
         let res = Ok(match ty {
             Type::Var(id) => {
                 let ty = self.env.rec_find_type(id)?;
-                // Variable doesn't cost anything, so we need to undo the counter.
-                self.size += 1;
-                self.depth += 1;
-                let res = self.any(u, &ty)?;
-                self.depth -= 1;
-                res
+                self.any(u, &ty)?
             }
             Type::Null => IDLValue::Null,
             Type::Reserved => IDLValue::Reserved,
@@ -136,8 +153,9 @@ impl<'a> GenState<'a> {
             Type::Record(fs) => {
                 let mut res = Vec::new();
                 for Field { id, ty } in fs.iter() {
-                    self.path.push(id.to_string());
+                    let old_config = self.push_state(ty, Some(id.to_string()));
                     let val = self.any(u, ty)?;
+                    self.pop_state(old_config, ty, true);
                     res.push(IDLField {
                         id: id.clone(),
                         val,
@@ -157,8 +175,9 @@ impl<'a> GenState<'a> {
                 };
                 let idx = arbitrary_variant(u, &sizes)?;
                 let Field { id, ty } = &fs[idx];
-                self.path.push(id.to_string());
+                let old_config = self.push_state(ty, Some(id.to_string()));
                 let val = self.any(u, ty)?;
+                self.pop_state(old_config, ty, true);
                 let field = IDLField {
                     id: id.clone(),
                     val,
@@ -167,7 +186,7 @@ impl<'a> GenState<'a> {
             }
             _ => unimplemented!(),
         });
-        self.pop_state(old_config);
+        self.pop_state(old_config, ty, false);
         res
     }
 }
