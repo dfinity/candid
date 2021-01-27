@@ -239,6 +239,7 @@ Lemma coerce_nice_ind:
     P (OptT t1) (OptT t2) (SomeV v1) (SomeV v2)) ->
   (case opportunisticOptC, forall t1 t2 v1,
     ~ (t1 <: t2) ->
+    v1 :: t1 ->
     P (OptT t1) (OptT t2) (SomeV v1) NullV) ->
   (case reservedOptC,
     forall t, P ReservedT (OptT t) ReservedV NullV) ->
@@ -252,6 +253,7 @@ Lemma coerce_nice_ind:
     P t1 (OptT t2) v1 (SomeV v2)) ->
   (case opportunisticConstituentOptC,
     forall t1 t2 v1,
+    v1 :: t1 ->
     is_opt_like_type t1 = false ->
     is_opt_like_type t2 = true \/ ~ (t1 <: t2) ->
     P t1 (OptT t2) v1 NullV) ->
@@ -279,7 +281,7 @@ Proof.
       *)
       destruct (is_opt_like_type t0) eqn:His_opt_like.
       * destruct t0; inversion His_opt_like; simpl; clear His_opt_like;
-        apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
+        apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
       * destruct (subtyping_decidable NatT t0).
         + destruct t0; inversion s; subst; clear s; inversion His_opt_like; clear His_opt_like.
           - apply ConstituentOptC; clear_names; simpl; intuition; named_constructor.
@@ -287,8 +289,8 @@ Proof.
         + destruct t0; inversion His_opt_like; clear His_opt_like.
           - contradict n0. named_constructor.
           - contradict n0. named_constructor.
-          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
-          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
     }
     [reservedST]: { apply ReservedC; clear_names. named_constructor. }
   }
@@ -299,15 +301,15 @@ Proof.
     [optST]: {
       destruct (is_opt_like_type t0) eqn:His_opt_like.
       * destruct t0; inversion His_opt_like; simpl; clear His_opt_like;
-        apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
+        apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
       * destruct (subtyping_decidable IntT t0).
         + destruct t0; inversion s; subst; clear s; inversion His_opt_like; clear His_opt_like.
           - apply ConstituentOptC; clear_names; simpl; intuition; named_constructor.
         + destruct t0; inversion His_opt_like; clear His_opt_like.
-          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
           - contradict n0. named_constructor.
-          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
-          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
     }
     [reservedST]: { apply ReservedC; clear_names. named_constructor. }
   }
@@ -318,7 +320,7 @@ Proof.
     [optST]: {
       destruct (is_opt_like_type t4) eqn:His_opt_like.
       * destruct t4; inversion His_opt_like; simpl; clear His_opt_like;
-        apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
+        apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
       * destruct (subtyping_decidable (FuncT t1 t2) t4).
         + destruct t4; inversion s; subst; clear s; inversion His_opt_like; clear His_opt_like.
           - simpl. repeat rewrite subtype_dec_refl.
@@ -331,15 +333,15 @@ Proof.
             ** named_constructor; assumption.
             ** named_constructor.
         + destruct t4; inversion His_opt_like; clear His_opt_like.
-          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
-          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
           - simpl.
             destruct (t4_1 <:? t1).
             ** destruct (t2 <:? t4_2).
                ++ contradict n. named_constructor; assumption.
-               ++ apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
-            ** apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
-          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition.
+               ++ apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+            ** apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
     }
     [funcST]: { apply FuncC; clear_names; assumption. }
     [reservedST]: { apply ReservedC; clear_names. named_constructor. }
@@ -397,7 +399,7 @@ Proof.
     intros; name_cases; try solve [subst; simpl in *; congruence].
   [optSomeC]: {apply f_equal. apply H1. congruence. }
   [opportunisticOptC]: {
-    inversion H0; subst; clear H0. contradiction H; apply ReflST; clear_names.
+    inversion H1; subst; clear H1. contradiction H; apply ReflST; clear_names.
   }
   [reservedC]: {  inversion H; subst; clear H; congruence. }
 Qed.
@@ -570,11 +572,10 @@ Lemma no_new_values:
   forall p iv2 it2,
   val_idx (coerce t1 t2 v1) p = Some iv2 ->
   typ_idx t2 p = Some it2 ->
-  ~ (iv2 = NullV) ->
   exists iv1 it1,
    val_idx' v1 p = Some iv1 /\
    typ_idx' t1 p = Some it1 /\
-   it1 <: it2 /\
+   (iv2 = NullV \/ it1 <: it2) /\
    iv1 :: it1 /\
    coerce it1 it2 iv1 = iv2.
 Proof.
@@ -582,11 +583,10 @@ Proof.
     forall p iv2 it2,
     val_idx v2 p = Some iv2 ->
     typ_idx t2 p = Some it2 ->
-    ~ (iv2 = NullV) ->
     exists iv1 it1,
      val_idx' v1 p = Some iv1 /\
      typ_idx' t1 p = Some it1 /\
-     it1 <: it2 /\
+     (iv2 = NullV \/ it1 <: it2) /\
      iv1 :: it1 /\
      coerce it1 it2 iv1 = iv2
   )); intros; name_cases.
@@ -596,7 +596,7 @@ Proof.
     inversion H0; subst; clear H0.
     eexists; eexists.
     repeat split.
-    - named_constructor.
+    - right; named_constructor.
     - named_constructor.
   }
   [intC]: {
@@ -605,7 +605,7 @@ Proof.
     inversion H0; subst; clear H0.
     eexists; eexists.
     repeat split.
-    - named_constructor.
+    - right; named_constructor.
     - named_constructor.
   }
   [natIntC]: {
@@ -614,7 +614,7 @@ Proof.
     inversion H0; subst; clear H0.
     eexists; eexists.
     repeat split.
-    - named_constructor.
+    - right; named_constructor.
     - named_constructor.
   }
   [nullC]: {
@@ -623,20 +623,26 @@ Proof.
     inversion H0; subst; clear H0.
     eexists; eexists.
     repeat split.
-    - named_constructor.
+    - right; named_constructor.
     - named_constructor.
   }
   [nullOptC]: {
     destruct p;
     inversion H; subst; clear H;
     inversion H0; subst; clear H0.
-    contradiction.
+    eexists; eexists.
+    repeat split.
+    - right; named_constructor.
+    - named_constructor.
   }
   [optNullC]: {
     destruct p;
     inversion H; subst; clear H;
     inversion H0; subst; clear H0.
-    contradiction.
+    eexists; eexists.
+    repeat split.
+    - right; named_constructor.
+    - named_constructor.
   }
   [optSomeC]: {
     destruct p;
@@ -644,18 +650,13 @@ Proof.
     inversion H3; subst; clear H3.
     * specialize (H1 Here v2 t2 ltac:(destruct v2; reflexivity) ltac:(destruct v2; reflexivity)).
       simpl.
-      enough (OptT t1 <: OptT t2 /\ SomeV v1 :: OptT t1 /\ coerce (OptT t1) (OptT t2) (SomeV v1) = SomeV v2)
-        by firstorder.
-      simpl.
-      rewrite subtype_dec_true by assumption.
-      
+      enough (OptT t1 <: OptT t2 /\ SomeV v1 :: OptT t1 /\ coerce (OptT t1) (OptT t2) (SomeV v1) = SomeV v2) by firstorder.
       destruct H1 as [iv1 [it1 Hi]].
       decompose record Hi; clear Hi.
       inversion H1; subst; clear H1.
       inversion H3; subst; clear H3.
-      eexists; eexists.
       repeat split.
-      - right; named_constructor; assumption.
+      - named_constructor; assumption.
       - named_constructor; assumption.
       - simpl. rewrite subtype_dec_true by assumption. reflexivity.
     * specialize (H1 _ _ _ H5 H4).
@@ -670,16 +671,112 @@ Proof.
   }
   [opportunisticOptC]: {
     destruct p;
+    inversion H1; subst; clear H1;
+    inversion H2; subst; clear H2.
+    simpl.
+    eexists; eexists; repeat split.
+    - left; reflexivity.
+    - named_constructor. assumption.
+    - simpl. rewrite subtype_dec_false by assumption. reflexivity.
+  }
+  [reservedOptC]: {
+    destruct p;
+    inversion H; subst; clear H;
+    inversion H0; subst; clear H0.
+    eexists; eexists.
+    repeat split.
+    - left; reflexivity.
+    - named_constructor.
+  }
+  [constituentOptC]: {
+    destruct p;
+    inversion H4; subst; clear H4;
+    inversion H5; subst; clear H5.
+    * specialize (H3 Here v2 t2 ltac:(destruct v2; reflexivity) ltac:(destruct v2; reflexivity)).
+      simpl.
+      destruct H3 as [iv1 [it1 Hi]].
+      decompose record Hi; clear Hi.
+      inversion H3; subst; clear H3.
+      inversion H5; subst; clear H5.
+      eexists; eexists; repeat split.
+      - right;  named_constructor.
+      - assumption.
+      - simpl.
+        rewrite coerce_consituent_eq by assumption.
+        rewrite H0.
+        rewrite subtype_dec_true by assumption. reflexivity.
+    * specialize (H3 _ _ _ H7 H6).
+      destruct H3 as [iv1 [it1 Hi]].
+      decompose record Hi; clear Hi.
+      eexists; eexists; repeat split.
+      - simpl.
+        rewrite H3.
+        inversion H2; subst; clear H2; inversion H; subst; clear H; reflexivity.
+      - simpl. 
+        rewrite H5.
+        inversion H2; subst; clear H2; inversion H; subst; clear H; reflexivity.
+      - assumption.
+      - assumption.
+      - assumption.
+  }
+  [opportunisticConstituentOptC]: {
+    destruct p;
+    inversion H2; subst; clear H2;
+    inversion H3; subst; clear H3.
+    eexists; eexists; repeat split.
+    - left; reflexivity.
+    - assumption.
+    - rewrite coerce_consituent_eq by assumption.
+      destruct H1.
+      * rewrite H1. destruct (t1 <:? t2); reflexivity.
+      * rewrite subtype_dec_false by assumption. reflexivity.
+  }
+  [funcC]: {
+    destruct p;
+    inversion H1; subst; clear H1;
+    inversion H2; subst; clear H2.
+    eexists; eexists.
+    repeat split.
+    - right; named_constructor; assumption.
+    - named_constructor.
+  }
+  [reservedC]: {
+    destruct p;
     inversion H0; subst; clear H0;
     inversion H1; subst; clear H1.
-    eexists; eexists; repeat split.
-    - 
+    eexists; eexists.
+    repeat split.
+    - right; named_constructor; assumption.
+    - assumption.
+    - destruct t, v; simpl; try reflexivity.
+  }
+Qed.
 
-  Show Existentials.
-  
-  
+Definition passesThrough (s1 : T * T) (t1 : T) (s2 : T * T) (t2 : T) :=
+  exists v1 p r,
+  v1 :: t1 /\
+  val_idx' v1 p = Some (FuncV r) /\
+  typ_idx' t1 p = Some (FuncT (fst s1) (snd s1)) /\
+  val_idx (coerce t1 t2 v1) p = Some (FuncV r) /\
+  typ_idx t2 p = Some (FuncT (fst s2) (snd s2)).
 
-Definition
-  passesThrough
 
-
+Lemma compositional:
+  forall t1 t2 s1 s2,
+  t1 <: t2 -> passesThrough s1 t1 s2 t2 -> (fst s2 <: fst s1 /\ snd s1 <: snd s2).
+Proof.
+  intros.
+  unfold passesThrough in *.
+  destruct s1, s2.
+  simpl in *.
+  enough (FuncT t t0 <: FuncT t3 t4)
+    by (inversion H1; subst; clear H1; split; try assumption; named_constructor).
+  destruct H0 as [v1 [p [r Hpt]]].
+  decompose record Hpt; clear Hpt.
+  pose proof (no_new_values t1 t2 v1 H H0 p _ _ H3 H5).
+  destruct H4 as [iv1 [it1 Hnnv]].
+  decompose record Hnnv; clear Hnnv.
+  rewrite H2 in H4. inversion H4; subst; clear H4.
+  rewrite H1 in H7. inversion H7; subst; clear H7.
+  destruct H6; congruence.
+Qed.
