@@ -527,7 +527,6 @@ Proof.
     inversion Hval_idx; subst; clear Hval_idx.
     inversion HHT; subst; clear HHT; name_cases.
     all: try congruence.
-    Show Existentials.
     [natHT]: {
       specialize (IHp _ _ NatT ltac:(named_constructor) H0).
       destruct IHp as [t' Htyp_idx].
@@ -763,7 +762,7 @@ Definition passesThrough (s1 : T * T) (t1 : T) (s2 : T * T) (t2 : T) :=
 
 Lemma compositional:
   forall t1 t2 s1 s2,
-  t1 <: t2 -> passesThrough s1 t1 s2 t2 -> (fst s2 <: fst s1 /\ snd s1 <: snd s2).
+  t1 <: t2 -> passesThrough s1 t1 s2 t2 -> (snd s1 <: snd s2 /\ fst s2 <: fst s1).
 Proof.
   intros.
   unfold passesThrough in *.
@@ -780,3 +779,39 @@ Proof.
   rewrite H1 in H7. inversion H7; subst; clear H7.
   destruct H6; congruence.
 Qed.
+
+
+Require Import candid.IDLSoundness.
+
+Theorem soundness:
+  forall I,
+  IDLSound T Subtype passesThrough
+    (fun '(ta2, tr2) '(ta1,tr1)  => ta2 <: ta1 /\ tr1 <: tr2)
+    (fun '(ta1,tr1) '(ta2, tr2) => ta2 <: ta1 /\ tr1 <: tr2)
+    I.
+Proof.
+  intro.
+  apply canonical_soundness.
+  - apply subtyping_refl.
+  - apply subtyping_trans.
+  - unfold service_subtyping.
+    intros.
+    destruct s1 as [ta1 tr1].
+    destruct s2 as [ta2 tr2].
+    intuition.
+  - intros.
+    pose proof (compositional _ _ _ _ H H0).
+    unfold service_subtyping.
+    intros.
+    destruct s1 as [ta1 tr1].
+    destruct s2 as [ta2 tr2].
+    intuition.
+  - intros.
+    destruct s1 as [ta1 tr1].
+    destruct s2 as [ta2 tr2].
+    unfold service_subtyping.
+    intuition.
+Qed.f
+  
+  
+  
