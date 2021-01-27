@@ -353,13 +353,12 @@ Proof.
     coerce t1 t2 v1 = v1)
     by (intros; apply H; intuition; try apply ReflST; clear_names).
   apply (coerce_nice_ind (fun t1 t2 v1 v2 => t2 = t1 -> v2 = v1));
-    intros; name_cases; subst; simpl in *; try solve [congruence].
+    intros; name_cases; try solve [subst; simpl in *; congruence].
   [optSomeC]: {apply f_equal. apply H0. congruence. }
   [opportunisticOptC]: {
     inversion H0; subst; clear H0. contradiction H; apply ReflST; clear_names.
   }
-  * (* why is this not named? *)
-    inversion H; subst; clear H. reflexivity.
+  [reservedC]: {  inversion H; subst; clear H; congruence. }
 Qed.
 
 Lemma coerce_well_defined:
