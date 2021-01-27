@@ -811,7 +811,4 @@ Proof.
     destruct s2 as [ta2 tr2].
     unfold service_subtyping.
     intuition.
-Qed.f
-  
-  
-  
+Qed.
