@@ -14,7 +14,7 @@ const MAX_DEPTH: usize = 20;
 pub struct GenConfig {
     range: Option<(i64, i64)>,
     text: Option<String>, // regex or pattern
-    value: Option<IDLValue>,
+    value: Option<String>,
     depth: Option<isize>,
     size: Option<isize>,
 }
@@ -30,15 +30,16 @@ impl Default for GenConfig {
     }
 }
 impl GenConfig {
-    pub fn update(&self, config: GenConfig) -> GenConfig {
+    pub fn update(&self, config: GenConfig, recursive: bool) -> GenConfig {
         // TODO support removing properties
         let old = self.clone();
         GenConfig {
             range: config.range.or(old.range),
             text: config.text.or(old.text),
             value: config.value.or(old.value),
-            depth: config.depth.or(old.depth),
-            size: config.size.or(old.size),
+            // These properties only update when it's not inside a recursion.
+            depth: if recursive { None } else { config.depth },
+            size: if recursive { None } else { config.size },
         }
     }
 }
@@ -54,10 +55,10 @@ pub struct GenState<'a> {
 }
 impl<'a> GenState<'a> {
     fn new(tree: &'a Configs, env: &'a TypeEnv) -> Result<Self> {
-        let config = tree.get::<GenConfig>(&["default".to_string()]).unwrap(); //GenConfig::default();
+        let mut config = tree.get::<GenConfig>(&["default".to_string()]).unwrap().0; //GenConfig::default();
         Ok(GenState {
-            depth: config.depth.unwrap_or(5),
-            size: config.size.unwrap_or(50),
+            depth: config.depth.take().unwrap_or(5),
+            size: config.size.take().unwrap_or(50),
             tree,
             config,
             env,
@@ -78,11 +79,16 @@ impl<'a> GenState<'a> {
             }
             path_name(ty)
         };
-        let old_config = self.config.clone();
+        let mut old_config = self.config.clone();
         self.path.push(elem);
-        if let Some(config) = self.tree.get::<GenConfig>(&self.path) {
-            self.config = self.config.update(config);
+        if let Some((config, recursive)) = self.tree.get::<GenConfig>(&self.path) {
+            self.config = self.config.update(config, recursive);
         }
+        // Current depth and size are stored in old_config for pop_state to restore states.
+        old_config.depth = Some(self.depth);
+        old_config.size = Some(self.size);
+        self.depth = self.config.depth.take().unwrap_or(self.depth);
+        self.size = self.config.size.take().unwrap_or(self.size);
         old_config
     }
     fn pop_state(&mut self, old_config: GenConfig, ty: &Type, is_label: bool) {
@@ -96,11 +102,15 @@ impl<'a> GenState<'a> {
         }
         self.path.pop();
         self.config = old_config;
+        self.depth = self.config.depth.take().unwrap();
+        self.size = self.config.size.take().unwrap();
     }
     pub fn any(&mut self, u: &mut Unstructured, ty: &Type) -> Result<IDLValue> {
         let old_config = self.push_state(ty, None);
+        assert!(self.config.depth.is_none());
         if let Some(v) = &self.config.value {
-            let v = v.clone();
+            let v = v.parse::<IDLValue>()?;
+            let v = v.annotate_type(true, self.env, ty)?;
             self.pop_state(old_config, ty, false);
             return Ok(v);
         }

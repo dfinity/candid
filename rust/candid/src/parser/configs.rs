@@ -24,17 +24,26 @@ impl Configs {
             None
         }
     }
-    /// Get config that starts somewhere in the path and ends at the end of the path
-    pub fn get<T: DeserializeOwned>(&self, path: &[String]) -> Option<T> {
+    /// Get config that starts somewhere in the path and ends at the end of the path.
+    /// Also returns if the matched path appears earlier in the path (inside a recursion).
+    pub fn get<T: DeserializeOwned>(&self, path: &[String]) -> Option<(T, bool)> {
         for i in (0..path.len()).rev() {
             let (_, tail) = path.split_at(i);
             match self.get_helper(tail) {
-                Some(v) => return from_simple_value::<T>(v.clone()).ok(),
+                Some(v) => {
+                    let parsed_config = from_simple_value::<T>(v.clone()).ok()?;
+                    return Some((parsed_config, is_repeated(path, tail)));
+                }
                 None => continue,
             }
         }
         None
     }
+}
+
+fn is_repeated(path: &[String], matched: &[String]) -> bool {
+    let (test, _) = path.split_at(path.len() - matched.len());
+    test.join(".").contains(&matched.join("."))
 }
 
 fn has_leaf(v: &SimpleValue) -> bool {

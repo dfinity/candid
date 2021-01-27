@@ -7,10 +7,9 @@ let default =
       }
 
 in  { default
-    , list = { depth = Some 20, size = Some 50, range = Some [ 42, 43 ] }
-    , val.int.value = Some "42:int"
-    , left.range = Some [ -200, -100 ]
-    , right.tree.range = Some [ 100, 200 ]
+    , list = { depth = Some 20, size = Some 50 }
+    , val.value = Some "42"
+    , left = { depth = Some 1, range = Some [ -200, -100 ] }
+    , right.tree = { depth = Some 5, range = Some [ 100, 200 ] }
     , vec.nat8.range = Some [ 65, 90 ]
-    , vec.size = Some 100
     }
