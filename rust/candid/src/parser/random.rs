@@ -4,9 +4,9 @@ use super::value::{IDLArgs, IDLField, IDLValue};
 use crate::types::{Field, Type};
 use crate::Deserialize;
 use crate::Result;
-use arbitrary::unstructured::Int;
-use arbitrary::Unstructured;
+use arbitrary::{unstructured::Int, Arbitrary, Unstructured};
 use std::collections::HashSet;
+use std::convert::TryFrom;
 
 const MAX_DEPTH: usize = 20;
 
@@ -31,6 +31,7 @@ impl Default for GenConfig {
 }
 impl GenConfig {
     pub fn update(&self, config: GenConfig) -> GenConfig {
+        // TODO support removing properties
         let old = self.clone();
         GenConfig {
             range: config.range.or(old.range),
@@ -63,20 +64,32 @@ impl<'a> GenState<'a> {
             path: Vec::new(),
         })
     }
-    pub fn any(&mut self, u: &mut Unstructured, ty: &Type) -> Result<IDLValue> {
+    // Update state and return the old config state
+    fn push_state(&mut self, ty: &Type) -> GenConfig {
         self.path.push(path_name(ty));
-        let old_config = self.config.clone();
-        if let Some(conf) = self.tree.get::<GenConfig>(&self.path) {
-            self.config = self.config.update(conf);
-            //println!("{:?} {:?}", self.path, self.config);
-        }
+        self.depth -= 1;
         self.size -= 1;
+        let old_config = self.config.clone();
+        if let Some(config) = self.tree.get::<GenConfig>(&self.path) {
+            self.config = self.config.update(config);
+        }
+        old_config
+    }
+    fn pop_state(&mut self, old_config: GenConfig) {
+        self.path.pop();
+        self.depth += 1;
+        self.config = old_config;
+    }
+    pub fn any(&mut self, u: &mut Unstructured, ty: &Type) -> Result<IDLValue> {
+        let old_config = self.push_state(ty);
         let res = Ok(match ty {
             Type::Var(id) => {
                 let ty = self.env.rec_find_type(id)?;
+                // Variable doesn't cost anything, so we need to undo the counter.
                 self.size += 1;
+                self.depth += 1;
                 let res = self.any(u, &ty)?;
-                self.path.pop();
+                self.depth -= 1;
                 res
             }
             Type::Null => IDLValue::Null,
@@ -106,11 +119,7 @@ impl<'a> GenState<'a> {
                 if idx == 0 {
                     IDLValue::None
                 } else {
-                    self.depth -= 1;
-                    let res = IDLValue::Opt(Box::new(self.any(u, t)?));
-                    self.path.pop();
-                    self.depth += 1;
-                    res
+                    IDLValue::Opt(Box::new(self.any(u, t)?))
                 }
             }
             Type::Vec(t) => {
@@ -119,10 +128,7 @@ impl<'a> GenState<'a> {
                 let len = u.int_in_range(0..=max_len)?;
                 let mut vec = Vec::with_capacity(len);
                 for _ in 0..len {
-                    self.depth -= 1;
                     let e = self.any(u, t)?;
-                    self.path.pop();
-                    self.depth += 1;
                     vec.push(e);
                 }
                 IDLValue::Vec(vec)
@@ -130,11 +136,8 @@ impl<'a> GenState<'a> {
             Type::Record(fs) => {
                 let mut res = Vec::new();
                 for Field { id, ty } in fs.iter() {
-                    self.depth -= 1;
                     self.path.push(id.to_string());
                     let val = self.any(u, ty)?;
-                    self.path.pop();
-                    self.depth += 1;
                     res.push(IDLField {
                         id: id.clone(),
                         val,
@@ -154,11 +157,8 @@ impl<'a> GenState<'a> {
                 };
                 let idx = arbitrary_variant(u, &sizes)?;
                 let Field { id, ty } = &fs[idx];
-                self.depth -= 1;
                 self.path.push(id.to_string());
                 let val = self.any(u, ty)?;
-                self.path.pop();
-                self.depth += 1;
                 let field = IDLField {
                     id: id.clone(),
                     val,
@@ -167,7 +167,7 @@ impl<'a> GenState<'a> {
             }
             _ => unimplemented!(),
         });
-        self.config = old_config;
+        self.pop_state(old_config);
         res
     }
 }
@@ -233,20 +233,17 @@ impl TypeEnv {
     }
 }
 
-fn arbitrary_num<
-    T: num_traits::Bounded + Int + std::convert::TryFrom<i64> + arbitrary::Arbitrary,
->(
-    u: &mut Unstructured,
-    range: Option<(i64, i64)>,
-) -> Result<T> {
-    use std::convert::TryInto;
+fn arbitrary_num<T>(u: &mut Unstructured, range: Option<(i64, i64)>) -> Result<T>
+where
+    T: num_traits::Bounded + Int + TryFrom<i64> + Arbitrary,
+{
     Ok(match range {
         None => u.arbitrary::<T>()?,
         Some((l, r)) => {
             let min = T::min_value();
             let max = T::max_value();
-            let l: T = l.try_into().unwrap_or(min);
-            let r: T = r.try_into().unwrap_or(max);
+            let l = T::try_from(l).unwrap_or(min);
+            let r = T::try_from(r).unwrap_or(max);
             u.int_in_range(l..=r)?
         }
     })
