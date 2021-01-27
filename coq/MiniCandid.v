@@ -484,7 +484,7 @@ Lemma path_preserves_types:
   val_idx v p = Some v' ->
   typ_idx t p = Some t' ->
   v' :: t'.
-Admitted.
+Admitted. (* Did that once... *)
 
 Lemma path_preserves_types':
   forall v v' t t' p,
@@ -509,7 +509,7 @@ Proof.
       [eapply IHp; [|eassumption|eassumption]; try assumption; named_constructor].
 Qed.
 
-Lemma all_paths_typed:
+Lemma all_paths_typed':
   forall v v' t p,
   v :: t ->
   val_idx' v p = Some v' ->
@@ -570,9 +570,10 @@ Lemma no_new_values:
   forall p iv2 it2,
   val_idx (coerce t1 t2 v1) p = Some iv2 ->
   typ_idx t2 p = Some it2 ->
+  ~ (iv2 = NullV) ->
   exists iv1 it1,
-   val_idx v1 p = Some iv1 /\
-   typ_idx t1 p = Some it1 /\
+   val_idx' v1 p = Some iv1 /\
+   typ_idx' t1 p = Some it1 /\
    it1 <: it2 /\
    iv1 :: it1 /\
    coerce it1 it2 iv1 = iv2.
@@ -581,9 +582,10 @@ Proof.
     forall p iv2 it2,
     val_idx v2 p = Some iv2 ->
     typ_idx t2 p = Some it2 ->
+    ~ (iv2 = NullV) ->
     exists iv1 it1,
-     val_idx v1 p = Some iv1 /\
-     typ_idx t1 p = Some it1 /\
+     val_idx' v1 p = Some iv1 /\
+     typ_idx' t1 p = Some it1 /\
      it1 <: it2 /\
      iv1 :: it1 /\
      coerce it1 it2 iv1 = iv2
@@ -592,100 +594,87 @@ Proof.
     destruct p;
     inversion H; subst; clear H;
     inversion H0; subst; clear H0.
-    * eexists; eexists.
-      repeat split.
-      - named_constructor.
-      - named_constructor.
-    * simpl.
-      eexists; eexists.
-      repeat split.
-      - eassumption.
-      - eassumption.
-      - named_constructor.
-      - named_constructor.
+    eexists; eexists.
+    repeat split.
+    - named_constructor.
+    - named_constructor.
   }
   [intC]: {
-    destruct p2;
+    destruct p;
     inversion H; subst; clear H;
     inversion H0; subst; clear H0.
-    eexists; eexists; eexists.
+    eexists; eexists.
     repeat split.
-    - constructor.
-    - reflexivity.
-    - reflexivity.
     - named_constructor.
     - named_constructor.
-    - reflexivity.
   }
   [natIntC]: {
-    destruct p2;
+    destruct p;
     inversion H; subst; clear H;
     inversion H0; subst; clear H0.
-    eexists; eexists; eexists.
+    eexists; eexists.
     repeat split.
-    - constructor.
-    - reflexivity.
-    - reflexivity.
     - named_constructor.
     - named_constructor.
-    - reflexivity.
   }
   [nullC]: {
-    destruct p2;
+    destruct p;
     inversion H; subst; clear H;
     inversion H0; subst; clear H0.
-    eexists; eexists; eexists.
+    eexists; eexists.
     repeat split.
-    - constructor.
-    - reflexivity.
-    - reflexivity.
     - named_constructor.
     - named_constructor.
-    - reflexivity.
   }
   [nullOptC]: {
-    destruct p2;
+    destruct p;
     inversion H; subst; clear H;
     inversion H0; subst; clear H0.
-    eexists; eexists; eexists.
-    repeat split.
-    - constructor.
-    - reflexivity.
-    - reflexivity.
-    - named_constructor.
-    - named_constructor.
-    - reflexivity.
+    contradiction.
   }
   [optNullC]: {
-    destruct p2;
+    destruct p;
     inversion H; subst; clear H;
     inversion H0; subst; clear H0.
-    eexists; eexists; eexists.
-    repeat split.
-    - constructor.
-    - reflexivity.
-    - reflexivity.
-    - named_constructor.
-    - named_constructor.
-    - reflexivity.
+    contradiction.
   }
   [optSomeC]: {
-    destruct p2;
+    destruct p;
     inversion H2; subst; clear H2;
     inversion H3; subst; clear H3.
-    * 
-      specialize (H1 Here v2 t2 ltac:(destruct v2; reflexivity) ltac:(destruct v2; reflexivity)).
-      destruct H1 as [p1 [iv1 [it1 Hi]]].
-      exists (The Here); exists (SomeV iv1); exists (OptT it1).
+    * specialize (H1 Here v2 t2 ltac:(destruct v2; reflexivity) ltac:(destruct v2; reflexivity)).
+      simpl.
+      enough (OptT t1 <: OptT t2 /\ SomeV v1 :: OptT t1 /\ coerce (OptT t1) (OptT t2) (SomeV v1) = SomeV v2)
+        by firstorder.
+      simpl.
+      rewrite subtype_dec_true by assumption.
+      
+      destruct H1 as [iv1 [it1 Hi]].
+      decompose record Hi; clear Hi.
+      inversion H1; subst; clear H1.
+      inversion H3; subst; clear H3.
+      eexists; eexists.
       repeat split.
-      - 
-      - named_constructor. 
+      - right; named_constructor; assumption.
       - named_constructor; assumption.
-      - simpl. rewrite subtype_dec_true by assumption. intuition.
-      - named_constructor.
-      - named_constructor; assumption.
-      - simpl. rewrite subtype_dec_true by assumption. simpl.
+      - simpl. rewrite subtype_dec_true by assumption. reflexivity.
+    * specialize (H1 _ _ _ H5 H4).
+      destruct H1 as [iv1 [it1 Hi]].
+      decompose record Hi; clear Hi.
+      eexists; eexists; repeat split.
+      - simpl. eassumption.
+      - simpl. eassumption.
+      - assumption.
+      - assumption.
+      - assumption.
   }
+  [opportunisticOptC]: {
+    destruct p;
+    inversion H0; subst; clear H0;
+    inversion H1; subst; clear H1.
+    eexists; eexists; repeat split.
+    - 
+
   Show Existentials.
   
   
