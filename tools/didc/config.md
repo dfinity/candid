@@ -12,9 +12,28 @@ We need a way to customize how we interpret Candid data for various use cases, f
 We can of course implement all these in a host language, but there are some value to support these customizations in Candid
 to benefit canisters written in different host languages. Without using dependent typing, we propose a light-weight config language to specify properties for type nodes.
 
+## Design
+
+There are two parts in the config language: 1) A way to quickly identify particular type nodes in Candid type; 2) Attach semantic meaning to the type nodes.
+
+For the first problem, we use notations similar to CSS selector. For example, given the following Candid types,
+```
+type tree = variant { leaf: int; branch: record { left: tree; right: tree } };
+type list = opt record { left: int; right: list };
+type left = opt int;
+```
+If we want to find the left branch of a tree, we can write `left.tree`, `branch.record.left`
+or `tree.variant.branch.record.left`.
+If we write just `left`, it will match the `left` field in both `tree` and `list`, as well as the `left` type.
+
+For the second problem, we assign a set of key-value pairs to the selected type nodes. It's up to the implementator to
+interpret the meaning of these key-value pairs for different use cases. For example, if we want to generate a random tree
+whose left branch is always 1, we can write `left.tree = { depth = Some 1 }`.
+
+
 ## Why not use Candid as a configure language for Candid?
 
-We can! The config lanauge is of the following Candid type `configs`:
+We can! The config language is of the following Candid type `configs`:
 
 ```
 type RandomConfig = record { 
@@ -32,7 +51,6 @@ type node = record {
 type configs = vec record { text; node };
 ```
 
-Given a `tree` type in Candid: `type tree = variant { leaf: int; branch: record { left: tree; right: tree } };`,
 if we want to limit the depth of the left branch of a tree, we would write:
 
 ```
@@ -41,7 +59,15 @@ vec {
     "left"; 
     record { 
       config = null; 
-      branch = vec { record { "tree"; record { config = opt record { depth = opt 1 }; branch = vec {}} } }; 
+      branch = vec { 
+        record { 
+          "tree"; 
+          record { 
+            config = opt record { depth = opt 1 }; 
+            branch = vec {}
+          }
+        }
+      };
     }
   };
 }
