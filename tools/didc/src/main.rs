@@ -56,6 +56,9 @@ enum Command {
     Random {
         #[structopt(flatten)]
         annotate: TypeAnnotation,
+        #[structopt(short, long, possible_values = &["did", "js"], default_value = "did")]
+        /// Specifies value format
+        format: String,
     },
     /// Diff two Candid values
     Diff {
@@ -210,7 +213,7 @@ fn main() -> Result<()> {
                 println!("{:?}", value);
             }
         }
-        Command::Random { annotate } => {
+        Command::Random { annotate, format } => {
             use candid::parser::configs::Configs;
             use rand::Rng;
             use serde_dhall::SimpleValue;
@@ -220,8 +223,15 @@ fn main() -> Result<()> {
             let (env, types) = annotate.get_types(Mode::Encode)?;
             let config = serde_dhall::from_file("random.dhall").parse::<SimpleValue>()?;
             let config = Configs::from_dhall(config);
-            let value = IDLArgs::any(&mut u, &config, &env, &types)?;
-            println!("{}", value);
+            let args = IDLArgs::any(&mut u, &config, &env, &types)?;
+            match format.as_str() {
+                "did" => println!("{}", args),
+                "js" => println!(
+                    "{}",
+                    candid::bindings::javascript::value::pp_args(&args).pretty(80)
+                ),
+                _ => unreachable!(),
+            }
         }
         Command::Diff {
             values1,
