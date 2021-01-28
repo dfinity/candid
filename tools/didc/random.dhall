@@ -1,6 +1,7 @@
 let default =
       { range = None (List Natural)
-      , text = Some "ascii"
+      , text = Some "bs"
+      , width = Some 10
       , depth = Some 5
       , size = Some 100
       , value = None Text

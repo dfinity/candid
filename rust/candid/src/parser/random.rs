@@ -3,7 +3,7 @@ use super::typing::TypeEnv;
 use super::value::{IDLArgs, IDLField, IDLValue};
 use crate::types::{Field, Type};
 use crate::Deserialize;
-use crate::Result;
+use crate::{Error, Result};
 use arbitrary::{unstructured::Int, Arbitrary, Unstructured};
 use std::collections::HashSet;
 use std::convert::TryFrom;
@@ -13,7 +13,8 @@ const MAX_DEPTH: usize = 20;
 #[derive(Debug, Deserialize, Clone)]
 pub struct GenConfig {
     range: Option<(i64, i64)>,
-    text: Option<String>, // regex or pattern
+    text: Option<String>,
+    width: Option<usize>,
     value: Option<String>,
     depth: Option<isize>,
     size: Option<isize>,
@@ -23,6 +24,7 @@ impl Default for GenConfig {
         GenConfig {
             range: Some((0, 100)),
             text: Some("ascii".to_string()),
+            width: Some(10),
             value: None,
             depth: Some(5),
             size: Some(100),
@@ -37,6 +39,7 @@ impl GenConfig {
             range: config.range.or(old.range),
             text: config.text.or(old.text),
             value: config.value.or(old.value),
+            width: config.width.or(old.width),
             // These properties only update when it's not inside a recursion.
             depth: if recursive { None } else { config.depth },
             size: if recursive { None } else { config.size },
@@ -134,8 +137,8 @@ impl<'a> GenState<'a> {
             Type::Int64 => IDLValue::Int64(arbitrary_num(u, self.config.range)?),
             Type::Float32 => IDLValue::Float32(u.arbitrary()?),
             Type::Float64 => IDLValue::Float64(u.arbitrary()?),
-            Type::Text => IDLValue::Text(u.arbitrary()?),
             Type::Principal => IDLValue::Principal(crate::Principal::anonymous()),
+            Type::Text => IDLValue::Text(arbitrary_text(u, &self.config.text, &self.config.width)?),
             Type::Opt(t) => {
                 let depths = if self.depth <= 0 || self.size <= 0 {
                     [1, 0]
@@ -150,9 +153,11 @@ impl<'a> GenState<'a> {
                 }
             }
             Type::Vec(t) => {
-                let elem_size = self.env.size(t).unwrap_or(MAX_DEPTH);
-                let max_len = std::cmp::max(0, self.size) as usize / elem_size;
-                let len = u.int_in_range(0..=max_len)?;
+                let width = self.config.width.or_else(|| {
+                    let elem_size = self.env.size(t).unwrap_or(MAX_DEPTH);
+                    Some(std::cmp::max(0, self.size) as usize / elem_size)
+                });
+                let len = arbitrary_len(u, width)?;
                 let mut vec = Vec::with_capacity(len);
                 for _ in 0..len {
                     let e = self.any(u, t)?;
@@ -262,6 +267,40 @@ impl TypeEnv {
     }
 }
 
+fn arbitrary_text(
+    u: &mut Unstructured,
+    text: &Option<String>,
+    width: &Option<usize>,
+) -> Result<String> {
+    use fake::{faker::*, Fake};
+    use rand::SeedableRng;
+    Ok(if let Some(policy) = text {
+        let seed = u.arbitrary::<u64>()?;
+        let r = &mut rand::rngs::StdRng::seed_from_u64(seed);
+        match policy.as_str() {
+            "name" => name::en::Name().fake_with_rng(r),
+            "name.cn" => name::zh_cn::Name().fake_with_rng(r),
+            "path" => filesystem::en::FilePath().fake_with_rng(r),
+            "country" => address::en::CountryName().fake_with_rng(r),
+            "company" => company::en::CompanyName().fake_with_rng(r),
+            "bs" => company::en::Bs().fake_with_rng(r),
+            _ => return Err(Error::msg("Unknown text config")),
+        }
+    } else {
+        let len = arbitrary_len(u, *width)?;
+        let bytes = u.get_bytes(len)?;
+        String::from_utf8_lossy(&bytes).to_string()
+    })
+}
+
+fn arbitrary_len(u: &mut Unstructured, width: Option<usize>) -> Result<usize> {
+    Ok(if let Some(w) = width {
+        u.int_in_range(0..=w)?
+    } else {
+        u.arbitrary_len::<u8>()?
+    })
+}
+
 fn arbitrary_num<T>(u: &mut Unstructured, range: Option<(i64, i64)>) -> Result<T>
 where
     T: num_traits::Bounded + Int + TryFrom<i64> + Arbitrary,
@@ -293,5 +332,5 @@ fn arbitrary_variant(u: &mut Unstructured, weight: &[usize]) -> Result<usize> {
             return Ok(i);
         }
     }
-    Err(crate::Error::msg("empty variant"))
+    Err(Error::msg("empty variant"))
 }
