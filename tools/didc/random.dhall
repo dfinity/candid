@@ -16,6 +16,7 @@ in  { default
     , Vec = { width = Some 2, size = Some 10 }
     , profile.record =
       { name.text = Some "name"
+      , age.range = Some [ 18, 65 ]
       , company.text = Some "company"
       , country.text = Some "country"
       , file.text = Some "path"
