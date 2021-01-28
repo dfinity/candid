@@ -98,12 +98,14 @@ impl From<io::Error> for Error {
     }
 }
 
+#[cfg(feature = "random")]
 impl From<arbitrary::Error> for Error {
     fn from(e: arbitrary::Error) -> Error {
         Error::msg(format!("arbitrary error: {}", e))
     }
 }
 
+#[cfg(feature = "configs")]
 impl From<serde_dhall::Error> for Error {
     fn from(e: serde_dhall::Error) -> Error {
         Error::msg(format!("dhall error: {}", e))
