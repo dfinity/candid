@@ -16,20 +16,39 @@ to benefit canisters written in different host languages. Without using dependen
 
 There are two parts in the config language: 1) A way to quickly identify particular type nodes in Candid type; 2) Attach semantic meaning to the type nodes.
 
-For the first problem, we use notations similar to CSS selector. For example, given the following Candid types,
+For the first part, we use notations similar to CSS selector. For example, given the following Candid types,
 ```
 type tree = variant { leaf: int; branch: record { left: tree; right: tree } };
-type list = opt record { left: int; right: list };
+type pair = record { left: int; right: nat };
 type left = opt int;
 ```
 If we want to find the left branch of a tree, we can write `left.tree`, `branch.record.left`
 or `tree.variant.branch.record.left`.
-If we write just `left`, it will match the `left` field in both `tree` and `list`, as well as the `left` type.
+If we write just `left`, it will match the `left` field in both `tree` and `pair`, as well as the `left` type.
 
-For the second problem, we assign a set of key-value pairs to the selected type nodes. It's up to the implementator to
-interpret the meaning of these key-value pairs for different use cases. For example, if we want to generate a random tree
-whose left branch is always 1, we can write `left.tree = { depth = Some 1 }`.
+For the second part, we assign a set of key-value pairs to the selected type nodes. It's up to the implementator to
+interpret the meaning of these key-value pairs for different use cases. 
+These properties apply to the sub-tree rooted at the selected type nodes, not just the node itself.
+For example, if we want to generate a random tree whose left branch has depth 1 and leaf value between [20, 30], 
+we can write `left.tree = { depth = Some 1, range = Some [20, 30] }`. 
+Technically, `range` applies only to `left.tree.variant.leaf`, but since `leaf` is in the sub-tree of `left.tree`, 
+we do not need to write a separate type selector.
 
+Note that some properties, such as depth, only apply to the first occurance in the type path. 
+Otherwise, we get an infinite recursion.
+
+Based on the above requirements, we use Dhall as our config language.
+
+## Random config
+
+For random value generation, we define the following properties,
+
+* `range = Some [lower, upper]`, specifies the range for all integer types. If omitted or invalid, we uses the full integer range.
+* `width = Some 10`, specifies the maximal length for `vec` and `text`. If omitted, we estimate the length based on the size of the element.
+* `text = Some "kind"`, specifies the kind of text we want to generate for `text`. If omitted, we take a random bytes and convert to utf-8 text. The implemented kind are "name", "name.cn", "company", "country", "path", "bs", which all come from the `fake` crate.
+* `value = Some "CandidValue"`, specifies a fixed value in Candid textual form. It will be type checked against the expected type.
+* `depth = Some 10`, specifies the maximal depth for the Candid value. For recursive types, it only applies to the first occurance of the type selector. The depth bound is a soft limit.
+* `size = Some 10`, specifies the maximal size for the Candid value. For recursive types, it only applies to the first occurance of the type selector. The size bound is a soft limit.
 
 ## Why not use Candid as a configure language for Candid?
 
@@ -38,11 +57,8 @@ We can! The config language is of the following Candid type `configs`:
 ```
 type RandomConfig = record { 
   range: opt record { int; int }; 
-  "text": opt text; 
-  width: opt nat; 
-  value: opt text;
   depth: opt nat;
-  size: opt nat;
+  ...
 };
 type node = record { 
   config: opt RandomConfig; 
@@ -51,7 +67,7 @@ type node = record {
 type configs = vec record { text; node };
 ```
 
-if we want to limit the depth of the left branch of a tree, we would write:
+If we want to limit the depth of the left branch of a tree, we would write:
 
 ```
 vec {
