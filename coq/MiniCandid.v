@@ -425,297 +425,139 @@ a function reference at function type t.”. Moreover, this contains
 relation should indicate the position in the value in a way that
 the positions match up even after coercions.
 
-We allow spurious The constructors on this path; this models
-the consituent-to-opt rule.
+So we start by giving names to positions
+(This needs to be extended once we have sequences and records)
 *)
-
-(* This needs to be extended once we have sequences and records *)
 Inductive Path :=
   | Here : Path
   | The : Path -> Path
   .
 
-Fixpoint val_idx (v : V) (p : Path) : option V :=
+(*
+And a function that finds the value at a given path.
+It returns None if the path does not make sense for this value.
+*)
+Fixpoint val_idx (p : Path) (v : V) : option V :=
   match p with
   | Here => Some v
   | The p =>
     match v with
-    | SomeV v => val_idx v p
+    | SomeV v => val_idx p v
     | _ => None
     end
   end.
 
-Fixpoint val_idx' (v : V) (p : Path) : option V :=
+(*
+This is a lenitent variant, which is total (returning NoneV
+when the path is invalid), which makes proofs simpler.
+
+It also ignores extra [The] on the path; this way one can 
+use this on the pre-coerced value, and get the right value,
+even if the constituent-to-optional rule was used.
+*)
+Fixpoint val_idx' (p : Path) (v : V) : V :=
   match p with
-  | Here => Some v
+  | Here => v
   | The p =>
     match v with
-    | SomeV v => val_idx' v p
-    | NullV => None
-    | ReservedV => None
-    | _ => val_idx' v p
+    | SomeV v => val_idx' p v
+    | NullV => NullV
+    | ReservedV => NullV
+    | _ => val_idx' p v
     end
   end.
 
-
-Fixpoint typ_idx (t : T) (p : Path) : option T :=
+(*
+The corresponding function for types, also lenitent.
+*)
+Fixpoint typ_idx' (p : Path) (t : T) : T :=
   match p with
-  | Here => Some t
+  | Here => t
   | The p =>
     match t with
-    | OptT t => typ_idx t p
-    | _ => typ_idx t p
+    | OptT t => typ_idx' p t
+    | NullT => VoidT
+    | ReservedT => VoidT
+    | _ => typ_idx' p t
     end
   end.
 
-Fixpoint typ_idx' (t : T) (p : Path) : option T :=
-  match p with
-  | Here => Some t
-  | The p =>
-    match t with
-    | OptT t => typ_idx' t p
-    | NullT => None
-    | ReservedT => None
-    | _ => typ_idx' t p
-    end
-  end.
-
-
-Lemma path_preserves_types':
-  forall v v' t t' p,
-  v :: t ->
-  val_idx' v p = Some v' ->
-  typ_idx' t p = Some t' ->
-  v' :: t'.
-Proof.
-  intros v v' t t' p.
-  revert v v' t t'.
-  induction p.
-  * intros v v' t t' HHT Hval_idx Htyp_idx.
-    inversion Hval_idx; subst; clear Hval_idx;
-    inversion Htyp_idx; subst; clear Htyp_idx.
-    assumption.
-  * intros v v' t t' HHT Hval_idx Htyp_idx.
-    inversion Hval_idx; subst; clear Hval_idx;
-    inversion Htyp_idx; subst; clear Htyp_idx.
-    inversion HHT; subst; clear HHT; name_cases.
-    all: try congruence.
-    all: try solve
-      [eapply IHp; [|eassumption|eassumption]; try assumption; named_constructor].
-Qed.
-
-Lemma all_paths_typed':
+Lemma path_preserves_types:
   forall v v' t p,
   v :: t ->
-  val_idx' v p = Some v' ->
-  exists t', typ_idx' t p = Some t'.
+  val_idx p v = Some v' ->
+  v' :: typ_idx' p t.
 Proof.
   intros v v' t p.
   revert v v' t.
   induction p.
   * intros v v' t HHT Hval_idx.
     inversion Hval_idx; subst; clear Hval_idx.
-    eexists. reflexivity.
+    assumption.
   * intros v v' t HHT Hval_idx.
     inversion Hval_idx; subst; clear Hval_idx.
     inversion HHT; subst; clear HHT; name_cases.
-    all: try congruence.
-    [natHT]: {
-      specialize (IHp _ _ NatT ltac:(named_constructor) H0).
-      destruct IHp as [t' Htyp_idx].
-      eexists.
-      simpl. eassumption.
-    }
-    [intHT]: {
-      specialize (IHp _ _ IntT ltac:(named_constructor) H0).
-      destruct IHp as [t' Htyp_idx].
-      eexists.
-      simpl. eassumption.
-    }
-    [optHT]: {
-      specialize (IHp _ _ t0 H H0).
-      destruct IHp as [t' Htyp_idx].
-      eexists.
-      simpl. eassumption.
-    }
-    [funcHT]: {
-      specialize (IHp _ _ (FuncT t1 t2) ltac:(named_constructor) H0).
-      destruct IHp as [t' Htyp_idx].
-      eexists.
-      simpl. eassumption.
-    }
+    all: firstorder congruence.
 Qed.
-
-(*
-Because of our subtyping relation, when we coerce,
-we may be introducing some SomeV. This corresponds to
-adding some Paths.
-
-Inductive add_thes : Path -> Path -> Prop :=
-  | HereAT : add_thes Here Here
-  | UnderTheAT: forall p1 p2, add_thes p1 p2 -> add_thes (The p1) (The p2)
-  | AddTheAT: forall p1 p2, add_thes p1 p2 -> add_thes p1 (The p2).
-*)
 
 Lemma no_new_values:
   forall t1 t2 v1,
   t1 <: t2 ->
   v1 :: t1 ->
-  forall p iv2 it2,
-  val_idx (coerce t1 t2 v1) p = Some iv2 ->
-  typ_idx t2 p = Some it2 ->
-  exists iv1 it1,
-   val_idx' v1 p = Some iv1 /\
-   typ_idx' t1 p = Some it1 /\
-   (iv2 = NullV \/ it1 <: it2) /\
-   iv1 :: it1 /\
-   coerce it1 it2 iv1 = iv2.
+  forall p iv2,
+  val_idx p (coerce t1 t2 v1) = Some iv2 ->
+    (iv2 = NullV \/ typ_idx' p t1 <: typ_idx' p t2) /\
+    val_idx' p v1 :: typ_idx' p t1 /\
+    coerce (typ_idx' p t1) (typ_idx' p t2) (val_idx' p v1) = iv2.
 Proof.
   apply (coerce_nice_ind (fun t1 t2 v1 v2 =>
-    forall p iv2 it2,
-    val_idx v2 p = Some iv2 ->
-    typ_idx t2 p = Some it2 ->
-    exists iv1 it1,
-     val_idx' v1 p = Some iv1 /\
-     typ_idx' t1 p = Some it1 /\
-     (iv2 = NullV \/ it1 <: it2) /\
-     iv1 :: it1 /\
-     coerce it1 it2 iv1 = iv2
+    forall p iv2,
+    forall (Hval_idx : val_idx p v2 = Some iv2),
+      (iv2 = NullV \/ typ_idx' p t1 <: typ_idx' p t2) /\
+      val_idx' p v1 :: typ_idx' p t1 /\
+      coerce (typ_idx' p t1) (typ_idx' p t2) (val_idx' p v1) = iv2
   )); intros; name_cases.
-  [natC]: {
-    destruct p;
-    inversion H; subst; clear H;
-    inversion H0; subst; clear H0.
-    eexists; eexists.
-    repeat split.
-    - right; named_constructor.
-    - named_constructor.
-  }
-  [intC]: {
-    destruct p;
-    inversion H; subst; clear H;
-    inversion H0; subst; clear H0.
-    eexists; eexists.
-    repeat split.
-    - right; named_constructor.
-    - named_constructor.
-  }
-  [natIntC]: {
-    destruct p;
-    inversion H; subst; clear H;
-    inversion H0; subst; clear H0.
-    eexists; eexists.
-    repeat split.
-    - right; named_constructor.
-    - named_constructor.
-  }
-  [nullC]: {
-    destruct p;
-    inversion H; subst; clear H;
-    inversion H0; subst; clear H0.
-    eexists; eexists.
-    repeat split.
-    - right; named_constructor.
-    - named_constructor.
-  }
-  [nullOptC]: {
-    destruct p;
-    inversion H; subst; clear H;
-    inversion H0; subst; clear H0.
-    eexists; eexists.
-    repeat split.
-    - right; named_constructor.
-    - named_constructor.
-  }
-  [optNullC]: {
-    destruct p;
-    inversion H; subst; clear H;
-    inversion H0; subst; clear H0.
-    eexists; eexists.
-    repeat split.
-    - right; named_constructor.
-    - named_constructor.
-  }
+  all:
+    try solve [destruct p; inversion Hval_idx; subst; clear Hval_idx; intuition (named_constructor; assumption)].
   [optSomeC]: {
-    destruct p;
-    inversion H2; subst; clear H2;
-    inversion H3; subst; clear H3.
-    * specialize (H1 Here v2 t2 ltac:(destruct v2; reflexivity) ltac:(destruct v2; reflexivity)).
-      simpl.
-      enough (OptT t1 <: OptT t2 /\ SomeV v1 :: OptT t1 /\ coerce (OptT t1) (OptT t2) (SomeV v1) = SomeV v2) by firstorder.
-      destruct H1 as [iv1 [it1 Hi]].
-      decompose record Hi; clear Hi.
-      inversion H1; subst; clear H1.
-      inversion H3; subst; clear H3.
+    destruct p; inversion Hval_idx; subst; clear Hval_idx.
+    * specialize (H1 Here v2 eq_refl).
+      simpl in *.
+      decompose record H1; clear H1.
       repeat split.
+      - right; named_constructor; assumption.
       - named_constructor; assumption.
-      - named_constructor; assumption.
-      - simpl. rewrite subtype_dec_true by assumption. reflexivity.
-    * specialize (H1 _ _ _ H5 H4).
-      destruct H1 as [iv1 [it1 Hi]].
-      decompose record Hi; clear Hi.
-      eexists; eexists; repeat split.
-      - simpl. eassumption.
-      - simpl. eassumption.
-      - assumption.
-      - assumption.
-      - assumption.
+      - simpl. rewrite subtype_dec_true by assumption. congruence.
+    * specialize (H1 _ _ H3).
+      intuition.
   }
   [opportunisticOptC]: {
-    destruct p;
-    inversion H1; subst; clear H1;
-    inversion H2; subst; clear H2.
-    simpl.
-    eexists; eexists; repeat split.
+    destruct p; inversion Hval_idx; subst; clear Hval_idx.
+    simpl in *.
+    repeat split.
     - left; reflexivity.
     - named_constructor. assumption.
     - simpl. rewrite subtype_dec_false by assumption. reflexivity.
   }
-  [reservedOptC]: {
-    destruct p;
-    inversion H; subst; clear H;
-    inversion H0; subst; clear H0.
-    eexists; eexists.
-    repeat split.
-    - left; reflexivity.
-    - named_constructor.
-  }
   [constituentOptC]: {
-    destruct p;
-    inversion H4; subst; clear H4;
-    inversion H5; subst; clear H5.
-    * specialize (H3 Here v2 t2 ltac:(destruct v2; reflexivity) ltac:(destruct v2; reflexivity)).
-      simpl.
-      destruct H3 as [iv1 [it1 Hi]].
-      decompose record Hi; clear Hi.
-      inversion H3; subst; clear H3.
-      inversion H5; subst; clear H5.
-      eexists; eexists; repeat split.
+    destruct p; inversion Hval_idx; subst; clear Hval_idx.
+    * specialize (H3 Here v2 eq_refl).
+      simpl in *.
+      decompose record H3; clear H3.
+      repeat split.
       - right;  named_constructor.
       - assumption.
-      - simpl.
-        rewrite coerce_consituent_eq by assumption.
+      - rewrite coerce_consituent_eq by assumption.
         rewrite H0.
-        rewrite subtype_dec_true by assumption. reflexivity.
-    * specialize (H3 _ _ _ H7 H6).
-      destruct H3 as [iv1 [it1 Hi]].
-      decompose record Hi; clear Hi.
-      eexists; eexists; repeat split.
-      - simpl.
-        rewrite H3.
-        inversion H2; subst; clear H2; inversion H; subst; clear H; reflexivity.
-      - simpl. 
-        rewrite H5.
-        inversion H2; subst; clear H2; inversion H; subst; clear H; reflexivity.
-      - assumption.
-      - assumption.
-      - assumption.
+        rewrite subtype_dec_true by assumption. congruence.
+    * specialize (H3 _ _ H5).
+      decompose record H3; clear H3.
+      inversion H2; subst; clear H2; inversion H; subst; clear H; intuition.
   }
   [opportunisticConstituentOptC]: {
-    destruct p;
-    inversion H2; subst; clear H2;
-    inversion H3; subst; clear H3.
-    eexists; eexists; repeat split.
+    destruct p; inversion Hval_idx; subst; clear Hval_idx.
+    simpl in *.
+    repeat split.
     - left; reflexivity.
     - assumption.
     - rewrite coerce_consituent_eq by assumption.
@@ -723,20 +565,9 @@ Proof.
       * rewrite H1. destruct (t1 <:? t2); reflexivity.
       * rewrite subtype_dec_false by assumption. reflexivity.
   }
-  [funcC]: {
-    destruct p;
-    inversion H1; subst; clear H1;
-    inversion H2; subst; clear H2.
-    eexists; eexists.
-    repeat split.
-    - right; named_constructor; assumption.
-    - named_constructor.
-  }
   [reservedC]: {
-    destruct p;
-    inversion H0; subst; clear H0;
-    inversion H1; subst; clear H1.
-    eexists; eexists.
+    destruct p; inversion Hval_idx; subst; clear Hval_idx.
+    simpl in *.
     repeat split.
     - right; named_constructor; assumption.
     - assumption.
@@ -747,10 +578,10 @@ Qed.
 Definition passesThrough (s1 : T * T) (t1 : T) (s2 : T * T) (t2 : T) :=
   exists v1 p r,
   v1 :: t1 /\
-  val_idx' v1 p = Some (FuncV r) /\
-  typ_idx' t1 p = Some (FuncT (fst s1) (snd s1)) /\
-  val_idx (coerce t1 t2 v1) p = Some (FuncV r) /\
-  typ_idx t2 p = Some (FuncT (fst s2) (snd s2)).
+  val_idx' p v1 = FuncV r /\
+  typ_idx' p t1 = FuncT (fst s1) (snd s1) /\
+  val_idx  p (coerce t1 t2 v1) = Some (FuncV r) /\
+  typ_idx' p t2 = FuncT (fst s2) (snd s2).
 
 
 Lemma compositional:
@@ -765,12 +596,9 @@ Proof.
     by (inversion H1; subst; clear H1; split; try assumption; named_constructor).
   destruct H0 as [v1 [p [r Hpt]]].
   decompose record Hpt; clear Hpt.
-  pose proof (no_new_values t1 t2 v1 H H0 p _ _ H3 H5).
-  destruct H4 as [iv1 [it1 Hnnv]].
+  pose proof (no_new_values t1 t2 v1 H H0 p _ H3) as Hnnv.
   decompose record Hnnv; clear Hnnv.
-  rewrite H2 in H4. inversion H4; subst; clear H4.
-  rewrite H1 in H7. inversion H7; subst; clear H7.
-  destruct H6; congruence.
+  destruct H4; congruence.
 Qed.
 
 
