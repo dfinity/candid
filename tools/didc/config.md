@@ -1,4 +1,4 @@
-# Configure language for Candid
+# Configuration language for Candid
 
 ## Motivation
 
@@ -14,7 +14,7 @@ to benefit canisters written in different host languages. Without using dependen
 
 ## Design
 
-There are two parts in the config language: 1) A way to quickly identify particular type nodes in Candid type; 2) Attach semantic meaning to the type nodes.
+There are two parts in the config language: 1) A way to quickly select particular type nodes in Candid type; 2) Attach semantic meaning to the selected type nodes.
 
 For the first part, we use notations similar to CSS selector. For example, given the following Candid types,
 ```
@@ -37,22 +37,22 @@ we do not need to write a separate type selector.
 Note that some properties, such as depth, only apply to the first occurance in the type path. 
 Otherwise, we get an infinite recursion.
 
-Based on the above requirements, we use Dhall as our config language.
+Based on the above requirements, we use Dhall as our config language, which has similar type to Candid with more concise syntax.
 
 ## Random config
 
 For random value generation, we define the following properties,
 
-* `range = Some [lower, upper]`, specifies the range for all integer types. If omitted or invalid, we uses the full integer range.
-* `width = Some 10`, specifies the maximal length for `vec` and `text`. If omitted, we estimate the length based on the size of the element.
-* `text = Some "kind"`, specifies the kind of text we want to generate for `text`. If omitted, we take a random bytes and convert to utf-8 text. The implemented kind are "name", "name.cn", "company", "country", "path", and "bs", which all come from the `fake` crate.
-* `value = Some "CandidValue"`, specifies a fixed value in Candid textual form. It will be type checked against the expected type.
+* `range = Some [-300, 300]`, specifies the range for all integer types. If omitted or invalid, we use the full integer range.
+* `width = Some 10`, specifies the maximal length for `vec` and `text`. If omitted, we estimate the length based on the size of the vector element.
+* `text = Some "ascii"`, specifies the kind of text we want to generate for `text`. If omitted, it generates random utf8 text. The implemented kinds are "ascii", "emoji", as well as some words from the `fake` crate: "name", "name.cn", "company", "country", "path", and "bs".
+* `value = Some "record {}"`, specifies a fixed value in Candid textual form. It will be type checked against the expected type.
 * `depth = Some 10`, specifies the maximal depth for the Candid value. For recursive types, it only applies to the first occurance of the type selector. The depth bound is a soft limit.
 * `size = Some 10`, specifies the maximal size for the Candid value. For recursive types, it only applies to the first occurance of the type selector. The size bound is a soft limit.
 
-## Why not use Candid as a configure language for Candid?
+## Why not use Candid as a configuration language for Candid?
 
-We can! The config language is of the following Candid type `configs`:
+We can! The config is of the following Candid type `configs`:
 
 ```
 type RandomConfig = record { 
@@ -89,4 +89,4 @@ vec {
 ```
 
 As you can see, Candid's textual representation is not optimized for writing. What we really want to write is
-simply `left.tree = { depth = Some 1 }` in Dhall.
+simply `left.tree = { depth = Some 1 }` or `left.tree.depth = Some 1` in Dhall.
