@@ -239,6 +239,14 @@ Proof.
   }
 Qed.
 
+Lemma coerce_reservedT:
+  forall v t1, coerce t1 ReservedT v = ReservedV.
+Proof.
+  intros v1 t1.
+  destruct v1, t1; reflexivity.
+Qed.
+
+
 (**
 This beast of a lemma defines and proves a nice induction principle for [coerce].
 *)
@@ -698,3 +706,88 @@ Proof.
     intuition.
 Qed.
 
+(**
+* Transitive coherence
+
+Transitive coherence only holds up to a weaker relation:
+*)
+
+Reserved Infix "[=" (at level 80, no associativity).
+CoInductive UpToNull : V -> V -> Prop :=
+  (* This is the interesting rule: *)
+  | NullSomeUT:
+    forall v,
+    NullV [= SomeV v
+    
+  (* The rest just form the homomorphic closure *)
+  | NatUT:
+    forall n, NatV n [= NatV n
+  | IntUT:
+    forall n, IntV n [= IntV n
+  | NullUT:
+    NullV [= NullV
+  | SomeUT:
+    forall v1 v2,
+    v1 [= v2 ->
+    SomeV v1 [= SomeV v2
+  | FuncUT:
+    forall r, FuncV r [= FuncV r
+  | ReservedUT:
+    ReservedV [= ReservedV
+where "v1 [= v2" := (UpToNull v1 v2).
+
+Lemma UpToNull_refl:
+  forall v, UpToNull v v.
+Proof. intros. induction v; constructor; assumption. Qed.
+
+Ltac destruct_match :=
+  match goal with
+  | [ H :context[match ?a with _ => _ end] |- _] =>
+    let Heq := fresh "Heq" in
+    destruct a eqn:Heq
+  | [ |- context[match ?a with _ => _ end]] =>
+    let Heq := fresh "Heq" in
+    destruct a eqn:Heq
+  end.
+
+Theorem transitive_coherence:
+  forall ta tb tc v1,
+  ta <: tb ->
+  tb <: tc ->
+  v1 :: ta ->
+  coerce tb tc (coerce ta tb v1) [=  coerce ta tc v1.
+Proof.
+  intros ta tb tc v1 HST1 HST2 HHT.
+  revert tc HST2.
+  revert ta tb v1 HST1 HHT.
+  apply (coerce_nice_ind (fun ta tb v1 v2 =>
+    forall tc : T,
+     forall HST2 : tb <: tc,
+      coerce tb tc v2 [= coerce ta tc v1
+  )); intros;
+  inversion HST2; subst; clear HST2.
+  all: simpl.
+  all: try rewrite coerce_consituent_eq by assumption.
+  all: try rewrite coerce_reservedT.
+  all: try rewrite subtype_dec_refl.
+  all: try rewrite subtype_dec_true by assumption.
+  all: try apply UpToNull_refl.
+  all: try solve [destruct t2; try apply UpToNull_refl; apply NullSomeUT].
+  all: try solve [repeat destruct_match; try apply UpToNull_refl; try apply NullSomeUT].
+  * constructor. apply H1. named_constructor.
+  * repeat destruct_match; try apply UpToNull_refl; try  apply NullSomeUT.
+    - constructor. apply H1. assumption.
+    - contradiction n. eapply subtyping_trans; eassumption.
+  * rewrite H0.
+    constructor. apply H3. named_constructor.
+  * (* reservedC_optST *)
+    repeat destruct_match; try apply UpToNull_refl; try  apply NullSomeUT.
+    - admit. (* stuck here! *)
+    - constructor. apply H3. assumption.
+    - contradiction n. eapply subtyping_trans; eassumption.
+  * destruct t2; try apply UpToNull_refl.
+    repeat destruct_match; try apply UpToNull_refl; try  apply NullSomeUT.
+    - contradiction n. eapply subtyping_trans; eassumption.
+    - contradiction n. eapply subtyping_trans; eassumption.
+  * destruct t, v; simpl; repeat destruct_match; try apply UpToNull_refl; try  apply NullSomeUT.
+Abort.
