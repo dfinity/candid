@@ -267,6 +267,11 @@ impl TypeEnv {
     }
 }
 
+fn choose_range<T: Int>(u: &mut Unstructured, ranges: &[std::ops::RangeInclusive<T>]) -> Result<T> {
+    let range = u.choose(ranges)?.clone();
+    Ok(u.int_in_range(range)?)
+}
+
 fn arbitrary_text(
     u: &mut Unstructured,
     text: &Option<String>,
@@ -274,22 +279,40 @@ fn arbitrary_text(
 ) -> Result<String> {
     use fake::{faker::*, Fake};
     use rand::SeedableRng;
-    Ok(if let Some(policy) = text {
-        let seed = u.arbitrary::<u64>()?;
-        let r = &mut rand::rngs::StdRng::seed_from_u64(seed);
-        match policy.as_str() {
-            "name" => name::en::Name().fake_with_rng(r),
-            "name.cn" => name::zh_cn::Name().fake_with_rng(r),
-            "path" => filesystem::en::FilePath().fake_with_rng(r),
-            "country" => address::en::CountryName().fake_with_rng(r),
-            "company" => company::en::CompanyName().fake_with_rng(r),
-            "bs" => company::en::Bs().fake_with_rng(r),
-            _ => return Err(Error::msg("Unknown text config")),
+    let seed = u.arbitrary::<u64>()?;
+    let r = &mut rand::rngs::StdRng::seed_from_u64(seed);
+    let kind = text.as_ref().map(|x| x.as_str());
+    Ok(match kind {
+        Some("name") => name::en::Name().fake_with_rng(r),
+        Some("name.cn") => name::zh_cn::Name().fake_with_rng(r),
+        Some("path") => filesystem::en::FilePath().fake_with_rng(r),
+        Some("country") => address::en::CountryName().fake_with_rng(r),
+        Some("company") => company::en::CompanyName().fake_with_rng(r),
+        Some("bs") => company::en::Bs().fake_with_rng(r),
+        _ => {
+            let len = arbitrary_len(u, *width)?;
+            let mut res = String::with_capacity(len);
+            for _ in 0..len {
+                let ch = match kind {
+                    Some("emoji") => choose_range(u, &[0x1f300..=0x1f53d, 0x1f5fa..=0x1fa73])?,
+                    Some("ascii") => u.int_in_range(0x20..=0x7e)?,
+                    None => choose_range(
+                        u,
+                        &[
+                            0x00..=0x7f,
+                            0x80..=0x7ff,
+                            0x800..=0xffff,
+                            0x10000..=0x10ffff,
+                        ],
+                    )?,
+                    _ => return Err(Error::msg(format!("Unknown text config {:?}", kind))),
+                };
+                if let Some(ch) = std::char::from_u32(ch) {
+                    res.push(ch);
+                }
+            }
+            res
         }
-    } else {
-        let len = arbitrary_len(u, *width)?;
-        let bytes = u.get_bytes(len)?;
-        String::from_utf8_lossy(&bytes).to_string()
     })
 }
 

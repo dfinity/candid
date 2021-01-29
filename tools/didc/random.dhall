@@ -1,6 +1,6 @@
 let default =
       { range = None (List Natural)
-      , text = Some "name.cn"
+      , text = Some "emoji"
       , width = Some 10
       , depth = Some 5
       , size = Some 100
