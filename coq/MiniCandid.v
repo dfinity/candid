@@ -1,4 +1,4 @@
-(*
+(**
 MiniCandid: A formalization of the core ideas of Candid
 *)
 
@@ -20,7 +20,15 @@ Set Default Goal Selector "!".
 Require Import candid.NamedCases.
 Set Printing Goal Names. (* Coqide doesn’t use it yet, will be in 8.13 *)
 
-(* Types are coinductive (we do not want to model the graph structure explicilty) *)
+(**
+* Types
+
+We begin by defining the Candid types (or at least some of them).
+
+Candid types are inherently coinductive (e.g. <<type T = opt T>>), so we describe
+them as a coinductive relation. This way we don’t have to model an explicit graph
+structure in Coq.
+*)
 CoInductive T :=
   | NatT: T
   | IntT: T
@@ -31,7 +39,13 @@ CoInductive T :=
   | ReservedT : T
   .
 
-(* Some unspecified value representation for references *)
+(**
+* Values
+
+Values are inductive.
+
+We use an unspecified type to model refereneces (could have used [String] too)
+*)
 Axiom RefV : Type.
 
 Inductive V :=
@@ -42,8 +56,12 @@ Inductive V :=
   | FuncV : RefV -> V
   | ReservedV : V
   .
+(**
 
-(* This is a stand in for `null <: t` in places where <: is not allowed yet. *)
+* Typing and subtyping
+
+The following is a stand in for `null <: t` in places where <: is not allowed yet.
+*)
 Definition is_opt_like_type (t : T) : bool :=
   match t with
   | NullT => true
@@ -53,15 +71,7 @@ Definition is_opt_like_type (t : T) : bool :=
   end.
 
 
-Definition is_not_opt_like_value (v : V) : Prop :=
-match v with
-| NullV => False
-| SomeV _ => False
-| ReservedV => False
-| _ => True
-end.
-
-(* The boring, non-subtyping typing relation. *)
+(** The boring, non-subtyping typing relation. *)
 Inductive HasType : V -> T -> Prop :=
   | NatHT:
     case natHT,
@@ -86,7 +96,7 @@ Inductive HasType : V -> T -> Prop :=
     ReservedV :: ReservedT
 where "v :: t" := (HasType v t).
 
-
+(** The subtyping relation *)
 Reserved Infix "<:" (at level 80, no associativity).
 CoInductive Subtype : T -> T -> Prop :=
   | ReflST :
@@ -113,6 +123,11 @@ CoInductive Subtype : T -> T -> Prop :=
     forall t, t <: ReservedT
 where "t1 <: t2" := (Subtype t1 t2).
 
+(**
+Subtyping is reflexive and transitive.
+
+Note that these are coinductive proofs! (And yet so neat)
+**)
 
 Theorem subtyping_refl: reflexive _ Subtype.
 Proof. intros x. apply ReflST; constructor. Qed.
@@ -124,18 +139,16 @@ Proof.
   intros t1 t2 t3 H1 H2.
   inversion H1; subst; clear H1;
   inversion H2; subst; clear H2;
-    name_cases;
-    try (constructor; firstorder).
+  constructor; firstorder.
 Qed.
 
-(*
+(**
 Subtyping is undecidable, at least the way we model it in Coq.
-So let’s pretend it is.
+But for the decoding function we have to pretend it is decidable.
 *)
 Axiom subtyping_decidable:
   forall t1 t2, {t1 <: t2} + { ~(t1 <: t2) }.
 Infix "<:?" := subtyping_decidable (at level 80, no associativity).
-
 
 Lemma subtype_dec_true:
   forall T t1 t2 (x y : T), t1 <: t2 -> (if t1 <:? t2 then x else y) = x.
@@ -149,12 +162,15 @@ Lemma subtype_dec_refl:
   forall T t (x y : T), (if t <:? t then x else y) = x.
 Proof. intros. apply subtype_dec_true. named_constructor. Qed. 
 
-(*
+(**
+
+* Coercion function
+
 The spec defines the coercion function as indexed by the subtyping relation.
 But that relation is coinductive, so Coq will not allow that.
 We thus define the function by recursion on the value.
 
-We use NullV on the RHS of invalid cases.
+We use [NullV] on the right-hand side in invalid branches.
 *)
 
 Function coerce (t1 : T) (t2 : T) (v1 : V) : V :=
@@ -169,7 +185,7 @@ Function coerce (t1 : T) (t2 : T) (v1 : V) : V :=
     then SomeV (coerce t1 t2 v)
     else NullV
   
-  (* We’d prefer the equation from coerce_consituent_eq below,
+  (* We’d prefer the equation from [coerce_consituent_eq] below,
      but that will not satisfy the termination checker,
      so let’s repeat all the above ruls for OptT again.
   *)
@@ -182,7 +198,7 @@ Function coerce (t1 : T) (t2 : T) (v1 : V) : V :=
 
   | v, t, ReservedT => ReservedV
 
-  (* Failure is NullV. This also subsumes “valid” rules for NullV *)
+  (* Failure is NullV. Also subsumes “valid” rules that return NullV *)
   | _, _, _ => NullV
   end.
 
@@ -223,7 +239,9 @@ Proof.
   }
 Qed.
 
-(* Let’s try to create a suitable induction principle for this function *)
+(**
+This beast of a lemma defines and proves a nice induction principle for [coerce].
+*)
 Lemma coerce_nice_ind:
   forall (P : T -> T -> V -> V -> Prop),
   (case natC, forall n, P NatT NatT (NatV n) (NatV n)) ->
@@ -386,6 +404,11 @@ Proof.
   }
 Qed.
 
+(**
+* Properties of coercion
+
+Round-tripping
+*)
 Lemma coerce_roundtrip:
   forall t1 v1,
   v1 :: t1 ->
@@ -404,6 +427,10 @@ Proof.
   [reservedC]: {  inversion H; subst; clear H; congruence. }
 Qed.
 
+(**
+Coercion does not fail (and is well-defined)
+*)
+
 Lemma coerce_well_defined:
   forall t1 t2 v1,
   t1 <: t2 -> v1 :: t1 ->
@@ -414,12 +441,9 @@ Proof.
 Qed.
 
 
-Lemma is_not_opt_like_type_contravariant:
-  forall t1 t2,
-  is_opt_like_type t1 = false -> t2 <: t1 -> is_opt_like_type t2 = false.
-Proof. intros. destruct t1, t2; easy. Qed.
+(**
+* IDL Soundess 
 
-(*
 To work towards IDL soundness, we need a predicate for “Value v contains
 a function reference at function type t.”. Moreover, this contains
 relation should indicate the position in the value in a way that
@@ -433,9 +457,10 @@ Inductive Path :=
   | The : Path -> Path
   .
 
-(*
+(**
 And a function that finds the value at a given path.
-It returns None if the path does not make sense for this value.
+
+It returns [None] if the path does not make sense for this value.
 *)
 Fixpoint val_idx (p : Path) (v : V) : option V :=
   match p with
@@ -447,8 +472,8 @@ Fixpoint val_idx (p : Path) (v : V) : option V :=
     end
   end.
 
-(*
-This is a lenitent variant, which is total (returning NoneV
+(**
+This is a lenitent variant, which is total (returning [NullV]
 when the path is invalid), which makes proofs simpler.
 
 It also ignores extra [The] on the path; this way one can 
@@ -467,7 +492,7 @@ Fixpoint val_idx' (p : Path) (v : V) : V :=
     end
   end.
 
-(*
+(**
 The corresponding function for types, also lenitent.
 *)
 Fixpoint typ_idx' (p : Path) (t : T) : T :=
@@ -482,6 +507,9 @@ Fixpoint typ_idx' (p : Path) (t : T) : T :=
     end
   end.
 
+(**
+Properties about [val_idx] and [typ_idx'], mostly for sanity-checking
+*)
 Lemma path_preserves_types:
   forall v v' t p,
   v :: t ->
@@ -499,6 +527,34 @@ Proof.
     inversion HHT; subst; clear HHT; name_cases.
     all: firstorder congruence.
 Qed.
+
+Lemma val_idx_is_val_idx':
+  forall v v' t p,
+  v :: t ->
+  val_idx p v = Some v' ->
+  val_idx' p v = v'.
+Proof.
+  intros v v' t p.
+  revert v v' t.
+  induction p.
+  * intros v v' t HHT Hval_idx.
+    inversion Hval_idx; subst; clear Hval_idx.
+    reflexivity.
+  * intros v v' t HHT Hval_idx.
+    inversion Hval_idx; subst; clear Hval_idx.
+    inversion HHT; subst; clear HHT; name_cases.
+    all: firstorder congruence.
+Qed.
+
+(**
+The core lemma towards compositionality:
+
+All values in a decoded value originate from a value in the original value,
+and their types are related.
+
+This may be proving a bit more than needed for compositionality, but it my be
+handy for other things.
+*)
 
 Lemma no_new_values:
   forall t1 t2 v1,
@@ -575,6 +631,9 @@ Proof.
   }
 Qed.
 
+(**
+This is the instantiation of [passesThrough] from the IDL-Soundness theory.
+*)
 Definition passesThrough (s1 : T * T) (t1 : T) (s2 : T * T) (t2 : T) :=
   exists v1 p r,
   v1 :: t1 /\
@@ -583,7 +642,9 @@ Definition passesThrough (s1 : T * T) (t1 : T) (s2 : T * T) (t2 : T) :=
   val_idx  p (coerce t1 t2 v1) = Some (FuncV r) /\
   typ_idx' p t2 = FuncT (fst s2) (snd s2).
 
-
+(**
+And indeed subtyping is compositional:
+*)
 Lemma compositional:
   forall t1 t2 s1 s2,
   t1 <: t2 -> passesThrough s1 t1 s2 t2 -> (snd s1 <: snd s2 /\ fst s2 <: fst s1).
@@ -601,6 +662,9 @@ Proof.
   destruct H4; congruence.
 Qed.
 
+(**
+Now we can instantiate the soundness theorem from IDLSoundness
+*)
 
 Require Import candid.IDLSoundness.
 
@@ -633,3 +697,4 @@ Proof.
     unfold service_subtyping.
     intuition.
 Qed.
+
