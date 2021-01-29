@@ -101,4 +101,4 @@ In addition to the Candid implementations for Motoko, Rust, and JavaScript, ther
 
 If you want to create a Candid implementation to support a language or tool for which an implementation is not currently available, you should consult the https://github.com/dfinity/candid/blob/master/spec/Candid.md[Candid specification].
 
-If you add a Candid implementation for a new language or toll, you can use the official https://github.com/dfinity/candid/tree/master/test[Candid test data] to test and verify that your implementation is compatible with Candid, even in slightly more obscure corner cases.
+If you add a Candid implementation for a new language or tool, you can use the official https://github.com/dfinity/candid/tree/master/test[Candid test data] to test and verify that your implementation is compatible with Candid, even in slightly more obscure corner cases.
