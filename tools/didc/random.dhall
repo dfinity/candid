@@ -7,9 +7,13 @@ let default =
       , value = None Text
       }
 
-in  { default
+in  { `[*]` = default
+    , `[h]` =
+      { `[0]`.a = { range = Some [ 42,43 ] }
+      , b = { range = Some [0, 1] }
+      }
     , list = { depth = Some 20, size = Some 50 }
-    , val.value = Some "42"
+    , val.value = Some ["42", "-1"]
     , left = { depth = Some 1, range = Some [ -200, -100 ] }
     , right.tree = { depth = Some 5, range = Some [ 100, 200 ] }
     , vec.nat8.range = Some [ 65, 90 ]

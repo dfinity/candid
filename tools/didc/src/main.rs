@@ -223,6 +223,11 @@ fn main() -> Result<()> {
             let (env, types) = annotate.get_types(Mode::Encode)?;
             let config = serde_dhall::from_file("random.dhall").parse::<SimpleValue>()?;
             let config = Configs::from_dhall(config);
+            let config = if let Some(method) = annotate.method {
+                config.with_method(&method)
+            } else {
+                config
+            };
             let args = IDLArgs::any(&mut u, &config, &env, &types)?;
             match format.as_str() {
                 "did" => println!("{}", args),

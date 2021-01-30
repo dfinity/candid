@@ -16,15 +16,28 @@ to benefit canisters written in different host languages. Without using dependen
 
 There are two parts in the config language: 1) A way to quickly select particular type nodes in Candid type; 2) Attach semantic meaning to the selected type nodes.
 
-For the first part, we use notations similar to CSS selector. For example, given the following Candid types,
+For the first part, we define a type selector `<selector>` similar to CSS selector. 
+
+```
+<selector> := <method> (. <path>)? | <path>
+<method> = [ <name> ] (. [ <nat> ])? | [ * ]
+<path> = <name> (. <name>)*
+```
+
+For example, given the following Candid types,
 ```
 type tree = variant { leaf: int; branch: record { left: tree; right: tree } };
 type pair = record { left: int; right: nat };
 type left = opt int;
+service : {
+  f : (record {a:int; b:int}, record {a:int; b:int}) -> ();
+}
 ```
 If we want to find the left branch of a tree, we can write `left.tree`, `branch.record.left`
 or `tree.variant.branch.record.left`.
 If we write just `left`, it will match the `left` field in both `tree` and `pair`, as well as the `left` type.
+
+The type selector has an optional method prefix to specify the scope of the selector. For example, `[f].a` matches the `a` fields in method `f`; `[f].[0].a` matches the `a` field in the first argument of method `f`. The special selector `[*]` applies to all methods, which is used to provide a default configuration.
 
 For the second part, we assign a set of key-value pairs to the selected type nodes. It's up to the implementer to
 interpret the meaning of these key-value pairs for different use cases. 
@@ -38,6 +51,7 @@ Note that some properties, such as depth, only apply to the first occurance in t
 Otherwise, we get an infinite recursion.
 
 Based on the above requirements, we use Dhall as our config language, which has similar type to Candid with more concise syntax.
+(This is a temporary choice.)
 
 ## Random config
 
@@ -46,7 +60,7 @@ For random value generation, we define the following properties,
 * `range = Some [-300, 300]`, specifies the range for all integer types. If omitted or invalid, we use the full integer range.
 * `width = Some 10`, specifies the maximal length for `vec` and `text`. If omitted, we estimate the length based on the size of the vector element.
 * `text = Some "ascii"`, specifies the kind of text we want to generate for `text`. If omitted, it generates random utf8 text. The implemented kinds are "ascii", "emoji", as well as some words from the `fake` crate: "name", "name.cn", "company", "country", "path", and "bs".
-* `value = Some "record {}"`, specifies a fixed value in Candid textual form. It will be type checked against the expected type.
+* `value = Some ["null", "opt 42"]`, specifies a list of Candid values to choose from. It will be type checked against the expected type.
 * `depth = Some 10`, specifies the maximal depth for the Candid value. For recursive types, it only applies to the first occurance of the type selector. The depth bound is a soft limit.
 * `size = Some 10`, specifies the maximal size for the Candid value. For recursive types, it only applies to the first occurance of the type selector. The size bound is a soft limit.
 
@@ -90,3 +104,5 @@ vec {
 
 As you can see, Candid's textual representation is not optimized for writing. What we really want to write is
 simply `left.tree = { depth = Some 1 }` or `left.tree.depth = Some 1` in Dhall.
+Not that this is not a fundamental obstacle, we can easily add shorthand for nested record 
+and record merging semantics in Candid syntax.

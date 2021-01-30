@@ -15,18 +15,18 @@ pub struct GenConfig {
     range: Option<(i64, i64)>,
     text: Option<String>,
     width: Option<usize>,
-    value: Option<String>,
+    value: Option<Vec<String>>,
     depth: Option<isize>,
     size: Option<isize>,
 }
 impl Default for GenConfig {
     fn default() -> Self {
         GenConfig {
-            range: Some((0, 100)),
+            range: None,
             text: Some("ascii".to_string()),
             width: Some(10),
             value: None,
-            depth: Some(5),
+            depth: Some(10),
             size: Some(100),
         }
     }
@@ -58,7 +58,10 @@ pub struct GenState<'a> {
 }
 impl<'a> GenState<'a> {
     fn new(tree: &'a Configs, env: &'a TypeEnv) -> Result<Self> {
-        let mut config = tree.get::<GenConfig>(&["default".to_string()]).unwrap().0; //GenConfig::default();
+        let mut config = tree
+            .get::<GenConfig>(&["[*]".to_string()])
+            .unwrap_or_else(|| (GenConfig::default(), false))
+            .0;
         Ok(GenState {
             depth: config.depth.take().unwrap_or(5),
             size: config.size.take().unwrap_or(50),
@@ -111,7 +114,8 @@ impl<'a> GenState<'a> {
     pub fn any(&mut self, u: &mut Unstructured, ty: &Type) -> Result<IDLValue> {
         let old_config = self.push_state(ty, None);
         assert!(self.config.depth.is_none());
-        if let Some(v) = &self.config.value {
+        if let Some(vec) = &self.config.value {
+            let v = u.choose(vec)?;
             let v = v.parse::<IDLValue>()?;
             let v = v.annotate_type(true, self.env, ty)?;
             self.pop_state(old_config, ty, false);
@@ -214,8 +218,9 @@ impl IDLArgs {
         types: &[Type],
     ) -> Result<Self> {
         let mut args = Vec::new();
-        for t in types.iter() {
-            let mut state = GenState::new(tree, env)?;
+        for (i, t) in types.iter().enumerate() {
+            let tree = tree.with_method(&i.to_string());
+            let mut state = GenState::new(&tree, env)?;
             let v = state.any(u, t)?;
             args.push(v);
         }

@@ -8,6 +8,34 @@ impl Configs {
     pub fn from_dhall(v: SimpleValue) -> Self {
         Configs(v)
     }
+    pub fn with_method(&self, method: &str) -> Self {
+        let path = format!("[{}]", method);
+        let mut res = self.0.clone();
+        if let SimpleValue::Record(ref mut map) = res {
+            if let Some(SimpleValue::Record(mut subtree)) = map.remove(&path) {
+                map.append(&mut subtree);
+            }
+            Configs(res)
+        } else {
+            unreachable!()
+        }
+    }
+    /*
+    pub fn with_method(&self, method: &str) -> Self {
+        let path = [format!("[{}]", method)];
+        let res = self.0.clone();
+        let subtree = self.get_helper(&path).map(|x| x.clone());
+        if let Some(SimpleValue::Record(mut method_map)) = subtree {
+            if let SimpleValue::Record(mut map) = res {
+                map.append(&mut method_map);
+                Configs(SimpleValue::Record(map))
+            } else {
+                unreachable!()
+            }
+        } else {
+            Configs(res)
+        }
+    }*/
     fn get_helper(&self, path: &[String]) -> Option<&SimpleValue> {
         let mut result = &self.0;
         for elem in path.iter() {
@@ -18,14 +46,13 @@ impl Configs {
             }
         }
         if has_leaf(result) {
-            //println!("{:?} {:?}", path, result);
             Some(result)
         } else {
             None
         }
     }
     /// Get config that starts somewhere in the path and ends at the end of the path.
-    /// Also returns if the matched path appears earlier in the path (inside a recursion).
+    /// The second return bool is whether the matched path appears earlier in the path (inside a recursion).
     pub fn get<T: DeserializeOwned>(&self, path: &[String]) -> Option<(T, bool)> {
         for i in (0..path.len()).rev() {
             let (_, tail) = path.split_at(i);
