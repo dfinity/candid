@@ -1,12 +1,14 @@
 use crate::types::Type;
+use crate::Result;
 use serde::de::DeserializeOwned;
 use serde_dhall::{from_simple_value, SimpleValue};
 
 pub struct Configs(SimpleValue);
 
 impl Configs {
-    pub fn from_dhall(v: SimpleValue) -> Self {
-        Configs(v)
+    pub fn from_dhall(v: &str) -> Result<Self> {
+        let v = serde_dhall::from_str(v).parse::<SimpleValue>()?;
+        Ok(Configs(v))
     }
     pub fn with_method(&self, method: &str) -> Self {
         let path = format!("[{}]", method);
@@ -20,22 +22,6 @@ impl Configs {
             unreachable!()
         }
     }
-    /*
-    pub fn with_method(&self, method: &str) -> Self {
-        let path = [format!("[{}]", method)];
-        let res = self.0.clone();
-        let subtree = self.get_helper(&path).map(|x| x.clone());
-        if let Some(SimpleValue::Record(mut method_map)) = subtree {
-            if let SimpleValue::Record(mut map) = res {
-                map.append(&mut method_map);
-                Configs(SimpleValue::Record(map))
-            } else {
-                unreachable!()
-            }
-        } else {
-            Configs(res)
-        }
-    }*/
     fn get_helper(&self, path: &[String]) -> Option<&SimpleValue> {
         let mut result = &self.0;
         for elem in path.iter() {
@@ -53,7 +39,11 @@ impl Configs {
     }
     /// Get config that starts somewhere in the path and ends at the end of the path.
     /// The second return bool is whether the matched path appears earlier in the path (inside a recursion).
+    /// Empty path returns the top-level config.
     pub fn get<T: DeserializeOwned>(&self, path: &[String]) -> Option<(T, bool)> {
+        if path.is_empty() {
+            return Some((from_simple_value::<T>(self.0.clone()).ok()?, false));
+        }
         for i in (0..path.len()).rev() {
             let (_, tail) = path.split_at(i);
             match self.get_helper(tail) {

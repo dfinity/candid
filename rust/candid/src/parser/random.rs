@@ -58,10 +58,10 @@ pub struct GenState<'a> {
 }
 impl<'a> GenState<'a> {
     fn new(tree: &'a Configs, env: &'a TypeEnv) -> Result<Self> {
-        let mut config = tree
-            .get::<GenConfig>(&["[*]".to_string()])
-            .unwrap_or_else(|| (GenConfig::default(), false))
-            .0;
+        let mut config = GenConfig::default();
+        if let Some((global_config, _)) = tree.get::<GenConfig>(&[]) {
+            config = config.update(global_config, false);
+        }
         Ok(GenState {
             depth: config.depth.take().unwrap_or(5),
             size: config.size.take().unwrap_or(50),

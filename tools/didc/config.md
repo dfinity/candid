@@ -20,7 +20,7 @@ For the first part, we define a type selector `<selector>` similar to CSS select
 
 ```
 <selector> := <method> (. <path>)? | <path>
-<method> = [ <name> ] (. [ <nat> ])? | [ * ]
+<method> = [ <name> ] | [ <nat> ] | [ <name> ] . [ <nat> ]
 <path> = <name> (. <name>)*
 ```
 
@@ -37,7 +37,7 @@ If we want to find the left branch of a tree, we can write `left.tree`, `branch.
 or `tree.variant.branch.record.left`.
 If we write just `left`, it will match the `left` field in both `tree` and `pair`, as well as the `left` type.
 
-The type selector has an optional method prefix to specify the scope of the selector. For example, `[f].a` matches the `a` fields in method `f`; `[f].[0].a` matches the `a` field in the first argument of method `f`. The special selector `[*]` applies to all methods, which is used to provide a default configuration.
+The type selector has an optional method prefix to specify the scope of the selector. For example, `[f].a` matches the `a` fields in method `f`; `[f].[0].a` matches the `a` field in the first argument of method `f`.
 
 For the second part, we assign a set of key-value pairs to the selected type nodes. It's up to the implementer to
 interpret the meaning of these key-value pairs for different use cases. 
@@ -51,7 +51,7 @@ Note that some properties, such as depth, only apply to the first occurance in t
 Otherwise, we get an infinite recursion.
 
 Based on the above requirements, we use Dhall as our config language, which has similar type to Candid with more concise syntax.
-(This is a temporary choice.)
+This is a temporary choice. Eventually, we expect to expand the Candid syntax, see the last section for detail.
 
 ## Random config
 
@@ -63,6 +63,44 @@ For random value generation, we define the following properties,
 * `value = Some ["null", "opt 42"]`, specifies a list of Candid values to choose from. It will be type checked against the expected type.
 * `depth = Some 10`, specifies the maximal depth for the Candid value. For recursive types, it only applies to the first occurance of the type selector. The depth bound is a soft limit.
 * `size = Some 10`, specifies the maximal size for the Candid value. For recursive types, it only applies to the first occurance of the type selector. The size bound is a soft limit.
+
+### Example Dhall config
+
+```dhall
+let default =  {- This is the default config -}
+      { range = None (List Natural)
+      , text = Some "ascii"
+      , width = Some 10
+      , depth = Some 10
+      , size = Some 100
+      , value = None Text
+      }
+
+in  default /\
+    { {- Generate (record {a=42; b=1}, record {a=any int; b=1}) for method f  -}
+      `[f]` =
+      { `[0]`.a = { range = Some [ 42,42 ] }
+      , b = { value = Some ["1"] }
+      }
+      
+    {- Left tree is leaf only; Left tree has negative numbers and right tree has positive numbers -}
+    , left.tree = { depth = Some 1, range = Some [ -200, -100 ] }
+    , right = { depth = Some 5, range = Some [ 100, 200 ] }
+    
+    {- customize text fields in record type -}
+    , profile.record =
+      { name.text = Some "name"
+      , age.range = Some [ 18, 65 ]
+      , company.text = Some "company"
+      , country.text = Some "country"
+      , file.text = Some "path"
+      , description.text = Some "bs"
+      }
+      
+    {- Generate principal id -}
+    , principal.value = Some ["principal \"aaaaa-aa\", principal \"2vxsx-fae\" "]
+    }
+```
 
 ## Why not use Candid as a configuration language for Candid?
 
@@ -104,5 +142,5 @@ vec {
 
 As you can see, Candid's textual representation is not optimized for writing. What we really want to write is
 simply `left.tree = { depth = Some 1 }` or `left.tree.depth = Some 1` in Dhall.
-Not that this is not a fundamental obstacle, we can easily add shorthand for nested record 
+Note that this is not a fundamental obstacle, we can easily add shorthand for nested record 
 and record merging semantics in Candid syntax.

@@ -56,9 +56,15 @@ enum Command {
     Random {
         #[structopt(flatten)]
         annotate: TypeAnnotation,
+        #[structopt(short, long, conflicts_with("file"))]
+        /// Specifies random value generation config in Dhall syntax
+        config: Option<String>,
+        #[structopt(short, long)]
+        /// Load random value generation config from file
+        file: Option<String>,
         #[structopt(short, long, possible_values = &["did", "js"], default_value = "did")]
-        /// Specifies value format
-        format: String,
+        /// Specifies target language
+        lang: String,
     },
     /// Diff two Candid values
     Diff {
@@ -213,23 +219,36 @@ fn main() -> Result<()> {
                 println!("{:?}", value);
             }
         }
-        Command::Random { annotate, format } => {
+        Command::Random {
+            annotate,
+            lang,
+            config,
+            file,
+        } => {
             use candid::parser::configs::Configs;
             use rand::Rng;
-            use serde_dhall::SimpleValue;
-            let mut rng = rand::thread_rng();
-            let seed: Vec<u8> = (0..2048).map(|_| rng.gen::<u8>()).collect();
-            let mut u = arbitrary::Unstructured::new(&seed);
             let (env, types) = annotate.get_types(Mode::Encode)?;
-            let config = serde_dhall::from_file("random.dhall").parse::<SimpleValue>()?;
-            let config = Configs::from_dhall(config);
+            let config = match (config, file) {
+                (None, None) => Configs::from_dhall("{=}")?,
+                (Some(str), None) => Configs::from_dhall(&str)?,
+                (None, Some(file)) => {
+                    let content = std::fs::read_to_string(&file)
+                        .map_err(|_| Error::msg(format!("could not read {}", file)))?;
+                    Configs::from_dhall(&content)?
+                }
+                _ => unreachable!(),
+            };
             let config = if let Some(method) = annotate.method {
                 config.with_method(&method)
             } else {
                 config
             };
+            let mut rng = rand::thread_rng();
+            let seed: Vec<u8> = (0..2048).map(|_| rng.gen::<u8>()).collect();
+            let mut u = arbitrary::Unstructured::new(&seed);
+
             let args = IDLArgs::any(&mut u, &config, &env, &types)?;
-            match format.as_str() {
+            match lang.as_str() {
                 "did" => println!("{}", args),
                 "js" => println!(
                     "{}",
