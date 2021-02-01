@@ -20,8 +20,8 @@ For the first part, we define a type selector `<selector>` similar to CSS select
 
 ```
 <selector> := <method> (. <path>)? | <path>
-<method> = [ <name> ] | [ <nat> ] | [ <name> ] . [ <nat> ]
-<path> = <name> (. <name>)*
+<method> := [ <name> ] | [ <nat> ] | [ <name> ] . [ <nat> ]
+<path> := <name> (. <name>)*
 ```
 
 For example, given the following Candid types,
@@ -73,7 +73,7 @@ let default =  {- This is the default config -}
       , width = Some 10
       , depth = Some 10
       , size = Some 100
-      , value = None Text
+      , value = None (List Text)
       }
 
 in  default /\
@@ -85,9 +85,9 @@ in  default /\
       
     {- Left tree is leaf only; Left tree has negative numbers and right tree has positive numbers -}
     , left.tree = { depth = Some 1, range = Some [ -200, -100 ] }
-    , right = { depth = Some 5, range = Some [ 100, 200 ] }
+    , right.tree = { depth = Some 5, range = Some [ 100, 200 ] }
     
-    {- customize text fields in record type -}
+    {- Customize text fields in record type -}
     , profile.record =
       { name.text = Some "name"
       , age.range = Some [ 18, 65 ]
@@ -98,7 +98,7 @@ in  default /\
       }
       
     {- Generate principal id -}
-    , principal.value = Some ["principal \"aaaaa-aa\", principal \"2vxsx-fae\" "]
+    , principal.value = Some ["principal \"aaaaa-aa\"", "principal \"2vxsx-fae\""]
     }
 ```
 

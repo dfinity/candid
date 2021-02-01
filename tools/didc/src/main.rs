@@ -65,6 +65,9 @@ enum Command {
         #[structopt(short, long, possible_values = &["did", "js"], default_value = "did")]
         /// Specifies target language
         lang: String,
+        #[structopt(short, long, requires("method"))]
+        /// Specifies input arguments for a method call, mocking the return result
+        args: Option<IDLArgs>,
     },
     /// Diff two Candid values
     Diff {
@@ -224,10 +227,15 @@ fn main() -> Result<()> {
             lang,
             config,
             file,
+            args,
         } => {
             use candid::parser::configs::Configs;
             use rand::Rng;
-            let (env, types) = annotate.get_types(Mode::Encode)?;
+            let (env, types) = if args.is_some() {
+                annotate.get_types(Mode::Decode)?
+            } else {
+                annotate.get_types(Mode::Encode)?
+            };
             let config = match (config, file) {
                 (None, None) => Configs::from_dhall("{=}")?,
                 (Some(str), None) => Configs::from_dhall(&str)?,
@@ -238,15 +246,21 @@ fn main() -> Result<()> {
                 }
                 _ => unreachable!(),
             };
-            let config = if let Some(method) = annotate.method {
-                config.with_method(&method)
+            let config = if let Some(ref method) = annotate.method {
+                config.with_method(method)
             } else {
                 config
             };
-            let mut rng = rand::thread_rng();
-            let seed: Vec<u8> = (0..2048).map(|_| rng.gen::<u8>()).collect();
+            // TODO figure out how many bytes of entropy we need
+            let seed: Vec<u8> = if let Some(ref args) = args {
+                let (env, types) = annotate.get_types(Mode::Encode)?;
+                let bytes = args.to_bytes_with_types(&env, &types)?;
+                bytes.into_iter().rev().cycle().take(2048).collect()
+            } else {
+                let mut rng = rand::thread_rng();
+                (0..2048).map(|_| rng.gen::<u8>()).collect()
+            };
             let mut u = arbitrary::Unstructured::new(&seed);
-
             let args = IDLArgs::any(&mut u, &config, &env, &types)?;
             match lang.as_str() {
                 "did" => println!("{}", args),

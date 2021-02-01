@@ -4,7 +4,7 @@ let default =
       , width = Some 10
       , depth = Some 5
       , size = Some 100
-      , value = None Text
+      , value = None (List Text)
       }
 
 in    default
