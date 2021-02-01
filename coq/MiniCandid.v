@@ -246,7 +246,6 @@ Proof.
   destruct v1, t1; reflexivity.
 Qed.
 
-
 (**
 This beast of a lemma defines and proves a nice induction principle for [coerce].
 *)
@@ -712,34 +711,38 @@ Qed.
 Transitive coherence only holds up to a weaker relation:
 *)
 
-Reserved Infix "[=" (at level 80, no associativity).
+Reserved Infix "~~" (at level 80, no associativity).
 CoInductive UpToNull : V -> V -> Prop :=
   (* This is the interesting rule: *)
   | NullSomeUT:
     forall v,
-    NullV [= SomeV v
+    NullV ~~ SomeV v
+  | SomeNullUT:
+    forall v,
+    SomeV v ~~ NullV
     
   (* The rest just form the homomorphic closure *)
   | NatUT:
-    forall n, NatV n [= NatV n
+    forall n, NatV n ~~ NatV n
   | IntUT:
-    forall n, IntV n [= IntV n
+    forall n, IntV n ~~ IntV n
   | NullUT:
-    NullV [= NullV
+    NullV ~~ NullV
   | SomeUT:
     forall v1 v2,
-    v1 [= v2 ->
-    SomeV v1 [= SomeV v2
+    v1 ~~ v2 ->
+    SomeV v1 ~~ SomeV v2
   | FuncUT:
-    forall r, FuncV r [= FuncV r
+    forall r, FuncV r ~~ FuncV r
   | ReservedUT:
-    ReservedV [= ReservedV
-where "v1 [= v2" := (UpToNull v1 v2).
+    ReservedV ~~ ReservedV
+where "v1 ~~ v2" := (UpToNull v1 v2).
 
 Lemma UpToNull_refl:
   forall v, UpToNull v v.
 Proof. intros. induction v; constructor; assumption. Qed.
 
+(** A small tactic that I keep copying into each development *)
 Ltac destruct_match :=
   match goal with
   | [ H :context[match ?a with _ => _ end] |- _] =>
@@ -755,7 +758,7 @@ Theorem transitive_coherence:
   ta <: tb ->
   tb <: tc ->
   v1 :: ta ->
-  coerce tb tc (coerce ta tb v1) [=  coerce ta tc v1.
+  coerce tb tc (coerce ta tb v1) ~~ coerce ta tc v1.
 Proof.
   intros ta tb tc v1 HST1 HST2 HHT.
   revert tc HST2.
@@ -763,31 +766,36 @@ Proof.
   apply (coerce_nice_ind (fun ta tb v1 v2 =>
     forall tc : T,
      forall HST2 : tb <: tc,
-      coerce tb tc v2 [= coerce ta tc v1
-  )); intros;
-  inversion HST2; subst; clear HST2.
+      coerce tb tc v2 ~~ coerce ta tc v1
+  )); intros; inversion HST2; subst; clear HST2.
   all: simpl.
   all: try rewrite coerce_consituent_eq by assumption.
   all: try rewrite coerce_reservedT.
   all: try rewrite subtype_dec_refl.
   all: try rewrite subtype_dec_true by assumption.
-  all: try apply UpToNull_refl.
-  all: try solve [destruct t2; try apply UpToNull_refl; apply NullSomeUT].
-  all: try solve [repeat destruct_match; try apply UpToNull_refl; try apply NullSomeUT].
-  * constructor. apply H1. named_constructor.
-  * repeat destruct_match; try apply UpToNull_refl; try  apply NullSomeUT.
+  all: try solve [
+    repeat destruct_match;
+    try apply UpToNull_refl;
+    intuition constructor
+    ].
+  all: name_cases.
+  [optSomeC_reflST]: { constructor. apply H1. named_constructor. }
+  [optSomeC_optST]: {
+    repeat destruct_match; try apply UpToNull_refl; try  apply NullSomeUT.
     - constructor. apply H1. assumption.
     - contradiction n. eapply subtyping_trans; eassumption.
-  * rewrite H0.
+  }
+  [constituentOptC_reflST]: {
+    rewrite H0.
     constructor. apply H3. named_constructor.
-  * (* reservedC_optST *)
+  }
+  [constituentOptC_optST]: {
     repeat destruct_match; try apply UpToNull_refl; try  apply NullSomeUT.
-    - admit. (* stuck here! *)
+    - constructor.
     - constructor. apply H3. assumption.
     - contradiction n. eapply subtyping_trans; eassumption.
-  * destruct t2; try apply UpToNull_refl.
-    repeat destruct_match; try apply UpToNull_refl; try  apply NullSomeUT.
-    - contradiction n. eapply subtyping_trans; eassumption.
-    - contradiction n. eapply subtyping_trans; eassumption.
-  * destruct t, v; simpl; repeat destruct_match; try apply UpToNull_refl; try  apply NullSomeUT.
-Abort.
+  }
+  [reservedC_optST]: {
+    destruct t, v; simpl; repeat destruct_match; try apply UpToNull_refl; try  apply NullSomeUT.
+  } 
+Qed.
