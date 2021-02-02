@@ -1,6 +1,18 @@
 
 # Changelog
 
+## 2021-02-01
+
+### Rust (0.6.14)
+
+* Generate random Candid values
+
+### Other
+
+* Candid user guide
+* More Coq proof for MiniCandid
+* `didc random` command and an experimental config file
+
 ## 2021-01-12 (Rust 0.6.13)
 
 * Better pretty printer for Candid value
