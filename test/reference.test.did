@@ -27,6 +27,7 @@ assert blob "DIDL\02\6a\01\71\01\7d\00\69\02\03foo\00\04foo\32\00\01\01\01\03\ca
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\03\03foo\00\04foo\32\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service: too long";
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\04foo\32\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service: too short";
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\02\04foo\32\00\03foo\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service: unsorted";
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\02\09foobarbaz\00\06foobar\00\01\01\01\03\ca\ff\ee" !: (service { foobar : (text) -> (nat); foobarbaz : (text) -> (nat) }) "service: unsorted (but sorted by hash)";
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03\e2\28\a1\00\01\01\01\03\ca\ff\ee" !: (reserved) "service: invalid unicode";
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\02\03foo\00\03foo\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat) }) "service: duplicate";
 
