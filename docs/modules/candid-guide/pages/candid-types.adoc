@@ -16,9 +16,9 @@ For example, the reference does not list `+empty+` as a subtype because it can b
 Similarly, the types `+reserved+` and `+opt t+` are not listed as supertypes of specific types because they are supertypes of any type. 
 For details about the subtyping rules for the `+empty+`, `+reserved+`, and `+opt t+` types, see the following sections:
 
-* <<type-empty, `+empty+`>>
-* <<type-reserved, `+reserved+`>>
 * <<type-opt,`+opt t+`>>
+* <<type-reserved, `+reserved+`>>
+* <<type-empty, `+empty+`>>
 
 [#type-text]
 == Type text
@@ -26,7 +26,8 @@ For details about the subtyping rules for the `+empty+`, `+reserved+`, and `+opt
 The `+text+` type is used for human readable text. More precisely, its values are sequences of unicode code points (excluding surrogate parts).
 
 Type syntax::
-  `+text+`
+
+`+text+`
 
 Textual syntax::
 
@@ -40,46 +41,49 @@ Textual syntax::
 
 Corresponding Motoko type::
 
-`Text`
+`+Text+`
 
 Corresponding Rust type::
 
-`String`
+`+String+`
 
 Corresponding JavaScript values::
 
-`String`
+`+String+`
 
 [#type-blob]
 == Type blob
 
 The `+blob+` type can be used for binary data, that is, sequences of bytes. 
-It is interchangable with `+vec nat8+`. 
-Therefore, interfaces written in terms of `+blob+` and interfaces written in terms of `+vec nat8+` are compatible.
+Interfaces written using the `+blob+` type are interchangeable with interfaces that are written using `+vec nat8+`.
 
 Type syntax::
 
-`blob`
+`+blob+`
 
 Textual syntax::
 
-`blob <text>`, where `<text>` is a text literal (see <<type-text,Text>>), with all characters representing their utf8 encoding, and arbitrary byte sequences (`"\CA\FF\FE"`).
+`+blob <text>+`
++
+where `+<text>+` represents a text literal with all characters representing their utf8 encoding, and arbitrary byte sequences (`"\CA\FF\FE"`).
++
+For more information about text types, see <<type-text,Text>>. 
 
 Subtypes::
 
-`vec nat8`, and all subtypes of that.
+`+vec nat8+`, and all subtypes of `+vec nat8+`.
 
 Supertypes::
 
-`vec nat8`, and all supertypes of that.
+`+vec nat8+`, and all supertypes of `+vec nat8+`.
 
 Corresponding Motoko type::
 
-`Blob`
+`+Blob+`
 
 Corresponding Rust type::
 
-`Vec<u8>`
+`+Vec<u8>+`
 
 Corresponding JavaScript values::
 
@@ -88,11 +92,13 @@ TODO
 [#type-nat]
 == Type nat
 
-The `nat` type contains all natural (non-negative) numbers. It is unbounded, and can represent arbitrary large numbers.  The on-wire encoding is LEB128, so small numbers are still efficiently represented.
+The `+nat+` type contains all natural (non-negative) numbers. 
+It is unbounded, and can represent arbitrary large numbers.
+The on-wire encoding is LEB128, so small numbers are still efficiently represented.
 
 Type syntax::
 
-`nat`
+`+nat+`
 
 Textual syntax::
 
@@ -104,32 +110,33 @@ Textual syntax::
 
 Supertypes::
 
-`int`
+`+int+`
 
 Corresponding Motoko type::
 
-`Nat`
+`+Nat+`
 
 Corresponding Rust type::
 
-TODO
+Unsigned integers: `u8`, `u16`, `u32`, `u64`, `u128`
 
 Corresponding JavaScript values::
 
 `Number`
 
-
 [#type-int]
 == Type int
 
-The `int` type contains all integral, i.e. whole, numbers. It is unbounded, and can represent arbitrary small or large numbers. The on-wire encoding is SLEB128, so small numbers are still efficiently represented.
+The `+int+` type contains all whole numbers. 
+It is unbounded and can represent arbitrary small or large numbers. 
+The on-wire encoding is SLEB128, so small numbers are still efficiently represented.
 
 Type syntax::
 
-`int`
+`+int+`
 
 Textual syntax::
-+
+
 ....
 1234
 -1234
@@ -144,38 +151,39 @@ Textual syntax::
 
 Subtypes::
 
-`nat`
+`+nat+`
 
 Corresponding Motoko type::
 
-`Int`
+`+Int+`
 
 Corresponding Rust type::
 
-TODO
+Signed integers: `+i8+`, `+i16+`, `+i32+`, `+i64+`, `+i128+`
 
 Corresponding JavaScript values::
 
-TODO
-
+`+Number+`
 
 [#type-natN]
 [#type-intN]
 == Type natN and intN
 
-The types `nat8`, `nat16`, `nat32`, `nat64`, `int8`, `int16`, `int32` and `nat64` represent numbers with a representation of that many bits, and can be used in more “low-level” interface.
+The types `nat8`, `nat16`, `nat32`, `nat64`, `int8`, `int16`, `int32` and `int64` represent numbers with a representation of that many bits, and can be used in more “low-level” interfaces.
 
 The range of `natN` is \(\{0 \ldots 2^\{N\}-1\}\), and the range of `intN` is \(\{-2^\{N-1\} \ldots 2^\{N-1\}-1\}\).
 
-The on-wire representation is exactly that many bits long. So for small values, `nat` is more space-efficent than `nat64`.
+The on-wire representation is exactly that many bits long. So for small values, `nat` is more space-efficient than `nat64`.
 
 Type syntax::
 
-`nat8`, `nat16`, `nat32`, `nat64`, `int8`, `int16`, `int32` or `nat64`
+`nat8`, `nat16`, `nat32`, `nat64`, `int8`, `int16`, `int32` or `int64`
 
 Textual syntax::
 
-Same as `nat` (for `natN`) resp. `int` (for `intN`).
+Same as `nat` for `nat8`, `nat16`, `nat32`, and `nat64`.
++
+Same as `int` for `int8`, `int16`, `int32` and `int64`.
 
 Corresponding Motoko type::
 
@@ -185,7 +193,17 @@ Corresponding Motoko type::
 
 Corresponding Rust type::
 
-TODO
+Signed and unsigned integers of corresponding size.
++
+[width="30%",cols="<10%,<10%,<10%",options="header"]
+|===
+|Length	|Signed	|Unsigned
+|8-bit |i8 |u8
+|16-bit |i16 |u16
+|32-bit |i32 |u32
+|64-bit |i64 |u64
+|128-bit |i128 |u128
+|===
 
 Corresponding JavaScript values::
 
@@ -194,7 +212,7 @@ TODO
 [#type-floatN]
 == Type float32 and float64
 
-The types `float32`, `float64` represent IEEE 754 floating point numbers, in single precision (32 bit) and double precision (64 bit).
+The types `float32` and `float64` represent IEEE 754 floating point numbers in single precision (32 bit) and double precision (64 bit).
 
 Type syntax::
 
@@ -202,7 +220,7 @@ Type syntax::
 
 Textual syntax::
 
-The same syntax as `int`, plus floating point literals as follows
+The same syntax as `int`, plus floating point literals as follows:
 +
 ....
 1245.678
@@ -224,7 +242,9 @@ Corresponding Motoko type::
 
 Corresponding Rust type::
 
-TODO
+`f32`, `f64`
++
+The `f32` type is a single-precision float, and `f64` has double precision.
 
 Corresponding JavaScript values::
 
@@ -233,7 +253,7 @@ TODO
 [#type-bool]
 == Type bool
 
-The type of truth values.
+The `bool` type is a logical data type that can have only the values `true` or `false`.
 
 Type syntax::
 
@@ -249,11 +269,11 @@ Corresponding Motoko type::
 
 Corresponding Rust type::
 
-TODO
+`bool`
 
 Corresponding JavaScript values::
 
-TODO
+`boolean`
 
 [#type-null]
 == Type null
@@ -282,17 +302,17 @@ TODO
 
 Corresponding JavaScript values::
 
-TODO
-
+`null`
 
 [#type-vec]
 == Type vec t
 
-The `vec` type represents vectors (sequences, lists, arrays): A value of type `vec t` contains a sequence of zero or more values of type `t`.
+The `vec` type represents vectors (sequences, lists, arrays). 
+A value of type `vec t` contains a sequence of zero or more values of type `t`.
 
 Type syntax::
 
-`vec bool`, `vec nat8`, `vec vec text`,…
+`vec bool`, `vec nat8`, `vec vec text`, and so on.
 
 Textual syntax::
 +
@@ -304,40 +324,41 @@ vec { "john@doe.com"; "john.doe@example.com" };
 Subtypes::
 
 * Whenever `t` is a subtype of `t'`, then `vec t` is a subtype of `vec t'`.
-* `blob` is a subtype of `vec nat8`
+* `blob` is a subtype of `vec nat8`.
 
 Supertypes::
 
 * Whenever `t` is a supertype of `t'`, then `vec t` is a supertype of `vec t'`.
-* `blob` is a supertype of `vec nat8`
+* `blob` is a supertype of `vec nat8`.
 
 Corresponding Motoko type::
 
-`[T]`, where the Motoko type `T` corresponds to `t`
+`[T]`, where the Motoko type `T` corresponds to `t`.
 
 Corresponding Rust type::
 
-`Vec<T>`, where the Rust type `T` corresponds to `t`
+`Vec<T>`, where the Rust type `T` corresponds to `t`.
 
 Corresponding JavaScript values::
 
-TODO:
+TODO
 
 [#type-opt]
 == Type opt t
 
-The `opt t` type contains all the values of type `t`, plus the special `null` value. It is used to express that some value is optional, i.e. it may be present as some value of type `t`, or absent as the value `null`.
+The `opt t` type contains all the values of type `t`, plus the special `null` value. 
+It is used to express that some value is optional, meaning that data might be present as some value of type `t`, or might be absent as the value `null`.
 
-The `opt` type can be nested (e.g. `opt opt text`), and the values `null` and `opt null` are distinct values.
+The `opt` type can be nested (for example, `opt opt text`), and the values `null` and `opt null` are distinct values.
 
-The `opt` type plays a crucial role in the evolution of Candid interfaces, and has special subtyping rules; see below.
+The `opt` type plays a crucial role in the evolution of Candid interfaces, and has special subtyping rules as described below.
 
 Type syntax::
 
-`opt bool`, `opt nat8`, `opt opt text`,…
+`opt bool`, `opt nat8`, `opt opt text`, and so on.
 
 Textual syntax::
-+
+
 ....
 null
 opt true
@@ -352,7 +373,7 @@ The canonical rules for subtyping with `opt` are:
 +
 * Whenever `t` is a subtype of `t'`, then `opt t` is a subtype of `opt t'`.
 * `null` is a subtype of `opt t'`.
-* `t` is a subtype of `opt t` (unless `t` itself is `null`, `opt …` or `reserved`)
+* `t` is a subtype of `opt t` (unless `t` itself is `null`, `opt …` or `reserved`).
 +
 In addition, for technical reasons related to upgrading and higher-order services, _every_ type is a subtype of `opt t`, yielding `null` if the types do not match. Users are advised, however, to not directly make use of that rule.
 
@@ -362,20 +383,21 @@ Supertypes::
 
 Corresponding Motoko type::
 
-`?T`, where the Motoko type `T` corresponds to `t`
+`?T`, where the Motoko type `T` corresponds to `t`.
 
 Corresponding Rust type::
 
-`Option<T>`, where the Rust type `T` corresponds to `t`
+`Option<T>`, where the Rust type `T` corresponds to `t`.
 
 Corresponding JavaScript values::
 
-TODO:
+TODO
 
 [#type-record]
 == Type record { n : t, … }
 
-A `record` type is a collection of labeled values. For example,
+A `record` type is a collection of labeled values. For example, the following code gives the name `address` to the type of records that have the textual fields `street`, `city` and `country` and a numerical field of `zip_code`.
+
 ....
 type address = record {
   street : text;
@@ -384,9 +406,11 @@ type address = record {
   country : text;
 };
 ....
-gives the name `address` to the type of records that have textual fields `street`, `city` and `country` and a numerical field `zip_code`. The order of fields in the record type declaration does not matter.
+
+The order of fields in the record type declaration does not matter.
 Each field can have a different type (unlike vectors).
-The label of a record field can also be a 32-bit natural number, as in
+The label of a record field can also be a 32-bit natural number, as in this example:
+
 ....
 type address2 = record {
   288167939 : text;
@@ -395,12 +419,13 @@ type address2 = record {
   492419670 : text;
 };
 ....
-In fact, textual labels are treated as their _field hash_, and incidentially, `address` and `address2` are – to Candid – the same types.
 
-If you omit the label, Candid automatically assigns sequentially increasing labels. This leads to the following short syntax, which is typically used to represent pairs and tuples. The type `record { text; text; opt bool }` is equivalent to `record { 0 : text;  1: text;  2: opt bool }`
+In fact, textual labels are treated as their _field hash_, and incidentally, `address` and `address2` are—to Candid—the same types.
+
+If you omit the label, Candid automatically assigns sequentially-increasing labels. This behavior leads to the following shortened syntax, which is typically used to represent pairs and tuples. The type `record { text; text; opt bool }` is equivalent to `record { 0 : text;  1: text;  2: opt bool }`
 
 Type syntax::
-+
+
 ....
 record {}
 record { first_name : text; second_name : text }
@@ -409,7 +434,7 @@ record { text; text; opt bool }
 ....
 
 Textual syntax::
-+
+
 ....
 record {}
 record { first_name = "John"; second_name = "Doe" }
@@ -419,15 +444,15 @@ record { "a"; "tuple"; null }
 
 Subtypes::
 
-Subtypes of a record are record types that have additional fields (of any type), where some field’s types are changed to subtypes, or where optional fields are removed. It is, however, bad practice to remove optional fields in method results; you can change a field's type to `opt empty` to indicate that this field is no longer used.
+Subtypes of a record are record types that have additional fields (of any type), where some field’s types are changed to subtypes, or where optional fields are removed. It is, however, bad practice to remove optional fields in method results. You can change a field's type to `opt empty` to indicate that this field is no longer used.
 +
-For example, if you have a function returning a record of type
+For example, if you have a function returning a record of of the following type:
 +
 ....
 record { first_name : text; middle_name : opt text; second_name : text; score : int }
 ....
 +
-you can evolve that to a function returning a record of type
+you can evolve that to a function returning a record of the following type:
 +
 ....
 record { first_name : text; middle_name : opt empty; second_name : text; score : nat; country : text }
@@ -435,20 +460,19 @@ record { first_name : text; middle_name : opt empty; second_name : text; score :
 +
 where we have deprecated the `middle_name` field, change the type of `score` and added the `country` field.
 
-
 Supertypes::
 
 Supertypes of a record are record types with some fields removed, some fields’ types changed to supertypes, or with optional fields added.
 +
 The latter is what allows you to extend your argument records with additional fields. Clients using the old interface will not include the field in their record, which will decode, when expected in the upgraded service, as `null`.
 +
-For example, if you have a function expecting a record of type
+For example, if you have a function expecting a record of type:
 +
 ....
 record { first_name : text; second_name : text; score : nat }
 ....
 +
-you can evolve that to a function expecting a record of type
+you can evolve that to a function expecting a record of type:
 +
 ....
 record { first_name : text; score: int; country : opt text }
@@ -456,11 +480,11 @@ record { first_name : text; score: int; country : opt text }
 
 Corresponding Motoko type::
 
-If the record type looks like it could refer to a tuple (i.e. consecutive labels starting at 0), a Motoko tuple type (e.g. `(T1, T2, T3)`) is used. Else, a Motoko record `({ first_name  :Text, second_name : Text })` is used.
+If the record type looks like it could refer to a tuple (that is, consecutive labels starting at 0), a Motoko tuple type (for example `(T1, T2, T3)`) is used. Else, a Motoko record `({ first_name  :Text, second_name : Text })` is used.
 +
 If the field name is a reserved name in Motoko, an undescore is appended. So `record { if : bool }` corresponds to `{ if_ : Bool  }`.
 +
-If (even then) the field name is not a valid Motoko identifier, the _field_ hash is used insted: `record { ☃ : bool }` corresponds to `{ _11272781_ : Boolean }`.
+If (even then) the field name is not a valid Motoko identifier, the _field_ hash is used instead: `record { ☃ : bool }` corresponds to `{ _11272781_ : Boolean }`.
 
 Corresponding Rust type::
 
@@ -470,11 +494,11 @@ Corresponding JavaScript values::
 
 TODO
 
-
 [#type-variant]
 == Type variant { n : t, … }
 
-A `variant` type represents a value that is from exactly one of the given cases, or _tags_. So a value of the type
+A `variant` type represents a value that is from exactly one of the given cases, or _tags_. So a value of the type:
+
 ....
 type shape = variant {
   dot : null;
@@ -483,24 +507,29 @@ type shape = variant {
   "💬" : text;
 };
 ....
-is either a dot, or a circle (with a radius), or a rectangle (with dimensions) or a speech bubble (with some text). The speech bubble illustrates use of a unicode label name (💬).
+
+is either a dot, or a circle (with a radius), or a rectangle (with dimensions), or a speech bubble (with some text). The speech bubble illustrates use of a unicode label name (💬).
 
 The tags in variants are, just like the labels in records, actually numbers, and string tags refer to their hash value.
 
-Often, some or all of the the tags do not carry data. It is idiomatic to then use the `null` type, as in the `dot` above. In fact, Candid encourages this by allowing you to omit the `: null` type annotation in variants, so
+Often, some or all of the the tags do not carry data. It is idiomatic to then use the `null` type, as in the `dot` above. In fact, Candid encourages this by allowing you to omit the `: null` type annotation in variants, so:
+
 ....
 type season = variant { spring; summer; fall; winter }
 ....
-is equivalent to
+
+is equivalent to:
+
 ....
 type season = variant { spring : null; summer: null; fall: null; winter : null }
 ....
+
 and used to represent enumerations.
 
 The type `variant {}` is legal, but has no values. If that is the intention, the <<type-empty,`empty` type>> may be more appropriate.
 
 Type syntax::
-+
+
 ....
 variant {}
 variant { ok : nat; error : text }
@@ -509,7 +538,7 @@ variant { spring; summer; fall; winter }
 ....
 
 Textual syntax::
-+
+
 ....
 variant { ok = 42 }
 variant { "unicode, too: ☃" = true }
@@ -520,28 +549,27 @@ Subtypes::
 
 Subtypes of a variant type are variant types with some tags removed, and the type of some tags themselves changed to a subtype.
 +
-If you want to be able to _add_ new tags in variants in a method result, you can do so if the variant is itself wrapped in `opt …`. This requires planning ahead! When you design an interface, instead of writing
+If you want to be able to _add_ new tags in variants in a method result, you can do so if the variant is itself wrapped in `opt …`. This requires planning ahead! When you design an interface, instead of writing:
 +
 ....
 service { get_member_status (member_id : nat) -> (variant {active; expired}); }
 ....
 +
-better use
+it is better to use this:
 +
 ....
 service { get_member_status (member_id : nat) -> (opt variant {active; expired}); }
 ....
 +
-This way, if you later need to add a `honory` membership status, you can expand the list of statuses. Old clients will receive unknown fields as `null`.
+This way, if you later need to add a `honorary` membership status, you can expand the list of statuses. Old clients will receive unknown fields as `null`.
 
 Supertypes::
 
 Supertypes of a variant types are variants with additional tags, and maybe the type of some tags changed to a supertype.
 
-
 Corresponding Motoko type::
 
-Variant types are represented as Motoko variant types, e.g.
+Variant types are represented as Motoko variant types, for example:
 +
 ....
 type Shape = {
@@ -562,14 +590,21 @@ Corresponding JavaScript values::
 
 TODO
 
-
 [#type-func]
 == Type func (…) -> (…)
 
-Candid is designed to support higher-order use cases, where a service may receive or provide references to other serivces or their methods, e.g., as callbacks. The `func` type is central to this: It indicates the function’s _signature_ (argument and results types, annotations), and values of this type are references to functions with that signature.
+Candid is designed to support higher-order use cases, where a service may receive or provide references to other services or their methods, for example, as callbacks. 
+The `func` type is central to this: It indicates the function’s _signature_ (argument and results types, annotations), and values of this type are references to functions with that signature.
+
+The supported annotations are:
+
+* `query` indicates that the referenced function is a query method, meaning it does not alter the state of its canister, and that it can be invoked using the cheaper “query call” mechanism.
+* `oneway` indicates that this function returns no response, intended for fire-and-forget scenarios.
+
+For more information about parameter naming, see link:candid-concepts{outfilesuffix}#service-naming[Naming arguments and results].
 
 Type syntax::
-+
+
 ....
 func () -> ()
 func (text) -> (text)
@@ -577,17 +612,10 @@ func (dividend : nat, divisor : nat) -> (div : nat, mod : nat);
 func () -> (int) query
 func (func (int) -> ()) -> ()
 ....
-+
-See the <<candid-service-descriptions,note on function parameter names>>.
-+
-The supported annotation are:
-+
-* `query` indicates that the referenced function is a query method, meaning it does not alter the state of its canister, and that it can be invoked using the cheaper “query call” mechanism.
-* `oneway` indicates that this function returns no response, intended for fire-and-forget scenarios.
 
 Textual syntax::
 
-At the moment, only public methods of services, which are identified by their principal, are supported:
+Currently, only public methods of services, which are identified by their principal, are supported:
 +
 ....
 func "w7x7r-cok77-xa".hello
@@ -597,23 +625,22 @@ func "aaaaa-aa".create_canister
 
 Subtypes::
 
-The following modifications to a function type change it to a subtype (cf. the rules in <<upgrades>>):
+The following modifications to a function type change it to a subtype as discussed in the rules for link:candid-concepts{outfilesuffix}#upgrades[Service upgrades]:
 +
- * The result type list may be extended
+ * The result type list may be extended.
  * The parameter type list may be shortened.
  * The parameter type list may be extended with optional arguments (type `opt …`).
- * Existing parameter types may be changed to to a _supertype_ (!). In other words: The function type is _contravariant_ in the argument type.
+ * Existing parameter types may be changed to to a _supertype_ (!). In other words, the function type is _contravariant_ in the argument type.
  * Existing result types may be changed to a subtype.
-
 
 Supertypes::
 
-Dually, the following modifications to a function type change it to a supertype:
+The following modifications to a function type change it to a supertype:
 +
- * The result type list may be shortened
- * The result type list may be extended with optional arguments (type `opt …`)
+ * The result type list may be shortened.
+ * The result type list may be extended with optional arguments (type `opt …`).
  * The parameter type list may be extended.
- * Existing parameter types may be changed to to a _subtype_ (!). In other words: The function type is _contravariant_ in the argument type.
+ * Existing parameter types may be changed to to a _subtype_ (!). In other words, the function type is _contravariant_ in the argument type.
  * Existing result types may be changed to a supertype.
 
 Corresponding Motoko type::
@@ -627,7 +654,9 @@ type F2 = func (text, bool) -> () oneway;
 type F3 = func (text) -> () oneway;
 type F4 = func () -> (text) query;
 ....
++
 corresponds in Motoko to
++
 ....
 type F0 = shared () -> async ();
 type F1 = shared Text -> async Text;
@@ -648,8 +677,10 @@ TODO
 
 Services may want to pass around references to not just individual functions (using the <<type-func,`func` type>>), but references to whole services. In this case, Candid types can be used to declare the complete interface of such a service.
 
+See link:candid-concepts{outfilesuffix}#candid-service-descriptions[Candid service descriptions] for more details on the syntax of a service type.
+
 Type syntax::
-+
+
 ....
 service {
   add : (nat) -> ();
@@ -658,11 +689,9 @@ service {
   subscribe : (func (int) -> ()) -> ();
 }
 ....
-+
-See Section “<<candid-service-descriptions>>” for more details on the syntax of a service type.
 
 Textual syntax::
-+
+
 ....
 service "w7x7r-cok77-xa"
 service "zwigo-aiaaa-aaaaa-qaa3a-cai"
@@ -673,7 +702,7 @@ Subtypes::
 
 The subtypes of a service type are those service types that possibly have additional methods, and where the type of an existing method is changed to a subtype.
 +
-This is exactly the notion that shows up in Section “<<upgrades,safe upgrades>>”.
+This is exactly the same principle as discussed for upgrade rules in link:candid-concepts{outfilesuffix}#upgrades[Service upgrades].
 
 Supertypes::
 
@@ -703,7 +732,7 @@ TODO
 [#type-principal]
 == Type principal
 
-The Internet computer uses _principals_ as the common scheme to identify canisters, users and other entities.
+The Internet Computer uses _principals_ as the common scheme to identify canisters, users, and other entities.
 
 Type syntax::
 
@@ -736,6 +765,44 @@ TODO
 
 The `reserved` type is a type with one (uninformative) value `reserved`, and is the supertype of all other types.
 
+The `reserved` type can be used to remove method arguments. Consider a method with the following signature:
+
+....
+service { foo : (first_name : text, middle_name : text, last_name : text) -> () }
+....
+
+and assume you no longer care about the `middle_name`. Although Candid will not prevent you from changing the signature to this:
+
+....
+service { foo : (first_name : text, last_name : text) -> () }
+....
+it would be disastrous: If a client talks to you using the old interface, you will silently ignore the `last_name` and take the `middle_name` as the `last_name`. Remember that method parameter names are just convention, and method arguments are identified by their position.
+
+Instead, you can use:
+
+....
+service { foo : (first_name : text, middle_name : reserved, last_name : text) -> () }
+....
+
+to indicate that `foo` used to take a second argument, but you no longer care about that.
+
+You can avoid this pitfall by adopting the pattern any function that is anticipated to have changing arguments, or whose arguments can only be distinguished by position, not type, is declared to take a single record.
+For example:
+
+....
+service { foo : (record { first_name : text; middle_name : text; last_name : text}) -> () }
+....
+
+Now, changing the signature to this:
+
+....
+service { foo : (record { first_name : text; last_name : text}) -> () }
+....
+
+does the right thing, and you don’t even need to keep a record of the removed argument around.
+
+NOTE: In general, it is not recommended to remove arguments from methods. Usually, it is preferable to introduce a new method that omits the argument.
+
 Type syntax::
 
 `reserved`
@@ -760,40 +827,20 @@ Corresponding JavaScript values::
 
 TODO
 
-The `reserved` type can be used to remove method arguments. Consider a method with signature
-....
-service { foo : (first_name : text, middle_name : text, last_name : text) -> () }
-....
-and assume you no longer care about the `middle_name`. Although Candid will not prevent you from changing the signature to
-....
-service { foo : (first_name : text, last_name : text) -> () }
-....
-it would be disastrous: If a client talks to you using the old interface, you will silently ignore the `last_name` and take the `middle_name` as the `last_name`. Remember that method parameter names are just convention, and method arguments are identified by their position.
-
-Instead, you can use
-....
-service { foo : (first_name : text, middle_name : reserved, last_name : text) -> () }
-....
-to indicate that `foo` used to take a second argument, but you no longer care about that.
-
-
-You can avoid this pitfall by adopting the pattern any function that is anticipated to have changing arguments, or whose arguments can only be distinguished by position, not type,  is declared to take a single record, i.e.
-....
-service { foo : (record { first_name : text; middle_name : text; last_name : text}) -> () }
-....
-Now, changing that to
-....
-service { foo : (record { first_name : text; last_name : text}) -> () }
-....
-does the right thing, and you don’t even need to keep a record of the removed argument around.
-
-NOTE: In general, it is not recommended to remove arguments from methods. Usually it is preferable to introduce a new method that omits the argument.
-
-
 [#type-empty]
 == Type empty
 
 The `empty` type is the type without values, and is the subtype of any other type.
+
+Practical use cases for the `empty` type are relatively rare.
+It could be used to mark a method as “never returns successfully”.
+For example:
+
+....
+service : {
+  always_fails () -> (empty)
+}
+....
 
 Type syntax::
 
@@ -818,11 +865,3 @@ TODO
 Corresponding JavaScript values::
 
 TODO
-
-Practical uses of the `empty` type are relatively rare.
-It could be used to mark a method as “never returns successful”:
-....
-service : {
-  always_fails () -> (empty)
-}
-....

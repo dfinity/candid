@@ -99,6 +99,7 @@ The method `+reverse+` expects a single parameter of type `+text+` and returns o
 
 The method `+divMod+` expects and returns two values, all of type `+nat+`.
 
+[[service-naming]]
 == Naming arguments and results
 
 In the previous example, the signature for the `+divMod+` method includes names for the argument and result values. 
