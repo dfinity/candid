@@ -1,0 +1,13 @@
+= Candid
+
+Welcome to the Candid documentation for application developers. 
+
+This _Candid Guide_ explains what Candid is and how you can use it when developing programs to run on the {IC}.
+The information here is intended primarily for back-end and front-end developers who want to deploy canisters on the {IC}.
+If you want to _implement_ support for a new language or _extend_ existing Candid features, you should refer to the formal
+link:https://github.com/dfinity/candid/blob/master/spec/Candid.md[Candid specification] for background information and details about the internal structure of the language.
+
+* The link:candid-concepts{outfilesuffix}[What is Candid?] section introduces the purpose and key features of the Candid interface description language. 
+It includes an overview of how Candid works and some simple examples to give you a working knowledge of how you can apply Candid to your use case. 
+* The link:candid-howto{outfilesuffix}[How to] section explains how to perform typical tasks. 
+* The link:candid-ref{outfilesuffix}[Reference] section provides links to Candid tools and libraries and detailed reference information about Candid supported types.

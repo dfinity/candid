@@ -23,10 +23,11 @@ assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\01\01\01\03\ca\ff\ee"
   == "(service \"w7x7r-cok77-xa\")" : (service { foo : (text) -> (nat) }) "service";
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\02\03foo\00\04foo\32\00\01\01\01\03\ca\ff\ee"
   == "(service \"w7x7r-cok77-xa\")" : (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service";
-  
+
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\03\03foo\00\04foo\32\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service: too long";
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\04foo\32\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service: too short";
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\02\04foo\32\00\03foo\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service: unsorted";
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03\e2\28\a1\00\01\01\01\03\ca\ff\ee" !: (reserved) "service: invalid unicode";
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\02\03foo\00\03foo\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat) }) "service: duplicate";
 
 assert blob "DIDL\05i\02\03foo\01\04\f0\9f\90\82\02j\00\00\01\02j\01\03\01\04\01\01n|l\00\01\00\01\00"
@@ -40,7 +41,7 @@ assert blob "DIDL\01\6a\00\00\00\01\00\01\01\03\ca\ff\ee\01\61"
   == "(func \"w7x7r-cok77-xa\".\"a\")"          : (func () -> ()) "func: quote name";
 assert blob "DIDL\01\6a\00\00\00\01\00\01\01\03\ca\ff\ee\01\61"
   == "(func \"w7x7r-cok77-xa\".a)"              : (func () -> ()) "func: non-quote name";
-assert blob "DIDL\01\6a\00\00\00\01\00\01\00\03\ca\ff\ee\01\61" !: (func () -> ()) "func: wrong tag";  
+assert blob "DIDL\01\6a\00\00\00\01\00\01\00\03\ca\ff\ee\01\61" !: (func () -> ()) "func: wrong tag";
 assert blob "DIDL\02j\02|}\01\01\01\01i\00\01\00\01\01\00\04\f0\9f\90\82"
   == "(func \"aaaaa-aa\".\"🐂\")"               : (func (int,nat) -> (service {}) query) "func: unicode";
 assert blob "DIDL\01\6a\01\68\01\7d\00\01\00\01\01\03\ca\ff\ee\03foo"
