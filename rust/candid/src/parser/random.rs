@@ -211,17 +211,13 @@ impl<'a> GenState<'a> {
 }
 
 impl IDLArgs {
-    pub fn any(
-        u: &mut Unstructured,
-        tree: &Configs,
-        env: &TypeEnv,
-        types: &[Type],
-    ) -> Result<Self> {
+    pub fn any(seed: &[u8], tree: &Configs, env: &TypeEnv, types: &[Type]) -> Result<Self> {
+        let mut u = arbitrary::Unstructured::new(seed);
         let mut args = Vec::new();
         for (i, t) in types.iter().enumerate() {
             let tree = tree.with_method(&i.to_string());
             let mut state = GenState::new(&tree, env)?;
-            let v = state.any(u, t)?;
+            let v = state.any(&mut u, t)?;
             args.push(v);
         }
         Ok(IDLArgs { args })

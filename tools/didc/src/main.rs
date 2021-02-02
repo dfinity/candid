@@ -260,8 +260,7 @@ fn main() -> Result<()> {
                 let mut rng = rand::thread_rng();
                 (0..2048).map(|_| rng.gen::<u8>()).collect()
             };
-            let mut u = arbitrary::Unstructured::new(&seed);
-            let args = IDLArgs::any(&mut u, &config, &env, &types)?;
+            let args = IDLArgs::any(&seed, &config, &env, &types)?;
             match lang.as_str() {
                 "did" => println!("{}", args),
                 "js" => println!(
