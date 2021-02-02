@@ -10,4 +10,9 @@ pub mod value;
 
 pub mod typing;
 
+#[cfg(feature = "configs")]
+pub mod configs;
+pub mod pretty;
+#[cfg(feature = "random")]
+pub mod random;
 pub mod test;

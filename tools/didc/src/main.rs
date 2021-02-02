@@ -52,6 +52,23 @@ enum Command {
         /// Disable pretty printing
         flat: bool,
     },
+    /// Generate random Candid values
+    Random {
+        #[structopt(flatten)]
+        annotate: TypeAnnotation,
+        #[structopt(short, long, conflicts_with("file"))]
+        /// Specifies random value generation config in Dhall syntax
+        config: Option<String>,
+        #[structopt(short, long)]
+        /// Load random value generation config from file
+        file: Option<String>,
+        #[structopt(short, long, possible_values = &["did", "js"], default_value = "did")]
+        /// Specifies target language
+        lang: String,
+        #[structopt(short, long, requires("method"))]
+        /// Specifies input arguments for a method call, mocking the return result
+        args: Option<IDLArgs>,
+    },
     /// Diff two Candid values
     Diff {
         #[structopt(parse(try_from_str = parse_args))]
@@ -179,7 +196,7 @@ fn main() -> Result<()> {
                 "blob" => {
                     let mut res = String::new();
                     for ch in bytes.iter() {
-                        res.push_str(&candid::parser::value::pretty::pp_char(*ch));
+                        res.push_str(&candid::parser::pretty::pp_char(*ch));
                     }
                     res
                 }
@@ -203,6 +220,54 @@ fn main() -> Result<()> {
                 println!("{}", value);
             } else {
                 println!("{:?}", value);
+            }
+        }
+        Command::Random {
+            annotate,
+            lang,
+            config,
+            file,
+            args,
+        } => {
+            use candid::parser::configs::Configs;
+            use rand::Rng;
+            let (env, types) = if args.is_some() {
+                annotate.get_types(Mode::Decode)?
+            } else {
+                annotate.get_types(Mode::Encode)?
+            };
+            let config = match (config, file) {
+                (None, None) => Configs::from_dhall("{=}")?,
+                (Some(str), None) => Configs::from_dhall(&str)?,
+                (None, Some(file)) => {
+                    let content = std::fs::read_to_string(&file)
+                        .map_err(|_| Error::msg(format!("could not read {}", file)))?;
+                    Configs::from_dhall(&content)?
+                }
+                _ => unreachable!(),
+            };
+            let config = if let Some(ref method) = annotate.method {
+                config.with_method(method)
+            } else {
+                config
+            };
+            // TODO figure out how many bytes of entropy we need
+            let seed: Vec<u8> = if let Some(ref args) = args {
+                let (env, types) = annotate.get_types(Mode::Encode)?;
+                let bytes = args.to_bytes_with_types(&env, &types)?;
+                bytes.into_iter().rev().cycle().take(2048).collect()
+            } else {
+                let mut rng = rand::thread_rng();
+                (0..2048).map(|_| rng.gen::<u8>()).collect()
+            };
+            let args = IDLArgs::any(&seed, &config, &env, &types)?;
+            match lang.as_str() {
+                "did" => println!("{}", args),
+                "js" => println!(
+                    "{}",
+                    candid::bindings::javascript::value::pp_args(&args).pretty(80)
+                ),
+                _ => unreachable!(),
             }
         }
         Command::Diff {
