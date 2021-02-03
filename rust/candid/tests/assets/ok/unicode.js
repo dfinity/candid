@@ -14,8 +14,8 @@ export default ({ IDL }) => {
   return IDL.Service({
     '' : IDL.Func([IDL.Nat], [IDL.Nat], []),
     '✈️  🚗 ⛱️ ' : IDL.Func([], [], ['oneway']),
-    '👀' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
     '函数名' : IDL.Func([A], [B], []),
+    '👀' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
   });
 };
 export const init = ({ IDL }) => { return []; };

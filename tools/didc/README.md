@@ -11,8 +11,10 @@ USAGE:
 SUBCOMMANDS:
     check     Type check Candid file
     bind      Binding for different languages
+    test      Generate test suites for different languages
     encode    Encode Candid value
     decode    Decode Candid binary data
+    random    Generate random Candid values
     diff      Diff two Candid values
 ```
 

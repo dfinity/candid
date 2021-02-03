@@ -1,6 +1,6 @@
 [package]
 name = "candid"
-version = "0.6.14"
+version = "0.6.15"
 edition = "2018"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
@@ -43,6 +43,7 @@ rand = { version = "0.8", optional = true }
 [dev-dependencies]
 goldenfile = "1.1.0"
 test-generator = "0.3.0"
+rand = "0.8"
 
 [features]
 cdk = ["candid_derive/cdk"]

@@ -1,6 +1,6 @@
 type List = opt record { head : int; tail : List };
 type broker = service {
-  find : (text) -> (service { up : () -> (); current : () -> (nat32) });
+  find : (text) -> (service { current : () -> (nat32); up : () -> () });
 };
 type f = func (List, func (int32) -> (int64)) -> (opt List);
 type my_type = principal;
