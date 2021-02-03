@@ -1,5 +1,7 @@
 /*
 Encoding tests for primitive types
+
+Corresponding to spec version version 0.1.2
 */
 
 // fundamentally wrong
