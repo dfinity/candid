@@ -718,7 +718,7 @@ To summarize, the subtyping relation for validating upgrades is designed with th
 * No covert channels: Serialisation never includes any fields in the value that the sender is not aware of. Specifically, when passing on a value to a third party that the sender previously received itself, then that will only contain fields that the sender intends to send out per its type.
 
 However, something has to give, so one seemingly desirable property that is not maintained is *transitive coherence*, i.e., given a value serialized at some type, deserialized and serialized at a supertype, and then again deserialized at a supertype of the supertype may yield a diferent result than deserialised directly at the later supertype.
-However, the only possible difference can be one of getting `null` for an option vs a non-null value.
+However, the only possible difference can be one of getting `null` instead of an optional value, or vica versa.
 
 
 ### Rules
@@ -1075,7 +1075,7 @@ The relations above have certain properties. To express them, we need the relati
   ```
   does not imply `v3 = v3'`.
 
-  However, it implies that `R(v3,v3')`, where `R` is the smallest homomorphic, reflexive relation `R` that satisfies `∀ v. R(opt v, null)`.
+  However, it implies that `R(v3,v3')`, where `R` is the smallest homomorphic, reflexive, symmetric relation `R` that satisfies `∀ v. R(opt v, null)`.
 
 The goal of “subtyping completeness” has not been cast into a formal formulation yet.
 
