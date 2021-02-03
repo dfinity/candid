@@ -1252,7 +1252,7 @@ Deserialisation at an expected type sequence `(<t'>,*)` proceeds by
  * using the inverse of the `T` function to decode the type definitions `(<t>,*)`
  * check that `(<t>,*) <: (<t'>,*)`, else fail
  * using the inverse of the `M` function, indexed by `(<t>,*)`, to decode the values `(<v>,*)`
- * use the coercion function `c[(<t>,*) <: (<t'>,*)]((<v>*,))` to understand the decoded values at the expected type.
+ * use the coercion function `c[(<t>,*) <: (<t'>,*)]((<v>,*))` to understand the decoded values at the expected type.
 
 ### Deserialisation of future types
 
