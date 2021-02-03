@@ -1,9 +1,13 @@
 = What is Candid?
+:source-language: candid
+:!page-repl:
 
 Candid is an _interface description language_. Its primary purpose is to describe the public interface of a **service**, usually in the form of a program deployed as a **canister** that runs on the Internet Computer. 
 One of the key benefits of Candid is that it is language-agnostic, and allows inter-operation between services and front-ends written in different programming languages, including Motoko, Rust, and JavaScript.
 
 A typical interface description in Candid might look like this:
+
+[source]
 ....
 service counter : {
   add : (nat) -> ();
@@ -69,11 +73,14 @@ Before you explore how to generate service descriptions for a specific host lang
 
 The simplest service description specifies a service with no public methods and would look like this:
 
+[source]
 ....
 service : {}
 ....
 
 This service is not very useful, so let's add a simple `+ping+` method:
+
+[source]
 ....
 service : {
   ping : () -> ();
@@ -88,6 +95,7 @@ Methods declare a _sequence_ of arguments and result types. In the case of this 
 Now that you've seen the simplest case, let's consider a slightly more complex service description. 
 This service consists of two methods—`+reverse+` and `+divMod+`—and each method include a sequence of argument and result types:
 
+[source]
 ....
 service : {
   reverse : (text) -> (text);
@@ -107,10 +115,13 @@ Naming the arguments or results for a method is purely for documentation purpose
 The name you use does not change the method’s type or the values being passed. 
 Instead, arguments and results are identified by their _position_, independent of the name.
 
-In particular, Candid does not prevent you from changing the type to
+In particular, Candid does not prevent you from changing the type to:
+
+[source]
 ....
   divMod : (dividend : nat, divisor : nat) -> (mod : nat, div : nat);
 ....
+
 or passing the above `divMod` to a service expecting a method that returns `mod` first.
 
 This is thus very different from named _record_ fields, which are semantically relevant.
@@ -119,6 +130,8 @@ This is thus very different from named _record_ fields, which are semantically r
 
 Often, multiple methods in a service may refer to the same complex type. In that case, the type can be named and reused multiple times.
 For example:
+
+[source]
 ....
 type address = record {
   street : text;
@@ -138,6 +151,8 @@ These type definitions merely abbreviate an _existing_ type, they do not define 
 
 In the last example, you might have noticed the use of the `+query+` annotation for the `+get_address+` method. 
 For example:
+
+[source]
 ....
 service address_book : {
   set_address: (name : text, addr : address) -> ();
@@ -184,9 +199,10 @@ Services can safely evolve in the following ways:
 
 For information about the supertypes and subtypes of a given type, see the corresponding xref:candid-ref{outfilesuffix}[reference] section for that type.
 
-[TIP]
-====
+Let's look at a concrete example of how a service might evolve.
 Consider a service with the following API:
+
+[source]
 ....
 service counter : {
   add : (nat) -> ();
@@ -196,7 +212,9 @@ service counter : {
 }
 ....
 
-This can evolve to the following interface:
+This service can evolve to the following interface:
+
+[source]
 ....
 type timestamp = nat;
 service counter : {
@@ -207,7 +225,6 @@ service counter : {
   subscribe : (func (nat) -> (unregister : opt bool)) -> ();
 }
 ....
-====
 
 [[textual-values]]
 == Candid textual values
@@ -223,6 +240,7 @@ In these scenarios, you can use the _textual presentation_ for Candid values.
 The syntax is similar to that for Candid types. 
 For example, a typical textual presentation for a Candid value might look like this:
 
+[source]
 ....
 (record {
   first_name = "John";
@@ -236,7 +254,9 @@ For example, a typical textual presentation for a Candid value might look like t
 
 [NOTE]
 ====
-The Candid _binary_ format does not include the actual field names, merely numeric _hashes_. So pretty-printing such a value without knowledge of the expected type will not include the field names of records and variants. The above value might then be printed as
+The Candid _binary_ format does not include the actual field names, merely numeric _hashes_. So pretty-printing such a value without knowledge of the expected type will not include the field names of records and variants. The above value might then be printed as follows:
+
+[source]
 ....
 (record {4846783 = 14; 456245371 = variant {373703110}; 1443915007 = vec {"john@doe.com"; "john.doe@example.com"}; 2797692922 = "John"; 3046132756 = "Doe"})
 ....
@@ -248,6 +268,7 @@ In the <<candid-service-descriptions,section above>>, you learned how to write a
 
 For example, in Motoko, you can write a canister like this:
 
+[source]
 ....
 actor {
   var v : Int = 0;
