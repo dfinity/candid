@@ -3,9 +3,10 @@
 
 ## 2021-02-01
 
-### Rust (0.6.14)
+### Rust (0.6.14 -- 0.6.15)
 
 * Generate random Candid values
+* Sort method names lexicographically
 
 ### Other
 

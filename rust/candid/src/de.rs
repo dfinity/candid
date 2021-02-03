@@ -215,17 +215,16 @@ impl<'de> Deserializer<'de> {
                         .map_err(|_| Error::msg(Error::msg("length out of u32")))?;
                     // Push one element to the table to ensure it's a non-primitive type
                     buf.push(RawValue::U(obj_len));
-                    let mut prev_hash = None;
+                    let mut prev = None;
                     for _ in 0..obj_len {
                         let mlen = self.leb128_read()? as usize;
                         let meth = self.parse_string(mlen)?;
-                        let hash = crate::idl_hash(&meth);
-                        if let Some(prev_hash) = prev_hash {
-                            if prev_hash >= hash {
+                        if let Some(prev) = prev {
+                            if prev >= meth {
                                 return Err(Error::msg("method name collision or not sorted"));
                             }
                         }
-                        prev_hash = Some(hash);
+                        prev = Some(meth);
                         let ty = self.sleb128_read()?;
                         validate_type_range(ty, len)?;
                         // Check for method type
