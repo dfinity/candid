@@ -1,4 +1,6 @@
 = Supported types
+:source-language: candid
+:!page-repl:
 
 This section lists all the types supported by Candid.
 For each type, the reference includes the following information:
@@ -29,7 +31,7 @@ Type syntax::
   `+text+`
 
 Textual syntax::
-
+[source]
 ....
 ""
 "Hello"
@@ -95,7 +97,7 @@ Type syntax::
 `nat`
 
 Textual syntax::
-
+[source]
 ....
 1234
 1_000_000
@@ -129,7 +131,7 @@ Type syntax::
 `int`
 
 Textual syntax::
-+
+[source]
 ....
 1234
 -1234
@@ -203,7 +205,7 @@ Type syntax::
 Textual syntax::
 
 The same syntax as `int`, plus floating point literals as follows
-+
+[source]
 ....
 1245.678
 +1245.678
@@ -295,7 +297,7 @@ Type syntax::
 `vec bool`, `vec nat8`, `vec vec text`,…
 
 Textual syntax::
-+
+[source]
 ....
 vec {}
 vec { "john@doe.com"; "john.doe@example.com" };
@@ -337,7 +339,7 @@ Type syntax::
 `opt bool`, `opt nat8`, `opt opt text`,…
 
 Textual syntax::
-+
+[source]
 ....
 null
 opt true
@@ -376,6 +378,7 @@ TODO:
 == Type record { n : t, … }
 
 A `record` type is a collection of labeled values. For example,
+[source]
 ....
 type address = record {
   street : text;
@@ -387,6 +390,7 @@ type address = record {
 gives the name `address` to the type of records that have textual fields `street`, `city` and `country` and a numerical field `zip_code`. The order of fields in the record type declaration does not matter.
 Each field can have a different type (unlike vectors).
 The label of a record field can also be a 32-bit natural number, as in
+[source]
 ....
 type address2 = record {
   288167939 : text;
@@ -400,7 +404,7 @@ In fact, textual labels are treated as their _field hash_, and incidentially, `a
 If you omit the label, Candid automatically assigns sequentially increasing labels. This leads to the following short syntax, which is typically used to represent pairs and tuples. The type `record { text; text; opt bool }` is equivalent to `record { 0 : text;  1: text;  2: opt bool }`
 
 Type syntax::
-+
+[source]
 ....
 record {}
 record { first_name : text; second_name : text }
@@ -409,7 +413,7 @@ record { text; text; opt bool }
 ....
 
 Textual syntax::
-+
+[source]
 ....
 record {}
 record { first_name = "John"; second_name = "Doe" }
@@ -422,17 +426,17 @@ Subtypes::
 Subtypes of a record are record types that have additional fields (of any type), where some field’s types are changed to subtypes, or where optional fields are removed. It is, however, bad practice to remove optional fields in method results; you can change a field's type to `opt empty` to indicate that this field is no longer used.
 +
 For example, if you have a function returning a record of type
-+
+[source]
 ....
 record { first_name : text; middle_name : opt text; second_name : text; score : int }
 ....
-+
+
 you can evolve that to a function returning a record of type
-+
+[source]
 ....
 record { first_name : text; middle_name : opt empty; second_name : text; score : nat; country : text }
 ....
-+
+
 where we have deprecated the `middle_name` field, change the type of `score` and added the `country` field.
 
 
@@ -443,13 +447,13 @@ Supertypes of a record are record types with some fields removed, some fields’
 The latter is what allows you to extend your argument records with additional fields. Clients using the old interface will not include the field in their record, which will decode, when expected in the upgraded service, as `null`.
 +
 For example, if you have a function expecting a record of type
-+
+[source]
 ....
 record { first_name : text; second_name : text; score : nat }
 ....
-+
+
 you can evolve that to a function expecting a record of type
-+
+[source]
 ....
 record { first_name : text; score: int; country : opt text }
 ....
@@ -475,6 +479,7 @@ TODO
 == Type variant { n : t, … }
 
 A `variant` type represents a value that is from exactly one of the given cases, or _tags_. So a value of the type
+[source]
 ....
 type shape = variant {
   dot : null;
@@ -488,10 +493,12 @@ is either a dot, or a circle (with a radius), or a rectangle (with dimensions) o
 The tags in variants are, just like the labels in records, actually numbers, and string tags refer to their hash value.
 
 Often, some or all of the the tags do not carry data. It is idiomatic to then use the `null` type, as in the `dot` above. In fact, Candid encourages this by allowing you to omit the `: null` type annotation in variants, so
+[source]
 ....
 type season = variant { spring; summer; fall; winter }
 ....
 is equivalent to
+[source]
 ....
 type season = variant { spring : null; summer: null; fall: null; winter : null }
 ....
@@ -500,7 +507,7 @@ and used to represent enumerations.
 The type `variant {}` is legal, but has no values. If that is the intention, the <<type-empty,`empty` type>> may be more appropriate.
 
 Type syntax::
-+
+[source]
 ....
 variant {}
 variant { ok : nat; error : text }
@@ -509,7 +516,7 @@ variant { spring; summer; fall; winter }
 ....
 
 Textual syntax::
-+
+[source]
 ....
 variant { ok = 42 }
 variant { "unicode, too: ☃" = true }
@@ -521,17 +528,17 @@ Subtypes::
 Subtypes of a variant type are variant types with some tags removed, and the type of some tags themselves changed to a subtype.
 +
 If you want to be able to _add_ new tags in variants in a method result, you can do so if the variant is itself wrapped in `opt …`. This requires planning ahead! When you design an interface, instead of writing
-+
+[source]
 ....
 service { get_member_status (member_id : nat) -> (variant {active; expired}); }
 ....
-+
+
 better use
-+
+[source]
 ....
 service { get_member_status (member_id : nat) -> (opt variant {active; expired}); }
 ....
-+
+
 This way, if you later need to add a `honory` membership status, you can expand the list of statuses. Old clients will receive unknown fields as `null`.
 
 Supertypes::
@@ -542,7 +549,7 @@ Supertypes of a variant types are variants with additional tags, and maybe the t
 Corresponding Motoko type::
 
 Variant types are represented as Motoko variant types, e.g.
-+
+[source, motoko]
 ....
 type Shape = {
   #dot : ();
@@ -551,7 +558,7 @@ type Shape = {
   #_2669435721_ : Text;
 };
 ....
-+
+
 Note that if the type of a tag is `null`, this corresponds to `()` in Motoko, to preserve the mapping between the respective idiomatic ways to model enumerations as variants.
 
 Corresponding Rust type::
@@ -569,7 +576,7 @@ TODO
 Candid is designed to support higher-order use cases, where a service may receive or provide references to other serivces or their methods, e.g., as callbacks. The `func` type is central to this: It indicates the function’s _signature_ (argument and results types, annotations), and values of this type are references to functions with that signature.
 
 Type syntax::
-+
+[source]
 ....
 func () -> ()
 func (text) -> (text)
@@ -577,18 +584,17 @@ func (dividend : nat, divisor : nat) -> (div : nat, mod : nat);
 func () -> (int) query
 func (func (int) -> ()) -> ()
 ....
-+
 See the <<candid-service-descriptions,note on function parameter names>>.
-+
+
 The supported annotation are:
-+
-* `query` indicates that the referenced function is a query method, meaning it does not alter the state of its canister, and that it can be invoked using the cheaper “query call” mechanism.
-* `oneway` indicates that this function returns no response, intended for fire-and-forget scenarios.
+
+  * `query` indicates that the referenced function is a query method, meaning it does not alter the state of its canister, and that it can be invoked using the cheaper “query call” mechanism.
+  * `oneway` indicates that this function returns no response, intended for fire-and-forget scenarios.
 
 Textual syntax::
 
 At the moment, only public methods of services, which are identified by their principal, are supported:
-+
+[source]
 ....
 func "w7x7r-cok77-xa".hello
 func "w7x7r-cok77-xa"."☃"
@@ -619,7 +625,7 @@ Dually, the following modifications to a function type change it to a supertype:
 Corresponding Motoko type::
 
 Candid function types correspond to `shared` Motoko functions, with the result type wrapped in `async` (unless they are annotated with `oneway`, then the result type is simply `()`).  Arguments resp. results become tuples, unless there is exactly one, in which case it is used directly:
-+
+[source]
 ....
 type F0 = func () -> ();
 type F1 = func (text) -> (text);
@@ -628,6 +634,7 @@ type F3 = func (text) -> () oneway;
 type F4 = func () -> (text) query;
 ....
 corresponds in Motoko to
+[source, motoko]
 ....
 type F0 = shared () -> async ();
 type F1 = shared Text -> async Text;
@@ -649,7 +656,7 @@ TODO
 Services may want to pass around references to not just individual functions (using the <<type-func,`func` type>>), but references to whole services. In this case, Candid types can be used to declare the complete interface of such a service.
 
 Type syntax::
-+
+[source]
 ....
 service {
   add : (nat) -> ();
@@ -658,11 +665,11 @@ service {
   subscribe : (func (int) -> ()) -> ();
 }
 ....
-+
+
 See Section “<<candid-service-descriptions>>” for more details on the syntax of a service type.
 
 Textual syntax::
-+
+[source]
 ....
 service "w7x7r-cok77-xa"
 service "zwigo-aiaaa-aaaaa-qaa3a-cai"
@@ -682,7 +689,7 @@ The supertypes of a service type are those service types that may have some meth
 Corresponding Motoko type::
 
 Service types in Candid correspond directly to `actor` types in Motoko:
-+
+[source, motoko]
 ....
 actor {
   add : shared Nat -> async ()
@@ -711,7 +718,7 @@ Type syntax::
 
 
 Textual syntax::
-+
+[source]
 ....
 principal "w7x7r-cok77-xa"
 principal "zwigo-aiaaa-aaaaa-qaa3a-cai"
@@ -761,16 +768,19 @@ Corresponding JavaScript values::
 TODO
 
 The `reserved` type can be used to remove method arguments. Consider a method with signature
+[source]
 ....
 service { foo : (first_name : text, middle_name : text, last_name : text) -> () }
 ....
 and assume you no longer care about the `middle_name`. Although Candid will not prevent you from changing the signature to
+[source]
 ....
 service { foo : (first_name : text, last_name : text) -> () }
 ....
 it would be disastrous: If a client talks to you using the old interface, you will silently ignore the `last_name` and take the `middle_name` as the `last_name`. Remember that method parameter names are just convention, and method arguments are identified by their position.
 
 Instead, you can use
+[source]
 ....
 service { foo : (first_name : text, middle_name : reserved, last_name : text) -> () }
 ....
@@ -778,10 +788,12 @@ to indicate that `foo` used to take a second argument, but you no longer care ab
 
 
 You can avoid this pitfall by adopting the pattern any function that is anticipated to have changing arguments, or whose arguments can only be distinguished by position, not type,  is declared to take a single record, i.e.
+[source]
 ....
 service { foo : (record { first_name : text; middle_name : text; last_name : text}) -> () }
 ....
 Now, changing that to
+[source]
 ....
 service { foo : (record { first_name : text; last_name : text}) -> () }
 ....
@@ -821,6 +833,7 @@ TODO
 
 Practical uses of the `empty` type are relatively rare.
 It could be used to mark a method as “never returns successful”:
+[source]
 ....
 service : {
   always_fails () -> (empty)

@@ -1,4 +1,5 @@
 = How to
+:!page-repl:
 
 As discussed in link:[], Candid provides a language-agnostic way to interact with canisters.
 By using Candid, you can specify input argument values and display return values from canister methods regardless of whether you interact with the {IC} from a terminal using the `+dfx+` command-line interface, through a web browser, or from a program written in JavaScript, {proglang}, Rust, or other language.
@@ -17,6 +18,7 @@ When you pass Candid textual values on the command-line, you can specify multipl
 For example, specifying `+(42, true)+` represents two argument values, where the first argument is the number `+42+` and the second argument is a boolean value of `+true+`.
 
 The following example illustrates using the `+dfx canister call+` command to call the `+msgt2-6nlzx-xq+` canister service and pass arguments for the `+add_entry+` method:
+[source, bash]
 ....
 dfx canister call msgt2-6nlzx-xq add_entry ("John Doe", record { street = "Hauptstraße", city = "Zürich" })
 ....
@@ -64,6 +66,7 @@ If you write a program for a service in Rust, you need to write the Candid servi
 You can then reference the service description in your project's `+dfx.json+` configuration file using the `+candid+` key.
 
 For example, if you have a Hello, World! program, you might manually create a service description in a text editor that looks like this:
+[source, candid]
 ....
 service : {
     "print": () -> () query;
@@ -71,6 +74,7 @@ service : {
 ....
 
 You could configure the project `+dfx.json+` file to set the path to the service description like this:
+[source, json]
 ....
   "canisters": {
     "rust_hello": {
@@ -98,6 +102,7 @@ In addition to the Candid implementations for Motoko, Rust, and JavaScript, ther
 * link:https://hackage.haskell.org/package/candid[Haskell]
 * link:https://github.com/chenyan2002/ic-elm/[Elm]
 * link:https://github.com/seniorjoinu/candid-kt[Kotlin]
+* link:https://github.com/rckprtr/cdk-as/tree/master/packages/cdk/assembly/candid[AssemblyScript]
 
 If you want to create a Candid implementation to support a language or tool for which an implementation is not currently available, you should consult the https://github.com/dfinity/candid/blob/master/spec/Candid.md[Candid specification].
 

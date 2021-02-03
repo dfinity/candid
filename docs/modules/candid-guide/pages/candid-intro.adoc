@@ -1,4 +1,5 @@
 = Candid
+:!page-repl:
 
 Welcome to the Candid documentation for application developers. 
 
