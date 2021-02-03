@@ -24,6 +24,7 @@ A list of community maintained Candid libraries:
 * [Haskell](https://github.com/nomeata/haskell-candid)
 * [Elm](https://github.com/chenyan2002/ic-elm/)
 * [Kotlin](https://github.com/seniorjoinu/candid-kt)
+* [AssemblyScript](https://github.com/rckprtr/cdk-as/tree/master/packages/cdk/assembly/candid)
 
 ## Tools
 
