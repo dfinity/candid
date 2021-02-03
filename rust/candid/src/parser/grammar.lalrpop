@@ -3,7 +3,7 @@ use super::typing::{check_unique, TypeEnv};
 use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg, IDLTypes};
 use super::test::{Assert, Input, Test};
 use super::token::{Token, error2, LexicalError, Span};
-use crate::{idl_hash, Principal, types::Label};
+use crate::{Principal, types::Label};
 
 grammar;
 
@@ -238,7 +238,7 @@ FuncMode: FuncMode = {
 ActorTyp: Vec<Binding> = {
     "{" <mut fs:Sp<SepBy<MethTyp, ";">>> "}" =>? {
         let span = fs.1.clone();
-        fs.0.sort_unstable_by_key(|Binding { id, .. }| idl_hash(id));
+        fs.0.sort_unstable_by_key(|Binding { id, .. }| id.clone());
         let labs: Vec<_> = fs.0.iter().map(|f| Label::Named(f.id.clone())).collect();
         check_unique(labs.iter()).map_err(|e| error2(e, span))?;
         Ok(fs.0)

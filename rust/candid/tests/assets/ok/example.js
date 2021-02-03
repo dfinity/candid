@@ -21,8 +21,8 @@ export default ({ IDL }) => {
         [IDL.Text],
         [
           IDL.Service({
-            'up' : IDL.Func([], [], []),
             'current' : IDL.Func([], [IDL.Nat32], []),
+            'up' : IDL.Func([], [], []),
           }),
         ],
         [],

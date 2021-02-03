@@ -223,7 +223,7 @@ checksum = "b700ce4376041dcd0a327fd0097c41095743c4c8af8887265942faf1100bd040"
 
 [[package]]
 name = "candid"
-version = "0.6.14"
+version = "0.6.15"
 dependencies = [
  "arbitrary",
  "byteorder",
