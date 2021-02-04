@@ -268,7 +268,7 @@ In the <<candid-service-descriptions,section above>>, you learned how to write a
 
 For example, in Motoko, you can write a canister like this:
 
-[source]
+[source, motoko]
 ....
 actor {
   var v : Int = 0;
