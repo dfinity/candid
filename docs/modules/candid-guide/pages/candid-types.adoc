@@ -475,15 +475,21 @@ Subtypes::
 Subtypes of a record are record types that have additional fields (of any type), where some field’s types are changed to subtypes, or where optional fields are removed. It is, however, bad practice to remove optional fields in method results. You can change a field's type to `opt empty` to indicate that this field is no longer used.
 +
 For example, if you have a function returning a record of of the following type:
-+
+
+[source]
 ....
-record { first_name : text; middle_name : opt text; second_name : text; score : int }
+record {
+  first_name : text; middle_name : opt text; second_name : text; score : int
+}
 ....
-+
+
 you can evolve that to a function returning a record of the following type:
-+
+
+[source]
 ....
-record { first_name : text; middle_name : opt empty; second_name : text; score : nat; country : text }
+record {
+  first_name : text; middle_name : opt empty; second_name : text; score : nat; country : text
+}
 ....
 
 where we have deprecated the `middle_name` field, change the type of `score` and added the `country` field.
@@ -560,7 +566,9 @@ is equivalent to:
 
 [source]
 ....
-type season = variant { spring : null; summer: null; fall: null; winter : null }
+type season = variant {
+  spring : null; summer: null; fall: null; winter : null
+}
 ....
 
 and used to represent enumerations.
@@ -592,14 +600,20 @@ Subtypes of a variant type are variant types with some tags removed, and the typ
 +
 If you want to be able to _add_ new tags in variants in a method result, you can do so if the variant is itself wrapped in `opt …`. This requires planning ahead! When you design an interface, instead of writing:
 
+[source]
 ....
-service { get_member_status (member_id : nat) -> (variant {active; expired}); }
+service {
+  get_member_status (member_id : nat) -> (variant {active; expired});
+}
 ....
 
 it is better to use this:
 
+[source]
 ....
-service { get_member_status (member_id : nat) -> (opt variant {active; expired}); }
+service {
+  get_member_status (member_id : nat) -> (opt variant {active; expired});
+}
 ....
 
 This way, if you later need to add a `honorary` membership status, you can expand the list of statuses. Old clients will receive unknown fields as `null`.
@@ -824,14 +838,18 @@ The `reserved` type can be used to remove method arguments. Consider a method wi
 
 [source]
 ....
-service { foo : (first_name : text, middle_name : text, last_name : text) -> () }
+service {
+  foo : (first_name : text, middle_name : text, last_name : text) -> ()
+}
 ....
 
 and assume you no longer care about the `middle_name`. Although Candid will not prevent you from changing the signature to this:
 
 [source]
 ....
-service { foo : (first_name : text, last_name : text) -> () }
+service {
+  foo : (first_name : text, last_name : text) -> ()
+}
 ....
 it would be disastrous: If a client talks to you using the old interface, you will silently ignore the `last_name` and take the `middle_name` as the `last_name`. Remember that method parameter names are just convention, and method arguments are identified by their position.
 
@@ -839,7 +857,9 @@ Instead, you can use:
 
 [source]
 ....
-service { foo : (first_name : text, middle_name : reserved, last_name : text) -> () }
+service {
+  foo : (first_name : text, middle_name : reserved, last_name : text) -> ()
+}
 ....
 
 to indicate that `foo` used to take a second argument, but you no longer care about that.
@@ -849,14 +869,18 @@ For example:
 
 [source]
 ....
-service { foo : (record { first_name : text; middle_name : text; last_name : text}) -> () }
+service {
+  foo : (record { first_name : text; middle_name : text; last_name : text}) -> ()
+}
 ....
 
 Now, changing the signature to this:
 
 [source]
 ....
-service { foo : (record { first_name : text; last_name : text}) -> () }
+service {
+  foo : (record { first_name : text; last_name : text}) -> ()
+}
 ....
 
 does the right thing, and you don’t even need to keep a record of the removed argument around.

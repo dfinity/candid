@@ -5,8 +5,20 @@ As discussed in link:[], Candid provides a language-agnostic way to interact wit
 By using Candid, you can specify input argument values and display return values from canister methods regardless of whether you interact with the {IC} from a terminal using the `+dfx+` command-line interface, through a web browser, or from a program written in JavaScript, {proglang}, Rust, or other language.
 Now that you are familiar with what Candid is and how it works, this section provides instructions for how to use it in some common scenarios.
 
+As a concrete example, we assume there is a `counter` canister already deployed on the network with the following
+Candid interface:
+
+[source, candid]
+....
+service Counter : {
+  inc : (step: nat) -> (nat);
+}
+....
+
+We will show how to interact with this canister in various scenarios with the help of Candid.
+
 [[idl-syntax]]
-== Pass arguments in a terminal 
+== Interact with a service in a terminal
 
 One of the most common ways you interact with canisters and the {IC} is by using the {company-id} Canister SDK `+dfx+` command-line interface.
 
@@ -17,12 +29,23 @@ When you run the `+dfx canister call+` command, you can pass arguments to a meth
 When you pass Candid textual values on the command-line, you can specify multiple argument values separated by commas (`+,+`) and wrapped inside parentheses.
 For example, specifying `+(42, true)+` represents two argument values, where the first argument is the number `+42+` and the second argument is a boolean value of `+true+`.
 
-The following example illustrates using the `+dfx canister call+` command to call the `+msgt2-6nlzx-xq+` canister service and pass arguments for the `+add_entry+` method:
+The following example illustrates using the `+dfx canister call+` command to call the `+counter+` canister service and pass arguments for the `+inc+` method:
 
 [source, bash]
 ....
-dfx canister call msgt2-6nlzx-xq add_entry \
-  '("John Doe", record { street = "Hauptstraße", city = "Zürich" })'
+$ dfx canister call counter inc '(42)'
+(43)
+....
+
+You can also omit the arguments and let dfx generate a random value that matches the method type:
+
+[source, bash]
+....
+$ dfx canister call counter inc
+Unspecified argument, sending the following random argument:
+(1_543_454_453)
+
+(1_543_454_454)
 ....
 
 For more information about using `+dfx+` and the `+dfx canister call+` command, see link:../developers-guide/cli-reference{outfilesuffix}[Command-line reference] and link:../developers-guide/cli-reference/dfx-canister{outfilesuffix}[dfx canister] documentation.
@@ -54,50 +77,95 @@ For example, if a function takes an array, you might need to specify the number 
 
 For more information about the tool that creates a Web interface from the Candid interface of any canister, see the link:https://github.com/dfinity/candid/tree/master/tools/ui[Candid UI] repository.
 
-== Generate a service description for a Motoko canister
+== Interact with a service from a Motoko canister
 
-If you are writing a service from scratch in Motoko, the Motoko compiler automatically translates the signature of your canister’s top-level actor or actor class into a Candid description, and the `+dfx build+` command ensures that the service description is properly referenced where it needs to be.
+If you are writing a service in Motoko, the Motoko compiler automatically translates the signature of your canister’s top-level `actor` or `actor class` into a Candid description, and the `+dfx build+` command ensures that the service description is properly referenced where it needs to be.
 
-For example, if you have a multi-canister project written in {proglang}, `+dfx build+` ensure that any clients of your Motoko service import the generated Candid description of that service.
+For example, if you want to write a `hello` canister in {proglang} that calls the `counter` canister in {proglang}:
 
-If you want to implement a _specific_ interface, for example because you want to interact with a service that expects your canister to have that interface, you can consult the link:candid-types{outfilesuffix}[Supported types] reference section to determine which Motoko types to use to achieve this effect. In the future, this will be simplified.
+[source, motoko]
+....
+import Counter "canister:Counter";
+import Nat "mo:base/Nat";
+actor {
+  public func greet() : async Text {
+    let result = await Counter.inc(1);
+    "The current counter is " # Nat.toText(result)
+  };
+}
+....
 
-== Create a service description for a Rust canister
+The import dependency of counter canister is handled by `+dfx build+`, which ensures that the canister id and the Candid
+description is correctly feed into the {proglang} compiler. The {proglang} compiler then translate the Candid type into
+native Motoko type and enables you to call the `inc` method natively, even if the counter canister is implemented in a
+different language and you do not have the source code. For additional information on the type mapping
+between Candid and {proglang}, you can consult the link:candid-types{outfilesuffix}[Supported types] reference section.
 
-If you write a program for a service in Rust, you need to write the Candid service description manually following the conventions described in the link:https://github.com/dfinity/candid[Candid specification].
-You can then reference the service description in your project's `+dfx.json+` configuration file using the `+candid+` key.
+The {proglang} compiler and `+dfx build+` also auto-generate the Candid description for the `hello` canister to allow
+other canisters or tools to interact with the `hello` canister seamlessly. The generated Candid description is located
+in your project build directory at `.dfx/local/canisters/hello/hello.did`.
 
-For example, if you have a Hello, World! program, you might manually create a service description in a text editor that looks like this:
+== Interact with a service from a Rust canister
+
+If you write a canister in Rust, the `+dfx build+` command ensures that the service description is properly referenced where it needs to be. However, you need to write the Candid service description manually following the conventions described in the link:https://github.com/dfinity/candid/blob/master/spec/Candid.md#core-grammar[Candid specification].
+
+For example, if you want to write a `hello` canister in {proglang} that calls the `counter` canister in {proglang}:
+
+[source, rust]
+....
+use ic_cdk_macros::*;
+
+#[import(canister = "counter")]
+struct Counter;
+
+#[update]
+async fn greet() -> String {
+    let result = Counter::inc(1.into()).await;
+    format!("The current counter is {}", result)
+}
+....
+
+The import dependency of counter canister is handled by `+dfx build+`, which ensures that the canister id and the Candid
+description is correctly feed into the Rust CDK. The Rust CDK then translate the Candid type into
+native Rust type and enables you to call the `inc` method natively, even if the counter canister is implemented in a
+different language and you do not have the source code. For additional information on the type mapping
+between Candid and Rust, you can consult the link:candid-types{outfilesuffix}[Supported types] reference section.
+
+For other canisters and tools to interact with the `hello` canister, you need to manually create a `.did` file:
 
 [source, candid]
 ....
 service : {
-    "print": () -> () query;
+    greet : () -> (text);
 }
 ....
 
-You could configure the project `+dfx.json+` file to set the path to the service description like this:
+There is also an experimental feature to generate Candid service description automatically, see this https://github.com/dfinity/candid/blob/master/rust/candid/tests/types.rs#L99[test case] as an example.
 
-[source, json]
+For additional information and libraries to help you create Candid services or canisters in Rust, see the documentation for the https://docs.rs/candid/[Candid crate], link:https://github.com/dfinity/cdk-rs/tree/next/examples[Rust CDK examples] and the link:../rust-guide/rust-intro{outfilesuffix}[Rust tutorials].
+
+== Interact with a service from JavaScript
+
+The https://www.npmjs.com/package/@dfinity/agent[dfinity/agent npm package] includes support for
+importing canisters via Candid.
+
+For example, if you want to call the `counter` canister, you can write the following JavaScript program:
+
+[source, javascript]
 ....
-  "canisters": {
-    "rust_hello": {
-      "build": "cargo build --target wasm32-unknown-unknown --package rust_hello",
-      "candid": "src/rust_hello/rust_hello.did",
-      "wasm": "target/wasm32-unknown-unknown/debug/rust_hello.wasm",
-      "type": "custom"
-    }
+import counter from 'ic:canisters/counter';
+import BigNumber from 'bignumber.js';
+async () => {
+  const result = await counter.inc(new BigNumber(42));
+  console.log("The current counter is " + result.toString());
+}
 ....
 
-For examples of how to write Candid service descriptions for Rust programs, see the link:https://github.com/dfinity/cdk-rs/tree/next/examples[Rust CDK examples] and the link:../rust-guide/rust-intro{outfilesuffix}[Rust tutorials].
-
-For additional information and libraries to help you create Candid services or clients in Rust, you can download and use the https://crates.io/crates/candid[Candid crate].
-
-== Use Candid for a JavaScript front-end
-
-TODO: How to use Candid with JavaScript front-end canisters
-
-The https://github.com/dfinity/agent-js/[Internet Computer agent library for JavaScript] includes support for Candid.
+The import dependency of counter canister is handled by `+dfx build+` and `webpack`, which ensures that the canister id and the Candid description is correctly feed into the JavaScript program. Behind the scenes, the Candid service description is
+translated into a JavaScript module, located at `.dfx/local/canister/counter/counter.did.js`, by `+dfx build+`. The `dfinity/agent` package then translate the Candid type into
+native JavaScript values and enables you to call the `inc` method natively, even if the counter canister is implemented in a
+different language and you do not have the source code. For additional information on the type mapping
+between Candid and JavaScript, you can consult the link:candid-types{outfilesuffix}[Supported types] reference section.
 
 == Create a new Candid implementation
 
@@ -110,4 +178,4 @@ In addition to the Candid implementations for Motoko, Rust, and JavaScript, ther
 
 If you want to create a Candid implementation to support a language or tool for which an implementation is not currently available, you should consult the https://github.com/dfinity/candid/blob/master/spec/Candid.md[Candid specification].
 
-If you add a Candid implementation for a new language or toll, you can use the official https://github.com/dfinity/candid/tree/master/test[Candid test data] to test and verify that your implementation is compatible with Candid, even in slightly more obscure corner cases.
+If you add a Candid implementation for a new language or tool, you can use the official https://github.com/dfinity/candid/tree/master/test[Candid test data] to test and verify that your implementation is compatible with Candid, even in slightly more obscure corner cases.
