@@ -884,7 +884,7 @@ service { <name> : <functype>; <methtype>;* } <: service { <name> : <functype'>;
 
 This subtyping is implemented during the deserialisation of Candid at an expected type. As described in [Section Deserialisation](#deserialisation), the binary value is conceptually first _decoded_ into the actual type and a value of that type, and then that value is _coerced_ into the expected type.
 
-To model this, we defined, for every `t1, t2` with `t1 <: t2`, the function `c[t1<:t2] : t1 -> t2`. This function maps values of type `t1` to values of type `t2`, and is indeed total.
+To model this, we define, for every `t1, t2` with `t1 <: t2`, a function `c[t1<:t2] : t1 -> t2`. This function maps values of type `t1` to values of type `t2`, and is indeed total.
 
 to describe these values, we re-use the syntax of the textual representation, and use the the `<annval>` syntax (i.e. `(v : t)`) if necessary to resolve overloading.
 
