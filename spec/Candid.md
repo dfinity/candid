@@ -975,7 +975,7 @@ Whole argument and result sequences are coerced with the same rules as tuple-lik
 
 ```
 c[(<t>,*) <: (<t'>,*)]((<v>,*)) = (<v'>,*)
-    if c[record {<t>;*} ~> record {<t'>,*}](record {<v>;*}) = record {<v'>;*}
+    if c[record {<t>;*} <: record {<t'>,*}](record {<v>;*}) = record {<v'>;*}
 ```
 
 
