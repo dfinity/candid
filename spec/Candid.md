@@ -954,8 +954,8 @@ c[record { <nat1> = <t1>;* <nat2> = <t2>;* } <: record { <nat1> = <t1'>;* <nat3>
 Only a variant value with an expected tag coerces at variant type.
 
 ```
-c[variant { <nat> = <t>;* _;* } <: variant { <nat> = <t'>;* _;* }](variant { <natN> = <v> })
-    = variant { <natN> = c[<tN> <: <t'N>](<v>) }
+c[variant { <nat> = <t>; _;* } <: variant { <nat> = <t'>; _;* }](variant { <nat> = <v> })
+    = variant { <nat> = c[<t> <: <t'>](<v>) }
 ```
 
 
