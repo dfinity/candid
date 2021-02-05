@@ -25,7 +25,7 @@ export interface nested {
     { 'C' : null },
   _42_ : BigNumber,
 };
-export default interface {
+export default interface _SERVICE {
   'f' : (arg_0: Array<number>, arg_1: [] | [boolean]) => Promise<undefined>,
   'g' : (
       arg_0: my_type,

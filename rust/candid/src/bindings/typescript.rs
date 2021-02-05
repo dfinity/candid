@@ -111,7 +111,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
 
 fn pp_actor(ty: &Type) -> RcDoc {
     match ty {
-        Type::Service(_) => kwd("export default interface").append(pp_ty(ty)),
+        Type::Service(_) => kwd("export default interface _SERVICE").append(pp_ty(ty)),
         Type::Var(id) => kwd("export default").append(str(id)),
         Type::Class(_, t) => pp_actor(t),
         _ => unreachable!(),

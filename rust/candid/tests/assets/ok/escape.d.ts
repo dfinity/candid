@@ -6,6 +6,6 @@ export interface t {
   '\"\'' : BigNumber,
   '\\\n\'\"' : BigNumber,
 };
-export default interface {
+export default interface _SERVICE {
   '\n\'\"\'\'\"\"\r\t' : (arg_0: t) => Promise<undefined>,
 };

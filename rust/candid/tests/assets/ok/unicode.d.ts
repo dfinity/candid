@@ -10,7 +10,7 @@ export type B = { '' : null } |
   { '空的' : null } |
   { '  空的  ' : null } |
   { '1⃣️2⃣️3⃣️' : null };
-export default interface {
+export default interface _SERVICE {
   '' : (arg_0: BigNumber) => Promise<BigNumber>,
   '✈️  🚗 ⛱️ ' : () => Promise<undefined>,
   '函数名' : (arg_0: A) => Promise<B>,

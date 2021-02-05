@@ -6,7 +6,7 @@ export type f = (
 export type g = f;
 export type h = (arg_0: f) => Promise<f>;
 export type o = [] | [o];
-export default interface {
+export default interface _SERVICE {
   'f' : (arg_0: BigNumber) => Promise<h>,
   'g' : f,
   'h' : g,
