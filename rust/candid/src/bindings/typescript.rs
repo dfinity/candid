@@ -114,8 +114,7 @@ fn pp_actor(ty: &Type) -> RcDoc {
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
-    let header = r#"// AUTO-GENERATED. DO NOT EDIT.
-import { Principal } from '@dfinity/agent';
+    let header = r#"import { Principal } from '@dfinity/agent';
 import BigNumber from 'bignumber.js';
 "#;
     let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
