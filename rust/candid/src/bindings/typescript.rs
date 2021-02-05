@@ -106,8 +106,8 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
 
 fn pp_actor(ty: &Type) -> RcDoc {
     match ty {
-        Type::Service(_) => pp_ty(ty),
-        Type::Var(id) => str(id),
+        Type::Service(_) => kwd("export interface SERVICE").append(pp_ty(ty)),
+        Type::Var(id) => kwd("export type SERVICE =").append(str(id)),
         Type::Class(_, t) => pp_actor(t),
         _ => unreachable!(),
     }
@@ -122,39 +122,8 @@ import BigNumber from 'bignumber.js';
     let defs = pp_defs(env, &def_list);
     let actor = match actor {
         None => RcDoc::nil(),
-        Some(actor) => kwd("export interface SERVICE")
-            .append(pp_actor(actor))
-            .append(";"),
+        Some(actor) => pp_actor(actor).append(";"),
     };
     let doc = RcDoc::text(header).append(defs).append(actor);
     doc.pretty(LINE_WIDTH).to_string()
-    /*
-    match actor {
-        None => {
-            let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
-            let doc = pp_defs(env, &def_list);
-            doc.pretty(LINE_WIDTH).to_string()
-        }
-        Some(actor) => {
-            let def_list = chase_actor(env, actor).unwrap();
-            let defs = pp_defs(env, &def_list);
-            let init = if let Type::Class(ref args, _) = actor {
-                args.as_slice()
-            } else {
-                &[][..]
-            };
-            let actor = kwd("export interface SERVICE").append(pp_actor(actor)).append(";");
-            let doc = defs.append(actor);
-            // export init args
-            let init_defs = chase_types(env, &init).unwrap();
-            let init_defs_doc = pp_defs(env, &init_defs);
-            let init_doc = kwd("return").append(pp_args(&init)).append(";");
-            let init_doc = init_defs_doc.append(init_doc);
-            let init_doc =
-                str("export const init = ({ IDL }) => ").append(enclose_space("{", init_doc, "};"));
-            let init_doc = init_doc.pretty(LINE_WIDTH).to_string();
-            let doc = doc.append(RcDoc::hardline()).append(init_doc);
-            doc.pretty(LINE_WIDTH).to_string()
-        }
-    }*/
 }
