@@ -1,6 +1,6 @@
-import { Principal } from '@dfinity/agent';
-import BigNumber from 'bignumber.js';
-export type s = {
+import type { Principal } from '@dfinity/agent';
+import type BigNumber from 'bignumber.js';
+export interface s {
   'next' : () => Promise<s>,
 };
-export type SERVICE = s;
+export default s;

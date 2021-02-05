@@ -77,7 +77,7 @@ fn pp_function(func: &Function) -> RcDoc {
         match func.rets.len() {
             0 => str("undefined"),
             1 => pp_ty(&func.rets[0]),
-            _ => enclose("[", concat(func.args.iter().map(pp_ty), ","), "]"),
+            _ => enclose("[", concat(func.rets.iter().map(pp_ty), ","), "]"),
         },
         ">",
     ));
@@ -96,26 +96,31 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
-        kwd("export type")
-            .append(ident(id))
-            .append(kwd("="))
-            .append(pp_ty(ty))
-            .append(";")
+        let export = match ty {
+            Type::Record(_) | Type::Service(_) => {
+                kwd("export interface").append(ident(id)).append(pp_ty(ty))
+            }
+            _ => kwd("export type")
+                .append(ident(id))
+                .append("= ")
+                .append(pp_ty(ty)),
+        };
+        export.append(";")
     }))
 }
 
 fn pp_actor(ty: &Type) -> RcDoc {
     match ty {
-        Type::Service(_) => kwd("export interface SERVICE").append(pp_ty(ty)),
-        Type::Var(id) => kwd("export type SERVICE =").append(str(id)),
+        Type::Service(_) => kwd("export default interface").append(pp_ty(ty)),
+        Type::Var(id) => kwd("export default").append(str(id)),
         Type::Class(_, t) => pp_actor(t),
         _ => unreachable!(),
     }
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
-    let header = r#"import { Principal } from '@dfinity/agent';
-import BigNumber from 'bignumber.js';
+    let header = r#"import type { Principal } from '@dfinity/agent';
+import type BigNumber from 'bignumber.js';
 "#;
     let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
     let defs = pp_defs(env, &def_list);

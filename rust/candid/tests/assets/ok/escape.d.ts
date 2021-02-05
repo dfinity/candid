@@ -1,11 +1,11 @@
-import { Principal } from '@dfinity/agent';
-import BigNumber from 'bignumber.js';
-export type t = {
+import type { Principal } from '@dfinity/agent';
+import type BigNumber from 'bignumber.js';
+export interface t {
   '\"' : BigNumber,
   '\'' : BigNumber,
   '\"\'' : BigNumber,
   '\\\n\'\"' : BigNumber,
 };
-export interface SERVICE {
+export default interface {
   '\n\'\"\'\'\"\"\r\t' : (arg_0: t) => Promise<undefined>,
 };

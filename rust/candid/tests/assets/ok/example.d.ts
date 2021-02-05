@@ -1,9 +1,9 @@
-import { Principal } from '@dfinity/agent';
-import BigNumber from 'bignumber.js';
+import type { Principal } from '@dfinity/agent';
+import type BigNumber from 'bignumber.js';
 export type List = [] | [
   { 'head' : BigNumber, 'tail' : List }
 ];
-export type broker = {
+export interface broker {
   'find' : (arg_0: string) => Promise<
       { 'current' : () => Promise<number>, 'up' : () => Promise<undefined> }
     >,
@@ -13,7 +13,7 @@ export type f = (
     arg_1: (arg_0: number) => Promise<BigNumber>,
   ) => Promise<[] | [List]>;
 export type my_type = Principal;
-export type nested = {
+export interface nested {
   _0_ : BigNumber,
   _1_ : BigNumber,
   _2_ : [BigNumber, BigNumber],
@@ -25,14 +25,14 @@ export type nested = {
     { 'C' : null },
   _42_ : BigNumber,
 };
-export interface SERVICE {
+export default interface {
   'f' : (arg_0: Array<number>, arg_1: [] | [boolean]) => Promise<undefined>,
   'g' : (
       arg_0: my_type,
       arg_1: List,
       arg_2: [] | [List],
       arg_3: nested,
-    ) => Promise<[my_type, List, [] | [List], nested]>,
+    ) => Promise<[BigNumber, broker]>,
   'h' : (
       arg_0: Array<[] | [string]>,
       arg_1: { 'A' : BigNumber } |

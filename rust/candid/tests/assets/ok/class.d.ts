@@ -1,9 +1,9 @@
-import { Principal } from '@dfinity/agent';
-import BigNumber from 'bignumber.js';
+import type { Principal } from '@dfinity/agent';
+import type BigNumber from 'bignumber.js';
 export type List = [] | [
   [BigNumber, List]
 ];
-export interface SERVICE {
+export default interface {
   'get' : () => Promise<List>,
   'set' : (arg_0: List) => Promise<List>,
 };
