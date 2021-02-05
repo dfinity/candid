@@ -19,7 +19,7 @@ enum Command {
     Bind {
         /// Specifies did file for code generation
         input: PathBuf,
-        #[structopt(short, long, possible_values = &["js", "did"])]
+        #[structopt(short, long, possible_values = &["js", "ts", "did"])]
         /// Specifies target language
         target: String,
     },
@@ -160,6 +160,7 @@ fn main() -> Result<()> {
             let actor = check_file(&mut env, &input)?;
             let content = match target.as_str() {
                 "js" => candid::bindings::javascript::compile(&env, &actor),
+                "ts" => candid::bindings::typescript::compile(&env, &actor),
                 "did" => candid::bindings::candid::compile(&env, &actor),
                 _ => unreachable!(),
             };
