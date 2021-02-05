@@ -897,7 +897,7 @@ c[<t> <: <t>](x) = x    for every <t> ∈ <numtype>, bool, text, null
 
 Values of type `nat` coerce at type `int`:
 ```
-c[nat <: int](x) = x
+c[nat <: int](<nat>) = <nat>
 ```
 
 Coercion into `reserved` is the constant map (this is arbitrarily using `null` as “the” value of `reserved`):
