@@ -4,3 +4,4 @@
 pub mod analysis;
 pub mod candid;
 pub mod javascript;
+pub mod typescript;
