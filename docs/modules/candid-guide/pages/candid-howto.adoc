@@ -5,7 +5,7 @@ As discussed in link:[], Candid provides a language-agnostic way to interact wit
 By using Candid, you can specify input argument values and display return values from canister methods regardless of whether you interact with the {IC} from a terminal using the `+dfx+` command-line interface, through a web browser, or from a program written in JavaScript, {proglang}, Rust, or other language.
 Now that you are familiar with what Candid is and how it works, this section provides instructions for how to use it in some common scenarios.
 
-As a concrete example, we assume there is a `counter` canister already deployed on the network with the following
+As a concrete example, let's assume there is a `counter` canister already deployed on the network with the following
 Candid interface:
 
 [source, candid]
@@ -37,7 +37,7 @@ $ dfx canister call counter inc '(42)'
 (43)
 ....
 
-You can also omit the arguments and let dfx generate a random value that matches the method type:
+You can also omit the arguments and let `dfx` generate a random value that matches the method type. For example:
 
 [source, bash]
 ....
@@ -95,13 +95,12 @@ actor {
 }
 ....
 
-The import dependency of counter canister is handled by `+dfx build+`, which ensures that the canister id and the Candid
-description is correctly feed into the {proglang} compiler. The {proglang} compiler then translate the Candid type into
-native Motoko type and enables you to call the `inc` method natively, even if the counter canister is implemented in a
-different language and you do not have the source code. For additional information on the type mapping
+In this example, when the import dependency on the `counter` canister— the `import Counter "canister:Counter"` declaration—is processed by the `+dfx build+` command, the `+dfx build+` command ensures that the `counter` canister identifier and the Candid description are passed to the {proglang} compiler correctly .
+The {proglang} compiler then translates the Candid type into the appropriate native Motoko type. This translation enables you to call the `inc` method natively—as if it were a Motoko function—even if the `counter` canister is implemented in a different language and even if you do not have the source code for the imported canister.
+For additional information on the type mapping
 between Candid and {proglang}, you can consult the link:candid-types{outfilesuffix}[Supported types] reference section.
 
-The {proglang} compiler and `+dfx build+` also auto-generate the Candid description for the `hello` canister to allow
+The {proglang} compiler and `+dfx build+` command also auto-generate the Candid description for the `hello` canister to allow
 other canisters or tools to interact with the `hello` canister seamlessly. The generated Candid description is located
 in your project build directory at `.dfx/local/canisters/hello/hello.did`.
 
@@ -147,7 +146,7 @@ For additional information and libraries to help you create Candid services or c
 == Interact with a service from JavaScript
 
 The https://www.npmjs.com/package/@dfinity/agent[dfinity/agent npm package] includes support for
-importing canisters via Candid.
+importing canisters using Candid.
 
 For example, if you want to call the `counter` canister, you can write the following JavaScript program:
 
@@ -161,7 +160,7 @@ async () => {
 }
 ....
 
-The import dependency of counter canister is handled by `+dfx build+` and `webpack`, which ensures that the canister id and the Candid description is correctly feed into the JavaScript program. Behind the scenes, the Candid service description is
+When the import dependency of counter canister is processed by the `+dfx build+` command and the `webpack`configuration, this processing ensures that the canister id and the Candid description are passed to the JavaScript program correctly. Behind the scenes, the Candid service description is
 translated into a JavaScript module, located at `.dfx/local/canister/counter/counter.did.js`, by `+dfx build+`. The `dfinity/agent` package then translate the Candid type into
 native JavaScript values and enables you to call the `inc` method natively, even if the counter canister is implemented in a
 different language and you do not have the source code. For additional information on the type mapping
