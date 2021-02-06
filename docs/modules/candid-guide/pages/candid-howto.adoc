@@ -56,24 +56,21 @@ For more information about using `+dfx+` and the `+dfx canister call+` command, 
 The Candid interface description language provides a common language for specifying the signature of a canister service.
 Based on the type signature of that service, Candid provides a web interface—the Candid UI—that allows you to call canister functions for testing and debugging from a web browser without writing any front-end code.
 
-To use the Candid web interface to test canister functions:
+To use the Candid web interface to test `counter `canister:
 
-. Deploy your project using the `+dfx canister install+` command and copy the canister identifier associated with the main program for your application.
+. Find the canister identifier associated with the `counter` canister using the `dfx canister id counter` command.
 . Open a browser and navigate to the address and port number specified in the `+dfx.json+` configuration file.
 +
 By default, the `+local+` network binds to the `+127.0.0.1:8000+` address and port number.
 . Add the `+candid+` endpoint to access the Candid web interface followed by the required `canisterId` parameter and canister identifier.
 +
-For example, the full URL should look similar to the following but with the `+canister_identifier+` that was returned by the `+dfx canister install+` command:
+For example, the full URL should look similar to the following but with the `+canister_identifier+` that was returned by the `+dfx canister id+` command:
 +
 ....
 http://127.0.0.1:8000/candid?canisterId=<YOUR-CANISTER-IDENTIFIER>
 ....
 . Review the list of function calls and types defined in the program.
 . Type a value of the appropriate type for a function or click *Random* to generate a value, then click *Call* or *Query* to see the result.
-+
-Note that depending on the data type, the Candid interface might display additional configuration settings for testing functions. 
-For example, if a function takes an array, you might need to specify the number of items in the array before entering values.
 
 For more information about the tool that creates a Web interface from the Candid interface of any canister, see the link:https://github.com/dfinity/candid/tree/master/tools/ui[Candid UI] repository.
 
