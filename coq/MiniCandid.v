@@ -185,7 +185,7 @@ Function coerce (t1 : T) (t2 : T) (v1 : V) : V :=
     then SomeV (coerce t1 t2 v)
     else NullV
   
-  (* We’d prefer the equation from [coerce_consituent_eq] below,
+  (* We’d prefer the equation from [coerce_constituent_eq] below,
      but that will not satisfy the termination checker,
      so let’s repeat all the above ruls for OptT again.
   *)
@@ -203,7 +203,7 @@ Function coerce (t1 : T) (t2 : T) (v1 : V) : V :=
   end.
 
 (* We can prove the desired equation at least as an equality *)
-Lemma coerce_consituent_eq:
+Lemma coerce_constituent_eq:
   forall v t1 t2,
   v :: t1 ->
   is_opt_like_type t1 = false ->
@@ -301,7 +301,7 @@ Proof.
     [natIntST]: { apply NatIntC; clear_names. }
     [optST]: {
       (* oddly,
-        rewrite coerce_consituent_eq by (try named_constructor; reflexivity).
+        rewrite coerce_constituent_eq by (try named_constructor; reflexivity).
         does not seem to lead to a simpler proof here.
       *)
       destruct (is_opt_like_type t0) eqn:His_opt_like.
@@ -480,7 +480,7 @@ Fixpoint val_idx (p : Path) (v : V) : option V :=
   end.
 
 (**
-This is a lenitent variant, which is total (returning [NullV]
+This is a lenient variant, which is total (returning [NullV]
 when the path is invalid), which makes proofs simpler.
 
 It also ignores extra [The] on the path; this way one can 
@@ -500,7 +500,7 @@ Fixpoint val_idx' (p : Path) (v : V) : V :=
   end.
 
 (**
-The corresponding function for types, also lenitent.
+The corresponding function for types, also lenient.
 *)
 Fixpoint typ_idx' (p : Path) (t : T) : T :=
   match p with
@@ -610,7 +610,7 @@ Proof.
       repeat split.
       - right;  named_constructor.
       - assumption.
-      - rewrite coerce_consituent_eq by assumption.
+      - rewrite coerce_constituent_eq by assumption.
         rewrite H0.
         rewrite subtype_dec_true by assumption. congruence.
     * specialize (H3 _ _ H5).
@@ -623,7 +623,7 @@ Proof.
     repeat split.
     - left; reflexivity.
     - assumption.
-    - rewrite coerce_consituent_eq by assumption.
+    - rewrite coerce_constituent_eq by assumption.
       destruct H1.
       * rewrite H1. destruct (t1 <:? t2); reflexivity.
       * rewrite subtype_dec_false by assumption. reflexivity.
@@ -769,7 +769,7 @@ Proof.
       coerce tb tc v2 ~~ coerce ta tc v1
   )); intros; inversion HST2; subst; clear HST2.
   all: simpl.
-  all: try rewrite coerce_consituent_eq by assumption.
+  all: try rewrite coerce_constituent_eq by assumption.
   all: try rewrite coerce_reservedT.
   all: try rewrite subtype_dec_refl.
   all: try rewrite subtype_dec_true by assumption.
