@@ -9,9 +9,9 @@ export interface s {
   'g' : (arg_0: list) => Promise<[B, tree, stream]>,
 };
 export type stream = [] | [
-  { 'head' : BigNumber, 'next' : () => Promise<stream> }
+  { 'head' : BigNumber, 'next' : [Principal, string] }
 ];
-export type t = (arg_0: s) => Promise<undefined>;
+export type t = (arg_0: Principal) => Promise<undefined>;
 export type tree = {
     'branch' : { 'val' : BigNumber, 'left' : tree, 'right' : tree }
   } |

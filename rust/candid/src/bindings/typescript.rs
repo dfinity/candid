@@ -42,8 +42,8 @@ fn pp_ty(ty: &Type) -> RcDoc {
             " |",
         )
         .nest(INDENT_SPACE),
-        Func(ref func) => pp_function(func),
-        Service(ref serv) => pp_service(serv),
+        Func(_) => str("[Principal, string]"),
+        Service(_) => str("Principal"),
         Class(_, _) => unreachable!(),
         Knot(_) | Unknown => unreachable!(),
     }
@@ -65,29 +65,50 @@ fn pp_field(field: &Field) -> RcDoc {
         .append(pp_ty(&field.ty))
 }
 
-fn pp_function(func: &Function) -> RcDoc {
+fn as_ref_ty<'a>(env: &'a TypeEnv, t: &'a Type) -> RcDoc<'a> {
+    if let Type::Var(id) = t {
+        let ty = env.rec_find_type(id).unwrap();
+        match ty {
+            Type::Service(_) | Type::Func(_) => pp_ty(ty),
+            _ => pp_ty(t),
+        }
+    } else {
+        pp_ty(t)
+    }
+}
+
+fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
     let args = func
         .args
         .iter()
         .enumerate()
-        .map(|(i, ty)| RcDoc::text(format!("arg_{}: ", i)).append(pp_ty(ty)));
+        .map(|(i, ty)| RcDoc::text(format!("arg_{}: ", i)).append(as_ref_ty(env, ty)));
     let args = enclose("(", concat(args, ","), ")");
     let rets = str("Promise").append(enclose(
         "<",
         match func.rets.len() {
             0 => str("undefined"),
-            1 => pp_ty(&func.rets[0]),
-            _ => enclose("[", concat(func.rets.iter().map(pp_ty), ","), "]"),
+            1 => as_ref_ty(env, &func.rets[0]),
+            _ => enclose(
+                "[",
+                concat(func.rets.iter().map(|ty| as_ref_ty(env, ty)), ","),
+                "]",
+            ),
         },
         ">",
     ));
     args.append(" => ").append(rets).nest(INDENT_SPACE)
 }
 
-fn pp_service(serv: &[(String, Type)]) -> RcDoc {
+fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
     let doc = concat(
-        serv.iter()
-            .map(|(id, func)| quote_ident(id).append(kwd(":")).append(pp_ty(func))),
+        serv.iter().map(|(id, func)| {
+            let func = match func {
+                Type::Func(ref func) => pp_function(env, func),
+                _ => pp_ty(func),
+            };
+            quote_ident(id).append(kwd(":")).append(func)
+        }),
         ",",
     );
     enclose_space("{", doc, "}")
@@ -97,9 +118,14 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         let export = match ty {
-            Type::Record(_) | Type::Service(_) => {
-                kwd("export interface").append(ident(id)).append(pp_ty(ty))
-            }
+            Type::Record(_) => kwd("export interface").append(ident(id)).append(pp_ty(ty)),
+            Type::Service(ref serv) => kwd("export interface")
+                .append(ident(id))
+                .append(pp_service(env, serv)),
+            Type::Func(ref func) => kwd("export type")
+                .append(ident(id))
+                .append("= ")
+                .append(pp_function(env, func)),
             _ => kwd("export type")
                 .append(ident(id))
                 .append("= ")
@@ -109,11 +135,13 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
     }))
 }
 
-fn pp_actor(ty: &Type) -> RcDoc {
+fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
     match ty {
-        Type::Service(_) => kwd("export default interface _SERVICE").append(pp_ty(ty)),
+        Type::Service(ref serv) => {
+            kwd("export default interface _SERVICE").append(pp_service(env, serv))
+        }
         Type::Var(id) => kwd("export default").append(str(id)),
-        Type::Class(_, t) => pp_actor(t),
+        Type::Class(_, t) => pp_actor(env, t),
         _ => unreachable!(),
     }
 }
@@ -126,7 +154,7 @@ import type BigNumber from 'bignumber.js';
     let defs = pp_defs(env, &def_list);
     let actor = match actor {
         None => RcDoc::nil(),
-        Some(actor) => pp_actor(actor).append(";"),
+        Some(actor) => pp_actor(env, actor).append(";"),
     };
     let doc = RcDoc::text(header).append(defs).append(actor);
     doc.pretty(LINE_WIDTH).to_string()
