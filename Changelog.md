@@ -1,6 +1,18 @@
 
 # Changelog
 
+## 2021-02-11
+
+### Rust (0.6.16)
+
+* Typescript binding for Candid
+* Support more native Rust types: Path, PathBuf, VecDeque, LinkedList, BinaryHeap, Cow, Cell, RefCell
+
+### Other
+
+* Documentation for type mapping and howto section
+* `didc bind` to generate typescript binding
+
 ## 2021-02-01
 
 ### Rust (0.6.14 -- 0.6.15)
