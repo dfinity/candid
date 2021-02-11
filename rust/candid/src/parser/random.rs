@@ -57,19 +57,19 @@ pub struct GenState<'a> {
     size: isize,
 }
 impl<'a> GenState<'a> {
-    fn new(tree: &'a Configs, env: &'a TypeEnv) -> Result<Self> {
+    fn new(tree: &'a Configs, env: &'a TypeEnv) -> Self {
         let mut config = GenConfig::default();
         if let Some((global_config, _)) = tree.get::<GenConfig>(&[]) {
             config = config.update(global_config, false);
         }
-        Ok(GenState {
+        GenState {
             depth: config.depth.take().unwrap_or(5),
             size: config.size.take().unwrap_or(50),
             tree,
             config,
             env,
             path: Vec::new(),
-        })
+        }
     }
     // Update state and return the old config state. Label and var type are cost free.
     fn push_state(&mut self, ty: &Type, label: Option<String>) -> GenConfig {
@@ -216,7 +216,7 @@ impl IDLArgs {
         let mut args = Vec::new();
         for (i, t) in types.iter().enumerate() {
             let tree = tree.with_method(&i.to_string());
-            let mut state = GenState::new(&tree, env)?;
+            let mut state = GenState::new(&tree, env);
             let v = state.any(&mut u, t)?;
             args.push(v);
         }

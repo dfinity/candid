@@ -69,6 +69,34 @@ impl CandidType for String {
     }
 }
 
+impl CandidType for std::path::Path {
+    fn _ty() -> Type {
+        Type::Text
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::Error;
+        match self.to_str() {
+            Some(s) => s.idl_serialize(serializer),
+            None => Err(S::Error::custom("path contains invalid UTF-8 characters")),
+        }
+    }
+}
+
+impl CandidType for std::path::PathBuf {
+    fn _ty() -> Type {
+        Type::Text
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        self.as_path().idl_serialize(serializer)
+    }
+}
+
 impl<T: Sized> CandidType for Option<T>
 where
     T: CandidType,
@@ -81,25 +109,6 @@ where
         S: Serializer,
     {
         serializer.serialize_option(self.as_ref())
-    }
-}
-
-impl<T> CandidType for Vec<T>
-where
-    T: CandidType,
-{
-    fn _ty() -> Type {
-        Type::Vec(Box::new(T::ty()))
-    }
-    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
-    where
-        S: Serializer,
-    {
-        let mut ser = serializer.serialize_vec(self.len())?;
-        for e in self.iter() {
-            Compound::serialize_element(&mut ser, &e)?;
-        }
-        Ok(())
     }
 }
 
@@ -156,7 +165,7 @@ macro_rules! map_impl {
         }
     }
 }
-macro_rules! set_impl {
+macro_rules! seq_impl {
     ($ty:ident < K $(: $kbound1:ident $(+ $kbound2:ident)*)* $(, $typaram:ident : $bound:ident)* >) => {
         impl<K $(, $typaram)*> CandidType for $ty<K $(, $typaram)*>
         where
@@ -179,12 +188,17 @@ macro_rules! set_impl {
         }
     }
 }
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque};
 use std::hash::{BuildHasher, Hash};
 map_impl!(BTreeMap<K: Ord, V>);
-set_impl!(BTreeSet<K: Ord>);
 map_impl!(HashMap<K: Eq + Hash, V, H: BuildHasher>);
-set_impl!(HashSet<K: Eq + Hash, H: BuildHasher>);
+
+seq_impl!(Vec<K>);
+seq_impl!(VecDeque<K>);
+seq_impl!(LinkedList<K>);
+seq_impl!(BinaryHeap<K: Ord>);
+seq_impl!(BTreeSet<K: Ord>);
+seq_impl!(HashSet<K: Eq + Hash, H: BuildHasher>);
 
 macro_rules! array_impls {
     ($($len:tt)+) => {
@@ -266,7 +280,7 @@ where
 
 impl<'a, T> CandidType for &'a T
 where
-    T: 'a + ?Sized + CandidType,
+    T: ?Sized + CandidType,
 {
     fn id() -> TypeId {
         TypeId::of::<&T>()
@@ -279,6 +293,55 @@ where
         S: Serializer,
     {
         (**self).idl_serialize(serializer)
+    }
+}
+
+impl<'a, T> CandidType for std::borrow::Cow<'a, T>
+where
+    T: ?Sized + CandidType + ToOwned,
+{
+    fn _ty() -> Type {
+        T::ty()
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        (**self).idl_serialize(serializer)
+    }
+}
+
+impl<T> CandidType for std::cell::Cell<T>
+where
+    T: CandidType + Copy,
+{
+    fn _ty() -> Type {
+        T::ty()
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        self.get().idl_serialize(serializer)
+    }
+}
+
+impl<T> CandidType for std::cell::RefCell<T>
+where
+    T: CandidType,
+{
+    fn _ty() -> Type {
+        T::ty()
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::Error;
+        match self.try_borrow() {
+            Ok(v) => v.idl_serialize(serializer),
+            Err(_) => Err(S::Error::custom("already mutably borrowed")),
+        }
     }
 }
 

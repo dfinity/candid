@@ -190,7 +190,12 @@ impl IDLValue {
                 .map(|v| IDLValue::Opt(Box::new(v)))
                 .unwrap_or(IDLValue::None),
             // try consituent type
-            (v, Type::Opt(ty)) if !matches!(env.trace_type(ty)?, Type::Null|Type::Reserved|Type::Opt(_)) => {
+            (v, Type::Opt(ty))
+                if !matches!(
+                    env.trace_type(ty)?,
+                    Type::Null | Type::Reserved | Type::Opt(_)
+                ) =>
+            {
                 v.annotate_type(from_parser, env, ty)
                     .map(|v| IDLValue::Opt(Box::new(v)))
                     .unwrap_or(IDLValue::None)
