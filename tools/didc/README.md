@@ -15,6 +15,7 @@ SUBCOMMANDS:
     encode    Encode Candid value
     decode    Decode Candid binary data
     random    Generate random Candid values
+    call      Call canister method
     diff      Diff two Candid values
 ```
 
@@ -58,4 +59,14 @@ $ didc random -t '(int, text)' -c '{ range = Some [-10, +10], text = "name" }'
 
 $ didc random -d service.did -m method -f random.dhall -a '("seed argument")' -l js
 [new BigNumber('-4'), 'Marcus Kris']
+
+$ didc call rwlgt-iiaaa-aaaaa-aaaaa-cai
+service : { greet : (text) -> (text) }
+
+$ didc call rwlgt-iiaaa-aaaaa-aaaaa-cai greet '("name")'
+("Hello, name!")
+
+$ didc call -r ic rwlgt-iiaaa-aaaaa-aaaaa-cai greet -c '{ text = Some "name" }'
+Sending ("Godfrey Lebsack")
+("Hello, Godfrey Lebsack!")
 ```

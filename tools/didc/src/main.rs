@@ -1,8 +1,10 @@
 use anyhow::Result;
+use candid::parser::configs::Configs;
 use candid::{
     check_prog, parser::types::IDLTypes, pretty_parse, types::Type, Error, IDLArgs, IDLProg,
     TypeEnv,
 };
+use ic_agent::export::Principal;
 use std::path::{Path, PathBuf};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
@@ -56,18 +58,24 @@ enum Command {
     Random {
         #[structopt(flatten)]
         annotate: TypeAnnotation,
-        #[structopt(short, long, conflicts_with("file"))]
-        /// Specifies random value generation config in Dhall syntax
-        config: Option<String>,
-        #[structopt(short, long)]
-        /// Load random value generation config from file
-        file: Option<String>,
+        #[structopt(flatten)]
+        config: RandomConfig,
         #[structopt(short, long, possible_values = &["did", "js"], default_value = "did")]
         /// Specifies target language
         lang: String,
         #[structopt(short, long, requires("method"))]
         /// Specifies input arguments for a method call, mocking the return result
         args: Option<IDLArgs>,
+    },
+    /// Call canister method
+    Call {
+        canister_id: Principal,
+        method: Option<String>,
+        args: Option<IDLArgs>,
+        #[structopt(short, long)]
+        replica: Option<String>,
+        #[structopt(flatten)]
+        random: RandomConfig,
     },
     /// Diff two Candid values
     Diff {
@@ -92,6 +100,47 @@ struct TypeAnnotation {
     #[structopt(short, long)]
     /// Loads did file for --types or --method to reference type definitions
     defs: Option<PathBuf>,
+}
+
+#[derive(StructOpt)]
+struct RandomConfig {
+    #[structopt(short, long, conflicts_with("file"))]
+    /// Specifies random value generation config in Dhall syntax
+    config: Option<String>,
+    #[structopt(short, long)]
+    /// Load random value generation config from file
+    file: Option<String>,
+    #[structopt(short, long)]
+    /// Random seed
+    seed: Option<Vec<u8>>,
+}
+
+impl RandomConfig {
+    fn get_config(&self, method: &Option<String>) -> candid::Result<Configs> {
+        let config = match (&self.config, &self.file) {
+            (None, None) => Configs::from_dhall("{=}")?,
+            (Some(str), None) => Configs::from_dhall(&str)?,
+            (None, Some(file)) => {
+                let content = std::fs::read_to_string(&file)
+                    .map_err(|_| Error::msg(format!("could not read {}", file)))?;
+                Configs::from_dhall(&content)?
+            }
+            _ => unreachable!(),
+        };
+        Ok(match method {
+            None => config,
+            Some(method) => config.with_method(method),
+        })
+    }
+    fn get_seed(&self) -> Vec<u8> {
+        use rand::Rng;
+        if let Some(seed) = &self.seed {
+            seed.to_vec()
+        } else {
+            let mut rng = rand::thread_rng();
+            (0..4096).map(|_| rng.gen::<u8>()).collect()
+        }
+    }
 }
 
 enum Mode {
@@ -149,7 +198,8 @@ fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
     check_prog(env, &ast)
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     match Command::from_args() {
         Command::Check { input } => {
             let mut env = TypeEnv::new();
@@ -227,40 +277,21 @@ fn main() -> Result<()> {
             annotate,
             lang,
             config,
-            file,
             args,
         } => {
-            use candid::parser::configs::Configs;
-            use rand::Rng;
             let (env, types) = if args.is_some() {
                 annotate.get_types(Mode::Decode)?
             } else {
                 annotate.get_types(Mode::Encode)?
             };
-            let config = match (config, file) {
-                (None, None) => Configs::from_dhall("{=}")?,
-                (Some(str), None) => Configs::from_dhall(&str)?,
-                (None, Some(file)) => {
-                    let content = std::fs::read_to_string(&file)
-                        .map_err(|_| Error::msg(format!("could not read {}", file)))?;
-                    Configs::from_dhall(&content)?
-                }
-                _ => unreachable!(),
-            };
-            let config = if let Some(ref method) = annotate.method {
-                config.with_method(method)
-            } else {
-                config
-            };
-            // TODO figure out how many bytes of entropy we need
-            let seed: Vec<u8> = if let Some(ref args) = args {
+            let seed = if let Some(ref args) = args {
                 let (env, types) = annotate.get_types(Mode::Encode)?;
                 let bytes = args.to_bytes_with_types(&env, &types)?;
                 bytes.into_iter().rev().cycle().take(2048).collect()
             } else {
-                let mut rng = rand::thread_rng();
-                (0..2048).map(|_| rng.gen::<u8>()).collect()
+                config.get_seed()
             };
+            let config = config.get_config(&annotate.method)?;
             let args = IDLArgs::any(&seed, &config, &env, &types)?;
             match lang.as_str() {
                 "did" => println!("{}", args),
@@ -269,6 +300,69 @@ fn main() -> Result<()> {
                     candid::bindings::javascript::value::pp_args(&args).pretty(80)
                 ),
                 _ => unreachable!(),
+            }
+        }
+        Command::Call {
+            replica,
+            canister_id,
+            method,
+            args,
+            random,
+        } => {
+            use candid::{Decode, Encode};
+            use ic_agent::Agent;
+            let replica = match replica.as_ref().map(|v| v.as_ref()) {
+                None => "http://localhost:8000",
+                Some("ic") => "https://gw.dfinity.network",
+                Some(url) => url,
+            };
+            let agent = Agent::builder().with_url(replica).build()?;
+            let response = agent
+                .query(&canister_id, "__get_candid_interface_tmp_hack")
+                .with_arg(&Encode!()?)
+                .call()
+                .await?;
+            let response = Decode!(&response, &str)?;
+            let ast = pretty_parse::<IDLProg>("fetched candid", response)?;
+            let mut env = TypeEnv::new();
+            let actor = check_prog(&mut env, &ast)?;
+            match method {
+                None => println!("{}", candid::bindings::candid::compile(&env, &actor)),
+                Some(method) => {
+                    let actor = actor.unwrap();
+                    let func = env.get_method(&actor, &method)?;
+                    let args = match args {
+                        Some(args) => args,
+                        None => {
+                            let seed = random.get_seed();
+                            let config = random.get_config(&Some(method.to_string()))?;
+                            let args = IDLArgs::any(&seed, &config, &env, &func.args)?;
+                            println!("Sending {}", args);
+                            args
+                        }
+                    }
+                    .to_bytes_with_types(&env, &func.args)?;
+                    let bytes = if func.is_query() {
+                        agent
+                            .query(&canister_id, &method)
+                            .with_arg(args)
+                            .call()
+                            .await?
+                    } else {
+                        agent.fetch_root_key().await?;
+                        let waiter = delay::Delay::builder()
+                            .exponential_backoff(std::time::Duration::from_secs(1), 1.1)
+                            .timeout(std::time::Duration::from_secs(60 * 5))
+                            .build();
+                        agent
+                            .update(&canister_id, &method)
+                            .with_arg(args)
+                            .call_and_wait(waiter)
+                            .await?
+                    };
+                    let result = IDLArgs::from_bytes_with_types(&bytes, &env, &func.rets)?;
+                    println!("{}", result);
+                }
             }
         }
         Command::Diff {
