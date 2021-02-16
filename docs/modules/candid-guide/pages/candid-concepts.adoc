@@ -258,7 +258,12 @@ The Candid _binary_ format does not include the actual field names, merely numer
 
 [source]
 ....
-(record {4846783 = 14; 456245371 = variant {373703110}; 1443915007 = vec {"john@doe.com"; "john.doe@example.com"}; 2797692922 = "John"; 3046132756 = "Doe"})
+(record {
+   4846783 = 14;
+   456245371 = variant {373703110};
+   1443915007 = vec {"john@doe.com"; "john.doe@example.com"};
+   2797692922 = "John"; 3046132756 = "Doe"
+})
 ....
 ====
 
