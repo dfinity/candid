@@ -1,0 +1,17 @@
+[package]
+name = "repl"
+version = "0.1.0"
+authors = ["DFINITY Team"]
+edition = "2018"
+
+[dependencies]
+candid = { path = "../../rust/candid", features = ["random"] }
+rustyline = "7.1"
+rustyline-derive = "0.4"
+ansi_term = "0.12"
+ic-agent = { git = "https://github.com/dfinity/agent-rs.git", branch = "next" }
+tokio = { version = "0.2", features = ["full"] }
+delay = "0.3"
+anyhow = "1.0"
+rand = "0.8"
+logos = "0.12"
