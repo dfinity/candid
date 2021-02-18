@@ -2039,12 +2039,14 @@ dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
  "candid",
+ "clap",
  "delay",
  "ic-agent",
  "logos",
  "rand 0.8.3",
  "rustyline",
  "rustyline-derive",
+ "structopt",
  "tokio 0.2.25",
 ]
 

@@ -26,9 +26,9 @@ struct CanisterInfo {
     pub methods: BTreeMap<String, Function>,
 }
 impl CanisterMap {
-    fn get(&mut self, id: &Principal) -> anyhow::Result<&CanisterInfo> {
+    fn get(&mut self, agent: &Agent, id: &Principal) -> anyhow::Result<&CanisterInfo> {
         if !self.0.contains_key(id) {
-            let info = fetch_actor(id)?;
+            let info = fetch_actor(agent, id)?;
             self.0.insert(id.clone(), info);
         }
         Ok(self.0.get(id).unwrap())
@@ -46,14 +46,11 @@ impl CanisterInfo {
             })
             .collect()
     }
-    fn get_func(&self, method: &str) -> Option<&Function> {
-        self.methods.get(method)
-    }
 }
 
 #[tokio::main]
-async fn fetch_actor(canister_id: &Principal) -> anyhow::Result<CanisterInfo> {
-    let agent = Agent::builder().with_url("http://localhost:8000").build()?;
+async fn fetch_actor(agent: &Agent, canister_id: &Principal) -> anyhow::Result<CanisterInfo> {
+    //let agent = Agent::builder().with_url("http://localhost:8000").build()?;
     let response = agent
         .query(canister_id, "__get_candid_interface_tmp_hack")
         .with_arg(&Encode!()?)
@@ -65,7 +62,7 @@ async fn fetch_actor(canister_id: &Principal) -> anyhow::Result<CanisterInfo> {
     let actor = check_prog(&mut env, &ast)?.unwrap();
     let methods = env
         .as_service(&actor)?
-        .into_iter()
+        .iter()
         .map(|(meth, ty)| {
             let func = env.as_func(ty).unwrap();
             (meth.to_owned(), func.clone())
@@ -82,6 +79,7 @@ struct MyHelper {
     hinter: HistoryHinter,
     colored_prompt: String,
     canister_map: RefCell<CanisterMap>,
+    agent: Agent,
 }
 
 fn random_value(env: &TypeEnv, tys: &[Type]) -> candid::Result<IDLArgs> {
@@ -115,7 +113,7 @@ impl Completer for MyHelper {
         match extract_canister(line, pos) {
             Some((pos, canister_id, meth)) => {
                 let mut map = self.canister_map.borrow_mut();
-                Ok(match map.get(&canister_id) {
+                Ok(match map.get(&self.agent, &canister_id) {
                     Ok(info) => (pos, info.match_method(meth)),
                     Err(_) => (pos, Vec::new()),
                 })
@@ -128,12 +126,15 @@ impl Completer for MyHelper {
 impl Hinter for MyHelper {
     type Hint = String;
     fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
+        if pos < line.len() {
+            return None;
+        }
         match extract_canister(line, pos) {
             Some((_, canister_id, method)) => {
                 let mut map = self.canister_map.borrow_mut();
-                match map.get(&canister_id) {
+                match map.get(&self.agent, &canister_id) {
                     Ok(info) => {
-                        let func = info.get_func(method)?;
+                        let func = info.methods.get(method)?;
                         let value = random_value(&info.env, &func.args).ok()?;
                         Some(format!("{}", value))
                     }
@@ -160,7 +161,7 @@ impl Highlighter for MyHelper {
 
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
         let s = format!("{}", Color::Black.dimmed().paint(hint));
-        Owned(s.to_owned())
+        Owned(s)
     }
 
     fn highlight<'l>(&self, line: &'l str, pos: usize) -> Cow<'l, str> {
@@ -192,8 +193,16 @@ fn print_eval(v: Result<IDLArgs, candid::Error>) {
     }
 }
 
-fn repl() {
+fn repl(opts: Opts) -> anyhow::Result<()> {
     println!("Canister REPL");
+    let replica = opts.replica.unwrap_or_else(|| "local".to_string());
+    let url = match replica.as_str() {
+        "local" => "http://localhost:8000/",
+        "ic" => "https://gw.dfinity.network",
+        url => url,
+    };
+    let agent = Agent::builder().with_url(url).build()?;
+
     let config = Config::builder()
         .history_ignore_space(true)
         .completion_type(CompletionType::List)
@@ -205,6 +214,7 @@ fn repl() {
         colored_prompt: "".to_owned(),
         validator: MatchingBracketValidator::new(),
         canister_map: RefCell::new(CanisterMap::default()),
+        agent,
     };
     let mut rl = Editor::with_config(config);
     rl.set_helper(Some(h));
@@ -213,7 +223,7 @@ fn repl() {
     }
     let mut count = 1;
     loop {
-        let p = format!("{}> ", count);
+        let p = format!("{} {}> ", replica, count);
         rl.helper_mut().expect("No helper").colored_prompt =
             format!("{}", Color::Green.bold().paint(&p));
         let input = rl.readline(&p);
@@ -230,9 +240,19 @@ fn repl() {
         }
         count += 1;
     }
-    rl.save_history("./.history").unwrap();
+    rl.save_history("./.history")?;
+    Ok(())
 }
 
-fn main() {
-    repl()
+use structopt::StructOpt;
+#[derive(StructOpt)]
+#[structopt(global_settings = &[structopt::clap::AppSettings::ColoredHelp, structopt::clap::AppSettings::DeriveDisplayOrder])]
+struct Opts {
+    #[structopt(short, long)]
+    replica: Option<String>,
+}
+
+fn main() -> anyhow::Result<()> {
+    let opts = Opts::from_args();
+    repl(opts)
 }
