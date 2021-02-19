@@ -2,12 +2,11 @@ use ansi_term::Color;
 use candid::{
     check_prog, pretty_parse,
     types::{Function, Type},
-    IDLArgs, IDLProg, TypeEnv,
+    Decode, Encode, IDLArgs, IDLProg, TypeEnv,
 };
-use candid::{Decode, Encode};
 use ic_agent::export::Principal;
 use ic_agent::Agent;
-use rustyline::completion::{extract_word, Completer, FilenameCompleter, Pair};
+use rustyline::completion::{Completer, FilenameCompleter, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
 use rustyline::hint::{Hinter, HistoryHinter};
@@ -17,6 +16,10 @@ use rustyline_derive::Helper;
 use std::borrow::Cow::{self, Borrowed, Owned};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use tokio::runtime::Runtime;
+
+mod token;
+use token::{Token, Tokenizer};
 
 #[derive(Default)]
 struct CanisterMap(BTreeMap<Principal, CanisterInfo>);
@@ -50,7 +53,6 @@ impl CanisterInfo {
 
 #[tokio::main]
 async fn fetch_actor(agent: &Agent, canister_id: &Principal) -> anyhow::Result<CanisterInfo> {
-    //let agent = Agent::builder().with_url("http://localhost:8000").build()?;
     let response = agent
         .query(canister_id, "__get_candid_interface_tmp_hack")
         .with_arg(&Encode!()?)
@@ -92,14 +94,27 @@ fn random_value(env: &TypeEnv, tys: &[Type]) -> candid::Result<IDLArgs> {
 }
 
 // Return position at the end of principal, principal, and method
-fn extract_canister(line: &str, pos: usize) -> Option<(usize, Principal, &str)> {
-    let (id_pos, word) = extract_word(line, pos, None, b" ");
-    let (pos, id, meth) = match word.rfind('.') {
-        Some(idx) => (id_pos + idx, &word[..idx], &word[idx + 1..]),
-        None => (pos, word, ""),
-    };
-    let canister_id = Principal::from_text(id).ok()?;
-    Some((pos, canister_id, meth))
+fn extract_canister(line: &str, pos: usize) -> Option<(usize, Principal, String)> {
+    let mut iter = Tokenizer::new(&line[..pos]);
+    while let Some((_start, tok, end)) = iter.next() {
+        match tok {
+            Token::Text(id) => {
+                if let Ok(canister_id) = Principal::from_text(id) {
+                    match iter.next() {
+                        None => return Some((end, canister_id, "".to_owned())),
+                        Some((_, Token::Dot, _)) => match iter.next() {
+                            None => return Some((end, canister_id, "".to_owned())),
+                            Some((_, Token::Id(meth), _)) => return Some((end, canister_id, meth)),
+                            _ => continue,
+                        },
+                        _ => continue,
+                    }
+                }
+            }
+            _ => continue,
+        }
+    }
+    None
 }
 
 impl Completer for MyHelper {
@@ -114,7 +129,7 @@ impl Completer for MyHelper {
             Some((pos, canister_id, meth)) => {
                 let mut map = self.canister_map.borrow_mut();
                 Ok(match map.get(&self.agent, &canister_id) {
-                    Ok(info) => (pos, info.match_method(meth)),
+                    Ok(info) => (pos, info.match_method(&meth)),
                     Err(_) => (pos, Vec::new()),
                 })
             }
@@ -134,7 +149,7 @@ impl Hinter for MyHelper {
                 let mut map = self.canister_map.borrow_mut();
                 match map.get(&self.agent, &canister_id) {
                     Ok(info) => {
-                        let func = info.methods.get(method)?;
+                        let func = info.methods.get(&method)?;
                         let value = random_value(&info.env, &func.args).ok()?;
                         Some(format!("{}", value))
                     }
@@ -186,23 +201,31 @@ impl Validator for MyHelper {
     }
 }
 
-fn print_eval(v: Result<IDLArgs, candid::Error>) {
+fn print_eval<T: std::fmt::Display, E: std::fmt::Display>(v: Result<T, E>) {
     match v {
         Ok(res) => println!("{}", res),
         Err(e) => eprintln!("Error: {}", e),
     }
 }
+fn parse(line: &str) -> Vec<(usize, token::Token, usize)> {
+    Tokenizer::new(line).collect()
+}
 
 fn repl(opts: Opts) -> anyhow::Result<()> {
-    println!("Canister REPL");
     let replica = opts.replica.unwrap_or_else(|| "local".to_string());
     let url = match replica.as_str() {
         "local" => "http://localhost:8000/",
         "ic" => "https://gw.dfinity.network",
         url => url,
     };
+    println!("Ping {}...", url);
     let agent = Agent::builder().with_url(url).build()?;
+    {
+        let mut runtime = Runtime::new().expect("Unable to create a runtime");
+        runtime.block_on(agent.status())?;
+    }
 
+    println!("Canister REPL");
     let config = Config::builder()
         .history_ignore_space(true)
         .completion_type(CompletionType::List)
@@ -230,7 +253,8 @@ fn repl(opts: Opts) -> anyhow::Result<()> {
         match input {
             Ok(line) => {
                 rl.add_history_entry(&line);
-                print_eval(pretty_parse::<IDLArgs>("stdin", &line));
+                //print_eval(pretty_parse::<IDLArgs>("stdin", &line));
+                println!("{:?}", parse(&line));
             }
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
             Err(err) => {

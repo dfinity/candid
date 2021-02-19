@@ -1,5 +1,5 @@
 [package]
-name = "repl"
+name = "ic-repl"
 version = "0.1.0"
 authors = ["DFINITY Team"]
 edition = "2018"
