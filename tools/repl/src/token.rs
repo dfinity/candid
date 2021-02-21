@@ -1,4 +1,3 @@
-use candid::parser::value::IDLValue;
 use logos::{Lexer, Logos};
 
 #[derive(Logos, Debug, PartialEq, Clone)]
@@ -13,10 +12,10 @@ pub enum Token {
     LParen,
     #[token(")")]
     RParen,
-    #[token(",")]
-    Comma,
     #[token(".")]
     Dot,
+    #[token(",")]
+    Comma,
     #[token("call")]
     Call,
     #[token("let")]
@@ -28,7 +27,7 @@ pub enum Token {
     #[token("\"")]
     StartString,
     Text(String),
-    Candid(IDLValue),
+    Args(Vec<String>),
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
     Id(String),
 }
@@ -91,6 +90,41 @@ impl<'input> Iterator for Tokenizer<'input> {
                 }
                 self.lex = lex.morph::<Token>();
                 Some((span.start, Token::Text(result), self.lex.span().end))
+            }
+            Token::LParen => {
+                let mut nesting = 1;
+                let mut res = Vec::new();
+                let mut arg = String::new();
+                loop {
+                    match self.lex.next() {
+                        Some(Token::LParen) => {
+                            nesting += 1;
+                            arg.push_str(self.lex.slice());
+                        }
+                        Some(Token::RParen) => {
+                            nesting -= 1;
+                            if nesting == 0 {
+                                if !arg.is_empty() {
+                                    res.push(arg);
+                                }
+                                break;
+                            } else {
+                                arg.push_str(self.lex.slice());
+                            }
+                        }
+                        // TODO fix comma in string
+                        Some(Token::Comma) if nesting == 1 => {
+                            res.push(arg.clone());
+                            arg.clear();
+                        }
+                        Some(_) => arg.push_str(self.lex.slice()),
+                        None => {
+                            res.push(arg);
+                            break;
+                        }
+                    }
+                }
+                Some((span.start, Token::Args(res), self.lex.span().end))
             }
             _ => Some((span.start, token, span.end)),
         }

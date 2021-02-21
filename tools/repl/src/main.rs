@@ -84,27 +84,44 @@ struct MyHelper {
     agent: Agent,
 }
 
-fn random_value(env: &TypeEnv, tys: &[Type]) -> candid::Result<IDLArgs> {
+fn random_value(env: &TypeEnv, tys: &[Type], given_args: &Option<Token>) -> candid::Result<String> {
     use candid::parser::configs::Configs;
     use rand::Rng;
     let mut rng = rand::thread_rng();
     let seed: Vec<_> = (0..2048).map(|_| rng.gen::<u8>()).collect();
     let config = Configs::from_dhall("{=}")?;
-    IDLArgs::any(&seed, &config, env, &tys)
+    let result = IDLArgs::any(&seed, &config, env, &tys)?;
+    Ok(if let Some(Token::Args(args)) = given_args {
+        if args.len() <= tys.len() {
+            let mut res = String::new();
+            for v in result.args[args.len()..].iter() {
+                res.push_str(&format!(", {}", v));
+            }
+            res.push(')');
+            res
+        } else {
+            "".to_owned()
+        }
+    } else {
+        format!("{}", result)
+    })
 }
 
-// Return position at the end of principal, principal, and method
-fn extract_canister(line: &str, pos: usize) -> Option<(usize, Principal, String)> {
+// Return position at the end of principal, principal, method, args
+fn extract_canister(line: &str, pos: usize) -> Option<(usize, Principal, String, Option<Token>)> {
     let mut iter = Tokenizer::new(&line[..pos]);
     while let Some((_start, tok, end)) = iter.next() {
         match tok {
             Token::Text(id) => {
                 if let Ok(canister_id) = Principal::from_text(id) {
                     match iter.next() {
-                        None => return Some((end, canister_id, "".to_owned())),
+                        None => return Some((end, canister_id, "".to_owned(), None)),
                         Some((_, Token::Dot, _)) => match iter.next() {
-                            None => return Some((end, canister_id, "".to_owned())),
-                            Some((_, Token::Id(meth), _)) => return Some((end, canister_id, meth)),
+                            None => return Some((end, canister_id, "".to_owned(), None)),
+                            Some((_, Token::Id(meth), _)) => {
+                                let tok = iter.next().map(|(_, tok, _)| tok);
+                                return Some((end, canister_id, meth, tok));
+                            }
                             _ => continue,
                         },
                         _ => continue,
@@ -126,7 +143,7 @@ impl Completer for MyHelper {
         ctx: &Context<'_>,
     ) -> Result<(usize, Vec<Pair>), ReadlineError> {
         match extract_canister(line, pos) {
-            Some((pos, canister_id, meth)) => {
+            Some((pos, canister_id, meth, _)) => {
                 let mut map = self.canister_map.borrow_mut();
                 Ok(match map.get(&self.agent, &canister_id) {
                     Ok(info) => (pos, info.match_method(&meth)),
@@ -145,13 +162,13 @@ impl Hinter for MyHelper {
             return None;
         }
         match extract_canister(line, pos) {
-            Some((_, canister_id, method)) => {
+            Some((_, canister_id, method, args)) => {
                 let mut map = self.canister_map.borrow_mut();
                 match map.get(&self.agent, &canister_id) {
                     Ok(info) => {
                         let func = info.methods.get(&method)?;
-                        let value = random_value(&info.env, &func.args).ok()?;
-                        Some(format!("{}", value))
+                        let value = random_value(&info.env, &func.args, &args).ok()?;
+                        Some(value)
                     }
                     Err(_) => None,
                 }
