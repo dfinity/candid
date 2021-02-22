@@ -1,6 +1,9 @@
 use ansi_term::Color;
 use candid::{
-    check_prog, pretty_parse,
+    check_prog,
+    parser::configs::Configs,
+    parser::value::IDLValue,
+    pretty_parse,
     types::{Function, Type},
     Decode, Encode, IDLArgs, IDLProg, TypeEnv,
 };
@@ -18,8 +21,10 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use tokio::runtime::Runtime;
 
+mod command;
+mod grammar;
 mod token;
-use token::{Token, Tokenizer};
+use crate::command::Command;
 
 #[derive(Default)]
 struct CanisterMap(BTreeMap<Principal, CanisterInfo>);
@@ -82,19 +87,23 @@ struct MyHelper {
     colored_prompt: String,
     canister_map: RefCell<CanisterMap>,
     agent: Agent,
+    config: Configs,
 }
 
-fn random_value(env: &TypeEnv, tys: &[Type], given_args: &Option<Token>) -> candid::Result<String> {
-    use candid::parser::configs::Configs;
+fn random_value(
+    env: &TypeEnv,
+    tys: &[Type],
+    given_args: &[IDLValue],
+    config: &Configs,
+) -> candid::Result<String> {
     use rand::Rng;
     let mut rng = rand::thread_rng();
     let seed: Vec<_> = (0..2048).map(|_| rng.gen::<u8>()).collect();
-    let config = Configs::from_dhall("{=}")?;
     let result = IDLArgs::any(&seed, &config, env, &tys)?;
-    Ok(if let Some(Token::Args(args)) = given_args {
-        if args.len() <= tys.len() {
+    Ok(if !given_args.is_empty() {
+        if given_args.len() <= tys.len() {
             let mut res = String::new();
-            for v in result.args[args.len()..].iter() {
+            for v in result.args[given_args.len()..].iter() {
                 res.push_str(&format!(", {}", v));
             }
             res.push(')');
@@ -108,30 +117,16 @@ fn random_value(env: &TypeEnv, tys: &[Type], given_args: &Option<Token>) -> cand
 }
 
 // Return position at the end of principal, principal, method, args
-fn extract_canister(line: &str, pos: usize) -> Option<(usize, Principal, String, Option<Token>)> {
-    let mut iter = Tokenizer::new(&line[..pos]);
-    while let Some((_start, tok, end)) = iter.next() {
-        match tok {
-            Token::Text(id) => {
-                if let Ok(canister_id) = Principal::from_text(id) {
-                    match iter.next() {
-                        None => return Some((end, canister_id, "".to_owned(), None)),
-                        Some((_, Token::Dot, _)) => match iter.next() {
-                            None => return Some((end, canister_id, "".to_owned(), None)),
-                            Some((_, Token::Id(meth), _)) => {
-                                let tok = iter.next().map(|(_, tok, _)| tok);
-                                return Some((end, canister_id, meth, tok));
-                            }
-                            _ => continue,
-                        },
-                        _ => continue,
-                    }
-                }
-            }
-            _ => continue,
-        }
+fn extract_canister(line: &str, pos: usize) -> Option<(usize, Principal, String, Vec<IDLValue>)> {
+    let command = line[..pos].parse::<Command>().ok()?;
+    match command {
+        Command::Call {
+            canister,
+            method,
+            args,
+        } => Some((canister.span.end, canister.value, method, args)),
+        _ => None,
     }
-    None
 }
 
 impl Completer for MyHelper {
@@ -167,7 +162,8 @@ impl Hinter for MyHelper {
                 match map.get(&self.agent, &canister_id) {
                     Ok(info) => {
                         let func = info.methods.get(&method)?;
-                        let value = random_value(&info.env, &func.args, &args).ok()?;
+                        let value =
+                            random_value(&info.env, &func.args, &args, &self.config).ok()?;
                         Some(value)
                     }
                     Err(_) => None,
@@ -218,14 +214,15 @@ impl Validator for MyHelper {
     }
 }
 
-fn print_eval<T: std::fmt::Display, E: std::fmt::Display>(v: Result<T, E>) {
+fn unwrap<T, E: std::fmt::Display, F>(v: Result<T, E>, f: F)
+where
+    E: std::fmt::Display,
+    F: FnOnce(T),
+{
     match v {
-        Ok(res) => println!("{}", res),
+        Ok(res) => f(res),
         Err(e) => eprintln!("Error: {}", e),
     }
-}
-fn parse(line: &str) -> Vec<(usize, token::Token, usize)> {
-    Tokenizer::new(line).collect()
 }
 
 fn repl(opts: Opts) -> anyhow::Result<()> {
@@ -254,6 +251,7 @@ fn repl(opts: Opts) -> anyhow::Result<()> {
         colored_prompt: "".to_owned(),
         validator: MatchingBracketValidator::new(),
         canister_map: RefCell::new(CanisterMap::default()),
+        config: Configs::from_dhall("{=}")?,
         agent,
     };
     let mut rl = Editor::with_config(config);
@@ -264,14 +262,17 @@ fn repl(opts: Opts) -> anyhow::Result<()> {
     let mut count = 1;
     loop {
         let p = format!("{} {}> ", replica, count);
-        rl.helper_mut().expect("No helper").colored_prompt =
-            format!("{}", Color::Green.bold().paint(&p));
+        rl.helper_mut().unwrap().colored_prompt = format!("{}", Color::Green.bold().paint(&p));
         let input = rl.readline(&p);
         match input {
             Ok(line) => {
                 rl.add_history_entry(&line);
-                //print_eval(pretty_parse::<IDLArgs>("stdin", &line));
-                println!("{:?}", parse(&line));
+                unwrap(line.parse::<Command>(), |cmd| match cmd {
+                    Command::Call { .. } => println!("{:?}", cmd),
+                    Command::Config(conf) => unwrap(Configs::from_dhall(&conf), |conf| {
+                        rl.helper_mut().unwrap().config = conf
+                    }),
+                });
             }
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
             Err(err) => {

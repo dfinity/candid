@@ -270,7 +270,7 @@ dependencies = [
  "fake",
  "goldenfile",
  "hex",
- "ic-types 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ic-types",
  "lalrpop",
  "lalrpop-util",
  "leb128",
@@ -1040,7 +1040,7 @@ dependencies = [
  "byteorder",
  "delay",
  "hex",
- "ic-types 0.1.2 (git+https://github.com/dfinity/agent-rs.git?branch=next)",
+ "ic-types",
  "leb128",
  "mime",
  "num-bigint",
@@ -1069,25 +1069,14 @@ dependencies = [
  "clap",
  "delay",
  "ic-agent",
+ "lalrpop",
+ "lalrpop-util",
  "logos",
  "rand 0.8.3",
  "rustyline",
  "rustyline-derive",
  "structopt",
  "tokio 0.2.25",
-]
-
-[[package]]
-name = "ic-types"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "968dbc1cc04bf93e94c2ffd3cb370c451d2136425dd38e9ed4cc5ca425d737af"
-dependencies = [
- "base32",
- "crc32fast",
- "serde",
- "sha2",
- "thiserror",
 ]
 
 [[package]]

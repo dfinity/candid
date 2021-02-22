@@ -6,3 +6,8 @@ members = [
     "tools/didc",
     "tools/repl",
 ]
+
+[patch.crates-io.ic-types]
+version = "0.1.2"
+git = "https://github.com/dfinity/agent-rs.git"
+branch = "next"

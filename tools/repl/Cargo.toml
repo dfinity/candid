@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["DFINITY Team"]
 edition = "2018"
 
+[build-dependencies]
+lalrpop = "0.19"
+
 [dependencies]
 candid = { path = "../../rust/candid", features = ["random"] }
 rustyline = "7.1"
@@ -15,5 +18,6 @@ delay = "0.3"
 anyhow = "1.0"
 rand = "0.8"
 logos = "0.12"
+lalrpop-util = "0.19"
 clap = "2.33"
 structopt = "0.3.16"

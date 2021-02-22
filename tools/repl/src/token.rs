@@ -1,9 +1,13 @@
+use lalrpop_util::ParseError;
 use logos::{Lexer, Logos};
 
-#[derive(Logos, Debug, PartialEq, Clone)]
+#[derive(Logos, Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub enum Token {
     #[regex(r"[ \t\r\n]+", logos::skip)]
+    // line comment
     #[regex("//[^\n]*", logos::skip)]
+    #[token("/*")]
+    StartComment,
     #[error]
     UnexpectedToken,
     #[token("=")]
@@ -12,27 +16,86 @@ pub enum Token {
     LParen,
     #[token(")")]
     RParen,
-    #[token(".")]
-    Dot,
+    #[token("{")]
+    LBrace,
+    #[token("}")]
+    RBrace,
+    #[token(";")]
+    Semi,
     #[token(",")]
     Comma,
-    #[token("call")]
-    Call,
-    #[token("let")]
-    Let,
+    #[token(".", priority = 10)]
+    Dot,
+    #[token(":")]
+    Colon,
+    #[token("->")]
+    Arrow,
+    #[token("null")]
+    Null,
+    #[token("vec")]
+    Vec,
+    #[token("record")]
+    Record,
+    #[token("variant")]
+    Variant,
+    #[token("func")]
+    Func,
+    #[token("service")]
+    Service,
+    #[token("oneway")]
+    Oneway,
+    #[token("query")]
+    Query,
+    #[token("blob")]
+    Blob,
+    #[token("type")]
+    Type,
     #[token("import")]
     Import,
+    #[token("opt")]
+    Opt,
+    #[token("call")]
+    Call,
     #[token("config")]
     Config,
-    #[token("\"")]
-    StartString,
-    Text(String),
-    Args(Vec<String>),
+    #[token("==")]
+    TestEqual,
+    #[token("!=")]
+    NotEqual,
+    #[token("!:")]
+    NotDecode,
+    #[token("principal")]
+    Principal,
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
     Id(String),
+    #[token("\"")]
+    StartString,
+    // This token is not derived. Stores the unescaped string
+    Text(String),
+    #[regex("[+-]", |lex| lex.slice().chars().next())]
+    Sign(char),
+    #[regex("[0-9][_0-9]*", parse_number)]
+    Decimal(String),
+    #[regex("0[xX][0-9a-fA-F][_0-9a-fA-F]*", parse_number)]
+    Hex(String),
+    #[regex("[0-9]*\\.[0-9]*", parse_number)]
+    #[regex("[0-9]*(\\.[0-9]*)?[eE][+-]?[0-9]+", parse_number)]
+    Float(String),
+    #[regex("true|false", |lex| lex.slice().parse())]
+    Boolean(bool),
 }
 
-#[derive(Logos, Debug, PartialEq, Clone)]
+#[derive(Logos, Debug, Clone, PartialEq, Eq)]
+enum Comment {
+    #[error]
+    Skip,
+    #[token("*/")]
+    End,
+    #[token("/*")]
+    Start,
+}
+
+#[derive(Logos, Debug, Clone, PartialEq, Eq)]
 enum Text {
     #[error]
     Error,
@@ -40,8 +103,27 @@ enum Text {
     Text,
     #[regex(r"\\.")]
     EscapeCharacter,
+    #[regex(r"\\u\{[0-9a-fA-F]+\}")]
+    Codepoint,
+    #[regex(r"\\[0-9a-fA-F][0-9a-fA-F]")]
+    Byte,
     #[token("\"")]
     EndString,
+}
+
+impl std::fmt::Display for Token {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "{:?}", self)
+    }
+}
+
+fn parse_number(lex: &mut Lexer<Token>) -> String {
+    let iter = lex.slice().chars().filter(|c| *c != '_');
+    if lex.slice().starts_with("0x") {
+        iter.skip(2).collect()
+    } else {
+        iter.collect()
+    }
 }
 
 pub struct Tokenizer<'input> {
@@ -54,12 +136,76 @@ impl<'input> Tokenizer<'input> {
     }
 }
 
+pub type Span = std::ops::Range<usize>;
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Spanned<T> {
+    pub span: Span,
+    pub value: T,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LexicalError {
+    pub err: String,
+    pub span: Span,
+}
+impl std::fmt::Display for LexicalError {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.span.start == 0 && self.span.end == 0 {
+            write!(fmt, "{}", self.err)
+        } else {
+            write!(fmt, "{} at {:?}", self.err, self.span)
+        }
+    }
+}
+impl LexicalError {
+    fn new<E: ToString>(err: E, span: Span) -> Self {
+        LexicalError {
+            err: err.to_string(),
+            span,
+        }
+    }
+}
+
+pub(crate) type ParserError = ParseError<usize, Token, LexicalError>;
+pub fn error2<E: ToString>(err: E, span: Span) -> ParserError {
+    ParseError::User {
+        error: LexicalError::new(err, span),
+    }
+}
+
 impl<'input> Iterator for Tokenizer<'input> {
-    type Item = (usize, Token, usize);
+    type Item = Result<(usize, Token, usize), LexicalError>;
     fn next(&mut self) -> Option<Self::Item> {
         let token = self.lex.next()?;
         let span = self.lex.span();
         match token {
+            Token::UnexpectedToken => {
+                let err = format!("Unknown token {}", self.lex.slice());
+                Some(Err(LexicalError::new(err, span)))
+            }
+            Token::StartComment => {
+                let mut lex = self.lex.to_owned().morph::<Comment>();
+                let mut nesting = 1;
+                loop {
+                    match lex.next() {
+                        Some(Comment::Skip) => continue,
+                        Some(Comment::End) => {
+                            nesting -= 1;
+                            if nesting == 0 {
+                                break;
+                            }
+                        }
+                        Some(Comment::Start) => nesting += 1,
+                        None => {
+                            return Some(Err(LexicalError::new(
+                                "Unclosed comment",
+                                span.start..lex.span().end,
+                            )))
+                        }
+                    }
+                }
+                self.lex = lex.morph::<Token>();
+                self.next()
+            }
             Token::StartString => {
                 let mut result = String::new();
                 let mut lex = self.lex.to_owned().morph::<Text>();
@@ -74,59 +220,68 @@ impl<'input> Iterator for Tokenizer<'input> {
                             '\\' => result.push('\\'),
                             '"' => result.push('"'),
                             '\'' => result.push('\''),
-                            _ => {
-                                return Some((
-                                    lex.span().start,
-                                    Token::UnexpectedToken,
-                                    lex.span().end,
-                                ))
+                            c => {
+                                return Some(Err(LexicalError::new(
+                                    format!("Unknown escape character {}", c),
+                                    lex.span(),
+                                )))
                             }
                         },
+                        Some(Codepoint) => {
+                            let slice = lex.slice();
+                            let hex = &slice[3..slice.len() - 1];
+                            match u32::from_str_radix(hex, 16)
+                                .map_err(|_| {
+                                    LexicalError::new("Not a valid hex escape", lex.span())
+                                })
+                                .and_then(|c| {
+                                    std::char::from_u32(c).ok_or_else(|| {
+                                        LexicalError::new(
+                                            format!("Unicode escape out of range {}", hex),
+                                            lex.span(),
+                                        )
+                                    })
+                                }) {
+                                Ok(c) => result.push(c),
+                                Err(e) => return Some(Err(e)),
+                            }
+                        }
+                        Some(Byte) => {
+                            let hex = &lex.slice()[1..];
+                            match u8::from_str_radix(hex, 16) {
+                                Ok(byte) => {
+                                    // According to https://webassembly.github.io/spec/core/text/values.html#strings
+                                    // \xx escape can break utf8 unicode.
+                                    let bytes = unsafe { result.as_mut_vec() };
+                                    bytes.push(byte);
+                                }
+                                Err(_) => {
+                                    return Some(Err(LexicalError::new(
+                                        "Not a valid hex escape",
+                                        lex.span(),
+                                    )))
+                                }
+                            }
+                        }
                         Some(EndString) => break,
-                        Some(Error) | None => {
-                            return Some((lex.span().start, Token::UnexpectedToken, lex.span().end))
+                        Some(Error) => {
+                            return Some(Err(LexicalError::new(
+                                format!("Unexpected string {}", lex.slice()),
+                                lex.span(),
+                            )))
+                        }
+                        None => {
+                            return Some(Err(LexicalError::new(
+                                "Unclosed string",
+                                span.start..lex.span().end,
+                            )))
                         }
                     }
                 }
                 self.lex = lex.morph::<Token>();
-                Some((span.start, Token::Text(result), self.lex.span().end))
+                Some(Ok((span.start, Token::Text(result), self.lex.span().end)))
             }
-            Token::LParen => {
-                let mut nesting = 1;
-                let mut res = Vec::new();
-                let mut arg = String::new();
-                loop {
-                    match self.lex.next() {
-                        Some(Token::LParen) => {
-                            nesting += 1;
-                            arg.push_str(self.lex.slice());
-                        }
-                        Some(Token::RParen) => {
-                            nesting -= 1;
-                            if nesting == 0 {
-                                if !arg.is_empty() {
-                                    res.push(arg);
-                                }
-                                break;
-                            } else {
-                                arg.push_str(self.lex.slice());
-                            }
-                        }
-                        // TODO fix comma in string
-                        Some(Token::Comma) if nesting == 1 => {
-                            res.push(arg.clone());
-                            arg.clear();
-                        }
-                        Some(_) => arg.push_str(self.lex.slice()),
-                        None => {
-                            res.push(arg);
-                            break;
-                        }
-                    }
-                }
-                Some((span.start, Token::Args(res), self.lex.span().end))
-            }
-            _ => Some((span.start, token, span.end)),
+            _ => Some(Ok((span.start, token, span.end))),
         }
     }
 }
