@@ -50,7 +50,7 @@ extern {
 
 // Command
 pub Command: Command = {
-    "call" <canister:Sp<Name>> =>? {
+    "call" <canister:Sp<Name>> "."? =>? {
          let id = Principal::from_text(&canister.0).map_err(|e| error2(e, canister.1.clone()))?;
          let canister = Spanned { span: canister.1.clone(), value: id };
          Ok(Command::Call{canister, method: "".to_string(), args: Vec::new()})

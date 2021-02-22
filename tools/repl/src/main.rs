@@ -1,4 +1,5 @@
 use ansi_term::Color;
+use anyhow::anyhow;
 use candid::{
     check_prog,
     parser::configs::Configs,
@@ -76,6 +77,36 @@ async fn fetch_actor(agent: &Agent, canister_id: &Principal) -> anyhow::Result<C
         })
         .collect();
     Ok(CanisterInfo { env, methods })
+}
+
+#[tokio::main]
+async fn call(
+    agent: &Agent,
+    canister_id: &Principal,
+    method: &str,
+    args: &IDLArgs,
+    env: &TypeEnv,
+    func: &Function,
+) -> anyhow::Result<IDLArgs> {
+    let args = args.to_bytes_with_types(env, &func.args)?;
+    let bytes = if func.is_query() {
+        agent
+            .query(canister_id, method)
+            .with_arg(args)
+            .call()
+            .await?
+    } else {
+        let waiter = delay::Delay::builder()
+            .exponential_backoff(std::time::Duration::from_secs(1), 1.1)
+            .timeout(std::time::Duration::from_secs(60 * 5))
+            .build();
+        agent
+            .update(canister_id, method)
+            .with_arg(args)
+            .call_and_wait(waiter)
+            .await?
+    };
+    Ok(IDLArgs::from_bytes_with_types(&bytes, env, &func.rets)?)
 }
 
 #[derive(Helper)]
@@ -188,7 +219,7 @@ impl Highlighter for MyHelper {
     }
 
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
-        let s = format!("{}", Color::Black.dimmed().paint(hint));
+        let s = format!("{}", Color::White.dimmed().paint(hint));
         Owned(s)
     }
 
@@ -224,6 +255,29 @@ where
         Err(e) => eprintln!("Error: {}", e),
     }
 }
+fn run(helper: &mut MyHelper, cmd: Command) -> anyhow::Result<()> {
+    match cmd {
+        Command::Call {
+            canister,
+            method,
+            args,
+        } => {
+            let canister_id = canister.value;
+            let agent = &helper.agent;
+            let mut map = helper.canister_map.borrow_mut();
+            let info = map.get(&agent, &canister_id)?;
+            let func = info
+                .methods
+                .get(&method)
+                .ok_or_else(|| anyhow!("no method {}", method))?;
+            let args = IDLArgs { args };
+            let res = call(&agent, &canister_id, &method, &args, &info.env, &func)?;
+            println!("{}", res);
+        }
+        Command::Config(conf) => helper.config = Configs::from_dhall(&conf)?,
+    }
+    Ok(())
+}
 
 fn repl(opts: Opts) -> anyhow::Result<()> {
     let replica = opts.replica.unwrap_or_else(|| "local".to_string());
@@ -236,7 +290,7 @@ fn repl(opts: Opts) -> anyhow::Result<()> {
     let agent = Agent::builder().with_url(url).build()?;
     {
         let mut runtime = Runtime::new().expect("Unable to create a runtime");
-        runtime.block_on(agent.status())?;
+        runtime.block_on(agent.fetch_root_key())?;
     }
 
     println!("Canister REPL");
@@ -267,11 +321,9 @@ fn repl(opts: Opts) -> anyhow::Result<()> {
         match input {
             Ok(line) => {
                 rl.add_history_entry(&line);
-                unwrap(line.parse::<Command>(), |cmd| match cmd {
-                    Command::Call { .. } => println!("{:?}", cmd),
-                    Command::Config(conf) => unwrap(Configs::from_dhall(&conf), |conf| {
-                        rl.helper_mut().unwrap().config = conf
-                    }),
+                unwrap(line.parse::<Command>(), |cmd| {
+                    let mut helper = rl.helper_mut().unwrap();
+                    unwrap(run(&mut helper, cmd), |_| {});
                 });
             }
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
