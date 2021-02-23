@@ -58,6 +58,10 @@ pub enum Token {
     Call,
     #[token("config")]
     Config,
+    #[token("show")]
+    Show,
+    #[token("assert")]
+    Assert,
     #[token("==")]
     TestEqual,
     #[token("!=")]

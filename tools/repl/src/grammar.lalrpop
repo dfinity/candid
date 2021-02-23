@@ -31,6 +31,8 @@ extern {
         "principal" => Token::Principal,
         "call" => Token::Call,
         "config" => Token::Config,
+        "show" => Token::Show,
+        "assert" => Token::Assert,
         "sign" => Token::Sign(<char>),
         "=" => Token::Equals,
         "==" => Token::TestEqual,
@@ -66,6 +68,7 @@ pub Command: Command = {
          Ok(Command::Call{canister, method, args})
     },
     "config" <Text> => Command::Config(<>),
+    "show" <"id"> => Command::Show(<>),
 }
 
 
