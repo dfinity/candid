@@ -1,4 +1,4 @@
-use super::helper::MyHelper;
+use super::helper::{Env, MyHelper};
 use super::token::{ParserError, Spanned, Tokenizer};
 use anyhow::anyhow;
 use candid::Principal;
@@ -7,7 +7,24 @@ use candid::{
 };
 use ic_agent::Agent;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub enum Value {
+    Candid(IDLValue),
+    Path(Vec<String>),
+}
+impl Value {
+    fn get<'a>(&'a self, env: &'a Env) -> anyhow::Result<&'a IDLValue> {
+        Ok(match self {
+            Value::Candid(v) => v,
+            Value::Path(vs) => env
+                .0
+                .get(&vs[0])
+                .ok_or_else(|| anyhow!("Undefined variable {}", vs[0]))?,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Command {
     Call {
         canister: Spanned<Principal>,
@@ -15,7 +32,10 @@ pub enum Command {
         args: Vec<IDLValue>,
     },
     Config(String),
-    Show(String),
+    Show(Value),
+    Let(String, Value),
+    Assert(Value, Value),
+    Export(String),
 }
 
 impl Command {
@@ -39,9 +59,32 @@ impl Command {
                 };
                 let res = call(&agent, canister_id, &method, &args, &info.env, &func)?;
                 println!("{}", res);
+                // TODO multiple values
+                for arg in res.args.into_iter() {
+                    helper.env.0.insert("_".to_string(), arg);
+                }
+            }
+            Command::Let(id, val) => {
+                let v = val.get(&helper.env)?.clone();
+                helper.env.0.insert(id.to_string(), v);
+            }
+            Command::Assert(left, right) => {
+                let left = left.get(&helper.env)?;
+                let right = right.get(&helper.env)?;
+                assert_eq!(left, right);
             }
             Command::Config(conf) => helper.config = Configs::from_dhall(&conf)?,
-            Command::Show(_var) => (),
+            Command::Show(val) => {
+                let v = val.get(&helper.env)?;
+                println!("{}", v);
+            }
+            Command::Export(_file) => {
+                //let path = Path::new(&file);
+                //let ext = path.extension().ok_or_else(|| anyhow!("extension required"))?;
+                for item in helper.history.iter() {
+                    println!("{}", item);
+                }
+            }
         }
         Ok(())
     }

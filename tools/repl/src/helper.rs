@@ -22,6 +22,8 @@ use std::collections::BTreeMap;
 
 #[derive(Default)]
 pub struct CanisterMap(BTreeMap<Principal, CanisterInfo>);
+#[derive(Default)]
+pub struct Env(pub BTreeMap<String, IDLValue>);
 #[derive(Clone)]
 pub struct CanisterInfo {
     pub env: TypeEnv,
@@ -59,6 +61,8 @@ pub struct MyHelper {
     pub canister_map: RefCell<CanisterMap>,
     pub agent: Agent,
     pub config: Configs,
+    pub env: Env,
+    pub history: Vec<String>,
 }
 
 impl MyHelper {
@@ -71,6 +75,8 @@ impl MyHelper {
             validator: MatchingBracketValidator::new(),
             canister_map: RefCell::new(CanisterMap::default()),
             config: Configs::from_dhall("{=}").unwrap(),
+            env: Env::default(),
+            history: Vec::new(),
             agent,
         }
     }

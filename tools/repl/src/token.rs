@@ -60,14 +60,16 @@ pub enum Token {
     Config,
     #[token("show")]
     Show,
+    #[token("let")]
+    Let,
     #[token("assert")]
     Assert,
+    #[token("export")]
+    Export,
     #[token("==")]
     TestEqual,
     #[token("!=")]
     NotEqual,
-    #[token("!:")]
-    NotDecode,
     #[token("principal")]
     Principal,
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]

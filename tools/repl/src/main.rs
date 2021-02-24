@@ -57,6 +57,7 @@ fn repl(opts: Opts) -> anyhow::Result<()> {
                 rl.add_history_entry(&line);
                 unwrap(line.parse::<Command>(), |cmd| {
                     let mut helper = rl.helper_mut().unwrap();
+                    helper.history.push(line.clone());
                     unwrap(cmd.run(&mut helper), |_| {});
                 });
             }

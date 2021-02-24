@@ -9,12 +9,13 @@ ic-repl --replica [local|ic|url]
 ```
 <command> := 
  | import <id> = <text>   (canister URI)
+ | export <text>  (filename)
  | config <text>  (dhall config)
  | call <name> . <name> ( <val>,* )
  | let <id> = <val>
- | show <id>
+ | show <val>
  | assert <val> = <val>
 
-<var> := <id> | $ <nat>
+<var> := <id> | _
 <val> := <candid val> | <var> (. <id>)*
 ```

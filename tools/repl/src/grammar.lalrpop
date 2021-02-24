@@ -2,7 +2,7 @@ use candid::parser::value::{IDLField, IDLValue, IDLArgs};
 use candid::parser::typing::check_unique;
 use super::token::{Token, error2, LexicalError, Span, Spanned};
 use candid::{Principal, types::Label};
-use super::command::Command;
+use super::command::{Command, Value};
 
 grammar;
 
@@ -28,16 +28,17 @@ extern {
         "blob" => Token::Blob,
         "type" => Token::Type,
         "import" => Token::Import,
+        "export" => Token::Export,
         "principal" => Token::Principal,
         "call" => Token::Call,
         "config" => Token::Config,
         "show" => Token::Show,
         "assert" => Token::Assert,
+        "let" => Token::Let,
         "sign" => Token::Sign(<char>),
         "=" => Token::Equals,
         "==" => Token::TestEqual,
         "!=" => Token::NotEqual,
-        "!:" => Token::NotDecode,
         "(" => Token::LParen,
         ")" => Token::RParen,
         "{" => Token::LBrace,
@@ -68,9 +69,25 @@ pub Command: Command = {
          Ok(Command::Call{canister, method, args})
     },
     "config" <Text> => Command::Config(<>),
-    "show" <"id"> => Command::Show(<>),
+    "show" <Value> => Command::Show(<>),
+    "assert" <left:Value> "==" <right:Value> => Command::Assert(left, right),
+    "let" <id:"id"> "=" <val:Value> => Command::Let(id, val),
+    "export" <Text> => Command::Export(<>),
 }
 
+Value: Value = {
+  Arg => Value::Candid(<>),
+  <v:Var> <mut vs:("." <Var>)*> => {
+     let mut res = Vec::with_capacity(vs.len() + 1);
+     res.push(v);
+     res.append(&mut vs);
+     Value::Path(res)
+  },
+}
+
+Var: String = {
+     "id" => <>,
+}
 
 // Value
 Args: IDLArgs = "(" <SepBy<AnnVal, ",">> ")" => IDLArgs { args: <> };
