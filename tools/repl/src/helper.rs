@@ -1,4 +1,4 @@
-use crate::command::Command;
+use crate::command::{extract_canister, Value};
 use ansi_term::Color;
 use candid::{
     check_prog,
@@ -24,6 +24,8 @@ use std::collections::BTreeMap;
 pub struct CanisterMap(BTreeMap<Principal, CanisterInfo>);
 #[derive(Default)]
 pub struct Env(pub BTreeMap<String, IDLValue>);
+#[derive(Default)]
+pub struct NameEnv(pub BTreeMap<String, Principal>);
 #[derive(Clone)]
 pub struct CanisterInfo {
     pub env: TypeEnv,
@@ -59,14 +61,16 @@ pub struct MyHelper {
     hinter: HistoryHinter,
     pub colored_prompt: String,
     pub canister_map: RefCell<CanisterMap>,
+    pub agent_url: String,
     pub agent: Agent,
     pub config: Configs,
     pub env: Env,
+    pub canister_env: NameEnv,
     pub history: Vec<String>,
 }
 
 impl MyHelper {
-    pub fn new(agent: Agent) -> Self {
+    pub fn new(agent: Agent, agent_url: String) -> Self {
         MyHelper {
             completer: FilenameCompleter::new(),
             highlighter: MatchingBracketHighlighter::new(),
@@ -76,8 +80,10 @@ impl MyHelper {
             canister_map: RefCell::new(CanisterMap::default()),
             config: Configs::from_dhall("{=}").unwrap(),
             env: Env::default(),
+            canister_env: NameEnv::default(),
             history: Vec::new(),
             agent,
+            agent_url,
         }
     }
 }
@@ -90,7 +96,7 @@ impl Completer for MyHelper {
         pos: usize,
         ctx: &Context<'_>,
     ) -> Result<(usize, Vec<Pair>), ReadlineError> {
-        match extract_canister(line, pos) {
+        match extract_canister(line, pos, &self.canister_env) {
             Some((pos, canister_id, meth, _)) => {
                 let mut map = self.canister_map.borrow_mut();
                 Ok(match map.get(&self.agent, &canister_id) {
@@ -109,7 +115,7 @@ impl Hinter for MyHelper {
         if pos < line.len() {
             return None;
         }
-        match extract_canister(line, pos) {
+        match extract_canister(line, pos, &self.canister_env) {
             Some((_, canister_id, method, args)) => {
                 let mut map = self.canister_map.borrow_mut();
                 match map.get(&self.agent, &canister_id) {
@@ -167,23 +173,10 @@ impl Validator for MyHelper {
     }
 }
 
-// Return position at the end of principal, principal, method, args
-fn extract_canister(line: &str, pos: usize) -> Option<(usize, Principal, String, Vec<IDLValue>)> {
-    let command = line[..pos].parse::<Command>().ok()?;
-    match command {
-        Command::Call {
-            canister,
-            method,
-            args,
-        } => Some((canister.span.end, canister.value, method, args)),
-        _ => None,
-    }
-}
-
 fn random_value(
     env: &TypeEnv,
     tys: &[Type],
-    given_args: &[IDLValue],
+    given_args: &[Value],
     config: &Configs,
 ) -> candid::Result<String> {
     use rand::Rng;

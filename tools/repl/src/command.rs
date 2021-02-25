@@ -1,4 +1,4 @@
-use super::helper::{Env, MyHelper};
+use super::helper::{Env, MyHelper, NameEnv};
 use super::token::{ParserError, Spanned, Tokenizer};
 use anyhow::anyhow;
 use candid::Principal;
@@ -27,15 +27,16 @@ impl Value {
 #[derive(Debug, Clone)]
 pub enum Command {
     Call {
-        canister: Spanned<Principal>,
+        canister: Spanned<String>,
         method: String,
-        args: Vec<IDLValue>,
+        args: Vec<Value>,
     },
     Config(String),
     Show(Value),
     Let(String, Value),
     Assert(Value, Value),
     Export(String),
+    Identity(String),
 }
 
 impl Command {
@@ -46,7 +47,15 @@ impl Command {
                 method,
                 args,
             } => {
-                let canister_id = &canister.value;
+                let try_id = Principal::from_text(&canister.value);
+                let canister_id = match try_id {
+                    Ok(ref id) => id,
+                    Err(_) => helper
+                        .canister_env
+                        .0
+                        .get(&canister.value)
+                        .ok_or_else(|| anyhow!("Unknown canister {}", canister.value))?,
+                };
                 let agent = &helper.agent;
                 let mut map = helper.canister_map.borrow_mut();
                 let info = map.get(&agent, canister_id)?;
@@ -54,9 +63,11 @@ impl Command {
                     .methods
                     .get(method)
                     .ok_or_else(|| anyhow!("no method {}", method))?;
-                let args = IDLArgs {
-                    args: args.to_vec(),
-                };
+                let mut values = Vec::new();
+                for arg in args.iter() {
+                    values.push(arg.get(&helper.env)?.clone());
+                }
+                let args = IDLArgs { args: values };
                 let res = call(&agent, canister_id, &method, &args, &info.env, &func)?;
                 println!("{}", res);
                 // TODO multiple values
@@ -78,11 +89,40 @@ impl Command {
                 let v = val.get(&helper.env)?;
                 println!("{}", v);
             }
-            Command::Export(_file) => {
-                //let path = Path::new(&file);
-                //let ext = path.extension().ok_or_else(|| anyhow!("extension required"))?;
-                for item in helper.history.iter() {
-                    println!("{}", item);
+            Command::Identity(id) => {
+                // TODO use existing identity
+                use ic_agent::Identity;
+                let identity = create_identity()?;
+                let sender = identity.sender().map_err(|e| anyhow!("{}", e))?;
+                println!("Create identity {}", sender);
+                let agent = Agent::builder()
+                    .with_url(&helper.agent_url)
+                    .with_identity(identity)
+                    .build()?;
+                {
+                    let mut runtime =
+                        tokio::runtime::Runtime::new().expect("Unable to create a runtime");
+                    runtime.block_on(agent.fetch_root_key())?;
+                }
+                helper.agent = agent;
+                helper
+                    .env
+                    .0
+                    .insert(id.to_string(), IDLValue::Principal(sender));
+            }
+            Command::Export(file) => {
+                use std::io::{BufWriter, Write};
+                let file = std::fs::File::create(file)?;
+                let mut writer = BufWriter::new(&file);
+                let last = helper.history.len() - 1;
+                for (i, item) in helper.history.iter().enumerate() {
+                    if i < last {
+                        let item = item
+                            .chars()
+                            .map(|c| if c == '\n' { ' ' } else { c })
+                            .collect::<String>();
+                        writeln!(&mut writer, "{}", item)?;
+                    }
                 }
             }
         }
@@ -126,4 +166,38 @@ async fn call(
             .await?
     };
     Ok(IDLArgs::from_bytes_with_types(&bytes, env, &func.rets)?)
+}
+
+fn create_identity() -> anyhow::Result<impl ic_agent::Identity> {
+    let rng = ring::rand::SystemRandom::new();
+    let pkcs8_bytes = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)?
+        .as_ref()
+        .to_vec();
+    Ok(ic_agent::identity::BasicIdentity::from_key_pair(
+        ring::signature::Ed25519KeyPair::from_pkcs8(&pkcs8_bytes)?,
+    ))
+}
+
+// Return position at the end of principal, principal, method, args
+pub fn extract_canister(
+    line: &str,
+    pos: usize,
+    env: &NameEnv,
+) -> Option<(usize, Principal, String, Vec<Value>)> {
+    let command = line[..pos].parse::<Command>().ok()?;
+    match command {
+        Command::Call {
+            canister,
+            method,
+            args,
+        } => {
+            let try_id = Principal::from_text(&canister.value);
+            let canister_id = match try_id {
+                Ok(id) => id,
+                Err(_) => env.0.get(&canister.value)?.clone(),
+            };
+            Some((canister.span.end, canister_id, method, args))
+        }
+        _ => None,
+    }
 }

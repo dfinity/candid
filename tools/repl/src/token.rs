@@ -64,6 +64,8 @@ pub enum Token {
     Let,
     #[token("assert")]
     Assert,
+    #[token("identity")]
+    Identity,
     #[token("export")]
     Export,
     #[token("==")]

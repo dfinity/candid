@@ -15,6 +15,7 @@ ic-repl --replica [local|ic|url]
  | let <id> = <val>
  | show <val>
  | assert <val> = <val>
+ | identity <id>
 
 <var> := <id> | _
 <val> := <candid val> | <var> (. <id>)*

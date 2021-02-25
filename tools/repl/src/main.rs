@@ -41,11 +41,15 @@ fn repl(opts: Opts) -> anyhow::Result<()> {
         .history_ignore_space(true)
         .completion_type(CompletionType::List)
         .build();
-    let h = MyHelper::new(agent);
+    let h = MyHelper::new(agent, url.to_string());
     let mut rl = rustyline::Editor::with_config(config);
     rl.set_helper(Some(h));
     if rl.load_history("./.history").is_err() {
         eprintln!("No history found");
+    }
+    if let Some(file) = opts.config {
+        let config = std::fs::read_to_string(file)?;
+        rl.helper_mut().unwrap().config = candid::parser::configs::Configs::from_dhall(&config)?;
     }
     let mut count = 1;
     loop {
@@ -79,6 +83,8 @@ use structopt::StructOpt;
 struct Opts {
     #[structopt(short, long)]
     replica: Option<String>,
+    #[structopt(short, long)]
+    config: Option<String>,
 }
 
 fn main() -> anyhow::Result<()> {

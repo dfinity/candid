@@ -35,6 +35,7 @@ extern {
         "show" => Token::Show,
         "assert" => Token::Assert,
         "let" => Token::Let,
+        "identity" => Token::Identity,
         "sign" => Token::Sign(<char>),
         "=" => Token::Equals,
         "==" => Token::TestEqual,
@@ -54,18 +55,15 @@ extern {
 // Command
 pub Command: Command = {
     "call" <canister:Sp<Name>> "."? =>? {
-         let id = Principal::from_text(&canister.0).map_err(|e| error2(e, canister.1.clone()))?;
-         let canister = Spanned { span: canister.1.clone(), value: id };
+         let canister = Spanned { span: canister.1.clone(), value: canister.0 };
          Ok(Command::Call{canister, method: "".to_string(), args: Vec::new()})
     },
     "call" <canister:Sp<Name>> "." <method:Name> =>? {
-         let id = Principal::from_text(&canister.0).map_err(|e| error2(e, canister.1.clone()))?;
-         let canister = Spanned { span: canister.1.clone(), value: id };    
+         let canister = Spanned { span: canister.1.clone(), value: canister.0 };    
          Ok(Command::Call{canister, method, args: Vec::new()})    
     },
-    "call" <canister:Sp<Name>> "." <method:Name> "(" <args: SepBy<AnnVal, ",">> ")"? =>? {
-         let id = Principal::from_text(&canister.0).map_err(|e| error2(e, canister.1.clone()))?;
-         let canister = Spanned { span: canister.1.clone(), value: id };    
+    "call" <canister:Sp<Name>> "." <method:Name> "(" <args: SepBy<Value, ",">> ")"? =>? {
+         let canister = Spanned { span: canister.1.clone(), value: canister.0 };    
          Ok(Command::Call{canister, method, args})
     },
     "config" <Text> => Command::Config(<>),
@@ -73,6 +71,7 @@ pub Command: Command = {
     "assert" <left:Value> "==" <right:Value> => Command::Assert(left, right),
     "let" <id:"id"> "=" <val:Value> => Command::Let(id, val),
     "export" <Text> => Command::Export(<>),
+    "identity" <"id"> => Command::Identity(<>),
 }
 
 Value: Value = {
