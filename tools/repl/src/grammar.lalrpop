@@ -54,23 +54,27 @@ extern {
 
 // Command
 pub Command: Command = {
-    "call" <canister:Sp<Name>> "."? =>? {
+    "call" <canister:Sp<Name>> "."? => {
          let canister = Spanned { span: canister.1.clone(), value: canister.0 };
-         Ok(Command::Call{canister, method: "".to_string(), args: Vec::new()})
+         Command::Call{canister, method: "".to_string(), args: Vec::new()}
     },
-    "call" <canister:Sp<Name>> "." <method:Name> =>? {
+    "call" <canister:Sp<Name>> "." <method:Name> => {
          let canister = Spanned { span: canister.1.clone(), value: canister.0 };    
-         Ok(Command::Call{canister, method, args: Vec::new()})    
+         Command::Call{canister, method, args: Vec::new()}
     },
-    "call" <canister:Sp<Name>> "." <method:Name> "(" <args: SepBy<Value, ",">> ")"? =>? {
+    "call" <canister:Sp<Name>> "." <method:Name> "(" <args: SepBy<Value, ",">> ")"? => {
          let canister = Spanned { span: canister.1.clone(), value: canister.0 };    
-         Ok(Command::Call{canister, method, args})
+         Command::Call{canister, method, args}
     },
     "config" <Text> => Command::Config(<>),
     "show" <Value> => Command::Show(<>),
     "assert" <left:Value> "==" <right:Value> => Command::Assert(left, right),
     "let" <id:"id"> "=" <val:Value> => Command::Let(id, val),
     "export" <Text> => Command::Export(<>),
+    "import" <id:"id"> "=" <uri:Sp<Text>> =>? {
+         let principal = Principal::from_text(&uri.0).map_err(|e| error2(e, uri.1))?;
+         Ok(Command::Import(id, principal))
+    },
     "identity" <"id"> => Command::Identity(<>),
 }
 

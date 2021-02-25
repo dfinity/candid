@@ -36,6 +36,7 @@ pub enum Command {
     Let(String, Value),
     Assert(Value, Value),
     Export(String),
+    Import(String, Principal),
     Identity(String),
 }
 
@@ -74,6 +75,12 @@ impl Command {
                 for arg in res.args.into_iter() {
                     helper.env.0.insert("_".to_string(), arg);
                 }
+            }
+            Command::Import(id, canister_id) => {
+                helper
+                    .canister_env
+                    .0
+                    .insert(id.to_string(), canister_id.clone());
             }
             Command::Let(id, val) => {
                 let v = val.get(&helper.env)?.clone();
