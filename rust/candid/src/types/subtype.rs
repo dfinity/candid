@@ -1,6 +1,6 @@
 use super::internal::{find_type, Field, Label, Type};
 use crate::parser::typing::TypeEnv;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Check if t1 <: t2
 pub fn subtype(env: &TypeEnv, t1: &Type, t2: &Type) -> bool {
@@ -75,8 +75,9 @@ pub fn subtype(env: &TypeEnv, t1: &Type, t2: &Type) -> bool {
             true
         }
         (Func(f1), Func(f2)) => {
-            // This is enough for now
-            if f1.modes.len() != f2.modes.len() || f1.modes[0] != f2.modes[1] {
+            let m1: HashSet<_> = f1.modes.iter().collect();
+            let m2: HashSet<_> = f2.modes.iter().collect();
+            if m1 != m2 {
                 return false;
             }
             let args1 = Record(
