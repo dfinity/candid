@@ -1,7 +1,10 @@
 use anyhow::Result;
 use candid::{
-    check_prog, parser::types::IDLTypes, pretty_parse, types::Type, Error, IDLArgs, IDLProg,
-    TypeEnv,
+    check_prog,
+    parser::types::{IDLType, IDLTypes},
+    pretty_parse,
+    types::Type,
+    Error, IDLArgs, IDLProg, TypeEnv,
 };
 use std::path::{Path, PathBuf};
 use structopt::clap::AppSettings;
@@ -68,6 +71,13 @@ enum Command {
         #[structopt(short, long, requires("method"))]
         /// Specifies input arguments for a method call, mocking the return result
         args: Option<IDLArgs>,
+    },
+    /// Check for subtyping
+    Subtype {
+        #[structopt(short, long)]
+        defs: Option<PathBuf>,
+        ty1: IDLType,
+        ty2: IDLType,
     },
     /// Diff two Candid values
     Diff {
@@ -154,6 +164,16 @@ fn main() -> Result<()> {
         Command::Check { input } => {
             let mut env = TypeEnv::new();
             check_file(&mut env, &input)?;
+        }
+        Command::Subtype { defs, ty1, ty2 } => {
+            let mut env = TypeEnv::new();
+            if let Some(file) = defs {
+                check_file(&mut env, &file)?;
+            }
+            let ty1 = env.ast_to_type(&ty1)?;
+            let ty2 = env.ast_to_type(&ty2)?;
+            let res = candid::types::subtype::subtype(&env, &ty1, &ty2);
+            println!("{}", res);
         }
         Command::Bind { input, target } => {
             let mut env = TypeEnv::new();
