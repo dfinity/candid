@@ -172,7 +172,12 @@ fn main() -> Result<()> {
             }
             let ty1 = env.ast_to_type(&ty1)?;
             let ty2 = env.ast_to_type(&ty2)?;
-            let res = candid::types::subtype::subtype(&env, &ty1, &ty2);
+            let res = candid::types::subtype::subtype(
+                &mut std::collections::HashSet::new(),
+                &env,
+                &ty1,
+                &ty2,
+            );
             println!("{}", res);
         }
         Command::Bind { input, target } => {
