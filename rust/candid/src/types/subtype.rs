@@ -10,35 +10,21 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> bool {
     if t1 == t2 {
         return true;
     }
-    let pair = (t1.clone(), t2.clone());
-    if gamma.contains(&pair) {
-        return true;
+    if matches!(t1, Var(_) | Knot(_)) || matches!(t2, Var(_) | Knot(_)) {
+        if !gamma.insert((t1.clone(), t2.clone())) {
+            return true;
+        }
+        let res = match (t1, t2) {
+            (Var(id), _) => subtype(gamma, env, env.rec_find_type(id).unwrap(), t2),
+            (_, Var(id)) => subtype(gamma, env, t1, env.rec_find_type(id).unwrap()),
+            (Knot(id), _) => subtype(gamma, env, &find_type(id).unwrap(), t2),
+            (_, Knot(id)) => subtype(gamma, env, t1, &find_type(id).unwrap()),
+            (_, _) => unreachable!(),
+        };
+        gamma.remove(&(t1.clone(), t2.clone()));
+        return res;
     }
     match (t1, t2) {
-        (_, Var(id)) => {
-            gamma.insert(pair.clone());
-            let res = subtype(gamma, env, t1, env.rec_find_type(id).unwrap());
-            gamma.remove(&pair);
-            res
-        }
-        (Var(id), _) => {
-            gamma.insert(pair.clone());
-            let res = subtype(gamma, env, env.rec_find_type(id).unwrap(), t2);
-            gamma.remove(&pair);
-            res
-        }
-        (_, Knot(id)) => {
-            gamma.insert(pair.clone());
-            let res = subtype(gamma, env, t1, &find_type(id).unwrap());
-            gamma.remove(&pair);
-            res
-        }
-        (Knot(id), _) => {
-            gamma.insert(pair.clone());
-            let res = subtype(gamma, env, &find_type(id).unwrap(), t2);
-            gamma.remove(&pair);
-            res
-        }
         (_, Reserved) => true,
         (Empty, _) => true,
         (Nat, Int) => true,
