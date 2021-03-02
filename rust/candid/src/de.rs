@@ -577,9 +577,17 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         use std::convert::TryInto;
         self.record_nesting_depth = 0;
-        self.check_type(Opcode::Int)?;
-        let v = Int::decode(&mut self.input).map_err(Error::msg)?;
-        let value: i128 = v.0.try_into().map_err(Error::msg)?;
+        let value: i128 = match self.parse_type()? {
+            Opcode::Int => {
+                let v = Int::decode(&mut self.input).map_err(Error::msg)?;
+                v.0.try_into().map_err(Error::msg)?
+            }
+            Opcode::Nat => {
+                let v = Nat::decode(&mut self.input).map_err(Error::msg)?;
+                v.0.try_into().map_err(Error::msg)?
+            }
+            _ => return Err(Error::msg("Type mismatch")),
+        };
         visitor.visit_i128(value)
     }
 

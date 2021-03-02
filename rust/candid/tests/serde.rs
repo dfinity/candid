@@ -69,6 +69,13 @@ fn test_integer() {
 }
 
 #[test]
+fn test_subtype() {
+    test_decode(&hex("4449444c00017d2a"), &Int::from(42));
+    test_decode(&hex("4449444c00017d2a"), &42i128);
+    test_decode(&hex("4449444c00017d2a"), &candid::Reserved);
+}
+
+#[test]
 fn test_fixed_number() {
     all_check(42u8, "4449444c00017b2a");
     all_check(42u16, "4449444c00017a2a00");

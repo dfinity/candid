@@ -1,8 +1,13 @@
 use super::internal::{find_type, Field, Label, Type};
 use crate::parser::typing::TypeEnv;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 pub type Gamma = HashSet<(Type, Type)>;
+
+thread_local! {
+    pub static COUNT: RefCell<usize> = RefCell::new(0);
+}
 
 /// Check if t1 <: t2
 pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> bool {
@@ -21,9 +26,14 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> bool {
             (_, Knot(id)) => subtype(gamma, env, t1, &find_type(id).unwrap()),
             (_, _) => unreachable!(),
         };
-        gamma.remove(&(t1.clone(), t2.clone()));
+        if !res {
+            gamma.remove(&(t1.clone(), t2.clone()));
+        }
         return res;
     }
+    COUNT.with(|e| {
+        *e.borrow_mut() += 1;
+    });
     match (t1, t2) {
         (_, Reserved) => true,
         (Empty, _) => true,
@@ -31,14 +41,13 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> bool {
         (Vec(ty1), Vec(ty2)) => subtype(gamma, env, ty1, ty2),
         (Null, Opt(_)) => true,
         (Opt(ty1), Opt(ty2)) if subtype(gamma, env, ty1, ty2) => true,
-        (t1, Opt(ty2)) if subtype(gamma, env, t1, ty2) && !subtype(gamma, env, &Null, ty2) => true,
-        (Opt(ty1), Opt(_ty2)) if !subtype(gamma, env, ty1, t2) => {
-            eprintln!("{} <: {} via special opt rule", t1, t2);
+        (t1, Opt(ty2))
+            if subtype(gamma, env, t1, ty2)
+                && !matches!(env.trace_type(ty2).unwrap(), Null | Reserved | Opt(_)) =>
+        {
             true
         }
-        (Opt(ty1), Opt(ty2))
-            if !subtype(gamma, env, ty1, ty2) && !subtype(gamma, env, &Null, ty1) =>
-        {
+        (t1, Opt(_)) => {
             eprintln!("{} <: {} via special opt rule", t1, t2);
             true
         }
