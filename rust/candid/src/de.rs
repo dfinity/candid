@@ -685,10 +685,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Opcode::Vec => {
                 self.check_type(Opcode::Vec)?;
                 self.check_type(Opcode::Nat8)?;
-                let len = self.leb128_read()?;
-                // TODO
-                let bytes = self.parse_bytes(len as usize)?;
-                visitor.visit_bytes(&bytes)
+                let len = self.leb128_read()? as usize;
+                let bytes: &[u8] = &self.input[0..len];
+                self.input = &self.input[len..];
+                visitor.visit_borrowed_bytes(bytes)
             }
             _ => Err(Error::msg("bytes only takes principal or vec nat8")),
         }

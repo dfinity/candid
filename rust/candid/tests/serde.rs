@@ -284,13 +284,19 @@ fn test_newtype() {
 
 #[test]
 fn test_serde_bytes() {
-    use serde_bytes::{ByteBuf, Bytes};
+    use serde_bytes::ByteBuf;
     //all_check(ByteBuf::from(vec![1, 2, 3]), "4449444c016d7c010003010203");
     test_decode(
         &hex("4449444c016d7b010003010203"),
         &ByteBuf::from(vec![1u8, 2u8, 3u8]),
     );
-    //test_decode(&hex("4449444c016d7b010003010203"), Bytes::new(&[1u8,2u8,3u8]));
+    #[derive(Deserialize, Debug, PartialEq)]
+    struct Efficient<'a> {
+        #[serde(with = "serde_bytes")]
+        b: &'a [u8],
+    }
+    let vec = Efficient { b: &vec![1, 2, 3] };
+    test_decode(&hex("4449444c026c0162016d7b010003010203"), &vec);
 }
 
 #[test]
