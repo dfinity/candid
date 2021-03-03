@@ -295,7 +295,7 @@ fn test_serde_bytes() {
         #[serde(with = "serde_bytes")]
         b: &'a [u8],
     }
-    let vec = Efficient { b: &vec![1, 2, 3] };
+    let vec = Efficient { b: &[1, 2, 3] };
     test_decode(&hex("4449444c026c0162016d7b010003010203"), &vec);
 }
 
