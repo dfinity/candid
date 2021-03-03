@@ -153,8 +153,7 @@ impl<'de> Deserializer<'de> {
         if self.input.len() < len {
             return Err(Error::msg("unexpected end of message"));
         }
-        let mut buf = Vec::new();
-        buf.resize(len, 0);
+        let mut buf = vec![0; len];
         self.input.read_exact(&mut buf)?;
         Ok(buf)
     }

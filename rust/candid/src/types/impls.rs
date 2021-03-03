@@ -130,6 +130,28 @@ where
         Ok(())
     }
 }
+impl CandidType for serde_bytes::ByteBuf {
+    fn _ty() -> Type {
+        Type::Vec(Box::new(Type::Nat8))
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_blob(&self.as_slice())
+    }
+}
+impl CandidType for serde_bytes::Bytes {
+    fn _ty() -> Type {
+        Type::Vec(Box::new(Type::Nat8))
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_blob(&self)
+    }
+}
 
 macro_rules! map_impl {
     ($ty:ident < K $(: $kbound1:ident $(+ $kbound2:ident)*)*, V $(, $typaram:ident : $bound:ident)* >) => {

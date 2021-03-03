@@ -177,6 +177,11 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
         self.write_leb128(len as u64)?;
         Ok(Self::Compound { ser: self })
     }
+    fn serialize_blob(self, blob: &[u8]) -> Result<()> {
+        self.write_leb128(blob.len() as u64)?;
+        self.write(blob)?;
+        Ok(())
+    }
 }
 
 pub struct Compound<'a> {
