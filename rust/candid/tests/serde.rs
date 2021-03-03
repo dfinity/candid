@@ -285,10 +285,9 @@ fn test_newtype() {
 #[test]
 fn test_serde_bytes() {
     use serde_bytes::ByteBuf;
-    //all_check(ByteBuf::from(vec![1, 2, 3]), "4449444c016d7c010003010203");
-    test_decode(
-        &hex("4449444c016d7b010003010203"),
-        &ByteBuf::from(vec![1u8, 2u8, 3u8]),
+    all_check(
+        ByteBuf::from(vec![1u8, 2u8, 3u8]),
+        "4449444c016d7b010003010203",
     );
     #[derive(Deserialize, Debug, PartialEq)]
     struct Efficient<'a> {
