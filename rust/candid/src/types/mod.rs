@@ -77,4 +77,7 @@ pub trait Compound {
     fn serialize_element<T: ?Sized>(&mut self, v: &T) -> Result<(), Self::Error>
     where
         T: CandidType;
+    // Used for simulating serde(with = "serde_bytes"). We can remove this when specialization is stable in Rust,
+    // or generalize this function to take a closure for with.
+    fn serialize_blob(&mut self, blob: &[u8]) -> Result<(), Self::Error>;
 }

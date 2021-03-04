@@ -196,6 +196,10 @@ impl<'a> types::Compound for Compound<'a> {
         value.idl_serialize(&mut *self.ser)?;
         Ok(())
     }
+    fn serialize_blob(&mut self, blob: &[u8]) -> Result<()> {
+        use crate::types::Serializer;
+        self.ser.serialize_blob(blob)
+    }
 }
 
 /// A structure for serializing Rust values to IDL types.

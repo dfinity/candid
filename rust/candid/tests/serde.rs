@@ -289,7 +289,7 @@ fn test_serde_bytes() {
         ByteBuf::from(vec![1u8, 2u8, 3u8]),
         "4449444c016d7b010003010203",
     );
-    #[derive(Deserialize, Debug, PartialEq)]
+    #[derive(CandidType, Deserialize, Debug, PartialEq)]
     struct Efficient<'a> {
         #[serde(with = "serde_bytes")]
         b: &'a [u8],
@@ -300,6 +300,7 @@ fn test_serde_bytes() {
         b: &[1, 2, 3],
         c: vec![1, 2, 3],
     };
+    test_encode(&vec, &hex("4449444c026c02620163016d7b01000301020303010203"));
     test_decode(&hex("4449444c026c02620163016d7b01000301020303010203"), &vec);
 }
 
