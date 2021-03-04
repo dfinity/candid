@@ -9,6 +9,9 @@
 //!
 //! Candid provides efficient, flexible and safe ways of converting data between each of these representations.
 //!
+//! Note that if you are using the [Rust CDK](https://github.com/dfinity/cdk-rs/) to develop Rust canisters, it is encouraged to
+//! use the Candid crate from `ic_cdk::export::candid` to avoid version mismatch.
+//!
 //! ## Operating on native Rust values
 //! We are using a builder pattern to encode/decode Candid messages, see [`candid::ser::IDLBuilder`](ser/struct.IDLBuilder.html) for serialization and [`candid::de::IDLDeserialize`](de/struct.IDLDeserialize.html) for deserialization.
 //!
@@ -85,6 +88,8 @@
 //! enum List {
 //!     #[serde(rename = "nil")]
 //!     Nil,
+//!     #[serde(with = "serde_bytes")]
+//!     Node(Vec<u8>),
 //!     Cons(i32, Box<List>),
 //! }
 //! let list = List::Cons(42, Box::new(List::Nil));
@@ -94,10 +99,13 @@
 //! assert_eq!(res, list);
 //! # Ok::<(), candid::Error>(())
 //! ```
-//! We also support serde's rename attributes for each field, namely `#[serde(rename = "foo")]`
+//! We support serde's rename attributes for each field, namely `#[serde(rename = "foo")]`
 //! and `#[serde(rename(serialize = "foo", deserialize = "foo"))]`.
 //! This is useful when interoperating between Rust and Motoko canisters involving variant types, because
 //! they use different naming conventions for field names.
+//!
+//! We support `#[serde(with = "serde_bytes")]` for efficient handling of `&[u8]` and `Vec<u8>`. You can
+//! also use the wrapper type `serde_bytes::ByteBuf` and `serde_bytes::Bytes`.
 //!
 //! Note that if you are deriving `Deserialize` trait from Candid, you need to import `serde` as a dependency in
 //! your project, as the derived implementation will refer to the `serde` crate.
