@@ -58,6 +58,10 @@ fn test_integer() {
         Nat::parse(b"60000000000000000").unwrap(),
         "4449444c00017d808098f4e9b5ca6a",
     );
+    test_decode(
+        &hex("4449444c00017d808098f4e9b5ca6a"),
+        &Int::parse(b"60000000000000000").unwrap(),
+    );
     all_check(
         Int::parse(b"-60000000000000000").unwrap(),
         "4449444c00017c8080e88b96cab5957f",
@@ -65,17 +69,6 @@ fn test_integer() {
     check_error(
         || test_decode(&hex("4449444c00017c2a"), &42i64),
         "Type mismatch. Type on the wire: Int; Expected type: Int64",
-    );
-}
-
-#[test]
-fn test_subtype() {
-    test_decode(&hex("4449444c00017d2a"), &Int::from(42));
-    test_decode(&hex("4449444c00017d2a"), &42i128);
-    test_decode(&hex("4449444c00017b2a"), &candid::Reserved);
-    test_decode(
-        &hex("4449444c016c02d3e3aa027e868eb7027c0100012a"),
-        &candid::Reserved,
     );
 }
 
@@ -94,6 +87,7 @@ fn test_fixed_number() {
     all_check(-42i64, "4449444c000174d6ffffffffffffff");
     all_check(-42isize, "4449444c000174d6ffffffffffffff");
     all_check(42i128, "4449444c00017c2a");
+    test_decode(&hex("4449444c00017d2a"), &42i128);
 }
 
 #[test]
@@ -117,6 +111,11 @@ fn test_text() {
 fn test_reserved() {
     use candid::{Empty, Reserved};
     all_check(Reserved, "4449444c000170");
+    test_decode(&hex("4449444c00017b2a"), &candid::Reserved);
+    test_decode(
+        &hex("4449444c016c02d3e3aa027e868eb7027c0100012a"),
+        &candid::Reserved,
+    );
     let res: Result<u8, Empty> = Ok(1);
     all_check(res, "4449444c016b02bc8a017bc5fed2016f01000001");
     let bytes = hex("4449444c016b02bc8a017bc5fed2016f010001");
