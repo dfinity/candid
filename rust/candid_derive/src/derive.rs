@@ -14,8 +14,8 @@ pub(crate) fn derive_idl_type(input: DeriveInput) -> TokenStream {
     let (ty_body, ser_body) = match input.data {
         Data::Enum(ref data) => enum_from_ast(&name, &data.variants),
         Data::Struct(ref data) => {
-            let (ty, idents) = struct_from_ast(&data.fields);
-            (ty, serialize_struct(&idents))
+            let (ty, idents, is_bytes) = struct_from_ast(&data.fields);
+            (ty, serialize_struct(&idents, &is_bytes))
         }
         Data::Union(_) => unimplemented!("doesn't derive union type"),
     };
@@ -44,6 +44,7 @@ struct Variant {
     hash: u32,
     ty: TokenStream,
     members: Vec<Ident>,
+    with_bytes: bool,
 }
 enum Style {
     Struct,
@@ -101,20 +102,22 @@ fn enum_from_ast(
         .iter()
         .map(|variant| {
             let id = variant.ident.clone();
-            let (renamed_ident, hash) = match get_rename_attrs(&variant.attrs) {
+            let attrs = get_attrs(&variant.attrs);
+            let (renamed_ident, hash) = match attrs.rename {
                 Some(ref rename) => (
                     proc_macro2::Ident::new(rename, proc_macro2::Span::call_site()),
                     idl_hash(rename),
                 ),
                 None => (id.clone(), idl_hash(&id.unraw().to_string())),
             };
-            let (ty, idents) = struct_from_ast(&variant.fields);
+            let (ty, idents, _) = struct_from_ast(&variant.fields);
             Variant {
                 real_ident: id,
                 renamed_ident,
                 hash,
                 ty,
                 members: idents,
+                with_bytes: attrs.with_bytes,
             }
         })
         .collect();
@@ -148,8 +151,14 @@ fn enum_from_ast(
             let (pattern, id) = f.to_pattern();
             (
                 pattern,
-                quote! {
-                    #(#candid::types::Compound::serialize_element(&mut ser, #id)?;)*
+                if f.with_bytes {
+                    quote! {
+                        #(#candid::types::Compound::serialize_blob(&mut ser, #id.as_ref())?;)*
+                    }
+                } else {
+                    quote! {
+                        #(#candid::types::Compound::serialize_element(&mut ser, #id)?;)*
+                    }
                 },
             )
         })
@@ -166,33 +175,52 @@ fn enum_from_ast(
     (ty_gen, variant_gen)
 }
 
-fn serialize_struct(idents: &[Ident]) -> TokenStream {
+fn serialize_struct(idents: &[Ident], is_bytes: &[bool]) -> TokenStream {
     let candid = candid_path();
     let id = idents.iter().map(|ident| ident.to_token());
+    let ser_elem = id.zip(is_bytes.iter()).map(|(id, is_bytes)| {
+        if *is_bytes {
+            quote! { #candid::types::Compound::serialize_blob(&mut ser, self.#id.as_ref())?; }
+        } else {
+            quote! { #candid::types::Compound::serialize_element(&mut ser, &self.#id)?; }
+        }
+    });
     quote! {
         let mut ser = __serializer.serialize_struct()?;
-        #(#candid::types::Compound::serialize_element(&mut ser, &self.#id)?;)*
+        #(#ser_elem)*
         Ok(())
     }
 }
 
-fn struct_from_ast(fields: &syn::Fields) -> (TokenStream, Vec<Ident>) {
+fn struct_from_ast(fields: &syn::Fields) -> (TokenStream, Vec<Ident>, Vec<bool>) {
     let candid = candid_path();
     match *fields {
         syn::Fields::Named(ref fields) => {
-            let (fs, idents) = fields_from_ast(&fields.named);
-            (quote! { #candid::types::Type::Record(#fs) }, idents)
+            let (fs, idents, is_bytes) = fields_from_ast(&fields.named);
+            (
+                quote! { #candid::types::Type::Record(#fs) },
+                idents,
+                is_bytes,
+            )
         }
         syn::Fields::Unnamed(ref fields) => {
-            let (fs, idents) = fields_from_ast(&fields.unnamed);
+            let (fs, idents, is_bytes) = fields_from_ast(&fields.unnamed);
             if idents.len() == 1 {
                 let newtype = derive_type(&fields.unnamed[0].ty);
-                (quote! { #newtype }, idents)
+                (quote! { #newtype }, idents, is_bytes)
             } else {
-                (quote! { #candid::types::Type::Record(#fs) }, idents)
+                (
+                    quote! { #candid::types::Type::Record(#fs) },
+                    idents,
+                    is_bytes,
+                )
             }
         }
-        syn::Fields::Unit => (quote! { #candid::types::Type::Null }, Vec::new()),
+        syn::Fields::Unit => (
+            quote! { #candid::types::Type::Null },
+            Vec::new(),
+            Vec::new(),
+        ),
     }
 }
 
@@ -223,6 +251,7 @@ struct Field {
     renamed_ident: Ident,
     hash: u32,
     ty: TokenStream,
+    with_bytes: bool,
 }
 
 fn get_serde_meta_items(attr: &syn::Attribute) -> Result<Vec<syn::NestedMeta>, ()> {
@@ -235,15 +264,24 @@ fn get_serde_meta_items(attr: &syn::Attribute) -> Result<Vec<syn::NestedMeta>, (
     }
 }
 
-fn get_rename_attrs(attrs: &[syn::Attribute]) -> Option<String> {
+struct Attributes {
+    rename: Option<String>,
+    with_bytes: bool,
+}
+
+fn get_attrs(attrs: &[syn::Attribute]) -> Attributes {
     use syn::Meta::{List, NameValue};
     use syn::NestedMeta::Meta;
+    let mut res = Attributes {
+        rename: None,
+        with_bytes: false,
+    };
     for item in attrs.iter().flat_map(get_serde_meta_items).flatten() {
         match &item {
             // #[serde(rename = "foo")]
             Meta(NameValue(m)) if m.path.is_ident("rename") => {
                 if let syn::Lit::Str(lit) = &m.lit {
-                    return Some(lit.value());
+                    res.rename = Some(lit.value());
                 }
             }
             // #[serde(rename(serialize = "foo"))]
@@ -252,29 +290,40 @@ fn get_rename_attrs(attrs: &[syn::Attribute]) -> Option<String> {
                     match item {
                         Meta(NameValue(m)) if m.path.is_ident("serialize") => {
                             if let syn::Lit::Str(lit) = &m.lit {
-                                return Some(lit.value());
+                                res.rename = Some(lit.value());
                             }
                         }
                         _ => continue,
                     }
                 }
             }
+            // #[serde(with = "serde_bytes")]
+            Meta(NameValue(m)) if m.path.is_ident("with") => {
+                if let syn::Lit::Str(lit) = &m.lit {
+                    if lit.value() == "serde_bytes" {
+                        res.with_bytes = true;
+                    }
+                }
+            }
             _ => continue,
         }
     }
-    None
+    res
 }
 
-fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (TokenStream, Vec<Ident>) {
+fn fields_from_ast(
+    fields: &Punctuated<syn::Field, syn::Token![,]>,
+) -> (TokenStream, Vec<Ident>, Vec<bool>) {
     let candid = candid_path();
     let mut fs: Vec<_> = fields
         .iter()
         .enumerate()
         .map(|(i, field)| {
+            let attrs = get_attrs(&field.attrs);
             let (real_ident, renamed_ident, hash) = match field.ident {
                 Some(ref ident) => {
                     let real_ident = Ident::Named(ident.clone());
-                    match get_rename_attrs(&field.attrs) {
+                    match attrs.rename {
                         Some(ref renamed) => {
                             let ident =
                                 proc_macro2::Ident::new(renamed, proc_macro2::Span::call_site());
@@ -295,6 +344,7 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (TokenStr
                 renamed_ident,
                 hash,
                 ty: derive_type(&field.ty),
+                with_bytes: attrs.with_bytes,
             }
         })
         .collect();
@@ -324,7 +374,8 @@ fn fields_from_ast(fields: &Punctuated<syn::Field, syn::Token![,]>) -> (TokenStr
         .iter()
         .map(|Field { real_ident, .. }| real_ident.clone())
         .collect();
-    (ty_gen, idents)
+    let is_bytes: Vec<_> = fs.iter().map(|f| f.with_bytes).collect();
+    (ty_gen, idents, is_bytes)
 }
 
 fn derive_type(t: &syn::Type) -> TokenStream {

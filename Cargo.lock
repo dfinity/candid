@@ -282,6 +282,7 @@ dependencies = [
  "pretty 0.10.0",
  "rand 0.8.3",
  "serde",
+ "serde_bytes",
  "serde_dhall",
  "test-generator",
  "thiserror",

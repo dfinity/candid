@@ -177,6 +177,11 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
         self.write_leb128(len as u64)?;
         Ok(Self::Compound { ser: self })
     }
+    fn serialize_blob(self, blob: &[u8]) -> Result<()> {
+        self.write_leb128(blob.len() as u64)?;
+        self.write(blob)?;
+        Ok(())
+    }
 }
 
 pub struct Compound<'a> {
@@ -190,6 +195,10 @@ impl<'a> types::Compound for Compound<'a> {
     {
         value.idl_serialize(&mut *self.ser)?;
         Ok(())
+    }
+    fn serialize_blob(&mut self, blob: &[u8]) -> Result<()> {
+        use crate::types::Serializer;
+        self.ser.serialize_blob(blob)
     }
 }
 
