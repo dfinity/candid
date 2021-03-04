@@ -113,11 +113,14 @@
 //! ## Operating on big integers
 //! To support big integer types [`Candid::Int`](types/number/struct.Int.html) and [`Candid::Nat`](types/number/struct.Nat.html),
 //! we use the `num_bigint` crate. We provide interface to convert `i64`, `u64`, `&str` and `&[u8]` to big integers.
+//! You can also use `i128` and `u128` to represent Candid `int` and `nat` types respectively (decoding will fail if
+//! the number is more than 128 bits).
 //! ```
 //! use candid::{Int, Nat, Encode, Decode};
 //! let x = "-10000000000000000000".parse::<Int>()?;
 //! let bytes = Encode!(&Nat::from(1024), &x)?;
 //! let (a, b) = Decode!(&bytes, Nat, Int)?;
+//! let (c, d) = Decode!(&bytes, u128, i128)?;
 //! assert_eq!(a + 1, 1025);
 //! assert_eq!(b, Int::parse(b"-10000000000000000000")?);
 //! # Ok::<(), candid::Error>(())
