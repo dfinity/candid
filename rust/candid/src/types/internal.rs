@@ -264,7 +264,15 @@ pub struct Function {
     pub args: Vec<Type>,
     pub rets: Vec<Type>,
 }
-
+impl fmt::Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            crate::bindings::candid::pp_function(&self).pretty(80)
+        )
+    }
+}
 impl Function {
     pub fn is_query(&self) -> bool {
         self.modes.contains(&crate::parser::types::FuncMode::Query)

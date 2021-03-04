@@ -290,6 +290,28 @@ fn test_newtype() {
 }
 
 #[test]
+fn test_serde_bytes() {
+    use serde_bytes::ByteBuf;
+    all_check(
+        ByteBuf::from(vec![1u8, 2u8, 3u8]),
+        "4449444c016d7b010003010203",
+    );
+    #[derive(CandidType, Deserialize, Debug, PartialEq)]
+    struct Efficient<'a> {
+        #[serde(with = "serde_bytes")]
+        b: &'a [u8],
+        #[serde(with = "serde_bytes")]
+        c: Vec<u8>,
+    }
+    let vec = Efficient {
+        b: &[1, 2, 3],
+        c: vec![1, 2, 3],
+    };
+    test_encode(&vec, &hex("4449444c026c02620163016d7b01000301020303010203"));
+    test_decode(&hex("4449444c026c02620163016d7b01000301020303010203"), &vec);
+}
+
+#[test]
 fn test_keyword_label() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct A {

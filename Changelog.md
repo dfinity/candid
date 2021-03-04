@@ -1,6 +1,10 @@
 
 # Changelog
 
+## 2021-03-04 (Rust 0.6.17)
+
+* Support `serde_bytes` for efficient handling of `&[u8]` and `Vec<u8>`
+
 ## 2021-02-11
 
 ### Rust (0.6.16)
