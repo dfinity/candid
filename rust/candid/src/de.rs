@@ -153,8 +153,7 @@ impl<'de> Deserializer<'de> {
         if self.input.len() < len {
             return Err(Error::msg("unexpected end of message"));
         }
-        let mut buf = Vec::new();
-        buf.resize(len, 0);
+        let mut buf = vec![0; len];
         self.input.read_exact(&mut buf)?;
         Ok(buf)
     }
@@ -335,7 +334,7 @@ impl<'de> Deserializer<'de> {
         self.field_name = Some(field);
     }
     // Customize deserailization methods
-    // Several deserialize functions will call visit_bytes.
+    // Several deserialize functions will call visit_byte_buf.
     // We reserve the first byte to be a tag to distinguish between different callers:
     // int(0), nat(1), principal(2), reserved(3)
     // This is necessary for deserializing IDLValue because
@@ -670,6 +669,29 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         visitor.visit_newtype_struct(self)
     }
+    fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+        self.record_nesting_depth = 0;
+        self.check_type(Opcode::Vec)?;
+        self.check_type(Opcode::Nat8)?;
+        let len = self.leb128_read()?;
+        let bytes = self.parse_bytes(len as usize)?;
+        visitor.visit_byte_buf(bytes)
+    }
+    fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+        self.record_nesting_depth = 0;
+        match self.peek_type()? {
+            Opcode::Principal => self.deserialize_principal(visitor),
+            Opcode::Vec => {
+                self.check_type(Opcode::Vec)?;
+                self.check_type(Opcode::Nat8)?;
+                let len = self.leb128_read()? as usize;
+                let bytes: &[u8] = &self.input[0..len];
+                self.input = &self.input[len..];
+                visitor.visit_borrowed_bytes(bytes)
+            }
+            _ => Err(Error::msg("bytes only takes principal or vec nat8")),
+        }
+    }
     fn deserialize_seq<V>(mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -787,7 +809,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     serde::forward_to_deserialize_any! {
-        char bytes byte_buf
+        char
     }
 }
 
