@@ -72,7 +72,11 @@ fn test_integer() {
 fn test_subtype() {
     test_decode(&hex("4449444c00017d2a"), &Int::from(42));
     test_decode(&hex("4449444c00017d2a"), &42i128);
-    test_decode(&hex("4449444c00017d2a"), &candid::Reserved);
+    test_decode(&hex("4449444c00017b2a"), &candid::Reserved);
+    test_decode(
+        &hex("4449444c016c02d3e3aa027e868eb7027c0100012a"),
+        &candid::Reserved,
+    );
 }
 
 #[test]
