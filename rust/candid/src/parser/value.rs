@@ -323,13 +323,13 @@ impl IDLValue {
 
 impl crate::CandidType for IDLValue {
     fn ty() -> Type {
-        unreachable!();
+        Type::Unknown
     }
     fn id() -> crate::types::TypeId {
         unreachable!();
     }
     fn _ty() -> Type {
-        unreachable!();
+        Type::Unknown
     }
     fn idl_serialize<S>(&self, serializer: S) -> std::result::Result<(), S::Error>
     where
@@ -473,12 +473,6 @@ impl<'de> Deserialize<'de> for IDLValue {
             {
                 let v = Deserialize::deserialize(deserializer)?;
                 Ok(IDLValue::Opt(Box::new(v)))
-            }
-            fn __private_visit_untagged_option<D>(self, deserializer: D) -> DResult<()>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                Ok(Deserialize::deserialize(deserializer).unwrap_or(IDLValue::None))
             }
             fn visit_unit<E>(self) -> DResult<E> {
                 Ok(IDLValue::Null)

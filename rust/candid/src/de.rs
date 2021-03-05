@@ -1,8 +1,8 @@
 //! Deserialize Candid binary format to Rust data structures
 
 use super::error::{Error, Result};
-use super::types::internal::Opcode;
-use super::{idl_hash, Int, Nat};
+use super::types::internal::{Opcode, Type};
+use super::{idl_hash, CandidType, Int, Nat};
 use byteorder::{LittleEndian, ReadBytesExt};
 use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
 use serde::de::{self, Deserialize, Visitor};
@@ -27,7 +27,7 @@ impl<'de> IDLDeserialize<'de> {
     /// Deserialize one value from deserializer.
     pub fn get_value<T>(&mut self) -> Result<T>
     where
-        T: de::Deserialize<'de>,
+        T: de::Deserialize<'de> + CandidType,
     {
         let ty = self
             .de
@@ -36,7 +36,9 @@ impl<'de> IDLDeserialize<'de> {
             .ok_or_else(|| Error::msg("No more values to deserialize"))?;
         self.de.current_type.push_back(ty);
 
+        self.de.expected_type = T::ty();
         let v = T::deserialize(&mut self.de).map_err(|e| self.de.dump_error_state(e))?;
+        self.de.expected_type = Type::Unknown;
         if self.de.current_type.is_empty() && self.de.field_name.is_none() {
             Ok(v)
         } else {
@@ -51,7 +53,7 @@ impl<'de> IDLDeserialize<'de> {
     /// Return error if there are unprocessed bytes in the input.
     pub fn done(mut self) -> Result<()> {
         while !self.is_done() {
-            self.get_value::<crate::parser::value::IDLValue>()?;
+            self.get_value::<crate::Reserved>()?;
         }
         if !self.de.input.is_empty() {
             return Err(Error::msg("Trailing value after finishing deserialization"))
@@ -113,6 +115,7 @@ struct Deserializer<'de> {
     field_name: Option<FieldLabel>,
     // The record nesting depth should be bounded by the length of table to avoid infinite loop.
     record_nesting_depth: usize,
+    expected_type: Type,
 }
 
 impl<'de> Deserializer<'de> {
@@ -124,6 +127,7 @@ impl<'de> Deserializer<'de> {
             current_type: VecDeque::new(),
             field_name: None,
             record_nesting_depth: 0,
+            expected_type: Type::Unknown,
         }
     }
 
@@ -654,10 +658,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                         self.pop_current_type()?;
                         visitor.visit_none()
                     }
-                    // If fail to decode opt, return None
-                    1 => visitor
-                        .__private_visit_untagged_option(self)
-                        .map_err(|_| de::Error::custom("always success")),
+                    // TODO handle subtyping failure
+                    1 => visitor.visit_some(self),
                     _ => Err(de::Error::custom("not an option tag")),
                 }
             }
@@ -665,9 +667,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.parse_type()?;
                 visitor.visit_none()
             }
-            _ => visitor
-                .__private_visit_untagged_option(self)
-                .map_err(|_| de::Error::custom("always success")),
+            _ => visitor.visit_some(self),
         }
     }
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
@@ -1081,7 +1081,7 @@ macro_rules! decode_impl {
     ( $($id: ident : $typename: ident),* ) => {
         impl<'a, $( $typename ),*> ArgumentDecoder<'a> for ($($typename,)*)
         where
-            $( $typename: Deserialize<'a> ),*
+            $( $typename: Deserialize<'a> + CandidType),*
         {
             fn decode(de: &mut IDLDeserialize<'a>) -> Result<Self> {
                 $(
@@ -1239,7 +1239,7 @@ where
 /// ```
 pub fn decode_one<'a, T>(bytes: &'a [u8]) -> Result<T>
 where
-    T: Deserialize<'a>,
+    T: Deserialize<'a> + CandidType,
 {
     let (res,) = decode_args(bytes)?;
     Ok(res)
