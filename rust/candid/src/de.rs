@@ -645,16 +645,29 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.record_nesting_depth = 0;
-        self.check_type(Opcode::Opt)?;
-        let bit = self.parse_byte()?;
-        if bit == 0u8 {
-            // Skip the type T of Option<T>
-            self.pop_current_type()?;
-            visitor.visit_none()
-        } else if bit == 1u8 {
-            visitor.visit_some(self)
-        } else {
-            Err(de::Error::custom("not an option value"))
+        match self.peek_type()? {
+            Opcode::Opt => {
+                self.parse_type()?;
+                match self.parse_byte()? {
+                    0 => {
+                        // Skip the type T of Option<T>
+                        self.pop_current_type()?;
+                        visitor.visit_none()
+                    }
+                    // If fail to decode opt, return None
+                    1 => visitor
+                        .__private_visit_untagged_option(self)
+                        .map_err(|_| de::Error::custom("always success")),
+                    _ => Err(de::Error::custom("not an option tag")),
+                }
+            }
+            Opcode::Null | Opcode::Reserved => {
+                self.parse_type()?;
+                visitor.visit_none()
+            }
+            _ => visitor
+                .__private_visit_untagged_option(self)
+                .map_err(|_| de::Error::custom("always success")),
         }
     }
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>

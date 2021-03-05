@@ -474,6 +474,12 @@ impl<'de> Deserialize<'de> for IDLValue {
                 let v = Deserialize::deserialize(deserializer)?;
                 Ok(IDLValue::Opt(Box::new(v)))
             }
+            fn __private_visit_untagged_option<D>(self, deserializer: D) -> DResult<()>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                Ok(Deserialize::deserialize(deserializer).unwrap_or(IDLValue::None))
+            }
             fn visit_unit<E>(self) -> DResult<E> {
                 Ok(IDLValue::Null)
             }
