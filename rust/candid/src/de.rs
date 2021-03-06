@@ -672,7 +672,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 }
             }
             Opcode::Null | Opcode::Reserved => {
-                self.parse_type()?;
+                self.table.parse_type()?;
                 visitor.visit_none()
             }
             _ => visitor.visit_some(self),
