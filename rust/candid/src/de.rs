@@ -129,6 +129,7 @@ struct TypeTable {
     current_type: VecDeque<RawValue>,
 }
 impl TypeTable {
+    // Parse the type table and return the remaining bytes
     fn from_bytes(input: &[u8]) -> Result<(Self, &[u8])> {
         let mut bytes = Bytes::from(input);
         let mut table: Vec<Vec<RawValue>> = Vec::new();
