@@ -332,7 +332,7 @@ impl TypeSerialize {
         Ok(())
     }
 
-    fn push_type(&mut self, t: &Type) -> Result<()> {
+    pub fn push_type(&mut self, t: &Type) -> Result<()> {
         self.args.push(t.clone());
         self.build_type(t)
     }
@@ -390,7 +390,7 @@ impl TypeSerialize {
         Ok(())
     }
 
-    fn serialize(&mut self) -> Result<()> {
+    pub fn serialize(&mut self) -> Result<()> {
         leb128_encode(&mut self.result, self.type_table.len() as u64)?;
         self.result.append(&mut self.type_table.concat());
 

@@ -36,9 +36,9 @@ impl<'de> IDLDeserialize<'de> {
             .ok_or_else(|| Error::msg("No more values to deserialize"))?;
         self.de.table.current_type.push_back(ty);
 
-        self.de.expected_type = T::ty();
+        self.de.expected_type = TypeTable::from_type(&T::ty())?;
         let v = T::deserialize(&mut self.de).map_err(|e| self.de.dump_error_state(e))?;
-        self.de.expected_type = Type::Unknown;
+        self.de.expected_type = None;
         if self.de.table.current_type.is_empty() && self.de.field_name.is_none() {
             Ok(v)
         } else {
@@ -131,6 +131,20 @@ struct TypeTable {
     current_type: VecDeque<RawValue>,
 }
 impl TypeTable {
+    fn from_type(t: &Type) -> Result<Option<Self>> {
+        if matches!(t, Type::Unknown) {
+            Ok(None)
+        } else {
+            use std::io::Write;
+            let mut ser = crate::ser::TypeSerialize::new();
+            ser.push_type(t)?;
+            ser.serialize()?;
+            let mut input = Vec::new();
+            input.write_all(b"DIDL")?;
+            input.write_all(ser.get_result())?;
+            Ok(Some(Self::from_bytes(&input)?.0))
+        }
+    }
     // Parse the type table and return the remaining bytes
     fn from_bytes(input: &[u8]) -> Result<(Self, &[u8])> {
         let mut bytes = Bytes::from(input);
@@ -326,7 +340,7 @@ struct Deserializer<'de> {
     field_name: Option<FieldLabel>,
     // The record nesting depth should be bounded by the length of table to avoid infinite loop.
     record_nesting_depth: usize,
-    expected_type: Type,
+    expected_type: Option<TypeTable>,
 }
 
 impl<'de> Deserializer<'de> {
@@ -337,6 +351,7 @@ impl<'de> Deserializer<'de> {
             table,
             field_name: None,
             record_nesting_depth: 0,
+            expected_type: None,
         })
     }
 
