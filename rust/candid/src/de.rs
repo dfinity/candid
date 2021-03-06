@@ -20,8 +20,7 @@ pub struct IDLDeserialize<'de> {
 impl<'de> IDLDeserialize<'de> {
     /// Create a new deserializer with IDL binary message.
     pub fn new(bytes: &'de [u8]) -> Result<Self> {
-        let mut de = Deserializer::from_bytes(bytes);
-        de.parse_table().map_err(|e| de.dump_error_state(e))?;
+        let de = Deserializer::from_bytes(bytes)?;
         Ok(IDLDeserialize { de })
     }
     /// Deserialize one value from deserializer.
@@ -56,7 +55,7 @@ impl<'de> IDLDeserialize<'de> {
         while !self.is_done() {
             self.get_value::<crate::Reserved>()?;
         }
-        if !self.de.input.is_empty() {
+        if !self.de.input.0.is_empty() {
             return Err(Error::msg("Trailing value after finishing deserialization"))
                 .map_err(|e| self.de.dump_error_state(e));
         }
@@ -84,7 +83,43 @@ impl RawValue {
     }
 }
 
-#[derive(Default)]
+struct Bytes<'a>(&'a [u8]);
+impl<'a> Bytes<'a> {
+    fn from(input: &'a [u8]) -> Self {
+        Bytes(input)
+    }
+    fn leb128_read(&mut self) -> Result<u64> {
+        leb128_decode(&mut self.0).map_err(Error::msg)
+    }
+    fn sleb128_read(&mut self) -> Result<i64> {
+        sleb128_decode(&mut self.0).map_err(Error::msg)
+    }
+    fn parse_byte(&mut self) -> Result<u8> {
+        let mut buf = [0u8; 1];
+        self.0.read_exact(&mut buf)?;
+        Ok(buf[0])
+    }
+    fn parse_bytes(&mut self, len: usize) -> Result<Vec<u8>> {
+        if self.0.len() < len {
+            return Err(Error::msg("unexpected end of message"));
+        }
+        let mut buf = vec![0; len];
+        self.0.read_exact(&mut buf)?;
+        Ok(buf)
+    }
+    fn parse_string(&mut self, len: usize) -> Result<String> {
+        let buf = self.parse_bytes(len)?;
+        String::from_utf8(buf).map_err(Error::msg)
+    }
+    fn parse_magic(&mut self) -> Result<()> {
+        let mut buf = [0u8; 4];
+        match self.0.read(&mut buf) {
+            Ok(4) if buf == *MAGIC_NUMBER => Ok(()),
+            _ => Err(Error::msg(format!("wrong magic number {:?}", buf))),
+        }
+    }
+}
+
 struct TypeTable {
     // Raw value of the type description table
     table: Vec<Vec<RawValue>>,
@@ -96,6 +131,126 @@ struct TypeTable {
     current_type: VecDeque<RawValue>,
 }
 impl TypeTable {
+    // Parse the type table and return the remaining bytes
+    fn from_bytes(input: &[u8]) -> Result<(Self, &[u8])> {
+        let mut bytes = Bytes::from(input);
+        let mut table: Vec<Vec<RawValue>> = Vec::new();
+        let mut types = VecDeque::new();
+
+        bytes.parse_magic()?;
+        let len = bytes.leb128_read()? as usize;
+        let mut expect_func = std::collections::HashSet::new();
+        for i in 0..len {
+            let mut buf = Vec::new();
+            let ty = bytes.sleb128_read()?;
+            buf.push(RawValue::I(ty));
+            if expect_func.contains(&i) && ty != -22 {
+                return Err(Error::msg(format!(
+                    "Expect function opcode, but got {}",
+                    ty
+                )));
+            }
+            match Opcode::try_from(ty) {
+                Ok(Opcode::Opt) | Ok(Opcode::Vec) => {
+                    let ty = bytes.sleb128_read()?;
+                    validate_type_range(ty, len)?;
+                    buf.push(RawValue::I(ty));
+                }
+                Ok(Opcode::Record) | Ok(Opcode::Variant) => {
+                    let obj_len = u32::try_from(bytes.leb128_read()?)
+                        .map_err(|_| Error::msg(Error::msg("length out of u32")))?;
+                    buf.push(RawValue::U(obj_len));
+                    let mut prev_hash = None;
+                    for _ in 0..obj_len {
+                        let hash = u32::try_from(bytes.leb128_read()?)
+                            .map_err(|_| Error::msg(Error::msg("field hash out of u32")))?;
+                        if let Some(prev_hash) = prev_hash {
+                            if prev_hash >= hash {
+                                return Err(Error::msg("field id collision or not sorted"));
+                            }
+                        }
+                        prev_hash = Some(hash);
+                        buf.push(RawValue::U(hash));
+                        let ty = bytes.sleb128_read()?;
+                        validate_type_range(ty, len)?;
+                        buf.push(RawValue::I(ty));
+                    }
+                }
+                Ok(Opcode::Service) => {
+                    let obj_len = u32::try_from(bytes.leb128_read()?)
+                        .map_err(|_| Error::msg(Error::msg("length out of u32")))?;
+                    // Push one element to the table to ensure it's a non-primitive type
+                    buf.push(RawValue::U(obj_len));
+                    let mut prev = None;
+                    for _ in 0..obj_len {
+                        let mlen = bytes.leb128_read()? as usize;
+                        let meth = bytes.parse_string(mlen)?;
+                        if let Some(prev) = prev {
+                            if prev >= meth {
+                                return Err(Error::msg("method name collision or not sorted"));
+                            }
+                        }
+                        prev = Some(meth);
+                        let ty = bytes.sleb128_read()?;
+                        validate_type_range(ty, len)?;
+                        // Check for method type
+                        if ty >= 0 {
+                            let idx = ty as usize;
+                            if idx < table.len() && table[idx][0] != RawValue::I(-22) {
+                                return Err(Error::msg("not a function type"));
+                            } else {
+                                expect_func.insert(idx);
+                            }
+                        } else {
+                            return Err(Error::msg("not a function type"));
+                        }
+                    }
+                }
+                Ok(Opcode::Func) => {
+                    let arg_len = bytes.leb128_read()?;
+                    // Push one element to the table to ensure it's a non-primitive type
+                    buf.push(RawValue::U(arg_len as u32));
+                    for _ in 0..arg_len {
+                        let ty = bytes.sleb128_read()?;
+                        validate_type_range(ty, len)?;
+                    }
+                    let ret_len = bytes.leb128_read()?;
+                    for _ in 0..ret_len {
+                        let ty = bytes.sleb128_read()?;
+                        validate_type_range(ty, len)?;
+                    }
+                    let ann_len = bytes.leb128_read()?;
+                    for _ in 0..ann_len {
+                        let ann = bytes.parse_byte()?;
+                        if ann > 2u8 {
+                            return Err(Error::msg("Unknown function annotation"));
+                        }
+                    }
+                }
+                _ => {
+                    return Err(Error::msg(format!(
+                        "Unsupported op_code {} in type table",
+                        ty
+                    )))
+                }
+            };
+            table.push(buf);
+        }
+        let len = bytes.leb128_read()?;
+        for _i in 0..len {
+            let ty = bytes.sleb128_read()?;
+            validate_type_range(ty, table.len())?;
+            types.push_back(RawValue::I(ty));
+        }
+        Ok((
+            TypeTable {
+                table,
+                types,
+                current_type: VecDeque::new(),
+            },
+            bytes.0,
+        ))
+    }
     fn pop_current_type(&mut self) -> Result<RawValue> {
         self.current_type
             .pop_front()
@@ -164,7 +319,7 @@ enum FieldLabel {
 }
 
 struct Deserializer<'de> {
-    input: &'de [u8],
+    input: Bytes<'de>,
     table: TypeTable,
     // field_name tells deserialize_identifier which field name to process.
     // This field should always be set by set_field_name function.
@@ -175,19 +330,19 @@ struct Deserializer<'de> {
 }
 
 impl<'de> Deserializer<'de> {
-    fn from_bytes(input: &'de [u8]) -> Self {
-        Deserializer {
-            input,
-            table: TypeTable::default(),
+    fn from_bytes(input: &'de [u8]) -> Result<Self> {
+        let (table, input) = TypeTable::from_bytes(input)?;
+        Ok(Deserializer {
+            input: Bytes::from(input),
+            table,
             field_name: None,
             record_nesting_depth: 0,
-            expected_type: Type::Unknown,
-        }
+        })
     }
 
     fn dump_error_state(&self, e: Error) -> Error {
         let mut str = format!("Trailing type: {:?}\n", self.table.current_type);
-        str.push_str(&format!("Trailing value: {:02x?}\n", self.input));
+        str.push_str(&format!("Trailing value: {:02x?}\n", self.input.0));
         if self.field_name.is_some() {
             str.push_str(&format!("Trailing field_name: {:?}\n", self.field_name));
         }
@@ -196,147 +351,6 @@ impl<'de> Deserializer<'de> {
         e.with_states(str)
     }
 
-    fn leb128_read(&mut self) -> Result<u64> {
-        leb128_decode(&mut self.input).map_err(Error::msg)
-    }
-    fn sleb128_read(&mut self) -> Result<i64> {
-        sleb128_decode(&mut self.input).map_err(Error::msg)
-    }
-    fn parse_byte(&mut self) -> Result<u8> {
-        let mut buf = [0u8; 1];
-        self.input.read_exact(&mut buf)?;
-        Ok(buf[0])
-    }
-    fn parse_bytes(&mut self, len: usize) -> Result<Vec<u8>> {
-        if self.input.len() < len {
-            return Err(Error::msg("unexpected end of message"));
-        }
-        let mut buf = vec![0; len];
-        self.input.read_exact(&mut buf)?;
-        Ok(buf)
-    }
-    fn parse_string(&mut self, len: usize) -> Result<String> {
-        let buf = self.parse_bytes(len)?;
-        String::from_utf8(buf).map_err(Error::msg)
-    }
-    fn parse_magic(&mut self) -> Result<()> {
-        let mut buf = [0u8; 4];
-        match self.input.read(&mut buf) {
-            Ok(4) if buf == *MAGIC_NUMBER => Ok(()),
-            _ => Err(Error::msg(format!("wrong magic number {:?}", buf))),
-        }
-    }
-    // Parse magic number, type table, and type seq from input.
-    fn parse_table(&mut self) -> Result<()> {
-        self.parse_magic()?;
-        let len = self.leb128_read()? as usize;
-        let mut expect_func = std::collections::HashSet::new();
-        for i in 0..len {
-            let mut buf = Vec::new();
-            let ty = self.sleb128_read()?;
-            buf.push(RawValue::I(ty));
-            if expect_func.contains(&i) && ty != -22 {
-                return Err(Error::msg(format!(
-                    "Expect function opcode, but got {}",
-                    ty
-                )));
-            }
-            match Opcode::try_from(ty) {
-                Ok(Opcode::Opt) | Ok(Opcode::Vec) => {
-                    let ty = self.sleb128_read()?;
-                    validate_type_range(ty, len)?;
-                    buf.push(RawValue::I(ty));
-                }
-                Ok(Opcode::Record) | Ok(Opcode::Variant) => {
-                    let obj_len = u32::try_from(self.leb128_read()?)
-                        .map_err(|_| Error::msg(Error::msg("length out of u32")))?;
-                    buf.push(RawValue::U(obj_len));
-                    let mut prev_hash = None;
-                    for _ in 0..obj_len {
-                        let hash = u32::try_from(self.leb128_read()?)
-                            .map_err(|_| Error::msg(Error::msg("field hash out of u32")))?;
-                        if let Some(prev_hash) = prev_hash {
-                            if prev_hash >= hash {
-                                return Err(Error::msg("field id collision or not sorted"));
-                            }
-                        }
-                        prev_hash = Some(hash);
-                        buf.push(RawValue::U(hash));
-                        let ty = self.sleb128_read()?;
-                        validate_type_range(ty, len)?;
-                        buf.push(RawValue::I(ty));
-                    }
-                }
-                Ok(Opcode::Service) => {
-                    let obj_len = u32::try_from(self.leb128_read()?)
-                        .map_err(|_| Error::msg(Error::msg("length out of u32")))?;
-                    // Push one element to the table to ensure it's a non-primitive type
-                    buf.push(RawValue::U(obj_len));
-                    let mut prev = None;
-                    for _ in 0..obj_len {
-                        let mlen = self.leb128_read()? as usize;
-                        let meth = self.parse_string(mlen)?;
-                        if let Some(prev) = prev {
-                            if prev >= meth {
-                                return Err(Error::msg("method name collision or not sorted"));
-                            }
-                        }
-                        prev = Some(meth);
-                        let ty = self.sleb128_read()?;
-                        validate_type_range(ty, len)?;
-                        // Check for method type
-                        if ty >= 0 {
-                            let idx = ty as usize;
-                            if idx < self.table.table.len()
-                                && self.table.table[idx][0] != RawValue::I(-22)
-                            {
-                                return Err(Error::msg("not a function type"));
-                            } else {
-                                expect_func.insert(idx);
-                            }
-                        } else {
-                            return Err(Error::msg("not a function type"));
-                        }
-                    }
-                }
-                Ok(Opcode::Func) => {
-                    let arg_len = self.leb128_read()?;
-                    // Push one element to the table to ensure it's a non-primitive type
-                    buf.push(RawValue::U(arg_len as u32));
-                    for _ in 0..arg_len {
-                        let ty = self.sleb128_read()?;
-                        validate_type_range(ty, len)?;
-                    }
-                    let ret_len = self.leb128_read()?;
-                    for _ in 0..ret_len {
-                        let ty = self.sleb128_read()?;
-                        validate_type_range(ty, len)?;
-                    }
-                    let ann_len = self.leb128_read()?;
-                    for _ in 0..ann_len {
-                        let ann = self.parse_byte()?;
-                        if ann > 2u8 {
-                            return Err(Error::msg("Unknown function annotation"));
-                        }
-                    }
-                }
-                _ => {
-                    return Err(Error::msg(format!(
-                        "Unsupported op_code {} in type table",
-                        ty
-                    )))
-                }
-            };
-            self.table.table.push(buf);
-        }
-        let len = self.leb128_read()?;
-        for _i in 0..len {
-            let ty = self.sleb128_read()?;
-            validate_type_range(ty, self.table.table.len())?;
-            self.table.types.push_back(RawValue::I(ty));
-        }
-        Ok(())
-    }
     // Should always call set_field_name to set the field_name. After deserialize_identifier
     // processed the field_name, field_name will be reset to None.
     fn set_field_name(&mut self, field: FieldLabel) {
@@ -357,7 +371,7 @@ impl<'de> Deserializer<'de> {
     {
         self.record_nesting_depth = 0;
         self.table.check_type(Opcode::Int)?;
-        let v = Int::decode(&mut self.input).map_err(Error::msg)?;
+        let v = Int::decode(&mut self.input.0).map_err(Error::msg)?;
         let bytes = v.0.to_signed_bytes_le();
         let mut tagged = vec![0u8];
         tagged.extend_from_slice(&bytes);
@@ -369,19 +383,19 @@ impl<'de> Deserializer<'de> {
     {
         self.record_nesting_depth = 0;
         self.table.check_type(Opcode::Nat)?;
-        let v = Nat::decode(&mut self.input).map_err(Error::msg)?;
+        let v = Nat::decode(&mut self.input.0).map_err(Error::msg)?;
         let bytes = v.0.to_bytes_le();
         let mut tagged = vec![1u8];
         tagged.extend_from_slice(&bytes);
         visitor.visit_byte_buf(tagged)
     }
     fn decode_principal(&mut self) -> Result<Vec<u8>> {
-        let bit = self.parse_byte()?;
+        let bit = self.input.parse_byte()?;
         if bit != 1u8 {
             return Err(Error::msg("Opaque reference not supported"));
         }
-        let len = self.leb128_read()? as usize;
-        self.parse_bytes(len)
+        let len = self.input.leb128_read()? as usize;
+        self.input.parse_bytes(len)
     }
     fn deserialize_principal<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
@@ -413,13 +427,13 @@ impl<'de> Deserializer<'de> {
         self.record_nesting_depth = 0;
         self.table.check_type(Opcode::Func)?;
         self.table.pop_current_type()?;
-        let bit = self.parse_byte()?;
+        let bit = self.input.parse_byte()?;
         if bit != 1u8 {
             return Err(Error::msg("Opaque reference not supported"));
         }
         let vec = self.decode_principal()?;
-        let len = self.leb128_read()? as usize;
-        let meth = self.parse_bytes(len)?;
+        let len = self.input.leb128_read()? as usize;
+        let meth = self.input.parse_bytes(len)?;
         let mut tagged = vec![5u8];
         // TODO: find a better way
         leb128::write::unsigned(&mut tagged, len as u64)?;
@@ -451,7 +465,7 @@ macro_rules! primitive_impl {
             where V: Visitor<'de> {
                 self.record_nesting_depth = 0;
                 self.table.check_type($opcode)?;
-                let value = self.input.$($value)*().map_err(|_| Error::msg(format!("cannot read {} value", stringify!($opcode))))?;
+                let value = self.input.0.$($value)*().map_err(|_| Error::msg(format!("cannot read {} value", stringify!($opcode))))?;
                 visitor.[<visit_ $ty>](value)
             }
         }
@@ -590,11 +604,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.record_nesting_depth = 0;
         let value: i128 = match self.table.parse_type()? {
             Opcode::Int => {
-                let v = Int::decode(&mut self.input).map_err(Error::msg)?;
+                let v = Int::decode(&mut self.input.0).map_err(Error::msg)?;
                 v.0.try_into().map_err(Error::msg)?
             }
             Opcode::Nat => {
-                let v = Nat::decode(&mut self.input).map_err(Error::msg)?;
+                let v = Nat::decode(&mut self.input.0).map_err(Error::msg)?;
                 v.0.try_into().map_err(Error::msg)?
             }
             _ => return Err(Error::msg("Type mismatch")),
@@ -609,7 +623,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         use std::convert::TryInto;
         self.record_nesting_depth = 0;
         self.table.check_type(Opcode::Nat)?;
-        let v = Nat::decode(&mut self.input).map_err(Error::msg)?;
+        let v = Nat::decode(&mut self.input.0).map_err(Error::msg)?;
         let value: u128 = v.0.try_into().map_err(Error::msg)?;
         visitor.visit_u128(value)
     }
@@ -620,7 +634,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.record_nesting_depth = 0;
         self.table.check_type(Opcode::Bool)?;
-        let byte = self.parse_byte()?;
+        let byte = self.input.parse_byte()?;
         if byte > 1u8 {
             return Err(de::Error::custom("not a boolean value"));
         }
@@ -634,8 +648,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.record_nesting_depth = 0;
         self.table.check_type(Opcode::Text)?;
-        let len = self.leb128_read()? as usize;
-        let value = self.parse_string(len)?;
+        let len = self.input.leb128_read()? as usize;
+        let value = self.input.parse_string(len)?;
         visitor.visit_string(value)
     }
 
@@ -645,10 +659,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.record_nesting_depth = 0;
         self.table.check_type(Opcode::Text)?;
-        let len = self.leb128_read()? as usize;
+        let len = self.input.leb128_read()? as usize;
         let value: Result<&str> =
-            std::str::from_utf8(&self.input[0..len]).map_err(de::Error::custom);
-        self.input = &self.input[len..];
+            std::str::from_utf8(&self.input.0[0..len]).map_err(de::Error::custom);
+        self.input.0 = &self.input.0[len..];
         visitor.visit_borrowed_str(value?)
     }
 
@@ -660,7 +674,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         match self.table.peek_type()? {
             Opcode::Opt => {
                 self.table.parse_type()?;
-                match self.parse_byte()? {
+                match self.input.parse_byte()? {
                     0 => {
                         // Skip the type T of Option<T>
                         self.table.pop_current_type()?;
@@ -702,8 +716,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.record_nesting_depth = 0;
         self.table.check_type(Opcode::Vec)?;
         self.table.check_type(Opcode::Nat8)?;
-        let len = self.leb128_read()?;
-        let bytes = self.parse_bytes(len as usize)?;
+        let len = self.input.leb128_read()?;
+        let bytes = self.input.parse_bytes(len as usize)?;
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
@@ -713,9 +727,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Opcode::Vec => {
                 self.table.check_type(Opcode::Vec)?;
                 self.table.check_type(Opcode::Nat8)?;
-                let len = self.leb128_read()? as usize;
-                let bytes: &[u8] = &self.input[0..len];
-                self.input = &self.input[len..];
+                let len = self.input.leb128_read()? as usize;
+                let bytes: &[u8] = &self.input.0[0..len];
+                self.input.0 = &self.input.0[len..];
                 visitor.visit_borrowed_bytes(bytes)
             }
             _ => Err(Error::msg("bytes only takes principal or vec nat8")),
@@ -728,7 +742,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.record_nesting_depth = 0;
         match self.table.parse_type()? {
             Opcode::Vec => {
-                let len = self.leb128_read()?;
+                let len = self.input.leb128_read()?;
                 let value = visitor.visit_seq(Compound::new(&mut self, Style::Vector { len }));
                 // Skip the type T of Vec<T>.
                 self.table.pop_current_type()?;
@@ -747,7 +761,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.record_nesting_depth = 0;
         self.table.check_type(Opcode::Vec)?;
-        let len = self.leb128_read()?;
+        let len = self.input.leb128_read()?;
         let ty = self.table.peek_current_type()?.clone();
         let value = visitor.visit_map(Compound::new(&mut self, Style::Map { len, ty }));
         self.table.pop_current_type()?;
@@ -982,7 +996,7 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
     {
         match self.style {
             Style::Enum { len, ref fs } => {
-                let index = u32::try_from(self.de.leb128_read()?)
+                let index = u32::try_from(self.de.input.leb128_read()?)
                     .map_err(|_| Error::msg("variant index out of u32"))?;
                 if index >= len {
                     return Err(Error::msg(format!(
