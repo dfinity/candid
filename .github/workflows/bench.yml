@@ -20,7 +20,7 @@ jobs:
           ~/.cargo/git
           target
         key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
-    - uses: jasonwilliams/criterion-compare-action@master
+    - uses: boa-dev/criterion-compare-action@v2
       with:
         cwd: rust/candid
         benchName: benchmark
