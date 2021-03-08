@@ -22,5 +22,6 @@ jobs:
         key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
     - uses: jasonwilliams/criterion-compare-action@move_to_actions
       with:
-        cwd: "rust/candid"
+        cwd: rust/candid
+        benchName: benchmark
         token: ${{ secrets.GITHUB_TOKEN }}
