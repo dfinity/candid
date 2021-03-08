@@ -61,6 +61,7 @@ fn bench_blob(c: &mut Criterion) {
 
 fn bench_profile(c: &mut Criterion) {
     #[derive(CandidType, Deserialize, Clone)]
+    #[allow(non_snake_case)]
     struct Profile {
         id: Principal,
         imgUrl: String,
