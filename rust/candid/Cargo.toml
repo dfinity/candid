@@ -45,7 +45,7 @@ rand = { version = "0.8", optional = true }
 goldenfile = "1.1.0"
 test-generator = "0.3.0"
 rand = "0.8"
-iai = { git = "https://github.com/bheisler/iai.git", branch = "main" }
+criterion = "0.3"
 
 [[bench]]
 name = "benchmark"
