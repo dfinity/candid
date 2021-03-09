@@ -1,0 +1,29 @@
+name: Rust Bench
+on: [pull_request]
+jobs:
+  runBenchMark:
+    name: run benchmark
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+      with:
+        fetch-depth: 0
+    - name: Install stable toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+    - name: Cache cargo build
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
+    - uses: boa-dev/criterion-compare-action@master
+      with:
+        cwd: rust/candid
+        benchName: benchmark  # needed to address https://bheisler.github.io/criterion.rs/book/faq.html#cargo-bench-gives-unrecognized-option-errors-for-valid-command-line-options
+        token: ${{ secrets.GITHUB_TOKEN }}
