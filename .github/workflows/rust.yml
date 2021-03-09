@@ -4,13 +4,9 @@ on:
     branches:
       - master
   pull_request:
-    paths:
-    - '**.rs'
-    - 'rust/**'
-    - 'test/**'
 
 jobs:
-  tests:
+  rust:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
