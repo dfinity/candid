@@ -28,7 +28,7 @@ jobs:
     - uses: actions-rs/install@v0.1
       with:
         crate: critcmp
-        version: latest
+        version: 0.1.4
         use-tool-cache: true
     - uses: boa-dev/criterion-compare-action@master
       with:
