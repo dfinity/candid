@@ -16,7 +16,6 @@ const MAGIC_NUMBER: &[u8; 4] = b"DIDL";
 pub struct IDLDeserialize<'de> {
     de: Deserializer<'de>,
 }
-
 impl<'de> IDLDeserialize<'de> {
     /// Create a new deserializer with IDL binary message.
     pub fn new(bytes: &'de [u8]) -> Result<Self> {
