@@ -82,7 +82,7 @@ fn bench_profile(c: &mut Criterion) {
         education: "**King's College London**  \nBA, Computer Science".to_string(),
         imgUrl: "https://media-exp1.licdn.com/dms/image/C5603AQHdxGV6zMbg-A/profile-displayphoto-shrink_200_200/0?e=1592438400&v=beta&t=NlR0J9mgJXd3SO6K3YJ6xBC_wCip20u5THPNKu6ImYQ".to_string(),
     };
-    let profiles: Vec<_> = std::iter::repeat(profile).take(500).collect();
+    let profiles: Vec<_> = std::iter::repeat(profile).take(200).collect();
     c.bench_with_input(
         BenchmarkId::new("profiles", profiles.len()),
         &profiles,
