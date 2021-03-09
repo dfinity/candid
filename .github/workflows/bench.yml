@@ -25,6 +25,11 @@ jobs:
           ~/.cargo/git
           target
         key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
+    - uses: actions-rs/install@v0.1
+      with:
+        crate: critcmp
+        version: latest
+        use-tool-cache: true
     - uses: boa-dev/criterion-compare-action@master
       with:
         cwd: rust/candid
