@@ -4,6 +4,10 @@ on:
     branches:
       - master
   pull_request:
+    paths:
+    - '**.rs'
+    - 'rust/**'
+    - 'test/**'
 
 jobs:
   tests:
