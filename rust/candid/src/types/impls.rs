@@ -317,6 +317,23 @@ where
         (**self).idl_serialize(serializer)
     }
 }
+impl<'a, T> CandidType for &'a mut T
+where
+    T: ?Sized + CandidType,
+{
+    fn id() -> TypeId {
+        TypeId::of::<&T>()
+    } // ignore lifetime
+    fn _ty() -> Type {
+        T::ty()
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        (**self).idl_serialize(serializer)
+    }
+}
 
 impl<'a, T> CandidType for std::borrow::Cow<'a, T>
 where
