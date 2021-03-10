@@ -50,12 +50,21 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenSt
         ));
     }
     if attrs.is_init {
-        // TODO check return type is either empty or Self
-        if let Some(init) = INIT.lock().unwrap().as_mut() {
-            if init.is_some() {
-                return Err(Error::new_spanned(&sig.ident, "duplicate init method"));
-            };
-            *init = Some(args);
+        match (rets.len(), rets.get(0).map(|x| x.as_str())) {
+            (0, None) | (1, Some("Self")) => {
+                if let Some(init) = INIT.lock().unwrap().as_mut() {
+                    if init.is_some() {
+                        return Err(Error::new_spanned(&sig.ident, "duplicate init method"));
+                    };
+                    *init = Some(args);
+                }
+            }
+            _ => {
+                return Err(Error::new_spanned(
+                    &sig.output,
+                    "init method should have no return value or return Self",
+                ))
+            }
         }
     } else if let Some(map) = METHODS.lock().unwrap().as_mut() {
         if map
