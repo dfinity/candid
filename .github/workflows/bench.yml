@@ -23,9 +23,8 @@ jobs:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
-          ~/.cargo/bin/critcmp
           target
-        key: ${{ runner.os }}-benchmark-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
     - uses: boa-dev/criterion-compare-action@master
       with:
         cwd: rust/candid
