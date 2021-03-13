@@ -111,6 +111,9 @@ fn enum_from_ast(
                 None => (id.clone(), idl_hash(&id.unraw().to_string())),
             };
             let (ty, idents, _) = struct_from_ast(&variant.fields);
+            if attrs.with_bytes {
+                panic!("[serde(with = \"serde_bytes\")] cannot be used in enum. Use ByteBuf or Bytes type instead. This is a limitation of the current implementation");
+            }
             Variant {
                 real_ident: id,
                 renamed_ident,
@@ -339,6 +342,9 @@ fn fields_from_ast(
                 }
                 None => (Ident::Unnamed(i as u32), Ident::Unnamed(i as u32), i as u32),
             };
+            if attrs.with_bytes && !is_bytes_type(&field.ty) {
+                panic!("[serde(with = \"serde_bytes\")] can only be used for Vec<u8> and &[u8]. Use ByteBuf or Bytes type instead. This is a limitation of the current implementation");
+            }
             Field {
                 real_ident,
                 renamed_ident,
@@ -382,6 +388,37 @@ fn derive_type(t: &syn::Type) -> TokenStream {
     let candid = candid_path();
     quote! {
         <#t as #candid::types::CandidType>::ty()
+    }
+}
+
+fn is_bytes_type(t: &syn::Type) -> bool {
+    use syn::Type;
+    match t {
+        Type::Path(p) => {
+            let seg = &p.path.segments[0];
+            if let syn::PathArguments::AngleBracketed(arg) = &seg.arguments {
+                if let syn::GenericArgument::Type(Type::Path(p)) = &arg.args[0] {
+                    return &seg.ident.to_string() == "Vec"
+                        && p.path
+                            .get_ident()
+                            .filter(|id| &id.to_string() == "u8")
+                            .is_some();
+                }
+            }
+            false
+        }
+        Type::Slice(s) => {
+            if let Type::Path(p) = &*s.elem {
+                p.path
+                    .get_ident()
+                    .filter(|id| &id.to_string() == "u8")
+                    .is_some()
+            } else {
+                false
+            }
+        }
+        Type::Reference(r) => is_bytes_type(&*r.elem),
+        _ => false,
     }
 }
 
