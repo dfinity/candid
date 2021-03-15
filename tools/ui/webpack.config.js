@@ -1,9 +1,11 @@
 const path = require("path");
 const TerserPlugin = require("terser-webpack-plugin");
 const dfxJson = require("./dfx.json");
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
 
 // List of all aliases for canisters. This creates the module alias for
-// the `import ... from "ic:canisters/xyz"` where xyz is the name of a
+// the `import ... from "@dfinity/ic/canisters/xyz"` where xyz is the name of a
 // canister.
 const aliases = Object.entries(dfxJson.canisters).reduce(
   (acc, [name, _value]) => {
@@ -19,8 +21,7 @@ const aliases = Object.entries(dfxJson.canisters).reduce(
 
     return {
       ...acc,
-      ["ic:canisters/" + name]: path.join(outputRoot, name + ".js"),
-      ["ic:idl/" + name]: path.join(outputRoot, name + ".did.js"),
+      ["dfx-generated/" + name]: path.join(outputRoot, name + ".js"),
     };
   },
   {}
@@ -30,21 +31,31 @@ const aliases = Object.entries(dfxJson.canisters).reduce(
  * Generate a webpack configuration for a canister.
  */
 function generateWebpackConfigForCanister(name, info) {
-  if (typeof info.frontend !== "object") {
-    return;
-  }
+  //if (typeof info.frontend !== "object") {
+  //  return;
+  //}
 
   return {
     mode: "production",
     entry: {
-      index: path.join(__dirname, info.frontend.entrypoint),
+      index: path.join(__dirname, "src/index.js"),
     },
+    target: 'web',
     devtool: "source-map",
     optimization: {
       minimize: true,
       minimizer: [new TerserPlugin()],
     },
     resolve: {
+      plugins: [new TsconfigPathsPlugin({ configFile: './tsconfig.json' })],
+      extensions: [".js", ".ts", ".jsx", ".tsx"],
+      fallback: {
+        //"assert": require.resolve("assert/"),
+        //"buffer": require.resolve("buffer/"),
+        //"events": require.resolve("events/"),
+        //"stream": require.resolve("stream-browserify/"),
+        //"util": require.resolve("util/"),
+      },
       alias: aliases,
     },
     output: {
@@ -59,10 +70,25 @@ function generateWebpackConfigForCanister(name, info) {
     // tutorial, uncomment the following lines:
     module: {
       rules: [
-        { test: /\.css$/, use: ['style-loader','css-loader'] }
+        { test: /\.css$/, use: ['style-loader','css-loader'] },
+        {  test: /\.(jsx|ts|tsx)$/,
+          use: {
+            loader: "ts-loader",
+            options: {
+              // eslint-disable-next-line no-undef
+              configFile: path.join(__dirname, 'tsconfig.json'),
+              projectReferences: true,
+            }
+          }
+        }
       ]
     },
-    plugins: [],
+    plugins: [
+      new HtmlWebpackPlugin({
+        template: 'src/candid.html',
+        filename: 'index.html',
+      }),
+    ],
   };
 }
 
