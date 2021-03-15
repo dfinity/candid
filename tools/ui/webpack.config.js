@@ -2,7 +2,9 @@ const path = require("path");
 const TerserPlugin = require("terser-webpack-plugin");
 const dfxJson = require("./dfx.json");
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
+const webpack = require("webpack");
 
 // List of all aliases for canisters. This creates the module alias for
 // the `import ... from "@dfinity/ic/canisters/xyz"` where xyz is the name of a
@@ -87,6 +89,15 @@ function generateWebpackConfigForCanister(name, info) {
       new HtmlWebpackPlugin({
         template: 'src/candid.html',
         filename: 'index.html',
+      }),
+      new CopyWebpackPlugin([
+        {
+          from: 'src/favicon.ico',
+          to: 'favicon.ico',
+        },
+      ]),   
+      new webpack.ProvidePlugin({
+        Buffer: [require.resolve('buffer/'), 'Buffer'],
       }),
     ],
   };

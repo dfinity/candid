@@ -1,5 +1,5 @@
 import { Actor, IDL, InputBox, Principal, UI, HttpAgent } from '@dfinity/agent';
-import { SiteInfo } from './site';
+import { SiteInfo, DomainKind } from './site';
 import './candid.css';
 
 const agent = new HttpAgent();
@@ -17,31 +17,50 @@ function getCanisterId(): Principal {
 }
 
 export async function fetchActor(canisterId: Principal): Promise<CanisterActor> {
+  let js;
+  if (site.kind !== DomainKind.Ic0) {
+    js = await getLocalDidJs(canisterId);
+  } else {
+    js = await getRemoteDidJs(canisterId);
+  }
+  if (!js) {
+    throw new Error('Cannot fetch candid file');
+  }
+  const dataUri = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(js);
+  const candid: any = await eval('import("' + dataUri + '")');
+  return Actor.createActor(candid.default, { agent, canisterId });
+}
+
+async function getLocalDidJs(canisterId: Principal): Promise<undefined | string> {
+  const origin = window.location.origin;
+  const url = `${origin}/_/candid?canisterId=${canisterId.toText()}&format=js`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    return undefined;
+  }
+  return response.text();
+}
+
+async function getRemoteDidJs(canisterId: Principal): Promise<undefined | string> {
   const common_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
     __get_candid_interface_tmp_hack: IDL.Func([], [IDL.Text], ['query']),
   });
   const actor: CanisterActor = Actor.createActor(common_interface, { agent, canisterId });
   const candid_source: any = await actor.__get_candid_interface_tmp_hack();
-  const candid: any = await didToJs(candid_source);
-  return Actor.createActor(candid.default, { agent, canisterId });
-}
-
-export async function didToJs(source: string) {
+  // call didjs canister
   const didjs_id = getCanisterId();
   const didjs_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
     did_to_js: IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
   });
   const didjs: CanisterActor = Actor.createActor(didjs_interface, { agent, canisterId: didjs_id });
-  const js: any = await didjs.did_to_js(source);
+  const js: any = await didjs.did_to_js(candid_source);
   if (js === []) {
     return undefined;
   }
-  const dataUri = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(js[0]);
-  const candid = await eval('import("' + dataUri + '")');
-  return candid;
+  return js[0];
 }
 
-export function render(id: string, canister: CanisterActor) {
+export function render(id: Principal, canister: CanisterActor) {
   document.getElementById('canisterId')!.innerText = `${id}`;
   const sortedMethods = Actor.interfaceOf(canister)._fields.sort(([a], [b]) => (a > b ? 1 : -1));
   for (const [name, func] of sortedMethods) {

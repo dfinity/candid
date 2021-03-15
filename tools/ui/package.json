@@ -7,9 +7,10 @@
     "build": "webpack"
   },
   "devDependencies": {
-    "@dfinity/agent": "0.6.25-beta.0",
+    "@dfinity/agent": "0.6.26-beta.1",
     "buffer": "6.0.3",
     "css-loader": "^3.6.0",
+    "copy-webpack-plugin": "^5.1.1",
     "html-webpack-plugin": "^5.2.0",
     "style-loader": "^1.2.1",
     "terser-webpack-plugin": "^4.2.2",
