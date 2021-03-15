@@ -7,7 +7,7 @@ class CanisterActor extends Actor {
   [x: string]: (...args: unknown[]) => Promise<unknown>;
 }
 
-export async function fetchActor(didjs: Principal, canisterId: Principal) {
+export async function fetchActor(didjs: Principal, canisterId: Principal): Promise<CanisterActor> {
   const common_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
     __get_candid_interface_tmp_hack: IDL.Func([], [IDL.Text], ['query']),
   });
@@ -31,7 +31,7 @@ export async function didToJs(didjs_id: Principal, source: string) {
   return candid;
 }
 
-export function render(id: Principal, canister: CanisterActor) {
+export function render(id: string, canister: CanisterActor) {
   document.getElementById('canisterId')!.innerText = `${id}`;
   const sortedMethods = Actor.interfaceOf(canister)._fields.sort(([a], [b]) => (a > b ? 1 : -1));
   for (const [name, func] of sortedMethods) {

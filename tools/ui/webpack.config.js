@@ -38,7 +38,7 @@ function generateWebpackConfigForCanister(name, info) {
   return {
     mode: "production",
     entry: {
-      index: path.join(__dirname, "src/index.js"),
+      index: path.join(__dirname, "src/index.ts"),
     },
     target: 'web',
     devtool: "source-map",
@@ -51,7 +51,7 @@ function generateWebpackConfigForCanister(name, info) {
       extensions: [".js", ".ts", ".jsx", ".tsx"],
       fallback: {
         //"assert": require.resolve("assert/"),
-        //"buffer": require.resolve("buffer/"),
+        "buffer": require.resolve("buffer/"),
         //"events": require.resolve("events/"),
         //"stream": require.resolve("stream-browserify/"),
         //"util": require.resolve("util/"),

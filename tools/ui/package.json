@@ -8,6 +8,7 @@
   },
   "devDependencies": {
     "@dfinity/agent": "0.6.25-beta.0",
+    "buffer": "6.0.3",
     "css-loader": "^3.6.0",
     "html-webpack-plugin": "^5.2.0",
     "style-loader": "^1.2.1",
