@@ -1,23 +1,33 @@
 import { Actor, IDL, InputBox, Principal, UI, HttpAgent } from '@dfinity/agent';
+import { SiteInfo } from './site';
 import './candid.css';
 
 const agent = new HttpAgent();
+const site = SiteInfo.fromWindow()
 
 class CanisterActor extends Actor {
   [x: string]: (...args: unknown[]) => Promise<unknown>;
 }
 
-export async function fetchActor(didjs: Principal, canisterId: Principal): Promise<CanisterActor> {
+function getCanisterId(): Principal {
+  if (!site.principal) {
+    throw new Error('Could not find canister Id');
+  }
+  return site.principal;
+}
+
+export async function fetchActor(canisterId: Principal): Promise<CanisterActor> {
   const common_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
     __get_candid_interface_tmp_hack: IDL.Func([], [IDL.Text], ['query']),
   });
   const actor: CanisterActor = Actor.createActor(common_interface, { agent, canisterId });
   const candid_source: any = await actor.__get_candid_interface_tmp_hack();
-  const candid: any = await didToJs(didjs, candid_source);
+  const candid: any = await didToJs(candid_source);
   return Actor.createActor(candid.default, { agent, canisterId });
 }
 
-export async function didToJs(didjs_id: Principal, source: string) {
+export async function didToJs(source: string) {
+  const didjs_id = getCanisterId();
   const didjs_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
     did_to_js: IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
   });

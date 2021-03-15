@@ -9,10 +9,7 @@ if (!cid) {
 } else {
   (async () => {
     const canisterId = Principal.fromText(cid);
-    const didjs = Principal.fromText('rrkah-fqaaa-aaaaa-aaaaq-cai');
-    const actor = await fetchActor(didjs, canisterId);
-    const div = document.createElement('div');
-    document.body.appendChild(div);
+    const actor = await fetchActor(canisterId);
     render(cid, actor);
   })();
 }
