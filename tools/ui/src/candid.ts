@@ -1,5 +1,5 @@
 import { Actor, IDL, InputBox, Principal, UI, HttpAgent } from '@dfinity/agent';
-import { SiteInfo, DomainKind } from './site';
+import { SiteInfo } from './site';
 import './candid.css';
 
 const agent = new HttpAgent();
@@ -18,10 +18,14 @@ function getCanisterId(): Principal {
 
 export async function fetchActor(canisterId: Principal): Promise<CanisterActor> {
   let js;
-  if (site.kind !== DomainKind.Ic0) {
-    js = await getLocalDidJs(canisterId);
-  } else {
+  try {
     js = await getRemoteDidJs(canisterId);
+  } catch(err) {
+    if (/__get_candid_interface_tmp_hack/.test(err)) {
+      js = await getLocalDidJs(canisterId);
+    } else {
+      throw(err);
+    }
   }
   if (!js) {
     throw new Error('Cannot fetch candid file');

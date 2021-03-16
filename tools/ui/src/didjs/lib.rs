@@ -1,4 +1,6 @@
-use ic_cdk::export::candid::{check_prog, CandidType, Deserialize, IDLProg, TypeEnv};
+use ic_cdk::export::candid::{
+    candid_method, check_prog, export_service, CandidType, Deserialize, IDLProg, TypeEnv,
+};
 
 #[derive(CandidType, Deserialize)]
 pub struct HeaderField(pub String, pub String);
@@ -21,6 +23,7 @@ pub struct HttpResponse {
 }
 
 #[ic_cdk_macros::query]
+#[candid_method(query)]
 fn did_to_js(prog: String) -> Option<String> {
     let ast = prog.parse::<IDLProg>().ok()?;
     let mut env = TypeEnv::new();
@@ -43,6 +46,7 @@ fn get_path(url: &str) -> Option<&str> {
 }
 
 #[ic_cdk_macros::query]
+#[candid_method(query)]
 fn http_request(request: HttpRequest) -> HttpResponse {
     //TODO add /canister_id/ as endpoint when ICQC is available.
     let path = get_path(request.url.as_str()).unwrap_or("/");
@@ -63,4 +67,11 @@ fn http_request(request: HttpRequest) -> HttpResponse {
             body: path.as_bytes().to_vec(),
         }
     }
+}
+
+export_service!();
+
+#[ic_cdk_macros::query(name = "__get_candid_interface_tmp_hack")]
+fn export_candid() -> String {
+    __export_service()
 }
