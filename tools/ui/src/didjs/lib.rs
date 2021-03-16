@@ -1,4 +1,4 @@
-use ic_cdk::export::candid::{check_prog, IDLProg, TypeEnv, CandidType, Deserialize};
+use ic_cdk::export::candid::{check_prog, CandidType, Deserialize, IDLProg, TypeEnv};
 
 #[derive(CandidType, Deserialize)]
 pub struct HeaderField(pub String, pub String);
@@ -16,7 +16,7 @@ pub struct HttpRequest {
 pub struct HttpResponse {
     pub status_code: u16,
     pub headers: Vec<HeaderField>,
-    #[serde(with = "serde_bytes")]    
+    #[serde(with = "serde_bytes")]
     pub body: Vec<u8>,
 }
 

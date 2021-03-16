@@ -10,6 +10,10 @@ async function main() {
     const canisterId = Principal.fromText(cid);
     const actor = await fetchActor(canisterId);
     render(canisterId, actor);
+    const app = document.getElementById('app');
+    const progress = document.getElementById('progress');
+    progress!.remove();
+    app!.style.display = 'block';
   }
 }
 
@@ -20,7 +24,9 @@ main().catch(err => {
   pre.innerHTML = err.stack;
   div.appendChild(pre);
   const app = document.getElementById('app');
-  app!.innerHTML = '';
-  app!.appendChild(div);
+  const progress = document.getElementById('progress');
+  progress!.remove();
+  app!.remove();
+  document.body.appendChild(div);
   throw err;
 });

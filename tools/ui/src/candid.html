@@ -8,9 +8,13 @@
       href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;500&display=swap"
       rel="stylesheet"
     />
+    <style>.ic_progress { display: block; margin: 50vh auto; width: 25vw; }</style>
   </head>
   <body>
-    <app id="app">
+    <div id="progress">
+      <progress class="ic_progress" id="ic-progress">Loading Candid UI...</progress>
+    </div>
+    <app id="app" style="display: none">
       <div id="header">Canister ID:&nbsp;<span id="canisterId"></span></div>
       <div id="container">
         <div id="main-content">
