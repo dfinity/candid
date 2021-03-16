@@ -461,7 +461,7 @@ macro_rules! primitive_impl {
             where V: Visitor<'de> {
                 self.record_nesting_depth = 0;
                 self.table.check_type($opcode)?;
-                let value = self.input.0.$($value)*().map_err(|_| Error::msg(format!("cannot read {} value", stringify!($opcode))))?;
+                let value = (self.input.0).$($value)*().map_err(|_| Error::msg(format!("cannot read {} value", stringify!($opcode))))?;
                 visitor.[<visit_ $ty>](value)
             }
         }
