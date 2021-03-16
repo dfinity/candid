@@ -7,6 +7,7 @@ async function main() {
   if (!cid) {
     throw new Error('Provide parameter id in the URL as the target canister id');
   } else {
+    document.title = `Canister ${cid}`;
     const canisterId = Principal.fromText(cid);
     const actor = await fetchActor(canisterId);
     render(canisterId, actor);
@@ -23,10 +24,8 @@ main().catch(err => {
   const pre = document.createElement('pre');
   pre.innerHTML = err.stack;
   div.appendChild(pre);
-  const app = document.getElementById('app');
   const progress = document.getElementById('progress');
   progress!.remove();
-  app!.remove();
   document.body.appendChild(div);
   throw err;
 });

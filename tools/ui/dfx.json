@@ -15,12 +15,6 @@
     "local": {
       "bind": "127.0.0.1:8000",
       "type": "ephemeral"
-    },
-    "tungsten": {
-      "providers": [
-        "https://gw.dfinity.network"
-      ],
-      "type": "persistent"
     }
   },
   "version": 1
