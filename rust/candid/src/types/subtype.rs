@@ -1,13 +1,8 @@
 use super::internal::{find_type, Field, Label, Type};
 use crate::parser::typing::TypeEnv;
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 pub type Gamma = HashSet<(Type, Type)>;
-
-thread_local! {
-    pub static COUNT: RefCell<usize> = RefCell::new(0);
-}
 
 /// Check if t1 <: t2
 pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> bool {
@@ -31,9 +26,6 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> bool {
         }
         return res;
     }
-    COUNT.with(|e| {
-        *e.borrow_mut() += 1;
-    });
     match (t1, t2) {
         (_, Reserved) => true,
         (Empty, _) => true,

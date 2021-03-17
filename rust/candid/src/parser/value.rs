@@ -323,13 +323,13 @@ impl IDLValue {
 
 impl crate::CandidType for IDLValue {
     fn ty() -> Type {
-        Type::Unknown
+        unreachable!()
     }
     fn id() -> crate::types::TypeId {
         unreachable!();
     }
     fn _ty() -> Type {
-        Type::Unknown
+        unreachable!()
     }
     fn idl_serialize<S>(&self, serializer: S) -> std::result::Result<(), S::Error>
     where

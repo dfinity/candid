@@ -570,7 +570,7 @@ where
 
 fn test_decode<'de, T>(bytes: &'de [u8], expected: &T)
 where
-    T: PartialEq + serde::de::Deserialize<'de> + std::fmt::Debug + CandidType,
+    T: PartialEq + serde::de::Deserialize<'de> + std::fmt::Debug,
 {
     let decoded_one = decode_one::<T>(bytes).unwrap();
     let decoded_macro = Decode!(bytes, T).unwrap();

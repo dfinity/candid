@@ -1,8 +1,8 @@
 //! Deserialize Candid binary format to Rust data structures
 
 use super::error::{Error, Result};
-use super::types::internal::{Opcode, Type};
-use super::{idl_hash, CandidType, Int, Nat};
+use super::types::internal::{Opcode};
+use super::{idl_hash, Int, Nat};
 use byteorder::{LittleEndian, ReadBytesExt};
 use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
 use serde::de::{self, Deserialize, Visitor};
@@ -25,7 +25,7 @@ impl<'de> IDLDeserialize<'de> {
     /// Deserialize one value from deserializer.
     pub fn get_value<T>(&mut self) -> Result<T>
     where
-        T: de::Deserialize<'de> + CandidType,
+        T: de::Deserialize<'de>,
     {
         let ty = self
             .de
@@ -35,9 +35,7 @@ impl<'de> IDLDeserialize<'de> {
             .ok_or_else(|| Error::msg("No more values to deserialize"))?;
         self.de.table.current_type.push_back(ty);
 
-        self.de.expected_type = TypeTable::from_type(&T::ty())?;
         let v = T::deserialize(&mut self.de).map_err(|e| self.de.dump_error_state(e))?;
-        self.de.expected_type = None;
         if self.de.table.current_type.is_empty() && self.de.field_name.is_none() {
             Ok(v)
         } else {
@@ -130,20 +128,6 @@ struct TypeTable {
     current_type: VecDeque<RawValue>,
 }
 impl TypeTable {
-    fn from_type(t: &Type) -> Result<Option<Self>> {
-        if matches!(t, Type::Unknown) {
-            Ok(None)
-        } else {
-            use std::io::Write;
-            let mut ser = crate::ser::TypeSerialize::new();
-            ser.push_type(t)?;
-            ser.serialize()?;
-            let mut input = Vec::new();
-            input.write_all(b"DIDL")?;
-            input.write_all(ser.get_result())?;
-            Ok(Some(Self::from_bytes(&input)?.0))
-        }
-    }
     // Parse the type table and return the remaining bytes
     fn from_bytes(input: &[u8]) -> Result<(Self, &[u8])> {
         let mut bytes = Bytes::from(input);
@@ -339,7 +323,6 @@ struct Deserializer<'de> {
     field_name: Option<FieldLabel>,
     // The record nesting depth should be bounded by the length of table to avoid infinite loop.
     record_nesting_depth: usize,
-    expected_type: Option<TypeTable>,
 }
 
 impl<'de> Deserializer<'de> {
@@ -350,7 +333,6 @@ impl<'de> Deserializer<'de> {
             table,
             field_name: None,
             record_nesting_depth: 0,
-            expected_type: None,
         })
     }
 
@@ -625,7 +607,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let v = Nat::decode(&mut self.input.0).map_err(Error::msg)?;
                 v.0.try_into().map_err(Error::msg)?
             }
-            _ => return Err(Error::msg("Type mismatch")),
+            t => return Err(Error::msg(format!("Type mismatch. Type on the wire: {:?}; Expected type: int", t))),
         };
         visitor.visit_i128(value)
     }
@@ -1117,7 +1099,7 @@ macro_rules! decode_impl {
     ( $($id: ident : $typename: ident),* ) => {
         impl<'a, $( $typename ),*> ArgumentDecoder<'a> for ($($typename,)*)
         where
-            $( $typename: Deserialize<'a> + CandidType),*
+            $( $typename: Deserialize<'a> ),*
         {
             fn decode(de: &mut IDLDeserialize<'a>) -> Result<Self> {
                 $(
@@ -1275,7 +1257,7 @@ where
 /// ```
 pub fn decode_one<'a, T>(bytes: &'a [u8]) -> Result<T>
 where
-    T: Deserialize<'a> + CandidType,
+    T: Deserialize<'a>,
 {
     let (res,) = decode_args(bytes)?;
     Ok(res)
