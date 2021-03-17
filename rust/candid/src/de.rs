@@ -50,7 +50,7 @@ impl<'de> IDLDeserialize<'de> {
     /// Return error if there are unprocessed bytes in the input.
     pub fn done(mut self) -> Result<()> {
         while !self.is_done() {
-            self.get_value::<crate::parser::value::IDLValue>()?;
+            self.get_value::<crate::Reserved>()?;
         }
         if !self.de.input.0.is_empty() {
             return Err(Error::msg("Trailing value after finishing deserialization"))
@@ -598,9 +598,22 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         use std::convert::TryInto;
         self.record_nesting_depth = 0;
-        self.table.check_type(Opcode::Int)?;
-        let v = Int::decode(&mut self.input.0).map_err(Error::msg)?;
-        let value: i128 = v.0.try_into().map_err(Error::msg)?;
+        let value: i128 = match self.table.parse_type()? {
+            Opcode::Int => {
+                let v = Int::decode(&mut self.input.0).map_err(Error::msg)?;
+                v.0.try_into().map_err(Error::msg)?
+            }
+            Opcode::Nat => {
+                let v = Nat::decode(&mut self.input.0).map_err(Error::msg)?;
+                v.0.try_into().map_err(Error::msg)?
+            }
+            t => {
+                return Err(Error::msg(format!(
+                    "Type mismatch. Type on the wire: {:?}; Expected type: int",
+                    t
+                )))
+            }
+        };
         visitor.visit_i128(value)
     }
 
@@ -659,16 +672,25 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.record_nesting_depth = 0;
-        self.table.check_type(Opcode::Opt)?;
-        let bit = self.input.parse_byte()?;
-        if bit == 0u8 {
-            // Skip the type T of Option<T>
-            self.table.pop_current_type()?;
-            visitor.visit_none()
-        } else if bit == 1u8 {
-            visitor.visit_some(self)
-        } else {
-            Err(de::Error::custom("not an option value"))
+        match self.table.peek_type()? {
+            Opcode::Opt => {
+                self.table.parse_type()?;
+                match self.input.parse_byte()? {
+                    0 => {
+                        // Skip the type T of Option<T>
+                        self.table.pop_current_type()?;
+                        visitor.visit_none()
+                    }
+                    // TODO handle subtyping failure
+                    1 => visitor.visit_some(self),
+                    _ => Err(de::Error::custom("not an option tag")),
+                }
+            }
+            Opcode::Null | Opcode::Reserved => {
+                self.table.parse_type()?;
+                visitor.visit_none()
+            }
+            _ => visitor.visit_some(self),
         }
     }
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>

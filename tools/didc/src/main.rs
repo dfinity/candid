@@ -1,8 +1,12 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use candid::{
-    check_prog, parser::types::IDLTypes, pretty_parse, types::Type, Error, IDLArgs, IDLProg,
-    TypeEnv,
+    check_prog,
+    parser::types::{IDLType, IDLTypes},
+    pretty_parse,
+    types::Type,
+    Error, IDLArgs, IDLProg, TypeEnv,
 };
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
@@ -14,6 +18,8 @@ enum Command {
     Check {
         /// Specifies did file for type checking
         input: PathBuf,
+        /// Specifies a second did file for subtyping check
+        upgrade: Option<PathBuf>,
     },
     /// Generate binding for different languages
     Bind {
@@ -68,6 +74,13 @@ enum Command {
         #[structopt(short, long, requires("method"))]
         /// Specifies input arguments for a method call, mocking the return result
         args: Option<IDLArgs>,
+    },
+    /// Check for subtyping
+    Subtype {
+        #[structopt(short, long)]
+        defs: Option<PathBuf>,
+        ty1: IDLType,
+        ty2: IDLType,
     },
     /// Diff two Candid values
     Diff {
@@ -151,9 +164,34 @@ fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
 
 fn main() -> Result<()> {
     match Command::from_args() {
-        Command::Check { input } => {
+        Command::Check { input, upgrade } => {
             let mut env = TypeEnv::new();
-            check_file(&mut env, &input)?;
+            let opt_t1 = check_file(&mut env, &input)?;
+            if let Some(upgrade) = upgrade {
+                let mut env2 = TypeEnv::new();
+                let opt_t2 = check_file(&mut env2, &upgrade)?;
+                match (opt_t1, opt_t2) {
+                    (Some(t1), Some(t2)) => {
+                        let mut gamma = HashSet::new();
+                        let res =
+                            candid::types::subtype::subtype(&mut gamma, &env, &t1, &env2, &t2);
+                        println!("{}", res);
+                    }
+                    _ => {
+                        bail!("did file need to contain the main service type for subtyping check")
+                    }
+                }
+            }
+        }
+        Command::Subtype { defs, ty1, ty2 } => {
+            let mut env = TypeEnv::new();
+            if let Some(file) = defs {
+                check_file(&mut env, &file)?;
+            }
+            let ty1 = env.ast_to_type(&ty1)?;
+            let ty2 = env.ast_to_type(&ty2)?;
+            let res = candid::types::subtype::subtype(&mut HashSet::new(), &env, &ty1, &env, &ty2);
+            println!("{}", res);
         }
         Command::Bind { input, target } => {
             let mut env = TypeEnv::new();
