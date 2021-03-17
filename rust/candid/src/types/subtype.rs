@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 pub type Gamma = HashSet<(Type, Type)>;
 
 /// Check if t1 <: t2
-pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> bool {
+pub fn subtype(gamma: &mut Gamma, env1: &TypeEnv, t1: &Type, env2: &TypeEnv, t2: &Type) -> bool {
     use Type::*;
     if t1 == t2 {
         return true;
@@ -15,10 +15,10 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> bool {
             return true;
         }
         let res = match (t1, t2) {
-            (Var(id), _) => subtype(gamma, env, env.rec_find_type(id).unwrap(), t2),
-            (_, Var(id)) => subtype(gamma, env, t1, env.rec_find_type(id).unwrap()),
-            (Knot(id), _) => subtype(gamma, env, &find_type(id).unwrap(), t2),
-            (_, Knot(id)) => subtype(gamma, env, t1, &find_type(id).unwrap()),
+            (Var(id), _) => subtype(gamma, env1, env1.rec_find_type(id).unwrap(), env2, t2),
+            (_, Var(id)) => subtype(gamma, env1, t1, env2, env2.rec_find_type(id).unwrap()),
+            (Knot(id), _) => subtype(gamma, env1, &find_type(id).unwrap(), env2, t2),
+            (_, Knot(id)) => subtype(gamma, env1, t1, env2, &find_type(id).unwrap()),
             (_, _) => unreachable!(),
         };
         if !res {
@@ -30,12 +30,12 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> bool {
         (_, Reserved) => true,
         (Empty, _) => true,
         (Nat, Int) => true,
-        (Vec(ty1), Vec(ty2)) => subtype(gamma, env, ty1, ty2),
+        (Vec(ty1), Vec(ty2)) => subtype(gamma, env1, ty1, env2, ty2),
         (Null, Opt(_)) => true,
-        (Opt(ty1), Opt(ty2)) if subtype(gamma, env, ty1, ty2) => true,
+        (Opt(ty1), Opt(ty2)) if subtype(gamma, env1, ty1, env2, ty2) => true,
         (t1, Opt(ty2))
-            if subtype(gamma, env, t1, ty2)
-                && !matches!(env.trace_type(ty2).unwrap(), Null | Reserved | Opt(_)) =>
+            if subtype(gamma, env1, t1, env2, ty2)
+                && !matches!(env2.trace_type(ty2).unwrap(), Null | Reserved | Opt(_)) =>
         {
             true
         }
@@ -47,22 +47,22 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> bool {
             let fields: HashMap<_, _> = fs1.iter().map(|Field { id, ty }| (id, ty)).collect();
             fs2.iter()
                 .all(|Field { id, ty: ty2 }| match fields.get(id) {
-                    Some(ty1) => subtype(gamma, env, ty1, ty2),
-                    None => subtype(gamma, env, &Opt(Box::new(Empty)), ty2),
+                    Some(ty1) => subtype(gamma, env1, ty1, env2, ty2),
+                    None => subtype(gamma, env1, &Opt(Box::new(Empty)), env2, ty2),
                 })
         }
         (Variant(fs1), Variant(fs2)) => {
             let fields: HashMap<_, _> = fs2.iter().map(|Field { id, ty }| (id, ty)).collect();
             fs1.iter()
                 .all(|Field { id, ty: ty1 }| match fields.get(id) {
-                    Some(ty2) => subtype(gamma, env, ty1, ty2),
+                    Some(ty2) => subtype(gamma, env1, ty1, env2, ty2),
                     None => false,
                 })
         }
         (Service(ms1), Service(ms2)) => {
             let meths: HashMap<_, _> = ms2.iter().map(|(name, ty)| (name, ty)).collect();
             ms1.iter().all(|(name, ty1)| match meths.get(name) {
-                Some(ty2) => subtype(gamma, env, ty1, ty2),
+                Some(ty2) => subtype(gamma, env1, ty1, env2, ty2),
                 None => false,
             })
         }
@@ -76,7 +76,7 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> bool {
             let args2 = to_tuple(&f2.args);
             let rets1 = to_tuple(&f1.rets);
             let rets2 = to_tuple(&f2.rets);
-            subtype(gamma, env, &args2, &args1) && subtype(gamma, env, &rets1, &rets2)
+            subtype(gamma, env2, &args2, env1, &args1) && subtype(gamma, env1, &rets1, env2, &rets2)
         }
         (Class(_, _), Class(_, _)) => unreachable!(),
         (Unknown, _) => unreachable!(),
