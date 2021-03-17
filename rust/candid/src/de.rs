@@ -1,7 +1,7 @@
 //! Deserialize Candid binary format to Rust data structures
 
 use super::error::{Error, Result};
-use super::types::internal::{Opcode};
+use super::types::internal::Opcode;
 use super::{idl_hash, Int, Nat};
 use byteorder::{LittleEndian, ReadBytesExt};
 use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
@@ -607,7 +607,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let v = Nat::decode(&mut self.input.0).map_err(Error::msg)?;
                 v.0.try_into().map_err(Error::msg)?
             }
-            t => return Err(Error::msg(format!("Type mismatch. Type on the wire: {:?}; Expected type: int", t))),
+            t => {
+                return Err(Error::msg(format!(
+                    "Type mismatch. Type on the wire: {:?}; Expected type: int",
+                    t
+                )))
+            }
         };
         visitor.visit_i128(value)
     }
