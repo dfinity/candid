@@ -230,7 +230,7 @@ checksum = "b700ce4376041dcd0a327fd0097c41095743c4c8af8887265942faf1100bd040"
 
 [[package]]
 name = "candid"
-version = "0.6.17"
+version = "0.6.18"
 dependencies = [
  "arbitrary",
  "byteorder",
@@ -260,7 +260,7 @@ dependencies = [
 
 [[package]]
 name = "candid_derive"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "lazy_static",
  "proc-macro2 1.0.24",
