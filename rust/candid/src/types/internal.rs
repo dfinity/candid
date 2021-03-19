@@ -374,6 +374,9 @@ pub(crate) fn show_env() {
 pub(crate) fn env_add(id: TypeId, t: Type) {
     ENV.with(|e| drop(e.borrow_mut().insert(id, t)));
 }
+pub(crate) fn env_clear() {
+    ENV.with(|e| e.borrow_mut().clear());
+}
 
 pub(crate) fn env_id(id: TypeId, t: Type) {
     // prefer shorter type names
