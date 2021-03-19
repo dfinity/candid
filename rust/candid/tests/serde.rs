@@ -222,6 +222,39 @@ fn test_struct() {
 }
 
 #[test]
+fn test_equivalent_types() {
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct RootType {
+        typeas: Vec<TypeA>,
+    }
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct TypeA {
+        typeb: Box<Option<TypeB>>,
+    }
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct TypeB {
+        typea: Option<TypeA>,
+    }
+    // Encode to the following types leads to equivalent but different representations of TypeA
+    all_check(
+        RootType { typeas: Vec::new() },
+        "4449444c066c01acd4dbb905016d026c01e8e0add601036e046c01e7e0add601056e02010000",
+    );
+    all_check(
+        TypeB { typea: None },
+        "4449444c046c01e7e0add601016e026c01e8e0add601036e00010000",
+    );
+    Encode!(
+        &RootType { typeas: Vec::new() },
+        &TypeB { typea: None },
+        &TypeA {
+            typeb: Box::new(None)
+        }
+    )
+    .unwrap();
+}
+
+#[test]
 fn test_extra_fields() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct A1 {

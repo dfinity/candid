@@ -19,6 +19,10 @@ pub struct IDLBuilder {
 
 impl IDLBuilder {
     pub fn new() -> Self {
+        // We cannot share the memo table across different Builder. Because the same Rust
+        // type can map to a different but equivalent candid type for different builder,
+        // due to memo match happening in different time/order.
+        types::internal::env_clear();
         IDLBuilder {
             type_ser: TypeSerialize::new(),
             value_ser: ValueSerializer::new(),
