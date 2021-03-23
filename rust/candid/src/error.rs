@@ -11,10 +11,13 @@ use thiserror::Error;
 
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
-#[derive(Debug, Error, Eq, PartialEq)]
+#[derive(Debug, Error)]
 pub enum Error {
-    #[error("Candid parser error: {0:}")]
+    #[error("Candid parser error: {0}")]
     Parse(#[from] token::ParserError),
+
+    #[error("Binary parser error: {0}")]
+    Binread(#[from] binread::Error),
 
     #[error("Deserialize error: {0}")]
     Deserialize(String, String),
@@ -56,9 +59,57 @@ impl Error {
                 };
                 diag.with_labels(vec![label])
             }
+            Error::Binread(e) => {
+                let diag = Diagnostic::error().with_message("decoding error");
+                let labels = get_binread_labels(e);
+                diag.with_labels(labels)
+            }
             Error::Deserialize(e, _) => Diagnostic::error().with_message(e),
             Error::Custom(e) => Diagnostic::error().with_message(e),
         }
+    }
+}
+
+fn get_binread_labels(e: &binread::Error) -> Vec<Label<()>> {
+    use binread::Error::*;
+    match e {
+        BadMagic { pos, .. } => {
+            let pos = (pos * 2) as usize;
+            vec![Label::primary((), pos..pos + 2).with_message("Unexpected bytes")]
+        }
+        Custom { pos, err } => {
+            let pos = (pos * 2) as usize;
+            let err = err.downcast_ref::<&str>().unwrap();
+            vec![Label::primary((), pos..pos + 2).with_message(err.to_string())]
+        }
+        EnumErrors {
+            pos,
+            variant_errors,
+        } => {
+            let pos = (pos * 2) as usize;
+            let variant = variant_errors
+                .iter()
+                .find(|(_, e)| !matches!(e, BadMagic { .. }));
+            // Should be only one non-magic error
+            match variant {
+                None => vec![Label::primary((), pos..pos + 2).with_message("Unknown opcode")],
+                Some((id, e)) => {
+                    let mut labels = get_binread_labels(e);
+                    labels.push(Label::secondary((), pos..pos + 2).with_message(id.to_string()));
+                    labels
+                }
+            }
+        }
+        NoVariantMatch { pos } => {
+            let pos = (pos * 2) as usize;
+            vec![Label::primary((), pos..pos + 2).with_message("No variant match")]
+        }
+        AssertFail { pos, message } => {
+            let pos = (pos * 2) as usize;
+            vec![Label::primary((), pos..pos + 2).with_message(message)]
+        }
+        Io(e) => vec![Label::primary((), 0..0).with_message(e.to_string())],
+        _ => Vec::new(),
     }
 }
 
@@ -120,6 +171,21 @@ where
         let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
         let config = term::Config::default();
         let file = SimpleFile::new(name, str);
+        term::emit(&mut writer.lock(), &config, &file, &e.report())?;
+        Err(e)
+    })
+}
+
+pub fn pretty_read<T>(reader: &mut std::io::Cursor<&[u8]>) -> Result<T>
+where
+    T: binread::BinRead,
+{
+    T::read(reader).or_else(|e| {
+        let e = Error::Binread(e);
+        let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
+        let config = term::Config::default();
+        let str = hex::encode(&reader.get_ref());
+        let file = SimpleFile::new("binary", &str);
         term::emit(&mut writer.lock(), &config, &file, &e.report())?;
         Err(e)
     })

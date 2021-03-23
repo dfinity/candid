@@ -270,6 +270,7 @@ pub use parser::types::IDLProg;
 pub use parser::typing::{check_prog, TypeEnv};
 pub use parser::value::IDLArgs;
 
+pub mod binary_parser;
 pub mod de;
 pub use de::{decode_args, decode_one};
 pub mod ser;
