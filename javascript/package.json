@@ -1,0 +1,31 @@
+{
+  "name": "@dfinity/candid",
+  "version": "0.0.1",
+  "main": "src/index.js",
+  "scripts": {
+    "build": "tsc -b",
+    "bundle": "npm run build",
+    "ci": "npm run prettier && npm run lint && npm run build && npm run test",
+    "lint": "tslint --project tsconfig.json --config tslint.json",
+    "lint:fix": "npm run lint -- --fix",
+    "prettier": "prettier --check \"src/**/*.ts\"",
+    "prettier:write": "npm run prettier -- --write",
+    "test": "jest --verbose"
+  },
+  "dependencies": {
+    "@dfinity/agent": "0.6.14",
+    "@types/jest": "^24.0.18",
+    "bignumber.js": "^9.0.0",
+    "buffer": "^5.4.3",
+    "buffer-pipe": "0.0.4"
+  },
+  "devDependencies": {
+    "jest": "^26.4.4",
+    "jest-expect-message": "^1.0.2",
+    "prettier": "^2.2.0",
+    "text-encoding": "^0.7.0",
+    "ts-jest": "^26.4.4",
+    "tslint": "^6.1.3",
+    "typescript": "^3.6.3"
+  }
+}

@@ -228,9 +228,9 @@ pub mod value {
     pub fn pp_value(v: &IDLValue) -> RcDoc {
         use IDLValue::*;
         match &*v {
-            Number(_) | Int(_) | Nat(_) | Int64(_) | Nat64(_) => {
-                RcDoc::text(format!("new BigNumber('{}')", v))
-            }
+            Int(v) => RcDoc::text(format!("new BigNumber('{}')", v.0.to_str_radix(10))),
+            Nat(v) => RcDoc::text(format!("new BigNumber('{}')", v.0.to_str_radix(10))),
+            Number(_) | Int64(_) | Nat64(_) => RcDoc::text(format!("new BigNumber('{}')", v)),
             Reserved => RcDoc::text("null"),
             Principal(id) => RcDoc::text(format!("Principal.fromText('{}')", id)),
             Text(s) => RcDoc::text(format!("'{}'", s.escape_debug())),
@@ -293,7 +293,7 @@ pub mod test {
 import BigNumber from 'bignumber.js';
 import * as IDL from './idl';
 import { Buffer } from 'buffer/';
-import { Principal } from './principal';
+import { Principal } from '@dfinity/agent';
 "#;
         let mut res = header.to_string();
         let mut env = TypeEnv::new();
