@@ -75,7 +75,14 @@ impl TypeEnv {
         Err(Error::msg(format!("cannot find method {}", id)))
     }
 }
-
+impl std::fmt::Display for TypeEnv {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (k, v) in self.0.iter() {
+            writeln!(f, "type {} = {}", k, v)?;
+        }
+        Ok(())
+    }
+}
 fn check_prim(prim: &PrimType) -> Type {
     match prim {
         PrimType::Nat => Type::Nat,

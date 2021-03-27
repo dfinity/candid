@@ -137,6 +137,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f9def047620f016f4d5eb5a4c9b925f03175870772d354c696ec9062e942886"
 dependencies = [
  "binread_derive",
+ "lazy_static",
 ]
 
 [[package]]
