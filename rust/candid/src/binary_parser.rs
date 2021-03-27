@@ -1,19 +1,20 @@
 use crate::parser::typing::TypeEnv;
 use crate::types::internal::{Field, Label, Type};
+use crate::{Error, Result};
 use binread::io::{Read, Seek, SeekFrom};
-use binread::{BinRead, BinResult, Error, ReadOptions};
+use binread::{BinRead, BinResult, Error as BError, ReadOptions};
 use std::convert::TryInto;
 
 fn read_leb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, _: ()) -> BinResult<u64> {
     let pos = reader.seek(SeekFrom::Current(0))?;
-    leb128::read::unsigned(reader).map_err(|_| Error::Custom {
+    leb128::read::unsigned(reader).map_err(|_| BError::Custom {
         pos,
         err: Box::new(ro.variable_name.unwrap_or("Invalid leb128")),
     })
 }
 fn read_sleb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, _: ()) -> BinResult<i64> {
     let pos = reader.seek(SeekFrom::Current(0))?;
-    leb128::read::signed(reader).map_err(|_| Error::Custom {
+    leb128::read::signed(reader).map_err(|_| BError::Custom {
         pos,
         err: Box::new(ro.variable_name.unwrap_or("Invalid sleb128")),
     })
@@ -67,9 +68,14 @@ struct FieldType {
 }
 
 impl IndexType {
-    pub fn to_type(&self) -> Type {
-        match self.index {
-            v if v >= 0 => Type::Var(v.to_string()),
+    fn to_type(&self, len: u64) -> Result<Type> {
+        Ok(match self.index {
+            v if v >= 0 => {
+                if v >= len as i64 {
+                    return Err(Error::msg("type index out of range"));
+                }
+                Type::Var(v.to_string())
+            }
             -1 => Type::Null,
             -2 => Type::Bool,
             -3 => Type::Nat,
@@ -89,46 +95,70 @@ impl IndexType {
             -17 => Type::Empty,
             -24 => Type::Principal,
             _ => unreachable!(),
-        }
-    }
-}
-impl FieldType {
-    pub fn to_field(&self) -> Field {
-        Field {
-            id: Label::Id(self.id),
-            ty: self.index.to_type(),
-        }
+        })
     }
 }
 impl ConsType {
-    pub fn to_type(&self) -> Type {
-        match &self {
-            ConsType::Opt(ref ind) => Type::Opt(Box::new(ind.to_type())),
-            ConsType::Vec(ref ind) => Type::Vec(Box::new(ind.to_type())),
-            ConsType::Record(fs) => Type::Record(fs.inner.iter().map(|f| f.to_field()).collect()),
-            ConsType::Variant(fs) => Type::Variant(fs.inner.iter().map(|f| f.to_field()).collect()),
-        }
+    fn to_type(&self, len: u64) -> Result<Type> {
+        Ok(match &self {
+            ConsType::Opt(ref ind) => Type::Opt(Box::new(ind.to_type(len)?)),
+            ConsType::Vec(ref ind) => Type::Vec(Box::new(ind.to_type(len)?)),
+            ConsType::Record(fs) | ConsType::Variant(fs) => {
+                let mut res = Vec::new();
+                let mut prev = None;
+                for f in fs.inner.iter() {
+                    if let Some(prev) = prev {
+                        if prev >= f.id {
+                            return Err(Error::msg("unsorted or duplicate fields"));
+                        }
+                    }
+                    prev = Some(f.id);
+                    let field = Field {
+                        id: Label::Id(f.id),
+                        ty: f.index.to_type(len)?,
+                    };
+                    res.push(field);
+                }
+                if matches!(&self, ConsType::Record(_)) {
+                    Type::Record(res)
+                } else {
+                    Type::Variant(res)
+                }
+            }
+        })
     }
 }
 impl Table {
-    pub fn to_env(&self) -> TypeEnv {
-        TypeEnv(
-            self.table
-                .iter()
-                .enumerate()
-                .map(|(i, t)| (i.to_string(), t.to_type()))
-                .collect(),
-        )
+    fn to_env(&self, len: u64) -> Result<TypeEnv> {
+        use std::collections::BTreeMap;
+        let mut env = BTreeMap::new();
+        for (i, t) in self.table.iter().enumerate() {
+            env.insert(i.to_string(), t.to_type(len)?);
+        }
+        Ok(TypeEnv(env))
+    }
+}
+impl Header {
+    pub fn to_types(&self) -> Result<(TypeEnv, Vec<Type>)> {
+        let len = self.table.len;
+        let env = self.table.to_env(len)?;
+        let mut args = Vec::new();
+        for t in self.args.iter() {
+            args.push(t.to_type(len)?);
+        }
+        Ok((env, args))
     }
 }
 
 #[test]
-fn parse() -> crate::Result<()> {
+fn parse() -> Result<()> {
     use binread::io::Cursor;
     let mut reader =
-        Cursor::new(b"DIDL\x03\x6e\x00\x6d\x6f\x6c\x02\x00\x7e\x01\x7a\x02\x02\x03".as_ref());
+        Cursor::new(b"DIDL\x03\x6e\x00\x6d\x6f\x6c\x02\x00\x7e\x01\x7a\x02\x02\x7a".as_ref());
     let header = crate::error::pretty_read::<Header>(&mut reader)?;
-    println!("{}", header.table.to_env());
+    let (env, types) = header.to_types()?;
+    println!("env {}", env);
+    println!("types {:?}", types);
     let rest = reader.position() as usize;
     println!("remaining {:02x?}", &reader.into_inner()[rest..]);
     Ok(())
