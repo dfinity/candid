@@ -32,7 +32,7 @@ pub struct Header {
 
 #[derive(BinRead, Debug)]
 pub struct Table {
-    #[br(parse_with = read_leb)]
+    #[br(parse_with = read_leb, assert(len <= i64::MAX as u64, "type table size out of range"))]
     len: u64,
     #[br(count = len)]
     table: Vec<ConsType>,
