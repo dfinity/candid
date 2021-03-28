@@ -152,10 +152,10 @@ impl Header {
 #[test]
 fn parse() -> Result<()> {
     let bytes = b"DIDL\x03\x6e\x00\x6d\x6f\x6c\x02\x00\x7e\x01\x7a\x02\x02\x7a\x01";
-    let (header, rest) = crate::pretty_read::<Header>(bytes.as_ref())?;
+    let (header, rest): (Header, usize) = crate::pretty_read(bytes)?;
     let (env, types) = header.to_types()?;
     println!("env {}", env);
     println!("types {:?}", types);
-    println!("rest {:02x?}", rest);
+    println!("rest {:02x?}", &bytes[rest..]);
     Ok(())
 }

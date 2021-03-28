@@ -176,9 +176,10 @@ where
     })
 }
 
-pub fn pretty_read<T>(bytes: &[u8]) -> Result<(T, &[u8])>
+pub fn pretty_read<R, T>(bytes: R) -> Result<(T, usize)>
 where
     T: binread::BinRead,
+    R: AsRef<[u8]>,
 {
     let mut reader = std::io::Cursor::new(bytes);
     let res = T::read(&mut reader).or_else(|e| {
@@ -190,7 +191,6 @@ where
         term::emit(&mut writer.lock(), &config, &file, &e.report())?;
         Err(e)
     })?;
-    let ind = reader.position() as usize;
-    let rest = &reader.into_inner()[ind..];
+    let rest = reader.position() as usize;
     Ok((res, rest))
 }
