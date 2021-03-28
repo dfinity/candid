@@ -29,9 +29,8 @@ pub struct Header {
     #[br(count = len)]
     args: Vec<IndexType>,
 }
-
 #[derive(BinRead, Debug)]
-pub struct Table {
+struct Table {
     #[br(parse_with = read_leb, assert(len <= i64::MAX as u64, "type table size out of range"))]
     len: u64,
     #[br(count = len)]
@@ -109,7 +108,7 @@ impl ConsType {
                 for f in fs.inner.iter() {
                     if let Some(prev) = prev {
                         if prev >= f.id {
-                            return Err(Error::msg("unsorted or duplicate fields"));
+                            return Err(Error::msg("field id collision or not sorted"));
                         }
                     }
                     prev = Some(f.id);
@@ -152,14 +151,11 @@ impl Header {
 
 #[test]
 fn parse() -> Result<()> {
-    use binread::io::Cursor;
-    let mut reader =
-        Cursor::new(b"DIDL\x03\x6e\x00\x6d\x6f\x6c\x02\x00\x7e\x01\x7a\x02\x02\x7a".as_ref());
-    let header = crate::error::pretty_read::<Header>(&mut reader)?;
+    let bytes = b"DIDL\x03\x6e\x00\x6d\x6f\x6c\x02\x00\x7e\x01\x7a\x02\x02\x7a\x01";
+    let (header, rest) = crate::pretty_read::<Header>(bytes.as_ref())?;
     let (env, types) = header.to_types()?;
     println!("env {}", env);
     println!("types {:?}", types);
-    let rest = reader.position() as usize;
-    println!("remaining {:02x?}", &reader.into_inner()[rest..]);
+    println!("rest {:02x?}", rest);
     Ok(())
 }

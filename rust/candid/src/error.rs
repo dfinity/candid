@@ -90,7 +90,7 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label<()>> {
             let variant = variant_errors
                 .iter()
                 .find(|(_, e)| !matches!(e, BadMagic { .. }));
-            // Should be only one non-magic error
+            // Should have at most one non-magic error
             match variant {
                 None => vec![Label::primary((), pos..pos + 2).with_message("Unknown opcode")],
                 Some((id, e)) => {
@@ -176,11 +176,12 @@ where
     })
 }
 
-pub fn pretty_read<T>(reader: &mut std::io::Cursor<&[u8]>) -> Result<T>
+pub fn pretty_read<T>(bytes: &[u8]) -> Result<(T, &[u8])>
 where
     T: binread::BinRead,
 {
-    T::read(reader).or_else(|e| {
+    let mut reader = std::io::Cursor::new(bytes);
+    let res = T::read(&mut reader).or_else(|e| {
         let e = Error::Binread(e);
         let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
         let config = term::Config::default();
@@ -188,5 +189,8 @@ where
         let file = SimpleFile::new("binary", &str);
         term::emit(&mut writer.lock(), &config, &file, &e.report())?;
         Err(e)
-    })
+    })?;
+    let ind = reader.position() as usize;
+    let rest = &reader.into_inner()[ind..];
+    Ok((res, rest))
 }
