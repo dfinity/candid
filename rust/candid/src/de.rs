@@ -89,15 +89,42 @@ impl<'de> Deserializer<'de> {
             record_nesting_depth: 0,
         })
     }
-    fn check_type(&self, expect: &Type) -> Result<()> {
-        if self.wire_type == self.expect_type && self.wire_type == *expect {
-            Ok(())
-        } else {
+    fn expect_type(&self, expect: &Type) -> Result<()> {
+        if *expect != self.expect_type {
             Err(Error::msg(format!(
-                "Type mismatch. Expect {}, but found {}",
-                expect, self.wire_type
+                "Internal error. Expect {}, but expect_type is {}",
+                expect, self.expect_type
             )))
+        } else {
+            Ok(())
         }
+    }
+    fn deserialize_int<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.record_nesting_depth = 0;
+        self.expect_type(&Type::Int)?;
+        let mut bytes = Vec::new();
+        match &self.wire_type {
+            Type::Int => {
+                bytes.push(0u8);
+                let int = Int::decode(&mut self.input).map_err(Error::msg)?;
+                bytes.extend_from_slice(&int.0.to_signed_bytes_le());
+            }
+            Type::Nat => {
+                bytes.push(1u8);
+                let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
+                bytes.extend_from_slice(&nat.0.to_bytes_le());
+            }
+            t => {
+                return Err(Error::msg(format!(
+                    "Type mismatch. Expect int, but found {}",
+                    t
+                )))
+            }
+        }
+        visitor.visit_byte_buf(bytes)
     }
 }
 
@@ -110,7 +137,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         let t = self.table.trace_type(&self.expect_type)?;
         match t {
             Type::Bool => self.deserialize_bool(visitor),
-            Type::Nat8 => self.deserialize_u8(visitor),
+            Type::Int => self.deserialize_int(visitor),
             Type::Vec(_) => self.deserialize_seq(visitor),
             _ => unreachable!(),
         }
@@ -126,8 +153,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
              bool,
         );
         self.record_nesting_depth = 0;
-        self.check_type(&Type::Bool)?;
         let res: BoolValue = pretty_read(&mut self.input)?;
+        self.expect_type(&Type::Bool)?;
         visitor.visit_bool(res.0)
     }
 
