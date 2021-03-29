@@ -176,13 +176,11 @@ where
     })
 }
 
-pub fn pretty_read<R, T>(bytes: R) -> Result<(T, usize)>
+pub fn pretty_read<T>(reader: &mut std::io::Cursor<&[u8]>) -> Result<T>
 where
     T: binread::BinRead,
-    R: AsRef<[u8]>,
 {
-    let mut reader = std::io::Cursor::new(bytes);
-    let res = T::read(&mut reader).or_else(|e| {
+    T::read(reader).or_else(|e| {
         let e = Error::Binread(e);
         let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
         let config = term::Config::default();
@@ -190,7 +188,5 @@ where
         let file = SimpleFile::new("binary", &str);
         term::emit(&mut writer.lock(), &config, &file, &e.report())?;
         Err(e)
-    })?;
-    let rest = reader.position() as usize;
-    Ok((res, rest))
+    })
 }
