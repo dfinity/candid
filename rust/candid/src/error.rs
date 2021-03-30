@@ -19,19 +19,13 @@ pub enum Error {
     #[error("Binary parser error: {0}")]
     Binread(#[from] binread::Error),
 
-    #[error("Deserialize error: {0}")]
-    Deserialize(String, String),
-
     #[error("{0}")]
-    Custom(String),
+    Custom(#[from] anyhow::Error),
 }
 
 impl Error {
     pub fn msg<T: ToString>(msg: T) -> Self {
-        Error::Custom(msg.to_string())
-    }
-    pub fn with_states(&self, states: String) -> Self {
-        Error::Deserialize(self.to_string(), states)
+        Error::Custom(anyhow::anyhow!(msg.to_string()))
     }
     pub fn report(&self) -> Diagnostic<()> {
         match self {
@@ -64,8 +58,7 @@ impl Error {
                 let labels = get_binread_labels(e);
                 diag.with_labels(labels)
             }
-            Error::Deserialize(e, _) => Diagnostic::error().with_message(e),
-            Error::Custom(e) => Diagnostic::error().with_message(e),
+            Error::Custom(e) => Diagnostic::error().with_message(e.to_string()),
         }
     }
 }
@@ -109,7 +102,7 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label<()>> {
             vec![Label::primary((), pos..pos + 2).with_message(message)]
         }
         Io(e) => vec![Label::primary((), 0..0).with_message(e.to_string())],
-        _ => Vec::new(),
+        _ => unreachable!(),
     }
 }
 

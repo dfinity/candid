@@ -1,6 +1,7 @@
 use crate::parser::typing::TypeEnv;
 use crate::types::internal::{Field, Label, Type};
-use crate::{Error, Result};
+//use crate::{Error, Result};
+use anyhow::{anyhow, Context, Result};
 use binread::io::{Read, Seek, SeekFrom};
 use binread::{BinRead, BinResult, Error as BError, ReadOptions};
 use std::convert::TryInto;
@@ -71,7 +72,7 @@ impl IndexType {
         Ok(match self.index {
             v if v >= 0 => {
                 if v >= len as i64 {
-                    return Err(Error::msg("type index out of range"));
+                    return Err(anyhow!("type index {} out of range", v));
                 }
                 Type::Var(v.to_string())
             }
@@ -108,7 +109,7 @@ impl ConsType {
                 for f in fs.inner.iter() {
                     if let Some(prev) = prev {
                         if prev >= f.id {
-                            return Err(Error::msg("field id collision or not sorted"));
+                            return Err(anyhow!("field id {} collision or not sorted", f.id));
                         }
                     }
                     prev = Some(f.id);
@@ -132,7 +133,11 @@ impl Table {
         use std::collections::BTreeMap;
         let mut env = BTreeMap::new();
         for (i, t) in self.table.iter().enumerate() {
-            env.insert(i.to_string(), t.to_type(len)?);
+            env.insert(
+                i.to_string(),
+                t.to_type(len)
+                    .with_context(|| format!("Invalid table entry {}: {:?}", i, t))?,
+            );
         }
         Ok(TypeEnv(env))
     }
@@ -142,8 +147,11 @@ impl Header {
         let len = self.table.len;
         let env = self.table.to_env(len)?;
         let mut args = Vec::new();
-        for t in self.args.iter() {
-            args.push(t.to_type(len)?);
+        for (i, t) in self.args.iter().enumerate() {
+            args.push(
+                t.to_type(len)
+                    .with_context(|| format!("Invalid argument entry {}: {:?}", i, t))?,
+            );
         }
         Ok((env, args))
     }

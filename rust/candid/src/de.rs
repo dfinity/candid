@@ -3,6 +3,7 @@
 use super::error::{pretty_read, Error, Result};
 use super::{idl_hash, parser::typing::TypeEnv, types::Type, CandidType, Int, Nat};
 use crate::binary_parser::Header;
+use anyhow::{anyhow, Context};
 use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Deserialize, Visitor};
@@ -17,7 +18,8 @@ pub struct IDLDeserialize<'de> {
 impl<'de> IDLDeserialize<'de> {
     /// Create a new deserializer with IDL binary message.
     pub fn new(bytes: &'de [u8]) -> Result<Self> {
-        let de = Deserializer::from_bytes(bytes)?;
+        let de = Deserializer::from_bytes(bytes)
+            .with_context(|| format!("Cannot parse header {}", &hex::encode(bytes)))?;
         Ok(IDLDeserialize { de })
     }
     /// Deserialize one value from deserializer.
@@ -25,20 +27,24 @@ impl<'de> IDLDeserialize<'de> {
     where
         T: de::Deserialize<'de> + CandidType,
     {
-        let ty = self
+        let (ind, ty) = self
             .de
             .types
             .pop_front()
-            .ok_or_else(|| Error::msg("No more values to deserialize"))?;
+            .context("No more values to deserialize")?;
         let expected_type = T::ty();
         self.de.expect_type = if matches!(expected_type, Type::Unknown) {
             ty.clone()
         } else {
             expected_type
         };
-        self.de.wire_type = ty;
+        self.de.wire_type = ty.clone();
 
-        let v = T::deserialize(&mut self.de)?; //.map_err(|e| self.de.dump_error_state(e))?;
+        let v = T::deserialize(&mut self.de)
+            .with_context(|| self.de.dump_state())
+            .with_context(|| {
+                format!("Fail to decode argument {} from {} to {}", ind, ty, T::ty())
+            })?;
         Ok(v)
         /*if self.de.table.current_type.is_empty() && self.de.field_name.is_none() {
             Ok(v)
@@ -59,8 +65,8 @@ impl<'de> IDLDeserialize<'de> {
         let ind = self.de.input.position() as usize;
         let rest = &self.de.input.get_ref()[ind..];
         if !rest.is_empty() {
-            return Err(Error::msg("Trailing value after finishing deserialization"));
-            //.map_err(|e| self.de.dump_error_state(e));
+            return Err(anyhow!(self.de.dump_state()))
+                .context("Trailing value after finishing deserialization")?;
         }
         Ok(())
     }
@@ -69,7 +75,7 @@ impl<'de> IDLDeserialize<'de> {
 struct Deserializer<'de> {
     input: Cursor<&'de [u8]>,
     table: TypeEnv,
-    types: VecDeque<Type>,
+    types: VecDeque<(usize, Type)>,
     wire_type: Type,
     expect_type: Type,
     record_nesting_depth: usize,
@@ -83,11 +89,25 @@ impl<'de> Deserializer<'de> {
         Ok(Deserializer {
             input: reader,
             table: env,
-            types: types.into(),
+            types: types.into_iter().enumerate().collect(),
             wire_type: Type::Unknown,
             expect_type: Type::Unknown,
             record_nesting_depth: 0,
         })
+    }
+    fn dump_state(&self) -> String {
+        let hex = hex::encode(self.input.get_ref());
+        let pos = self.input.position() as usize * 2;
+        let (before, after) = hex.split_at(pos);
+        let mut res = format!("input: {}_{}\n", before, after);
+        if !self.table.0.is_empty() {
+            res += &format!("table: {}", self.table);
+        }
+        res += &format!(
+            "wire_type: {}, expect_type: {}",
+            self.wire_type, self.expect_type
+        );
+        res
     }
     fn expect_type(&self, expect: &Type) -> Result<()> {
         if *expect != self.expect_type {
