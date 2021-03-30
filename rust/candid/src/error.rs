@@ -16,10 +16,10 @@ pub enum Error {
     #[error("Candid parser error: {0}")]
     Parse(#[from] token::ParserError),
 
-    #[error("Binary parser error: {0}")]
+    #[error(transparent)]
     Binread(#[from] binread::Error),
 
-    #[error("{0}")]
+    #[error(transparent)]
     Custom(#[from] anyhow::Error),
 }
 

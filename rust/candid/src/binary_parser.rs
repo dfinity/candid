@@ -1,6 +1,5 @@
 use crate::parser::typing::TypeEnv;
 use crate::types::internal::{Field, Label, Type};
-//use crate::{Error, Result};
 use anyhow::{anyhow, Context, Result};
 use binread::io::{Read, Seek, SeekFrom};
 use binread::{BinRead, BinResult, Error as BError, ReadOptions};
