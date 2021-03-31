@@ -3,6 +3,7 @@
 use super::error::{pretty_read, Error, Result};
 use super::{idl_hash, parser::typing::TypeEnv, types::Type, CandidType, Int, Nat};
 use crate::binary_parser::Header;
+use crate::types::subtype::{subtype, Gamma};
 use anyhow::{anyhow, Context};
 use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -39,6 +40,20 @@ impl<'de> IDLDeserialize<'de> {
             expected_type
         };
         self.de.wire_type = ty.clone();
+        if !subtype(
+            &mut self.de.gamma,
+            &self.de.table,
+            &ty,
+            &self.de.table,
+            &self.de.expect_type,
+        ) {
+            return Err(Error::msg(format!(
+                "Fail to decode argument {}, because {} is not subtype of {}",
+                ind,
+                ty,
+                T::ty()
+            )));
+        }
 
         let v = T::deserialize(&mut self.de)
             .with_context(|| self.de.dump_state())
@@ -72,12 +87,24 @@ impl<'de> IDLDeserialize<'de> {
     }
 }
 
+macro_rules! assert {
+    ( $self:ident, false ) => {{
+        return Err(anyhow!($self.dump_state())).context("Internal error")?;
+    }};
+    ( $self:ident, $pred:expr ) => {{
+        if !$pred {
+            return Err(anyhow!($self.dump_state())).context("Internal error")?;
+        }
+    }};
+}
+
 struct Deserializer<'de> {
     input: Cursor<&'de [u8]>,
     table: TypeEnv,
     types: VecDeque<(usize, Type)>,
     wire_type: Type,
     expect_type: Type,
+    gamma: Gamma,
     record_nesting_depth: usize,
 }
 
@@ -92,6 +119,7 @@ impl<'de> Deserializer<'de> {
             types: types.into_iter().enumerate().collect(),
             wire_type: Type::Unknown,
             expect_type: Type::Unknown,
+            gamma: Gamma::default(),
             record_nesting_depth: 0,
         })
     }
@@ -109,22 +137,12 @@ impl<'de> Deserializer<'de> {
         );
         res
     }
-    fn expect_type(&self, expect: &Type) -> Result<()> {
-        if *expect != self.expect_type {
-            Err(Error::msg(format!(
-                "Internal error. Expect {}, but expect_type is {}",
-                expect, self.expect_type
-            )))
-        } else {
-            Ok(())
-        }
-    }
     fn deserialize_int<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         self.record_nesting_depth = 0;
-        self.expect_type(&Type::Int)?;
+        assert!(self, self.expect_type == Type::Int);
         let mut bytes = Vec::new();
         match &self.wire_type {
             Type::Int => {
@@ -137,12 +155,7 @@ impl<'de> Deserializer<'de> {
                 let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
                 bytes.extend_from_slice(&nat.0.to_bytes_le());
             }
-            t => {
-                return Err(Error::msg(format!(
-                    "Type mismatch. Expect int, but found {}",
-                    t
-                )))
-            }
+            _ => assert!(self, false),
         }
         visitor.visit_byte_buf(bytes)
     }
@@ -159,7 +172,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Type::Bool => self.deserialize_bool(visitor),
             Type::Int => self.deserialize_int(visitor),
             Type::Vec(_) => self.deserialize_seq(visitor),
-            _ => unreachable!(),
+            _ => assert!(self, false),
         }
     }
 
@@ -173,8 +186,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
              bool,
         );
         self.record_nesting_depth = 0;
+        assert!(self, self.expect_type == Type::Bool);
         let res: BoolValue = pretty_read(&mut self.input)?;
-        self.expect_type(&Type::Bool)?;
         visitor.visit_bool(res.0)
     }
 
