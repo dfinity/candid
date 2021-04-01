@@ -88,12 +88,12 @@ impl<'de> IDLDeserialize<'de> {
 }
 
 macro_rules! assert {
-    ( $self:ident, false ) => {{
-        return Err(anyhow!($self.dump_state())).context("Internal error")?;
+    ( false ) => {{
+        return Err(Error::msg("Internal error. Please file a bug."));
     }};
-    ( $self:ident, $pred:expr ) => {{
+    ( $pred:expr ) => {{
         if !$pred {
-            return Err(anyhow!($self.dump_state())).context("Internal error")?;
+            return Err(Error::msg("Internal error. Please file a bug."));
         }
     }};
 }
@@ -142,7 +142,7 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.record_nesting_depth = 0;
-        assert!(self, self.expect_type == Type::Int);
+        assert!(self.expect_type == Type::Int);
         let mut bytes = Vec::new();
         match &self.wire_type {
             Type::Int => {
@@ -155,7 +155,8 @@ impl<'de> Deserializer<'de> {
                 let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
                 bytes.extend_from_slice(&nat.0.to_bytes_le());
             }
-            _ => assert!(self, false),
+            // We already did subtype checking before deserialize, so this is unreachable code
+            _ => assert!(false),
         }
         visitor.visit_byte_buf(bytes)
     }
@@ -172,7 +173,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Type::Bool => self.deserialize_bool(visitor),
             Type::Int => self.deserialize_int(visitor),
             Type::Vec(_) => self.deserialize_seq(visitor),
-            _ => assert!(self, false),
+            _ => assert!(false),
         }
     }
 
@@ -186,7 +187,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
              bool,
         );
         self.record_nesting_depth = 0;
-        assert!(self, self.expect_type == Type::Bool);
+        assert!(self.expect_type == Type::Bool && self.wire_type == Type::Bool);
         let res: BoolValue = pretty_read(&mut self.input)?;
         visitor.visit_bool(res.0)
     }
