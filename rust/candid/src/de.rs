@@ -7,6 +7,7 @@ use crate::types::subtype::{subtype, Gamma};
 use anyhow::{anyhow, Context};
 use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
+use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
 use serde::de::{self, Deserialize, Visitor};
 use std::collections::{BTreeMap, VecDeque};
 use std::convert::TryFrom;
@@ -206,11 +207,21 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         let t = self.table.trace_type(&self.expect_type)?;
         match t {
+            Type::Null => self.deserialize_unit(visitor),
             Type::Bool => self.deserialize_bool(visitor),
             Type::Int => self.deserialize_int(visitor),
             Type::Opt(_) => self.deserialize_option(visitor),
+            Type::Vec(_) => self.deserialize_seq(visitor),
             _ => assert!(false),
         }
+    }
+    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.record_nesting_depth = 0;
+        assert!(self.expect_type == Type::Null && self.wire_type == Type::Null);
+        visitor.visit_unit()
     }
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
     where
@@ -227,10 +238,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.record_nesting_depth = 0;
         self.unroll_type()?;
-        if let Type::Opt(ref t) = self.expect_type {
-            self.expect_type = *t.clone();
-        } else {
-            assert!(false);
+        match self.expect_type {
+            Type::Opt(ref t) => self.expect_type = *t.clone(),
+            _ => assert!(false),
         }
         match self.wire_type {
             Type::Null | Type::Reserved => visitor.visit_none(),
@@ -255,6 +265,22 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             }
         }
     }
+    fn deserialize_seq<V>(mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.record_nesting_depth = 0;
+        self.unroll_type()?;
+        match (&self.expect_type, &self.wire_type) {
+            (Type::Vec(ref e), Type::Vec(ref w)) => {
+                self.expect_type = *e.clone();
+                self.wire_type = *w.clone();
+                let len = leb128_decode(&mut self.input).map_err(Error::msg)?;
+                visitor.visit_seq(Compound::new(&mut self, Style::Vector { len }))
+            }
+            _ => assert!(false),
+        }
+    }
 
     serde::forward_to_deserialize_any! {
         u8
@@ -270,7 +296,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         char
         str
         string
-        unit
         bytes
         byte_buf
         unit_struct
@@ -280,8 +305,57 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         identifier
         tuple
         enum
-        seq
         map
         ignored_any
+    }
+}
+
+#[derive(Debug)]
+enum Style {
+    Tuple {
+        len: u32,
+        index: u32,
+    },
+    Vector {
+        len: u64, // non-vector length can only be u32, because field ids is u32.
+    },
+    Struct {
+        len: u32,
+        fs: BTreeMap<u32, Option<&'static str>>,
+    },
+    Enum {
+        len: u32,
+        fs: BTreeMap<u32, Option<&'static str>>,
+    },
+}
+
+struct Compound<'a, 'de> {
+    de: &'a mut Deserializer<'de>,
+    style: Style,
+}
+
+impl<'a, 'de> Compound<'a, 'de> {
+    fn new(de: &'a mut Deserializer<'de>, style: Style) -> Self {
+        Compound { de, style }
+    }
+}
+
+impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
+    type Error = Error;
+
+    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        match self.style {
+            Style::Vector { ref mut len } => {
+                if *len == 0 {
+                    return Ok(None);
+                }
+                *len -= 1;
+                seed.deserialize(&mut *self.de).map(Some)
+            }
+            _ => Err(Error::msg("expect vector")),
+        }
     }
 }
