@@ -66,10 +66,20 @@ struct FieldType {
     index: IndexType,
 }
 
+#[derive(BinRead)]
+pub struct BoolValue(
+    #[br(try_map = |x:u8| match x { 0u8 => Ok(false), | 1u8 => Ok(true), | _ => Err("Expect 00 or 01") } )]
+    pub bool,
+);
+#[derive(BinRead)]
+pub struct Len(
+    #[br(parse_with = read_leb)]
+    pub u64
+);
+
 fn index_to_var(ind: i64) -> String {
     format!("var{}", ind)
 }
-
 impl IndexType {
     fn to_type(&self, len: u64) -> Result<Type> {
         Ok(match self.index {

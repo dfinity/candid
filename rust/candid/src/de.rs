@@ -2,10 +2,9 @@
 
 use super::error::{pretty_read, Error, Result};
 use super::{idl_hash, parser::typing::TypeEnv, types::Type, CandidType, Int, Nat};
-use crate::binary_parser::Header;
+use crate::binary_parser::{Header, BoolValue, Len};
 use crate::types::subtype::{subtype, Gamma};
 use anyhow::{anyhow, Context};
-use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
 use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
 use serde::de::{self, Deserialize, Visitor};
@@ -42,20 +41,6 @@ impl<'de> IDLDeserialize<'de> {
         };
         self.de.wire_type = ty.clone();
         self.de.check_subtype()?;
-        /*if !subtype(
-            &mut self.de.gamma,
-            &self.de.table,
-            &ty,
-            &self.de.table,
-            &self.de.expect_type,
-        ) {
-            return Err(Error::msg(format!(
-                "Fail to decode argument {}, because {} is not subtype of {}",
-                ind,
-                ty,
-                T::ty()
-            )));
-        }*/
 
         let v = T::deserialize(&mut self.de)
             .with_context(|| self.de.dump_state())
@@ -193,12 +178,6 @@ impl<'de> Deserializer<'de> {
     }
 }
 
-#[derive(BinRead)]
-struct BoolValue(
-    #[br(try_map = |x:u8| match x { 0u8 => Ok(false), | 1u8 => Ok(true), | _ => Err("Expect 00 or 01") } )]
-     bool,
-);
-
 impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value>
@@ -275,7 +254,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (Type::Vec(ref e), Type::Vec(ref w)) => {
                 self.expect_type = *e.clone();
                 self.wire_type = *w.clone();
-                let len = leb128_decode(&mut self.input).map_err(Error::msg)?;
+                let len = pretty_read::<Len>(&mut self.input)?.0;
                 visitor.visit_seq(Compound::new(&mut self, Style::Vector { len }))
             }
             _ => assert!(false),
