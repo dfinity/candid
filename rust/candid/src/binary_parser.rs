@@ -54,14 +54,14 @@ struct IndexType {
 }
 #[derive(BinRead, Debug)]
 struct Fields {
-    #[br(parse_with = read_leb, try_map = |x:u64| x.try_into())]
+    #[br(parse_with = read_leb, try_map = |x:u64| x.try_into().map_err(|_| "field length out of 32-bit range"))]
     len: u32,
     #[br(count = len)]
     inner: Vec<FieldType>,
 }
 #[derive(BinRead, Debug)]
 struct FieldType {
-    #[br(parse_with = read_leb, try_map = |x:u64| x.try_into())]
+    #[br(parse_with = read_leb, try_map = |x:u64| x.try_into().map_err(|_| "field id out of 32-bit range"))]
     id: u32,
     index: IndexType,
 }
@@ -72,10 +72,7 @@ pub struct BoolValue(
     pub bool,
 );
 #[derive(BinRead)]
-pub struct Len(
-    #[br(parse_with = read_leb)]
-    pub u64
-);
+pub struct Len(#[br(parse_with = read_leb)] pub u64);
 
 fn index_to_var(ind: i64) -> String {
     format!("var{}", ind)

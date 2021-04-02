@@ -72,7 +72,9 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label<()>> {
         }
         Custom { pos, err } => {
             let pos = (pos * 2) as usize;
-            let err = err.downcast_ref::<&str>().unwrap();
+            let err = err
+                .downcast_ref::<&str>()
+                .unwrap_or(&"unknown error (there's a bug in error reporting)");
             vec![Label::primary((), pos..pos + 2).with_message(err.to_string())]
         }
         EnumErrors {

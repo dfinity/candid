@@ -1,8 +1,13 @@
 //! Deserialize Candid binary format to Rust data structures
 
 use super::error::{pretty_read, Error, Result};
-use super::{idl_hash, parser::typing::TypeEnv, types::Type, CandidType, Int, Nat};
-use crate::binary_parser::{Header, BoolValue, Len};
+use super::{
+    idl_hash,
+    parser::typing::TypeEnv,
+    types::{Field, Label, Type},
+    CandidType, Int, Nat,
+};
+use crate::binary_parser::{BoolValue, Header, Len};
 use crate::types::subtype::{subtype, Gamma};
 use anyhow::{anyhow, Context};
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -100,6 +105,9 @@ struct Deserializer<'de> {
     wire_type: Type,
     expect_type: Type,
     gamma: Gamma,
+    // field_name tells deserialize_identifier which field name to process.
+    // This field should always be set by set_field_name function.
+    field_name: Option<Label>,
     record_nesting_depth: usize,
 }
 
@@ -115,6 +123,7 @@ impl<'de> Deserializer<'de> {
             wire_type: Type::Unknown,
             expect_type: Type::Unknown,
             gamma: Gamma::default(),
+            field_name: None,
             record_nesting_depth: 0,
         })
     }
@@ -130,6 +139,9 @@ impl<'de> Deserializer<'de> {
             "wire_type: {}, expect_type: {}",
             self.wire_type, self.expect_type
         );
+        if let Some(field) = &self.field_name {
+            res += &format!(", field_name: {:?}", field);
+        }
         res
     }
     fn check_subtype(&mut self) -> Result<()> {
@@ -152,6 +164,14 @@ impl<'de> Deserializer<'de> {
         self.expect_type = self.table.trace_type(&self.expect_type)?;
         self.wire_type = self.table.trace_type(&self.wire_type)?;
         Ok(())
+    }
+    // Should always call set_field_name to set the field_name. After deserialize_identifier
+    // processed the field_name, field_name will be reset to None.
+    fn set_field_name(&mut self, field: Label) {
+        if self.field_name.is_some() {
+            unreachable!();
+        }
+        self.field_name = Some(field);
     }
     fn deserialize_int<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
@@ -176,6 +196,15 @@ impl<'de> Deserializer<'de> {
         }
         visitor.visit_byte_buf(bytes)
     }
+    fn deserialize_reserved<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.record_nesting_depth = 0;
+        assert!(self.expect_type == Type::Reserved);
+        let tagged = vec![3u8];
+        visitor.visit_byte_buf(tagged)
+    }
 }
 
 impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
@@ -184,13 +213,22 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        if self.field_name.is_some() {
+            return self.deserialize_identifier(visitor);
+        }
         let t = self.table.trace_type(&self.expect_type)?;
+        // TODO needed?
+        if !matches!(t, Type::Record(_)) {
+            self.record_nesting_depth = 0;
+        }
         match t {
             Type::Null => self.deserialize_unit(visitor),
+            Type::Reserved => self.deserialize_reserved(visitor),
             Type::Bool => self.deserialize_bool(visitor),
             Type::Int => self.deserialize_int(visitor),
             Type::Opt(_) => self.deserialize_option(visitor),
             Type::Vec(_) => self.deserialize_seq(visitor),
+            Type::Record(_) => self.deserialize_struct("_", &[], visitor),
             _ => assert!(false),
         }
     }
@@ -260,6 +298,43 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             _ => assert!(false),
         }
     }
+    fn deserialize_struct<V>(
+        mut self,
+        _name: &'static str,
+        _fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        let old_nesting = self.record_nesting_depth;
+        self.record_nesting_depth += 1;
+        if self.record_nesting_depth > self.table.0.len() {
+            return Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"));
+        }
+        self.unroll_type()?;
+        match (&self.expect_type, &self.wire_type) {
+            (Type::Record(e), Type::Record(w)) => {
+                let expect = e.clone().into();
+                let wire = w.clone().into();
+                let value =
+                    visitor.visit_map(Compound::new(&mut self, Style::Struct { expect, wire }))?;
+                self.record_nesting_depth = old_nesting;
+                Ok(value)
+            }
+            _ => assert!(false),
+        }
+    }
+    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        match self.field_name.take() {
+            Some(Label::Named(name)) => visitor.visit_string(name),
+            Some(Label::Id(hash)) | Some(Label::Unnamed(hash)) => visitor.visit_u32(hash),
+            None => assert!(false),
+        }
+    }
 
     serde::forward_to_deserialize_any! {
         u8
@@ -280,8 +355,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         unit_struct
         newtype_struct
         tuple_struct
-        struct
-        identifier
         tuple
         enum
         map
@@ -299,8 +372,8 @@ enum Style {
         len: u64, // non-vector length can only be u32, because field ids is u32.
     },
     Struct {
-        len: u32,
-        fs: BTreeMap<u32, Option<&'static str>>,
+        expect: VecDeque<Field>,
+        wire: VecDeque<Field>,
     },
     Enum {
         len: u32,
@@ -336,5 +409,80 @@ impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
             }
             _ => Err(Error::msg("expect vector")),
         }
+    }
+}
+
+impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
+    type Error = Error;
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>>
+    where
+        K: de::DeserializeSeed<'de>,
+    {
+        match self.style {
+            Style::Struct {
+                ref mut expect,
+                ref mut wire,
+            } => {
+                match (expect.front(), wire.front()) {
+                    (Some(e), Some(w)) => {
+                        if e.id.get_id() == w.id.get_id() {
+                            self.de.set_field_name(e.id.clone());
+                            self.de.expect_type = expect.pop_front().unwrap().ty;
+                            self.de.wire_type = wire.pop_front().unwrap().ty;
+                        } else if e.id.get_id() < w.id.get_id() {
+                            // by subtyping rules, expect_type can only be opt, reserved or null.
+                            self.de.set_field_name(e.id.clone());
+                            self.de.expect_type = expect.pop_front().unwrap().ty;
+                            self.de.wire_type = Type::Reserved;
+                        } else {
+                            self.de.set_field_name(Label::Named("_".to_owned()));
+                            self.de.wire_type = expect.pop_front().unwrap().ty;
+                            self.de.expect_type = Type::Reserved;
+                        }
+                    }
+                    (None, Some(_)) => {
+                        self.de.set_field_name(Label::Named("_".to_owned()));
+                        self.de.wire_type = expect.pop_front().unwrap().ty;
+                        self.de.expect_type = Type::Reserved;
+                    }
+                    (Some(e), None) => {
+                        self.de.set_field_name(e.id.clone());
+                        self.de.expect_type = expect.pop_front().unwrap().ty;
+                        self.de.wire_type = Type::Reserved;
+                    }
+                    (None, None) => return Ok(None),
+                }
+                seed.deserialize(&mut *self.de).map(Some)
+            }
+            /*
+            Style::Map { ref mut len, .. } => {
+                // This only comes from deserialize_map
+                if *len == 0 {
+                    return Ok(None);
+                }
+                self.de.table.check_type(Opcode::Record)?;
+                assert_eq!(2, self.de.table.pop_current_type()?.get_u32()?);
+                assert_eq!(0, self.de.table.pop_current_type()?.get_u32()?);
+                *len -= 1;
+                seed.deserialize(&mut *self.de).map(Some)
+            }*/
+            _ => Err(Error::msg("expect struct or map")),
+        }
+    }
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        seed.deserialize(&mut *self.de)
+        /*
+        match self.style {
+            Style::Map { ref ty, .. } => {
+                assert_eq!(1, self.de.table.pop_current_type()?.get_u32()?);
+                let res = seed.deserialize(&mut *self.de);
+                self.de.table.current_type.push_front(ty.clone());
+                res
+            }
+            _ => seed.deserialize(&mut *self.de),
+        }*/
     }
 }
