@@ -101,7 +101,7 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label<()>> {
             let pos = (pos * 2) as usize;
             vec![Label::primary((), pos..pos + 2).with_message(message)]
         }
-        Io(e) => vec![Label::primary((), 0..0).with_message(e.to_string())],
+        Io(_) => vec![],
         _ => unreachable!(),
     }
 }

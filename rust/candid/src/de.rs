@@ -40,7 +40,8 @@ impl<'de> IDLDeserialize<'de> {
             expected_type
         };
         self.de.wire_type = ty.clone();
-        if !subtype(
+        self.de.check_subtype()?;
+        /*if !subtype(
             &mut self.de.gamma,
             &self.de.table,
             &ty,
@@ -53,7 +54,7 @@ impl<'de> IDLDeserialize<'de> {
                 ty,
                 T::ty()
             )));
-        }
+        }*/
 
         let v = T::deserialize(&mut self.de)
             .with_context(|| self.de.dump_state())
@@ -89,11 +90,19 @@ impl<'de> IDLDeserialize<'de> {
 
 macro_rules! assert {
     ( false ) => {{
-        return Err(Error::msg("Internal error. Please file a bug."));
+        return Err(Error::msg(format!(
+            "Internal error at {}:{}. Please file a bug.",
+            file!(),
+            line!()
+        )));
     }};
     ( $pred:expr ) => {{
         if !$pred {
-            return Err(Error::msg("Internal error. Please file a bug."));
+            return Err(Error::msg(format!(
+                "Internal error at {}:{}. Please file a bug.",
+                file!(),
+                line!()
+            )));
         }
     }};
 }
@@ -137,6 +146,27 @@ impl<'de> Deserializer<'de> {
         );
         res
     }
+    fn check_subtype(&mut self) -> Result<()> {
+        if !subtype(
+            &mut self.gamma,
+            &self.table,
+            &self.wire_type,
+            &self.table,
+            &self.expect_type,
+        ) {
+            Err(Error::msg(format!(
+                "{} is not subtype of {}",
+                self.wire_type, self.expect_type,
+            )))
+        } else {
+            Ok(())
+        }
+    }
+    fn unroll_type(&mut self) -> Result<()> {
+        self.expect_type = self.table.trace_type(&self.expect_type)?;
+        self.wire_type = self.table.trace_type(&self.wire_type)?;
+        Ok(())
+    }
     fn deserialize_int<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -162,6 +192,12 @@ impl<'de> Deserializer<'de> {
     }
 }
 
+#[derive(BinRead)]
+struct BoolValue(
+    #[br(try_map = |x:u8| match x { 0u8 => Ok(false), | 1u8 => Ok(true), | _ => Err("Expect 00 or 01") } )]
+     bool,
+);
+
 impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value>
@@ -172,24 +208,52 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         match t {
             Type::Bool => self.deserialize_bool(visitor),
             Type::Int => self.deserialize_int(visitor),
-            Type::Vec(_) => self.deserialize_seq(visitor),
+            Type::Opt(_) => self.deserialize_option(visitor),
             _ => assert!(false),
         }
     }
-
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        #[derive(BinRead)]
-        struct BoolValue(
-            #[br(try_map = |x:u8| match x { 0u8 => Ok(false), | 1u8 => Ok(true), | _ => Err("Not a boolean") } )]
-             bool,
-        );
         self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Bool && self.wire_type == Type::Bool);
         let res: BoolValue = pretty_read(&mut self.input)?;
         visitor.visit_bool(res.0)
+    }
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.record_nesting_depth = 0;
+        self.unroll_type()?;
+        if let Type::Opt(ref t) = self.expect_type {
+            self.expect_type = *t.clone();
+        } else {
+            assert!(false);
+        }
+        match self.wire_type {
+            Type::Null | Type::Reserved => visitor.visit_none(),
+            Type::Opt(ref t) => {
+                self.wire_type = *t.clone();
+                if pretty_read::<BoolValue>(&mut self.input)?.0 {
+                    if self.check_subtype().is_ok() {
+                        visitor.visit_some(self)
+                    } else {
+                        visitor.visit_none()
+                    }
+                } else {
+                    visitor.visit_none()
+                }
+            }
+            _ => {
+                if self.check_subtype().is_ok() {
+                    visitor.visit_some(self)
+                } else {
+                    visitor.visit_none()
+                }
+            }
+        }
     }
 
     serde::forward_to_deserialize_any! {
@@ -207,7 +271,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         str
         string
         unit
-        option
         bytes
         byte_buf
         unit_struct

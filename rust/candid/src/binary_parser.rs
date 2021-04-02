@@ -66,6 +66,10 @@ struct FieldType {
     index: IndexType,
 }
 
+fn index_to_var(ind: i64) -> String {
+    format!("var{}", ind)
+}
+
 impl IndexType {
     fn to_type(&self, len: u64) -> Result<Type> {
         Ok(match self.index {
@@ -73,7 +77,7 @@ impl IndexType {
                 if v >= len as i64 {
                     return Err(anyhow!("type index {} out of range", v));
                 }
-                Type::Var(v.to_string())
+                Type::Var(index_to_var(v))
             }
             -1 => Type::Null,
             -2 => Type::Bool,
@@ -133,7 +137,7 @@ impl Table {
         let mut env = BTreeMap::new();
         for (i, t) in self.table.iter().enumerate() {
             env.insert(
-                i.to_string(),
+                index_to_var(i as i64),
                 t.to_type(len)
                     .with_context(|| format!("Invalid table entry {}: {:?}", i, t))?,
             );
