@@ -73,6 +73,13 @@ pub struct BoolValue(
 );
 #[derive(BinRead)]
 pub struct Len(#[br(parse_with = read_leb)] pub u64);
+#[derive(BinRead)]
+pub struct Bytes {
+    #[br(parse_with = read_leb)]
+    pub len: u64,
+    #[br(count = len)]
+    pub inner: Vec<u8>,
+}
 
 fn index_to_var(ind: i64) -> String {
     format!("var{}", ind)

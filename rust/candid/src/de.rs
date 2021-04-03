@@ -1,14 +1,15 @@
 //! Deserialize Candid binary format to Rust data structures
 
-use super::error::{pretty_read, Error, Result};
+use super::error::{Error, Result};
 use super::{
     parser::typing::TypeEnv,
     types::{Field, Label, Type},
     CandidType, Int, Nat,
 };
-use crate::binary_parser::{BoolValue, Header, Len};
+use crate::binary_parser::{BoolValue, Bytes, Header, Len};
 use crate::types::subtype::{subtype, Gamma};
 use anyhow::{anyhow, Context};
+use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
 use std::collections::VecDeque;
@@ -108,7 +109,7 @@ struct Deserializer<'de> {
 impl<'de> Deserializer<'de> {
     fn from_bytes(bytes: &'de [u8]) -> Result<Self> {
         let mut reader = Cursor::new(bytes);
-        let header: Header = pretty_read(&mut reader)?;
+        let header = Header::read(&mut reader)?;
         let (env, types) = header.to_types()?;
         Ok(Deserializer {
             input: reader,
@@ -137,16 +138,6 @@ impl<'de> Deserializer<'de> {
             res += &format!(", field_name: {:?}", field);
         }
         res
-    }
-    fn parse_bytes(&mut self, len: usize) -> Result<Vec<u8>> {
-        // TODO check for length
-        let mut buf = vec![0; len];
-        self.input.read_exact(&mut buf)?;
-        Ok(buf)
-    }
-    fn parse_string(&mut self, len: usize) -> Result<String> {
-        let buf = self.parse_bytes(len)?;
-        String::from_utf8(buf).map_err(Error::msg)
     }
     fn check_subtype(&mut self) -> Result<()> {
         if !subtype(
@@ -268,6 +259,13 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             _ => assert!(false),
         }
     }
+    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        //self.expect_type = self.wire_type.clone();
+        self.deserialize_any(visitor)
+    }
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -282,7 +280,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Bool && self.wire_type == Type::Bool);
-        let res: BoolValue = pretty_read(&mut self.input)?;
+        let res = BoolValue::read(&mut self.input)?;
         visitor.visit_bool(res.0)
     }
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
@@ -291,8 +289,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
-        let len = pretty_read::<Len>(&mut self.input)?.0 as usize;
-        let value = self.parse_string(len)?;
+        let bytes = Bytes::read(&mut self.input)?;
+        let value = String::from_utf8(bytes.inner).map_err(Error::msg)?;
         visitor.visit_string(value)
     }
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
@@ -301,13 +299,13 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
-        let len = pretty_read::<Len>(&mut self.input)?.0 as usize;
+        let len = Len::read(&mut self.input)?.0 as usize;
         let pos = self.input.position() as usize;
         let end = pos + len;
         let slice = &self.input.get_ref()[pos..end];
         self.input.set_position(end as u64);
-        let value: Result<&str> = std::str::from_utf8(slice).map_err(de::Error::custom);
-        visitor.visit_borrowed_str(value?)
+        let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
+        visitor.visit_borrowed_str(value)
     }
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>
     where
@@ -323,7 +321,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Type::Null | Type::Reserved => visitor.visit_none(),
             Type::Opt(ref t) => {
                 self.wire_type = *t.clone();
-                if pretty_read::<BoolValue>(&mut self.input)?.0 {
+                if BoolValue::read(&mut self.input)?.0 {
                     if self.check_subtype().is_ok() {
                         visitor.visit_some(self)
                     } else {
@@ -352,7 +350,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (Type::Vec(ref e), Type::Vec(ref w)) => {
                 self.expect_type = *e.clone();
                 self.wire_type = *w.clone();
-                let len = pretty_read::<Len>(&mut self.input)?.0;
+                let len = Len::read(&mut self.input)?.0;
                 visitor.visit_seq(Compound::new(&mut self, Style::Vector { len }))
             }
             _ => assert!(false),
@@ -398,8 +396,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.unroll_type()?;
         match (&self.expect_type, &self.wire_type) {
             (Type::Variant(e), Type::Variant(w)) => {
-                let index =
-                    usize::try_from(pretty_read::<Len>(&mut self.input)?.0).map_err(Error::msg)?;
+                let index = usize::try_from(Len::read(&mut self.input)?.0).map_err(Error::msg)?;
                 let len = w.len();
                 if index >= len {
                     return Err(Error::msg(format!(
@@ -448,7 +445,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         tuple_struct
         tuple
         map
-        ignored_any
     }
 }
 
