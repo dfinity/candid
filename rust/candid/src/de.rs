@@ -13,7 +13,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
 use std::collections::VecDeque;
 use std::convert::TryFrom;
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
 pub struct IDLDeserialize<'de> {
@@ -96,10 +96,12 @@ struct Deserializer<'de> {
     types: VecDeque<(usize, Type)>,
     wire_type: Type,
     expect_type: Type,
+    // Memo table for subtyping relation
     gamma: Gamma,
     // field_name tells deserialize_identifier which field name to process.
     // This field should always be set by set_field_name function.
     field_name: Option<Label>,
+    // The record nesting depth should be bounded by the length of table to avoid infinite loop.
     record_nesting_depth: usize,
 }
 
@@ -135,6 +137,16 @@ impl<'de> Deserializer<'de> {
             res += &format!(", field_name: {:?}", field);
         }
         res
+    }
+    fn parse_bytes(&mut self, len: usize) -> Result<Vec<u8>> {
+        // TODO check for length
+        let mut buf = vec![0; len];
+        self.input.read_exact(&mut buf)?;
+        Ok(buf)
+    }
+    fn parse_string(&mut self, len: usize) -> Result<String> {
+        let buf = self.parse_bytes(len)?;
+        String::from_utf8(buf).map_err(Error::msg)
     }
     fn check_subtype(&mut self) -> Result<()> {
         if !subtype(
@@ -194,14 +206,25 @@ impl<'de> Deserializer<'de> {
         }
         visitor.visit_byte_buf(bytes)
     }
+    fn deserialize_nat<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.record_nesting_depth = 0;
+        assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
+        let mut bytes = vec![1u8];
+        let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
+        bytes.extend_from_slice(&nat.0.to_bytes_le());
+        visitor.visit_byte_buf(bytes)
+    }
     fn deserialize_reserved<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Reserved);
-        let tagged = vec![3u8];
-        visitor.visit_byte_buf(tagged)
+        let bytes = vec![3u8];
+        visitor.visit_byte_buf(bytes)
     }
 }
 
@@ -220,10 +243,24 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             self.record_nesting_depth = 0;
         }
         match t {
+            Type::Int => self.deserialize_int(visitor),
+            Type::Nat => self.deserialize_nat(visitor),
+            /*Type::Nat8 => self.deserialize_u8(visitor),
+            Type::Nat16 => self.deserialize_u16(visitor),
+            Type::Nat32 => self.deserialize_u32(visitor),
+            Type::Nat64 => self.deserialize_u64(visitor),
+            Type::Int8 => self.deserialize_i8(visitor),
+            Type::Int16 => self.deserialize_i16(visitor),
+            Type::Int32 => self.deserialize_i32(visitor),
+            Type::Int64 => self.deserialize_i64(visitor),
+            Type::Float32 => self.deserialize_f32(visitor),
+            Type::Float64 => self.deserialize_f64(visitor),*/
+            Type::Bool => self.deserialize_bool(visitor),
+            Type::Text => self.deserialize_string(visitor),
             Type::Null => self.deserialize_unit(visitor),
             Type::Reserved => self.deserialize_reserved(visitor),
-            Type::Bool => self.deserialize_bool(visitor),
-            Type::Int => self.deserialize_int(visitor),
+            //Type::Empty => self.deserialize_empty(visitor),
+            // construct types
             Type::Opt(_) => self.deserialize_option(visitor),
             Type::Vec(_) => self.deserialize_seq(visitor),
             Type::Record(_) => self.deserialize_struct("_", &[], visitor),
@@ -247,6 +284,30 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         assert!(self.expect_type == Type::Bool && self.wire_type == Type::Bool);
         let res: BoolValue = pretty_read(&mut self.input)?;
         visitor.visit_bool(res.0)
+    }
+    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.record_nesting_depth = 0;
+        assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
+        let len = pretty_read::<Len>(&mut self.input)?.0 as usize;
+        let value = self.parse_string(len)?;
+        visitor.visit_string(value)
+    }
+    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.record_nesting_depth = 0;
+        assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
+        let len = pretty_read::<Len>(&mut self.input)?.0 as usize;
+        let pos = self.input.position() as usize;
+        let end = pos + len;
+        let slice = &self.input.get_ref()[pos..end];
+        self.input.set_position(end as u64);
+        let value: Result<&str> = std::str::from_utf8(slice).map_err(de::Error::custom);
+        visitor.visit_borrowed_str(value?)
     }
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>
     where
@@ -380,8 +441,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         f32
         f64
         char
-        str
-        string
         bytes
         byte_buf
         unit_struct
