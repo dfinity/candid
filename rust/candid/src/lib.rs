@@ -273,10 +273,9 @@ pub use parser::value::IDLArgs;
 pub mod binary_parser;
 pub mod de;
 pub mod ser;
-pub use ser::{encode_args, encode_one};
 
 pub mod utils;
-pub use utils::{decode_args, decode_one};
+pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
 pub mod pretty;
 
 // Candid hash function comes from
@@ -291,38 +290,4 @@ pub fn idl_hash(id: &str) -> u32 {
         s = s.wrapping_mul(223).wrapping_add(*c as u32);
     }
     s
-}
-
-/// Encode sequence of Rust values into Candid message of type `candid::Result<Vec<u8>>`.
-#[macro_export]
-macro_rules! Encode {
-    ( $($x:expr),* ) => {{
-        let mut builder = $crate::ser::IDLBuilder::new();
-        Encode!(@PutValue builder $($x,)*)
-    }};
-    ( @PutValue $builder:ident $x:expr, $($tail:expr,)* ) => {{
-        $builder.arg($x).and_then(|builder| Encode!(@PutValue builder $($tail,)*))
-    }};
-    ( @PutValue $builder:ident ) => {{
-        $builder.serialize_to_vec()
-    }};
-}
-
-/// Decode Candid message into a tuple of Rust values of the given types.
-/// Produces `Err` if the message fails to decode at any given types.
-/// If the message contains only one value, it returns the value directly instead of a tuple.
-#[macro_export]
-macro_rules! Decode {
-    ( $hex:expr $(,$ty:ty)* ) => {{
-        $crate::de::IDLDeserialize::new($hex)
-            .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
-                      .and_then(|res| de.done().and(Ok(res))))
-    }};
-    (@GetValue [$($ans:ident)*] $de:ident $ty:ty, $($tail:ty,)* ) => {{
-        $de.get_value::<$ty>()
-            .and_then(|val| Decode!(@GetValue [$($ans)* val] $de $($tail,)* ))
-    }};
-    (@GetValue [$($ans:ident)*] $de:ident) => {{
-        Ok(($($ans),*))
-    }};
 }
