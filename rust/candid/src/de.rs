@@ -263,7 +263,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        //self.expect_type = self.wire_type.clone();
+        self.expect_type = self.wire_type.clone();
         self.deserialize_any(visitor)
     }
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>

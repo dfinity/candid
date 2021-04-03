@@ -111,7 +111,7 @@ fn test_text() {
 fn test_reserved() {
     use candid::{Empty, Reserved};
     all_check(Reserved, "4449444c000170");
-    test_decode(&hex("4449444c00017b2a"), &candid::Reserved);
+    test_decode(&hex("4449444c00017c2a"), &candid::Reserved);
     test_decode(
         &hex("4449444c016c02d3e3aa027e868eb7027c0100012a"),
         &candid::Reserved,
