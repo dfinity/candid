@@ -2,7 +2,6 @@
 
 use super::error::{pretty_read, Error, Result};
 use super::{
-    idl_hash,
     parser::typing::TypeEnv,
     types::{Field, Label, Type},
     CandidType, Int, Nat,
@@ -11,7 +10,6 @@ use crate::binary_parser::{BoolValue, Header, Len};
 use crate::types::subtype::{subtype, Gamma};
 use anyhow::{anyhow, Context};
 use byteorder::{LittleEndian, ReadBytesExt};
-use leb128::read::{signed as sleb128_decode, unsigned as leb128_decode};
 use serde::de::{self, Deserialize, Visitor};
 use std::collections::{BTreeMap, VecDeque};
 use std::convert::TryFrom;
@@ -173,6 +171,12 @@ impl<'de> Deserializer<'de> {
         }
         self.field_name = Some(field);
     }
+    // Customize deserailization methods
+    // Several deserialize functions will call visit_byte_buf.
+    // We reserve the first byte to be a tag to distinguish between different callers:
+    // int(0), nat(1), principal(2), reserved(3), service(4), function(5)
+    // This is necessary for deserializing IDLValue because
+    // it has only one visitor and we need a way to know who called the visitor.
     fn deserialize_int<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -229,6 +233,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Type::Opt(_) => self.deserialize_option(visitor),
             Type::Vec(_) => self.deserialize_seq(visitor),
             Type::Record(_) => self.deserialize_struct("_", &[], visitor),
+            Type::Variant(_) => self.deserialize_enum("_", &[], visitor),
             _ => assert!(false),
         }
     }
@@ -325,6 +330,39 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             _ => assert!(false),
         }
     }
+    fn deserialize_enum<V>(
+        mut self,
+        _name: &'static str,
+        _variants: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.record_nesting_depth = 0;
+        self.unroll_type()?;
+        match (&self.expect_type, &self.wire_type) {
+            (Type::Variant(e), Type::Variant(w)) => {
+                let index =
+                    usize::try_from(pretty_read::<Len>(&mut self.input)?.0).map_err(Error::msg)?;
+                let len = w.len();
+                if index >= len {
+                    return Err(Error::msg(format!(
+                        "Variant index {} larger than length {}",
+                        index, len
+                    )));
+                }
+                let wire = w[index].clone();
+                let expect = e
+                    .iter()
+                    .find(|&f| f.id == wire.id)
+                    .ok_or_else(|| Error::msg(format!("Unknown variant field {}", wire.id)))?
+                    .clone();
+                visitor.visit_enum(Compound::new(&mut self, Style::Enum { expect, wire }))
+            }
+            _ => assert!(false),
+        }
+    }
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -356,7 +394,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         newtype_struct
         tuple_struct
         tuple
-        enum
         map
         ignored_any
     }
@@ -376,8 +413,8 @@ enum Style {
         wire: VecDeque<Field>,
     },
     Enum {
-        len: u32,
-        fs: BTreeMap<u32, Option<&'static str>>,
+        expect: Field,
+        wire: Field,
     },
 }
 
@@ -483,6 +520,74 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                 res
             }
             _ => seed.deserialize(&mut *self.de),
+        }*/
+    }
+}
+
+impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
+    type Error = Error;
+    type Variant = Self;
+
+    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant)>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        match &self.style {
+            Style::Enum { expect, wire } => {
+                self.de.expect_type = expect.ty.clone();
+                self.de.wire_type = wire.ty.clone();
+                let label = match &expect.id {
+                    Label::Named(name) => name.clone(),
+                    Label::Id(hash) | Label::Unnamed(hash) => {
+                        let accessor = match &expect.ty {
+                            Type::Null => "unit",
+                            Type::Record(_) => "struct",
+                            _ => "newtype",
+                        };
+                        format!("{},{}", hash, accessor)
+                    }
+                };
+                self.de.set_field_name(Label::Named(label));
+                let field = seed.deserialize(&mut *self.de)?;
+                Ok((field, self))
+            }
+            _ => Err(Error::msg("expect enum")),
+        }
+    }
+}
+
+impl<'de, 'a> de::VariantAccess<'de> for Compound<'a, 'de> {
+    type Error = Error;
+
+    fn unit_variant(self) -> Result<()> {
+        assert!(self.de.expect_type == Type::Null && self.de.wire_type == Type::Null);
+        Ok(())
+    }
+
+    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        seed.deserialize(self.de)
+    }
+
+    fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        de::Deserializer::deserialize_tuple(self.de, len, visitor)
+    }
+
+    fn struct_variant<V>(self, fields: &'static [&'static str], visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        de::Deserializer::deserialize_struct(self.de, "_", fields, visitor)
+        /*
+        if fields.is_empty() {
+            de::Deserializer::deserialize_any(self.de, visitor)
+        } else {
+            de::Deserializer::deserialize_struct(self.de, "_", fields, visitor)
         }*/
     }
 }
