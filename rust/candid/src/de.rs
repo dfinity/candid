@@ -10,8 +10,8 @@ use crate::binary_parser::{BoolValue, Header, Len};
 use crate::types::subtype::{subtype, Gamma};
 use anyhow::{anyhow, Context};
 use byteorder::{LittleEndian, ReadBytesExt};
-use serde::de::{self, Deserialize, Visitor};
-use std::collections::{BTreeMap, VecDeque};
+use serde::de::{self, Visitor};
+use std::collections::VecDeque;
 use std::convert::TryFrom;
 use std::io::Cursor;
 
@@ -51,12 +51,6 @@ impl<'de> IDLDeserialize<'de> {
                 format!("Fail to decode argument {} from {} to {}", ind, ty, T::ty())
             })?;
         Ok(v)
-        /*if self.de.table.current_type.is_empty() && self.de.field_name.is_none() {
-            Ok(v)
-        } else {
-            Err(Error::msg("Trailing type after deserializing a value"))
-                .map_err(|e| self.de.dump_error_state(e))
-        }*/
     }
     /// Check if we finish deserializing all values.
     pub fn is_done(&self) -> bool {

@@ -272,10 +272,11 @@ pub use parser::value::IDLArgs;
 
 pub mod binary_parser;
 pub mod de;
-//pub use de::{decode_args, decode_one};
 pub mod ser;
 pub use ser::{encode_args, encode_one};
 
+pub mod utils;
+pub use utils::{decode_args, decode_one};
 pub mod pretty;
 
 // Candid hash function comes from
