@@ -157,6 +157,15 @@ impl<'de> Deserializer<'de> {
             Ok(())
         }
     }
+    fn inc_record_nesting_depth(&mut self) -> Result<usize> {
+        let old_nesting = self.record_nesting_depth;
+        self.record_nesting_depth += 1;
+        if self.record_nesting_depth > self.table.0.len() {
+            return Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"));
+        } else {
+            Ok(old_nesting)
+        }
+    }
     fn unroll_type(&mut self) -> Result<()> {
         self.expect_type = self.table.trace_type(&self.expect_type)?;
         self.wire_type = self.table.trace_type(&self.wire_type)?;
@@ -353,6 +362,18 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
         visitor.visit_borrowed_str(value)
     }
+    fn deserialize_unit_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserialize_unit(visitor)
+    }
+    fn deserialize_newtype_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        visitor.visit_newtype_struct(self)
+    }
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -390,17 +411,39 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         self.unroll_type()?;
         match (&self.expect_type, &self.wire_type) {
             (Type::Vec(ref e), Type::Vec(ref w)) => {
+                self.record_nesting_depth = 0;
                 self.expect_type = *e.clone();
                 self.wire_type = *w.clone();
                 let len = Len::read(&mut self.input)?.0;
                 visitor.visit_seq(Compound::new(&mut self, Style::Vector { len }))
             }
+            (Type::Record(e), Type::Record(w)) => {
+                let expect = e.clone().into();
+                let wire = w.clone().into();
+                let old_nesting = self.inc_record_nesting_depth()?;
+                assert!(self.expect_type.is_tuple());
+                if !self.wire_type.is_tuple() {
+                    return Err(Error::msg(format!(
+                        "{} is not a tuple type",
+                        self.wire_type
+                    )));
+                }
+                let value =
+                    visitor.visit_seq(Compound::new(&mut self, Style::Struct { expect, wire }))?;
+                self.record_nesting_depth = old_nesting;
+                Ok(value)
+            }
             _ => assert!(false),
         }
+    }
+    fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserialize_seq(visitor)
     }
     fn deserialize_struct<V>(
         mut self,
@@ -411,11 +454,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        let old_nesting = self.record_nesting_depth;
-        self.record_nesting_depth += 1;
-        if self.record_nesting_depth > self.table.0.len() {
-            return Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"));
-        }
+        let old_nesting = self.inc_record_nesting_depth()?;
         self.unroll_type()?;
         match (&self.expect_type, &self.wire_type) {
             (Type::Record(e), Type::Record(w)) => {
@@ -476,22 +515,15 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         char
         bytes
         byte_buf
-        unit_struct
-        newtype_struct
         tuple_struct
-        tuple
         map
     }
 }
 
 #[derive(Debug)]
 enum Style {
-    Tuple {
-        len: u32,
-        index: u32,
-    },
     Vector {
-        len: u64, // non-vector length can only be u32, because field ids is u32.
+        len: u64,
     },
     Struct {
         expect: VecDeque<Field>,
@@ -529,7 +561,18 @@ impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
                 *len -= 1;
                 seed.deserialize(&mut *self.de).map(Some)
             }
-            _ => Err(Error::msg("expect vector")),
+            Style::Struct {
+                ref mut expect,
+                ref mut wire,
+            } => {
+                if expect.is_empty() && wire.is_empty() {
+                    return Ok(None);
+                }
+                self.de.expect_type = expect.pop_front().map(|f| f.ty).unwrap_or(Type::Reserved);
+                self.de.wire_type = wire.pop_front().map(|f| f.ty).unwrap_or(Type::Reserved);
+                seed.deserialize(&mut *self.de).map(Some)
+            }
+            _ => Err(Error::msg("expect vector or tuple")),
         }
     }
 }
