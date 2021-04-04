@@ -80,6 +80,15 @@ pub struct Bytes {
     #[br(count = len)]
     pub inner: Vec<u8>,
 }
+#[derive(BinRead)]
+pub struct PrincipalBytes {
+    #[br(assert(flag == 1u8, "Opaque reference not supported"))]
+    pub flag: u8,
+    #[br(parse_with = read_leb)]
+    pub len: u64,
+    #[br(count = len)]
+    pub inner: Vec<u8>,
+}
 
 fn index_to_var(ind: i64) -> String {
     format!("var{}", ind)

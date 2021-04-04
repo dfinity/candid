@@ -6,7 +6,7 @@ use super::{
     types::{Field, Label, Type},
     CandidType, Int, Nat,
 };
-use crate::binary_parser::{BoolValue, Bytes, Header, Len};
+use crate::binary_parser::{BoolValue, Bytes, Header, Len, PrincipalBytes};
 use crate::types::subtype::{subtype, Gamma};
 use anyhow::{anyhow, Context};
 use binread::{BinRead, BinReaderExt};
@@ -210,6 +210,17 @@ impl<'de> Deserializer<'de> {
         bytes.extend_from_slice(&nat.0.to_bytes_le());
         visitor.visit_byte_buf(bytes)
     }
+    fn deserialize_principal<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.record_nesting_depth = 0;
+        assert!(self.expect_type == Type::Principal && self.wire_type == Type::Principal);
+        let mut bytes = vec![2u8];
+        let id = PrincipalBytes::read(&mut self.input)?.inner;
+        bytes.extend_from_slice(&id);
+        visitor.visit_byte_buf(bytes)
+    }
     fn deserialize_reserved<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -273,6 +284,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Type::Null => self.deserialize_unit(visitor),
             Type::Reserved => self.deserialize_reserved(visitor),
             Type::Empty => self.deserialize_empty(visitor),
+            Type::Principal => self.deserialize_principal(visitor),
             // construct types
             Type::Opt(_) => self.deserialize_option(visitor),
             Type::Vec(_) => self.deserialize_seq(visitor),
