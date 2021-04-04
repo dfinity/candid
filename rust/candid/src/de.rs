@@ -321,6 +321,37 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     primitive_impl!(f32, Type::Float32);
     primitive_impl!(f64, Type::Float64);
 
+    fn deserialize_i128<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        use std::convert::TryInto;
+        self.record_nesting_depth = 0;
+        assert!(self.expect_type == Type::Int);
+        let value: i128 = match &self.wire_type {
+            Type::Int => {
+                let int = Int::decode(&mut self.input).map_err(Error::msg)?;
+                int.0.try_into().map_err(Error::msg)?
+            }
+            Type::Nat => {
+                let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
+                nat.0.try_into().map_err(Error::msg)?
+            }
+            _ => assert!(false),
+        };
+        visitor.visit_i128(value)
+    }
+    fn deserialize_u128<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        use std::convert::TryInto;
+        self.record_nesting_depth = 0;
+        assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
+        let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
+        let value: u128 = nat.0.try_into().map_err(Error::msg)?;
+        visitor.visit_u128(value)
+    }
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -445,6 +476,17 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.deserialize_seq(visitor)
     }
+    fn deserialize_tuple_struct<V>(
+        self,
+        _name: &'static str,
+        _len: usize,
+        visitor: V,
+    ) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserialize_seq(visitor)
+    }
     fn deserialize_struct<V>(
         mut self,
         _name: &'static str,
@@ -515,7 +557,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         char
         bytes
         byte_buf
-        tuple_struct
         map
     }
 }
