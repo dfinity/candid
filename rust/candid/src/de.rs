@@ -9,12 +9,11 @@ use super::{
 use crate::binary_parser::{BoolValue, Bytes, Header, Len};
 use crate::types::subtype::{subtype, Gamma};
 use anyhow::{anyhow, Context};
-use binread::BinRead;
-use byteorder::{LittleEndian, ReadBytesExt};
+use binread::{BinRead, BinReaderExt};
 use serde::de::{self, Visitor};
 use std::collections::VecDeque;
 use std::convert::TryFrom;
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
 pub struct IDLDeserialize<'de> {
@@ -44,7 +43,10 @@ impl<'de> IDLDeserialize<'de> {
             expected_type
         };
         self.de.wire_type = ty.clone();
-        self.de.check_subtype()?;
+        self.de
+            .check_subtype()
+            .with_context(|| self.de.dump_state())
+            .context("Subtype checking failed")?;
 
         let v = T::deserialize(&mut self.de)
             .with_context(|| self.de.dump_state())
@@ -217,6 +219,26 @@ impl<'de> Deserializer<'de> {
         let bytes = vec![3u8];
         visitor.visit_byte_buf(bytes)
     }
+    fn deserialize_empty<'a, V>(&'a mut self, _visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        Err(Error::msg("Cannot decode empty type"))
+    }
+}
+
+macro_rules! primitive_impl {
+    ($ty:ident, $type:expr) => {
+        paste::item! {
+            fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
+            where V: Visitor<'de> {
+                self.record_nesting_depth = 0;
+                assert!(self.expect_type == $type && self.wire_type == $type);
+                let val: $ty = self.input.read_le()?;
+                visitor.[<visit_ $ty>](val)
+            }
+        }
+    };
 }
 
 impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
@@ -236,7 +258,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         match t {
             Type::Int => self.deserialize_int(visitor),
             Type::Nat => self.deserialize_nat(visitor),
-            /*Type::Nat8 => self.deserialize_u8(visitor),
+            Type::Nat8 => self.deserialize_u8(visitor),
             Type::Nat16 => self.deserialize_u16(visitor),
             Type::Nat32 => self.deserialize_u32(visitor),
             Type::Nat64 => self.deserialize_u64(visitor),
@@ -245,12 +267,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Type::Int32 => self.deserialize_i32(visitor),
             Type::Int64 => self.deserialize_i64(visitor),
             Type::Float32 => self.deserialize_f32(visitor),
-            Type::Float64 => self.deserialize_f64(visitor),*/
+            Type::Float64 => self.deserialize_f64(visitor),
             Type::Bool => self.deserialize_bool(visitor),
             Type::Text => self.deserialize_string(visitor),
             Type::Null => self.deserialize_unit(visitor),
             Type::Reserved => self.deserialize_reserved(visitor),
-            //Type::Empty => self.deserialize_empty(visitor),
+            Type::Empty => self.deserialize_empty(visitor),
             // construct types
             Type::Opt(_) => self.deserialize_option(visitor),
             Type::Vec(_) => self.deserialize_seq(visitor),
@@ -266,6 +288,18 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.expect_type = self.wire_type.clone();
         self.deserialize_any(visitor)
     }
+
+    primitive_impl!(i8, Type::Int8);
+    primitive_impl!(i16, Type::Int16);
+    primitive_impl!(i32, Type::Int32);
+    primitive_impl!(i64, Type::Int64);
+    primitive_impl!(u8, Type::Nat8);
+    primitive_impl!(u16, Type::Nat16);
+    primitive_impl!(u32, Type::Nat32);
+    primitive_impl!(u64, Type::Nat64);
+    primitive_impl!(f32, Type::Float32);
+    primitive_impl!(f64, Type::Float64);
+
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -427,16 +461,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     serde::forward_to_deserialize_any! {
-        u8
-        u16
-        u32
-        u64
-        i8
-        i16
-        i32
-        i64
-        f32
-        f64
         char
         bytes
         byte_buf
@@ -522,13 +546,13 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                             self.de.wire_type = Type::Reserved;
                         } else {
                             self.de.set_field_name(Label::Named("_".to_owned()));
-                            self.de.wire_type = expect.pop_front().unwrap().ty;
+                            self.de.wire_type = wire.pop_front().unwrap().ty;
                             self.de.expect_type = Type::Reserved;
                         }
                     }
                     (None, Some(_)) => {
                         self.de.set_field_name(Label::Named("_".to_owned()));
-                        self.de.wire_type = expect.pop_front().unwrap().ty;
+                        self.de.wire_type = wire.pop_front().unwrap().ty;
                         self.de.expect_type = Type::Reserved;
                     }
                     (Some(e), None) => {
