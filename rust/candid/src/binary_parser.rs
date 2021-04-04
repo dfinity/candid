@@ -91,7 +91,7 @@ pub struct PrincipalBytes {
 }
 
 fn index_to_var(ind: i64) -> String {
-    format!("var{}", ind)
+    format!("table{}", ind)
 }
 impl IndexType {
     fn to_type(&self, len: u64) -> Result<Type> {

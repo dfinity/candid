@@ -161,7 +161,7 @@ impl<'de> Deserializer<'de> {
         let old_nesting = self.record_nesting_depth;
         self.record_nesting_depth += 1;
         if self.record_nesting_depth > self.table.0.len() {
-            return Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"));
+            Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"))
         } else {
             Ok(old_nesting)
         }
@@ -470,6 +470,50 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             _ => assert!(false),
         }
     }
+    fn deserialize_map<V>(mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.record_nesting_depth = 0;
+        self.unroll_type()?;
+        match (&self.expect_type, &self.wire_type) {
+            (Type::Vec(ref e), Type::Vec(ref w)) => {
+                let e = self.table.trace_type(e)?;
+                let w = self.table.trace_type(w)?;
+                let len = Len::read(&mut self.input)?.0;
+                match (e, w) {
+                    (Type::Record(ref e), Type::Record(ref w)) => match (&e[..], &w[..]) {
+                        (
+                            [Field {
+                                id: Label::Id(0),
+                                ty: ek,
+                            }, Field {
+                                id: Label::Id(1),
+                                ty: ev,
+                            }],
+                            [Field {
+                                id: Label::Id(0),
+                                ty: wk,
+                            }, Field {
+                                id: Label::Id(1),
+                                ty: wv,
+                            }],
+                        ) => {
+                            let expect = (ek.clone(), ev.clone());
+                            let wire = (wk.clone(), wv.clone());
+                            visitor.visit_map(Compound::new(
+                                &mut self,
+                                Style::Map { len, expect, wire },
+                            ))
+                        }
+                        _ => Err(Error::msg("expect a key-value pair")),
+                    },
+                    _ => Err(Error::msg("expect a key-value pair")),
+                }
+            }
+            _ => assert!(false),
+        }
+    }
     fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -557,7 +601,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         char
         bytes
         byte_buf
-        map
     }
 }
 
@@ -573,6 +616,11 @@ enum Style {
     Enum {
         expect: Field,
         wire: Field,
+    },
+    Map {
+        len: u64,
+        expect: (Type, Type),
+        wire: (Type, Type),
     },
 }
 
@@ -660,18 +708,20 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                 }
                 seed.deserialize(&mut *self.de).map(Some)
             }
-            /*
-            Style::Map { ref mut len, .. } => {
+            Style::Map {
+                ref mut len,
+                ref expect,
+                ref wire,
+            } => {
                 // This only comes from deserialize_map
                 if *len == 0 {
                     return Ok(None);
                 }
-                self.de.table.check_type(Opcode::Record)?;
-                assert_eq!(2, self.de.table.pop_current_type()?.get_u32()?);
-                assert_eq!(0, self.de.table.pop_current_type()?.get_u32()?);
+                self.de.expect_type = expect.0.clone();
+                self.de.wire_type = wire.0.clone();
                 *len -= 1;
                 seed.deserialize(&mut *self.de).map(Some)
-            }*/
+            }
             _ => Err(Error::msg("expect struct or map")),
         }
     }
@@ -679,17 +729,14 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
     where
         V: de::DeserializeSeed<'de>,
     {
-        seed.deserialize(&mut *self.de)
-        /*
-        match self.style {
-            Style::Map { ref ty, .. } => {
-                assert_eq!(1, self.de.table.pop_current_type()?.get_u32()?);
-                let res = seed.deserialize(&mut *self.de);
-                self.de.table.current_type.push_front(ty.clone());
-                res
+        match &self.style {
+            Style::Map { expect, wire, .. } => {
+                self.de.expect_type = expect.1.clone();
+                self.de.wire_type = wire.1.clone();
+                seed.deserialize(&mut *self.de)
             }
             _ => seed.deserialize(&mut *self.de),
-        }*/
+        }
     }
 }
 
