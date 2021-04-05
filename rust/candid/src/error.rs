@@ -16,8 +16,8 @@ pub enum Error {
     #[error("Candid parser error: {0}")]
     Parse(#[from] token::ParserError),
 
-    #[error(transparent)]
-    Binread(#[from] binread::Error),
+    #[error("binary parser error: {}", .0.get(0).map(|f| format!("{} at byte offset {}", f.message, f.range.start/2)).unwrap_or_else(|| "io error".to_string()))]
+    Binread(Vec<Label<()>>),
 
     #[error(transparent)]
     Custom(#[from] anyhow::Error),
@@ -53,10 +53,9 @@ impl Error {
                 };
                 diag.with_labels(vec![label])
             }
-            Error::Binread(e) => {
+            Error::Binread(labels) => {
                 let diag = Diagnostic::error().with_message("decoding error");
-                let labels = get_binread_labels(e);
-                diag.with_labels(labels)
+                diag.with_labels(labels.to_vec())
             }
             Error::Custom(e) => Diagnostic::error().with_message(e.to_string()),
         }
@@ -144,6 +143,12 @@ impl From<io::Error> for Error {
     }
 }
 
+impl From<binread::Error> for Error {
+    fn from(e: binread::Error) -> Error {
+        Error::Binread(get_binread_labels(&e))
+    }
+}
+
 #[cfg(feature = "random")]
 impl From<arbitrary::Error> for Error {
     fn from(e: arbitrary::Error) -> Error {
@@ -176,7 +181,7 @@ where
     T: binread::BinRead,
 {
     T::read(reader).or_else(|e| {
-        let e = Error::Binread(e);
+        let e = Error::from(e);
         let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
         let config = term::Config::default();
         let str = hex::encode(&reader.get_ref());

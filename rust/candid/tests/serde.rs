@@ -2,34 +2,31 @@ use candid::{decode_one, encode_one, CandidType, Decode, Deserialize, Encode, In
 
 #[test]
 fn test_error() {
-    check_error(|| test_decode(b"DID", &42), "failed to fill whole buffer");
-    check_error(
-        || test_decode(b"DIDL", &42),
-        "leb128::read::Error: failed to fill whole buffer",
-    );
+    check_error(|| test_decode(b"DID", &42), "io error");
+    check_error(|| test_decode(b"DIDL", &42), "len at byte offset 4");
     check_error(
         || test_decode(b"DIDL\0\0", &42),
         "No more values to deserialize",
     );
     check_error(
         || test_decode(b"DIDL\x01\x7c", &42),
-        "Unsupported op_code -4 in type table",
+        "Unknown opcode at byte offset 5",
     );
     // Infinite loop are prevented by design
     check_error(
         || test_decode(b"DIDL\x02\x6e\x01\0", &42),
-        "Unsupported op_code 0 in type table",
+        "Unknown opcode at byte offset 7",
     );
     check_error(
         || test_decode(b"DIDL\0\x01\x7e\x01\x01", &true),
         "Trailing value after finishing deserialization",
     );
-    check_error(
-        || test_decode(b"DIDL\0\x01\x7e", &true),
-        "io error: failed to fill whole buffer",
-    );
+    check_error(|| test_decode(b"DIDL\0\x01\x7e", &true), "io error");
     // Out of bounds type index
-    check_error(|| test_decode(b"DIDL\0\x01\0\x01", &42), "unknown type 0");
+    check_error(
+        || test_decode(b"DIDL\0\x01\0\x01", &42),
+        "type index 0 out of range",
+    );
 }
 
 #[test]
@@ -170,7 +167,7 @@ fn test_struct() {
                 },
             )
         },
-        "field hash out of u32",
+        "field id out of 32-bit range",
     );
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
