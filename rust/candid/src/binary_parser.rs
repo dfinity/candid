@@ -74,13 +74,6 @@ pub struct BoolValue(
 #[derive(BinRead)]
 pub struct Len(#[br(parse_with = read_leb)] pub u64);
 #[derive(BinRead)]
-pub struct Bytes {
-    #[br(parse_with = read_leb)]
-    pub len: u64,
-    #[br(count = len)]
-    pub inner: Vec<u8>,
-}
-#[derive(BinRead)]
 pub struct PrincipalBytes {
     #[br(assert(flag == 1u8, "Opaque reference not supported"))]
     pub flag: u8,

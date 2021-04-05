@@ -6,7 +6,7 @@ use super::{
     types::{Field, Label, Type},
     CandidType, Int, Nat,
 };
-use crate::binary_parser::{BoolValue, Bytes, Header, Len, PrincipalBytes};
+use crate::binary_parser::{BoolValue, Header, Len, PrincipalBytes};
 use crate::types::subtype::{subtype, Gamma};
 use anyhow::{anyhow, Context};
 use binread::{BinRead, BinReaderExt};
@@ -144,11 +144,16 @@ impl<'de> Deserializer<'de> {
         }
         res
     }
-    fn borrow_bytes(&mut self, len: usize) -> &'de [u8] {
+    fn borrow_bytes(&mut self, len: usize) -> Result<&'de [u8]> {
         let pos = self.input.position() as usize;
         let end = pos + len;
+        let slice = self.input.get_ref();
+        if end > slice.len() {
+            return Err(Error::msg(format!("Cannot read {} bytes", len)));
+        }
+        let res = &slice[pos..end];
         self.input.set_position(end as u64);
-        &self.input.get_ref()[pos..end]
+        Ok(res)
     }
     fn check_subtype(&mut self) -> Result<()> {
         if !subtype(
@@ -384,8 +389,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
-        let bytes = Bytes::read(&mut self.input)?;
-        let value = String::from_utf8(bytes.inner).map_err(Error::msg)?;
+        let len = Len::read(&mut self.input)?.0 as usize;
+        let bytes = self.borrow_bytes(len)?.to_owned();
+        let value = String::from_utf8(bytes).map_err(Error::msg)?;
         visitor.visit_string(value)
     }
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
@@ -395,7 +401,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
         let len = Len::read(&mut self.input)?.0 as usize;
-        let slice = self.borrow_bytes(len);
+        let slice = self.borrow_bytes(len)?;
         let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
         visitor.visit_borrowed_str(value)
     }
@@ -486,7 +492,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             self.expect_type == Type::Vec(Box::new(Type::Nat8))
                 && self.wire_type == Type::Vec(Box::new(Type::Nat8))
         );
-        let bytes = Bytes::read(&mut self.input)?.inner;
+        let len = Len::read(&mut self.input)?.0 as usize;
+        let bytes = self.borrow_bytes(len)?.to_owned();
+        //let bytes = Bytes::read(&mut self.input)?.inner;
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
@@ -496,7 +504,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Type::Principal => self.deserialize_principal(visitor),
             Type::Vec(t) if **t == Type::Nat8 => {
                 let len = Len::read(&mut self.input)?.0 as usize;
-                let slice = self.borrow_bytes(len);
+                let slice = self.borrow_bytes(len)?;
                 visitor.visit_borrowed_bytes(slice)
             }
             _ => Err(Error::msg("bytes only takes principal or vec nat8")),
