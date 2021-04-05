@@ -35,6 +35,7 @@ impl<'de> IDLDeserialize<'de> {
             .de
             .types
             .pop_front()
+            // TODO missing tuple for opt/reserved/null
             .context("No more values to deserialize")?;
         let expected_type = T::ty();
         self.de.expect_type = if matches!(expected_type, Type::Unknown) {
@@ -46,7 +47,9 @@ impl<'de> IDLDeserialize<'de> {
         self.de
             .check_subtype()
             .with_context(|| self.de.dump_state())
-            .context("Subtype checking failed")?;
+            .with_context(|| {
+                format!("Fail to decode argument {} from {} to {}", ind, ty, T::ty())
+            })?;
 
         let v = T::deserialize(&mut self.de)
             .with_context(|| self.de.dump_state())
@@ -449,10 +452,13 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         match (&self.expect_type, &self.wire_type) {
             (Type::Vec(ref e), Type::Vec(ref w)) => {
                 self.record_nesting_depth = 0;
-                self.expect_type = *e.clone();
-                self.wire_type = *w.clone();
+                let expect = *e.clone();
+                let wire = *w.clone();
                 let len = Len::read(&mut self.input)?.0;
-                visitor.visit_seq(Compound::new(&mut self, Style::Vector { len }))
+                visitor.visit_seq(Compound::new(
+                    &mut self,
+                    Style::Vector { len, expect, wire },
+                ))
             }
             (Type::Record(e), Type::Record(w)) => {
                 let expect = e.clone().into();
@@ -632,6 +638,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 enum Style {
     Vector {
         len: u64,
+        expect: Type,
+        wire: Type,
     },
     Struct {
         expect: VecDeque<Field>,
@@ -667,11 +675,17 @@ impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
         T: de::DeserializeSeed<'de>,
     {
         match self.style {
-            Style::Vector { ref mut len } => {
+            Style::Vector {
+                ref mut len,
+                ref expect,
+                ref wire,
+            } => {
                 if *len == 0 {
                     return Ok(None);
                 }
                 *len -= 1;
+                self.de.expect_type = expect.clone();
+                self.de.wire_type = wire.clone();
                 seed.deserialize(&mut *self.de).map(Some)
             }
             Style::Struct {

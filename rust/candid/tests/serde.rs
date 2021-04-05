@@ -2,10 +2,7 @@ use candid::{decode_one, encode_one, CandidType, Decode, Deserialize, Encode, In
 
 #[test]
 fn test_error() {
-    check_error(
-        || test_decode(b"DID", &42),
-        "wrong magic number [68, 73, 68, 0]",
-    );
+    check_error(|| test_decode(b"DID", &42), "failed to fill whole buffer");
     check_error(
         || test_decode(b"DIDL", &42),
         "leb128::read::Error: failed to fill whole buffer",
@@ -68,7 +65,7 @@ fn test_integer() {
     );
     check_error(
         || test_decode(&hex("4449444c00017c2a"), &42i64),
-        "Type mismatch. Type on the wire: Int; Expected type: Int64",
+        "int is not subtype of int64",
     );
 }
 
@@ -352,7 +349,7 @@ fn test_keyword_label() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct A {
         r#return: Vec<u8>,
-    };
+    }
     all_check(
         A {
             r#return: vec![1, 2, 3],
@@ -363,7 +360,7 @@ fn test_keyword_label() {
     struct B {
         #[serde(rename = "return")]
         dontcare: Vec<u8>,
-    };
+    }
     all_check(
         B {
             dontcare: vec![1, 2, 3],
@@ -374,13 +371,13 @@ fn test_keyword_label() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     enum E {
         r#return,
-    };
+    }
     all_check(E::r#return, "4449444c016b01b0c9b6497f010000");
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     enum E2 {
         #[serde(rename = "return")]
         Dontcare,
-    };
+    }
     all_check(E2::Dontcare, "4449444c016b01b0c9b6497f010000");
 }
 
@@ -391,7 +388,7 @@ fn test_mutual_recursion() {
     struct ListA {
         head: Int,
         tail: Box<List>,
-    };
+    }
 
     let list: List = None;
     all_check(list, "4449444c026e016c02a0d2aca8047c90eddae70400010000");
@@ -455,7 +452,7 @@ fn test_tuple() {
                 &(Int::from(42), "💩"),
             )
         },
-        "Expect vector index 1, but get 2",
+        "is not subtype",
     );
 }
 
@@ -469,7 +466,7 @@ fn test_variant() {
     all_check(Unit::Bar, "4449444c016b02b3d3c9017fe6fdd5017f010000");
     check_error(
         || test_decode(&hex("4449444c016b02b3d3c9017fe6fdd5017f010003"), &Unit::Bar),
-        "variant index 3 larger than length 2",
+        "Variant index 3 larger than length 2",
     );
 
     check_error(
