@@ -141,6 +141,12 @@ impl<'de> Deserializer<'de> {
         }
         res
     }
+    fn borrow_bytes(&mut self, len: usize) -> &'de [u8] {
+        let pos = self.input.position() as usize;
+        let end = pos + len;
+        self.input.set_position(end as u64);
+        &self.input.get_ref()[pos..end]
+    }
     fn check_subtype(&mut self) -> Result<()> {
         if !subtype(
             &mut self.gamma,
@@ -386,10 +392,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
         let len = Len::read(&mut self.input)?.0 as usize;
-        let pos = self.input.position() as usize;
-        let end = pos + len;
-        let slice = &self.input.get_ref()[pos..end];
-        self.input.set_position(end as u64);
+        let slice = self.borrow_bytes(len);
         let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
         visitor.visit_borrowed_str(value)
     }
@@ -468,6 +471,29 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 Ok(value)
             }
             _ => assert!(false),
+        }
+    }
+    fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+        self.record_nesting_depth = 0;
+        self.unroll_type()?;
+        assert!(
+            self.expect_type == Type::Vec(Box::new(Type::Nat8))
+                && self.wire_type == Type::Vec(Box::new(Type::Nat8))
+        );
+        let bytes = Bytes::read(&mut self.input)?.inner;
+        visitor.visit_byte_buf(bytes)
+    }
+    fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+        self.record_nesting_depth = 0;
+        self.unroll_type()?;
+        match &self.expect_type {
+            Type::Principal => self.deserialize_principal(visitor),
+            Type::Vec(t) if **t == Type::Nat8 => {
+                let len = Len::read(&mut self.input)?.0 as usize;
+                let slice = self.borrow_bytes(len);
+                visitor.visit_borrowed_bytes(slice)
+            }
+            _ => Err(Error::msg("bytes only takes principal or vec nat8")),
         }
     }
     fn deserialize_map<V>(mut self, visitor: V) -> Result<V::Value>
@@ -599,8 +625,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     serde::forward_to_deserialize_any! {
         char
-        bytes
-        byte_buf
     }
 }
 
