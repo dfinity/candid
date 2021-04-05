@@ -155,20 +155,20 @@ impl<'de> Deserializer<'de> {
         Ok(res)
     }
     fn check_subtype(&mut self) -> Result<()> {
-        if !subtype(
+        subtype(
             &mut self.gamma,
             &self.table,
             &self.wire_type,
             &self.table,
             &self.expect_type,
-        ) {
-            Err(Error::msg(format!(
-                "{} is not subtype of {}",
+        )
+        .with_context(|| {
+            format!(
+                "{} is not a subtype of {}",
                 self.wire_type, self.expect_type,
-            )))
-        } else {
-            Ok(())
-        }
+            )
+        })?;
+        Ok(())
     }
     fn inc_record_nesting_depth(&mut self) -> Result<usize> {
         let old_nesting = self.record_nesting_depth;

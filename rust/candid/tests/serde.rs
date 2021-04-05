@@ -65,7 +65,7 @@ fn test_integer() {
     );
     check_error(
         || test_decode(&hex("4449444c00017c2a"), &42i64),
-        "int is not subtype of int64",
+        "int is not a subtype of int64",
     );
 }
 
@@ -289,23 +289,22 @@ fn test_extra_fields() {
     test_decode(&bytes, &a1);
     // Cannot Decode A1 to A2
     let bytes = encode(&a1);
-    check_error(|| test_decode(&bytes, &a2), "missing field `baz`");
+    check_error(|| test_decode(&bytes, &a2), "field bab");
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     enum E2 {
         Foo,
-        Bar(A1, A2),
+        Bar,
         Baz,
     }
-    // E1, E2 can be used interchangably as long as the variant matches
     let bytes = encode(&E1::Foo);
     test_decode(&bytes, &E2::Foo);
+
     let bytes = encode(&E2::Foo);
-    test_decode(&bytes, &E1::Foo);
-    let bytes = encode(&E2::Baz);
+    test_decode(&bytes, &Some(E2::Foo));
     check_error(
-        || test_decode(&bytes, &E1::Bar),
-        "Unknown variant hash 3303867",
+        || test_decode(&bytes, &E1::Foo),
+        "Variant field 3_303_867 not found",
     );
 }
 
@@ -452,7 +451,7 @@ fn test_tuple() {
                 &(Int::from(42), "💩"),
             )
         },
-        "is not subtype",
+        "field 1 : text is only in the expected type",
     );
 }
 
@@ -471,7 +470,7 @@ fn test_variant() {
 
     check_error(
         || test_decode(&hex("4449444c016b02b4d3c9017fe6fdd5017f010000"), &Unit::Bar),
-        "Unknown variant hash 3303860",
+        "Variant field 3_303_860 not found",
     );
 
     let res: Result<String, String> = Ok("good".to_string());
