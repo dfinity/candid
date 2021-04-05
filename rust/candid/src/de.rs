@@ -12,7 +12,6 @@ use anyhow::{anyhow, Context};
 use binread::{BinRead, BinReaderExt};
 use serde::de::{self, Visitor};
 use std::collections::VecDeque;
-use std::convert::TryFrom;
 use std::io::Cursor;
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
@@ -389,7 +388,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
-        let len = Len::read(&mut self.input)?.0 as usize;
+        let len = Len::read(&mut self.input)?.0;
         let bytes = self.borrow_bytes(len)?.to_owned();
         let value = String::from_utf8(bytes).map_err(Error::msg)?;
         visitor.visit_string(value)
@@ -400,7 +399,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
-        let len = Len::read(&mut self.input)?.0 as usize;
+        let len = Len::read(&mut self.input)?.0;
         let slice = self.borrow_bytes(len)?;
         let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
         visitor.visit_borrowed_str(value)
@@ -492,7 +491,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             self.expect_type == Type::Vec(Box::new(Type::Nat8))
                 && self.wire_type == Type::Vec(Box::new(Type::Nat8))
         );
-        let len = Len::read(&mut self.input)?.0 as usize;
+        let len = Len::read(&mut self.input)?.0;
         let bytes = self.borrow_bytes(len)?.to_owned();
         //let bytes = Bytes::read(&mut self.input)?.inner;
         visitor.visit_byte_buf(bytes)
@@ -503,7 +502,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         match &self.expect_type {
             Type::Principal => self.deserialize_principal(visitor),
             Type::Vec(t) if **t == Type::Nat8 => {
-                let len = Len::read(&mut self.input)?.0 as usize;
+                let len = Len::read(&mut self.input)?.0;
                 let slice = self.borrow_bytes(len)?;
                 visitor.visit_borrowed_bytes(slice)
             }
@@ -607,7 +606,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.unroll_type()?;
         match (&self.expect_type, &self.wire_type) {
             (Type::Variant(e), Type::Variant(w)) => {
-                let index = usize::try_from(Len::read(&mut self.input)?.0).map_err(Error::msg)?;
+                let index = Len::read(&mut self.input)?.0;
                 let len = w.len();
                 if index >= len {
                     return Err(Error::msg(format!(
@@ -645,7 +644,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 #[derive(Debug)]
 enum Style {
     Vector {
-        len: u64,
+        len: usize,
         expect: Type,
         wire: Type,
     },
@@ -658,7 +657,7 @@ enum Style {
         wire: Field,
     },
     Map {
-        len: u64,
+        len: usize,
         expect: (Type, Type),
         wire: (Type, Type),
     },
