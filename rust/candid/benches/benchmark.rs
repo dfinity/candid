@@ -1,20 +1,11 @@
-use candid::{CandidType, Decode, Deserialize, Encode, Principal};
+use candid::{CandidType, Decode, Deserialize, Encode, Int, Nat, Principal};
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
+use std::collections::BTreeMap;
 
 fn bench_blob(c: &mut Criterion) {
     use serde_bytes::{ByteBuf, Bytes};
     let vec: Vec<u8> = vec![0x61; 524288];
     let mut group = c.benchmark_group("Blob");
-    /*group.bench_function("Vector", |b| {
-        b.iter_batched(
-            || vec.clone(),
-            |vec| {
-                let bytes = Encode!(&vec).unwrap();
-                Decode!(&bytes, Vec<u8>).unwrap();
-            },
-            BatchSize::SmallInput,
-        )
-    });*/
     group.bench_function("ByteBuf", |b| {
         b.iter_batched(
             || vec.clone(),
@@ -59,6 +50,101 @@ fn bench_blob(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_collections(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Collections");
+    {
+        let vec8: Vec<u8> = vec![0x61; 524288];
+        group.bench_function("vec nat8", |b| {
+            b.iter_batched(
+                || vec8.clone(),
+                |vec| {
+                    let bytes = Encode!(&vec).unwrap();
+                    Decode!(&bytes, Vec<u8>).unwrap();
+                },
+                BatchSize::SmallInput,
+            )
+        });
+    }
+    {
+        let vec64: Vec<i64> = vec![-1; 524288];
+        group.bench_function("vec int64", |b| {
+            b.iter_batched(
+                || vec64.clone(),
+                |vec| {
+                    let bytes = Encode!(&vec).unwrap();
+                    Decode!(&bytes, Vec<i64>).unwrap();
+                },
+                BatchSize::SmallInput,
+            )
+        });
+    }
+    {
+        let vec: Vec<Int> = vec![Int::from(-1); 65536];
+        group.bench_function("vec int", |b| {
+            b.iter_batched(
+                || vec.clone(),
+                |vec| {
+                    let bytes = Encode!(&vec).unwrap();
+                    Decode!(&bytes, Vec<candid::Int>).unwrap();
+                },
+                BatchSize::SmallInput,
+            )
+        });
+    }
+    {
+        let map: BTreeMap<String, Nat> =
+            (0..65536).map(|i| (i.to_string(), Nat::from(i))).collect();
+        group.bench_function("vec (text, nat)", |b| {
+            b.iter_batched(
+                || map.clone(),
+                |map| {
+                    let bytes = Encode!(&map).unwrap();
+                    Decode!(&bytes, BTreeMap<String, Nat>).unwrap();
+                },
+                BatchSize::SmallInput,
+            )
+        });
+    }
+}
+
+fn bench_recursion(c: &mut Criterion) {
+    #[derive(CandidType, Deserialize, Clone)]
+    struct List {
+        head: Int,
+        tail: Option<Box<List>>,
+    }
+    #[derive(CandidType, Deserialize, Clone)]
+    enum VariantList {
+        Nil,
+        Cons(Int, Box<VariantList>),
+    }
+    {
+        let list: Option<Box<List>> = (0..512).fold(None, |acc, x| {
+            Some(Box::new(List {
+                head: Int::from(x),
+                tail: acc,
+            }))
+        });
+        c.bench_with_input(BenchmarkId::new("option list", 512), &list, |b, list| {
+            b.iter(|| {
+                let bytes = Encode!(list).unwrap();
+                Decode!(&bytes, Option<Box<List>>).unwrap()
+            })
+        });
+    }
+    {
+        let list: VariantList = (0..512).fold(VariantList::Nil, |acc, x| {
+            VariantList::Cons(Int::from(x), Box::new(acc))
+        });
+        c.bench_with_input(BenchmarkId::new("variant list", 512), &list, |b, list| {
+            b.iter(|| {
+                let bytes = Encode!(list).unwrap();
+                Decode!(&bytes, VariantList).unwrap()
+            })
+        });
+    }
+}
+
 fn bench_profile(c: &mut Criterion) {
     #[derive(CandidType, Deserialize, Clone)]
     #[allow(non_snake_case)]
@@ -82,7 +168,7 @@ fn bench_profile(c: &mut Criterion) {
         education: "**King's College London**  \nBA, Computer Science".to_string(),
         imgUrl: "https://media-exp1.licdn.com/dms/image/C5603AQHdxGV6zMbg-A/profile-displayphoto-shrink_200_200/0?e=1592438400&v=beta&t=NlR0J9mgJXd3SO6K3YJ6xBC_wCip20u5THPNKu6ImYQ".to_string(),
     };
-    let profiles: Vec<_> = std::iter::repeat(profile).take(200).collect();
+    let profiles: Vec<_> = std::iter::repeat(profile).take(512).collect();
     c.bench_with_input(
         BenchmarkId::new("profiles", profiles.len()),
         &profiles,
@@ -95,5 +181,11 @@ fn bench_profile(c: &mut Criterion) {
     );
 }
 
-criterion_group!(benches, bench_blob, bench_profile);
+criterion_group!(
+    benches,
+    bench_blob,
+    bench_collections,
+    bench_profile,
+    bench_recursion
+);
 criterion_main!(benches);
