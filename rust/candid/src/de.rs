@@ -30,13 +30,21 @@ impl<'de> IDLDeserialize<'de> {
     where
         T: de::Deserialize<'de> + CandidType,
     {
-        let (ind, ty) = self
-            .de
-            .types
-            .pop_front()
-            // TODO missing tuple for opt/reserved/null
-            .context("No more values to deserialize")?;
         let expected_type = T::ty();
+        if self.de.types.is_empty() {
+            if matches!(expected_type, Type::Opt(_) | Type::Reserved | Type::Null) {
+                self.de.expect_type = expected_type;
+                self.de.wire_type = Type::Null;
+                return T::deserialize(&mut self.de);
+            } else {
+                return Err(Error::msg(format!(
+                    "No more values on the wire, the expected type {} is not opt, reserved or null",
+                    expected_type
+                )));
+            }
+        }
+
+        let (ind, ty) = self.de.types.pop_front().unwrap();
         self.de.expect_type = if matches!(expected_type, Type::Unknown) {
             ty.clone()
         } else {

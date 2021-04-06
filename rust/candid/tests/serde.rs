@@ -6,7 +6,7 @@ fn test_error() {
     check_error(|| test_decode(b"DIDL", &42), "len at byte offset 4");
     check_error(
         || test_decode(b"DIDL\0\0", &42),
-        "No more values to deserialize",
+        "No more values on the wire",
     );
     check_error(
         || test_decode(b"DIDL\x01\x7c", &42),
@@ -562,11 +562,18 @@ fn test_multiargs() {
     assert_eq!(tuple.0, [(42.into(), "text")]);
     assert_eq!(tuple.1, (42.into(), "text".to_string()));
 
-    let err = || {
-        Decode!(&bytes, Vec<(Int, &str)>, (Int, String), i32).unwrap();
-        true
-    };
-    check_error(err, "No more values to deserialize");
+    let tuple = Decode!(
+        &bytes,
+        Vec<(Int, &str)>,
+        (Int, String),
+        Option<i32>,
+        (),
+        candid::Reserved
+    )
+    .unwrap();
+    assert_eq!(tuple.2, None);
+    assert_eq!(tuple.3, ());
+    assert_eq!(tuple.4, candid::Reserved);
 }
 
 fn hex(bytes: &str) -> Vec<u8> {
