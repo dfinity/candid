@@ -9,7 +9,8 @@ use super::{
 use crate::binary_parser::{BoolValue, Header, Len, PrincipalBytes};
 use crate::types::subtype::{subtype, Gamma};
 use anyhow::{anyhow, Context};
-use binread::{BinRead, BinReaderExt};
+use binread::BinRead;
+use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
 use std::collections::VecDeque;
 use std::io::Cursor;
@@ -289,13 +290,14 @@ impl<'de> Deserializer<'de> {
 }
 
 macro_rules! primitive_impl {
-    ($ty:ident, $type:expr) => {
+    ($ty:ident, $type:expr, $($value:tt)*) => {
         paste::item! {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
                 self.record_nesting_depth = 0;
                 assert!(self.expect_type == $type && self.wire_type == $type);
-                let val: $ty = self.input.read_le()?;
+                let val = self.input.$($value)*().map_err(|_| Error::msg(format!("Cannot read {} value", stringify!($type))))?;
+                //let val: $ty = self.input.read_le()?;
                 visitor.[<visit_ $ty>](val)
             }
         }
@@ -351,16 +353,16 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.deserialize_any(visitor)
     }
 
-    primitive_impl!(i8, Type::Int8);
-    primitive_impl!(i16, Type::Int16);
-    primitive_impl!(i32, Type::Int32);
-    primitive_impl!(i64, Type::Int64);
-    primitive_impl!(u8, Type::Nat8);
-    primitive_impl!(u16, Type::Nat16);
-    primitive_impl!(u32, Type::Nat32);
-    primitive_impl!(u64, Type::Nat64);
-    primitive_impl!(f32, Type::Float32);
-    primitive_impl!(f64, Type::Float64);
+    primitive_impl!(i8, Type::Int8, read_i8);
+    primitive_impl!(i16, Type::Int16, read_i16::<LittleEndian>);
+    primitive_impl!(i32, Type::Int32, read_i32::<LittleEndian>);
+    primitive_impl!(i64, Type::Int64, read_i64::<LittleEndian>);
+    primitive_impl!(u8, Type::Nat8, read_u8);
+    primitive_impl!(u16, Type::Nat16, read_u16::<LittleEndian>);
+    primitive_impl!(u32, Type::Nat32, read_u32::<LittleEndian>);
+    primitive_impl!(u64, Type::Nat64, read_u64::<LittleEndian>);
+    primitive_impl!(f32, Type::Float32, read_f32::<LittleEndian>);
+    primitive_impl!(f64, Type::Float64, read_f64::<LittleEndian>);
 
     fn deserialize_i128<V>(self, visitor: V) -> Result<V::Value>
     where
