@@ -30,7 +30,22 @@ impl<'de> IDLDeserialize<'de> {
     where
         T: de::Deserialize<'de> + CandidType,
     {
-        let expected_type = T::ty();
+        self.de.is_untyped = false;
+        self.deserialize_with_type(T::ty())
+    }
+    pub fn get_value_with_type(
+        &mut self,
+        env: &TypeEnv,
+        expected_type: &Type,
+    ) -> Result<crate::parser::value::IDLValue> {
+        self.de.table.merge(env)?;
+        self.de.is_untyped = true;
+        self.deserialize_with_type(expected_type.clone())
+    }
+    fn deserialize_with_type<T>(&mut self, expected_type: Type) -> Result<T>
+    where
+        T: de::Deserialize<'de> + CandidType,
+    {
         if self.de.types.is_empty() {
             if matches!(expected_type, Type::Opt(_) | Type::Reserved | Type::Null) {
                 self.de.expect_type = expected_type;
@@ -46,6 +61,7 @@ impl<'de> IDLDeserialize<'de> {
 
         let (ind, ty) = self.de.types.pop_front().unwrap();
         self.de.expect_type = if matches!(expected_type, Type::Unknown) {
+            self.de.is_untyped = true;
             ty.clone()
         } else {
             expected_type
@@ -116,6 +132,9 @@ struct Deserializer<'de> {
     field_name: Option<Label>,
     // The record nesting depth should be bounded by the length of table to avoid infinite loop.
     record_nesting_depth: usize,
+    // Indicates whether to deserialize with IDLValue.
+    // It only affects the field id generation in enum type.
+    is_untyped: bool,
 }
 
 impl<'de> Deserializer<'de> {
@@ -132,6 +151,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             record_nesting_depth: 0,
+            is_untyped: false,
         })
     }
     fn dump_state(&self) -> String {
@@ -805,17 +825,18 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
             Style::Enum { expect, wire } => {
                 self.de.expect_type = expect.ty.clone();
                 self.de.wire_type = wire.ty.clone();
-                let label = match &expect.id {
-                    Label::Named(name) => name.clone(),
-                    Label::Id(hash) | Label::Unnamed(hash) => {
-                        let accessor = match &expect.ty {
-                            Type::Null => "unit",
-                            Type::Record(_) => "struct",
-                            _ => "newtype",
-                        };
-                        format!("{},{}", hash, accessor)
-                    }
+                let (mut label, label_type) = match &expect.id {
+                    Label::Named(name) => (name.clone(), "name"),
+                    Label::Id(hash) | Label::Unnamed(hash) => (hash.to_string(), "id"),
                 };
+                if self.de.is_untyped {
+                    let accessor = match &expect.ty {
+                        Type::Null => "unit",
+                        Type::Record(_) => "struct",
+                        _ => "newtype",
+                    };
+                    label += &format!(",{},{}", label_type, accessor);
+                }
                 self.de.set_field_name(Label::Named(label));
                 let field = seed.deserialize(&mut *self.de)?;
                 Ok((field, self))
@@ -852,11 +873,5 @@ impl<'de, 'a> de::VariantAccess<'de> for Compound<'a, 'de> {
         V: Visitor<'de>,
     {
         de::Deserializer::deserialize_struct(self.de, "_", fields, visitor)
-        /*
-        if fields.is_empty() {
-            de::Deserializer::deserialize_any(self.de, visitor)
-        } else {
-            de::Deserializer::deserialize_struct(self.de, "_", fields, visitor)
-        }*/
     }
 }

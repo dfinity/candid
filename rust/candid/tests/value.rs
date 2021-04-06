@@ -28,7 +28,8 @@ type List = List1;
 type List1 = List2;
 type List2 = opt record { head: int16; tail: List1 };
 type byte = nat8;
-type f = func (byte, int, nat, int8) -> (List);
+type enum = variant { a: nat; b: text; c };
+type f = func (byte, int, nat, int8) -> (List, enum);
 service : {
   f : f;
 }
@@ -47,20 +48,20 @@ service : {
                 IDLValue::Nat8(42),
                 IDLValue::Int(42.into()),
                 IDLValue::Nat(42.into()),
-                IDLValue::Int8(42)
+                IDLValue::Int8(42),
             ]
         );
     }
     {
-        let str = "(opt record { head = 1000; tail = opt record {head = -2000; tail = null}})";
+        let str = "(opt record { head = 1000; tail = opt record {head = -2000; tail = null}}, variant {a = 42})";
         let args = str.parse::<IDLArgs>().unwrap();
         let encoded = args.to_bytes_with_types(&env, &method.rets).unwrap();
         let decoded = IDLArgs::from_bytes(&encoded).unwrap();
-        assert_eq!(decoded.to_string(), "(\n  opt record {\n    1_158_359_328 = 1_000;\n    1_291_237_008 = opt record { 1_158_359_328 = -2_000; 1_291_237_008 = null };\n  },\n)");
+        assert_eq!(decoded.to_string(), "(\n  opt record {\n    1_158_359_328 = 1_000;\n    1_291_237_008 = opt record { 1_158_359_328 = -2_000; 1_291_237_008 = null };\n  },\n  variant { 97 = 42 },\n)");
         let decoded = IDLArgs::from_bytes_with_types(&encoded, &env, &method.rets).unwrap();
         assert_eq!(
             decoded.to_string(),
-            "(opt record { head = 1_000; tail = opt record { head = -2_000; tail = null } })"
+            "(\n  opt record { head = 1_000; tail = opt record { head = -2_000; tail = null } },\n  variant { a = 42 },\n)"
         );
         let decoded = IDLArgs::from_bytes_with_types(&encoded, &env, &[]).unwrap();
         assert_eq!(decoded.to_string(), "()");

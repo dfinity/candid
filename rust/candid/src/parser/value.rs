@@ -96,8 +96,8 @@ impl IDLArgs {
         let mut de = crate::de::IDLDeserialize::new(bytes)?;
         let mut args = Vec::new();
         for ty in types.iter() {
-            let v = de.get_value::<IDLValue>()?;
-            let v = v.annotate_type(false, env, ty)?;
+            let v = de.get_value_with_type(env, ty)?;
+            //let v = v.annotate_type(false, env, ty)?;
             args.push(v);
         }
         de.done()?;
@@ -493,15 +493,13 @@ impl<'de> Deserialize<'de> for IDLValue {
             {
                 let mut vec = Vec::new();
                 while let Some((key, value)) = visitor.next_entry()? {
-                    if let IDLValue::Nat32(hash) = key {
-                        let f = IDLField {
-                            id: Label::Id(hash),
-                            val: value,
-                        };
-                        vec.push(f);
-                    } else {
-                        unreachable!()
-                    }
+                    let id = match key {
+                        IDLValue::Nat32(hash) => Label::Id(hash),
+                        IDLValue::Text(name) => Label::Named(name),
+                        _ => unreachable!(),
+                    };
+                    let f = IDLField { id, val: value };
+                    vec.push(f);
                 }
                 Ok(IDLValue::Record(vec))
             }
@@ -513,9 +511,12 @@ impl<'de> Deserialize<'de> for IDLValue {
                 let (variant, visitor) = data.variant::<IDLValue>()?;
                 if let IDLValue::Text(v) = variant {
                     let v: Vec<_> = v.split(',').collect();
-                    assert_eq!(v.len(), 2);
-                    let id = v[0].parse::<u32>().unwrap();
-                    let val = match v[1] {
+                    let (id, style) = match v.as_slice() {
+                        [name, "name", style] => (Label::Named(name.to_string()), style),
+                        [hash, "id", style] => (Label::Id(hash.parse::<u32>().unwrap()), style),
+                        _ => unreachable!(),
+                    };
+                    let val = match *style {
                         "unit" => {
                             visitor.unit_variant()?;
                             IDLValue::Null
@@ -524,10 +525,7 @@ impl<'de> Deserialize<'de> for IDLValue {
                         "newtype" => visitor.newtype_variant()?,
                         _ => unreachable!(),
                     };
-                    let f = IDLField {
-                        id: Label::Id(id),
-                        val,
-                    };
+                    let f = IDLField { id, val };
                     // Deserialized variant always has 0 index to ensure untyped
                     // serialization is correct.
                     Ok(IDLValue::Variant(Box::new(f), 0))
