@@ -65,20 +65,26 @@ impl<'de> IDLDeserialize<'de> {
             self.de.is_untyped = true;
             ty.clone()
         } else {
-            expected_type
+            expected_type.clone()
         };
         self.de.wire_type = ty.clone();
         self.de
             .check_subtype()
             .with_context(|| self.de.dump_state())
             .with_context(|| {
-                format!("Fail to decode argument {} from {} to {}", ind, ty, T::ty())
+                format!(
+                    "Fail to decode argument {} from {} to {}",
+                    ind, ty, expected_type
+                )
             })?;
 
         let v = T::deserialize(&mut self.de)
             .with_context(|| self.de.dump_state())
             .with_context(|| {
-                format!("Fail to decode argument {} from {} to {}", ind, ty, T::ty())
+                format!(
+                    "Fail to decode argument {} from {} to {}",
+                    ind, ty, expected_type
+                )
             })?;
         Ok(v)
     }
@@ -231,23 +237,21 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        use std::convert::TryInto;
         self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Int);
-        let mut bytes = Vec::new();
-        match &self.wire_type {
-            Type::Int => {
-                bytes.push(0u8);
-                let int = Int::decode(&mut self.input).map_err(Error::msg)?;
-                bytes.extend_from_slice(&int.0.to_signed_bytes_le());
-            }
-            Type::Nat => {
-                bytes.push(1u8);
-                let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
-                bytes.extend_from_slice(&nat.0.to_bytes_le());
-            }
+        let mut bytes = vec![0u8];
+        let int = match &self.wire_type {
+            Type::Int => Int::decode(&mut self.input).map_err(Error::msg)?,
+            Type::Nat => Int(Nat::decode(&mut self.input)
+                .map_err(Error::msg)?
+                .0
+                .try_into()
+                .map_err(Error::msg)?),
             // We already did subtype checking before deserialize, so this is unreachable code
             _ => assert!(false),
-        }
+        };
+        bytes.extend_from_slice(&int.0.to_signed_bytes_le());
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_nat<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
@@ -467,6 +471,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                         visitor.visit_none()
                     }
                 } else {
+                    // TODO skip values
+                    self.expect_type = self.wire_type.clone();
                     visitor.visit_none()
                 }
             }
@@ -474,6 +480,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 if self.check_subtype().is_ok() {
                     visitor.visit_some(self)
                 } else {
+                    self.expect_type = self.wire_type.clone();
                     visitor.visit_none()
                 }
             }

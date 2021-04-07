@@ -52,7 +52,7 @@ assert blob "DIDL\01\6d\7c\01\00\02\01\02" == "(vec { 1; 2 })"              : (v
 assert blob "DIDL\01\6d\7b\01\00\02\01\02" == "(blob \"\\01\\02\")"         : (vec nat8) "vec: blob";
 assert blob "DIDL\01\6d\00\01\00\00" == "(vec {})"                          : (Vec) "vec: recursive vector";
 assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (Vec) "vec: tree";
-assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (vec vec empty) "vec: non-recursive tree";
+assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (vec vec opt empty) "vec: non-recursive tree";
 assert blob "DIDL\01\6d\7f\01\00\e8\07"                                     : (vec null) "vec: space bomb";
 assert "(vec { 1; -1 })"                                                   !: (vec nat) "vec: type mismatch";
 assert blob "DIDL\01\6d\7c\01\00"                                          !: (vec int) "vec: too short";
@@ -107,6 +107,8 @@ assert blob "DIDL\00\01\7e\01" == "(opt true)"    : (opt bool) "opt: parsing tru
 assert blob "DIDL\00\01\7e\02"                   !: (opt bool) "opt: parsing invalid bool at opt bool";
 assert blob "DIDL\01\6e\7f\01\00\00" == "(null)"  : (opt opt null) "opt: parsing (null : opt null) at opt opt null gives null, not opt null";
 assert blob "DIDL\00\01\7e\01" == "(null)"        : (opt opt bool) "opt: parsing true : opt opt bool gives null";
+
+// STACK OVERFLOW
 assert blob "DIDL\00\01\7e\01" == "(null)"        : (Opt) "opt: parsing (true : bool) at \"fix opt\" gives null";
 assert blob "DIDL\01\6c\01\00\00\01\00"          !: (OptRec) "opt: parsing \"fix record\" at \"fix record opt\" fails";
 

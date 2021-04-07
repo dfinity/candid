@@ -43,7 +43,7 @@ pub fn subtype(
         (Opt(ty1), Opt(ty2)) if subtype(gamma, env1, ty1, env2, ty2).is_ok() => Ok(()),
         (t1, Opt(ty2))
             if subtype(gamma, env1, t1, env2, ty2).is_ok()
-                && !matches!(env2.trace_type(ty2).unwrap(), Null | Reserved | Opt(_)) =>
+                && !matches!(env2.trace_type(ty2)?, Null | Reserved | Opt(_)) =>
         {
             Ok(())
         }
