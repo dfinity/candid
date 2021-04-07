@@ -3,7 +3,7 @@
 
 ## 2021-04-07 (Rust 0.6.19 -- 0.6.20)
 
-* Fix a bug for serializing recursive values in Rust CDK (#210)
+* Fix a bug for serializing recursive values in Rust CDK [#210](https://github.com/dfinity/candid/pull/210)
 * Use BigInt in JS/TS binding
 
 ## 2021-03-17 
