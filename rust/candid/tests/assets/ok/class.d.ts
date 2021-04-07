@@ -1,7 +1,6 @@
 import type { Principal } from '@dfinity/agent';
-import type BigNumber from 'bignumber.js';
 export type List = [] | [
-  [BigNumber, List]
+  [BigInt, List]
 ];
 export default interface _SERVICE {
   'get' : () => Promise<List>,
