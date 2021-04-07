@@ -1,6 +1,6 @@
 import type { Principal } from '@dfinity/agent';
 export type List = [] | [
-  [BigInt, List]
+  [bigint, List]
 ];
 export default interface _SERVICE {
   'get' : () => Promise<List>,

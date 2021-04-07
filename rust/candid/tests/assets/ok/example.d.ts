@@ -1,6 +1,6 @@
 import type { Principal } from '@dfinity/agent';
 export type List = [] | [
-  { 'head' : BigInt, 'tail' : List }
+  { 'head' : bigint, 'tail' : List }
 ];
 export interface broker { 'find' : (arg_0: string) => Promise<Principal> };
 export type f = (arg_0: List, arg_1: [Principal, string]) => Promise<
@@ -8,16 +8,16 @@ export type f = (arg_0: List, arg_1: [Principal, string]) => Promise<
   >;
 export type my_type = Principal;
 export interface nested {
-  _0_ : BigInt,
-  _1_ : BigInt,
-  _2_ : [BigInt, BigInt],
-  _3_ : { _0_ : BigInt, _42_ : BigInt, _43_ : number },
-  _40_ : BigInt,
+  _0_ : bigint,
+  _1_ : bigint,
+  _2_ : [bigint, bigint],
+  _3_ : { _0_ : bigint, _42_ : bigint, _43_ : number },
+  _40_ : bigint,
   _41_ : { _42_ : null } |
     { 'A' : null } |
     { 'B' : null } |
     { 'C' : null },
-  _42_ : BigInt,
+  _42_ : bigint,
 };
 export default interface _SERVICE {
   'f' : (arg_0: Array<number>, arg_1: [] | [boolean]) => Promise<undefined>,
@@ -26,12 +26,12 @@ export default interface _SERVICE {
       arg_1: List,
       arg_2: [] | [List],
       arg_3: nested,
-    ) => Promise<[BigInt, Principal]>,
+    ) => Promise<[bigint, Principal]>,
   'h' : (
       arg_0: Array<[] | [string]>,
-      arg_1: { 'A' : BigInt } |
+      arg_1: { 'A' : bigint } |
         { 'B' : [] | [string] },
       arg_2: [] | [List],
-    ) => Promise<{ _42_ : {}, 'id' : BigInt }>,
+    ) => Promise<{ _42_ : {}, 'id' : bigint }>,
   'i' : f,
 };
