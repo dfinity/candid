@@ -1,12 +1,9 @@
 import type { Principal } from '@dfinity/agent';
-import type BigNumber from 'bignumber.js';
 export default interface _SERVICE {
-  'bab' : (arg_0: BigNumber, arg_1: BigNumber) => Promise<undefined>,
-  'bar' : (arg_0: { '2' : BigNumber }) => Promise<undefined>,
-  'bas' : (arg_0: [BigNumber, BigNumber]) => Promise<[string, BigNumber]>,
-  'baz' : (arg_0: { _2_ : BigNumber, '2' : BigNumber }) => Promise<{}>,
-  'bib' : (arg_0: [BigNumber]) => Promise<{ _0_ : BigNumber }>,
-  'foo' : (arg_0: { _2_ : BigNumber }) => Promise<
-      { _2_ : BigNumber, '_2' : BigNumber }
-    >,
+  'bab' : (arg_0: bigint, arg_1: bigint) => Promise<undefined>,
+  'bar' : (arg_0: { '2' : bigint }) => Promise<undefined>,
+  'bas' : (arg_0: [bigint, bigint]) => Promise<[string, bigint]>,
+  'baz' : (arg_0: { _2_ : bigint, '2' : bigint }) => Promise<{}>,
+  'bib' : (arg_0: [bigint]) => Promise<{ _0_ : bigint }>,
+  'foo' : (arg_0: { _2_ : bigint }) => Promise<{ _2_ : bigint, '_2' : bigint }>,
 };
