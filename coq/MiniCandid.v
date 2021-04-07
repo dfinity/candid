@@ -270,6 +270,9 @@ Lemma coerce_nice_ind:
     forall t, P ReservedT (OptT t) ReservedV NullV) ->
   (case constituentOptC,
     forall t1 t2 v1 v2,
+    (* The following assumption is redundant, as it follows from the
+       two subsequent onces, but it is convenient when using this
+       induction theorem *)
     is_opt_like_type t1 = false ->
     is_opt_like_type t2 = false ->
     t1 <: t2 ->
