@@ -460,14 +460,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.record_nesting_depth = 0;
         self.unroll_type()?;
-        match self.expect_type {
-            Type::Opt(ref t) => self.expect_type = *t.clone(),
-            _ => assert!(false),
-        }
-        match self.wire_type {
-            Type::Null | Type::Reserved => visitor.visit_none(),
-            Type::Opt(ref t) => {
-                self.wire_type = *t.clone();
+        match (&self.wire_type, &self.expect_type) {
+            (Type::Null, Type::Opt(_)) | (Type::Reserved, Type::Opt(_)) => visitor.visit_none(),
+            (Type::Opt(t1), Type::Opt(t2)) => {
+                self.wire_type = *t1.clone();
+                self.expect_type = *t2.clone();
                 if BoolValue::read(&mut self.input)?.0 {
                     if self.check_subtype().is_ok() {
                         visitor.visit_some(self)
@@ -479,14 +476,18 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     visitor.visit_none()
                 }
             }
-            _ => {
-                if self.check_subtype().is_ok() {
+            (_, Type::Opt(t2)) => {
+                self.expect_type = self.table.trace_type(&*t2)?;
+                if !matches!(self.expect_type, Type::Null | Type::Reserved | Type::Opt(_))
+                    && self.check_subtype().is_ok()
+                {
                     visitor.visit_some(self)
                 } else {
                     self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                     visitor.visit_none()
                 }
             }
+            (_, _) => assert!(false),
         }
     }
     fn deserialize_seq<V>(mut self, visitor: V) -> Result<V::Value>
