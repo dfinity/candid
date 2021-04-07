@@ -351,7 +351,7 @@ impl<'de> Deserializer<'de> {
     // processed the field_name, field_name will be reset to None.
     fn set_field_name(&mut self, field: FieldLabel) {
         if self.field_name.is_some() {
-            panic!(format!("field_name already taken {:?}", self.field_name));
+            panic!("field_name already taken");
         }
         self.field_name = Some(field);
     }

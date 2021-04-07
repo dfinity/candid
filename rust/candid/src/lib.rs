@@ -246,6 +246,8 @@
 //! ```
 //!
 
+#![allow(clippy::upper_case_acronyms)]
+
 pub use candid_derive::{candid_method, export_service, CandidType};
 pub use serde::Deserialize;
 
