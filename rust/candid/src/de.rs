@@ -281,7 +281,6 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.record_nesting_depth = 0;
-        assert!(self.expect_type == Type::Reserved);
         let bytes = vec![3u8];
         visitor.visit_byte_buf(bytes)
     }
@@ -338,7 +337,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Type::Bool => self.deserialize_bool(visitor),
             Type::Text => self.deserialize_string(visitor),
             Type::Null => self.deserialize_unit(visitor),
-            Type::Reserved => self.deserialize_reserved(visitor),
+            Type::Reserved => {
+                if self.wire_type != Type::Reserved {
+                    self.deserialize_ignored_any(serde::de::IgnoredAny)?;
+                }
+                self.deserialize_reserved(visitor)
+            }
             Type::Empty => self.deserialize_empty(visitor),
             Type::Principal => self.deserialize_principal(visitor),
             // construct types
@@ -468,11 +472,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     if self.check_subtype().is_ok() {
                         visitor.visit_some(self)
                     } else {
+                        self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                         visitor.visit_none()
                     }
                 } else {
-                    // TODO skip values
-                    self.expect_type = self.wire_type.clone();
                     visitor.visit_none()
                 }
             }
@@ -480,7 +483,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 if self.check_subtype().is_ok() {
                     visitor.visit_some(self)
                 } else {
-                    self.expect_type = self.wire_type.clone();
+                    self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                     visitor.visit_none()
                 }
             }
