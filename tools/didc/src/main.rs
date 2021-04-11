@@ -173,9 +173,7 @@ fn main() -> Result<()> {
                 match (opt_t1, opt_t2) {
                     (Some(t1), Some(t2)) => {
                         let mut gamma = HashSet::new();
-                        let res =
-                            candid::types::subtype::subtype(&mut gamma, &env, &t1, &env2, &t2);
-                        println!("{}", res);
+                        candid::types::subtype::subtype(&mut gamma, &env, &t1, &env2, &t2)?;
                     }
                     _ => {
                         bail!("did file need to contain the main service type for subtyping check")
@@ -190,8 +188,7 @@ fn main() -> Result<()> {
             }
             let ty1 = env.ast_to_type(&ty1)?;
             let ty2 = env.ast_to_type(&ty2)?;
-            let res = candid::types::subtype::subtype(&mut HashSet::new(), &env, &ty1, &env, &ty2);
-            println!("{}", res);
+            candid::types::subtype::subtype(&mut HashSet::new(), &env, &ty1, &env, &ty2)?;
         }
         Command::Bind { input, target } => {
             let mut env = TypeEnv::new();

@@ -317,10 +317,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             return self.deserialize_identifier(visitor);
         }
         let t = self.table.trace_type(&self.expect_type)?;
-        // TODO needed?
-        if !matches!(t, Type::Record(_)) {
-            self.record_nesting_depth = 0;
-        }
         match t {
             Type::Int => self.deserialize_int(visitor),
             Type::Nat => self.deserialize_nat(visitor),

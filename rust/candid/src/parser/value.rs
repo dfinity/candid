@@ -495,6 +495,7 @@ impl<'de> Deserialize<'de> for IDLValue {
                 while let Some((key, value)) = visitor.next_entry()? {
                     let id = match key {
                         IDLValue::Nat32(hash) => Label::Id(hash),
+                        IDLValue::Text(name) if name == "_" => continue,
                         IDLValue::Text(name) => Label::Named(name),
                         _ => unreachable!(),
                     };
