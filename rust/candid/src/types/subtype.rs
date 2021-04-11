@@ -79,15 +79,15 @@ pub fn subtype(
             Ok(())
         }
         (Service(ms1), Service(ms2)) => {
-            let meths: HashMap<_, _> = ms2.iter().map(|(name, ty)| (name, ty)).collect();
-            for (name, ty1) in ms1.iter() {
+            let meths: HashMap<_, _> = ms1.iter().map(|(name, ty)| (name, ty)).collect();
+            for (name, ty2) in ms2.iter() {
                 match meths.get(name) {
-                    Some(ty2) => subtype(gamma, env1, ty1, env2, ty2).with_context(|| {
+                    Some(ty1) => subtype(gamma, env1, ty1, env2, ty2).with_context(|| {
                         format!("Method {}: {} is not a subtype of {}", name, ty1, ty2)
                     })?,
                     None => {
                         return Err(Error::msg(format!(
-                            "Method {} not found in expected type",
+                            "Method {} is only in the expected type",
                             name
                         )))
                     }

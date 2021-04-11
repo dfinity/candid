@@ -512,9 +512,17 @@ impl<'de> Deserialize<'de> for IDLValue {
                 let (variant, visitor) = data.variant::<IDLValue>()?;
                 if let IDLValue::Text(v) = variant {
                     let v: Vec<_> = v.split(',').collect();
-                    let (id, style) = match v.as_slice() {
-                        [name, "name", style] => (Label::Named(name.to_string()), style),
-                        [hash, "id", style] => (Label::Id(hash.parse::<u32>().unwrap()), style),
+                    let (id, style, ind) = match v.as_slice() {
+                        [name, "name", style, ind] => (
+                            Label::Named(name.to_string()),
+                            style,
+                            ind.parse::<u64>().unwrap(),
+                        ),
+                        [hash, "id", style, ind] => (
+                            Label::Id(hash.parse::<u32>().unwrap()),
+                            style,
+                            ind.parse::<u64>().unwrap(),
+                        ),
                         _ => unreachable!(),
                     };
                     let val = match *style {
@@ -529,7 +537,7 @@ impl<'de> Deserialize<'de> for IDLValue {
                     let f = IDLField { id, val };
                     // Deserialized variant always has 0 index to ensure untyped
                     // serialization is correct.
-                    Ok(IDLValue::Variant(Box::new(f), 0))
+                    Ok(IDLValue::Variant(Box::new(f), ind))
                 } else {
                     unreachable!()
                 }

@@ -652,12 +652,21 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     )));
                 }
                 let wire = w[index].clone();
-                let expect = e
+                let e_tuple = e
                     .iter()
-                    .find(|&f| f.id == wire.id)
-                    .ok_or_else(|| Error::msg(format!("Unknown variant field {}", wire.id)))?
-                    .clone();
-                visitor.visit_enum(Compound::new(&mut self, Style::Enum { expect, wire }))
+                    .enumerate()
+                    .find(|(_, ref f)| f.id == wire.id)
+                    .ok_or_else(|| Error::msg(format!("Unknown variant field {}", wire.id)))?;
+                let expect_index = e_tuple.0;
+                let expect = e_tuple.1.clone();
+                visitor.visit_enum(Compound::new(
+                    &mut self,
+                    Style::Enum {
+                        expect,
+                        expect_index,
+                        wire,
+                    },
+                ))
             }
             _ => assert!(false),
         }
@@ -691,6 +700,7 @@ enum Style {
     },
     Enum {
         expect: Field,
+        expect_index: usize,
         wire: Field,
     },
     Map {
@@ -831,7 +841,11 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
         V: de::DeserializeSeed<'de>,
     {
         match &self.style {
-            Style::Enum { expect, wire } => {
+            Style::Enum {
+                expect,
+                expect_index,
+                wire,
+            } => {
                 self.de.expect_type = expect.ty.clone();
                 self.de.wire_type = wire.ty.clone();
                 let (mut label, label_type) = match &expect.id {
@@ -844,7 +858,7 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
                         Type::Record(_) => "struct",
                         _ => "newtype",
                     };
-                    label += &format!(",{},{}", label_type, accessor);
+                    label += &format!(",{},{},{}", label_type, accessor, expect_index);
                 }
                 self.de.set_field_name(Label::Named(label));
                 let field = seed.deserialize(&mut *self.de)?;
