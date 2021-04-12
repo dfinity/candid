@@ -138,8 +138,6 @@ struct Deserializer<'de> {
     // field_name tells deserialize_identifier which field name to process.
     // This field should always be set by set_field_name function.
     field_name: Option<Label>,
-    // The record nesting depth should be bounded by the length of table to avoid infinite loop.
-    record_nesting_depth: usize,
     // Indicates whether to deserialize with IDLValue.
     // It only affects the field id generation in enum type.
     is_untyped: bool,
@@ -158,7 +156,6 @@ impl<'de> Deserializer<'de> {
             expect_type: Type::Unknown,
             gamma: Gamma::default(),
             field_name: None,
-            record_nesting_depth: 0,
             is_untyped: false,
         })
     }
@@ -206,15 +203,6 @@ impl<'de> Deserializer<'de> {
         })?;
         Ok(())
     }
-    fn inc_record_nesting_depth(&mut self) -> Result<usize> {
-        let old_nesting = self.record_nesting_depth;
-        self.record_nesting_depth += 1;
-        if self.record_nesting_depth > self.table.0.len() {
-            Err(Error::msg("There is an infinite loop in the record definition, the type is isomorphic to an empty type"))
-        } else {
-            Ok(old_nesting)
-        }
-    }
     fn unroll_type(&mut self) -> Result<()> {
         self.expect_type = self.table.trace_type(&self.expect_type)?;
         self.wire_type = self.table.trace_type(&self.wire_type)?;
@@ -239,7 +227,6 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         use std::convert::TryInto;
-        self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Int);
         let mut bytes = vec![0u8];
         let int = match &self.wire_type {
@@ -259,7 +246,6 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
         let mut bytes = vec![1u8];
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
@@ -270,7 +256,6 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Principal && self.wire_type == Type::Principal);
         let mut bytes = vec![2u8];
         let id = PrincipalBytes::read(&mut self.input)?.inner;
@@ -281,7 +266,6 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         let bytes = vec![3u8];
         visitor.visit_byte_buf(bytes)
     }
@@ -289,7 +273,6 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         self.unroll_type()?;
         assert!(matches!(self.wire_type, Type::Service(_)));
         let mut bytes = vec![4u8];
@@ -301,7 +284,6 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         self.unroll_type()?;
         assert!(matches!(self.wire_type, Type::Func(_)));
         if !BoolValue::read(&mut self.input)?.0 {
@@ -330,7 +312,6 @@ macro_rules! primitive_impl {
         paste::item! {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
-                self.record_nesting_depth = 0;
                 assert!(self.expect_type == $type && self.wire_type == $type);
                 let val = self.input.$($value)*().map_err(|_| Error::msg(format!("Cannot read {} value", stringify!($type))))?;
                 //let val: $ty = self.input.read_le()?;
@@ -408,7 +389,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         use std::convert::TryInto;
-        self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Int);
         let value: i128 = match &self.wire_type {
             Type::Int => {
@@ -428,7 +408,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         use std::convert::TryInto;
-        self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
         let value: u128 = nat.0.try_into().map_err(Error::msg)?;
@@ -438,7 +417,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Null && self.wire_type == Type::Null);
         visitor.visit_unit()
     }
@@ -446,7 +424,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Bool && self.wire_type == Type::Bool);
         let res = BoolValue::read(&mut self.input)?;
         visitor.visit_bool(res.0)
@@ -455,7 +432,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
         let len = Len::read(&mut self.input)?.0;
         let bytes = self.borrow_bytes(len)?.to_owned();
@@ -466,7 +442,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
         let len = Len::read(&mut self.input)?.0;
         let slice = self.borrow_bytes(len)?;
@@ -489,7 +464,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         self.unroll_type()?;
         match (&self.wire_type, &self.expect_type) {
             (Type::Null, Type::Opt(_)) | (Type::Reserved, Type::Opt(_)) => visitor.visit_none(),
@@ -528,7 +502,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.unroll_type()?;
         match (&self.expect_type, &self.wire_type) {
             (Type::Vec(ref e), Type::Vec(ref w)) => {
-                self.record_nesting_depth = 0;
                 let expect = *e.clone();
                 let wire = *w.clone();
                 let len = Len::read(&mut self.input)?.0;
@@ -540,7 +513,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (Type::Record(e), Type::Record(w)) => {
                 let expect = e.clone().into();
                 let wire = w.clone().into();
-                let old_nesting = self.inc_record_nesting_depth()?;
                 assert!(self.expect_type.is_tuple());
                 if !self.wire_type.is_tuple() {
                     return Err(Error::msg(format!(
@@ -550,7 +522,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 }
                 let value =
                     visitor.visit_seq(Compound::new(&mut self, Style::Struct { expect, wire }))?;
-                self.record_nesting_depth = old_nesting;
                 Ok(value)
             }
             (Type::Record(_), Type::Empty) => Err(Error::msg("Cannot decode empty type")),
@@ -558,7 +529,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         }
     }
     fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
-        self.record_nesting_depth = 0;
         self.unroll_type()?;
         assert!(
             self.expect_type == Type::Vec(Box::new(Type::Nat8))
@@ -570,7 +540,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
-        self.record_nesting_depth = 0;
         self.unroll_type()?;
         match &self.expect_type {
             Type::Principal => self.deserialize_principal(visitor),
@@ -586,7 +555,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         self.unroll_type()?;
         match (&self.expect_type, &self.wire_type) {
             (Type::Vec(ref e), Type::Vec(ref w)) => {
@@ -652,7 +620,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        let old_nesting = self.inc_record_nesting_depth()?;
         self.unroll_type()?;
         match (&self.expect_type, &self.wire_type) {
             (Type::Record(e), Type::Record(w)) => {
@@ -660,7 +627,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let wire = w.clone().into();
                 let value =
                     visitor.visit_map(Compound::new(&mut self, Style::Struct { expect, wire }))?;
-                self.record_nesting_depth = old_nesting;
                 Ok(value)
             }
             (Type::Record(_), Type::Empty) => Err(Error::msg("Cannot decode empty type")),
@@ -676,7 +642,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.record_nesting_depth = 0;
         self.unroll_type()?;
         match (&self.expect_type, &self.wire_type) {
             (Type::Variant(e), Type::Variant(w)) => {

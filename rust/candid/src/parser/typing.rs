@@ -102,7 +102,7 @@ impl TypeEnv {
         }
         Ok(())
     }
-    fn check_empty<'a>(&'a self) -> Result<BTreeSet<&'a str>> {
+    fn check_empty(&self) -> Result<BTreeSet<&str>> {
         let mut res = BTreeSet::new();
         for (name, t) in self.0.iter() {
             let mut seen: BTreeSet<&str> = BTreeSet::new();
