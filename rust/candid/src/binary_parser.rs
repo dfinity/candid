@@ -1,5 +1,6 @@
+use crate::parser::types::FuncMode;
 use crate::parser::typing::TypeEnv;
-use crate::types::internal::{Field, Label, Type};
+use crate::types::internal::{Field, Function, Label, Type};
 use anyhow::{anyhow, Context, Result};
 use binread::io::{Read, Seek, SeekFrom};
 use binread::{BinRead, BinResult, Error as BError, ReadOptions};
@@ -46,6 +47,10 @@ enum ConsType {
     Record(Fields),
     #[br(magic = 0x6bu8)]
     Variant(Fields),
+    #[br(magic = 0x6au8)]
+    Func(FuncType),
+    #[br(magic = 0x69u8)]
+    Service(ServType),
 }
 #[derive(BinRead, Debug)]
 struct IndexType {
@@ -64,6 +69,41 @@ struct FieldType {
     #[br(parse_with = read_leb, try_map = |x:u64| x.try_into().map_err(|_| "field id out of 32-bit range"))]
     id: u32,
     index: IndexType,
+}
+#[derive(BinRead, Debug)]
+struct FuncType {
+    #[br(parse_with = read_leb)]
+    arg_len: u64,
+    #[br(count = arg_len)]
+    args: Vec<IndexType>,
+    #[br(parse_with = read_leb)]
+    ret_len: u64,
+    #[br(count = ret_len)]
+    rets: Vec<IndexType>,
+    #[br(assert(ann_len <= 1u8, "function annotation length should be at most 1"))]
+    ann_len: u8,
+    #[br(count = ann_len)]
+    ann: Vec<Mode>,
+}
+#[derive(BinRead, Debug)]
+struct ServType {
+    #[br(parse_with = read_leb)]
+    len: u64,
+    #[br(count = len)]
+    meths: Vec<Meths>,
+}
+#[derive(BinRead, Debug)]
+struct Meths {
+    #[br(parse_with = read_leb)]
+    len: u64,
+    #[br(count = len, try_map = |x:Vec<u8>| String::from_utf8(x).map_err(|_| "invalid utf8"))]
+    name: String,
+    ty: IndexType,
+}
+#[derive(BinRead, Debug)]
+struct Mode {
+    #[br(try_map = |x:u8| match x { 1u8 => Ok(FuncMode::Query), | 2u8 => Ok(FuncMode::Oneway), | _ => Err("Unknown annotation") })]
+    inner: FuncMode,
 }
 
 #[derive(BinRead)]
@@ -147,6 +187,35 @@ impl ConsType {
                     Type::Variant(res)
                 }
             }
+            ConsType::Func(f) => {
+                let mut args = Vec::new();
+                let mut rets = Vec::new();
+                for arg in f.args.iter() {
+                    args.push(arg.to_type(len)?);
+                }
+                for ret in f.rets.iter() {
+                    rets.push(ret.to_type(len)?);
+                }
+                Type::Func(Function {
+                    modes: f.ann.iter().map(|x| x.inner.clone()).collect(),
+                    args,
+                    rets,
+                })
+            }
+            ConsType::Service(serv) => {
+                let mut res = Vec::new();
+                let mut prev = None;
+                for m in serv.meths.iter() {
+                    if let Some(prev) = prev {
+                        if prev >= &m.name {
+                            return Err(anyhow!("method name {} duplicate or not sorted", m.name));
+                        }
+                    }
+                    prev = Some(&m.name);
+                    res.push((m.name.clone(), m.ty.to_type(len)?));
+                }
+                Type::Service(res)
+            }
         })
     }
 }
@@ -155,11 +224,23 @@ impl Table {
         use std::collections::BTreeMap;
         let mut env = BTreeMap::new();
         for (i, t) in self.table.iter().enumerate() {
-            env.insert(
-                index_to_var(i as i64),
-                t.to_type(len)
-                    .with_context(|| format!("Invalid table entry {}: {:?}", i, t))?,
-            );
+            let ty = t
+                .to_type(len)
+                .with_context(|| format!("Invalid table entry {}: {:?}", i, t))?;
+            env.insert(index_to_var(i as i64), ty);
+        }
+        // validate method has func type
+        for (_, t) in env.iter() {
+            if let Type::Service(ms) = t {
+                for (name, ty) in ms.iter() {
+                    if let Type::Var(id) = ty {
+                        if matches!(env.get(id), Some(Type::Func(_))) {
+                            continue;
+                        }
+                    }
+                    return Err(anyhow!("Method {} has a non-function type {}", name, ty));
+                }
+            }
         }
         Ok(TypeEnv(env))
     }

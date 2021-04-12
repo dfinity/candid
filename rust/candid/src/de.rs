@@ -284,6 +284,38 @@ impl<'de> Deserializer<'de> {
         let bytes = vec![3u8];
         visitor.visit_byte_buf(bytes)
     }
+    fn deserialize_service<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.record_nesting_depth = 0;
+        self.unroll_type()?;
+        assert!(matches!(self.wire_type, Type::Service(_)));
+        let mut bytes = vec![4u8];
+        let id = PrincipalBytes::read(&mut self.input)?.inner;
+        bytes.extend_from_slice(&id);
+        visitor.visit_byte_buf(bytes)
+    }
+    fn deserialize_function<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.record_nesting_depth = 0;
+        self.unroll_type()?;
+        assert!(matches!(self.wire_type, Type::Func(_)));
+        if !BoolValue::read(&mut self.input)?.0 {
+            return Err(Error::msg("Opaque reference not supported"));
+        }
+        let mut bytes = vec![5u8];
+        let id = PrincipalBytes::read(&mut self.input)?.inner;
+        let len = Len::read(&mut self.input)?.0;
+        let meth = self.borrow_bytes(len)?;
+        // TODO find a better way
+        leb128::write::unsigned(&mut bytes, len as u64)?;
+        bytes.extend_from_slice(meth);
+        bytes.extend_from_slice(&id);
+        visitor.visit_byte_buf(bytes)
+    }
     fn deserialize_empty<'a, V>(&'a mut self, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -346,6 +378,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Type::Vec(_) => self.deserialize_seq(visitor),
             Type::Record(_) => self.deserialize_struct("_", &[], visitor),
             Type::Variant(_) => self.deserialize_enum("_", &[], visitor),
+            Type::Service(_) => self.deserialize_service(visitor),
+            Type::Func(_) => self.deserialize_function(visitor),
             _ => assert!(false),
         }
     }
