@@ -553,6 +553,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.record_nesting_depth = old_nesting;
                 Ok(value)
             }
+            (Type::Record(_), Type::Empty) => Err(Error::msg("Cannot decode empty type")),
             _ => assert!(false),
         }
     }
@@ -662,6 +663,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.record_nesting_depth = old_nesting;
                 Ok(value)
             }
+            (Type::Record(_), Type::Empty) => Err(Error::msg("Cannot decode empty type")),
             _ => assert!(false),
         }
     }

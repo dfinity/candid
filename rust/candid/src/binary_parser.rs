@@ -248,7 +248,8 @@ impl Table {
 impl Header {
     pub fn to_types(&self) -> Result<(TypeEnv, Vec<Type>)> {
         let len = self.table.len;
-        let env = self.table.to_env(len)?;
+        let mut env = self.table.to_env(len)?;
+        env.replace_empty()?;
         let mut args = Vec::new();
         for (i, t) in self.args.iter().enumerate() {
             args.push(

@@ -74,6 +74,52 @@ impl TypeEnv {
         }
         Err(Error::msg(format!("cannot find method {}", id)))
     }
+    fn go<'a>(
+        &'a self,
+        seen: &mut BTreeSet<&'a str>,
+        res: &mut BTreeSet<&'a str>,
+        t: &'a Type,
+    ) -> Result<()> {
+        if !res.is_empty() {
+            return Ok(());
+        }
+        match &t {
+            Type::Record(fs) => {
+                for f in fs.iter() {
+                    self.go(seen, res, &f.ty)?;
+                }
+            }
+            Type::Var(id) => {
+                if seen.insert(id) {
+                    let t = self.find_type(id)?;
+                    self.go(seen, res, t)?;
+                    seen.remove(&id.as_str());
+                } else {
+                    *res = seen.clone();
+                }
+            }
+            _ => (),
+        }
+        Ok(())
+    }
+    fn check_empty<'a>(&'a self) -> Result<BTreeSet<&'a str>> {
+        let mut res = BTreeSet::new();
+        for (name, t) in self.0.iter() {
+            let mut seen: BTreeSet<&str> = BTreeSet::new();
+            let mut local_res = BTreeSet::new();
+            seen.insert(name);
+            self.go(&mut seen, &mut local_res, t)?;
+            res.append(&mut local_res);
+        }
+        Ok(res)
+    }
+    pub fn replace_empty(&mut self) -> Result<()> {
+        let ids: Vec<_> = self.check_empty()?.iter().map(|x| x.to_string()).collect();
+        for id in ids.into_iter() {
+            self.0.insert(id, Type::Empty);
+        }
+        Ok(())
+    }
 }
 impl std::fmt::Display for TypeEnv {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

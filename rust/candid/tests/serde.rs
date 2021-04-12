@@ -142,12 +142,6 @@ fn test_option() {
     // Deserialize \mu T.Option<T> to a non-recursive type
     let v: Option<Option<Option<i32>>> = Some(Some(None));
     test_decode(b"DIDL\x01\x6e\0\x01\0\x01\x01\0", &v);
-    #[derive(PartialEq, Debug, Deserialize, CandidType)]
-    struct OptInner((Box<Opt>,));
-    #[derive(PartialEq, Debug, Deserialize, CandidType)]
-    struct Opt(Option<OptInner>);
-    //Decode!(&hex("4449444c016c0100000100"), Opt).unwrap();
-    //Decode!(&hex("4449444c016c0100000100"), Opt).unwrap();
 }
 
 #[test]
@@ -455,7 +449,7 @@ fn test_tuple() {
                 &(Int::from(42), "💩"),
             )
         },
-        "field 1 : text is only in the expected type",
+        "field 1: text is only in the expected type",
     );
 }
 
