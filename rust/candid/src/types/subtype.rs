@@ -56,7 +56,7 @@ pub fn subtype(
             for Field { id, ty: ty2 } in fs2.iter() {
                 match fields.get(id) {
                     Some(ty1) => subtype(gamma, env1, ty1, env2, ty2).with_context(|| format!("Record field {}: {} is not a subtype of {}", id, ty1, ty2))?,
-                    None => subtype(gamma, env1, &Opt(Box::new(Empty)), env2, ty2).map_err(|_| anyhow::anyhow!("Record field {} : {} is only in the expected type and is not of opt, reserved or null type", id, ty2))?,
+                    None => subtype(gamma, env1, &Opt(Box::new(Empty)), env2, ty2).map_err(|_| anyhow::anyhow!("Record field {}: {} is only in the expected type and is not of opt, reserved or null type", id, ty2))?,
                 }
             }
             Ok(())
@@ -105,8 +105,10 @@ pub fn subtype(
             let args2 = to_tuple(&f2.args);
             let rets1 = to_tuple(&f1.rets);
             let rets2 = to_tuple(&f2.rets);
-            subtype(gamma, env2, &args2, env1, &args1)?;
-            subtype(gamma, env1, &rets1, env2, &rets2)?;
+            subtype(gamma, env2, &args2, env1, &args1)
+                .context("Subtype fails at function input type")?;
+            subtype(gamma, env1, &rets1, env2, &rets2)
+                .context("Subtype fails at function return type")?;
             Ok(())
         }
         (Class(_, _), Class(_, _)) => unreachable!(),

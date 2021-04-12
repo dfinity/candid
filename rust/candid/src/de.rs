@@ -47,6 +47,7 @@ impl<'de> IDLDeserialize<'de> {
     where
         T: de::Deserialize<'de> + CandidType,
     {
+        let expected_type = self.de.table.trace_type(&expected_type)?;
         if self.de.types.is_empty() {
             if matches!(expected_type, Type::Opt(_) | Type::Reserved | Type::Null) {
                 self.de.expect_type = expected_type;
