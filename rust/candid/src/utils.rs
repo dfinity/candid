@@ -44,7 +44,7 @@ macro_rules! Decode {
 ///
 /// ```
 /// # use candid::Encode;
-/// # use candid::de::decode_args;
+/// # use candid::decode_args;
 /// let golden1 = 123u64;
 /// let golden2 = "456";
 /// let bytes = Encode!(&golden1, &golden2).unwrap();
@@ -69,7 +69,7 @@ where
 ///
 /// ```
 /// # use candid::Encode;
-/// # use candid::de::decode_one;
+/// # use candid::decode_one;
 /// let golden1 = 123u64;
 /// let bytes = Encode!(&golden1).unwrap();
 /// let value1: u64 = decode_one(&bytes).unwrap();
@@ -88,7 +88,7 @@ where
 ///
 /// ```
 /// # use candid::Decode;
-/// # use candid::ser::write_args;
+/// # use candid::write_args;
 /// let golden1 = 1u64;
 /// let golden2 = "hello";
 /// let mut buffer = Vec::new();
@@ -111,7 +111,7 @@ pub fn write_args<Tuple: ArgumentEncoder, Writer: std::io::Write>(
 ///
 /// ```
 /// # use candid::Decode;
-/// # use candid::ser::encode_args;
+/// # use candid::encode_args;
 /// let golden1 = 1u64;
 /// let golden2 = "hello";
 /// let buffer = encode_args((golden1, golden2)).unwrap();
@@ -130,7 +130,7 @@ pub fn encode_args<Tuple: ArgumentEncoder>(arguments: Tuple) -> Result<Vec<u8>> 
 ///
 /// ```
 /// # use candid::Decode;
-/// # use candid::ser::encode_one;
+/// # use candid::encode_one;
 /// let golden = "hello";
 /// let buffer = encode_one(golden).unwrap();
 ///

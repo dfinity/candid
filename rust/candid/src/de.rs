@@ -805,19 +805,24 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
             } => {
                 match (expect.front(), wire.front()) {
                     (Some(e), Some(w)) => {
-                        if e.id.get_id() == w.id.get_id() {
-                            self.de.set_field_name(e.id.clone());
-                            self.de.expect_type = expect.pop_front().unwrap().ty;
-                            self.de.wire_type = wire.pop_front().unwrap().ty;
-                        } else if e.id.get_id() < w.id.get_id() {
-                            // by subtyping rules, expect_type can only be opt, reserved or null.
-                            self.de.set_field_name(e.id.clone());
-                            self.de.expect_type = expect.pop_front().unwrap().ty;
-                            self.de.wire_type = Type::Reserved;
-                        } else {
-                            self.de.set_field_name(Label::Named("_".to_owned()));
-                            self.de.wire_type = wire.pop_front().unwrap().ty;
-                            self.de.expect_type = Type::Reserved;
+                        use std::cmp::Ordering;
+                        match e.id.get_id().cmp(&w.id.get_id()) {
+                            Ordering::Equal => {
+                                self.de.set_field_name(e.id.clone());
+                                self.de.expect_type = expect.pop_front().unwrap().ty;
+                                self.de.wire_type = wire.pop_front().unwrap().ty;
+                            }
+                            Ordering::Less => {
+                                // by subtyping rules, expect_type can only be opt, reserved or null.
+                                self.de.set_field_name(e.id.clone());
+                                self.de.expect_type = expect.pop_front().unwrap().ty;
+                                self.de.wire_type = Type::Reserved;
+                            }
+                            Ordering::Greater => {
+                                self.de.set_field_name(Label::Named("_".to_owned()));
+                                self.de.wire_type = wire.pop_front().unwrap().ty;
+                                self.de.expect_type = Type::Reserved;
+                            }
                         }
                     }
                     (None, Some(_)) => {
