@@ -1,3 +1,4 @@
+#![allow(clippy::unit_cmp)]
 use candid::{decode_one, encode_one, CandidType, Decode, Deserialize, Encode, Int, Nat};
 
 #[test]

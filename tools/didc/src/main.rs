@@ -18,8 +18,8 @@ enum Command {
     Check {
         /// Specifies did file for type checking
         input: PathBuf,
-        /// Specifies a second did file for subtyping check
-        upgrade: Option<PathBuf>,
+        /// Specifies a previous version of did file for subtyping check
+        previous: Option<PathBuf>,
     },
     /// Generate binding for different languages
     Bind {
@@ -164,12 +164,12 @@ fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
 
 fn main() -> Result<()> {
     match Command::from_args() {
-        Command::Check { input, upgrade } => {
+        Command::Check { input, previous } => {
             let mut env = TypeEnv::new();
             let opt_t1 = check_file(&mut env, &input)?;
-            if let Some(upgrade) = upgrade {
+            if let Some(previous) = previous {
                 let mut env2 = TypeEnv::new();
-                let opt_t2 = check_file(&mut env2, &upgrade)?;
+                let opt_t2 = check_file(&mut env2, &previous)?;
                 match (opt_t1, opt_t2) {
                     (Some(t1), Some(t2)) => {
                         let mut gamma = HashSet::new();
