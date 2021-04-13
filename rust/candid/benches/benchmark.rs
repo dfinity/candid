@@ -108,6 +108,7 @@ fn bench_collections(c: &mut Criterion) {
 }
 
 fn bench_recursion(c: &mut Criterion) {
+    let n = 1024;
     #[derive(CandidType, Deserialize, Clone)]
     struct List {
         head: Int,
@@ -119,13 +120,13 @@ fn bench_recursion(c: &mut Criterion) {
         Cons(Int, Box<VariantList>),
     }
     {
-        let list: Option<Box<List>> = (0..512).fold(None, |acc, x| {
+        let list: Option<Box<List>> = (0..n).fold(None, |acc, x| {
             Some(Box::new(List {
                 head: Int::from(x),
                 tail: acc,
             }))
         });
-        c.bench_with_input(BenchmarkId::new("option list", 512), &list, |b, list| {
+        c.bench_with_input(BenchmarkId::new("option list", n), &list, |b, list| {
             b.iter(|| {
                 let bytes = Encode!(list).unwrap();
                 Decode!(&bytes, Option<Box<List>>).unwrap()
@@ -133,10 +134,10 @@ fn bench_recursion(c: &mut Criterion) {
         });
     }
     {
-        let list: VariantList = (0..512).fold(VariantList::Nil, |acc, x| {
+        let list: VariantList = (0..n).fold(VariantList::Nil, |acc, x| {
             VariantList::Cons(Int::from(x), Box::new(acc))
         });
-        c.bench_with_input(BenchmarkId::new("variant list", 512), &list, |b, list| {
+        c.bench_with_input(BenchmarkId::new("variant list", n), &list, |b, list| {
             b.iter(|| {
                 let bytes = Encode!(list).unwrap();
                 Decode!(&bytes, VariantList).unwrap()
@@ -168,7 +169,7 @@ fn bench_profile(c: &mut Criterion) {
         education: "**King's College London**  \nBA, Computer Science".to_string(),
         imgUrl: "https://media-exp1.licdn.com/dms/image/C5603AQHdxGV6zMbg-A/profile-displayphoto-shrink_200_200/0?e=1592438400&v=beta&t=NlR0J9mgJXd3SO6K3YJ6xBC_wCip20u5THPNKu6ImYQ".to_string(),
     };
-    let profiles: Vec<_> = std::iter::repeat(profile).take(512).collect();
+    let profiles: Vec<_> = std::iter::repeat(profile).take(1024).collect();
     c.bench_with_input(
         BenchmarkId::new("profiles", profiles.len()),
         &profiles,
