@@ -1,8 +1,11 @@
+type non_tuple = record { 1 : text; 2 : text };
+type tuple = record { text; text };
 service : {
   bab : (int, nat) -> ();
   bar : (record { "2" : int }) -> ();
   bas : (record { int; int }) -> (record { text; nat });
   baz : (record { 2 : int; "2" : nat }) -> (record {});
+  bba : (tuple) -> (non_tuple);
   bib : (record { int }) -> (variant { 0 : int });
   foo : (record { 2 : int }) -> (record { 2 : int; _2 : int });
 }
