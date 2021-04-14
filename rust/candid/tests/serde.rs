@@ -121,11 +121,22 @@ fn test_reserved() {
 }
 
 #[test]
-fn test_principal() {
-    use candid::Principal;
+fn test_reference() {
+    use candid::{Func, Principal, Service};
+    let principal = Principal::from_text("w7x7r-cok77-xa").unwrap();
+    all_check(principal.clone(), "4449444c0001680103caffee");
     all_check(
-        Principal::from_text("w7x7r-cok77-xa").unwrap(),
-        "4449444c0001680103caffee",
+        Service {
+            principal: principal.clone(),
+        },
+        "4449444c01690001000103caffee",
+    );
+    all_check(
+        Func {
+            principal,
+            method: "method".to_owned(),
+        },
+        "4449444c016a0000000100010103caffee066d6574686f64",
     );
 }
 
