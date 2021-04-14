@@ -264,6 +264,7 @@ pub use types::CandidType;
 pub use types::{
     number::{Int, Nat},
     principal::Principal,
+    reference::{Func, Service},
     reserved::{Empty, Reserved},
 };
 
