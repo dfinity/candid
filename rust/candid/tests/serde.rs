@@ -126,11 +126,22 @@ fn test_reserved() {
 }
 
 #[test]
-fn test_principal() {
-    use candid::Principal;
+fn test_reference() {
+    use candid::{Func, Principal, Service};
+    let principal = Principal::from_text("w7x7r-cok77-xa").unwrap();
+    all_check(principal.clone(), "4449444c0001680103caffee");
     all_check(
-        Principal::from_text("w7x7r-cok77-xa").unwrap(),
-        "4449444c0001680103caffee",
+        Service {
+            principal: principal.clone(),
+        },
+        "4449444c01690001000103caffee",
+    );
+    all_check(
+        Func {
+            principal,
+            method: "method".to_owned(),
+        },
+        "4449444c016a0000000100010103caffee066d6574686f64",
     );
 }
 
@@ -352,7 +363,7 @@ fn test_keyword_label() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct A {
         r#return: Vec<u8>,
-    };
+    }
     all_check(
         A {
             r#return: vec![1, 2, 3],
@@ -363,7 +374,7 @@ fn test_keyword_label() {
     struct B {
         #[serde(rename = "return")]
         dontcare: Vec<u8>,
-    };
+    }
     all_check(
         B {
             dontcare: vec![1, 2, 3],
@@ -374,13 +385,13 @@ fn test_keyword_label() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     enum E {
         r#return,
-    };
+    }
     all_check(E::r#return, "4449444c016b01b0c9b6497f010000");
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     enum E2 {
         #[serde(rename = "return")]
         Dontcare,
-    };
+    }
     all_check(E2::Dontcare, "4449444c016b01b0c9b6497f010000");
 }
 
@@ -391,7 +402,7 @@ fn test_mutual_recursion() {
     struct ListA {
         head: Int,
         tail: Box<List>,
-    };
+    }
 
     let list: List = None;
     all_check(list, "4449444c026e016c02a0d2aca8047c90eddae70400010000");
