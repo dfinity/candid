@@ -118,7 +118,9 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         let export = match ty {
-            Type::Record(_) => kwd("export interface").append(ident(id)).append(pp_ty(ty)),
+            Type::Record(_) if !ty.is_tuple() => {
+                kwd("export interface").append(ident(id)).append(pp_ty(ty))
+            }
             Type::Service(ref serv) => kwd("export interface")
                 .append(ident(id))
                 .append(pp_service(env, serv)),
