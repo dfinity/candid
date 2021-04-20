@@ -65,9 +65,12 @@ assert blob "DIDL\02\6d\01\6c\00\01\00\05"                                  : (v
 assert blob "DIDL\01\6c\00\01\00" == "(record {})"                                : (record {}) "record: empty";
 assert blob "DIDL\01\6c\00\03\00\00\00" == "(record {}, record {}, record {})"    : (record {}, record {}, record {}) "record: multiple records";
 assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 1 = 42 })"               : (record {1:int}) "record";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 1 = opt 42 })"           : (record {1:opt int}) "record: opt";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 1 = null })"             : (record {1:reserved}) "record: reserved";
 assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record {})"                       : (record {}) "record: ignore fields";
 assert "(record { whatever = 0 })"  == "(record {})"                              : (record {}) "record: ignore fields (textual)";
 assert blob "DIDL\01\6c\01\01\7c\01\00\2a"                                       !: (record {2:int}) "record: missing field";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 2 = null })"             : (record {2:opt int}) "record: missing opt field";
 assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01" == "(record {42; true})"      : (record {int; bool}) "record: tuple";
 assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01" == "(record {1 = true})"      : (record {1:bool}) "record: ignore fields";
 assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01"                              !: (record {bool; int}) "record: type mismatch";
@@ -96,6 +99,7 @@ assert blob "DIDL\01\6e\7e\01\00\00" == "(null)"                                
 assert blob "DIDL\01\6e\7e\01\00\01\00" == "(opt false)"                        : (opt bool) "opt: parsing opt false : opt bool";
 assert blob "DIDL\01\6e\7e\01\00\01\01" == "(opt true)"                         : (opt bool) "opt: parsing opt true : opt bool";
 assert blob "DIDL\01\6e\7e\01\00\01\02"                                        !: (opt bool) "opt: parsing invalid bool at opt bool";
+assert blob "DIDL\00\00" == "(null)"                                            : (opt bool) "opt: extra value";
 
 // nested opt
 assert blob "DIDL\02\6e\01\6e\7e\01\00\00" == "(null)"                          : (opt opt bool) "opt: parsing null : opt opt bool";
@@ -108,7 +112,6 @@ assert blob "DIDL\00\01\7e\01" == "(opt true)"    : (opt bool) "opt: parsing tru
 assert blob "DIDL\00\01\7e\02"                   !: (opt bool) "opt: parsing invalid bool at opt bool";
 assert blob "DIDL\01\6e\7f\01\00\00" == "(null)"  : (opt opt null) "opt: parsing (null : opt null) at opt opt null gives null, not opt null";
 assert blob "DIDL\00\01\7e\01" == "(null)"        : (opt opt bool) "opt: parsing true : opt opt bool gives null";
-
 assert blob "DIDL\00\01\7e\01" == "(null)"        : (Opt) "opt: parsing (true : bool) at \"fix opt\" gives null";
 assert blob "DIDL\01\6c\01\00\00\01\00"          !: (OptRec) "opt: parsing \"fix record\" at \"fix record opt\" fails";
 
