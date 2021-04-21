@@ -15,7 +15,11 @@
     "local": {
       "bind": "127.0.0.1:8000",
       "type": "ephemeral"
-    }
+    },
+    "alpha": {
+      "providers": ["https://boundary.dfinity.network"],
+      "type": "persistent"
+    }    
   },
   "version": 1
 }

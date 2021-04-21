@@ -1,19 +1,33 @@
 import { Actor, IDL, InputBox, Principal, UI, HttpAgent } from '@dfinity/agent';
-import { SiteInfo } from './site';
 import './candid.css';
 
 const agent = new HttpAgent();
-const site = SiteInfo.fromWindow()
 
 class CanisterActor extends Actor {
   [x: string]: (...args: unknown[]) => Promise<unknown>;
 }
 
 function getCanisterId(): Principal {
-  if (!site.principal) {
-    throw new Error('Could not find canister Id');
+  // Check the query params.
+  const maybeCanisterId = new URLSearchParams(window.location.search).get(
+    "canisterId"
+  );
+  if (maybeCanisterId) {
+    return Principal.fromText(maybeCanisterId);
   }
-  return site.principal;
+
+  // Return the first canister ID when resolving from the right hand side.
+  const domain = window.location.hostname.split(".").reverse();
+  for (const subdomain of domain) {
+    try {
+      if (subdomain.length >= 25) {
+        // The following throws if it can't decode or the checksum is invalid.
+        return Principal.fromText(subdomain);
+      }
+    } catch (_) {}
+  }
+
+  throw new Error("Could not find the canister ID.");
 }
 
 export async function fetchActor(canisterId: Principal): Promise<CanisterActor> {
