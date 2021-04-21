@@ -56,7 +56,7 @@ function generateWebpackConfigForCanister(name, info) {
         "buffer": require.resolve("buffer/"),
         //"events": require.resolve("events/"),
         //"stream": require.resolve("stream-browserify/"),
-        //"util": require.resolve("util/"),
+        //"util": require.resolve("util/"),        
       },
       alias: aliases,
     },
@@ -95,9 +95,10 @@ function generateWebpackConfigForCanister(name, info) {
           from: 'src/favicon.ico',
           to: 'favicon.ico',
         },
-      ]),   
+      ]),
       new webpack.ProvidePlugin({
         Buffer: [require.resolve('buffer/'), 'Buffer'],
+        //process: require.resolve('process/browser'),
       }),
     ],
   };

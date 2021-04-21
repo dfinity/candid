@@ -7,16 +7,16 @@
     "build": "webpack"
   },
   "devDependencies": {
-    "@dfinity/agent": "0.6.26-beta.1",
+    "@dfinity/agent": "0.8.3",
     "buffer": "6.0.3",
-    "css-loader": "^3.6.0",
     "copy-webpack-plugin": "^5.1.1",
+    "css-loader": "^3.6.0",
     "html-webpack-plugin": "^5.2.0",
     "style-loader": "^1.2.1",
     "terser-webpack-plugin": "^4.2.2",
-    "typescript": "^3.6.3",
     "ts-loader": "7.0.5",
     "tsconfig-paths-webpack-plugin": "^3.2.0",
+    "typescript": "^3.6.3",
     "webpack": "5.24.4",
     "webpack-cli": "4.5.0"
   }
