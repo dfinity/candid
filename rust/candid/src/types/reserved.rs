@@ -1,7 +1,7 @@
 //! Data structure for Candid type Reserved and Empty.
 
 use super::{CandidType, Serializer, Type, TypeId};
-use serde::de::{Deserialize, Visitor};
+use serde::de::{self, Deserialize, Deserializer, Visitor};
 use std::fmt;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -42,22 +42,11 @@ impl CandidType for Empty {
 impl<'de> Deserialize<'de> for Reserved {
     fn deserialize<D>(deserializer: D) -> Result<Reserved, D::Error>
     where
-        D: serde::Deserializer<'de>,
+        D: Deserializer<'de>,
     {
-        struct ReservedVisitor;
-        impl<'de> Visitor<'de> for ReservedVisitor {
-            type Value = Reserved;
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("Reserved value")
-            }
-            fn visit_unit<E>(self) -> Result<Reserved, E> {
-                Ok(Reserved)
-            }
-            fn visit_bytes<E>(self, _v: &[u8]) -> Result<Reserved, E> {
-                Ok(Reserved)
-            }
-        }
-        deserializer.deserialize_any(ReservedVisitor)
+        deserializer
+            .deserialize_ignored_any(de::IgnoredAny)
+            .map(|_| Reserved)
     }
 }
 

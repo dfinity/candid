@@ -359,10 +359,7 @@ thread_local! {
 }
 
 pub(crate) fn find_type(id: &TypeId) -> Option<Type> {
-    ENV.with(|e| match e.borrow().get(id) {
-        None => None,
-        Some(t) => Some(t.clone()),
-    })
+    ENV.with(|e| e.borrow().get(id).cloned())
 }
 
 // only for debugging
@@ -373,6 +370,9 @@ pub(crate) fn show_env() {
 
 pub(crate) fn env_add(id: TypeId, t: Type) {
     ENV.with(|e| drop(e.borrow_mut().insert(id, t)));
+}
+pub(crate) fn env_clear() {
+    ENV.with(|e| e.borrow_mut().clear());
 }
 
 pub(crate) fn env_id(id: TypeId, t: Type) {

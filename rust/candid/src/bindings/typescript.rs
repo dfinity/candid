@@ -9,16 +9,16 @@ fn pp_ty(ty: &Type) -> RcDoc {
     match *ty {
         Null => str("null"),
         Bool => str("boolean"),
-        Nat => str("BigNumber"),
-        Int => str("BigNumber"),
+        Nat => str("bigint"),
+        Int => str("bigint"),
         Nat8 => str("number"),
         Nat16 => str("number"),
         Nat32 => str("number"),
-        Nat64 => str("BigNumber"),
+        Nat64 => str("bigint"),
         Int8 => str("number"),
         Int16 => str("number"),
         Int32 => str("number"),
-        Int64 => str("BigNumber"),
+        Int64 => str("bigint"),
         Float32 => str("number"),
         Float64 => str("number"),
         Text => str("string"),
@@ -118,7 +118,9 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         let export = match ty {
-            Type::Record(_) => kwd("export interface").append(ident(id)).append(pp_ty(ty)),
+            Type::Record(_) if !ty.is_tuple() => {
+                kwd("export interface").append(ident(id)).append(pp_ty(ty))
+            }
             Type::Service(ref serv) => kwd("export interface")
                 .append(ident(id))
                 .append(pp_service(env, serv)),
@@ -148,7 +150,6 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     let header = r#"import type { Principal } from '@dfinity/agent';
-import type BigNumber from 'bignumber.js';
 "#;
     let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
     let defs = pp_defs(env, &def_list);

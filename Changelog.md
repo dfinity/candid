@@ -1,6 +1,27 @@
 
 # Changelog
 
+## 2021-04-07 (Rust 0.6.19 -- 0.6.21)
+
+* Fix a bug for serializing recursive values in Rust CDK [#210](https://github.com/dfinity/candid/pull/210)
+* Use BigInt in JS/TS binding
+* Fix TypeScript binding for tuple
+* Rust support for Func and Service value
+
+## 2021-03-17 
+
+### Rust (0.6.18)
+
+* `#[candid_method(init)]` to support init arguments in service actor
+* Subtyping check for Candid types
+* Handle subtyping for `reserved` and `int` in decoding
+
+### Other
+
+* Benchmark for Rust library with criterion
+* `didc check` and `didc subtype` command to check for subtyping
+* Conditional running CI for Coq or Rust library
+
 ## 2021-03-04 (Rust 0.6.17)
 
 * Support `serde_bytes` for efficient handling of `&[u8]` and `Vec<u8>`

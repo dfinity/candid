@@ -58,7 +58,7 @@ Candid is a strongly typed system with a set of types that canonically cover mos
  * Reference types (`+service+`, `+func+`, `+principal+`).
  * The special `+null+`, `+reserved+` and `+empty+` types.
 
-All types are described in detail in the xref:candid-ref{outfilesuffix}[Reference] section.
+All types are described in detail in the link:candid-ref{outfilesuffix}[Reference] section.
 
 The philosophy behind this set of types is that they are sufficient to describe the _structure_ of data, so that information can be encoded, passed around and decoded, but intentionally do not describe _semantic_ constraints beyond what’s needed to describe the representation. For example, there's no way to express that a number should be even, that a vector has a certain length, or that the elements of a vector are sorted.
 
@@ -293,4 +293,4 @@ Therefore, if you write a program for a service in Rust or C, you need to write 
 For examples of how to write Candid service descriptions for Rust programs, see the link:https://github.com/dfinity/cdk-rs/tree/next/examples[Rust CDK examples] and the link:../rust-guide/rust-intro{outfilesuffix}[Rust tutorials].
 
 Regardless of the host language you use, it is important to know the mapping between host language types and Candid types.
-In the link:candid-types{outfilesuffix}[Supported types] reference section, you'll find Candid type mapping described for Motoko, Rust, and JavaScript.
+In the link:../candid-types{outfilesuffix}[Supported types] reference section, you'll find Candid type mapping described for Motoko, Rust, and JavaScript.

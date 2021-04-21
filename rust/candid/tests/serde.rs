@@ -58,6 +58,10 @@ fn test_integer() {
         Nat::parse(b"60000000000000000").unwrap(),
         "4449444c00017d808098f4e9b5ca6a",
     );
+    test_decode(
+        &hex("4449444c00017d808098f4e9b5ca6a"),
+        &Int::parse(b"60000000000000000").unwrap(),
+    );
     all_check(
         Int::parse(b"-60000000000000000").unwrap(),
         "4449444c00017c8080e88b96cab5957f",
@@ -83,6 +87,7 @@ fn test_fixed_number() {
     all_check(-42i64, "4449444c000174d6ffffffffffffff");
     all_check(-42isize, "4449444c000174d6ffffffffffffff");
     all_check(42i128, "4449444c00017c2a");
+    test_decode(&hex("4449444c00017d2a"), &42i128);
 }
 
 #[test]
@@ -106,6 +111,11 @@ fn test_text() {
 fn test_reserved() {
     use candid::{Empty, Reserved};
     all_check(Reserved, "4449444c000170");
+    test_decode(&hex("4449444c00017b2a"), &candid::Reserved);
+    test_decode(
+        &hex("4449444c016c02d3e3aa027e868eb7027c0100012a"),
+        &candid::Reserved,
+    );
     let res: Result<u8, Empty> = Ok(1);
     all_check(res, "4449444c016b02bc8a017bc5fed2016f01000001");
     let bytes = hex("4449444c016b02bc8a017bc5fed2016f010001");
@@ -116,11 +126,22 @@ fn test_reserved() {
 }
 
 #[test]
-fn test_principal() {
-    use candid::Principal;
+fn test_reference() {
+    use candid::{Func, Principal, Service};
+    let principal = Principal::from_text("w7x7r-cok77-xa").unwrap();
+    all_check(principal.clone(), "4449444c0001680103caffee");
     all_check(
-        Principal::from_text("w7x7r-cok77-xa").unwrap(),
-        "4449444c0001680103caffee",
+        Service {
+            principal: principal.clone(),
+        },
+        "4449444c01690001000103caffee",
+    );
+    all_check(
+        Func {
+            principal,
+            method: "method".to_owned(),
+        },
+        "4449444c016a0000000100010103caffee066d6574686f64",
     );
 }
 
@@ -209,6 +230,39 @@ fn test_struct() {
     let list: Option<List> = None;
     // without memoization on the unrolled type, type table will have 3 entries.
     all_check(list, "4449444c026e016c02a0d2aca8047c90eddae70400010000");
+}
+
+#[test]
+fn test_equivalent_types() {
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct RootType {
+        typeas: Vec<TypeA>,
+    }
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct TypeA {
+        typeb: Box<Option<TypeB>>,
+    }
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct TypeB {
+        typea: Option<TypeA>,
+    }
+    // Encode to the following types leads to equivalent but different representations of TypeA
+    all_check(
+        RootType { typeas: Vec::new() },
+        "4449444c066c01acd4dbb905016d026c01e8e0add601036e046c01e7e0add601056e02010000",
+    );
+    all_check(
+        TypeB { typea: None },
+        "4449444c046c01e7e0add601016e026c01e8e0add601036e00010000",
+    );
+    Encode!(
+        &RootType { typeas: Vec::new() },
+        &TypeB { typea: None },
+        &TypeA {
+            typeb: Box::new(None)
+        }
+    )
+    .unwrap();
 }
 
 #[test]
@@ -309,7 +363,7 @@ fn test_keyword_label() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct A {
         r#return: Vec<u8>,
-    };
+    }
     all_check(
         A {
             r#return: vec![1, 2, 3],
@@ -320,7 +374,7 @@ fn test_keyword_label() {
     struct B {
         #[serde(rename = "return")]
         dontcare: Vec<u8>,
-    };
+    }
     all_check(
         B {
             dontcare: vec![1, 2, 3],
@@ -331,13 +385,13 @@ fn test_keyword_label() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     enum E {
         r#return,
-    };
+    }
     all_check(E::r#return, "4449444c016b01b0c9b6497f010000");
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     enum E2 {
         #[serde(rename = "return")]
         Dontcare,
-    };
+    }
     all_check(E2::Dontcare, "4449444c016b01b0c9b6497f010000");
 }
 
@@ -348,7 +402,7 @@ fn test_mutual_recursion() {
     struct ListA {
         head: Int,
         tail: Box<List>,
-    };
+    }
 
     let list: List = None;
     all_check(list, "4449444c026e016c02a0d2aca8047c90eddae70400010000");

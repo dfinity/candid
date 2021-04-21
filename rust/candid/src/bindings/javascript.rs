@@ -229,7 +229,7 @@ pub mod value {
         use IDLValue::*;
         match &*v {
             Number(_) | Int(_) | Nat(_) | Int64(_) | Nat64(_) => {
-                RcDoc::text(format!("new BigNumber('{}')", v))
+                RcDoc::text(format!("BigInt({})", v))
             }
             Reserved => RcDoc::text("null"),
             Principal(id) => RcDoc::text(format!("Principal.fromText('{}')", id)),
@@ -290,7 +290,6 @@ pub mod test {
     pub fn test_generate(test: Test) -> String {
         let header = r#"// AUTO-GENERATED. DO NOT EDIT.
 // tslint:disable
-import BigNumber from 'bignumber.js';
 import * as IDL from './idl';
 import { Buffer } from 'buffer/';
 import { Principal } from './principal';

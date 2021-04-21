@@ -1,8 +1,5 @@
 import type { Principal } from '@dfinity/agent';
-import type BigNumber from 'bignumber.js';
-export type A = [] | [
-  B
-];
+export type A = [] | [B];
 export type B = [] | [C];
 export type C = A;
 export type X = Y;

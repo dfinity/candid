@@ -8,11 +8,13 @@ use serde::ser::Error;
 
 mod impls;
 pub mod internal;
+pub mod subtype;
 
 pub use self::internal::{get_type, Field, Function, Label, Type, TypeId};
 
 pub mod number;
 pub mod principal;
+pub mod reference;
 pub mod reserved;
 
 pub trait CandidType {
