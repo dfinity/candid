@@ -11,6 +11,17 @@
 * `types::subtype` returns `Result<()>` instead of `bool` for better error message
 * Disable subtyping conversion for opt rules in `IDLValue.annotate_type`
 
+### Non-breaking changes
+
+* Better error messages in deserialization
+* Update test suite to conform with the new spec
+
+### Pending issues
+
+* Update opt rule for subtyping and coercion
+* Performance regression in decoding struct type
+* Integration test with production canisters
+
 ## 2021-04-07 (Rust 0.6.19 -- 0.6.21)
 
 * Fix a bug for serializing recursive values in Rust CDK [#210](https://github.com/dfinity/candid/pull/210)
