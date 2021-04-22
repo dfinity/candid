@@ -5,7 +5,18 @@ async function main() {
   const params = new URLSearchParams(window.location.search);
   const cid = params.get('id');
   if (!cid) {
-    throw new Error('Provide parameter id in the URL as the target canister id');
+    document.body.innerHTML = `<div id="main-content">
+<label>Provide a canister ID: </label>
+<input id="id" type="text">
+<button id="btn" class="btn">Go</button>
+</div>
+`;
+    const id = document.getElementById('id')!;
+    const btn = document.getElementById('btn')!;
+    btn.addEventListener('click', () => {
+      params.append('id', (id as any).value);
+      window.location.href = `?${params}`;
+    });
   } else {
     document.title = `Canister ${cid}`;
     const canisterId = Principal.fromText(cid);

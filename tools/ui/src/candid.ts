@@ -1,11 +1,7 @@
-import { Actor, IDL, InputBox, Principal, UI, HttpAgent } from '@dfinity/agent';
+import { Actor, IDL, InputBox, Principal, UI, HttpAgent, ActorSubclass } from '@dfinity/agent';
 import './candid.css';
 
 const agent = new HttpAgent();
-
-class CanisterActor extends Actor {
-  [x: string]: (...args: unknown[]) => Promise<unknown>;
-}
 
 function getCanisterId(): Principal {
   // Check the query params.
@@ -30,7 +26,7 @@ function getCanisterId(): Principal {
   throw new Error("Could not find the canister ID.");
 }
 
-export async function fetchActor(canisterId: Principal): Promise<CanisterActor> {
+export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> {
   let js;
   try {
     js = await getRemoteDidJs(canisterId);
@@ -63,14 +59,14 @@ async function getRemoteDidJs(canisterId: Principal): Promise<undefined | string
   const common_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
     __get_candid_interface_tmp_hack: IDL.Func([], [IDL.Text], ['query']),
   });
-  const actor: CanisterActor = Actor.createActor(common_interface, { agent, canisterId });
+  const actor: ActorSubclass = Actor.createActor(common_interface, { agent, canisterId });
   const candid_source: any = await actor.__get_candid_interface_tmp_hack();
   // call didjs canister
   const didjs_id = getCanisterId();
   const didjs_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
     did_to_js: IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
   });
-  const didjs: CanisterActor = Actor.createActor(didjs_interface, { agent, canisterId: didjs_id });
+  const didjs: ActorSubclass = Actor.createActor(didjs_interface, { agent, canisterId: didjs_id });
   const js: any = await didjs.did_to_js(candid_source);
   if (js === []) {
     return undefined;
@@ -78,7 +74,7 @@ async function getRemoteDidJs(canisterId: Principal): Promise<undefined | string
   return js[0];
 }
 
-export function render(id: Principal, canister: CanisterActor) {
+export function render(id: Principal, canister: ActorSubclass) {
   document.getElementById('canisterId')!.innerText = `${id}`;
   const sortedMethods = Actor.interfaceOf(canister)._fields.sort(([a], [b]) => (a > b ? 1 : -1));
   for (const [name, func] of sortedMethods) {
@@ -86,7 +82,7 @@ export function render(id: Principal, canister: CanisterActor) {
   }
 }
 
-function renderMethod(canister: CanisterActor, name: string, idlFunc: IDL.FuncClass) {
+function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncClass) {
   const item = document.createElement('li');
   item.id = name;
 
@@ -296,30 +292,3 @@ function log(content: Element | string) {
   line.scrollIntoView();
 }
 
-/**
- * Type of module we expect back from _loadCandid (but may get something else)
- */
-export interface CandidModule {
-  default: IDL.InterfaceFactory;
-}
-
-/**
- * Type Guard for dynamically loaded candid module from some canister.
- * @param value - (maybe) ES-module object dynamically imported/evaled from candid ui
- */
-export function isProbablyCandidModule(value: unknown): value is CandidModule {
-  if (!value) {
-    return false;
-  }
-  if (
-    !(
-      typeof value === 'object' &&
-      value &&
-      'default' in value &&
-      typeof (value as CandidModule)?.default === 'function'
-    )
-  ) {
-    return false;
-  }
-  return true;
-}
