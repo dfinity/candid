@@ -57,12 +57,23 @@ impl IDLArgs {
         }
     }
     pub fn annotate_types(self, from_parser: bool, env: &TypeEnv, types: &[Type]) -> Result<Self> {
-        if types.len() > self.args.len() {
-            return Err(Error::msg("wrong number of argument values"));
-        }
         let mut args = Vec::new();
         for (v, ty) in self.args.iter().zip(types.iter()) {
             let v = v.annotate_type(from_parser, env, &ty)?;
+            args.push(v);
+        }
+        for ty in types[self.args.len()..].iter() {
+            let v = match env.trace_type(ty)? {
+                Type::Null => IDLValue::Null,
+                Type::Reserved => IDLValue::Reserved,
+                Type::Opt(_) => IDLValue::None,
+                _ => {
+                    return Err(Error::msg(format!(
+                        "Omitted values cannot be of type {}",
+                        ty
+                    )))
+                }
+            };
             args.push(v);
         }
         Ok(IDLArgs { args })
@@ -96,8 +107,7 @@ impl IDLArgs {
         let mut de = crate::de::IDLDeserialize::new(bytes)?;
         let mut args = Vec::new();
         for ty in types.iter() {
-            let v = de.get_value::<IDLValue>()?;
-            let v = v.annotate_type(false, env, ty)?;
+            let v = de.get_value_with_type(env, ty)?;
             args.push(v);
         }
         de.done()?;
@@ -132,8 +142,9 @@ impl std::str::FromStr for IDLValue {
 }
 
 impl IDLValue {
-    /// Anotate `IDLValue` with the given type, allowing subtyping. If `IDLValue` is parser from
-    /// string, we need to set `from_parser` to true to enable converting numbers to the expected types.
+    /// Anotate `IDLValue` with the given type, allowing subtyping. If `IDLValue` is parsed from
+    /// string, we need to set `from_parser` to true to enable converting numbers to the expected
+    /// types, and disable the opt rules.
     pub fn annotate_type(&self, from_parser: bool, env: &TypeEnv, t: &Type) -> Result<Self> {
         Ok(match (self, t) {
             (_, Type::Var(id)) => {
@@ -146,24 +157,6 @@ impl IDLValue {
             }
             (_, Type::Reserved) => IDLValue::Reserved,
             (IDLValue::Float64(n), Type::Float32) if from_parser => IDLValue::Float32(*n as f32),
-            (IDLValue::Number(str), t) if from_parser => match t {
-                Type::Int => IDLValue::Int(str.parse::<Int>()?),
-                Type::Nat => IDLValue::Nat(str.parse::<Nat>()?),
-                Type::Nat8 => IDLValue::Nat8(str.parse::<u8>().map_err(error)?),
-                Type::Nat16 => IDLValue::Nat16(str.parse::<u16>().map_err(error)?),
-                Type::Nat32 => IDLValue::Nat32(str.parse::<u32>().map_err(error)?),
-                Type::Nat64 => IDLValue::Nat64(str.parse::<u64>().map_err(error)?),
-                Type::Int8 => IDLValue::Int8(str.parse::<i8>().map_err(error)?),
-                Type::Int16 => IDLValue::Int16(str.parse::<i16>().map_err(error)?),
-                Type::Int32 => IDLValue::Int32(str.parse::<i32>().map_err(error)?),
-                Type::Int64 => IDLValue::Int64(str.parse::<i64>().map_err(error)?),
-                _ => {
-                    return Err(Error::msg(format!(
-                        "type mismatch: {} can not be of type {}",
-                        self, t
-                    )))
-                }
-            },
             (IDLValue::Null, Type::Null) => IDLValue::Null,
             (IDLValue::Bool(b), Type::Bool) => IDLValue::Bool(*b),
             (IDLValue::Nat(n), Type::Nat) => IDLValue::Nat(n.clone()),
@@ -184,24 +177,28 @@ impl IDLValue {
             (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
             (IDLValue::Reserved, Type::Opt(_)) => IDLValue::None,
             (IDLValue::None, Type::Opt(_)) => IDLValue::None,
+            (IDLValue::Opt(v), Type::Opt(ty)) if from_parser => {
+                IDLValue::Opt(Box::new(v.annotate_type(from_parser, env, ty)?))
+            }
             // liberal decoding of optionals
-            (IDLValue::Opt(v), Type::Opt(ty)) => v
+            (IDLValue::Opt(v), Type::Opt(ty)) if !from_parser => v
                 .annotate_type(from_parser, env, ty)
                 .map(|v| IDLValue::Opt(Box::new(v)))
                 .unwrap_or(IDLValue::None),
             // try consituent type
             (v, Type::Opt(ty))
-                if !matches!(
-                    env.trace_type(ty)?,
-                    Type::Null | Type::Reserved | Type::Opt(_)
-                ) =>
+                if !from_parser
+                    && !matches!(
+                        env.trace_type(ty)?,
+                        Type::Null | Type::Reserved | Type::Opt(_)
+                    ) =>
             {
                 v.annotate_type(from_parser, env, ty)
                     .map(|v| IDLValue::Opt(Box::new(v)))
                     .unwrap_or(IDLValue::None)
             }
             // fallback
-            (_, Type::Opt(_)) => IDLValue::None,
+            (_, Type::Opt(_)) if !from_parser => IDLValue::None,
             (IDLValue::Vec(vec), Type::Vec(ty)) => {
                 let mut res = Vec::new();
                 for e in vec.iter() {
@@ -223,7 +220,7 @@ impl IDLValue {
                             Type::Reserved => Some(&IDLValue::Reserved),
                             _ => None,
                         })
-                        .ok_or_else(|| Error::msg(format!("required field {} not found", id)))?;
+                        .ok_or_else(|| Error::msg(format!("record field {} not found", id)))?;
                     let val = val.annotate_type(from_parser, env, ty)?;
                     res.push(IDLField {
                         id: id.clone(),
@@ -243,11 +240,29 @@ impl IDLValue {
                         return Ok(IDLValue::Variant(Box::new(field), i as u64));
                     }
                 }
-                return Err(Error::msg(format!("field {} not found", v.id)));
+                return Err(Error::msg(format!("variant field {} not found", v.id)));
             }
             (IDLValue::Principal(id), Type::Principal) => IDLValue::Principal(id.clone()),
             (IDLValue::Service(_), Type::Service(_)) => self.clone(),
             (IDLValue::Func(_, _), Type::Func(_)) => self.clone(),
+            (IDLValue::Number(str), t) if from_parser => match t {
+                Type::Int => IDLValue::Int(str.parse::<Int>()?),
+                Type::Nat => IDLValue::Nat(str.parse::<Nat>()?),
+                Type::Nat8 => IDLValue::Nat8(str.parse::<u8>().map_err(error)?),
+                Type::Nat16 => IDLValue::Nat16(str.parse::<u16>().map_err(error)?),
+                Type::Nat32 => IDLValue::Nat32(str.parse::<u32>().map_err(error)?),
+                Type::Nat64 => IDLValue::Nat64(str.parse::<u64>().map_err(error)?),
+                Type::Int8 => IDLValue::Int8(str.parse::<i8>().map_err(error)?),
+                Type::Int16 => IDLValue::Int16(str.parse::<i16>().map_err(error)?),
+                Type::Int32 => IDLValue::Int32(str.parse::<i32>().map_err(error)?),
+                Type::Int64 => IDLValue::Int64(str.parse::<i64>().map_err(error)?),
+                _ => {
+                    return Err(Error::msg(format!(
+                        "type mismatch: {} can not be of type {}",
+                        self, t
+                    )))
+                }
+            },
             _ => {
                 return Err(Error::msg(format!(
                     "type mismatch: {} cannot be of type {}",
@@ -323,13 +338,13 @@ impl IDLValue {
 
 impl crate::CandidType for IDLValue {
     fn ty() -> Type {
-        unreachable!()
+        Type::Unknown
     }
     fn id() -> crate::types::TypeId {
         unreachable!();
     }
     fn _ty() -> Type {
-        unreachable!()
+        Type::Unknown
     }
     fn idl_serialize<S>(&self, serializer: S) -> std::result::Result<(), S::Error>
     where
@@ -493,15 +508,14 @@ impl<'de> Deserialize<'de> for IDLValue {
             {
                 let mut vec = Vec::new();
                 while let Some((key, value)) = visitor.next_entry()? {
-                    if let IDLValue::Nat32(hash) = key {
-                        let f = IDLField {
-                            id: Label::Id(hash),
-                            val: value,
-                        };
-                        vec.push(f);
-                    } else {
-                        unreachable!()
-                    }
+                    let id = match key {
+                        IDLValue::Nat32(hash) => Label::Id(hash),
+                        IDLValue::Text(name) if name == "_" => continue,
+                        IDLValue::Text(name) => Label::Named(name),
+                        _ => unreachable!(),
+                    };
+                    let f = IDLField { id, val: value };
+                    vec.push(f);
                 }
                 Ok(IDLValue::Record(vec))
             }
@@ -513,9 +527,20 @@ impl<'de> Deserialize<'de> for IDLValue {
                 let (variant, visitor) = data.variant::<IDLValue>()?;
                 if let IDLValue::Text(v) = variant {
                     let v: Vec<_> = v.split(',').collect();
-                    assert_eq!(v.len(), 2);
-                    let id = v[0].parse::<u32>().unwrap();
-                    let val = match v[1] {
+                    let (id, style, ind) = match v.as_slice() {
+                        [name, "name", style, ind] => (
+                            Label::Named(name.to_string()),
+                            style,
+                            ind.parse::<u64>().unwrap(),
+                        ),
+                        [hash, "id", style, ind] => (
+                            Label::Id(hash.parse::<u32>().unwrap()),
+                            style,
+                            ind.parse::<u64>().unwrap(),
+                        ),
+                        _ => unreachable!(),
+                    };
+                    let val = match *style {
                         "unit" => {
                             visitor.unit_variant()?;
                             IDLValue::Null
@@ -524,13 +549,10 @@ impl<'de> Deserialize<'de> for IDLValue {
                         "newtype" => visitor.newtype_variant()?,
                         _ => unreachable!(),
                     };
-                    let f = IDLField {
-                        id: Label::Id(id),
-                        val,
-                    };
+                    let f = IDLField { id, val };
                     // Deserialized variant always has 0 index to ensure untyped
                     // serialization is correct.
-                    Ok(IDLValue::Variant(Box::new(f), 0))
+                    Ok(IDLValue::Variant(Box::new(f), ind))
                 } else {
                     unreachable!()
                 }
