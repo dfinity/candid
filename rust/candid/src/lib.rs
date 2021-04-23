@@ -3,11 +3,14 @@
 //! Candid is an interface description language (IDL) for interacting with _canisters_ (also known as _services_ or _actors_) running on the Internet Computer.
 //!
 //! There are three common ways that you might find yourself needing to work with Candid in Rust.
-//! - As a typed Rust data strcuture. When you write canisters or frontend in Rust, you want to have a seamless way of converting data between Rust and Candid.
+//! - As a typed Rust data structure. When you write canisters or frontend in Rust, you want to have a seamless way of converting data between Rust and Candid.
 //! - As an untyped Candid value. When you write generic tools for the Internet Computer without knowing the type of the Candid data.
 //! - As text data. When you get the data from CLI or read from a file, you can use the provided parser to send/receive messages.
 //!
 //! Candid provides efficient, flexible and safe ways of converting data between each of these representations.
+//!
+//! Note that if you are using the [Rust CDK](https://github.com/dfinity/cdk-rs/) to develop Rust canisters, it is encouraged to
+//! use the Candid crate from `ic_cdk::export::candid` to avoid version mismatch.
 //!
 //! ## Operating on native Rust values
 //! We are using a builder pattern to encode/decode Candid messages, see [`candid::ser::IDLBuilder`](ser/struct.IDLBuilder.html) for serialization and [`candid::de::IDLDeserialize`](de/struct.IDLDeserialize.html) for deserialization.
@@ -85,6 +88,8 @@
 //! enum List {
 //!     #[serde(rename = "nil")]
 //!     Nil,
+//!     #[serde(with = "serde_bytes")]
+//!     Node(Vec<u8>),
 //!     Cons(i32, Box<List>),
 //! }
 //! let list = List::Cons(42, Box::new(List::Nil));
@@ -94,10 +99,13 @@
 //! assert_eq!(res, list);
 //! # Ok::<(), candid::Error>(())
 //! ```
-//! We also support serde's rename attributes for each field, namely `#[serde(rename = "foo")]`
+//! We support serde's rename attributes for each field, namely `#[serde(rename = "foo")]`
 //! and `#[serde(rename(serialize = "foo", deserialize = "foo"))]`.
 //! This is useful when interoperating between Rust and Motoko canisters involving variant types, because
 //! they use different naming conventions for field names.
+//!
+//! We support `#[serde(with = "serde_bytes")]` for efficient handling of `&[u8]` and `Vec<u8>`. You can
+//! also use the wrapper type `serde_bytes::ByteBuf` and `serde_bytes::Bytes`.
 //!
 //! Note that if you are deriving `Deserialize` trait from Candid, you need to import `serde` as a dependency in
 //! your project, as the derived implementation will refer to the `serde` crate.
@@ -105,11 +113,14 @@
 //! ## Operating on big integers
 //! To support big integer types [`Candid::Int`](types/number/struct.Int.html) and [`Candid::Nat`](types/number/struct.Nat.html),
 //! we use the `num_bigint` crate. We provide interface to convert `i64`, `u64`, `&str` and `&[u8]` to big integers.
+//! You can also use `i128` and `u128` to represent Candid `int` and `nat` types respectively (decoding will fail if
+//! the number is more than 128 bits).
 //! ```
 //! use candid::{Int, Nat, Encode, Decode};
 //! let x = "-10000000000000000000".parse::<Int>()?;
 //! let bytes = Encode!(&Nat::from(1024), &x)?;
 //! let (a, b) = Decode!(&bytes, Nat, Int)?;
+//! let (c, d) = Decode!(&bytes, u128, i128)?;
 //! assert_eq!(a + 1, 1025);
 //! assert_eq!(b, Int::parse(b"-10000000000000000000")?);
 //! # Ok::<(), candid::Error>(())
@@ -235,6 +246,8 @@
 //! ```
 //!
 
+#![allow(clippy::upper_case_acronyms)]
+
 pub use candid_derive::{candid_method, export_service, CandidType};
 pub use serde::Deserialize;
 
@@ -244,13 +257,14 @@ pub use codegen::generate_code;
 pub mod bindings;
 
 pub mod error;
-pub use error::{pretty_parse, Error, Result};
+pub use error::{pretty_parse, pretty_read, Error, Result};
 
 pub mod types;
 pub use types::CandidType;
 pub use types::{
     number::{Int, Nat},
     principal::Principal,
+    reference::{Func, Service},
     reserved::{Empty, Reserved},
 };
 
@@ -259,11 +273,12 @@ pub use parser::types::IDLProg;
 pub use parser::typing::{check_prog, TypeEnv};
 pub use parser::value::IDLArgs;
 
+pub mod binary_parser;
 pub mod de;
-pub use de::{decode_args, decode_one};
 pub mod ser;
-pub use ser::{encode_args, encode_one};
 
+pub mod utils;
+pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
 pub mod pretty;
 
 // Candid hash function comes from
@@ -278,38 +293,4 @@ pub fn idl_hash(id: &str) -> u32 {
         s = s.wrapping_mul(223).wrapping_add(*c as u32);
     }
     s
-}
-
-/// Encode sequence of Rust values into Candid message of type `candid::Result<Vec<u8>>`.
-#[macro_export]
-macro_rules! Encode {
-    ( $($x:expr),* ) => {{
-        let mut builder = $crate::ser::IDLBuilder::new();
-        Encode!(@PutValue builder $($x,)*)
-    }};
-    ( @PutValue $builder:ident $x:expr, $($tail:expr,)* ) => {{
-        $builder.arg($x).and_then(|builder| Encode!(@PutValue builder $($tail,)*))
-    }};
-    ( @PutValue $builder:ident ) => {{
-        $builder.serialize_to_vec()
-    }};
-}
-
-/// Decode Candid message into a tuple of Rust values of the given types.
-/// Produces `Err` if the message fails to decode at any given types.
-/// If the message contains only one value, it returns the value directly instead of a tuple.
-#[macro_export]
-macro_rules! Decode {
-    ( $hex:expr $(,$ty:ty)* ) => {{
-        $crate::de::IDLDeserialize::new($hex)
-            .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
-                      .and_then(|res| de.done().and(Ok(res))))
-    }};
-    (@GetValue [$($ans:ident)*] $de:ident $ty:ty, $($tail:ty,)* ) => {{
-        $de.get_value::<$ty>()
-            .and_then(|val| Decode!(@GetValue [$($ans)* val] $de $($tail,)* ))
-    }};
-    (@GetValue [$($ans:ident)*] $de:ident) => {{
-        Ok(($($ans),*))
-    }};
 }

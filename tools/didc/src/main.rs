@@ -1,8 +1,12 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use candid::{
-    check_prog, parser::types::IDLTypes, pretty_parse, types::Type, Error, IDLArgs, IDLProg,
-    TypeEnv,
+    check_prog,
+    parser::types::{IDLType, IDLTypes},
+    pretty_parse,
+    types::Type,
+    Error, IDLArgs, IDLProg, TypeEnv,
 };
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
@@ -14,12 +18,14 @@ enum Command {
     Check {
         /// Specifies did file for type checking
         input: PathBuf,
+        /// Specifies a previous version of did file for subtyping check
+        previous: Option<PathBuf>,
     },
     /// Generate binding for different languages
     Bind {
         /// Specifies did file for code generation
         input: PathBuf,
-        #[structopt(short, long, possible_values = &["js", "did"])]
+        #[structopt(short, long, possible_values = &["js", "ts", "did"])]
         /// Specifies target language
         target: String,
     },
@@ -51,6 +57,30 @@ enum Command {
         #[structopt(short, long)]
         /// Disable pretty printing
         flat: bool,
+    },
+    /// Generate random Candid values
+    Random {
+        #[structopt(flatten)]
+        annotate: TypeAnnotation,
+        #[structopt(short, long, conflicts_with("file"))]
+        /// Specifies random value generation config in Dhall syntax
+        config: Option<String>,
+        #[structopt(short, long)]
+        /// Load random value generation config from file
+        file: Option<String>,
+        #[structopt(short, long, possible_values = &["did", "js"], default_value = "did")]
+        /// Specifies target language
+        lang: String,
+        #[structopt(short, long, requires("method"))]
+        /// Specifies input arguments for a method call, mocking the return result
+        args: Option<IDLArgs>,
+    },
+    /// Check for subtyping
+    Subtype {
+        #[structopt(short, long)]
+        defs: Option<PathBuf>,
+        ty1: IDLType,
+        ty2: IDLType,
     },
     /// Diff two Candid values
     Diff {
@@ -134,15 +164,38 @@ fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
 
 fn main() -> Result<()> {
     match Command::from_args() {
-        Command::Check { input } => {
+        Command::Check { input, previous } => {
             let mut env = TypeEnv::new();
-            check_file(&mut env, &input)?;
+            let opt_t1 = check_file(&mut env, &input)?;
+            if let Some(previous) = previous {
+                let mut env2 = TypeEnv::new();
+                let opt_t2 = check_file(&mut env2, &previous)?;
+                match (opt_t1, opt_t2) {
+                    (Some(t1), Some(t2)) => {
+                        let mut gamma = HashSet::new();
+                        candid::types::subtype::subtype(&mut gamma, &env, &t1, &env2, &t2)?;
+                    }
+                    _ => {
+                        bail!("did file need to contain the main service type for subtyping check")
+                    }
+                }
+            }
+        }
+        Command::Subtype { defs, ty1, ty2 } => {
+            let mut env = TypeEnv::new();
+            if let Some(file) = defs {
+                check_file(&mut env, &file)?;
+            }
+            let ty1 = env.ast_to_type(&ty1)?;
+            let ty2 = env.ast_to_type(&ty2)?;
+            candid::types::subtype::subtype(&mut HashSet::new(), &env, &ty1, &env, &ty2)?;
         }
         Command::Bind { input, target } => {
             let mut env = TypeEnv::new();
             let actor = check_file(&mut env, &input)?;
             let content = match target.as_str() {
                 "js" => candid::bindings::javascript::compile(&env, &actor),
+                "ts" => candid::bindings::typescript::compile(&env, &actor),
                 "did" => candid::bindings::candid::compile(&env, &actor),
                 _ => unreachable!(),
             };
@@ -179,7 +232,7 @@ fn main() -> Result<()> {
                 "blob" => {
                     let mut res = String::new();
                     for ch in bytes.iter() {
-                        res.push_str(&candid::parser::value::pretty::pp_char(*ch));
+                        res.push_str(&candid::parser::pretty::pp_char(*ch));
                     }
                     res
                 }
@@ -203,6 +256,54 @@ fn main() -> Result<()> {
                 println!("{}", value);
             } else {
                 println!("{:?}", value);
+            }
+        }
+        Command::Random {
+            annotate,
+            lang,
+            config,
+            file,
+            args,
+        } => {
+            use candid::parser::configs::Configs;
+            use rand::Rng;
+            let (env, types) = if args.is_some() {
+                annotate.get_types(Mode::Decode)?
+            } else {
+                annotate.get_types(Mode::Encode)?
+            };
+            let config = match (config, file) {
+                (None, None) => Configs::from_dhall("{=}")?,
+                (Some(str), None) => Configs::from_dhall(&str)?,
+                (None, Some(file)) => {
+                    let content = std::fs::read_to_string(&file)
+                        .map_err(|_| Error::msg(format!("could not read {}", file)))?;
+                    Configs::from_dhall(&content)?
+                }
+                _ => unreachable!(),
+            };
+            let config = if let Some(ref method) = annotate.method {
+                config.with_method(method)
+            } else {
+                config
+            };
+            // TODO figure out how many bytes of entropy we need
+            let seed: Vec<u8> = if let Some(ref args) = args {
+                let (env, types) = annotate.get_types(Mode::Encode)?;
+                let bytes = args.to_bytes_with_types(&env, &types)?;
+                bytes.into_iter().rev().cycle().take(2048).collect()
+            } else {
+                let mut rng = rand::thread_rng();
+                (0..2048).map(|_| rng.gen::<u8>()).collect()
+            };
+            let args = IDLArgs::any(&seed, &config, &env, &types)?;
+            match lang.as_str() {
+                "did" => println!("{}", args),
+                "js" => println!(
+                    "{}",
+                    candid::bindings::javascript::value::pp_args(&args).pretty(80)
+                ),
+                _ => unreachable!(),
             }
         }
         Command::Diff {

@@ -51,7 +51,7 @@ pub type ValueEditRc = ValueEdit<RcValueEdit>;
 pub mod pretty {
     use super::*;
     use ::pretty::RcDoc;
-    use candid::parser::value::pretty::*;
+    use candid::parser::pretty::*;
     use candid::pretty::*;
 
     pub fn value_edit(edit: &RcValueEdit) -> RcDoc {

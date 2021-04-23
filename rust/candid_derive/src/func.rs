@@ -19,6 +19,7 @@ struct Method {
 lazy_static! {
     static ref METHODS: Mutex<Option<BTreeMap<String, Method>>> =
         Mutex::new(Some(Default::default()));
+    static ref INIT: Mutex<Option<Option<Vec<String>>>> = Mutex::new(Some(Default::default()));
 }
 
 pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenStream> {
@@ -48,7 +49,24 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenSt
             "oneway function should have no return value",
         ));
     }
-    if let Some(map) = METHODS.lock().unwrap().as_mut() {
+    if attrs.is_init {
+        match (rets.len(), rets.get(0).map(|x| x.as_str())) {
+            (0, None) | (1, Some("Self")) => {
+                if let Some(init) = INIT.lock().unwrap().as_mut() {
+                    if init.is_some() {
+                        return Err(Error::new_spanned(&sig.ident, "duplicate init method"));
+                    };
+                    *init = Some(args);
+                }
+            }
+            _ => {
+                return Err(Error::new_spanned(
+                    &sig.output,
+                    "init method should have no return value or return Self",
+                ))
+            }
+        }
+    } else if let Some(map) = METHODS.lock().unwrap().as_mut() {
         if map
             .insert(name.clone(), Method { args, rets, modes })
             .is_some()
@@ -65,6 +83,22 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenSt
 pub(crate) fn export_service() -> TokenStream {
     if let Some(meths) = METHODS.lock().unwrap().as_mut() {
         let candid = candid_path();
+        let init = if let Some(opt_args) = INIT.lock().unwrap().as_mut() {
+            let res = opt_args.as_ref().map(|args| {
+                let args = args
+                    .iter()
+                    .map(|t| generate_arg(quote! { init_args }, t))
+                    .collect::<Vec<_>>();
+                quote! {
+                    let mut init_args = Vec::new();
+                    #(#args)*
+                }
+            });
+            *opt_args = None;
+            res
+        } else {
+            unreachable!();
+        };
         let gen_tys = meths.iter().map(|(name, Method { args, rets, modes })| {
             let args = args
                 .iter()
@@ -91,15 +125,26 @@ pub(crate) fn export_service() -> TokenStream {
                 }
             }
         });
+        let service = quote! {
+            use #candid::types::{CandidType, Function, Type};
+            let mut service = Vec::<(String, Type)>::new();
+            let mut env = #candid::types::internal::TypeContainer::new();
+            #(#gen_tys)*
+            service.sort_unstable_by_key(|(name, _)| name.clone());
+            let ty = Type::Service(service);
+        };
+        let actor = if let Some(init) = init {
+            quote! {
+                #init
+                let actor = Some(Type::Class(init_args, Box::new(ty)));
+            }
+        } else {
+            quote! { let actor = Some(ty); }
+        };
         let res = quote! {
             fn __export_service() -> String {
-                use #candid::types::{CandidType, Function, Type};
-                let mut service = Vec::<(String, Type)>::new();
-                let mut env = #candid::types::internal::TypeContainer::new();
-                #(#gen_tys)*
-                service.sort_unstable_by_key(|(name, _)| #candid::idl_hash(name));
-                let ty = Type::Service(service);
-                let actor = Some(ty);
+                #service
+                #actor
                 let result = #candid::bindings::candid::compile(&env.env, &actor);
                 format!("{}", result)
             }
@@ -144,6 +189,7 @@ fn get_args(sig: &Signature) -> Result<(Vec<Type>, Vec<Type>)> {
 struct CandidAttribute {
     rename: Option<String>,
     method_type: Option<String>,
+    is_init: bool,
 }
 
 fn get_candid_attribute(attrs: &[syn::NestedMeta]) -> Result<CandidAttribute> {
@@ -152,6 +198,7 @@ fn get_candid_attribute(attrs: &[syn::NestedMeta]) -> Result<CandidAttribute> {
     let mut res = CandidAttribute {
         rename: None,
         method_type: None,
+        is_init: false,
     };
     for attr in attrs.iter() {
         match &attr {
@@ -164,6 +211,7 @@ fn get_candid_attribute(attrs: &[syn::NestedMeta]) -> Result<CandidAttribute> {
                 let mode = p.get_ident().unwrap().to_string();
                 match mode.as_ref() {
                     "query" | "update" | "oneway" => res.method_type = Some(mode),
+                    "init" => res.is_init = true,
                     _ => return Err(Error::new_spanned(p, "unknown mode")),
                 }
             }

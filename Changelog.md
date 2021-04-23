@@ -1,6 +1,77 @@
 
 # Changelog
 
+## 2021-04-22 (Rust 0.7.0-beta.1)
+
+### Breaking changes
+
+* Update spec to introduce subtyping check in deserialization [#168](https://github.com/dfinity/candid/pull/168)
+* Deserialization requires both `Deserialize` and `CandidType` trait
+* `de::ArgumentDecoder`, `ser::ArgumentEncoder` moved to `utils::{ArgumentDecoder, ArgumentEncoder}`
+* `types::subtype` returns `Result<()>` instead of `bool` for better error message
+* Disable subtyping conversion for opt rules in `IDLValue.annotate_type`
+
+### Non-breaking changes
+
+* Better error messages in deserialization
+* Update test suite to conform with the new spec
+
+### Pending issues
+
+* Update opt rule for subtyping and coercion
+* Performance regression in decoding struct type
+* Integration test with production canisters
+
+## 2021-04-07 (Rust 0.6.19 -- 0.6.21)
+
+* Fix a bug for serializing recursive values in Rust CDK [#210](https://github.com/dfinity/candid/pull/210)
+* Use BigInt in JS/TS binding
+* Fix TypeScript binding for tuple
+* Rust support for Func and Service value
+
+## 2021-03-17 
+
+### Rust (0.6.18)
+
+* `#[candid_method(init)]` to support init arguments in service actor
+* Subtyping check for Candid types
+* Handle subtyping for `reserved` and `int` in decoding
+
+### Other
+
+* Benchmark for Rust library with criterion
+* `didc check` and `didc subtype` command to check for subtyping
+* Conditional running CI for Coq or Rust library
+
+## 2021-03-04 (Rust 0.6.17)
+
+* Support `serde_bytes` for efficient handling of `&[u8]` and `Vec<u8>`
+
+## 2021-02-11
+
+### Rust (0.6.16)
+
+* Typescript binding for Candid
+* Support more native Rust types: Path, PathBuf, VecDeque, LinkedList, BinaryHeap, Cow, Cell, RefCell
+
+### Other
+
+* Documentation for type mapping and howto section
+* `didc bind` to generate typescript binding
+
+## 2021-02-01
+
+### Rust (0.6.14 -- 0.6.15)
+
+* Generate random Candid values
+* Sort method names lexicographically
+
+### Other
+
+* Candid user guide
+* More Coq proof for MiniCandid
+* `didc random` command and an experimental config file
+
 ## 2021-01-12 (Rust 0.6.13)
 
 * Better pretty printer for Candid value

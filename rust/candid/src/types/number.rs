@@ -3,7 +3,7 @@
 use super::{CandidType, Serializer, Type, TypeId};
 use crate::Error;
 use num_bigint::{BigInt, BigUint};
-use serde::de::{Deserialize, Visitor};
+use serde::de::{self, Deserialize, Visitor};
 use std::convert::From;
 use std::{fmt, io};
 
@@ -154,8 +154,15 @@ impl<'de> Deserialize<'de> for Int {
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("Int value")
             }
-            fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Int, E> {
-                Ok(Int(BigInt::from_signed_bytes_le(&v[1..])))
+            fn visit_byte_buf<E: de::Error>(self, v: Vec<u8>) -> Result<Int, E> {
+                Ok(Int(match v[0] {
+                    0 => BigInt::from_signed_bytes_le(&v[1..]),
+                    1 => BigInt::from_biguint(
+                        num_bigint::Sign::Plus,
+                        BigUint::from_bytes_le(&v[1..]),
+                    ),
+                    _ => return Err(de::Error::custom("not int nor nat")),
+                }))
             }
         }
         deserializer.deserialize_any(IntVisitor)
@@ -173,8 +180,12 @@ impl<'de> Deserialize<'de> for Nat {
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("Nat value")
             }
-            fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Nat, E> {
-                Ok(Nat(BigUint::from_bytes_le(&v[1..])))
+            fn visit_byte_buf<E: de::Error>(self, v: Vec<u8>) -> Result<Nat, E> {
+                if v[0] == 1 {
+                    Ok(Nat(BigUint::from_bytes_le(&v[1..])))
+                } else {
+                    Err(de::Error::custom("not nat"))
+                }
             }
         }
         deserializer.deserialize_any(NatVisitor)

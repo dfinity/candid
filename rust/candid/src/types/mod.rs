@@ -8,11 +8,13 @@ use serde::ser::Error;
 
 mod impls;
 pub mod internal;
+pub mod subtype;
 
 pub use self::internal::{get_type, Field, Function, Label, Type, TypeId};
 
 pub mod number;
 pub mod principal;
+pub mod reference;
 pub mod reserved;
 
 pub trait CandidType {
@@ -66,6 +68,7 @@ pub trait Serializer: Sized {
         T: CandidType;
     fn serialize_struct(self) -> Result<Self::Compound, Self::Error>;
     fn serialize_vec(self, len: usize) -> Result<Self::Compound, Self::Error>;
+    fn serialize_blob(self, v: &[u8]) -> Result<(), Self::Error>;
     fn serialize_variant(self, index: u64) -> Result<Self::Compound, Self::Error>;
     fn serialize_principal(self, v: &[u8]) -> Result<(), Self::Error>;
     fn serialize_function(self, v: &[u8], meth: &str) -> Result<(), Self::Error>;
@@ -76,4 +79,8 @@ pub trait Compound {
     fn serialize_element<T: ?Sized>(&mut self, v: &T) -> Result<(), Self::Error>
     where
         T: CandidType;
+    // Used for simulating serde(with = "serde_bytes"). We can remove this when specialization is stable in Rust,
+    // or generalize this function to take a closure for with.
+    #[doc(hidden)]
+    fn serialize_blob(&mut self, blob: &[u8]) -> Result<(), Self::Error>;
 }

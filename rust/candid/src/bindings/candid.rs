@@ -115,7 +115,7 @@ pub fn pp_ty(ty: &Type) -> RcDoc {
             }
         }
         Knot(ref id) => RcDoc::text(format!("{}", id)),
-        Unknown => unreachable!(),
+        Unknown => str("unknown"),
     }
 }
 
@@ -140,7 +140,7 @@ fn pp_fields(fs: &[Field], is_variant: bool) -> RcDoc {
     enclose_space("{", fields, "}")
 }
 
-fn pp_function(func: &Function) -> RcDoc {
+pub fn pp_function(func: &Function) -> RcDoc {
     let args = pp_args(&func.args);
     let rets = pp_args(&func.rets);
     let modes = pp_modes(&func.modes);

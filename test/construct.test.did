@@ -1,5 +1,7 @@
 /*
 Encoding tests for construct types
+
+Corresponding to spec version version 0.1.2
 */
 
 // Type definitions
@@ -45,14 +47,16 @@ assert blob "DIDL\02\6e\01\6e\7c\01\00\01\01\2a" == "(opt opt 42)"   : (opt opt 
 assert blob "DIDL\01\6e\00\01\00\01\01\00" == "(opt opt null)"       : (Opt) "opt: recursion";
 assert blob "DIDL\01\6e\00\01\00\01\01\00" == "(opt opt null)"       : (opt opt opt empty) "opt: non-recurisve type";
 assert blob "DIDL\02\6e\01\6e\00\01\00\01\01\00" == "(opt opt null)" : (Opt) "opt: mutual recursion";
+assert blob "DIDL\00\00" == "(null)"                                 : (Opt) "opt: extra arg";
 
 // vector
 assert blob "DIDL\01\6d\7c\01\00\00" == "(vec {})"                          : (vec int) "vec: empty";
+assert blob "DIDL\01\6d\7c\01\00\00"                                       !: (vec int8) "vec: non subtype empty";
 assert blob "DIDL\01\6d\7c\01\00\02\01\02" == "(vec { 1; 2 })"              : (vec int) "vec";
 assert blob "DIDL\01\6d\7b\01\00\02\01\02" == "(blob \"\\01\\02\")"         : (vec nat8) "vec: blob";
 assert blob "DIDL\01\6d\00\01\00\00" == "(vec {})"                          : (Vec) "vec: recursive vector";
 assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (Vec) "vec: tree";
-assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (vec vec empty) "vec: non-recursive tree";
+assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (vec vec opt empty) "vec: non-recursive tree";
 assert blob "DIDL\01\6d\7f\01\00\e8\07"                                     : (vec null) "vec: space bomb";
 assert "(vec { 1; -1 })"                                                   !: (vec nat) "vec: type mismatch";
 assert blob "DIDL\01\6d\7c\01\00"                                          !: (vec int) "vec: too short";
@@ -64,8 +68,12 @@ assert blob "DIDL\02\6d\01\6c\00\01\00\05"                                  : (v
 assert blob "DIDL\01\6c\00\01\00" == "(record {})"                                : (record {}) "record: empty";
 assert blob "DIDL\01\6c\00\03\00\00\00" == "(record {}, record {}, record {})"    : (record {}, record {}, record {}) "record: multiple records";
 assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 1 = 42 })"               : (record {1:int}) "record";
-assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { whatever = 0 })"         : (record {}) "record: ignore fields";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 1 = opt 42 })"           : (record {1:opt int}) "record: opt";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 1 = null })"             : (record {1:reserved}) "record: reserved";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record {})"                       : (record {}) "record: ignore fields";
+assert "(record { whatever = 0 })"  == "(record {})"                              : (record {}) "record: ignore fields (textual)";
 assert blob "DIDL\01\6c\01\01\7c\01\00\2a"                                       !: (record {2:int}) "record: missing field";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 2 = null })"             : (record {2:opt int}) "record: missing opt field";
 assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01" == "(record {42; true})"      : (record {int; bool}) "record: tuple";
 assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01" == "(record {1 = true})"      : (record {1:bool}) "record: ignore fields";
 assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01"                              !: (record {bool; int}) "record: type mismatch";
@@ -94,6 +102,7 @@ assert blob "DIDL\01\6e\7e\01\00\00" == "(null)"                                
 assert blob "DIDL\01\6e\7e\01\00\01\00" == "(opt false)"                        : (opt bool) "opt: parsing opt false : opt bool";
 assert blob "DIDL\01\6e\7e\01\00\01\01" == "(opt true)"                         : (opt bool) "opt: parsing opt true : opt bool";
 assert blob "DIDL\01\6e\7e\01\00\01\02"                                        !: (opt bool) "opt: parsing invalid bool at opt bool";
+assert blob "DIDL\00\00" == "(null)"                                            : (opt bool) "opt: extra value";
 
 // nested opt
 assert blob "DIDL\02\6e\01\6e\7e\01\00\00" == "(null)"                          : (opt opt bool) "opt: parsing null : opt opt bool";
@@ -127,10 +136,11 @@ assert "(variant {})"                                                          !
 assert blob "DIDL\01\6b\00\01\00"                                              !: (variant {}) "variant: no empty value";
 assert blob "DIDL\01\6b\01\00\7f\01\00\00" == "(variant {0})"                   : (variant {0}) "variant: numbered field";
 assert blob "DIDL\01\6b\01\00\7f\01\00\00\2a"                                  !: (variant {0:int}) "variant: type mismatch";
-assert blob "DIDL\01\6b\02\00\7f\01\7c\01\00\01\2a"                             : (variant {0:int; 1:int}) "variant: type mismatch in unused tag";
+assert blob "DIDL\01\6b\02\00\7f\01\7c\01\00\01\2a"                            !: (variant {0:int; 1:int}) "variant: type mismatch in unused tag";
 assert blob "DIDL\01\6b\01\00\7f\01\00\00" == "(variant {0})"                   : (variant {0;1}) "variant: ignore field";
-assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\00" == "(variant {0})"             : (variant {0}) "variant: ignore field";
-assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\01" == "(variant {1})"             : (variant {1;2}) "variant: change index";
+assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\00"                               !: (variant {0}) "variant {0;1} !<: variant {0}";
+assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\00" == "(null)"                    : (opt variant {0}) "variant {0;1} <: opt variant {0}";
+assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\01" == "(variant {1})"             : (variant {0;1;2}) "variant: change index";
 assert blob "DIDL\01\6b\01\00\7f\01\00\00"                                     !: (variant {1}) "variant: missing field";
 assert blob "DIDL\01\6b\01\00\7f\01\00\01"                                     !: (variant {0}) "variant: index out of range";
 assert blob "DIDL\01\6b\02\00\7f\00\7f\01\00\00"                               !: (variant {0}) "variant: duplicate fields";
@@ -174,6 +184,11 @@ assert blob "DIDL\02\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\01\6c\02\a0\d2\ac\a8\04
 assert blob "DIDL\02\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\01\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\00\01\00\01\01\01\02\00"
     == "(variant { cons = record { head = 1; tail = variant { cons = record { head = 2; tail = variant { nil } } } } })" : (VariantList) "variant: list";
 
+assert blob "DIDL\02\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\01\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\00\01\00\00"
+    == "(variant {nil}, null, null, null, null)" : (VariantList, opt VariantList, null, reserved, opt int) "variant: extra args";
+
+assert blob "DIDL\02\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\01\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\00\01\00\00" !: (VariantList, opt int, vec int) "non-null extra args";
+
 // skip fields
 assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa\02\01\a2\e5\aa\02\04\bb\f1\aa\02\06\86\8e\b7\02\75\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\75\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\03\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\02\6e\05\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\04\6b\02\d3\e3\aa\02\7f\86\8e\b7\02\7f\01\00\01\0b\00\00\00\01\00\00\0a\00\00\00\01\14\00\00\2a\00\00\00" == "(record { foo = 42; bar = true; bat = variant { nil }; baz = record { foo = 10; bar = false }; bbb = opt record { head = 20; tail = null }; bib = variant { bar }; bab = record { foo = 11; bar = true}})" : (A2);
 
@@ -181,7 +196,7 @@ assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa
 
 assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa\02\01\a2\e5\aa\02\04\bb\f1\aa\02\06\86\8e\b7\02\75\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\75\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\03\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\02\6e\05\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\04\6b\02\d3\e3\aa\02\7f\86\8e\b7\02\7f\01\00\01\0b\00\00\00\01\00\00\0a\00\00\00\01\14\00\00\2a\00\00\00" == "(record { bar = true; baz = record { bar = false }; bbb = opt record { head = 20 }})" : (record { bar: bool; baz: record { bar: bool }; bbb: opt record { head : int} }) "skip fields";
 
-assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa\02\01\a2\e5\aa\02\04\bb\f1\aa\02\06\86\8e\b7\02\75\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\75\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\03\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\02\6e\05\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\04\6b\02\d3\e3\aa\02\7f\86\8e\b7\02\7f\01\00\01\0b\00\00\00\01\00\00\0a\00\00\00\01\14\00\00\2a\00\00\00" == "(record { bat = variant { nil } })" : (record { bat: variant { nil; new_field: empty } }) "new variant field";
+assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa\02\01\a2\e5\aa\02\04\bb\f1\aa\02\06\86\8e\b7\02\75\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\75\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\03\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\02\6e\05\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\04\6b\02\d3\e3\aa\02\7f\86\8e\b7\02\7f\01\00\01\0b\00\00\00\01\00\00\0a\00\00\00\01\14\00\00\2a\00\00\00" == "(record { bat = variant { nil } })" : (record { bat: variant { nil; cons: record { head : int; tail : VariantList }; new_field: empty } }) "new variant field";
 
 assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa\02\01\a2\e5\aa\02\04\bb\f1\aa\02\06\86\8e\b7\02\75\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\75\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\03\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\02\6e\05\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\04\6b\02\d3\e3\aa\02\7f\86\8e\b7\02\7f\01\00\01\0b\00\00\00\01\00\00\0a\00\00\00\01\14\00\00\2a\00\00\00" !: (record { foo: int; new_field: bool }) "new record field";
 

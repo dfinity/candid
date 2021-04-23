@@ -8,7 +8,7 @@ path = "lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-ic-cdk = "0.1.0"
-ic-cdk-macros = "0.1.0"
-candid = { path = "../../../../rust/candid", version = "0.6" }
+ic-cdk = "0.2"
+ic-cdk-macros = "0.2"
+#candid = { path = "../../../../rust/candid", version = "0.6" }
 #serde = "1.0.111"

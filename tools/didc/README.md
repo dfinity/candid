@@ -11,8 +11,10 @@ USAGE:
 SUBCOMMANDS:
     check     Type check Candid file
     bind      Binding for different languages
+    test      Generate test suites for different languages
     encode    Encode Candid value
     decode    Decode Candid binary data
+    random    Generate random Candid values
     diff      Diff two Candid values
 ```
 
@@ -47,4 +49,13 @@ $ didc bind hello.did -t js
 export default ({ IDL }) => {
   return IDL.Service({ 'greet' : IDL.Func([IDL.Text], [IDL.Text], []) });
 };
+
+$ didc random -t '(int, text)'
+(-72_594_379_354_493_140_610_202_928_640_651_761_468, "_J`:t7^>")
+
+$ didc random -t '(int, text)' -c '{ range = Some [-10, +10], text = "name" }'
+(-6, "Cindy Klocko")
+
+$ didc random -d service.did -m method -f random.dhall -a '("seed argument")' -l js
+[new BigNumber('-4'), 'Marcus Kris']
 ```

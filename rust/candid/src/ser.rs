@@ -19,6 +19,10 @@ pub struct IDLBuilder {
 
 impl IDLBuilder {
     pub fn new() -> Self {
+        // We cannot share the memo table across different Builder. Because the same Rust
+        // type can map to a different but equivalent candid type for different builder,
+        // due to memo match happening in different time/order.
+        types::internal::env_clear();
         IDLBuilder {
             type_ser: TypeSerialize::new(),
             value_ser: ValueSerializer::new(),
@@ -177,6 +181,11 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
         self.write_leb128(len as u64)?;
         Ok(Self::Compound { ser: self })
     }
+    fn serialize_blob(self, blob: &[u8]) -> Result<()> {
+        self.write_leb128(blob.len() as u64)?;
+        self.write(blob)?;
+        Ok(())
+    }
 }
 
 pub struct Compound<'a> {
@@ -190,6 +199,10 @@ impl<'a> types::Compound for Compound<'a> {
     {
         value.idl_serialize(&mut *self.ser)?;
         Ok(())
+    }
+    fn serialize_blob(&mut self, blob: &[u8]) -> Result<()> {
+        use crate::types::Serializer;
+        self.ser.serialize_blob(blob)
     }
 }
 
@@ -393,197 +406,4 @@ impl TypeSerialize {
         self.result.append(&mut ty_encode);
         Ok(())
     }
-}
-
-/// Allow encoding of any serializable value.
-pub trait ArgumentEncoder {
-    /// Encode a value of type [Self].
-    fn encode(self, ser: &mut IDLBuilder) -> Result<()>;
-}
-
-/// Decode an empty tuple.
-impl ArgumentEncoder for () {
-    fn encode(self, _de: &mut IDLBuilder) -> Result<()> {
-        Ok(())
-    }
-}
-
-// Create implementation of [ArgumentEncoder] for up to 16 value tuples.
-macro_rules! encode_impl {
-    ( $($id: ident : $typename: ident),* ) => {
-        impl<$( $typename ),*> ArgumentEncoder for ($($typename,)*)
-        where
-            $( $typename: types::CandidType ),*
-        {
-            fn encode(self, ser: &mut IDLBuilder) -> Result<()> {
-                let ( $( $id, )* ) = self;
-                $(
-                ser.arg(&$id)?;
-                )*
-
-                Ok(())
-            }
-        }
-    }
-}
-
-encode_impl!(a: A);
-encode_impl!(a: A, b: B);
-encode_impl!(a: A, b: B, c: C);
-encode_impl!(a: A, b: B, c: C, d: D);
-encode_impl!(a: A, b: B, c: C, d: D, e: E);
-encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F);
-encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G);
-encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H);
-encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I);
-encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J);
-encode_impl!(
-    a: A,
-    b: B,
-    c: C,
-    d: D,
-    e: E,
-    f: F,
-    g: G,
-    h: H,
-    i: I,
-    j: J,
-    k: K
-);
-encode_impl!(
-    a: A,
-    b: B,
-    c: C,
-    d: D,
-    e: E,
-    f: F,
-    g: G,
-    h: H,
-    i: I,
-    j: J,
-    k: K,
-    l: L
-);
-encode_impl!(
-    a: A,
-    b: B,
-    c: C,
-    d: D,
-    e: E,
-    f: F,
-    g: G,
-    h: H,
-    i: I,
-    j: J,
-    k: K,
-    l: L,
-    m: M
-);
-encode_impl!(
-    a: A,
-    b: B,
-    c: C,
-    d: D,
-    e: E,
-    f: F,
-    g: G,
-    h: H,
-    i: I,
-    j: J,
-    k: K,
-    l: L,
-    m: M,
-    n: N
-);
-encode_impl!(
-    a: A,
-    b: B,
-    c: C,
-    d: D,
-    e: E,
-    f: F,
-    g: G,
-    h: H,
-    i: I,
-    j: J,
-    k: K,
-    l: L,
-    m: M,
-    n: N,
-    o: O
-);
-encode_impl!(
-    a: A,
-    b: B,
-    c: C,
-    d: D,
-    e: E,
-    f: F,
-    g: G,
-    h: H,
-    i: I,
-    j: J,
-    k: K,
-    l: L,
-    m: M,
-    n: N,
-    o: O,
-    p: P
-);
-
-/// Serialize an encoding of a tuple and write it to a [Write] buffer.
-///
-/// ```
-/// # use candid::Decode;
-/// # use candid::ser::write_args;
-/// let golden1 = 1u64;
-/// let golden2 = "hello";
-/// let mut buffer = Vec::new();
-/// write_args(&mut buffer, (golden1, golden2)).unwrap();
-///
-/// let (value1, value2) = Decode!(&buffer, u64, String).unwrap();
-/// assert_eq!(golden1, value1);
-/// assert_eq!(golden2, value2);
-/// ```
-pub fn write_args<Tuple: ArgumentEncoder, Writer: std::io::Write>(
-    writer: &mut Writer,
-    arguments: Tuple,
-) -> Result<()> {
-    let mut ser = IDLBuilder::new();
-    arguments.encode(&mut ser)?;
-    ser.serialize(writer)
-}
-
-/// Serialize an encoding of a tuple to a vector of bytes.
-///
-/// ```
-/// # use candid::Decode;
-/// # use candid::ser::encode_args;
-/// let golden1 = 1u64;
-/// let golden2 = "hello";
-/// let buffer = encode_args((golden1, golden2)).unwrap();
-///
-/// let (value1, value2) = Decode!(&buffer, u64, String).unwrap();
-/// assert_eq!(golden1, value1);
-/// assert_eq!(golden2, value2);
-/// ```
-pub fn encode_args<Tuple: ArgumentEncoder>(arguments: Tuple) -> Result<Vec<u8>> {
-    let mut result = Vec::new();
-    write_args(&mut result, arguments)?;
-    Ok(result)
-}
-
-/// Serialize a single value to a vector of bytes.
-///
-/// ```
-/// # use candid::Decode;
-/// # use candid::ser::encode_one;
-/// let golden = "hello";
-/// let buffer = encode_one(golden).unwrap();
-///
-/// let (value) = Decode!(&buffer, String).unwrap();
-/// assert_eq!(golden, value);
-/// ```
-pub fn encode_one<T: types::CandidType>(argument: T) -> Result<Vec<u8>> {
-    encode_args((argument,))
 }

@@ -1,0 +1,12 @@
+= Reference
+
+This section provides detailed reference information about Candid supported types and links to the Candid specification and documentation for the Candid Rust crate.
+
+* link:candid-types{outfilesuffix}[Supported types]
+* link:https://github.com/dfinity/candid[Candid specification]
+* link:https://docs.rs/candid[Candid Rust crate]
+
+If you are looking for more information before you start working with Candid, check out the following related resources:
+
+* link:https://www.youtube.com/watch?v=O2KaWRtsqHg[How Candid provides a common language for application interfaces (video)]
+

@@ -264,7 +264,15 @@ pub struct Function {
     pub args: Vec<Type>,
     pub rets: Vec<Type>,
 }
-
+impl fmt::Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            crate::bindings::candid::pp_function(&self).pretty(80)
+        )
+    }
+}
 impl Function {
     pub fn is_query(&self) -> bool {
         self.modes.contains(&crate::parser::types::FuncMode::Query)
@@ -351,10 +359,7 @@ thread_local! {
 }
 
 pub(crate) fn find_type(id: &TypeId) -> Option<Type> {
-    ENV.with(|e| match e.borrow().get(id) {
-        None => None,
-        Some(t) => Some(t.clone()),
-    })
+    ENV.with(|e| e.borrow().get(id).cloned())
 }
 
 // only for debugging
@@ -365,6 +370,9 @@ pub(crate) fn show_env() {
 
 pub(crate) fn env_add(id: TypeId, t: Type) {
     ENV.with(|e| drop(e.borrow_mut().insert(id, t)));
+}
+pub(crate) fn env_clear() {
+    ENV.with(|e| e.borrow_mut().clear());
 }
 
 pub(crate) fn env_id(id: TypeId, t: Type) {
