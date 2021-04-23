@@ -916,6 +916,7 @@ C[vec <t> <: vec <t'>]( vec { <v>;* } ) = vec { C[<t> <: <t'>](<v>);* }
 #### Options
 
 The null type coerces into any option type:
+```
 C[null <: opt <t>](null) = null
 ```
 
