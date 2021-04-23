@@ -227,6 +227,7 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         use std::convert::TryInto;
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Int);
         let mut bytes = vec![0u8];
         let int = match &self.wire_type {
@@ -246,6 +247,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
         let mut bytes = vec![1u8];
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
@@ -256,6 +258,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Principal && self.wire_type == Type::Principal);
         let mut bytes = vec![2u8];
         let id = PrincipalBytes::read(&mut self.input)?.inner;
@@ -312,6 +315,7 @@ macro_rules! primitive_impl {
         paste::item! {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
+                self.unroll_type()?;
                 assert!(self.expect_type == $type && self.wire_type == $type);
                 let val = self.input.$($value)*().map_err(|_| Error::msg(format!("Cannot read {} value", stringify!($type))))?;
                 //let val: $ty = self.input.read_le()?;
@@ -330,8 +334,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         if self.field_name.is_some() {
             return self.deserialize_identifier(visitor);
         }
-        let t = self.table.trace_type(&self.expect_type)?;
-        match t {
+        self.unroll_type()?;
+        match &self.expect_type {
             Type::Int => self.deserialize_int(visitor),
             Type::Nat => self.deserialize_nat(visitor),
             Type::Nat8 => self.deserialize_u8(visitor),
@@ -389,6 +393,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         use std::convert::TryInto;
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Int);
         let value: i128 = match &self.wire_type {
             Type::Int => {
@@ -408,6 +413,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         use std::convert::TryInto;
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
         let value: u128 = nat.0.try_into().map_err(Error::msg)?;
@@ -417,6 +423,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Null && self.wire_type == Type::Null);
         visitor.visit_unit()
     }
@@ -424,6 +431,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Bool && self.wire_type == Type::Bool);
         let res = BoolValue::read(&mut self.input)?;
         visitor.visit_bool(res.0)
@@ -432,6 +440,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
         let len = Len::read(&mut self.input)?.0;
         let bytes = self.borrow_bytes(len)?.to_owned();
@@ -442,6 +451,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
         let len = Len::read(&mut self.input)?.0;
         let slice = self.borrow_bytes(len)?;
