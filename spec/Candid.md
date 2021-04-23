@@ -910,7 +910,7 @@ NB: No rule is needed for type `empty`, because there are no values of that type
 
 Vectors coerce pointwise:
 ```
-C[vec <t> <: vec <t'>]( vec { <v>;* } ) = vec { c[<t> <: <t'>](<v>);* }
+C[vec <t> <: vec <t'>]( vec { <v>;* } ) = vec { C[<t> <: <t'>](<v>);* }
 ```
 
 #### Options
