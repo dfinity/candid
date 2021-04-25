@@ -230,9 +230,9 @@ pub fn value_diff_rec(v1: &Value, v2: &Value, _t: &Option<Type>) -> ValueEdit<Rc
                 ValueEdit::Opt(d)
             }
         }
-        (Variant(f1, _), Variant(f2, _)) => {
-            if f1.id == f2.id {
-                let edit = value_diff(&f1.val, &f2.val, &Option::None);
+        (Variant(f1), Variant(f2)) => {
+            if f1.0.id == f2.0.id {
+                let edit = value_diff(&f1.0.val, &f2.0.val, &Option::None);
                 if value_edit_is_skip(&edit) {
                     Skip
                 } else {
