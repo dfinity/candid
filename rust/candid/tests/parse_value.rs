@@ -1,5 +1,5 @@
 use candid::parser::typing::TypeEnv;
-use candid::parser::value::{IDLArgs, IDLField, IDLValue};
+use candid::parser::value::{IDLArgs, IDLField, IDLValue, VariantValue};
 use candid::types::{Label, Type};
 
 fn parse_args(input: &str) -> IDLArgs {
@@ -151,13 +151,13 @@ fn parse_optional_record() {
                     val: IDLValue::Text("test".to_owned())
                 },
             ]),
-            IDLValue::Variant(
+            IDLValue::Variant(VariantValue(
                 Box::new(IDLField {
                     id: Label::Id(5),
                     val: IDLValue::Null
                 }),
                 0
-            )
+            ))
         ]
     );
     assert_eq!(

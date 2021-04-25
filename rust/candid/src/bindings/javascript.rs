@@ -248,7 +248,7 @@ pub mod value {
                     enclose_space("{", pp_fields(&fields), "}")
                 }
             }
-            Variant(v, _) => enclose_space("{", pp_field(&v), "}"),
+            Variant(v) => enclose_space("{", pp_field(&v.0), "}"),
             _ => RcDoc::as_string(v),
         }
     }

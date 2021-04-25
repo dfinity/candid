@@ -1,7 +1,7 @@
 use candid::parser::{
     types::IDLProg,
     typing::{check_prog, TypeEnv},
-    value::{IDLArgs, IDLField, IDLValue},
+    value::{IDLArgs, IDLField, IDLValue, VariantValue},
 };
 use candid::types::Label;
 use candid::{decode_args, decode_one, Decode};
@@ -109,13 +109,13 @@ fn test_value() {
 #[test]
 fn test_variant() {
     use IDLValue::*;
-    let value = Variant(
+    let value = Variant(VariantValue(
         Box::new(IDLField {
             id: Label::Id(3_303_859),
             val: Null,
         }),
         0,
-    );
+    ));
     let bytes = hex("4449444c016b02b3d3c9017fe6fdd5017f010000");
     test_decode(&bytes, &value);
     let encoded = IDLArgs::new(&[value.clone()]).to_bytes().unwrap();

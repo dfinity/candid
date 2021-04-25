@@ -98,12 +98,12 @@ impl fmt::Debug for IDLValue {
                 }
                 write!(f, "}}")
             }
-            Variant(v, _) => {
-                write!(f, "variant {{ ")?;
-                if v.val == Null {
-                    write!(f, "{}", v.id)?;
+            Variant(v) => {
+                write!(f, "variant/{} {{ ", v.1)?;
+                if v.0.val == Null {
+                    write!(f, "{}", v.0.id)?;
                 } else {
-                    write!(f, "{:?}", v)?;
+                    write!(f, "{:?}", v.0)?;
                 }
                 write!(f, " }}")
             }
@@ -179,7 +179,7 @@ pub fn pp_value(depth: usize, v: &IDLValue) -> RcDoc {
                 kwd("record").append(pp_fields(depth, &fields))
             }
         }
-        Variant(v, _) => kwd("variant").append(enclose_space("{", pp_field(depth, &v, true), "}")),
+        Variant(v) => kwd("variant").append(enclose_space("{", pp_field(depth, &v.0, true), "}")),
         _ => RcDoc::as_string(format!("{:?}", v)),
     }
 }
