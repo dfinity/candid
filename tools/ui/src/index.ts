@@ -7,15 +7,29 @@ async function main() {
   if (!cid) {
     document.body.innerHTML = `<div id="main-content">
 <label>Provide a canister ID: </label>
-<input id="id" type="text">
+<input id="id" type="text"><br>
+<label>Choose a did file (optional) </label>
+<input id="did" type="file" accept=".did"><br>
 <button id="btn" class="btn">Go</button>
 </div>
 `;
-    const id = document.getElementById('id')!;
+    const id = (document.getElementById('id') as HTMLInputElement)!;
+    const did = (document.getElementById('did')! as HTMLInputElement)!;
     const btn = document.getElementById('btn')!;
     btn.addEventListener('click', () => {
-      params.append('id', (id as any).value);
-      window.location.href = `?${params}`;
+      params.set('id', id.value);
+      if (did.files!.length > 0) {
+        const reader = new FileReader();
+        reader.addEventListener('load', () => {
+          const encoded = reader.result as string;
+          const hex = encoded.substr(encoded.indexOf(',') + 1);
+          params.set('did', hex);
+          window.location.href = `?${params}`;
+        });
+        reader.readAsDataURL(did.files![0]);
+      } else {
+        window.location.href = `?${params}`;
+      }
     });
   } else {
     document.title = `Canister ${cid}`;

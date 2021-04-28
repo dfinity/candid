@@ -28,13 +28,21 @@ function getCanisterId(): Principal {
 
 export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> {
   let js;
-  try {
-    js = await getRemoteDidJs(canisterId);
-  } catch(err) {
-    if (/__get_candid_interface_tmp_hack/.test(err)) {
-      js = await getLocalDidJs(canisterId);
-    } else {
-      throw(err);
+  const maybeDid = new URLSearchParams(window.location.search).get(
+    "did"
+  );
+  if (maybeDid) {
+    const source = window.atob(maybeDid);
+    js = await didToJs(source);
+  } else {
+    try {
+      js = await getRemoteDidJs(canisterId);
+    } catch(err) {
+      if (/__get_candid_interface_tmp_hack/.test(err)) {
+        js = await getLocalDidJs(canisterId);
+      } else {
+        throw(err);
+      }
     }
   }
   if (!js) {
@@ -60,7 +68,11 @@ async function getRemoteDidJs(canisterId: Principal): Promise<undefined | string
     __get_candid_interface_tmp_hack: IDL.Func([], [IDL.Text], ['query']),
   });
   const actor: ActorSubclass = Actor.createActor(common_interface, { agent, canisterId });
-  const candid_source: any = await actor.__get_candid_interface_tmp_hack();
+  const candid_source = await actor.__get_candid_interface_tmp_hack() as string;
+  return didToJs(candid_source);
+}
+
+async function didToJs(candid_source: string): Promise<undefined | string> {
   // call didjs canister
   const didjs_id = getCanisterId();
   const didjs_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
@@ -71,7 +83,7 @@ async function getRemoteDidJs(canisterId: Principal): Promise<undefined | string
   if (js === []) {
     return undefined;
   }
-  return js[0];
+  return js[0];  
 }
 
 export function render(id: Principal, canister: ActorSubclass) {
