@@ -41,7 +41,7 @@ fn parse_literals() {
     );
     assert_eq!(
         format!("{}", args),
-        "(true, null, 42, 42, 42.42, -4200000, 0.0004242)"
+        "(\n  true,\n  null : null,\n  42,\n  42 : float64,\n  42.42 : float64,\n  -4200000 : float64,\n  0.0004242 : float64,\n)"
     );
 }
 
@@ -103,7 +103,7 @@ fn parse_more_literals() {
     );
     assert_eq!(
         format!("{}", args),
-        "(true, null, 42, \"哈哈\", \"string with whitespace\", 42, -42, false)"
+        "(\n  true,\n  null : null,\n  42 : nat,\n  \"哈哈\",\n  \"string with whitespace\",\n  42 : int,\n  -42 : int,\n  false,\n)"
     );
 }
 
@@ -122,7 +122,10 @@ fn parse_vec() {
             IDLValue::Nat(4.into())
         ])]
     );
-    assert_eq!(format!("{}", args), "(vec { 1; 2; 3; 4 })");
+    assert_eq!(
+        format!("{}", args),
+        "(vec { 1 : nat; 2 : nat; 3 : nat; 4 : nat })"
+    );
 }
 
 #[test]
@@ -162,7 +165,7 @@ fn parse_optional_record() {
     );
     assert_eq!(
         format!("{}", args),
-        "(opt record {}, record { 1 = 42; 2 = false; 44 = \"test\" }, variant { 5 })"
+        "(opt record {}, record { 1 = 42 : nat; 2 = false; 44 = \"test\" }, variant { 5 })"
     );
 }
 
@@ -203,12 +206,12 @@ fn parse_nested_record() {
             }
         ])]
     );
-    assert_eq!(format!("{}", args), "(\n  record {\n    43 = record { \"opt\" = \"hello\"; test = \"test\" };\n    long_label = opt null;\n    label = 42;\n  },\n)");
+    assert_eq!(format!("{}", args), "(\n  record {\n    43 = record { \"opt\" = \"hello\"; test = \"test\" };\n    long_label = opt (null : null);\n    label = 42 : nat;\n  },\n)");
     let skip_typ = parse_type("record { label: nat }");
     args.args[0] = args.args[0]
         .annotate_type(true, &TypeEnv::new(), &skip_typ)
         .unwrap();
-    assert_eq!(format!("{}", args), "(record { label = 42 })");
+    assert_eq!(format!("{}", args), "(record { label = 42 : nat })");
 }
 
 #[test]

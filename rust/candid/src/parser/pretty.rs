@@ -38,13 +38,33 @@ impl fmt::Debug for IDLArgs {
         }
     }
 }
+fn has_type_annotation(v: &IDLValue) -> bool {
+    use IDLValue::*;
+    matches!(
+        v,
+        Int(_)
+            | Nat(_)
+            | Nat8(_)
+            | Nat16(_)
+            | Nat32(_)
+            | Nat64(_)
+            | Int8(_)
+            | Int16(_)
+            | Int32(_)
+            | Int64(_)
+            | Float32(_)
+            | Float64(_)
+            | Null
+            | Reserved
+    )
+}
 impl fmt::Debug for IDLValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use IDLValue::*;
         match self {
             Null => write!(f, "null : null"),
             Bool(b) => write!(f, "{}", b),
-            Number(n) => write!(f, "{} : number", n),
+            Number(n) => write!(f, "{}", n),
             Int(i) => write!(f, "{} : int", i),
             Nat(n) => write!(f, "{} : nat", n),
             Nat8(n) => write!(f, "{} : nat8", n),
@@ -58,8 +78,8 @@ impl fmt::Debug for IDLValue {
             Float32(n) => write!(f, "{} : float32", n),
             Float64(n) => write!(f, "{} : float64", n),
             Text(s) => write!(f, "{:?}", s),
-            None => write!(f, "null : opt _"),
-            Reserved => write!(f, "reserved"),
+            None => write!(f, "null"),
+            Reserved => write!(f, "null : reserved"),
             Principal(id) => write!(f, "principal \"{}\"", id),
             Service(id) => write!(f, "service \"{}\"", id),
             Func(id, meth) => write!(
@@ -68,6 +88,7 @@ impl fmt::Debug for IDLValue {
                 id,
                 crate::bindings::candid::ident_string(meth)
             ),
+            Opt(v) if has_type_annotation(v) => write!(f, "opt ({:?})", v),
             Opt(v) => write!(f, "opt {:?}", v),
             Vec(vs) => {
                 if let Some(Nat8(_)) = vs.first() {
@@ -99,7 +120,7 @@ impl fmt::Debug for IDLValue {
                 write!(f, "}}")
             }
             Variant(v) => {
-                write!(f, "variant/{} {{ ", v.1)?;
+                write!(f, "variant {{ ")?;
                 if v.0.val == Null {
                     write!(f, "{}", v.0.id)?;
                 } else {
@@ -160,6 +181,9 @@ pub fn pp_value(depth: usize, v: &IDLValue) -> RcDoc {
     }
     match v {
         Text(ref s) => RcDoc::as_string(format!("\"{}\"", s)),
+        Opt(v) if has_type_annotation(v) => {
+            kwd("opt").append(enclose("(", pp_value(depth - 1, v), ")"))
+        }
         Opt(v) => kwd("opt").append(pp_value(depth - 1, v)),
         Vec(vs) => {
             if let Some(Nat8(_)) = vs.first() {

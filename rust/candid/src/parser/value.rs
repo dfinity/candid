@@ -86,6 +86,9 @@ impl IDLArgs {
         }
         Ok(IDLArgs { args })
     }
+    pub fn get_types(&self) -> Vec<Type> {
+        self.args.iter().map(|v| v.value_ty()).collect()
+    }
     /// Encode IDLArgs with the given types. Note that this is not equivalent to
     /// `idl_args.annotate_types(true, env, types).to_bytes()` for recursive types.
     pub fn to_bytes_with_types(&self, env: &TypeEnv, types: &[Type]) -> Result<Vec<u8>> {

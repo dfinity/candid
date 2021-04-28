@@ -57,11 +57,11 @@ service : {
         let args = str.parse::<IDLArgs>().unwrap();
         let encoded = args.to_bytes_with_types(&env, &method.rets).unwrap();
         let decoded = IDLArgs::from_bytes(&encoded).unwrap();
-        assert_eq!(decoded.to_string(), "(\n  opt record {\n    1_158_359_328 = 1_000;\n    1_291_237_008 = opt record { 1_158_359_328 = -2_000; 1_291_237_008 = null };\n  },\n  variant { 97 = 42 },\n)");
+        assert_eq!(decoded.to_string(), "(\n  opt record {\n    1_158_359_328 = 1_000 : int16;\n    1_291_237_008 = opt record {\n      1_158_359_328 = -2_000 : int16;\n      1_291_237_008 = null;\n    };\n  },\n  variant { 97 = 42 : nat },\n)");
         let decoded = IDLArgs::from_bytes_with_types(&encoded, &env, &method.rets).unwrap();
         assert_eq!(
             decoded.to_string(),
-            "(\n  opt record { head = 1_000; tail = opt record { head = -2_000; tail = null } },\n  variant { a = 42 },\n)"
+            "(\n  opt record {\n    head = 1_000 : int16;\n    tail = opt record { head = -2_000 : int16; tail = null };\n  },\n  variant { a = 42 : nat },\n)"
         );
         let decoded = IDLArgs::from_bytes_with_types(&encoded, &env, &[]).unwrap();
         assert_eq!(decoded.to_string(), "()");
@@ -128,7 +128,10 @@ fn parse_check(str: &str) {
     let decoded = IDLArgs::from_bytes(&encoded).unwrap();
     let output = decoded.to_string();
     let back_args = output.parse::<IDLArgs>().unwrap();
-    assert_eq!(args, back_args);
+    let annotated_args = args
+        .annotate_types(true, &TypeEnv::new(), &back_args.get_types())
+        .unwrap();
+    assert_eq!(annotated_args, back_args);
 }
 
 fn check(v: IDLValue, bytes: &str) {
