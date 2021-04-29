@@ -37,6 +37,8 @@ enum Command {
         /// Specifies target language
         target: String,
     },
+    /// Hash
+    Hash { input: String },
     /// Encode Candid value
     Encode {
         #[structopt(parse(try_from_str = parse_args))]
@@ -214,6 +216,9 @@ fn main() -> Result<()> {
                 _ => unreachable!(),
             };
             println!("{}", content);
+        }
+        Command::Hash { input } => {
+            println!("{}", candid::idl_hash(&input));
         }
         Command::Encode {
             args,
