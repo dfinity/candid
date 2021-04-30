@@ -204,8 +204,12 @@ impl<'de> Deserializer<'de> {
         Ok(())
     }
     fn unroll_type(&mut self) -> Result<()> {
-        self.expect_type = self.table.trace_type(&self.expect_type)?;
-        self.wire_type = self.table.trace_type(&self.wire_type)?;
+        if matches!(self.expect_type, Type::Var(_) | Type::Knot(_)) {
+            self.expect_type = self.table.trace_type(&self.expect_type)?;
+        }
+        if matches!(self.wire_type, Type::Var(_) | Type::Knot(_)) {
+            self.wire_type = self.table.trace_type(&self.wire_type)?;
+        }
         Ok(())
     }
     // Should always call set_field_name to set the field_name. After deserialize_identifier
@@ -227,6 +231,7 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         use std::convert::TryInto;
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Int);
         let mut bytes = vec![0u8];
         let int = match &self.wire_type {
@@ -246,6 +251,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
         let mut bytes = vec![1u8];
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
@@ -256,6 +262,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Principal && self.wire_type == Type::Principal);
         let mut bytes = vec![2u8];
         let id = PrincipalBytes::read(&mut self.input)?.inner;
@@ -312,6 +319,7 @@ macro_rules! primitive_impl {
         paste::item! {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
+                self.unroll_type()?;
                 assert!(self.expect_type == $type && self.wire_type == $type);
                 let val = self.input.$($value)*().map_err(|_| Error::msg(format!("Cannot read {} value", stringify!($type))))?;
                 //let val: $ty = self.input.read_le()?;
@@ -330,8 +338,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         if self.field_name.is_some() {
             return self.deserialize_identifier(visitor);
         }
-        let t = self.table.trace_type(&self.expect_type)?;
-        match t {
+        self.unroll_type()?;
+        match &self.expect_type {
             Type::Int => self.deserialize_int(visitor),
             Type::Nat => self.deserialize_nat(visitor),
             Type::Nat8 => self.deserialize_u8(visitor),
@@ -389,6 +397,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         use std::convert::TryInto;
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Int);
         let value: i128 = match &self.wire_type {
             Type::Int => {
@@ -408,6 +417,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         use std::convert::TryInto;
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
         let value: u128 = nat.0.try_into().map_err(Error::msg)?;
@@ -417,6 +427,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Null && self.wire_type == Type::Null);
         visitor.visit_unit()
     }
@@ -424,6 +435,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Bool && self.wire_type == Type::Bool);
         let res = BoolValue::read(&mut self.input)?;
         visitor.visit_bool(res.0)
@@ -432,6 +444,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
         let len = Len::read(&mut self.input)?.0;
         let bytes = self.borrow_bytes(len)?.to_owned();
@@ -442,6 +455,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.unroll_type()?;
         assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
         let len = Len::read(&mut self.input)?.0;
         let slice = self.borrow_bytes(len)?;
@@ -654,21 +668,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     )));
                 }
                 let wire = w[index].clone();
-                let e_tuple = e
+                let expect = e
                     .iter()
-                    .enumerate()
-                    .find(|(_, ref f)| f.id == wire.id)
-                    .ok_or_else(|| Error::msg(format!("Unknown variant field {}", wire.id)))?;
-                let expect_index = e_tuple.0;
-                let expect = e_tuple.1.clone();
-                visitor.visit_enum(Compound::new(
-                    &mut self,
-                    Style::Enum {
-                        expect,
-                        expect_index,
-                        wire,
-                    },
-                ))
+                    .find(|ref f| f.id == wire.id)
+                    .ok_or_else(|| Error::msg(format!("Unknown variant field {}", wire.id)))?
+                    .clone();
+                visitor.visit_enum(Compound::new(&mut self, Style::Enum { expect, wire }))
             }
             _ => assert!(false),
         }
@@ -702,7 +707,6 @@ enum Style {
     },
     Enum {
         expect: Field,
-        expect_index: usize,
         wire: Field,
     },
     Map {
@@ -848,11 +852,7 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
         V: de::DeserializeSeed<'de>,
     {
         match &self.style {
-            Style::Enum {
-                expect,
-                expect_index,
-                wire,
-            } => {
+            Style::Enum { expect, wire } => {
                 self.de.expect_type = expect.ty.clone();
                 self.de.wire_type = wire.ty.clone();
                 let (mut label, label_type) = match &expect.id {
@@ -865,7 +865,7 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
                         Type::Record(_) => "struct",
                         _ => "newtype",
                     };
-                    label += &format!(",{},{},{}", label_type, accessor, expect_index);
+                    label += &format!(",{},{}", label_type, accessor);
                 }
                 self.de.set_field_name(Label::Named(label));
                 let field = seed.deserialize(&mut *self.de)?;

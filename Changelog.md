@@ -10,16 +10,19 @@
 * `de::ArgumentDecoder`, `ser::ArgumentEncoder` moved to `utils::{ArgumentDecoder, ArgumentEncoder}`
 * `types::subtype` returns `Result<()>` instead of `bool` for better error message
 * Disable subtyping conversion for opt rules in `IDLValue.annotate_type`
+* Display type annotations for number types
 
 ### Non-breaking changes
 
 * Better error messages in deserialization
 * Update test suite to conform with the new spec
+* `didc hash` to compute hash of a field name
+* `didc decode` can decode blob format
 
 ### Pending issues
 
 * Update opt rule for subtyping and coercion
-* Performance regression in decoding struct type
+* Performance regression in decoding struct type, likely due to `Type` clone
 * Integration test with production canisters
 
 ## 2021-04-07 (Rust 0.6.19 -- 0.6.21)

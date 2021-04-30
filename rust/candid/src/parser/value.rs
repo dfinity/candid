@@ -19,7 +19,7 @@ pub enum IDLValue {
     Opt(Box<IDLValue>),
     Vec(Vec<IDLValue>),
     Record(Vec<IDLField>),
-    Variant(Box<IDLField>, u64), // u64 represents the index from the type, defaults to 0 when parsing
+    Variant(VariantValue),
     Principal(crate::Principal),
     Service(crate::Principal),
     Func(crate::Principal, String),
@@ -37,6 +37,14 @@ pub enum IDLValue {
     Int64(i64),
     Float32(f32),
     Reserved,
+}
+
+#[derive(Clone)]
+pub struct VariantValue(pub Box<IDLField>, pub u64); // u64 represents the index from the type, defaults to 0 when parsing, only used for serialization
+impl PartialEq for VariantValue {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
 }
 
 #[derive(PartialEq, Clone)]
@@ -77,6 +85,9 @@ impl IDLArgs {
             args.push(v);
         }
         Ok(IDLArgs { args })
+    }
+    pub fn get_types(&self) -> Vec<Type> {
+        self.args.iter().map(|v| v.value_ty()).collect()
     }
     /// Encode IDLArgs with the given types. Note that this is not equivalent to
     /// `idl_args.annotate_types(true, env, types).to_bytes()` for recursive types.
@@ -229,18 +240,18 @@ impl IDLValue {
                 }
                 IDLValue::Record(res)
             }
-            (IDLValue::Variant(v, _), Type::Variant(fs)) => {
+            (IDLValue::Variant(v), Type::Variant(fs)) => {
                 for (i, f) in fs.iter().enumerate() {
-                    if v.id == f.id {
-                        let val = v.val.annotate_type(from_parser, env, &f.ty)?;
+                    if v.0.id == f.id {
+                        let val = v.0.val.annotate_type(from_parser, env, &f.ty)?;
                         let field = IDLField {
                             id: f.id.clone(),
                             val,
                         };
-                        return Ok(IDLValue::Variant(Box::new(field), i as u64));
+                        return Ok(IDLValue::Variant(VariantValue(Box::new(field), i as u64)));
                     }
                 }
-                return Err(Error::msg(format!("variant field {} not found", v.id)));
+                return Err(Error::msg(format!("variant field {} not found", v.0.id)));
             }
             (IDLValue::Principal(id), Type::Principal) => IDLValue::Principal(id.clone()),
             (IDLValue::Service(_), Type::Service(_)) => self.clone(),
@@ -314,11 +325,10 @@ impl IDLValue {
                     .collect();
                 Type::Record(fs)
             }
-            IDLValue::Variant(ref v, idx) => {
-                assert_eq!(idx, 0);
+            IDLValue::Variant(ref v) => {
                 let f = Field {
-                    id: v.id.clone(),
-                    ty: v.val.value_ty(),
+                    id: v.0.id.clone(),
+                    ty: v.0.val.value_ty(),
                 };
                 Type::Variant(vec![f])
             }
@@ -387,9 +397,9 @@ impl crate::CandidType for IDLValue {
                 }
                 Ok(())
             }
-            IDLValue::Variant(ref v, idx) => {
-                let mut ser = serializer.serialize_variant(idx)?;
-                ser.serialize_element(&v.val)?;
+            IDLValue::Variant(ref v) => {
+                let mut ser = serializer.serialize_variant(v.1)?;
+                ser.serialize_element(&v.0.val)?;
                 Ok(())
             }
             IDLValue::Principal(ref id) => serializer.serialize_principal(id.as_slice()),
@@ -527,17 +537,9 @@ impl<'de> Deserialize<'de> for IDLValue {
                 let (variant, visitor) = data.variant::<IDLValue>()?;
                 if let IDLValue::Text(v) = variant {
                     let v: Vec<_> = v.split(',').collect();
-                    let (id, style, ind) = match v.as_slice() {
-                        [name, "name", style, ind] => (
-                            Label::Named(name.to_string()),
-                            style,
-                            ind.parse::<u64>().unwrap(),
-                        ),
-                        [hash, "id", style, ind] => (
-                            Label::Id(hash.parse::<u32>().unwrap()),
-                            style,
-                            ind.parse::<u64>().unwrap(),
-                        ),
+                    let (id, style) = match v.as_slice() {
+                        [name, "name", style] => (Label::Named(name.to_string()), style),
+                        [hash, "id", style] => (Label::Id(hash.parse::<u32>().unwrap()), style),
                         _ => unreachable!(),
                     };
                     let val = match *style {
@@ -552,7 +554,7 @@ impl<'de> Deserialize<'de> for IDLValue {
                     let f = IDLField { id, val };
                     // Deserialized variant always has 0 index to ensure untyped
                     // serialization is correct.
-                    Ok(IDLValue::Variant(Box::new(f), ind))
+                    Ok(IDLValue::Variant(VariantValue(Box::new(f), 0)))
                 } else {
                     unreachable!()
                 }

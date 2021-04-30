@@ -1,6 +1,6 @@
 use super::configs::{path_name, Configs};
 use super::typing::TypeEnv;
-use super::value::{IDLArgs, IDLField, IDLValue};
+use super::value::{IDLArgs, IDLField, IDLValue, VariantValue};
 use crate::types::{Field, Type};
 use crate::Deserialize;
 use crate::{Error, Result};
@@ -201,7 +201,7 @@ impl<'a> GenState<'a> {
                     id: id.clone(),
                     val,
                 };
-                IDLValue::Variant(Box::new(field), idx as u64)
+                IDLValue::Variant(VariantValue(Box::new(field), idx as u64))
             }
             _ => unimplemented!(),
         });

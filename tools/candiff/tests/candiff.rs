@@ -38,7 +38,7 @@ mod echo {
         let mut cmd = candiff();
         cmd.arg("echo").arg("1").arg("-t nat").arg("-d");
         cmd.assert()
-            .stdout(predicate::eq(b"1\n" as &[u8]))
+            .stdout(predicate::eq(b"1 : nat\n" as &[u8]))
             .success();
     }
 
@@ -47,7 +47,7 @@ mod echo {
         let mut cmd = candiff();
         cmd.arg("echo").arg("1").arg("-t int").arg("-d");
         cmd.assert()
-            .stdout(predicate::eq(b"1\n" as &[u8]))
+            .stdout(predicate::eq(b"1 : int\n" as &[u8]))
             .success();
     }
 
@@ -174,7 +174,7 @@ mod diff {
         cmd.arg("diff").arg(v1).arg(v2).arg("-t vec vec nat");
         cmd.assert()
             .stdout(predicate::eq(
-                b"vec { edit { 1 vec { edit { 1 put { 3 } }; } }; }\n" as &[u8],
+                b"vec { edit { 1 vec { edit { 1 put { 3 : nat } }; } }; }\n" as &[u8],
             ))
             .success();
     }
@@ -187,7 +187,7 @@ mod diff {
         cmd.arg("diff").arg(v1).arg(v2).arg("-t vec vec nat");
         cmd.assert()
             .stdout(predicate::eq(
-                b"vec { edit { 2 vec { insert { 2 2 }; } }; }\n" as &[u8],
+                b"vec { edit { 2 vec { insert { 2 2 : nat }; } }; }\n" as &[u8],
             ))
             .success();
     }

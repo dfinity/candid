@@ -156,7 +156,7 @@
 //! We also provide a parser to parse Candid values in text format.
 //!
 //! ```
-//! use candid::IDLArgs;
+//! use candid::{IDLArgs, TypeEnv};
 //! // Candid values represented in text format
 //! let text_value = r#"
 //!      (42, opt true, vec {1;2;3},
@@ -174,7 +174,8 @@
 //! // Convert IDLArgs to text format
 //! let output: String = decoded.to_string();
 //! let parsed_args: IDLArgs = output.parse()?;
-//! assert_eq!(args, parsed_args);
+//! let annotated_args = args.annotate_types(true, &TypeEnv::new(), &parsed_args.get_types())?;
+//! assert_eq!(annotated_args, parsed_args);
 //! # Ok::<(), candid::Error>(())
 //! ```
 //! Note that when parsing Candid values, we assume the number literals are always of type `Int`.

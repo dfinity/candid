@@ -37,6 +37,8 @@ enum Command {
         /// Specifies target language
         target: String,
     },
+    /// Compute the hash of a field name
+    Hash { input: String },
     /// Encode Candid value
     Encode {
         #[structopt(parse(try_from_str = parse_args))]
@@ -52,11 +54,11 @@ enum Command {
     Decode {
         /// Specifies Candid binary data in hex string
         blob: String,
+        #[structopt(short, long, possible_values = &["hex", "blob"], default_value = "hex")]
+        /// Specifies hex format
+        format: String,
         #[structopt(flatten)]
         annotate: TypeAnnotation,
-        #[structopt(short, long)]
-        /// Disable pretty printing
-        flat: bool,
     },
     /// Generate random Candid values
     Random {
@@ -215,6 +217,9 @@ fn main() -> Result<()> {
             };
             println!("{}", content);
         }
+        Command::Hash { input } => {
+            println!("{}", candid::idl_hash(&input));
+        }
         Command::Encode {
             args,
             format,
@@ -234,7 +239,7 @@ fn main() -> Result<()> {
                     for ch in bytes.iter() {
                         res.push_str(&candid::parser::pretty::pp_char(*ch));
                     }
-                    res
+                    format!("blob \"{}\"", res)
                 }
                 _ => unreachable!(),
             };
@@ -242,21 +247,36 @@ fn main() -> Result<()> {
         }
         Command::Decode {
             blob,
+            format,
             annotate,
-            flat,
         } => {
-            let bytes = hex::decode(&blob)?;
+            let bytes = match format.as_str() {
+                "hex" => hex::decode(&blob)?,
+                "blob" => {
+                    use candid::parser::value::IDLValue;
+                    match pretty_parse::<IDLValue>("blob", &blob)? {
+                        IDLValue::Vec(vec) => vec
+                            .iter()
+                            .map(|v| {
+                                if let IDLValue::Nat8(u) = v {
+                                    *u
+                                } else {
+                                    unreachable!()
+                                }
+                            })
+                            .collect(),
+                        _ => unreachable!(),
+                    }
+                }
+                _ => unreachable!(),
+            };
             let value = if annotate.is_empty() {
                 IDLArgs::from_bytes(&bytes)?
             } else {
                 let (env, types) = annotate.get_types(Mode::Decode)?;
                 IDLArgs::from_bytes_with_types(&bytes, &env, &types)?
             };
-            if !flat {
-                println!("{}", value);
-            } else {
-                println!("{:?}", value);
-            }
+            println!("{}", value);
         }
         Command::Random {
             annotate,
