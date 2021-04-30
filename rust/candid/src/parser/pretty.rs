@@ -167,7 +167,7 @@ fn pp_fields(depth: usize, fields: &[IDLField]) -> RcDoc {
 }
 
 pub fn pp_char(v: u8) -> String {
-    if (0x20..=0x7e).contains(&v) && v != 0x22 && v != 0x5c {
+    if (0x20..=0x7e).contains(&v) && v != 0x22 && v != 0x27 && v != 0x60 && v != 0x5c {
         std::char::from_u32(v as u32).unwrap().to_string()
     } else {
         format!("\\{:02x}", v)
