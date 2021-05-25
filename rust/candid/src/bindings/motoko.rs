@@ -100,7 +100,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("Text"),
         Reserved => str("Any"),
         Empty => str("None"),
-        Var(ref s) => str(s),
+        Var(ref s) => escape(s),
         Principal => str("Principal"),
         Opt(ref t) => str("?").append(pp_ty(t)),
         Vec(ref t) => enclose("[", pp_ty(t), "]"), // TODO blob
@@ -194,8 +194,8 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 fn pp_defs(env: &TypeEnv) -> RcDoc {
     lines(env.0.iter().map(|(id, ty)| {
         kwd("type")
-            .append(ident(id))
-            .append(kwd("="))
+            .append(escape(id))
+            .append(" = ")
             .append(pp_ty(ty))
             .append(";")
     }))
@@ -210,7 +210,7 @@ fn pp_actor(ty: &Type) -> RcDoc {
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
-    let header = r#"// This is a static generated Motoko binding. Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
+    let header = r#"// This is a generated Motoko binding. Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 "#;
     let doc = match actor {
         None => pp_defs(env),

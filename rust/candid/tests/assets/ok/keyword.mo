@@ -1,13 +1,14 @@
-// This is a static generated Motoko binding. Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
+// This is a generated Motoko binding. Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 
 type list = ?node;
 type node = { head : Nat; tail : list };
 type o = ?o;
-type s = actor { f : t; g : shared list -> async (tree, stream) };
+type return_ = actor { f : t; g : shared list -> async (tree, stream) };
 type stream = ?{ head : Nat; next : shared query () -> async stream };
-type t = shared s -> async ();
+type t = shared return_ -> async ();
 type tree = { #branch : { val : Int; left : tree; right : tree }; #leaf : Int };
 type _SERVICE = actor {
+  Oneway : shared () -> ();
   f__ : shared o -> async o;
   field : shared { test : Nat16; _1291438163_  : Nat8 } -> async {};
   fieldnat : shared { _2_  : Int; _50_ : Nat } -> async { _0_  : Int };

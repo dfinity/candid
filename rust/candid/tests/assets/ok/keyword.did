@@ -1,14 +1,15 @@
 type list = opt node;
 type node = record { head : nat; tail : list };
 type o = opt o;
-type s = service { f : t; g : (list) -> (tree, stream) };
+type return = service { f : t; g : (list) -> (tree, stream) };
 type stream = opt record { head : nat; next : func () -> (stream) query };
-type t = func (s) -> ();
+type t = func (return) -> ();
 type tree = variant {
   branch : record { val : int; left : tree; right : tree };
   leaf : int;
 };
 service : {
+  Oneway : () -> () oneway;
   f_ : (o) -> (o);
   field : (record { test : nat16; 1_291_438_163 : nat8 }) -> (record {});
   fieldnat : (record { 2 : int; "2" : nat }) -> (record { int });

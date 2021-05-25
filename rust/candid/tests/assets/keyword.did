@@ -5,8 +5,8 @@ type tree = variant {
   leaf : int;
   branch : record { left : tree; val : int; right : tree };
 };
-type s = service { f : t; g : (list) -> (tree,stream); };
-type t = func (server : s) -> ();
+type return = service { f : t; g : (list) -> (tree,stream); };
+type t = func (server : return) -> ();
 type stream = opt record {head:nat; next:func ()-> (stream) query};
 
 service : {
@@ -17,6 +17,7 @@ service : {
   "variant": (variant { A; B; C: null; D: float64}) -> ();
   "oneway": (nat8) -> () oneway;
   oneway_: (nat8) -> () oneway;
+  Oneway: () -> () oneway;
   "query": (blob) -> (blob) query;
   "service": t;
   tuple: (record { int; blob; text }) -> (record { int; 1: nat8 });

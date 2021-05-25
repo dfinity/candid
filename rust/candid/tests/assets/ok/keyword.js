@@ -21,12 +21,13 @@ export default ({ IDL }) => {
       })
     )
   );
-  const s = IDL.Service({
+  const return_ = IDL.Service({
     'f' : t,
     'g' : IDL.Func([list], [tree, stream], []),
   });
-  t.fill(IDL.Func([s], [], []));
+  t.fill(IDL.Func([return_], [], []));
   return IDL.Service({
+    'Oneway' : IDL.Func([], [], ['oneway']),
     'f_' : IDL.Func([o], [o], []),
     'field' : IDL.Func(
         [IDL.Record({ 'test' : IDL.Nat16, _1291438163_ : IDL.Nat8 })],

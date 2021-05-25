@@ -1,4 +1,4 @@
-use super::javascript::is_tuple;
+use super::javascript::{ident, is_tuple};
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
 use crate::types::{Field, Function, Label, Type};
@@ -118,19 +118,21 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         let export = match ty {
-            Type::Record(_) if !ty.is_tuple() => {
-                kwd("export interface").append(ident(id)).append(pp_ty(ty))
-            }
+            Type::Record(_) if !ty.is_tuple() => kwd("export interface")
+                .append(ident(id))
+                .append(" ")
+                .append(pp_ty(ty)),
             Type::Service(ref serv) => kwd("export interface")
                 .append(ident(id))
+                .append(" ")
                 .append(pp_service(env, serv)),
             Type::Func(ref func) => kwd("export type")
                 .append(ident(id))
-                .append("= ")
+                .append(" = ")
                 .append(pp_function(env, func)),
             _ => kwd("export type")
                 .append(ident(id))
-                .append("= ")
+                .append(" = ")
                 .append(pp_ty(ty)),
         };
         export.append(";")

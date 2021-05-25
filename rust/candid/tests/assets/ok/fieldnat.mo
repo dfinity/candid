@@ -1,4 +1,4 @@
-// This is a static generated Motoko binding. Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
+// This is a generated Motoko binding. Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 
 type non_tuple = { _1_  : Text; _2_  : Text };
 type tuple = (Text, Text);
