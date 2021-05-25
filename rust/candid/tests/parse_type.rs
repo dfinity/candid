@@ -1,4 +1,4 @@
-use candid::bindings::{candid as candid_export, javascript, typescript};
+use candid::bindings::{candid as candid_export, javascript, motoko, typescript};
 use candid::parser::types::{to_pretty, IDLProg};
 use candid::parser::typing::{check_prog, TypeEnv};
 use candid::types::Type;
@@ -55,6 +55,11 @@ fn compiler_test(resource: &str) {
                 // Type check output
                 let ast = content.parse::<IDLProg>().unwrap();
                 check_prog(&mut TypeEnv::new(), &ast).unwrap();
+                writeln!(output, "{}", content).unwrap();
+            }
+            {
+                let mut output = mint.new_goldenfile(filename.with_extension("mo")).unwrap();
+                let content = motoko::compile(&env, &actor);
                 writeln!(output, "{}", content).unwrap();
             }
             {

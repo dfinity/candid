@@ -1,0 +1,164 @@
+use crate::parser::types::FuncMode;
+use crate::parser::typing::TypeEnv;
+use crate::pretty::*;
+use crate::types::{Field, Function, Label, Type};
+use pretty::RcDoc;
+
+// The definition of tuple is language specific.
+fn is_tuple(t: &Type) -> bool {
+    match t {
+        Type::Record(ref fs) => {
+            if fs.len() <= 1 {
+                return false;
+            }
+            for (i, field) in fs.iter().enumerate() {
+                if field.id.get_id() != (i as u32) {
+                    return false;
+                }
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
+fn pp_ty(ty: &Type) -> RcDoc {
+    use Type::*;
+    match *ty {
+        Null => str("Null"),
+        Bool => str("Bool"),
+        Nat => str("Nat"),
+        Int => str("Int"),
+        Nat8 => str("Nat8"),
+        Nat16 => str("Nat16"),
+        Nat32 => str("Nat32"),
+        Nat64 => str("Nat64"),
+        Int8 => str("Int8"),
+        Int16 => str("Int16"),
+        Int32 => str("Int32"),
+        Int64 => str("Int64"),
+        Float32 => panic!("float32 not supported in Motoko"),
+        Float64 => str("Float"),
+        Text => str("Text"),
+        Reserved => str("Any"),
+        Empty => str("None"),
+        Var(ref s) => str(s),
+        Principal => str("Principal"),
+        Opt(ref t) => str("?").append(pp_ty(t)),
+        Vec(ref t) => enclose("[", pp_ty(t), "]"), // TODO blob
+        Record(ref fs) => {
+            if is_tuple(ty) {
+                let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
+                enclose("(", tuple, ")")
+            } else {
+                let fields = concat(fs.iter().map(pp_field), ";");
+                enclose_space("{", fields, "}")
+            }
+        }
+        Variant(ref fs) => {
+            let fields = concat(fs.iter().map(pp_variant), ";");
+            enclose_space("{", fields, "}")
+        }
+        Func(ref func) => pp_function(func),
+        Service(ref serv) => kwd("actor").append(pp_service(serv)),
+        Class(ref args, ref t) => {
+            let doc = pp_args(&args).append(" -> ");
+            match t.as_ref() {
+                Service(ref serv) => doc.append(pp_service(serv)),
+                Var(ref s) => doc.append(s),
+                _ => unreachable!(),
+            }
+        }
+        Knot(_) | Unknown => unreachable!(),
+    }
+}
+
+fn pp_label(id: &Label) -> RcDoc {
+    match id {
+        Label::Named(str) => quote_ident(str),
+        Label::Id(n) | Label::Unnamed(n) => str("_")
+            .append(RcDoc::as_string(n))
+            .append("_")
+            .append(RcDoc::space()),
+    }
+}
+
+fn pp_field(field: &Field) -> RcDoc {
+    pp_label(&field.id).append(" : ").append(pp_ty(&field.ty))
+}
+fn pp_variant(field: &Field) -> RcDoc {
+    let doc = str("#").append(pp_label(&field.id));
+    if field.ty != Type::Null {
+        doc.append(" : ").append(pp_ty(&field.ty))
+    } else {
+        doc
+    }
+}
+
+fn pp_function(func: &Function) -> RcDoc {
+    let args = pp_args(&func.args);
+    let rets = pp_args(&func.rets);
+    match func.modes.as_slice() {
+        [FuncMode::Oneway] => kwd("shared").append(args).append(" -> ").append("()"),
+        [FuncMode::Query] => kwd("shared query")
+            .append(args)
+            .append(" -> ")
+            .append("async ")
+            .append(rets),
+        [] => kwd("shared")
+            .append(args)
+            .append(" -> ")
+            .append("async ")
+            .append(rets),
+        _ => unreachable!(),
+    }
+    .nest(INDENT_SPACE)
+}
+fn pp_args(args: &[Type]) -> RcDoc {
+    match args {
+        [ty] => pp_ty(ty),
+        _ => {
+            let doc = concat(args.iter().map(pp_ty), ",");
+            enclose("(", doc, ")")
+        }
+    }
+}
+
+fn pp_service(serv: &[(String, Type)]) -> RcDoc {
+    let doc = concat(
+        serv.iter()
+            .map(|(id, func)| quote_ident(id).append(": ").append(pp_ty(func))),
+        ";",
+    );
+    enclose_space("{", doc, "}")
+}
+
+fn pp_defs(env: &TypeEnv) -> RcDoc {
+    lines(env.0.iter().map(|(id, ty)| {
+        kwd("type")
+            .append(ident(id))
+            .append(kwd("="))
+            .append(pp_ty(ty))
+            .append(";")
+    }))
+}
+
+fn pp_actor(ty: &Type) -> RcDoc {
+    match ty {
+        Type::Service(ref serv) => pp_service(serv),
+        Type::Var(_) | Type::Class(_, _) => pp_ty(ty),
+        _ => unreachable!(),
+    }
+}
+
+pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
+    match actor {
+        None => pp_defs(env).pretty(LINE_WIDTH).to_string(),
+        Some(actor) => {
+            let defs = pp_defs(env);
+            let actor = kwd("public type _MAIN =").append(pp_actor(actor));
+            let doc = defs.append(actor);
+            doc.pretty(LINE_WIDTH).to_string()
+        }
+    }
+}
