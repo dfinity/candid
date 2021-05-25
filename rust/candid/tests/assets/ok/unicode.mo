@@ -1,13 +1,13 @@
 type A = {
-  '\u{e000}'  : Nat;
-  '📦🍦'  : Nat;
-  '字段名'  : Nat;
-  '字 段 名2'  : Nat;
+  _11864174_ : Nat;
+  _1832283146_ : Nat;
+  _2119362116_ : Nat;
+  _3133479156_ : Nat;
 };
-type B = { #'' ; #'空的' ; #'  空的  ' ; #'1⃣️2⃣️3⃣️'  };
+type B = { #_0_; #_650764729_; #_1036827129_; #_3099250646_ };
 public type _MAIN = {
-  '' : shared Nat -> async Nat;
-  '✈️  🚗 ⛱️ ' : shared () -> ();
-  '函数名' : shared A -> async B;
-  '👀' : shared query Nat -> async Nat;
+  _0_ : shared Nat -> async Nat;
+  _356566390_ : shared () -> ();
+  _3300066460_ : shared A -> async B;
+  _2669435454_ : shared query Nat -> async Nat;
 }

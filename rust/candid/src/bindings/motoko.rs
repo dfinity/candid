@@ -1,3 +1,4 @@
+use super::candid::is_valid_as_id;
 use crate::parser::types::FuncMode;
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
@@ -19,6 +20,63 @@ fn is_tuple(t: &Type) -> bool {
             true
         }
         _ => false,
+    }
+}
+static KEYWORDS: [&str; 42] = [
+    "actor",
+    "and",
+    "async",
+    "assert",
+    "await",
+    "break",
+    "case",
+    "catch",
+    "class",
+    "continue",
+    "debug",
+    "debug_show",
+    "else",
+    "false",
+    "flexible",
+    "for",
+    "func",
+    "if",
+    "in",
+    "import",
+    "module",
+    "not",
+    "null",
+    "object",
+    "or",
+    "label",
+    "let",
+    "loop",
+    "private",
+    "public",
+    "query",
+    "return",
+    "shared",
+    "stable",
+    "switch",
+    "system",
+    "try",
+    "throw",
+    "true",
+    "type",
+    "var",
+    "while",
+];
+fn escape(id: &str) -> RcDoc {
+    if KEYWORDS.contains(&id) {
+        str(id).append("_")
+    } else if is_valid_as_id(id) {
+        if id.ends_with('_') {
+            str(id).append("_")
+        } else {
+            str(id)
+        }
+    } else {
+        str("_").append(crate::idl_hash(id).to_string()).append("_")
     }
 }
 
@@ -75,7 +133,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
 
 fn pp_label(id: &Label) -> RcDoc {
     match id {
-        Label::Named(str) => quote_ident(str),
+        Label::Named(str) => escape(str),
         Label::Id(n) | Label::Unnamed(n) => str("_")
             .append(RcDoc::as_string(n))
             .append("_")
@@ -127,7 +185,7 @@ fn pp_args(args: &[Type]) -> RcDoc {
 fn pp_service(serv: &[(String, Type)]) -> RcDoc {
     let doc = concat(
         serv.iter()
-            .map(|(id, func)| quote_ident(id).append(": ").append(pp_ty(func))),
+            .map(|(id, func)| escape(id).append(" : ").append(pp_ty(func))),
         ";",
     );
     enclose_space("{", doc, "}")
