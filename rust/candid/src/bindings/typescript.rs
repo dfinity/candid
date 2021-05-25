@@ -149,14 +149,16 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
-    let header = r#"import type { Principal } from '@dfinity/agent';
-"#;
+    let header = r#"import type { Principal } from '@dfinity/agent';"#;
     let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
     let defs = pp_defs(env, &def_list);
     let actor = match actor {
         None => RcDoc::nil(),
         Some(actor) => pp_actor(env, actor).append(";"),
     };
-    let doc = RcDoc::text(header).append(defs).append(actor);
+    let doc = RcDoc::text(header)
+        .append(RcDoc::line())
+        .append(defs)
+        .append(actor);
     doc.pretty(LINE_WIDTH).to_string()
 }

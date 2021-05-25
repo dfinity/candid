@@ -1,6 +1,8 @@
+// This is a static generated Motoko binding. Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
+
 type non_tuple = { _1_  : Text; _2_  : Text };
 type tuple = (Text, Text);
-public type _MAIN = {
+type _SERVICE = actor {
   bab : shared (Int, Nat) -> async ();
   bar : shared { _50_ : Int } -> async ();
   bas : shared (Int, Int) -> async (Text, Nat);

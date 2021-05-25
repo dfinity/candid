@@ -1,3 +1,5 @@
+// This is a static generated Motoko binding. Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
+
 type List = ?{ head : Int; tail : List };
 type broker = actor {
   find : shared Text -> async actor {
@@ -16,7 +18,7 @@ type nested = {
   _41_  : { #_42_ ; #A; #B; #C };
   _42_  : Nat;
 };
-public type _MAIN = {
+type _SERVICE = actor {
   f : shared ([Nat8], ?Bool) -> ();
   g : shared query (my_type, List, ?List, nested) -> async (Int, broker);
   h : shared ([?Text], { #A : Nat; #B : ?Text }, ?List) -> async {

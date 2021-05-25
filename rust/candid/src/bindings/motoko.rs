@@ -118,9 +118,9 @@ fn pp_ty(ty: &Type) -> RcDoc {
             enclose_space("{", fields, "}")
         }
         Func(ref func) => pp_function(func),
-        Service(ref serv) => kwd("actor").append(pp_service(serv)),
+        Service(ref serv) => pp_service(serv),
         Class(ref args, ref t) => {
-            let doc = pp_args(&args).append(" -> ");
+            let doc = pp_args(&args).append(" -> async ");
             match t.as_ref() {
                 Service(ref serv) => doc.append(pp_service(serv)),
                 Var(ref s) => doc.append(s),
@@ -188,7 +188,7 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
             .map(|(id, func)| escape(id).append(" : ").append(pp_ty(func))),
         ";",
     );
-    enclose_space("{", doc, "}")
+    kwd("actor").append(enclose_space("{", doc, "}"))
 }
 
 fn pp_defs(env: &TypeEnv) -> RcDoc {
@@ -210,13 +210,19 @@ fn pp_actor(ty: &Type) -> RcDoc {
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
-    match actor {
-        None => pp_defs(env).pretty(LINE_WIDTH).to_string(),
+    let header = r#"// This is a static generated Motoko binding. Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
+"#;
+    let doc = match actor {
+        None => pp_defs(env),
         Some(actor) => {
             let defs = pp_defs(env);
-            let actor = kwd("public type _MAIN =").append(pp_actor(actor));
-            let doc = defs.append(actor);
-            doc.pretty(LINE_WIDTH).to_string()
+            let actor = kwd("type _SERVICE =").append(pp_actor(actor));
+            defs.append(actor)
         }
-    }
+    };
+    RcDoc::text(header)
+        .append(RcDoc::line())
+        .append(doc)
+        .pretty(LINE_WIDTH)
+        .to_string()
 }
