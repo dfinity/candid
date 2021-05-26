@@ -75,12 +75,10 @@ fn escape(id: &str, is_method: bool) -> RcDoc {
         } else {
             str(id)
         }
+    } else if !is_method {
+        str("_").append(crate::idl_hash(id).to_string()).append("_")
     } else {
-        if !is_method {
-            str("_").append(crate::idl_hash(id).to_string()).append("_")
-        } else {
-            panic!("Candid method {} is not a valid Motoko id", id);
-        }
+        panic!("Candid method {} is not a valid Motoko id", id);
     }
 }
 
