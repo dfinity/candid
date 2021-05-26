@@ -10,5 +10,5 @@ crate-type = ["cdylib"]
 [dependencies]
 ic-cdk = "0.2"
 ic-cdk-macros = "0.2"
-#candid = { path = "../../../../rust/candid", version = "0.6" }
-#serde = "1.0.111"
+serde = "1.0"
+serde_bytes = "0.11"
