@@ -174,7 +174,13 @@ fn pp_function(func: &Function) -> RcDoc {
 }
 fn pp_args(args: &[Type]) -> RcDoc {
     match args {
-        [ty] => pp_ty(ty),
+        [ty] => {
+            if is_tuple(ty) {
+                enclose("(", pp_ty(ty), ")")
+            } else {
+                pp_ty(ty)
+            }
+        }
         _ => {
             let doc = concat(args.iter().map(pp_ty), ",");
             enclose("(", doc, ")")

@@ -17,6 +17,6 @@ type _SERVICE = actor {
   query_ : shared query [Nat8] -> async [Nat8];
   return_ : shared o -> async o;
   service : t;
-  tuple : shared (Int, [Nat8], Text) -> async (Int, Nat8);
+  tuple : shared ((Int, [Nat8], Text)) -> async ((Int, Nat8));
   variant : shared { #A; #B; #C; #D : Float } -> async ();
 }

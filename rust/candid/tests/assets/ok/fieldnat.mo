@@ -5,7 +5,7 @@ type tuple = (Text, Text);
 type _SERVICE = actor {
   bab : shared (Int, Nat) -> async ();
   bar : shared { _50_ : Int } -> async ();
-  bas : shared (Int, Int) -> async (Text, Nat);
+  bas : shared ((Int, Int)) -> async ((Text, Nat));
   baz : shared { _2_  : Int; _50_ : Nat } -> async {};
   bba : shared tuple -> async non_tuple;
   bib : shared { _0_  : Int } -> async { #_0_  : Int };
