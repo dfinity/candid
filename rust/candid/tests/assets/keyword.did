@@ -1,11 +1,11 @@
 type o = opt o;
 type node = record {head:nat; tail:list};
 type list = opt node;
-type tree = variant {
+type if = variant {
   leaf : int;
-  branch : record { left : tree; val : int; right : tree };
+  branch : record { left : if; val : int; right : if };
 };
-type return = service { f : t; g : (list) -> (tree,stream); };
+type return = service { f : t; g : (list) -> (if,stream); };
 type t = func (server : return) -> ();
 type stream = opt record {head:nat; next:func ()-> (stream) query};
 

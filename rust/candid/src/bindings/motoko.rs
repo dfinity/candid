@@ -66,7 +66,7 @@ static KEYWORDS: [&str; 42] = [
     "var",
     "while",
 ];
-fn escape(id: &str) -> RcDoc {
+fn escape(id: &str, is_method: bool) -> RcDoc {
     if KEYWORDS.contains(&id) {
         str(id).append("_")
     } else if is_valid_as_id(id) {
@@ -76,7 +76,11 @@ fn escape(id: &str) -> RcDoc {
             str(id)
         }
     } else {
-        str("_").append(crate::idl_hash(id).to_string()).append("_")
+        if !is_method {
+            str("_").append(crate::idl_hash(id).to_string()).append("_")
+        } else {
+            panic!("Candid method {} is not a valid Motoko id", id);
+        }
     }
 }
 
@@ -100,7 +104,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("Text"),
         Reserved => str("Any"),
         Empty => str("None"),
-        Var(ref s) => escape(s),
+        Var(ref s) => escape(s, false),
         Principal => str("Principal"),
         Opt(ref t) => str("?").append(pp_ty(t)),
         Vec(ref t) => enclose("[", pp_ty(t), "]"), // TODO blob
@@ -133,7 +137,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
 
 fn pp_label(id: &Label) -> RcDoc {
     match id {
-        Label::Named(str) => escape(str),
+        Label::Named(str) => escape(str, false),
         Label::Id(n) | Label::Unnamed(n) => str("_")
             .append(RcDoc::as_string(n))
             .append("_")
@@ -191,7 +195,7 @@ fn pp_args(args: &[Type]) -> RcDoc {
 fn pp_service(serv: &[(String, Type)]) -> RcDoc {
     let doc = concat(
         serv.iter()
-            .map(|(id, func)| escape(id).append(" : ").append(pp_ty(func))),
+            .map(|(id, func)| escape(id, true).append(" : ").append(pp_ty(func))),
         ";",
     );
     kwd("actor").append(enclose_space("{", doc, "}"))
@@ -200,7 +204,7 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 fn pp_defs(env: &TypeEnv) -> RcDoc {
     lines(env.0.iter().map(|(id, ty)| {
         kwd("type")
-            .append(escape(id))
+            .append(escape(id, false))
             .append(" = ")
             .append(pp_ty(ty))
             .append(";")

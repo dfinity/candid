@@ -24,7 +24,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("string"),
         Reserved => str("any"),
         Empty => str("never"),
-        Var(ref s) => str(s),
+        Var(ref s) => ident(s),
         Principal => str("Principal"),
         Opt(ref t) => str("[] | ").append(enclose("[", pp_ty(t), "]")),
         Vec(ref t) => str("Array").append(enclose("<", pp_ty(t), ">")),

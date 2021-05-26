@@ -1,15 +1,15 @@
 export default ({ IDL }) => {
+  const if_ = IDL.Rec();
   const list = IDL.Rec();
   const o = IDL.Rec();
   const stream = IDL.Rec();
   const t = IDL.Rec();
-  const tree = IDL.Rec();
   o.fill(IDL.Opt(o));
   const node = IDL.Record({ 'head' : IDL.Nat, 'tail' : list });
   list.fill(IDL.Opt(node));
-  tree.fill(
+  if_.fill(
     IDL.Variant({
-      'branch' : IDL.Record({ 'val' : IDL.Int, 'left' : tree, 'right' : tree }),
+      'branch' : IDL.Record({ 'val' : IDL.Int, 'left' : if_, 'right' : if_ }),
       'leaf' : IDL.Int,
     })
   );
@@ -23,7 +23,7 @@ export default ({ IDL }) => {
   );
   const return_ = IDL.Service({
     'f' : t,
-    'g' : IDL.Func([list], [tree, stream], []),
+    'g' : IDL.Func([list], [if_, stream], []),
   });
   t.fill(IDL.Func([return_], [], []));
   return IDL.Service({

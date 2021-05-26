@@ -202,7 +202,7 @@ fn pp_defs<'a>(
     let defs = lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         if recs.contains(id) {
-            str(id)
+            ident(id)
                 .append(".fill")
                 .append(enclose("(", pp_ty(ty), ");"))
         } else {

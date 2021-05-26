@@ -1,12 +1,12 @@
 // This is a generated Motoko binding. Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 
+type if_ = { #branch : { val : Int; left : if_; right : if_ }; #leaf : Int };
 type list = ?node;
 type node = { head : Nat; tail : list };
 type o = ?o;
-type return_ = actor { f : t; g : shared list -> async (tree, stream) };
+type return_ = actor { f : t; g : shared list -> async (if_, stream) };
 type stream = ?{ head : Nat; next : shared query () -> async stream };
 type t = shared return_ -> async ();
-type tree = { #branch : { val : Int; left : tree; right : tree }; #leaf : Int };
 type _SERVICE = actor {
   Oneway : shared () -> ();
   f__ : shared o -> async o;

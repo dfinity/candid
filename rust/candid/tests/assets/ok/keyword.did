@@ -1,13 +1,13 @@
+type if = variant {
+  branch : record { val : int; left : if; right : if };
+  leaf : int;
+};
 type list = opt node;
 type node = record { head : nat; tail : list };
 type o = opt o;
-type return = service { f : t; g : (list) -> (tree, stream) };
+type return = service { f : t; g : (list) -> (if, stream) };
 type stream = opt record { head : nat; next : func () -> (stream) query };
 type t = func (return) -> ();
-type tree = variant {
-  branch : record { val : int; left : tree; right : tree };
-  leaf : int;
-};
 service : {
   Oneway : () -> () oneway;
   f_ : (o) -> (o);

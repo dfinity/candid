@@ -1,17 +1,17 @@
 import type { Principal } from '@dfinity/agent';
+export type if_ = {
+    'branch' : { 'val' : bigint, 'left' : if_, 'right' : if_ }
+  } |
+  { 'leaf' : bigint };
 export type list = [] | [node];
 export interface node { 'head' : bigint, 'tail' : list };
 export type o = [] | [o];
 export interface return_ {
   'f' : t,
-  'g' : (arg_0: list) => Promise<[tree, stream]>,
+  'g' : (arg_0: list) => Promise<[if_, stream]>,
 };
 export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
 export type t = (arg_0: Principal) => Promise<undefined>;
-export type tree = {
-    'branch' : { 'val' : bigint, 'left' : tree, 'right' : tree }
-  } |
-  { 'leaf' : bigint };
 export default interface _SERVICE {
   'Oneway' : () => Promise<undefined>,
   'f_' : (arg_0: o) => Promise<o>,

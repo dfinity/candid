@@ -58,9 +58,15 @@ fn compiler_test(resource: &str) {
                 writeln!(output, "{}", content).unwrap();
             }
             {
-                let mut output = mint.new_goldenfile(filename.with_extension("mo")).unwrap();
-                let content = motoko::compile(&env, &actor);
-                writeln!(output, "{}", content).unwrap();
+                match filename.file_name().unwrap().to_str().unwrap() {
+                    "unicode.did" | "escape.did" => (),
+                    _ => {
+                        let mut output =
+                            mint.new_goldenfile(filename.with_extension("mo")).unwrap();
+                        let content = motoko::compile(&env, &actor);
+                        writeln!(output, "{}", content).unwrap();
+                    }
+                }
             }
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
