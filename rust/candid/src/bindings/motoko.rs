@@ -105,7 +105,8 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Var(ref s) => escape(s, false),
         Principal => str("Principal"),
         Opt(ref t) => str("?").append(pp_ty(t)),
-        Vec(ref t) => enclose("[", pp_ty(t), "]"), // TODO blob
+        Vec(ref t) => enclose("[", pp_ty(t), "]"),
+        Blob => str("Blob"),
         Record(ref fs) => {
             if is_tuple(ty) {
                 let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");

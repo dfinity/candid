@@ -19,7 +19,7 @@ type nested = {
   _42_  : Nat;
 };
 type _SERVICE = actor {
-  f : shared ([Nat8], ?Bool) -> ();
+  f : shared (Blob, ?Bool) -> ();
   g : shared query (my_type, List, ?List, nested) -> async (Int, broker);
   h : shared ([?Text], { #A : Nat; #B : ?Text }, ?List) -> async {
       _42_  : {};

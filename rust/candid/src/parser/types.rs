@@ -13,6 +13,7 @@ pub enum IDLType {
     VariantT(Vec<TypeField>),
     ServT(Vec<Binding>),
     ClassT(Vec<IDLType>, Box<IDLType>),
+    BlobT,
     PrincipalT,
 }
 
@@ -207,6 +208,7 @@ impl ToDoc for IDLType {
             IDLType::VariantT(ref fs) => RcDoc::text("variant ").append(fields_to_doc(fs)),
             IDLType::ServT(ref serv) => RcDoc::text("service ").append(meths_to_doc(serv)),
             IDLType::ClassT(_, _) => unreachable!(),
+            IDLType::BlobT => RcDoc::text("blob"),
             IDLType::PrincipalT => RcDoc::text("principal"),
         }
         .nest(2)

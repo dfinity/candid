@@ -235,12 +235,11 @@ impl TypeSerialize {
         if self.type_map.contains_key(t) {
             return Ok(());
         }
-        let actual_type = if let Type::Var(id) = t {
-            self.env.rec_find_type(id)?
-        } else {
-            t
-        }
-        .clone();
+        let actual_type = match t {
+            Type::Var(id) => self.env.rec_find_type(id)?.clone(),
+            Type::Blob => Type::Vec(Box::new(Type::Nat8)),
+            _ => t.clone(),
+        };
         if types::internal::is_primitive(&actual_type) {
             return Ok(());
         }
@@ -384,6 +383,11 @@ impl TypeSerialize {
                 sleb128_encode(buf, i64::from(*idx))
             }
             _ => {
+                if *t == Type::Blob {
+                    &Type::Vec(Box::new(Type::Nat8))
+                } else {
+                    t
+                };
                 let idx = self
                     .type_map
                     .get(&t)

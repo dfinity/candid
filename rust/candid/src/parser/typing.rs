@@ -121,6 +121,7 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
             let fs = check_fields(env, fs)?;
             Ok(Type::Variant(fs))
         }
+        IDLType::BlobT => Ok(Type::Blob),
         IDLType::PrincipalT => Ok(Type::Principal),
         IDLType::FuncT(func) => {
             let mut t1 = Vec::new();

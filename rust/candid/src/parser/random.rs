@@ -126,6 +126,7 @@ impl<'a> GenState<'a> {
                 let ty = self.env.rec_find_type(id)?;
                 self.any(u, &ty)?
             }
+            Type::Blob => self.any(u, &Type::Vec(Box::new(Type::Nat8)))?,
             Type::Null => IDLValue::Null,
             Type::Reserved => IDLValue::Reserved,
             Type::Bool => IDLValue::Bool(u.arbitrary()?),
@@ -242,6 +243,7 @@ impl TypeEnv {
             Empty => 0,
             Opt(t) => 1 + self.size_helper(seen, t)?,
             Vec(t) => 1 + self.size_helper(seen, t)? * 2,
+            Blob => 1 + 2,
             Record(fs) => {
                 let mut sum = 0;
                 for Field { ty, .. } in fs.iter() {
