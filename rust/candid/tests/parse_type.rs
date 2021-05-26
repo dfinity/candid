@@ -59,7 +59,9 @@ fn compiler_test(resource: &str) {
             }
             {
                 match filename.file_name().unwrap().to_str().unwrap() {
-                    "unicode.did" | "escape.did" => (),
+                    "unicode.did" | "escape.did" => {
+                        check_error(|| motoko::compile(&env, &actor), "not a valid Motoko id")
+                    }
                     _ => {
                         let mut output =
                             mint.new_goldenfile(filename.with_extension("mo")).unwrap();
@@ -88,4 +90,13 @@ fn compiler_test(resource: &str) {
             writeln!(fail_output, "{}", e.to_string()).unwrap();
         }
     }
+}
+
+fn check_error<F: FnOnce() -> R + std::panic::UnwindSafe, R>(f: F, str: &str) {
+    assert_eq!(
+        std::panic::catch_unwind(f)
+            .err()
+            .and_then(|a| a.downcast_ref::<String>().map(|s| { s.contains(str) })),
+        Some(true)
+    );
 }
