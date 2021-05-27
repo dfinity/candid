@@ -157,6 +157,9 @@ pub fn check(test: Test) -> Result<()> {
                 print!("[round-trip failed] ");
             }
             let is_equal = left == right;
+            if assert.pass != is_equal {
+                print!(" left:{}, right:{} ", left, right);
+            }
             assert.pass == is_equal
         } else {
             let res = assert.pass == input.is_ok();

@@ -1,13 +1,16 @@
-(* This formalizes
+(**
+
+This theory formalizes
    https://github.com/dfinity/candid/blob/master/spec/IDL-Soundness.md
- *)
+
+*)
 
 Require Import Coq.Lists.List.
 Import ListNotations.
 
 Require Import Coq.Sets.Ensembles.
 (* Odd that this is needed, see
-   https://www.reddit.com/r/Coq/comments/bmslyy/why_doesnt_ensemble_functions_in_coqs_standard/emzazzd
+https://www.reddit.com/r/Coq/comments/bmslyy/why_doesnt_ensemble_functions_in_coqs_standard/emzazzd
 *)
 Arguments In {U}.
 Arguments Add {U}.
@@ -23,16 +26,21 @@ Set Bullet Behavior "Strict Subproofs".
 
 Section IDL.
 
-  (* An abstract theory of IDLs is parametrized as follows: *)
-
-  (* Argument or result types *)
+  (**
+  
+  * The Abstract IDL theory
+  
+  An abstract theory of IDLs is parametrized as follows:
+  *)
+  
+  (** The type of (argument or result types) *)
   Variable T : Set.
 
-  (* A service type is a pair of types *)
+  (** A service type is a pair of types (argument and results) *)
   Definition S : Set := (T * T).
   Notation "t1 --> t2" := (t1, t2) (at level 80, no associativity).
 
-  (* The prediates of the theory *)
+  (** The theory has to define the following predicates *)
   Variable decodesAt : T -> T -> Prop.
   Notation "t1 <: t2" := (decodesAt t1 t2) (at level 70, no associativity).
 
@@ -46,10 +54,10 @@ Section IDL.
   Variable hostSubtypeOf : S -> S -> Prop.
   Notation "s1 <<: s2" := (hostSubtypeOf s1 s2) (at level 70, no associativity).
 
-  (* Service Identifiers *)
+  (** This is generic in the set of service identifiers *)
   Variable I : Set.
 
-  (* Judgements *)
+  (** ** Judgements *)
   Inductive Assertion : Set :=
     | HasType : I -> S -> Assertion
     | HasRef : I -> I -> S -> Assertion.
@@ -108,17 +116,19 @@ Section IDL.
 
   Definition StateSound (st : State) : Prop :=
     forall A t1 t2 B, CanSend st A t1 t2 B ->  t1 <: t2.
+    
+  (** The final soundness proposition *)
 
   Definition IDLSound : Prop :=
     forall s, clos_refl_trans _ step Empty_set s -> StateSound s.
 
-  (* Now we continue with the soundness proof for canonical subtyping.
+  (** * Canonical subtyping *)
 
-     We do so by just adding more hypotheses to this Section.
-     This is fine for now; when we actually want to instantiate this proof
-     with an actual IDL, we may want to revisit this, and maybe
-     modularize this development.
-   *)
+  (**
+  We continue with the soundness proof for canonical subtyping.
+
+  We do so by just adding more hypotheses to this Section.
+  *)
 
   Hypothesis decodesAt_refl: reflexive _ decodesAt.
   Hypothesis decodesAt_trans: transitive _ decodesAt.
@@ -137,7 +147,7 @@ Section IDL.
   Hypothesis host_subtyping_sound:
    forall s1 s2, s1 <<: s2 -> s1 <:: s2.
 
-  (*
+  (**
   Now the actual proofs. When I was writing these, my Coq has become
   pretty rusty, so these are rather manual proofs, with little
   automation. The style is heavily influenced by the explicit Isar-style

@@ -1,5 +1,7 @@
 /*
 Encoding tests for primitive types
+
+Corresponding to spec version version 0.1.2
 */
 
 // fundamentally wrong
@@ -21,7 +23,7 @@ assert blob "DIDL\00\01\5e" !: () "Out of range type";
 assert blob "DIDL\00\01\7f"     : (null);
 assert blob "DIDL\00\01\7e"    !: (null) "wrong type";
 assert blob "DIDL\00\01\7f\00" !: (null) "null: too long";
-assert blob "DIDL\00\00"       !: (null) "null: missing";
+assert blob "DIDL\00\00"        : (null) "null: extra null values";
 
 assert blob "DIDL\00\01\7e\00" == "(false)" : (bool) "bool: false";
 assert blob "DIDL\00\01\7e\01" == "(true)"  : (bool) "bool: true";
@@ -178,8 +180,9 @@ assert blob "DIDL\00\01\70" == blob "DIDL\00\01\7f"          : (reserved) "reser
 assert blob "DIDL\00\01\70" == blob "DIDL\00\01\7e\01"       : (reserved) "reserved from bool";
 assert blob "DIDL\00\01\70" == blob "DIDL\00\01\7d\80\01"    : (reserved) "reserved from nat";
 assert blob "DIDL\00\01\70" == blob "DIDL\00\01\71\06Motoko" : (reserved) "reserved from text";
+assert blob "DIDL\00\00"                                     : (reserved) "reserved extra value";
 assert blob "DIDL\00\01\71\05Motoko"    !: (reserved) "reserved from too short text";
-assert blob "DIDL\00\01\71\03\e2\28\a1" !: (reserved) "reserved from invalid utf8 text"; // Do we really require this to fail?
+assert blob "DIDL\00\01\71\03\e2\28\a1" !: (reserved) "reserved from invalid utf8 text";
 
 assert blob "DIDL\00\01\6f"                      !: (empty) "cannot decode empty type";
 assert blob "DIDL\01\6e\6f\01\00\00" == "(null)"  : (opt empty) "okay to decode non-empty value";

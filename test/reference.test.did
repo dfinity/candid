@@ -1,5 +1,7 @@
 /*
 Encoding tests for reference types
+
+Corresponding to spec version version 0.1.2
 */
 
 // principal
@@ -55,9 +57,9 @@ assert blob "DIDL\00\01\6a\01\03\ca\ff\ee\01\61"    !: (func () -> ()) "func: no
 assert blob "DIDL\01\6a\01\69\01\7d\00\01\00\01\01\03\ca\ff\ee\03foo" !: (func (service {}) -> (nat)) "func: service not in type table";
 assert blob "DIDL\01\6a\01\71\01\7d\01\03\01\00\01\01\03\ca\ff\ee\03foo" !: (func (text) -> (nat)) "func: invalid annotation";
 
-// coercion does not look at type table
-assert blob "DIDL\01\69\00\01\00\01\03\ca\ff\ee" == "(service \"w7x7r-cok77-xa\")" : (service { foo : (text) -> (nat) }) "service {} decodes at service { foo : (text) -> (nat) }";
+// subtype
+assert blob "DIDL\01\69\00\01\00\01\03\ca\ff\ee"    !: (service { foo : (text) -> (nat) }) "service {} !<: service { foo : (text) -> (nat) }";
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\01\01\01\03\ca\ff\ee" == "(service \"w7x7r-cok77-xa\")" : (service {}) "service { foo : (text) -> (nat) } decodes at service {}";
 
-assert blob "DIDL\01\6a\00\00\00\01\00\01\01\03\ca\ff\ee\03foo" == "(func \"w7x7r-cok77-xa\".foo)" : (func (text) -> (nat)) "func () -> () decodes at func (text) -> (nat) }";
-assert blob "DIDL\01\6a\01\71\01\7d\00\01\00\01\01\03\ca\ff\ee\03foo" == "(func \"w7x7r-cok77-xa\".foo)" : (func () -> ()) "func (text) -> (nat) decodes at func () -> () }";
+assert blob "DIDL\01\6a\00\00\00\01\00\01\01\03\ca\ff\ee\03foo" !: (func (text) -> (nat)) "func () -> () !<: (text) -> (nat) }";
+assert blob "DIDL\01\6a\01\71\01\7d\00\01\00\01\01\03\ca\ff\ee\03foo" == "(func \"w7x7r-cok77-xa\".foo)" : (func (text, opt text) -> ()) "func (text) -> (nat) decodes at func () -> () }";
