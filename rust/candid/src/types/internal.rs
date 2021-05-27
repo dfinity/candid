@@ -190,7 +190,6 @@ pub enum Type {
     Service(Vec<(String, Type)>),
     Class(Vec<Type>, Box<Type>),
     Principal,
-    Blob,
 }
 impl Type {
     pub(crate) fn is_tuple(&self) -> bool {
@@ -322,7 +321,6 @@ pub fn is_primitive(t: &Type) -> bool {
         Knot(_) => true,
         Opt(_) | Vec(_) | Record(_) | Variant(_) => false,
         Func(_) | Service(_) | Class(_, _) => false,
-        Blob => false,
         Principal => true,
     }
 }
@@ -349,7 +347,6 @@ pub fn unroll(t: &Type) -> Type {
                 })
                 .collect(),
         ),
-        Blob => Vec(Box::new(Nat8)),
         _ => (*t).clone(),
     }
 }

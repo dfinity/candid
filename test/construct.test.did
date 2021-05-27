@@ -54,7 +54,6 @@ assert blob "DIDL\01\6d\7c\01\00\00" == "(vec {})"                          : (v
 assert blob "DIDL\01\6d\7c\01\00\00"                                       !: (vec int8) "vec: non subtype empty";
 assert blob "DIDL\01\6d\7c\01\00\02\01\02" == "(vec { 1; 2 })"              : (vec int) "vec";
 assert blob "DIDL\01\6d\7b\01\00\02\01\02" == "(blob \"\\01\\02\")"         : (vec nat8) "vec: blob";
-assert blob "DIDL\01\6d\7b\01\00\02\01\02" == "(blob \"\\01\\02\")"         : (blob) "vec: blob";
 assert blob "DIDL\01\6d\00\01\00\00" == "(vec {})"                          : (Vec) "vec: recursive vector";
 assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (Vec) "vec: tree";
 assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (vec vec opt empty) "vec: non-recursive tree";

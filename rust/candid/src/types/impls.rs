@@ -132,7 +132,7 @@ where
 }
 impl CandidType for serde_bytes::ByteBuf {
     fn _ty() -> Type {
-        Type::Blob
+        Type::Vec(Box::new(Type::Nat8))
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -143,7 +143,7 @@ impl CandidType for serde_bytes::ByteBuf {
 }
 impl CandidType for serde_bytes::Bytes {
     fn _ty() -> Type {
-        Type::Blob
+        Type::Vec(Box::new(Type::Nat8))
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where

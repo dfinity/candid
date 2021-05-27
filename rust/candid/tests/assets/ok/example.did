@@ -14,7 +14,7 @@ type nested = record {
   42 : nat;
 };
 service : {
-  f : (blob, opt bool) -> () oneway;
+  f : (vec nat8, opt bool) -> () oneway;
   g : (my_type, List, opt List, nested) -> (int, broker) query;
   h : (vec opt text, variant { A : nat; B : opt text }, opt List) -> (
       record { 42 : record {}; id : nat },

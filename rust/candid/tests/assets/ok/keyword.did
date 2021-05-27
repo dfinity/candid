@@ -15,9 +15,9 @@ service : {
   fieldnat : (record { 2 : int; "2" : nat }) -> (record { int });
   "oneway" : (nat8) -> () oneway;
   oneway_ : (nat8) -> () oneway;
-  "query" : (blob) -> (vec nat8) query;
+  "query" : (vec nat8) -> (vec nat8) query;
   return : (o) -> (o);
   "service" : t;
-  tuple : (record { int; blob; text }) -> (record { int; nat8 });
+  tuple : (record { int; vec nat8; text }) -> (record { int; nat8 });
   "variant" : (variant { A; B; C; D : float64 }) -> ();
 }

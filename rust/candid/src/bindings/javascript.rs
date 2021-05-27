@@ -120,7 +120,6 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Principal => str("IDL.Principal"),
         Opt(ref t) => str("IDL.Opt").append(enclose("(", pp_ty(t), ")")),
         Vec(ref t) => str("IDL.Vec").append(enclose("(", pp_ty(t), ")")),
-        Blob => str("IDL.Vec").append(enclose("(", pp_ty(&Type::Nat8), ")")),
         Record(ref fs) => {
             if is_tuple(ty) {
                 let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");

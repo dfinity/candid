@@ -48,7 +48,6 @@ pub trait LanguageBinding {
             IDLType::VariantT(fields) => self.usage_variant(fields),
             IDLType::ServT(serv_t) => self.usage_service(serv_t),
             IDLType::ClassT(_, _) => unreachable!(),
-            IDLType::BlobT => unreachable!(),
             IDLType::PrincipalT => Ok("principal".to_string()),
         }
     }
@@ -91,7 +90,6 @@ pub trait LanguageBinding {
             IDLType::VariantT(fields) => self.declare_variant(id, fields),
             IDLType::ServT(serv_t) => self.declare_service(id, serv_t),
             IDLType::ClassT(_, _) => unreachable!(),
-            IDLType::BlobT => unreachable!(),
             IDLType::PrincipalT => Ok("principal".to_string()),
         }
     }

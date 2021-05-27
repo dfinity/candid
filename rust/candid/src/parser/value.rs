@@ -166,9 +166,6 @@ impl IDLValue {
                 let ty = crate::types::internal::find_type(id).unwrap();
                 self.annotate_type(from_parser, env, &ty)?
             }
-            (_, Type::Blob) => {
-                self.annotate_type(from_parser, env, &Type::Vec(Box::new(Type::Nat8)))?
-            }
             (_, Type::Reserved) => IDLValue::Reserved,
             (IDLValue::Float64(n), Type::Float32) if from_parser => IDLValue::Float32(*n as f32),
             (IDLValue::Null, Type::Null) => IDLValue::Null,

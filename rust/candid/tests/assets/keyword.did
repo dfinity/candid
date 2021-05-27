@@ -18,7 +18,7 @@ service : {
   "oneway": (nat8) -> () oneway;
   oneway_: (nat8) -> () oneway;
   Oneway: () -> () oneway;
-  "query": (blob) -> (vec nat8) query;
+  "query": (blob) -> (blob) query;
   "service": t;
   tuple: (record { int; blob; text }) -> (record { int; 1: nat8 });
 }

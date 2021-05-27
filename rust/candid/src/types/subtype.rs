@@ -18,7 +18,7 @@ pub fn subtype(
     if t1 == t2 {
         return Ok(());
     }
-    if matches!(t1, Var(_) | Knot(_) | Blob) || matches!(t2, Var(_) | Knot(_) | Blob) {
+    if matches!(t1, Var(_) | Knot(_)) || matches!(t2, Var(_) | Knot(_)) {
         if !gamma.insert((t1.clone(), t2.clone())) {
             return Ok(());
         }
@@ -27,8 +27,6 @@ pub fn subtype(
             (_, Var(id)) => subtype(gamma, env1, t1, env2, env2.rec_find_type(id).unwrap()),
             (Knot(id), _) => subtype(gamma, env1, &find_type(id).unwrap(), env2, t2),
             (_, Knot(id)) => subtype(gamma, env1, t1, env2, &find_type(id).unwrap()),
-            (Blob, _) => subtype(gamma, env1, &Vec(Box::new(Nat8)), env2, t2),
-            (_, Blob) => subtype(gamma, env1, t1, env2, &Vec(Box::new(Nat8))),
             (_, _) => unreachable!(),
         };
         if res.is_err() {
