@@ -1,3 +1,6 @@
+// This module implements the Candid to Motoko binding as specified in
+// https://github.com/dfinity/motoko/blob/master/design/IDL-Motoko.md
+
 use super::candid::is_valid_as_id;
 use crate::parser::types::FuncMode;
 use crate::parser::typing::TypeEnv;
@@ -202,7 +205,7 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 
 fn pp_defs(env: &TypeEnv) -> RcDoc {
     lines(env.0.iter().map(|(id, ty)| {
-        kwd("type")
+        kwd("public type")
             .append(escape(id, false))
             .append(" = ")
             .append(pp_ty(ty))
@@ -219,19 +222,21 @@ fn pp_actor(ty: &Type) -> RcDoc {
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
-    let header = r#"// This is a generated Motoko binding. Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
+    let header = r#"// This is a generated Motoko binding.
+// Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 "#;
     let doc = match actor {
         None => pp_defs(env),
         Some(actor) => {
             let defs = pp_defs(env);
-            let actor = kwd("type _SERVICE =").append(pp_actor(actor));
+            let actor = kwd("public type Self =").append(pp_actor(actor));
             defs.append(actor)
         }
     };
     RcDoc::text(header)
         .append(RcDoc::line())
-        .append(doc)
+        .append("module ")
+        .append(enclose_space("{", doc, "}"))
         .pretty(LINE_WIDTH)
         .to_string()
 }
