@@ -84,7 +84,7 @@ where
     Ok(res)
 }
 
-/// Serialize an encoding of a tuple and write it to a [Write] buffer.
+/// Serialize an encoding of a tuple and write it to a `Write` buffer.
 ///
 /// ```
 /// # use candid::Decode;
