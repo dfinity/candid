@@ -143,7 +143,7 @@ pub trait LanguageBinding {
     }
 
     /// Function called when declaring the service (or actor) of a candid file. By default
-    /// returns the result of calling [service_binding] on all bindings, and returning a
+    /// returns the result of calling `service_binding` on all bindings, and returning a
     /// string separated by `\n`.
     fn service(&self, bindings: &[Binding]) -> Result<String> {
         bindings

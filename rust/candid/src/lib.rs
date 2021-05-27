@@ -73,8 +73,8 @@
 //! we can decode a Candid `text` type into either `String` or `&str` in Rust.
 //!
 //! ## Operating on user defined struct/enum
-//! We use trait [`CandidType`](types/trait.CandidType.html) for serialization, and Serde's [`Deserialize`](trait.Deserialize.html) trait for deserialization.
-//! Any type that implements these two traits can be used for serialization and deserialization respectively.
+//! We use trait [`CandidType`](types/trait.CandidType.html) for serialization. Deserialization requires both [`CandidType`](types/trait.CandidType.html) and Serde's [`Deserialize`](trait.Deserialize.html) trait.
+//! Any type that implements these two traits can be used for serialization and deserialization.
 //! This includes built-in Rust standard library types like `Vec<T>` and `Result<T, E>`, as well as any structs
 //! or enums annotated with `#[derive(CandidType, Deserialize)]`.
 //!
@@ -245,6 +245,51 @@
 //!            ]);
 //! # Ok::<(), candid::Error>(())
 //! ```
+//!
+//! ## Building the library as a JS/Wasm package
+//! With the help of `wasm-bindgen` and `wasm-pack`, we can build the library as a Wasm binary and run in the browser.
+//! This is useful for client-side UIs and parsing did files in JavaScript.
+//!
+//! Create a new project with the following `Cargo.toml`.
+//! ```toml
+//! [lib]
+//! crate-type = ["cdylib"]
+//!
+//! [dependencies]
+//! wasm-bindgen = "0.2"
+//! candid = "0.7.0"
+//!
+//! [profile.release]
+//! lto = true
+//! opt-level = 'z'
+//! ```
+//! Expose the methods in `lib.rs`
+//! ```ignore
+//! use candid::{check_prog, IDLProg, TypeEnv};
+//! use wasm_bindgen::prelude::*;
+//! #[wasm_bindgen]
+//! pub fn did_to_js(prog: String) -> Option<String> {
+//!   let ast = prog.parse::<IDLProg>().ok()?;
+//!   let mut env = TypeEnv::new();
+//!   let actor = check_prog(&mut env, &ast).ok()?;
+//!   Some(candid::bindings::javascript::compile(&env, &actor))
+//! }
+//! ```
+//! ### Building
+//! ```shell
+//! cargo install wasm-pack
+//! wasm-pack build --target bundler
+//! wasm-opt --strip-debug -Oz pkg/didc_bg.wasm -o pkg/didc_bg.wasm
+//! ```
+//! ### Usage
+//! ```js
+//! const didc = import("pkg/didc");
+//! didc.then((mod) => {
+//!   const service = "service : {}";
+//!   const js = mod.did_to_js(service);
+//! });
+//! ```
+//!
 //!
 
 #![allow(clippy::upper_case_acronyms)]
