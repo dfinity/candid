@@ -1,4 +1,4 @@
-use super::value::{IDLField, IDLValue, IDLArgs};
+use super::value::{IDLField, IDLValue, IDLArgs, VariantValue};
 use super::typing::{check_unique, TypeEnv};
 use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg, IDLTypes};
 use super::test::{Assert, Input, Test};
@@ -81,7 +81,7 @@ pub Arg: IDLValue = {
         check_unique(fs.iter().map(|f| &f.id)).map_err(|e| error2(e, span))?;
         Ok(IDLValue::Record(fs))
     },
-    "variant" "{" <VariantField> "}" => IDLValue::Variant(Box::new(<>), 0),
+    "variant" "{" <VariantField> "}" => IDLValue::Variant(VariantValue(Box::new(<>), 0)),
     "principal" <Sp<Text>> =>? Ok(IDLValue::Principal(Principal::from_text(&<>.0).map_err(|e| error2(e, <>.1))?)),
     "service" <Sp<Text>> =>? Ok(IDLValue::Service(Principal::from_text(&<>.0).map_err(|e| error2(e, <>.1))?)),
     "func" <id:Sp<Text>> "." <meth:Name> =>? {
