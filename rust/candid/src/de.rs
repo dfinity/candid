@@ -204,11 +204,19 @@ impl<'de> Deserializer<'de> {
         Ok(())
     }
     fn unroll_type(&mut self) -> Result<()> {
-        if matches!(self.expect_type, Type::Var(_) | Type::Knot(_)) {
-            self.expect_type = self.table.trace_type(&self.expect_type)?;
+        match &self.expect_type {
+            Type::Var(_) | Type::Knot(_) => {
+                self.expect_type = self.table.trace_type(&self.expect_type)?
+            }
+            Type::Blob => self.expect_type = Type::Vec(Box::new(Type::Nat8)),
+            _ => (),
         }
-        if matches!(self.wire_type, Type::Var(_) | Type::Knot(_)) {
-            self.wire_type = self.table.trace_type(&self.wire_type)?;
+        match &self.wire_type {
+            Type::Var(_) | Type::Knot(_) => {
+                self.wire_type = self.table.trace_type(&self.wire_type)?
+            }
+            Type::Blob => self.wire_type = Type::Vec(Box::new(Type::Nat8)),
+            _ => (),
         }
         Ok(())
     }
