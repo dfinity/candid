@@ -1,4 +1,4 @@
-use super::javascript::is_tuple;
+use super::javascript::{ident, is_tuple};
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
 use crate::types::{Field, Function, Label, Type};
@@ -24,7 +24,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("string"),
         Reserved => str("any"),
         Empty => str("never"),
-        Var(ref s) => str(s),
+        Var(ref s) => ident(s),
         Principal => str("Principal"),
         Opt(ref t) => str("[] | ").append(enclose("[", pp_ty(t), "]")),
         Vec(ref t) => str("Array").append(enclose("<", pp_ty(t), ">")),
@@ -118,19 +118,21 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         let export = match ty {
-            Type::Record(_) if !ty.is_tuple() => {
-                kwd("export interface").append(ident(id)).append(pp_ty(ty))
-            }
+            Type::Record(_) if !ty.is_tuple() => kwd("export interface")
+                .append(ident(id))
+                .append(" ")
+                .append(pp_ty(ty)),
             Type::Service(ref serv) => kwd("export interface")
                 .append(ident(id))
+                .append(" ")
                 .append(pp_service(env, serv)),
             Type::Func(ref func) => kwd("export type")
                 .append(ident(id))
-                .append("= ")
+                .append(" = ")
                 .append(pp_function(env, func)),
             _ => kwd("export type")
                 .append(ident(id))
-                .append("= ")
+                .append(" = ")
                 .append(pp_ty(ty)),
         };
         export.append(";")
@@ -149,14 +151,16 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
-    let header = r#"import type { Principal } from '@dfinity/agent';
-"#;
+    let header = r#"import type { Principal } from '@dfinity/agent';"#;
     let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
     let defs = pp_defs(env, &def_list);
     let actor = match actor {
         None => RcDoc::nil(),
         Some(actor) => pp_actor(env, actor).append(";"),
     };
-    let doc = RcDoc::text(header).append(defs).append(actor);
+    let doc = RcDoc::text(header)
+        .append(RcDoc::line())
+        .append(defs)
+        .append(actor);
     doc.pretty(LINE_WIDTH).to_string()
 }

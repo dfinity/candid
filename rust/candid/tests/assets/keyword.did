@@ -1,0 +1,25 @@
+type o = opt o;
+type node = record {head:nat; tail:list};
+type list = opt node;
+type if = variant {
+  leaf : int;
+  branch : record { left : if; val : int; right : if };
+};
+type return = service { f : t; g : (list) -> (if,stream); };
+type t = func (server : return) -> ();
+type stream = opt record {head:nat; next:func ()-> (stream) query};
+
+service : {
+  return: (o) -> (o);
+  f_: (o) -> (o);
+  fieldnat: (record {2 : int; "2": nat}) -> (record { int });
+  field: (record {test: nat16; nat8;}) -> (record {});
+  "variant": (variant { A; B; C: null; D: float64}) -> ();
+  "oneway": (nat8) -> () oneway;
+  oneway_: (nat8) -> () oneway;
+  Oneway: () -> () oneway;
+  "query": (blob) -> (blob) query;
+  "service": t;
+  tuple: (record { int; blob; text }) -> (record { int; 1: nat8 });
+}
+

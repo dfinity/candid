@@ -39,7 +39,7 @@ fn is_keyword(id: &str) -> bool {
     KEYWORDS.contains(&id)
 }
 
-fn is_valid_as_id(id: &str) -> bool {
+pub(crate) fn is_valid_as_id(id: &str) -> bool {
     if id.is_empty() || !id.is_ascii() {
         return false;
     }

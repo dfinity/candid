@@ -22,6 +22,79 @@ pub(crate) fn is_tuple(t: &Type) -> bool {
         _ => false,
     }
 }
+static KEYWORDS: [&str; 64] = [
+    "abstract",
+    "arguments",
+    "await",
+    "boolean",
+    "break",
+    "byte",
+    "case",
+    "catch",
+    "char",
+    "class",
+    "const",
+    "continue",
+    "debugger",
+    "default",
+    "delete",
+    "do",
+    "double",
+    "else",
+    "enum",
+    "eval",
+    "export",
+    "extends",
+    "false",
+    "final",
+    "finally",
+    "float",
+    "for",
+    "function",
+    "goto",
+    "if",
+    "implements",
+    "import",
+    "in",
+    "instanceof",
+    "int",
+    "interface",
+    "let",
+    "long",
+    "native",
+    "new",
+    "null",
+    "package",
+    "private",
+    "protected",
+    "public",
+    "return",
+    "short",
+    "static",
+    "super",
+    "switch",
+    "synchronized",
+    "this",
+    "throw",
+    "throws",
+    "transient",
+    "true",
+    "try",
+    "typeof",
+    "var",
+    "void",
+    "volatile",
+    "while",
+    "with",
+    "yield",
+];
+pub(crate) fn ident(id: &str) -> RcDoc {
+    if KEYWORDS.contains(&id) {
+        str(id).append("_")
+    } else {
+        str(id)
+    }
+}
 
 fn pp_ty(ty: &Type) -> RcDoc {
     use Type::*;
@@ -43,7 +116,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("IDL.Text"),
         Reserved => str("IDL.Reserved"),
         Empty => str("IDL.Empty"),
-        Var(ref s) => str(s),
+        Var(ref s) => ident(s),
         Principal => str("IDL.Principal"),
         Opt(ref t) => str("IDL.Opt").append(enclose("(", pp_ty(t), ")")),
         Vec(ref t) => str("IDL.Vec").append(enclose("(", pp_ty(t), ")")),
@@ -124,18 +197,18 @@ fn pp_defs<'a>(
 ) -> RcDoc<'a> {
     let recs_doc = lines(
         recs.iter()
-            .map(|id| kwd("const").append(ident(id)).append("= IDL.Rec();")),
+            .map(|id| kwd("const").append(ident(id)).append(" = IDL.Rec();")),
     );
     let defs = lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         if recs.contains(id) {
-            str(id)
+            ident(id)
                 .append(".fill")
                 .append(enclose("(", pp_ty(ty), ");"))
         } else {
             kwd("const")
                 .append(ident(id))
-                .append(kwd("="))
+                .append(" = ")
                 .append(pp_ty(ty))
                 .append(";")
         }
