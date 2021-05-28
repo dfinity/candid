@@ -100,6 +100,20 @@ fn test_text() {
     let bytes = hex("4449444c00017107486920e298830a");
     test_encode(&"Hi ☃\n", &bytes);
     test_decode(&bytes, &"Hi ☃\n");
+    test_decode(&bytes, &std::borrow::Cow::from("Hi ☃\n"));
+}
+
+#[test]
+fn test_time() {
+    use std::time::{Duration, SystemTime};
+    let now = SystemTime::now();
+    let duration = now.duration_since(SystemTime::UNIX_EPOCH).unwrap();
+    let encoded = Encode!(&now).unwrap();
+    let decoded = Decode!(&encoded, SystemTime).unwrap();
+    assert_eq!(now, decoded);
+    let encoded = Encode!(&duration).unwrap();
+    let decoded = Decode!(&encoded, Duration).unwrap();
+    assert_eq!(duration, decoded);
 }
 
 #[test]
