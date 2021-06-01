@@ -86,7 +86,7 @@ For example, the full URL should look similar to the following but with the `+CA
 http://127.0.0.1:8000/candid?canisterId=<CANDID-UI-IDENTIFIER>
 ....
 +
-The browser displays a form ior you to specify a canister identifier or choose a Candid description (`+.did+`) file.
+The browser displays a form for you to specify a canister identifier or choose a Candid description (`+.did+`) file.
 +
 
 image:candid-ui-select-id.png[]
