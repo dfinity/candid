@@ -91,7 +91,7 @@ The browser displays a form for you to specify a canister identifier or choose a
 
 image:candid-ui-select-id.png[]
 +
-If you aren't sure of the canister identifier to use, you can run the `+dfx canister id+` command to look up the identifier for a specific canister name. 
+If you aren't sure which canister identifier to use, you can run the `+dfx canister id+` command to look up the identifier for a specific canister name. 
 +
 For example, if you want to view the functions for the `+counter+` service description, you could look up the canister identifier by running the following command:
 +
