@@ -22,10 +22,12 @@ candid = { path = "../../rust/candid" }
 clap = "2.33"
 structopt = "0.3"
 log = "0.4"
-env_logger = "0.6"
+env_logger = "0.8"
+pretty = "0.10.0"
+
+[dev-dependencies]
 assert_cmd = "1.0.1"
 predicates = "1.0.5"
-pretty = "0.10.0"
 
 [[bin]]
 name = "candiff"
