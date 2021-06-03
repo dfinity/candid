@@ -268,6 +268,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 
 pub mod value {
     use super::pp_label;
+    use crate::parser::pretty::number_to_string;
     use crate::parser::value::{IDLArgs, IDLField, IDLValue};
     use crate::pretty::*;
     use pretty::RcDoc;
@@ -300,12 +301,26 @@ pub mod value {
 
     pub fn pp_value(v: &IDLValue) -> RcDoc {
         use IDLValue::*;
-        match &*v {
+        match v {
             Number(_) | Int(_) | Nat(_) | Int64(_) | Nat64(_) => {
-                RcDoc::text(format!("BigInt({})", v))
+                RcDoc::text(format!("BigInt({})", number_to_string(v)))
             }
+            Int8(_) | Int16(_) | Int32(_) | Nat8(_) | Nat16(_) | Nat32(_) | Float32(_)
+            | Float64(_) => RcDoc::text(number_to_string(v)),
+            Bool(_) => RcDoc::as_string(v),
+            Null => RcDoc::text("null"),
             Reserved => RcDoc::text("null"),
             Principal(id) => RcDoc::text(format!("Principal.fromText('{}')", id)),
+            Service(id) => RcDoc::text(format!("Principal.fromText('{}')", id)),
+            Func(id, meth) => {
+                let id = RcDoc::text(format!("Principal.fromText('{}')", id));
+                let meth = RcDoc::text(meth);
+                RcDoc::text("[")
+                    .append(id)
+                    .append(", ")
+                    .append(meth)
+                    .append("]")
+            }
             Text(s) => RcDoc::text(format!("'{}'", s.escape_debug())),
             None => RcDoc::text("[]"),
             Opt(v) => enclose_space("[", pp_value(v), "]"),
@@ -322,7 +337,6 @@ pub mod value {
                 }
             }
             Variant(v) => enclose_space("{", pp_field(&v.0), "}"),
-            _ => RcDoc::as_string(v),
         }
     }
 
