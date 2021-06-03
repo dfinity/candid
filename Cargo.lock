@@ -246,7 +246,7 @@ checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
 name = "candid"
-version = "0.7.0-beta.1"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -763,13 +763,15 @@ checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "ic-types"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "968dbc1cc04bf93e94c2ffd3cb370c451d2136425dd38e9ed4cc5ca425d737af"
+checksum = "e80baa984981300b80bc45a589ebb49ed09738be532db025f9a94fc6f88bf77d"
 dependencies = [
  "base32",
  "crc32fast",
+ "hex",
  "serde",
+ "serde_bytes",
  "sha2",
  "thiserror",
 ]
