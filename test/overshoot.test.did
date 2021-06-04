@@ -1,5 +1,5 @@
 /*
-Corresponding to spec version version 0.1.2
+Corresponding to spec version version 0.1.3
 
 The tests in this file involve large leb-encoded values that indicate sizes (of
 tables, arrays, blobs, etc.). In all cases, a decode should be able to catch
