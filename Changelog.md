@@ -1,29 +1,38 @@
 
 # Changelog
 
-## 2021-04-22 (Rust 0.7.0-beta.1)
+## 2021-06-03 
 
-### Breaking changes
+### Spec
 
 * Update spec to introduce subtyping check in deserialization [#168](https://github.com/dfinity/candid/pull/168)
-* Deserialization requires both `Deserialize` and `CandidType` trait
-* `de::ArgumentDecoder`, `ser::ArgumentEncoder` moved to `utils::{ArgumentDecoder, ArgumentEncoder}`
-* `types::subtype` returns `Result<()>` instead of `bool` for better error message
-* Disable subtyping conversion for opt rules in `IDLValue.annotate_type`
-* Display type annotations for number types
+* Coq proof for subtype check
+* Update test suite to conform with the new spec
 
-### Non-breaking changes
+### Rust (0.7.0)
+
+#### Breaking changes
+
+* Require full subtype checking in deserialization. This removes undefined behavior when trying to decode
+  variant and empty vector at types that are not supertype of the wire type.
+* Deserialization requires both `Deserialize` and `CandidType` trait.
+* `de::ArgumentDecoder`, `ser::ArgumentEncoder` moved to `utils::{ArgumentDecoder, ArgumentEncoder}`.
+* `types::subtype` returns `Result<()>` instead of `bool` for better error message.
+* Disable subtyping conversion for opt rules in `IDLValue.annotate_type`.
+* Display type annotations for number types.
+
+#### Non-breaking changes
 
 * Better error messages in deserialization
-* Update test suite to conform with the new spec
+* Remove unnessary `reqwest` dependency
+* Implement CandidType for `str`
+
+### Tools
+
+* `didc bind` to support Motoko bindings
 * `didc hash` to compute hash of a field name
 * `didc decode` can decode blob format
-
-### Pending issues
-
-* Update opt rule for subtyping and coercion
-* Performance regression in decoding struct type, likely due to `Type` clone
-* Integration test with production canisters
+* Candid UI canister
 
 ## 2021-04-07 (Rust 0.6.19 -- 0.6.21)
 
