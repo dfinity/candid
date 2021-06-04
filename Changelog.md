@@ -14,7 +14,7 @@
 #### Breaking changes
 
 * Require full subtype checking in deserialization. This removes undefined behavior when trying to decode
-  variant and empty vector at different types.
+  variant and empty vector at types that are not supertype of the wire type.
 * Deserialization requires both `Deserialize` and `CandidType` trait.
 * `de::ArgumentDecoder`, `ser::ArgumentEncoder` moved to `utils::{ArgumentDecoder, ArgumentEncoder}`.
 * `types::subtype` returns `Result<()>` instead of `bool` for better error message.
