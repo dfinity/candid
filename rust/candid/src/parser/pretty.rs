@@ -58,6 +58,25 @@ fn has_type_annotation(v: &IDLValue) -> bool {
             | Reserved
     )
 }
+pub fn number_to_string(v: &IDLValue) -> String {
+    use IDLValue::*;
+    match v {
+        Number(n) => n.to_string(),
+        Int(n) => n.to_string(),
+        Nat(n) => n.to_string(),
+        Nat8(n) => n.to_string(),
+        Nat16(n) => n.to_string(),
+        Nat32(n) => n.to_string(),
+        Nat64(n) => n.to_string(),
+        Int8(n) => n.to_string(),
+        Int16(n) => n.to_string(),
+        Int32(n) => n.to_string(),
+        Int64(n) => n.to_string(),
+        Float32(f) => f.to_string(),
+        Float64(f) => f.to_string(),
+        _ => unreachable!(),
+    }
+}
 impl fmt::Debug for IDLValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use IDLValue::*;
