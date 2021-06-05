@@ -58,21 +58,22 @@ Based on the type signature of that service, Candid provides a web interface—t
 
 To use the Candid web interface to test `counter `canister:
 
+. Find the canister identifier of the Candid UI canister which was printed by `dfx deploy` as "UI canister".
 . Find the canister identifier associated with the `counter` canister using the `dfx canister id counter` command.
 . Open a browser and navigate to the address and port number specified in the `+dfx.json+` configuration file.
 +
 By default, the `+local+` network binds to the `+127.0.0.1:8000+` address and port number.
-. Add the `+candid+` endpoint to access the Candid web interface followed by the required `canisterId` parameter and canister identifier.
+. Add the required `canisterId` parameter for the Candid UI canister, and `id` for the `counter` canister
 +
-For example, the full URL should look similar to the following but with the `+canister_identifier+` that was returned by the `+dfx canister id+` command:
+For example, the full URL should look similar to the following but with the `+ui_canister` and `+canister_identifier+` that was returned by the `+dfx canister id+` command:
 +
 ....
-http://127.0.0.1:8000/candid?canisterId=<YOUR-CANISTER-IDENTIFIER>
+http://127.0.0.1:8000/?canisterId=<UI-CANISTER>&id=<YOUR-CANISTER-IDENTIFIER>
 ....
 . Review the list of function calls and types defined in the program.
 . Type a value of the appropriate type for a function or click *Random* to generate a value, then click *Call* or *Query* to see the result.
 
-For more information about the tool that creates a Web interface from the Candid interface of any canister, see the link:https://github.com/dfinity/candid/tree/master/tools/ui[Candid UI] repository.
+For more information about the tool that creates a Web interface from the Candid interface of any canister, see the link:https://github.com/dfinity/candid/tree/master/tools/ui[Candid UI] repository.  Note link:https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.ic0.app[Candid UI on Mainnet], according to link:https://github.com/dfinity/candid#tools[this page].
 
 == Interact with a service from a Motoko canister
 
