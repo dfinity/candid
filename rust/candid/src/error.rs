@@ -4,7 +4,7 @@ use serde::{de, ser};
 
 use crate::parser::token;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
-use codespan_reporting::files::SimpleFile;
+use codespan_reporting::files::{Error as ReportError, SimpleFile};
 use codespan_reporting::term::{self, termcolor::StandardStream};
 use std::io;
 use thiserror::Error;
@@ -146,6 +146,11 @@ impl From<io::Error> for Error {
 impl From<binread::Error> for Error {
     fn from(e: binread::Error) -> Error {
         Error::Binread(get_binread_labels(&e))
+    }
+}
+impl From<ReportError> for Error {
+    fn from(e: ReportError) -> Error {
+        Error::msg(e)
     }
 }
 

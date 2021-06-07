@@ -325,9 +325,9 @@ fn arbitrary_len(u: &mut Unstructured, width: Option<usize>) -> Result<usize> {
     })
 }
 
-fn arbitrary_num<T>(u: &mut Unstructured, range: Option<(i64, i64)>) -> Result<T>
+fn arbitrary_num<'a, T>(u: &mut Unstructured<'a>, range: Option<(i64, i64)>) -> Result<T>
 where
-    T: num_traits::Bounded + Int + TryFrom<i64> + Arbitrary,
+    T: num_traits::Bounded + Int + TryFrom<i64> + Arbitrary<'a>,
 {
     Ok(match range {
         None => u.arbitrary::<T>()?,
@@ -341,7 +341,7 @@ where
     })
 }
 
-fn arbitrary_variant(u: &mut Unstructured, weight: &[usize]) -> Result<usize> {
+fn arbitrary_variant<'a>(u: &mut Unstructured<'a>, weight: &[usize]) -> Result<usize> {
     // TODO read from end of unstructured to improve stability
     let prefix_sum: Vec<_> = weight
         .iter()
