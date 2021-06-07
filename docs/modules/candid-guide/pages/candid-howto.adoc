@@ -80,10 +80,10 @@ dfx start --background
 By default, the `+local+` network binds to the `+127.0.0.1:8000+` address and port number.
 . Add the required `canisterId` parameter and the Candid UI canister identifier returned by the `+dfx canister id+` command.
 +
-For example, the full URL should look similar to the following but with the `+CANDID-UI_IDNETIFIER+` that was returned by the `+dfx canister id+` command:
+For example, the full URL should look similar to the following but with the `+CANDID-UI-CANISTER-IDENTIFIER+` that was returned by the `+dfx canister id+` command:
 +
 ....
-http://127.0.0.1:8000/candid?canisterId=<CANDID-UI-IDENTIFIER>
+http://127.0.0.1:8000/candid?canisterId=<CANDID-UI-CANISTER-IDENTIFIER>
 ....
 +
 The browser displays a form for you to specify a canister identifier or choose a Candid description (`+.did+`) file.
