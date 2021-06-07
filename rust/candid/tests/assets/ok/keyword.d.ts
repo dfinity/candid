@@ -1,4 +1,4 @@
-import type { Principal } from '@dfinity/agent';
+import type { Principal } from '@dfinity/principal';
 export type if_ = {
     'branch' : { 'val' : bigint, 'left' : if_, 'right' : if_ }
   } |

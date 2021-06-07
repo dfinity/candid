@@ -1,4 +1,4 @@
-import type { Principal } from '@dfinity/agent';
+import type { Principal } from '@dfinity/principal';
 export type List = [] | [[bigint, List]];
 export default interface _SERVICE {
   'get' : () => Promise<List>,
