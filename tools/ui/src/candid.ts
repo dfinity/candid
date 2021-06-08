@@ -1,4 +1,8 @@
-import { Actor, IDL, InputBox, Principal, UI, HttpAgent, ActorSubclass } from '@dfinity/agent';
+import { Actor, HttpAgent, ActorSubclass } from '@dfinity/agent';
+import {
+  IDL, InputBox, renderInput, renderValue
+} from '@dfinity/candid';
+import {Principal} from '@dfinity/principal'
 import './candid.css';
 
 const agent = new HttpAgent();
@@ -116,7 +120,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
 
   const inputs: InputBox[] = [];
   idlFunc.argTypes.forEach((arg, i) => {
-    const inputbox = UI.renderInput(arg);
+    const inputbox = renderInput(arg);
     inputs.push(inputbox);
     inputbox.render(inputContainer);
   });
@@ -227,9 +231,9 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       uiContainer.style.display = setContainerVisibility('ui');
       left.appendChild(uiContainer);
       idlFunc.retTypes.forEach((arg, ind) => {
-        const box = UI.renderInput(arg);
+        const box = renderInput(arg);
         box.render(uiContainer);
-        UI.renderValue(arg, box, result[ind]);
+        renderValue(arg, box, result[ind]);
       });
 
       const jsonContainer = document.createElement('div');

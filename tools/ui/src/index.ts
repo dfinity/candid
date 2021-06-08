@@ -1,5 +1,5 @@
 import { fetchActor, render } from './candid';
-import { Principal } from '@dfinity/agent';
+import { Principal } from '@dfinity/principal';
 
 async function main() {
   const params = new URLSearchParams(window.location.search);
