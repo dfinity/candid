@@ -237,7 +237,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       containers.push(jsonContainer);
       jsonContainer.style.display = setContainerVisibility('json');
       left.appendChild(jsonContainer);
-      jsonContainer.innerText = JSON.stringify(callResult);
+      jsonContainer.innerText = JSON.stringify(callResult, (k,v) => typeof v === 'bigint'?v.toString():v);
     })().catch(err => {
       resultDiv.classList.add('error');
       left.innerText = err.message;
