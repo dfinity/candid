@@ -1,4 +1,4 @@
-import type { Principal } from '@dfinity/agent';
+import type { Principal } from '@dfinity/principal';
 export type A = [] | [B];
 export type B = [] | [C];
 export type C = A;

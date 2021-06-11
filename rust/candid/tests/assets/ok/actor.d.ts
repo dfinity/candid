@@ -1,4 +1,4 @@
-import type { Principal } from '@dfinity/agent';
+import type { Principal } from '@dfinity/principal';
 export type f = (arg_0: number) => Promise<number>;
 export type g = f;
 export type h = (arg_0: [Principal, string]) => Promise<[Principal, string]>;

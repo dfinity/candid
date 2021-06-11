@@ -1,4 +1,4 @@
-import type { Principal } from '@dfinity/agent';
+import type { Principal } from '@dfinity/principal';
 export interface t {
   '\"' : bigint,
   '\'' : bigint,

@@ -1,4 +1,4 @@
-import type { Principal } from '@dfinity/agent';
+import type { Principal } from '@dfinity/principal';
 export interface non_tuple { _1_ : string, _2_ : string };
 export type tuple = [string, string];
 export default interface _SERVICE {
