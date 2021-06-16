@@ -915,7 +915,7 @@ C[vec <t> <: vec <t'>]( vec { <v>;* } ) = vec { C[<t> <: <t'>](<v>);* }
 
 #### Options
 
-The null type coerces into any option type:
+The null type and the reserved type coerce into any option type:
 ```
 C[null <: opt <t>](null) = null
 ```
@@ -927,14 +927,19 @@ C[opt <t> <: opt <t'>](opt <v>) = opt C[<t> <: <t'>](v)  if <t> <: <t'>
 C[opt <t> <: opt <t'>](opt <v>) = null                   if not(<t> <: <t'>)
 ```
 
-NOTE: These rules above imply that a Candid decoder has to be able to decide the subtyping relation at runtime.
-
-Coercing a non-null, non-optional and non-reserved value at an option type treats it as an optional value:
+Coercing a non-null, non-optional and non-reserved type at an option type treats it as an optional value, if it has a suitable type:
 ```
 C[<t> <: opt <t'>](<v>) = opt C[<t> <: <t'>](v)  if not (null <: <t>) and <t> <: <t'>
-C[<t> <: opt <t'>](_)   = null                   if not (null <: <t>) and not (<t> <: <t'>)
-C[reserved <: opt <t'>](_) = null
 ```
+
+Any other type goes to `null`:
+```
+C[reserved <: opt <t>](_) = null
+C[<t> <: opt <t'>](_) = null  if not (null <: <t'>) and not (<t> <: <t'>)
+C[<t> <: opt <t'>](_) = null  if null <: <t'> and not (null <: <t>)
+```
+
+NOTE: These rules above imply that a Candid decoder has to be able to decide the subtyping relation at runtime.
 
 #### Records
 
