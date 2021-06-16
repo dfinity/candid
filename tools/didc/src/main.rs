@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use candid::{
     check_prog,
+    idl_hash,
     parser::types::{IDLType, IDLTypes},
     pretty_parse,
     types::Type,
@@ -219,7 +220,7 @@ fn main() -> Result<()> {
             println!("{}", content);
         }
         Command::Hash { input } => {
-            println!("{}", candid::idl_hash(&input));
+            println!("{}", idl_hash(&input));
         }
         Command::Encode {
             args,

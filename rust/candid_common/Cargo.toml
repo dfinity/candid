@@ -1,0 +1,15 @@
+[package]
+name = "candid_common"
+version = "1.0.0"
+edition = "2018"
+authors = ["DFINITY Team"]
+description = "Common elements Candid creates."
+homepage = "https://docs.rs/candid_common"
+documentation = "https://docs.rs/candid_common"
+repository = "https://github.com/dfinity/candid"
+license = "Apache-2.0"
+readme = "README.md"
+
+categories = ["encoding", "wasm"]
+keywords = ["internet-computer", "idl", "candid", "dfinity", "parser"]
+include = ["src", "README.md", "Cargo.toml", "LICENSE"]

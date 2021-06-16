@@ -1,4 +1,5 @@
-use super::{candid_path, idl_hash};
+use super::candid_path;
+use candid_common::idl_hash;
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::BTreeSet;

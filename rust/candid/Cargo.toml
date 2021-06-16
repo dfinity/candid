@@ -20,6 +20,7 @@ lalrpop = "0.19.0"
 
 [dependencies]
 byteorder = "1.4.3"
+candid_common = { path = "../candid_common", version = "1.0" }
 candid_derive = { path = "../candid_derive", version = "=0.4.4" }
 codespan-reporting = "0.11"
 hex = "0.4.2"

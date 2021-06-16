@@ -252,6 +252,7 @@ dependencies = [
  "arbitrary",
  "binread",
  "byteorder",
+ "candid_common",
  "candid_derive",
  "codespan-reporting",
  "criterion",
@@ -277,9 +278,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "candid_common"
+version = "1.0.0"
+
+[[package]]
 name = "candid_derive"
 version = "0.4.4"
 dependencies = [
+ "candid_common",
  "lazy_static",
  "proc-macro2 1.0.27",
  "quote 1.0.9",
