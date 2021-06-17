@@ -59,9 +59,9 @@ assert blob "DIDL\01\6a\01\71\01\7d\01\03\01\00\01\01\03\ca\ff\ee\03foo" !: (fun
 
 // subtype
 assert blob "DIDL\01\69\00\01\00\01\03\ca\ff\ee"    !: (service { foo : (text) -> (nat) }) "service {} !<: service { foo : (text) -> (nat) }";
-assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\01\01\01\03\ca\ff\ee"   !: (service { foo : (text) -> (nat) }) "service { foo : (text) -> (nat) query } !<: service { foo : (text) -> (nat) }";
-assert blob "DIDL\02\6a\01\71\01\7d\01\01\69\01\03foo\00\01\01\01\03\ca\ff\ee"   !: (service { foo : (text) -> (nat) query }) "service { foo : (text) -> (nat) } !<: service { foo : (text) -> (nat) query }";
+assert blob "DIDL\02\6a\01\71\01\7d\01\01\69\01\03foo\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat) }) "service { foo : (text) -> (nat) query } !<: service { foo : (text) -> (nat) }";
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat) query }) "service { foo : (text) -> (nat) } !<: service { foo : (text) -> (nat) query }";
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\01\01\01\03\ca\ff\ee" == "(service \"w7x7r-cok77-xa\")" : (service {}) "service { foo : (text) -> (nat) } decodes at service {}";
 
-assert blob "DIDL\01\6a\00\00\00\01\00\01\01\03\ca\ff\ee\03foo" !: (func (text) -> (nat)) "func () -> () !<: (text) -> (nat) }";
-assert blob "DIDL\01\6a\01\71\01\7d\00\01\00\01\01\03\ca\ff\ee\03foo" == "(func \"w7x7r-cok77-xa\".foo)" : (func (text, opt text) -> ()) "func (text) -> (nat) decodes at func () -> () }";
+assert blob "DIDL\01\6a\00\00\00\01\00\01\01\03\ca\ff\ee\03foo" !: (func (text) -> (nat)) "func () -> () !<: func (text) -> (nat) }";
+assert blob "DIDL\01\6a\01\71\01\7d\00\01\00\01\01\03\ca\ff\ee\03foo" == "(func \"w7x7r-cok77-xa\".foo)" : (func (text, opt text) -> ()) "func (text) -> (nat) decodes at func (text, opt text) -> () }";
