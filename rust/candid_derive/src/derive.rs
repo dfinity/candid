@@ -8,7 +8,7 @@ use syn::{Data, DeriveInput, GenericParam, Generics, Token};
 
 pub(crate) fn derive_idl_type(
     input: DeriveInput,
-    custom_candid_path: &Option<TokenStream>
+    custom_candid_path: &Option<TokenStream>,
 ) -> TokenStream {
     let candid = candid_path(custom_candid_path);
     let name = input.ident;
@@ -100,7 +100,7 @@ impl Variant {
 fn enum_from_ast(
     name: &syn::Ident,
     variants: &Punctuated<syn::Variant, Token![,]>,
-    custom_candid_path: &Option<TokenStream>
+    custom_candid_path: &Option<TokenStream>,
 ) -> (TokenStream, TokenStream) {
     let mut fs: Vec<_> = variants
         .iter()
@@ -179,7 +179,11 @@ fn enum_from_ast(
     (ty_gen, variant_gen)
 }
 
-fn serialize_struct(idents: &[Ident], is_bytes: &[bool], custom_candid_path: &Option<TokenStream>) -> TokenStream {
+fn serialize_struct(
+    idents: &[Ident],
+    is_bytes: &[bool],
+    custom_candid_path: &Option<TokenStream>,
+) -> TokenStream {
     let candid = candid_path(custom_candid_path);
     let id = idents.iter().map(|ident| ident.to_token());
     let ser_elem = id.zip(is_bytes.iter()).map(|(id, is_bytes)| {
@@ -196,7 +200,10 @@ fn serialize_struct(idents: &[Ident], is_bytes: &[bool], custom_candid_path: &Op
     }
 }
 
-fn struct_from_ast(fields: &syn::Fields, custom_candid_path: &Option<TokenStream>) -> (TokenStream, Vec<Ident>, Vec<bool>) {
+fn struct_from_ast(
+    fields: &syn::Fields,
+    custom_candid_path: &Option<TokenStream>,
+) -> (TokenStream, Vec<Ident>, Vec<bool>) {
     let candid = candid_path(custom_candid_path);
     match *fields {
         syn::Fields::Named(ref fields) => {
@@ -317,7 +324,7 @@ fn get_attrs(attrs: &[syn::Attribute]) -> Attributes {
 
 fn fields_from_ast(
     fields: &Punctuated<syn::Field, syn::Token![,]>,
-    custom_candid_path: &Option<TokenStream>
+    custom_candid_path: &Option<TokenStream>,
 ) -> (TokenStream, Vec<Ident>, Vec<bool>) {
     let candid = candid_path(custom_candid_path);
     let mut fs: Vec<_> = fields
