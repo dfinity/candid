@@ -2,8 +2,7 @@
 
 use super::error::{Error, Result};
 use super::parser::{typing::TypeEnv, value::IDLValue};
-use super::types;
-use super::types::{internal::Opcode, Field, Type};
+use super::types::{self, CandidTyping, IdlSerialize, internal::Opcode, Field, Type};
 use byteorder::{LittleEndian, WriteBytesExt};
 use leb128::write::{signed as sleb128_encode, unsigned as leb128_encode};
 use std::collections::HashMap;
@@ -28,13 +27,12 @@ impl IDLBuilder {
             value_ser: ValueSerializer::new(),
         }
     }
-    pub fn arg<'a, T: types::CandidType>(&'a mut self, value: &T) -> Result<&'a mut Self> {
+    pub fn arg<'a, T: ?Sized+CandidTyping>(&'a mut self, value: &T) -> Result<&'a mut Self> {
         self.type_ser.push_type(&T::ty())?;
         value.idl_serialize(&mut self.value_ser)?;
         Ok(self)
     }
     pub fn value_arg<'a>(&'a mut self, value: &IDLValue) -> Result<&'a mut Self> {
-        use super::CandidType;
         self.type_ser.push_type(&value.value_ty())?;
         value.idl_serialize(&mut self.value_ser)?;
         Ok(self)
@@ -47,7 +45,6 @@ impl IDLBuilder {
         env: &TypeEnv,
         t: &Type,
     ) -> Result<&'a mut Self> {
-        use super::CandidType;
         let env = self.type_ser.env.merge(env)?;
         let v = value.annotate_type(true, env, t)?;
         self.type_ser.push_type(t)?;
@@ -157,7 +154,7 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
     }
     fn serialize_option<T: ?Sized>(self, v: Option<&T>) -> Result<()>
     where
-        T: super::CandidType,
+        T: IdlSerialize,
     {
         match v {
             None => {
@@ -195,7 +192,7 @@ impl<'a> types::Compound for Compound<'a> {
     type Error = Error;
     fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<()>
     where
-        T: types::CandidType,
+        T: IdlSerialize,
     {
         value.idl_serialize(&mut *self.ser)?;
         Ok(())

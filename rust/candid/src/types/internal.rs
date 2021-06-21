@@ -1,4 +1,4 @@
-use super::CandidType;
+use super::{CandidType, CandidTyping};
 use crate::idl_hash;
 use num_enum::TryFromPrimitive;
 use std::cell::RefCell;

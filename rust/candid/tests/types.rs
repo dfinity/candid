@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use candid::types::{get_type, Label, Type};
-use candid::{candid_method, CandidType, Int};
+use candid::{candid_method, CandidType, types::CandidTyping, Int};
 
 #[test]
 fn test_primitive() {

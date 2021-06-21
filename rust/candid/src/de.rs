@@ -3,8 +3,8 @@
 use super::error::{Error, Result};
 use super::{
     parser::typing::TypeEnv,
-    types::{Field, Label, Type},
-    CandidType, Int, Nat,
+    types::{CandidTyping, Field, Label, Type},
+    Int, Nat,
 };
 use crate::binary_parser::{BoolValue, Header, Len, PrincipalBytes};
 use crate::types::subtype::{subtype, Gamma};
@@ -29,7 +29,7 @@ impl<'de> IDLDeserialize<'de> {
     /// Deserialize one value from deserializer.
     pub fn get_value<T>(&mut self) -> Result<T>
     where
-        T: de::Deserialize<'de> + CandidType,
+        T: de::Deserialize<'de> + CandidTyping,
     {
         self.de.is_untyped = false;
         self.deserialize_with_type(T::ty())
@@ -45,7 +45,7 @@ impl<'de> IDLDeserialize<'de> {
     }
     fn deserialize_with_type<T>(&mut self, expected_type: Type) -> Result<T>
     where
-        T: de::Deserialize<'de> + CandidType,
+        T: de::Deserialize<'de>,
     {
         let expected_type = self.de.table.trace_type(&expected_type)?;
         if self.de.types.is_empty() {

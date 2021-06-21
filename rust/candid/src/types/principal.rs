@@ -1,6 +1,15 @@
-use super::{CandidType, Serializer, Type, TypeId};
+use super::{CandidType, IdlSerialize, Serializer, Type, TypeId};
 
-pub type Principal = ic_types::Principal;
+pub use ic_types::Principal;
+
+impl IdlSerialize for Principal {
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_principal(self.as_slice())
+    }
+}
 
 impl CandidType for Principal {
     fn id() -> TypeId {
@@ -8,11 +17,5 @@ impl CandidType for Principal {
     }
     fn _ty() -> Type {
         Type::Principal
-    }
-    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_principal(self.as_slice())
     }
 }

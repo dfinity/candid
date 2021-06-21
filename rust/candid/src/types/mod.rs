@@ -17,8 +17,18 @@ pub mod principal;
 pub mod reference;
 pub mod reserved;
 
-pub trait CandidType {
-    // memoized type derivation
+pub trait IdlSerialize {
+    // only serialize the value encoding
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer;
+}
+
+pub trait CandidTyping: IdlSerialize {
+    fn ty() -> Type;
+}
+
+impl<T: CandidType+?Sized> CandidTyping for T {
     fn ty() -> Type {
         let id = Self::id();
         if let Some(t) = self::internal::find_type(&id) {
@@ -34,14 +44,14 @@ pub trait CandidType {
             t
         }
     }
+}
+
+pub trait CandidType: IdlSerialize {
+    // memoized type derivation
     fn id() -> TypeId {
         TypeId::of::<Self>()
     }
     fn _ty() -> Type;
-    // only serialize the value encoding
-    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
-    where
-        S: Serializer;
 }
 
 pub trait Serializer: Sized {
@@ -65,7 +75,7 @@ pub trait Serializer: Sized {
     fn serialize_empty(self) -> Result<(), Self::Error>;
     fn serialize_option<T: ?Sized>(self, v: Option<&T>) -> Result<(), Self::Error>
     where
-        T: CandidType;
+        T: IdlSerialize;
     fn serialize_struct(self) -> Result<Self::Compound, Self::Error>;
     fn serialize_vec(self, len: usize) -> Result<Self::Compound, Self::Error>;
     fn serialize_blob(self, v: &[u8]) -> Result<(), Self::Error>;
@@ -78,7 +88,7 @@ pub trait Compound {
     type Error;
     fn serialize_element<T: ?Sized>(&mut self, v: &T) -> Result<(), Self::Error>
     where
-        T: CandidType;
+        T: IdlSerialize;
     // Used for simulating serde(with = "serde_bytes"). We can remove this when specialization is stable in Rust,
     // or generalize this function to take a closure for with.
     #[doc(hidden)]

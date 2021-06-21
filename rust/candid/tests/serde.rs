@@ -1,5 +1,5 @@
 #![allow(clippy::unit_cmp)]
-use candid::{decode_one, encode_one, CandidType, Decode, Deserialize, Encode, Int, Nat};
+use candid::{decode_one, encode_one, CandidType, types::CandidTyping, Decode, Deserialize, Encode, Int, Nat};
 
 #[test]
 fn test_error() {
@@ -608,7 +608,7 @@ fn hex(bytes: &str) -> Vec<u8> {
 
 fn all_check<T>(value: T, bytes: &str)
 where
-    T: PartialEq + CandidType + serde::de::DeserializeOwned + std::fmt::Debug,
+    T: PartialEq + CandidTyping + serde::de::DeserializeOwned + std::fmt::Debug,
 {
     let bytes = hex(bytes);
     test_encode(&value, &bytes);
@@ -617,9 +617,9 @@ where
 
 fn test_encode<T>(value: &T, expected: &[u8])
 where
-    T: CandidType,
+    T: CandidTyping,
 {
-    let encoded = encode(&value);
+    let encoded = encode(value);
     assert_eq!(
         encoded, expected,
         "\nActual\n{:02x?}\nExpected\n{:02x?}\n",
@@ -629,7 +629,7 @@ where
 
 fn test_decode<'de, T>(bytes: &'de [u8], expected: &T)
 where
-    T: PartialEq + serde::de::Deserialize<'de> + std::fmt::Debug + CandidType,
+    T: PartialEq + serde::de::Deserialize<'de> + std::fmt::Debug + CandidTyping,
 {
     let decoded_one = decode_one::<T>(bytes).unwrap();
     let decoded_macro = Decode!(bytes, T).unwrap();
@@ -637,9 +637,9 @@ where
     assert_eq!(decoded_macro, *expected);
 }
 
-fn encode<T: CandidType>(value: &T) -> Vec<u8> {
+fn encode<T: CandidTyping>(value: &T) -> Vec<u8> {
     let encode_one = encode_one(value).unwrap();
-    let encode_macro = Encode!(&value).unwrap();
+    let encode_macro = Encode!(value).unwrap();
 
     assert_eq!(encode_one, encode_macro);
     encode_one

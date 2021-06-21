@@ -21,18 +21,19 @@ pub(crate) fn derive_idl_type(input: DeriveInput) -> TokenStream {
         Data::Union(_) => unimplemented!("doesn't derive union type"),
     };
     let gen = quote! {
-        impl #impl_generics #candid::types::CandidType for #name #ty_generics #where_clause {
-            fn _ty() -> #candid::types::Type {
-                #ty_body
-            }
-            fn id() -> #candid::types::TypeId { #candid::types::TypeId::of::<#name #ty_generics>() }
-
+        impl #impl_generics #candid::types::IdlSerialize for #name #ty_generics #where_clause {
             fn idl_serialize<__S>(&self, __serializer: __S) -> ::std::result::Result<(), __S::Error>
                 where
                 __S: #candid::types::Serializer,
                 {
                     #ser_body
                 }
+        }
+        impl #impl_generics #candid::types::CandidType for #name #ty_generics #where_clause {
+            fn _ty() -> #candid::types::Type {
+                #ty_body
+            }
+            fn id() -> #candid::types::TypeId { #candid::types::TypeId::of::<#name #ty_generics>() }
         }
     };
     //panic!(gen.to_string());
@@ -382,7 +383,7 @@ fn fields_from_ast(
 fn derive_type(t: &syn::Type) -> TokenStream {
     let candid = candid_path();
     quote! {
-        <#t as #candid::types::CandidType>::ty()
+        <#t as #candid::types::CandidTyping>::ty()
     }
 }
 

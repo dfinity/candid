@@ -346,16 +346,14 @@ impl IDLValue {
     }
 }
 
-impl crate::CandidType for IDLValue {
+
+impl crate::types::CandidTyping for IDLValue {
     fn ty() -> Type {
         Type::Unknown
     }
-    fn id() -> crate::types::TypeId {
-        unreachable!();
-    }
-    fn _ty() -> Type {
-        Type::Unknown
-    }
+}
+
+impl crate::types::IdlSerialize for IDLValue {
     fn idl_serialize<S>(&self, serializer: S) -> std::result::Result<(), S::Error>
     where
         S: crate::types::Serializer,

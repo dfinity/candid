@@ -1,6 +1,6 @@
 //! Data structure for Candid value Func and Service
 
-use super::{CandidType, Function, Serializer, Type};
+use super::{CandidType, Function, IdlSerialize, Serializer, Type};
 use ic_types::Principal;
 use serde::de::{self, Deserialize, Visitor};
 use std::convert::TryFrom;
@@ -16,6 +16,14 @@ pub struct Service {
     pub principal: Principal,
 }
 
+impl IdlSerialize for Func {
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_function(self.principal.as_slice(), &self.method)
+    }
+}
 impl CandidType for Func {
     fn _ty() -> Type {
         Type::Func(Function {
@@ -24,22 +32,18 @@ impl CandidType for Func {
             rets: Vec::new(),
         })
     }
-    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_function(self.principal.as_slice(), &self.method)
-    }
 }
-impl CandidType for Service {
-    fn _ty() -> Type {
-        Type::Service(Vec::new())
-    }
+impl IdlSerialize for Service {
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
         S: Serializer,
     {
         serializer.serialize_principal(self.principal.as_slice())
+    }
+}
+impl CandidType for Service {
+    fn _ty() -> Type {
+        Type::Service(Vec::new())
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::de::IDLDeserialize;
 use crate::ser::IDLBuilder;
-use crate::{CandidType, Result};
+use crate::{types::CandidTyping, Result};
 use serde::de::Deserialize;
 
 /// Encode sequence of Rust values into Candid message of type `candid::Result<Vec<u8>>`.
@@ -78,7 +78,7 @@ where
 /// ```
 pub fn decode_one<'a, T>(bytes: &'a [u8]) -> Result<T>
 where
-    T: Deserialize<'a> + CandidType,
+    T: Deserialize<'a> + CandidTyping,
 {
     let (res,) = decode_args(bytes)?;
     Ok(res)
@@ -92,7 +92,7 @@ where
 /// let golden1 = 1u64;
 /// let golden2 = "hello";
 /// let mut buffer = Vec::new();
-/// write_args(&mut buffer, (golden1, golden2)).unwrap();
+/// write_args(&mut buffer, (&golden1, golden2)).unwrap();
 ///
 /// let (value1, value2) = Decode!(&buffer, u64, String).unwrap();
 /// assert_eq!(golden1, value1);
@@ -114,7 +114,7 @@ pub fn write_args<Tuple: ArgumentEncoder, Writer: std::io::Write>(
 /// # use candid::encode_args;
 /// let golden1 = 1u64;
 /// let golden2 = "hello";
-/// let buffer = encode_args((golden1, golden2)).unwrap();
+/// let buffer = encode_args((&golden1, golden2)).unwrap();
 ///
 /// let (value1, value2) = Decode!(&buffer, u64, String).unwrap();
 /// assert_eq!(golden1, value1);
@@ -137,7 +137,7 @@ pub fn encode_args<Tuple: ArgumentEncoder>(arguments: Tuple) -> Result<Vec<u8>> 
 /// let (value) = Decode!(&buffer, String).unwrap();
 /// assert_eq!(golden, value);
 /// ```
-pub fn encode_one<T: CandidType>(argument: T) -> Result<Vec<u8>> {
+pub fn encode_one<T: ?Sized+CandidTyping>(argument: &T) -> Result<Vec<u8>> {
     encode_args((argument,))
 }
 
@@ -172,7 +172,7 @@ macro_rules! decode_impl {
     ( $($id: ident : $typename: ident),* ) => {
         impl<'a, $( $typename ),*> ArgumentDecoder<'a> for ($($typename,)*)
         where
-            $( $typename: Deserialize<'a> + CandidType ),*
+            $( $typename: Deserialize<'a> + CandidTyping ),*
         {
             fn decode(de: &mut IDLDeserialize<'a>) -> Result<Self> {
                 $(
@@ -188,14 +188,14 @@ macro_rules! decode_impl {
 // Create implementation of [ArgumentEncoder] for up to 16 value tuples.
 macro_rules! encode_impl {
     ( $($id: ident : $typename: ident),* ) => {
-        impl<$( $typename ),*> ArgumentEncoder for ($($typename,)*)
+        impl<'a, $( $typename ),*> ArgumentEncoder for ($(&'a $typename,)*)
         where
-            $( $typename: CandidType ),*
+            $( $typename: ?Sized+CandidTyping ),*
         {
             fn encode(self, ser: &mut IDLBuilder) -> Result<()> {
                 let ( $( $id, )* ) = self;
                 $(
-                ser.arg(&$id)?;
+                ser.arg($id)?;
                 )*
 
                 Ok(())
