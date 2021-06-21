@@ -670,7 +670,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let wire = w[index].clone();
                 let expect = e
                     .iter()
-                    .find(|ref f| f.id == wire.id)
+                    .find(|f| f.id == wire.id)
                     .ok_or_else(|| Error::msg(format!("Unknown variant field {}", wire.id)))?
                     .clone();
                 visitor.visit_enum(Compound::new(&mut self, Style::Enum { expect, wire }))

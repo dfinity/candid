@@ -33,7 +33,7 @@ pub fn candid_id_to_rust(id: &str) -> String {
     if id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
         || id.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
     {
-        format!("_{}_", idl_hash(&id))
+        format!("_{}_", idl_hash(id))
     } else if is_keyword(id) {
         format!("r#{}", id)
     } else {
@@ -270,16 +270,16 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
 
     fn declare(&self, id: &str, ty: &IDLType) -> Result<String> {
         match ty {
-            IDLType::PrimT(prim) => self.declare_prim(&id, prim),
-            IDLType::VarT(var) => self.declare_var(&id, var),
-            IDLType::FuncT(func) => self.declare_func(&id, func),
-            IDLType::OptT(sub_t) => self.declare_opt(&id, sub_t.as_ref()),
-            IDLType::VecT(item_t) => self.declare_vec(&id, item_t.as_ref()),
-            IDLType::RecordT(fields) => self.declare_record(&id, fields),
-            IDLType::VariantT(fields) => self.declare_variant(&id, fields),
-            IDLType::ServT(serv_t) => self.declare_service(&id, serv_t),
+            IDLType::PrimT(prim) => self.declare_prim(id, prim),
+            IDLType::VarT(var) => self.declare_var(id, var),
+            IDLType::FuncT(func) => self.declare_func(id, func),
+            IDLType::OptT(sub_t) => self.declare_opt(id, sub_t.as_ref()),
+            IDLType::VecT(item_t) => self.declare_vec(id, item_t.as_ref()),
+            IDLType::RecordT(fields) => self.declare_record(id, fields),
+            IDLType::VariantT(fields) => self.declare_variant(id, fields),
+            IDLType::ServT(serv_t) => self.declare_service(id, serv_t),
             IDLType::ClassT(_, _) => unreachable!(),
-            IDLType::PrincipalT => self.declare_var(&id, "principal"),
+            IDLType::PrincipalT => self.declare_var(id, "principal"),
         }
     }
     fn declare_prim(&self, id: &str, ty: &PrimType) -> Result<String> {
@@ -356,7 +356,7 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
                         .enumerate()
                         .map(|(i, ty)| {
                             let arg_name = format!("arg{}", i);
-                            let ty = self.usage(&ty)?;
+                            let ty = self.usage(ty)?;
 
                             Ok((arg_name, ty))
                         })
@@ -381,8 +381,8 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
 pub fn idl_to_rust(prog: &IDLProg, config: &Config) -> Result<String> {
     let binding = RustLanguageBinding {
         config,
-        prog: &prog,
+        prog,
     };
 
-    generate_code(&prog, binding)
+    generate_code(prog, binding)
 }
