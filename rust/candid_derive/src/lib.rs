@@ -39,7 +39,7 @@ pub(crate) fn candid_path(
 ) -> proc_macro2::TokenStream {
     match custom_candid_path {
         Some(custom_candid_path_value) => custom_candid_path_value.clone(),
-        None => quote::quote! { ::ic_cdk::export::candid }
+        None => quote::quote! { ::ic_cdk::export::candid },
     }
 }
 
@@ -49,7 +49,7 @@ pub(crate) fn candid_path(
 ) -> proc_macro2::TokenStream {
     match custom_candid_path {
         Some(custom_candid_path_value) => custom_candid_path_value.clone(),
-        None => quote::quote! { ::candid }
+        None => quote::quote! { ::candid },
     }
 }
 
