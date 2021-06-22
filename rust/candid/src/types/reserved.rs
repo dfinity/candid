@@ -1,6 +1,6 @@
 //! Data structure for Candid type Reserved and Empty.
 
-use super::{CandidType, IdlSerialize, Serializer, Type, TypeId};
+use super::{CandidType, CandidTypeCache, IdlSerialize, Serializer, Type, TypeId};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use std::fmt;
 
@@ -21,7 +21,7 @@ impl CandidType for Reserved {
     fn id() -> TypeId {
         TypeId::of::<Reserved>()
     }
-    fn _ty() -> Type {
+    fn _ty<C: CandidTypeCache>(_c: &mut C) -> Type {
         Type::Reserved
     }
 }
@@ -38,7 +38,7 @@ impl CandidType for Empty {
     fn id() -> TypeId {
         TypeId::of::<Empty>()
     }
-    fn _ty() -> Type {
+    fn _ty<C: CandidTypeCache>(_c: &mut C) -> Type {
         Type::Empty
     }
 }

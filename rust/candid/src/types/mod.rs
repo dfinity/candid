@@ -24,25 +24,50 @@ pub trait IdlSerialize {
         S: Serializer;
 }
 
-pub trait CandidTyping: IdlSerialize {
-    fn ty() -> Type;
+pub trait CandidTyping<Cache = StaticCache>: IdlSerialize {
+    fn ty() -> Type
+    where
+        Cache: Default,
+    {
+        Self::ty_from_cache(&mut Default::default())
+    }
+
+    fn ty_from_cache(c: &mut Cache) -> Type;
 }
 
-impl<T: CandidType+?Sized> CandidTyping for T {
-    fn ty() -> Type {
+impl<T: CandidType + ?Sized, Cache: CandidTypeCache> CandidTyping<Cache> for T {
+    fn ty_from_cache(c: &mut Cache) -> Type {
         let id = Self::id();
-        if let Some(t) = self::internal::find_type(&id) {
-            match t {
-                Type::Unknown => Type::Knot(id),
-                _ => t,
+        match c.find_type(&id) {
+            Some(Type::Unknown) => Type::Knot(id),
+            Some(t) => t,
+            None => {
+                c.add_type(id.clone(), Type::Unknown);
+                let t = Self::_ty(c);
+                c.add_type(id, t.clone());
+                t
             }
-        } else {
-            self::internal::env_add(id.clone(), Type::Unknown);
-            let t = Self::_ty();
-            self::internal::env_add(id.clone(), t.clone());
-            self::internal::env_id(id, t.clone());
-            t
         }
+    }
+}
+
+pub trait CandidTypeCache {
+    fn find_type(&self, id: &TypeId) -> Option<Type>;
+    fn add_type(&mut self, id: TypeId, ty: Type);
+}
+
+#[derive(Default)]
+pub struct StaticCache;
+
+impl CandidTypeCache for StaticCache {
+    fn find_type(&self, id: &TypeId) -> Option<Type> {
+        self::internal::find_type(&id)
+    }
+    fn add_type(&mut self, id: TypeId, ty: Type) {
+        if ty != Type::Unknown {
+            self::internal::env_id(id.clone(), ty.clone());
+        }
+        self::internal::env_add(id, ty);
     }
 }
 
@@ -51,7 +76,7 @@ pub trait CandidType: IdlSerialize {
     fn id() -> TypeId {
         TypeId::of::<Self>()
     }
-    fn _ty() -> Type;
+    fn _ty<C: CandidTypeCache>(c: &mut C) -> Type;
 }
 
 pub trait Serializer: Sized {

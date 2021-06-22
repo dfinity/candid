@@ -1,4 +1,4 @@
-use super::{CandidType, IdlSerialize, Serializer, Type, TypeId};
+use super::{CandidType, CandidTypeCache, IdlSerialize, Serializer, Type, TypeId};
 
 pub use ic_types::Principal;
 
@@ -15,7 +15,7 @@ impl CandidType for Principal {
     fn id() -> TypeId {
         TypeId::of::<Principal>()
     }
-    fn _ty() -> Type {
+    fn _ty<C: CandidTypeCache>(_c: &mut C) -> Type {
         Type::Principal
     }
 }

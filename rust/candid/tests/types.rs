@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use candid::types::{get_type, Label, Type};
-use candid::{candid_method, CandidType, types::CandidTyping, Int};
+use candid::{candid_method, types::CandidTyping, CandidType, Int};
 
 #[test]
 fn test_primitive() {
@@ -17,14 +17,14 @@ fn test_primitive() {
 fn test_struct() {
     #[derive(Debug, CandidType)]
     struct Newtype(Int);
-    assert_eq!(Newtype::ty(), Type::Int,);
+    assert_eq!(<Newtype as CandidTyping>::ty(), Type::Int,);
     #[derive(Debug, CandidType)]
     struct A {
         foo: Int,
         bar: bool,
     }
     assert_eq!(
-        A::ty(),
+        <A as CandidTyping>::ty(),
         Type::Record(vec![field("bar", Type::Bool), field("foo", Type::Int),])
     );
 
@@ -45,7 +45,7 @@ fn test_struct() {
         tail: Option<Box<List>>,
     }
     assert_eq!(
-        List::ty(),
+        <List as CandidTyping>::ty(),
         Type::Record(vec![
             field("head", Type::Int32),
             field(

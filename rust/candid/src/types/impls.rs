@@ -1,5 +1,5 @@
 use super::internal::*;
-use super::{CandidType, CandidTyping, Compound, IdlSerialize, Serializer};
+use super::{CandidType, CandidTypeCache, CandidTyping, Compound, IdlSerialize, Serializer};
 
 macro_rules! serialize_impl {
     (
@@ -68,17 +68,17 @@ macro_rules! candid_impl {
             $(;)?
             $(const $c:ident: $ct:ty),*
         > for $t:ty,
-        $_ty:expr
+        ($C:ident, $cache:ident) => $_ty:expr
     ) => {
         impl<
             $($l,)*
             $($p$(:$($b)+)?,)*
             $(const $c: $ct),*
         > CandidType for $t {
-            fn _ty() -> Type { $_ty }
+            fn _ty<$C: CandidTypeCache>($cache: &mut $C) -> Type { $_ty }
         }
     };
-    
+
     (
         $($t:ident)::+ $(<
             $($l:lifetime),*
@@ -88,7 +88,7 @@ macro_rules! candid_impl {
             $(;)?
             $(const $c:ident: $ct:ty),*
         >)?,
-        $_ty:expr
+        ($C:ident, $cache:ident) => $_ty:expr
     ) => {
         candid_impl!{
             <$(
@@ -96,12 +96,15 @@ macro_rules! candid_impl {
                 $($p$(:$b)?,)*
                 $(const $c: $ct),*
             )?> for $($t)::+$(<$($l,)*$($p,)*$(const $c: $ct),*>)?,
-            $_ty
+            ($C, $cache) => $_ty
         }
     };
 
+    ($t:ty, ($C:ident, $cache:ident) => $_ty:expr) => {
+        candid_impl!{<> for $t, ($C, $cache) => $_ty}
+    };
     ($t:ty, $_ty:expr) => {
-        candid_impl!{<> for $t, $_ty}
+        candid_impl!{<> for $t, (C, _c) => $_ty}
     };
 }
 
@@ -130,15 +133,15 @@ macro_rules! map_candid_impl {
     ($($t:tt)+) => {
         candid_impl!{
             $($t)+,
-            {
+            (C, c) => {
                 let tuple = Type::Record(vec![
                     Field {
                         id: Label::Id(0),
-                        ty: K::ty(),
+                        ty: <K as CandidTyping<C>>::ty_from_cache(c),
                     },
                     Field {
                         id: Label::Id(1),
-                        ty: V::ty(),
+                        ty: <V as CandidTyping<C>>::ty_from_cache(c),
                     },
                 ]);
                 Type::Vec(Box::new(tuple))
@@ -148,7 +151,7 @@ macro_rules! map_candid_impl {
 }
 macro_rules! seq_candid_impl {
     ($($t:tt)+) => {
-        candid_impl!{$($t)+, Type::Vec(Box::new(K::ty()))}
+        candid_impl!{$($t)+, (C, c) => Type::Vec(Box::new(<K as CandidTyping<C>>::ty_from_cache(c)))}
     };
 }
 
@@ -189,55 +192,54 @@ primitive_impl!(std::path::PathBuf, Text, (self, serializer) => {
 });
 
 // Option
-serialize_impl!{
-    Option<T: (IdlSerialize)>, 
+serialize_impl! {
+    Option<T: (IdlSerialize)>,
     (self, serializer) => serializer.serialize_option(self.as_ref())
 }
-candid_impl!{Option<T: (CandidType)>, Type::Opt(Box::new(T::ty()))}
+candid_impl! {Option<T: (CandidType)>, (C, c) => Type::Opt(Box::new(<T as CandidTyping<C>>::ty_from_cache(c)))}
 
 // [T]
-iter_serialize_impl!{<T: (IdlSerialize)> for [T]}
-candid_impl!{<T: (CandidType)> for [T], Type::Vec(Box::new(T::ty()))}
+iter_serialize_impl! {<T: (IdlSerialize)> for [T]}
+candid_impl! {<T: (CandidType)> for [T], (C, c) => Type::Vec(Box::new(<T as CandidTyping<C>>::ty_from_cache(c)))}
 
-serialize_impl!{
+serialize_impl! {
     serde_bytes::ByteBuf,
     (self, serializer) => serializer.serialize_blob(self.as_slice())
 }
-candid_impl!{serde_bytes::ByteBuf, Type::Vec(Box::new(Type::Nat8))}
+candid_impl! {serde_bytes::ByteBuf, Type::Vec(Box::new(Type::Nat8))}
 
-serialize_impl!{
+serialize_impl! {
     serde_bytes::Bytes,
     (self, serializer) => serializer.serialize_blob(self.as_ref())
 }
-candid_impl!{serde_bytes::Bytes, Type::Vec(Box::new(Type::Nat8))}
-
+candid_impl! {serde_bytes::Bytes, Type::Vec(Box::new(Type::Nat8))}
 
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque};
 use std::hash::{BuildHasher, Hash};
-iter_serialize_impl!{BTreeMap<K: (Ord+IdlSerialize), V: (IdlSerialize)>}
-map_candid_impl!{BTreeMap<K: (Ord+CandidType), V: (CandidType)>}
+iter_serialize_impl! {BTreeMap<K: (Ord+IdlSerialize), V: (IdlSerialize)>}
+map_candid_impl! {BTreeMap<K: (Ord+CandidType), V: (CandidType)>}
 
-iter_serialize_impl!{HashMap<K: (Eq+Hash+IdlSerialize), V: (IdlSerialize), H: (BuildHasher)>}
-map_candid_impl!{HashMap<K: (Eq+Hash+CandidType), V: (CandidType), H: (BuildHasher)>}
+iter_serialize_impl! {HashMap<K: (Eq+Hash+IdlSerialize), V: (IdlSerialize), H: (BuildHasher)>}
+map_candid_impl! {HashMap<K: (Eq+Hash+CandidType), V: (CandidType), H: (BuildHasher)>}
 
-iter_serialize_impl!{Vec<K: (IdlSerialize)>}
-seq_candid_impl!{Vec<K: (CandidType)>}
-iter_serialize_impl!{VecDeque<K: (IdlSerialize)>}
-seq_candid_impl!{VecDeque<K: (CandidType)>}
-iter_serialize_impl!{LinkedList<K: (IdlSerialize)>}
-seq_candid_impl!{LinkedList<K: (CandidType)>}
-iter_serialize_impl!{BinaryHeap<K: (Ord+IdlSerialize)>}
-seq_candid_impl!{BinaryHeap<K: (Ord+CandidType)>}
-iter_serialize_impl!{BTreeSet<K: (Ord+IdlSerialize)>}
-seq_candid_impl!{BTreeSet<K: (Ord+CandidType)>}
-iter_serialize_impl!{HashSet<K: (Eq+Hash+IdlSerialize), H: (BuildHasher)>}
-seq_candid_impl!{HashSet<K: (Eq+Hash+CandidType), H: (BuildHasher)>}
+iter_serialize_impl! {Vec<K: (IdlSerialize)>}
+seq_candid_impl! {Vec<K: (CandidType)>}
+iter_serialize_impl! {VecDeque<K: (IdlSerialize)>}
+seq_candid_impl! {VecDeque<K: (CandidType)>}
+iter_serialize_impl! {LinkedList<K: (IdlSerialize)>}
+seq_candid_impl! {LinkedList<K: (CandidType)>}
+iter_serialize_impl! {BinaryHeap<K: (Ord+IdlSerialize)>}
+seq_candid_impl! {BinaryHeap<K: (Ord+CandidType)>}
+iter_serialize_impl! {BTreeSet<K: (Ord+IdlSerialize)>}
+seq_candid_impl! {BTreeSet<K: (Ord+CandidType)>}
+iter_serialize_impl! {HashSet<K: (Eq+Hash+IdlSerialize), H: (BuildHasher)>}
+seq_candid_impl! {HashSet<K: (Eq+Hash+CandidType), H: (BuildHasher)>}
 
-iter_serialize_impl!{<T: (IdlSerialize); const N: usize> for [T; N]}
-candid_impl!{<T: (CandidType); const N: usize> for [T; N], Type::Vec(Box::new(T::ty()))}
+iter_serialize_impl! {<T: (IdlSerialize); const N: usize> for [T; N]}
+candid_impl! {<T: (CandidType); const N: usize> for [T; N], (C, c) => Type::Vec(Box::new(<T as CandidTyping<C>>::ty_from_cache(c)))}
 
-serialize_impl!{
-    Result<T: (IdlSerialize), E: (IdlSerialize)>, 
+serialize_impl! {
+    Result<T: (IdlSerialize), E: (IdlSerialize)>,
     (self, serializer) => {
         match *self {
             Result::Ok(ref v) => {
@@ -251,25 +253,25 @@ serialize_impl!{
         }
     }
 }
-candid_impl!{Result<T: (CandidType), E: (CandidType)>, Type::Variant(vec![
+candid_impl! {Result<T: (CandidType), E: (CandidType)>, (C, c) => Type::Variant(vec![
     // Make sure the field id is sorted by idl_hash
     Field {
         id: Label::Named("Ok".to_owned()),
-        ty: T::ty(),
+        ty: <T as CandidTyping<C>>::ty_from_cache(c),
     },
     Field {
         id: Label::Named("Err".to_owned()),
-        ty: E::ty(),
+        ty: <E as CandidTyping<C>>::ty_from_cache(c),
     },
 ])}
 
-serialize_impl!{
+serialize_impl! {
     Box<T: (?Sized + IdlSerialize)>,
     (self, serializer) => (**self).idl_serialize(serializer)
 }
-candid_impl!{Box<T: (?Sized+CandidType)>, T::ty()}
+candid_impl! {Box<T: (?Sized+CandidType)>, (C, c) => <T as CandidTyping<C>>::ty_from_cache(c)}
 
-serialize_impl!{
+serialize_impl! {
     <'a, T: (?Sized + IdlSerialize)> for &'a T,
     (self, serializer) => (**self).idl_serialize(serializer)
 }
@@ -280,12 +282,12 @@ where
     fn id() -> TypeId {
         TypeId::of::<&T>() // ignore lifetime
     }
-    fn _ty() -> Type {
-        T::ty()
+    fn _ty<C: CandidTypeCache>(c: &mut C) -> Type {
+        <T as CandidTyping<C>>::ty_from_cache(c)
     }
 }
 
-serialize_impl!{
+serialize_impl! {
     <'a, T: (?Sized + IdlSerialize)> for &'a mut T,
     (self, serializer) => (**self).idl_serialize(serializer)
 }
@@ -296,25 +298,24 @@ where
     fn id() -> TypeId {
         TypeId::of::<&T>() // ignore lifetime
     }
-    fn _ty() -> Type {
-        T::ty()
+    fn _ty<C: CandidTypeCache>(c: &mut C) -> Type {
+        <T as CandidTyping<C>>::ty_from_cache(c)
     }
 }
 
-
-serialize_impl!{
+serialize_impl! {
     std::borrow::Cow<'a, T: (?Sized + IdlSerialize + ToOwned)>,
     (self, serializer) => (**self).idl_serialize(serializer)
 }
-candid_impl!{std::borrow::Cow<'a, T: (?Sized + CandidType + ToOwned)>, T::ty()}
+candid_impl! {std::borrow::Cow<'a, T: (?Sized + CandidType + ToOwned)>, (C, c) => <T as CandidTyping<C>>::ty_from_cache(c)}
 
-serialize_impl!{
+serialize_impl! {
     std::cell::Cell<T: (IdlSerialize + Copy)>,
     (self, serializer) => self.get().idl_serialize(serializer)
 }
-candid_impl!{std::cell::Cell<T: (CandidType + Copy)>, T::ty()}
+candid_impl! {std::cell::Cell<T: (CandidType + Copy)>, (C, c) => <T as CandidTyping<C>>::ty_from_cache(c)}
 
-serialize_impl!{
+serialize_impl! {
     std::cell::RefCell<T: (IdlSerialize)>,
     (self, serializer) => {
         use serde::ser::Error;
@@ -324,7 +325,7 @@ serialize_impl!{
         }
     }
 }
-candid_impl!{std::cell::RefCell<T: (CandidType)>, T::ty()}
+candid_impl! {std::cell::RefCell<T: (CandidType)>, (C, c) => <T as CandidTyping<C>>::ty_from_cache(c)}
 
 macro_rules! tuple_impls {
     ($($len:expr => ($($n:tt $name:ident)+))+) => {
@@ -342,8 +343,8 @@ macro_rules! tuple_impls {
 
             candid_impl!{
                 <$($name: (CandidType)),+> for ($($name,)+),
-                Type::Record(vec![
-                    $(Field{ id: Label::Id($n), ty: $name::ty() },)+
+                (C, c) => Type::Record(vec![
+                    $(Field{ id: Label::Id($n), ty: <$name as CandidTyping<C>>::ty_from_cache(c) },)+
                 ])
             }
         )+
@@ -369,7 +370,7 @@ tuple_impls! {
     16 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14 15 T15)
 }
 
-serialize_impl!{
+serialize_impl! {
     std::time::SystemTime,
     (self, serializer) => {
         use serde::ser::Error;
@@ -388,22 +389,20 @@ serialize_impl!{
         Ok(())
     }
 }
-impl CandidType for std::time::SystemTime {
-    fn _ty() -> Type {
-        Type::Record(vec![
-            Field {
-                id: Label::Named("nanos_since_epoch".to_owned()),
-                ty: u32::ty(),
-            },
-            Field {
-                id: Label::Named("secs_since_epoch".to_owned()),
-                ty: u64::ty(),
-            },
-        ])
-    }
+
+candid_impl! {std::time::SystemTime, (C, c) => Type::Record(vec![
+        Field {
+            id: Label::Named("nanos_since_epoch".to_owned()),
+            ty: <u32 as CandidTyping<C>>::ty_from_cache(c),
+        },
+        Field {
+            id: Label::Named("secs_since_epoch".to_owned()),
+            ty: <u64 as CandidTyping<C>>::ty_from_cache(c),
+        },
+    ])
 }
 
-serialize_impl!{
+serialize_impl! {
     std::time::Duration,
     (self, serializer) => {
         let secs: u64 = self.as_secs();
@@ -416,17 +415,14 @@ serialize_impl!{
         Ok(())
     }
 }
-impl CandidType for std::time::Duration {
-    fn _ty() -> Type {
-        Type::Record(vec![
-            Field {
-                id: Label::Named("secs".to_owned()),
-                ty: u64::ty(),
-            },
-            Field {
-                id: Label::Named("nanos".to_owned()),
-                ty: u32::ty(),
-            },
-        ])
-    }    
+candid_impl! {std::time::Duration, (C, c) => Type::Record(vec![
+        Field {
+            id: Label::Named("secs".to_owned()),
+            ty: <u64 as CandidTyping<C>>::ty_from_cache(c),
+        },
+        Field {
+            id: Label::Named("nanos".to_owned()),
+            ty: <u32 as CandidTyping<C>>::ty_from_cache(c),
+        },
+    ])
 }

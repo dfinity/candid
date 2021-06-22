@@ -30,7 +30,7 @@ pub(crate) fn derive_idl_type(input: DeriveInput) -> TokenStream {
                 }
         }
         impl #impl_generics #candid::types::CandidType for #name #ty_generics #where_clause {
-            fn _ty() -> #candid::types::Type {
+            fn _ty<C: #candid::types::CandidTypeCache>(_c: &mut C) -> #candid::types::Type {
                 #ty_body
             }
             fn id() -> #candid::types::TypeId { #candid::types::TypeId::of::<#name #ty_generics>() }
@@ -383,7 +383,7 @@ fn fields_from_ast(
 fn derive_type(t: &syn::Type) -> TokenStream {
     let candid = candid_path();
     quote! {
-        <#t as #candid::types::CandidTyping>::ty()
+        <#t as #candid::types::CandidTyping<C>>::ty_from_cache(_c)
     }
 }
 

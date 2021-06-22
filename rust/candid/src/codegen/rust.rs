@@ -379,10 +379,7 @@ impl<'a> LanguageBinding for RustLanguageBinding<'a> {
 
 /// Takes an IDL string and returns a Rust string, unformatted.
 pub fn idl_to_rust(prog: &IDLProg, config: &Config) -> Result<String> {
-    let binding = RustLanguageBinding {
-        config,
-        prog,
-    };
+    let binding = RustLanguageBinding { config, prog };
 
     generate_code(prog, binding)
 }

@@ -1,6 +1,6 @@
 //! Data structure for Candid value Func and Service
 
-use super::{CandidType, Function, IdlSerialize, Serializer, Type};
+use super::{CandidType, CandidTypeCache, Function, IdlSerialize, Serializer, Type};
 use ic_types::Principal;
 use serde::de::{self, Deserialize, Visitor};
 use std::convert::TryFrom;
@@ -25,7 +25,7 @@ impl IdlSerialize for Func {
     }
 }
 impl CandidType for Func {
-    fn _ty() -> Type {
+    fn _ty<C: CandidTypeCache>(_c: &mut C) -> Type {
         Type::Func(Function {
             modes: Vec::new(),
             args: Vec::new(),
@@ -42,7 +42,7 @@ impl IdlSerialize for Service {
     }
 }
 impl CandidType for Service {
-    fn _ty() -> Type {
+    fn _ty<C: CandidTypeCache>(_c: &mut C) -> Type {
         Type::Service(Vec::new())
     }
 }

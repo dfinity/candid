@@ -89,7 +89,7 @@ impl TypeContainer {
         }
     }
     pub fn add<T: CandidType>(&mut self) -> Type {
-        let t = T::ty();
+        let t = <T as CandidTyping>::ty();
         self.go(&t)
     }
     fn go(&mut self, t: &Type) -> Type {
@@ -395,5 +395,5 @@ pub fn get_type<T>(_v: &T) -> Type
 where
     T: CandidType,
 {
-    T::ty()
+    <T as CandidTyping>::ty()
 }

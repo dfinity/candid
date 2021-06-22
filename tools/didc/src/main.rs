@@ -1,7 +1,6 @@
 use anyhow::{bail, Result};
 use candid::{
-    check_prog,
-    idl_hash,
+    check_prog, idl_hash,
     parser::types::{IDLType, IDLTypes},
     pretty_parse,
     types::Type,

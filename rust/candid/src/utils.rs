@@ -137,7 +137,7 @@ pub fn encode_args<Tuple: ArgumentEncoder>(arguments: Tuple) -> Result<Vec<u8>> 
 /// let (value) = Decode!(&buffer, String).unwrap();
 /// assert_eq!(golden, value);
 /// ```
-pub fn encode_one<T: ?Sized+CandidTyping>(argument: &T) -> Result<Vec<u8>> {
+pub fn encode_one<T: ?Sized + CandidTyping>(argument: &T) -> Result<Vec<u8>> {
     encode_args((argument,))
 }
 

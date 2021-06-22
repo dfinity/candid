@@ -2,7 +2,7 @@
 
 use super::error::{Error, Result};
 use super::parser::{typing::TypeEnv, value::IDLValue};
-use super::types::{self, CandidTyping, IdlSerialize, internal::Opcode, Field, Type};
+use super::types::{self, internal::Opcode, CandidTyping, Field, IdlSerialize, Type};
 use byteorder::{LittleEndian, WriteBytesExt};
 use leb128::write::{signed as sleb128_encode, unsigned as leb128_encode};
 use std::collections::HashMap;
@@ -27,7 +27,7 @@ impl IDLBuilder {
             value_ser: ValueSerializer::new(),
         }
     }
-    pub fn arg<'a, T: ?Sized+CandidTyping>(&'a mut self, value: &T) -> Result<&'a mut Self> {
+    pub fn arg<'a, T: ?Sized + CandidTyping>(&'a mut self, value: &T) -> Result<&'a mut Self> {
         self.type_ser.push_type(&T::ty())?;
         value.idl_serialize(&mut self.value_ser)?;
         Ok(self)

@@ -346,9 +346,8 @@ impl IDLValue {
     }
 }
 
-
-impl crate::types::CandidTyping for IDLValue {
-    fn ty() -> Type {
+impl<C> crate::types::CandidTyping<C> for IDLValue {
+    fn ty_from_cache(_c: &mut C) -> Type {
         Type::Unknown
     }
 }

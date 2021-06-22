@@ -1,5 +1,7 @@
 #![allow(clippy::unit_cmp)]
-use candid::{decode_one, encode_one, CandidType, types::CandidTyping, Decode, Deserialize, Encode, Int, Nat};
+use candid::{
+    decode_one, encode_one, types::CandidTyping, CandidType, Decode, Deserialize, Encode, Int, Nat,
+};
 
 #[test]
 fn test_error() {
