@@ -1,8 +1,5 @@
 use proc_macro::TokenStream;
-use syn::{
-    parse_macro_input,
-    Result
-};
+use syn::{parse_macro_input, Result};
 
 mod derive;
 mod func;
@@ -14,7 +11,7 @@ pub fn derive_idl_type(input: TokenStream) -> TokenStream {
 
     match custom_candid_path_result {
         Ok(custom_candid_path) => derive::derive_idl_type(input, &custom_candid_path).into(),
-        Err(e) => e.to_compile_error().into()
+        Err(e) => e.to_compile_error().into(),
     }
 }
 
@@ -60,7 +57,10 @@ pub(crate) fn candid_path(
 }
 
 fn get_custom_candid_path(input: &syn::DeriveInput) -> Result<Option<proc_macro2::TokenStream>> {
-    let candid_path_helper_attribute_option = input.attrs.iter().find(|attr| attr.path.is_ident("candid_path"));
+    let candid_path_helper_attribute_option = input
+        .attrs
+        .iter()
+        .find(|attr| attr.path.is_ident("candid_path"));
 
     match candid_path_helper_attribute_option {
         Some(candid_path_helper_attribute) => {
@@ -70,6 +70,6 @@ fn get_custom_candid_path(input: &syn::DeriveInput) -> Result<Option<proc_macro2
         
             Ok(Some(custom_candid_token_stream))
         },
-        None => Ok(None)
+        None => Ok(None),
     }
 }
