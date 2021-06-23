@@ -1,5 +1,8 @@
 use proc_macro::TokenStream;
-use syn::parse_macro_input;
+use syn::{
+    parse_macro_input,
+    Result
+};
 
 mod derive;
 mod func;
@@ -7,9 +10,12 @@ mod func;
 #[proc_macro_derive(CandidType, attributes(candid_path))]
 pub fn derive_idl_type(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as syn::DeriveInput);
-    let custom_candid_path = get_custom_candid_path(&input);
+    let custom_candid_path_result = get_custom_candid_path(&input);
 
-    derive::derive_idl_type(input, &custom_candid_path).into()
+    match custom_candid_path_result {
+        Ok(custom_candid_path) => derive::derive_idl_type(input, &custom_candid_path).into(),
+        Err(e) => e.to_compile_error().into()
+    }
 }
 
 #[proc_macro_attribute]
@@ -53,15 +59,17 @@ pub(crate) fn candid_path(
     }
 }
 
-// TODO I am not sure I parsed this in the best way possible...any pointers would be great
-fn get_custom_candid_path(input: &syn::DeriveInput) -> Option<proc_macro2::TokenStream> {
-    let candid_path_helper_attribute = input.attrs.iter().find(|attr| {
-        return attr.path.is_ident("candid_path");
-    })?;
+fn get_custom_candid_path(input: &syn::DeriveInput) -> Result<Option<proc_macro2::TokenStream>> {
+    let candid_path_helper_attribute_option = input.attrs.iter().find(|attr| attr.path.is_ident("candid_path"));
 
-    let custom_candid_path_lit: syn::LitStr = candid_path_helper_attribute.parse_args().unwrap(); // TODO not sure how to handle the result
-    let custom_candid_token_stream: proc_macro2::TokenStream =
-        custom_candid_path_lit.value().parse().unwrap(); // TODO not sure how to handle the result
-
-    Some(custom_candid_token_stream)
+    match candid_path_helper_attribute_option {
+        Some(candid_path_helper_attribute) => {
+            let custom_candid_path_lit: syn::LitStr = candid_path_helper_attribute.parse_args()?;
+            let custom_candid_token_stream: proc_macro2::TokenStream =
+                custom_candid_path_lit.value().parse()?;
+        
+            Ok(Some(custom_candid_token_stream))
+        },
+        None => Ok(None)
+    }
 }
