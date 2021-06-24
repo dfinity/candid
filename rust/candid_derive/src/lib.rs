@@ -67,9 +67,9 @@ fn get_custom_candid_path(input: &syn::DeriveInput) -> Result<Option<proc_macro2
             let custom_candid_path_lit: syn::LitStr = candid_path_helper_attribute.parse_args()?;
             let custom_candid_token_stream: proc_macro2::TokenStream =
                 custom_candid_path_lit.value().parse()?;
-        
+
             Ok(Some(custom_candid_token_stream))
-        },
+        }
         None => Ok(None),
     }
 }
