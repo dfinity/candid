@@ -55,6 +55,5 @@ harness = false
 path = "benches/benchmark.rs"
 
 [features]
-cdk = ["candid_derive/cdk"]
 configs = ["serde_dhall"]
 random = ["configs", "arbitrary", "fake", "rand"]
