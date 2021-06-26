@@ -4,31 +4,28 @@ use serde::{de, ser};
 
 use crate::parser::token;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
-use codespan_reporting::files::SimpleFile;
+use codespan_reporting::files::{Error as ReportError, SimpleFile};
 use codespan_reporting::term::{self, termcolor::StandardStream};
 use std::io;
 use thiserror::Error;
 
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
-#[derive(Debug, Error, Eq, PartialEq)]
+#[derive(Debug, Error)]
 pub enum Error {
-    #[error("Candid parser error: {0:}")]
+    #[error("Candid parser error: {0}")]
     Parse(#[from] token::ParserError),
 
-    #[error("Deserialize error: {0}")]
-    Deserialize(String, String),
+    #[error("binary parser error: {}", .0.get(0).map(|f| format!("{} at byte offset {}", f.message, f.range.start/2)).unwrap_or_else(|| "io error".to_string()))]
+    Binread(Vec<Label<()>>),
 
-    #[error("{0}")]
-    Custom(String),
+    #[error(transparent)]
+    Custom(#[from] anyhow::Error),
 }
 
 impl Error {
     pub fn msg<T: ToString>(msg: T) -> Self {
-        Error::Custom(msg.to_string())
-    }
-    pub fn with_states(&self, states: String) -> Self {
-        Error::Deserialize(self.to_string(), states)
+        Error::Custom(anyhow::anyhow!(msg.to_string()))
     }
     pub fn report(&self) -> Diagnostic<()> {
         match self {
@@ -56,9 +53,57 @@ impl Error {
                 };
                 diag.with_labels(vec![label])
             }
-            Error::Deserialize(e, _) => Diagnostic::error().with_message(e),
-            Error::Custom(e) => Diagnostic::error().with_message(e),
+            Error::Binread(labels) => {
+                let diag = Diagnostic::error().with_message("decoding error");
+                diag.with_labels(labels.to_vec())
+            }
+            Error::Custom(e) => Diagnostic::error().with_message(e.to_string()),
         }
+    }
+}
+
+fn get_binread_labels(e: &binread::Error) -> Vec<Label<()>> {
+    use binread::Error::*;
+    match e {
+        BadMagic { pos, .. } => {
+            let pos = (pos * 2) as usize;
+            vec![Label::primary((), pos..pos + 2).with_message("Unexpected bytes")]
+        }
+        Custom { pos, err } => {
+            let pos = (pos * 2) as usize;
+            let err = err
+                .downcast_ref::<&str>()
+                .unwrap_or(&"unknown error (there's a bug in error reporting)");
+            vec![Label::primary((), pos..pos + 2).with_message(err.to_string())]
+        }
+        EnumErrors {
+            pos,
+            variant_errors,
+        } => {
+            let pos = (pos * 2) as usize;
+            let variant = variant_errors
+                .iter()
+                .find(|(_, e)| !matches!(e, BadMagic { .. }));
+            // Should have at most one non-magic error
+            match variant {
+                None => vec![Label::primary((), pos..pos + 2).with_message("Unknown opcode")],
+                Some((id, e)) => {
+                    let mut labels = get_binread_labels(e);
+                    labels.push(Label::secondary((), pos..pos + 2).with_message(id.to_string()));
+                    labels
+                }
+            }
+        }
+        NoVariantMatch { pos } => {
+            let pos = (pos * 2) as usize;
+            vec![Label::primary((), pos..pos + 2).with_message("No variant match")]
+        }
+        AssertFail { pos, message } => {
+            let pos = (pos * 2) as usize;
+            vec![Label::primary((), pos..pos + 2).with_message(message)]
+        }
+        Io(_) => vec![],
+        _ => unreachable!(),
     }
 }
 
@@ -98,6 +143,17 @@ impl From<io::Error> for Error {
     }
 }
 
+impl From<binread::Error> for Error {
+    fn from(e: binread::Error) -> Error {
+        Error::Binread(get_binread_labels(&e))
+    }
+}
+impl From<ReportError> for Error {
+    fn from(e: ReportError) -> Error {
+        Error::msg(e)
+    }
+}
+
 #[cfg(feature = "random")]
 impl From<arbitrary::Error> for Error {
     fn from(e: arbitrary::Error) -> Error {
@@ -120,6 +176,21 @@ where
         let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
         let config = term::Config::default();
         let file = SimpleFile::new(name, str);
+        term::emit(&mut writer.lock(), &config, &file, &e.report())?;
+        Err(e)
+    })
+}
+
+pub fn pretty_read<T>(reader: &mut std::io::Cursor<&[u8]>) -> Result<T>
+where
+    T: binread::BinRead,
+{
+    T::read(reader).or_else(|e| {
+        let e = Error::from(e);
+        let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
+        let config = term::Config::default();
+        let str = hex::encode(&reader.get_ref());
+        let file = SimpleFile::new("binary", &str);
         term::emit(&mut writer.lock(), &config, &file, &e.report())?;
         Err(e)
     })

@@ -1,0 +1,132 @@
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>DFINITY Canister Candid UI</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-reboot@4.5.4/reboot.css" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>.ic_progress { display: block; margin: 50vh auto; width: 25vw; }</style>
+  </head>
+  <body>
+    <div id="progress">
+      <progress class="ic_progress" id="ic-progress">Loading Candid UI...</progress>
+    </div>
+    <app id="app" style="display: none">
+      <div id="header">Canister ID:&nbsp;<span id="canisterId"></span></div>
+      <div id="container">
+        <div id="main-content">
+          <div id="title-card">
+            <h1 id="title">Candid UI</h1>
+            Browse and test your API with our visual web interface.
+          </div>
+          <ul id="methods"></ul>
+        </div>
+        <div id="console">
+          <div id="console-bar">
+            <button id="output-button">
+              <svg
+                viewBox="64 64 896 896"
+                focusable="false"
+                data-icon="clock-circle"
+                width="1em"
+                height="1em"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm0 820c-205.4 0-372-166.6-372-372s166.6-372 372-372 372 166.6 372 372-166.6 372-372 372z"
+                ></path>
+                <path
+                  d="M686.7 638.6L544.1 535.5V288c0-4.4-3.6-8-8-8H488c-4.4 0-8 3.6-8 8v275.4c0 2.6 1.2 5 3.3 6.5l165.4 120.6c3.6 2.6 8.6 1.8 11.2-1.7l28.6-39c2.6-3.7 1.8-8.7-1.8-11.2z"
+                ></path>
+              </svg>
+            </button>
+            <button id="methods-button">
+              <svg
+                viewBox="64 64 896 896"
+                focusable="false"
+                data-icon="unordered-list"
+                width="1em"
+                height="1em"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  d="M912 192H328c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h584c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 284H328c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h584c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 284H328c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h584c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM104 228a56 56 0 10112 0 56 56 0 10-112 0zm0 284a56 56 0 10112 0 56 56 0 10-112 0zm0 284a56 56 0 10112 0 56 56 0 10-112 0z"
+                ></path>
+              </svg>
+            </button>
+          </div>
+          <div id="output-pane">
+            <div class="console-header">Output Log</div>
+            <div id="output-list"></div>
+          </div>
+          <div id="methods-pane" style="display: none">
+            <div class="console-header">Methods</div>
+            <ul id="methods-list"></ul>
+          </div>
+        </div>
+      </div>
+    </app>
+    <script>
+      initializeConsoleControls();
+      function initializeConsoleControls() {
+        const consoleEl = document.getElementById('console');
+        const outputButton = document.getElementById('output-button');
+        const methodsButton = document.getElementById('methods-button');
+        const outputPane = document.getElementById('output-pane');
+        const methodsPane = document.getElementById('methods-pane');
+
+        const buttons = [outputButton, methodsButton];
+        const panes = [outputPane, methodsPane];
+
+        function openConsole() {
+          if (!consoleEl.classList.contains('open')) {
+            consoleEl.classList.add('open');
+          }
+        }
+        function toggleConsole() {
+          if (consoleEl.classList.contains('open')) {
+            consoleEl.classList.remove('open');
+            buttons.forEach(button => {
+              button.classList.remove('active-tab');
+              button.blur();
+            });
+            panes.forEach(pane => {
+              pane.style.display = 'none';
+            });
+          } else {
+            consoleEl.classList.add('open');
+          }
+        }
+
+        outputButton.addEventListener('click', () => {
+          if (outputButton.classList.contains('active-tab')) {
+            toggleConsole();
+          } else {
+            openConsole();
+            outputPane.style.display = 'block';
+            outputButton.classList.add('active-tab');
+            methodsPane.style.display = 'none';
+            methodsButton.classList.remove('active-tab');
+          }
+        });
+        methodsButton.addEventListener('click', () => {
+          if (methodsButton.classList.contains('active-tab')) {
+            toggleConsole();
+          } else {
+            openConsole();
+            methodsPane.style.display = 'block';
+            methodsButton.classList.add('active-tab');
+            outputPane.style.display = 'none';
+            outputButton.classList.remove('active-tab');
+          }
+        });
+        outputButton.click();
+      }
+    </script>
+  </body>
+</html>

@@ -12,7 +12,6 @@ macro_rules! primitive_impl {
     };
 }
 
-primitive_impl!(&str, Text, serialize_text);
 primitive_impl!((), Null, serialize_null);
 primitive_impl!(bool, Bool, serialize_bool);
 
@@ -58,6 +57,17 @@ impl CandidType for u128 {
 }
 
 impl CandidType for String {
+    fn _ty() -> Type {
+        Type::Text
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_text(self)
+    }
+}
+impl CandidType for str {
     fn _ty() -> Type {
         Type::Text
     }
@@ -489,26 +499,4 @@ impl CandidType for std::time::Duration {
 
         Ok(())
     }
-}
-
-#[test]
-fn test_systemtime() {
-    use crate::{Decode, Encode};
-
-    let now = std::time::SystemTime::now();
-    let encoded = Encode!(&now).unwrap();
-    let decoded = Decode!(&encoded, std::time::SystemTime).unwrap();
-    assert_eq!(now, decoded);
-}
-
-#[test]
-fn test_duration() {
-    use crate::{Decode, Encode};
-    use std::time::{Duration, SystemTime};
-
-    let now = SystemTime::now();
-    let duration = now.duration_since(SystemTime::UNIX_EPOCH).unwrap();
-    let encoded = Encode!(&duration).unwrap();
-    let decoded = Decode!(&encoded, Duration).unwrap();
-    assert_eq!(duration, decoded);
 }

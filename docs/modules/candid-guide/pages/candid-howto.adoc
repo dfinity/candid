@@ -1,12 +1,11 @@
 = How to
 :!page-repl:
 
-As discussed in link:[], Candid provides a language-agnostic way to interact with canisters.
+As discussed in link:candid-concepts{outfilesuffix}[What is Candid?], Candid provides a language-agnostic way to interact with canisters.
 By using Candid, you can specify input argument values and display return values from canister methods regardless of whether you interact with the {IC} from a terminal using the `+dfx+` command-line interface, through a web browser, or from a program written in JavaScript, {proglang}, Rust, or other language.
 Now that you are familiar with what Candid is and how it works, this section provides instructions for how to use it in some common scenarios.
 
-As a concrete example, let's assume there is a `counter` canister already deployed on the network with the following
-Candid interface:
+As a concrete example, let's assume there is a `counter` canister already deployed on the network with the following Candid interface:
 
 [source, candid]
 ....
@@ -56,19 +55,50 @@ For more information about using `+dfx+` and the `+dfx canister call+` command, 
 The Candid interface description language provides a common language for specifying the signature of a canister service.
 Based on the type signature of that service, Candid provides a web interface—the Candid UI—that allows you to call canister functions for testing and debugging from a web browser without writing any front-end code.
 
-To use the Candid web interface to test `counter `canister:
+To use the Candid web interface to test the `counter `canister:
 
-. Find the canister identifier associated with the `counter` canister using the `dfx canister id counter` command.
+. Find the Candid UI canister identifier associated with the `counter` canister using the `+dfx canister id __Candid_UI+` command.
++
+[source,bash]
+----
+dfx canister id __Candid_UI
+----
++
+The command displays the canister identifier for the Candid UI with output similar to the following:
++
+....
+r7inp-6aaaa-aaaaa-aaabq-cai
+....
+. Start the {IC} locally by running the following command:
++
+[source,bash]
+----
+dfx start --background
+----
 . Open a browser and navigate to the address and port number specified in the `+dfx.json+` configuration file.
 +
 By default, the `+local+` network binds to the `+127.0.0.1:8000+` address and port number.
-. Add the `+candid+` endpoint to access the Candid web interface followed by the required `canisterId` parameter and canister identifier.
+. Add the required `canisterId` parameter and the Candid UI canister identifier returned by the `+dfx canister id+` command.
 +
-For example, the full URL should look similar to the following but with the `+canister_identifier+` that was returned by the `+dfx canister id+` command:
+For example, the full URL should look similar to the following but with the `+CANDID-UI-CANISTER-IDENTIFIER+` that was returned by the `+dfx canister id+` command:
 +
 ....
-http://127.0.0.1:8000/candid?canisterId=<YOUR-CANISTER-IDENTIFIER>
+http://127.0.0.1:8000/candid?canisterId=<CANDID-UI-CANISTER-IDENTIFIER>
 ....
++
+The browser displays a form for you to specify a canister identifier or choose a Candid description (`+.did+`) file.
++
+
+image:candid-ui-select-id.png[]
++
+If you aren't sure which canister identifier to use, you can run the `+dfx canister id+` command to look up the identifier for a specific canister name. 
++
+For example, if you want to view the functions for the `+counter+` service description, you could look up the canister identifier by running the following command:
++
+....
+dfx canister id counter
+....
+. Specify a canister identifier or description file, then click *Go* to display the service description.
 . Review the list of function calls and types defined in the program.
 . Type a value of the appropriate type for a function or click *Random* to generate a value, then click *Call* or *Query* to see the result.
 

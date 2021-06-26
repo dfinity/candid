@@ -1,38 +1,33 @@
+#![allow(clippy::unit_cmp)]
 use candid::{decode_one, encode_one, CandidType, Decode, Deserialize, Encode, Int, Nat};
 
 #[test]
 fn test_error() {
-    check_error(
-        || test_decode(b"DID", &42),
-        "wrong magic number [68, 73, 68, 0]",
-    );
-    check_error(
-        || test_decode(b"DIDL", &42),
-        "leb128::read::Error: failed to fill whole buffer",
-    );
+    check_error(|| test_decode(b"DID", &42), "io error");
+    check_error(|| test_decode(b"DIDL", &42), "len at byte offset 4");
     check_error(
         || test_decode(b"DIDL\0\0", &42),
-        "No more values to deserialize",
+        "No more values on the wire",
     );
     check_error(
         || test_decode(b"DIDL\x01\x7c", &42),
-        "Unsupported op_code -4 in type table",
+        "Unknown opcode at byte offset 5",
     );
     // Infinite loop are prevented by design
     check_error(
         || test_decode(b"DIDL\x02\x6e\x01\0", &42),
-        "Unsupported op_code 0 in type table",
+        "Unknown opcode at byte offset 7",
     );
     check_error(
         || test_decode(b"DIDL\0\x01\x7e\x01\x01", &true),
         "Trailing value after finishing deserialization",
     );
-    check_error(
-        || test_decode(b"DIDL\0\x01\x7e", &true),
-        "io error: failed to fill whole buffer",
-    );
+    check_error(|| test_decode(b"DIDL\0\x01\x7e", &true), "io error");
     // Out of bounds type index
-    check_error(|| test_decode(b"DIDL\0\x01\0\x01", &42), "unknown type 0");
+    check_error(
+        || test_decode(b"DIDL\0\x01\0\x01", &42),
+        "type index 0 out of range",
+    );
 }
 
 #[test]
@@ -68,7 +63,7 @@ fn test_integer() {
     );
     check_error(
         || test_decode(&hex("4449444c00017c2a"), &42i64),
-        "Type mismatch. Type on the wire: Int; Expected type: Int64",
+        "int is not a subtype of int64",
     );
 }
 
@@ -105,13 +100,27 @@ fn test_text() {
     let bytes = hex("4449444c00017107486920e298830a");
     test_encode(&"Hi ☃\n", &bytes);
     test_decode(&bytes, &"Hi ☃\n");
+    test_decode(&bytes, &std::borrow::Cow::from("Hi ☃\n"));
+}
+
+#[test]
+fn test_time() {
+    use std::time::{Duration, SystemTime};
+    let now = SystemTime::now();
+    let duration = now.duration_since(SystemTime::UNIX_EPOCH).unwrap();
+    let encoded = Encode!(&now).unwrap();
+    let decoded = Decode!(&encoded, SystemTime).unwrap();
+    assert_eq!(now, decoded);
+    let encoded = Encode!(&duration).unwrap();
+    let decoded = Decode!(&encoded, Duration).unwrap();
+    assert_eq!(duration, decoded);
 }
 
 #[test]
 fn test_reserved() {
     use candid::{Empty, Reserved};
     all_check(Reserved, "4449444c000170");
-    test_decode(&hex("4449444c00017b2a"), &candid::Reserved);
+    test_decode(&hex("4449444c00017c2a"), &candid::Reserved);
     test_decode(
         &hex("4449444c016c02d3e3aa027e868eb7027c0100012a"),
         &candid::Reserved,
@@ -184,7 +193,7 @@ fn test_struct() {
                 },
             )
         },
-        "field hash out of u32",
+        "field id out of 32-bit range",
     );
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
@@ -303,23 +312,22 @@ fn test_extra_fields() {
     test_decode(&bytes, &a1);
     // Cannot Decode A1 to A2
     let bytes = encode(&a1);
-    check_error(|| test_decode(&bytes, &a2), "missing field `baz`");
+    check_error(|| test_decode(&bytes, &a2), "field bab");
 
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     enum E2 {
         Foo,
-        Bar(A1, A2),
+        Bar,
         Baz,
     }
-    // E1, E2 can be used interchangably as long as the variant matches
     let bytes = encode(&E1::Foo);
     test_decode(&bytes, &E2::Foo);
+
     let bytes = encode(&E2::Foo);
-    test_decode(&bytes, &E1::Foo);
-    let bytes = encode(&E2::Baz);
+    test_decode(&bytes, &Some(E2::Foo));
     check_error(
-        || test_decode(&bytes, &E1::Bar),
-        "Unknown variant hash 3303867",
+        || test_decode(&bytes, &E1::Foo),
+        "Variant field 3_303_867 not found",
     );
 }
 
@@ -466,7 +474,7 @@ fn test_tuple() {
                 &(Int::from(42), "💩"),
             )
         },
-        "Expect vector index 1, but get 2",
+        "field 1: text is only in the expected type",
     );
 }
 
@@ -480,12 +488,12 @@ fn test_variant() {
     all_check(Unit::Bar, "4449444c016b02b3d3c9017fe6fdd5017f010000");
     check_error(
         || test_decode(&hex("4449444c016b02b3d3c9017fe6fdd5017f010003"), &Unit::Bar),
-        "variant index 3 larger than length 2",
+        "Variant index 3 larger than length 2",
     );
 
     check_error(
         || test_decode(&hex("4449444c016b02b4d3c9017fe6fdd5017f010000"), &Unit::Bar),
-        "Unknown variant hash 3303860",
+        "Variant field 3_303_860 not found",
     );
 
     let res: Result<String, String> = Ok("good".to_string());
@@ -580,11 +588,18 @@ fn test_multiargs() {
     assert_eq!(tuple.0, [(42.into(), "text")]);
     assert_eq!(tuple.1, (42.into(), "text".to_string()));
 
-    let err = || {
-        Decode!(&bytes, Vec<(Int, &str)>, (Int, String), i32).unwrap();
-        true
-    };
-    check_error(err, "No more values to deserialize");
+    let tuple = Decode!(
+        &bytes,
+        Vec<(Int, &str)>,
+        (Int, String),
+        Option<i32>,
+        (),
+        candid::Reserved
+    )
+    .unwrap();
+    assert_eq!(tuple.2, None);
+    assert_eq!(tuple.3, ());
+    assert_eq!(tuple.4, candid::Reserved);
 }
 
 fn hex(bytes: &str) -> Vec<u8> {
@@ -614,7 +629,7 @@ where
 
 fn test_decode<'de, T>(bytes: &'de [u8], expected: &T)
 where
-    T: PartialEq + serde::de::Deserialize<'de> + std::fmt::Debug,
+    T: PartialEq + serde::de::Deserialize<'de> + std::fmt::Debug + CandidType,
 {
     let decoded_one = decode_one::<T>(bytes).unwrap();
     let decoded_macro = Decode!(bytes, T).unwrap();

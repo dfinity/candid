@@ -1,7 +1,5 @@
-import type { Principal } from '@dfinity/agent';
-export type List = [] | [
-  { 'head' : bigint, 'tail' : List }
-];
+import type { Principal } from '@dfinity/principal';
+export type List = [] | [{ 'head' : bigint, 'tail' : List }];
 export interface broker { 'find' : (arg_0: string) => Promise<Principal> };
 export type f = (arg_0: List, arg_1: [Principal, string]) => Promise<
     [] | [List]

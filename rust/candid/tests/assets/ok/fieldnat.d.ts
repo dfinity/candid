@@ -1,8 +1,5 @@
-import type { Principal } from '@dfinity/agent';
-export interface non_tuple {
-  _1_ : string,
-  _2_ : string,
-};
+import type { Principal } from '@dfinity/principal';
+export interface non_tuple { _1_ : string, _2_ : string };
 export type tuple = [string, string];
 export default interface _SERVICE {
   'bab' : (arg_0: bigint, arg_1: bigint) => Promise<undefined>,

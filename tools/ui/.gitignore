@@ -13,5 +13,6 @@
 # frontend code
 node_modules/
 dist/
+ts-out/
 package-lock.json
 Cargo.lock

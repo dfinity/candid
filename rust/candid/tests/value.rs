@@ -1,7 +1,7 @@
 use candid::parser::{
     types::IDLProg,
     typing::{check_prog, TypeEnv},
-    value::{IDLArgs, IDLField, IDLValue},
+    value::{IDLArgs, IDLField, IDLValue, VariantValue},
 };
 use candid::types::Label;
 use candid::{decode_args, decode_one, Decode};
@@ -28,7 +28,8 @@ type List = List1;
 type List1 = List2;
 type List2 = opt record { head: int16; tail: List1 };
 type byte = nat8;
-type f = func (byte, int, nat, int8) -> (List);
+type enum = variant { a: nat; b: text; c };
+type f = func (byte, int, nat, int8) -> (List, enum);
 service : {
   f : f;
 }
@@ -47,20 +48,20 @@ service : {
                 IDLValue::Nat8(42),
                 IDLValue::Int(42.into()),
                 IDLValue::Nat(42.into()),
-                IDLValue::Int8(42)
+                IDLValue::Int8(42),
             ]
         );
     }
     {
-        let str = "(opt record { head = 1000; tail = opt record {head = -2000; tail = null}})";
+        let str = "(opt record { head = 1000; tail = opt record {head = -2000; tail = null}}, variant {a = 42})";
         let args = str.parse::<IDLArgs>().unwrap();
         let encoded = args.to_bytes_with_types(&env, &method.rets).unwrap();
         let decoded = IDLArgs::from_bytes(&encoded).unwrap();
-        assert_eq!(decoded.to_string(), "(\n  opt record {\n    1_158_359_328 = 1_000;\n    1_291_237_008 = opt record { 1_158_359_328 = -2_000; 1_291_237_008 = null };\n  },\n)");
+        assert_eq!(decoded.to_string(), "(\n  opt record {\n    1_158_359_328 = 1_000 : int16;\n    1_291_237_008 = opt record {\n      1_158_359_328 = -2_000 : int16;\n      1_291_237_008 = null;\n    };\n  },\n  variant { 97 = 42 : nat },\n)");
         let decoded = IDLArgs::from_bytes_with_types(&encoded, &env, &method.rets).unwrap();
         assert_eq!(
             decoded.to_string(),
-            "(opt record { head = 1_000; tail = opt record { head = -2_000; tail = null } })"
+            "(\n  opt record {\n    head = 1_000 : int16;\n    tail = opt record { head = -2_000 : int16; tail = null };\n  },\n  variant { a = 42 : nat },\n)"
         );
         let decoded = IDLArgs::from_bytes_with_types(&encoded, &env, &[]).unwrap();
         assert_eq!(decoded.to_string(), "()");
@@ -108,13 +109,13 @@ fn test_value() {
 #[test]
 fn test_variant() {
     use IDLValue::*;
-    let value = Variant(
+    let value = Variant(VariantValue(
         Box::new(IDLField {
             id: Label::Id(3_303_859),
             val: Null,
         }),
         0,
-    );
+    ));
     let bytes = hex("4449444c016b02b3d3c9017fe6fdd5017f010000");
     test_decode(&bytes, &value);
     let encoded = IDLArgs::new(&[value.clone()]).to_bytes().unwrap();
@@ -127,7 +128,10 @@ fn parse_check(str: &str) {
     let decoded = IDLArgs::from_bytes(&encoded).unwrap();
     let output = decoded.to_string();
     let back_args = output.parse::<IDLArgs>().unwrap();
-    assert_eq!(args, back_args);
+    let annotated_args = args
+        .annotate_types(true, &TypeEnv::new(), &back_args.get_types())
+        .unwrap();
+    assert_eq!(annotated_args, back_args);
 }
 
 fn check(v: IDLValue, bytes: &str) {

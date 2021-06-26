@@ -18,14 +18,14 @@ enum Command {
     Check {
         /// Specifies did file for type checking
         input: PathBuf,
-        /// Specifies a second did file for subtyping check
-        upgrade: Option<PathBuf>,
+        /// Specifies a previous version of did file for subtyping check
+        previous: Option<PathBuf>,
     },
     /// Generate binding for different languages
     Bind {
         /// Specifies did file for code generation
         input: PathBuf,
-        #[structopt(short, long, possible_values = &["js", "ts", "did"])]
+        #[structopt(short, long, possible_values = &["js", "ts", "did", "mo"])]
         /// Specifies target language
         target: String,
     },
@@ -37,6 +37,8 @@ enum Command {
         /// Specifies target language
         target: String,
     },
+    /// Compute the hash of a field name
+    Hash { input: String },
     /// Encode Candid value
     Encode {
         #[structopt(parse(try_from_str = parse_args))]
@@ -52,11 +54,11 @@ enum Command {
     Decode {
         /// Specifies Candid binary data in hex string
         blob: String,
+        #[structopt(short, long, possible_values = &["hex", "blob"], default_value = "hex")]
+        /// Specifies hex format
+        format: String,
         #[structopt(flatten)]
         annotate: TypeAnnotation,
-        #[structopt(short, long)]
-        /// Disable pretty printing
-        flat: bool,
     },
     /// Generate random Candid values
     Random {
@@ -164,18 +166,16 @@ fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
 
 fn main() -> Result<()> {
     match Command::from_args() {
-        Command::Check { input, upgrade } => {
+        Command::Check { input, previous } => {
             let mut env = TypeEnv::new();
             let opt_t1 = check_file(&mut env, &input)?;
-            if let Some(upgrade) = upgrade {
+            if let Some(previous) = previous {
                 let mut env2 = TypeEnv::new();
-                let opt_t2 = check_file(&mut env2, &upgrade)?;
+                let opt_t2 = check_file(&mut env2, &previous)?;
                 match (opt_t1, opt_t2) {
                     (Some(t1), Some(t2)) => {
                         let mut gamma = HashSet::new();
-                        let res =
-                            candid::types::subtype::subtype(&mut gamma, &env, &t1, &env2, &t2);
-                        println!("{}", res);
+                        candid::types::subtype::subtype(&mut gamma, &env, &t1, &env2, &t2)?;
                     }
                     _ => {
                         bail!("did file need to contain the main service type for subtyping check")
@@ -190,8 +190,7 @@ fn main() -> Result<()> {
             }
             let ty1 = env.ast_to_type(&ty1)?;
             let ty2 = env.ast_to_type(&ty2)?;
-            let res = candid::types::subtype::subtype(&mut HashSet::new(), &env, &ty1, &env, &ty2);
-            println!("{}", res);
+            candid::types::subtype::subtype(&mut HashSet::new(), &env, &ty1, &env, &ty2)?;
         }
         Command::Bind { input, target } => {
             let mut env = TypeEnv::new();
@@ -200,6 +199,7 @@ fn main() -> Result<()> {
                 "js" => candid::bindings::javascript::compile(&env, &actor),
                 "ts" => candid::bindings::typescript::compile(&env, &actor),
                 "did" => candid::bindings::candid::compile(&env, &actor),
+                "mo" => candid::bindings::motoko::compile(&env, &actor),
                 _ => unreachable!(),
             };
             println!("{}", content);
@@ -217,6 +217,9 @@ fn main() -> Result<()> {
                 _ => unreachable!(),
             };
             println!("{}", content);
+        }
+        Command::Hash { input } => {
+            println!("{}", candid::idl_hash(&input));
         }
         Command::Encode {
             args,
@@ -237,7 +240,7 @@ fn main() -> Result<()> {
                     for ch in bytes.iter() {
                         res.push_str(&candid::parser::pretty::pp_char(*ch));
                     }
-                    res
+                    format!("blob \"{}\"", res)
                 }
                 _ => unreachable!(),
             };
@@ -245,21 +248,36 @@ fn main() -> Result<()> {
         }
         Command::Decode {
             blob,
+            format,
             annotate,
-            flat,
         } => {
-            let bytes = hex::decode(&blob)?;
+            let bytes = match format.as_str() {
+                "hex" => hex::decode(&blob)?,
+                "blob" => {
+                    use candid::parser::value::IDLValue;
+                    match pretty_parse::<IDLValue>("blob", &blob)? {
+                        IDLValue::Vec(vec) => vec
+                            .iter()
+                            .map(|v| {
+                                if let IDLValue::Nat8(u) = v {
+                                    *u
+                                } else {
+                                    unreachable!()
+                                }
+                            })
+                            .collect(),
+                        _ => unreachable!(),
+                    }
+                }
+                _ => unreachable!(),
+            };
             let value = if annotate.is_empty() {
                 IDLArgs::from_bytes(&bytes)?
             } else {
                 let (env, types) = annotate.get_types(Mode::Decode)?;
                 IDLArgs::from_bytes_with_types(&bytes, &env, &types)?
             };
-            if !flat {
-                println!("{}", value);
-            } else {
-                println!("{:?}", value);
-            }
+            println!("{}", value);
         }
         Command::Random {
             annotate,

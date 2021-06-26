@@ -22,6 +22,79 @@ pub(crate) fn is_tuple(t: &Type) -> bool {
         _ => false,
     }
 }
+static KEYWORDS: [&str; 64] = [
+    "abstract",
+    "arguments",
+    "await",
+    "boolean",
+    "break",
+    "byte",
+    "case",
+    "catch",
+    "char",
+    "class",
+    "const",
+    "continue",
+    "debugger",
+    "default",
+    "delete",
+    "do",
+    "double",
+    "else",
+    "enum",
+    "eval",
+    "export",
+    "extends",
+    "false",
+    "final",
+    "finally",
+    "float",
+    "for",
+    "function",
+    "goto",
+    "if",
+    "implements",
+    "import",
+    "in",
+    "instanceof",
+    "int",
+    "interface",
+    "let",
+    "long",
+    "native",
+    "new",
+    "null",
+    "package",
+    "private",
+    "protected",
+    "public",
+    "return",
+    "short",
+    "static",
+    "super",
+    "switch",
+    "synchronized",
+    "this",
+    "throw",
+    "throws",
+    "transient",
+    "true",
+    "try",
+    "typeof",
+    "var",
+    "void",
+    "volatile",
+    "while",
+    "with",
+    "yield",
+];
+pub(crate) fn ident(id: &str) -> RcDoc {
+    if KEYWORDS.contains(&id) {
+        str(id).append("_")
+    } else {
+        str(id)
+    }
+}
 
 fn pp_ty(ty: &Type) -> RcDoc {
     use Type::*;
@@ -43,7 +116,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("IDL.Text"),
         Reserved => str("IDL.Reserved"),
         Empty => str("IDL.Empty"),
-        Var(ref s) => str(s),
+        Var(ref s) => ident(s),
         Principal => str("IDL.Principal"),
         Opt(ref t) => str("IDL.Opt").append(enclose("(", pp_ty(t), ")")),
         Vec(ref t) => str("IDL.Vec").append(enclose("(", pp_ty(t), ")")),
@@ -124,18 +197,18 @@ fn pp_defs<'a>(
 ) -> RcDoc<'a> {
     let recs_doc = lines(
         recs.iter()
-            .map(|id| kwd("const").append(ident(id)).append("= IDL.Rec();")),
+            .map(|id| kwd("const").append(ident(id)).append(" = IDL.Rec();")),
     );
     let defs = lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         if recs.contains(id) {
-            str(id)
+            ident(id)
                 .append(".fill")
                 .append(enclose("(", pp_ty(ty), ");"))
         } else {
             kwd("const")
                 .append(ident(id))
-                .append(kwd("="))
+                .append(" = ")
                 .append(pp_ty(ty))
                 .append(";")
         }
@@ -195,6 +268,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 
 pub mod value {
     use super::pp_label;
+    use crate::parser::pretty::number_to_string;
     use crate::parser::value::{IDLArgs, IDLField, IDLValue};
     use crate::pretty::*;
     use pretty::RcDoc;
@@ -227,12 +301,26 @@ pub mod value {
 
     pub fn pp_value(v: &IDLValue) -> RcDoc {
         use IDLValue::*;
-        match &*v {
+        match v {
             Number(_) | Int(_) | Nat(_) | Int64(_) | Nat64(_) => {
-                RcDoc::text(format!("BigInt({})", v))
+                RcDoc::text(format!("BigInt({})", number_to_string(v)))
             }
+            Int8(_) | Int16(_) | Int32(_) | Nat8(_) | Nat16(_) | Nat32(_) | Float32(_)
+            | Float64(_) => RcDoc::text(number_to_string(v)),
+            Bool(_) => RcDoc::as_string(v),
+            Null => RcDoc::text("null"),
             Reserved => RcDoc::text("null"),
             Principal(id) => RcDoc::text(format!("Principal.fromText('{}')", id)),
+            Service(id) => RcDoc::text(format!("Principal.fromText('{}')", id)),
+            Func(id, meth) => {
+                let id = RcDoc::text(format!("Principal.fromText('{}')", id));
+                let meth = RcDoc::text(meth);
+                RcDoc::text("[")
+                    .append(id)
+                    .append(", ")
+                    .append(meth)
+                    .append("]")
+            }
             Text(s) => RcDoc::text(format!("'{}'", s.escape_debug())),
             None => RcDoc::text("[]"),
             Opt(v) => enclose_space("[", pp_value(v), "]"),
@@ -248,8 +336,7 @@ pub mod value {
                     enclose_space("{", pp_fields(&fields), "}")
                 }
             }
-            Variant(v, _) => enclose_space("{", pp_field(&v), "}"),
-            _ => RcDoc::as_string(v),
+            Variant(v) => enclose_space("{", pp_field(&v.0), "}"),
         }
     }
 

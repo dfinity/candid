@@ -1,6 +1,6 @@
 use super::configs::{path_name, Configs};
 use super::typing::TypeEnv;
-use super::value::{IDLArgs, IDLField, IDLValue};
+use super::value::{IDLArgs, IDLField, IDLValue, VariantValue};
 use crate::types::{Field, Type};
 use crate::Deserialize;
 use crate::{Error, Result};
@@ -201,7 +201,7 @@ impl<'a> GenState<'a> {
                     id: id.clone(),
                     val,
                 };
-                IDLValue::Variant(Box::new(field), idx as u64)
+                IDLValue::Variant(VariantValue(Box::new(field), idx as u64))
             }
             _ => unimplemented!(),
         });
@@ -325,9 +325,9 @@ fn arbitrary_len(u: &mut Unstructured, width: Option<usize>) -> Result<usize> {
     })
 }
 
-fn arbitrary_num<T>(u: &mut Unstructured, range: Option<(i64, i64)>) -> Result<T>
+fn arbitrary_num<'a, T>(u: &mut Unstructured<'a>, range: Option<(i64, i64)>) -> Result<T>
 where
-    T: num_traits::Bounded + Int + TryFrom<i64> + Arbitrary,
+    T: num_traits::Bounded + Int + TryFrom<i64> + Arbitrary<'a>,
 {
     Ok(match range {
         None => u.arbitrary::<T>()?,
@@ -341,7 +341,7 @@ where
     })
 }
 
-fn arbitrary_variant(u: &mut Unstructured, weight: &[usize]) -> Result<usize> {
+fn arbitrary_variant<'a>(u: &mut Unstructured<'a>, weight: &[usize]) -> Result<usize> {
     // TODO read from end of unstructured to improve stability
     let prefix_sum: Vec<_> = weight
         .iter()
