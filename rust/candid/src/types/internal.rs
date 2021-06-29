@@ -24,7 +24,7 @@ impl TypeId {
 }
 impl std::fmt::Display for TypeId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = NAME.with(|n| n.borrow_mut().get(&self));
+        let name = NAME.with(|n| n.borrow_mut().get(self));
         write!(f, "{}", name)
     }
 }
@@ -208,7 +208,7 @@ impl Type {
 }
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", crate::bindings::candid::pp_ty(&self).pretty(80))
+        write!(f, "{}", crate::bindings::candid::pp_ty(self).pretty(80))
     }
 }
 
@@ -269,7 +269,7 @@ impl fmt::Display for Function {
         write!(
             f,
             "{}",
-            crate::bindings::candid::pp_function(&self).pretty(80)
+            crate::bindings::candid::pp_function(self).pretty(80)
         )
     }
 }

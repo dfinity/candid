@@ -57,7 +57,7 @@ impl Input {
     fn check_round_trip(&self, v: &IDLArgs, env: &TypeEnv, types: &[Type]) -> Result<bool> {
         match self {
             Input::Blob(ref blob) => {
-                let bytes = v.to_bytes_with_types(&env, &types)?;
+                let bytes = v.to_bytes_with_types(env, types)?;
                 Ok(*blob == bytes)
             }
             Input::Text(_) => Ok(true), //Ok(*s == v.to_string()),
