@@ -138,10 +138,10 @@ fn test_reserved() {
 fn test_reference() {
     use candid::{Func, Principal, Service};
     let principal = Principal::from_text("w7x7r-cok77-xa").unwrap();
-    all_check(principal.clone(), "4449444c0001680103caffee");
+    all_check(principal, "4449444c0001680103caffee");
     all_check(
         Service {
-            principal: principal.clone(),
+            principal,
         },
         "4449444c01690001000103caffee",
     );
