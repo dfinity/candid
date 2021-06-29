@@ -67,7 +67,7 @@ impl IDLArgs {
     pub fn annotate_types(self, from_parser: bool, env: &TypeEnv, types: &[Type]) -> Result<Self> {
         let mut args = Vec::new();
         for (v, ty) in self.args.iter().zip(types.iter()) {
-            let v = v.annotate_type(from_parser, env, &ty)?;
+            let v = v.annotate_type(from_parser, env, ty)?;
             args.push(v);
         }
         for ty in types[self.args.len()..].iter() {
@@ -253,7 +253,7 @@ impl IDLValue {
                 }
                 return Err(Error::msg(format!("variant field {} not found", v.0.id)));
             }
-            (IDLValue::Principal(id), Type::Principal) => IDLValue::Principal(id.clone()),
+            (IDLValue::Principal(id), Type::Principal) => IDLValue::Principal(*id),
             (IDLValue::Service(_), Type::Service(_)) => self.clone(),
             (IDLValue::Func(_, _), Type::Func(_)) => self.clone(),
             (IDLValue::Number(str), t) if from_parser => match t {

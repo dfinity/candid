@@ -125,7 +125,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Func(ref func) => pp_function(func),
         Service(ref serv) => pp_service(serv),
         Class(ref args, ref t) => {
-            let doc = pp_args(&args).append(" -> async ");
+            let doc = pp_args(args).append(" -> async ");
             match t.as_ref() {
                 Service(ref serv) => doc.append(pp_service(serv)),
                 Var(ref s) => doc.append(s),

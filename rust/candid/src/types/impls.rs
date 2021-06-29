@@ -148,7 +148,7 @@ impl CandidType for serde_bytes::ByteBuf {
     where
         S: Serializer,
     {
-        serializer.serialize_blob(&self.as_slice())
+        serializer.serialize_blob(self.as_slice())
     }
 }
 impl CandidType for serde_bytes::Bytes {
@@ -159,7 +159,7 @@ impl CandidType for serde_bytes::Bytes {
     where
         S: Serializer,
     {
-        serializer.serialize_blob(&self)
+        serializer.serialize_blob(self)
     }
 }
 

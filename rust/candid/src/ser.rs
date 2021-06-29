@@ -344,7 +344,7 @@ impl TypeSerialize {
     fn encode(&self, buf: &mut Vec<u8>, t: &Type) -> Result<()> {
         if let Type::Var(id) = t {
             let actual_type = self.env.rec_find_type(id)?;
-            if types::internal::is_primitive(&actual_type) {
+            if types::internal::is_primitive(actual_type) {
                 return self.encode(buf, actual_type);
             }
         }
@@ -379,14 +379,14 @@ impl TypeSerialize {
             Type::Var(_) => {
                 let idx = self
                     .type_map
-                    .get(&t)
+                    .get(t)
                     .ok_or_else(|| Error::msg(format!("var type {} not found", t)))?;
                 sleb128_encode(buf, i64::from(*idx))
             }
             _ => {
                 let idx = self
                     .type_map
-                    .get(&t)
+                    .get(t)
                     .ok_or_else(|| Error::msg(format!("type {} not found", t)))?;
                 sleb128_encode(buf, i64::from(*idx))
             }

@@ -62,7 +62,7 @@ impl TypeEnv {
         match t {
             Type::Service(s) => Ok(s),
             Type::Var(id) => self.as_service(self.find_type(id)?),
-            Type::Class(_, ty) => self.as_service(&ty),
+            Type::Class(_, ty) => self.as_service(ty),
             _ => Err(Error::msg(format!("not a service type: {}", t))),
         }
     }
@@ -325,7 +325,7 @@ fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
             Ok(Some(Type::Class(args, Box::new(serv))))
         }
         Some(typ) => {
-            let t = check_type(env, &typ)?;
+            let t = check_type(env, typ)?;
             env.te.as_service(&t)?;
             Ok(Some(t))
         }
