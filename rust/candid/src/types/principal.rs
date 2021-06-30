@@ -1,6 +1,6 @@
 use super::{CandidType, Serializer, Type, TypeId};
 
-pub use ic_types::Principal;
+pub type Principal = ic_types::Principal;
 
 impl CandidType for Principal {
     fn id() -> TypeId {
