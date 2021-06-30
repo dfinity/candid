@@ -1,6 +1,12 @@
 
 # Changelog
 
+## 2021-06-30 (Rust 0.7.1)
+
+* Update JS binding to use `Principal` from `@dfinity/principal`
+* Add `#[candid_path("path_to_candid")]` helper attribute to the candid derive macro
+* Update `ic-types` to 0.2.0
+
 ## 2021-06-03 
 
 ### Spec
