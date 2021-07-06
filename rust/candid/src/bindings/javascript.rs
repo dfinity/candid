@@ -250,7 +250,8 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             };
             let actor = kwd("return").append(pp_actor(actor, &recs)).append(";");
             let body = defs.append(actor);
-            let doc = str("export const idlFactory = ({ IDL }) => ").append(enclose_space("{", body, "};"));
+            let doc = str("export const idlFactory = ({ IDL }) => ")
+                .append(enclose_space("{", body, "};"));
             // export init args
             let init_defs = chase_types(env, init).unwrap();
             let init_recs = infer_rec(env, &init_defs).unwrap();
