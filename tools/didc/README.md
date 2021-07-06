@@ -46,9 +46,9 @@ record { edit { 1 put { 5 } }; edit { 2 put { 9 } }; }
 skip
 
 $ didc bind hello.did -t js
-export default ({ IDL }) => {
+export const idlFactory = ({ IDL }) => {
   return IDL.Service({ 'greet' : IDL.Func([IDL.Text], [IDL.Text], []) });
-};
+}
 
 $ didc random -t '(int, text)'
 (-72_594_379_354_493_140_610_202_928_640_651_761_468, "_J`:t7^>")

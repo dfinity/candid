@@ -129,22 +129,24 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
             Type::Func(ref func) => kwd("export type")
                 .append(ident(id))
                 .append(" = ")
-                .append(pp_function(env, func)),
+                .append(pp_function(env, func))
+                .append(";"),
             _ => kwd("export type")
                 .append(ident(id))
                 .append(" = ")
-                .append(pp_ty(ty)),
+                .append(pp_ty(ty))
+                .append(";"),
         };
-        export.append(";")
+        export
     }))
 }
 
 fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
     match ty {
-        Type::Service(ref serv) => {
-            kwd("export default interface _SERVICE").append(pp_service(env, serv))
-        }
-        Type::Var(id) => kwd("export default").append(str(id)),
+        Type::Service(ref serv) => kwd("export interface _SERVICE").append(pp_service(env, serv)),
+        Type::Var(id) => kwd("export interface _SERVICE extends")
+            .append(str(id))
+            .append(str(" {}")),
         Type::Class(_, t) => pp_actor(env, t),
         _ => unreachable!(),
     }
@@ -156,7 +158,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     let defs = pp_defs(env, &def_list);
     let actor = match actor {
         None => RcDoc::nil(),
-        Some(actor) => pp_actor(env, actor).append(";"),
+        Some(actor) => pp_actor(env, actor),
     };
     let doc = RcDoc::text(header)
         .append(RcDoc::line())
