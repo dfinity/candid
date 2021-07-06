@@ -1,4 +1,4 @@
-export default ({ IDL }) => {
+export const idlFactory = ({ IDL }) => {
   const List = IDL.Rec();
   List.fill(IDL.Opt(IDL.Tuple(IDL.Int, List)));
   return IDL.Service({

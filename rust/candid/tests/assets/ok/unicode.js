@@ -1,4 +1,4 @@
-export default ({ IDL }) => {
+export const idlFactory = ({ IDL }) => {
   const A = IDL.Record({
     '\u{e000}' : IDL.Nat,
     '📦🍦' : IDL.Nat,
