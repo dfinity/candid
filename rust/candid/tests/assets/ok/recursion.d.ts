@@ -13,3 +13,4 @@ export type tree = {
     'branch' : { 'val' : bigint, 'left' : tree, 'right' : tree }
   } |
   { 'leaf' : bigint };
+export interface _SERVICE extends s {}

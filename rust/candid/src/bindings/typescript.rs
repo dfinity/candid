@@ -146,7 +146,7 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
         Type::Service(ref serv) => {
             kwd("export interface _SERVICE").append(pp_service(env, serv))
         }
-        Type::Var(id) => kwd("export").append(str(id)),
+        Type::Var(id) => kwd("export interface _SERVICE extends").append(str(id)).append(str(" {}")),
         Type::Class(_, t) => pp_actor(env, t),
         _ => unreachable!(),
     }
