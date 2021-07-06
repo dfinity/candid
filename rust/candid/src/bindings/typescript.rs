@@ -137,7 +137,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
                 .append(pp_ty(ty))
                 .append(";"),
         };
-        export.append("")
+        export
     }))
 }
 
