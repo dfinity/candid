@@ -4,15 +4,15 @@ export type if_ = {
   } |
   { 'leaf' : bigint };
 export type list = [] | [node];
-export interface node { 'head' : bigint, 'tail' : list };
+export interface node { 'head' : bigint, 'tail' : list }
 export type o = [] | [o];
 export interface return_ {
   'f' : t,
   'g' : (arg_0: list) => Promise<[if_, stream]>,
-};
+}
 export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
 export type t = (arg_0: Principal) => Promise<undefined>;
-export default interface _SERVICE {
+export interface _SERVICE {
   'Oneway' : () => Promise<undefined>,
   'f_' : (arg_0: o) => Promise<o>,
   'field' : (arg_0: { 'test' : number, _1291438163_ : number }) => Promise<{}>,
@@ -31,4 +31,4 @@ export default interface _SERVICE {
         { 'C' : null } |
         { 'D' : number },
     ) => Promise<undefined>,
-};
+}

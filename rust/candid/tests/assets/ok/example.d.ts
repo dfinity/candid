@@ -1,6 +1,6 @@
 import type { Principal } from '@dfinity/principal';
 export type List = [] | [{ 'head' : bigint, 'tail' : List }];
-export interface broker { 'find' : (arg_0: string) => Promise<Principal> };
+export interface broker { 'find' : (arg_0: string) => Promise<Principal> }
 export type f = (arg_0: List, arg_1: [Principal, string]) => Promise<
     [] | [List]
   >;
@@ -16,8 +16,8 @@ export interface nested {
     { 'B' : null } |
     { 'C' : null },
   _42_ : bigint,
-};
-export default interface _SERVICE {
+}
+export interface _SERVICE {
   'f' : (arg_0: Array<number>, arg_1: [] | [boolean]) => Promise<undefined>,
   'g' : (
       arg_0: my_type,
@@ -32,4 +32,4 @@ export default interface _SERVICE {
       arg_2: [] | [List],
     ) => Promise<{ _42_ : {}, 'id' : bigint }>,
   'i' : f,
-};
+}

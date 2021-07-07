@@ -1,4 +1,4 @@
-export default ({ IDL }) => {
+export const idlFactory = ({ IDL }) => {
   const B = IDL.Rec();
   const list = IDL.Rec();
   const s = IDL.Rec();
