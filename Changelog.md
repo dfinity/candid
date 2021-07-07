@@ -1,7 +1,7 @@
 
 # Changelog
 
-## 2021-07-07 (Rust 0.7.2)
+## 2021-07-07 (Rust 0.7.2 -- 0.7.3)
 
 * Update TypeScript binding to better integrate with dfx
 
