@@ -1,6 +1,10 @@
 
 # Changelog
 
+## 2021-07-07 (Rust 0.7.2)
+
+* Update TypeScript binding to better integrate with dfx
+
 ## 2021-06-30 (Rust 0.7.1)
 
 * Update JS binding to use `Principal` from `@dfinity/principal`
