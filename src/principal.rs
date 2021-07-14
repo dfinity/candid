@@ -378,9 +378,15 @@ mod deserialize {
 impl<'de> serde::Deserialize<'de> for Principal {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Principal, D::Error> {
         use serde::de::Error;
-        deserializer
-            .deserialize_bytes(deserialize::PrincipalVisitor)
-            .map_err(D::Error::custom)
+        if deserializer.is_human_readable() {
+            deserializer
+                .deserialize_str(deserialize::PrincipalVisitor)
+                .map_err(D::Error::custom)
+        } else {
+            deserializer
+                .deserialize_bytes(deserialize::PrincipalVisitor)
+                .map_err(D::Error::custom)
+        }
     }
 }
 
@@ -535,7 +541,10 @@ mod tests {
 
     #[test]
     fn parse_management_canister_to_text_ok() {
-        assert_eq!(Principal::from_str("aaaaa-aa").unwrap().as_slice(), &[]);
+        assert_eq!(
+            Principal::from_str("aaaaa-aa").unwrap().as_slice(),
+            &[0u8; 0]
+        );
     }
 
     #[test]
@@ -593,7 +602,7 @@ mod tests {
 
     #[cfg(feature = "serde")]
     #[test]
-    fn check_serialize_deserialize() {
+    fn check_serde_cbor() {
         let id = Principal::from_str("2chl6-4hpzw-vqaaa-aaaaa-c").unwrap();
 
         // Use cbor serialization.
@@ -601,6 +610,18 @@ mod tests {
         let value = serde_cbor::from_slice(vec.as_slice()).unwrap();
 
         assert_eq!(id, value);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn check_serde_json() {
+        let id = Principal::from_str("2chl6-4hpzw-vqaaa-aaaaa-c").unwrap();
+
+        // Use cbor serialization.
+        let ser = serde_json::to_string(&id).unwrap();
+        let de = serde_json::from_str::<Principal>(&ser).unwrap();
+
+        assert_eq!(id, de);
     }
 
     #[test]
