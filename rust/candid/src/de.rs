@@ -392,6 +392,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     primitive_impl!(f32, Type::Float32, read_f32::<LittleEndian>);
     primitive_impl!(f64, Type::Float64, read_f64::<LittleEndian>);
 
+    fn is_human_readable(&self) -> bool {
+        false
+    }
     fn deserialize_i128<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
