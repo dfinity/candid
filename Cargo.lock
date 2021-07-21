@@ -741,9 +741,9 @@ checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "ic-types"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08f0b1f1517d697f67a8b5ad558ef6b9372ed1fc5ab669a519d7fa1837e8f88a"
+checksum = "471541b20b3d2bb26dd81ac0c44c66eabeaa2ba3641e96606b6c66f86a035a27"
 dependencies = [
  "base32",
  "crc32fast",
