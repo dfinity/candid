@@ -1,9 +1,10 @@
 
 # Changelog
 
-## 2021-07-07 (Rust 0.7.2 -- 0.7.3)
+## 2021-07-07 (Rust 0.7.2 -- 0.7.4)
 
 * Update TypeScript binding to better integrate with dfx
+* Set `is_human_readable` to false in Deserializer
 
 ## 2021-06-30 (Rust 0.7.1)
 
