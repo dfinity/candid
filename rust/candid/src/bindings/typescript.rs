@@ -4,7 +4,7 @@ use crate::pretty::*;
 use crate::types::{Field, Function, Label, Type};
 use pretty::RcDoc;
 
-fn pp_ty(ty: &Type) -> RcDoc {
+fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
     use Type::*;
     match *ty {
         Null => str("null"),
@@ -24,21 +24,33 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("string"),
         Reserved => str("any"),
         Empty => str("never"),
-        Var(ref s) => ident(s),
+        Var(ref id) => {
+            if is_ref {
+                let ty = env.rec_find_type(id).unwrap();
+                if matches!(ty, Service(_) | Func(_)) {
+                    pp_ty(env, ty, false)
+                } else {
+                    ident(id)
+                }
+            } else {
+                ident(id)
+            }
+        }
         Principal => str("Principal"),
-        Opt(ref t) => str("[] | ").append(enclose("[", pp_ty(t), "]")),
-        Vec(ref t) => str("Array").append(enclose("<", pp_ty(t), ">")),
+        Opt(ref t) => str("[] | ").append(enclose("[", pp_ty(env, t, is_ref), "]")),
+        Vec(ref t) => str("Array").append(enclose("<", pp_ty(env, t, is_ref), ">")),
         Record(ref fs) => {
             if is_tuple(ty) {
-                let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
+                let tuple = concat(fs.iter().map(|f| pp_ty(env, &f.ty, is_ref)), ",");
                 enclose("[", tuple, "]")
             } else {
-                let fields = concat(fs.iter().map(pp_field), ",");
+                let fields = concat(fs.iter().map(|f| pp_field(env, f, is_ref)), ",");
                 enclose_space("{", fields, "}")
             }
         }
         Variant(ref fs) => strict_concat(
-            fs.iter().map(|f| enclose_space("{", pp_field(f), "}")),
+            fs.iter()
+                .map(|f| enclose_space("{", pp_field(env, f, is_ref), "}")),
             " |",
         )
         .nest(INDENT_SPACE),
@@ -59,22 +71,10 @@ fn pp_label(id: &Label) -> RcDoc {
     }
 }
 
-fn pp_field(field: &Field) -> RcDoc {
+fn pp_field<'a>(env: &'a TypeEnv, field: &'a Field, is_ref: bool) -> RcDoc<'a> {
     pp_label(&field.id)
         .append(kwd(":"))
-        .append(pp_ty(&field.ty))
-}
-
-fn as_ref_ty<'a>(env: &'a TypeEnv, t: &'a Type) -> RcDoc<'a> {
-    if let Type::Var(id) = t {
-        let ty = env.rec_find_type(id).unwrap();
-        match ty {
-            Type::Service(_) | Type::Func(_) => pp_ty(ty),
-            _ => pp_ty(t),
-        }
-    } else {
-        pp_ty(t)
-    }
+        .append(pp_ty(env, &field.ty, is_ref))
 }
 
 fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
@@ -82,16 +82,16 @@ fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
         .args
         .iter()
         .enumerate()
-        .map(|(i, ty)| RcDoc::text(format!("arg_{}: ", i)).append(as_ref_ty(env, ty)));
+        .map(|(i, ty)| RcDoc::text(format!("arg_{}: ", i)).append(pp_ty(env, ty, true)));
     let args = enclose("(", concat(args, ","), ")");
     let rets = str("Promise").append(enclose(
         "<",
         match func.rets.len() {
             0 => str("undefined"),
-            1 => as_ref_ty(env, &func.rets[0]),
+            1 => pp_ty(env, &func.rets[0], true),
             _ => enclose(
                 "[",
-                concat(func.rets.iter().map(|ty| as_ref_ty(env, ty)), ","),
+                concat(func.rets.iter().map(|ty| pp_ty(env, ty, true)), ","),
                 "]",
             ),
         },
@@ -105,7 +105,7 @@ fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
         serv.iter().map(|(id, func)| {
             let func = match func {
                 Type::Func(ref func) => pp_function(env, func),
-                _ => pp_ty(func),
+                _ => pp_ty(env, func, false),
             };
             quote_ident(id).append(kwd(":")).append(func)
         }),
@@ -121,7 +121,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
             Type::Record(_) if !ty.is_tuple() => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
-                .append(pp_ty(ty)),
+                .append(pp_ty(env, ty, false)),
             Type::Service(ref serv) => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
@@ -134,7 +134,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
             _ => kwd("export type")
                 .append(ident(id))
                 .append(" = ")
-                .append(pp_ty(ty))
+                .append(pp_ty(env, ty, false))
                 .append(";"),
         };
         export
