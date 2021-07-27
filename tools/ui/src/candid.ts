@@ -5,7 +5,16 @@ import {
 import {Principal} from '@dfinity/principal'
 import './candid.css';
 
+function is_local(agent: HttpAgent) {
+  // @ts-ignore
+  const hostname = agent._host.hostname;
+  return hostname === '127.0.0.1' || hostname.endsWith('localhost');
+}
+
 const agent = new HttpAgent();
+if (is_local(agent)) {
+  agent.fetchRootKey();
+}
 
 function getCanisterId(): Principal {
   // Check the query params.
@@ -54,7 +63,7 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   }
   const dataUri = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(js);
   const candid: any = await eval('import("' + dataUri + '")');
-  return Actor.createActor(candid.default, { agent, canisterId });
+  return Actor.createActor(candid.idlFactory, { agent, canisterId });
 }
 
 async function getLocalDidJs(canisterId: Principal): Promise<undefined | string> {
