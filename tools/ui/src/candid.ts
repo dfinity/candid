@@ -251,7 +251,8 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       const text = encodeStr(IDL.FuncClass.argsToString(idlFunc.retTypes, result));
       textContainer.innerHTML = decodeSpace(text);
       const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
-      log(decodeSpace(`› ${name}${showArgs} ` + (instr_counter?`(${instr_counter[0]} instrs, GC ${instr_counter[1]} instrs)`:"")));
+      const showInstr = instr_counter && instr_counter[0]?`(${instr_counter[0]} instrs, GC ${instr_counter[1]} instrs)`:"";
+      log(decodeSpace(`› ${name}${showArgs} ` + showInstr));
       log(decodeSpace(text));
 
       const uiContainer = document.createElement('div');
