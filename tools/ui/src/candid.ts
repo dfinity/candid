@@ -66,13 +66,13 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   return Actor.createActor(candid.idlFactory, { agent, canisterId });
 }
 
-export async function getCycles(canisterId: Principal): Promise<bigint|undefined> {
+export async function getCycles(canisterId: Principal): Promise<[bigint,bigint]|undefined> {
   try {
     const profiling_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
-      __get_cycles: IDL.Func([], [IDL.Int64], ['query']),
+      __get_cycles: IDL.Func([], [IDL.Int64, IDL.Int64], ['query']),
     });
     const actor: ActorSubclass = Actor.createActor(profiling_interface, { agent, canisterId });
-    const cycles = await actor.__get_cycles() as bigint;
+    const cycles = await actor.__get_cycles() as [bigint, bigint];
     return cycles;
   } catch(err) {
     return undefined;
@@ -112,11 +112,11 @@ async function didToJs(candid_source: string): Promise<undefined | string> {
   return js[0];  
 }
 
-export function render(id: Principal, canister: ActorSubclass, profiling: bigint|undefined) {
+export function render(id: Principal, canister: ActorSubclass, profiling: [bigint,bigint]|undefined) {
   document.getElementById('canisterId')!.innerText = `${id}`;
   let profiler;
   if (profiling) {
-    log(`Wasm instructions executed ${profiling}`);
+    log(`Wasm instructions executed ${profiling[0]} (GC ${profiling[1]} instrs)`);
     profiler = async () => { return await getCycles(id) };
   }
   const sortedMethods = Actor.interfaceOf(canister)._fields.sort(([a], [b]) => (a > b ? 1 : -1));
@@ -204,11 +204,11 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
     right.innerText = '';
     resultDiv.style.display = 'flex';
 
-    const before_instrs = profiler ? (await profiler() as bigint) : null;
+    const before_instrs = profiler ? (await profiler() as [bigint, bigint]) : null;
     const tStart = Date.now();
     const result = await canister[name](...args);
     const duration = (Date.now() - tStart) / 1000;
-    const instr_counter = profiler ? (await profiler() as bigint - before_instrs!) : null;
+    const instr_counter = profiler ? ((await profiler() as [bigint, bigint]).map((now, i) => now-before_instrs![i])) : null;
     right.innerText = `(${duration}s)`;
     return [result, instr_counter];
   }
@@ -216,8 +216,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
   const containers: HTMLDivElement[] = [];
   function callAndRender(args: any[]) {
     (async () => {
-      // @ts-ignore
-      const [callResult, instr_counter] = await call(args);
+      const [callResult, instr_counter] = await call(args) as [any, [bigint, bigint]];
       let result: any;
       if (idlFunc.retTypes.length === 0) {
         result = [];
@@ -252,7 +251,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       const text = encodeStr(IDL.FuncClass.argsToString(idlFunc.retTypes, result));
       textContainer.innerHTML = decodeSpace(text);
       const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
-      log(decodeSpace(`› ${name}${showArgs} ` + (instr_counter?`(${instr_counter} instrs)`:"")));
+      log(decodeSpace(`› ${name}${showArgs} ` + (instr_counter?`(${instr_counter[0]} instrs, GC ${instr_counter[1]} instrs)`:"")));
       log(decodeSpace(text));
 
       const uiContainer = document.createElement('div');
