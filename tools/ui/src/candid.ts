@@ -216,6 +216,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
   const containers: HTMLDivElement[] = [];
   function callAndRender(args: any[]) {
     (async () => {
+      resultDiv.classList.remove('error');
       const [callResult, instr_counter] = await call(args) as [any, [bigint, bigint]];
       let result: any;
       if (idlFunc.retTypes.length === 0) {
