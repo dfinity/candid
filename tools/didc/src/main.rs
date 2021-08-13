@@ -137,7 +137,7 @@ impl TypeAnnotation {
             (None, Some(meth)) => {
                 let actor = actor
                     .ok_or_else(|| Error::msg("Cannot use --method with a non-service did file"))?;
-                let func = env.get_method(&actor, &meth)?;
+                let func = env.get_method(&actor, meth)?;
                 let types = match mode {
                     Mode::Encode => &func.args,
                     Mode::Decode => &func.rets,
@@ -346,7 +346,7 @@ fn main() -> Result<()> {
                 return Err(Error::msg("value length mismatch").into());
             }
             for (v1, v2) in vs1.iter().zip(vs2.iter()) {
-                let edit = candiff::value_diff(&v1, &v2, &None);
+                let edit = candiff::value_diff(v1, v2, &None);
                 println!("{}", candiff::pretty::value_edit(&edit).pretty(80));
             }
         }
