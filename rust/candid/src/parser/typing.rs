@@ -113,6 +113,7 @@ impl TypeEnv {
         }
         Ok(res)
     }
+    #[allow(clippy::needless_collect)]
     pub fn replace_empty(&mut self) -> Result<()> {
         let ids: Vec<_> = self.check_empty()?.iter().map(|x| x.to_string()).collect();
         for id in ids.into_iter() {
