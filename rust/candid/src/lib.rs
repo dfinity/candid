@@ -316,7 +316,7 @@ pub use types::{
 
 pub mod parser;
 pub use parser::types::IDLProg;
-pub use parser::typing::{check_prog, TypeEnv};
+pub use parser::typing::{check_file, check_prog, pretty_check_file, TypeEnv};
 pub use parser::value::IDLArgs;
 
 pub mod binary_parser;

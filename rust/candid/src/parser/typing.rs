@@ -1,6 +1,6 @@
 use super::types::*;
 use crate::types::{Field, Function, Type};
-use crate::{Error, Result};
+use crate::{pretty_parse, Error, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -335,7 +335,7 @@ fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
 }
 
 fn resolve_path(base: &Path, file: &str) -> PathBuf {
-    //let file = PathBuf::from(shellexpand::tilde(file).into_owned());
+    // TODO use shellexpand to support tilde
     let file = PathBuf::from(file);
     if file.is_absolute() {
         file
@@ -345,6 +345,7 @@ fn resolve_path(base: &Path, file: &str) -> PathBuf {
 }
 
 fn load_imports(
+    is_pretty: bool,
     base: &Path,
     visited: &mut BTreeSet<PathBuf>,
     prog: &IDLProg,
@@ -356,9 +357,13 @@ fn load_imports(
             if visited.insert(path.clone()) {
                 let code = std::fs::read_to_string(&path)
                     .map_err(|_| Error::msg(format!("Cannot import {:?}", file)))?;
-                let code = code.parse::<IDLProg>()?;
+                let code = if is_pretty {
+                    pretty_parse::<IDLProg>(path.to_str().unwrap(), &code)?
+                } else {
+                    code.parse::<IDLProg>()?
+                };
                 let base = path.parent().unwrap();
-                load_imports(base, visited, &code, list)?;
+                load_imports(is_pretty, base, visited, &code, list)?;
                 list.push(path);
             }
         }
@@ -374,8 +379,7 @@ pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<Option<Type>> {
     check_actor(&env, &prog.actor)
 }
 
-/// Type check did file including the imports.
-pub fn check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
+fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> {
     let base = if file.is_absolute() {
         file.parent().unwrap().to_path_buf()
     } else {
@@ -383,9 +387,13 @@ pub fn check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
     };
     let prog = std::fs::read_to_string(&file)
         .map_err(|_| Error::msg(format!("Cannot open {:?}", file)))?;
-    let prog = prog.parse::<IDLProg>()?;
+    let prog = if is_pretty {
+        pretty_parse::<IDLProg>(file.to_str().unwrap(), &prog)?
+    } else {
+        prog.parse::<IDLProg>()?
+    };
     let mut imports = Vec::new();
-    load_imports(&base, &mut BTreeSet::new(), &prog, &mut imports)?;
+    load_imports(is_pretty, &base, &mut BTreeSet::new(), &prog, &mut imports)?;
     let mut te = TypeEnv::new();
     let mut env = Env {
         te: &mut te,
@@ -399,4 +407,12 @@ pub fn check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
     check_decs(&mut env, &prog.decs)?;
     let actor = check_actor(&env, &prog.actor)?;
     Ok((te, actor))
+}
+
+/// Type check did file including the imports.
+pub fn check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
+    check_file_(file, false)
+}
+pub fn pretty_check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
+    check_file_(file, true)
 }
