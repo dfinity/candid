@@ -1,13 +1,12 @@
 use anyhow::{bail, Result};
 use candid::{
-    check_prog,
     parser::types::{IDLType, IDLTypes},
-    pretty_parse,
+    pretty_check_file, pretty_parse,
     types::Type,
-    Error, IDLArgs, IDLProg, TypeEnv,
+    Error, IDLArgs, TypeEnv,
 };
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
 
@@ -119,11 +118,10 @@ impl TypeAnnotation {
         self.tys.is_none() && self.method.is_none()
     }
     fn get_types(&self, mode: Mode) -> candid::Result<(TypeEnv, Vec<Type>)> {
-        let mut env = TypeEnv::new();
-        let actor = if let Some(ref file) = self.defs {
-            check_file(&mut env, file)?
+        let (env, actor) = if let Some(ref file) = self.defs {
+            pretty_check_file(file)?
         } else {
-            None
+            (TypeEnv::new(), None)
         };
         match (&self.tys, &self.method) {
             (None, None) => Err(Error::msg("no type annotations")),
@@ -137,7 +135,7 @@ impl TypeAnnotation {
             (None, Some(meth)) => {
                 let actor = actor
                     .ok_or_else(|| Error::msg("Cannot use --method with a non-service did file"))?;
-                let func = env.get_method(&actor, &meth)?;
+                let func = env.get_method(&actor, meth)?;
                 let types = match mode {
                     Mode::Encode => &func.args,
                     Mode::Decode => &func.rets,
@@ -157,21 +155,12 @@ fn parse_types(str: &str) -> Result<IDLTypes, Error> {
     pretty_parse("type annotations", str)
 }
 
-fn check_file(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
-    let prog = std::fs::read_to_string(file)
-        .map_err(|_| Error::msg(format!("could not read file {}", file.display())))?;
-    let ast = pretty_parse::<IDLProg>(file.to_str().unwrap(), &prog)?;
-    check_prog(env, &ast)
-}
-
 fn main() -> Result<()> {
     match Command::from_args() {
         Command::Check { input, previous } => {
-            let mut env = TypeEnv::new();
-            let opt_t1 = check_file(&mut env, &input)?;
+            let (env, opt_t1) = pretty_check_file(&input)?;
             if let Some(previous) = previous {
-                let mut env2 = TypeEnv::new();
-                let opt_t2 = check_file(&mut env2, &previous)?;
+                let (env2, opt_t2) = pretty_check_file(&previous)?;
                 match (opt_t1, opt_t2) {
                     (Some(t1), Some(t2)) => {
                         let mut gamma = HashSet::new();
@@ -184,17 +173,17 @@ fn main() -> Result<()> {
             }
         }
         Command::Subtype { defs, ty1, ty2 } => {
-            let mut env = TypeEnv::new();
-            if let Some(file) = defs {
-                check_file(&mut env, &file)?;
-            }
+            let (env, _) = if let Some(file) = defs {
+                pretty_check_file(&file)?
+            } else {
+                (TypeEnv::new(), None)
+            };
             let ty1 = env.ast_to_type(&ty1)?;
             let ty2 = env.ast_to_type(&ty2)?;
             candid::types::subtype::subtype(&mut HashSet::new(), &env, &ty1, &env, &ty2)?;
         }
         Command::Bind { input, target } => {
-            let mut env = TypeEnv::new();
-            let actor = check_file(&mut env, &input)?;
+            let (env, actor) = pretty_check_file(&input)?;
             let content = match target.as_str() {
                 "js" => candid::bindings::javascript::compile(&env, &actor),
                 "ts" => candid::bindings::typescript::compile(&env, &actor),
@@ -346,7 +335,7 @@ fn main() -> Result<()> {
                 return Err(Error::msg("value length mismatch").into());
             }
             for (v1, v2) in vs1.iter().zip(vs2.iter()) {
-                let edit = candiff::value_diff(&v1, &v2, &None);
+                let edit = candiff::value_diff(v1, v2, &None);
                 println!("{}", candiff::pretty::value_edit(&edit).pretty(80));
             }
         }

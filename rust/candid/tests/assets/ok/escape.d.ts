@@ -4,7 +4,7 @@ export interface t {
   '\'' : bigint,
   '\"\'' : bigint,
   '\\\n\'\"' : bigint,
-};
-export default interface _SERVICE {
+}
+export interface _SERVICE {
   '\n\'\"\'\'\"\"\r\t' : (arg_0: t) => Promise<undefined>,
-};
+}

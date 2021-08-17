@@ -1,7 +1,6 @@
 use candid::bindings::{candid as candid_export, javascript, motoko, typescript};
 use candid::parser::types::{to_pretty, IDLProg};
-use candid::parser::typing::{check_prog, TypeEnv};
-use candid::types::Type;
+use candid::parser::typing::{check_file, check_prog, TypeEnv};
 use goldenfile::Mint;
 use std::io::Write;
 use std::path::Path;
@@ -32,12 +31,6 @@ service server : {
     assert_eq!(format!("{:?}", ast2), format!("{:?}", ast));
 }
 
-fn compile(env: &mut TypeEnv, file: &Path) -> candid::Result<Option<Type>> {
-    let prog = std::fs::read_to_string(&file)?;
-    let ast = prog.parse::<IDLProg>()?;
-    check_prog(env, &ast)
-}
-
 #[test_generator::test_resources("rust/candid/tests/assets/*.did")]
 fn compiler_test(resource: &str) {
     let base_path = std::env::current_dir().unwrap().join("tests/assets");
@@ -46,9 +39,8 @@ fn compiler_test(resource: &str) {
     let filename = Path::new(Path::new(resource).file_name().unwrap());
     let candid_path = base_path.join(filename);
 
-    let mut env = TypeEnv::new();
-    match compile(&mut env, &candid_path) {
-        Ok(actor) => {
+    match check_file(&candid_path) {
+        Ok((env, actor)) => {
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
                 let content = candid_export::compile(&env, &actor);

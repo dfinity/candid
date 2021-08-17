@@ -82,7 +82,7 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenSt
 
 pub(crate) fn export_service() -> TokenStream {
     if let Some(meths) = METHODS.lock().unwrap().as_mut() {
-        let candid = candid_path();
+        let candid = candid_path(&None);
         let init = if let Some(opt_args) = INIT.lock().unwrap().as_mut() {
             let res = opt_args.as_ref().map(|args| {
                 let args = args

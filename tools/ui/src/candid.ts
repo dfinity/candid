@@ -5,7 +5,16 @@ import {
 import {Principal} from '@dfinity/principal'
 import './candid.css';
 
+function is_local(agent: HttpAgent) {
+  // @ts-ignore
+  const hostname = agent._host.hostname;
+  return hostname === '127.0.0.1' || hostname.endsWith('localhost');
+}
+
 const agent = new HttpAgent();
+if (is_local(agent)) {
+  agent.fetchRootKey();
+}
 
 function getCanisterId(): Principal {
   // Check the query params.
@@ -42,7 +51,7 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
     try {
       js = await getRemoteDidJs(canisterId);
     } catch(err) {
-      if (/__get_candid_interface_tmp_hack/.test(err)) {
+      if (/no query method/.test(err)) {
         js = await getLocalDidJs(canisterId);
       } else {
         throw(err);
@@ -54,7 +63,20 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   }
   const dataUri = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(js);
   const candid: any = await eval('import("' + dataUri + '")');
-  return Actor.createActor(candid.default, { agent, canisterId });
+  return Actor.createActor(candid.idlFactory, { agent, canisterId });
+}
+
+export async function getCycles(canisterId: Principal): Promise<[bigint,bigint]|undefined> {
+  try {
+    const profiling_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
+      __get_cycles: IDL.Func([], [IDL.Int64, IDL.Int64], ['query']),
+    });
+    const actor: ActorSubclass = Actor.createActor(profiling_interface, { agent, canisterId });
+    const cycles = await actor.__get_cycles() as [bigint, bigint];
+    return cycles;
+  } catch(err) {
+    return undefined;
+  }
 }
 
 async function getLocalDidJs(canisterId: Principal): Promise<undefined | string> {
@@ -90,15 +112,20 @@ async function didToJs(candid_source: string): Promise<undefined | string> {
   return js[0];  
 }
 
-export function render(id: Principal, canister: ActorSubclass) {
+export function render(id: Principal, canister: ActorSubclass, profiling: [bigint,bigint]|undefined) {
   document.getElementById('canisterId')!.innerText = `${id}`;
+  let profiler;
+  if (profiling) {
+    log(`Wasm instructions executed ${profiling[0]} (GC ${profiling[1]} instrs)`);
+    profiler = async () => { return await getCycles(id) };
+  }
   const sortedMethods = Actor.interfaceOf(canister)._fields.sort(([a], [b]) => (a > b ? 1 : -1));
   for (const [name, func] of sortedMethods) {
-    renderMethod(canister, name, func);
+    renderMethod(canister, name, func, profiler);
   }
 }
 
-function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncClass) {
+function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncClass, profiler: any) {
   const item = document.createElement('li');
   item.id = name;
 
@@ -177,17 +204,20 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
     right.innerText = '';
     resultDiv.style.display = 'flex';
 
+    const before_instrs = profiler ? (await profiler() as [bigint, bigint]) : null;
     const tStart = Date.now();
     const result = await canister[name](...args);
     const duration = (Date.now() - tStart) / 1000;
+    const instr_counter = profiler ? ((await profiler() as [bigint, bigint]).map((now, i) => now-before_instrs![i])) : null;
     right.innerText = `(${duration}s)`;
-    return result;
+    return [result, instr_counter];
   }
 
   const containers: HTMLDivElement[] = [];
   function callAndRender(args: any[]) {
     (async () => {
-      const callResult = await call(args);
+      resultDiv.classList.remove('error');
+      const [callResult, instr_counter] = await call(args) as [any, [bigint, bigint]];
       let result: any;
       if (idlFunc.retTypes.length === 0) {
         result = [];
@@ -222,7 +252,8 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       const text = encodeStr(IDL.FuncClass.argsToString(idlFunc.retTypes, result));
       textContainer.innerHTML = decodeSpace(text);
       const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
-      log(decodeSpace(`› ${name}${showArgs}`));
+      const showInstr = instr_counter && instr_counter[0]?`(${instr_counter[0]} instrs, GC ${instr_counter[1]} instrs)`:"";
+      log(decodeSpace(`› ${name}${showArgs} ` + showInstr));
       log(decodeSpace(text));
 
       const uiContainer = document.createElement('div');

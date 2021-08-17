@@ -1,5 +1,8 @@
-export default ({ IDL }) => {
+export const idlFactory = ({ IDL }) => {
   const List = IDL.Rec();
+  const list = IDL.Rec();
+  const node = IDL.Record({ 'head' : IDL.Nat, 'tail' : list });
+  list.fill(IDL.Opt(node));
   const my_type = IDL.Principal;
   List.fill(IDL.Opt(IDL.Record({ 'head' : IDL.Int, 'tail' : List })));
   const nested = IDL.Record({
@@ -34,7 +37,11 @@ export default ({ IDL }) => {
       [],
     );
   return IDL.Service({
-    'f' : IDL.Func([IDL.Vec(IDL.Nat8), IDL.Opt(IDL.Bool)], [], ['oneway']),
+    'f' : IDL.Func(
+        [list, IDL.Vec(IDL.Nat8), IDL.Opt(IDL.Bool)],
+        [],
+        ['oneway'],
+      ),
     'g' : IDL.Func(
         [my_type, List, IDL.Opt(List), nested],
         [IDL.Int, broker],

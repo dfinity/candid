@@ -23,7 +23,7 @@ const aliases = Object.entries(dfxJson.canisters).reduce(
 
     return {
       ...acc,
-      ["dfx-generated/" + name]: path.join(outputRoot, name + ".js"),
+      ["dfx-generated/" + name]: path.join(outputRoot),
     };
   },
   {}
@@ -90,12 +90,13 @@ function generateWebpackConfigForCanister(name, info) {
         template: 'src/candid.html',
         filename: 'index.html',
       }),
-      new CopyWebpackPlugin([
-        {
-          from: 'src/favicon.ico',
-          to: 'favicon.ico',
-        },
-      ]),
+      new CopyWebpackPlugin({
+        patterns: [
+          {
+            from: 'src/favicon.ico',
+            to: 'favicon.ico',
+          },
+        ]}),
       new webpack.ProvidePlugin({
         Buffer: [require.resolve('buffer/'), 'Buffer'],
         //process: require.resolve('process/browser'),

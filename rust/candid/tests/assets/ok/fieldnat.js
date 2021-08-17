@@ -1,4 +1,4 @@
-export default ({ IDL }) => {
+export const idlFactory = ({ IDL }) => {
   const tuple = IDL.Tuple(IDL.Text, IDL.Text);
   const non_tuple = IDL.Record({ _1_ : IDL.Text, _2_ : IDL.Text });
   return IDL.Service({

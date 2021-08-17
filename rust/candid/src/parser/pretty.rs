@@ -11,7 +11,7 @@ const MAX_ELEMENTS_FOR_PRETTY_PRINT: usize = 10;
 
 impl fmt::Display for IDLArgs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", pp_args(&self).pretty(80))
+        write!(f, "{}", pp_args(self).pretty(80))
     }
 }
 
@@ -20,7 +20,7 @@ impl fmt::Display for IDLValue {
         write!(
             f,
             "{}",
-            pp_value(MAX_ELEMENTS_FOR_PRETTY_PRINT, &self).pretty(80)
+            pp_value(MAX_ELEMENTS_FOR_PRETTY_PRINT, self).pretty(80)
         )
     }
 }
@@ -219,7 +219,7 @@ pub fn pp_value(depth: usize, v: &IDLValue) -> RcDoc {
                 let tuple = concat(fields.iter().map(|f| pp_value(depth - 1, &f.val)), ";");
                 kwd("record").append(enclose_space("{", tuple, "}"))
             } else {
-                kwd("record").append(pp_fields(depth, &fields))
+                kwd("record").append(pp_fields(depth, fields))
             }
         }
         Variant(v) => kwd("variant").append(enclose_space("{", pp_field(depth, &v.0, true), "}")),
