@@ -16,8 +16,8 @@ Candid supports several different programming languages.
 This repository contains some of the implementations developed by DFINITY.
 
 * [Rust](rust/): A serialization library based on Serde, and a compiler for generating bindings for other languages.
-* Motoko: Compiler support for importing/export Candid files.
-* JavaScript: As part of the [JavaScript User Library](https://www.npmjs.com/package/@dfinity/agent), we provide a library for serialization of native JavaScript values, and a visitor class for extending Candid for building generic tools such as UI and random testing.
+* [Motoko](https://github.com/dfinity/motoko): Compiler support for importing/export Candid files. The type mapping between Motoko and Candid is specified [here](https://github.com/dfinity/motoko/blob/master/design/IDL-Motoko.md).
+* [JavaScript](https://github.com/dfinity/agent-js/tree/main/packages/candid): We provide a library for serialization of native JavaScript values, and a visitor class for extending Candid for building generic tools such as UI and random testing.
 
 A list of community maintained Candid libraries:
 
@@ -30,7 +30,8 @@ A list of community maintained Candid libraries:
 
 * [didc](tools/didc): Candid CLI
 * [candiff](tools/candiff): Diff Candid values structurally
-* [ui](tools/ui): Candid UI canister [Mainnet](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.ic0.app/)
+* [ui](tools/ui): Candid UI canister. See deployed [canister](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.ic0.app/) on the IC
+* [ic-repl](https://github.com/chenyan2002/ic-repl): A REPL environment to communicate with canisters using Candid
 
 ## Tests
 

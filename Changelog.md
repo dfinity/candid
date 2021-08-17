@@ -1,6 +1,18 @@
 
 # Changelog
 
+## 2021-08-17
+
+### Rust (0.7.5)
+
+* Support import when parsing did files with `check_file` function 
+* Fix TypeScript binding for reference types
+
+### Candid UI
+
+* Report profiling info when `__get_cycles` method is available
+* Add binding generation and subtype checking for Candid UI canister
+
 ## 2021-07-07 (Rust 0.7.2 -- 0.7.4)
 
 * Update TypeScript binding to better integrate with dfx
