@@ -1,7 +1,8 @@
 use super::types::*;
 use crate::types::{Field, Function, Type};
-use crate::{Error, Result};
+use crate::{pretty_parse, Error, Result};
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 
 pub struct Env<'a> {
     pub te: &'a mut TypeEnv,
@@ -333,10 +334,85 @@ fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
     }
 }
 
-/// Type check IDLProg, and adds bindings to type environment. Returns
-/// a hash map for the serivce method signatures. For now, we omit import.
+fn resolve_path(base: &Path, file: &str) -> PathBuf {
+    // TODO use shellexpand to support tilde
+    let file = PathBuf::from(file);
+    if file.is_absolute() {
+        file
+    } else {
+        base.join(file)
+    }
+}
+
+fn load_imports(
+    is_pretty: bool,
+    base: &Path,
+    visited: &mut BTreeSet<PathBuf>,
+    prog: &IDLProg,
+    list: &mut Vec<PathBuf>,
+) -> Result<()> {
+    for dec in prog.decs.iter() {
+        if let Dec::ImportD(file) = dec {
+            let path = resolve_path(base, file);
+            if visited.insert(path.clone()) {
+                let code = std::fs::read_to_string(&path)
+                    .map_err(|_| Error::msg(format!("Cannot import {:?}", file)))?;
+                let code = if is_pretty {
+                    pretty_parse::<IDLProg>(path.to_str().unwrap(), &code)?
+                } else {
+                    code.parse::<IDLProg>()?
+                };
+                let base = path.parent().unwrap();
+                load_imports(is_pretty, base, visited, &code, list)?;
+                list.push(path);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Type check IDLProg and adds bindings to type environment. Returns
+/// a hash map for the serivce method signatures. This function ignores the imports.
 pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<Option<Type>> {
     let mut env = Env { te, pre: false };
     check_decs(&mut env, &prog.decs)?;
     check_actor(&env, &prog.actor)
+}
+
+fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> {
+    let base = if file.is_absolute() {
+        file.parent().unwrap().to_path_buf()
+    } else {
+        std::env::current_dir()?
+    };
+    let prog = std::fs::read_to_string(&file)
+        .map_err(|_| Error::msg(format!("Cannot open {:?}", file)))?;
+    let prog = if is_pretty {
+        pretty_parse::<IDLProg>(file.to_str().unwrap(), &prog)?
+    } else {
+        prog.parse::<IDLProg>()?
+    };
+    let mut imports = Vec::new();
+    load_imports(is_pretty, &base, &mut BTreeSet::new(), &prog, &mut imports)?;
+    let mut te = TypeEnv::new();
+    let mut env = Env {
+        te: &mut te,
+        pre: false,
+    };
+    for import in imports.iter() {
+        let code = std::fs::read_to_string(&import)?;
+        let code = code.parse::<IDLProg>()?;
+        check_decs(&mut env, &code.decs)?;
+    }
+    check_decs(&mut env, &prog.decs)?;
+    let actor = check_actor(&env, &prog.actor)?;
+    Ok((te, actor))
+}
+
+/// Type check did file including the imports.
+pub fn check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
+    check_file_(file, false)
+}
+pub fn pretty_check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
+    check_file_(file, true)
 }
