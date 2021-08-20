@@ -384,6 +384,10 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
         file.parent().unwrap().to_path_buf()
     } else {
         std::env::current_dir()?
+            .join(file)
+            .parent()
+            .unwrap()
+            .to_path_buf()
     };
     let prog = std::fs::read_to_string(&file)
         .map_err(|_| Error::msg(format!("Cannot open {:?}", file)))?;

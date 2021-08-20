@@ -2,6 +2,9 @@ import type { Principal } from '@dfinity/principal';
 export type A = B;
 export type B = [] | [A];
 export type List = [] | [{ 'head' : bigint, 'tail' : List }];
+export type a = { 'a' : null } |
+  { 'b' : b };
+export type b = [bigint, bigint];
 export interface broker { 'find' : (arg_0: string) => Promise<Principal> }
 export type f = (arg_0: List, arg_1: [Principal, string]) => Promise<
     [] | [List]
@@ -48,4 +51,5 @@ export interface _SERVICE {
       arg_2: [] | [List],
     ) => Promise<{ _42_ : {}, 'id' : bigint }>,
   'i' : f,
+  'x' : (arg_0: a, arg_1: b) => Promise<[[] | [a], [] | [b]]>,
 }

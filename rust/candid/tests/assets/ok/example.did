@@ -1,6 +1,8 @@
 type A = B;
 type B = opt A;
 type List = opt record { head : int; tail : List };
+type a = variant { a; b : b };
+type b = record { int; nat };
 type broker = service {
   find : (text) -> (service { current : () -> (nat32); up : () -> () });
 };
@@ -31,4 +33,5 @@ service : {
       record { 42 : record {}; id : nat },
     );
   i : f;
+  x : (a, b) -> (opt a, opt b);
 }

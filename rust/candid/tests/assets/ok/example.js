@@ -36,6 +36,8 @@ export const idlFactory = ({ IDL }) => {
       [IDL.Opt(List)],
       [],
     );
+  const b = IDL.Tuple(IDL.Int, IDL.Nat);
+  const a = IDL.Variant({ 'a' : IDL.Null, 'b' : b });
   return IDL.Service({
     'f' : IDL.Func(
         [list, IDL.Vec(IDL.Nat8), IDL.Opt(IDL.Bool)],
@@ -57,6 +59,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'i' : f,
+    'x' : IDL.Func([a, b], [IDL.Opt(a), IDL.Opt(b)], []),
   });
 };
 export const init = ({ IDL }) => { return []; };
