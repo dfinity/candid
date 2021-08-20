@@ -5,6 +5,8 @@ module {
   public type A = B;
   public type B = ?A;
   public type List = ?{ head : Int; tail : List };
+  public type a = { #a; #b : b };
+  public type b = (Int, Nat);
   public type broker = actor {
     find : shared Text -> async actor {
         current : shared () -> async Nat32;
@@ -39,5 +41,6 @@ module {
         id : Nat;
       };
     i : f;
+    x : shared (a, b) -> async (?a, ?b);
   }
 }
