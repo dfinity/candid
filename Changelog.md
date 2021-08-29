@@ -1,6 +1,29 @@
 
 # Changelog
 
+## 2021-08-17
+
+### Rust (0.7.5)
+
+* Support import when parsing did files with `check_file` function 
+* Fix TypeScript binding for reference types
+
+### Candid UI
+
+* Report profiling info when `__get_cycles` method is available
+* Add binding generation and subtype checking for Candid UI canister
+
+## 2021-07-07 (Rust 0.7.2 -- 0.7.4)
+
+* Update TypeScript binding to better integrate with dfx
+* Set `is_human_readable` to false in Deserializer
+
+## 2021-06-30 (Rust 0.7.1)
+
+* Update JS binding to use `Principal` from `@dfinity/principal`
+* Add `#[candid_path("path_to_candid")]` helper attribute to the candid derive macro
+* Update `ic-types` to 0.2.0
+
 ## 2021-06-03 
 
 ### Spec

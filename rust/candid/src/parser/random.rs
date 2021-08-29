@@ -124,7 +124,7 @@ impl<'a> GenState<'a> {
         let res = Ok(match ty {
             Type::Var(id) => {
                 let ty = self.env.rec_find_type(id)?;
-                self.any(u, &ty)?
+                self.any(u, ty)?
             }
             Type::Null => IDLValue::Null,
             Type::Reserved => IDLValue::Reserved,
@@ -232,7 +232,7 @@ impl TypeEnv {
             Var(id) => {
                 if seen.insert(id.to_string()) {
                     let ty = self.rec_find_type(id).unwrap();
-                    let res = self.size_helper(seen, &ty)?;
+                    let res = self.size_helper(seen, ty)?;
                     seen.remove(id);
                     res
                 } else {

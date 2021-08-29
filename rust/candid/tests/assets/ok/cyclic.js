@@ -1,4 +1,4 @@
-export default ({ IDL }) => {
+export const idlFactory = ({ IDL }) => {
   const A = IDL.Rec();
   const C = A;
   const B = IDL.Opt(C);

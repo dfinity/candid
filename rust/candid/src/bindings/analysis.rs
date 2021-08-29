@@ -58,7 +58,7 @@ pub fn chase_types<'a>(env: &'a TypeEnv, tys: &'a [Type]) -> crate::Result<Vec<&
     let mut seen = BTreeSet::new();
     let mut res = Vec::new();
     for t in tys.iter() {
-        chase_type(&mut seen, &mut res, env, &t)?;
+        chase_type(&mut seen, &mut res, env, t)?;
     }
     Ok(res)
 }
@@ -111,7 +111,7 @@ pub fn infer_rec<'a>(
     }
     for var in def_list.iter() {
         let t = env.0.get(*var).unwrap();
-        go(&mut seen, &mut res, env, &t)?;
+        go(&mut seen, &mut res, env, t)?;
         seen.insert(var);
     }
     Ok(res)

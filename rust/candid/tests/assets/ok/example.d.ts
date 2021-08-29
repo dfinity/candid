@@ -1,9 +1,15 @@
 import type { Principal } from '@dfinity/principal';
+export type A = B;
+export type B = [] | [A];
 export type List = [] | [{ 'head' : bigint, 'tail' : List }];
-export interface broker { 'find' : (arg_0: string) => Promise<Principal> };
+export type a = { 'a' : null } |
+  { 'b' : b };
+export type b = [bigint, bigint];
+export interface broker { 'find' : (arg_0: string) => Promise<Principal> }
 export type f = (arg_0: List, arg_1: [Principal, string]) => Promise<
     [] | [List]
   >;
+export type list = [] | [node];
 export type my_type = Principal;
 export interface nested {
   _0_ : bigint,
@@ -16,9 +22,22 @@ export interface nested {
     { 'B' : null } |
     { 'C' : null },
   _42_ : bigint,
-};
-export default interface _SERVICE {
-  'f' : (arg_0: Array<number>, arg_1: [] | [boolean]) => Promise<undefined>,
+}
+export interface node { 'head' : bigint, 'tail' : list }
+export interface s {
+  'f' : t,
+  'g' : (arg_0: list) => Promise<[B, tree, stream]>,
+}
+export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
+export type t = (arg_0: Principal) => Promise<undefined>;
+export type tree = {
+    'branch' : { 'val' : bigint, 'left' : tree, 'right' : tree }
+  } |
+  { 'leaf' : bigint };
+export interface _SERVICE {
+  'f' : (arg_0: list, arg_1: Array<number>, arg_2: [] | [boolean]) => Promise<
+      undefined
+    >,
   'g' : (
       arg_0: my_type,
       arg_1: List,
@@ -32,4 +51,5 @@ export default interface _SERVICE {
       arg_2: [] | [List],
     ) => Promise<{ _42_ : {}, 'id' : bigint }>,
   'i' : f,
-};
+  'x' : (arg_0: a, arg_1: b) => Promise<[[] | [a], [] | [b]]>,
+}

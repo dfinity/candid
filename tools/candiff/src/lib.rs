@@ -58,11 +58,11 @@ pub mod pretty {
         use ValueEdit::*;
         match &*edit.0 {
             Skip => str("skip"),
-            Put(v) => kwd("put").append(enclose_space("{", pp_value(20, &v), "}")),
-            Opt(ve) => kwd("opt").append(enclose_space("{", value_edit(&ve), "}")),
-            Vec(edits) => kwd("vec").append(enclose_space("{", vec_edits(&edits), "}")),
-            Record(edits) => kwd("record").append(enclose_space("{", record_edits(&edits), "}")),
-            Variant(ve) => kwd("variant").append(enclose_space("{", value_edit(&ve), "}")),
+            Put(v) => kwd("put").append(enclose_space("{", pp_value(20, v), "}")),
+            Opt(ve) => kwd("opt").append(enclose_space("{", value_edit(ve), "}")),
+            Vec(edits) => kwd("vec").append(enclose_space("{", vec_edits(edits), "}")),
+            Record(edits) => kwd("record").append(enclose_space("{", record_edits(edits), "}")),
+            Variant(ve) => kwd("variant").append(enclose_space("{", value_edit(ve), "}")),
         }
     }
 

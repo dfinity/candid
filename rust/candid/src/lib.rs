@@ -202,9 +202,13 @@
 //! // Pretty-print AST
 //! let pretty: String = candid::parser::types::to_pretty(&ast, 80);
 //!
-//! // Type checking
+//! // Type checking a given .did file
+//! // let (env, opt_actor) = check_file("a.did")?;
+//! // Or alternatively, use check_prog to check in-memory did file
+//! // Note that file import is ignored by check_prog.
 //! let mut env = TypeEnv::new();
 //! let actor: Type = check_prog(&mut env, &ast)?.unwrap();
+//!
 //! let method = env.get_method(&actor, "g").unwrap();
 //! assert_eq!(method.is_query(), true);
 //! assert_eq!(method.args, vec![Type::Var("List".to_string())]);
@@ -316,7 +320,7 @@ pub use types::{
 
 pub mod parser;
 pub use parser::types::IDLProg;
-pub use parser::typing::{check_prog, TypeEnv};
+pub use parser::typing::{check_file, check_prog, pretty_check_file, TypeEnv};
 pub use parser::value::IDLArgs;
 
 pub mod binary_parser;

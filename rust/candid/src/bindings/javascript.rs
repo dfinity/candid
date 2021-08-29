@@ -250,12 +250,13 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             };
             let actor = kwd("return").append(pp_actor(actor, &recs)).append(";");
             let body = defs.append(actor);
-            let doc = str("export default ({ IDL }) => ").append(enclose_space("{", body, "};"));
+            let doc = str("export const idlFactory = ({ IDL }) => ")
+                .append(enclose_space("{", body, "};"));
             // export init args
-            let init_defs = chase_types(env, &init).unwrap();
+            let init_defs = chase_types(env, init).unwrap();
             let init_recs = infer_rec(env, &init_defs).unwrap();
             let init_defs_doc = pp_defs(env, &init_defs, &init_recs);
-            let init_doc = kwd("return").append(pp_args(&init)).append(";");
+            let init_doc = kwd("return").append(pp_args(init)).append(";");
             let init_doc = init_defs_doc.append(init_doc);
             let init_doc =
                 str("export const init = ({ IDL }) => ").append(enclose_space("{", init_doc, "};"));
@@ -333,7 +334,7 @@ pub mod value {
                     let tuple = concat(fields.iter().map(|f| pp_value(&f.val)), ",");
                     enclose_space("[", tuple, "]")
                 } else {
-                    enclose_space("{", pp_fields(&fields), "}")
+                    enclose_space("{", pp_fields(fields), "}")
                 }
             }
             Variant(v) => enclose_space("{", pp_field(&v.0), "}"),
@@ -359,16 +360,16 @@ pub mod test {
             .append("', 'hex')")
     }
     fn pp_encode<'a>(args: &'a crate::IDLArgs, tys: &'a [crate::types::Type]) -> RcDoc<'a> {
-        let vals = value::pp_args(&args);
-        let tys = super::pp_args(&tys);
+        let vals = value::pp_args(args);
+        let tys = super::pp_args(tys);
         let items = [tys, vals];
         let params = concat(items.iter().cloned(), ",");
         str("IDL.encode").append(enclose("(", params, ")"))
     }
 
     fn pp_decode<'a>(bytes: &'a [u8], tys: &'a [crate::types::Type]) -> RcDoc<'a> {
-        let hex = pp_hex(&bytes);
-        let tys = super::pp_args(&tys);
+        let hex = pp_hex(bytes);
+        let tys = super::pp_args(tys);
         let items = [tys, hex];
         let params = concat(items.iter().cloned(), ",");
         str("IDL.decode").append(enclose("(", params, ")"))
@@ -403,11 +404,11 @@ import { Principal } from './principal';
                 use HostAssert::*;
                 let test_func = match cmd {
                     Encode(args, tys, _, _) | NotEncode(args, tys) => {
-                        let items = [super::pp_args(&tys), pp_encode(&args, &tys)];
+                        let items = [super::pp_args(tys), pp_encode(args, tys)];
                         let params = concat(items.iter().cloned(), ",");
                         str("IDL.decode").append(enclose("(", params, ")"))
                     }
-                    Decode(bytes, tys, _, _) | NotDecode(bytes, tys) => pp_decode(&bytes, &tys),
+                    Decode(bytes, tys, _, _) | NotDecode(bytes, tys) => pp_decode(bytes, tys),
                 };
                 let (test_func, predicate) = match cmd {
                     Encode(_, _, true, _) | Decode(_, _, true, _) => (test_func, str(".toEqual")),
@@ -419,8 +420,8 @@ import { Principal } from './principal';
                     }
                 };
                 let expected = match cmd {
-                    Encode(_, tys, _, bytes) => pp_decode(&bytes, &tys),
-                    Decode(_, _, _, vals) => value::pp_args(&vals),
+                    Encode(_, tys, _, bytes) => pp_decode(bytes, tys),
+                    Decode(_, _, _, vals) => value::pp_args(vals),
                     NotEncode(_, _) | NotDecode(_, _) => RcDoc::nil(),
                 };
                 let expect = enclose("expect(", test_func, ")")
