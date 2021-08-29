@@ -791,7 +791,7 @@ not (<datatype> <: opt <datatype'>)
 ---------------------------------
 opt <datatype> <: opt <datatype'>
 
-not (null <: <datatype>)
+not (null <: <datatype'>)
 not (<datatype> <: <datatype'>)
 ---------------------------------
 opt <datatype> <: opt <datatype'>
@@ -929,7 +929,7 @@ C[opt <t> <: opt <t'>](opt <v>) = null                   if not(<t> <: <t'>)
 
 Coercing a non-null, non-optional and non-reserved type at an option type treats it as an optional value, if it has a suitable type:
 ```
-C[<t> <: opt <t'>](<v>) = opt C[<t> <: <t'>](v)  if not (null <: <t>) and <t> <: <t'>
+C[<t> <: opt <t'>](<v>) = opt C[<t> <: <t'>](v)  if not (null <: <t'>) and <t> <: <t'>
 ```
 
 Any other type goes to `null`:
