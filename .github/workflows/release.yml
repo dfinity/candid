@@ -20,7 +20,7 @@ jobs:
             asset_name: didc-macos
           - os: ubuntu-latest
             name: arm
-            artifact_name: target/armv7-unknown-linux-gnueabihf/release/didc
+            artifact_name: target/arm-unknown-linux-gnueabihf/release/didc
             asset_name: didc-arm32
 
     steps:
@@ -39,7 +39,7 @@ jobs:
         profile: minimal
         toolchain: stable
         override: true
-        target: armv7-unknown-linux-gnueabihf
+        target: arm-unknown-linux-gnueabihf
     - name: Build
       if: matrix.name != 'arm'
       run: cargo build --release --locked
@@ -49,7 +49,7 @@ jobs:
       with:
         use-cross: true
         command: build
-        args: --target armv7-unknown-linux-gnueabihf --release --locked
+        args: --target arm-unknown-linux-gnueabihf --release --locked
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
