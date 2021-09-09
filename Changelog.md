@@ -1,9 +1,14 @@
 
 # Changelog
 
+## 2021-09-09
+
+* Release ARM binary for `didc`
+* Refine the spec for opt rules
+
 ## 2021-08-17
 
-### Rust (0.7.5)
+### Rust (0.7.5 -- 0.7.7)
 
 * Support import when parsing did files with `check_file` function 
 * Fix TypeScript binding for reference types
