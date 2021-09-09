@@ -18,7 +18,7 @@ jobs:
             artifact_name: target/release/didc
             asset_name: didc-macos
           - os: ubuntu-latest
-            name: arm32
+            name: arm
             artifact_name: target/armv7-unknown-linux-gnueabihf/release/didc
             asset_name: didc-arm32
 
