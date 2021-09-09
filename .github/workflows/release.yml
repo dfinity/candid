@@ -1,40 +1,54 @@
 name: Release
 
-on:
-  push:
-    tags:
-      - '*'
+on: pull_request
 
 jobs:
   publish:
-    name: Release for ${{ matrix.os }}
+    name: Release for ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: didc
+            name: linux64
+            artifact_name: target/release/didc
             asset_name: didc-linux64
           - os: macos-latest
-            artifact_name: didc
+            name: macos
+            artifact_name: target/release/didc
             asset_name: didc-macos
           - os: ubuntu-latest
-            artifact_name: candiff
-            asset_name: candiff-linux64
-          - os: macos-latest
-            artifact_name: candiff
-            asset_name: candiff-macos            
+            name: arm32
+            artifact_name: target/armv7-unknown-linux-gnueabihf/release/didc
+            asset_name: didc-arm32
 
     steps:
+    - uses: actions/checkout@v2
     - name: Install stable toolchain
+      if: matrix.name != 'arm'
       uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         toolchain: stable
         override: true
-    - uses: actions/checkout@v2
+    - name: Install stable toolchain
+      if: matrix.name == 'arm'
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+        target: armv7-unknown-linux-gnueabihf
     - name: Build
+      if: matrix.name != 'arm'
       run: cargo build --release --locked
+    - name: Cross build
+      if: matrix.name == 'arm'
+      uses: actions-rs/cargo@v1
+      with:
+        use-cross: true
+        command: build
+        args: --target armv7-unknown-linux-gnueabihf --release --locked
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
