@@ -33,7 +33,7 @@ Type syntax::
 `+text+`
 
 Textual syntax::
-
++
 [source]
 ....
 ""
@@ -105,7 +105,7 @@ Type syntax::
 `+nat+`
 
 Textual syntax::
-
++
 [source]
 ....
 1234
@@ -141,7 +141,7 @@ Type syntax::
 `+int+`
 
 Textual syntax::
-
++
 [source]
 ....
 1234
@@ -192,6 +192,7 @@ Same as `nat` for `nat8`, `nat16`, `nat32`, and `nat64`.
 Same as `int` for `int8`, `int16`, `int32` and `int64`.
 +
 We can use type annotation to distinguish different integer types.
++
 [source]
 ....
 100 : nat8
@@ -236,7 +237,7 @@ Type syntax::
 Textual syntax::
 
 The same syntax as `int`, plus floating point literals as follows:
-
++
 [source]
 ....
 1245.678
@@ -329,7 +330,7 @@ Type syntax::
 `vec bool`, `vec nat8`, `vec vec text`, and so on.
 
 Textual syntax::
-
++
 [source]
 ....
 vec {}
@@ -377,7 +378,7 @@ Type syntax::
 `opt bool`, `opt nat8`, `opt opt text`, and so on.
 
 Textual syntax::
-
++
 [source]
 ....
 null
@@ -388,14 +389,16 @@ opt opt "test"
 ....
 
 Subtypes::
-
-The canonical rules for subtyping with `opt` are:
 +
+--
+The canonical rules for subtyping with `opt` are:
+
 * Whenever `t` is a subtype of `t'`, then `opt t` is a subtype of `opt t'`.
 * `null` is a subtype of `opt t'`.
 * `t` is a subtype of `opt t` (unless `t` itself is `null`, `opt …` or `reserved`).
-+
+
 In addition, for technical reasons related to upgrading and higher-order services, _every_ type is a subtype of `opt t`, yielding `null` if the types do not match. Users are advised, however, to not directly make use of that rule.
+--
 
 Supertypes::
 
@@ -451,7 +454,7 @@ In fact, textual labels are treated as their _field hash_, and incidentally, `ad
 If you omit the label, Candid automatically assigns sequentially-increasing labels. This behavior leads to the following shortened syntax, which is typically used to represent pairs and tuples. The type `record { text; text; opt bool }` is equivalent to `record { 0 : text;  1: text;  2: opt bool }`
 
 Type syntax::
-
++
 [source]
 ....
 record {}
@@ -461,7 +464,7 @@ record { text; text; opt bool }
 ....
 
 Textual syntax::
-
++
 [source]
 ....
 record {}
@@ -471,9 +474,10 @@ record { "a"; "tuple"; null }
 ....
 
 Subtypes::
-
-Subtypes of a record are record types that have additional fields (of any type), where some field’s types are changed to subtypes, or where optional fields are removed. It is, however, bad practice to remove optional fields in method results. You can change a field's type to `opt empty` to indicate that this field is no longer used.
 +
+--
+Subtypes of a record are record types that have additional fields (of any type), where some field’s types are changed to subtypes, or where optional fields are removed. It is, however, bad practice to remove optional fields in method results. You can change a field's type to `opt empty` to indicate that this field is no longer used.
+
 For example, if you have a function returning a record of of the following type:
 
 [source]
@@ -493,13 +497,15 @@ record {
 ....
 
 where we have deprecated the `middle_name` field, change the type of `score` and added the `country` field.
+--
 
 Supertypes::
-
++
+--
 Supertypes of a record are record types with some fields removed, some fields’ types changed to supertypes, or with optional fields added.
-+
+
 The latter is what allows you to extend your argument records with additional fields. Clients using the old interface will not include the field in their record, which will decode, when expected in the upgraded service, as `null`.
-+
+
 For example, if you have a function expecting a record of type:
 [source]
 ....
@@ -511,6 +517,7 @@ you can evolve that to a function expecting a record of type:
 ....
 record { first_name : text; score: int; country : opt text }
 ....
+--
 
 Corresponding Motoko type::
 
@@ -576,7 +583,7 @@ and used to represent enumerations.
 The type `variant {}` is legal, but has no values. If that is the intention, the <<type-empty,`empty` type>> may be more appropriate.
 
 Type syntax::
-
++
 [source]
 ....
 variant {}
@@ -586,7 +593,7 @@ variant { spring; summer; fall; winter }
 ....
 
 Textual syntax::
-
++
 [source]
 ....
 variant { ok = 42 }
@@ -595,9 +602,10 @@ variant { fall }
 ....
 
 Subtypes::
-
-Subtypes of a variant type are variant types with some tags removed, and the type of some tags themselves changed to a subtype.
 +
+--
+Subtypes of a variant type are variant types with some tags removed, and the type of some tags themselves changed to a subtype.
+
 If you want to be able to _add_ new tags in variants in a method result, you can do so if the variant is itself wrapped in `opt …`. This requires planning ahead! When you design an interface, instead of writing:
 
 [source]
@@ -617,13 +625,15 @@ service {
 ....
 
 This way, if you later need to add a `honorary` membership status, you can expand the list of statuses. Old clients will receive unknown fields as `null`.
+--
 
 Supertypes::
 
 Supertypes of a variant types are variants with additional tags, and maybe the type of some tags changed to a supertype.
 
 Corresponding Motoko type::
-
++
+--
 Variant types are represented as Motoko variant types, for example:
 
 [source, motoko]
@@ -637,6 +647,7 @@ type Shape = {
 ....
 
 Note that if the type of a tag is `null`, this corresponds to `()` in Motoko, to preserve the mapping between the respective idiomatic ways to model enumerations as variants.
+--
 
 Corresponding Rust type::
 
@@ -664,7 +675,7 @@ The supported annotations are:
 For more information about parameter naming, see link:candid-concepts{outfilesuffix}#service-naming[Naming arguments and results].
 
 Type syntax::
-
++
 [source]
 ....
 func () -> ()
@@ -677,7 +688,7 @@ func (func (int) -> ()) -> ()
 Textual syntax::
 
 Currently, only public methods of services, which are identified by their principal, are supported:
-
++
 [source]
 ....
 func "w7x7r-cok77-xa".hello
@@ -706,7 +717,8 @@ The following modifications to a function type change it to a supertype:
  * Existing result types may be changed to a supertype.
 
 Corresponding Motoko type::
-
++
+--
 Candid function types correspond to `shared` Motoko functions, with the result type wrapped in `async` (unless they are annotated with `oneway`, then the result type is simply `()`).  Arguments resp. results become tuples, unless there is exactly one, in which case it is used directly:
 
 [source]
@@ -728,6 +740,7 @@ type F2 = shared (Text, Bool) -> ();
 type F3 = shared (text) -> ();
 type F4 = shared query () -> async Text;
 ....
+--
 
 Corresponding Rust type::
 
@@ -745,7 +758,7 @@ Services may want to pass around references to not just individual functions (us
 See link:candid-concepts{outfilesuffix}#candid-service-descriptions[Candid service descriptions] for more details on the syntax of a service type.
 
 Type syntax::
-
++
 [source]
 ....
 service {
@@ -757,7 +770,7 @@ service {
 ....
 
 Textual syntax::
-
++
 [source]
 ....
 service "w7x7r-cok77-xa"
@@ -776,7 +789,8 @@ Supertypes::
 The supertypes of a service type are those service types that may have some methods removed, and the type of existing methods are changed to a supertype.
 
 Corresponding Motoko type::
-
++
+--
 Service types in Candid correspond directly to `actor` types in Motoko:
 
 [source, motoko]
@@ -788,6 +802,7 @@ actor {
   subscribe : shared (shared Int -> async ()) -> async ();
 }
 ....
+--
 
 Corresponding Rust type::
 
@@ -808,7 +823,7 @@ Type syntax::
 
 
 Textual syntax::
-
++
 [source]
 ....
 principal "w7x7r-cok77-xa"
