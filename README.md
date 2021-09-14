@@ -3,12 +3,13 @@
 ![](https://github.com/dfinity/candid/workflows/Rust/badge.svg)
 
 
-[Candid](spec/Candid.md) is an interface description language (IDL) for interacting with _canisters_ (also known as _services_ or _actors_) running on the Internet Computer. It provides a language-independent description of canister interfaces and
+Candid is an interface description language (IDL) for interacting with _canisters_ (also known as _services_ or _actors_) running on the Internet Computer. It provides a language-independent description of canister interfaces and
 the data they exchange, with type safety and extensibility.
 
-## Specifications
+## Documentation
 
-The [spec](spec/) directory contains Candid specifications, including the language specification and soundness proof.
+* The [spec](spec/) directory contains Candid specifications, including the [Candid language specification](spec/Candid.md) and a soundness proof.
+* The [official manual](https://sdk.dfinity.org/docs/candid-guide/candid-intro.html) is hosted by dfinity; see [./docs](docs/) for the source code.
 
 ## Implementations
 
@@ -16,7 +17,7 @@ Candid supports several different programming languages.
 This repository contains some of the implementations developed by DFINITY.
 
 * [Rust](rust/): A serialization library based on Serde, and a compiler for generating bindings for other languages.
-* [Motoko](https://github.com/dfinity/motoko): Compiler support for importing/export Candid files. The type mapping between Motoko and Candid is specified [here](https://github.com/dfinity/motoko/blob/master/design/IDL-Motoko.md).
+* [Motoko](https://github.com/dfinity/motoko): Compiler support for importing/export Candid files. Also see the [Motoko-Candid type mapping specificatoin](https://github.com/dfinity/motoko/blob/master/design/IDL-Motoko.md).
 * [JavaScript](https://github.com/dfinity/agent-js/tree/main/packages/candid): We provide a library for serialization of native JavaScript values, and a visitor class for extending Candid for building generic tools such as UI and random testing.
 
 A list of community maintained Candid libraries:
