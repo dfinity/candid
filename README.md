@@ -9,7 +9,7 @@ the data they exchange, with type safety and extensibility.
 ## Documentation
 
 * The [spec](spec/) directory contains Candid specifications, including the [Candid language specification](spec/Candid.md) and a soundness proof.
-* The [official manual](https://sdk.dfinity.org/docs/candid-guide/candid-intro.html) is hosted by dfinity; see <./docs> for the source code.
+* The [official manual](https://sdk.dfinity.org/docs/candid-guide/candid-intro.html) is hosted by dfinity; see [./docs](docs/) for the source code.
 
 ## Implementations
 
