@@ -51,7 +51,7 @@ The features that make Candid particularly well-suited for developing dapps for 
 
 * Candid defines rules for how services and their interface can be upgraded in a sound and compositional way.
 
-* Candid is inherently a higher order language. With Candid, you can pass more than plain data, including references to services and methods. Candid support for safe upgrades takes such higher-order use into account.
+* Candid is inherently a higher-order language. With Candid, you can pass more than plain data, including references to services and methods. Candid support for safe upgrades takes such higher-order use into account.
 
 * Candid has built-in support for specific Internet Computer features, such as the `+query+` annotation.
 
