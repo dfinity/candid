@@ -205,6 +205,48 @@ impl Type {
             _ => false,
         }
     }
+    pub fn subst(self, tau: &std::collections::BTreeMap<String, String>) -> Self {
+        use Type::*;
+        match self {
+            Var(id) => match tau.get(&id) {
+                None => Var(id),
+                Some(new_id) => Var(new_id.to_string()),
+            },
+            Opt(t) => Opt(Box::new(t.subst(tau))),
+            Vec(t) => Vec(Box::new(t.subst(tau))),
+            Record(fs) => Record(
+                fs.into_iter()
+                    .map(|Field { id, ty }| Field {
+                        id,
+                        ty: ty.subst(tau),
+                    })
+                    .collect(),
+            ),
+            Variant(fs) => Variant(
+                fs.into_iter()
+                    .map(|Field { id, ty }| Field {
+                        id,
+                        ty: ty.subst(tau),
+                    })
+                    .collect(),
+            ),
+            Func(func) => Func(Function {
+                modes: func.modes,
+                args: func.args.into_iter().map(|t| t.subst(tau)).collect(),
+                rets: func.rets.into_iter().map(|t| t.subst(tau)).collect(),
+            }),
+            Service(serv) => Service(
+                serv.into_iter()
+                    .map(|(meth, ty)| (meth, ty.subst(tau)))
+                    .collect(),
+            ),
+            Class(args, ty) => Class(
+                args.into_iter().map(|t| t.subst(tau)).collect(),
+                Box::new(ty.subst(tau)),
+            ),
+            _ => self,
+        }
+    }
 }
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

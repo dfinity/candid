@@ -192,7 +192,6 @@ impl<'de> Deserializer<'de> {
             &mut self.gamma,
             &self.table,
             &self.wire_type,
-            &self.table,
             &self.expect_type,
         )
         .with_context(|| {

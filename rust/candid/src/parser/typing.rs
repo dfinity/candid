@@ -33,6 +33,23 @@ impl TypeEnv {
         }
         Ok(self)
     }
+    pub fn merge_type(&mut self, env: TypeEnv, ty: Type) -> Type {
+        let tau: BTreeMap<String, String> = env
+            .0
+            .keys()
+            .filter(|k| self.0.contains_key(*k))
+            .map(|k| (k.clone(), format!("{}/1", k)))
+            .collect();
+        for (k, t) in env.0.into_iter() {
+            let t = t.subst(&tau);
+            if let Some(new_key) = tau.get(&k) {
+                self.0.insert(new_key.clone(), t);
+            } else {
+                self.0.insert(k, t);
+            }
+        }
+        ty.subst(&tau)
+    }
     pub fn find_type(&self, name: &str) -> Result<&Type> {
         match self.0.get(name) {
             None => Err(Error::msg(format!("Unbound type identifier {}", name))),

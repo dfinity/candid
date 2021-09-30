@@ -158,13 +158,14 @@ fn parse_types(str: &str) -> Result<IDLTypes, Error> {
 fn main() -> Result<()> {
     match Command::from_args() {
         Command::Check { input, previous } => {
-            let (env, opt_t1) = pretty_check_file(&input)?;
+            let (mut env, opt_t1) = pretty_check_file(&input)?;
             if let Some(previous) = previous {
                 let (env2, opt_t2) = pretty_check_file(&previous)?;
                 match (opt_t1, opt_t2) {
                     (Some(t1), Some(t2)) => {
                         let mut gamma = HashSet::new();
-                        candid::types::subtype::subtype(&mut gamma, &env, &t1, &env2, &t2)?;
+                        let t2 = env.merge_type(env2, t2);
+                        candid::types::subtype::subtype(&mut gamma, &env, &t1, &t2)?;
                     }
                     _ => {
                         bail!("did file need to contain the main service type for subtyping check")
@@ -180,7 +181,7 @@ fn main() -> Result<()> {
             };
             let ty1 = env.ast_to_type(&ty1)?;
             let ty2 = env.ast_to_type(&ty2)?;
-            candid::types::subtype::subtype(&mut HashSet::new(), &env, &ty1, &env, &ty2)?;
+            candid::types::subtype::subtype(&mut HashSet::new(), &env, &ty1, &ty2)?;
         }
         Command::Bind { input, target } => {
             let (env, actor) = pretty_check_file(&input)?;
