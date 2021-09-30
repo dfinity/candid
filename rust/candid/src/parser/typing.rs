@@ -38,7 +38,7 @@ impl TypeEnv {
             .0
             .keys()
             .filter(|k| self.0.contains_key(*k))
-            .map(|k| (k.clone(), format!("{}'", k)))
+            .map(|k| (k.clone(), format!("{}/1", k)))
             .collect();
         for (k, t) in env.0.into_iter() {
             let t = t.subst(&tau);
