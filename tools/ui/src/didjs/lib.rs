@@ -66,7 +66,8 @@ fn subtype(new: String, old: String) -> Result<(), String> {
     let new_actor = check_prog(&mut new_env, &new).unwrap().unwrap();
     let old_actor = check_prog(&mut old_env, &old).unwrap().unwrap();
     let mut gamma = std::collections::HashSet::new();
-    subtype::subtype(&mut gamma, &new_env, &new_actor, &old_env, &old_actor)
+    let old_actor = new_env.merge_type(old_env, old_actor);
+    subtype::subtype(&mut gamma, &new_env, &new_actor, &old_actor)
         .or_else(|e| Err(e.to_string()))
 }
 

@@ -1,6 +1,10 @@
 
 # Changelog
 
+## 2021-09-30 (Rust 0.7.8)
+
+* Fix `subtype` function to take only one env. To check subtyping from two did files, use `env.merge_type(env2, ty2)` to merge the env and rename variable names.
+
 ## 2021-09-09
 
 * Release ARM binary for `didc`
