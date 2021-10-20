@@ -199,7 +199,7 @@ pub fn pp_value(depth: usize, v: &IDLValue) -> RcDoc {
         return RcDoc::as_string(format!("{:?}", v));
     }
     match v {
-        Text(ref s) => RcDoc::as_string(format!("\"{}\"", s)),
+        Text(ref s) => RcDoc::as_string(format!("\"{}\"", s.escape_debug())),
         Opt(v) if has_type_annotation(v) => {
             kwd("opt").append(enclose("(", pp_value(depth - 1, v), ")"))
         }
