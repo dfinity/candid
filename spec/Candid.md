@@ -1080,13 +1080,12 @@ The following notation is used:
 
 #### Types
 
-`T` maps an Candid type to a byte sequence representing that type.
-Each type constructor is encoded as a negative opcode;
-positive numbers index auxiliary *type definitions* that define more complex types.
+`T` maps an Candid type to a byte sequence representing that type. Negative opcodes represent non-composite types directly. Positive numbers represent composite types via their index in the auxillary _type definitions_.
 We assume that the fields in a record or variant type are sorted by increasing id and the methods in a service are sorted by name.
 
 ```
-T : <primtype> -> i8*
+T : <datatype> -> i8*
+
 T(null)     = sleb128(-1)  = 0x7f
 T(bool)     = sleb128(-2)  = 0x7e
 T(nat)      = sleb128(-3)  = 0x7d
@@ -1132,11 +1131,11 @@ T* : <X>* -> i8*
 T*(<X>^N) = leb128(N) T(<X>)^N
 ```
 
-Every nested type is encoded as either a primitive type or an index into a list of *type definitions*. This allows for recursive types and sharing of types occuring multiple times:
+Every nested type is encoded as either a non-composite type directly, or an index into a list of *type definitions*. This allows for recursive types and sharing of types occuring multiple times:
 
 ```
 I : <datatype> -> i8*
-I(<primtype>) = T(<primtype>)
+I(<datatype>) = T(<primtype>) if <datatype> is non-composite
 I(<datatype>) = sleb128(i)  where type definition i defines T(<datatype>)
 ```
 
@@ -1153,6 +1152,8 @@ Note:
 * The serialised data type representing a method type must denote a function type.
 
 * Because recursion goes through `T`, this format by construction rules out non-well-founded definitions like `type t = t`.
+
+* The type table may only contain composite types (no `<primtype>` or `principal`).
 
 #### Memory
 
