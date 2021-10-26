@@ -178,11 +178,11 @@ impl<'de> Deserializer<'de> {
     }
     fn borrow_bytes(&mut self, len: usize) -> Result<&'de [u8]> {
         let pos = self.input.position() as usize;
-        let end = pos + len;
         let slice = self.input.get_ref();
-        if end > slice.len() {
+        if len > slice.len() || pos + len > slice.len() {
             return Err(Error::msg(format!("Cannot read {} bytes", len)));
         }
+        let end = pos + len;
         let res = &slice[pos..end];
         self.input.set_position(end as u64);
         Ok(res)
