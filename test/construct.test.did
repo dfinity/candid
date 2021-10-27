@@ -33,6 +33,9 @@ assert blob "DIDL\00\03\7f\7f"        !: () "arg too short";
 assert blob "DIDL\00\02\7f\7f\7f"     !: () "arg too long";
 assert blob "DIDL\00\01\6e\7f\00"     !: () "non-primitive in arg list";
 assert blob "DIDL\01\7f\00"           !: () "primitive type in the table";
+assert blob "DIDL\01\68\00"           !: () "principal in the table";
+assert blob "DIDL\02\6d\7f\00\00"     !: () "table entry in the table";
+assert blob "DIDL\01\00\00"           !: () "table entry in the table (self-reference)";
 assert blob "DIDL\01\6e\6f\6e\6f\00"  !: () "table too long";
 
 // option
