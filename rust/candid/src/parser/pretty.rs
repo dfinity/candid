@@ -205,9 +205,7 @@ pub fn pp_value(depth: usize, v: &IDLValue) -> RcDoc {
         }
         Opt(v) => kwd("opt").append(pp_value(depth - 1, v)),
         Vec(vs) => {
-            if let Some(Nat8(_)) = vs.first() {
-                RcDoc::as_string(format!("{:?}", v))
-            } else if vs.len() > MAX_ELEMENTS_FOR_PRETTY_PRINT {
+            if matches!(vs.first(), Some(Nat8(_))) || vs.len() > MAX_ELEMENTS_FOR_PRETTY_PRINT {
                 RcDoc::as_string(format!("{:?}", v))
             } else {
                 let body = concat(vs.iter().map(|v| pp_value(depth - 1, v)), ";");

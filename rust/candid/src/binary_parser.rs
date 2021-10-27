@@ -122,7 +122,7 @@ pub struct PrincipalBytes {
     pub flag: u8,
     #[br(parse_with = read_leb)]
     pub len: u64,
-    #[br(count = len, parse_with = binread::helpers::read_bytes)]
+    #[br(count = len)]
     pub inner: Vec<u8>,
 }
 
