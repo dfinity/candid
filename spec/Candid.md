@@ -74,7 +74,8 @@ This is a summary of the grammar proposed:
 <tuptype>   ::= ( <argtype>,* )
 <argtype>   ::= <datatype>
 <fieldtype> ::= <nat> : <datatype>
-<datatype>  ::= <id> | <primtype> | <constype> | <reftype>
+<datatype>  ::= <id> | <primtype> | <comptype>
+<comptype>  ::= <constype> | <reftype>
 
 <primtype>  ::=
   | <numtype>
@@ -83,6 +84,7 @@ This is a summary of the grammar proposed:
   | null
   | reserved
   | empty
+  | principal
 
 <numtype>  ::=
   | nat | nat8 | nat16 | nat32 | nat64
@@ -98,7 +100,6 @@ This is a summary of the grammar proposed:
 <reftype>  ::=
   | func <functype>
   | service <actortype>
-  | principal
 
 <name> ::= <id> | <text>
 ```
@@ -473,10 +474,10 @@ type engine = service {
 
 #### Principal References
 
-A *principal reference* points to an identity, such as a canister or a user. Through this, we can authenticate or authorize other services or users.
+A *principal reference* points to an identity, such as a canister or a user. Through this, we can authenticate or authorize other services or users. Because the type constructor takes no arguments, it is classified as a _primitive_ type.
 
 ```
-<reftype> ::= ... | principal | ...
+<primtype> ::= ... | principal | ...
 ```
 
 ### Type Definitions
@@ -1081,29 +1082,29 @@ The following notation is used:
 #### Types
 
 `T` maps an Candid type to a byte sequence representing that type.
-Each type constructor is encoded as a negative opcode;
-positive numbers index auxiliary *type definitions* that define more complex types.
+Each type constructor is encoded as a negative opcode.
 We assume that the fields in a record or variant type are sorted by increasing id and the methods in a service are sorted by name.
 
 ```
 T : <primtype> -> i8*
-T(null)     = sleb128(-1)  = 0x7f
-T(bool)     = sleb128(-2)  = 0x7e
-T(nat)      = sleb128(-3)  = 0x7d
-T(int)      = sleb128(-4)  = 0x7c
-T(nat8)     = sleb128(-5)  = 0x7b
-T(nat16)    = sleb128(-6)  = 0x7a
-T(nat32)    = sleb128(-7)  = 0x79
-T(nat64)    = sleb128(-8)  = 0x78
-T(int8)     = sleb128(-9)  = 0x77
-T(int16)    = sleb128(-10) = 0x76
-T(int32)    = sleb128(-11) = 0x75
-T(int64)    = sleb128(-12) = 0x74
-T(float32)  = sleb128(-13) = 0x73
-T(float64)  = sleb128(-14) = 0x72
-T(text)     = sleb128(-15) = 0x71
-T(reserved) = sleb128(-16) = 0x70
-T(empty)    = sleb128(-17) = 0x6f
+T(null)      = sleb128(-1)  = 0x7f
+T(bool)      = sleb128(-2)  = 0x7e
+T(nat)       = sleb128(-3)  = 0x7d
+T(int)       = sleb128(-4)  = 0x7c
+T(nat8)      = sleb128(-5)  = 0x7b
+T(nat16)     = sleb128(-6)  = 0x7a
+T(nat32)     = sleb128(-7)  = 0x79
+T(nat64)     = sleb128(-8)  = 0x78
+T(int8)      = sleb128(-9)  = 0x77
+T(int16)     = sleb128(-10) = 0x76
+T(int32)     = sleb128(-11) = 0x75
+T(int64)     = sleb128(-12) = 0x74
+T(float32)   = sleb128(-13) = 0x73
+T(float64)   = sleb128(-14) = 0x72
+T(text)      = sleb128(-15) = 0x71
+T(reserved)  = sleb128(-16) = 0x70
+T(empty)     = sleb128(-17) = 0x6f
+T(principal) = sleb128(-24) = 0x68
 
 T : <constype> -> i8*
 T(opt <datatype>) = sleb128(-18) I(<datatype>)              // 0x6e
@@ -1119,7 +1120,6 @@ T(func (<datatype1>*) -> (<datatype2>*) <funcann>*) =
   sleb128(-22) T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*) // 0x6a
 T(service {<methtype>*}) =
   sleb128(-23) T*(<methtype>*)                                    // 0x69
-T(principal) = sleb128(-24)                                       // 0x68
 
 T : <methtype> -> i8*
 T(<name>:<datatype>) = leb128(|utf8(<name>)|) i8*(utf8(<name>)) I(<datatype>)
@@ -1132,17 +1132,17 @@ T* : <X>* -> i8*
 T*(<X>^N) = leb128(N) T(<X>)^N
 ```
 
-Every nested type is encoded as either a primitive type or an index into a list of *type definitions*. This allows for recursive types and sharing of types occuring multiple times:
+Every nested type is encoded as either a primitive type, via the negative op-code, or an index into a list of *type definitions*, via a positive number. This allows for recursive types and sharing of types occuring multiple times:
 
 ```
 I : <datatype> -> i8*
 I(<primtype>) = T(<primtype>)
-I(<datatype>) = sleb128(i)  where type definition i defines T(<datatype>)
+I(<comptype>) = sleb128(i)  where type definition i defines T(<datatype>)
 ```
 
 Type definitions themselves are represented as a list of serialised data types:
 ```
-T*(<datatype>*)
+T*(<comptype>*)
 ```
 The data types in this list can themselves refer to each other (or themselves) via `I`.
 
@@ -1153,6 +1153,8 @@ Note:
 * The serialised data type representing a method type must denote a function type.
 
 * Because recursion goes through `T`, this format by construction rules out non-well-founded definitions like `type t = t`.
+
+* The type table may only contain composite types (no `<primtype>`).
 
 #### Memory
 
@@ -1237,11 +1239,11 @@ A(kv* : <datatype>*) = ( B(kv* : <datatype>*), R(kv* : <datatype>*) )
 
 B(kv* : <datatype>*) =
   i8('D') i8('I') i8('D') i8('L')      magic number
-  T*(<datatype>*)                      type definition table
+  T*(<comptype>*)                      type definition table
   I*(<datatype>*)                      types of the argument list
   M(kv* : <datatype>*)                 values of argument list
 ```
-The vector `T*(<datatype>*)` contains an arbitrary sequence of type definitions (see above), to be referenced in the serialisation of the other `<datatype>` vector.
+The vector `T*(<comptype>*)` contains an arbitrary sequence of type definitions (see above), to be referenced in the serialisation of the other `<datatype>` vector.
 
 The same representation is used for function results.
 
