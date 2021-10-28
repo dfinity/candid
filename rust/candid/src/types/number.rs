@@ -154,6 +154,16 @@ impl<'de> Deserialize<'de> for Int {
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("Int value")
             }
+            fn visit_i64<E>(self, v: i64) -> Result<Int, E> {
+                Ok(Int::from(v))
+            }
+            fn visit_u64<E>(self, v: u64) -> Result<Int, E> {
+                Ok(Int::from(v))
+            }
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<Int, E> {
+                v.parse::<Int>()
+                    .map_err(|_| de::Error::custom(format!("{:?} is not int", v)))
+            }
             fn visit_byte_buf<E: de::Error>(self, v: Vec<u8>) -> Result<Int, E> {
                 Ok(Int(match v[0] {
                     0 => BigInt::from_signed_bytes_le(&v[1..]),
@@ -179,6 +189,19 @@ impl<'de> Deserialize<'de> for Nat {
             type Value = Nat;
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("Nat value")
+            }
+            fn visit_i64<E: de::Error>(self, v: i64) -> Result<Nat, E> {
+                use std::convert::TryFrom;
+                Ok(Nat(BigUint::try_from(v).map_err(|_| {
+                    de::Error::custom("int cannot be converted to nat")
+                })?))
+            }
+            fn visit_u64<E>(self, v: u64) -> Result<Nat, E> {
+                Ok(Nat::from(v))
+            }
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<Nat, E> {
+                v.parse::<Nat>()
+                    .map_err(|_| de::Error::custom(format!("{:?} is not nat", v)))
             }
             fn visit_byte_buf<E: de::Error>(self, v: Vec<u8>) -> Result<Nat, E> {
                 if v[0] == 1 {
