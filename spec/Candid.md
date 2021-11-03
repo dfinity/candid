@@ -1220,7 +1220,7 @@ M(?v   : opt <datatype>) = i8(1) M(v : <datatype>)
 M(v*   : vec <datatype>) = leb128(N) M(v : <datatype>)*
 M(kv*  : record {<fieldtype>*}) = M(kv : <fieldtype>)*
 M(kv   : variant {<fieldtype>*}) = leb128(i) M(kv : <fieldtype>*[i])
-M(v:t  : dynamic) = B((0,v) : t)
+M(v:t  : dynamic) = leb128(|B((0,v) : t)|) leb128(|R(v : t)|) B((0,v) : t)
 
 M : (<nat>, <val>) -> <fieldtype> -> i8*
 M((k,v) : k:<datatype>) = M(v : <datatype>)
