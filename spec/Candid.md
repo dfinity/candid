@@ -1200,7 +1200,6 @@ Note:
 
 `M` maps an Candid value to a byte sequence representing that value. The definition is indexed by type.
 We assume that the fields in a record value are sorted by increasing id.
-For values serialised at type `dynamic`, we assume that their concrete type `t` can either be determined from the value or is known from context.
 
 ```
 M : <val> -> <primtype> -> i8*
@@ -1221,7 +1220,7 @@ M(?v   : opt <datatype>) = i8(1) M(v : <datatype>)
 M(v*   : vec <datatype>) = leb128(N) M(v : <datatype>)*
 M(kv*  : record {<fieldtype>*}) = M(kv : <fieldtype>)*
 M(kv   : variant {<fieldtype>*}) = leb128(i) M(kv : <fieldtype>*[i])
-M(v:t  : dynamic) = T(t) M(v : t)
+M(v:t  : dynamic) = B((0,v) : t)
 
 M : (<nat>, <val>) -> <fieldtype> -> i8*
 M((k,v) : k:<datatype>) = M(v : <datatype>)
@@ -1236,6 +1235,9 @@ M(pub(s,n) : func <functype>) = i8(1) M(s : service {}) M(n : text)
 M(ref(r) : principal) = i8(0)
 M(id(v*) : principal) = i8(1) M(v* : vec nat8)
 ```
+
+Note: For values serialised at type `dynamic`, we assume that their concrete type `t` can either be determined from the value or is known from context.
+Such a value is serialised as a nested, self-contained Candid blob, as defined by the meta-function `B` below (#parameters-and-results).
 
 
 #### References
