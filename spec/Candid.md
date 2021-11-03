@@ -464,13 +464,25 @@ A *function reference* is described by its function type. For example, they allo
 <reftype> ::= func <functype> | ...
 ```
 
-##### Example
+A function reference may be represented by a simple closure, encapsulating a prefix of arguments that have previously been bound. These hidden arguments do not appear in the function type, but will be forwarded implicitly when the function itself is invoked.
+
+
+##### Examples
 
 ```
 type engine = service {
   search : (query : text, callback : func (vec result) -> ());
 }
 ```
+
+```
+type wallet = service {
+  topup : (amount : nat) -> ();
+  forward : (call : () -> ()) -> ();
+}
+```
+In the latter example, the `call` parameter is assumed to be a closure encapsulating a call to another service (including bound arguments) that the wallet executes on its own caller's behalf by invoking the function.
+
 
 #### Principal References
 
@@ -571,9 +583,9 @@ The types of these values are assumed to be known from context, so the syntax do
 <fieldval> ::= <nat> = <annval>
 
 <refval> ::=
-  | service <text>             (canister URI)
-  | func <text> . <name>       (canister URI and message name)
-  | principal <text>           (principal URI)
+  | principal <text>                      (principal URI)
+  | service <text>                        (canister URI)
+  | func <text> . <name> ( <annval>,* )?  (canister URI, message name, and possibly bound arguments)
 
 <arg> ::= ( <annval>,* )
 
@@ -1064,7 +1076,7 @@ Most Candid values are self-explanatory, except for references. There are two fo
 Likewise, there are two forms of Candid values for function references:
 
 * `ref(r)` indicates an opaque reference, understood only by the underlying system.
-* `pub(s,n)`, indicates the public method name `n` of the service referenced by `s`.
+* `pub(s,n,v*:t*)`, indicates the public method name `n` of the service referenced by `s`, possibly followed by a list of type-annotated bound argument values.
 
 #### Notation
 
@@ -1188,11 +1200,15 @@ M : <val> -> <reftype> -> i8*
 M(ref(r) : service <actortype>) = i8(0)
 M(id(v*) : service <actortype>) = i8(1) M(v* : vec nat8)
 
-M(ref(r)   : func <functype>) = i8(0)
-M(pub(s,n) : func <functype>) = i8(1) M(s : service {}) M(n : text)
+M(ref(r)         : func <functype>) = i8(0)
+M(pub(s,n)       : func <functype>) = i8(1) M(s : service {}) M(n : text)
+M(pub(s,n,v*:t*) : func <functype>) = i8(2) M(s : service {}) M(n : text) M*(v* : t*)
 
 M(ref(r) : principal) = i8(0)
 M(id(v*) : principal) = i8(1) M(v* : vec nat8)
+
+M* : <val>* -> <datatype>* -> i8*
+M*(v^N : <datatype>^N) = leb128(N) M(v : <datatype>)^N
 ```
 
 
@@ -1218,10 +1234,13 @@ R((k,v) : k:<datatype>) = R(v : <datatype>)
 R : <val> -> <reftype> -> <ref>*
 R(ref(r) : service <actortype>) = r
 R(id(b*) : service <actortype>) = .
-R(ref(r)   : func <functype>) = r
-R(pub(s,n) : func <functype>) = .
+R(ref(r) : func <functype>) = r
+R(pub(s,n,v*:t*) : func <functype>) = R*(v* : t*)
 R(ref(r) : principal) = r
 R(id(b*) : principal) = .
+
+R* : <val>* -> <datatype>* -> <ref>*
+R*(v^N : <datatype>^N) = R(v : <datatype>)^N
 ```
 
 Note:
