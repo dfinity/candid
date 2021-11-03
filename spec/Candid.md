@@ -478,7 +478,7 @@ type engine = service {
 ```
 type wallet = service {
   topup : (amount : nat) -> ();
-  forward : (call : () -> ()) -> ();
+  forward : (call : func () -> ()) -> ();
 }
 ```
 In the latter example, the `call` parameter is assumed to be a closure encapsulating a call to another service (including bound arguments) that the wallet executes on its own caller's behalf by invoking the function.
@@ -573,6 +573,7 @@ The types of these values are assumed to be known from context, so the syntax do
   | <text>
   | true | false
   | null
+  | principal <text>                      (principal URI)
 
 <consval> ::=
   | opt <val>
@@ -583,7 +584,6 @@ The types of these values are assumed to be known from context, so the syntax do
 <fieldval> ::= <nat> = <annval>
 
 <refval> ::=
-  | principal <text>                      (principal URI)
   | service <text>                        (canister URI)
   | func <text> . <name> ( <annval>,* )?  (canister URI, message name, and possibly bound arguments)
 
