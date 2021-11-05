@@ -81,10 +81,10 @@ This is a summary of the grammar proposed:
   | <numtype>
   | bool
   | text
+  | principal
   | null
   | reserved
   | empty
-  | principal
 
 <numtype>  ::=
   | nat | nat8 | nat16 | nat32 | nat64
@@ -99,6 +99,7 @@ This is a summary of the grammar proposed:
 
 <reftype>  ::=
   | func <functype>
+  | closure <functype>
   | service <actortype>
 
 <name> ::= <id> | <text>
@@ -279,6 +280,15 @@ Text strings are represented by the type `text` and consist of a sequence of Uni
 <primtype> ::= ... | text | ...
 ```
 **Note:** The `text` type is distinguished from `vec nat8` (a UTF-8 string) or `vec nat32` (a sequence of code points) in order to allow bindings to map it to a suitable string type, and enable the binary format to select an efficient internal representation independently.
+
+
+#### Principal
+
+A *principal* points to an identity, such as a canister or a user. Through this, we can authenticate or authorize other services or users. Because the type constructor takes no arguments, it is classified as a _primitive_ type.
+
+```
+<primtype> ::= ... | principal | ...
+```
 
 #### Null
 
@@ -464,10 +474,7 @@ A *function reference* is described by its function type. For example, they allo
 <reftype> ::= func <functype> | ...
 ```
 
-A function reference may be represented by a simple closure, encapsulating a prefix of arguments that have previously been bound. These hidden arguments do not appear in the function type, but will be forwarded implicitly when the function itself is invoked.
-
-
-##### Examples
+##### Example
 
 ```
 type engine = service {
@@ -475,22 +482,28 @@ type engine = service {
 }
 ```
 
+
+#### Closure References
+
+A *closure reference* is also described by its function type. Like function references, they allow passing callbacks to other functions, but they may additionally encapsulate a prefix of arguments that have previously been bound. These hidden arguments do not appear in the function type, but will be forwarded implicitly when the function closure itself is invoked.
+
+```
+<reftype> ::= ... | closure <functype> | ...
+```
+
+Note: Closures are more general than functions, so in most cases, a service should allow closures as arguments instead of plain functions.
+
+
+##### Example
+
 ```
 type wallet = service {
   topup : (amount : nat) -> ();
-  forward : (call : func () -> ()) -> ();
+  forward : (call : closure () -> ()) -> ();
 }
 ```
 In the latter example, the `call` parameter is assumed to be a closure encapsulating a call to another service (including bound arguments) that the wallet executes on its own caller's behalf by invoking the function.
 
-
-#### Principal References
-
-A *principal reference* points to an identity, such as a canister or a user. Through this, we can authenticate or authorize other services or users. Because the type constructor takes no arguments, it is classified as a _primitive_ type.
-
-```
-<primtype> ::= ... | principal | ...
-```
 
 ### Type Definitions
 
@@ -584,8 +597,9 @@ The types of these values are assumed to be known from context, so the syntax do
 <fieldval> ::= <nat> = <annval>
 
 <refval> ::=
-  | service <text>                        (canister URI)
-  | func <text> . <name> ( <annval>,* )?  (canister URI, message name, and possibly bound arguments)
+  | service <text>                          (canister URI)
+  | func <text> . <name>                    (canister URI, message name)
+  | closure <text> . <name> ( <annval>,* )  (canister URI, message name, bound arguments)
 
 <arg> ::= ( <annval>,* )
 
@@ -865,18 +879,21 @@ variant { <nat> : <datatype>; <fieldtype>;* } <: variant { <nat> : <datatype'>; 
 *Note:* By virtue of the rules around `opt` above, it is possible to evolve and extend variant types that also occur in outbound position (i.e., are used both as function results and function parameters) by *adding* tags to variants, provided the variant itself is optional (e.g.  `opt variant { 0 : nat; 1 : bool } <: opt variant { 1 : bool }`). Any party not aware of the extension will treat the new case as `null`.
 
 
-#### Functions
+#### Functions and Closures
 
 For a specialised function, any parameter type can be generalised and any result type specialised. Moreover, arguments can be dropped while results can be added. That is, the rules mirror those of tuple-like records, i.e., they are ordered and can only be extended at the end.
+
+Closures have the same subtyping rules as functions. In addition, any function can be treated as a trivial closure.
 ```
+kind1 = kind2 \/ kind1 = func
 record { (N1' : <datatype1'>);* } <: record { (N1 : <datatype1>);* }
 record { (N2 : <datatype2>);* } <: record { N2' : <datatype2'>);* }
 -------------------------------------------------------------------------------------------------------------------
-func ( <datatype1>,* ) -> ( <datatype2>,* ) <funcann>* <: func ( <datatype1'>,* ) -> ( <datatype2'>,* ) <funcann>*
+kind1 ( <datatype1>,* ) -> ( <datatype2>,* ) <funcann>* <: kind2 ( <datatype1'>,* ) -> ( <datatype2'>,* ) <funcann>*
 ```
 where `NI*` is the `<nat>` sequence `1`..`|<datatypeNI>*|`, respectively.
 
-Viewed as sets, the annotations on the functions must be equal.
+Viewed as sets, the annotations on the function type must be equal.
 
 
 #### Services
@@ -987,6 +1004,12 @@ C[service <actortype> <: service <actortype'>](service <text>) = service <text>
 C[principal <: principal](principal <text>) = principal <text>
 ```
 
+However, functions can be converted into closures with an empty list of bound arguments:
+```
+C[func <functype> <: closure <functype'>](func <text>.<id>) = clos(func <text>.<id>, .)
+```
+
+
 #### Tuple types
 
 Whole argument and result sequences are coerced with the same rules as tuple-like records. In particular, extra arguments are ignored, and optional parameters read as as `null` if the argument is missing or fails to coerce:
@@ -1070,13 +1093,18 @@ Serialisation is defined by three functions `T`, `M`, and `R` given below.
 
 Most Candid values are self-explanatory, except for references. There are two forms of Candid values for service references and principal references:
 
-* `ref(r)` indicates an opaque reference, understood only by the underlying system.
+* `ref(r)`, indicates an opaque reference, understood only by the underlying system.
 * `id(b)`, indicates a transparent reference to a service addressed by the blob `b`.
 
 Likewise, there are two forms of Candid values for function references:
 
-* `ref(r)` indicates an opaque reference, understood only by the underlying system.
-* `pub(s,n,v*:t*)`, indicates the public method name `n` of the service referenced by `s`, possibly followed by a list of type-annotated bound argument values.
+* `ref(r)`, indicates an opaque reference, understood only by the underlying system.
+* `pub(s,n)`, indicates the public method name `n` of the service referenced by `s`.
+
+Finally, a closure pairs a function reference value `f` with a list of bound argument values:
+
+* `clos(f,v*:t*)`, where `f` is one of the above, and binds the argument values `v*`, annotated with their respective type.
+
 
 #### Notation
 
@@ -1131,7 +1159,10 @@ T : <reftype> -> i8*
 T(func (<datatype1>*) -> (<datatype2>*) <funcann>*) =
   sleb128(-22) T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*) // 0x6a
 T(service {<methtype>*}) =
-  sleb128(-23) T*(<methtype>*)                                    // 0x69
+  sleb128(-23) T*(<methtype>*)                                  // 0x69
+T(closure (<datatype1>*) -> (<datatype2>*) <funcann>*) =
+  sleb128(-26) leb128(|T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*)|)  // 0x66
+  T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*)
 
 T : <methtype> -> i8*
 T(<name>:<datatype>) = leb128(|utf8(<name>)|) i8*(utf8(<name>)) I(<datatype>)
@@ -1200,15 +1231,21 @@ M : <val> -> <reftype> -> i8*
 M(ref(r) : service <actortype>) = i8(0)
 M(id(v*) : service <actortype>) = i8(1) M(v* : vec nat8)
 
-M(ref(r)         : func <functype>) = i8(0)
-M(pub(s,n)       : func <functype>) = i8(1) M(s : service {}) M(n : text)
-M(pub(s,n,v*:t*) : func <functype>) = i8(2) M(s : service {}) M(n : text) M*(v* : t*)
+M(ref(r)        : func <functype>) = i8(0)
+M(pub(s,n)      : func <functype>) = i8(1) M(s : service {}) M(n : text)
+M(clos(f,v*:t*) : closure <functype>) =
+  leb128(|i8(2) M(f : func <functype>) TM*(v* : t*)|)
+  leb128(|R(f : func <functype>) R*(v* : t*)|)
+  i8(2) M(f : func <functype>) TM*(v* : t*)
 
 M(ref(r) : principal) = i8(0)
 M(id(v*) : principal) = i8(1) M(v* : vec nat8)
 
-M* : <val>* -> <datatype>* -> i8*
-M*(v^N : <datatype>^N) = leb128(N) M(v : <datatype>)^N
+TM : <val> -> <datatype> -> i8*
+TM(v : <datatype>) = T(<datatype>) M(v : <datatype>)
+
+TM* : <val>* -> <datatype>* -> i8*
+TM*(v^N : <datatype>^N) = leb128(N) TM(v : <datatype>)^N
 ```
 
 
@@ -1235,7 +1272,8 @@ R : <val> -> <reftype> -> <ref>*
 R(ref(r) : service <actortype>) = r
 R(id(b*) : service <actortype>) = .
 R(ref(r) : func <functype>) = r
-R(pub(s,n,v*:t*) : func <functype>) = R*(v* : t*)
+R(pub(s,n) : func <functype>) = R*(v* : t*)
+R(clos(f,v*:t*) : closure <functype>) = R(f : func <functype>) R*(v* : t*)
 R(ref(r) : principal) = r
 R(id(b*) : principal) = .
 
@@ -1286,7 +1324,9 @@ Deserialisation uses the following mechanism for robustness towards future exten
 
 * A serialised type may be headed by an opcode other than the ones defined above (i.e., less than -24). Any such opcode is followed by an LEB128-encoded count, and then a number of bytes corresponding to this count. A type represented that way is called a *future type*.
 
-* A value corresponding to a future type is called a *future value*. It is represented by two LEB128-encoded counts, *m* and *n*, followed by a *m* bytes in the memory representation M and accompanied by *n* corresponding references in R.
+* A serialised type may be headed by an other than -1 to -24 . Any such opcode is followed by an LEB128-encoded count, and then a number of bytes corresponding to this count. A type represented that way is called a *future type*.
+
+Closure types are the only future type so far.
 
 These measures allow the serialisation format to be extended with new types in the future, as long as their representation and the representation of the corresponding values include a length prefix matching the above scheme, and thereby allowing an older deserialiser not understanding them to skip over them. The subtyping rules ensure that upgradability is maintained in this situation, i.e., an old deserialiser has no need to understand the encoded data.
 
