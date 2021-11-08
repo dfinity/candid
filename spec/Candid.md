@@ -1006,7 +1006,7 @@ C[principal <: principal](principal <text>) = principal <text>
 
 However, functions can be converted into closures with an empty list of bound arguments:
 ```
-C[func <functype> <: closure <functype'>](func <text>.<id>) = clos(func <text>.<id>, .)
+C[func <functype> <: closure <functype'>](f) = clos(f, .)
 ```
 
 
@@ -1161,8 +1161,7 @@ T(func (<datatype1>*) -> (<datatype2>*) <funcann>*) =
 T(service {<methtype>*}) =
   sleb128(-23) T*(<methtype>*)                                  // 0x69
 T(closure (<datatype1>*) -> (<datatype2>*) <funcann>*) =
-  sleb128(-26) leb128(|T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*)|)  // 0x66
-  T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*)
+  FT(-26, T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*))     // 0x66
 
 T : <methtype> -> i8*
 T(<name>:<datatype>) = leb128(|utf8(<name>)|) i8*(utf8(<name>)) I(<datatype>)
@@ -1174,6 +1173,7 @@ T(oneway) = i8(2)
 T* : <X>* -> i8*
 T*(<X>^N) = leb128(N) T(<X>)^N
 ```
+The meta-function `FT` constructs a backwards-compatible encoding for [future types](#deserialisation-of-future-types).
 
 Every nested type is encoded as either a primitive type, via the negative op-code, or an index into a list of *type definitions*, via a positive number. This allows for recursive types and sharing of types occuring multiple times:
 
@@ -1234,19 +1234,21 @@ M(id(v*) : service <actortype>) = i8(1) M(v* : vec nat8)
 M(ref(r)        : func <functype>) = i8(0)
 M(pub(s,n)      : func <functype>) = i8(1) M(s : service {}) M(n : text)
 M(clos(f,v*:t*) : closure <functype>) =
-  leb128(|i8(2) M(f : func <functype>) TM*(v* : t*)|)
-  leb128(|R(f : func <functype>) R*(v* : t*)|)
-  i8(2) M(f : func <functype>) TM*(v* : t*)
+  FM(
+    i8(2) M(f : func <functype>) TM*(v* : t*),
+    R(f : func <functype>) R*(v* : t*)
+  )
 
 M(ref(r) : principal) = i8(0)
 M(id(v*) : principal) = i8(1) M(v* : vec nat8)
 
 TM : <val> -> <datatype> -> i8*
-TM(v : <datatype>) = T(<datatype>) M(v : <datatype>)
+TM(v : <datatype>) = I(<datatype>) M(v : <datatype>)
 
 TM* : <val>* -> <datatype>* -> i8*
 TM*(v^N : <datatype>^N) = leb128(N) TM(v : <datatype>)^N
 ```
+The meta-function `FM` constructs a backwards-compatible encoding for values of for [future types](#deserialisation-of-future-types).
 
 
 #### References
@@ -1322,9 +1324,17 @@ Deserialisation at an expected type sequence `(<t'>,*)` proceeds by
 
 Deserialisation uses the following mechanism for robustness towards future extensions:
 
-* A serialised type may be headed by an opcode other than the ones defined above (i.e., less than -24). Any such opcode is followed by an LEB128-encoded count, and then a number of bytes corresponding to this count. A type represented that way is called a *future type*.
-
 * A serialised type may be headed by an other than -1 to -24 . Any such opcode is followed by an LEB128-encoded count, and then a number of bytes corresponding to this count. A type represented that way is called a *future type*.
+  ```
+  FT : i32 -> i8* -> i8*
+  FT(n, b*) = sleb128(n) leb128(|b*|) b*
+  ```
+
+* A value corresponding to a future type is called a *future value*. It is represented by two LEB128-encoded counts, *m* and *n*, followed by a *m* bytes in the memory representation M and accompanied by *n* corresponding references in R.
+  ```
+  FM : i8* -> ref* -> i8*
+  FM(b*, r*) = leb128(|b*|) leb128(r*) b*
+  ```
 
 Closure types are the only future type so far.
 
