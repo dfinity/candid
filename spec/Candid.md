@@ -1333,7 +1333,7 @@ Deserialisation uses the following mechanism for robustness towards future exten
 * A value corresponding to a future type is called a *future value*. It is represented by two LEB128-encoded counts, *m* and *n*, followed by a *m* bytes in the memory representation M and accompanied by *n* corresponding references in R.
   ```
   FM : i8* -> ref* -> i8*
-  FM(b*, r*) = leb128(|b*|) leb128(r*) b*
+  FM(b*, r*) = leb128(|b*|) leb128(|r*|) b*
   ```
 
 Closure types are the only future type so far.
