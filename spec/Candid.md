@@ -1310,7 +1310,7 @@ Deserialisation at an expected type sequence `(<t'>,*)` proceeds by
 
 Deserialisation uses the following mechanism for robustness towards future extensions:
 
-* A serialised type may be headed by an other than -1 to -24 . Any such opcode is followed by an LEB128-encoded count, and then a number of bytes corresponding to this count. A type represented that way is called a *future type*.
+* A serialised type may be headed by an opcode other than -1 to -24 . Any such opcode is followed by an LEB128-encoded count, and then a number of bytes corresponding to this count. A type represented that way is called a *future type*.
 
 * A value corresponding to a future type is called a *future value*. It is represented by two LEB128-encoded counts, *m* and *n*, followed by a *m* bytes in the memory representation M and accompanied by *n* corresponding references in R.
 
