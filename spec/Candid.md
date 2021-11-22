@@ -1248,7 +1248,7 @@ TM(v : <datatype>) = I(<datatype>) M(v : <datatype>)
 TM* : <val>* -> <datatype>* -> i8*
 TM*(v^N : <datatype>^N) = leb128(N) TM(v : <datatype>)^N
 ```
-The meta-function `FM` constructs a backwards-compatible encoding for values of for [future types](#deserialisation-of-future-types).
+The meta-function `FM` constructs a backwards-compatible encoding for values of [future types](#deserialisation-of-future-types).
 
 
 #### References
