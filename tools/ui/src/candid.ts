@@ -79,6 +79,54 @@ export async function getCycles(canisterId: Principal): Promise<[bigint,bigint]|
   }
 }
 
+export async function getProfiling(canisterId: Principal): Promise<Array<[number, bigint]>|undefined> {
+  try {
+    const profiling_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
+      __get_profiling: IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Int32, IDL.Int64))], ['query']),
+    });
+    const actor: ActorSubclass = Actor.createActor(profiling_interface, { agent, canisterId });
+    const info = await actor.__get_profiling() as Array<[number, bigint]>;
+    return info;
+  } catch(err) {
+    return undefined;
+  }
+}
+function decodeProfiling(input: Array<[number, bigint]>) {
+  console.log(input);
+  const stack: Array<[number, bigint, any[]]> = [[0,BigInt(0),[]]];
+  let prev_id = undefined;
+  let i = 1;
+  for (const [id, cycles] of input) {
+    if (id >= 0) {
+      stack.push([id, cycles, []]);
+    } else {
+      const pair = stack.pop();
+      if (!pair) {
+        console.log(i);
+        throw new Error("cannot pop empty stack");
+      }
+      if (pair[0] !== -id) {
+        throw new Error(`Exiting func ${-pair[0]}, but expect to exit func ${id}`);
+      }
+      const value: number = Number(cycles - pair[1]);
+      let result = pair[2];
+      const node = { name: pair[0].toString(), value };
+      if (typeof prev_id === "number" && prev_id < 0) {
+        result = [{ ...node, children: result }];
+      } else {
+        result.push(node);
+      }
+      stack[stack.length-1][2].push(result);
+    }
+    prev_id = id;
+    i++;
+  }
+  if (stack.length !== 1 || stack[0][2].length !== 1) {
+    throw new Error("End of input, but stack is not empty");
+  }
+  return stack[0][2][0];
+}
+
 async function getLocalDidJs(canisterId: Principal): Promise<undefined | string> {
   const origin = window.location.origin;
   const url = `${origin}/_/candid?canisterId=${canisterId.toText()}&format=js`;
@@ -117,7 +165,7 @@ export function render(id: Principal, canister: ActorSubclass, profiling: [bigin
   let profiler;
   if (profiling) {
     log(`Wasm instructions executed ${profiling[0]} (GC ${profiling[1]} instrs)`);
-    profiler = async () => { return await getCycles(id) };
+    profiler = async () => { return await getProfiling(id) };
   }
   const sortedMethods = Actor.interfaceOf(canister)._fields.sort(([a], [b]) => (a > b ? 1 : -1));
   for (const [name, func] of sortedMethods) {
@@ -204,20 +252,20 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
     right.innerText = '';
     resultDiv.style.display = 'flex';
 
-    const before_instrs = profiler ? (await profiler() as [bigint, bigint]) : null;
     const tStart = Date.now();
     const result = await canister[name](...args);
     const duration = (Date.now() - tStart) / 1000;
-    const instr_counter = profiler ? ((await profiler() as [bigint, bigint]).map((now, i) => now-before_instrs![i])) : null;
     right.innerText = `(${duration}s)`;
-    return [result, instr_counter];
+    return result;
   }
 
   const containers: HTMLDivElement[] = [];
   function callAndRender(args: any[]) {
     (async () => {
       resultDiv.classList.remove('error');
-      const [callResult, instr_counter] = await call(args) as [any, [bigint, bigint]];
+      const callResult = await call(args) as any;
+      const profiling = decodeProfiling(await profiler());
+      console.log(profiling);
       let result: any;
       if (idlFunc.retTypes.length === 0) {
         result = [];
@@ -252,9 +300,9 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       const text = encodeStr(IDL.FuncClass.argsToString(idlFunc.retTypes, result));
       textContainer.innerHTML = decodeSpace(text);
       const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
-      const showInstr = instr_counter && instr_counter[0]?`(${instr_counter[0]} instrs, GC ${instr_counter[1]} instrs)`:"";
-      log(decodeSpace(`› ${name}${showArgs} ` + showInstr));
+      log(decodeSpace(`› ${name}${showArgs}`));
       log(decodeSpace(text));
+      //log(decodeSpace(profiling.toString()));
 
       const uiContainer = document.createElement('div');
       uiContainer.className = 'ui-result';
