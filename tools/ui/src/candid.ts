@@ -88,6 +88,7 @@ export async function getProfiling(canisterId: Principal): Promise<Array<[number
     const info = await actor.__get_profiling() as Array<[number, bigint]>;
     return info;
   } catch(err) {
+    console.log(err);
     return undefined;
   }
 }
@@ -116,15 +117,17 @@ function decodeProfiling(input: Array<[number, bigint]>) {
       } else {
         result.push(node);
       }
-      stack[stack.length-1][2].push(result);
+      stack[stack.length-1][2].push(...result);
     }
     prev_id = id;
     i++;
   }
-  if (stack.length !== 1 || stack[0][2].length !== 1) {
+  if (stack.length !== 1) {
+    console.log(stack);
     throw new Error("End of input, but stack is not empty");
   }
-  return stack[0][2][0];
+  const total_cycles = Number(input[input.length - 1][1] - input[0][1]);
+  return { children: stack[0][2], name: "all", value: total_cycles };
 }
 
 async function getLocalDidJs(canisterId: Principal): Promise<undefined | string> {
@@ -264,8 +267,6 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
     (async () => {
       resultDiv.classList.remove('error');
       const callResult = await call(args) as any;
-      const profiling = decodeProfiling(await profiler());
-      console.log(profiling);
       let result: any;
       if (idlFunc.retTypes.length === 0) {
         result = [];
@@ -301,8 +302,22 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       textContainer.innerHTML = decodeSpace(text);
       const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
       log(decodeSpace(`› ${name}${showArgs}`));
+      if (profiler) {
+        let div = document.createElement('div');
+        div.id = 'chart';
+        log(div);
+        const profiling = decodeProfiling(await profiler());
+        console.log(profiling);
+        // @ts-ignore
+        const chart = flamegraph().selfValue(true).sort(false).width(400);
+        // @ts-ignore
+        const tip = flamegraph.tooltip.defaultFlamegraphTooltip().text(d => `func${d.data.name}: ${d.data.value} cycles`);
+        chart.tooltip(tip);
+        // @ts-ignore
+        d3.select("#chart").datum(profiling).call(chart);
+        div.id = 'old-chart';
+      }
       log(decodeSpace(text));
-      //log(decodeSpace(profiling.toString()));
 
       const uiContainer = document.createElement('div');
       uiContainer.className = 'ui-result';
