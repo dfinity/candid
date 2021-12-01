@@ -94,6 +94,9 @@ export async function getProfiling(canisterId: Principal): Promise<Array<[number
 }
 function decodeProfiling(input: Array<[number, bigint]>) {
   console.log(input);
+  if (!input) {
+    return [];
+  }
   const stack: Array<[number, bigint, any[]]> = [[0,BigInt(0),[]]];
   let prev_id = undefined;
   let i = 1;
@@ -126,8 +129,12 @@ function decodeProfiling(input: Array<[number, bigint]>) {
     console.log(stack);
     throw new Error("End of input, but stack is not empty");
   }
-  const total_cycles = Number(input[input.length - 1][1] - input[0][1]);
-  return { children: stack[0][2], name: "all", value: total_cycles };
+  if (stack[0][2].length === 1) {
+    return stack[0][2][0];
+  } else {
+    const total_cycles = Number(input[input.length - 1][1] - input[0][1]);
+    return { children: stack[0][2], name: "all", value: total_cycles };
+  }
 }
 
 async function getLocalDidJs(canisterId: Principal): Promise<undefined | string> {
@@ -303,19 +310,21 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
       log(decodeSpace(`› ${name}${showArgs}`));
       if (profiler) {
-        let div = document.createElement('div');
-        div.id = 'chart';
-        log(div);
         const profiling = decodeProfiling(await profiler());
         console.log(profiling);
-        // @ts-ignore
-        const chart = flamegraph().selfValue(true).sort(false).width(400);
-        // @ts-ignore
-        const tip = flamegraph.tooltip.defaultFlamegraphTooltip().text(d => `func${d.data.name}: ${d.data.value} cycles`);
-        chart.tooltip(tip);
-        // @ts-ignore
-        d3.select("#chart").datum(profiling).call(chart);
-        div.id = 'old-chart';
+        if (profiling) {
+          let div = document.createElement('div');
+          div.id = 'chart';
+          log(div);
+          // @ts-ignore
+          const chart = flamegraph().selfValue(true).sort(false).width(400);
+          // @ts-ignore
+          const tip = flamegraph.tooltip.defaultFlamegraphTooltip().text(d => `func${d.data.name}: ${d.data.value} cycles`);
+          chart.tooltip(tip);
+          // @ts-ignore
+          d3.select("#chart").datum(profiling).call(chart);
+          div.id = 'old-chart';
+        }
       }
       log(decodeSpace(text));
 
