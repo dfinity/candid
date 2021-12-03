@@ -187,6 +187,7 @@ service : {
 
 **Note:** In a synchronous interpretation of functions, invocation of a oneway function would return immediately, without waiting for completion of the service-side invocation of the function. In an asynchronous interpretation of functions, the invocation of a `oneway` function does not accept a callback (to invoke on completion).
 
+
 #### Structure
 
 A function type describes the list of parameters and results and their respective types. It can optionally be annotated to be *query*, which indicates that it does not modify any state and can potentially be executed more efficiently (e.g., on cached state). (Other annotations may be added in the future.)
@@ -443,6 +444,9 @@ The type `dynamic` represents a value of *dynamic* type. That is, the actual typ
 <constype>  ::= ... | dynamic | ...
 ```
 
+The type `dynamic` is convertable to and from any other type, in the spirit of *gradual* typing. In particular, this allows specifying generic [functions](#function-references) as parameters, such that any concrete function can be supplied.
+
+
 ##### Example
 
 The following interface to a key/value store would allow storing any Candid value.
@@ -453,8 +457,10 @@ type value = dynamic;
 service store : {
   put : (key, value) -> ();
   get : (key) -> (?value);
+  foreach : (f : func (key, value) -> ()) -> ();
 };
 ```
+Note: Any unary function can be passed to `map`. For example, a client might use this service to store values of type `nat`, and invoke `map` with a function of type `(text, nat) -> ()`.
 
 
 ### References
@@ -589,6 +595,7 @@ The types of these values are assumed to be known from context, so the syntax do
   | vec { <annval>;* }
   | record { <fieldval>;* }
   | variant { <fieldval> }
+  | dynamic <val> : <datatype>
 
 <fieldval> ::= <nat> = <annval>
 
@@ -877,11 +884,19 @@ variant { <nat> : <datatype>; <fieldtype>;* } <: variant { <nat> : <datatype'>; 
 
 #### Dynamic
 
-The dynamic type does not exhibit any interesting subtyping rules.
+The dynamic type is reflexive, but also interchangeable with any other data type in both directions, which may involve a runtime check. This amounts to gradual typing.
 ```
 
 ------------------
 dynamic <: dynamic
+
+
+---------------------
+dynamic <: <datatype>
+
+
+---------------------
+<datatype> <: dynamic
 ```
 
 
@@ -998,10 +1013,19 @@ C[variant { <nat> = <t>; _;* } <: variant { <nat> = <t'>; _;* }](variant { <nat>
 
 #### Dynamic
 
-On dynamic types, coercion is again the identity:
+On the dynamic type, coercion is the identity:
 ```
 C[dynamic <: dynamic](x) = x
 ```
+Any data type can be coerced to `dynamic`:
+```
+C[<t> <: dynamic](<v>) = dynamic <v> : <t>  if <t> =/= dynamic
+```
+The inverse direction is only possible if the encapsulated value matches the target type, such that the corresponding coercions is defined:
+```
+C[dynamic <: <t>](dynamic <v'> : <t'>) = C[<t'> <: <t>](<v'>)  if <t> =/= dynamic
+```
+Note: Type `<t>` is not known statically, so it cannot be decided statically whether `C[<t'> <: <t>]` is defined. Hence this amouts to a runtime type check.
 
 
 #### References
@@ -1157,7 +1181,7 @@ T(<nat>:<datatype>) = leb128(<nat>) I(<datatype>)
 
 T : <reftype> -> i8*
 T(func (<datatype1>*) -> (<datatype2>*) <funcann>*) =
-  sleb128(-22) T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*) // 0x6a
+  sleb128(-22) T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*)   // 0x6a
 T(service {<methtype>*}) =
   sleb128(-23) T*(<methtype>*)                                    // 0x69
 
@@ -1220,7 +1244,7 @@ M(?v   : opt <datatype>) = i8(1) M(v : <datatype>)
 M(v*   : vec <datatype>) = leb128(N) M(v : <datatype>)*
 M(kv*  : record {<fieldtype>*}) = M(kv : <fieldtype>)*
 M(kv   : variant {<fieldtype>*}) = leb128(i) M(kv : <fieldtype>*[i])
-M(v:t  : dynamic) = leb128(|B((0,v) : t)|) leb128(|R(v : t)|) B((0,v) : t)
+M(dynamic v:t  : dynamic) = leb128(|B((0,v) : t)|) leb128(|R(v : t)|) B((0,v) : t)
 
 M : (<nat>, <val>) -> <fieldtype> -> i8*
 M((k,v) : k:<datatype>) = M(v : <datatype>)
@@ -1236,8 +1260,7 @@ M(ref(r) : principal) = i8(0)
 M(id(v*) : principal) = i8(1) M(v* : vec nat8)
 ```
 
-Note: For values serialised at type `dynamic`, we assume that their concrete type `t` can either be determined from the value or is known from context.
-Such a value is serialised as a nested, self-contained Candid blob, as defined by the meta-function `B` below (#parameters-and-results).
+Note: The type `dynamic` is serialised as a nested, self-contained Candid blob, as defined by the meta-function `B` below (#parameters-and-results).
 
 
 #### References
