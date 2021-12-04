@@ -1,4 +1,4 @@
-import { fetchActor, render, getCycles } from './candid';
+import { fetchActor, render, getCycles, getNames } from './candid';
 import { Principal } from '@dfinity/principal';
 
 async function main() {
@@ -34,8 +34,9 @@ async function main() {
   } else {
     document.title = `Canister ${cid}`;
     const canisterId = Principal.fromText(cid);
-    const actor = await fetchActor(canisterId);
     const profiling = await getCycles(canisterId);
+    const actor = await fetchActor(canisterId);
+    const names = await getNames(canisterId);
     render(canisterId, actor, profiling);
     const app = document.getElementById('app');
     const progress = document.getElementById('progress');

@@ -5,6 +5,8 @@ import {
 import {Principal} from '@dfinity/principal'
 import './candid.css';
 
+const names: Record<number,string> = {};
+
 function is_local(agent: HttpAgent) {
   // @ts-ignore
   const hostname = agent._host.hostname;
@@ -66,25 +68,40 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   return Actor.createActor(candid.idlFactory, { agent, canisterId });
 }
 
-export async function getCycles(canisterId: Principal): Promise<[bigint,bigint]|undefined> {
+export function getProfilerActor(canisterId: Principal): ActorSubclass {
+  const profiler_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
+    __get_profiling: IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Int32, IDL.Int64))], ['query']),
+    __get_names: IDL.Func([], [IDL.Vec(IDL.Nat8)], ['query']),
+    __get_cycles: IDL.Func([], [IDL.Int64], ['query']),
+  });
+  return Actor.createActor(profiler_interface, { agent, canisterId });
+}
+
+export async function getCycles(canisterId: Principal): Promise<bigint|undefined> {
   try {
-    const profiling_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
-      __get_cycles: IDL.Func([], [IDL.Int64, IDL.Int64], ['query']),
-    });
-    const actor: ActorSubclass = Actor.createActor(profiling_interface, { agent, canisterId });
-    const cycles = await actor.__get_cycles() as [bigint, bigint];
+    const actor = getProfilerActor(canisterId);
+    const cycles = await actor.__get_cycles() as bigint;
     return cycles;
   } catch(err) {
     return undefined;
   }
 }
 
+export async function getNames(canisterId: Principal) {
+  try {
+    const actor = getProfilerActor(canisterId);
+    const blob = await actor.__get_names() as number[];
+    const decoded = IDL.decode([IDL.Vec(IDL.Tuple(IDL.Nat16, IDL.Text))], Uint8Array.from(blob))[0] as Array<[number,string]>;
+    decoded.forEach(([id, name]) => names[id] = name);
+  } catch(err) {
+    console.log(err);
+    return undefined;
+  }
+}
+
 export async function getProfiling(canisterId: Principal): Promise<Array<[number, bigint]>|undefined> {
   try {
-    const profiling_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
-      __get_profiling: IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Int32, IDL.Int64))], ['query']),
-    });
-    const actor: ActorSubclass = Actor.createActor(profiling_interface, { agent, canisterId });
+    const actor = getProfilerActor(canisterId);
     const info = await actor.__get_profiling() as Array<[number, bigint]>;
     return info;
   } catch(err) {
@@ -112,9 +129,10 @@ function decodeProfiling(input: Array<[number, bigint]>) {
       if (pair[0] !== -id) {
         throw new Error(`Exiting func ${-pair[0]}, but expect to exit func ${id}`);
       }
+      const name = names[pair[0]] || `func_${pair[0]}`;
       const value: number = Number(cycles - pair[1]);
       let result = pair[2];
-      const node = { name: pair[0].toString(), value };
+      const node = { name, value };
       if (typeof prev_id === "number" && prev_id < 0) {
         result = [{ ...node, children: result }];
       } else {
@@ -170,11 +188,11 @@ async function didToJs(candid_source: string): Promise<undefined | string> {
   return js[0];  
 }
 
-export function render(id: Principal, canister: ActorSubclass, profiling: [bigint,bigint]|undefined) {
+export function render(id: Principal, canister: ActorSubclass, profiling: bigint|undefined) {
   document.getElementById('canisterId')!.innerText = `${id}`;
   let profiler;
   if (profiling) {
-    log(`Wasm instructions executed ${profiling[0]} (GC ${profiling[1]} instrs)`);
+    log(`Wasm instructions executed ${profiling} instrs.`);
     profiler = async () => { return await getProfiling(id) };
   }
   const sortedMethods = Actor.interfaceOf(canister)._fields.sort(([a], [b]) => (a > b ? 1 : -1));
@@ -319,7 +337,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
           // @ts-ignore
           const chart = flamegraph().selfValue(true).sort(false).width(400);
           // @ts-ignore
-          const tip = flamegraph.tooltip.defaultFlamegraphTooltip().text(d => `func${d.data.name}: ${d.data.value} cycles`);
+          const tip = flamegraph.tooltip.defaultFlamegraphTooltip().text(d => `${d.data.name}: ${d.data.value} cycles`);
           chart.tooltip(tip);
           // @ts-ignore
           d3.select("#chart").datum(profiling).call(chart);
