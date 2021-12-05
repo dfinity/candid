@@ -151,7 +151,24 @@ function decodeProfiling(input: Array<[number, bigint]>) {
     return stack[0][2][0];
   } else {
     const total_cycles = Number(input[input.length - 1][1] - input[0][1]);
-    return { children: stack[0][2], name: "all", value: total_cycles };
+    return { children: stack[0][2], name: "Total", value: total_cycles };
+  }
+}
+async function renderFlameGraph(profiler: any) {
+  const profiling = decodeProfiling(await profiler());
+  console.log(profiling);
+  if (profiling) {
+    let div = document.createElement('div');
+    div.id = 'chart';
+    log(div);
+    // @ts-ignore
+    const chart = flamegraph().selfValue(false).sort(false).width(400);
+    // @ts-ignore
+    const tip = flamegraph.tooltip.defaultFlamegraphTooltip().text(d => `${d.data.name}: ${d.data.value} cycles`);
+    chart.tooltip(tip);
+    // @ts-ignore
+    d3.select("#chart").datum(profiling).call(chart);
+    div.id = 'old-chart';
   }
 }
 
@@ -328,21 +345,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
       log(decodeSpace(`› ${name}${showArgs}`));
       if (profiler) {
-        const profiling = decodeProfiling(await profiler());
-        console.log(profiling);
-        if (profiling) {
-          let div = document.createElement('div');
-          div.id = 'chart';
-          log(div);
-          // @ts-ignore
-          const chart = flamegraph().selfValue(true).sort(false).width(400);
-          // @ts-ignore
-          const tip = flamegraph.tooltip.defaultFlamegraphTooltip().text(d => `${d.data.name}: ${d.data.value} cycles`);
-          chart.tooltip(tip);
-          // @ts-ignore
-          d3.select("#chart").datum(profiling).call(chart);
-          div.id = 'old-chart';
-        }
+        await renderFlameGraph(profiler);
       }
       log(decodeSpace(text));
 
@@ -366,6 +369,11 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
     })().catch(err => {
       resultDiv.classList.add('error');
       left.innerText = err.message;
+      if (profiler) {
+        const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
+        log(`[Error] ${name}${showArgs}`);
+        renderFlameGraph(profiler);
+      }
       throw err;
     });
   }
