@@ -1221,7 +1221,7 @@ M(i : int<N>)   = i<N>(signed_N^-1(i))
 M(z : float<N>) = f<N>(z)
 M(b : bool)     = i8(if b then 1 else 0)
 M(t : text)     = leb128(|utf8(t)|) i8*(utf8(t))
-M(_ : null)     = .
+M(null : null)  = .
 M(_ : reserved) = .
 // NB: M(_ : empty) will never be called
 
@@ -1264,7 +1264,7 @@ We assume that the fields in a record value are sorted by increasing id.
 
 ```
 R : <val> -> <primtype> -> <ref>*
-R(_ : <primtype>) = .
+R(<primval> : <primtype>) = .
 
 R : <val> -> <constype> -> <ref>*
 R(null : opt <datatype>) = .
