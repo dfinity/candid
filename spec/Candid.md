@@ -884,16 +884,8 @@ variant { <nat> : <datatype>; <fieldtype>;* } <: variant { <nat> : <datatype'>; 
 
 #### Dynamic
 
-The dynamic type is reflexive, but also interchangeable with any other data type in both directions, which may involve a runtime check. This amounts to gradual typing.
+Any data type can be turned into a dynamic type.
 ```
-
-------------------
-dynamic <: dynamic
-
-
----------------------
-dynamic <: <datatype>
-
 
 ---------------------
 <datatype> <: dynamic
@@ -1017,15 +1009,10 @@ On the dynamic type, coercion is the identity:
 ```
 C[dynamic <: dynamic](x) = x
 ```
-Any data type can be coerced to `dynamic`:
+Any other data type can be coerced to `dynamic`:
 ```
 C[<t> <: dynamic](<v>) = dynamic <v> : <t>  if <t> =/= dynamic
 ```
-The inverse direction is only possible if the encapsulated value matches the target type, such that the corresponding coercions is defined:
-```
-C[dynamic <: <t>](dynamic <v'> : <t'>) = C[<t'> <: <t>](<v'>)  if <t> =/= dynamic
-```
-Note: Type `<t>` is not known statically, so it cannot be decided statically whether `C[<t'> <: <t>]` is defined. Hence this amouts to a runtime type check.
 
 
 #### References
@@ -1244,7 +1231,10 @@ M(?v   : opt <datatype>) = i8(1) M(v : <datatype>)
 M(v*   : vec <datatype>) = leb128(N) M(v : <datatype>)*
 M(kv*  : record {<fieldtype>*}) = M(kv : <fieldtype>)*
 M(kv   : variant {<fieldtype>*}) = leb128(i) M(kv : <fieldtype>*[i])
-M(dynamic v:t  : dynamic) = leb128(|B((0,v) : t)|) leb128(|R(v : t)|) B((0,v) : t)
+
+M(dynamic v:t : dynamic)    = leb128(|B((0,v) : t)|) leb128(|R(v : t)|) B((0,v) : t)
+M(dynamic v:t : <datatype>) = M(C[t <: <datatype>](v) : <datatype>)  if t <: <datatype> =/= dynamic
+M(v : dynamic) = M(dynamic v:t : dynamic)  if v:t and v =/= dynamic v':t'
 
 M : (<nat>, <val>) -> <fieldtype> -> i8*
 M((k,v) : k:<datatype>) = M(v : <datatype>)
@@ -1262,6 +1252,10 @@ M(id(v*) : principal) = i8(1) M(v* : vec nat8)
 
 Note: The type `dynamic` is serialised as a nested, self-contained Candid blob, as defined by the meta-function `B` below (#parameters-and-results).
 
+A dynamic value can also be serialised with a regular type, as long as the types match; this amounts to a runtime type check and implicitly unwraps the value.
+Inversely, a value of regular non-dynamic type can be serialised with type `dynamic`; this implicitly wraps the value (we assume here that the value's type `t` can be determined from the value or is known from context).
+Together, the latter two rules implement a form of *gradual typing* for type `dynamic`.
+
 
 #### References
 
@@ -1278,7 +1272,10 @@ R(?v   : opt <datatype>) = R(v : <datatype>)
 R(v*   : vec <datatype>) = R(v : <datatype>)*
 R(kv*  : record {<fieldtype>*}) = R(kv : <fieldtype>)*
 R(kv   : variant {<fieldtype>*}) = R(kv : <fieldtype>*[i])
-R(v:t  : dynamic) = R(v : t)
+
+R(dynamic v:t : dynamic) = R(v : t)
+R(dynamic v:t : <datatype>) = R(C[t <: <datatype>](v) : <datatype>)  if t <: <datatype> =/= dynamic
+R(v : dynamic) = R(dynamic v:t : dynamic)  if v:t and v =/= dynamic v':t'
 
 R : (<nat>, <val>) -> <fieldtype> -> <ref>*
 R((k,v) : k:<datatype>) = R(v : <datatype>)
