@@ -42,7 +42,7 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
             Ok(())
         }
         (t1, Opt(_)) => {
-            eprintln!("{} <: {} via special opt rule", t1, t2);
+            eprintln!("FIX ME! {} <: {} via special opt rule.\nThis means the sender and receiver type has diverged, and can cause data loss.", t1, t2);
             Ok(())
         }
         (Record(fs1), Record(fs2)) => {
@@ -103,7 +103,9 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
             subtype(gamma, env, &rets1, &rets2).context("Subtype fails at function return type")?;
             Ok(())
         }
-        (Class(_, _), Class(_, _)) => unreachable!(),
+        // This only works in the first order case, but service constructor only appears at the top level according to the spec.
+        (Class(_, t), _) => subtype(gamma, env, t, t2),
+        (_, Class(_, t)) => subtype(gamma, env, t1, t),
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
         (_, _) => Err(Error::msg(format!("{} is not a subtype of {}", t1, t2))),
