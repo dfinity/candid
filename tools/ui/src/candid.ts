@@ -5,6 +5,9 @@ import {
 import {Principal} from '@dfinity/principal'
 import './candid.css';
 
+declare var flamegraph: any;
+declare var d3: any;
+
 const names: Record<number,string> = {};
 
 function is_local(agent: HttpAgent) {
@@ -161,12 +164,9 @@ async function renderFlameGraph(profiler: any) {
     let div = document.createElement('div');
     div.id = 'chart';
     log(div);
-    // @ts-ignore
     const chart = flamegraph().selfValue(false).sort(false).width(400);
-    // @ts-ignore
-    const tip = flamegraph.tooltip.defaultFlamegraphTooltip().text(d => `${d.data.name}: ${d.data.value} cycles`);
+    const tip = flamegraph.tooltip.defaultFlamegraphTooltip().text((d:any) => `${d.data.name}: ${d.data.value} instrs`);
     chart.tooltip(tip);
-    // @ts-ignore
     d3.select("#chart").datum(profiling).call(chart);
     div.id = 'old-chart';
   }
