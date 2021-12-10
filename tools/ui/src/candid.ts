@@ -5,6 +5,11 @@ import {
 import {Principal} from '@dfinity/principal'
 import './candid.css';
 
+declare var flamegraph: any;
+declare var d3: any;
+
+const names: Record<number,string> = {};
+
 function is_local(agent: HttpAgent) {
   // @ts-ignore
   const hostname = agent._host.hostname;
@@ -66,16 +71,103 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   return Actor.createActor(candid.idlFactory, { agent, canisterId });
 }
 
-export async function getCycles(canisterId: Principal): Promise<[bigint,bigint]|undefined> {
+export function getProfilerActor(canisterId: Principal): ActorSubclass {
+  const profiler_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
+    __get_profiling: IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Int32, IDL.Int64))], ['query']),
+    __get_names: IDL.Func([], [IDL.Vec(IDL.Nat8)], ['query']),
+    __get_cycles: IDL.Func([], [IDL.Int64], ['query']),
+  });
+  return Actor.createActor(profiler_interface, { agent, canisterId });
+}
+
+export async function getCycles(canisterId: Principal): Promise<bigint|undefined> {
   try {
-    const profiling_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
-      __get_cycles: IDL.Func([], [IDL.Int64, IDL.Int64], ['query']),
-    });
-    const actor: ActorSubclass = Actor.createActor(profiling_interface, { agent, canisterId });
-    const cycles = await actor.__get_cycles() as [bigint, bigint];
+    const actor = getProfilerActor(canisterId);
+    const cycles = await actor.__get_cycles() as bigint;
     return cycles;
   } catch(err) {
     return undefined;
+  }
+}
+
+export async function getNames(canisterId: Principal) {
+  try {
+    const actor = getProfilerActor(canisterId);
+    const blob = await actor.__get_names() as number[];
+    const decoded = IDL.decode([IDL.Vec(IDL.Tuple(IDL.Nat16, IDL.Text))], Uint8Array.from(blob))[0] as Array<[number,string]>;
+    decoded.forEach(([id, name]) => names[id] = name);
+  } catch(err) {
+    return undefined;
+  }
+}
+
+export async function getProfiling(canisterId: Principal): Promise<Array<[number, bigint]>|undefined> {
+  try {
+    const actor = getProfilerActor(canisterId);
+    const info = await actor.__get_profiling() as Array<[number, bigint]>;
+    return info;
+  } catch(err) {
+    console.log(err);
+    return undefined;
+  }
+}
+function decodeProfiling(input: Array<[number, bigint]>) {
+  //console.log(input);
+  if (!input) {
+    return [];
+  }
+  const stack: Array<[number, bigint, any[]]> = [[0,BigInt(0),[]]];
+  let prev_id = undefined;
+  let i = 1;
+  for (const [id, cycles] of input) {
+    if (id >= 0) {
+      stack.push([id, cycles, []]);
+    } else {
+      const pair = stack.pop();
+      if (!pair) {
+        console.log(i);
+        throw new Error("cannot pop empty stack");
+      }
+      if (pair[0] !== -id) {
+        throw new Error(`Exiting func ${-pair[0]}, but expect to exit func ${id}`);
+      }
+      const name = names[pair[0]] || `func_${pair[0]}`;
+      const value: number = Number(cycles - pair[1]);
+      let result = pair[2];
+      const node = { name, value };
+      if (typeof prev_id === "number" && prev_id < 0) {
+        result = [{ ...node, children: result }];
+      } else {
+        result.push(node);
+      }
+      stack[stack.length-1][2].push(...result);
+    }
+    prev_id = id;
+    i++;
+  }
+  if (stack.length !== 1) {
+    console.log(stack);
+    throw new Error("End of input, but stack is not empty");
+  }
+  if (stack[0][2].length === 1) {
+    return stack[0][2][0];
+  } else {
+    const total_cycles = Number(input[input.length - 1][1] - input[0][1]);
+    return { children: stack[0][2], name: "Total", value: total_cycles };
+  }
+}
+async function renderFlameGraph(profiler: any) {
+  const profiling = decodeProfiling(await profiler());
+  //console.log(profiling);
+  if (profiling) {
+    let div = document.createElement('div');
+    div.id = 'chart';
+    log(div);
+    const chart = flamegraph().selfValue(false).sort(false).width(400);
+    const tip = flamegraph.tooltip.defaultFlamegraphTooltip().text((d:any) => `${d.data.name}: ${d.data.value} instrs`);
+    chart.tooltip(tip);
+    d3.select("#chart").datum(profiling).call(chart);
+    div.id = 'old-chart';
   }
 }
 
@@ -112,12 +204,12 @@ async function didToJs(candid_source: string): Promise<undefined | string> {
   return js[0];  
 }
 
-export function render(id: Principal, canister: ActorSubclass, profiling: [bigint,bigint]|undefined) {
+export function render(id: Principal, canister: ActorSubclass, profiling: bigint|undefined) {
   document.getElementById('canisterId')!.innerText = `${id}`;
   let profiler;
   if (profiling) {
-    log(`Wasm instructions executed ${profiling[0]} (GC ${profiling[1]} instrs)`);
-    profiler = async () => { return await getCycles(id) };
+    log(`Wasm instructions executed ${profiling} instrs.`);
+    profiler = async () => { return await getProfiling(id) };
   }
   const sortedMethods = Actor.interfaceOf(canister)._fields.sort(([a], [b]) => (a > b ? 1 : -1));
   for (const [name, func] of sortedMethods) {
@@ -204,20 +296,18 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
     right.innerText = '';
     resultDiv.style.display = 'flex';
 
-    const before_instrs = profiler ? (await profiler() as [bigint, bigint]) : null;
     const tStart = Date.now();
     const result = await canister[name](...args);
     const duration = (Date.now() - tStart) / 1000;
-    const instr_counter = profiler ? ((await profiler() as [bigint, bigint]).map((now, i) => now-before_instrs![i])) : null;
     right.innerText = `(${duration}s)`;
-    return [result, instr_counter];
+    return result;
   }
 
   const containers: HTMLDivElement[] = [];
   function callAndRender(args: any[]) {
     (async () => {
       resultDiv.classList.remove('error');
-      const [callResult, instr_counter] = await call(args) as [any, [bigint, bigint]];
+      const callResult = await call(args) as any;
       let result: any;
       if (idlFunc.retTypes.length === 0) {
         result = [];
@@ -252,8 +342,10 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       const text = encodeStr(IDL.FuncClass.argsToString(idlFunc.retTypes, result));
       textContainer.innerHTML = decodeSpace(text);
       const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
-      const showInstr = instr_counter && instr_counter[0]?`(${instr_counter[0]} instrs, GC ${instr_counter[1]} instrs)`:"";
-      log(decodeSpace(`› ${name}${showArgs} ` + showInstr));
+      log(decodeSpace(`› ${name}${showArgs}`));
+      if (profiler) {
+        await renderFlameGraph(profiler);
+      }
       log(decodeSpace(text));
 
       const uiContainer = document.createElement('div');
@@ -276,6 +368,11 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
     })().catch(err => {
       resultDiv.classList.add('error');
       left.innerText = err.message;
+      if (profiler) {
+        const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
+        log(`[Error] ${name}${showArgs}`);
+        renderFlameGraph(profiler);
+      }
       throw err;
     });
   }
