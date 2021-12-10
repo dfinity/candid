@@ -97,7 +97,6 @@ export async function getNames(canisterId: Principal) {
     const decoded = IDL.decode([IDL.Vec(IDL.Tuple(IDL.Nat16, IDL.Text))], Uint8Array.from(blob))[0] as Array<[number,string]>;
     decoded.forEach(([id, name]) => names[id] = name);
   } catch(err) {
-    console.log(err);
     return undefined;
   }
 }
@@ -113,7 +112,7 @@ export async function getProfiling(canisterId: Principal): Promise<Array<[number
   }
 }
 function decodeProfiling(input: Array<[number, bigint]>) {
-  console.log(input);
+  //console.log(input);
   if (!input) {
     return [];
   }
@@ -159,7 +158,7 @@ function decodeProfiling(input: Array<[number, bigint]>) {
 }
 async function renderFlameGraph(profiler: any) {
   const profiling = decodeProfiling(await profiler());
-  console.log(profiling);
+  //console.log(profiling);
   if (profiling) {
     let div = document.createElement('div');
     div.id = 'chart';
