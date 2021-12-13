@@ -297,7 +297,7 @@ pub mod value {
     }
 
     fn pp_fields(fields: &[IDLField]) -> RcDoc {
-        concat(fields.iter().map(|f| pp_field(f)), ",")
+        concat(fields.iter().map(pp_field), ",")
     }
 
     pub fn pp_value(v: &IDLValue) -> RcDoc {
@@ -326,7 +326,7 @@ pub mod value {
             None => RcDoc::text("[]"),
             Opt(v) => enclose_space("[", pp_value(v), "]"),
             Vec(vs) => {
-                let body = concat(vs.iter().map(|v| pp_value(v)), ",");
+                let body = concat(vs.iter().map(pp_value), ",");
                 enclose_space("[", body, "]")
             }
             Record(fields) => {

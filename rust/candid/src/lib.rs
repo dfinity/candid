@@ -323,6 +323,7 @@ pub use parser::types::IDLProg;
 pub use parser::typing::{check_file, check_prog, pretty_check_file, TypeEnv};
 pub use parser::value::IDLArgs;
 
+#[allow(dead_code)]
 pub mod binary_parser;
 pub mod de;
 pub mod ser;

@@ -511,7 +511,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (_, _) => assert!(false),
         }
     }
-    fn deserialize_seq<V>(mut self, visitor: V) -> Result<V::Value>
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
@@ -521,10 +521,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let expect = *e.clone();
                 let wire = *w.clone();
                 let len = Len::read(&mut self.input)?.0;
-                visitor.visit_seq(Compound::new(
-                    &mut self,
-                    Style::Vector { len, expect, wire },
-                ))
+                visitor.visit_seq(Compound::new(self, Style::Vector { len, expect, wire }))
             }
             (Type::Record(e), Type::Record(w)) => {
                 let expect = e.clone().into();
@@ -537,7 +534,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     )));
                 }
                 let value =
-                    visitor.visit_seq(Compound::new(&mut self, Style::Struct { expect, wire }))?;
+                    visitor.visit_seq(Compound::new(self, Style::Struct { expect, wire }))?;
                 Ok(value)
             }
             (Type::Record(_), Type::Empty) => Err(Error::msg("Cannot decode empty type")),
@@ -567,7 +564,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             _ => Err(Error::msg("bytes only takes principal or vec nat8")),
         }
     }
-    fn deserialize_map<V>(mut self, visitor: V) -> Result<V::Value>
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
@@ -597,10 +594,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                         ) => {
                             let expect = (ek.clone(), ev.clone());
                             let wire = (wk.clone(), wv.clone());
-                            visitor.visit_map(Compound::new(
-                                &mut self,
-                                Style::Map { len, expect, wire },
-                            ))
+                            visitor.visit_map(Compound::new(self, Style::Map { len, expect, wire }))
                         }
                         _ => Err(Error::msg("expect a key-value pair")),
                     },
@@ -628,7 +622,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.deserialize_seq(visitor)
     }
     fn deserialize_struct<V>(
-        mut self,
+        self,
         _name: &'static str,
         _fields: &'static [&'static str],
         visitor: V,
@@ -642,7 +636,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let expect = e.clone().into();
                 let wire = w.clone().into();
                 let value =
-                    visitor.visit_map(Compound::new(&mut self, Style::Struct { expect, wire }))?;
+                    visitor.visit_map(Compound::new(self, Style::Struct { expect, wire }))?;
                 Ok(value)
             }
             (Type::Record(_), Type::Empty) => Err(Error::msg("Cannot decode empty type")),
@@ -650,7 +644,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         }
     }
     fn deserialize_enum<V>(
-        mut self,
+        self,
         _name: &'static str,
         _variants: &'static [&'static str],
         visitor: V,
@@ -675,7 +669,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     .find(|f| f.id == wire.id)
                     .ok_or_else(|| Error::msg(format!("Unknown variant field {}", wire.id)))?
                     .clone();
-                visitor.visit_enum(Compound::new(&mut self, Style::Enum { expect, wire }))
+                visitor.visit_enum(Compound::new(self, Style::Enum { expect, wire }))
             }
             _ => assert!(false),
         }
