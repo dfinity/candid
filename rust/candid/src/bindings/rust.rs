@@ -11,12 +11,9 @@ pub(crate) fn is_tuple(fs: &[Field]) -> bool {
     if fs.is_empty() {
         return false;
     }
-    for (i, field) in fs.iter().enumerate() {
-        if field.id.get_id() != (i as u32) {
-            return false;
-        }
-    }
-    true
+    !fs.iter()
+        .enumerate()
+        .any(|(i, field)| field.id.get_id() != (i as u32))
 }
 static KEYWORDS: [&str; 51] = [
     "as", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn", "for",
