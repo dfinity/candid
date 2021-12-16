@@ -7,4 +7,6 @@ type C = A
 type X = Y
 type Y = Z
 type Z = A
-
+pub trait SERVICE {
+  pub fn f(arg0: A, arg1: B, arg2: C, arg3: X, arg4: Y, arg5: Z) -> ();
+}

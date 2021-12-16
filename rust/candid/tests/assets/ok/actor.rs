@@ -5,4 +5,9 @@ type f = candid::Func
 type g = f
 type h = candid::Func
 type o = Option<o>
-
+pub trait SERVICE {
+  pub fn f(arg0: candid::Nat) -> (h);
+  pub fn g(arg0: i8) -> (i8);
+  pub fn h(arg0: i8) -> (i8);
+  pub fn o(arg0: o) -> (o);
+}
