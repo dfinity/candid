@@ -1,8 +1,11 @@
+use super::analysis::infer_rec;
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
 use crate::types::{Field, Function, Label, Type};
 use pretty::RcDoc;
+use std::collections::BTreeSet;
 
+type RecPoints<'a> = BTreeSet<&'a str>;
 // The definition of tuple is language specific.
 pub(crate) fn is_tuple(fs: &[Field]) -> bool {
     if fs.is_empty() {
@@ -37,7 +40,7 @@ pub fn ident(id: &str) -> RcDoc {
     }
 }
 
-fn pp_ty(ty: &Type) -> RcDoc {
+fn pp_ty<'a, 'b>(ty: &'a Type, recs: &'b RecPoints) -> RcDoc<'a> {
     use Type::*;
     match *ty {
         Null => str("()"),
@@ -57,11 +60,18 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("String"),
         Reserved => str("candid::Reserved"),
         Empty => str("candid::Empty"),
-        Var(ref s) => ident(s),
+        Var(ref id) => {
+            let name = ident(id);
+            if recs.contains(id.as_str()) {
+                str("Box<").append(name).append(">")
+            } else {
+                name
+            }
+        }
         Principal => str("candid::Principal"),
-        Opt(ref t) => str("Option").append(enclose("<", pp_ty(t), ">")),
-        Vec(ref t) => str("Vec").append(enclose("<", pp_ty(t), ">")),
-        Record(ref fs) => pp_record_fields(fs),
+        Opt(ref t) => str("Option").append(enclose("<", pp_ty(t, recs), ">")),
+        Vec(ref t) => str("Vec").append(enclose("<", pp_ty(t, recs), ">")),
+        Record(ref fs) => pp_record_fields(fs, recs),
         Variant(_) => unreachable!(),
         Func(_) => str("candid::Func"),
         Service(_) => str("candid::Service"),
@@ -77,67 +87,87 @@ fn pp_label(id: &Label) -> RcDoc {
     }
 }
 
-fn pp_record_field(field: &Field) -> RcDoc {
+fn pp_record_field<'a, 'b>(field: &'a Field, recs: &'b RecPoints) -> RcDoc<'a> {
     pp_label(&field.id)
         .append(kwd(":"))
-        .append(pp_ty(&field.ty))
+        .append(pp_ty(&field.ty, recs))
 }
 
-fn pp_record_fields(fs: &[Field]) -> RcDoc {
+fn pp_record_fields<'a, 'b>(fs: &'a [Field], recs: &'b RecPoints) -> RcDoc<'a> {
     if is_tuple(fs) {
-        let tuple = RcDoc::concat(fs.iter().map(|f| pp_ty(&f.ty).append(",")));
+        let tuple = RcDoc::concat(fs.iter().map(|f| pp_ty(&f.ty, recs).append(",")));
         enclose("(", tuple, ")")
     } else {
-        let fields = concat(fs.iter().map(pp_record_field), ",");
+        let fields = concat(fs.iter().map(|f| pp_record_field(f, recs)), ",");
         enclose_space("{", fields, "}")
     }
 }
 
-fn pp_variant_field(field: &Field) -> RcDoc {
+fn pp_variant_field<'a, 'b>(field: &'a Field, recs: &'b RecPoints) -> RcDoc<'a> {
     match &field.ty {
         Type::Null => pp_label(&field.id),
-        Type::Record(fs) => pp_label(&field.id).append(pp_record_fields(fs)),
-        _ => pp_label(&field.id).append(enclose("(", pp_ty(&field.ty), ")")),
+        Type::Record(fs) => pp_label(&field.id).append(pp_record_fields(fs, recs)),
+        _ => pp_label(&field.id).append(enclose("(", pp_ty(&field.ty, recs), ")")),
     }
 }
 
-fn pp_variant_fields(fs: &[Field]) -> RcDoc {
-    let fields = concat(fs.iter().map(pp_variant_field), ",");
+fn pp_variant_fields<'a, 'b>(fs: &'a [Field], recs: &'b RecPoints) -> RcDoc<'a> {
+    let fields = concat(fs.iter().map(|f| pp_variant_field(f, recs)), ",");
     enclose_space("{", fields, "}")
 }
 
-fn pp_defs(env: &TypeEnv) -> RcDoc {
+fn pp_defs<'a>(env: &'a TypeEnv, recs: &'a RecPoints) -> RcDoc<'a> {
     let derive = "#[derive(CandidType, Deserialize)]";
     lines(env.0.iter().map(|(id, ty)| {
-        let id = ident(id).append(" ");
+        let name = ident(id).append(" ");
         match ty {
             Type::Record(fs) => str(derive)
                 .append(RcDoc::line())
                 .append("struct ")
-                .append(id)
-                .append(pp_record_fields(fs))
+                .append(name)
+                .append(pp_record_fields(fs, recs))
+                .append(";")
                 .append(RcDoc::hardline()),
             Type::Variant(fs) => str(derive)
                 .append(RcDoc::line())
                 .append("enum ")
-                .append(id)
-                .append(pp_variant_fields(fs))
+                .append(name)
+                .append(pp_variant_fields(fs, recs))
+                .append(";")
                 .append(RcDoc::hardline()),
-            _ => kwd("type").append(id).append("= ").append(pp_ty(ty)),
+            _ => {
+                if recs.contains(id.as_str()) {
+                    str(derive)
+                        .append(RcDoc::line())
+                        .append("struct ")
+                        .append(ident(id))
+                        .append(enclose("(", pp_ty(ty, recs), ")"))
+                        .append(";")
+                        .append(RcDoc::hardline())
+                } else {
+                    let empty = BTreeSet::new();
+                    kwd("type")
+                        .append(name)
+                        .append("= ")
+                        .append(pp_ty(ty, &empty))
+                        .append(";")
+                }
+            }
         }
     }))
 }
 
 fn pp_function<'a>(id: &'a str, func: &'a Function) -> RcDoc<'a> {
     let id = ident(id);
+    let empty = BTreeSet::new();
     let args = concat(
         func.args
             .iter()
             .enumerate()
-            .map(|(i, ty)| RcDoc::as_string(format!("arg{}: ", i)).append(pp_ty(ty))),
+            .map(|(i, ty)| RcDoc::as_string(format!("arg{}: ", i)).append(pp_ty(ty, &empty))),
         ",",
     );
-    let rets = concat(func.rets.iter().map(pp_ty), ",");
+    let rets = concat(func.rets.iter().map(|ty| pp_ty(ty, &empty)), ",");
     let sig = kwd("pub fn")
         .append(id)
         .append(enclose("(", args, ")"))
@@ -164,10 +194,12 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 // You may want to manually adjust some of the types.
 "#;
     let (env, actor) = nominalize_all(env, actor);
+    let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
+    let recs = infer_rec(&env, &def_list).unwrap();
+    let defs = pp_defs(&env, &recs);
     let doc = match &actor {
-        None => pp_defs(&env),
+        None => defs,
         Some(actor) => {
-            let defs = pp_defs(&env);
             let actor = pp_actor(&env, actor);
             defs.append(actor)
         }

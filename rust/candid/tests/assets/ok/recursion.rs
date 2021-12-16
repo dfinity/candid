@@ -1,23 +1,29 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
 
-type A = B
-type B = Option<A>
-type list = Option<node>
+type A = B;
 #[derive(CandidType, Deserialize)]
-struct node { head: candid::Nat, tail: list }
+struct B(Option<A>);
 
-type s = candid::Service
-type stream = Option<stream_inner>
+type list = Option<node>;
 #[derive(CandidType, Deserialize)]
-struct stream_inner { head: candid::Nat, next: candid::Func }
+struct node { head: candid::Nat, tail: list };
 
-type t = candid::Func
+type s = candid::Service;
+#[derive(CandidType, Deserialize)]
+struct stream(Option<stream_inner>);
+
+#[derive(CandidType, Deserialize)]
+struct stream_inner { head: candid::Nat, next: candid::Func };
+
+#[derive(CandidType, Deserialize)]
+struct t(candid::Func);
+
 #[derive(CandidType, Deserialize)]
 enum tree {
   branch{ val: candid::Int, left: tree, right: tree },
   leaf(candid::Int),
-}
+};
 
 pub trait SERVICE {
   pub fn f(arg0: s) -> ();
