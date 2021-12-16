@@ -10,7 +10,7 @@ type List = Option<List_inner>;
 struct List_inner { head: candid::Int, tail: List };
 
 #[derive(CandidType, Deserialize)]
-enum a { a, b(b) };
+enum a { a, b(Box<b>) };
 
 #[derive(CandidType, Deserialize)]
 struct b (candid::Int,candid::Nat,);
@@ -21,7 +21,7 @@ type f = candid::Func;
 enum h_arg1 { A(candid::Nat), B(Option<String>) };
 
 #[derive(CandidType, Deserialize)]
-struct h_ret0 { _42_: h_ret0_42, id: candid::Nat };
+struct h_ret0 { _42_: Box<h_ret0_42>, id: candid::Nat };
 
 #[derive(CandidType, Deserialize)]
 struct h_ret0_42 {};
@@ -33,9 +33,9 @@ struct nested {
   _0_: candid::Nat,
   _1_: candid::Nat,
   _2_: (candid::Nat,candid::Int,),
-  _3_: nested_3,
+  _3_: Box<nested_3>,
   _40_: candid::Nat,
-  _41_: nested_41,
+  _41_: Box<nested_41>,
   _42_: candid::Nat,
 };
 
@@ -50,7 +50,7 @@ struct node { head: candid::Nat, tail: list };
 
 type s = candid::Service;
 #[derive(CandidType, Deserialize)]
-struct stream(Option<stream_inner>);
+struct stream(Option<Box<stream_inner>>);
 
 #[derive(CandidType, Deserialize)]
 struct stream_inner { head: candid::Nat, next: candid::Func };
@@ -60,7 +60,7 @@ struct t(candid::Func);
 
 #[derive(CandidType, Deserialize)]
 enum tree {
-  branch{ val: candid::Int, left: tree, right: tree },
+  branch{ val: candid::Int, left: Box<tree>, right: Box<tree> },
   leaf(candid::Int),
 };
 

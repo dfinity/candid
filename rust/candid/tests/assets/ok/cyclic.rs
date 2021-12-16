@@ -3,14 +3,14 @@
 
 type A = Option<B>;
 #[derive(CandidType, Deserialize)]
-struct B(Option<C>);
+struct B(Option<Box<C>>);
 
 #[derive(CandidType, Deserialize)]
 struct C(A);
 
 type X = Y;
 #[derive(CandidType, Deserialize)]
-struct Y(Z);
+struct Y(Box<Z>);
 
 #[derive(CandidType, Deserialize)]
 struct Z(A);

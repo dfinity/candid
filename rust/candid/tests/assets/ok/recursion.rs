@@ -11,7 +11,7 @@ struct node { head: candid::Nat, tail: list };
 
 type s = candid::Service;
 #[derive(CandidType, Deserialize)]
-struct stream(Option<stream_inner>);
+struct stream(Option<Box<stream_inner>>);
 
 #[derive(CandidType, Deserialize)]
 struct stream_inner { head: candid::Nat, next: candid::Func };
@@ -21,7 +21,7 @@ struct t(candid::Func);
 
 #[derive(CandidType, Deserialize)]
 enum tree {
-  branch{ val: candid::Int, left: tree, right: tree },
+  branch{ val: candid::Int, left: Box<tree>, right: Box<tree> },
   leaf(candid::Int),
 };
 

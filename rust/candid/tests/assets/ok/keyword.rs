@@ -12,7 +12,7 @@ struct fieldnat_arg0 { _2_: candid::Int, _50_: candid::Nat };
 
 #[derive(CandidType, Deserialize)]
 enum r#if {
-  branch{ val: candid::Int, left: r#if, right: r#if },
+  branch{ val: candid::Int, left: Box<r#if>, right: Box<r#if> },
   leaf(candid::Int),
 };
 
@@ -21,11 +21,11 @@ type list = Option<node>;
 struct node { head: candid::Nat, tail: list };
 
 #[derive(CandidType, Deserialize)]
-struct o(Option<o>);
+struct o(Option<Box<o>>);
 
 type r#return = candid::Service;
 #[derive(CandidType, Deserialize)]
-struct stream(Option<stream_inner>);
+struct stream(Option<Box<stream_inner>>);
 
 #[derive(CandidType, Deserialize)]
 struct stream_inner { head: candid::Nat, next: candid::Func };
