@@ -1,4 +1,3 @@
-use super::analysis::{chase_actor, chase_types, infer_rec};
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
 use crate::types::{Field, Function, Label, Type};
@@ -116,15 +115,48 @@ fn pp_defs(env: &TypeEnv) -> RcDoc {
                 .append(RcDoc::line())
                 .append("struct ")
                 .append(id)
-                .append(pp_record_fields(fs)),
+                .append(pp_record_fields(fs))
+                .append(RcDoc::hardline()),
             Type::Variant(fs) => str(derive)
                 .append(RcDoc::line())
                 .append("enum ")
                 .append(id)
-                .append(pp_variant_fields(fs)),
+                .append(pp_variant_fields(fs))
+                .append(RcDoc::hardline()),
             _ => kwd("type").append(id).append("= ").append(pp_ty(ty)),
         }
     }))
+}
+
+fn pp_function<'a>(id: &'a str, func: &'a Function) -> RcDoc<'a> {
+    let id = ident(id);
+    let args = concat(
+        func.args
+            .iter()
+            .enumerate()
+            .map(|(i, ty)| RcDoc::as_string(format!("arg{}: ", i)).append(pp_ty(ty))),
+        ",",
+    );
+    let rets = concat(func.rets.iter().map(pp_ty), ",");
+    let sig = kwd("pub fn")
+        .append(id)
+        .append(enclose("(", args, ")"))
+        .append(kwd(" ->"))
+        .append(enclose("(", rets, ")"));
+    sig.append(";")
+}
+
+fn pp_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
+    // TODO trace to service before we figure out what canister means in Rust
+    let serv = env.as_service(actor).unwrap();
+    let body = RcDoc::intersperse(
+        serv.iter().map(|(id, func)| {
+            let func = env.as_func(func).unwrap();
+            pp_function(id, func)
+        }),
+        RcDoc::hardline(),
+    );
+    kwd("pub trait SERVICE").append(enclose_space("{", body, "}"))
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
@@ -132,8 +164,15 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 // You may want to manually adjust some of the types.
 "#;
     let (env, actor) = nominalize_all(env, actor);
-    let defs = pp_defs(&env);
-    let doc = RcDoc::text(header).append(RcDoc::line()).append(defs);
+    let doc = match &actor {
+        None => pp_defs(&env),
+        Some(actor) => {
+            let defs = pp_defs(&env);
+            let actor = pp_actor(&env, actor);
+            defs.append(actor)
+        }
+    };
+    let doc = RcDoc::text(header).append(RcDoc::line()).append(doc);
     doc.pretty(LINE_WIDTH).to_string()
 }
 
@@ -282,6 +321,8 @@ fn nominalize_all(env: &TypeEnv, actor: &Option<Type>) -> (TypeEnv, Option<Type>
         let ty = nominalize(&mut res, &mut vec![TypePath::Id(id.clone())], ty.clone());
         res.0.insert(id.to_string(), ty);
     }
-    let actor = actor.as_ref().map(|ty| nominalize(&mut res, &mut vec![], ty.clone()));
+    let actor = actor
+        .as_ref()
+        .map(|ty| nominalize(&mut res, &mut vec![], ty.clone()));
     (res, actor)
 }
