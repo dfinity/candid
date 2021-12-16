@@ -1,5 +1,6 @@
 use crate::parser::typing::TypeEnv;
 use crate::types::Type;
+use crate::Result;
 use std::collections::BTreeSet;
 
 /// Same as chase_actor, with seen set as part of the type. Used for chasing type names from type definitions.
@@ -8,7 +9,7 @@ pub fn chase_type<'a>(
     res: &mut Vec<&'a str>,
     env: &'a TypeEnv,
     t: &'a Type,
-) -> crate::Result<()> {
+) -> Result<()> {
     use Type::*;
     match t {
         Var(id) => {
@@ -47,14 +48,14 @@ pub fn chase_type<'a>(
 
 /// Gather type definitions mentioned in actor, return the non-recursive type names in topological order.
 /// Recursive types can appear in any order.
-pub fn chase_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> crate::Result<Vec<&'a str>> {
+pub fn chase_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> Result<Vec<&'a str>> {
     let mut seen = BTreeSet::new();
     let mut res = Vec::new();
     chase_type(&mut seen, &mut res, env, actor)?;
     Ok(res)
 }
 
-pub fn chase_types<'a>(env: &'a TypeEnv, tys: &'a [Type]) -> crate::Result<Vec<&'a str>> {
+pub fn chase_types<'a>(env: &'a TypeEnv, tys: &'a [Type]) -> Result<Vec<&'a str>> {
     let mut seen = BTreeSet::new();
     let mut res = Vec::new();
     for t in tys.iter() {
@@ -64,10 +65,7 @@ pub fn chase_types<'a>(env: &'a TypeEnv, tys: &'a [Type]) -> crate::Result<Vec<&
 }
 
 /// Given a `def_list` produced by the `chase_actor` function, infer which types are recursive
-pub fn infer_rec<'a>(
-    env: &'a TypeEnv,
-    def_list: &'a [&'a str],
-) -> crate::Result<BTreeSet<&'a str>> {
+pub fn infer_rec<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTreeSet<&'a str>> {
     let mut seen = BTreeSet::new();
     let mut res = BTreeSet::new();
     fn go<'a>(
@@ -75,7 +73,7 @@ pub fn infer_rec<'a>(
         res: &mut BTreeSet<&'a str>,
         env: &'a TypeEnv,
         t: &'a Type,
-    ) -> crate::Result<()> {
+    ) -> Result<()> {
         use Type::*;
         match t {
             Var(id) => {
