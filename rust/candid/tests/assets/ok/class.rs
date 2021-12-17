@@ -2,7 +2,7 @@
 // You may want to manually adjust some of the types.
 
 #[derive(CandidType, Deserialize)]
-struct List(Option<(candid::Int,Box<List>,)>)
+struct List(Option<(candid::Int,Box<List>,)>);
 
 pub trait SERVICE {
   pub fn get() -> (List);

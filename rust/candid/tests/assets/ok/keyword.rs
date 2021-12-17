@@ -21,17 +21,17 @@ type list = Option<Box<node>>;
 struct node { head: candid::Nat, tail: list }
 
 #[derive(CandidType, Deserialize)]
-struct o(Option<Box<o>>)
+struct o(Option<Box<o>>);
 
 type r#return = candid::Service;
 #[derive(CandidType, Deserialize)]
-struct stream(Option<Box<stream_inner>>)
+struct stream(Option<Box<stream_inner>>);
 
 #[derive(CandidType, Deserialize)]
 struct stream_inner { head: candid::Nat, next: candid::Func }
 
 #[derive(CandidType, Deserialize)]
-struct t(candid::Func)
+struct t(candid::Func);
 
 #[derive(CandidType, Deserialize)]
 enum variant_arg0 { A, B, C, D(f64) }

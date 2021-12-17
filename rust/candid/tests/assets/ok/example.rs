@@ -3,7 +3,7 @@
 
 type A = Box<B>;
 #[derive(CandidType, Deserialize)]
-struct B(Option<A>)
+struct B(Option<A>);
 
 type List = Option<Box<List_inner>>;
 #[derive(CandidType, Deserialize)]
@@ -50,13 +50,13 @@ struct node { head: candid::Nat, tail: list }
 
 type s = candid::Service;
 #[derive(CandidType, Deserialize)]
-struct stream(Option<Box<stream_inner>>)
+struct stream(Option<Box<stream_inner>>);
 
 #[derive(CandidType, Deserialize)]
 struct stream_inner { head: candid::Nat, next: candid::Func }
 
 #[derive(CandidType, Deserialize)]
-struct t(candid::Func)
+struct t(candid::Func);
 
 #[derive(CandidType, Deserialize)]
 enum tree {

@@ -3,7 +3,7 @@
 
 type Func = candid::Func;
 #[derive(CandidType, Deserialize)]
-struct Service(candid::Service)
+struct Service(candid::Service);
 
 type Service2 = Box<Service>;
 #[derive(CandidType, Deserialize)]

@@ -2,6 +2,6 @@
 // You may want to manually adjust some of the types.
 
 #[derive(CandidType, Deserialize)]
-struct s(candid::Service)
+struct s(candid::Service);
 
 pub trait SERVICE { pub fn next() -> (s); }

@@ -137,6 +137,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, recs: &'a RecPoints) -> RcDoc<'a> {
                         .append("struct ")
                         .append(ident(id))
                         .append(enclose("(", pp_ty(ty, recs), ")"))
+                        .append(";")
                         .append(RcDoc::hardline())
                 } else {
                     kwd("type")
