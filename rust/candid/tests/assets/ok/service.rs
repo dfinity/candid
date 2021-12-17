@@ -3,11 +3,11 @@
 
 type Func = candid::Func;
 #[derive(CandidType, Deserialize)]
-struct Service(candid::Service);
+struct Service(candid::Service)
 
-type Service2 = Service;
+type Service2 = Box<Service>;
 #[derive(CandidType, Deserialize)]
-enum asVariant_ret0 { a(Service2), b{ f: Option<Func> } };
+enum asVariant_ret0 { a(Service2), b{ f: Option<Func> } }
 
 pub trait SERVICE {
   pub fn asArray() -> (Vec<Service2>, Vec<Func>);

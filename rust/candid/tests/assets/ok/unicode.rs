@@ -7,10 +7,10 @@ struct A {
   _1832283146_: candid::Nat,
   _2119362116_: candid::Nat,
   _3133479156_: candid::Nat,
-};
+}
 
 #[derive(CandidType, Deserialize)]
-enum B { _0_, _650764729_, _1036827129_, _3099250646_ };
+enum B { _0_, _650764729_, _1036827129_, _3099250646_ }
 
 pub trait SERVICE {
   pub fn _0_(arg0: candid::Nat) -> (candid::Nat);

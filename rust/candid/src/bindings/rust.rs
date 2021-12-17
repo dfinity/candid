@@ -123,14 +123,12 @@ fn pp_defs<'a>(env: &'a TypeEnv, recs: &'a RecPoints) -> RcDoc<'a> {
                 .append("struct ")
                 .append(name)
                 .append(pp_record_fields(fs, recs))
-                .append(";")
                 .append(RcDoc::hardline()),
             Type::Variant(fs) => str(derive)
                 .append(RcDoc::line())
                 .append("enum ")
                 .append(name)
                 .append(pp_variant_fields(fs, recs))
-                .append(";")
                 .append(RcDoc::hardline()),
             _ => {
                 if recs.contains(id.as_str()) {
@@ -139,14 +137,12 @@ fn pp_defs<'a>(env: &'a TypeEnv, recs: &'a RecPoints) -> RcDoc<'a> {
                         .append("struct ")
                         .append(ident(id))
                         .append(enclose("(", pp_ty(ty, recs), ")"))
-                        .append(";")
                         .append(RcDoc::hardline())
                 } else {
-                    let empty = BTreeSet::new();
                     kwd("type")
                         .append(name)
                         .append("= ")
-                        .append(pp_ty(ty, &empty))
+                        .append(pp_ty(ty, recs))
                         .append(";")
                 }
             }

@@ -5,7 +5,7 @@ type f = candid::Func;
 type g = f;
 type h = candid::Func;
 #[derive(CandidType, Deserialize)]
-struct o(Option<Box<o>>);
+struct o(Option<Box<o>>)
 
 pub trait SERVICE {
   pub fn f(arg0: candid::Nat) -> (h);
