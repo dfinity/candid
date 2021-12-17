@@ -4,4 +4,9 @@
 #[derive(CandidType, Deserialize)]
 struct s(candid::Service);
 
-pub trait SERVICE { pub fn next() -> (s); }
+struct SERVICE(candid::Principal);
+impl SERVICE{
+  pub async fn next(&self) -> (s) {
+    ic_cdk::call(self.0, "next", ()).await.unwrap()
+  }
+}

@@ -25,12 +25,27 @@ struct non_tuple { _1_: String, _2_: String }
 #[derive(CandidType, Deserialize)]
 struct tuple (String,String,)
 
-pub trait SERVICE {
-  pub fn bab(arg0: candid::Int, arg1: candid::Nat) -> ();
-  pub fn bar(arg0: bar_arg0) -> ();
-  pub fn bas(arg0: (candid::Int,candid::Int,)) -> ((String,candid::Nat,));
-  pub fn baz(arg0: baz_arg0) -> (baz_ret0);
-  pub fn bba(arg0: tuple) -> (non_tuple);
-  pub fn bib(arg0: (candid::Int,)) -> (bib_ret0);
-  pub fn foo(arg0: foo_arg0) -> (foo_ret0);
+struct SERVICE(candid::Principal);
+impl SERVICE{
+  pub async fn bab(&self, arg0: candid::Int, arg1: candid::Nat) -> () {
+    ic_cdk::call(self.0, "bab", (arg0,arg1,)).await.unwrap()
+  }
+  pub async fn bar(&self, arg0: bar_arg0) -> () {
+    ic_cdk::call(self.0, "bar", (arg0,)).await.unwrap()
+  }
+  pub async fn bas(&self, arg0: (candid::Int,candid::Int,)) -> (
+    (String,candid::Nat,),
+  ) { ic_cdk::call(self.0, "bas", (arg0,)).await.unwrap() }
+  pub async fn baz(&self, arg0: baz_arg0) -> (baz_ret0) {
+    ic_cdk::call(self.0, "baz", (arg0,)).await.unwrap()
+  }
+  pub async fn bba(&self, arg0: tuple) -> (non_tuple) {
+    ic_cdk::call(self.0, "bba", (arg0,)).await.unwrap()
+  }
+  pub async fn bib(&self, arg0: (candid::Int,)) -> (bib_ret0) {
+    ic_cdk::call(self.0, "bib", (arg0,)).await.unwrap()
+  }
+  pub async fn foo(&self, arg0: foo_arg0) -> (foo_ret0) {
+    ic_cdk::call(self.0, "foo", (arg0,)).await.unwrap()
+  }
 }

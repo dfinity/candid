@@ -15,6 +15,17 @@ struct Y(Box<Z>);
 #[derive(CandidType, Deserialize)]
 struct Z(A);
 
-pub trait SERVICE {
-  pub fn f(arg0: A, arg1: B, arg2: C, arg3: X, arg4: Y, arg5: Z) -> ();
+struct SERVICE(candid::Principal);
+impl SERVICE{
+  pub async fn f(
+    &self,
+    arg0: A,
+    arg1: B,
+    arg2: C,
+    arg3: X,
+    arg4: Y,
+    arg5: Z,
+  ) -> () {
+    ic_cdk::call(self.0, "f", (arg0,arg1,arg2,arg3,arg4,arg5,)).await.unwrap()
+  }
 }

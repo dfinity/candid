@@ -4,7 +4,12 @@
 #[derive(CandidType, Deserialize)]
 struct List(Option<(candid::Int,Box<List>,)>);
 
-pub trait SERVICE {
-  pub fn get() -> (List);
-  pub fn set(arg0: List) -> (List);
+struct SERVICE(candid::Principal);
+impl SERVICE{
+  pub async fn get(&self) -> (List) {
+    ic_cdk::call(self.0, "get", ()).await.unwrap()
+  }
+  pub async fn set(&self, arg0: List) -> (List) {
+    ic_cdk::call(self.0, "set", (arg0,)).await.unwrap()
+  }
 }

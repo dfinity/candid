@@ -9,4 +9,9 @@ struct t {
   _1020746185_: candid::Nat,
 }
 
-pub trait SERVICE { pub fn _2635468193_(arg0: t) -> (); }
+struct SERVICE(candid::Principal);
+impl SERVICE{
+  pub async fn _2635468193_(&self, arg0: t) -> () {
+    ic_cdk::call(self.0, "\n\'\"\'\'\"\"\r\t", (arg0,)).await.unwrap()
+  }
+}

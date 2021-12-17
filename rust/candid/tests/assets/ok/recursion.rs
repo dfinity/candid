@@ -25,7 +25,12 @@ enum tree {
   leaf(candid::Int),
 }
 
-pub trait SERVICE {
-  pub fn f(arg0: s) -> ();
-  pub fn g(arg0: list) -> (B, tree, stream);
+struct SERVICE(candid::Principal);
+impl SERVICE{
+  pub async fn f(&self, arg0: s) -> () {
+    ic_cdk::call(self.0, "f", (arg0,)).await.unwrap()
+  }
+  pub async fn g(&self, arg0: list) -> (B, tree, stream) {
+    ic_cdk::call(self.0, "g", (arg0,)).await.unwrap()
+  }
 }
