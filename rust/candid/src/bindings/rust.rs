@@ -152,22 +152,31 @@ fn pp_defs<'a>(env: &'a TypeEnv, recs: &'a RecPoints) -> RcDoc<'a> {
 }
 
 fn pp_function<'a>(id: &'a str, func: &'a Function) -> RcDoc<'a> {
-    let id = ident(id);
+    let name = ident(id);
     let empty = BTreeSet::new();
     let args = concat(
-        func.args
-            .iter()
-            .enumerate()
-            .map(|(i, ty)| RcDoc::as_string(format!("arg{}: ", i)).append(pp_ty(ty, &empty))),
+        std::iter::once(str("&self")).chain(
+            func.args
+                .iter()
+                .enumerate()
+                .map(|(i, ty)| RcDoc::as_string(format!("arg{}: ", i)).append(pp_ty(ty, &empty))),
+        ),
         ",",
     );
     let rets = concat(func.rets.iter().map(|ty| pp_ty(ty, &empty)), ",");
-    let sig = kwd("pub fn")
-        .append(id)
+    let sig = kwd("pub async fn")
+        .append(name)
         .append(enclose("(", args, ")"))
         .append(kwd(" ->"))
-        .append(enclose("(", rets, ")"));
-    sig.append(";")
+        .append(enclose("(", rets, ") "));
+    let args = RcDoc::concat((0..func.args.len()).map(|i| RcDoc::text(format!("arg{},", i))));
+    let method = id.escape_debug().to_string();
+    let body = str("ic_cdk::call(self.0, \"")
+        .append(method)
+        .append("\", ")
+        .append(enclose("(", args, ")"))
+        .append(").await.unwrap()");
+    sig.append(enclose_space("{", body, "}"))
 }
 
 fn pp_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
@@ -180,7 +189,10 @@ fn pp_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
         }),
         RcDoc::hardline(),
     );
-    kwd("pub trait SERVICE").append(enclose_space("{", body, "}"))
+    RcDoc::text("struct SERVICE(candid::Principal);")
+        .append(RcDoc::hardline())
+        .append("impl SERVICE")
+        .append(enclose_space("{", body, "}"))
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
