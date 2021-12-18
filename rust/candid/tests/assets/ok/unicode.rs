@@ -3,14 +3,27 @@
 
 #[derive(CandidType, Deserialize)]
 struct A {
+  #[serde(rename="\u{e000}")]
   _11864174_: candid::Nat,
+  #[serde(rename="📦🍦")]
   _1832283146_: candid::Nat,
+  #[serde(rename="字段名")]
   _2119362116_: candid::Nat,
+  #[serde(rename="字 段 名2")]
   _3133479156_: candid::Nat,
 }
 
 #[derive(CandidType, Deserialize)]
-enum B { _0_, _650764729_, _1036827129_, _3099250646_ }
+enum B {
+  #[serde(rename="")]
+  _0_,
+  #[serde(rename="空的")]
+  _650764729_,
+  #[serde(rename="  空的  ")]
+  _1036827129_,
+  #[serde(rename="1⃣️2⃣️3⃣️")]
+  _3099250646_,
+}
 
 struct SERVICE(candid::Principal);
 impl SERVICE{

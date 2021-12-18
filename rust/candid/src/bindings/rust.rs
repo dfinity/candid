@@ -22,18 +22,33 @@ static KEYWORDS: [&str; 51] = [
     "while", "async", "await", "dyn", "abstract", "become", "box", "do", "final", "macro",
     "override", "priv", "typeof", "unsized", "virtual", "yield", "try",
 ];
-pub fn ident(id: &str) -> RcDoc {
+fn ident_(id: &str) -> (RcDoc, bool) {
     if id.is_empty()
         || id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
         || id.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
     {
-        RcDoc::as_string(format!("_{}_", crate::idl_hash(id)))
+        (RcDoc::as_string(format!("_{}_", crate::idl_hash(id))), true)
     } else if ["crate", "self", "super", "Self"].contains(&id) {
-        str(id).append("_")
+        (str(id).append("_"), true)
     } else if KEYWORDS.contains(&id) {
-        str("r#").append(id)
+        (str("r#").append(id), false)
     } else {
-        str(id)
+        (str(id), false)
+    }
+}
+fn ident(id: &str) -> RcDoc {
+    ident_(id).0
+}
+fn field_name(id: &str) -> RcDoc {
+    let (doc, is_rename) = ident_(id);
+    if is_rename {
+        str("#[serde(rename=\"")
+            .append(id.escape_debug().to_string())
+            .append("\")]")
+            .append(RcDoc::line())
+            .append(doc)
+    } else {
+        doc
     }
 }
 
@@ -69,7 +84,7 @@ fn pp_ty<'a, 'b>(ty: &'a Type, recs: &'b RecPoints) -> RcDoc<'a> {
         Opt(ref t) => str("Option").append(enclose("<", pp_ty(t, recs), ">")),
         Vec(ref t) => str("Vec").append(enclose("<", pp_ty(t, recs), ">")),
         Record(ref fs) => pp_record_fields(fs, recs),
-        Variant(_) => unreachable!(),
+        Variant(_) => unreachable!(), // not possible after rewriting
         Func(_) => str("candid::Func"),
         Service(_) => str("candid::Service"),
         Class(_, _) => unreachable!(),
@@ -79,7 +94,7 @@ fn pp_ty<'a, 'b>(ty: &'a Type, recs: &'b RecPoints) -> RcDoc<'a> {
 
 fn pp_label(id: &Label) -> RcDoc {
     match id {
-        Label::Named(str) => ident(str),
+        Label::Named(str) => field_name(str),
         Label::Id(n) | Label::Unnamed(n) => str("_").append(RcDoc::as_string(n)).append("_"),
     }
 }

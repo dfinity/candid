@@ -2,10 +2,10 @@
 // You may want to manually adjust some of the types.
 
 #[derive(CandidType, Deserialize)]
-struct bar_arg0 { _50_: candid::Int }
+struct bar_arg0 { #[serde(rename="2")] _50_: candid::Int }
 
 #[derive(CandidType, Deserialize)]
-struct baz_arg0 { _2_: candid::Int, _50_: candid::Nat }
+struct baz_arg0 { _2_: candid::Int, #[serde(rename="2")] _50_: candid::Nat }
 
 #[derive(CandidType, Deserialize)]
 struct baz_ret0 {}

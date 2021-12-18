@@ -8,7 +8,11 @@ struct field_arg0 { test: u16, _1291438163_: u8 }
 struct field_ret0 {}
 
 #[derive(CandidType, Deserialize)]
-struct fieldnat_arg0 { _2_: candid::Int, _50_: candid::Nat }
+struct fieldnat_arg0 {
+  _2_: candid::Int,
+  #[serde(rename="2")]
+  _50_: candid::Nat,
+}
 
 #[derive(CandidType, Deserialize)]
 enum r#if {

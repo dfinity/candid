@@ -3,9 +3,13 @@
 
 #[derive(CandidType, Deserialize)]
 struct t {
+  #[serde(rename="\"")]
   _34_: candid::Nat,
+  #[serde(rename="\'")]
   _39_: candid::Nat,
+  #[serde(rename="\"\'")]
   _7621_: candid::Nat,
+  #[serde(rename="\\\n\'\"")]
   _1020746185_: candid::Nat,
 }
 
