@@ -1,43 +1,18 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
 
-type A = Box<B>;
 #[derive(CandidType, Deserialize)]
-struct B(Option<A>);
-
-type List = Option<Box<List_inner>>;
-#[derive(CandidType, Deserialize)]
-struct List_inner { head: candid::Int, tail: List }
+struct node { head: candid::Nat, tail: Box<list> }
 
 #[derive(CandidType, Deserialize)]
-enum a { a, b(Box<b>) }
+struct list(Option<node>);
 
-#[derive(CandidType, Deserialize)]
-struct b (candid::Int,candid::Nat,)
-
-type broker = candid::Service;
-type f = candid::Func;
-#[derive(CandidType, Deserialize)]
-enum h_arg1 { A(candid::Nat), B(Option<String>) }
-
-#[derive(CandidType, Deserialize)]
-struct h_ret0 { _42_: Box<h_ret0_42>, id: candid::Nat }
-
-#[derive(CandidType, Deserialize)]
-struct h_ret0_42 {}
-
-type list = Option<Box<node>>;
 type my_type = candid::Principal;
 #[derive(CandidType, Deserialize)]
-struct nested {
-  _0_: candid::Nat,
-  _1_: candid::Nat,
-  _2_: (candid::Nat,candid::Int,),
-  _3_: Box<nested_3>,
-  _40_: candid::Nat,
-  _41_: Box<nested_41>,
-  _42_: candid::Nat,
-}
+struct List_inner { head: candid::Int, tail: Box<List> }
+
+#[derive(CandidType, Deserialize)]
+struct List(Option<List_inner>);
 
 #[derive(CandidType, Deserialize)]
 struct nested_3 { _0_: candid::Nat, _42_: candid::Nat, _43_: u8 }
@@ -46,23 +21,32 @@ struct nested_3 { _0_: candid::Nat, _42_: candid::Nat, _43_: u8 }
 enum nested_41 { _42_, A, B, C }
 
 #[derive(CandidType, Deserialize)]
-struct node { head: candid::Nat, tail: list }
-
-type s = candid::Service;
-#[derive(CandidType, Deserialize)]
-struct stream(Option<Box<stream_inner>>);
-
-#[derive(CandidType, Deserialize)]
-struct stream_inner { head: candid::Nat, next: candid::Func }
-
-#[derive(CandidType, Deserialize)]
-struct t(candid::Func);
-
-#[derive(CandidType, Deserialize)]
-enum tree {
-  branch{ val: candid::Int, left: Box<tree>, right: Box<tree> },
-  leaf(candid::Int),
+struct nested {
+  _0_: candid::Nat,
+  _1_: candid::Nat,
+  _2_: (candid::Nat,candid::Int,),
+  _3_: nested_3,
+  _40_: candid::Nat,
+  _41_: nested_41,
+  _42_: candid::Nat,
 }
+
+type broker = candid::Service;
+#[derive(CandidType, Deserialize)]
+enum h_arg1 { A(candid::Nat), B(Option<String>) }
+
+#[derive(CandidType, Deserialize)]
+struct h_ret0_42 {}
+
+#[derive(CandidType, Deserialize)]
+struct h_ret0 { _42_: h_ret0_42, id: candid::Nat }
+
+type f = candid::Func;
+#[derive(CandidType, Deserialize)]
+struct b (candid::Int,candid::Nat,)
+
+#[derive(CandidType, Deserialize)]
+enum a { a, b(b) }
 
 struct SERVICE(candid::Principal);
 impl SERVICE{

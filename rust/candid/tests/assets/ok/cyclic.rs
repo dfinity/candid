@@ -1,20 +1,14 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
 
-type A = Option<Box<B>>;
+type C = Box<A>;
+type B = Option<C>;
 #[derive(CandidType, Deserialize)]
-struct B(Option<Box<C>>);
+struct A(Option<B>);
 
-#[derive(CandidType, Deserialize)]
-struct C(A);
-
-type X = Box<Y>;
-#[derive(CandidType, Deserialize)]
-struct Y(Box<Z>);
-
-#[derive(CandidType, Deserialize)]
-struct Z(A);
-
+type Z = Box<A>;
+type Y = Z;
+type X = Y;
 struct SERVICE(candid::Principal);
 impl SERVICE{
   pub async fn f(

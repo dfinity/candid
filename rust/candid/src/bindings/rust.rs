@@ -1,4 +1,4 @@
-use super::analysis::infer_rec;
+use super::analysis::{chase_actor, infer_rec};
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
 use crate::types::{Field, Function, Label, Type};
@@ -128,9 +128,10 @@ fn pp_variant_fields<'a, 'b>(fs: &'a [Field], recs: &'b RecPoints) -> RcDoc<'a> 
     enclose_space("{", fields, "}")
 }
 
-fn pp_defs<'a>(env: &'a TypeEnv, recs: &'a RecPoints) -> RcDoc<'a> {
+fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -> RcDoc<'a> {
     let derive = "#[derive(CandidType, Deserialize)]";
-    lines(env.0.iter().map(|(id, ty)| {
+    lines(def_list.iter().map(|id| {
+        let ty = env.find_type(id).unwrap();
         let name = ident(id).append(" ");
         match ty {
             Type::Record(fs) => str(derive)
@@ -146,7 +147,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, recs: &'a RecPoints) -> RcDoc<'a> {
                 .append(pp_variant_fields(fs, recs))
                 .append(RcDoc::hardline()),
             _ => {
-                if recs.contains(id.as_str()) {
+                if recs.contains(id) {
                     str(derive)
                         .append(RcDoc::line())
                         .append("struct ")
@@ -215,9 +216,13 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 // You may want to manually adjust some of the types.
 "#;
     let (env, actor) = nominalize_all(env, actor);
-    let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
+    let def_list: Vec<_> = if let Some(actor) = &actor {
+        chase_actor(&env, actor).unwrap()
+    } else {
+        env.0.iter().map(|pair| pair.0.as_ref()).collect()
+    };
     let recs = infer_rec(&env, &def_list).unwrap();
-    let defs = pp_defs(&env, &recs);
+    let defs = pp_defs(&env, &def_list, &recs);
     let doc = match &actor {
         None => defs,
         Some(actor) => {

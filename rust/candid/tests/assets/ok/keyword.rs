@@ -2,6 +2,9 @@
 // You may want to manually adjust some of the types.
 
 #[derive(CandidType, Deserialize)]
+struct o(Option<Box<o>>);
+
+#[derive(CandidType, Deserialize)]
 struct field_arg0 { test: u16, _1291438163_: u8 }
 
 #[derive(CandidType, Deserialize)]
@@ -15,25 +18,24 @@ struct fieldnat_arg0 {
 }
 
 #[derive(CandidType, Deserialize)]
+struct node { head: candid::Nat, tail: Box<list> }
+
+#[derive(CandidType, Deserialize)]
+struct list(Option<node>);
+
+#[derive(CandidType, Deserialize)]
 enum r#if {
   branch{ val: candid::Int, left: Box<r#if>, right: Box<r#if> },
   leaf(candid::Int),
 }
 
-type list = Option<Box<node>>;
-#[derive(CandidType, Deserialize)]
-struct node { head: candid::Nat, tail: list }
-
-#[derive(CandidType, Deserialize)]
-struct o(Option<Box<o>>);
-
-type r#return = candid::Service;
-#[derive(CandidType, Deserialize)]
-struct stream(Option<Box<stream_inner>>);
-
 #[derive(CandidType, Deserialize)]
 struct stream_inner { head: candid::Nat, next: candid::Func }
 
+#[derive(CandidType, Deserialize)]
+struct stream(Option<stream_inner>);
+
+type r#return = candid::Service;
 #[derive(CandidType, Deserialize)]
 struct t(candid::Func);
 

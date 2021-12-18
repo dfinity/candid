@@ -2,8 +2,8 @@
 // You may want to manually adjust some of the types.
 
 type f = candid::Func;
-type g = f;
 type h = candid::Func;
+type g = f;
 #[derive(CandidType, Deserialize)]
 struct o(Option<Box<o>>);
 
