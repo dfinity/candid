@@ -1,5 +1,7 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
+use ic_cdk::export::candid::{self, CandidType, Deserialize};
+use ic_cdk::api::call::CallResult;
 
 type C = Box<A>;
 type B = Option<C>;
@@ -19,7 +21,7 @@ impl SERVICE{
     arg3: X,
     arg4: Y,
     arg5: Z,
-  ) -> () {
-    ic_cdk::call(self.0, "f", (arg0,arg1,arg2,arg3,arg4,arg5,)).await.unwrap()
+  ) -> CallResult<()> {
+    ic_cdk::call(self.0, "f", (arg0,arg1,arg2,arg3,arg4,arg5,)).await
   }
 }

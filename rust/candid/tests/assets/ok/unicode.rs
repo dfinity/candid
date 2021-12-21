@@ -1,5 +1,7 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
+use ic_cdk::export::candid::{self, CandidType, Deserialize};
+use ic_cdk::api::call::CallResult;
 
 #[derive(CandidType, Deserialize)]
 struct A {
@@ -27,16 +29,16 @@ enum B {
 
 struct SERVICE(candid::Principal);
 impl SERVICE{
-  pub async fn _0_(&self, arg0: candid::Nat) -> (candid::Nat) {
-    ic_cdk::call(self.0, "", (arg0,)).await.unwrap()
+  pub async fn _0_(&self, arg0: candid::Nat) -> CallResult<(candid::Nat,)> {
+    ic_cdk::call(self.0, "", (arg0,)).await
   }
-  pub async fn _356566390_(&self) -> () {
-    ic_cdk::call(self.0, "✈️  🚗 ⛱️ ", ()).await.unwrap()
+  pub async fn _356566390_(&self) -> CallResult<()> {
+    ic_cdk::call(self.0, "✈️  🚗 ⛱️ ", ()).await
   }
-  pub async fn _3300066460_(&self, arg0: A) -> (B) {
-    ic_cdk::call(self.0, "函数名", (arg0,)).await.unwrap()
+  pub async fn _3300066460_(&self, arg0: A) -> CallResult<(B,)> {
+    ic_cdk::call(self.0, "函数名", (arg0,)).await
   }
-  pub async fn _2669435454_(&self, arg0: candid::Nat) -> (candid::Nat) {
-    ic_cdk::call(self.0, "👀", (arg0,)).await.unwrap()
-  }
+  pub async fn _2669435454_(&self, arg0: candid::Nat) -> CallResult<
+    (candid::Nat,)
+  > { ic_cdk::call(self.0, "👀", (arg0,)).await }
 }

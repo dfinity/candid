@@ -179,19 +179,23 @@ fn pp_function<'a>(id: &'a str, func: &'a Function) -> RcDoc<'a> {
         ),
         ",",
     );
-    let rets = concat(func.rets.iter().map(|ty| pp_ty(ty, &empty)), ",");
+    let rets = enclose(
+        "(",
+        RcDoc::concat(func.rets.iter().map(|ty| pp_ty(ty, &empty).append(","))),
+        ")",
+    );
     let sig = kwd("pub async fn")
         .append(name)
         .append(enclose("(", args, ")"))
         .append(kwd(" ->"))
-        .append(enclose("(", rets, ") "));
+        .append(enclose("CallResult<", rets, "> "));
     let args = RcDoc::concat((0..func.args.len()).map(|i| RcDoc::text(format!("arg{},", i))));
     let method = id.escape_debug().to_string();
     let body = str("ic_cdk::call(self.0, \"")
         .append(method)
         .append("\", ")
         .append(enclose("(", args, ")"))
-        .append(").await.unwrap()");
+        .append(").await");
     sig.append(enclose_space("{", body, "}"))
 }
 
@@ -214,6 +218,8 @@ fn pp_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     let header = r#"// This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
+use ic_cdk::export::candid::{self, CandidType, Deserialize};
+use ic_cdk::api::call::CallResult;
 "#;
     let (env, actor) = nominalize_all(env, actor);
     let def_list: Vec<_> = if let Some(actor) = &actor {
