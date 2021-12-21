@@ -5,4 +5,5 @@ pub mod analysis;
 pub mod candid;
 pub mod javascript;
 pub mod motoko;
+pub mod rust;
 pub mod typescript;

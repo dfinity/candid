@@ -24,7 +24,7 @@ enum Command {
     Bind {
         /// Specifies did file for code generation
         input: PathBuf,
-        #[structopt(short, long, possible_values = &["js", "ts", "did", "mo"])]
+        #[structopt(short, long, possible_values = &["js", "ts", "did", "mo", "rs"])]
         /// Specifies target language
         target: String,
     },
@@ -190,6 +190,7 @@ fn main() -> Result<()> {
                 "ts" => candid::bindings::typescript::compile(&env, &actor),
                 "did" => candid::bindings::candid::compile(&env, &actor),
                 "mo" => candid::bindings::motoko::compile(&env, &actor),
+                "rs" => candid::bindings::rust::compile(&env, &actor),
                 _ => unreachable!(),
             };
             println!("{}", content);

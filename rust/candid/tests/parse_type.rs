@@ -1,4 +1,4 @@
-use candid::bindings::{candid as candid_export, javascript, motoko, typescript};
+use candid::bindings::{candid as candid_export, javascript, motoko, rust, typescript};
 use candid::parser::types::{to_pretty, IDLProg};
 use candid::parser::typing::{check_file, check_prog, TypeEnv};
 use goldenfile::Mint;
@@ -61,6 +61,11 @@ fn compiler_test(resource: &str) {
                         writeln!(output, "{}", content).unwrap();
                     }
                 }
+            }
+            {
+                let mut output = mint.new_goldenfile(filename.with_extension("rs")).unwrap();
+                let content = rust::compile(&env, &actor);
+                writeln!(output, "{}", content).unwrap();
             }
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
