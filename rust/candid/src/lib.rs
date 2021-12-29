@@ -332,6 +332,8 @@ pub mod utils;
 pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
 pub mod pretty;
 
+pub mod check;
+
 // Candid hash function comes from
 // https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf
 // Not public API. Only used by tests.

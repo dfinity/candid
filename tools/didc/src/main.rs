@@ -1,5 +1,6 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use candid::{
+    check::Source,
     parser::types::{IDLType, IDLTypes},
     pretty_check_file, pretty_parse,
     types::Type,
@@ -158,20 +159,7 @@ fn parse_types(str: &str) -> Result<IDLTypes, Error> {
 fn main() -> Result<()> {
     match Command::from_args() {
         Command::Check { input, previous } => {
-            let (mut env, opt_t1) = pretty_check_file(&input)?;
-            if let Some(previous) = previous {
-                let (env2, opt_t2) = pretty_check_file(&previous)?;
-                match (opt_t1, opt_t2) {
-                    (Some(t1), Some(t2)) => {
-                        let mut gamma = HashSet::new();
-                        let t2 = env.merge_type(env2, t2);
-                        candid::types::subtype::subtype(&mut gamma, &env, &t1, &t2)?;
-                    }
-                    _ => {
-                        bail!("did file need to contain the main service type for subtyping check")
-                    }
-                }
-            }
+            candid::check::check(Source::File(input), previous.map(Source::File))?;
         }
         Command::Subtype { defs, ty1, ty2 } => {
             let (env, _) = if let Some(file) = defs {
