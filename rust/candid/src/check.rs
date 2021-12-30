@@ -3,7 +3,7 @@ use crate::Error::Custom;
 use crate::{pretty_check_file, types};
 use anyhow::Error;
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // can be extended to other sources such as strings and streams
 pub enum Source {
@@ -23,26 +23,22 @@ pub fn check(input: Source, previous: Option<Source>) -> Result<()> {
                         let t2 = env.merge_type(env2, t2);
                         types::subtype::subtype(&mut gamma, &env, &t1, &t2)
                     }
-                    (None, _) => {
-                        let msg = format!(
-                            "did file {} must contain the main service type for subtyping check",
-                            input.display()
-                        );
-                        Err(Custom(Error::msg(msg)))
-                    }
-                    _ => {
-                        let msg = format!(
-                            "did file {} must contain the main service type for subtyping check",
-                            previous.display()
-                        );
-                        Err(Custom(Error::msg(msg)))
-                    }
+                    (None, _) => Err(Custom(no_main_service_found_err(input))),
+                    _ => Err(Custom(no_main_service_found_err(previous))),
                 }
             })
         } else {
             Ok(())
         }
     })
+}
+
+fn no_main_service_found_err(file: &Path) -> Error {
+    let msg = format!(
+        "did file {} must contain the main service type for subtyping check",
+        file.display()
+    );
+    Error::msg(msg)
 }
 
 fn with_source(source: Source, f: impl FnOnce(&PathBuf) -> Result<()>) -> Result<()> {
