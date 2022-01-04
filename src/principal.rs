@@ -42,9 +42,9 @@ enum PrincipalClass {
     Unassigned,
 }
 
-impl Into<u8> for PrincipalClass {
-    fn into(self) -> u8 {
-        match self {
+impl From<PrincipalClass> for u8 {
+    fn from(class: PrincipalClass) -> u8 {
+        match class {
             PrincipalClass::Unassigned => 0,
             PrincipalClass::OpaqueId => 1,
             PrincipalClass::SelfAuthenticating => 2,
@@ -266,7 +266,7 @@ impl std::fmt::Display for Principal {
             f.write_char('-')?;
             s = &s[5..];
         }
-        f.write_str(&s)
+        f.write_str(s)
     }
 }
 
