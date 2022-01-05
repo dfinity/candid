@@ -127,7 +127,7 @@ Corresponding Rust type::
 
 Corresponding JavaScript values::
 
-`+new BigNumber("10000")+` from `bignumber.js` npm package
+`+BigInt(10000)` or `10000n`
 
 [#type-int]
 == Type int
@@ -169,7 +169,7 @@ Corresponding Rust type::
 
 Corresponding JavaScript values::
 
-`+new BigNumber("-10000")+` from `bignumber.js` npm package
+`+BigInt(-10000)` or `-10000n`
 
 [#type-natN]
 [#type-intN]
@@ -223,7 +223,7 @@ Corresponding JavaScript values::
 
 8-bit, 16-bit and 32-bit translate to the number type.
 +
-`int64` and `nat64` translate to the `BigNumber` object in `bignumber.js`.
+`int64` and `nat64` translate to the `BigInt` primitive in JavaScript.
 
 [#type-floatN]
 == Type float32 and float64
