@@ -1,6 +1,11 @@
 
 # Changelog
 
+## 2022-01-06 (Rust 0.7.10)
+
+* Bump ic-types to 0.3
+* `candid::utils::service_compatible` to check for upgrade compatibility of two service types
+
 ## 2021-12-20 
 
 ### Rust (0.7.9)
