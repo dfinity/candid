@@ -1,7 +1,39 @@
 use crate::de::IDLDeserialize;
 use crate::ser::IDLBuilder;
-use crate::{CandidType, Result};
+use crate::{check_prog, pretty_check_file, pretty_parse, types::Type, TypeEnv};
+use crate::{CandidType, Error, Result};
 use serde::de::Deserialize;
+use std::path::Path;
+
+pub enum CandidSource<'a> {
+    File(&'a Path),
+    Text(&'a str),
+}
+impl<'a> CandidSource<'a> {
+    pub fn load(&self) -> Result<(TypeEnv, Option<Type>)> {
+        Ok(match self {
+            CandidSource::File(path) => pretty_check_file(path)?,
+            CandidSource::Text(str) => {
+                let ast = pretty_parse("", str)?;
+                let mut env = TypeEnv::new();
+                let actor = check_prog(&mut env, &ast)?;
+                (env, actor)
+            }
+        })
+    }
+}
+
+/// Check compatibility of two service types
+pub fn service_compatible(new: CandidSource, old: CandidSource) -> Result<()> {
+    let (mut env, t1) = new.load()?;
+    let t1 = t1.ok_or_else(|| Error::msg("new interface has no main service type"))?;
+    let (env2, t2) = old.load()?;
+    let t2 = t2.ok_or_else(|| Error::msg("old interface has no main service type"))?;
+    let mut gamma = std::collections::HashSet::new();
+    let t2 = env.merge_type(env2, t2);
+    crate::types::subtype::subtype(&mut gamma, &env, &t1, &t2)?;
+    Ok(())
+}
 
 /// Encode sequence of Rust values into Candid message of type `candid::Result<Vec<u8>>`.
 #[macro_export]
