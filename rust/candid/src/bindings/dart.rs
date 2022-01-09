@@ -9,7 +9,7 @@ use std::process::id;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::ptr::null;
-use lazy_static::lazy_static;
+// use lazy_static::lazy_static;
 use std::sync::Mutex;
 //
 // lazy_static! {
@@ -138,8 +138,8 @@ fn pp_ty_init<'a>(ty: &'a Type, id:&'a str) -> RcDoc<'a> {
     use Type::*;
     match *ty {
         Null => pp_ty_init_single(id,str("IDL.Null"),"IDL.Null"),
-        Bool => pp_ty_init_single(id,str("bool"),"IDL.Bool"),
-        Nat => pp_ty_init_single(id,str("BigInt"),"BigInt"),
+        Bool => pp_ty_init_single(id,str("IDL.Bool"),"IDL.Bool"),
+        Nat => pp_ty_init_single(id,str("IDL.Nat"),"BigInt"),
         Int => pp_ty_init_single(id,str("IDL.Int"),"IDL.Int"),
         Nat8 => pp_ty_init_single(id,str("IDL.Nat8"),"IDL.Nat8"),
         Nat16 => pp_ty_init_single(id,str("IDL.Nat16"),"IDL.Nat16"),
@@ -152,17 +152,12 @@ fn pp_ty_init<'a>(ty: &'a Type, id:&'a str) -> RcDoc<'a> {
         Float32 => pp_ty_init_single(id,str("IDL.Float32"),"dynamic"),
         Float64 => pp_ty_init_single(id,str("IDL.Float64"),"IDL.Float64"),
         Text => pp_ty_init_single(id,str("IDL.Text"),"IDL.Text"),
-        Reserved => str("IDL.Reserved"),
-        Empty => str("IDL.Empty"),
+        Reserved => pp_ty_init_single(id,str("IDL.Reserved"),"IDL.Reserved"),
+        Empty => pp_ty_init_single(id,str("IDL.Empty"),"IDL.Empty"),
         Var(ref s) => ident_for_var(s),
         Principal => str("IDL.Principal"),
-        Opt(ref t) => {
-            str("IDL.Opt").append(enclose("(", pp_ty(t), ")"))
-        },
-        Vec(ref t) => {
-            //todo
-            pp_ty_init_single(id,str("IDL.Vec").append(enclose("(", pp_ty(t), ")")),"dynamic")
-        },
+        Opt(ref t) => pp_ty_init_single(id,str("IDL.Opt").append(enclose("(", pp_ty_raw(t), ")")),"IDL.Text"),
+        Vec(ref t) => pp_ty_init_single(id,str("IDL.Vec").append(enclose("(", pp_ty_raw(t), ")")),"dynamic"),
         Record(ref fs) => {
             if is_tuple(ty) {
                 let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
@@ -180,7 +175,7 @@ fn pp_ty_init<'a>(ty: &'a Type, id:&'a str) -> RcDoc<'a> {
                                         .append(pp_to_json(fs))
                                         .append(RcDoc::hardline())
                                         .append(pp_create_static_idl(fs))
-                                    ,"}"))
+                                    ,"};"))
 
                 // str("IDL.Record").append(pp_fields(fs))
             }
@@ -203,20 +198,20 @@ fn pp_ty_init<'a>(ty: &'a Type, id:&'a str) -> RcDoc<'a> {
 fn pp_ty_for_field<'a>(ty: &'a Type) -> RcDoc<'a> {
     use Type::*;
     match *ty {
-        Null => str("IDL.Null"),
-        Bool => str("IDL.Bool"),
+        Null => str("dynamic"),
+        Bool => str("bool"),
         Nat => str("BigInt"),
-        Int => str("IDL.Int"),
-        Nat8 => str("IDL.Nat8"),
-        Nat16 => str("IDL.Nat16"),
+        Int => str("int"),
+        Nat8 => str("int"),
+        Nat16 => str("int"),
         Nat32 => str("int"),
-        Nat64 => str("BigInt"),
-        Int8 => str("IDL.Int8"),
-        Int16 => str("IDL.Int16"),
-        Int32 => str("IDL.Int32"),
-        Int64 => str("IDL.Int64"),
-        Float32 => str("IDL.Float32"),
-        Float64 => str("IDL.Float64"),
+        Nat64 => str("int"),
+        Int8 => str("int"),
+        Int16 => str("int"),
+        Int32 => str("int"),
+        Int64 => str("int"),
+        Float32 => str("double"),
+        Float64 => str("double"),
         Text => str("String"),
         Reserved => str("IDL.Reserved"),
         Empty => str("IDL.Empty"),
@@ -260,7 +255,6 @@ fn pp_ty_for_field<'a>(ty: &'a Type) -> RcDoc<'a> {
         Knot(_) | Unknown => unreachable!(),
     }
 }
-
 fn pp_ty<'a>(ty: &'a Type) -> RcDoc<'a> {
     use Type::*;
     match *ty {
@@ -292,6 +286,66 @@ fn pp_ty<'a>(ty: &'a Type) -> RcDoc<'a> {
         Record(ref fs) => {
             if is_tuple(ty) {
                 let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
+                str("IDL.Tuple").append(enclose("(", tuple, ")"))
+            } else {
+                // str("")
+                // .append(pp_fields(fs))
+                // .append(RcDoc::hardline())
+                // .append(pp_fields_constructor(fs))
+                // .append(RcDoc::hardline())
+                // .append(pp_factory(fs))
+                // .append(RcDoc::hardline())
+                // .append(pp_to_json(fs))
+                // .append(RcDoc::hardline())
+                // .append(pp_create_static_idl(fs))
+                str("IDL.Record").append(pp_fields(fs))
+            }
+        }
+        Variant(ref fs) => {
+            str("IDL.Variant").append(pp_fields(fs ))
+        },
+        Func(ref func) => {
+            str("IDL.Func").append(pp_function(func ))
+        },
+        Service(ref serv) => {
+            str("IDL.Service").append(pp_service(serv ))
+        },
+        Class(_, _) => unreachable!(),
+        Knot(_) | Unknown => unreachable!(),
+    }
+}
+
+fn pp_ty_raw<'a>(ty: &'a Type) -> RcDoc<'a> {
+    use Type::*;
+    match *ty {
+        Null => str("IDL.Null"),
+        Bool => str("IDL.Bool"),
+        Nat => str("IDL.Nat"),
+        Int => str("IDL.Int"),
+        Nat8 => str("IDL.Nat8"),
+        Nat16 => str("IDL.Nat16"),
+        Nat32 => str("IDL.Nat32"),
+        Nat64 => str("IDL.Nat64"),
+        Int8 => str("IDL.Int8"),
+        Int16 => str("IDL.Int16"),
+        Int32 => str("IDL.Int32"),
+        Int64 => str("IDL.Int64"),
+        Float32 => str("IDL.Float32"),
+        Float64 => str("IDL.Float64"),
+        Text => str("IDL.Text"),
+        Reserved => str("IDL.Reserved"),
+        Empty => str("IDL.Empty"),
+        Var(ref s) => ident_for_var(s),
+        Principal => str("IDL.Principal"),
+        Opt(ref t) => {
+            str("IDL.Opt").append(enclose("(", pp_ty_raw(t), ")"))
+        },
+        Vec(ref t) => {
+            str("IDL.Vec").append(enclose("(", pp_ty_raw(t ), ")"))
+        },
+        Record(ref fs) => {
+            if is_tuple(ty) {
+                let tuple = concat(fs.iter().map(|f| pp_ty_raw(&f.ty)), ",");
                 str("IDL.Tuple").append(enclose("(", tuple, ")"))
             } else {
                 // str("")
@@ -422,11 +476,11 @@ fn pp_factory<'a>(fs: &'a [Field],class_name:&'a str) -> RcDoc<'a> {
                                 enclose("(",
                                         concat(fs.iter().map(pp_field_in_factory), ","),
                                         ")"))
-                            ,"})"))
+                            ,"});"))
 }
 
 fn pp_create_static_idl<'a>(fs: &'a [Field]) -> RcDoc<'a> {
-    str("static Record idl = IDL.Record").append(enclose("({",concat(fs.iter().map(pp_field_in_static_idl), ","),"})"))
+    str("static Record idl = IDL.Record").append(enclose("({",concat(fs.iter().map(pp_field_in_static_idl), ","),"});"))
 }
 
 fn pp_to_json(fs: &[Field]) -> RcDoc {
@@ -447,7 +501,7 @@ fn pp_field_in_factory(field: &Field) -> RcDoc {
 }
 
 fn pp_field_in_static_idl<'a>(field: &'a Field) -> RcDoc<'a> {
-    enclose("\"",pp_label(&field.id),"\"").append(":").append(pp_ty(&field.ty))
+    enclose("\"",pp_label(&field.id),"\"").append(":").append(pp_ty_raw(&field.ty))
     // kwd("").append("this.").append(pp_label(&field.id))
     // pp_label(&field.id)
     //     .append(pp_ty(&field.ty))
@@ -475,6 +529,11 @@ fn pp_function<'a>(func: &'a Function) -> RcDoc<'a> {
 //     let doc = concat(args.iter().map(pp_ty), ",");
 //     enclose("[", doc, "]")
 // }
+
+fn pp_args(args: &[Type]) -> RcDoc {
+    let doc = concat(args.iter().map(pp_ty), ",");
+    enclose("[", doc, "]")
+}
 
 fn pp_args_for_function<'a>(args: &'a [Type]) -> RcDoc<'a> {
     enclose("[", concat(args.iter().map(pp_ty_for_function), ","), "]")
@@ -504,17 +563,18 @@ fn pp_defs<'a>(
     def_list: &'a [&'a str],
     recs: &'a BTreeSet<&'a str>
 ) -> RcDoc<'a> {
-    let recs_doc = lines(
-        recs.iter()
-            .map(|id| kwd("const").append(ident(id)).append(" = IDL.Rec();")),
-    );
+    let recs_doc = str("");
+        // lines(
+        // recs.iter()
+        //     .map(|id| kwd("const").append(ident(id)).append(" = IDL.Rec();")),
+    // );
     let defs = lines(def_list.iter().map(|id| unsafe {
         let ty = env.find_type(id).unwrap();
-        if recs.contains(id) {
-            ident(id)
-                .append(".fill")
-                .append(enclose("(", pp_ty(ty), ");"))
-        } else {
+        // if recs.contains(id) {
+        //     ident(id)
+        //         .append(".fill")
+        //         .append(enclose("(", pp_ty(ty), ");"))
+        // } else {
             pp_ty_init(ty,id)
                 // .append(pp_ty(ty))
                 // .append(";")
@@ -524,10 +584,8 @@ fn pp_defs<'a>(
             //     .append(" = ")
             //     .append(pp_ty(ty))
             //     .append(";")
-        }
+        // }
     }));
-    // print!("{}",defs.pretty(LINE_WIDTH).to_string());
-
     recs_doc.append(defs)
 }
 
