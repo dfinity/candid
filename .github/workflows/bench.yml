@@ -8,7 +8,7 @@ jobs:
     name: run benchmark
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v2
       with:
         fetch-depth: 0
     - name: Install stable toolchain
@@ -29,4 +29,5 @@ jobs:
       with:
         cwd: rust/candid
         benchName: benchmark  # needed to address https://bheisler.github.io/criterion.rs/book/faq.html#cargo-bench-gives-unrecognized-option-errors-for-valid-command-line-options
+        branchName: ${{ github.base_ref }}
         token: ${{ secrets.GITHUB_TOKEN }}
