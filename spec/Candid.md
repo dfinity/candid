@@ -1,8 +1,8 @@
 # Candid Specification
 
-Version: 0.1.3
+Version: 0.1.4
 
-Date: February 3, 2021
+Date: January 11, 2022
 
 ## Motivation
 
@@ -885,62 +885,60 @@ service { <name> : <functype>; <methtype>;* } <: service { <name> : <functype'>;
 
 This subtyping is implemented during the deserialisation of Candid at an expected type. As described in [Section Deserialisation](#deserialisation), the binary value is conceptually first _decoded_ into the actual type and a value of that type, and then that value is _coerced_ into the expected type.
 
-To model this, we define, for every `t1, t2` with `t1 <: t2`, a function `C[t1<:t2] : t1 -> t2`. This function maps values of type `t1` to values of type `t2`, and is indeed total.
+To model this, we define a partial coercion function `C[t1 ~> t2] : t1 -> t2`. This function maps values of type `t1` to values of type `t2`. For every `t1, t2` with `t1 <: t2`, the function is always defined, but not every `t1, t2` has a coercion.
 
-to describe these values, we re-use the syntax of the textual representation, and use the the `<annval>` syntax (i.e. `(v : t)`) if necessary to resolve overloading.
+To describe these values, we re-use the syntax of the textual representation, and use the the `<annval>` syntax (i.e. `(v : t)`) if necessary to resolve overloading.
 
 #### Primitive Types
 
 On primitve types, coercion is the identity:
 ```
-C[<t> <: <t>](x) = x    for every <t> ∈ <numtype>, bool, text, null
+C[<t> ~> <t>](x) = x     for every <t> ∈ <numtype>, bool, text, null
 ```
 
 Values of type `nat` coerce at type `int`:
 ```
-C[nat <: int](<nat>) = <nat>
+C[nat ~> int](<nat>) = <nat>
 ```
 
 Coercion into `reserved` is the constant map (this is arbitrarily using `null` as “the” value of `reserved`):
 ```
-C[<t> <: reserved](_) = null
+C[<t> ~> reserved](_) = null
 ```
-NB: No rule is needed for type `empty`, because there are no values of that type. By construction, `C[empty <: <t>]` is the unique function on the empty domain.
+NB: No rule is needed for type `empty`, because there are no values of that type. By construction, `C[empty ~> <t>]` is the unique function on the empty domain.
 
 #### Vectors
 
 Vectors coerce pointwise:
 ```
-C[vec <t> <: vec <t'>]( vec { <v>;* } ) = vec { C[<t> <: <t'>](<v>);* }
+C[vec <t> ~> vec <t'>]( vec { <v>;* } ) = vec { C[<t> ~> <t'>](<v>);* }
 ```
 
 #### Options
 
 The null type and the reserved type coerce into any option type:
 ```
-C[null <: opt <t>](null) = null
+C[null ~> opt <t>](null) = null
 ```
 
 An optional value coerces at an option type, if the constituent value has a suitable type, and else goes to `null`:
 ```
-C[opt <t> <: opt <t'>](null) = null
-C[opt <t> <: opt <t'>](opt <v>) = opt C[<t> <: <t'>](v)  if <t> <: <t'>
-C[opt <t> <: opt <t'>](opt <v>) = null                   if not(<t> <: <t'>)
+C[opt <t> ~> opt <t'>](null) = null
+C[opt <t> ~> opt <t'>](opt <v>) = opt C[t ~> t'](v)  if t ~> t'
+C[opt <t> ~> opt <t'>](opt <v>) = null               if not (t ~> t')
 ```
 
 Coercing a non-null, non-optional and non-reserved type at an option type treats it as an optional value, if it has a suitable type:
 ```
-C[<t> <: opt <t'>](<v>) = opt C[<t> <: <t'>](v)  if not (null <: <t'>) and <t> <: <t'>
+C[<t> ~> opt <t'>](<v>) = opt C[<t> ~> <t'>](v)  if not (null <: <t'>) and <t> ~> <t'>
 ```
 
 Any other type goes to `null`:
 ```
-C[reserved <: opt <t>](_) = null
-C[<t> <: opt <t'>](_) = null  if not (null <: <t'>) and not (<t> <: <t'>)
-C[<t> <: opt <t'>](_) = null  if null <: <t'> and not (null <: <t>)
+C[reserved ~> opt <t>](_) = null
+C[<t> ~> opt <t'>](_) = null  if not (null <: <t'>) and not (<t> ~> <t'>)
+C[<t> ~> opt <t'>](_) = null  if null <: <t'> and not (null ~> <t>)
 ```
-
-NOTE: These rules above imply that a Candid decoder has to be able to decide the subtyping relation at runtime.
 
 #### Records
 
@@ -951,8 +949,8 @@ In the following rule:
  * the `<nat3>*` field names are those only in the expected type, which therefore must be of optional or reserved type. The `null` value is used for these.
 
 ```
-C[record { <nat1> = <t1>;* <nat2> = <t2>;* } <: record { <nat1> = <t1'>;* <nat3> = <t3>;* }](record { <nat1> = <v1>;* <nat2> = <v2>;* })
-    = record { <nat1> = C[<t1> <: <t1'>](<v1>);* <nat3> = null;* }
+C[record { <nat1> = <t1>;* <nat2> = <t2>;* } ~> record { <nat1> = <t1'>;* <nat3> = <t3>;* }](record { <nat1> = <v1>;* <nat2> = <v2>;* })
+    = record { <nat1> = C[<t1> ~> <t1'>](<v1>);* <nat3> = null;* }
 ```
 
 #### Variants
@@ -960,8 +958,8 @@ C[record { <nat1> = <t1>;* <nat2> = <t2>;* } <: record { <nat1> = <t1'>;* <nat3>
 Only a variant value with an expected tag coerces at variant type.
 
 ```
-C[variant { <nat> = <t>; _;* } <: variant { <nat> = <t'>; _;* }](variant { <nat> = <v> })
-    = variant { <nat> = C[<t> <: <t'>](<v>) }
+C[variant { <nat> = <t>; _;* } ~> variant { <nat> = <t'>; _;* }](variant { <nat> = <v> })
+    = variant { <nat> = C[<t> ~> <t'>](<v>) }
 ```
 
 
@@ -970,18 +968,20 @@ C[variant { <nat> = <t>; _;* } <: variant { <nat> = <t'>; _;* }](variant { <nat>
 Function and services reference values are untyped, so the coercion function is the identity here:
 
 ```
-C[func <functype> <: func <functype'>](func <text>.<id>) = func <text>.<id>
-C[service <actortype> <: service <actortype'>](service <text>) = service <text>
-C[principal <: principal](principal <text>) = principal <text>
+C[func <functype> ~> func <functype'>](func <text>.<id>) = func <text>.<id>      if func <functype> <: func <functype'>
+C[service <actortype> ~> service <actortype'>](service <text>) = service <text>  if service <functype> <: service <functype'>
+C[principal ~> principal](principal <text>) = principal <text>
 ```
+
+NOTE: These rules above imply that a Candid decoder has to be able to decide the subtyping relation for reference types.
 
 #### Tuple types
 
 Whole argument and result sequences are coerced with the same rules as tuple-like records. In particular, extra arguments are ignored, and optional parameters read as as `null` if the argument is missing or fails to coerce:
 
 ```
-C[(<t>,*) <: (<t'>,*)]((<v>,*)) = (<v'>,*)
-    if C[record {<t>;*} <: record {<t'>,*}](record {<v>;*}) = record {<v'>;*}
+C[(<t>,*) ~> (<t'>,*)]((<v>,*)) = (<v'>,*)
+    if C[record {<t>;*} ~> record {<t'>,*}](record {<v>;*}) = record {<v'>;*}
 ```
 
 
@@ -1001,7 +1001,7 @@ The relations above have certain properties. As in the previous section, `<v> : 
 
 * Roundtripping:
   ```
-  (<v> : <t>) ⟺ C[<t> <: <t>](<v>) = <v>
+  (<v> : <t>) ⟺ C[<t> ~> <t>](<v>) = <v>
   ```
 
 * Soundness of subtyping (or, alternatively, well-definedness of coercion)
@@ -1024,12 +1024,12 @@ The relations above have certain properties. As in the previous section, `<v> : 
   ```
   does not imply
   ```
-  C[<t1> <: <t3>] = C[<t2> <: <t3>] ⚬ C[<t1> <: <t2>]
+  C[<t1> ~> <t3>] = C[<t2> ~> <t3>] ⚬ C[<t1> ~> <t2>]
   ```
 
   However, it implies
   ```
-  C[<t1> <: <t3>] ~ (C[<t2> <: <t3>] ⚬ C[<t1> <: <t2>])
+  C[<t1> ~> <t3>] ~ (C[<t2> ~> <t3>] ⚬ C[<t1> ~> <t2>])
   ```
   where ~ is the smallest homomorphic, reflexive, symmetric relation that satisfies `∀ v. opt v ~ null`.
 
