@@ -924,8 +924,9 @@ vec { <v>;* } : vec <t> ~> vec { <v'>;* } : vec <t'>
 
 The null value coerces into any option type:
 ```
+null <: <t>
 -----------------------------
-null : _ ~> null : opt <t>
+null : <t> ~> null : opt <t'>
 ```
 
 An optional value coerces at an option type, if the constituent value has a suitable type, and else goes to `null`:
@@ -949,6 +950,8 @@ not (null <: <t'>)
 
 Any other value goes to `null`:
 ```
+---------------------------------
+<v> : reserved ~> null : opt <t'>
 
 not (null <: <t'>)
 not (<v> : <t> ~> _ : <t'>)
@@ -1038,6 +1041,11 @@ The relations above have certain properties. As in the previous section, `<v> : 
   (<v> : <t>) ⟺ <v> : <t> ~> <v> : <t>
   ```
 
+* Well-typedness:
+  ```
+  <v> : <t> ~> <v'> : <t'> ⇒ <v'> : <t'>
+  ```
+
 * Soundness of subtyping (or, alternatively, well-definedness of coercion)
   ```
   <t> <: <t'> ⇒ ∀ <v> : <t> ∃ <v'>. <v> : <t> ~> <v'> : <t'>
@@ -1054,17 +1062,16 @@ The relations above have certain properties. As in the previous section, `<v> : 
 
 * NB: Transitive coherence does not hold:
   ```
-  <t1> <: <t2>, <t2> <: <t3>
+  <v1> : <t1> ~> <v2> : <t2>
+  <v2> : <t2> ~> <v3> : <t3>
+  <v1> : <t1> ~> <v3'> : <t3>
   ```
   does not imply
   ```
-  C[<t1> ~> <t3>] = C[<t2> ~> <t3>] ⚬ C[<t1> ~> <t2>]
+  <v3> = <v3'>
   ```
 
-  However, it implies
-  ```
-  C[<t1> ~> <t3>] ~ (C[<t2> ~> <t3>] ⚬ C[<t1> ~> <t2>])
-  ```
+  However, it implies `<v3> ~ <v3'>`, 
   where ~ is the smallest homomorphic, reflexive, symmetric relation that satisfies `∀ v. opt v ~ null`.
 
 The goal of “subtyping completeness” has not been cast into a formal formulation yet.
