@@ -909,7 +909,7 @@ Coercion into `reserved` is the constant map (this is arbitrarily using `null` a
 _ : <t> ~> null : reserved
 ```
 
-NB: No rule is needed for type `empty`, because there are no values of that type. By construction, `<v> : <t> ~> _ : empty` will not hold.
+NB: No rule is needed for type `empty`, because there are no values of that type. By construction, `_ : empty ~> _ : _` will not hold.
 
 #### Vectors
 
@@ -939,7 +939,7 @@ not (<v> : <t> ~> _ : <t'>)
 opt <v> : opt <t> ~> null : opt <t'>
 ```
 
-Coercing a non-null, non-optional and non-reserved type at an option type treats it as an optional value, if it has a suitable type:
+Coercing a non-null, non-optional and non-reserved type at an option type treats it as an optional value, if it can be decoded successfully:
 ```
 not (null <: <t'>)
 <v> : <t> ~> <v'> : <t'>
@@ -991,7 +991,7 @@ variant { <nat> = <v'> } : variant { <nat> : <t'>; _;* }
 
 #### References
 
-Function and services reference values are untyped, so the coercion function is the identity here:
+For function and services reference values, the coercion relation checks whether the given types are actually subtypes of the expected type, and fails else:
 
 ```
 func <functype> <: func <functype'>
