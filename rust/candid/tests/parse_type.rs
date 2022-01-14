@@ -84,7 +84,7 @@ fn compiler_test(resource: &str) {
             let mut fail_output = mint
                 .new_goldenfile(filename.with_extension("fail"))
                 .unwrap();
-            writeln!(fail_output, "{}", e.to_string()).unwrap();
+            writeln!(fail_output, "{}", e).unwrap();
         }
     }
 }

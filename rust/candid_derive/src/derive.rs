@@ -251,8 +251,8 @@ impl Ident {
 impl std::fmt::Display for Ident {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            Ident::Named(ref ident) => f.write_fmt(format_args!("{}", ident.to_string())),
-            Ident::Unnamed(ref i) => f.write_fmt(format_args!("{}", (*i).to_string())),
+            Ident::Named(ref ident) => f.write_fmt(format_args!("{}", ident)),
+            Ident::Unnamed(ref i) => f.write_fmt(format_args!("{}", *i)),
         }
     }
 }
