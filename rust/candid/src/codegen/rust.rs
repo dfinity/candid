@@ -118,7 +118,7 @@ pub trait RustBindings {
             arguments = arguments_list,
             body = body,
             return_type = if return_type.is_empty() {
-                format!("")
+                String::new()
             } else {
                 format!(" -> {}", return_type)
             }
