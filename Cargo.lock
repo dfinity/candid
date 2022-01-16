@@ -241,6 +241,7 @@ dependencies = [
  "ic-types",
  "lalrpop",
  "lalrpop-util",
+ "lazy_static",
  "leb128",
  "logos",
  "num-bigint",

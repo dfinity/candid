@@ -9,24 +9,12 @@ use std::process::id;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::ptr::null;
-// use lazy_static::lazy_static;
+use lazy_static::lazy_static; // 1.4.0
 use std::sync::Mutex;
-//
-// lazy_static! {
-//     static ref SINGLE_FIELD_MAP:Mutex<>> = {
-//         let mut map = HashMap::new();
-//         Mutex::new(map)
-//     };
-//     //
-//     // static ref HASHMAP: Mutex<HashMap<u32, &'static str>> = {
-//     //     let mut m = HashMap::new();
-//     //     m.insert(0, "foo");
-//     //     m.insert(1, "bar");
-//     //     m.insert(2, "baz");
-//     //     Mutex::new(m)
-//     // };
-// }
 
+lazy_static! {
+    static ref PRIVILEGES2: Mutex<HashMap<String, Vec<String>>> = Mutex::new(HashMap::new());
+}
 
 // The definition of tuple is language specific.
 pub(crate) fn is_tuple(t: &Type) -> bool {
@@ -118,7 +106,14 @@ pub(crate) fn ident(id: &str) -> RcDoc {
     if KEYWORDS.contains(&id) {
         str(id).append("_")
     } else {
-        str(id)
+        match PRIVILEGES2.lock().unwrap().get(id) {
+            None => {
+                str(id)
+            }
+            Some(it) => {
+                RcDoc::text(it.get(1).unwrap().to_owned())
+            }
+        }
     }
 }
 
@@ -126,38 +121,50 @@ pub(crate) fn ident_for_var(id: &str) -> RcDoc {
     if KEYWORDS.contains(&id) {
         str(id).append("_")
     } else {
-        str(id).append(".idl")
+        match PRIVILEGES2.lock().unwrap().get(id) {
+            None => {
+                str(id).append(".idl")
+            }
+            Some(it) => {
+                RcDoc::text(it.get(0).unwrap().to_owned())
+            }
+        }
     }
 }
 
-fn pp_ty_init_single<'a>(id:&'a str, type_str: RcDoc<'a>, did_type:&'a str) ->RcDoc<'a>{
+fn pp_ty_init_individual<'a>(id:&'a str, type_str: RcDoc<'a>, dart_type:String) ->RcDoc<'a>{
+    PRIVILEGES2.lock().unwrap().insert(id.to_string(), vec![type_str.pretty(LINE_WIDTH).to_string(), dart_type]);
     kwd("final").append(id).append("=").append(type_str).append(";")
 }
 
 fn pp_ty_init<'a>(ty: &'a Type, id:&'a str) -> RcDoc<'a> {
     use Type::*;
     match *ty {
-        Null => pp_ty_init_single(id,str("IDL.Null"),"IDL.Null"),
-        Bool => pp_ty_init_single(id,str("IDL.Bool"),"IDL.Bool"),
-        Nat => pp_ty_init_single(id,str("IDL.Nat"),"BigInt"),
-        Int => pp_ty_init_single(id,str("IDL.Int"),"IDL.Int"),
-        Nat8 => pp_ty_init_single(id,str("IDL.Nat8"),"IDL.Nat8"),
-        Nat16 => pp_ty_init_single(id,str("IDL.Nat16"),"IDL.Nat16"),
-        Nat32 => pp_ty_init_single(id,str("IDL.Nat32"),"IDL.Nat32"),
-        Nat64 => pp_ty_init_single(id,str("IDL.Nat64"),"IDL.Nat64"),
-        Int8 => pp_ty_init_single(id,str("IDL.Int8"),"IDL.Int8"),
-        Int16 => pp_ty_init_single(id,str("IDL.Int16"),"IDL.Int16"),
-        Int32 => pp_ty_init_single(id,str("IDL.Int32"),"IDL.Int32"),
-        Int64 => pp_ty_init_single(id,str("IDL.Int64"),"IDL.Int64"),
-        Float32 => pp_ty_init_single(id,str("IDL.Float32"),"dynamic"),
-        Float64 => pp_ty_init_single(id,str("IDL.Float64"),"IDL.Float64"),
-        Text => pp_ty_init_single(id,str("IDL.Text"),"IDL.Text"),
-        Reserved => pp_ty_init_single(id,str("IDL.Reserved"),"IDL.Reserved"),
-        Empty => pp_ty_init_single(id,str("IDL.Empty"),"IDL.Empty"),
+        Null => pp_ty_init_individual(id, str("IDL.Null"), String::from("dynamic")),
+        Bool => pp_ty_init_individual(id, str("IDL.Bool"), String::from("bool")),
+        Nat => pp_ty_init_individual(id, str("IDL.Nat"), String::from("BigInt")),
+        Int => pp_ty_init_individual(id, str("IDL.Int"), String::from("int")),
+        Nat8 => pp_ty_init_individual(id, str("IDL.Nat8"), String::from("int")),
+        Nat16 => pp_ty_init_individual(id, str("IDL.Nat16"), String::from("int")),
+        Nat32 => pp_ty_init_individual(id, str("IDL.Nat32"), String::from("int")),
+        Nat64 => pp_ty_init_individual(id, str("IDL.Nat64"), String::from("int")),
+        Int8 => pp_ty_init_individual(id, str("IDL.Int8"), String::from("int")),
+        Int16 => pp_ty_init_individual(id, str("IDL.Int16"), String::from("int")),
+        Int32 => pp_ty_init_individual(id, str("IDL.Int32"), String::from("int")),
+        Int64 => pp_ty_init_individual(id, str("IDL.Int64"), String::from("int")),
+        Float32 => pp_ty_init_individual(id, str("IDL.Float32"), String::from("double")),
+        Float64 => pp_ty_init_individual(id, str("IDL.Float64"), String::from("double")),
+        Text => pp_ty_init_individual(id, str("IDL.Text"), String::from("String")),
+        Reserved => pp_ty_init_individual(id, str("IDL.Reserved"), String::from("IDL.Reserved")),
+        Empty => pp_ty_init_individual(id, str("IDL.Empty"), String::from("IDL.Empty")),
         Var(ref s) => ident_for_var(s),
         Principal => str("IDL.Principal"),
-        Opt(ref t) => pp_ty_init_single(id,str("IDL.Opt").append(enclose("(", pp_ty_raw(t), ")")),"IDL.Text"),
-        Vec(ref t) => pp_ty_init_single(id,str("IDL.Vec").append(enclose("(", pp_ty_raw(t), ")")),"dynamic"),
+        Opt(ref t) => pp_ty_init_individual(id, str("IDL.Opt").append(enclose("(", pp_ty_raw(t), ")")),
+                                            pp_ty_for_field(ty).pretty(LINE_WIDTH).to_string()),
+        Vec(ref t) => {
+            pp_ty_init_individual(id, str("IDL.Vec").append(enclose("(", pp_ty_raw(t), ")")),
+                                  pp_ty_for_field(ty).pretty(LINE_WIDTH).to_string())
+        },
         Record(ref fs) => {
             if is_tuple(ty) {
                 let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
@@ -223,25 +230,7 @@ fn pp_ty_for_field<'a>(ty: &'a Type) -> RcDoc<'a> {
         Vec(ref t) => {
             str("List").append(enclose("<", pp_ty_for_field(t), ">"))
         },
-        Record(ref fs) => {
-            if is_tuple(ty) {
-                // let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
-                // str("IDL.Tuple").append(enclose("(", tuple, ")"))
-                str("List")
-            } else {
-                str("")
-                    // .append(pp_fields(fs))
-                    // .append(RcDoc::hardline())
-                    // .append(pp_fields_constructor(fs))
-                    // .append(RcDoc::hardline())
-                    // .append(pp_factory(fs))
-                    // .append(RcDoc::hardline())
-                    // .append(pp_to_json(fs))
-                    // .append(RcDoc::hardline())
-                    // .append(pp_create_static_idl(fs))
-                // str("IDL.Record").append(pp_fields(fs))
-            }
-        }
+        Record(ref fs) => unreachable!(),
         Variant(ref fs) => {
             str("IDL.Variant").append(pp_fields(fs))
         },
@@ -288,16 +277,6 @@ fn pp_ty<'a>(ty: &'a Type) -> RcDoc<'a> {
                 let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
                 str("IDL.Tuple").append(enclose("(", tuple, ")"))
             } else {
-                // str("")
-                // .append(pp_fields(fs))
-                // .append(RcDoc::hardline())
-                // .append(pp_fields_constructor(fs))
-                // .append(RcDoc::hardline())
-                // .append(pp_factory(fs))
-                // .append(RcDoc::hardline())
-                // .append(pp_to_json(fs))
-                // .append(RcDoc::hardline())
-                // .append(pp_create_static_idl(fs))
                 str("IDL.Record").append(pp_fields(fs))
             }
         }
@@ -348,16 +327,6 @@ fn pp_ty_raw<'a>(ty: &'a Type) -> RcDoc<'a> {
                 let tuple = concat(fs.iter().map(|f| pp_ty_raw(&f.ty)), ",");
                 str("IDL.Tuple").append(enclose("(", tuple, ")"))
             } else {
-                // str("")
-                    // .append(pp_fields(fs))
-                    // .append(RcDoc::hardline())
-                    // .append(pp_fields_constructor(fs))
-                    // .append(RcDoc::hardline())
-                    // .append(pp_factory(fs))
-                    // .append(RcDoc::hardline())
-                    // .append(pp_to_json(fs))
-                    // .append(RcDoc::hardline())
-                    // .append(pp_create_static_idl(fs))
                 str("IDL.Record").append(pp_fields(fs))
             }
         }
@@ -403,24 +372,7 @@ fn pp_ty_for_function<'a>(ty: &'a Type) -> RcDoc<'a> {
         Vec(ref t) => {
             str("IDL.Vec").append(enclose("(", pp_ty(t), ")"))
         },
-        Record(ref fs) => {
-            if is_tuple(ty) {
-                let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
-                str("IDL.Tuple").append(enclose("(", tuple, ")"))
-            } else {
-                str("")
-                    // .append(pp_fields(fs))
-                    // .append(RcDoc::hardline())
-                    // .append(pp_fields_constructor(fs))
-                    // .append(RcDoc::hardline())
-                    // .append(pp_factory(fs))
-                    // .append(RcDoc::hardline())
-                    // .append(pp_to_json(fs))
-                    // .append(RcDoc::hardline())
-                    // .append(pp_create_static_idl(fs))
-                // str("IDL.Record").append(pp_fields(fs))
-            }
-        }
+        Record(ref fs) => unreachable!(),
         Variant(ref fs) => {
             str("IDL.Variant").append(pp_fields(fs))
         },
@@ -446,28 +398,20 @@ fn pp_label(id: &Label) -> RcDoc {
 
 
 fn pp_field<'a>(field: &'a Field) -> RcDoc<'a> {
-    str("").append(pp_ty_for_field(&field.ty)).append(" ").append(pp_label(&field.id))
-    // pp_label(&field.id)
-    //     .append(pp_ty(&field.ty))
-    //     .append(kwd(":"))
+    let lable = pp_label(&field.id);
+    str("").append(pp_ty_for_field(&field.ty)).append(" ").append(lable)
 }
 
 fn pp_fields<'a>(fs: &'a [Field]) -> RcDoc<'a> {
-    // let fields = concat(fs.iter().map(pp_field), ";");
-    // enclose_space("", fields, "")
     concat(fs.iter().map(pp_field), ";")
 }
 
 
 fn pp_fields_constructor<'a>(fs: &'a [Field],class_name:&'a str) -> RcDoc<'a> {
-    //todo fix class name
     str(class_name).append(enclose("({",concat(fs.iter().map(pp_field_in_constructor), ","),"})"))
-    // let fields = concat(fs.iter().map(pp_field), ",");
-    // enclose_space("({", fields, "})")
 }
 
 fn pp_factory<'a>(fs: &'a [Field],class_name:&'a str) -> RcDoc<'a> {
-    //todo fix class name
     kwd("factory")
         .append(class_name)
         .append(".fromMap(Map map)")
@@ -494,18 +438,10 @@ fn pp_to_json(fs: &[Field]) -> RcDoc {
 fn pp_field_in_factory(field: &Field) -> RcDoc {
     pp_label(&field.id).append(":").append(
         enclose("map[\"",pp_label(&field.id),"\"]"))
-    // kwd("").append("this.").append(pp_label(&field.id))
-    // pp_label(&field.id)
-    //     .append(pp_ty(&field.ty))
-    //     .append(kwd(":"))
 }
 
 fn pp_field_in_static_idl<'a>(field: &'a Field) -> RcDoc<'a> {
     enclose("\"",pp_label(&field.id),"\"").append(":").append(pp_ty_raw(&field.ty))
-    // kwd("").append("this.").append(pp_label(&field.id))
-    // pp_label(&field.id)
-    //     .append(pp_ty(&field.ty))
-    //     .append(kwd(":"))
 }
 
 fn pp_field_in_to_json(field: &Field) -> RcDoc {
@@ -564,27 +500,14 @@ fn pp_defs<'a>(
     recs: &'a BTreeSet<&'a str>
 ) -> RcDoc<'a> {
     let recs_doc = str("");
-        // lines(
-        // recs.iter()
-        //     .map(|id| kwd("const").append(ident(id)).append(" = IDL.Rec();")),
-    // );
-    let defs = lines(def_list.iter().map(|id| unsafe {
+    lines(def_list.iter().map(|id| unsafe {
         let ty = env.find_type(id).unwrap();
-        // if recs.contains(id) {
-        //     ident(id)
-        //         .append(".fill")
-        //         .append(enclose("(", pp_ty(ty), ");"))
-        // } else {
             pp_ty_init(ty,id)
-                // .append(pp_ty(ty))
-                // .append(";")
+    }));
 
-            // kwd("const")
-            //     .append(id)
-            //     .append(" = ")
-            //     .append(pp_ty(ty))
-            //     .append(";")
-        // }
+    let defs = lines(def_list.iter().rev().map(|id| unsafe {
+        let ty = env.find_type(id).unwrap();
+        pp_ty_init(ty,id)
     }));
     recs_doc.append(defs)
 }
@@ -610,6 +533,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
             let recs = infer_rec(env, &def_list).unwrap();
             let doc = pp_defs(env, &def_list, &recs);
+            // println!("AAAAA {}",PRIVILEGES2.lock().unwrap().get("TextField").unwrap().get(1).unwrap().to_owned());
             doc.pretty(LINE_WIDTH).to_string()
         }
         Some(actor) => {
@@ -618,11 +542,9 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 
             // 处理定义
             let defs = pp_defs(env, &def_list, &recs);
-            // return defs.pretty(LINE_WIDTH).to_string();
 
             //处理actor
             let pp = pp_actor(actor, &recs );
-            // return pp.pretty(LINE_WIDTH).to_string();
 
             //整合定义和actor
             let actor = kwd("Service _Service = ").append(pp).append(";");
@@ -638,7 +560,6 @@ pub mod value {
     use crate::parser::value::{IDLArgs, IDLField, IDLValue};
     use crate::pretty::*;
     use pretty::RcDoc;
-
     fn is_tuple(v: &IDLValue) -> bool {
         match v {
             IDLValue::Record(ref fs) => {
