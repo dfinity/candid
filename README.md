@@ -26,10 +26,11 @@ A list of community maintained Candid libraries:
 * [Elm](https://github.com/chenyan2002/ic-elm/)
 * [Kotlin](https://github.com/seniorjoinu/candid-kt)
 * [AssemblyScript](https://github.com/rckprtr/cdk-as/tree/master/packages/cdk/assembly/candid)
+* [Java](https://github.com/ic4j/ic4j-candid)
 
 ## Tools
 
-* [didc](tools/didc): Candid CLI
+* [didc](tools/didc): Candid CLI. Download [prebuilt binary](https://github.com/dfinity/candid/releases).
 * [candiff](tools/candiff): Diff Candid values structurally
 * [ui](tools/ui): Candid UI canister. See deployed [canister](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.ic0.app/) on the IC
 * [ic-repl](https://github.com/chenyan2002/ic-repl): A REPL environment to communicate with canisters using Candid
