@@ -170,36 +170,48 @@ The spec defines the coercion function as indexed by the subtyping relation.
 But that relation is coinductive, so Coq will not allow that.
 We thus define the function by recursion on the value.
 
-We use [NullV] on the right-hand side in invalid branches.
 *)
 
-Function coerce (t1 : T) (t2 : T) (v1 : V) : V :=
+Function coerce (t1 : T) (t2 : T) (v1 : V) : option V :=
   match v1, t1, t2 with
-  | NatV n, NatT, NatT => NatV n
-  | IntV n, IntT, IntT => IntV n
-  | NatV n, NatT, IntT => IntV (Z.of_nat n)
-  | FuncV r, FuncT ta1 tr1, FuncT ta2 tr2 => FuncV r
+  | NatV n, NatT, NatT => Some (NatV n)
+  | IntV n, IntT, IntT => Some (IntV n)
+  | NatV n, NatT, IntT => Some (IntV (Z.of_nat n))
+  | FuncV r, FuncT ta1 tr1, FuncT ta2 tr2 =>
+    if FuncT ta1 tr1 <:? (FuncT ta2 tr2)
+    then Some (FuncV r)
+    else None
 
+  | NullV, NullT, NullT => Some NullV
+
+  | NullV, NullT, OptT t2 => Some NullV
+  | NullV, OptT t1, OptT t2 => Some NullV
   | SomeV v, OptT t1, OptT t2 =>
-    if t1 <:? t2
-    then SomeV (coerce t1 t2 v)
-    else NullV
-  
+    match coerce t1 t2 v with
+    | None => Some NullV
+    | Some t => Some (SomeV t)
+    end
+
   (* We’d prefer the equation from [coerce_constituent_eq] below,
+     but that looks like it recurses on t2, and that’s coinductive,
      but that will not satisfy the termination checker,
-     so let’s repeat all the above ruls for OptT again.
+     so we have to repeat all the above rules for OptT again.
   *)
-  | NatV n, NatT, OptT NatT => SomeV (NatV n)
-  | IntV n, IntT, OptT IntT => SomeV (IntV n)
-  | NatV n, NatT, OptT IntT => SomeV (IntV (Z.of_nat n))
+  | NatV n, NatT, OptT NatT => Some (SomeV (NatV n))
+  | IntV n, IntT, OptT IntT => Some (SomeV (IntV n))
+  | NatV n, NatT, OptT IntT => Some (SomeV (IntV (Z.of_nat n)))
   | FuncV r, FuncT ta1 tr1, OptT (FuncT ta2 tr2) =>
-    if ta2 <:? ta1
-    then if tr1 <:? tr2 then SomeV (FuncV r) else NullV else NullV
+    if FuncT ta1 tr1 <:? (FuncT ta2 tr2)
+    then Some (SomeV (FuncV r))
+    else Some NullV
 
-  | v, t, ReservedT => ReservedV
+  (* The final catch-all for OptT *)
+  | _, _, OptT t => Some NullV
 
-  (* Failure is NullV. Also subsumes “valid” rules that return NullV *)
-  | _, _, _ => NullV
+
+  | v, t, ReservedT => Some ReservedV
+
+  | _, _, _ => None
   end.
 
 (* We can prove the desired equation at least as an equality *)
@@ -207,47 +219,39 @@ Lemma coerce_constituent_eq:
   forall v t1 t2,
   v :: t1 ->
   is_opt_like_type t1 = false ->
+  is_opt_like_type t2 = false ->
   coerce t1 (OptT t2) v =
-    if t1 <:? t2
-    then if is_opt_like_type t2
-    then NullV
-    else SomeV (coerce t1 t2 v)
-    else NullV.
+    match coerce t1 t2 v with
+    | None => Some NullV
+    | Some t => Some (SomeV t)
+    end.
 Proof.
-  intros v t1 t2 HHT His_opt_like.
-  inversion HHT; subst; clear HHT; inversion His_opt_like; clear His_opt_like; name_cases.
+  intros v t1 t2 HHT His_opt_like_t1 His_opt_like_t2.
+  inversion HHT; subst; clear HHT; inversion His_opt_like_t1; clear His_opt_like_t1; name_cases.
   [natHT]: {
-    destruct (NatT <:? t2) as [HST | HNotST].
-    - inversion HST; subst; clear HST; simpl; reflexivity.
-    - destruct t2; try reflexivity; contradict HNotST; named_constructor.
+    destruct t2; subst; inversion His_opt_like_t2; clear His_opt_like_t2; simpl; try reflexivity.
   }
   [intHT]: {
-    destruct (IntT <:? t2) as [HST | HNotST].
-    - inversion HST; subst; clear HST; simpl; reflexivity.
-    - destruct t2; try reflexivity; contradict HNotST; named_constructor.
+    destruct t2; subst; inversion His_opt_like_t2; clear His_opt_like_t2; simpl; try reflexivity.
   }
   [funcHT]: {
-    destruct (FuncT t0 t3 <:? t2) as [HST | HNotST].
-    - inversion HST; subst; clear HST; simpl;try reflexivity.
-      * repeat rewrite subtype_dec_refl. reflexivity. 
-      * repeat rewrite subtype_dec_true by assumption. reflexivity. 
-    - destruct t2; try reflexivity.
-      simpl.
-      destruct (t2_1 <:? t0); try reflexivity.
-      destruct (t3 <:? t2_2); try reflexivity.
-      contradict HNotST; named_constructor; assumption.
+    destruct t2; subst; inversion His_opt_like_t2; clear His_opt_like_t2; simpl; try reflexivity.
+    destruct (FuncT t0 t3 <:? FuncT t2_1 t2_2); try reflexivity.
   }
 Qed.
 
 Lemma coerce_reservedT:
-  forall v t1, coerce t1 ReservedT v = ReservedV.
+  forall v t1, coerce t1 ReservedT v = Some ReservedV.
 Proof.
   intros v1 t1.
   destruct v1, t1; reflexivity.
 Qed.
 
+(** TODO: What to make of this now
+
+
 (**
-This beast of a lemma defines and proves a nice induction principle for [coerce].
+This beast of a lemma defines and proves a nice induction principle for [coerce],
 *)
 Lemma coerce_nice_ind:
   forall (P : T -> T -> V -> V -> Prop),
@@ -258,24 +262,19 @@ Lemma coerce_nice_ind:
   (case nullOptC, forall t, P NullT (OptT t) NullV NullV) ->
   (case optNullC, forall t1 t2, P (OptT t1) (OptT t2) NullV NullV) ->
   (case optSomeC, forall t1 t2 v1 v2,
-    t1 <: t2 ->
     v1 :: t1 ->
     P t1 t2 v1 v2 ->
     P (OptT t1) (OptT t2) (SomeV v1) (SomeV v2)) ->
   (case opportunisticOptC, forall t1 t2 v1,
-    ~ (t1 <: t2) ->
+    coerce t1 t2 v = None ->
     v1 :: t1 ->
     P (OptT t1) (OptT t2) (SomeV v1) NullV) ->
   (case reservedOptC,
     forall t, P ReservedT (OptT t) ReservedV NullV) ->
   (case constituentOptC,
     forall t1 t2 v1 v2,
-    (* The following assumption is redundant, as it follows from the
-       two subsequent onces, but it is convenient when using this
-       induction theorem *)
     is_opt_like_type t1 = false ->
     is_opt_like_type t2 = false ->
-    t1 <: t2 ->
     v1 :: t1 ->
     P t1 t2 v1 v2 ->
     P t1 (OptT t2) v1 (SomeV v2)) ->
@@ -283,14 +282,15 @@ Lemma coerce_nice_ind:
     forall t1 t2 v1,
     v1 :: t1 ->
     is_opt_like_type t1 = false ->
-    is_opt_like_type t2 = true \/ ~ (t1 <: t2) ->
+    is_opt_like_type t2 = true \/ coerce t1 t2 v1 = None ->
     P t1 (OptT t2) v1 NullV) ->
   (case funcC, forall ta1 tr1 ta2 tr2 v,
     ta2 <: ta1 ->
     tr1 <: tr2 ->
     P (FuncT ta1 tr1) (FuncT ta2 tr2) (FuncV v) (FuncV v)) ->
   (case reservedC, forall t v, v :: t -> P t ReservedT v ReservedV) ->
-  (forall t1 t2 v1, t1 <: t2 -> v1 :: t1 -> P t1 t2 v1 (coerce t1 t2 v1)).
+  (forall t1 t2 v1,
+   v1 :: t1 -> P t1 t2 v1 (coerce t1 t2 v1)).
 Proof.
   intros P.
   intros NatC IntC NatIntC NullC NullOptC OptNullC OptSomeC OpportunisticOptC ReservedOptC ConstituentOptC OpportunisticConstituentOptC FuncC ReservedC.
@@ -413,6 +413,8 @@ Proof.
     [reservedST]: { apply ReservedC; clear_names.  named_constructor. }
   }
 Qed.
+**)
+
 
 (**
 * Properties of coercion
@@ -422,8 +424,9 @@ Round-tripping
 Lemma coerce_roundtrip:
   forall t1 v1,
   v1 :: t1 ->
-  coerce t1 t1 v1 = v1.
+  coerce t1 t1 v1 = Some v1.
 Proof.
+(** 
   enough (forall t1 t2 v1,
     t1 <: t2 -> v1 :: t1 -> t2 = t1 ->
     coerce t1 t2 v1 = v1)
@@ -435,6 +438,15 @@ Proof.
     inversion H1; subst; clear H1. contradiction H; apply ReflST; clear_names.
   }
   [reservedC]: {  inversion H; subst; clear H; congruence. }
+*)
+  intros t1 v1 HHT.
+  induction HHT; name_cases. all: simpl; try reflexivity.
+  
+  * rewrite IHHHT; reflexivity.
+  * (* This doesn’t work: The :: relation does not say anything about FuncV.
+       But including the type of the function in the FuncV makes types
+       and terms mutally recursive, so also not good. *)
+
 Qed.
 
 (**
