@@ -391,7 +391,10 @@ impl<'de> serde::Deserialize<'de> for Principal {
 }
 
 mod inner {
-    use sha2::{digest::generic_array::typenum::Unsigned, Digest, Sha224};
+    use sha2::{
+        digest::{generic_array::typenum::Unsigned, OutputSizeUser},
+        Sha224,
+    };
 
     /// Inner structure of a Principal. This is not meant to be public as the different classes
     /// of principals are not public.
@@ -410,7 +413,8 @@ mod inner {
     }
 
     impl PrincipalInner {
-        const HASH_LEN_IN_BYTES: usize = <<Sha224 as Digest>::OutputSize as Unsigned>::USIZE; // 28
+        const HASH_LEN_IN_BYTES: usize =
+            <<Sha224 as OutputSizeUser>::OutputSize as Unsigned>::USIZE; // 28
         const MAX_LENGTH_IN_BYTES: usize = Self::HASH_LEN_IN_BYTES + 1; // 29
 
         pub const fn new() -> Self {
