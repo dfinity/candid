@@ -1,6 +1,6 @@
 [package]
 name = "candid"
-version = "0.7.10"
+version = "0.7.11"
 edition = "2018"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
@@ -58,3 +58,4 @@ path = "benches/benchmark.rs"
 cdk = ["candid_derive/cdk"]
 configs = ["serde_dhall"]
 random = ["configs", "arbitrary", "fake", "rand"]
+mute_warnings = []
