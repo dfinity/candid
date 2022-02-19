@@ -6,6 +6,7 @@ Require Import FunInd.
 
 Require Import Coq.ZArith.BinInt.
 Require Import Coq.Init.Datatypes.
+Require Import Coq.Strings.String.
 
 Require Import Coq.Relations.Relation_Operators.
 Require Import Coq.Relations.Relation_Definitions.
@@ -44,16 +45,17 @@ CoInductive T :=
 
 Values are inductive.
 
-We use an unspecified type to model refereneces (could have used [String] too)
+Function reference values are modeled as a string, together with their “true type”.
+Since they always have function type, we store the argument and result type.
 *)
-Axiom RefV : Type.
+Inductive Ref := MkRef : string -> T -> T -> Ref.
 
 Inductive V :=
   | NatV : nat -> V
   | IntV : Z -> V
   | NullV : V
   | SomeV : V -> V
-  | FuncV : RefV -> V
+  | FuncV : Ref -> V
   | ReservedV : V
   .
 (**
@@ -90,7 +92,7 @@ Inductive HasType : V -> T -> Prop :=
     forall v t, v :: t -> SomeV v :: OptT t
   | FuncHT:
     case funcHT,
-    forall rv t1 t2, FuncV rv :: FuncT t1 t2
+    forall rn t1 t2, FuncV (MkRef rn t1 t2) :: FuncT t1 t2
   | ReservedHT:
     case reservedHT,
     ReservedV :: ReservedT
@@ -440,24 +442,71 @@ Proof.
   [reservedC]: {  inversion H; subst; clear H; congruence. }
 *)
   intros t1 v1 HHT.
-  induction HHT; name_cases. all: simpl; try reflexivity.
-  
+  induction HHT; name_cases. all: simpl; try rewrite subtype_dec_refl; try reflexivity.
   * rewrite IHHHT; reflexivity.
-  * (* This doesn’t work: The :: relation does not say anything about FuncV.
-       But including the type of the function in the FuncV makes types
-       and terms mutally recursive, so also not good. *)
-
 Qed.
 
 (**
-Coercion does not fail (and is well-defined)
+Coercion does not fail on subtypes and well-typed values
 *)
 
 Lemma coerce_well_defined:
   forall t1 t2 v1,
   t1 <: t2 -> v1 :: t1 ->
-  coerce t1 t2 v1 :: t2.
+  coerce t1 t2 v1 <> None.
 Proof.
+  intros t1 t2 v1 HST HHT.
+  revert t2 HST.
+  induction HHT; name_cases; intros t3 HST; inversion HST.
+  all: try (simpl; congruence).
+  all: try (destruct t2; simpl; congruence).
+  * simpl; rewrite coerce_roundtrip; [|assumption]; congruence.
+  * simpl; destruct (coerce t t2 v) eqn:H2; try congruence.
+  * simpl; rewrite subtype_dec_refl; congruence.
+  * simpl. destruct t4;simpl; try congruence.
+    destruct (_ <:? _); congruence.
+  * simpl. destruct (_ <:? _); congruence.
+Qed.
+
+
+(**
+Coercion returns well-typed values
+*)
+
+Lemma coerce_well_typed:
+  forall t1 t2 v1 v2, v1 :: t1 ->
+  coerce t1 t2 v1 = Some v2 ->
+  v2 :: t2.
+Proof.
+  intros t1 t2 v1 v2 HHT Heq.
+  revert t2 v2 Heq.
+  induction HHT; name_cases; intros t3 v3 Heq.
+  all: simpl in Heq; destruct t3; try congruence.
+  all: inversion Heq; clear Heq; try named_constructor.
+  + destruct t3; try congruence;
+    inversion H0; try named_constructor; try named_constructor.
+  + destruct t3; try congruence;
+    inversion H0; try named_constructor; try named_constructor.
+  + destruct (coerce t t3 v) eqn:Heq.
+    - specialize (IHHHT _ _ Heq).
+      inversion H0; clear H0.
+      named_constructor; assumption.
+    - inversion H0; clear H0; named_constructor.
+  + destruct t3; try congruence.
+    all: inversion H0; clear H0; try named_constructor; try named_constructor.
+    - destruct (FuncT t1 t2 <:? FuncT t3_1 t3_2) eqn:Hst.
+      * inversion H1; clear H1.
+        named_constructor.
+        (* This doesn’t quite work: Looks like :: needs to take <: into account in
+        the FuncT case *)
+        (* apply FuncHT. *)
+        admit.
+    
+      
+      
+  revert t1 t2 v2 Heq.
+  destruct t3; inversion Heq; try named_constructor.
+  * exact
   apply coerce_nice_ind with (P := fun t1 t2 v1 v2 => v2 :: t2); intros; name_cases;
      named_constructor; assumption.
 Qed.
