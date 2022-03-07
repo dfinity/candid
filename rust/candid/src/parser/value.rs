@@ -562,7 +562,6 @@ impl<'de> Deserialize<'de> for IDLValue {
     where
         D: serde::Deserializer<'de>,
     {
-
         deserializer.deserialize_any(IDLValueVisitor)
     }
 }
