@@ -422,145 +422,146 @@ macro_rules! visit_prim {
     };
 }
 
+/// A [`Visitor`] to extract [`IDLValue`]s.
+pub struct IDLValueVisitor;
+
+impl<'de> Visitor<'de> for IDLValueVisitor {
+    type Value = IDLValue;
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("any valid Candid value")
+    }
+    visit_prim!(Bool, bool);
+    visit_prim!(Nat8, u8);
+    visit_prim!(Nat16, u16);
+    visit_prim!(Nat32, u32);
+    visit_prim!(Nat64, u64);
+    visit_prim!(Int8, i8);
+    visit_prim!(Int16, i16);
+    visit_prim!(Int32, i32);
+    visit_prim!(Int64, i64);
+    visit_prim!(Float32, f32);
+    visit_prim!(Float64, f64);
+    // Deserialize Candid specific types: Bignumber, principal, reversed, service, function
+    fn visit_byte_buf<E: de::Error>(self, value: Vec<u8>) -> DResult<E> {
+        use std::convert::TryFrom;
+        let (tag, mut bytes) = value.split_at(1);
+        match tag[0] {
+            0u8 => {
+                let v = Int(num_bigint::BigInt::from_signed_bytes_le(bytes));
+                Ok(IDLValue::Int(v))
+            }
+            1u8 => {
+                let v = Nat(num_bigint::BigUint::from_bytes_le(bytes));
+                Ok(IDLValue::Nat(v))
+            }
+            2u8 => {
+                let v = crate::Principal::try_from(bytes).map_err(E::custom)?;
+                Ok(IDLValue::Principal(v))
+            }
+            4u8 => {
+                let v = crate::Principal::try_from(bytes).map_err(E::custom)?;
+                Ok(IDLValue::Service(v))
+            }
+            5u8 => {
+                use std::io::Read;
+                let len = leb128::read::unsigned(&mut bytes).map_err(E::custom)? as usize;
+                let mut buf = Vec::new();
+                buf.resize(len, 0);
+                bytes.read_exact(&mut buf).map_err(E::custom)?;
+                let meth = String::from_utf8(buf).map_err(E::custom)?;
+                let id = crate::Principal::try_from(bytes).map_err(E::custom)?;
+                Ok(IDLValue::Func(id, meth))
+            }
+            3u8 => Ok(IDLValue::Reserved),
+            _ => Err(de::Error::custom("unknown tag in visit_byte_buf")),
+        }
+    }
+    fn visit_string<E>(self, value: String) -> DResult<E> {
+        Ok(IDLValue::Text(value))
+    }
+    fn visit_str<E>(self, value: &str) -> DResult<E>
+    where
+        E: serde::de::Error,
+    {
+        self.visit_string(String::from(value))
+    }
+    fn visit_none<E>(self) -> DResult<E> {
+        Ok(IDLValue::None)
+    }
+    fn visit_some<D>(self, deserializer: D) -> DResult<D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let v = Deserialize::deserialize(deserializer)?;
+        Ok(IDLValue::Opt(Box::new(v)))
+    }
+    fn visit_unit<E>(self) -> DResult<E> {
+        Ok(IDLValue::Null)
+    }
+    fn visit_seq<V>(self, mut visitor: V) -> DResult<V::Error>
+    where
+        V: de::SeqAccess<'de>,
+    {
+        let mut vec = Vec::new();
+        while let Some(elem) = visitor.next_element()? {
+            vec.push(elem);
+        }
+        Ok(IDLValue::Vec(vec))
+    }
+    fn visit_map<V>(self, mut visitor: V) -> DResult<V::Error>
+    where
+        V: de::MapAccess<'de>,
+    {
+        let mut vec = Vec::new();
+        while let Some((key, value)) = visitor.next_entry()? {
+            let id = match key {
+                IDLValue::Nat32(hash) => Label::Id(hash),
+                IDLValue::Text(name) if name == "_" => continue,
+                IDLValue::Text(name) => Label::Named(name),
+                _ => unreachable!(),
+            };
+            let f = IDLField { id, val: value };
+            vec.push(f);
+        }
+        Ok(IDLValue::Record(vec))
+    }
+    fn visit_enum<V>(self, data: V) -> DResult<V::Error>
+    where
+        V: de::EnumAccess<'de>,
+    {
+        use serde::de::VariantAccess;
+        let (variant, visitor) = data.variant::<IDLValue>()?;
+        if let IDLValue::Text(v) = variant {
+            let v: Vec<_> = v.split(',').collect();
+            let (id, style) = match v.as_slice() {
+                [name, "name", style] => (Label::Named(name.to_string()), style),
+                [hash, "id", style] => (Label::Id(hash.parse::<u32>().unwrap()), style),
+                _ => unreachable!(),
+            };
+            let val = match *style {
+                "unit" => {
+                    visitor.unit_variant()?;
+                    IDLValue::Null
+                }
+                "struct" => visitor.struct_variant(&[], self)?,
+                "newtype" => visitor.newtype_variant()?,
+                _ => unreachable!(),
+            };
+            let f = IDLField { id, val };
+            // Deserialized variant always has 0 index to ensure untyped
+            // serialization is correct.
+            Ok(IDLValue::Variant(VariantValue(Box::new(f), 0)))
+        } else {
+            unreachable!()
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for IDLValue {
     fn deserialize<D>(deserializer: D) -> DResult<D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        struct IDLValueVisitor;
-
-        impl<'de> Visitor<'de> for IDLValueVisitor {
-            type Value = IDLValue;
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("any valid Candid value")
-            }
-            visit_prim!(Bool, bool);
-            visit_prim!(Nat8, u8);
-            visit_prim!(Nat16, u16);
-            visit_prim!(Nat32, u32);
-            visit_prim!(Nat64, u64);
-            visit_prim!(Int8, i8);
-            visit_prim!(Int16, i16);
-            visit_prim!(Int32, i32);
-            visit_prim!(Int64, i64);
-            visit_prim!(Float32, f32);
-            visit_prim!(Float64, f64);
-            // Deserialize Candid specific types: Bignumber, principal, reversed, service, function
-            fn visit_byte_buf<E: de::Error>(self, value: Vec<u8>) -> DResult<E> {
-                use std::convert::TryFrom;
-                let (tag, mut bytes) = value.split_at(1);
-                match tag[0] {
-                    0u8 => {
-                        let v = Int(num_bigint::BigInt::from_signed_bytes_le(bytes));
-                        Ok(IDLValue::Int(v))
-                    }
-                    1u8 => {
-                        let v = Nat(num_bigint::BigUint::from_bytes_le(bytes));
-                        Ok(IDLValue::Nat(v))
-                    }
-                    2u8 => {
-                        let v = crate::Principal::try_from(bytes).map_err(E::custom)?;
-                        Ok(IDLValue::Principal(v))
-                    }
-                    4u8 => {
-                        let v = crate::Principal::try_from(bytes).map_err(E::custom)?;
-                        Ok(IDLValue::Service(v))
-                    }
-                    5u8 => {
-                        use std::io::Read;
-                        let len = leb128::read::unsigned(&mut bytes).map_err(E::custom)? as usize;
-                        let mut buf = Vec::new();
-                        buf.resize(len, 0);
-                        bytes.read_exact(&mut buf).map_err(E::custom)?;
-                        let meth = String::from_utf8(buf).map_err(E::custom)?;
-                        let id = crate::Principal::try_from(bytes).map_err(E::custom)?;
-                        Ok(IDLValue::Func(id, meth))
-                    }
-                    3u8 => Ok(IDLValue::Reserved),
-                    _ => Err(de::Error::custom("unknown tag in visit_byte_buf")),
-                }
-            }
-            fn visit_string<E>(self, value: String) -> DResult<E> {
-                Ok(IDLValue::Text(value))
-            }
-            fn visit_str<E>(self, value: &str) -> DResult<E>
-            where
-                E: serde::de::Error,
-            {
-                self.visit_string(String::from(value))
-            }
-            fn visit_none<E>(self) -> DResult<E> {
-                Ok(IDLValue::None)
-            }
-            fn visit_some<D>(self, deserializer: D) -> DResult<D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                let v = Deserialize::deserialize(deserializer)?;
-                Ok(IDLValue::Opt(Box::new(v)))
-            }
-            fn visit_unit<E>(self) -> DResult<E> {
-                Ok(IDLValue::Null)
-            }
-            fn visit_seq<V>(self, mut visitor: V) -> DResult<V::Error>
-            where
-                V: de::SeqAccess<'de>,
-            {
-                let mut vec = Vec::new();
-                while let Some(elem) = visitor.next_element()? {
-                    vec.push(elem);
-                }
-                Ok(IDLValue::Vec(vec))
-            }
-            fn visit_map<V>(self, mut visitor: V) -> DResult<V::Error>
-            where
-                V: de::MapAccess<'de>,
-            {
-                let mut vec = Vec::new();
-                while let Some((key, value)) = visitor.next_entry()? {
-                    let id = match key {
-                        IDLValue::Nat32(hash) => Label::Id(hash),
-                        IDLValue::Text(name) if name == "_" => continue,
-                        IDLValue::Text(name) => Label::Named(name),
-                        _ => unreachable!(),
-                    };
-                    let f = IDLField { id, val: value };
-                    vec.push(f);
-                }
-                Ok(IDLValue::Record(vec))
-            }
-            fn visit_enum<V>(self, data: V) -> DResult<V::Error>
-            where
-                V: de::EnumAccess<'de>,
-            {
-                use serde::de::VariantAccess;
-                let (variant, visitor) = data.variant::<IDLValue>()?;
-                if let IDLValue::Text(v) = variant {
-                    let v: Vec<_> = v.split(',').collect();
-                    let (id, style) = match v.as_slice() {
-                        [name, "name", style] => (Label::Named(name.to_string()), style),
-                        [hash, "id", style] => (Label::Id(hash.parse::<u32>().unwrap()), style),
-                        _ => unreachable!(),
-                    };
-                    let val = match *style {
-                        "unit" => {
-                            visitor.unit_variant()?;
-                            IDLValue::Null
-                        }
-                        "struct" => visitor.struct_variant(&[], self)?,
-                        "newtype" => visitor.newtype_variant()?,
-                        _ => unreachable!(),
-                    };
-                    let f = IDLField { id, val };
-                    // Deserialized variant always has 0 index to ensure untyped
-                    // serialization is correct.
-                    Ok(IDLValue::Variant(VariantValue(Box::new(f), 0)))
-                } else {
-                    unreachable!()
-                }
-            }
-        }
-
         deserializer.deserialize_any(IDLValueVisitor)
     }
 }
