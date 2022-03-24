@@ -83,11 +83,13 @@ impl ValueSerializer {
     pub fn get_result(&self) -> &[u8] {
         &self.value
     }
-    fn write_leb128(&mut self, value: u64) -> Result<()> {
+    #[doc(hidden)]
+    pub fn write_leb128(&mut self, value: u64) -> Result<()> {
         leb128_encode(&mut self.value, value)?;
         Ok(())
     }
-    fn write(&mut self, bytes: &[u8]) -> Result<()> {
+    #[doc(hidden)]
+    pub fn write(&mut self, bytes: &[u8]) -> Result<()> {
         use std::io::Write;
         self.value.write_all(bytes)?;
         Ok(())
@@ -335,12 +337,11 @@ impl TypeSerialize {
         self.type_table[idx] = buf;
         Ok(())
     }
-
-    fn push_type(&mut self, t: &Type) -> Result<()> {
+    #[doc(hidden)]
+    pub fn push_type(&mut self, t: &Type) -> Result<()> {
         self.args.push(t.clone());
         self.build_type(t)
     }
-
     fn encode(&self, buf: &mut Vec<u8>, t: &Type) -> Result<()> {
         if let Type::Var(id) = t {
             let actual_type = self.env.rec_find_type(id)?;
@@ -393,8 +394,8 @@ impl TypeSerialize {
         }?;
         Ok(())
     }
-
-    fn serialize(&mut self) -> Result<()> {
+    #[doc(hidden)]
+    pub fn serialize(&mut self) -> Result<()> {
         leb128_encode(&mut self.result, self.type_table.len() as u64)?;
         self.result.append(&mut self.type_table.concat());
 
