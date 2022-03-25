@@ -5,15 +5,15 @@ use std::fmt::Debug;
 use candid::{
     candid_method,
     parser::value::{IDLValue, IDLValueVisitor},
+    ser::IDLBuilder,
     types::{get_type, Label, Serializer, Type},
-    CandidType, Decode, Deserialize, Encode, Int, ser::IDLBuilder,
+    CandidType, Decode, Deserialize, Encode, Int,
 };
 use serde::de::DeserializeOwned;
 
 #[test]
 fn any_val() {
-
-    fn test_embed<T: DeserializeOwned+Debug+CandidType+PartialEq>(value: T) -> IDLValue {
+    fn test_embed<T: DeserializeOwned + Debug + CandidType + PartialEq>(value: T) -> IDLValue {
         #[derive(Debug, Clone, PartialEq)]
         struct IDLValueEmbed(IDLValue);
         impl CandidType for IDLValueEmbed {
@@ -25,7 +25,9 @@ fn any_val() {
             }
         }
         impl<'de> Deserialize<'de> for IDLValueEmbed {
-            fn deserialize<D: serde::de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            fn deserialize<D: serde::de::Deserializer<'de>>(
+                deserializer: D,
+            ) -> Result<Self, D::Error> {
                 deserializer
                     .deserialize_ignored_any(IDLValueVisitor)
                     .map(IDLValueEmbed)
@@ -36,13 +38,16 @@ fn any_val() {
         struct Embed<T> {
             value: T,
         }
-        
+
         let orig = Embed { value };
-        let bytes1 = Encode!(&orig)
-        .unwrap();
-    
+        let bytes1 = Encode!(&orig).unwrap();
+
         let idl_value = Decode!(&bytes1, Embed<IDLValueEmbed>).unwrap();
-        let bytes2 = IDLBuilder::new().value_arg(&idl_value.value.0).unwrap().serialize_to_vec().unwrap();
+        let bytes2 = IDLBuilder::new()
+            .value_arg(&idl_value.value.0)
+            .unwrap()
+            .serialize_to_vec()
+            .unwrap();
         let new = Decode!(&bytes2, T).unwrap();
         assert_eq!(orig.value, new);
         idl_value.value.0
@@ -60,17 +65,17 @@ fn any_val() {
         g1: T,
         g2: E,
     }
-    
+
     let v = test_embed(E::Foo);
     assert!(matches!(v, IDLValue::Variant(_)));
 
     let v = test_embed(E::Bar(true, 42));
     assert!(matches!(v, IDLValue::Variant(_)));
 
-    let v = test_embed(G{
+    let v = test_embed(G {
         g1: E::Bar(true, 42),
-        g2: G{
-            g1: E::Baz{ a: -199, b: 14 },
+        g2: G {
+            g1: E::Baz { a: -199, b: 14 },
             g2: E::Newtype(false),
         },
     });
