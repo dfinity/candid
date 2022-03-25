@@ -301,7 +301,7 @@ impl IDLValue {
             IDLValue::Float32(_) => Type::Float32,
             IDLValue::Float64(_) => Type::Float64,
             IDLValue::Text(_) => Type::Text,
-            IDLValue::None => Type::Opt(Box::new(Type::Null)),
+            IDLValue::None => Type::Opt(Box::new(Type::Empty)),
             IDLValue::Reserved => Type::Reserved,
             IDLValue::Opt(ref v) => {
                 let t = v.deref().value_ty();
@@ -309,7 +309,7 @@ impl IDLValue {
             }
             IDLValue::Vec(ref vec) => {
                 let t = if vec.is_empty() {
-                    Type::Null
+                    Type::Empty
                 } else {
                     vec[0].value_ty()
                 };
