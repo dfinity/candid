@@ -1,19 +1,20 @@
 //! Deserialize Candid binary format to Rust data structures
 
-use super::error::{Error, Result};
 use super::{
+    error::{Error, Result},
     parser::typing::TypeEnv,
     types::{Field, Label, Type},
     CandidType, Int, Nat,
 };
-use crate::binary_parser::{BoolValue, Header, Len, PrincipalBytes};
-use crate::types::subtype::{subtype, Gamma};
+use crate::{
+    binary_parser::{BoolValue, Header, Len, PrincipalBytes},
+    types::subtype::{subtype, Gamma},
+};
 use anyhow::{anyhow, Context};
 use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
-use std::collections::VecDeque;
-use std::io::Cursor;
+use std::{collections::VecDeque, io::Cursor, mem::replace};
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
 pub struct IDLDeserialize<'de> {
@@ -376,8 +377,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        let is_untyped = replace(&mut self.is_untyped, true);
         self.expect_type = self.wire_type.clone();
-        self.deserialize_any(visitor)
+        let v = self.deserialize_any(visitor);
+        self.is_untyped = is_untyped;
+        v
     }
 
     primitive_impl!(i8, Type::Int8, read_i8);
