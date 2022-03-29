@@ -1,6 +1,25 @@
 
 # Changelog
 
+
+## 2022-03-30 (Rust 0.7.14)
+
+* Fix subtype error message
+* Fix empty vec subtyping
+* Fix `deserialize_ignored_any` edge case
+
+## 2022-03-07 (Rust 0.7.13)
+
+* `FuncVisitor` to customize `Func` deserialization
+
+## 2022-03-07 (Rust 0.7.12)
+
+* `IDLValueVisitor` to customize `IDLValue` deserialization
+
+## 2022-02-11 (Rust 0.7.11)
+
+* `mute_warnings` feature to avoid `"FIX ME"` being printed to `stderr` 
+
 ## 2022-01-06 (Rust 0.7.10)
 
 * Bump ic-types to 0.3
