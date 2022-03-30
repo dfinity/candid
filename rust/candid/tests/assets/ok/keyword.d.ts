@@ -22,10 +22,8 @@ export interface _SERVICE {
   'return' : ActorMethod<[o], o>,
   'service' : t,
   'tuple' : ActorMethod<[[bigint, Array<number>, string]], [bigint, number]>,
-  'variant' : ActorMethod<[
-    { 'A' : null } |
-      { 'B' : null } |
-      { 'C' : null } |
-      { 'D' : number },
-  ], undefined>,
+  'variant' : ActorMethod<
+    [{ 'A' : null } | { 'B' : null } | { 'C' : null } | { 'D' : number }],
+    undefined,
+  >,
 }

@@ -34,12 +34,15 @@ export type tree = {
 export interface _SERVICE {
   'f' : ActorMethod<[list, Array<number>, [] | [boolean]], undefined>,
   'g' : ActorMethod<[my_type, List, [] | [List], nested], [bigint, Principal]>,
-  'h' : ActorMethod<[
-    Array<[] | [string]>,
-    { 'A' : bigint } |
-      { 'B' : [] | [string] },
-    [] | [List],
-  ], { _42_ : {}, 'id' : bigint }>,
+  'h' : ActorMethod<
+    [
+      Array<[] | [string]>,
+      { 'A' : bigint } |
+        { 'B' : [] | [string] },
+      [] | [List],
+    ],
+    { _42_ : {}, 'id' : bigint },
+  >,
   'i' : f,
   'x' : ActorMethod<[a, b], [[] | [a], [] | [b]]>,
 }

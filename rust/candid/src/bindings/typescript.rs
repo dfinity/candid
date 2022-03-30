@@ -78,11 +78,7 @@ fn pp_field<'a>(env: &'a TypeEnv, field: &'a Field, is_ref: bool) -> RcDoc<'a> {
 }
 
 fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
-    let args = func
-        .args
-        .iter()
-        .enumerate()
-        .map(|(_i, ty)| pp_ty(env, ty, true));
+    let args = func.args.iter().map(|ty| pp_ty(env, ty, true));
     let args = enclose("[", concat(args, ","), "]");
     let rets = match func.rets.len() {
         0 => str("undefined"),
@@ -93,11 +89,11 @@ fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
             "]",
         ),
     };
-    str("ActorMethod<")
-        .append(args)
-        .append(", ")
-        .append(rets)
-        .append(">")
+    enclose(
+        "ActorMethod<",
+        concat([args, rets].iter().cloned(), ","),
+        ">",
+    )
 }
 
 fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
@@ -153,19 +149,16 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
-    let header1 = r#"import type { Principal } from '@dfinity/principal';"#;
-    let header2 = r#"import type { ActorMethod } from '@dfinity/agent';"#;
+    let header = r#"import type { Principal } from '@dfinity/principal';
+import type { ActorMethod } from '@dfinity/agent';
+"#;
     let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
     let defs = pp_defs(env, &def_list);
     let actor = match actor {
         None => RcDoc::nil(),
         Some(actor) => pp_actor(env, actor),
     };
-    let doc = RcDoc::text(header1)
-        .append(RcDoc::line())
-        .append(RcDoc::text(header2))
-        .append(RcDoc::line())
-        // A line between the imports and the content is appropriate
+    let doc = RcDoc::text(header)
         .append(RcDoc::line())
         .append(defs)
         .append(actor);
