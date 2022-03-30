@@ -1,14 +1,14 @@
 import type { Principal } from '@dfinity/principal';
+import type { ActorMethod } from '@dfinity/agent';
+
 export type A = B;
 export type B = [] | [A];
 export type List = [] | [{ 'head' : bigint, 'tail' : List }];
 export type a = { 'a' : null } |
   { 'b' : b };
 export type b = [bigint, bigint];
-export interface broker { 'find' : (arg_0: string) => Promise<Principal> }
-export type f = (arg_0: List, arg_1: [Principal, string]) => Promise<
-    [] | [List]
-  >;
+export interface broker { 'find' : ActorMethod<[string], Principal> }
+export type f = ActorMethod<[List, [Principal, string]], [] | [List]>;
 export type list = [] | [node];
 export type my_type = Principal;
 export interface nested {
@@ -24,32 +24,25 @@ export interface nested {
   _42_ : bigint,
 }
 export interface node { 'head' : bigint, 'tail' : list }
-export interface s {
-  'f' : t,
-  'g' : (arg_0: list) => Promise<[B, tree, stream]>,
-}
+export interface s { 'f' : t, 'g' : ActorMethod<[list], [B, tree, stream]> }
 export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
-export type t = (arg_0: Principal) => Promise<undefined>;
+export type t = ActorMethod<[Principal], undefined>;
 export type tree = {
     'branch' : { 'val' : bigint, 'left' : tree, 'right' : tree }
   } |
   { 'leaf' : bigint };
 export interface _SERVICE {
-  'f' : (arg_0: list, arg_1: Array<number>, arg_2: [] | [boolean]) => Promise<
-      undefined
-    >,
-  'g' : (
-      arg_0: my_type,
-      arg_1: List,
-      arg_2: [] | [List],
-      arg_3: nested,
-    ) => Promise<[bigint, Principal]>,
-  'h' : (
-      arg_0: Array<[] | [string]>,
-      arg_1: { 'A' : bigint } |
+  'f' : ActorMethod<[list, Array<number>, [] | [boolean]], undefined>,
+  'g' : ActorMethod<[my_type, List, [] | [List], nested], [bigint, Principal]>,
+  'h' : ActorMethod<
+    [
+      Array<[] | [string]>,
+      { 'A' : bigint } |
         { 'B' : [] | [string] },
-      arg_2: [] | [List],
-    ) => Promise<{ _42_ : {}, 'id' : bigint }>,
+      [] | [List],
+    ],
+    { _42_ : {}, 'id' : bigint },
+  >,
   'i' : f,
-  'x' : (arg_0: a, arg_1: b) => Promise<[[] | [a], [] | [b]]>,
+  'x' : ActorMethod<[a, b], [[] | [a], [] | [b]]>,
 }

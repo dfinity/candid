@@ -1,6 +1,10 @@
 
 # Changelog
 
+## 2022-03-30
+
+* Update service methods in TS bindings to use ActorMethod, the type used by agent-js's Actor class
+
 ## 2022-01-06 (Rust 0.7.10)
 
 * Bump ic-types to 0.3
