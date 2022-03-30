@@ -1,9 +1,11 @@
 
 # Changelog
 
-## 2022-03-30
+## 2022-03-30 (Rust 0.7.11 -- 0.7.14)
 
 * Update service methods in TS bindings to use ActorMethod, the type used by agent-js's Actor class
+* Infer the type of `vec {}` to `vec empty` to satisfy subtype checking
+* Expose more internal structures
 
 ## 2022-01-06 (Rust 0.7.10)
 

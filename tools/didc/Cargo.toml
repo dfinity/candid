@@ -1,6 +1,6 @@
 [package]
 name = "didc"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["DFINITY Team"]
 edition = "2018"
 
