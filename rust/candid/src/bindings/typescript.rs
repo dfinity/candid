@@ -82,7 +82,7 @@ fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
         .args
         .iter()
         .enumerate()
-        .map(|(i, ty)| pp_ty(env, ty, true));
+        .map(|(_i, ty)| pp_ty(env, ty, true));
     let args = enclose("[", concat(args, ","), "]");
     let rets = match func.rets.len() {
         0 => str("undefined"),
