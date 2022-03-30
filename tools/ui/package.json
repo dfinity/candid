@@ -7,7 +7,7 @@
     "build": "webpack"
   },
   "devDependencies": {
-    "@dfinity/agent": "0.10.1",
+    '@dfinity/agent': "0.10.1",
     "@dfinity/candid": "0.10.1",
     "@dfinity/principal": "0.10.1",
     "buffer": "6.0.3",

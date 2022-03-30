@@ -82,22 +82,22 @@ fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
         .args
         .iter()
         .enumerate()
-        .map(|(i, ty)| RcDoc::text(format!("arg_{}: ", i)).append(pp_ty(env, ty, true)));
-    let args = enclose("(", concat(args, ","), ")");
-    let rets = str("Promise").append(enclose(
-        "<",
-        match func.rets.len() {
-            0 => str("undefined"),
-            1 => pp_ty(env, &func.rets[0], true),
-            _ => enclose(
-                "[",
-                concat(func.rets.iter().map(|ty| pp_ty(env, ty, true)), ","),
-                "]",
-            ),
-        },
-        ">",
-    ));
-    args.append(" => ").append(rets).nest(INDENT_SPACE)
+        .map(|(i, ty)| pp_ty(env, ty, true));
+    let args = enclose("[", concat(args, ","), "]");
+    let rets = match func.rets.len() {
+        0 => str("undefined"),
+        1 => pp_ty(env, &func.rets[0], true),
+        _ => enclose(
+            "[",
+            concat(func.rets.iter().map(|ty| pp_ty(env, ty, true)), ","),
+            "]",
+        ),
+    };
+    str("ActorMethod<")
+        .append(args)
+        .append(", ")
+        .append(rets)
+        .append(">")
 }
 
 fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
@@ -153,14 +153,19 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
-    let header = r#"import type { Principal } from '@dfinity/principal';"#;
+    let header1 = r#"import type { Principal } from '@dfinity/principal';"#;
+    let header2 = r#"import type { ActorMethod } from '@dfinity/agent';"#;
     let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
     let defs = pp_defs(env, &def_list);
     let actor = match actor {
         None => RcDoc::nil(),
         Some(actor) => pp_actor(env, actor),
     };
-    let doc = RcDoc::text(header)
+    let doc = RcDoc::text(header1)
+        .append(RcDoc::line())
+        .append(RcDoc::text(header2))
+        .append(RcDoc::line())
+        // A line between the imports and the content is appropriate
         .append(RcDoc::line())
         .append(defs)
         .append(actor);
