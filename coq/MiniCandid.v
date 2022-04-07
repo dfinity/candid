@@ -45,10 +45,9 @@ CoInductive T :=
 
 Values are inductive.
 
-Function reference values are modeled as a string, together with their “true type”.
-Since they always have function type, we store the argument and result type.
+Function reference values are modeled as an abstract type.
 *)
-Inductive Ref := MkRef : string -> T -> T -> Ref.
+Axiom Ref : Type.
 
 Inductive V :=
   | NatV : nat -> V
@@ -73,30 +72,40 @@ Definition is_opt_like_type (t : T) : bool :=
   end.
 
 
-(** The boring, non-subtyping typing relation. *)
-Inductive HasType : V -> T -> Prop :=
+(** The boring, non-subtyping typing relation.
+
+This is parametrized by a typing relation for references.
+*)
+Reserved Notation "G '|-' v ':::' T" (at level 80).
+
+Inductive HasType (G : Ref -> T -> T -> Prop) : V -> T -> Prop :=
   | NatHT:
     case natHT,
-    forall n, NatV n :: NatT
+    forall n,
+    G |- NatV n ::: NatT
   | IntHT:
     case intHT,
-    forall n, IntV n :: IntT
+    forall n,
+    G |- IntV n ::: IntT
   | NullHT:
     case nullHT,
-    NullV :: NullT
+    G |- NullV ::: NullT
   | NullOptHT:
     case nullOptHT,
-    forall t, NullV :: OptT t
+    forall t,
+    G |- NullV ::: OptT t
   | OptHT:
     case optHT,
-    forall v t, v :: t -> SomeV v :: OptT t
+    forall v t, G |- v ::: t ->
+    G |- SomeV v ::: OptT t
   | FuncHT:
     case funcHT,
-    forall rn t1 t2, FuncV (MkRef rn t1 t2) :: FuncT t1 t2
+    forall r t1 t2, G r t1 t2 ->
+    G |- FuncV r ::: FuncT t1 t2
   | ReservedHT:
     case reservedHT,
-    ReservedV :: ReservedT
-where "v :: t" := (HasType v t).
+    G |- ReservedV ::: ReservedT
+where "G |- v ::: t" := (HasType G v t).
 
 (** The subtyping relation *)
 Reserved Infix "<:" (at level 80, no associativity).
@@ -218,8 +227,8 @@ Function coerce (t1 : T) (t2 : T) (v1 : V) : option V :=
 
 (* We can prove the desired equation at least as an equality *)
 Lemma coerce_constituent_eq:
-  forall v t1 t2,
-  v :: t1 ->
+  forall G v t1 t2,
+  G |- v ::: t1 ->
   is_opt_like_type t1 = false ->
   is_opt_like_type t2 = false ->
   coerce t1 (OptT t2) v =
@@ -228,7 +237,7 @@ Lemma coerce_constituent_eq:
     | Some t => Some (SomeV t)
     end.
 Proof.
-  intros v t1 t2 HHT His_opt_like_t1 His_opt_like_t2.
+  intros G v t1 t2 HHT His_opt_like_t1 His_opt_like_t2.
   inversion HHT; subst; clear HHT; inversion His_opt_like_t1; clear His_opt_like_t1; name_cases.
   [natHT]: {
     destruct t2; subst; inversion His_opt_like_t2; clear His_opt_like_t2; simpl; try reflexivity.
@@ -424,8 +433,8 @@ Qed.
 Round-tripping
 *)
 Lemma coerce_roundtrip:
-  forall t1 v1,
-  v1 :: t1 ->
+  forall G t1 v1,
+  G |- v1 ::: t1 ->
   coerce t1 t1 v1 = Some v1.
 Proof.
 (** 
@@ -441,7 +450,7 @@ Proof.
   }
   [reservedC]: {  inversion H; subst; clear H; congruence. }
 *)
-  intros t1 v1 HHT.
+  intros G t1 v1 HHT.
   induction HHT; name_cases. all: simpl; try rewrite subtype_dec_refl; try reflexivity.
   * rewrite IHHHT; reflexivity.
 Qed.
@@ -451,16 +460,16 @@ Coercion does not fail on subtypes and well-typed values
 *)
 
 Lemma coerce_well_defined:
-  forall t1 t2 v1,
-  t1 <: t2 -> v1 :: t1 ->
+  forall G t1 t2 v1,
+  t1 <: t2 -> G |- v1 ::: t1 ->
   coerce t1 t2 v1 <> None.
 Proof.
-  intros t1 t2 v1 HST HHT.
+  intros G t1 t2 v1 HST HHT.
   revert t2 HST.
   induction HHT; name_cases; intros t3 HST; inversion HST.
   all: try (simpl; congruence).
   all: try (destruct t2; simpl; congruence).
-  * simpl; rewrite coerce_roundtrip; [|assumption]; congruence.
+  * simpl. rewrite (coerce_roundtrip G _ _ HHT). congruence.
   * simpl; destruct (coerce t t2 v) eqn:H2; try congruence.
   * simpl; rewrite subtype_dec_refl; congruence.
   * simpl. destruct t4;simpl; try congruence.
@@ -469,16 +478,21 @@ Proof.
 Qed.
 
 
+Definition Ok_ref_env (G : Ref -> T -> T -> Prop) :=
+  forall r ta1 tr1 ta2 tr2,
+  G r ta1 tr1 -> ta2 <: ta1 -> tr1 <: tr2 -> G r ta2 tr2.
+
 (**
 Coercion returns well-typed values
 *)
 
 Lemma coerce_well_typed:
-  forall t1 t2 v1 v2, v1 :: t1 ->
+  forall G, Ok_ref_env G ->
+  forall t1 t2 v1 v2, G |- v1 ::: t1 ->
   coerce t1 t2 v1 = Some v2 ->
-  v2 :: t2.
+  G |- v2 ::: t2.
 Proof.
-  intros t1 t2 v1 v2 HHT Heq.
+  intros G HG t1 t2 v1 v2 HHT Heq.
   revert t2 v2 Heq.
   induction HHT; name_cases; intros t3 v3 Heq.
   all: simpl in Heq; destruct t3; try congruence.
@@ -493,22 +507,26 @@ Proof.
       named_constructor; assumption.
     - inversion H0; clear H0; named_constructor.
   + destruct t3; try congruence.
-    all: inversion H0; clear H0; try named_constructor; try named_constructor.
+    all: inversion H1; clear H1; try named_constructor; try named_constructor.
     - destruct (FuncT t1 t2 <:? FuncT t3_1 t3_2) eqn:Hst.
-      * inversion H1; clear H1.
+      * inversion H2; clear H2.
+        named_constructor.
         named_constructor.
         (* This doesn’t quite work: Looks like :: needs to take <: into account in
         the FuncT case *)
         (* apply FuncHT. *)
-        admit.
-    
-      
-      
-  revert t1 t2 v2 Heq.
-  destruct t3; inversion Heq; try named_constructor.
-  * exact
-  apply coerce_nice_ind with (P := fun t1 t2 v1 v2 => v2 :: t2); intros; name_cases;
-     named_constructor; assumption.
+        inversion s; subst; clear s Hst.
+        ++ apply H.
+        ++ apply (HG _ _ _ _ _ H H4 H6).
+      * inversion H2; clear H2.
+        subst.
+        named_constructor.
+  + destruct (FuncT t1 t2 <:? FuncT t3_1 t3_2) eqn:Hst; try congruence.
+    inversion H1; subst; clear H1.
+    named_constructor.
+    inversion s; subst; clear s Hst.
+    ++ apply H.
+    ++ apply (HG _ _ _ _ _ H H3 H5).
 Qed.
 
 
@@ -582,12 +600,12 @@ Fixpoint typ_idx' (p : Path) (t : T) : T :=
 Properties about [val_idx] and [typ_idx'], mostly for sanity-checking
 *)
 Lemma path_preserves_types:
-  forall v v' t p,
-  v :: t ->
+  forall G v v' t p,
+  G |- v ::: t ->
   val_idx p v = Some v' ->
-  v' :: typ_idx' p t.
+  G |- v' ::: typ_idx' p t.
 Proof.
-  intros v v' t p.
+  intros G v v' t p.
   revert v v' t.
   induction p.
   * intros v v' t HHT Hval_idx.
@@ -600,12 +618,12 @@ Proof.
 Qed.
 
 Lemma val_idx_is_val_idx':
-  forall v v' t p,
-  v :: t ->
+  forall G v v' t p,
+  G |- v ::: t ->
   val_idx p v = Some v' ->
   val_idx' p v = v'.
 Proof.
-  intros v v' t p.
+  intros G v v' t p.
   revert v v' t.
   induction p.
   * intros v v' t HHT Hval_idx.
@@ -627,14 +645,17 @@ This may be proving a bit more than needed for compositionality, but it my be
 handy for other things.
 *)
 
+(* TODO: Update to option-returning coerce
+  (although we know it can't be Null due to coerce_well_defined) *)
+
 Lemma no_new_values:
-  forall t1 t2 v1,
+  forall G t1 t2 v1,
   t1 <: t2 ->
-  v1 :: t1 ->
+  G |- v1 ::: t1 ->
   forall p iv2,
   val_idx p (coerce t1 t2 v1) = Some iv2 ->
     (iv2 = NullV \/ typ_idx' p t1 <: typ_idx' p t2) /\
-    val_idx' p v1 :: typ_idx' p t1 /\
+    G |- val_idx' p v1 ::: typ_idx' p t1 /\
     coerce (typ_idx' p t1) (typ_idx' p t2) (val_idx' p v1) = iv2.
 Proof.
   apply (coerce_nice_ind (fun t1 t2 v1 v2 =>
