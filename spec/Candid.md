@@ -994,7 +994,7 @@ variant { <nat> = <v'> } : variant { <nat> : <t'>; _;* }
 
 #### References
 
-For function and services reference values, the coercion relation checks whether the given types are actually subtypes of the expected type, and fails else:
+For function and services reference values, the coercion relation checks whether the given types are actually subtypes of the expected type, and fails otherwise:
 
 ```
 func <functype> <: func <functype'>
