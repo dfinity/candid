@@ -121,7 +121,6 @@ assert blob "DIDL\02\6a\00\01\01\00\6b\01\00\7e\01\00\01\01\00\01m"
 
 // infinite types
 
-
 assert blob "DIDL\02\6a\00\01\01\00\6c\01\00\01\01\00\01\01\00\01m"
    == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (EmptyRecord)) "(µ record) <: (µ record)";
 assert blob "DIDL\02\6a\00\01\01\00\6c\01\00\01\01\00\01\01\00\01m"
@@ -154,3 +153,12 @@ assert blob "DIDL\02\6a\00\01\01\00\6d\01\01\00\01\01\00\01m"
    == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (vec Vec)) "(µ vec) <: vec {µ vec}";
 assert blob "DIDL\03\6a\00\01\01\00\6d\02\6d\02\01\00\01\01\00\01m"
    == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (Vec)) "vec {µ vec} <: (µ vec)";
+
+// future types
+// This uses 0x67 for the “future type”; bump (well, decrement) once that
+// becomes a concrete future type
+
+assert blob "DIDL\02\6a\00\01\01\00\67\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (opt empty)) "(future type) <: (opt empty)";
+assert blob "DIDL\02\6a\00\01\01\00\67\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (nat)) "(future type) <: (nat)";

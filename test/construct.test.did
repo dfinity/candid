@@ -203,3 +203,8 @@ assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa
 
 assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa\02\01\a2\e5\aa\02\04\bb\f1\aa\02\06\86\8e\b7\02\75\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\75\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\03\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\02\6e\05\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\04\6b\02\d3\e3\aa\02\7f\86\8e\b7\02\7f\01\00\01\0b\00\00\00\01\00\00\0a\00\00\00\01\14\00\00\2a\00\00\00" !: (record { foo: int; new_field: bool }) "new record field";
 
+// Future types
+// This uses 0x67 for the “future type”; bump (well, decrement) once that
+// becomes a concrete future type
+assert blob "DIDL\01\67\00\02\00\7e\00\00\01" == "(null, true)" : (opt empty,bool) "skipping minimal future type";
+assert blob "DIDL\01\67\03ABC\02\00\7e\05\00hello\01" == "(null,true)" : (opt empty,bool) "skipping future type with data";
