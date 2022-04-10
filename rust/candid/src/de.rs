@@ -26,13 +26,19 @@ impl<'de> IDLDeserialize<'de> {
     pub fn new(bytes: &'de [u8]) -> Result<Self> {
         let de = Deserializer::from_bytes(bytes)
             .with_context(|| format!("Cannot parse header {}", &hex::encode(bytes)))?;
-        Ok(IDLDeserialize { de, allow_trailing: false })
+        Ok(IDLDeserialize {
+            de,
+            allow_trailing: false
+        })
     }
     /// Create a new deserializer with IDL binary message, but allows trailing bytes
     pub fn new_allow_trailing(bytes: &'de [u8]) -> Result<Self> {
         let de = Deserializer::from_bytes(bytes)
             .with_context(|| format!("Cannot parse header {}", &hex::encode(bytes)))?;
-        Ok(IDLDeserialize { de, allow_trailing: true })
+        Ok(IDLDeserialize {
+            de,
+            allow_trailing: true
+        })
     }
     /// Deserialize one value from deserializer.
     pub fn get_value<T>(&mut self) -> Result<T>
