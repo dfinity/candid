@@ -19,13 +19,20 @@ use std::{collections::VecDeque, io::Cursor, mem::replace};
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
 pub struct IDLDeserialize<'de> {
     de: Deserializer<'de>,
+    allow_trailing: bool,
 }
 impl<'de> IDLDeserialize<'de> {
     /// Create a new deserializer with IDL binary message.
     pub fn new(bytes: &'de [u8]) -> Result<Self> {
         let de = Deserializer::from_bytes(bytes)
             .with_context(|| format!("Cannot parse header {}", &hex::encode(bytes)))?;
-        Ok(IDLDeserialize { de })
+        Ok(IDLDeserialize { de, allow_trailing: false })
+    }
+    /// Create a new deserializer with IDL binary message, but allows trailing bytes
+    pub fn new_allow_trailing(bytes: &'de [u8]) -> Result<Self> {
+        let de = Deserializer::from_bytes(bytes)
+            .with_context(|| format!("Cannot parse header {}", &hex::encode(bytes)))?;
+        Ok(IDLDeserialize { de, allow_trailing: true })
     }
     /// Deserialize one value from deserializer.
     pub fn get_value<T>(&mut self) -> Result<T>
@@ -101,7 +108,7 @@ impl<'de> IDLDeserialize<'de> {
         }
         let ind = self.de.input.position() as usize;
         let rest = &self.de.input.get_ref()[ind..];
-        if !rest.is_empty() {
+        if !rest.is_empty() && !self.allow_trailing {
             return Err(anyhow!(self.de.dump_state()))
                 .context("Trailing value after finishing deserialization")?;
         }
