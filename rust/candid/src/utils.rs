@@ -94,18 +94,16 @@ where
     de.done()?;
     Ok(res)
 }
-
 /// Same as decode_args, but allows trailing data
 pub fn decode_args_allow_trailing<'a, Tuple>(bytes: &'a [u8]) -> Result<Tuple>
-    where
-        Tuple: ArgumentDecoder<'a>,
+where
+    Tuple: ArgumentDecoder<'a>,
 {
     let mut de = IDLDeserialize::new_allow_trailing(bytes)?;
     let res = ArgumentDecoder::decode(&mut de)?;
     de.done()?;
     Ok(res)
 }
-
 /// Decode a single argument.
 ///
 /// Example:
@@ -126,16 +124,14 @@ where
     let (res,) = decode_args(bytes)?;
     Ok(res)
 }
-
 /// Same as decode_one, but allows trailing data
 pub fn decode_one_allow_trailing<'a, T>(bytes: &'a [u8]) -> Result<T>
-    where
-        T: Deserialize<'a> + CandidType,
+where
+    T: Deserialize<'a> + CandidType,
 {
     let (res,) = decode_args_allow_trailing(bytes)?;
     Ok(res)
 }
-
 /// Serialize an encoding of a tuple and write it to a `Write` buffer.
 ///
 /// ```
