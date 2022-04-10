@@ -28,7 +28,7 @@ impl<'de> IDLDeserialize<'de> {
             .with_context(|| format!("Cannot parse header {}", &hex::encode(bytes)))?;
         Ok(IDLDeserialize {
             de,
-            allow_trailing: false
+            allow_trailing: false,
         })
     }
     /// Create a new deserializer with IDL binary message, but allows trailing bytes
@@ -37,7 +37,7 @@ impl<'de> IDLDeserialize<'de> {
             .with_context(|| format!("Cannot parse header {}", &hex::encode(bytes)))?;
         Ok(IDLDeserialize {
             de,
-            allow_trailing: true
+            allow_trailing: true,
         })
     }
     /// Deserialize one value from deserializer.
