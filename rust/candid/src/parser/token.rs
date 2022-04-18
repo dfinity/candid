@@ -100,7 +100,7 @@ enum Text {
     Text,
     #[regex(r"\\.")]
     EscapeCharacter,
-    #[regex(r"\\u\{[0-9a-fA-F]+\}")]
+    #[regex(r"\\u\{[0-9a-fA-F][_0-9a-fA-F]*\}")]
     Codepoint,
     #[regex(r"\\[0-9a-fA-F][0-9a-fA-F]")]
     Byte,

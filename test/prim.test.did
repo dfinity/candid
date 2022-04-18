@@ -171,6 +171,7 @@ assert blob "DIDL\00\01\71\07Motoko"                  !: (text) "text: too short
 assert blob "DIDL\00\01\71\86\00Motoko"                : (text) "text: overlong length leb";
 assert blob "DIDL\00\01\71\03\e2\98\83" == "(\"☃\")"   : (text) "text: Unicode";
 assert "(\"\\u{2603}\")" == "(\"☃\")"                  : (text) "text: Unicode escape";
+assert "(\"\\u{26_03}\")" == "(\"☃\")"                 : (text) "text: Unicode escape with underscore";
 assert "(\"\\u{2603\")"                               !: (text) "text: Unicode escape (unclosed)";
 assert blob "DIDL\00\01\71\03\e2\28\a1"               !: (text) "text: Invalid utf8";
 assert blob "DIDL\00\01\71\02\e2\98\83"               !: (text) "text: Unicode overshoots";
