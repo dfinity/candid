@@ -231,8 +231,8 @@ impl<'input> Iterator for Tokenizer<'input> {
                         },
                         Some(Codepoint) => {
                             let slice = lex.slice();
-                            let hex = &slice[3..slice.len() - 1];
-                            match u32::from_str_radix(hex, 16)
+                            let hex = slice[3..slice.len() - 1].replace("_", "");
+                            match u32::from_str_radix(&hex, 16)
                                 .map_err(|_| {
                                     LexicalError::new("Not a valid hex escape", lex.span())
                                 })
