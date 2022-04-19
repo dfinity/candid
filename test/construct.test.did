@@ -188,7 +188,7 @@ assert blob "DIDL\02\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\01\6c\02\a0\d2\ac\a8\04
     == "(variant { cons = record { head = 1; tail = variant { cons = record { head = 2; tail = variant { nil } } } } })" : (VariantList) "variant: list";
 
 assert blob "DIDL\02\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\01\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\00\01\00\00"
-    == "(variant {nil}, null, null, null, null)" : (VariantList, opt VariantList, null, reserved, opt int) "variant: extra args";
+    == "(variant {nil}, null, null, null, null)" : (VariantList, opt VariantList, reserved, reserved, opt int) "variant: extra args";
 
 assert blob "DIDL\02\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\01\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\00\01\00\00" !: (VariantList, opt int, vec int) "non-null extra args";
 

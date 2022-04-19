@@ -50,13 +50,13 @@ impl<'de> IDLDeserialize<'de> {
     {
         let expected_type = self.de.table.trace_type(&expected_type)?;
         if self.de.types.is_empty() {
-            if matches!(expected_type, Type::Opt(_) | Type::Reserved | Type::Null) {
+            if matches!(expected_type, Type::Opt(_) | Type::Reserved) {
                 self.de.expect_type = expected_type;
-                self.de.wire_type = Type::Null;
+                self.de.wire_type = Type::Reserved;
                 return T::deserialize(&mut self.de);
             } else {
                 return Err(Error::msg(format!(
-                    "No more values on the wire, the expected type {} is not opt, reserved or null",
+                    "No more values on the wire, the expected type {} is not opt or reserved",
                     expected_type
                 )));
             }
