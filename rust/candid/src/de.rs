@@ -484,6 +484,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.expect_type = *t2.clone();
                 if BoolValue::read(&mut self.input)?.0 {
                     // this visitor is the same as visit_some, but converts Err to None
+                    // TODO the problem is that when decoding fails, it doesn't finish reading the whole part.
+                    // Then there is a mismatch with next read
                     visitor
                         .__private_visit_untagged_option(self)
                         .map_err(|_| Error::msg("cannot deserialize opt value"))
