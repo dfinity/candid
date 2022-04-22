@@ -495,6 +495,15 @@ impl<'de> Visitor<'de> for IDLValueVisitor {
         let v = Deserialize::deserialize(deserializer)?;
         Ok(IDLValue::Opt(Box::new(v)))
     }
+    fn __private_visit_untagged_option<D>(self, deserializer: D) -> DResult<()>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(match Deserialize::deserialize(deserializer) {
+            Ok(v) => IDLValue::Opt(Box::new(v)),
+            Err(_) => IDLValue::None,
+        })
+    }
     fn visit_unit<E>(self) -> DResult<E> {
         Ok(IDLValue::Null)
     }

@@ -70,15 +70,6 @@ impl<'de> IDLDeserialize<'de> {
             expected_type.clone()
         };
         self.de.wire_type = ty.clone();
-        self.de
-            .check_subtype()
-            .with_context(|| self.de.dump_state())
-            .with_context(|| {
-                format!(
-                    "Fail to decode argument {} from {} to {}",
-                    ind, ty, expected_type
-                )
-            })?;
 
         let v = T::deserialize(&mut self.de)
             .with_context(|| self.de.dump_state())
@@ -241,8 +232,7 @@ impl<'de> Deserializer<'de> {
                 .0
                 .try_into()
                 .map_err(Error::msg)?),
-            // We already did subtype checking before deserialize, so this is unreachable code
-            _ => assert!(false),
+            t => return Err(Error::msg(format!("{} cannot be deserialized to int", t))),
         };
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
         visitor.visit_byte_buf(bytes)
@@ -282,6 +272,7 @@ impl<'de> Deserializer<'de> {
     {
         self.unroll_type()?;
         assert!(matches!(self.wire_type, Type::Service(_)));
+        self.check_subtype()?;
         let mut bytes = vec![4u8];
         let id = PrincipalBytes::read(&mut self.input)?.inner;
         bytes.extend_from_slice(&id);
@@ -293,6 +284,7 @@ impl<'de> Deserializer<'de> {
     {
         self.unroll_type()?;
         assert!(matches!(self.wire_type, Type::Func(_)));
+        self.check_subtype()?;
         if !BoolValue::read(&mut self.input)?.0 {
             return Err(Error::msg("Opaque reference not supported"));
         }
@@ -414,7 +406,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
                 nat.0.try_into().map_err(Error::msg)?
             }
-            _ => assert!(false),
+            t => return Err(Error::msg(format!("{} cannot be deserialized to int", t))),
         };
         visitor.visit_i128(value)
     }
@@ -491,22 +483,27 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.wire_type = *t1.clone();
                 self.expect_type = *t2.clone();
                 if BoolValue::read(&mut self.input)?.0 {
+                    // this visitor is the same as visit_some, but converts Err to None
+                    visitor
+                        .__private_visit_untagged_option(self)
+                        .map_err(|_| Error::msg("cannot deserialize opt value"))
+                    /*
                     if self.check_subtype().is_ok() {
                         visitor.visit_some(self)
                     } else {
                         self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                         visitor.visit_none()
-                    }
+                    }*/
                 } else {
                     visitor.visit_none()
                 }
             }
             (_, Type::Opt(t2)) => {
                 self.expect_type = self.table.trace_type(&*t2)?;
-                if !matches!(self.expect_type, Type::Null | Type::Reserved | Type::Opt(_))
-                    && self.check_subtype().is_ok()
-                {
-                    visitor.visit_some(self)
+                if !matches!(self.expect_type, Type::Null | Type::Reserved | Type::Opt(_)) {
+                    visitor
+                        .__private_visit_untagged_option(self)
+                        .map_err(|_| Error::msg("cannot deserialize opt value"))
                 } else {
                     self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                     visitor.visit_none()
