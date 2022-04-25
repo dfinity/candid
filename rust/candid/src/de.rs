@@ -223,7 +223,6 @@ impl<'de> Deserializer<'de> {
     {
         use std::convert::TryInto;
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Int);
         let mut bytes = vec![0u8];
         let int = match &self.wire_type {
             Type::Int => Int::decode(&mut self.input).map_err(Error::msg)?,
@@ -235,6 +234,7 @@ impl<'de> Deserializer<'de> {
             t => return Err(Error::msg(format!("{} cannot be deserialized to int", t))),
         };
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
+        assert!(self.expect_type == Type::Int);
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_nat<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
@@ -242,9 +242,9 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
         let mut bytes = vec![1u8];
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
+        assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
         bytes.extend_from_slice(&nat.0.to_bytes_le());
         visitor.visit_byte_buf(bytes)
     }
@@ -253,9 +253,9 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Principal && self.wire_type == Type::Principal);
         let mut bytes = vec![2u8];
         let id = PrincipalBytes::read(&mut self.input)?.inner;
+        assert!(self.expect_type == Type::Principal && self.wire_type == Type::Principal);
         bytes.extend_from_slice(&id);
         visitor.visit_byte_buf(bytes)
     }
@@ -271,10 +271,10 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(matches!(self.wire_type, Type::Service(_)));
         self.check_subtype()?;
         let mut bytes = vec![4u8];
         let id = PrincipalBytes::read(&mut self.input)?.inner;
+        assert!(matches!(self.wire_type, Type::Service(_)));
         bytes.extend_from_slice(&id);
         visitor.visit_byte_buf(bytes)
     }
@@ -283,7 +283,6 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(matches!(self.wire_type, Type::Func(_)));
         self.check_subtype()?;
         if !BoolValue::read(&mut self.input)?.0 {
             return Err(Error::msg("Opaque reference not supported"));
@@ -294,6 +293,7 @@ impl<'de> Deserializer<'de> {
         let meth = self.borrow_bytes(len)?;
         // TODO find a better way
         leb128::write::unsigned(&mut bytes, len as u64)?;
+        assert!(matches!(self.wire_type, Type::Func(_)));
         bytes.extend_from_slice(meth);
         bytes.extend_from_slice(&id);
         visitor.visit_byte_buf(bytes)
@@ -312,9 +312,9 @@ macro_rules! primitive_impl {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
                 self.unroll_type()?;
-                assert!(self.expect_type == $type && self.wire_type == $type);
                 let val = self.input.$($value)*().map_err(|_| Error::msg(format!("Cannot read {} value", stringify!($type))))?;
                 //let val: $ty = self.input.read_le()?;
+                assert!(self.expect_type == $type && self.wire_type == $type);
                 visitor.[<visit_ $ty>](val)
             }
         }
@@ -396,7 +396,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         use std::convert::TryInto;
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Int);
         let value: i128 = match &self.wire_type {
             Type::Int => {
                 let int = Int::decode(&mut self.input).map_err(Error::msg)?;
@@ -408,6 +407,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             }
             t => return Err(Error::msg(format!("{} cannot be deserialized to int", t))),
         };
+        assert!(self.expect_type == Type::Int);
         visitor.visit_i128(value)
     }
     fn deserialize_u128<V>(self, visitor: V) -> Result<V::Value>
@@ -416,9 +416,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         use std::convert::TryInto;
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
         let value: u128 = nat.0.try_into().map_err(Error::msg)?;
+        assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
         visitor.visit_u128(value)
     }
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
@@ -434,8 +434,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Bool && self.wire_type == Type::Bool);
         let res = BoolValue::read(&mut self.input)?;
+        assert!(self.expect_type == Type::Bool && self.wire_type == Type::Bool);
         visitor.visit_bool(res.0)
     }
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
@@ -443,10 +443,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
         let len = Len::read(&mut self.input)?.0;
         let bytes = self.borrow_bytes(len)?.to_owned();
         let value = String::from_utf8(bytes).map_err(Error::msg)?;
+        assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
         visitor.visit_string(value)
     }
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
@@ -454,10 +454,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
         let len = Len::read(&mut self.input)?.0;
         let slice = self.borrow_bytes(len)?;
         let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
+        assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
         visitor.visit_borrowed_str(value)
     }
     fn deserialize_unit_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
@@ -483,9 +483,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.wire_type = *t1.clone();
                 self.expect_type = *t2.clone();
                 if BoolValue::read(&mut self.input)?.0 {
-                    // this visitor is the same as visit_some, but converts Err to None
-                    // TODO the problem is that when decoding fails, it doesn't finish reading the whole part.
-                    // Then there is a mismatch with next read
                     visitor
                         .__private_visit_untagged_option(self)
                         .map_err(|_| Error::msg("cannot deserialize opt value"))
@@ -546,13 +543,13 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
     fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         self.unroll_type()?;
+        let len = Len::read(&mut self.input)?.0;
+        let bytes = self.borrow_bytes(len)?.to_owned();
+        //let bytes = Bytes::read(&mut self.input)?.inner;
         assert!(
             self.expect_type == Type::Vec(Box::new(Type::Nat8))
                 && self.wire_type == Type::Vec(Box::new(Type::Nat8))
         );
-        let len = Len::read(&mut self.input)?.0;
-        let bytes = self.borrow_bytes(len)?.to_owned();
-        //let bytes = Bytes::read(&mut self.input)?.inner;
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
