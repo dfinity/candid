@@ -452,7 +452,7 @@ A *service reference* points to a service and is described by an actor type. Thr
 ```
 type broker = service {
   findCounterService : (name : text) ->
-    (service {up : () -> (); current : () -> nat});
+    (service {up : () -> (); current : () -> (nat)});
 }
 ```
 
