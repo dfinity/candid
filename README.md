@@ -27,6 +27,7 @@ A list of community maintained Candid libraries:
 * [Kotlin](https://github.com/seniorjoinu/candid-kt)
 * [AssemblyScript](https://github.com/rckprtr/cdk-as/tree/master/packages/cdk/assembly/candid)
 * [Java](https://github.com/ic4j/ic4j-candid)
+* [Dart](https://github.com/levifeldman/ic_tools_dart)
 
 ## Tools
 
