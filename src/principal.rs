@@ -5,15 +5,6 @@ use std::convert::TryFrom;
 use std::fmt::Write;
 use thiserror::Error;
 
-// TODO: remove (blocked by rust-lang/rust#85194)
-const ASSERT: [(); 1] = [()];
-macro_rules! const_panic {
-    ($($arg:tt)*) => {
-        #[allow(unconditional_panic)]
-        let _ = $crate::principal::ASSERT[1];
-    };
-}
-
 /// An error happened while encoding, decoding or serializing a principal.
 #[derive(Error, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -181,10 +172,7 @@ impl Principal {
         if let Ok(v) = Self::try_from_slice(bytes) {
             v
         } else {
-            // TODO: replace with panic (blocked by rust-lang/rust#85194)
-            const_panic!("slice length exceeded capacity");
-            //panic!("slice length exceeds capacity")
-            Self::management_canister()
+            panic!("slice length exceeds capacity")
         }
     }
 
@@ -429,10 +417,7 @@ mod inner {
             if let Some(v) = Self::try_from_slice(slice) {
                 v
             } else {
-                // TODO: replace with panic (blocked by rust-lang/rust#85194)
-                const_panic!("slice length exceeded capacity");
-                Self::new()
-                //panic!("slice length exceeds capacity")
+                panic!("slice length exceeds capacity")
             }
         }
 
