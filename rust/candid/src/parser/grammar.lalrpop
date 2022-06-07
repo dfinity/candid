@@ -263,7 +263,7 @@ Actor: IDLType = {
 
 MainActor: IDLType = {
     "service" "id"? ":" <t:Actor> ";"? => <>,
-    "service" "id"? ":" <args:TupTyp> "->" <t:Actor> ":"? => IDLType::ClassT(args, Box::new(t)),
+    "service" "id"? ":" <args:TupTyp> "->" <t:Actor> ";"? => IDLType::ClassT(args, Box::new(t)),
 }
 
 pub IDLProg: IDLProg = {
