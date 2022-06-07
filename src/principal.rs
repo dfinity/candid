@@ -162,12 +162,6 @@ impl Principal {
     /// # use ic_types::Principal;
     /// const BAR: Principal = Principal::from_slice(&[0; 32]); // Fails, too long
     /// ```
-    ///
-    /// ```compile_fail
-    /// # use ic_types::Principal;
-    /// // Fails, ends in 0x04 (anonymous), but has a prefix
-    /// const BAZ: Principal = Principal::from_slice(&[1,2,3,4]);
-    /// ```
     pub const fn from_slice(bytes: &[u8]) -> Self {
         if let Ok(v) = Self::try_from_slice(bytes) {
             v
@@ -182,7 +176,6 @@ impl Principal {
         match bytes {
             [] => Ok(Principal::management_canister()),
             [ANONYMOUS] => Ok(Principal::anonymous()),
-            [.., ANONYMOUS] => Err(PrincipalError::BufferTooLong()),
             bytes @ [..] => match PrincipalInner::try_from_slice(bytes) {
                 None => Err(PrincipalError::BufferTooLong()),
                 Some(v) => Ok(Principal(v)),
@@ -510,6 +503,14 @@ mod tests {
             .unwrap(),
             principal
         );
+    }
+
+    #[test]
+    fn long_blobs_ending_04_is_valid_principal() {
+        let blob: [u8; 18] = [
+            10, 116, 105, 100, 0, 0, 0, 0, 0, 144, 0, 51, 1, 1, 0, 0, 0, 4,
+        ];
+        assert!(Principal::try_from_slice(&blob).is_ok());
     }
 
     #[test]
