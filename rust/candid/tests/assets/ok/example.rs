@@ -45,7 +45,7 @@ struct h_ret0 { _42_: h_ret0_42, id: candid::Nat }
 
 type f = candid::Func;
 #[derive(CandidType, Deserialize)]
-struct b (candid::Int,candid::Nat,)
+struct b (candid::Int,candid::Nat,);
 
 #[derive(CandidType, Deserialize)]
 enum a { a, b(b) }

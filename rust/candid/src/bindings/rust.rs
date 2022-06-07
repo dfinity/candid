@@ -134,12 +134,20 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -
         let ty = env.find_type(id).unwrap();
         let name = ident(id).append(" ");
         match ty {
-            Type::Record(fs) => str(derive)
-                .append(RcDoc::line())
-                .append("struct ")
-                .append(name)
-                .append(pp_record_fields(fs, recs))
-                .append(RcDoc::hardline()),
+            Type::Record(fs) => {
+                let separator = if is_tuple(fs) {
+                    RcDoc::text(";")
+                } else {
+                    RcDoc::nil()
+                };
+                str(derive)
+                    .append(RcDoc::line())
+                    .append("struct ")
+                    .append(name)
+                    .append(pp_record_fields(fs, recs))
+                    .append(separator)
+                    .append(RcDoc::hardline())
+            }
             Type::Variant(fs) => str(derive)
                 .append(RcDoc::line())
                 .append("enum ")
