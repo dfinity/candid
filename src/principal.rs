@@ -421,22 +421,13 @@ mod inner {
             if len > MAX_LENGTH_IN_BYTES {
                 None
             } else {
-                // for-loops in const fn are not supported
-                const fn assign_recursive(
-                    mut v: [u8; MAX_LENGTH_IN_BYTES],
-                    slice: &[u8],
-                    index: usize,
-                ) -> [u8; MAX_LENGTH_IN_BYTES] {
-                    if index == 0 {
-                        v
-                    } else {
-                        let index = index - 1;
-                        v[index] = slice[index];
-                        assign_recursive(v, slice, index)
-                    }
+                let mut bytes = [0; MAX_LENGTH_IN_BYTES];
+                let mut i = 0;
+                while i < len {
+                    bytes[i] = slice[i];
+                    i += 1;
                 }
-                let bytes = assign_recursive([0; MAX_LENGTH_IN_BYTES], slice, len);
-                //bytes.copy_from_slice(slice);
+                //bytes[0..len].copy_from_slice(slice);
                 Some(PrincipalInner {
                     bytes,
                     len: len as u8,
