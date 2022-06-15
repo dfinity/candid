@@ -5,65 +5,36 @@ use std::convert::TryFrom;
 use std::fmt::Write;
 use thiserror::Error;
 
-/// An error happened while encoding, decoding or serializing a principal.
+/// An error happened while encoding, decoding or serializing a [`Principal`].
 #[derive(Error, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum PrincipalError {
-    #[error("Buffer is too long.")]
-    BufferTooLong(),
+    #[error("Bytes is longer than 29 bytes.")]
+    BytesTooLong(),
 
-    #[error(r#"Invalid textual format: expected "{0}""#)]
-    AbnormalTextualFormat(Principal),
+    #[error("Text must be in valid Base32 encoding.")]
+    InvalidBase32(),
 
-    #[error("Text must be a base 32 string.")]
-    InvalidTextualFormatNotBase32(),
+    #[error("Text is too short.")]
+    TextTooShort(),
 
-    #[error("Text cannot be converted to a Principal; too small.")]
-    TextTooSmall(),
+    #[error("Text is too long.")]
+    TextTooLong(),
+
+    #[error("CRC32 check sequence doesn't match with calculated from Principal bytes.")]
+    CheckSequenceNotMatch(),
+
+    #[error(r#"Text should be separated by - (dash) every 5 characters: expected "{0}""#)]
+    AbnormalGrouped(Principal),
 }
 
-/// A class of principal. Because this should not be exposed it
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(u8)]
-enum PrincipalClass {
-    OpaqueId = 1,
-    SelfAuthenticating = 2,
-    DerivedId = 3,
-    Anonymous = 4,
-    Unassigned,
-}
-
-impl From<PrincipalClass> for u8 {
-    fn from(class: PrincipalClass) -> u8 {
-        match class {
-            PrincipalClass::Unassigned => 0,
-            PrincipalClass::OpaqueId => 1,
-            PrincipalClass::SelfAuthenticating => 2,
-            PrincipalClass::DerivedId => 3,
-            PrincipalClass::Anonymous => 4,
-        }
-    }
-}
-
-impl TryFrom<u8> for PrincipalClass {
-    type Error = PrincipalError;
-
-    fn try_from(byte: u8) -> Result<Self, Self::Error> {
-        match byte {
-            1 => Ok(PrincipalClass::OpaqueId),
-            2 => Ok(PrincipalClass::SelfAuthenticating),
-            3 => Ok(PrincipalClass::DerivedId),
-            4 => Ok(PrincipalClass::Anonymous),
-            _ => Ok(PrincipalClass::Unassigned),
-        }
-    }
-}
-
-/// A principal describes the security context of an identity, namely
-/// any identity that can be authenticated along with a specific
-/// role. In the case of the Internet Computer this maps currently to
-/// the identities that can be authenticated by a canister. For example,
-/// a canister ID is a Principal. So is a user.
+/// Generic ID on Internet Computer.
+///
+/// Principals are generic identifiers for canisters, users
+/// and possibly other concepts in the future.
+/// As far as most uses of the IC are concerned they are
+/// opaque binary blobs with a length between 0 and 29 bytes,
+/// and there is intentionally no mechanism to tell canister ids and user ids apart.
 ///
 /// Note a principal is not necessarily tied with a public key-pair,
 /// yet we need at least a key-pair of a related principal to sign
@@ -113,123 +84,146 @@ impl TryFrom<u8> for PrincipalClass {
 /// );
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Principal(PrincipalInner);
+pub struct Principal {
+    /// Length.
+    len: u8,
+
+    /// The content buffer. When returning slices this should always be sized according to
+    /// `len`.
+    bytes: [u8; Self::MAX_LENGTH_IN_BYTES],
+}
 
 impl Principal {
+    const MAX_LENGTH_IN_BYTES: usize = 29;
     const CRC_LENGTH_IN_BYTES: usize = 4;
 
-    /// An empty principal that marks the system canister.
+    const SELF_AUTHENTICATING_TAG: u8 = 2;
+    const ANONYMOUS_TAG: u8 = 4;
+
+    /// Construct a [`Principal`] of the IC management canister
     pub const fn management_canister() -> Self {
-        Self(PrincipalInner::new())
+        Self {
+            len: 0,
+            bytes: [0; Self::MAX_LENGTH_IN_BYTES],
+        }
     }
 
-    /// Right now we are enforcing a Twisted Edwards Curve 25519 point
-    /// as the public key.
+    /// Construct a self-authenticating ID from public key
     pub fn self_authenticating<P: AsRef<[u8]>>(public_key: P) -> Self {
         let public_key = public_key.as_ref();
         let hash = Sha224::digest(public_key);
-        let mut inner = PrincipalInner::from_slice(hash.as_slice());
-        // Now add a suffix denoting the identifier as representing a
-        // self-authenticating principal.
-        inner.push(PrincipalClass::SelfAuthenticating as u8);
+        let mut bytes = [0; Self::MAX_LENGTH_IN_BYTES];
+        bytes[..Self::MAX_LENGTH_IN_BYTES - 1].copy_from_slice(hash.as_slice());
+        bytes[Self::MAX_LENGTH_IN_BYTES - 1] = Self::SELF_AUTHENTICATING_TAG;
 
-        Self(inner)
+        Self {
+            len: Self::MAX_LENGTH_IN_BYTES as u8,
+            bytes,
+        }
     }
 
-    /// An anonymous Principal.
+    /// Construct an anonymous ID.
     pub const fn anonymous() -> Self {
-        Self(PrincipalInner::from_slice(&[
-            PrincipalClass::Anonymous as u8
-        ]))
+        let mut bytes = [0; Self::MAX_LENGTH_IN_BYTES];
+        bytes[0] = Self::ANONYMOUS_TAG;
+        Self { len: 1, bytes }
     }
 
-    /// Attempt to decode a slice into a Principal.
+    /// Construct a [`Principal`] from a slice of bytes.
     ///
     /// # Panics
     ///
-    /// Panics if the bytes can't be interpreted.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ic_types::Principal;
-    /// const FOO: Principal = Principal::from_slice(&[0; 29]);    // normal length
-    /// const MGMT: Principal = Principal::from_slice(&[]);        // management
-    /// const OPQ: Principal = Principal::from_slice(&[4,3,2,1]);  // opaque id
-    /// ```
-    ///
-    /// ```compile_fail
-    /// # use ic_types::Principal;
-    /// const BAR: Principal = Principal::from_slice(&[0; 32]); // Fails, too long
-    /// ```
-    pub const fn from_slice(bytes: &[u8]) -> Self {
-        if let Ok(v) = Self::try_from_slice(bytes) {
-            v
-        } else {
-            panic!("slice length exceeds capacity")
+    /// Panics if the slice is longer than 29 bytes.
+    #[deprecated(
+        since = "0.4.0",
+        note = "use `Principal::try_from_slice` for better error handling"
+    )]
+    pub const fn from_slice(slice: &[u8]) -> Self {
+        match Self::try_from_slice(slice) {
+            Ok(v) => v,
+            _ => panic!("slice length exceeds capacity"),
         }
     }
 
-    /// Attempt to decode a slice into a Principal.
-    pub const fn try_from_slice(bytes: &[u8]) -> Result<Self, PrincipalError> {
-        const ANONYMOUS: u8 = PrincipalClass::Anonymous as u8;
-        match bytes {
-            [] => Ok(Principal::management_canister()),
-            [ANONYMOUS] => Ok(Principal::anonymous()),
-            bytes @ [..] => match PrincipalInner::try_from_slice(bytes) {
-                None => Err(PrincipalError::BufferTooLong()),
-                Some(v) => Ok(Principal(v)),
-            },
+    /// Construct a [`Principal`] from a slice of bytes.
+    pub const fn try_from_slice(slice: &[u8]) -> Result<Self, PrincipalError> {
+        const MAX_LENGTH_IN_BYTES: usize = Principal::MAX_LENGTH_IN_BYTES;
+        match slice.len() {
+            len @ 0..=MAX_LENGTH_IN_BYTES => {
+                let mut bytes = [0; MAX_LENGTH_IN_BYTES];
+                let mut i = 0;
+                while i < len {
+                    bytes[i] = slice[i];
+                    i += 1;
+                }
+                Ok(Self {
+                    len: len as u8,
+                    bytes,
+                })
+            }
+            _ => Err(PrincipalError::BytesTooLong()),
         }
     }
 
-    /// Parse the text format for canister IDs (e.g., `jkies-sibbb-ap6`).
-    ///
-    /// The text format follows the public spec (see Textual IDs section).
+    /// Parse a [`Principal`] from text representation.
     pub fn from_text<S: AsRef<str>>(text: S) -> Result<Self, PrincipalError> {
         // Strategy: Parse very liberally, then pretty-print and compare output
         // This is both simpler and yields better error messages
 
         let mut s = text.as_ref().to_string();
-        s.make_ascii_lowercase();
+        s.make_ascii_uppercase();
         s.retain(|c| c != '-');
-        match base32::decode(base32::Alphabet::RFC4648 { padding: false }, &s) {
-            Some(mut bytes) => {
-                if bytes.len() < Principal::CRC_LENGTH_IN_BYTES {
-                    return Err(PrincipalError::TextTooSmall());
+        match data_encoding::BASE32_NOPAD.decode(s.as_bytes()) {
+            Ok(bytes) => {
+                if bytes.len() < Self::CRC_LENGTH_IN_BYTES {
+                    return Err(PrincipalError::TextTooShort());
                 }
-                let result = Self::try_from(bytes.split_off(Principal::CRC_LENGTH_IN_BYTES))?;
+
+                let crc_bytes = &bytes[..Self::CRC_LENGTH_IN_BYTES];
+                let data_bytes = &bytes[Self::CRC_LENGTH_IN_BYTES..];
+                if data_bytes.len() > Self::MAX_LENGTH_IN_BYTES {
+                    return Err(PrincipalError::TextTooLong());
+                }
+
+                if crc32fast::hash(data_bytes).to_be_bytes() != crc_bytes {
+                    return Err(PrincipalError::CheckSequenceNotMatch());
+                }
+
+                // Already checked data_bytes.len() <= MAX_LENGTH_IN_BYTES
+                // safe to unwrap here
+                let result = Self::try_from_slice(data_bytes).unwrap();
                 let expected = format!("{}", result);
 
-                if text.as_ref() != expected {
-                    return Err(PrincipalError::AbnormalTextualFormat(result));
+                // In the Spec:
+                // The textual representation is conventionally printed with lower case letters,
+                // but parsed case-insensitively.
+                if text.as_ref().to_ascii_lowercase() != expected {
+                    return Err(PrincipalError::AbnormalGrouped(result));
                 }
                 Ok(result)
             }
-            None => Err(PrincipalError::InvalidTextualFormatNotBase32()),
+            _ => Err(PrincipalError::InvalidBase32()),
         }
     }
 
-    /// Returns this Principal's text representation. The text representation is described
-    /// in the spec.
+    /// Convert [`Principal`] to text representation.
     pub fn to_text(&self) -> String {
         format!("{}", self)
     }
 
-    /// Returns this Principal's bytes.
+    /// Return the [`Principal`]'s underlying slice of bytes.
+    #[inline]
     pub fn as_slice(&self) -> &[u8] {
-        self.as_ref()
+        &self.bytes[..self.len as usize]
     }
 }
 
 impl std::fmt::Display for Principal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let blob: &[u8] = self.0.as_ref();
+        let blob: &[u8] = self.as_slice();
 
         // calc checksum
-        let mut hasher = crc32fast::Hasher::new();
-        hasher.update(blob);
-        let checksum = hasher.finalize();
+        let checksum = crc32fast::hash(blob);
 
         // combine blobs
         let mut bytes = vec![];
@@ -237,7 +231,7 @@ impl std::fmt::Display for Principal {
         bytes.extend_from_slice(blob);
 
         // base32
-        let mut s = base32::encode(base32::Alphabet::RFC4648 { padding: false }, &bytes);
+        let mut s = data_encoding::BASE32_NOPAD.encode(&bytes);
         s.make_ascii_lowercase();
 
         // write out string with dashes
@@ -267,7 +261,6 @@ impl TryFrom<&str> for Principal {
     }
 }
 
-/// Vector TryFrom. The slice and array version of this trait are defined below.
 impl TryFrom<Vec<u8>> for Principal {
     type Error = PrincipalError;
 
@@ -284,7 +277,6 @@ impl TryFrom<&Vec<u8>> for Principal {
     }
 }
 
-/// Implement try_from for a generic sized slice.
 impl TryFrom<&[u8]> for Principal {
     type Error = PrincipalError;
 
@@ -295,7 +287,7 @@ impl TryFrom<&[u8]> for Principal {
 
 impl AsRef<[u8]> for Principal {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
+        self.as_slice()
     }
 }
 
@@ -306,7 +298,7 @@ impl serde::Serialize for Principal {
         if serializer.is_human_readable() {
             self.to_text().serialize(serializer)
         } else {
-            serializer.serialize_bytes(self.0.as_ref())
+            serializer.serialize_bytes(self.as_slice())
         }
     }
 }
@@ -317,8 +309,8 @@ mod deserialize {
     use super::Principal;
     use std::convert::TryFrom;
 
-    /// Simple visitor for deserialization from bytes. We don't support other number types
-    /// as there's no need for it.
+    // Simple visitor for deserialization from bytes. We don't support other number types
+    // as there's no need for it.
     pub(super) struct PrincipalVisitor;
 
     impl<'de> serde::de::Visitor<'de> for PrincipalVisitor {
@@ -368,249 +360,5 @@ impl<'de> serde::Deserialize<'de> for Principal {
                 .deserialize_bytes(deserialize::PrincipalVisitor)
                 .map_err(D::Error::custom)
         }
-    }
-}
-
-mod inner {
-    use sha2::{
-        digest::{generic_array::typenum::Unsigned, OutputSizeUser},
-        Sha224,
-    };
-
-    /// Inner structure of a Principal. This is not meant to be public as the different classes
-    /// of principals are not public.
-    ///
-    /// This is a length (1 byte) and 29 bytes. The length can be 0, but won't ever be longer
-    /// than 29. The current interface spec says that principals cannot be longer than 29 bytes.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    #[repr(packed)]
-    pub struct PrincipalInner {
-        /// Length.
-        len: u8,
-
-        /// The content buffer. When returning slices this should always be sized according to
-        /// `len`.
-        bytes: [u8; Self::MAX_LENGTH_IN_BYTES],
-    }
-
-    impl PrincipalInner {
-        const HASH_LEN_IN_BYTES: usize =
-            <<Sha224 as OutputSizeUser>::OutputSize as Unsigned>::USIZE; // 28
-        const MAX_LENGTH_IN_BYTES: usize = Self::HASH_LEN_IN_BYTES + 1; // 29
-
-        pub const fn new() -> Self {
-            PrincipalInner {
-                len: 0,
-                bytes: [0; Self::MAX_LENGTH_IN_BYTES],
-            }
-        }
-
-        /// Panics if the length is over `MAX_LENGTH_IN_BYTES`
-        pub const fn from_slice(slice: &[u8]) -> Self {
-            if let Some(v) = Self::try_from_slice(slice) {
-                v
-            } else {
-                panic!("slice length exceeds capacity")
-            }
-        }
-
-        /// Returns none if the slice length is over `MAX_LENGTH_IN_BYTES`
-        pub const fn try_from_slice(slice: &[u8]) -> Option<Self> {
-            let len = slice.len();
-            const MAX_LENGTH_IN_BYTES: usize = PrincipalInner::MAX_LENGTH_IN_BYTES;
-            if len > MAX_LENGTH_IN_BYTES {
-                None
-            } else {
-                let mut bytes = [0; MAX_LENGTH_IN_BYTES];
-                let mut i = 0;
-                while i < len {
-                    bytes[i] = slice[i];
-                    i += 1;
-                }
-                //bytes[0..len].copy_from_slice(slice);
-                Some(PrincipalInner {
-                    bytes,
-                    len: len as u8,
-                })
-            }
-        }
-
-        #[inline]
-        pub fn as_slice(&self) -> &[u8] {
-            &self.bytes[..self.len as usize]
-        }
-
-        pub fn push(&mut self, val: u8) {
-            if self.len >= Self::MAX_LENGTH_IN_BYTES as u8 {
-                panic!("capacity overflow");
-            } else {
-                self.bytes[self.len as usize] = val;
-                self.len += 1;
-            }
-        }
-    }
-
-    impl AsRef<[u8]> for PrincipalInner {
-        fn as_ref(&self) -> &[u8] {
-            self.as_slice()
-        }
-    }
-}
-use inner::PrincipalInner;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::str::FromStr;
-
-    #[test]
-    #[should_panic]
-    fn inner_fails() {
-        let _ = inner::PrincipalInner::from_slice(&[0; 32]);
-    }
-
-    #[test]
-    fn inner() {
-        let _ = inner::PrincipalInner::from_slice(&[0; 29]);
-        let _ = inner::PrincipalInner::from_slice(&[0; 0]);
-        let _ = inner::PrincipalInner::from_slice(&[0; 4]);
-    }
-
-    #[cfg(feature = "serde")]
-    #[test]
-    fn serializes() {
-        let seed = [
-            0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22,
-            0x11, 0x00, 0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44,
-            0x33, 0x22, 0x11, 0x00,
-        ];
-        let principal: Principal = Principal::self_authenticating(&seed);
-        assert_eq!(
-            serde_cbor::from_slice::<Principal>(
-                serde_cbor::to_vec(&principal)
-                    .expect("Failed to serialize")
-                    .as_slice()
-            )
-            .unwrap(),
-            principal
-        );
-    }
-
-    #[test]
-    fn long_blobs_ending_04_is_valid_principal() {
-        let blob: [u8; 18] = [
-            10, 116, 105, 100, 0, 0, 0, 0, 0, 144, 0, 51, 1, 1, 0, 0, 0, 4,
-        ];
-        assert!(Principal::try_from_slice(&blob).is_ok());
-    }
-
-    #[test]
-    fn parse_management_canister_ok() {
-        assert_eq!(
-            Principal::from_str("aaaaa-aa").unwrap(),
-            Principal::management_canister(),
-        );
-    }
-
-    #[test]
-    fn parse_text_bad_format() {
-        assert_eq!(
-            Principal::from_str("aaaaa-aA").unwrap_err().to_string(),
-            r#"Invalid textual format: expected "aaaaa-aa""#,
-        );
-    }
-
-    #[test]
-    fn parse_management_canister_to_text_ok() {
-        assert_eq!(
-            Principal::from_str("aaaaa-aa").unwrap().as_slice(),
-            &[0u8; 0]
-        );
-    }
-
-    #[test]
-    fn create_managment_cid_from_empty_blob_ok() {
-        assert_eq!(Principal::management_canister().to_text(), "aaaaa-aa");
-    }
-
-    #[test]
-    fn create_managment_cid_from_text_ok() {
-        assert_eq!(
-            Principal::from_str("aaaaa-aa").unwrap().to_text(),
-            "aaaaa-aa",
-        );
-    }
-
-    #[test]
-    fn display_canister_id() {
-        assert_eq!(
-            Principal::try_from(vec![0xef, 0xcd, 0xab, 0, 0, 0, 0, 0, 1])
-                .unwrap()
-                .to_text(),
-            "2chl6-4hpzw-vqaaa-aaaaa-c",
-        );
-    }
-
-    #[test]
-    fn display_canister_id_from_bytes_as_bytes() {
-        assert_eq!(
-            Principal::try_from(vec![0xef, 0xcd, 0xab, 0, 0, 0, 0, 0, 1])
-                .unwrap()
-                .as_slice(),
-            &[0xef, 0xcd, 0xab, 0, 0, 0, 0, 0, 1],
-        );
-    }
-
-    #[test]
-    fn display_canister_id_from_blob_as_bytes() {
-        assert_eq!(
-            Principal::try_from(vec![0xef, 0xcd, 0xab, 0, 0, 0, 0, 0, 1])
-                .unwrap()
-                .as_slice(),
-            &[0xef, 0xcd, 0xab, 0, 0, 0, 0, 0, 1],
-        );
-    }
-
-    #[test]
-    fn display_canister_id_from_text_as_bytes() {
-        assert_eq!(
-            Principal::from_str("2chl6-4hpzw-vqaaa-aaaaa-c")
-                .unwrap()
-                .as_slice(),
-            &[0xef, 0xcd, 0xab, 0, 0, 0, 0, 0, 1],
-        );
-    }
-
-    #[cfg(feature = "serde")]
-    #[test]
-    fn check_serde_cbor() {
-        let id = Principal::from_str("2chl6-4hpzw-vqaaa-aaaaa-c").unwrap();
-
-        // Use cbor serialization.
-        let vec = serde_cbor::to_vec(&id).unwrap();
-        let value = serde_cbor::from_slice(vec.as_slice()).unwrap();
-
-        assert_eq!(id, value);
-    }
-
-    #[cfg(feature = "serde")]
-    #[test]
-    fn check_serde_json() {
-        let id = Principal::from_str("2chl6-4hpzw-vqaaa-aaaaa-c").unwrap();
-
-        // Use cbor serialization.
-        let ser = serde_json::to_string(&id).unwrap();
-        let de = serde_json::from_str::<Principal>(&ser).unwrap();
-
-        assert_eq!(id, de);
-    }
-
-    #[test]
-    fn text_form() {
-        let cid = Principal::try_from(vec![1, 8, 64, 255]).unwrap();
-        let text = cid.to_text();
-        let cid2 = Principal::from_str(&text).unwrap();
-        assert_eq!(cid, cid2);
-        assert_eq!(text, "jkies-sibbb-ap6");
     }
 }
