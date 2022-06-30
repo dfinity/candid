@@ -351,7 +351,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       textContainer.innerHTML = decodeSpace(text);
       const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
       log(decodeSpace(`› ${name}${showArgs}`));
-      if (profiler) {
+      if (profiler && !idlFunc.annotations.includes('query')) {
         await renderFlameGraph(profiler);
       }
       log(decodeSpace(text));
@@ -376,7 +376,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
     })().catch(err => {
       resultDiv.classList.add('error');
       left.innerText = err.message;
-      if (profiler) {
+      if (profiler && !idlFunc.annotations.includes('query')) {
         const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
         log(`[Error] ${name}${showArgs}`);
         renderFlameGraph(profiler);
