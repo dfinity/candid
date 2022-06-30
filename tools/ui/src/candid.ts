@@ -53,13 +53,16 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
     const source = window.atob(maybeDid);
     js = await didToJs(source);
   } else {
-    try {
-      js = await getRemoteDidJs(canisterId);
-    } catch(err) {
-      if (/no query method/.test(err)) {
-        js = await getLocalDidJs(canisterId);
-      } else {
-        throw(err);
+    js = await getDidJsFromMetadata(canisterId);
+    if (!js) {
+      try {
+        js = await getDidJsFromTmpHack(canisterId);
+      } catch(err) {
+        if (/no query method/.test(err)) {
+          js = undefined;
+        } else {
+          throw(err);
+        }
       }
     }
   }
@@ -102,6 +105,16 @@ export async function getNames(canisterId: Principal) {
     const decoded = IDL.decode([IDL.Vec(IDL.Tuple(IDL.Nat16, IDL.Text))], blob)[0] as Array<[number,string]>;
     decoded.forEach(([id, name]) => names[id] = name);
   } catch(err) {
+    return undefined;
+  }
+}
+
+async function getDidJsFromMetadata(canisterId: Principal): Promise<undefined | string> {
+  const status = await CanisterStatus.request({ agent, canisterId, paths: ['candid'] });
+  const did = status.get('candid') as string | null;
+  if (did) {
+    return didToJs(did);
+  } else {
     return undefined;
   }
 }
@@ -176,17 +189,7 @@ async function renderFlameGraph(profiler: any) {
   }
 }
 
-async function getLocalDidJs(canisterId: Principal): Promise<undefined | string> {
-  const origin = window.location.origin;
-  const url = `${origin}/_/candid?canisterId=${canisterId.toText()}&format=js`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    return undefined;
-  }
-  return response.text();
-}
-
-async function getRemoteDidJs(canisterId: Principal): Promise<undefined | string> {
+async function getDidJsFromTmpHack(canisterId: Principal): Promise<undefined | string> {
   const common_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
     __get_candid_interface_tmp_hack: IDL.Func([], [IDL.Text], ['query']),
   });
