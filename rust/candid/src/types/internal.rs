@@ -423,7 +423,9 @@ pub(crate) fn env_id(id: TypeId, t: Type) {
     ID.with(|n| {
         let mut n = n.borrow_mut();
         match n.get_mut(&t) {
-            None => drop(n.insert(t, id)),
+            None => {
+                n.insert(t, id);
+            }
             Some(v) => {
                 if new_len < v.name.len() {
                     *v = id;
