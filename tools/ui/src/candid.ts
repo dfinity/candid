@@ -1,4 +1,4 @@
-import { Actor, HttpAgent, ActorSubclass } from '@dfinity/agent';
+import { Actor, HttpAgent, ActorSubclass, CanisterStatus } from '@dfinity/agent';
 import {
   IDL, InputBox, renderInput, renderValue
 } from '@dfinity/candid';
@@ -53,13 +53,16 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
     const source = window.atob(maybeDid);
     js = await didToJs(source);
   } else {
-    try {
-      js = await getRemoteDidJs(canisterId);
-    } catch(err) {
-      if (/no query method/.test(err)) {
-        js = await getLocalDidJs(canisterId);
-      } else {
-        throw(err);
+    js = await getDidJsFromMetadata(canisterId);
+    if (!js) {
+      try {
+        js = await getDidJsFromTmpHack(canisterId);
+      } catch(err) {
+        if (/no query method/.test(err)) {
+          js = undefined;
+        } else {
+          throw(err);
+        }
       }
     }
   }
@@ -74,7 +77,6 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
 export function getProfilerActor(canisterId: Principal): ActorSubclass {
   const profiler_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
     __get_profiling: IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Int32, IDL.Int64))], ['query']),
-    __get_names: IDL.Func([], [IDL.Vec(IDL.Nat8)], ['query']),
     __get_cycles: IDL.Func([], [IDL.Int64], ['query']),
   });
   return Actor.createActor(profiler_interface, { agent, canisterId });
@@ -92,11 +94,27 @@ export async function getCycles(canisterId: Principal): Promise<bigint|undefined
 
 export async function getNames(canisterId: Principal) {
   try {
-    const actor = getProfilerActor(canisterId);
-    const blob = await actor.__get_names() as number[];
-    const decoded = IDL.decode([IDL.Vec(IDL.Tuple(IDL.Nat16, IDL.Text))], Uint8Array.from(blob))[0] as Array<[number,string]>;
+    const paths : CanisterStatus.Path[] = [{
+      kind: 'metadata',
+      path: 'name',
+      key: 'name',
+      decodeStrategy: 'raw',
+    }];
+    const status = await CanisterStatus.request({ agent, canisterId, paths });
+    const blob = status.get('name') as ArrayBuffer;
+    const decoded = IDL.decode([IDL.Vec(IDL.Tuple(IDL.Nat16, IDL.Text))], blob)[0] as Array<[number,string]>;
     decoded.forEach(([id, name]) => names[id] = name);
   } catch(err) {
+    return undefined;
+  }
+}
+
+async function getDidJsFromMetadata(canisterId: Principal): Promise<undefined | string> {
+  const status = await CanisterStatus.request({ agent, canisterId, paths: ['candid'] });
+  const did = status.get('candid') as string | null;
+  if (did) {
+    return didToJs(did);
+  } else {
     return undefined;
   }
 }
@@ -159,7 +177,7 @@ function decodeProfiling(input: Array<[number, bigint]>) {
 async function renderFlameGraph(profiler: any) {
   const profiling = decodeProfiling(await profiler());
   //console.log(profiling);
-  if (profiling) {
+  if (typeof profiling !== 'undefined') {
     let div = document.createElement('div');
     div.id = 'chart';
     log(div);
@@ -171,17 +189,7 @@ async function renderFlameGraph(profiler: any) {
   }
 }
 
-async function getLocalDidJs(canisterId: Principal): Promise<undefined | string> {
-  const origin = window.location.origin;
-  const url = `${origin}/_/candid?canisterId=${canisterId.toText()}&format=js`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    return undefined;
-  }
-  return response.text();
-}
-
-async function getRemoteDidJs(canisterId: Principal): Promise<undefined | string> {
+async function getDidJsFromTmpHack(canisterId: Principal): Promise<undefined | string> {
   const common_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
     __get_candid_interface_tmp_hack: IDL.Func([], [IDL.Text], ['query']),
   });
@@ -207,7 +215,7 @@ async function didToJs(candid_source: string): Promise<undefined | string> {
 export function render(id: Principal, canister: ActorSubclass, profiling: bigint|undefined) {
   document.getElementById('canisterId')!.innerText = `${id}`;
   let profiler;
-  if (profiling) {
+  if (typeof profiling !== 'undefined') {
     log(`Wasm instructions executed ${profiling} instrs.`);
     profiler = async () => { return await getProfiling(id) };
   }
@@ -343,7 +351,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       textContainer.innerHTML = decodeSpace(text);
       const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
       log(decodeSpace(`› ${name}${showArgs}`));
-      if (profiler) {
+      if (profiler && !idlFunc.annotations.includes('query')) {
         await renderFlameGraph(profiler);
       }
       log(decodeSpace(text));
@@ -368,7 +376,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
     })().catch(err => {
       resultDiv.classList.add('error');
       left.innerText = err.message;
-      if (profiler) {
+      if (profiler && !idlFunc.annotations.includes('query')) {
         const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
         log(`[Error] ${name}${showArgs}`);
         renderFlameGraph(profiler);

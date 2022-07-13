@@ -14,6 +14,7 @@ use anyhow::{anyhow, Context};
 use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
+use std::fmt::Write;
 use std::{collections::VecDeque, io::Cursor, mem::replace};
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
@@ -166,14 +167,16 @@ impl<'de> Deserializer<'de> {
         let (before, after) = hex.split_at(pos);
         let mut res = format!("input: {}_{}\n", before, after);
         if !self.table.0.is_empty() {
-            res += &format!("table: {}", self.table);
+            write!(&mut res, "table: {}", self.table).unwrap();
         }
-        res += &format!(
+        write!(
+            &mut res,
             "wire_type: {}, expect_type: {}",
             self.wire_type, self.expect_type
-        );
+        )
+        .unwrap();
         if let Some(field) = &self.field_name {
-            res += &format!(", field_name: {:?}", field);
+            write!(&mut res, ", field_name: {:?}", field).unwrap();
         }
         res
     }
@@ -865,7 +868,7 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
                         Type::Record(_) => "struct",
                         _ => "newtype",
                     };
-                    label += &format!(",{},{}", label_type, accessor);
+                    write!(&mut label, ",{},{}", label_type, accessor).map_err(Error::msg)?;
                 }
                 self.de.set_field_name(Label::Named(label));
                 let field = seed.deserialize(&mut *self.de)?;
