@@ -770,8 +770,9 @@ checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "ic-types"
-version = "0.4.0-beta.0"
-source = "git+https://github.com/dfinity/ic-types?branch=lwshang/principal_overhaul#0ce76396b98b6c685485592b25387fbffc6b33a1"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a67e4edc28c09d29ab97b50410245c91d71756eaf3956212e3488cd6eb75fda4"
 dependencies = [
  "crc32fast",
  "data-encoding",
