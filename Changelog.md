@@ -1,6 +1,23 @@
 
 # Changelog
 
+## 2022-07-13
+
+### Rust (0.7.15)
+
+* Fix parser: underscore for hexnum; semicolon at the EOF
+* Fix semicolon in Rust binding
+* Derive `Copy`, `Eq`, `Default` for `Reserved`
+* Bump `ic-types` to `0.4`
+
+### Candid UI
+
+* Fetch did file from canister metadata
+* Deprecate `localhost/_/candid` endpoint
+* Fetch name section from metadata (instrumented code)
+* Bug fix for encoding `vec nat8` types
+* Disable profiler for query methods
+
 ## 2022-03-30 (Rust 0.7.11 -- 0.7.14)
 
 * Update service methods in TS bindings to use ActorMethod, the type used by agent-js's Actor class
