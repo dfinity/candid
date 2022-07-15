@@ -134,10 +134,6 @@ impl Principal {
     /// # Panics
     ///
     /// Panics if the slice is longer than 29 bytes.
-    #[deprecated(
-        since = "0.4.0",
-        note = "use `Principal::try_from_slice` for better error handling"
-    )]
     pub const fn from_slice(slice: &[u8]) -> Self {
         match Self::try_from_slice(slice) {
             Ok(v) => v,
