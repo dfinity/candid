@@ -32,7 +32,7 @@ export type tree = {
   } |
   { 'leaf' : bigint };
 export interface _SERVICE {
-  'f' : ActorMethod<[list, Array<number>, [] | [boolean]], undefined>,
+  'f' : ActorMethod<[list, Uint8Array, [] | [boolean]], undefined>,
   'g' : ActorMethod<[my_type, List, [] | [List], nested], [bigint, Principal]>,
   'h' : ActorMethod<
     [
