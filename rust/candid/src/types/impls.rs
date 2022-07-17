@@ -394,6 +394,36 @@ where
     }
 }
 
+impl<T> CandidType for std::rc::Rc<T>
+where
+    T: CandidType,
+{
+    fn _ty() -> Type {
+        T::ty()
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        self.as_ref().idl_serialize(serializer)
+    }
+}
+
+impl<T> CandidType for std::sync::Arc<T>
+where
+    T: CandidType,
+{
+    fn _ty() -> Type {
+        T::ty()
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        self.as_ref().idl_serialize(serializer)
+    }
+}
+
 macro_rules! tuple_impls {
     ($($len:expr => ($($n:tt $name:ident)+))+) => {
         $(
