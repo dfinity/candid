@@ -38,7 +38,33 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         }
         Principal => str("Principal"),
         Opt(ref t) => str("[] | ").append(enclose("[", pp_ty(env, t, is_ref), "]")),
-        Vec(ref t) => str("Array").append(enclose("<", pp_ty(env, t, is_ref), ">")),
+        Vec(ref t) => {
+            let ty = match **t {
+                Var(ref id) => {
+                    let ty = env.rec_find_type(id).unwrap();
+                    if matches!(
+                        ty,
+                        Nat8 | Nat16 | Nat32 | Nat64 | Int8 | Int16 | Int32 | Int64
+                    ) {
+                        ty
+                    } else {
+                        t
+                    }
+                }
+                _ => t,
+            };
+            match *ty {
+                Nat8 => str("Uint8Array"),
+                Nat16 => str("Uint16Array"),
+                Nat32 => str("Uint32Array"),
+                Nat64 => str("BigUint64Array"),
+                Int8 => str("Int8Array"),
+                Int16 => str("Int16Array"),
+                Int32 => str("Int32Array"),
+                Int64 => str("BigInt64Array"),
+                _ => str("Array").append(enclose("<", pp_ty(env, t, is_ref), ">")),
+            }
+        }
         Record(ref fs) => {
             if is_tuple(ty) {
                 let tuple = concat(fs.iter().map(|f| pp_ty(env, &f.ty, is_ref)), ",");
