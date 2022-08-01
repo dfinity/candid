@@ -75,7 +75,7 @@ pub enum Token {
     #[regex("0[xX][0-9a-fA-F][_0-9a-fA-F]*", parse_number)]
     Hex(String),
     #[regex("[0-9]*\\.[0-9]*", parse_number)]
-    #[regex("[0-9]*(\\.[0-9]*)?[eE][+-]?[0-9]+", parse_number)]
+    #[regex("[0-9]+(\\.[0-9]*)?[eE][+-]?[0-9]+", parse_number)]
     Float(String),
     #[regex("true|false", |lex| lex.slice().parse())]
     Boolean(bool),

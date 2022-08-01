@@ -5,7 +5,7 @@ export interface non_tuple { _1_ : string, _2_ : string }
 export type tuple = [string, string];
 export interface _SERVICE {
   'bab' : ActorMethod<[bigint, bigint], undefined>,
-  'bar' : ActorMethod<[{ '2' : bigint }], undefined>,
+  'bar' : ActorMethod<[{ '2' : bigint }], { 'e20' : null } | { 'e30' : null }>,
   'bas' : ActorMethod<[[bigint, bigint]], [string, bigint]>,
   'baz' : ActorMethod<[{ _2_ : bigint, '2' : bigint }], {}>,
   'bba' : ActorMethod<[tuple], non_tuple>,

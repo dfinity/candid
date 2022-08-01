@@ -7,6 +7,9 @@ use ic_cdk::api::call::CallResult;
 struct bar_arg0 { #[serde(rename="2")] _50_: candid::Int }
 
 #[derive(CandidType, Deserialize)]
+enum bar_ret0 { e20, e30 }
+
+#[derive(CandidType, Deserialize)]
 struct baz_arg0 { _2_: candid::Int, #[serde(rename="2")] _50_: candid::Nat }
 
 #[derive(CandidType, Deserialize)]
@@ -32,7 +35,7 @@ impl SERVICE{
   pub async fn bab(&self, arg0: candid::Int, arg1: candid::Nat) -> CallResult<
     ()
   > { ic_cdk::call(self.0, "bab", (arg0,arg1,)).await }
-  pub async fn bar(&self, arg0: bar_arg0) -> CallResult<()> {
+  pub async fn bar(&self, arg0: bar_arg0) -> CallResult<(bar_ret0,)> {
     ic_cdk::call(self.0, "bar", (arg0,)).await
   }
   pub async fn bas(&self, arg0: (candid::Int,candid::Int,)) -> CallResult<
