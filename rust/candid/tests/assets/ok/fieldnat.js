@@ -3,7 +3,11 @@ export const idlFactory = ({ IDL }) => {
   const non_tuple = IDL.Record({ _1_ : IDL.Text, _2_ : IDL.Text });
   return IDL.Service({
     'bab' : IDL.Func([IDL.Int, IDL.Nat], [], []),
-    'bar' : IDL.Func([IDL.Record({ '2' : IDL.Int })], [], []),
+    'bar' : IDL.Func(
+        [IDL.Record({ '2' : IDL.Int })],
+        [IDL.Variant({ 'e20' : IDL.Null, 'e30' : IDL.Null })],
+        [],
+      ),
     'bas' : IDL.Func(
         [IDL.Tuple(IDL.Int, IDL.Int)],
         [IDL.Tuple(IDL.Text, IDL.Nat)],

@@ -2,7 +2,7 @@ type non_tuple = record { 1 : text; 2 : text };
 type tuple = record { text; text };
 service : {
   bab : (int, nat) -> ();
-  bar : (record { "2" : int }) -> ();
+  bar : (record { "2" : int }) -> (variant { e20; e30 });
   bas : (record { int; int }) -> (record { text; nat });
   baz : (record { 2 : int; "2" : nat }) -> (record {});
   bba : (tuple) -> (non_tuple);
