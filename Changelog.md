@@ -1,6 +1,12 @@
 
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+* Derive `Serialize` for `Int` and `Nat`
+
 ## 2022-07-13
 
 ### Rust (0.7.15)
