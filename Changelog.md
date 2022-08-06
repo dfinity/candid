@@ -3,9 +3,9 @@
 
 ## [Unreleased]
 
-* Derive `Serialize` for `Int` and `Nat`
-
 ### Added
+
+* Derive `Serialize` for `Int` and `Nat`
 
 ## 2022-07-13
 
