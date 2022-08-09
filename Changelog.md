@@ -1,10 +1,11 @@
 
 # Changelog
 
-## [Unreleased]
+## 2022-08-09 (Rust 0.7.16)
 
-### Added
-
+* Implement `CandidType` for `Rc` and `Arc`
+* Fix TS binding for TypedArray
+* Fix float tokenizer
 * Derive `Serialize` for `Int` and `Nat`
 
 ## 2022-07-13
