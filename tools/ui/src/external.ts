@@ -33,7 +33,7 @@ window.addEventListener("message", ({ origin, source, data }) => {
   if (typeof data === "string" && data.startsWith(messagePrefix)) {
     if (allowedExternalOrigins.includes(origin)) {
       const message = JSON.parse(data.substring(messagePrefix.length));
-      console.log("Received message:", message);
+      console.log("Candid UI received message:", message);
       try {
         if (
           message?.acknowledge !== undefined &&
@@ -52,7 +52,7 @@ window.addEventListener("message", ({ origin, source, data }) => {
       }
       messageListeners.forEach((listener) => listener(message));
     } else {
-      console.warn("Received message from unexpected origin:", origin);
+      console.warn("Candid UI received message from unexpected origin:", origin);
     }
   }
 });
