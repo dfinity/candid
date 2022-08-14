@@ -29,6 +29,34 @@ export function removeMessageListener(listener: MessageListener) {
   }
 }
 
+window.addEventListener("message", ({ origin, source, data }) => {
+  if (typeof data === "string" && data.startsWith(messagePrefix)) {
+    if (allowedExternalOrigins.includes(origin)) {
+      const message = JSON.parse(data.substring(messagePrefix.length));
+      console.log("Received message:", message);
+      try {
+        if (
+          message?.acknowledge !== undefined &&
+          !(source instanceof MessagePort)
+        ) {
+          source?.postMessage?.(
+            `${messagePrefix}${JSON.stringify({
+              type: "acknowledge",
+              acknowledge: message.acknowledge,
+            })}`,
+            origin
+          );
+        }
+      } catch (err) {
+        console.error("Unable to send message acknowledgement:", err);
+      }
+      messageListeners.forEach((listener) => listener(message));
+    } else {
+      console.warn("Received message from unexpected origin:", origin);
+    }
+  }
+});
+
 /**
  * Use this global promise to safely access `external-config` data provided through `postMessage()`.
  */
@@ -55,12 +83,3 @@ export const EXTERNAL_CONFIG_PROMISE: Promise<ExternalConfig> = new Promise(
     }, 1000);
   }
 );
-
-window.addEventListener("message", ({ origin, source, data }) => {
-  if (allowedExternalOrigins.includes(origin)) {
-    if (typeof data === "string" && data.startsWith(messagePrefix)) {
-      const message = JSON.parse(data.substring(messagePrefix.length));
-      messageListeners.forEach((listener) => listener(message));
-    }
-  }
-});
