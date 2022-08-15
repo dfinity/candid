@@ -505,7 +505,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 }
             }
             (_, Type::Opt(t2)) => {
-                self.expect_type = self.table.trace_type(&*t2)?;
+                self.expect_type = self.table.trace_type(t2)?;
                 if !matches!(self.expect_type, Type::Null | Type::Reserved | Type::Opt(_))
                     && self.check_subtype().is_ok()
                 {
