@@ -22,7 +22,7 @@ pub enum VecEdit<R> {
 pub struct RcVecEdit(pub Rc<VecEdit<RcValueEdit>>);
 
 /// edit a record's fields: edit some fields' values, drop others
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RecordEdit<R> {
     EditValue(Label, R),
     DropValue(Label),
