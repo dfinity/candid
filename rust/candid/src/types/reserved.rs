@@ -6,7 +6,7 @@ use std::fmt;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Reserved;
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum Empty {}
 
 impl CandidType for Reserved {

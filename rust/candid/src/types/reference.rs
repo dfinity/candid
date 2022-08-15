@@ -6,12 +6,12 @@ use serde::de::{self, Deserialize, Visitor};
 use std::convert::TryFrom;
 use std::{fmt, io::Read};
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Func {
     pub principal: Principal,
     pub method: String,
 }
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Service {
     pub principal: Principal,
 }
