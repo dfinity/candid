@@ -50,7 +50,7 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   const maybeDid = new URLSearchParams(window.location.search).get(
     "did"
   );
-  const base64Source = maybeDid || (await EXTERNAL_CONFIG_PROMISE)?.candid;
+  const base64Source = (await EXTERNAL_CONFIG_PROMISE)?.candid || maybeDid;
   if (base64Source) {
     js = await didToJs(window.atob(base64Source));
   } else {
