@@ -82,6 +82,13 @@ export function getProfilerActor(canisterId: Principal): ActorSubclass {
   return Actor.createActor(profiler_interface, { agent, canisterId });
 }
 
+function postToPlayground(id: Principal) {
+  const message = {
+    caller: id.toText(),
+  };
+  window.parent?.postMessage(`CandidUI${JSON.stringify(message)}`, '*');
+}
+
 export async function getCycles(canisterId: Principal): Promise<bigint|undefined> {
   try {
     const actor = getProfilerActor(canisterId);
@@ -354,6 +361,9 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       if (profiler && !idlFunc.annotations.includes('query')) {
         await renderFlameGraph(profiler);
       }
+      if (!idlFunc.annotations.includes('query')) {
+        postToPlayground(Actor.canisterIdOf(canister));
+      }
       log(decodeSpace(text));
 
       const uiContainer = document.createElement('div');
@@ -380,6 +390,9 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
         const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
         log(`[Error] ${name}${showArgs}`);
         renderFlameGraph(profiler);
+      }
+      if (!idlFunc.annotations.includes('query')) {
+        postToPlayground(Actor.canisterIdOf(canister));
       }
       throw err;
     });
