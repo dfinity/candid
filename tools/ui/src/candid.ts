@@ -1,3 +1,4 @@
+import { EXTERNAL_CONFIG_PROMISE } from './external';
 import { Actor, HttpAgent, ActorSubclass, CanisterStatus } from '@dfinity/agent';
 import {
   IDL, InputBox, renderInput, renderValue
@@ -49,9 +50,9 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   const maybeDid = new URLSearchParams(window.location.search).get(
     "did"
   );
-  if (maybeDid) {
-    const source = window.atob(maybeDid);
-    js = await didToJs(source);
+  const base64Source = (await EXTERNAL_CONFIG_PROMISE)?.candid || window.history.state?.candid || maybeDid;
+  if (base64Source) {
+    js = await didToJs(window.atob(base64Source));
   } else {
     js = await getDidJsFromMetadata(canisterId);
     if (!js) {
@@ -107,6 +108,10 @@ export async function getNames(canisterId: Principal) {
   } catch(err) {
     return undefined;
   }
+}
+
+async function getDidJsFromPostMessage(canisterId: Principal): Promise<undefined | string> {
+  return new Promise((resolve,reject)=>{})
 }
 
 async function getDidJsFromMetadata(canisterId: Principal): Promise<undefined | string> {
