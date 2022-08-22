@@ -87,7 +87,7 @@ function postToPlayground(id: Principal) {
   const message = {
     caller: id.toText(),
   };
-  window.parent?.postMessage(`CandidUI${JSON.stringify(message)}`, '*');
+  (window.parent || window.opener)?.postMessage(`CandidUI${JSON.stringify(message)}`, '*');
 }
 
 export async function getCycles(canisterId: Principal): Promise<bigint|undefined> {
