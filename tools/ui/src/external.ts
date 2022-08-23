@@ -14,6 +14,7 @@ const messagePrefix = "CandidUI";
 const allowedExternalOrigins = [
   "http://ryjl3-tyaaa-aaaaa-aaaba-cai.localhost:8000", // Motoko Playground (local)
   "https://m7sm4-2iaaa-aaaab-qabra-cai.raw.ic0.app", // Motoko Playground (mainnet)
+  "https://m7sm4-2iaaa-aaaab-qabra-cai.ic0.app", // Motoko Playground (certified)
 ];
 
 const messageListeners: MessageListener[] = [];
@@ -52,7 +53,10 @@ window.addEventListener("message", ({ origin, source, data }) => {
       }
       messageListeners.forEach((listener) => listener(message));
     } else {
-      console.warn("Candid UI received message from unexpected origin:", origin);
+      console.warn(
+        "Candid UI received message from unexpected origin:",
+        origin
+      );
     }
   }
 });
@@ -80,6 +84,6 @@ export const EXTERNAL_CONFIG_PROMISE: Promise<ExternalConfig> = new Promise(
         console.error("External config timeout");
         resolve({});
       }
-    }, 1000);
+    }, 3000);
   }
 );
