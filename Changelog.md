@@ -1,6 +1,10 @@
 
 # Changelog
 
+## 2022-09-22 (Rust 0.7.17)
+
+* Bump `ic-types` to `0.5` (fixing `lookup_path` for hash trees)
+
 ## 2022-08-09 (Rust 0.7.16)
 
 * Implement `CandidType` for `Rc` and `Arc`
