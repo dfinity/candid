@@ -1,6 +1,10 @@
 
 # Changelog
 
+## 2022-09-27 (Rust 0.8.0)
+
+* Move `Principal` into this crate, no more re-export `ic-types`
+
 ## 2022-09-22 (Rust 0.7.17)
 
 * Bump `ic-types` to `0.5` (fixing `lookup_path` for hash trees)
