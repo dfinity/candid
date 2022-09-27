@@ -1,21 +1,22 @@
 //! This module provides functions to serialize and deserialize types
-//! under [std::sync::Arc] shared reference type.
+//! under [std::rc::Rc] shared reference type.
 //!
 //! # Examples
 //!
 //! ```
 //! use candid::{CandidType, Deserialize};
 //! use serde_bytes::ByteBuf;
-//! use std::sync::Arc;
+//! use std::rc::Rc;
 //!
 //! #[derive(CandidType, Deserialize, PartialEq)]
-//! struct ArcBytes(#[serde(with = "candid::de::arc")] Arc<ByteBuf>);
+//! struct RcBytes(#[serde(with = "candid::rc")] Rc<ByteBuf>);
 //! ```
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::sync::Arc;
+use std::rc::Rc;
 
 pub fn serialize<T: Serialize, S: Serializer>(
-    data: &Arc<T>,
+    data: &Rc<T>,
     serializer: S,
 ) -> Result<S::Ok, S::Error> {
     T::serialize(data, serializer)
@@ -23,6 +24,6 @@ pub fn serialize<T: Serialize, S: Serializer>(
 
 pub fn deserialize<'de, T: Deserialize<'de>, D: Deserializer<'de>>(
     deserializer: D,
-) -> Result<Arc<T>, D::Error> {
-    T::deserialize(deserializer).map(Arc::new)
+) -> Result<Rc<T>, D::Error> {
+    T::deserialize(deserializer).map(Rc::new)
 }

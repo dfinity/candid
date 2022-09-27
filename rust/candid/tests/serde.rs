@@ -368,9 +368,9 @@ fn test_rc_bytes() {
     use std::sync::Arc;
 
     #[derive(CandidType, Deserialize, PartialEq, Debug)]
-    struct RcBytes(#[serde(with = "candid::de::rc")] Rc<ByteBuf>);
+    struct RcBytes(#[serde(with = "candid::rc")] Rc<ByteBuf>);
     #[derive(CandidType, Deserialize, PartialEq, Debug)]
-    struct ArcBytes(#[serde(with = "candid::de::arc")] Arc<ByteBuf>);
+    struct ArcBytes(#[serde(with = "candid::arc")] Arc<ByteBuf>);
 
     all_check(
         RcBytes(Rc::new(ByteBuf::from(vec![1u8, 2u8, 3u8]))),

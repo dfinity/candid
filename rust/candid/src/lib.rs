@@ -328,6 +328,9 @@ pub mod binary_parser;
 pub mod de;
 pub mod ser;
 
+pub mod arc;
+pub mod rc;
+
 pub mod utils;
 pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
 pub mod pretty;
