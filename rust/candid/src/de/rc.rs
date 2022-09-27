@@ -1,16 +1,16 @@
-/// This module provides functions to serialize and deserialize types
-/// under [std::rc::Rc] shared reference type.
-///
-/// # Examples
-///
-/// ```
-/// use candid::{CandidType, Deserialize};
-/// use serde_bytes::ByteBuf;
-/// use std::rc::Rc;
-///
-/// #[derive(CandidType, Deserialize, PartialEq)]
-/// struct RcBytes(#[serde(with = "candid::de::rc")] Rc<ByteBuf>);
-/// ```
+//! This module provides functions to serialize and deserialize types
+//! under [std::rc::Rc] shared reference type.
+//!
+//! # Examples
+//!
+//! ```
+//! use candid::{CandidType, Deserialize};
+//! use serde_bytes::ByteBuf;
+//! use std::rc::Rc;
+//!
+//! #[derive(CandidType, Deserialize, PartialEq)]
+//! struct RcBytes(#[serde(with = "candid::de::rc")] Rc<ByteBuf>);
+//! ```
 
 use std::rc::Rc;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
