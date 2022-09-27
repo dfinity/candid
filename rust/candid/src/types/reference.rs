@@ -1,7 +1,7 @@
 //! Data structure for Candid value Func and Service
 
+use super::principal::Principal;
 use super::{CandidType, Function, Serializer, Type};
-use ic_types::Principal;
 use serde::de::{self, Deserialize, Visitor};
 use std::convert::TryFrom;
 use std::{fmt, io::Read};

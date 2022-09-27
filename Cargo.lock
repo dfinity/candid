@@ -210,11 +210,13 @@ dependencies = [
  "byteorder",
  "candid_derive",
  "codespan-reporting",
+ "crc32fast",
  "criterion",
+ "data-encoding",
  "fake",
  "goldenfile",
  "hex",
- "ic-types",
+ "impls",
  "lalrpop",
  "lalrpop-util",
  "leb128",
@@ -227,7 +229,11 @@ dependencies = [
  "rand",
  "serde",
  "serde_bytes",
+ "serde_cbor",
  "serde_dhall",
+ "serde_json",
+ "serde_test",
+ "sha2 0.10.2",
  "test-generator",
  "thiserror",
 ]
@@ -734,21 +740,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
-name = "ic-types"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79a17269dff0ec6ca4c3d04e18fca97d018ff53d809e6d92348fc22f9588e1a5"
-dependencies = [
- "crc32fast",
- "data-encoding",
- "hex",
- "serde",
- "serde_bytes",
- "sha2 0.10.2",
- "thiserror",
-]
-
-[[package]]
 name = "idna"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -758,6 +749,12 @@ dependencies = [
  "unicode-bidi",
  "unicode-normalization",
 ]
+
+[[package]]
+name = "impls"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a46645bbd70538861a90d0f26c31537cdf1e44aae99a794fb75a664b70951bc"
 
 [[package]]
 name = "indexmap"
@@ -1541,6 +1538,15 @@ checksum = "38dd04e3c8279e75b31ef29dbdceebfe5ad89f4d0937213c53f7d49d01b3d5a7"
 dependencies = [
  "itoa 1.0.3",
  "ryu",
+ "serde",
+]
+
+[[package]]
+name = "serde_test"
+version = "1.0.145"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c17d2112159132660b4c5399e274f676fb75a2f8d70b7468f18f045b71138ed"
+dependencies = [
  "serde",
 ]
 
