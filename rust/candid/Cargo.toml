@@ -1,6 +1,6 @@
 [package]
 name = "candid"
-version = "0.7.17"
+version = "0.7.18"
 edition = "2018"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
@@ -32,7 +32,7 @@ num-bigint = { version = "0.4.2", features = ["serde"] }
 num-traits = "0.2.12"
 paste = "1.0.0"
 pretty = "0.10.0"
-serde = { version = "1.0.118", features = ["derive", "rc"] }
+serde = { version = "1.0.118", features = ["derive"] }
 serde_bytes = "0.11"
 thiserror = "1.0.20"
 anyhow = "1.0"
