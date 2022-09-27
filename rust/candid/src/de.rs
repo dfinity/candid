@@ -17,6 +17,9 @@ use serde::de::{self, Visitor};
 use std::fmt::Write;
 use std::{collections::VecDeque, io::Cursor, mem::replace};
 
+pub mod rc;
+pub mod arc;
+
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
 pub struct IDLDeserialize<'de> {
     de: Deserializer<'de>,
