@@ -12,8 +12,8 @@
 //! struct RcBytes(#[serde(with = "candid::de::rc")] Rc<ByteBuf>);
 //! ```
 
-use std::rc::Rc;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::rc::Rc;
 
 pub fn serialize<T: Serialize, S: Serializer>(
     data: &Rc<T>,
