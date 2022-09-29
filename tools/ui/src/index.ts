@@ -22,10 +22,10 @@ async function main() {
         const reader = new FileReader();
         reader.addEventListener("load", () => {
           const encoded = reader.result as string;
-          const hex = encoded.substr(encoded.indexOf(",") + 1);
+          const candid = encoded.substr(encoded.indexOf(",") + 1);
           // update URL with Candid data and refresh
           window.history.pushState({}, "", window.location.search);
-          window.history.pushState({ candid: hex }, "", `?${params}`);
+          window.history.pushState({ candid }, "", `?${params}`);
           window.location.reload();
         });
         reader.readAsDataURL(did.files![0]);

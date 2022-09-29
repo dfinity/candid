@@ -53,13 +53,18 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   const base64Source = (await EXTERNAL_CONFIG_PROMISE)?.candid || window.history.state?.candid || maybeDid;
   if (base64Source) {
     js = await didToJs(window.atob(base64Source));
-  } else {
+    if (!js) {
+      console.warn('Nothing returned from didjs for base64 input:', base64Source);
+    }
+  }
+  if (!js) {
     js = await getDidJsFromMetadata(canisterId);
     if (!js) {
       try {
         js = await getDidJsFromTmpHack(canisterId);
       } catch(err) {
         if (/no query method/.test(err)) {
+          console.warn(err);
           js = undefined;
         } else {
           throw(err);
