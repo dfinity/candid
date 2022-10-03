@@ -4,6 +4,10 @@ version = "0.1.4"
 authors = ["DFINITY Team"]
 edition = "2018"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/main.rs"
+
 [dependencies]
 candid = { path = "../../rust/candid", features = ["random"] }
 candiff = { path = "../candiff" }
