@@ -1,6 +1,10 @@
 
 # Changelog
 
+## 2022-10-04 (Rust 0.8.1)
+
+* Fix: missing impl serde traits for `Principal`
+
 ## 2022-09-27 (Rust 0.8.0)
 
 * Move `Principal` into this crate, no more re-export `ic-types`

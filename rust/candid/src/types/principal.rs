@@ -1,12 +1,12 @@
 use super::{CandidType, Serializer, Type, TypeId};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha224};
 use std::convert::TryFrom;
 use std::fmt::Write;
 use thiserror::Error;
 
 /// An error happened while encoding, decoding or serializing a [`Principal`].
-#[derive(Error, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Error, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PrincipalError {
     #[error("Bytes is longer than 29 bytes.")]
     BytesTooLong(),
@@ -52,8 +52,8 @@ pub enum PrincipalError {
 /// assert_eq!(principal.to_text(), text);
 /// ```
 ///
-/// Serialization is enabled with the "serde" feature. It supports serializing
-/// to a byte bufer for non-human readable serializer, and a string version for human
+/// Similarly, serialization using serde has two versions:
+/// serilizing to a byte bufer for non-human readable serializer, and a string version for human
 /// readable serializers.
 ///
 /// ```
