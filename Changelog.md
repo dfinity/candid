@@ -1,6 +1,10 @@
 
 # Changelog
 
+## 2022-10-06 (Rust 0.8.2)
+
+* Downgrade `serde_dhall` for license issue.
+
 ## 2022-10-04 (Rust 0.8.1)
 
 * Fix: missing impl serde traits for `Principal`
