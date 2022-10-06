@@ -1,6 +1,6 @@
 [package]
 name = "candid"
-version = "0.8.1"
+version = "0.8.2"
 edition = "2018"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
@@ -41,7 +41,8 @@ anyhow = "1.0"
 binread = { version = "2.1", features = ["debug_template"] }
 
 arbitrary = { version = "1.0", optional = true }
-serde_dhall = { version = "0.12.0", default-features = false, optional = true }
+# Don't upgrade serde_dhall. It will introduce dependency with invalid license.
+serde_dhall = { version = "0.11", default-features = false, optional = true }
 fake = { version = "2.4", optional = true }
 rand = { version = "0.8", optional = true }
 
