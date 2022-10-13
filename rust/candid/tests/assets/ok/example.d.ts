@@ -41,7 +41,7 @@ export interface _SERVICE {
         { 'B' : [] | [string] },
       [] | [List],
     ],
-    { _42_ : {}, 'id' : bigint },
+    { _42_ : {}, 'id' : bigint }
   >,
   'i' : f,
   'x' : ActorMethod<[a, b], [[] | [a], [] | [b]]>,
