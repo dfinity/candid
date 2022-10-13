@@ -117,7 +117,7 @@ fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
     };
     enclose(
         "ActorMethod<",
-        concat([args, rets].iter().cloned(), ","),
+        strict_concat([args, rets].iter().cloned(), ","),
         ">",
     )
 }
