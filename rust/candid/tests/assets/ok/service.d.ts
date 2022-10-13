@@ -9,11 +9,11 @@ export interface _SERVICE {
   'asPrincipal' : ActorMethod<[], [Principal, [Principal, string]]>,
   'asRecord' : ActorMethod<
     [],
-    [Principal, [] | [Principal], [Principal, string]],
+    [Principal, [] | [Principal], [Principal, string]]
   >,
   'asVariant' : ActorMethod<
     [],
     { 'a' : Principal } |
-      { 'b' : { 'f' : [] | [[Principal, string]] } },
+      { 'b' : { 'f' : [] | [[Principal, string]] } }
   >,
 }

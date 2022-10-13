@@ -24,6 +24,6 @@ export interface _SERVICE {
   'tuple' : ActorMethod<[[bigint, Uint8Array, string]], [bigint, number]>,
   'variant' : ActorMethod<
     [{ 'A' : null } | { 'B' : null } | { 'C' : null } | { 'D' : number }],
-    undefined,
+    undefined
   >,
 }
