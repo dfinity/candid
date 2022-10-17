@@ -3,6 +3,7 @@ use crate::types::{Field, Function, Type};
 use crate::{pretty_parse, Error, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::str;
 
 pub struct Env<'a> {
     pub te: &'a mut TypeEnv,
@@ -408,13 +409,18 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
     };
     let prog = std::fs::read_to_string(&file)
         .map_err(|_| Error::msg(format!("Cannot open {:?}", file)))?;
+
+    check_str(&prog, is_pretty, &base)
+}
+
+pub fn check_str(str: &str, is_pretty: bool, base: &Path) -> Result<(TypeEnv, Option<Type>)> {
     let prog = if is_pretty {
-        pretty_parse::<IDLProg>(file.to_str().unwrap(), &prog)?
+        pretty_parse::<IDLProg>("tmp.did", str)?
     } else {
-        prog.parse::<IDLProg>()?
+        str.parse::<IDLProg>()?
     };
     let mut imports = Vec::new();
-    load_imports(is_pretty, &base, &mut BTreeSet::new(), &prog, &mut imports)?;
+    load_imports(is_pretty, base, &mut BTreeSet::new(), &prog, &mut imports)?;
     let mut te = TypeEnv::new();
     let mut env = Env {
         te: &mut te,

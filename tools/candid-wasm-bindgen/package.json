@@ -1,0 +1,21 @@
+{
+    "name": "@dfinity/candid-wasm-bindgen",
+    "type": "module",
+    "author": "DFINITY Stiftung <sdk@dfinity.org>",
+    "collaborators": [
+        "Kyle Peacock <kylpeacock@gmail.com>"
+    ],
+    "version": "0.0.1-beta.1",
+    "files": [
+        "pkg/candid_wasm_bindgen_bg.wasm",
+        "pkg/candid_wasm_bindgen.js",
+        "pkg/candid_wasm_bindgen_bg.js",
+        "pkg/candid_wasm_bindgen.d.ts"
+    ],
+    "module": "pkg/candid_wasm_bindgen.js",
+    "types": "pkg/candid_wasm_bindgen.d.ts",
+    "sideEffects": false,
+    "dependencies": {
+        "parcel": "^1.12.4"
+    }
+}
