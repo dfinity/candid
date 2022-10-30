@@ -96,6 +96,7 @@ This is a summary of the grammar proposed:
   | vec <datatype>
   | record { <fieldtype>;* }
   | variant { <fieldtype>;* }
+  | dynamic
 
 <reftype>  ::=
   | func <functype>
@@ -185,6 +186,7 @@ service : {
 **Note:** Candid is in fact agnostic to the question of whether communication via functions is synchronous (like RPCs) or asynchronous (like messaging with callbacks as response continuations). However, it assumes that all invocations have the same semantics, i.e., there is no need to distinguish between both.
 
 **Note:** In a synchronous interpretation of functions, invocation of a oneway function would return immediately, without waiting for completion of the service-side invocation of the function. In an asynchronous interpretation of functions, the invocation of a `oneway` function does not accept a callback (to invoke on completion).
+
 
 #### Structure
 
@@ -434,6 +436,32 @@ type tree = variant {
 }
 ```
 
+#### Dynamic
+
+The type `dynamic` represents a value of *dynamic* type. That is, the actual type of such a value is not fixed statically and can be anything at runtime. This can be used, for example, to express generic interfaces.
+
+```
+<constype>  ::= ... | dynamic | ...
+```
+
+The type `dynamic` is convertable to and from any other type, in the spirit of *gradual* typing. In particular, this allows specifying generic [functions](#function-references) as parameters, such that any concrete function can be supplied.
+
+
+##### Example
+
+The following interface to a key/value store would allow storing any Candid value.
+```
+type key = text;
+type value = dynamic;
+
+service store : {
+  put : (key, value) -> ();
+  get : (key) -> (?value);
+  foreach : (f : func (key, value) -> ()) -> ();
+};
+```
+Note: Any unary function can be passed to `map`. For example, a client might use this service to store values of type `nat`, and invoke `map` with a function of type `(text, nat) -> ()`.
+
 
 ### References
 
@@ -567,6 +595,7 @@ The types of these values are assumed to be known from context, so the syntax do
   | vec { <annval>;* }
   | record { <fieldval>;* }
   | variant { <fieldval> }
+  | dynamic <val> : <datatype>
 
 <fieldval> ::= <nat> = <annval>
 
@@ -853,6 +882,16 @@ variant { <nat> : <datatype>; <fieldtype>;* } <: variant { <nat> : <datatype'>; 
 *Note:* By virtue of the rules around `opt` above, it is possible to evolve and extend variant types that also occur in outbound position (i.e., are used both as function results and function parameters) by *adding* tags to variants, provided the variant itself is optional (e.g.  `opt variant { 0 : nat; 1 : bool } <: opt variant { 1 : bool }`). Any party not aware of the extension will treat the new case as `null`.
 
 
+#### Dynamic
+
+Any data type can be turned into a dynamic type.
+```
+
+---------------------
+<datatype> <: dynamic
+```
+
+
 #### Functions
 
 For a specialised function, any parameter type can be generalised and any result type specialised. Moreover, arguments can be dropped while results can be added. That is, the rules mirror those of tuple-like records, i.e., they are ordered and can only be extended at the end.
@@ -883,7 +922,7 @@ service { <name> : <functype>; <methtype>;* } <: service { <name> : <functype'>;
 
 ### Coercion
 
-This subtyping is implemented during the deserialisation of Candid at an expected type. As described in [Section Deserialisation](#deserialisation), the binary value is conceptually first _decoded_ into the actual type and a value of that type, and then that value is _coerced_ into the expected type.
+The defined subtyping is implemented during the deserialisation of Candid at an expected type. As described in [Section Deserialisation](#deserialisation), the binary value is conceptually first _decoded_ into the actual type and a value of that type, and then that value is _coerced_ into the expected type.
 
 To model this, we define, for every `t1, t2` with `t1 <: t2`, a function `C[t1<:t2] : t1 -> t2`. This function maps values of type `t1` to values of type `t2`, and is indeed total.
 
@@ -891,7 +930,7 @@ to describe these values, we re-use the syntax of the textual representation, an
 
 #### Primitive Types
 
-On primitve types, coercion is the identity:
+On primitive types, coercion is the identity:
 ```
 C[<t> <: <t>](x) = x    for every <t> ∈ <numtype>, bool, text, null
 ```
@@ -962,6 +1001,17 @@ Only a variant value with an expected tag coerces at variant type.
 ```
 C[variant { <nat> = <t>; _;* } <: variant { <nat> = <t'>; _;* }](variant { <nat> = <v> })
     = variant { <nat> = C[<t> <: <t'>](<v>) }
+```
+
+#### Dynamic
+
+On the dynamic type, coercion is the identity:
+```
+C[dynamic <: dynamic](x) = x
+```
+Any other data type can be coerced to `dynamic`:
+```
+C[<t> <: dynamic](<v>) = dynamic <v> : <t>  if <t> =/= dynamic
 ```
 
 
@@ -1058,12 +1108,12 @@ Serialisation is defined by three functions `T`, `M`, and `R` given below.
 
 Most Candid values are self-explanatory, except for references. There are two forms of Candid values for service references and principal references:
 
-* `ref(r)` indicates an opaque reference, understood only by the underlying system.
+* `ref(r)`, indicates an opaque reference, understood only by the underlying system.
 * `id(b)`, indicates a transparent reference to a service addressed by the blob `b`.
 
 Likewise, there are two forms of Candid values for function references:
 
-* `ref(r)` indicates an opaque reference, understood only by the underlying system.
+* `ref(r)`, indicates an opaque reference, understood only by the underlying system.
 * `pub(s,n)`, indicates the public method name `n` of the service referenced by `s`.
 
 #### Notation
@@ -1111,13 +1161,14 @@ T(opt <datatype>) = sleb128(-18) I(<datatype>)              // 0x6e
 T(vec <datatype>) = sleb128(-19) I(<datatype>)              // 0x6d
 T(record {<fieldtype>^N}) = sleb128(-20) T*(<fieldtype>^N)  // 0x6c
 T(variant {<fieldtype>^N}) = sleb128(-21) T*(<fieldtype>^N) // 0x6b
+T(dynamic) = sleb128(-25) i8(0)                             // 0x67
 
 T : <fieldtype> -> i8*
 T(<nat>:<datatype>) = leb128(<nat>) I(<datatype>)
 
 T : <reftype> -> i8*
 T(func (<datatype1>*) -> (<datatype2>*) <funcann>*) =
-  sleb128(-22) T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*) // 0x6a
+  sleb128(-22) T*(<datatype1>*) T*(<datatype2>*) T*(<funcann>*)   // 0x6a
 T(service {<methtype>*}) =
   sleb128(-23) T*(<methtype>*)                                    // 0x69
 
@@ -1170,7 +1221,7 @@ M(i : int<N>)   = i<N>(signed_N^-1(i))
 M(z : float<N>) = f<N>(z)
 M(b : bool)     = i8(if b then 1 else 0)
 M(t : text)     = leb128(|utf8(t)|) i8*(utf8(t))
-M(_ : null)     = .
+M(null : null)  = .
 M(_ : reserved) = .
 // NB: M(_ : empty) will never be called
 
@@ -1180,6 +1231,10 @@ M(?v   : opt <datatype>) = i8(1) M(v : <datatype>)
 M(v^N  : vec <datatype>) = leb128(N) M(v : <datatype>)^N
 M(kv*  : record {<fieldtype>*}) = M(kv : <fieldtype>)*
 M(kv   : variant {<fieldtype>*}) = leb128(i) M(kv : <fieldtype>*[i])
+
+M(dynamic v:t : dynamic)    = leb128(|B((0,v) : t)|) leb128(|R(v : t)|) B((0,v) : t)
+M(dynamic v:t : <datatype>) = M(C[t <: <datatype>](v) : <datatype>)  if t <: <datatype> =/= dynamic
+M(v : dynamic) = M(dynamic v:t : dynamic)  if v:t and v =/= dynamic v':t'
 
 M : (<nat>, <val>) -> <fieldtype> -> i8*
 M((k,v) : k:<datatype>) = M(v : <datatype>)
@@ -1195,6 +1250,12 @@ M(ref(r) : principal) = i8(0)
 M(id(v*) : principal) = i8(1) M(v* : vec nat8)
 ```
 
+Note: The type `dynamic` is serialised as a nested, self-contained Candid blob, as defined by the meta-function `B` below (#parameters-and-results).
+
+A dynamic value can also be serialised with a regular type, as long as the types match; this amounts to a runtime type check and implicitly unwraps the value.
+Inversely, a value of regular non-dynamic type can be serialised with type `dynamic`; this implicitly wraps the value (we assume here that the value's type `t` can be determined from the value or is known from context).
+Together, the latter two rules implement a form of *gradual typing* for type `dynamic`.
+
 
 #### References
 
@@ -1203,7 +1264,7 @@ We assume that the fields in a record value are sorted by increasing id.
 
 ```
 R : <val> -> <primtype> -> <ref>*
-R(_ : <primtype>) = .
+R(<primval> : <primtype>) = .
 
 R : <val> -> <constype> -> <ref>*
 R(null : opt <datatype>) = .
@@ -1211,6 +1272,10 @@ R(?v   : opt <datatype>) = R(v : <datatype>)
 R(v*   : vec <datatype>) = R(v : <datatype>)*
 R(kv*  : record {<fieldtype>*}) = R(kv : <fieldtype>)*
 R(kv   : variant {<fieldtype>*}) = R(kv : <fieldtype>*[i])
+
+R(dynamic v:t : dynamic) = R(v : t)
+R(dynamic v:t : <datatype>) = R(C[t <: <datatype>](v) : <datatype>)  if t <: <datatype> =/= dynamic
+R(v : dynamic) = R(dynamic v:t : dynamic)  if v:t and v =/= dynamic v':t'
 
 R : (<nat>, <val>) -> <fieldtype> -> <ref>*
 R((k,v) : k:<datatype>) = R(v : <datatype>)
@@ -1265,11 +1330,13 @@ Deserialisation at an expected type sequence `(<t'>,*)` proceeds by
 
 Deserialisation uses the following mechanism for robustness towards future extensions:
 
-* A serialised type may be headed by an opcode other than the ones defined above (i.e., less than -24). Any such opcode is followed by an LEB128-encoded count, and then a number of bytes corresponding to this count. A type represented that way is called a *future type*.
+* A serialised type may be headed by an opcode other than -1 to -24 . Any such opcode is followed by an LEB128-encoded count, and then a number of bytes corresponding to this count. A type represented that way is called a *future type*.
 
 * A value corresponding to a future type is called a *future value*. It is represented by two LEB128-encoded counts, *m* and *n*, followed by a *m* bytes in the memory representation M and accompanied by *n* corresponding references in R.
 
 These measures allow the serialisation format to be extended with new types in the future, as long as their representation and the representation of the corresponding values include a length prefix matching the above scheme, and thereby allowing an older deserialiser not understanding them to skip over them. The subtyping rules ensure that upgradability is maintained in this situation, i.e., an old deserialiser has no need to understand the encoded data.
+
+The type `dynamic` is the only future type so far.
 
 
 ## Open Questions
