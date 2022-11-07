@@ -189,7 +189,7 @@ where
         let e = Error::from(e);
         let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
         let config = term::Config::default();
-        let str = hex::encode(&reader.get_ref());
+        let str = hex::encode(reader.get_ref());
         let file = SimpleFile::new("binary", &str);
         term::emit(&mut writer.lock(), &config, &file, &e.report())?;
         Err(e)

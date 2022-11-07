@@ -54,14 +54,14 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
                 _ => t,
             };
             match *ty {
-                Nat8 => str("Uint8Array"),
-                Nat16 => str("Uint16Array"),
-                Nat32 => str("Uint32Array"),
-                Nat64 => str("BigUint64Array"),
-                Int8 => str("Int8Array"),
-                Int16 => str("Int16Array"),
-                Int32 => str("Int32Array"),
-                Int64 => str("BigInt64Array"),
+                Nat8 => str("Uint8Array | number[]"),
+                Nat16 => str("Uint16Array | number[]"),
+                Nat32 => str("Uint32Array | number[]"),
+                Nat64 => str("BigUint64Array | bigint[]"),
+                Int8 => str("Int8Array | number[]"),
+                Int16 => str("Int16Array | number[]"),
+                Int32 => str("Int32Array | number[]"),
+                Int64 => str("BigInt64Array | bigint[]"),
                 _ => str("Array").append(enclose("<", pp_ty(env, t, is_ref), ">")),
             }
         }
