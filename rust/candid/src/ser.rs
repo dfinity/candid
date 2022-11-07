@@ -111,8 +111,7 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
     type Error = Error;
     type Compound = Compound<'a>;
     fn serialize_bool(self, v: bool) -> Result<()> {
-        let v = if v { 1 } else { 0 };
-        self.write(&[v])?;
+        self.write(&[v as u8])?;
         Ok(())
     }
     fn serialize_int(self, v: &crate::Int) -> Result<()> {
