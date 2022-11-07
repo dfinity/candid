@@ -406,8 +406,8 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
             .unwrap()
             .to_path_buf()
     };
-    let prog = std::fs::read_to_string(file)
-        .map_err(|_| Error::msg(format!("Cannot open {:?}", file)))?;
+    let prog =
+        std::fs::read_to_string(file).map_err(|_| Error::msg(format!("Cannot open {:?}", file)))?;
     let prog = if is_pretty {
         pretty_parse::<IDLProg>(file.to_str().unwrap(), &prog)?
     } else {
