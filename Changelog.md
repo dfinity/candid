@@ -1,6 +1,11 @@
 
 # Changelog
 
+## 2022-11-17 (Rust 0.8.3 -- 0.8.4)
+
+* Bug fix in TS bindings
+* Pretty print numbers
+
 ## 2022-10-06 (Rust 0.8.2)
 
 * Downgrade `serde_dhall` for license issue.

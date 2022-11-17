@@ -25,7 +25,7 @@ fn is_tuple(t: &Type) -> bool {
         _ => false,
     }
 }
-static KEYWORDS: [&str; 42] = [
+static KEYWORDS: [&str; 45] = [
     "actor",
     "and",
     "async",
@@ -42,6 +42,7 @@ static KEYWORDS: [&str; 42] = [
     "false",
     "flexible",
     "for",
+    "from_candid",
     "func",
     "if",
     "in",
@@ -64,10 +65,12 @@ static KEYWORDS: [&str; 42] = [
     "system",
     "try",
     "throw",
+    "to_candid",
     "true",
     "type",
     "var",
     "while",
+    "with",
 ];
 fn escape(id: &str, is_method: bool) -> RcDoc {
     if KEYWORDS.contains(&id) {
