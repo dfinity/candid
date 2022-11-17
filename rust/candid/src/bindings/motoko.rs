@@ -25,7 +25,7 @@ fn is_tuple(t: &Type) -> bool {
         _ => false,
     }
 }
-static KEYWORDS: [&str; 42] = [
+static KEYWORDS: [&str; 45] = [
     "actor",
     "and",
     "async",
