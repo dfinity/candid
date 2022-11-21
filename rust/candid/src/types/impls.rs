@@ -530,3 +530,16 @@ impl CandidType for std::time::Duration {
         Ok(())
     }
 }
+
+#[cfg(feature = "uuid")]
+impl CandidType for uuid::Uuid {
+    fn _ty() -> Type {
+        Type::Text
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_text(&self.to_string())
+    }
+}
