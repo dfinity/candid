@@ -54,7 +54,7 @@ assert blob "DIDL\00\00" == "(null)"                                 : (Opt) "op
 
 // vector
 assert blob "DIDL\01\6d\7c\01\00\00" == "(vec {})"                          : (vec int) "vec: empty";
-assert blob "DIDL\01\6d\7c\01\00\00"                                       !: (vec int8) "vec: non subtype empty";
+assert blob "DIDL\01\6d\7c\01\00\00"                                        : (vec int8) "vec: non subtype empty";
 assert blob "DIDL\01\6d\7c\01\00\02\01\02" == "(vec { 1; 2 })"              : (vec int) "vec";
 assert blob "DIDL\01\6d\7b\01\00\02\01\02" == "(blob \"\\01\\02\")"         : (vec nat8) "vec: blob";
 assert blob "DIDL\01\6d\00\01\00\00" == "(vec {})"                          : (Vec) "vec: recursive vector";
@@ -139,10 +139,10 @@ assert "(variant {})"                                                          !
 assert blob "DIDL\01\6b\00\01\00"                                              !: (variant {}) "variant: no empty value";
 assert blob "DIDL\01\6b\01\00\7f\01\00\00" == "(variant {0})"                   : (variant {0}) "variant: numbered field";
 assert blob "DIDL\01\6b\01\00\7f\01\00\00\2a"                                  !: (variant {0:int}) "variant: type mismatch";
-assert blob "DIDL\01\6b\02\00\7f\01\7c\01\00\01\2a"                            !: (variant {0:int; 1:int}) "variant: type mismatch in unused tag";
+assert blob "DIDL\01\6b\02\00\7f\01\7c\01\00\01\2a"                             : (variant {0:int; 1:int}) "variant: type mismatch in unused tag";
 assert blob "DIDL\01\6b\01\00\7f\01\00\00" == "(variant {0})"                   : (variant {0;1}) "variant: ignore field";
-assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\00"                               !: (variant {0}) "variant {0;1} !<: variant {0}";
-assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\00" == "(null)"                    : (opt variant {0}) "variant {0;1} <: opt variant {0}";
+assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\00"                                : (variant {0}) "variant {0;1} <: variant {0}";
+assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\00" == "(variant {0})"             : (opt variant {0}) "variant {0;1} <: opt variant {0}";
 assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\01" == "(variant {1})"             : (variant {0;1;2}) "variant: change index";
 assert blob "DIDL\01\6b\01\00\7f\01\00\00"                                     !: (variant {1}) "variant: missing field";
 assert blob "DIDL\01\6b\01\00\7f\01\00\01"                                     !: (variant {0}) "variant: index out of range";

@@ -19,6 +19,9 @@ pub enum Error {
     #[error("binary parser error: {}", .0.get(0).map(|f| format!("{} at byte offset {}", f.message, f.range.start/2)).unwrap_or_else(|| "io error".to_string()))]
     Binread(Vec<Label<()>>),
 
+    #[error("Subtyping error: {0}")]
+    Subtype(String),
+
     #[error(transparent)]
     Custom(#[from] anyhow::Error),
 }
@@ -26,6 +29,9 @@ pub enum Error {
 impl Error {
     pub fn msg<T: ToString>(msg: T) -> Self {
         Error::Custom(anyhow::anyhow!(msg.to_string()))
+    }
+    pub fn subtype<T: ToString>(msg: T) -> Self {
+        Error::Subtype(msg.to_string())
     }
     pub fn report(&self) -> Diagnostic<()> {
         match self {
@@ -57,6 +63,7 @@ impl Error {
                 let diag = Diagnostic::error().with_message("decoding error");
                 diag.with_labels(labels.to_vec())
             }
+            Error::Subtype(e) => Diagnostic::error().with_message(e),
             Error::Custom(e) => Diagnostic::error().with_message(e.to_string()),
         }
     }
@@ -134,6 +141,9 @@ impl ser::Error for Error {
 impl de::Error for Error {
     fn custom<T: std::fmt::Display>(msg: T) -> Self {
         Error::msg(format!("Deserialize error: {}", msg))
+    }
+    fn invalid_type(_: de::Unexpected<'_>, exp: &dyn de::Expected) -> Self {
+        Error::Subtype(format!("{}", exp))
     }
 }
 
