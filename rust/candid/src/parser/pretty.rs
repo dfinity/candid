@@ -72,8 +72,20 @@ pub fn number_to_string(v: &IDLValue) -> String {
         Int16(n) => pp_num_str(&n.to_string()),
         Int32(n) => pp_num_str(&n.to_string()),
         Int64(n) => pp_num_str(&n.to_string()),
-        Float32(f) => f.to_string(),
-        Float64(f) => f.to_string(),
+        Float32(f) => {
+            if f.trunc() == *f {
+                format!("{}.0", f)
+            } else {
+                f.to_string()
+            }
+        }
+        Float64(f) => {
+            if f.trunc() == *f {
+                format!("{}.0", f)
+            } else {
+                f.to_string()
+            }
+        }
         _ => unreachable!(),
     }
 }
@@ -94,8 +106,8 @@ impl fmt::Debug for IDLValue {
             Int16(n) => write!(f, "{} : int16", pp_num_str(&n.to_string())),
             Int32(n) => write!(f, "{} : int32", pp_num_str(&n.to_string())),
             Int64(n) => write!(f, "{} : int64", pp_num_str(&n.to_string())),
-            Float32(n) => write!(f, "{} : float32", n),
-            Float64(n) => write!(f, "{} : float64", n),
+            Float32(_) => write!(f, "{} : float32", number_to_string(self)),
+            Float64(_) => write!(f, "{} : float64", number_to_string(self)),
             Text(s) => write!(f, "{:?}", s),
             None => write!(f, "null"),
             Reserved => write!(f, "null : reserved"),
