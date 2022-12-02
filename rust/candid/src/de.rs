@@ -13,9 +13,8 @@ use crate::{
 use anyhow::{anyhow, Context};
 use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
-use serde::de::{self, Deserialize, Visitor};
+use serde::de::{self, Visitor};
 use std::fmt::Write;
-use std::marker::PhantomData;
 use std::{collections::VecDeque, io::Cursor, mem::replace};
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
@@ -119,40 +118,6 @@ macro_rules! assert {
             )));
         }
     }};
-}
-
-pub fn optional_variant<'de, T, D>(deserializer: D) -> std::result::Result<Option<T>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    struct OptionalVariant<T>(PhantomData<T>);
-    impl<'de, T> Visitor<'de> for OptionalVariant<T>
-    where
-        T: Deserialize<'de>,
-    {
-        type Value = Option<T>;
-        fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            formatter.write_str("optional variant")
-        }
-        fn visit_none<E>(self) -> std::result::Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            Ok(None)
-        }
-        fn visit_some<D>(self, deserializer: D) -> std::result::Result<Self::Value, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            Ok(match T::deserialize(deserializer) {
-                Ok(v) => Some(v),
-                // Issue: 1. cannot inspect value; 2. Err from subtype cannot use ?
-                Err(_) => None,
-            })
-        }
-    }
-    deserializer.deserialize_option(OptionalVariant(PhantomData))
 }
 
 struct Deserializer<'de> {
@@ -269,7 +234,12 @@ impl<'de> Deserializer<'de> {
                 .0
                 .try_into()
                 .map_err(Error::msg)?),
-            t => return Err(Error::msg(format!("{} cannot be deserialized to int", t))),
+            t => {
+                return Err(Error::subtype(format!(
+                    "{} cannot be deserialized to int",
+                    t
+                )))
+            }
         };
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
         assert!(self.expect_type == Type::Int);
@@ -443,7 +413,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
                 nat.0.try_into().map_err(Error::msg)?
             }
-            t => return Err(Error::msg(format!("{} cannot be deserialized to int", t))),
+            t => {
+                return Err(Error::subtype(format!(
+                    "{} cannot be deserialized to int",
+                    t
+                )))
+            }
         };
         assert!(self.expect_type == Type::Int);
         visitor.visit_i128(value)
@@ -520,17 +495,36 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (Type::Opt(t1), Type::Opt(t2)) => {
                 self.wire_type = *t1.clone();
                 self.expect_type = *t2.clone();
-                if BoolValue::read(&mut self.input)?.0 {
-                    // TODO define a function (wire_type, expect_type) -> bool to check if we get None
-                    visitor.visit_some(self)
-                } else {
-                    visitor.visit_none()
+                unsafe {
+                    let v = std::ptr::read(&visitor);
+                    if BoolValue::read(&mut self.input)?.0 {
+                        match v.visit_some(self) {
+                            Ok(v) => Ok(v),
+                            Err(Error::Subtype(_)) => {
+                                let v = std::ptr::read(&visitor);
+                                v.visit_none()
+                            }
+                            Err(e) => Err(e),
+                        }
+                    } else {
+                        v.visit_none()
+                    }
                 }
             }
             (_, Type::Opt(t2)) => {
                 self.expect_type = self.table.trace_type(t2)?;
                 if !matches!(self.expect_type, Type::Null | Type::Reserved | Type::Opt(_)) {
-                    visitor.visit_some(self)
+                    unsafe {
+                        let v = std::ptr::read(&visitor);
+                        match v.visit_some(self) {
+                            Ok(v) => Ok(v),
+                            Err(Error::Subtype(_)) => {
+                                let v = std::ptr::read(&visitor);
+                                v.visit_none()
+                            }
+                            Err(e) => Err(e),
+                        }
+                    }
                 } else {
                     self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                     visitor.visit_none()
