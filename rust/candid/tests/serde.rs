@@ -61,10 +61,7 @@ fn test_integer() {
         Int::parse(b"-60000000000000000").unwrap(),
         "4449444c00017c8080e88b96cab5957f",
     );
-    check_error(
-        || test_decode(&hex("4449444c00017c2a"), &42i64),
-        "Int64 value",
-    );
+    check_error(|| test_decode(&hex("4449444c00017c2a"), &42i64), "Int64");
 }
 
 #[test]
