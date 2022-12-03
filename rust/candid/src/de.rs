@@ -226,6 +226,7 @@ impl<'de> Deserializer<'de> {
     {
         use std::convert::TryInto;
         self.unroll_type()?;
+        assert!(self.expect_type == Type::Int);
         let mut bytes = vec![0u8];
         let int = match &self.wire_type {
             Type::Int => Int::decode(&mut self.input).map_err(Error::msg)?,
@@ -242,7 +243,6 @@ impl<'de> Deserializer<'de> {
             }
         };
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
-        assert!(self.expect_type == Type::Int);
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_nat<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
@@ -250,9 +250,12 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
+        //assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
+        if !(self.expect_type == Type::Nat && self.wire_type == Type::Nat) {
+            return Err(Error::subtype("expect nat type"));
+        }
         let mut bytes = vec![1u8];
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
-        assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
         bytes.extend_from_slice(&nat.0.to_bytes_le());
         visitor.visit_byte_buf(bytes)
     }
@@ -495,20 +498,22 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (Type::Opt(t1), Type::Opt(t2)) => {
                 self.wire_type = *t1.clone();
                 self.expect_type = *t2.clone();
-                unsafe {
-                    let v = std::ptr::read(&visitor);
-                    if BoolValue::read(&mut self.input)?.0 {
-                        match v.visit_some(self) {
+                if BoolValue::read(&mut self.input)?.0 {
+                    unsafe {
+                        let v = std::ptr::read(&visitor);
+                        let self_ptr = std::ptr::read(&self);
+                        match v.visit_some(self_ptr) {
                             Ok(v) => Ok(v),
                             Err(Error::Subtype(_)) => {
-                                let v = std::ptr::read(&visitor);
-                                v.visit_none()
+                                // TODO make sure it consumes a complete value
+                                self.deserialize_ignored_any(serde::de::IgnoredAny)?;
+                                visitor.visit_none()
                             }
                             Err(e) => Err(e),
                         }
-                    } else {
-                        v.visit_none()
                     }
+                } else {
+                    visitor.visit_none()
                 }
             }
             (_, Type::Opt(t2)) => {
@@ -516,11 +521,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 if !matches!(self.expect_type, Type::Null | Type::Reserved | Type::Opt(_)) {
                     unsafe {
                         let v = std::ptr::read(&visitor);
-                        match v.visit_some(self) {
+                        let self_ptr = std::ptr::read(&self);
+                        match v.visit_some(self_ptr) {
                             Ok(v) => Ok(v),
                             Err(Error::Subtype(_)) => {
-                                let v = std::ptr::read(&visitor);
-                                v.visit_none()
+                                self.deserialize_ignored_any(serde::de::IgnoredAny)?;
+                                visitor.visit_none()
                             }
                             Err(e) => Err(e),
                         }

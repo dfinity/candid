@@ -320,10 +320,10 @@ fn test_extra_fields() {
 
     let bytes = encode(&E2::Foo);
     test_decode(&bytes, &Some(E2::Foo));
-    /*check_error(
+    check_error(
         || test_decode(&bytes, &E1::Foo),
         "Variant field 3_303_867 not found",
-    );*/
+    );
 }
 
 #[test]
@@ -490,7 +490,7 @@ fn test_tuple() {
                 &(Int::from(42), "💩"),
             )
         },
-        "field 1: text is only in the expected type",
+        "is not a tuple type",
     );
 }
 
@@ -509,7 +509,7 @@ fn test_variant() {
 
     check_error(
         || test_decode(&hex("4449444c016b02b4d3c9017fe6fdd5017f010000"), &Unit::Bar),
-        "Variant field 3_303_860 not found",
+        "Unknown variant field 3_303_860",
     );
 
     let res: Result<String, String> = Ok("good".to_string());
