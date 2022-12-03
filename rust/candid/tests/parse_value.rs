@@ -41,7 +41,7 @@ fn parse_literals() {
     );
     assert_eq!(
         format!("{}", args),
-        "(\n  true,\n  null : null,\n  42,\n  42 : float64,\n  42.42 : float64,\n  -4200000 : float64,\n  0.0004242 : float64,\n)"
+        "(\n  true,\n  null : null,\n  42,\n  42.0 : float64,\n  42.42 : float64,\n  -4200000.0 : float64,\n  0.0004242 : float64,\n)"
     );
 }
 
