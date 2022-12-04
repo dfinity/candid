@@ -332,6 +332,22 @@ impl<'de> Deserializer<'de> {
     {
         Err(Error::msg("Cannot decode empty type"))
     }
+    unsafe fn recoverable_visit_some<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        use de::Deserializer;
+        let v = std::ptr::read(&visitor);
+        let self_ptr = std::ptr::read(&self);
+        match v.visit_some(self_ptr) {
+            Ok(v) => Ok(v),
+            Err(Error::Subtype(_)) => {
+                self.deserialize_ignored_any(serde::de::IgnoredAny)?;
+                visitor.visit_none()
+            }
+            Err(e) => Err(e),
+        }
+    }
 }
 
 macro_rules! primitive_impl {
@@ -342,7 +358,6 @@ macro_rules! primitive_impl {
                 self.unroll_type()?;
                 check!(self.expect_type == $type && self.wire_type == $type, stringify!($type));
                 let val = self.input.$($value)*().map_err(|_| Error::msg(format!("Cannot read {} value", stringify!($type))))?;
-                //let val: $ty = self.input.read_le()?;
                 visitor.[<visit_ $ty>](val)
             }
         }
@@ -531,18 +546,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.wire_type = *t1.clone();
                 self.expect_type = *t2.clone();
                 if BoolValue::read(&mut self.input)?.0 {
-                    unsafe {
-                        let v = std::ptr::read(&visitor);
-                        let self_ptr = std::ptr::read(&self);
-                        match v.visit_some(self_ptr) {
-                            Ok(v) => Ok(v),
-                            Err(Error::Subtype(_)) => {
-                                self.deserialize_ignored_any(serde::de::IgnoredAny)?;
-                                visitor.visit_none()
-                            }
-                            Err(e) => Err(e),
-                        }
-                    }
+                    unsafe { self.recoverable_visit_some(visitor) }
                 } else {
                     visitor.visit_none()
                 }
@@ -550,18 +554,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (_, Type::Opt(t2)) => {
                 self.expect_type = self.table.trace_type(t2)?;
                 if !matches!(self.expect_type, Type::Null | Type::Reserved | Type::Opt(_)) {
-                    unsafe {
-                        let v = std::ptr::read(&visitor);
-                        let self_ptr = std::ptr::read(&self);
-                        match v.visit_some(self_ptr) {
-                            Ok(v) => Ok(v),
-                            Err(Error::Subtype(_)) => {
-                                self.deserialize_ignored_any(serde::de::IgnoredAny)?;
-                                visitor.visit_none()
-                            }
-                            Err(e) => Err(e),
-                        }
-                    }
+                    unsafe { self.recoverable_visit_some(visitor) }
                 } else {
                     self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                     visitor.visit_none()
@@ -608,7 +601,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         );
         let len = Len::read(&mut self.input)?.0;
         let bytes = self.borrow_bytes(len)?.to_owned();
-        //let bytes = Bytes::read(&mut self.input)?.inner;
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
@@ -845,8 +837,8 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                                 // by subtyping rules, expect_type can only be opt, reserved or null.
                                 let field = e.id.clone();
                                 self.de.set_field_name(field.clone());
-                                self.de.expect_type = expect.pop_front().unwrap().ty;
-                                self.de.unroll_type()?;
+                                let expect = expect.pop_front().unwrap().ty;
+                                self.de.expect_type = self.de.table.trace_type(&expect)?;
                                 check!(
                                     matches!(
                                         self.de.expect_type,
