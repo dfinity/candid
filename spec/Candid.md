@@ -890,7 +890,7 @@ To describe these values, we re-use the syntax of the textual representation.
 
 #### Primitive Types
 
-On primitve types, coercion is the identity:
+On primitive types, coercion is the identity:
 ```
 <t> ∈ <numtype>, bool, text, null
 ---------------------------------
@@ -942,6 +942,7 @@ opt <v> : opt <t> ~> null : opt <t'>
 
 Coercing a non-null, non-optional and non-reserved type at an option type treats it as an optional value, if it can be decoded successfully:
 ```
+not (null <: <t>)
 not (null <: <t'>)
 <v> : <t> ~> <v'> : <t'>
 --------------------------------
