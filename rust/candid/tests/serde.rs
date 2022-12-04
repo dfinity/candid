@@ -521,6 +521,17 @@ fn test_variant() {
         v,
         "4449444c036b03b3d3c90101bbd3c90102e6fdd5017f6c02007e017c6c02617c627d010000012a",
     );
+
+    let bytes = encode(&Some(E::Foo));
+    test_decode(&bytes, &Some(Unit::Foo));
+    let bytes = encode(&E::Baz {
+        a: 42.into(),
+        b: 42.into(),
+    });
+    test_decode(&bytes, &None::<Unit>);
+    let bytes = encode(&E::Bar(true, 42.into()));
+    test_decode(&bytes, &None::<Unit>);
+    check_error(|| test_decode(&bytes, &Unit::Bar), "Subtyping error");
 }
 
 #[test]

@@ -121,11 +121,18 @@ macro_rules! assert {
 }
 
 macro_rules! check {
-    ($exp:expr, $msg:expr) => {
+    ( false ) => {{
+        return Err(Error::Subtype(format!(
+            "Type mismatch at {}:{}",
+            file!(),
+            line!()
+        )));
+    }};
+    ($exp:expr, $msg:expr) => {{
         if !$exp {
             return Err(Error::Subtype($msg.to_string()));
         }
-    };
+    }};
 }
 
 struct Deserializer<'de> {
@@ -530,7 +537,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                         match v.visit_some(self_ptr) {
                             Ok(v) => Ok(v),
                             Err(Error::Subtype(_)) => {
-                                // TODO make sure it consumes a complete value
                                 self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                                 visitor.visit_none()
                             }
@@ -561,7 +567,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     visitor.visit_none()
                 }
             }
-            (_, _) => assert!(false),
+            (_, _) => check!(false),
         }
     }
     fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value>
@@ -579,9 +585,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (Type::Record(e), Type::Record(w)) => {
                 let expect = e.clone().into();
                 let wire = w.clone().into();
-                assert!(self.expect_type.is_tuple());
+                check!(self.expect_type.is_tuple(), "seq_tuple");
                 if !self.wire_type.is_tuple() {
-                    return Err(Error::msg(format!(
+                    return Err(Error::subtype(format!(
                         "{} is not a tuple type",
                         self.wire_type
                     )));
@@ -590,8 +596,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     visitor.visit_seq(Compound::new(self, Style::Struct { expect, wire }))?;
                 Ok(value)
             }
-            (Type::Record(_), Type::Empty) => Err(Error::msg("Cannot decode empty type")),
-            _ => assert!(false),
+            _ => check!(false),
         }
     }
     fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
@@ -615,7 +620,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let slice = self.borrow_bytes(len)?;
                 visitor.visit_borrowed_bytes(slice)
             }
-            _ => Err(Error::msg("bytes only takes principal or vec nat8")),
+            _ => Err(Error::subtype("bytes only takes principal or vec nat8")),
         }
     }
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value>
@@ -627,7 +632,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (Type::Vec(ref e), Type::Vec(ref w)) => {
                 let e = self.table.trace_type(e)?;
                 let w = self.table.trace_type(w)?;
-                let len = Len::read(&mut self.input)?.0;
                 match (e, w) {
                     (Type::Record(ref e), Type::Record(ref w)) => match (&e[..], &w[..]) {
                         (
@@ -648,14 +652,15 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                         ) => {
                             let expect = (ek.clone(), ev.clone());
                             let wire = (wk.clone(), wv.clone());
+                            let len = Len::read(&mut self.input)?.0;
                             visitor.visit_map(Compound::new(self, Style::Map { len, expect, wire }))
                         }
-                        _ => Err(Error::msg("expect a key-value pair")),
+                        _ => Err(Error::subtype("expect a key-value pair")),
                     },
-                    _ => Err(Error::msg("expect a key-value pair")),
+                    _ => Err(Error::subtype("expect a key-value pair")),
                 }
             }
-            _ => assert!(false),
+            _ => check!(false),
         }
     }
     fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value>
@@ -693,8 +698,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     visitor.visit_map(Compound::new(self, Style::Struct { expect, wire }))?;
                 Ok(value)
             }
-            //(Type::Record(_), Type::Empty) => Err(Error::msg("Cannot decode empty type")),
-            _ => assert!(false),
+            _ => check!(false),
         }
     }
     fn deserialize_enum<V>(
@@ -709,6 +713,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.unroll_type()?;
         match (&self.expect_type, &self.wire_type) {
             (Type::Variant(e), Type::Variant(w)) => {
+                let old_pos = self.input.position();
                 let index = Len::read(&mut self.input)?.0;
                 let len = w.len();
                 if index >= len {
@@ -718,14 +723,16 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     )));
                 }
                 let wire = w[index].clone();
-                let expect = e
-                    .iter()
-                    .find(|f| f.id == wire.id)
-                    .ok_or_else(|| Error::msg(format!("Unknown variant field {}", wire.id)))?
-                    .clone();
+                let expect = match e.iter().find(|f| f.id == wire.id) {
+                    Some(v) => v.clone(),
+                    None => {
+                        self.input.set_position(old_pos);
+                        return Err(Error::subtype(format!("Unknown variant field {}", wire.id)));
+                    }
+                };
                 visitor.visit_enum(Compound::new(self, Style::Enum { expect, wire }))
             }
-            _ => assert!(false),
+            _ => check!(false),
         }
     }
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value>
@@ -809,7 +816,7 @@ impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
                 self.de.wire_type = wire.pop_front().map(|f| f.ty).unwrap_or(Type::Reserved);
                 seed.deserialize(&mut *self.de).map(Some)
             }
-            _ => Err(Error::msg("expect vector or tuple")),
+            _ => Err(Error::subtype("expect vector or tuple")),
         }
     }
 }
@@ -930,7 +937,7 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
                 let field = seed.deserialize(&mut *self.de)?;
                 Ok((field, self))
             }
-            _ => Err(Error::msg("expect enum")),
+            _ => Err(Error::subtype("expect enum")),
         }
     }
 }
@@ -939,7 +946,10 @@ impl<'de, 'a> de::VariantAccess<'de> for Compound<'a, 'de> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<()> {
-        assert!(self.de.expect_type == Type::Null && self.de.wire_type == Type::Null);
+        check!(
+            self.de.expect_type == Type::Null && self.de.wire_type == Type::Null,
+            "unit_variant"
+        );
         Ok(())
     }
 
