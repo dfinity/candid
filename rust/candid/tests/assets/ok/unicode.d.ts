@@ -1,4 +1,6 @@
 import type { Principal } from '@dfinity/principal';
+import type { ActorMethod } from '@dfinity/agent';
+
 export interface A {
   '\u{e000}' : bigint,
   '📦🍦' : bigint,
@@ -10,8 +12,8 @@ export type B = { '' : null } |
   { '  空的  ' : null } |
   { '1⃣️2⃣️3⃣️' : null };
 export interface _SERVICE {
-  '' : (arg_0: bigint) => Promise<bigint>,
-  '✈️  🚗 ⛱️ ' : () => Promise<undefined>,
-  '函数名' : (arg_0: A) => Promise<B>,
-  '👀' : (arg_0: bigint) => Promise<bigint>,
+  '' : ActorMethod<[bigint], bigint>,
+  '✈️  🚗 ⛱️ ' : ActorMethod<[], undefined>,
+  '函数名' : ActorMethod<[A], B>,
+  '👀' : ActorMethod<[bigint], bigint>,
 }

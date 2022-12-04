@@ -1,19 +1,21 @@
 //! Deserialize Candid binary format to Rust data structures
 
-use super::error::{Error, Result};
 use super::{
+    error::{Error, Result},
     parser::typing::TypeEnv,
     types::{Field, Label, Type},
     CandidType, Int, Nat,
 };
-use crate::binary_parser::{BoolValue, Header, Len, PrincipalBytes};
-use crate::types::subtype::{subtype, Gamma};
+use crate::{
+    binary_parser::{BoolValue, Header, Len, PrincipalBytes},
+    types::subtype::{subtype, Gamma},
+};
 use anyhow::{anyhow, Context};
 use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
-use std::collections::VecDeque;
-use std::io::Cursor;
+use std::fmt::Write;
+use std::{collections::VecDeque, io::Cursor, mem::replace};
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
 pub struct IDLDeserialize<'de> {
@@ -165,14 +167,16 @@ impl<'de> Deserializer<'de> {
         let (before, after) = hex.split_at(pos);
         let mut res = format!("input: {}_{}\n", before, after);
         if !self.table.0.is_empty() {
-            res += &format!("table: {}", self.table);
+            write!(&mut res, "table: {}", self.table).unwrap();
         }
-        res += &format!(
+        write!(
+            &mut res,
             "wire_type: {}, expect_type: {}",
             self.wire_type, self.expect_type
-        );
+        )
+        .unwrap();
         if let Some(field) = &self.field_name {
-            res += &format!(", field_name: {:?}", field);
+            write!(&mut res, ", field_name: {:?}", field).unwrap();
         }
         res
     }
@@ -376,8 +380,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        let is_untyped = replace(&mut self.is_untyped, true);
         self.expect_type = self.wire_type.clone();
-        self.deserialize_any(visitor)
+        let v = self.deserialize_any(visitor);
+        self.is_untyped = is_untyped;
+        v
     }
 
     primitive_impl!(i8, Type::Int8, read_i8);
@@ -498,7 +505,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 }
             }
             (_, Type::Opt(t2)) => {
-                self.expect_type = self.table.trace_type(&*t2)?;
+                self.expect_type = self.table.trace_type(t2)?;
                 if !matches!(self.expect_type, Type::Null | Type::Reserved | Type::Opt(_))
                     && self.check_subtype().is_ok()
                 {
@@ -861,7 +868,7 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
                         Type::Record(_) => "struct",
                         _ => "newtype",
                     };
-                    label += &format!(",{},{}", label_type, accessor);
+                    write!(&mut label, ",{},{}", label_type, accessor).map_err(Error::msg)?;
                 }
                 self.de.set_field_name(Label::Named(label));
                 let field = seed.deserialize(&mut *self.de)?;

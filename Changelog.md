@@ -1,6 +1,57 @@
 
 # Changelog
 
+## 2022-11-17 (Rust 0.8.3 -- 0.8.4)
+
+* Bug fix in TS bindings
+* Pretty print numbers
+
+## 2022-10-06 (Rust 0.8.2)
+
+* Downgrade `serde_dhall` for license issue.
+
+## 2022-10-04 (Rust 0.8.1)
+
+* Fix: missing impl serde traits for `Principal`
+
+## 2022-09-27 (Rust 0.8.0)
+
+* Move `Principal` into this crate, no more re-export `ic-types`
+
+## 2022-09-22 (Rust 0.7.17)
+
+* Bump `ic-types` to `0.5` (fixing `lookup_path` for hash trees)
+
+## 2022-08-09 (Rust 0.7.16)
+
+* Implement `CandidType` for `Rc` and `Arc`
+* Fix TS binding for TypedArray
+* Fix float tokenizer
+* Derive `Serialize` for `Int` and `Nat`
+
+## 2022-07-13
+
+### Rust (0.7.15)
+
+* Fix parser: underscore for hexnum; semicolon at the EOF
+* Fix semicolon in Rust binding
+* Derive `Copy`, `Eq`, `Default` for `Reserved`
+* Bump `ic-types` to `0.4`
+
+### Candid UI
+
+* Fetch did file from canister metadata
+* Deprecate `localhost/_/candid` endpoint
+* Fetch name section from metadata (instrumented code)
+* Bug fix for encoding `vec nat8` types
+* Disable profiler for query methods
+
+## 2022-03-30 (Rust 0.7.11 -- 0.7.14)
+
+* Update service methods in TS bindings to use ActorMethod, the type used by agent-js's Actor class
+* Infer the type of `vec {}` to `vec empty` to satisfy subtype checking
+* Expose more internal structures
+
 ## 2022-01-06 (Rust 0.7.10)
 
 * Bump ic-types to 0.3

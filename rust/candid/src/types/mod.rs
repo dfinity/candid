@@ -4,7 +4,6 @@
 //!    We do not use Serde's `Serialize` trait because Candid requires serializing types along with the values.
 //!    This is difficult to achieve in `Serialize`, especially for enum types.
 
-pub use ic_types;
 use serde::ser::Error;
 
 mod impls;

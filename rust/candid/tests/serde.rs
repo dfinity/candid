@@ -362,6 +362,27 @@ fn test_serde_bytes() {
 }
 
 #[test]
+fn test_rc_bytes() {
+    use serde_bytes::ByteBuf;
+    use std::rc::Rc;
+    use std::sync::Arc;
+
+    #[derive(CandidType, Deserialize, PartialEq, Debug)]
+    struct RcBytes(#[serde(with = "candid::rc")] Rc<ByteBuf>);
+    #[derive(CandidType, Deserialize, PartialEq, Debug)]
+    struct ArcBytes(#[serde(with = "candid::arc")] Arc<ByteBuf>);
+
+    all_check(
+        RcBytes(Rc::new(ByteBuf::from(vec![1u8, 2u8, 3u8]))),
+        "4449444c016d7b010003010203",
+    );
+    all_check(
+        ArcBytes(Arc::new(ByteBuf::from(vec![1u8, 2u8, 3u8]))),
+        "4449444c016d7b010003010203",
+    );
+}
+
+#[test]
 fn test_keyword_label() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct A {

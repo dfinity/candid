@@ -1,6 +1,6 @@
 [package]
 name = "candid_derive"
-version = "0.4.5"
+version = "0.5.0"
 edition = "2018"
 authors = ["DFINITY Team"]
 description = "Macros implementation of #[derive(CandidType)] for the Candid."
@@ -23,6 +23,3 @@ quote = "1.0.7"
 syn = { version = "1.0.38", features = ["visit", "full"] }
 proc-macro2 = "1.0.19"
 lazy_static = "1.4.0"
-
-[features]
-cdk = []

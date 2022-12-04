@@ -38,7 +38,33 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         }
         Principal => str("Principal"),
         Opt(ref t) => str("[] | ").append(enclose("[", pp_ty(env, t, is_ref), "]")),
-        Vec(ref t) => str("Array").append(enclose("<", pp_ty(env, t, is_ref), ">")),
+        Vec(ref t) => {
+            let ty = match **t {
+                Var(ref id) => {
+                    let ty = env.rec_find_type(id).unwrap();
+                    if matches!(
+                        ty,
+                        Nat8 | Nat16 | Nat32 | Nat64 | Int8 | Int16 | Int32 | Int64
+                    ) {
+                        ty
+                    } else {
+                        t
+                    }
+                }
+                _ => t,
+            };
+            match *ty {
+                Nat8 => str("Uint8Array | number[]"),
+                Nat16 => str("Uint16Array | number[]"),
+                Nat32 => str("Uint32Array | number[]"),
+                Nat64 => str("BigUint64Array | bigint[]"),
+                Int8 => str("Int8Array | number[]"),
+                Int16 => str("Int16Array | number[]"),
+                Int32 => str("Int32Array | number[]"),
+                Int64 => str("BigInt64Array | bigint[]"),
+                _ => str("Array").append(enclose("<", pp_ty(env, t, is_ref), ">")),
+            }
+        }
         Record(ref fs) => {
             if is_tuple(ty) {
                 let tuple = concat(fs.iter().map(|f| pp_ty(env, &f.ty, is_ref)), ",");
@@ -78,26 +104,22 @@ fn pp_field<'a>(env: &'a TypeEnv, field: &'a Field, is_ref: bool) -> RcDoc<'a> {
 }
 
 fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
-    let args = func
-        .args
-        .iter()
-        .enumerate()
-        .map(|(i, ty)| RcDoc::text(format!("arg_{}: ", i)).append(pp_ty(env, ty, true)));
-    let args = enclose("(", concat(args, ","), ")");
-    let rets = str("Promise").append(enclose(
-        "<",
-        match func.rets.len() {
-            0 => str("undefined"),
-            1 => pp_ty(env, &func.rets[0], true),
-            _ => enclose(
-                "[",
-                concat(func.rets.iter().map(|ty| pp_ty(env, ty, true)), ","),
-                "]",
-            ),
-        },
+    let args = func.args.iter().map(|ty| pp_ty(env, ty, true));
+    let args = enclose("[", concat(args, ","), "]");
+    let rets = match func.rets.len() {
+        0 => str("undefined"),
+        1 => pp_ty(env, &func.rets[0], true),
+        _ => enclose(
+            "[",
+            concat(func.rets.iter().map(|ty| pp_ty(env, ty, true)), ","),
+            "]",
+        ),
+    };
+    enclose(
+        "ActorMethod<",
+        strict_concat([args, rets].iter().cloned(), ","),
         ">",
-    ));
-    args.append(" => ").append(rets).nest(INDENT_SPACE)
+    )
 }
 
 fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
@@ -153,7 +175,9 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
-    let header = r#"import type { Principal } from '@dfinity/principal';"#;
+    let header = r#"import type { Principal } from '@dfinity/principal';
+import type { ActorMethod } from '@dfinity/agent';
+"#;
     let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
     let defs = pp_defs(env, &def_list);
     let actor = match actor {

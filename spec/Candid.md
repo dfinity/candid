@@ -452,7 +452,7 @@ A *service reference* points to a service and is described by an actor type. Thr
 ```
 type broker = service {
   findCounterService : (name : text) ->
-    (service {up : () -> (); current : () -> nat});
+    (service {up : () -> (); current : () -> (nat)});
 }
 ```
 
@@ -1219,7 +1219,7 @@ M(_ : reserved) = .
 M : <val> -> <constype> -> i8*
 M(null : opt <datatype>) = i8(0)
 M(?v   : opt <datatype>) = i8(1) M(v : <datatype>)
-M(v*   : vec <datatype>) = leb128(N) M(v : <datatype>)*
+M(v^N  : vec <datatype>) = leb128(N) M(v : <datatype>)^N
 M(kv*  : record {<fieldtype>*}) = M(kv : <fieldtype>)*
 M(kv   : variant {<fieldtype>*}) = leb128(i) M(kv : <fieldtype>*[i])
 
