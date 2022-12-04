@@ -317,10 +317,7 @@ fn test_extra_fields() {
 
     let bytes = encode(&E2::Foo);
     test_decode(&bytes, &Some(E2::Foo));
-    check_error(
-        || test_decode(&bytes, &E1::Foo),
-        "Variant field 3_303_867 not found",
-    );
+    test_decode(&bytes, &E1::Foo);
 }
 
 #[test]

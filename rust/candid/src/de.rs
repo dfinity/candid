@@ -694,7 +694,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     visitor.visit_map(Compound::new(self, Style::Struct { expect, wire }))?;
                 Ok(value)
             }
-            (Type::Record(_), Type::Empty) => Err(Error::msg("Cannot decode empty type")),
+            //(Type::Record(_), Type::Empty) => Err(Error::msg("Cannot decode empty type")),
             _ => assert!(false),
         }
     }
@@ -837,8 +837,16 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                             }
                             Ordering::Less => {
                                 // by subtyping rules, expect_type can only be opt, reserved or null.
-                                self.de.set_field_name(e.id.clone());
+                                let field = e.id.clone();
+                                self.de.set_field_name(field.clone());
                                 self.de.expect_type = expect.pop_front().unwrap().ty;
+                                check!(
+                                    matches!(
+                                        self.de.expect_type,
+                                        Type::Opt(_) | Type::Reserved | Type::Null
+                                    ),
+                                    format!("field {} is not optional field", field)
+                                );
                                 self.de.wire_type = Type::Reserved;
                             }
                             Ordering::Greater => {
