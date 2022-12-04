@@ -64,7 +64,7 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
                         format!("Variant field {}: {} is not a subtype of {}", id, ty1, ty2)
                     })?,
                     None => {
-                        return Err(Error::subtype(format!(
+                        return Err(Error::msg(format!(
                             "Variant field {} not found in the expected type",
                             id
                         )))
@@ -81,7 +81,7 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
                         format!("Method {}: {} is not a subtype of {}", name, ty1, ty2)
                     })?,
                     None => {
-                        return Err(Error::subtype(format!(
+                        return Err(Error::msg(format!(
                             "Method {} is only in the expected type",
                             name
                         )))
@@ -94,7 +94,7 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
             let m1: HashSet<_> = f1.modes.iter().collect();
             let m2: HashSet<_> = f2.modes.iter().collect();
             if m1 != m2 {
-                return Err(Error::subtype("Function mode mismatch"));
+                return Err(Error::msg("Function mode mismatch"));
             }
             let args1 = to_tuple(&f1.args);
             let args2 = to_tuple(&f2.args);
@@ -109,7 +109,7 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
         (_, Class(_, t)) => subtype(gamma, env, t1, t),
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
-        (_, _) => Err(Error::subtype(format!("{} is not a subtype of {}", t1, t2))),
+        (_, _) => Err(Error::msg(format!("{} is not a subtype of {}", t1, t2))),
     }
 }
 

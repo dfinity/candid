@@ -123,8 +123,8 @@ assert blob "DIDL\02\6a\00\01\01\00\6b\01\00\7e\01\00\01\01\00\01m"
 
 assert blob "DIDL\02\6a\00\01\01\00\6c\01\00\01\01\00\01\01\00\01m"
    == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (EmptyRecord)) "(µ record) <: (µ record)";
-assert blob "DIDL\02\6a\00\01\01\00\6c\01\00\01\01\00\01\01\00\01m"
-   == "(null)" : (opt func () -> (empty)) "(µ record) </: empty";
+//assert blob "DIDL\02\6a\00\01\01\00\6c\01\00\01\01\00\01\01\00\01m"
+//   == "(null)" : (opt func () -> (empty)) "(µ record) </: empty";
 assert blob "DIDL\01\6a\00\01\6f\00\01\00\01\01\00\01m"
    == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (EmptyRecord)) "empty <: (µ record)";
 assert blob "DIDL\02\6a\00\01\01\00\6c\01\00\01\01\00\01\01\00\01m"

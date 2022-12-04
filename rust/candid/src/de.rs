@@ -202,7 +202,8 @@ impl<'de> Deserializer<'de> {
                 "{} is not a subtype of {}",
                 self.wire_type, self.expect_type,
             )
-        })?;
+        })
+        .map_err(Error::subtype)?;
         Ok(())
     }
     fn unroll_type(&mut self) -> Result<()> {
@@ -293,7 +294,6 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        check!(matches!(self.wire_type, Type::Service(_)), "service");
         self.check_subtype()?;
         let mut bytes = vec![4u8];
         let id = PrincipalBytes::read(&mut self.input)?.inner;
@@ -305,7 +305,6 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        check!(matches!(self.wire_type, Type::Func(_)), "function");
         self.check_subtype()?;
         if !BoolValue::read(&mut self.input)?.0 {
             return Err(Error::msg("Opaque reference not supported"));
