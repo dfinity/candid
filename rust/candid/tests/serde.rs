@@ -61,10 +61,7 @@ fn test_integer() {
         Int::parse(b"-60000000000000000").unwrap(),
         "4449444c00017c8080e88b96cab5957f",
     );
-    check_error(
-        || test_decode(&hex("4449444c00017c2a"), &42i64),
-        "int is not a subtype of int64",
-    );
+    check_error(|| test_decode(&hex("4449444c00017c2a"), &42i64), "Int64");
 }
 
 #[test]
@@ -136,7 +133,10 @@ fn test_reserved() {
 
 #[test]
 fn test_reference() {
-    use candid::{Func, Principal, Service};
+    use candid::{
+        types::{Function, Type},
+        Func, Principal, Service,
+    };
     let principal = Principal::from_text("w7x7r-cok77-xa").unwrap();
     all_check(principal, "4449444c0001680103caffee");
     all_check(Service { principal }, "4449444c01690001000103caffee");
@@ -147,6 +147,25 @@ fn test_reference() {
         },
         "4449444c016a0000000100010103caffee066d6574686f64",
     );
+    #[derive(Deserialize, PartialEq, Debug)]
+    struct CustomFunc(Func);
+    impl CandidType for CustomFunc {
+        fn _ty() -> Type {
+            Type::Func(Function {
+                args: vec![],
+                rets: vec![Type::Nat],
+                modes: vec![],
+            })
+        }
+        fn idl_serialize<S: candid::types::Serializer>(
+            &self,
+            _serializer: S,
+        ) -> Result<(), S::Error> {
+            unimplemented!()
+        }
+    }
+    let bytes = hex("4449444c016a00017f000100010100016d");
+    test_decode(&bytes, &None::<CustomFunc>);
 }
 
 #[test]
@@ -237,6 +256,61 @@ fn test_struct() {
 }
 
 #[test]
+fn optional_fields() {
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct OldStruct {
+        bar: bool,
+        baz: Option<Old>,
+    }
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    enum Old {
+        Foo,
+        Bar(bool),
+    }
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    enum New {
+        Foo,
+        Bar(bool),
+        Baz(bool),
+    }
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct NewStruct {
+        foo: Option<u8>,
+        bar: bool,
+        baz: Option<New>,
+    }
+    let bytes = encode(&OldStruct {
+        bar: true,
+        baz: Some(Old::Foo),
+    });
+    test_decode(
+        &bytes,
+        &NewStruct {
+            foo: None,
+            bar: true,
+            baz: Some(New::Foo),
+        },
+    );
+    let bytes = encode(&NewStruct {
+        foo: Some(42),
+        bar: false,
+        baz: Some(New::Baz(true)),
+    });
+    test_decode(
+        &bytes,
+        &OldStruct {
+            bar: false,
+            baz: None,
+        },
+    );
+    let bytes = encode(&New::Baz(false));
+    check_error(
+        || test_decode(&bytes, &Old::Bar(false)),
+        "Unknown variant field",
+    );
+}
+
+#[test]
 fn test_equivalent_types() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct RootType {
@@ -320,10 +394,7 @@ fn test_extra_fields() {
 
     let bytes = encode(&E2::Foo);
     test_decode(&bytes, &Some(E2::Foo));
-    check_error(
-        || test_decode(&bytes, &E1::Foo),
-        "Variant field 3_303_867 not found",
-    );
+    test_decode(&bytes, &E1::Foo);
 }
 
 #[test]
@@ -490,7 +561,7 @@ fn test_tuple() {
                 &(Int::from(42), "💩"),
             )
         },
-        "field 1: text is only in the expected type",
+        "is not a tuple type",
     );
 }
 
@@ -509,7 +580,7 @@ fn test_variant() {
 
     check_error(
         || test_decode(&hex("4449444c016b02b4d3c9017fe6fdd5017f010000"), &Unit::Bar),
-        "Variant field 3_303_860 not found",
+        "Unknown variant field 3_303_860",
     );
 
     let res: Result<String, String> = Ok("good".to_string());
@@ -527,6 +598,17 @@ fn test_variant() {
         v,
         "4449444c036b03b3d3c90101bbd3c90102e6fdd5017f6c02007e017c6c02617c627d010000012a",
     );
+
+    let bytes = encode(&Some(E::Foo));
+    test_decode(&bytes, &Some(Unit::Foo));
+    let bytes = encode(&E::Baz {
+        a: 42.into(),
+        b: 42.into(),
+    });
+    test_decode(&bytes, &None::<Unit>);
+    let bytes = encode(&E::Bar(true, 42.into()));
+    test_decode(&bytes, &None::<Unit>);
+    check_error(|| test_decode(&bytes, &Unit::Bar), "Subtyping error");
 }
 
 #[test]
@@ -609,12 +691,12 @@ fn test_multiargs() {
         Vec<(Int, &str)>,
         (Int, String),
         Option<i32>,
-        (),
+        candid::Reserved,
         candid::Reserved
     )
     .unwrap();
     assert_eq!(tuple.2, None);
-    assert_eq!(tuple.3, ());
+    assert_eq!(tuple.3, candid::Reserved);
     assert_eq!(tuple.4, candid::Reserved);
 }
 
