@@ -840,6 +840,7 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                                 let field = e.id.clone();
                                 self.de.set_field_name(field.clone());
                                 self.de.expect_type = expect.pop_front().unwrap().ty;
+                                self.de.unroll_type()?;
                                 check!(
                                     matches!(
                                         self.de.expect_type,
