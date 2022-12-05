@@ -1,19 +1,21 @@
 //! Deserialize Candid binary format to Rust data structures
 
-use super::error::{Error, Result};
 use super::{
+    error::{Error, Result},
     parser::typing::TypeEnv,
     types::{Field, Label, Type},
     CandidType, Int, Nat,
 };
-use crate::binary_parser::{BoolValue, Header, Len, PrincipalBytes};
-use crate::types::subtype::{subtype, Gamma};
+use crate::{
+    binary_parser::{BoolValue, Header, Len, PrincipalBytes},
+    types::subtype::{subtype, Gamma},
+};
 use anyhow::{anyhow, Context};
 use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
-use std::collections::VecDeque;
-use std::io::Cursor;
+use std::fmt::Write;
+use std::{collections::VecDeque, io::Cursor, mem::replace};
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
 pub struct IDLDeserialize<'de> {
@@ -49,13 +51,13 @@ impl<'de> IDLDeserialize<'de> {
     {
         let expected_type = self.de.table.trace_type(&expected_type)?;
         if self.de.types.is_empty() {
-            if matches!(expected_type, Type::Opt(_) | Type::Reserved | Type::Null) {
+            if matches!(expected_type, Type::Opt(_) | Type::Reserved) {
                 self.de.expect_type = expected_type;
-                self.de.wire_type = Type::Null;
+                self.de.wire_type = Type::Reserved;
                 return T::deserialize(&mut self.de);
             } else {
                 return Err(Error::msg(format!(
-                    "No more values on the wire, the expected type {} is not opt, reserved or null",
+                    "No more values on the wire, the expected type {} is not opt or reserved",
                     expected_type
                 )));
             }
@@ -69,15 +71,6 @@ impl<'de> IDLDeserialize<'de> {
             expected_type.clone()
         };
         self.de.wire_type = ty.clone();
-        self.de
-            .check_subtype()
-            .with_context(|| self.de.dump_state())
-            .with_context(|| {
-                format!(
-                    "Fail to decode argument {} from {} to {}",
-                    ind, ty, expected_type
-                )
-            })?;
 
         let v = T::deserialize(&mut self.de)
             .with_context(|| self.de.dump_state())
@@ -127,6 +120,21 @@ macro_rules! assert {
     }};
 }
 
+macro_rules! check {
+    ( false ) => {{
+        return Err(Error::Subtype(format!(
+            "Type mismatch at {}:{}",
+            file!(),
+            line!()
+        )));
+    }};
+    ($exp:expr, $msg:expr) => {{
+        if !$exp {
+            return Err(Error::Subtype($msg.to_string()));
+        }
+    }};
+}
+
 struct Deserializer<'de> {
     input: Cursor<&'de [u8]>,
     table: TypeEnv,
@@ -165,14 +173,16 @@ impl<'de> Deserializer<'de> {
         let (before, after) = hex.split_at(pos);
         let mut res = format!("input: {}_{}\n", before, after);
         if !self.table.0.is_empty() {
-            res += &format!("table: {}", self.table);
+            write!(&mut res, "table: {}", self.table).unwrap();
         }
-        res += &format!(
+        write!(
+            &mut res,
             "wire_type: {}, expect_type: {}",
             self.wire_type, self.expect_type
-        );
+        )
+        .unwrap();
         if let Some(field) = &self.field_name {
-            res += &format!(", field_name: {:?}", field);
+            write!(&mut res, ", field_name: {:?}", field).unwrap();
         }
         res
     }
@@ -199,7 +209,8 @@ impl<'de> Deserializer<'de> {
                 "{} is not a subtype of {}",
                 self.wire_type, self.expect_type,
             )
-        })?;
+        })
+        .map_err(Error::subtype)?;
         Ok(())
     }
     fn unroll_type(&mut self) -> Result<()> {
@@ -240,8 +251,12 @@ impl<'de> Deserializer<'de> {
                 .0
                 .try_into()
                 .map_err(Error::msg)?),
-            // We already did subtype checking before deserialize, so this is unreachable code
-            _ => assert!(false),
+            t => {
+                return Err(Error::subtype(format!(
+                    "{} cannot be deserialized to int",
+                    t
+                )))
+            }
         };
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
         visitor.visit_byte_buf(bytes)
@@ -251,7 +266,10 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
+        check!(
+            self.expect_type == Type::Nat && self.wire_type == Type::Nat,
+            "nat"
+        );
         let mut bytes = vec![1u8];
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
         bytes.extend_from_slice(&nat.0.to_bytes_le());
@@ -262,7 +280,10 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Principal && self.wire_type == Type::Principal);
+        check!(
+            self.expect_type == Type::Principal && self.wire_type == Type::Principal,
+            "principal"
+        );
         let mut bytes = vec![2u8];
         let id = PrincipalBytes::read(&mut self.input)?.inner;
         bytes.extend_from_slice(&id);
@@ -280,7 +301,7 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(matches!(self.wire_type, Type::Service(_)));
+        self.check_subtype()?;
         let mut bytes = vec![4u8];
         let id = PrincipalBytes::read(&mut self.input)?.inner;
         bytes.extend_from_slice(&id);
@@ -291,7 +312,7 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(matches!(self.wire_type, Type::Func(_)));
+        self.check_subtype()?;
         if !BoolValue::read(&mut self.input)?.0 {
             return Err(Error::msg("Opaque reference not supported"));
         }
@@ -311,6 +332,22 @@ impl<'de> Deserializer<'de> {
     {
         Err(Error::msg("Cannot decode empty type"))
     }
+    unsafe fn recoverable_visit_some<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        use de::Deserializer;
+        let v = std::ptr::read(&visitor);
+        let self_ptr = std::ptr::read(&self);
+        match v.visit_some(self_ptr) {
+            Ok(v) => Ok(v),
+            Err(Error::Subtype(_)) => {
+                self.deserialize_ignored_any(serde::de::IgnoredAny)?;
+                visitor.visit_none()
+            }
+            Err(e) => Err(e),
+        }
+    }
 }
 
 macro_rules! primitive_impl {
@@ -319,9 +356,8 @@ macro_rules! primitive_impl {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
                 self.unroll_type()?;
-                assert!(self.expect_type == $type && self.wire_type == $type);
+                check!(self.expect_type == $type && self.wire_type == $type, stringify!($type));
                 let val = self.input.$($value)*().map_err(|_| Error::msg(format!("Cannot read {} value", stringify!($type))))?;
-                //let val: $ty = self.input.read_le()?;
                 visitor.[<visit_ $ty>](val)
             }
         }
@@ -376,8 +412,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        let is_untyped = replace(&mut self.is_untyped, true);
         self.expect_type = self.wire_type.clone();
-        self.deserialize_any(visitor)
+        let v = self.deserialize_any(visitor);
+        self.is_untyped = is_untyped;
+        v
     }
 
     primitive_impl!(i8, Type::Int8, read_i8);
@@ -410,7 +449,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
                 nat.0.try_into().map_err(Error::msg)?
             }
-            _ => assert!(false),
+            t => {
+                return Err(Error::subtype(format!(
+                    "{} cannot be deserialized to int",
+                    t
+                )))
+            }
         };
         visitor.visit_i128(value)
     }
@@ -420,7 +464,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         use std::convert::TryInto;
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Nat && self.wire_type == Type::Nat);
+        check!(
+            self.expect_type == Type::Nat && self.wire_type == Type::Nat,
+            "nat"
+        );
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
         let value: u128 = nat.0.try_into().map_err(Error::msg)?;
         visitor.visit_u128(value)
@@ -430,7 +477,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Null && self.wire_type == Type::Null);
+        check!(
+            self.expect_type == Type::Null && self.wire_type == Type::Null,
+            "unit"
+        );
         visitor.visit_unit()
     }
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
@@ -438,7 +488,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Bool && self.wire_type == Type::Bool);
+        check!(
+            self.expect_type == Type::Bool && self.wire_type == Type::Bool,
+            "bool"
+        );
         let res = BoolValue::read(&mut self.input)?;
         visitor.visit_bool(res.0)
     }
@@ -447,7 +500,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
+        check!(
+            self.expect_type == Type::Text && self.wire_type == Type::Text,
+            "text"
+        );
         let len = Len::read(&mut self.input)?.0;
         let bytes = self.borrow_bytes(len)?.to_owned();
         let value = String::from_utf8(bytes).map_err(Error::msg)?;
@@ -458,7 +514,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Text && self.wire_type == Type::Text);
+        check!(
+            self.expect_type == Type::Text && self.wire_type == Type::Text,
+            "text"
+        );
         let len = Len::read(&mut self.input)?.0;
         let slice = self.borrow_bytes(len)?;
         let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
@@ -487,28 +546,21 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.wire_type = *t1.clone();
                 self.expect_type = *t2.clone();
                 if BoolValue::read(&mut self.input)?.0 {
-                    if self.check_subtype().is_ok() {
-                        visitor.visit_some(self)
-                    } else {
-                        self.deserialize_ignored_any(serde::de::IgnoredAny)?;
-                        visitor.visit_none()
-                    }
+                    unsafe { self.recoverable_visit_some(visitor) }
                 } else {
                     visitor.visit_none()
                 }
             }
             (_, Type::Opt(t2)) => {
-                self.expect_type = self.table.trace_type(&*t2)?;
-                if !matches!(self.expect_type, Type::Null | Type::Reserved | Type::Opt(_))
-                    && self.check_subtype().is_ok()
-                {
-                    visitor.visit_some(self)
+                self.expect_type = self.table.trace_type(t2)?;
+                if !matches!(self.expect_type, Type::Null | Type::Reserved | Type::Opt(_)) {
+                    unsafe { self.recoverable_visit_some(visitor) }
                 } else {
                     self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                     visitor.visit_none()
                 }
             }
-            (_, _) => assert!(false),
+            (_, _) => check!(false),
         }
     }
     fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value>
@@ -526,9 +578,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (Type::Record(e), Type::Record(w)) => {
                 let expect = e.clone().into();
                 let wire = w.clone().into();
-                assert!(self.expect_type.is_tuple());
+                check!(self.expect_type.is_tuple(), "seq_tuple");
                 if !self.wire_type.is_tuple() {
-                    return Err(Error::msg(format!(
+                    return Err(Error::subtype(format!(
                         "{} is not a tuple type",
                         self.wire_type
                     )));
@@ -537,19 +589,18 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     visitor.visit_seq(Compound::new(self, Style::Struct { expect, wire }))?;
                 Ok(value)
             }
-            (Type::Record(_), Type::Empty) => Err(Error::msg("Cannot decode empty type")),
-            _ => assert!(false),
+            _ => check!(false),
         }
     }
     fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         self.unroll_type()?;
-        assert!(
+        check!(
             self.expect_type == Type::Vec(Box::new(Type::Nat8))
-                && self.wire_type == Type::Vec(Box::new(Type::Nat8))
+                && self.wire_type == Type::Vec(Box::new(Type::Nat8)),
+            "vec nat8"
         );
         let len = Len::read(&mut self.input)?.0;
         let bytes = self.borrow_bytes(len)?.to_owned();
-        //let bytes = Bytes::read(&mut self.input)?.inner;
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
@@ -561,7 +612,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let slice = self.borrow_bytes(len)?;
                 visitor.visit_borrowed_bytes(slice)
             }
-            _ => Err(Error::msg("bytes only takes principal or vec nat8")),
+            _ => Err(Error::subtype("bytes only takes principal or vec nat8")),
         }
     }
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value>
@@ -573,7 +624,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (Type::Vec(ref e), Type::Vec(ref w)) => {
                 let e = self.table.trace_type(e)?;
                 let w = self.table.trace_type(w)?;
-                let len = Len::read(&mut self.input)?.0;
                 match (e, w) {
                     (Type::Record(ref e), Type::Record(ref w)) => match (&e[..], &w[..]) {
                         (
@@ -594,14 +644,15 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                         ) => {
                             let expect = (ek.clone(), ev.clone());
                             let wire = (wk.clone(), wv.clone());
+                            let len = Len::read(&mut self.input)?.0;
                             visitor.visit_map(Compound::new(self, Style::Map { len, expect, wire }))
                         }
-                        _ => Err(Error::msg("expect a key-value pair")),
+                        _ => Err(Error::subtype("expect a key-value pair")),
                     },
-                    _ => Err(Error::msg("expect a key-value pair")),
+                    _ => Err(Error::subtype("expect a key-value pair")),
                 }
             }
-            _ => assert!(false),
+            _ => check!(false),
         }
     }
     fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value>
@@ -639,8 +690,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     visitor.visit_map(Compound::new(self, Style::Struct { expect, wire }))?;
                 Ok(value)
             }
-            (Type::Record(_), Type::Empty) => Err(Error::msg("Cannot decode empty type")),
-            _ => assert!(false),
+            _ => check!(false),
         }
     }
     fn deserialize_enum<V>(
@@ -655,6 +705,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.unroll_type()?;
         match (&self.expect_type, &self.wire_type) {
             (Type::Variant(e), Type::Variant(w)) => {
+                let old_pos = self.input.position();
                 let index = Len::read(&mut self.input)?.0;
                 let len = w.len();
                 if index >= len {
@@ -664,14 +715,16 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     )));
                 }
                 let wire = w[index].clone();
-                let expect = e
-                    .iter()
-                    .find(|f| f.id == wire.id)
-                    .ok_or_else(|| Error::msg(format!("Unknown variant field {}", wire.id)))?
-                    .clone();
+                let expect = match e.iter().find(|f| f.id == wire.id) {
+                    Some(v) => v.clone(),
+                    None => {
+                        self.input.set_position(old_pos);
+                        return Err(Error::subtype(format!("Unknown variant field {}", wire.id)));
+                    }
+                };
                 visitor.visit_enum(Compound::new(self, Style::Enum { expect, wire }))
             }
-            _ => assert!(false),
+            _ => check!(false),
         }
     }
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value>
@@ -755,7 +808,7 @@ impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
                 self.de.wire_type = wire.pop_front().map(|f| f.ty).unwrap_or(Type::Reserved);
                 seed.deserialize(&mut *self.de).map(Some)
             }
-            _ => Err(Error::msg("expect vector or tuple")),
+            _ => Err(Error::subtype("expect vector or tuple")),
         }
     }
 }
@@ -782,8 +835,17 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                             }
                             Ordering::Less => {
                                 // by subtyping rules, expect_type can only be opt, reserved or null.
-                                self.de.set_field_name(e.id.clone());
-                                self.de.expect_type = expect.pop_front().unwrap().ty;
+                                let field = e.id.clone();
+                                self.de.set_field_name(field.clone());
+                                let expect = expect.pop_front().unwrap().ty;
+                                self.de.expect_type = self.de.table.trace_type(&expect)?;
+                                check!(
+                                    matches!(
+                                        self.de.expect_type,
+                                        Type::Opt(_) | Type::Reserved | Type::Null
+                                    ),
+                                    format!("field {} is not optional field", field)
+                                );
                                 self.de.wire_type = Type::Reserved;
                             }
                             Ordering::Greater => {
@@ -861,13 +923,13 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
                         Type::Record(_) => "struct",
                         _ => "newtype",
                     };
-                    label += &format!(",{},{}", label_type, accessor);
+                    write!(&mut label, ",{},{}", label_type, accessor).map_err(Error::msg)?;
                 }
                 self.de.set_field_name(Label::Named(label));
                 let field = seed.deserialize(&mut *self.de)?;
                 Ok((field, self))
             }
-            _ => Err(Error::msg("expect enum")),
+            _ => Err(Error::subtype("expect enum")),
         }
     }
 }
@@ -876,7 +938,10 @@ impl<'de, 'a> de::VariantAccess<'de> for Compound<'a, 'de> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<()> {
-        assert!(self.de.expect_type == Type::Null && self.de.wire_type == Type::Null);
+        check!(
+            self.de.expect_type == Type::Null && self.de.wire_type == Type::Null,
+            "unit_variant"
+        );
         Ok(())
     }
 

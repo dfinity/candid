@@ -36,17 +36,6 @@ pub(crate) fn idl_hash(id: &str) -> u32 {
     s
 }
 
-#[cfg(feature = "cdk")]
-pub(crate) fn candid_path(
-    custom_candid_path: &Option<proc_macro2::TokenStream>,
-) -> proc_macro2::TokenStream {
-    match custom_candid_path {
-        Some(custom_candid_path_value) => custom_candid_path_value.clone(),
-        None => quote::quote! { ::ic_cdk::export::candid },
-    }
-}
-
-#[cfg(not(feature = "cdk"))]
 pub(crate) fn candid_path(
     custom_candid_path: &Option<proc_macro2::TokenStream>,
 ) -> proc_macro2::TokenStream {

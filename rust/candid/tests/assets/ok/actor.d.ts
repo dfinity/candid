@@ -1,11 +1,13 @@
 import type { Principal } from '@dfinity/principal';
-export type f = (arg_0: number) => Promise<number>;
+import type { ActorMethod } from '@dfinity/agent';
+
+export type f = ActorMethod<[number], number>;
 export type g = f;
-export type h = (arg_0: [Principal, string]) => Promise<[Principal, string]>;
+export type h = ActorMethod<[[Principal, string]], [Principal, string]>;
 export type o = [] | [o];
 export interface _SERVICE {
-  'f' : (arg_0: bigint) => Promise<[Principal, string]>,
+  'f' : ActorMethod<[bigint], [Principal, string]>,
   'g' : f,
   'h' : g,
-  'o' : (arg_0: o) => Promise<o>,
+  'o' : ActorMethod<[o], o>,
 }

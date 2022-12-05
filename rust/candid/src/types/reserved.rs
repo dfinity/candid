@@ -4,9 +4,9 @@ use super::{CandidType, Serializer, Type, TypeId};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use std::fmt;
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Reserved;
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum Empty {}
 
 impl CandidType for Reserved {

@@ -3,13 +3,16 @@
 use super::{CandidType, Serializer, Type, TypeId};
 use crate::Error;
 use num_bigint::{BigInt, BigUint};
-use serde::de::{self, Deserialize, Visitor};
+use serde::{
+    de::{self, Deserialize, Visitor},
+    Serialize,
+};
 use std::convert::From;
 use std::{fmt, io};
 
-#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Clone, Hash, Default)]
+#[derive(Serialize, Ord, PartialOrd, Eq, PartialEq, Debug, Clone, Hash, Default)]
 pub struct Int(pub BigInt);
-#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Clone, Hash, Default)]
+#[derive(Serialize, Ord, PartialOrd, Eq, PartialEq, Debug, Clone, Hash, Default)]
 pub struct Nat(pub BigUint);
 
 impl From<BigInt> for Int {

@@ -75,7 +75,7 @@ pub enum Token {
     #[regex("0[xX][0-9a-fA-F][_0-9a-fA-F]*", parse_number)]
     Hex(String),
     #[regex("[0-9]*\\.[0-9]*", parse_number)]
-    #[regex("[0-9]*(\\.[0-9]*)?[eE][+-]?[0-9]+", parse_number)]
+    #[regex("[0-9]+(\\.[0-9]*)?[eE][+-]?[0-9]+", parse_number)]
     Float(String),
     #[regex("true|false", |lex| lex.slice().parse())]
     Boolean(bool),
@@ -100,7 +100,7 @@ enum Text {
     Text,
     #[regex(r"\\.")]
     EscapeCharacter,
-    #[regex(r"\\u\{[0-9a-fA-F]+\}")]
+    #[regex(r"\\u\{[0-9a-fA-F][_0-9a-fA-F]*\}")]
     Codepoint,
     #[regex(r"\\[0-9a-fA-F][0-9a-fA-F]")]
     Byte,
@@ -231,8 +231,8 @@ impl<'input> Iterator for Tokenizer<'input> {
                         },
                         Some(Codepoint) => {
                             let slice = lex.slice();
-                            let hex = &slice[3..slice.len() - 1];
-                            match u32::from_str_radix(hex, 16)
+                            let hex = slice[3..slice.len() - 1].replace('_', "");
+                            match u32::from_str_radix(&hex, 16)
                                 .map_err(|_| {
                                     LexicalError::new("Not a valid hex escape", lex.span())
                                 })

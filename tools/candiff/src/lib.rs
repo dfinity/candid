@@ -22,7 +22,7 @@ pub enum VecEdit<R> {
 pub struct RcVecEdit(pub Rc<VecEdit<RcValueEdit>>);
 
 /// edit a record's fields: edit some fields' values, drop others
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RecordEdit<R> {
     EditValue(Label, R),
     DropValue(Label),
@@ -219,8 +219,8 @@ pub fn value_diff_rec(v1: &Value, v2: &Value, _t: &Option<Type>) -> ValueEdit<Rc
     match (v1, v2) {
         (Opt(x), Opt(y)) => {
             let d = value_diff(
-                &**x,
-                &**y,
+                x,
+                y,
                 // to do
                 &Option::None,
             );

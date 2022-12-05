@@ -90,7 +90,7 @@ service : {
 This example describes a service that supports a single public method called `+ping+`.
 Method names can be arbitrary strings, and you can quote them (`"method with spaces"`) if they are not plain identifiers.
 
-Methods declare a _sequence_ of arguments and result types. In the case of this `+ping+` method, no arguments are passed and no results are returned, so the empty sequence `+()+ ` is used for both arguments and results.
+Methods declare a _sequence_ of arguments and result types. In the case of this `+ping+` method, no arguments are passed and no results are returned, so the empty sequence `+()+` is used for both arguments and results.
 
 Now that you've seen the simplest case, let's consider a slightly more complex service description.
 This service consists of two methods—`+reverse+` and `+divMod+`—and each method include a sequence of argument and result types:

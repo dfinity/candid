@@ -51,7 +51,7 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
             for Field { id, ty: ty2 } in fs2.iter() {
                 match fields.get(id) {
                     Some(ty1) => subtype(gamma, env, ty1, ty2).with_context(|| format!("Record field {}: {} is not a subtype of {}", id, ty1, ty2))?,
-                    None => subtype(gamma, env, &Opt(Box::new(Empty)), ty2).map_err(|_| anyhow::anyhow!("Record field {}: {} is only in the expected type and is not of opt, reserved or null type", id, ty2))?,
+                    None => subtype(gamma, env, &Opt(Box::new(Empty)), ty2).map_err(|_| anyhow::anyhow!("Record field {}: {} is only in the expected type and is not of opt or reserved type", id, ty2))?,
                 }
             }
             Ok(())

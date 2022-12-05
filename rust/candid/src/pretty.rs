@@ -7,11 +7,11 @@ fn is_empty(doc: &RcDoc) -> bool {
     use pretty::Doc::*;
     match &**doc {
         Nil => true,
-        FlatAlt(t1, t2) => is_empty(&(*t1)) && is_empty(&(*t2)),
-        Group(t) => is_empty(&(*t)),
-        Nest(_, t) => is_empty(&(*t)),
-        Union(t1, t2) => is_empty(&(*t1)) && is_empty(&(*t2)),
-        Annotated(_, t) => is_empty(&(*t)),
+        FlatAlt(t1, t2) => is_empty(t1) && is_empty(t2),
+        Group(t) => is_empty(t),
+        Nest(_, t) => is_empty(t),
+        Union(t1, t2) => is_empty(t1) && is_empty(t2),
+        Annotated(_, t) => is_empty(t),
         _ => false,
     }
 }
@@ -44,7 +44,7 @@ pub fn enclose_space<'a>(left: &'a str, doc: RcDoc<'a>, right: &'a str) -> RcDoc
     }
 }
 
-#[allow(dead_code)]
+/// Intersperse the separator between each item in `docs`.
 pub fn strict_concat<'a, D>(docs: D, sep: &'a str) -> RcDoc<'a>
 where
     D: Iterator<Item = RcDoc<'a>>,
@@ -52,7 +52,7 @@ where
     RcDoc::intersperse(docs, RcDoc::text(sep).append(RcDoc::line()))
 }
 
-/// Append the separator to each docs items. If it is displayed in a single line, omit the last separator.
+/// Append the separator to each item in `docs`. If it is displayed in a single line, omit the last separator.
 pub fn concat<'a, D>(docs: D, sep: &'a str) -> RcDoc<'a>
 where
     D: Iterator<Item = RcDoc<'a>> + Clone,
