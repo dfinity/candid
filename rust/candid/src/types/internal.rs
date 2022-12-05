@@ -190,6 +190,7 @@ pub enum Type {
     Service(Vec<(String, Type)>),
     Class(Vec<Type>, Box<Type>),
     Principal,
+    Future,
 }
 impl Type {
     pub(crate) fn is_tuple(&self) -> bool {
@@ -359,6 +360,7 @@ pub fn is_primitive(t: &Type) -> bool {
         Float32 | Float64 => true,
         Reserved | Empty => true,
         Unknown => panic!("Unknown type"),
+        Future => panic!("Future type"),
         Var(_) => panic!("Variable"), // Var may or may not be a primitive, so don't ask me
         Knot(_) => true,
         Opt(_) | Vec(_) | Record(_) | Variant(_) => false,

@@ -83,7 +83,7 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         Func(_) => str("[Principal, string]"),
         Service(_) => str("Principal"),
         Class(_, _) => unreachable!(),
-        Knot(_) | Unknown => unreachable!(),
+        Knot(_) | Unknown | Future => unreachable!(),
     }
 }
 
