@@ -161,4 +161,4 @@ assert blob "DIDL\03\6a\00\01\01\00\6d\02\6d\02\01\00\01\01\00\01m"
 assert blob "DIDL\02\6a\00\01\01\00\67\00\01\00\01\01\00\01m"
    == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (opt empty)) "(future type) <: (opt empty)";
 assert blob "DIDL\02\6a\00\01\01\00\67\00\01\00\01\01\00\01m"
-   == "(null)" : (opt func () -> (nat)) "(future type) <: (nat)";
+   == "(null)" : (opt func () -> (nat)) "(future type) </: (nat)";
