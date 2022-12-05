@@ -330,7 +330,17 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        Err(Error::msg("Cannot decode empty type"))
+        Err(Error::subtype("Cannot decode empty type"))
+    }
+    fn deserialize_future<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        let len = Len::read(&mut self.input)?.0 as u64;
+        Len::read(&mut self.input)?;
+        let pos = self.input.position();
+        self.input.set_position(pos + len);
+        visitor.visit_unit()
     }
     unsafe fn recoverable_visit_some<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
@@ -405,6 +415,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Type::Variant(_) => self.deserialize_enum("_", &[], visitor),
             Type::Service(_) => self.deserialize_service(visitor),
             Type::Func(_) => self.deserialize_function(visitor),
+            Type::Future => self.deserialize_future(visitor),
             _ => assert!(false),
         }
     }

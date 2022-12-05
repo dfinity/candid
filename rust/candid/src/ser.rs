@@ -383,6 +383,7 @@ impl TypeSerialize {
                     .ok_or_else(|| Error::msg(format!("var type {} not found", t)))?;
                 sleb128_encode(buf, i64::from(*idx))
             }
+            Type::Future => unreachable!(),
             _ => {
                 let idx = self
                     .type_map

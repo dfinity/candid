@@ -51,6 +51,7 @@ enum ConsType {
     Func(FuncType),
     #[br(magic = 0x69u8)]
     Service(ServType),
+    Future(FutureType),
 }
 #[derive(BinRead, Debug)]
 struct IndexType {
@@ -91,6 +92,15 @@ struct ServType {
     len: u64,
     #[br(count = len)]
     meths: Vec<Meths>,
+}
+#[derive(BinRead, Debug)]
+struct FutureType {
+    #[br(parse_with = read_sleb, assert(opcode < -24, "{} is not a valid future type", opcode))]
+    opcode: i64,
+    #[br(parse_with = read_leb)]
+    len: u64,
+    #[br(count = len)]
+    blob: Vec<u8>,
 }
 #[derive(BinRead, Debug)]
 struct Meths {
@@ -216,6 +226,7 @@ impl ConsType {
                 }
                 Type::Service(res)
             }
+            ConsType::Future(_) => Type::Future,
         })
     }
 }

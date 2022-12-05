@@ -116,6 +116,7 @@ pub fn pp_ty(ty: &Type) -> RcDoc {
         }
         Knot(ref id) => RcDoc::text(format!("{}", id)),
         Unknown => str("unknown"),
+        Future => str("future"),
     }
 }
 
