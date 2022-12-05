@@ -207,4 +207,4 @@ assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa
 // This uses 0x67 for the “future type”; bump (well, decrement) once that
 // becomes a concrete future type
 assert blob "DIDL\01\67\00\02\00\7e\00\00\01" == "(null, true)" : (opt empty,bool) "skipping minimal future type";
-//assert blob "DIDL\01\67\03ABC\02\00\7e\05\00hello\01" == "(null,true)" : (opt empty,bool) "skipping future type with data";
+assert blob "DIDL\01\67\03ABC\02\00\7e\05\00hello\01" == "(null,true)" : (opt empty,bool) "skipping future type with data";

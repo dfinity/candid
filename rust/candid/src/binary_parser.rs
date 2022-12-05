@@ -135,7 +135,15 @@ pub struct PrincipalBytes {
     #[br(count = len)]
     pub inner: Vec<u8>,
 }
-
+#[derive(BinRead)]
+pub struct FutureValue {
+    #[br(parse_with = read_leb)]
+    val_len: u64,
+    #[br(parse_with = read_leb)]
+    ref_len: u64,
+    #[br(count = val_len)]
+    blob: Vec<u8>,
+}
 fn index_to_var(ind: i64) -> String {
     format!("table{}", ind)
 }
