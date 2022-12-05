@@ -29,6 +29,7 @@ where XX is a type entry table for a non-primitive type t1
 
 type Vec = vec Vec;
 type EmptyRecord = record { 0 : EmptyRecord };
+type MuRecordOpt = record { 0 : opt MuRecordOpt };
 type EmptyVariant = variant { 0: EmptyVariant };
 
 // some reflexive cases
@@ -131,6 +132,8 @@ assert blob "DIDL\02\6a\00\01\01\00\6c\01\00\01\01\00\01\01\00\01m"
    == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (record {EmptyRecord})) "(µ record) <: record {µ record}";
 assert blob "DIDL\03\6a\00\01\01\00\6c\01\00\02\6c\01\00\02\01\00\01\01\00\01m"
    == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (EmptyRecord)) "record {µ record} <: (µ record)";
+assert blob "DIDL\02\6a\00\01\01\00\6c\01\00\01\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (MuRecordOpt)) "(µ record) <: (μ (record opt))";
 
 assert blob "DIDL\02\6a\00\01\01\00\6b\01\00\01\01\00\01\01\00\01m"
    == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (EmptyVariant)) "(µ variant) <: (µ variant)";
