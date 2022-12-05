@@ -142,7 +142,7 @@ assert blob "DIDL\01\6b\01\00\7f\01\00\00\2a"                                  !
 assert blob "DIDL\01\6b\02\00\7f\01\7c\01\00\01\2a"                            : (variant {0:int; 1:int}) "variant: type mismatch in unused tag";
 assert blob "DIDL\01\6b\01\00\7f\01\00\00" == "(variant {0})"                   : (variant {0;1}) "variant: ignore field";
 assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\00"                               : (variant {0}) "variant {0;1} <: variant {0}";
-assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\00" == "(variant {0})"            : (opt variant {0}) "variant {0;1} <: opt variant {0}";
+assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\00" == "(opt variant {0})"        : (opt variant {0}) "variant {0;1} <: opt variant {0}";
 assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\01" == "(variant {1})"             : (variant {0;1;2}) "variant: change index";
 assert blob "DIDL\01\6b\01\00\7f\01\00\00"                                     !: (variant {1}) "variant: missing field";
 assert blob "DIDL\01\6b\01\00\7f\01\00\01"                                     !: (variant {0}) "variant: index out of range";
