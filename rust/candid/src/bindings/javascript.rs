@@ -132,7 +132,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Func(ref func) => str("IDL.Func").append(pp_function(func)),
         Service(ref serv) => str("IDL.Service").append(pp_service(serv)),
         Class(_, _) => unreachable!(),
-        Knot(_) | Unknown => unreachable!(),
+        Knot(_) | Unknown | Future => unreachable!(),
     }
 }
 

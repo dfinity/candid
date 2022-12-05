@@ -11,12 +11,12 @@ fn test_error() {
     );
     check_error(
         || test_decode(b"DIDL\x01\x7c", &42),
-        "Unknown opcode at byte offset 5",
+        "not a valid future type at byte offset 5",
     );
     // Infinite loop are prevented by design
     check_error(
         || test_decode(b"DIDL\x02\x6e\x01\0", &42),
-        "Unknown opcode at byte offset 7",
+        "not a valid future type at byte offset 7",
     );
     check_error(
         || test_decode(b"DIDL\0\x01\x7e\x01\x01", &true),

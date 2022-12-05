@@ -135,7 +135,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
                 _ => unreachable!(),
             }
         }
-        Knot(_) | Unknown => unreachable!(),
+        Knot(_) | Unknown | Future => unreachable!(),
     }
 }
 

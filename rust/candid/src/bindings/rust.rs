@@ -88,7 +88,7 @@ fn pp_ty<'a, 'b>(ty: &'a Type, recs: &'b RecPoints) -> RcDoc<'a> {
         Func(_) => str("candid::Func"),
         Service(_) => str("candid::Service"),
         Class(_, _) => unreachable!(),
-        Knot(_) | Unknown => unreachable!(),
+        Knot(_) | Unknown | Future => unreachable!(),
     }
 }
 
