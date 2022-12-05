@@ -7,7 +7,7 @@ use super::{
     CandidType, Int, Nat,
 };
 use crate::{
-    binary_parser::{BoolValue, FutureValue, Header, Len, PrincipalBytes},
+    binary_parser::{BoolValue, Header, Len, PrincipalBytes},
     types::subtype::{subtype, Gamma},
 };
 use anyhow::{anyhow, Context};
@@ -336,7 +336,10 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        FutureValue::read(&mut self.input)?;
+        let len = Len::read(&mut self.input)?.0 as u64;
+        Len::read(&mut self.input)?;
+        let pos = self.input.position();
+        self.input.set_position(pos + len);
         visitor.visit_unit()
     }
     unsafe fn recoverable_visit_some<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>

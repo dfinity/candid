@@ -158,7 +158,7 @@ assert blob "DIDL\03\6a\00\01\01\00\6d\02\6d\02\01\00\01\01\00\01m"
 // This uses 0x67 for the “future type”; bump (well, decrement) once that
 // becomes a concrete future type
 
-//assert blob "DIDL\02\6a\00\01\01\00\67\00\01\00\01\01\00\01m"
-//   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (opt empty)) "(future type) <: (opt empty)";
-//assert blob "DIDL\02\6a\00\01\01\00\67\00\01\00\01\01\00\01m"
-//   == "(null)" : (opt func () -> (nat)) "(future type) <: (nat)";
+assert blob "DIDL\02\6a\00\01\01\00\67\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (opt empty)) "(future type) <: (opt empty)";
+assert blob "DIDL\02\6a\00\01\01\00\67\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (nat)) "(future type) </: (nat)";
