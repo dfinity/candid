@@ -135,6 +135,7 @@ macro_rules! check {
     }};
 }
 
+#[derive(Clone)]
 struct Deserializer<'de> {
     input: Cursor<&'de [u8]>,
     table: TypeEnv,
@@ -348,9 +349,12 @@ impl<'de> Deserializer<'de> {
     {
         use de::Deserializer;
         let v = std::ptr::read(&visitor);
-        let self_ptr = std::ptr::read(&self);
-        match v.visit_some(self_ptr) {
-            Ok(v) => Ok(v),
+        let mut self_clone = self.clone();
+        match v.visit_some(&mut self_clone) {
+            Ok(v) => {
+                *self = self_clone;
+                Ok(v)
+            }
             Err(Error::Subtype(_)) => {
                 self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                 visitor.visit_none()
@@ -716,7 +720,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.unroll_type()?;
         match (&self.expect_type, &self.wire_type) {
             (Type::Variant(e), Type::Variant(w)) => {
-                let old_pos = self.input.position();
                 let index = Len::read(&mut self.input)?.0;
                 let len = w.len();
                 if index >= len {
@@ -729,7 +732,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let expect = match e.iter().find(|f| f.id == wire.id) {
                     Some(v) => v.clone(),
                     None => {
-                        self.input.set_position(old_pos);
                         return Err(Error::subtype(format!("Unknown variant field {}", wire.id)));
                     }
                 };
