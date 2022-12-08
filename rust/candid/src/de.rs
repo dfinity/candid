@@ -350,9 +350,9 @@ impl<'de> Deserializer<'de> {
         use de::Deserializer;
         let tid = type_of(&visitor);
         if tid != TypeId::of::<&crate::parser::value::IDLValueVisitor>()   // derive Copy
-            && !tid.name.starts_with("&serde::de::impls::OptionVisitor<")  // Doesn't derive Copy, but has only PhantomData
-            && tid.name != "&serde::de::ignored_any::IgnoredAny"
-        // derive Copy
+            && tid != TypeId::of::<&serde::de::IgnoredAny>()  // derive Copy
+            && !tid.name.starts_with("&serde::de::impls::OptionVisitor<")
+        // Doesn't derive Copy, but has only PhantomData
         {
             panic!("Not a valid visitor: {:?}", tid);
         }
