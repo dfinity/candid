@@ -3,6 +3,7 @@
 use super::{
     error::{Error, Result},
     parser::typing::TypeEnv,
+    types::internal::{type_of, TypeId},
     types::{Field, Label, Type},
     CandidType, Int, Nat,
 };
@@ -14,6 +15,7 @@ use anyhow::{anyhow, Context};
 use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
+use std::cell::RefCell;
 use std::fmt::Write;
 use std::{collections::VecDeque, io::Cursor, mem::replace};
 
@@ -133,6 +135,11 @@ macro_rules! check {
             return Err(Error::Subtype($msg.to_string()));
         }
     }};
+}
+
+thread_local! {
+    // Visitor has to implement Copy
+    static ALLOWED_VISITORS: RefCell<[TypeId; 2]> = RefCell::new([TypeId::of::<&crate::parser::value::IDLValueVisitor>(), TypeId::of::<&de::IgnoredAny>()]);
 }
 
 #[derive(Clone)]
@@ -343,20 +350,19 @@ impl<'de> Deserializer<'de> {
         self.input.set_position(pos + len);
         visitor.visit_unit()
     }
-    unsafe fn recoverable_visit_some<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    fn recoverable_visit_some<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         use de::Deserializer;
         let tid = type_of(&visitor);
-        if tid != TypeId::of::<&crate::parser::value::IDLValueVisitor>()   // derive Copy
-            && tid != TypeId::of::<&serde::de::IgnoredAny>()  // derive Copy
-            && !tid.name.starts_with("&serde::de::impls::OptionVisitor<")
-        // Doesn't derive Copy, but has only PhantomData
+        if !ALLOWED_VISITORS.with(|list| list.borrow().contains(&tid)) &&
+        // OptionVisitor doesn't derive Copy, but has only PhantomData
+            !tid.name.starts_with("&serde::de::impls::OptionVisitor<")
         {
             panic!("Not a valid visitor: {:?}", tid);
         }
-        let v = std::ptr::read(&visitor);
+        let v = unsafe { std::ptr::read(&visitor) };
         let mut self_clone = self.clone();
         match v.visit_some(&mut self_clone) {
             Ok(v) => {
@@ -370,11 +376,6 @@ impl<'de> Deserializer<'de> {
             Err(e) => Err(e),
         }
     }
-}
-
-use crate::types::internal::TypeId;
-fn type_of<T>(_: T) -> TypeId {
-    TypeId::of::<T>()
 }
 
 macro_rules! primitive_impl {
@@ -574,7 +575,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.wire_type = *t1.clone();
                 self.expect_type = *t2.clone();
                 if BoolValue::read(&mut self.input)?.0 {
-                    unsafe { self.recoverable_visit_some(visitor) }
+                    self.recoverable_visit_some(visitor)
                 } else {
                     visitor.visit_none()
                 }
@@ -582,7 +583,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (_, Type::Opt(t2)) => {
                 self.expect_type = self.table.trace_type(t2)?;
                 if !matches!(self.expect_type, Type::Null | Type::Reserved | Type::Opt(_)) {
-                    unsafe { self.recoverable_visit_some(visitor) }
+                    self.recoverable_visit_some(visitor)
                 } else {
                     self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                     visitor.visit_none()

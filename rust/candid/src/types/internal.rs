@@ -28,6 +28,9 @@ impl std::fmt::Display for TypeId {
         write!(f, "{}", name)
     }
 }
+pub fn type_of<T>(_: T) -> TypeId {
+    TypeId::of::<T>()
+}
 
 #[derive(Default)]
 struct TypeName {
