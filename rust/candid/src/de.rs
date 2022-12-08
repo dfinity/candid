@@ -348,6 +348,14 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         use de::Deserializer;
+        let tid = type_of(&visitor);
+        if tid != TypeId::of::<&crate::parser::value::IDLValueVisitor>()   // derive Copy
+            && !tid.name.starts_with("&serde::de::impls::OptionVisitor<")  // Doesn't derive Copy, but has only PhantomData
+            && tid.name != "&serde::de::ignored_any::IgnoredAny"
+        // derive Copy
+        {
+            panic!("Not a valid visitor: {:?}", tid);
+        }
         let v = std::ptr::read(&visitor);
         let mut self_clone = self.clone();
         match v.visit_some(&mut self_clone) {
@@ -362,6 +370,11 @@ impl<'de> Deserializer<'de> {
             Err(e) => Err(e),
         }
     }
+}
+
+use crate::types::internal::TypeId;
+fn type_of<T>(_: T) -> TypeId {
+    TypeId::of::<T>()
 }
 
 macro_rules! primitive_impl {
