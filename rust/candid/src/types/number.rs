@@ -1,6 +1,6 @@
 //! Data structure for Candid type Int, Nat, supporting big integer with LEB128 encoding.
 
-use super::{CandidType, Serializer, Type, TypeId};
+use super::{CandidType, Serializer, Type, TypeInner};
 use crate::Error;
 use num_bigint::{BigInt, BigUint};
 use serde::{
@@ -117,11 +117,8 @@ impl fmt::Display for Nat {
 }
 
 impl CandidType for Int {
-    fn id() -> TypeId {
-        TypeId::of::<Int>()
-    }
     fn _ty() -> Type {
-        Type::Int
+        TypeInner::Int.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -132,11 +129,8 @@ impl CandidType for Int {
 }
 
 impl CandidType for Nat {
-    fn id() -> TypeId {
-        TypeId::of::<Nat>()
-    }
     fn _ty() -> Type {
-        Type::Nat
+        TypeInner::Nat.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where

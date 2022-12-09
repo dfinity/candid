@@ -1,6 +1,6 @@
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, Type};
+use crate::types::{Field, Function, Label, Type, TypeInner};
 use pretty::RcDoc;
 
 static KEYWORDS: [&str; 29] = [
@@ -72,7 +72,7 @@ fn pp_text(id: &str) -> RcDoc {
 }
 
 pub fn pp_ty(ty: &Type) -> RcDoc {
-    use Type::*;
+    use TypeInner::*;
     match *ty {
         Null => str("null"),
         Bool => str("bool"),

@@ -4,6 +4,7 @@ use num_enum::TryFromPrimitive;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
 
 // This is a re-implementation of std::any::TypeId to get rid of 'static constraint.
 // The current TypeId doesn't consider lifetime while computing the hash, which is
@@ -93,75 +94,76 @@ impl TypeContainer {
         self.go(&t)
     }
     fn go(&mut self, t: &Type) -> Type {
-        match t {
-            Type::Opt(ref t) => Type::Opt(Box::new(self.go(t))),
-            Type::Vec(ref t) => Type::Vec(Box::new(self.go(t))),
-            Type::Record(fs) => {
-                let res = Type::Record(
+        match t.as_ref() {
+            TypeInner::Opt(t) => TypeInner::Opt(self.go(t)),
+            TypeInner::Vec(t) => TypeInner::Vec(self.go(t)),
+            TypeInner::Record(fs) => {
+                let res: Type = TypeInner::Record(
                     fs.iter()
                         .map(|Field { id, ty }| Field {
                             id: id.clone(),
                             ty: self.go(ty),
                         })
                         .collect(),
-                );
+                ).into();
                 if t.is_tuple() {
                     return res;
                 }
                 let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
                     self.env.0.insert(id.to_string(), res);
-                    Type::Var(id.to_string())
+                    TypeInner::Var(id.to_string())
                 } else {
                     // if the type is part of an enum, the id won't be recorded.
                     // we want to inline the type in this case.
-                    res
+                    return res
                 }
             }
-            Type::Variant(fs) => {
-                let res = Type::Variant(
+            TypeInner::Variant(fs) => {
+                let res: Type = TypeInner::Variant(
                     fs.iter()
                         .map(|Field { id, ty }| Field {
                             id: id.clone(),
                             ty: self.go(ty),
                         })
                         .collect(),
-                );
+                ).into();
                 let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
                     self.env.0.insert(id.to_string(), res);
-                    Type::Var(id.to_string())
+                    TypeInner::Var(id.to_string())
                 } else {
-                    res
+                    return res
                 }
             }
-            Type::Knot(id) => {
+            TypeInner::Knot(id) => {
                 let name = id.to_string();
                 let ty = ENV.with(|e| e.borrow().get(id).unwrap().clone());
                 self.env.0.insert(id.to_string(), ty);
-                Type::Var(name)
+                TypeInner::Var(name)
             }
-            Type::Func(func) => Type::Func(Function {
+            TypeInner::Func(func) => TypeInner::Func(Function {
                 modes: func.modes.clone(),
                 args: func.args.iter().map(|arg| self.go(arg)).collect(),
                 rets: func.rets.iter().map(|arg| self.go(arg)).collect(),
             }),
-            Type::Service(serv) => Type::Service(
+            TypeInner::Service(serv) => TypeInner::Service(
                 serv.iter()
                     .map(|(id, t)| (id.clone(), self.go(t)))
                     .collect(),
             ),
-            Type::Class(inits, ref ty) => Type::Class(
+            TypeInner::Class(inits, ref ty) => TypeInner::Class(
                 inits.iter().map(|t| self.go(t)).collect(),
-                Box::new(self.go(ty)),
+                self.go(ty),
             ),
-            _ => t.clone(),
-        }
+            t => t.clone(),
+        }.into()
     }
 }
-
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
-pub enum Type {
+pub struct Type(pub Rc<TypeInner>);
+#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+pub enum TypeInner {
     Null,
     Bool,
     Nat,
@@ -182,20 +184,37 @@ pub enum Type {
     Knot(TypeId), // For recursive types from Rust
     Var(String),  // For variables from Candid file
     Unknown,
-    Opt(Box<Type>),
-    Vec(Box<Type>),
+    Opt(Type),
+    Vec(Type),
     Record(Vec<Field>),
     Variant(Vec<Field>),
     Func(Function),
     Service(Vec<(String, Type)>),
-    Class(Vec<Type>, Box<Type>),
+    Class(Vec<Type>, Type),
     Principal,
     Future,
 }
+impl std::ops::Deref for Type {
+    type Target = TypeInner;
+    #[inline(always)]
+    fn deref(&self) -> &TypeInner {
+        self.0.deref()
+    }
+}
+impl AsRef<TypeInner> for Type {
+    fn as_ref(&self) -> &TypeInner {
+        self.0.as_ref()
+    }
+}
+impl From<TypeInner> for Type {
+    fn from(t: TypeInner) -> Self {
+        Type(Rc::new(t))
+    }
+}
 impl Type {
     pub(crate) fn is_tuple(&self) -> bool {
-        match self {
-            Type::Record(ref fs) => {
+        match self.as_ref() {
+            TypeInner::Record(ref fs) => {
                 for (i, field) in fs.iter().enumerate() {
                     if field.id.get_id() != (i as u32) {
                         return false;
@@ -207,18 +226,18 @@ impl Type {
         }
     }
     pub fn subst(self, tau: &std::collections::BTreeMap<String, String>) -> Self {
-        use Type::*;
-        match self {
+        use TypeInner::*;
+        match *self {
             Var(id) => match tau.get(&id) {
                 None => Var(id),
                 Some(new_id) => Var(new_id.to_string()),
             },
-            Opt(t) => Opt(Box::new(t.subst(tau))),
-            Vec(t) => Vec(Box::new(t.subst(tau))),
+            Opt(t) => Opt(t.subst(tau)),
+            Vec(t) => Vec(t.subst(tau)),
             Record(fs) => Record(
                 fs.into_iter()
                     .map(|Field { id, ty }| Field {
-                        id,
+                        id: id.clone(),
                         ty: ty.subst(tau),
                     })
                     .collect(),
@@ -226,7 +245,7 @@ impl Type {
             Variant(fs) => Variant(
                 fs.into_iter()
                     .map(|Field { id, ty }| Field {
-                        id,
+                        id: id.clone(),
                         ty: ty.subst(tau),
                     })
                     .collect(),
@@ -243,10 +262,10 @@ impl Type {
             ),
             Class(args, ty) => Class(
                 args.into_iter().map(|t| t.subst(tau)).collect(),
-                Box::new(ty.subst(tau)),
+                ty.subst(tau),
             ),
-            _ => self,
-        }
+            _ => return self,
+        }.into()
     }
 }
 impl fmt::Display for Type {
@@ -297,7 +316,7 @@ impl std::hash::Hash for Label {
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Field {
-    pub id: Label,
+    pub id: Rc<Label>,
     pub ty: Type,
 }
 
@@ -352,8 +371,8 @@ pub(crate) enum Opcode {
 }
 
 pub fn is_primitive(t: &Type) -> bool {
-    use self::Type::*;
-    match t {
+    use self::TypeInner::*;
+    match t.as_ref() {
         Null | Bool | Nat | Int | Text => true,
         Nat8 | Nat16 | Nat32 | Nat64 => true,
         Int8 | Int16 | Int32 | Int64 => true,
@@ -370,11 +389,11 @@ pub fn is_primitive(t: &Type) -> bool {
 }
 
 pub fn unroll(t: &Type) -> Type {
-    use self::Type::*;
-    match t {
-        Knot(ref id) => find_type(id).unwrap(),
-        Opt(ref t) => Opt(Box::new(unroll(t))),
-        Vec(ref t) => Vec(Box::new(unroll(t))),
+    use self::TypeInner::*;
+    match t.as_ref() {
+        Knot(ref id) => return find_type(id).unwrap(),
+        Opt(ref t) => Opt(unroll(t)),
+        Vec(ref t) => Vec(unroll(t)),
         Record(fs) => Record(
             fs.iter()
                 .map(|Field { id, ty }| Field {
@@ -391,8 +410,8 @@ pub fn unroll(t: &Type) -> Type {
                 })
                 .collect(),
         ),
-        _ => (*t).clone(),
-    }
+        t => t.clone(),
+    }.into()
 }
 
 thread_local! {

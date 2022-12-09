@@ -1,4 +1,4 @@
-use super::internal::{find_type, Field, Label, Type};
+use super::internal::{find_type, Field, Label, Type, TypeInner};
 use crate::parser::typing::TypeEnv;
 use crate::{Error, Result};
 use anyhow::Context;
@@ -8,15 +8,15 @@ pub type Gamma = HashSet<(Type, Type)>;
 
 /// Check if t1 <: t2
 pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<()> {
-    use Type::*;
+    use TypeInner::*;
     if t1 == t2 {
         return Ok(());
     }
-    if matches!(t1, Var(_) | Knot(_)) || matches!(t2, Var(_) | Knot(_)) {
+    if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
         if !gamma.insert((t1.clone(), t2.clone())) {
             return Ok(());
         }
-        let res = match (t1, t2) {
+        let res = match (t1.as_ref(), t2.as_ref()) {
             (Var(id), _) => subtype(gamma, env, env.rec_find_type(id).unwrap(), t2),
             (_, Var(id)) => subtype(gamma, env, t1, env.rec_find_type(id).unwrap()),
             (Knot(id), _) => subtype(gamma, env, &find_type(id).unwrap(), t2),
@@ -28,20 +28,20 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
         }
         return res;
     }
-    match (t1, t2) {
+    match (t1.as_ref(), t2.as_ref()) {
         (_, Reserved) => Ok(()),
         (Empty, _) => Ok(()),
         (Nat, Int) => Ok(()),
         (Vec(ty1), Vec(ty2)) => subtype(gamma, env, ty1, ty2),
         (Null, Opt(_)) => Ok(()),
         (Opt(ty1), Opt(ty2)) if subtype(gamma, env, ty1, ty2).is_ok() => Ok(()),
-        (t1, Opt(ty2))
+        (_, Opt(ty2))
             if subtype(gamma, env, t1, ty2).is_ok()
-                && !matches!(env.trace_type(ty2)?, Null | Reserved | Opt(_)) =>
+                && !matches!(env.trace_type(ty2)?.as_ref(), Null | Reserved | Opt(_)) =>
         {
             Ok(())
         }
-        (t1, Opt(_)) => {
+        (_, Opt(_)) => {
             #[cfg(not(feature = "mute_warnings"))]
             eprintln!("FIX ME! {} <: {} via special opt rule.\nThis means the sender and receiver type has diverged, and can cause data loss.", t1, t2);
             Ok(())
@@ -51,7 +51,7 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
             for Field { id, ty: ty2 } in fs2.iter() {
                 match fields.get(id) {
                     Some(ty1) => subtype(gamma, env, ty1, ty2).with_context(|| format!("Record field {}: {} is not a subtype of {}", id, ty1, ty2))?,
-                    None => subtype(gamma, env, &Opt(Box::new(Empty)), ty2).map_err(|_| anyhow::anyhow!("Record field {}: {} is only in the expected type and is not of opt or reserved type", id, ty2))?,
+                    None => subtype(gamma, env, &Opt(Empty.into()).into(), ty2).map_err(|_| anyhow::anyhow!("Record field {}: {} is only in the expected type and is not of opt or reserved type", id, ty2))?,
                 }
             }
             Ok(())
@@ -114,13 +114,13 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
 }
 
 fn to_tuple(args: &[Type]) -> Type {
-    Type::Record(
+    TypeInner::Record(
         args.iter()
             .enumerate()
             .map(|(i, ty)| Field {
-                id: Label::Id(i as u32),
+                id: Label::Id(i as u32).into(),
                 ty: ty.clone(),
             })
             .collect(),
-    )
+    ).into()
 }

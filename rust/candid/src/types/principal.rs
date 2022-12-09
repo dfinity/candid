@@ -1,4 +1,4 @@
-use super::{CandidType, Serializer, Type, TypeId};
+use super::{CandidType, Serializer, Type, TypeInner};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha224};
 use std::convert::TryFrom;
@@ -92,11 +92,8 @@ pub struct Principal {
 }
 
 impl CandidType for Principal {
-    fn id() -> TypeId {
-        TypeId::of::<Principal>()
-    }
     fn _ty() -> Type {
-        Type::Principal
+        TypeInner::Principal.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where

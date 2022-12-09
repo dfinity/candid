@@ -1,14 +1,14 @@
 use super::analysis::{chase_actor, chase_types, infer_rec};
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, Type};
+use crate::types::{Field, Function, Label, Type, TypeInner};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
 
 // The definition of tuple is language specific.
 pub(crate) fn is_tuple(t: &Type) -> bool {
     match t {
-        Type::Record(ref fs) => {
+        TypeInner::Record(ref fs) => {
             if fs.is_empty() {
                 return false;
             }
@@ -97,8 +97,8 @@ pub(crate) fn ident(id: &str) -> RcDoc {
 }
 
 fn pp_ty(ty: &Type) -> RcDoc {
-    use Type::*;
-    match *ty {
+    use TypeInner::*;
+    match ty {
         Null => str("IDL.Null"),
         Bool => str("IDL.Bool"),
         Nat => str("IDL.Nat"),
@@ -218,15 +218,15 @@ fn pp_defs<'a>(
 
 fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
     match ty {
-        Type::Service(_) => pp_ty(ty),
-        Type::Var(id) => {
+        TypeInner::Service(_) => pp_ty(ty),
+        TypeInner::Var(id) => {
             if recs.contains(&*id.clone()) {
                 str(id).append(".getType()")
             } else {
                 str(id)
             }
         }
-        Type::Class(_, t) => pp_actor(t, recs),
+        TypeInner::Class(_, t) => pp_actor(t, recs),
         _ => unreachable!(),
     }
 }

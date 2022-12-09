@@ -1,6 +1,6 @@
 //! Data structure for Candid type Reserved and Empty.
 
-use super::{CandidType, Serializer, Type, TypeId};
+use super::{CandidType, Serializer, Type, TypeInner};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use std::fmt;
 
@@ -10,11 +10,8 @@ pub struct Reserved;
 pub enum Empty {}
 
 impl CandidType for Reserved {
-    fn id() -> TypeId {
-        TypeId::of::<Reserved>()
-    }
     fn _ty() -> Type {
-        Type::Reserved
+        TypeInner::Reserved.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -25,11 +22,8 @@ impl CandidType for Reserved {
 }
 
 impl CandidType for Empty {
-    fn id() -> TypeId {
-        TypeId::of::<Empty>()
-    }
     fn _ty() -> Type {
-        Type::Empty
+        TypeInner::Empty.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where

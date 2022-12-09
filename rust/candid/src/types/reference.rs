@@ -1,7 +1,7 @@
 //! Data structure for Candid value Func and Service
 
 use super::principal::Principal;
-use super::{CandidType, Function, Serializer, Type};
+use super::{CandidType, Function, Serializer, Type, TypeInner};
 use serde::de::{self, Deserialize, Visitor};
 use std::convert::TryFrom;
 use std::{fmt, io::Read};
@@ -18,11 +18,11 @@ pub struct Service {
 
 impl CandidType for Func {
     fn _ty() -> Type {
-        Type::Func(Function {
+        TypeInner::Func(Function {
             modes: Vec::new(),
             args: Vec::new(),
             rets: Vec::new(),
-        })
+        }).into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -33,7 +33,7 @@ impl CandidType for Func {
 }
 impl CandidType for Service {
     fn _ty() -> Type {
-        Type::Service(Vec::new())
+        TypeInner::Service(Vec::new()).into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where

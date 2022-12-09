@@ -1,7 +1,7 @@
 use super::analysis::{chase_actor, infer_rec};
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, Type};
+use crate::types::{Field, Function, Label, Type, TypeInner};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
 
@@ -53,8 +53,8 @@ fn field_name(id: &str) -> RcDoc {
 }
 
 fn pp_ty<'a, 'b>(ty: &'a Type, recs: &'b RecPoints) -> RcDoc<'a> {
-    use Type::*;
-    match *ty {
+    use TypeInner::*;
+    match ty {
         Null => str("()"),
         Bool => str("bool"),
         Nat => str("candid::Nat"),
@@ -117,8 +117,8 @@ fn pp_record_fields<'a, 'b>(fs: &'a [Field], recs: &'b RecPoints) -> RcDoc<'a> {
 
 fn pp_variant_field<'a, 'b>(field: &'a Field, recs: &'b RecPoints) -> RcDoc<'a> {
     match &field.ty {
-        Type::Null => pp_label(&field.id),
-        Type::Record(fs) => pp_label(&field.id).append(pp_record_fields(fs, recs)),
+        TypeInner::Null => pp_label(&field.id),
+        TypeInner::Record(fs) => pp_label(&field.id).append(pp_record_fields(fs, recs)),
         _ => pp_label(&field.id).append(enclose("(", pp_ty(&field.ty, recs), ")")),
     }
 }
@@ -134,7 +134,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -
         let ty = env.find_type(id).unwrap();
         let name = ident(id).append(" ");
         match ty {
-            Type::Record(fs) => {
+            TypeInner::Record(fs) => {
                 let separator = if is_tuple(fs) {
                     RcDoc::text(";")
                 } else {
@@ -148,7 +148,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -
                     .append(separator)
                     .append(RcDoc::hardline())
             }
-            Type::Variant(fs) => str(derive)
+            TypeInner::Variant(fs) => str(derive)
                 .append(RcDoc::line())
                 .append("enum ")
                 .append(name)
@@ -273,20 +273,20 @@ fn path_to_var(path: &[TypePath]) -> String {
 }
 // Convert structural typing to nominal typing to fit Rust's type system
 fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: Type) -> Type {
-    match t {
-        Type::Opt(ty) => {
+    Type(Rc::new(match t.as_ref() {
+        TypeInner::Opt(ty) => {
             path.push(TypePath::Opt);
             let ty = nominalize(env, path, *ty);
             path.pop();
-            Type::Opt(Box::new(ty))
+            TypeInner::Opt(ty)
         }
-        Type::Vec(ty) => {
+        TypeInner::Vec(ty) => {
             path.push(TypePath::Opt);
             let ty = nominalize(env, path, *ty);
             path.pop();
-            Type::Vec(Box::new(ty))
+            TypeInner::Vec(ty)
         }
-        Type::Record(fs) => {
+        TypeInner::Record(fs) => {
             if matches!(
                 path.last(),
                 None | Some(TypePath::VariantField(_)) | Some(TypePath::Id(_))
@@ -301,19 +301,19 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: Type) -> Type {
                         Field { id, ty }
                     })
                     .collect();
-                Type::Record(fs)
+                TypeInner::Record(fs)
             } else {
                 let new_var = path_to_var(path);
                 let ty = nominalize(
                     env,
                     &mut vec![TypePath::Id(new_var.clone())],
-                    Type::Record(fs),
+                    TypeInner::Record(fs),
                 );
                 env.0.insert(new_var.clone(), ty);
-                Type::Var(new_var)
+                TypeInner::Var(new_var)
             }
         }
-        Type::Variant(fs) => match path.last() {
+        TypeInner::Variant(fs) => match path.last() {
             None | Some(TypePath::Id(_)) => {
                 let fs: Vec<_> = fs
                     .into_iter()
@@ -324,7 +324,7 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: Type) -> Type {
                         Field { id, ty }
                     })
                     .collect();
-                Type::Variant(fs)
+                TypeInner::Variant(fs)
             }
             Some(_) => {
                 let new_var = path_to_var(path);
@@ -337,7 +337,7 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: Type) -> Type {
                 Type::Var(new_var)
             }
         },
-        Type::Func(func) => Type::Func(Function {
+        TypeInner::Func(func) => TypeInner::Func(Function {
             modes: func.modes,
             args: func
                 .args
@@ -362,7 +362,7 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: Type) -> Type {
                 })
                 .collect(),
         }),
-        Type::Service(serv) => Type::Service(
+        TypeInner::Service(serv) => TypeInner::Service(
             serv.into_iter()
                 .map(|(meth, ty)| {
                     path.push(TypePath::Id(meth.to_string()));
@@ -372,7 +372,7 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: Type) -> Type {
                 })
                 .collect(),
         ),
-        Type::Class(args, ty) => Type::Class(
+        TypeInner::Class(args, ty) => TypeInner::Class(
             args.into_iter()
                 .map(|ty| {
                     path.push(TypePath::Init);
@@ -381,10 +381,10 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: Type) -> Type {
                     ty
                 })
                 .collect(),
-            Box::new(nominalize(env, path, *ty)),
+            nominalize(env, path, *ty),
         ),
         _ => t,
-    }
+    }))
 }
 
 fn nominalize_all(env: &TypeEnv, actor: &Option<Type>) -> (TypeEnv, Option<Type>) {

@@ -1,12 +1,12 @@
 use super::javascript::{ident, is_tuple};
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, Type};
+use crate::types::{Field, Function, Label, Type, TypeInner};
 use pretty::RcDoc;
 
 fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
-    use Type::*;
-    match *ty {
+    use TypeInner::*;
+    match ty {
         Null => str("null"),
         Bool => str("boolean"),
         Nat => str("bigint"),
@@ -39,11 +39,11 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         Principal => str("Principal"),
         Opt(ref t) => str("[] | ").append(enclose("[", pp_ty(env, t, is_ref), "]")),
         Vec(ref t) => {
-            let ty = match **t {
+            let ty = match t {
                 Var(ref id) => {
                     let ty = env.rec_find_type(id).unwrap();
                     if matches!(
-                        ty,
+                        ty.as_ref(),
                         Nat8 | Nat16 | Nat32 | Nat64 | Int8 | Int16 | Int32 | Int64
                     ) {
                         ty
@@ -53,7 +53,7 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
                 }
                 _ => t,
             };
-            match *ty {
+            match ty.as_ref() {
                 Nat8 => str("Uint8Array | number[]"),
                 Nat16 => str("Uint16Array | number[]"),
                 Nat32 => str("Uint32Array | number[]"),
@@ -140,15 +140,15 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         let export = match ty {
-            Type::Record(_) if !ty.is_tuple() => kwd("export interface")
+            TypeInner::Record(_) if !ty.is_tuple() => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
                 .append(pp_ty(env, ty, false)),
-            Type::Service(ref serv) => kwd("export interface")
+            TypeInner::Service(ref serv) => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
                 .append(pp_service(env, serv)),
-            Type::Func(ref func) => kwd("export type")
+            TypeInner::Func(ref func) => kwd("export type")
                 .append(ident(id))
                 .append(" = ")
                 .append(pp_function(env, func))

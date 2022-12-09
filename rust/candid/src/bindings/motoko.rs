@@ -5,13 +5,13 @@ use super::candid::is_valid_as_id;
 use crate::parser::types::FuncMode;
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, Type};
+use crate::types::{Field, Function, Label, Type, TypeInner};
 use pretty::RcDoc;
 
 // The definition of tuple is language specific.
 fn is_tuple(t: &Type) -> bool {
     match t {
-        Type::Record(ref fs) => {
+        TypeInner::Record(ref fs) => {
             if fs.len() <= 1 {
                 return false;
             }
@@ -89,8 +89,8 @@ fn escape(id: &str, is_method: bool) -> RcDoc {
 }
 
 fn pp_ty(ty: &Type) -> RcDoc {
-    use Type::*;
-    match *ty {
+    use TypeInner::*;
+    match ty {
         Null => str("Null"),
         Bool => str("Bool"),
         Nat => str("Nat"),
@@ -217,8 +217,8 @@ fn pp_defs(env: &TypeEnv) -> RcDoc {
 
 fn pp_actor(ty: &Type) -> RcDoc {
     match ty {
-        Type::Service(ref serv) => pp_service(serv),
-        Type::Var(_) | Type::Class(_, _) => pp_ty(ty),
+        TypeInner::Service(ref serv) => pp_service(serv),
+        TypeInner::Var(_) | TypeInner::Class(_, _) => pp_ty(ty),
         _ => unreachable!(),
     }
 }
