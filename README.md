@@ -22,6 +22,7 @@ This repository contains some of the implementations developed by DFINITY.
 
 A list of community maintained Candid libraries:
 
+* [Motoko](https://github.com/edjcase/motoko_candid)
 * [Haskell](https://github.com/nomeata/haskell-candid)
 * [Elm](https://github.com/chenyan2002/ic-elm/)
 * [Kotlin](https://github.com/seniorjoinu/candid-kt)
