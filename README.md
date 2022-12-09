@@ -22,13 +22,13 @@ This repository contains some of the implementations developed by DFINITY.
 
 A list of community maintained Candid libraries:
 
-* [Motoko](https://github.com/edjcase/motoko_candid)
 * [Haskell](https://github.com/nomeata/haskell-candid)
 * [Elm](https://github.com/chenyan2002/ic-elm/)
 * [Kotlin](https://github.com/seniorjoinu/candid-kt)
 * [AssemblyScript](https://github.com/rckprtr/cdk-as/tree/master/packages/cdk/assembly/candid)
 * [Java](https://github.com/ic4j/ic4j-candid)
 * [Dart](https://github.com/levifeldman/ic_tools_dart)
+* [Motoko](https://github.com/edjcase/motoko_candid)
 * [C#](https://github.com/edjCase/ICP.NET/tree/main/src/Candid)
 
 ## Tools
