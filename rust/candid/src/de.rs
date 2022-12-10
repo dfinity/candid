@@ -15,7 +15,6 @@ use anyhow::{anyhow, Context};
 use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
-use std::cell::RefCell;
 use std::fmt::Write;
 use std::{collections::VecDeque, io::Cursor, mem::replace};
 
@@ -135,11 +134,6 @@ macro_rules! check {
             return Err(Error::Subtype($msg.to_string()));
         }
     }};
-}
-
-thread_local! {
-    // Visitor has to implement Copy
-    static ALLOWED_VISITORS: RefCell<[TypeId; 2]> = RefCell::new([TypeId::of::<&crate::parser::value::IDLValueVisitor>(), TypeId::of::<&de::IgnoredAny>()]);
 }
 
 #[derive(Clone)]
@@ -356,12 +350,17 @@ impl<'de> Deserializer<'de> {
     {
         use de::Deserializer;
         let tid = type_of(&visitor);
-        if !ALLOWED_VISITORS.with(|list| list.borrow().contains(&tid)) &&
-        // OptionVisitor doesn't derive Copy, but has only PhantomData
-            !tid.name.starts_with("&serde::de::impls::OptionVisitor<")
+        if tid != TypeId::of::<crate::parser::value::IDLValueVisitor>() // derive Copy
+            && tid != TypeId::of::<de::IgnoredAny>() // derive Copy
+        // OptionVisitor doesn't derive Copy, but has only PhantomData.
+        // OptionVisitor is private and we cannot get TypeId of OptionVisitor<T>,
+        // we also cannot downcast V to concrete type, because of 'de
+        // The only option left seems to be type_name, but it is not guaranteed to be stable, so there is risk here.
+            && !tid.name.starts_with("serde::de::impls::OptionVisitor<")
         {
             panic!("Not a valid visitor: {:?}", tid);
         }
+        // This is safe, because the visitor either impl Copy or is zero sized
         let v = unsafe { std::ptr::read(&visitor) };
         let mut self_clone = self.clone();
         match v.visit_some(&mut self_clone) {
