@@ -39,6 +39,7 @@ sha2 = "0.10.1"
 thiserror = "1.0.20"
 anyhow = "1.0"
 binread = { version = "2.1", features = ["debug_template"] }
+traitobject = "0.1"
 
 arbitrary = { version = "1.0", optional = true }
 # Don't upgrade serde_dhall. It will introduce dependency with invalid license.

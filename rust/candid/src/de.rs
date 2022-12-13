@@ -3,6 +3,7 @@
 use super::{
     error::{Error, Result},
     parser::typing::TypeEnv,
+    types::internal::{type_of, TypeId},
     types::{Field, Label, Type},
     CandidType, Int, Nat,
 };
@@ -13,8 +14,9 @@ use crate::{
 use anyhow::{anyhow, Context};
 use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
-use serde::de::{self, Visitor};
+use serde::de::{self, Deserialize, Visitor};
 use std::fmt::Write;
+use std::marker::PhantomData;
 use std::{collections::VecDeque, io::Cursor, mem::replace};
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
@@ -133,6 +135,58 @@ macro_rules! check {
             return Err(Error::Subtype($msg.to_string()));
         }
     }};
+}
+
+pub fn optional_variant<'de, T, D>(deserializer: D) -> std::result::Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    struct OptionalVariant<T>(PhantomData<T>);
+    impl<'de, T> Visitor<'de> for OptionalVariant<T>
+    where
+        T: Deserialize<'de>,
+    {
+        type Value = Option<T>;
+        fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("optional variant")
+        }
+        fn visit_none<E>(self) -> std::result::Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+        fn visit_some<D>(self, deserializer: D) -> std::result::Result<Self::Value, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            if type_of(&deserializer) == TypeId::of::<Deserializer>() {
+                let mut deserializer: Box<Deserializer<'de>> = unsafe {
+                    let raw: *mut Box<dyn std::any::Any> =
+                        std::mem::transmute(Box::new(deserializer));
+                    std::mem::transmute(traitobject::data_mut(raw))
+                };
+                match T::deserialize(&mut *deserializer) {
+                    Ok(v) => Ok(Some(v)),
+                    Err(Error::Subtype(_)) => {
+                        use de::Deserializer;
+                        (*deserializer)
+                            .deserialize_ignored_any(serde::de::IgnoredAny)
+                            .map_err(de::Error::custom)?;
+                        Ok(None)
+                    }
+                    Err(e) => {
+                        let e: Box<D::Error> = unsafe { std::mem::transmute(Box::new(e)) };
+                        Err(*e)
+                    }
+                }
+            } else {
+                panic!("not candid deserializer");
+            }
+        }
+    }
+    deserializer.deserialize_option(OptionalVariant(PhantomData))
 }
 
 struct Deserializer<'de> {
