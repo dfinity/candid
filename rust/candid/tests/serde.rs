@@ -1,4 +1,5 @@
 #![allow(clippy::unit_cmp)]
+use candid::de::optional_variant;
 use candid::{decode_one, encode_one, CandidType, Decode, Deserialize, Encode, Int, Nat};
 
 #[test]
@@ -260,6 +261,7 @@ fn optional_fields() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct OldStruct {
         bar: bool,
+        #[serde(deserialize_with = "optional_variant")]
         baz: Option<Old>,
     }
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
@@ -275,8 +277,10 @@ fn optional_fields() {
     }
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct NewStruct {
+        #[serde(deserialize_with = "optional_variant")]
         foo: Option<u8>,
         bar: bool,
+        #[serde(deserialize_with = "optional_variant")]
         baz: Option<New>,
     }
     let bytes = encode(&OldStruct {

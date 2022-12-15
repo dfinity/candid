@@ -10,7 +10,7 @@ use std::fmt;
 // totally fine for Candid type, as we don't care about lifetime at all.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct TypeId {
-    id: usize,
+    pub id: usize,
     pub name: &'static str,
 }
 impl TypeId {

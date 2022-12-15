@@ -161,7 +161,7 @@ where
         where
             D: serde::Deserializer<'de>,
         {
-            if type_of(&deserializer) == TypeId::of::<Deserializer>() {
+            if type_of(&deserializer) == TypeId::of::<crate::de::Deserializer>() {
                 let mut deserializer: Box<Deserializer<'de>> = unsafe {
                     let raw: *mut Box<dyn std::any::Any> =
                         std::mem::transmute(Box::new(deserializer));
@@ -176,20 +176,21 @@ where
                             .map_err(de::Error::custom)?;
                         Ok(None)
                     }
-                    Err(e) => {
-                        let e: Box<D::Error> = unsafe { std::mem::transmute(Box::new(e)) };
-                        Err(*e)
-                    }
+                    Err(e) => Err(e).map_err(de::Error::custom),
                 }
             } else {
-                panic!("not candid deserializer");
+                panic!(
+                    "not candid deserializer: {}, not {}",
+                    type_of(&deserializer),
+                    TypeId::of::<crate::de::Deserializer>()
+                );
             }
         }
     }
     deserializer.deserialize_option(OptionalVariant(PhantomData))
 }
 
-struct Deserializer<'de> {
+pub(crate) struct Deserializer<'de> {
     input: Cursor<&'de [u8]>,
     table: TypeEnv,
     types: VecDeque<(usize, Type)>,
@@ -396,22 +397,6 @@ impl<'de> Deserializer<'de> {
         self.input.set_position(pos + len);
         visitor.visit_unit()
     }
-    unsafe fn recoverable_visit_some<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        use de::Deserializer;
-        let v = std::ptr::read(&visitor);
-        let self_ptr = std::ptr::read(&self);
-        match v.visit_some(self_ptr) {
-            Ok(v) => Ok(v),
-            Err(Error::Subtype(_)) => {
-                self.deserialize_ignored_any(serde::de::IgnoredAny)?;
-                visitor.visit_none()
-            }
-            Err(e) => Err(e),
-        }
-    }
 }
 
 macro_rules! primitive_impl {
@@ -611,7 +596,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.wire_type = *t1.clone();
                 self.expect_type = *t2.clone();
                 if BoolValue::read(&mut self.input)?.0 {
-                    unsafe { self.recoverable_visit_some(visitor) }
+                    visitor.visit_some(self)
                 } else {
                     visitor.visit_none()
                 }
@@ -619,7 +604,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (_, Type::Opt(t2)) => {
                 self.expect_type = self.table.trace_type(t2)?;
                 if !matches!(self.expect_type, Type::Null | Type::Reserved | Type::Opt(_)) {
-                    unsafe { self.recoverable_visit_some(visitor) }
+                    visitor.visit_some(self)
                 } else {
                     self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                     visitor.visit_none()

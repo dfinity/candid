@@ -492,8 +492,33 @@ impl<'de> Visitor<'de> for IDLValueVisitor {
     where
         D: serde::Deserializer<'de>,
     {
-        let v = Deserialize::deserialize(deserializer)?;
-        Ok(IDLValue::Opt(Box::new(v)))
+        use crate::de::Deserializer;
+        use crate::types::internal::{type_of, TypeId};
+        if type_of(&deserializer) == TypeId::of::<Deserializer<'de>>() {
+            let mut deserializer: Box<Deserializer<'de>> = unsafe {
+                let raw: *mut Box<dyn std::any::Any> = std::mem::transmute(Box::new(deserializer));
+                std::mem::transmute(traitobject::data_mut(raw))
+            };
+            match Deserialize::deserialize(&mut *deserializer) {
+                Ok(v) => Ok(IDLValue::Opt(Box::new(v))),
+                Err(Error::Subtype(_)) => {
+                    use serde::de::Deserializer;
+                    (*deserializer)
+                        .deserialize_ignored_any(serde::de::IgnoredAny)
+                        .map_err(de::Error::custom)?;
+                    Ok(IDLValue::Null)
+                }
+                Err(e) => Err(e).map_err(de::Error::custom),
+            }
+        } else {
+            panic!(
+                "not candid deserializer: {}, not {}",
+                type_of(&deserializer),
+                TypeId::of::<crate::de::Deserializer>()
+            );
+        }
+        //let v = Deserialize::deserialize(deserializer)?;
+        //Ok(IDLValue::Opt(Box::new(v)))
     }
     fn visit_unit<E>(self) -> DResult<E> {
         Ok(IDLValue::Null)
