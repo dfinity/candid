@@ -122,7 +122,7 @@ macro_rules! assert {
 
 macro_rules! check {
     ( false ) => {{
-        return Err(Error::Subtype(format!(
+        return Err(Error::msg(format!(
             "Type mismatch at {}:{}",
             file!(),
             line!()
@@ -130,11 +130,12 @@ macro_rules! check {
     }};
     ($exp:expr, $msg:expr) => {{
         if !$exp {
-            return Err(Error::Subtype($msg.to_string()));
+            return Err(Error::msg($msg.to_string()));
         }
     }};
 }
 
+#[derive(Clone)]
 struct Deserializer<'de> {
     input: Cursor<&'de [u8]>,
     table: TypeEnv,
@@ -342,20 +343,38 @@ impl<'de> Deserializer<'de> {
         self.input.set_position(pos + len);
         visitor.visit_unit()
     }
-    unsafe fn recoverable_visit_some<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    fn recoverable_visit_some<'a, V>(
+        &'a mut self,
+        visitor: V,
+        option_on_wire: bool,
+    ) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        use de::Deserializer;
-        let v = std::ptr::read(&visitor);
-        let self_ptr = std::ptr::read(&self);
-        match v.visit_some(self_ptr) {
-            Ok(v) => Ok(v),
-            Err(Error::Subtype(_)) => {
-                self.deserialize_ignored_any(serde::de::IgnoredAny)?;
+        use crate::parser::value::IDLValue;
+        use de::Deserialize;
+        let mut self_clone = self.clone();
+        let value = IDLValue::deserialize(&mut self_clone)?;
+        let value = if option_on_wire {
+            IDLValue::Opt(Box::new(value))
+        } else {
+            value
+        };
+        eprintln!("{} : {}", value, self.expect_type);
+        match value.annotate_type(
+            false,
+            &self.table,
+            &Type::Opt(Box::new(self.expect_type.clone())),
+        ) {
+            Ok(IDLValue::Opt(_)) => visitor.visit_some(self),
+            Ok(_) => {
+                *self = self_clone;
                 visitor.visit_none()
             }
-            Err(e) => Err(e),
+            Err(_) => {
+                *self = self_clone;
+                visitor.visit_none()
+            }
         }
     }
 }
@@ -557,7 +576,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.wire_type = *t1.clone();
                 self.expect_type = *t2.clone();
                 if BoolValue::read(&mut self.input)?.0 {
-                    unsafe { self.recoverable_visit_some(visitor) }
+                    self.recoverable_visit_some(visitor, true)
                 } else {
                     visitor.visit_none()
                 }
@@ -565,7 +584,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (_, Type::Opt(t2)) => {
                 self.expect_type = self.table.trace_type(t2)?;
                 if !matches!(self.expect_type, Type::Null | Type::Reserved | Type::Opt(_)) {
-                    unsafe { self.recoverable_visit_some(visitor) }
+                    self.recoverable_visit_some(visitor, false)
                 } else {
                     self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                     visitor.visit_none()
@@ -716,7 +735,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.unroll_type()?;
         match (&self.expect_type, &self.wire_type) {
             (Type::Variant(e), Type::Variant(w)) => {
-                let old_pos = self.input.position();
                 let index = Len::read(&mut self.input)?.0;
                 let len = w.len();
                 if index >= len {
@@ -729,7 +747,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let expect = match e.iter().find(|f| f.id == wire.id) {
                     Some(v) => v.clone(),
                     None => {
-                        self.input.set_position(old_pos);
                         return Err(Error::subtype(format!("Unknown variant field {}", wire.id)));
                     }
                 };
