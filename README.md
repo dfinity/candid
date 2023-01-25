@@ -9,7 +9,7 @@ the data they exchange, with type safety and extensibility.
 ## Documentation
 
 * The [spec](spec/) directory contains Candid specifications, including the [Candid language specification](spec/Candid.md) and a soundness proof.
-* The [official manual](https://sdk.dfinity.org/docs/candid-guide/candid-intro.html) is hosted by dfinity; see [./docs](docs/) for the source code.
+* The [official manual](https://internetcomputer.org/docs/current/developer-docs/build/candid/candid-intro/) is hosted by dfinity; see [./docs](docs/) for the source code.
 
 ## Implementations
 
@@ -28,6 +28,8 @@ A list of community maintained Candid libraries:
 * [AssemblyScript](https://github.com/rckprtr/cdk-as/tree/master/packages/cdk/assembly/candid)
 * [Java](https://github.com/ic4j/ic4j-candid)
 * [Dart](https://github.com/levifeldman/ic_tools_dart)
+* [Motoko](https://github.com/edjcase/motoko_candid)
+* [C#](https://github.com/edjCase/ICP.NET/tree/main/src/Candid)
 
 ## Tools
 
