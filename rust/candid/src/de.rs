@@ -3,6 +3,7 @@
 use super::{
     error::{Error, Result},
     parser::typing::TypeEnv,
+    types::internal::{type_of, TypeId},
     types::{Field, Label, Type},
     CandidType, Int, Nat,
 };
@@ -135,6 +136,7 @@ macro_rules! check {
     }};
 }
 
+#[derive(Clone)]
 struct Deserializer<'de> {
     input: Cursor<&'de [u8]>,
     table: TypeEnv,
@@ -342,15 +344,30 @@ impl<'de> Deserializer<'de> {
         self.input.set_position(pos + len);
         visitor.visit_unit()
     }
-    unsafe fn recoverable_visit_some<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    fn recoverable_visit_some<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         use de::Deserializer;
-        let v = std::ptr::read(&visitor);
-        let self_ptr = std::ptr::read(&self);
-        match v.visit_some(self_ptr) {
-            Ok(v) => Ok(v),
+        let tid = type_of(&visitor);
+        if tid != TypeId::of::<crate::parser::value::IDLValueVisitor>() // derive Copy
+            && tid != TypeId::of::<de::IgnoredAny>() // derive Copy
+        // OptionVisitor doesn't derive Copy, but has only PhantomData.
+        // OptionVisitor is private and we cannot get TypeId of OptionVisitor<T>,
+        // we also cannot downcast V to concrete type, because of 'de
+        // The only option left seems to be type_name, but it is not guaranteed to be stable, so there is risk here.
+            && !tid.name.starts_with("serde::de::impls::OptionVisitor<")
+        {
+            panic!("Not a valid visitor: {:?}", tid);
+        }
+        // This is safe, because the visitor either impl Copy or is zero sized
+        let v = unsafe { std::ptr::read(&visitor) };
+        let mut self_clone = self.clone();
+        match v.visit_some(&mut self_clone) {
+            Ok(v) => {
+                *self = self_clone;
+                Ok(v)
+            }
             Err(Error::Subtype(_)) => {
                 self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                 visitor.visit_none()
@@ -557,7 +574,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.wire_type = *t1.clone();
                 self.expect_type = *t2.clone();
                 if BoolValue::read(&mut self.input)?.0 {
-                    unsafe { self.recoverable_visit_some(visitor) }
+                    self.recoverable_visit_some(visitor)
                 } else {
                     visitor.visit_none()
                 }
@@ -565,7 +582,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (_, Type::Opt(t2)) => {
                 self.expect_type = self.table.trace_type(t2)?;
                 if !matches!(self.expect_type, Type::Null | Type::Reserved | Type::Opt(_)) {
-                    unsafe { self.recoverable_visit_some(visitor) }
+                    self.recoverable_visit_some(visitor)
                 } else {
                     self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                     visitor.visit_none()
@@ -716,7 +733,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.unroll_type()?;
         match (&self.expect_type, &self.wire_type) {
             (Type::Variant(e), Type::Variant(w)) => {
-                let old_pos = self.input.position();
                 let index = Len::read(&mut self.input)?.0;
                 let len = w.len();
                 if index >= len {
@@ -729,7 +745,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let expect = match e.iter().find(|f| f.id == wire.id) {
                     Some(v) => v.clone(),
                     None => {
-                        self.input.set_position(old_pos);
                         return Err(Error::subtype(format!("Unknown variant field {}", wire.id)));
                     }
                 };
