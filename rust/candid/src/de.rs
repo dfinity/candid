@@ -3,7 +3,7 @@
 use super::{
     error::{Error, Result},
     parser::typing::TypeEnv,
-    types::{Field, Label, Type},
+    types::{Field, Label, Type, TypeInner},
     CandidType, Int, Nat,
 };
 use crate::{
@@ -51,9 +51,9 @@ impl<'de> IDLDeserialize<'de> {
     {
         let expected_type = self.de.table.trace_type(&expected_type)?;
         if self.de.types.is_empty() {
-            if matches!(expected_type, Type::Opt(_) | Type::Reserved) {
+            if matches!(expected_type.as_ref(), TypeInner::Opt(_) | TypeInner::Reserved) {
                 self.de.expect_type = expected_type;
-                self.de.wire_type = Type::Reserved;
+                self.de.wire_type = TypeInner::Reserved.into();
                 return T::deserialize(&mut self.de);
             } else {
                 return Err(Error::msg(format!(
@@ -64,7 +64,7 @@ impl<'de> IDLDeserialize<'de> {
         }
 
         let (ind, ty) = self.de.types.pop_front().unwrap();
-        self.de.expect_type = if matches!(expected_type, Type::Unknown) {
+        self.de.expect_type = if matches!(expected_type.as_ref(), TypeInner::Unknown) {
             self.de.is_untyped = true;
             ty.clone()
         } else {
@@ -160,8 +160,8 @@ impl<'de> Deserializer<'de> {
             input: reader,
             table: env,
             types: types.into_iter().enumerate().collect(),
-            wire_type: Type::Unknown,
-            expect_type: Type::Unknown,
+            wire_type: TypeInner::Unknown.into(),
+            expect_type: TypeInner::Unknown.into(),
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
@@ -214,10 +214,10 @@ impl<'de> Deserializer<'de> {
         Ok(())
     }
     fn unroll_type(&mut self) -> Result<()> {
-        if matches!(self.expect_type, Type::Var(_) | Type::Knot(_)) {
+        if matches!(self.expect_type.as_ref(), TypeInner::Var(_) | TypeInner::Knot(_)) {
             self.expect_type = self.table.trace_type(&self.expect_type)?;
         }
-        if matches!(self.wire_type, Type::Var(_) | Type::Knot(_)) {
+        if matches!(self.wire_type.as_ref(), TypeInner::Var(_) | TypeInner::Knot(_)) {
             self.wire_type = self.table.trace_type(&self.wire_type)?;
         }
         Ok(())
@@ -242,7 +242,7 @@ impl<'de> Deserializer<'de> {
     {
         use std::convert::TryInto;
         self.unroll_type()?;
-        assert!(self.expect_type == Type::Int);
+        assert!(self.expect_type.as_ref() == TypeInner::Int);
         let mut bytes = vec![0u8];
         let int = match &self.wire_type {
             Type::Int => Int::decode(&mut self.input).map_err(Error::msg)?,
@@ -267,7 +267,7 @@ impl<'de> Deserializer<'de> {
     {
         self.unroll_type()?;
         check!(
-            self.expect_type == Type::Nat && self.wire_type == Type::Nat,
+            self.expect_type.as_ref() == TypeInner::Nat && self.wire_type.as_ref() == TypeInner::Nat,
             "nat"
         );
         let mut bytes = vec![1u8];
@@ -281,7 +281,7 @@ impl<'de> Deserializer<'de> {
     {
         self.unroll_type()?;
         check!(
-            self.expect_type == Type::Principal && self.wire_type == Type::Principal,
+            self.expect_type.as_ref() == TypeInner::Principal && self.wire_type.as_ref() == TypeInner::Principal,
             "principal"
         );
         let mut bytes = vec![2u8];

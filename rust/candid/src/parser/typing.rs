@@ -136,7 +136,7 @@ impl TypeEnv {
     pub fn replace_empty(&mut self) -> Result<()> {
         let ids: Vec<_> = self.check_empty()?.iter().map(|x| x.to_string()).collect();
         for id in ids.into_iter() {
-            self.0.insert(id, Type::Empty.into());
+            self.0.insert(id, TypeInner::Empty.into());
         }
         Ok(())
     }
@@ -294,8 +294,8 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
 
 fn check_cycle(env: &TypeEnv) -> Result<()> {
     fn has_cycle<'a>(seen: &mut BTreeSet<&'a str>, env: &'a TypeEnv, t: &'a Type) -> Result<bool> {
-        match t {
-            Type::Var(id) => {
+        match t.as_ref() {
+            TypeInner::Var(id) => {
                 if seen.insert(id) {
                     let ty = env.find_type(id)?;
                     has_cycle(seen, env, ty)
@@ -318,7 +318,7 @@ fn check_cycle(env: &TypeEnv) -> Result<()> {
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         if let Dec::TypD(Binding { id, typ: _ }) = dec {
-            let duplicate = env.te.0.insert(id.to_string(), Type::Unknown.into());
+            let duplicate = env.te.0.insert(id.to_string(), TypeInner::Unknown.into());
             if duplicate.is_some() {
                 return Err(Error::msg(format!("duplicate binding for {}", id)));
             }
