@@ -207,6 +207,7 @@ impl std::ops::Deref for Type {
     }
 }
 impl AsRef<TypeInner> for Type {
+    #[inline(always)]
     fn as_ref(&self) -> &TypeInner {
         self.0.as_ref()
     }

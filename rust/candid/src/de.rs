@@ -254,7 +254,7 @@ impl<'de> Deserializer<'de> {
     {
         use std::convert::TryInto;
         self.unroll_type()?;
-        assert!(self.expect_type.as_ref() == &TypeInner::Int);
+        assert!(*self.expect_type == TypeInner::Int);
         let mut bytes = vec![0u8];
         let int = match self.wire_type.as_ref() {
             TypeInner::Int => Int::decode(&mut self.input).map_err(Error::msg)?,
@@ -279,8 +279,7 @@ impl<'de> Deserializer<'de> {
     {
         self.unroll_type()?;
         check!(
-            self.expect_type.as_ref() == &TypeInner::Nat
-                && self.wire_type.as_ref() == &TypeInner::Nat,
+            *self.expect_type == TypeInner::Nat && *self.wire_type == TypeInner::Nat,
             "nat"
         );
         let mut bytes = vec![1u8];
@@ -294,8 +293,7 @@ impl<'de> Deserializer<'de> {
     {
         self.unroll_type()?;
         check!(
-            self.expect_type.as_ref() == &TypeInner::Principal
-                && self.wire_type.as_ref() == &TypeInner::Principal,
+            *self.expect_type == TypeInner::Principal && *self.wire_type == TypeInner::Principal,
             "principal"
         );
         let mut bytes = vec![2u8];
@@ -395,7 +393,7 @@ macro_rules! primitive_impl {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
                 self.unroll_type()?;
-                check!(self.expect_type.as_ref() == &$type && self.wire_type.as_ref() == &$type, stringify!($type));
+                check!(*self.expect_type == $type && *self.wire_type == $type, stringify!($type));
                 let val = self.input.$($value)*().map_err(|_| Error::msg(format!("Cannot read {} value", stringify!($type))))?;
                 visitor.[<visit_ $ty>](val)
             }
@@ -479,7 +477,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         use std::convert::TryInto;
         self.unroll_type()?;
-        assert!(self.expect_type.as_ref() == &TypeInner::Int);
+        assert!(*self.expect_type == TypeInner::Int);
         let value: i128 = match self.wire_type.as_ref() {
             TypeInner::Int => {
                 let int = Int::decode(&mut self.input).map_err(Error::msg)?;
@@ -505,8 +503,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         use std::convert::TryInto;
         self.unroll_type()?;
         check!(
-            self.expect_type.as_ref() == &TypeInner::Nat
-                && self.wire_type.as_ref() == &TypeInner::Nat,
+            *self.expect_type == TypeInner::Nat && *self.wire_type == TypeInner::Nat,
             "nat"
         );
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
@@ -519,8 +516,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.unroll_type()?;
         check!(
-            self.expect_type.as_ref() == &TypeInner::Null
-                && self.wire_type.as_ref() == &TypeInner::Null,
+            *self.expect_type == TypeInner::Null && *self.wire_type == TypeInner::Null,
             "unit"
         );
         visitor.visit_unit()
@@ -531,8 +527,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.unroll_type()?;
         check!(
-            self.expect_type.as_ref() == &TypeInner::Bool
-                && self.wire_type.as_ref() == &TypeInner::Bool,
+            *self.expect_type == TypeInner::Bool && *self.wire_type == TypeInner::Bool,
             "bool"
         );
         let res = BoolValue::read(&mut self.input)?;
@@ -544,8 +539,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.unroll_type()?;
         check!(
-            self.expect_type.as_ref() == &TypeInner::Text
-                && self.wire_type.as_ref() == &TypeInner::Text,
+            *self.expect_type == TypeInner::Text && *self.wire_type == TypeInner::Text,
             "text"
         );
         let len = Len::read(&mut self.input)?.0;
@@ -559,8 +553,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.unroll_type()?;
         check!(
-            self.expect_type.as_ref() == &TypeInner::Text
-                && self.wire_type.as_ref() == &TypeInner::Text,
+            *self.expect_type == TypeInner::Text && *self.wire_type == TypeInner::Text,
             "text"
         );
         let len = Len::read(&mut self.input)?.0;
@@ -645,8 +638,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         self.unroll_type()?;
         check!(
-            self.expect_type.as_ref() == &TypeInner::Vec(TypeInner::Nat8.into())
-                && self.wire_type.as_ref() == &TypeInner::Vec(TypeInner::Nat8.into()),
+            *self.expect_type == TypeInner::Vec(TypeInner::Nat8.into())
+                && *self.wire_type == TypeInner::Vec(TypeInner::Nat8.into()),
             "vec nat8"
         );
         let len = Len::read(&mut self.input)?.0;
@@ -657,7 +650,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.unroll_type()?;
         match self.expect_type.as_ref() {
             TypeInner::Principal => self.deserialize_principal(visitor),
-            TypeInner::Vec(t) if t.as_ref() == &TypeInner::Nat8 => {
+            TypeInner::Vec(t) if **t == TypeInner::Nat8 => {
                 let len = Len::read(&mut self.input)?.0;
                 let slice = self.borrow_bytes(len)?;
                 visitor.visit_borrowed_bytes(slice)
@@ -680,10 +673,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                             (
                                 [Field { id: e_id0, ty: ek }, Field { id: e_id1, ty: ev }],
                                 [Field { id: w_id0, ty: wk }, Field { id: w_id1, ty: wv }],
-                            ) if e_id0.as_ref() == &Label::Id(0)
-                                && e_id1.as_ref() == &Label::Id(1)
-                                && w_id0.as_ref() == &Label::Id(0)
-                                && w_id1.as_ref() == &Label::Id(1) =>
+                            ) if **e_id0 == Label::Id(0)
+                                && **e_id1 == Label::Id(1)
+                                && **w_id0 == Label::Id(0)
+                                && **w_id1 == Label::Id(1) =>
                             {
                                 let expect = (ek.clone(), ev.clone());
                                 let wire = (wk.clone(), wv.clone());
@@ -992,8 +985,7 @@ impl<'de, 'a> de::VariantAccess<'de> for Compound<'a, 'de> {
 
     fn unit_variant(self) -> Result<()> {
         check!(
-            self.de.expect_type.as_ref() == &TypeInner::Null
-                && self.de.wire_type.as_ref() == &TypeInner::Null,
+            *self.de.expect_type == TypeInner::Null && *self.de.wire_type == TypeInner::Null,
             "unit_variant"
         );
         Ok(())

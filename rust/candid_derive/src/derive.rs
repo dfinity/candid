@@ -82,7 +82,7 @@ impl Variant {
                     .iter()
                     .map(|ident| {
                         let ident = ident.to_string();
-                        let var = format!("__field{}", ident);
+                        let var = format!("__field{ident}");
                         syn::parse_str(&var).unwrap()
                     })
                     .collect();
@@ -146,7 +146,7 @@ fn enum_from_ast(
     };
 
     let id = fs.iter().map(|Variant { real_ident, .. }| {
-        syn::parse_str::<TokenStream>(&format!("{}::{}", name, real_ident)).unwrap()
+        syn::parse_str::<TokenStream>(&format!("{name}::{real_ident}")).unwrap()
     });
     let index = 0..fs.len() as u64;
     let (pattern, members): (Vec<_>, Vec<_>) = fs
@@ -244,14 +244,14 @@ impl Ident {
     fn to_token(&self) -> TokenStream {
         match self {
             Ident::Named(ident) => quote! { #ident },
-            Ident::Unnamed(ref i) => syn::parse_str::<TokenStream>(&format!("{}", i)).unwrap(),
+            Ident::Unnamed(ref i) => syn::parse_str::<TokenStream>(&format!("{i}")).unwrap(),
         }
     }
 }
 impl std::fmt::Display for Ident {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            Ident::Named(ref ident) => f.write_fmt(format_args!("{}", ident)),
+            Ident::Named(ref ident) => f.write_fmt(format_args!("{ident}")),
             Ident::Unnamed(ref i) => f.write_fmt(format_args!("{}", *i)),
         }
     }

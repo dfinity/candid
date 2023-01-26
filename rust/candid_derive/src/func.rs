@@ -73,7 +73,7 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenSt
         {
             return Err(Error::new_spanned(
                 &sig.ident,
-                format!("duplicate method name {}", name),
+                format!("duplicate method name {name}"),
             ));
         }
     }
