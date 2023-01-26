@@ -423,6 +423,7 @@ macro_rules! visit_prim {
 }
 
 /// A [`Visitor`] to extract [`IDLValue`]s.
+#[derive(Copy, Clone)]
 pub struct IDLValueVisitor;
 
 impl<'de> Visitor<'de> for IDLValueVisitor {
