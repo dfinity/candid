@@ -167,7 +167,8 @@ impl IndexType {
             -17 => TypeInner::Empty,
             -24 => TypeInner::Principal,
             _ => unreachable!(),
-        }.into())
+        }
+        .into())
     }
 }
 impl ConsType {
@@ -227,7 +228,8 @@ impl ConsType {
                 TypeInner::Service(res)
             }
             ConsType::Future(_) => TypeInner::Future,
-        }.into())
+        }
+        .into())
     }
 }
 impl Table {

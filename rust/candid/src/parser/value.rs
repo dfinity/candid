@@ -167,7 +167,9 @@ impl IDLValue {
                 self.annotate_type(from_parser, env, &ty)?
             }
             (_, TypeInner::Reserved) => IDLValue::Reserved,
-            (IDLValue::Float64(n), TypeInner::Float32) if from_parser => IDLValue::Float32(*n as f32),
+            (IDLValue::Float64(n), TypeInner::Float32) if from_parser => {
+                IDLValue::Float32(*n as f32)
+            }
             (IDLValue::Null, TypeInner::Null) => IDLValue::Null,
             (IDLValue::Bool(b), TypeInner::Bool) => IDLValue::Bool(*b),
             (IDLValue::Nat(n), TypeInner::Nat) => IDLValue::Nat(n.clone()),
@@ -342,7 +344,8 @@ impl IDLValue {
                 };
                 TypeInner::Func(f)
             }
-        }.into()
+        }
+        .into()
     }
 }
 

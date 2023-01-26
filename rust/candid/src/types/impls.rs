@@ -276,7 +276,8 @@ where
                 id: Label::Named("Err".to_owned()).into(),
                 ty: E::ty(),
             },
-        ]).into()
+        ])
+        .into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -480,7 +481,8 @@ impl CandidType for std::time::SystemTime {
                 id: Label::Named("secs_since_epoch".to_owned()).into(),
                 ty: u64::ty(),
             },
-        ]).into()
+        ])
+        .into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -514,7 +516,8 @@ impl CandidType for std::time::Duration {
                 id: Label::Named("nanos".to_owned()).into(),
                 ty: u32::ty(),
             },
-        ]).into()
+        ])
+        .into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where

@@ -66,7 +66,9 @@ impl TypeEnv {
     pub fn trace_type<'a>(&'a self, t: &'a Type) -> Result<Type> {
         match t.as_ref() {
             TypeInner::Var(id) => self.trace_type(self.find_type(id)?),
-            TypeInner::Knot(ref id) => self.trace_type(&crate::types::internal::find_type(id).unwrap()),
+            TypeInner::Knot(ref id) => {
+                self.trace_type(&crate::types::internal::find_type(id).unwrap())
+            }
             _ => Ok(t.clone()),
         }
     }
@@ -168,7 +170,8 @@ fn check_prim(prim: &PrimType) -> Type {
         PrimType::Null => TypeInner::Null,
         PrimType::Reserved => TypeInner::Reserved,
         PrimType::Empty => TypeInner::Empty,
-    }.into()
+    }
+    .into()
 }
 
 pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {

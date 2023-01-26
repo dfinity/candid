@@ -22,7 +22,8 @@ impl CandidType for Func {
             modes: Vec::new(),
             args: Vec::new(),
             rets: Vec::new(),
-        }).into()
+        })
+        .into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where

@@ -108,7 +108,8 @@ impl TypeContainer {
                             ty: self.go(ty),
                         })
                         .collect(),
-                ).into();
+                )
+                .into();
                 if t.is_tuple() {
                     return res;
                 }
@@ -119,7 +120,7 @@ impl TypeContainer {
                 } else {
                     // if the type is part of an enum, the id won't be recorded.
                     // we want to inline the type in this case.
-                    return res
+                    return res;
                 }
             }
             TypeInner::Variant(fs) => {
@@ -130,13 +131,14 @@ impl TypeContainer {
                             ty: self.go(ty),
                         })
                         .collect(),
-                ).into();
+                )
+                .into();
                 let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
                     self.env.0.insert(id.to_string(), res);
                     TypeInner::Var(id.to_string())
                 } else {
-                    return res
+                    return res;
                 }
             }
             TypeInner::Knot(id) => {
@@ -155,12 +157,12 @@ impl TypeContainer {
                     .map(|(id, t)| (id.clone(), self.go(t)))
                     .collect(),
             ),
-            TypeInner::Class(inits, ref ty) => TypeInner::Class(
-                inits.iter().map(|t| self.go(t)).collect(),
-                self.go(ty),
-            ),
+            TypeInner::Class(inits, ref ty) => {
+                TypeInner::Class(inits.iter().map(|t| self.go(t)).collect(), self.go(ty))
+            }
             t => t.clone(),
-        }.into()
+        }
+        .into()
     }
 }
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
@@ -268,12 +270,22 @@ impl Type {
                 ty.subst(tau),
             ),
             _ => return self,
-        }.into()
+        }
+        .into()
     }
 }
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", crate::bindings::candid::pp_ty(self).pretty(80))
+    }
+}
+impl fmt::Display for TypeInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            crate::bindings::candid::pp_ty(self.into()).pretty(80)
+        )
     }
 }
 
@@ -414,7 +426,8 @@ pub fn unroll(t: &Type) -> Type {
                 .collect(),
         ),
         t => t.clone(),
-    }.into()
+    }
+    .into()
 }
 
 thread_local! {

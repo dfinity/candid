@@ -122,5 +122,6 @@ fn to_tuple(args: &[Type]) -> Type {
                 ty: ty.clone(),
             })
             .collect(),
-    ).into()
+    )
+    .into()
 }
