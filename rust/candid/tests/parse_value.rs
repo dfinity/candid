@@ -1,6 +1,6 @@
 use candid::parser::typing::TypeEnv;
 use candid::parser::value::{IDLArgs, IDLField, IDLValue, VariantValue};
-use candid::types::{Label, Type};
+use candid::types::{Label, Type, TypeInner};
 
 fn parse_args(input: &str) -> IDLArgs {
     input.parse().unwrap()
@@ -80,13 +80,13 @@ fn parse_more_literals() {
     let mut args =
         parse_args("(true, null, 4_2, \"哈哈\", \"string with whitespace\", 0x2a, -42, false)");
     args.args[2] = args.args[2]
-        .annotate_type(true, &TypeEnv::new(), &Type::Nat)
+        .annotate_type(true, &TypeEnv::new(), &TypeInner::Nat.into())
         .unwrap();
     args.args[5] = args.args[5]
-        .annotate_type(true, &TypeEnv::new(), &Type::Int)
+        .annotate_type(true, &TypeEnv::new(), &TypeInner::Int.into())
         .unwrap();
     args.args[6] = args.args[6]
-        .annotate_type(true, &TypeEnv::new(), &Type::Int)
+        .annotate_type(true, &TypeEnv::new(), &TypeInner::Int.into())
         .unwrap();
     assert_eq!(
         args.args,
@@ -111,7 +111,11 @@ fn parse_more_literals() {
 fn parse_vec() {
     let mut args = parse_args("(vec{1;2;3;4})");
     args.args[0] = args.args[0]
-        .annotate_type(true, &TypeEnv::new(), &Type::Vec(Box::new(Type::Nat)))
+        .annotate_type(
+            true,
+            &TypeEnv::new(),
+            &TypeInner::Vec(TypeInner::Nat.into()).into(),
+        )
         .unwrap();
     assert_eq!(
         args.args,

@@ -6,7 +6,7 @@ use candid::{
     candid_method,
     parser::value::{IDLValue, IDLValueVisitor},
     ser::IDLBuilder,
-    types::{get_type, Label, Serializer, Type},
+    types::{get_type, Label, Serializer, Type, TypeInner},
     CandidType, Decode, Deserialize, Encode, Int,
 };
 use serde::de::DeserializeOwned;
@@ -18,7 +18,7 @@ fn any_val() {
         struct IDLValueEmbed(IDLValue);
         impl CandidType for IDLValueEmbed {
             fn _ty() -> Type {
-                Type::Reserved
+                TypeInner::Reserved.into()
             }
             fn idl_serialize<S: Serializer>(&self, _serializer: S) -> Result<(), S::Error> {
                 unimplemented!("IDLValueEmbed is not serializable")
@@ -84,19 +84,25 @@ fn any_val() {
 
 #[test]
 fn test_primitive() {
-    assert_eq!(get_type(&true), Type::Bool);
-    assert_eq!(get_type(&Box::new(42)), Type::Int32);
-    assert_eq!(get_type(&Box::new(Int::from(42))), Type::Int);
+    assert_eq!(get_type(&true), TypeInner::Bool.into());
+    assert_eq!(get_type(&Box::new(42)), TypeInner::Int32.into());
+    assert_eq!(get_type(&Box::new(Int::from(42))), TypeInner::Int.into());
     let opt: Option<&str> = None;
-    assert_eq!(get_type(&opt), Type::Opt(Box::new(Type::Text)));
-    assert_eq!(get_type(&[0, 1, 2, 3]), Type::Vec(Box::new(Type::Int32)));
+    assert_eq!(
+        get_type(&opt),
+        TypeInner::Opt(TypeInner::Text.into()).into()
+    );
+    assert_eq!(
+        get_type(&[0, 1, 2, 3]),
+        TypeInner::Vec(TypeInner::Int32.into()).into()
+    );
 }
 
 #[test]
 fn test_struct() {
     #[derive(Debug, CandidType)]
     struct Newtype(Int);
-    assert_eq!(Newtype::ty(), Type::Int,);
+    assert_eq!(Newtype::ty(), TypeInner::Int.into());
     #[derive(Debug, CandidType)]
     struct A {
         foo: Int,
@@ -104,7 +110,11 @@ fn test_struct() {
     }
     assert_eq!(
         A::ty(),
-        Type::Record(vec![field("bar", Type::Bool), field("foo", Type::Int),])
+        TypeInner::Record(vec![
+            field("bar", TypeInner::Bool.into()),
+            field("foo", TypeInner::Int.into())
+        ])
+        .into()
     );
 
     #[derive(Debug, CandidType)]
@@ -115,7 +125,11 @@ fn test_struct() {
     let res = G { g1: 42, g2: true };
     assert_eq!(
         get_type(&res),
-        Type::Record(vec![field("g1", Type::Int32), field("g2", Type::Bool)])
+        TypeInner::Record(vec![
+            field("g1", TypeInner::Int32.into()),
+            field("g2", TypeInner::Bool.into())
+        ])
+        .into()
     );
 
     #[derive(Debug, CandidType)]
@@ -125,13 +139,14 @@ fn test_struct() {
     }
     assert_eq!(
         List::ty(),
-        Type::Record(vec![
-            field("head", Type::Int32),
+        TypeInner::Record(vec![
+            field("head", TypeInner::Int32.into()),
             field(
                 "tail",
-                Type::Opt(Box::new(Type::Knot(candid::types::TypeId::of::<List>())))
+                TypeInner::Opt(TypeInner::Knot(candid::types::TypeId::of::<List>()).into()).into()
             )
         ])
+        .into()
     );
 }
 
@@ -149,21 +164,27 @@ fn test_variant() {
     let v = E::Bar(true, 42);
     assert_eq!(
         get_type(&v),
-        Type::Variant(vec![
+        TypeInner::Variant(vec![
             field(
                 "Bar",
-                Type::Record(vec![
-                    unnamed_field(0, Type::Bool),
-                    unnamed_field(1, Type::Int32)
+                TypeInner::Record(vec![
+                    unnamed_field(0, TypeInner::Bool.into()),
+                    unnamed_field(1, TypeInner::Int32.into())
                 ])
+                .into()
             ),
             field(
                 "Baz",
-                Type::Record(vec![field("a", Type::Int32), field("b", Type::Nat32)])
+                TypeInner::Record(vec![
+                    field("a", TypeInner::Int32.into()),
+                    field("b", TypeInner::Nat32.into())
+                ])
+                .into()
             ),
-            field("Foo", Type::Null),
-            field("Newtype", Type::Bool),
+            field("Foo", TypeInner::Null.into()),
+            field("Newtype", TypeInner::Bool.into()),
         ])
+        .into()
     );
 }
 
@@ -278,14 +299,14 @@ fn test_counter() {
 
 fn field(id: &str, ty: Type) -> candid::types::Field {
     candid::types::Field {
-        id: Label::Named(id.to_string()),
+        id: Label::Named(id.to_string()).into(),
         ty,
     }
 }
 
 fn unnamed_field(id: u32, ty: Type) -> candid::types::Field {
     candid::types::Field {
-        id: Label::Id(id),
+        id: Label::Id(id).into(),
         ty,
     }
 }

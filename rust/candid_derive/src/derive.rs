@@ -135,14 +135,14 @@ fn enum_from_ast(
     let ty = fs.iter().map(|Variant { ty, .. }| ty);
     let candid = candid_path(custom_candid_path);
     let ty_gen = quote! {
-        #candid::types::Type::Variant(
+        #candid::types::TypeInner::Variant(
             vec![
                 #(#candid::types::Field {
-                    id: #candid::types::Label::Named(#id.to_owned()),
+                    id: #candid::types::Label::Named(#id.to_owned()).into(),
                     ty: #ty }
                 ),*
             ]
-        )
+        ).into()
     };
 
     let id = fs.iter().map(|Variant { real_ident, .. }| {
@@ -209,7 +209,7 @@ fn struct_from_ast(
         syn::Fields::Named(ref fields) => {
             let (fs, idents, is_bytes) = fields_from_ast(&fields.named, custom_candid_path);
             (
-                quote! { #candid::types::Type::Record(#fs) },
+                quote! { #candid::types::TypeInner::Record(#fs).into() },
                 idents,
                 is_bytes,
             )
@@ -221,14 +221,14 @@ fn struct_from_ast(
                 (quote! { #newtype }, idents, is_bytes)
             } else {
                 (
-                    quote! { #candid::types::Type::Record(#fs) },
+                    quote! { #candid::types::TypeInner::Record(#fs).into() },
                     idents,
                     is_bytes,
                 )
             }
         }
         syn::Fields::Unit => (
-            quote! { #candid::types::Type::Null },
+            quote! { #candid::types::TypeInner::Null.into() },
             Vec::new(),
             Vec::new(),
         ),
@@ -369,9 +369,9 @@ fn fields_from_ast(
         .map(|Field { renamed_ident, .. }| match renamed_ident {
             Ident::Named(ref id) => {
                 let name = id.unraw().to_string();
-                quote! { #candid::types::Label::Named(#name.to_string()) }
+                quote! { #candid::types::Label::Named(#name.to_string()).into() }
             }
-            Ident::Unnamed(ref i) => quote! { #candid::types::Label::Id(#i) },
+            Ident::Unnamed(ref i) => quote! { #candid::types::Label::Id(#i).into() },
         });
     let ty = fs.iter().map(|Field { ty, .. }| ty);
     let ty_gen = quote! {

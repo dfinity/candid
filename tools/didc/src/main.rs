@@ -83,15 +83,6 @@ enum Command {
         ty1: IDLType,
         ty2: IDLType,
     },
-    /// Diff two Candid values
-    Diff {
-        #[structopt(parse(try_from_str = parse_args))]
-        values1: IDLArgs,
-        #[structopt(parse(try_from_str = parse_args))]
-        values2: IDLArgs,
-        #[structopt(flatten)]
-        annotate: TypeAnnotation,
-    },
 }
 
 #[derive(StructOpt)]
@@ -316,29 +307,6 @@ fn main() -> Result<()> {
                     candid::bindings::javascript::value::pp_args(&args).pretty(80)
                 ),
                 _ => unreachable!(),
-            }
-        }
-        Command::Diff {
-            values1,
-            values2,
-            annotate,
-        } => {
-            let (vs1, vs2) = if annotate.is_empty() {
-                (values1.args, values2.args)
-            } else {
-                // Either we assume the types are in decode mode, or forbid the use of --method in diff
-                let (env, types) = annotate.get_types(Mode::Decode)?;
-                (
-                    values1.annotate_types(true, &env, &types)?.args,
-                    values2.annotate_types(true, &env, &types)?.args,
-                )
-            };
-            if vs1.len() != vs2.len() {
-                return Err(Error::msg("value length mismatch").into());
-            }
-            for (v1, v2) in vs1.iter().zip(vs2.iter()) {
-                let edit = candiff::value_diff(v1, v2, &None);
-                println!("{}", candiff::pretty::value_edit(&edit).pretty(80));
             }
         }
     };

@@ -134,7 +134,7 @@ fn test_reserved() {
 #[test]
 fn test_reference() {
     use candid::{
-        types::{Function, Type},
+        types::{Function, Type, TypeInner},
         Func, Principal, Service,
     };
     let principal = Principal::from_text("w7x7r-cok77-xa").unwrap();
@@ -151,11 +151,12 @@ fn test_reference() {
     struct CustomFunc(Func);
     impl CandidType for CustomFunc {
         fn _ty() -> Type {
-            Type::Func(Function {
+            TypeInner::Func(Function {
                 args: vec![],
-                rets: vec![Type::Nat],
+                rets: vec![TypeInner::Nat.into()],
                 modes: vec![],
             })
+            .into()
         }
         fn idl_serialize<S: candid::types::Serializer>(
             &self,

@@ -1,12 +1,11 @@
 [package]
 name = "didc"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["DFINITY Team"]
 edition = "2018"
 
 [dependencies]
 candid = { path = "../../rust/candid", features = ["random"] }
-candiff = { path = "../candiff" }
 clap = "2.33.3"
 structopt = "0.3.16"
 pretty-hex = "0.2.1"

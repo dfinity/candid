@@ -1,0 +1,13 @@
+   Compiling candid v0.9.0-beta.0 (/Users/chenyan/src/candid/rust/candid)
+    Finished test [unoptimized + debuginfo] target(s) in 1.93s
+     Running unittests src/lib.rs (/Users/chenyan/src/candid/target/debug/deps/candid-40d96d7030e5df30)
+     Running tests/number.rs (/Users/chenyan/src/candid/target/debug/deps/number-e62cc96e2838fc49)
+     Running tests/parse_type.rs (/Users/chenyan/src/candid/target/debug/deps/parse_type-9fa4abcf1d269152)
+     Running tests/parse_value.rs (/Users/chenyan/src/candid/target/debug/deps/parse_value-85951448090bc7a7)
+     Running tests/principal.rs (/Users/chenyan/src/candid/target/debug/deps/principal-59b2a664073a3486)
+     Running tests/serde.rs (/Users/chenyan/src/candid/target/debug/deps/serde-36437880b5af3df4)
+     Running tests/test_suite.rs (/Users/chenyan/src/candid/target/debug/deps/test_suite-31b1809ce656ca1f)
+     Running tests/types.rs (/Users/chenyan/src/candid/target/debug/deps/types-a59d01b83d399362)
+     Running tests/value.rs (/Users/chenyan/src/candid/target/debug/deps/value-109e2a0dbde0d313)
+   Doc-tests candid
+error: doctest failed, to rerun pass `--doc`

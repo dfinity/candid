@@ -2,6 +2,5 @@
 members = [
     "rust/candid",
     "rust/candid_derive",
-    "tools/candiff",
     "tools/didc",
 ]
