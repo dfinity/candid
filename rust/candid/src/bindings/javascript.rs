@@ -4,10 +4,11 @@ use crate::pretty::*;
 use crate::types::{Field, Function, Label, Type, TypeInner};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
+use std::rc::Rc;
 
 // The definition of tuple is language specific.
 pub(crate) fn is_tuple(t: &Type) -> bool {
-    match t {
+    match t.as_ref() {
         TypeInner::Record(ref fs) => {
             if fs.is_empty() {
                 return false;
@@ -98,7 +99,7 @@ pub(crate) fn ident(id: &str) -> RcDoc {
 
 fn pp_ty(ty: &Type) -> RcDoc {
     use TypeInner::*;
-    match ty {
+    match ty.as_ref() {
         Null => str("IDL.Null"),
         Bool => str("IDL.Bool"),
         Nat => str("IDL.Nat"),
@@ -136,8 +137,8 @@ fn pp_ty(ty: &Type) -> RcDoc {
     }
 }
 
-fn pp_label(id: &Label) -> RcDoc {
-    match id {
+fn pp_label(id: &Rc<Label>) -> RcDoc {
+    match &**id {
         Label::Named(str) => quote_ident(str),
         Label::Id(n) | Label::Unnamed(n) => str("_")
             .append(RcDoc::as_string(n))
@@ -217,7 +218,7 @@ fn pp_defs<'a>(
 }
 
 fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
-    match ty {
+    match ty.as_ref() {
         TypeInner::Service(_) => pp_ty(ty),
         TypeInner::Var(id) => {
             if recs.contains(&*id.clone()) {
@@ -243,7 +244,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let def_list = chase_actor(env, actor).unwrap();
             let recs = infer_rec(env, &def_list).unwrap();
             let defs = pp_defs(env, &def_list, &recs);
-            let init = if let Type::Class(ref args, _) = actor {
+            let init = if let TypeInner::Class(ref args, _) = actor.as_ref() {
                 args.as_slice()
             } else {
                 &[][..]
@@ -268,10 +269,10 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 }
 
 pub mod value {
-    use super::pp_label;
     use crate::parser::pretty::number_to_string;
     use crate::parser::value::{IDLArgs, IDLField, IDLValue};
     use crate::pretty::*;
+    use crate::types::Label;
     use pretty::RcDoc;
 
     fn is_tuple(v: &IDLValue) -> bool {
@@ -288,6 +289,15 @@ pub mod value {
                 true
             }
             _ => false,
+        }
+    }
+    fn pp_label(id: &Label) -> RcDoc {
+        match id {
+            Label::Named(str) => quote_ident(str),
+            Label::Id(n) | Label::Unnamed(n) => str("_")
+                .append(RcDoc::as_string(n))
+                .append("_")
+                .append(RcDoc::space()),
         }
     }
     fn pp_field(field: &IDLField) -> RcDoc {

@@ -1,11 +1,10 @@
 use super::value::{IDLArgs, IDLField, IDLValue};
+use crate::bindings::candid::pp_text;
 use crate::pretty::*;
-use crate::types::number::pp_num_str;
+use crate::types::{number::pp_num_str, Label};
 use std::fmt;
 
 use ::pretty::RcDoc;
-
-pub use crate::bindings::candid::pp_label;
 
 const MAX_ELEMENTS_FOR_PRETTY_PRINT: usize = 10;
 
@@ -180,6 +179,13 @@ fn is_tuple(t: &IDLValue) -> bool {
             true
         }
         _ => false,
+    }
+}
+
+fn pp_label(id: &Label) -> RcDoc {
+    match id {
+        Label::Named(id) => pp_text(&id),
+        Label::Id(_) | Label::Unnamed(_) => RcDoc::as_string(id),
     }
 }
 

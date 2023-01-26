@@ -777,9 +777,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         match self.field_name.take() {
-            Some(l) => match *l {
-                Label::Named(name) => visitor.visit_string(name),
-                Label::Id(hash) | Label::Unnamed(hash) => visitor.visit_u32(hash),
+            Some(l) => match l.as_ref() {
+                Label::Named(name) => visitor.visit_string(name.to_string()),
+                Label::Id(hash) | Label::Unnamed(hash) => visitor.visit_u32(*hash),
             },
             None => assert!(false),
         }

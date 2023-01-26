@@ -216,9 +216,9 @@ impl From<TypeInner> for Type {
         Type(Rc::new(t))
     }
 }
-impl Type {
-    pub(crate) fn is_tuple(&self) -> bool {
-        match self.as_ref() {
+impl TypeInner {
+    pub fn is_tuple(&self) -> bool {
+        match self {
             TypeInner::Record(ref fs) => {
                 for (i, field) in fs.iter().enumerate() {
                     if field.id.get_id() != (i as u32) {
@@ -230,11 +230,16 @@ impl Type {
             _ => false,
         }
     }
-    pub fn subst(self, tau: &std::collections::BTreeMap<String, String>) -> Self {
+}
+impl Type {
+    pub fn is_tuple(&self) -> bool {
+        self.as_ref().is_tuple()
+    }
+    pub fn subst(&self, tau: &std::collections::BTreeMap<String, String>) -> Self {
         use TypeInner::*;
-        match *self {
-            Var(id) => match tau.get(&id) {
-                None => Var(id),
+        match self.as_ref() {
+            Var(id) => match tau.get(id) {
+                None => Var(id.to_string()),
                 Some(new_id) => Var(new_id.to_string()),
             },
             Opt(t) => Opt(t.subst(tau)),
@@ -255,21 +260,24 @@ impl Type {
                     })
                     .collect(),
             ),
-            Func(func) => Func(Function {
-                modes: func.modes,
-                args: func.args.into_iter().map(|t| t.subst(tau)).collect(),
-                rets: func.rets.into_iter().map(|t| t.subst(tau)).collect(),
-            }),
+            Func(func) => {
+                let func = func.clone();
+                Func(Function {
+                    modes: func.modes,
+                    args: func.args.into_iter().map(|t| t.subst(tau)).collect(),
+                    rets: func.rets.into_iter().map(|t| t.subst(tau)).collect(),
+                })
+            }
             Service(serv) => Service(
                 serv.into_iter()
-                    .map(|(meth, ty)| (meth, ty.subst(tau)))
+                    .map(|(meth, ty)| (meth.clone(), ty.subst(tau)))
                     .collect(),
             ),
             Class(args, ty) => Class(
                 args.into_iter().map(|t| t.subst(tau)).collect(),
                 ty.subst(tau),
             ),
-            _ => return self,
+            _ => return self.clone(),
         }
         .into()
     }
@@ -284,7 +292,7 @@ impl fmt::Display for TypeInner {
         write!(
             f,
             "{}",
-            crate::bindings::candid::pp_ty(self.into()).pretty(80)
+            crate::bindings::candid::pp_ty_inner(&self).pretty(80)
         )
     }
 }

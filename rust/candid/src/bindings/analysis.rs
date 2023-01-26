@@ -11,7 +11,7 @@ pub fn chase_type<'a>(
     t: &'a Type,
 ) -> Result<()> {
     use TypeInner::*;
-    match t {
+    match t.as_ref() {
         Var(id) => {
             if seen.insert(id) {
                 let t = env.find_type(id)?;
@@ -75,7 +75,7 @@ pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTree
         t: &'a Type,
     ) -> Result<()> {
         use TypeInner::*;
-        match t {
+        match t.as_ref() {
             Var(id) => {
                 if seen.insert(id) {
                     res.insert(id);

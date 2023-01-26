@@ -329,7 +329,7 @@ impl IDLValue {
             }
             IDLValue::Variant(ref v) => {
                 let f = Field {
-                    id: v.0.id.into(),
+                    id: v.0.id.clone().into(),
                     ty: v.0.val.value_ty(),
                 };
                 TypeInner::Variant(vec![f])
