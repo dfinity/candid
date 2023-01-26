@@ -672,8 +672,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.unroll_type()?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
-                let e = self.table.trace_type(&e)?;
-                let w = self.table.trace_type(&w)?;
+                let e = self.table.trace_type(e)?;
+                let w = self.table.trace_type(w)?;
                 match (e.as_ref(), w.as_ref()) {
                     (TypeInner::Record(ref e), TypeInner::Record(ref w)) => {
                         match (&e[..], &w[..]) {
@@ -854,11 +854,11 @@ impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
                 self.de.expect_type = expect
                     .pop_front()
                     .map(|f| f.ty)
-                    .unwrap_or(TypeInner::Reserved.into());
+                    .unwrap_or_else(|| TypeInner::Reserved.into());
                 self.de.wire_type = wire
                     .pop_front()
                     .map(|f| f.ty)
-                    .unwrap_or(TypeInner::Reserved.into());
+                    .unwrap_or_else(|| TypeInner::Reserved.into());
                 seed.deserialize(&mut *self.de).map(Some)
             }
             _ => Err(Error::subtype("expect vector or tuple")),

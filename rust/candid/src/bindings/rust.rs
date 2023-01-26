@@ -291,10 +291,10 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
             if matches!(
                 path.last(),
                 None | Some(TypePath::VariantField(_)) | Some(TypePath::Id(_))
-            ) || is_tuple(&fs)
+            ) || is_tuple(fs)
             {
                 let fs: Vec<_> = fs
-                    .into_iter()
+                    .iter()
                     .map(|Field { id, ty }| {
                         path.push(TypePath::RecordField(id.to_string()));
                         let ty = nominalize(env, path, ty);
@@ -317,7 +317,7 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
         TypeInner::Variant(fs) => match path.last() {
             None | Some(TypePath::Id(_)) => {
                 let fs: Vec<_> = fs
-                    .into_iter()
+                    .iter()
                     .map(|Field { id, ty }| {
                         path.push(TypePath::VariantField(id.to_string()));
                         let ty = nominalize(env, path, ty);
@@ -367,7 +367,7 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
             })
         }
         TypeInner::Service(serv) => TypeInner::Service(
-            serv.into_iter()
+            serv.iter()
                 .map(|(meth, ty)| {
                     path.push(TypePath::Id(meth.to_string()));
                     let ty = nominalize(env, path, ty);
@@ -377,7 +377,7 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
                 .collect(),
         ),
         TypeInner::Class(args, ty) => TypeInner::Class(
-            args.into_iter()
+            args.iter()
                 .map(|ty| {
                     path.push(TypePath::Init);
                     let ty = nominalize(env, path, ty);

@@ -128,7 +128,7 @@ pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
 
 pub fn pp_label(id: &Rc<Label>) -> RcDoc {
     match &**id {
-        Label::Named(id) => pp_text(&id),
+        Label::Named(id) => pp_text(id),
         Label::Id(_) | Label::Unnamed(_) => RcDoc::as_string(id),
     }
 }

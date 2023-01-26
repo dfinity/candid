@@ -245,7 +245,7 @@ impl Type {
             Opt(t) => Opt(t.subst(tau)),
             Vec(t) => Vec(t.subst(tau)),
             Record(fs) => Record(
-                fs.into_iter()
+                fs.iter()
                     .map(|Field { id, ty }| Field {
                         id: id.clone(),
                         ty: ty.subst(tau),
@@ -253,7 +253,7 @@ impl Type {
                     .collect(),
             ),
             Variant(fs) => Variant(
-                fs.into_iter()
+                fs.iter()
                     .map(|Field { id, ty }| Field {
                         id: id.clone(),
                         ty: ty.subst(tau),
@@ -269,14 +269,11 @@ impl Type {
                 })
             }
             Service(serv) => Service(
-                serv.into_iter()
+                serv.iter()
                     .map(|(meth, ty)| (meth.clone(), ty.subst(tau)))
                     .collect(),
             ),
-            Class(args, ty) => Class(
-                args.into_iter().map(|t| t.subst(tau)).collect(),
-                ty.subst(tau),
-            ),
+            Class(args, ty) => Class(args.iter().map(|t| t.subst(tau)).collect(), ty.subst(tau)),
             _ => return self.clone(),
         }
         .into()
@@ -292,7 +289,7 @@ impl fmt::Display for TypeInner {
         write!(
             f,
             "{}",
-            crate::bindings::candid::pp_ty_inner(&self).pretty(80)
+            crate::bindings::candid::pp_ty_inner(self).pretty(80)
         )
     }
 }

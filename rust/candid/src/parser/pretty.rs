@@ -184,7 +184,7 @@ fn is_tuple(t: &IDLValue) -> bool {
 
 fn pp_label(id: &Label) -> RcDoc {
     match id {
-        Label::Named(id) => pp_text(&id),
+        Label::Named(id) => pp_text(id),
         Label::Id(_) | Label::Unnamed(_) => RcDoc::as_string(id),
     }
 }
