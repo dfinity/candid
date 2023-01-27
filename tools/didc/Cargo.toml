@@ -6,8 +6,7 @@ edition = "2018"
 
 [dependencies]
 candid = { path = "../../rust/candid", features = ["random"] }
-clap = "2.33.3"
-structopt = "0.3.16"
+clap = { version = "3", features = ["derive"] }
 pretty-hex = "0.2.1"
 hex = "0.4.2"
 anyhow = "1.0.32"

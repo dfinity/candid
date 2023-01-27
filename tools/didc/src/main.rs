@@ -5,13 +5,12 @@ use candid::{
     types::Type,
     Error, IDLArgs, TypeEnv,
 };
+use clap::Parser;
 use std::collections::HashSet;
 use std::path::PathBuf;
-use structopt::clap::AppSettings;
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
-#[structopt(global_settings = &[AppSettings::ColoredHelp, AppSettings::DeriveDisplayOrder])]
+#[derive(Parser)]
+#[clap(version, author)]
 enum Command {
     /// Type check Candid file
     Check {
@@ -24,7 +23,7 @@ enum Command {
     Bind {
         /// Specifies did file for code generation
         input: PathBuf,
-        #[structopt(short, long, possible_values = &["js", "ts", "did", "mo", "rs"])]
+        #[clap(short, long, possible_values = &["js", "ts", "did", "mo", "rs"])]
         /// Specifies target language
         target: String,
     },
@@ -32,7 +31,7 @@ enum Command {
     Test {
         /// Specifies .test.did file for test suites generation
         input: PathBuf,
-        #[structopt(short, long, possible_values = &["js", "did"], default_value = "js")]
+        #[clap(short, long, possible_values = &["js", "did"], default_value = "js")]
         /// Specifies target language
         target: String,
     },
@@ -40,12 +39,12 @@ enum Command {
     Hash { input: String },
     /// Encode Candid value
     Encode {
-        #[structopt(parse(try_from_str = parse_args))]
+        #[clap(parse(try_from_str = parse_args))]
         /// Specifies Candid textual format for encoding
         args: IDLArgs,
-        #[structopt(flatten)]
+        #[clap(flatten)]
         annotate: TypeAnnotation,
-        #[structopt(short, long, possible_values = &["hex", "pretty", "blob"], default_value = "hex")]
+        #[clap(short, long, possible_values = &["hex", "pretty", "blob"], default_value = "hex")]
         /// Specifies hex format
         format: String,
     },
@@ -53,48 +52,48 @@ enum Command {
     Decode {
         /// Specifies Candid binary data in hex string
         blob: String,
-        #[structopt(short, long, possible_values = &["hex", "blob"], default_value = "hex")]
+        #[clap(short, long, possible_values = &["hex", "blob"], default_value = "hex")]
         /// Specifies hex format
         format: String,
-        #[structopt(flatten)]
+        #[clap(flatten)]
         annotate: TypeAnnotation,
     },
     /// Generate random Candid values
     Random {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         annotate: TypeAnnotation,
-        #[structopt(short, long, conflicts_with("file"))]
+        #[clap(short, long, conflicts_with("file"))]
         /// Specifies random value generation config in Dhall syntax
         config: Option<String>,
-        #[structopt(short, long)]
+        #[clap(short, long)]
         /// Load random value generation config from file
         file: Option<String>,
-        #[structopt(short, long, possible_values = &["did", "js"], default_value = "did")]
+        #[clap(short, long, possible_values = &["did", "js"], default_value = "did")]
         /// Specifies target language
         lang: String,
-        #[structopt(short, long, requires("method"))]
+        #[clap(short, long, requires("method"))]
         /// Specifies input arguments for a method call, mocking the return result
         args: Option<IDLArgs>,
     },
     /// Check for subtyping
     Subtype {
-        #[structopt(short, long)]
+        #[clap(short, long)]
         defs: Option<PathBuf>,
         ty1: IDLType,
         ty2: IDLType,
     },
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct TypeAnnotation {
-    #[structopt(name = "types", short, long)]
-    #[structopt(parse(try_from_str = parse_types))]
+    #[clap(name = "types", short, long)]
+    #[clap(parse(try_from_str = parse_types))]
     /// Annotates values with Candid types
     tys: Option<IDLTypes>,
-    #[structopt(short, long, conflicts_with("types"), requires("defs"))]
+    #[clap(short, long, conflicts_with("types"), requires("defs"))]
     /// Annotates values with a service method, specified in --defs option
     method: Option<String>,
-    #[structopt(short, long)]
+    #[clap(short, long)]
     /// Loads did file for --types or --method to reference type definitions
     defs: Option<PathBuf>,
 }
@@ -147,7 +146,7 @@ fn parse_types(str: &str) -> Result<IDLTypes, Error> {
 }
 
 fn main() -> Result<()> {
-    match Command::from_args() {
+    match Command::parse() {
         Command::Check { input, previous } => {
             let (mut env, opt_t1) = pretty_check_file(&input)?;
             if let Some(previous) = previous {
