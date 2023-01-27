@@ -1,4 +1,4 @@
-use crate::types::Label;
+use crate::types::{FuncMode, Label};
 use crate::Result;
 use pretty::RcDoc;
 
@@ -64,12 +64,6 @@ pub enum PrimType {
     Null,
     Reserved,
     Empty,
-}}
-
-enum_to_doc! {
-pub enum FuncMode {
-    Oneway,
-    Query,
 }}
 
 #[derive(Debug, Clone)]

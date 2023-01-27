@@ -1,8 +1,9 @@
 //! `candid::Result<T> = Result<T, candid::Error>>`
 
+#[cfg(feature = "parser")]
+use crate::parser::token;
 use serde::{de, ser};
 
-use crate::parser::token;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::files::{Error as ReportError, SimpleFile};
 use codespan_reporting::term::{self, termcolor::StandardStream};
@@ -13,6 +14,7 @@ pub type Result<T = ()> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[cfg(feature = "parser")]
     #[error("Candid parser error: {0}")]
     Parse(#[from] token::ParserError),
 
@@ -35,6 +37,7 @@ impl Error {
     }
     pub fn report(&self) -> Diagnostic<()> {
         match self {
+            #[cfg(feature = "parser")]
             Error::Parse(e) => {
                 use lalrpop_util::ParseError::*;
                 let mut diag = Diagnostic::error().with_message("parser error");
@@ -114,6 +117,7 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label<()>> {
     }
 }
 
+#[cfg(feature = "parser")]
 fn report_expected(expected: &[String]) -> Vec<String> {
     if expected.is_empty() {
         return Vec::new();

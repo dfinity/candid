@@ -2,9 +2,8 @@
 
 use super::{
     error::{Error, Result},
-    parser::typing::TypeEnv,
     types::internal::{type_of, TypeId},
-    types::{Field, Label, Type, TypeInner},
+    types::{Field, Label, Type, TypeEnv, TypeInner},
     CandidType, Int, Nat,
 };
 use crate::{
@@ -42,7 +41,7 @@ impl<'de> IDLDeserialize<'de> {
         &mut self,
         env: &TypeEnv,
         expected_type: &Type,
-    ) -> Result<crate::parser::value::IDLValue> {
+    ) -> Result<crate::types::value::IDLValue> {
         self.de.table.merge(env)?;
         self.de.is_untyped = true;
         self.deserialize_with_type(expected_type.clone())
@@ -351,7 +350,7 @@ impl<'de> Deserializer<'de> {
     {
         use de::Deserializer;
         let tid = type_of(&visitor);
-        if tid != TypeId::of::<crate::parser::value::IDLValueVisitor>() // derive Copy
+        if tid != TypeId::of::<crate::types::value::IDLValueVisitor>() // derive Copy
             && tid != TypeId::of::<de::IgnoredAny>() // derive Copy
         // OptionVisitor doesn't derive Copy, but has only PhantomData.
         // OptionVisitor is private and we cannot get TypeId of OptionVisitor<T>,

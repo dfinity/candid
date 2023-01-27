@@ -7,6 +7,10 @@
 
 * The old `candid::Type` is now `candid::TypeInner`, and `Type` is a newtype of `Rc<TypeInner>`. This change significantly improves deserialization performance
 * Deserializer only checks subtyping for reference types, fully conforming to Candid spec 1.4
+* `candid::parser::typing::TypeEnv` moved to `candid::types::TypeEnv`. Use of `candid::TypeEnv` is not affected
+* `candid::parser::types::FuncMode` moved to `candid::types::FuncMode`
+* `candid::parser::value` moved to `candid::types::value`
+* `candid::parser::pretty` moved to `candid::bindings::candid::value`
 * `candid::codegen` is deprecated, use `candid::bindings` instead
 
 ## 2022-11-17 (Rust 0.8.3 -- 0.8.4)

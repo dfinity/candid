@@ -1,7 +1,5 @@
-use super::token::error;
-use super::typing::TypeEnv;
 use crate::types::number::{Int, Nat};
-use crate::types::{Field, Label, Type, TypeInner};
+use crate::types::{Field, Label, Type, TypeEnv, TypeInner};
 use crate::{Error, Result};
 use serde::de;
 use serde::de::{Deserialize, Visitor};
@@ -131,27 +129,15 @@ impl IDLArgs {
     }
 }
 
-impl std::str::FromStr for IDLArgs {
-    type Err = Error;
-    fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
-        let lexer = super::token::Tokenizer::new(str);
-        Ok(super::grammar::ArgsParser::new().parse(lexer)?)
-    }
-}
-
-impl std::str::FromStr for IDLValue {
-    type Err = Error;
-    fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
-        let lexer = super::token::Tokenizer::new(str);
-        Ok(super::grammar::ArgParser::new().parse(lexer)?)
-    }
-}
-
 impl IDLValue {
     /// Anotate `IDLValue` with the given type, allowing subtyping. If `IDLValue` is parsed from
     /// string, we need to set `from_parser` to true to enable converting numbers to the expected
     /// types, and disable the opt rules.
     pub fn annotate_type(&self, from_parser: bool, env: &TypeEnv, t: &Type) -> Result<Self> {
+        #[cfg(not(feature = "parser"))]
+        if from_parser {
+            panic!("Please enable \"parser\" feature");
+        }
         Ok(match (self, t.as_ref()) {
             (_, TypeInner::Var(id)) => {
                 let ty = env.rec_find_type(id)?;
@@ -253,23 +239,27 @@ impl IDLValue {
             (IDLValue::Principal(id), TypeInner::Principal) => IDLValue::Principal(*id),
             (IDLValue::Service(_), TypeInner::Service(_)) => self.clone(),
             (IDLValue::Func(_, _), TypeInner::Func(_)) => self.clone(),
-            (IDLValue::Number(str), _) if from_parser => match t.as_ref() {
-                TypeInner::Int => IDLValue::Int(str.parse::<Int>()?),
-                TypeInner::Nat => IDLValue::Nat(str.parse::<Nat>()?),
-                TypeInner::Nat8 => IDLValue::Nat8(str.parse::<u8>().map_err(error)?),
-                TypeInner::Nat16 => IDLValue::Nat16(str.parse::<u16>().map_err(error)?),
-                TypeInner::Nat32 => IDLValue::Nat32(str.parse::<u32>().map_err(error)?),
-                TypeInner::Nat64 => IDLValue::Nat64(str.parse::<u64>().map_err(error)?),
-                TypeInner::Int8 => IDLValue::Int8(str.parse::<i8>().map_err(error)?),
-                TypeInner::Int16 => IDLValue::Int16(str.parse::<i16>().map_err(error)?),
-                TypeInner::Int32 => IDLValue::Int32(str.parse::<i32>().map_err(error)?),
-                TypeInner::Int64 => IDLValue::Int64(str.parse::<i64>().map_err(error)?),
-                _ => {
-                    return Err(Error::msg(format!(
-                        "type mismatch: {self} can not be of type {t}"
-                    )))
+            #[cfg(feature = "parser")]
+            (IDLValue::Number(str), _) if from_parser => {
+                use super::token::error;
+                match t.as_ref() {
+                    TypeInner::Int => IDLValue::Int(str.parse::<Int>()?),
+                    TypeInner::Nat => IDLValue::Nat(str.parse::<Nat>()?),
+                    TypeInner::Nat8 => IDLValue::Nat8(str.parse::<u8>().map_err(error)?),
+                    TypeInner::Nat16 => IDLValue::Nat16(str.parse::<u16>().map_err(error)?),
+                    TypeInner::Nat32 => IDLValue::Nat32(str.parse::<u32>().map_err(error)?),
+                    TypeInner::Nat64 => IDLValue::Nat64(str.parse::<u64>().map_err(error)?),
+                    TypeInner::Int8 => IDLValue::Int8(str.parse::<i8>().map_err(error)?),
+                    TypeInner::Int16 => IDLValue::Int16(str.parse::<i16>().map_err(error)?),
+                    TypeInner::Int32 => IDLValue::Int32(str.parse::<i32>().map_err(error)?),
+                    TypeInner::Int64 => IDLValue::Int64(str.parse::<i64>().map_err(error)?),
+                    _ => {
+                        return Err(Error::msg(format!(
+                            "type mismatch: {self} can not be of type {t}"
+                        )))
+                    }
                 }
-            },
+            }
             _ => {
                 return Err(Error::msg(format!(
                     "type mismatch: {self} cannot be of type {t}"

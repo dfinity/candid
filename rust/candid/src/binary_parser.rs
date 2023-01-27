@@ -1,6 +1,5 @@
-use crate::parser::types::FuncMode;
-use crate::parser::typing::TypeEnv;
 use crate::types::internal::{Field, Function, Label, Type, TypeInner};
+use crate::types::{FuncMode, TypeEnv};
 use anyhow::{anyhow, Context, Result};
 use binread::io::{Read, Seek};
 use binread::{BinRead, BinResult, Error as BError, ReadOptions};

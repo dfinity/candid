@@ -261,7 +261,7 @@
 //!
 //! [dependencies]
 //! wasm-bindgen = "0.2"
-//! candid = "0.7.0"
+//! candid = "0.9.0"
 //!
 //! [profile.release]
 //! lto = true
@@ -301,39 +301,39 @@
 pub use candid_derive::{candid_method, export_service, CandidType};
 pub use serde::Deserialize;
 
-//pub mod codegen;
-//pub use codegen::generate_code;
-
-pub mod bindings;
-
 pub mod error;
 pub use error::{pretty_parse, pretty_read, Error, Result};
 
 pub mod types;
 pub use types::CandidType;
 pub use types::{
+    arc,
     number::{Int, Nat},
     principal::Principal,
+    rc,
     reference::{Func, Service},
     reserved::{Empty, Reserved},
+    value::{IDLArgs, IDLValue},
+    TypeEnv,
 };
-
-pub mod parser;
-pub use parser::types::IDLProg;
-pub use parser::typing::{check_file, check_prog, pretty_check_file, TypeEnv};
-pub use parser::value::IDLArgs;
 
 #[allow(dead_code)]
 pub mod binary_parser;
 pub mod de;
 pub mod ser;
 
-pub mod arc;
-pub mod rc;
-
 pub mod utils;
 pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
 pub mod pretty;
+
+#[cfg(feature = "parser")]
+pub mod parser;
+#[cfg(feature = "parser")]
+pub use parser::types::IDLProg;
+#[cfg(feature = "parser")]
+pub use parser::typing::{check_file, check_prog, pretty_check_file};
+
+pub mod bindings;
 
 // Candid hash function comes from
 // https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf

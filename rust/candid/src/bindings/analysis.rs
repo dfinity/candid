@@ -1,5 +1,4 @@
-use crate::parser::typing::TypeEnv;
-use crate::types::{Type, TypeInner};
+use crate::types::{Type, TypeEnv, TypeInner};
 use crate::Result;
 use std::collections::BTreeSet;
 

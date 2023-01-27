@@ -1,5 +1,5 @@
 use super::internal::{find_type, Field, Label, Type, TypeInner};
-use crate::parser::typing::TypeEnv;
+use crate::types::TypeEnv;
 use crate::{Error, Result};
 use anyhow::Context;
 use std::collections::{HashMap, HashSet};
