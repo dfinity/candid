@@ -1,4 +1,4 @@
-use super::{CandidType, Serializer, Type, TypeId};
+use super::{CandidType, Serializer, Type, TypeInner};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha224};
 use std::convert::TryFrom;
@@ -92,11 +92,8 @@ pub struct Principal {
 }
 
 impl CandidType for Principal {
-    fn id() -> TypeId {
-        TypeId::of::<Principal>()
-    }
     fn _ty() -> Type {
-        Type::Principal
+        TypeInner::Principal.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -201,7 +198,7 @@ impl Principal {
                 // Already checked data_bytes.len() <= MAX_LENGTH_IN_BYTES
                 // safe to unwrap here
                 let result = Self::try_from_slice(data_bytes).unwrap();
-                let expected = format!("{}", result);
+                let expected = format!("{result}");
 
                 // In the Spec:
                 // The textual representation is conventionally printed with lower case letters,
@@ -217,7 +214,7 @@ impl Principal {
 
     /// Convert [`Principal`] to text representation.
     pub fn to_text(&self) -> String {
-        format!("{}", self)
+        format!("{self}")
     }
 
     /// Return the [`Principal`]'s underlying slice of bytes.

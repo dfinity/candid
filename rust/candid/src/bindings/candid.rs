@@ -1,7 +1,8 @@
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, Type};
+use crate::types::{Field, Function, Label, Type, TypeInner};
 use pretty::RcDoc;
+use std::rc::Rc;
 
 static KEYWORDS: [&str; 29] = [
     "import",
@@ -67,13 +68,17 @@ pub(crate) fn ident_string(id: &str) -> String {
     }
 }
 
-fn pp_text(id: &str) -> RcDoc {
+pub(crate) fn pp_text(id: &str) -> RcDoc {
     RcDoc::text(ident_string(id))
 }
 
 pub fn pp_ty(ty: &Type) -> RcDoc {
-    use Type::*;
-    match *ty {
+    pp_ty_inner(ty.as_ref())
+}
+
+pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
+    use TypeInner::*;
+    match ty {
         Null => str("null"),
         Bool => str("bool"),
         Nat => str("nat"),
@@ -96,7 +101,8 @@ pub fn pp_ty(ty: &Type) -> RcDoc {
         Opt(ref t) => kwd("opt").append(pp_ty(t)),
         Vec(ref t) => kwd("vec").append(pp_ty(t)),
         Record(ref fs) => {
-            if ty.is_tuple() {
+            let t = Type(Rc::new(ty.clone()));
+            if t.is_tuple() {
                 let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ";");
                 kwd("record").append(enclose_space("{", tuple, "}"))
             } else {
@@ -114,21 +120,21 @@ pub fn pp_ty(ty: &Type) -> RcDoc {
                 _ => unreachable!(),
             }
         }
-        Knot(ref id) => RcDoc::text(format!("{}", id)),
+        Knot(ref id) => RcDoc::text(format!("{id}")),
         Unknown => str("unknown"),
         Future => str("future"),
     }
 }
 
-pub fn pp_label(id: &Label) -> RcDoc {
-    match id {
+pub fn pp_label(id: &Rc<Label>) -> RcDoc {
+    match &**id {
         Label::Named(id) => pp_text(id),
         Label::Id(_) | Label::Unnamed(_) => RcDoc::as_string(id),
     }
 }
 
 fn pp_field(field: &Field, is_variant: bool) -> RcDoc {
-    let ty_doc = if is_variant && field.ty == Type::Null {
+    let ty_doc = if is_variant && *field.ty == TypeInner::Null {
         RcDoc::nil()
     } else {
         kwd(" :").append(pp_ty(&field.ty))
@@ -163,9 +169,9 @@ fn pp_modes(modes: &[crate::parser::types::FuncMode]) -> RcDoc {
 fn pp_service(serv: &[(String, Type)]) -> RcDoc {
     let doc = concat(
         serv.iter().map(|(id, func)| {
-            let func_doc = match func {
-                Type::Func(ref f) => pp_function(f),
-                Type::Var(_) => pp_ty(func),
+            let func_doc = match func.as_ref() {
+                TypeInner::Func(ref f) => pp_function(f),
+                TypeInner::Var(_) => pp_ty(func),
                 _ => unreachable!(),
             };
             pp_text(id).append(kwd(" :")).append(func_doc)
@@ -186,9 +192,9 @@ fn pp_defs(env: &TypeEnv) -> RcDoc {
 }
 
 fn pp_actor(ty: &Type) -> RcDoc {
-    match ty {
-        Type::Service(ref serv) => pp_service(serv),
-        Type::Var(_) | Type::Class(_, _) => pp_ty(ty),
+    match ty.as_ref() {
+        TypeInner::Service(ref serv) => pp_service(serv),
+        TypeInner::Var(_) | TypeInner::Class(_, _) => pp_ty(ty),
         _ => unreachable!(),
     }
 }

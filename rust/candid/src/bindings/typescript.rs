@@ -1,12 +1,13 @@
 use super::javascript::{ident, is_tuple};
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, Type};
+use crate::types::{Field, Function, Label, Type, TypeInner};
 use pretty::RcDoc;
+use std::rc::Rc;
 
 fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
-    use Type::*;
-    match *ty {
+    use TypeInner::*;
+    match ty.as_ref() {
         Null => str("null"),
         Bool => str("boolean"),
         Nat => str("bigint"),
@@ -27,7 +28,7 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         Var(ref id) => {
             if is_ref {
                 let ty = env.rec_find_type(id).unwrap();
-                if matches!(ty, Service(_) | Func(_)) {
+                if matches!(ty.as_ref(), Service(_) | Func(_)) {
                     pp_ty(env, ty, false)
                 } else {
                     ident(id)
@@ -39,11 +40,11 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         Principal => str("Principal"),
         Opt(ref t) => str("[] | ").append(enclose("[", pp_ty(env, t, is_ref), "]")),
         Vec(ref t) => {
-            let ty = match **t {
+            let ty = match t.as_ref() {
                 Var(ref id) => {
                     let ty = env.rec_find_type(id).unwrap();
                     if matches!(
-                        ty,
+                        ty.as_ref(),
                         Nat8 | Nat16 | Nat32 | Nat64 | Int8 | Int16 | Int32 | Int64
                     ) {
                         ty
@@ -53,7 +54,7 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
                 }
                 _ => t,
             };
-            match *ty {
+            match ty.as_ref() {
                 Nat8 => str("Uint8Array | number[]"),
                 Nat16 => str("Uint16Array | number[]"),
                 Nat32 => str("Uint32Array | number[]"),
@@ -87,8 +88,8 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
     }
 }
 
-fn pp_label(id: &Label) -> RcDoc {
-    match id {
+fn pp_label(id: &Rc<Label>) -> RcDoc {
+    match &**id {
         Label::Named(str) => quote_ident(str),
         Label::Id(n) | Label::Unnamed(n) => str("_")
             .append(RcDoc::as_string(n))
@@ -125,8 +126,8 @@ fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
 fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
     let doc = concat(
         serv.iter().map(|(id, func)| {
-            let func = match func {
-                Type::Func(ref func) => pp_function(env, func),
+            let func = match func.as_ref() {
+                TypeInner::Func(ref func) => pp_function(env, func),
                 _ => pp_ty(env, func, false),
             };
             quote_ident(id).append(kwd(":")).append(func)
@@ -139,16 +140,16 @@ fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
 fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
-        let export = match ty {
-            Type::Record(_) if !ty.is_tuple() => kwd("export interface")
+        let export = match ty.as_ref() {
+            TypeInner::Record(_) if !ty.is_tuple() => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
                 .append(pp_ty(env, ty, false)),
-            Type::Service(ref serv) => kwd("export interface")
+            TypeInner::Service(ref serv) => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
                 .append(pp_service(env, serv)),
-            Type::Func(ref func) => kwd("export type")
+            TypeInner::Func(ref func) => kwd("export type")
                 .append(ident(id))
                 .append(" = ")
                 .append(pp_function(env, func))
@@ -164,12 +165,14 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
 }
 
 fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
-    match ty {
-        Type::Service(ref serv) => kwd("export interface _SERVICE").append(pp_service(env, serv)),
-        Type::Var(id) => kwd("export interface _SERVICE extends")
+    match ty.as_ref() {
+        TypeInner::Service(ref serv) => {
+            kwd("export interface _SERVICE").append(pp_service(env, serv))
+        }
+        TypeInner::Var(id) => kwd("export interface _SERVICE extends")
             .append(str(id))
             .append(str(" {}")),
-        Type::Class(_, t) => pp_actor(env, t),
+        TypeInner::Class(_, t) => pp_actor(env, t),
         _ => unreachable!(),
     }
 }

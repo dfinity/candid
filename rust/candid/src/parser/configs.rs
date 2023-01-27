@@ -11,7 +11,7 @@ impl Configs {
         Ok(Configs(v))
     }
     pub fn with_method(&self, method: &str) -> Self {
-        let path = format!("[{}]", method);
+        let path = format!("[{method}]");
         let mut res = self.0.clone();
         if let SimpleValue::Record(ref mut map) = res {
             if let Some(SimpleValue::Record(mut subtree)) = map.remove(&path) {

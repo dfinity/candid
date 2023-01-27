@@ -186,7 +186,7 @@
 //! We provide a parser and type checker for Candid files specifying the service interface.
 //!
 //! ```
-//! use candid::{IDLProg, TypeEnv, check_prog, types::Type};
+//! use candid::{IDLProg, TypeEnv, check_prog, types::{Type, TypeInner}};
 //! let did_file = r#"
 //!     type List = opt record { head: int; tail: List };
 //!     type byte = nat8;
@@ -211,7 +211,7 @@
 //!
 //! let method = env.get_method(&actor, "g").unwrap();
 //! assert_eq!(method.is_query(), true);
-//! assert_eq!(method.args, vec![Type::Var("List".to_string())]);
+//! assert_eq!(method.args, vec![TypeInner::Var("List".to_string()).into()]);
 //! # Ok::<(), candid::Error>(())
 //! ```
 //!
@@ -301,8 +301,8 @@
 pub use candid_derive::{candid_method, export_service, CandidType};
 pub use serde::Deserialize;
 
-pub mod codegen;
-pub use codegen::generate_code;
+//pub mod codegen;
+//pub use codegen::generate_code;
 
 pub mod bindings;
 

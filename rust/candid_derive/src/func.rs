@@ -73,7 +73,7 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenSt
         {
             return Err(Error::new_spanned(
                 &sig.ident,
-                format!("duplicate method name {}", name),
+                format!("duplicate method name {name}"),
             ));
         }
     }
@@ -121,22 +121,22 @@ pub(crate) fn export_service() -> TokenStream {
                     let mut rets = Vec::new();
                     #(#rets)*
                     let func = Function { args, rets, modes: #modes };
-                    service.push((#name.to_string(), Type::Func(func)));
+                    service.push((#name.to_string(), TypeInner::Func(func).into()));
                 }
             }
         });
         let service = quote! {
-            use #candid::types::{CandidType, Function, Type};
+            use #candid::types::{CandidType, Function, Type, TypeInner};
             let mut service = Vec::<(String, Type)>::new();
             let mut env = #candid::types::internal::TypeContainer::new();
             #(#gen_tys)*
             service.sort_unstable_by_key(|(name, _)| name.clone());
-            let ty = Type::Service(service);
+            let ty = TypeInner::Service(service).into();
         };
         let actor = if let Some(init) = init {
             quote! {
                 #init
-                let actor = Some(Type::Class(init_args, Box::new(ty)));
+                let actor = Some(TypeInner::Class(init_args, ty).into());
             }
         } else {
             quote! { let actor = Some(ty); }

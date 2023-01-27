@@ -5,13 +5,14 @@ use super::candid::is_valid_as_id;
 use crate::parser::types::FuncMode;
 use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, Type};
+use crate::types::{Field, Function, Label, Type, TypeInner};
 use pretty::RcDoc;
+use std::rc::Rc;
 
 // The definition of tuple is language specific.
 fn is_tuple(t: &Type) -> bool {
-    match t {
-        Type::Record(ref fs) => {
+    match t.as_ref() {
+        TypeInner::Record(ref fs) => {
             if fs.len() <= 1 {
                 return false;
             }
@@ -89,8 +90,8 @@ fn escape(id: &str, is_method: bool) -> RcDoc {
 }
 
 fn pp_ty(ty: &Type) -> RcDoc {
-    use Type::*;
-    match *ty {
+    use TypeInner::*;
+    match ty.as_ref() {
         Null => str("Null"),
         Bool => str("Bool"),
         Nat => str("Nat"),
@@ -139,8 +140,8 @@ fn pp_ty(ty: &Type) -> RcDoc {
     }
 }
 
-fn pp_label(id: &Label) -> RcDoc {
-    match id {
+fn pp_label(id: &Rc<Label>) -> RcDoc {
+    match &**id {
         Label::Named(str) => escape(str, false),
         Label::Id(n) | Label::Unnamed(n) => str("_")
             .append(RcDoc::as_string(n))
@@ -154,7 +155,7 @@ fn pp_field(field: &Field) -> RcDoc {
 }
 fn pp_variant(field: &Field) -> RcDoc {
     let doc = str("#").append(pp_label(&field.id));
-    if field.ty != Type::Null {
+    if *field.ty != TypeInner::Null {
         doc.append(" : ").append(pp_ty(&field.ty))
     } else {
         doc
@@ -216,9 +217,9 @@ fn pp_defs(env: &TypeEnv) -> RcDoc {
 }
 
 fn pp_actor(ty: &Type) -> RcDoc {
-    match ty {
-        Type::Service(ref serv) => pp_service(serv),
-        Type::Var(_) | Type::Class(_, _) => pp_ty(ty),
+    match ty.as_ref() {
+        TypeInner::Service(ref serv) => pp_service(serv),
+        TypeInner::Var(_) | TypeInner::Class(_, _) => pp_ty(ty),
         _ => unreachable!(),
     }
 }

@@ -28,7 +28,7 @@ service server : {
     let ast = prog.parse::<IDLProg>().unwrap();
     let pretty = to_pretty(&ast, 80);
     let ast2 = pretty.parse::<IDLProg>().unwrap();
-    assert_eq!(format!("{:?}", ast2), format!("{:?}", ast));
+    assert_eq!(format!("{ast2:?}"), format!("{ast:?}"));
 }
 
 #[test_generator::test_resources("rust/candid/tests/assets/*.did")]
@@ -47,7 +47,7 @@ fn compiler_test(resource: &str) {
                 // Type check output
                 let ast = content.parse::<IDLProg>().unwrap();
                 check_prog(&mut TypeEnv::new(), &ast).unwrap();
-                writeln!(output, "{}", content).unwrap();
+                writeln!(output, "{content}").unwrap();
             }
             {
                 match filename.file_name().unwrap().to_str().unwrap() {
@@ -58,33 +58,33 @@ fn compiler_test(resource: &str) {
                         let mut output =
                             mint.new_goldenfile(filename.with_extension("mo")).unwrap();
                         let content = motoko::compile(&env, &actor);
-                        writeln!(output, "{}", content).unwrap();
+                        writeln!(output, "{content}").unwrap();
                     }
                 }
             }
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("rs")).unwrap();
                 let content = rust::compile(&env, &actor);
-                writeln!(output, "{}", content).unwrap();
+                writeln!(output, "{content}").unwrap();
             }
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
                 let content = javascript::compile(&env, &actor);
-                writeln!(output, "{}", content).unwrap();
+                writeln!(output, "{content}").unwrap();
             }
             {
                 let mut output = mint
                     .new_goldenfile(filename.with_extension("d.ts"))
                     .unwrap();
                 let content = typescript::compile(&env, &actor);
-                writeln!(output, "{}", content).unwrap();
+                writeln!(output, "{content}").unwrap();
             }
         }
         Err(e) => {
             let mut fail_output = mint
                 .new_goldenfile(filename.with_extension("fail"))
                 .unwrap();
-            writeln!(fail_output, "{}", e).unwrap();
+            writeln!(fail_output, "{e}").unwrap();
         }
     }
 }

@@ -134,22 +134,22 @@ fn report_expected(expected: &[String]) -> Vec<String> {
 
 impl ser::Error for Error {
     fn custom<T: std::fmt::Display>(msg: T) -> Self {
-        Error::msg(format!("Serialize error: {}", msg))
+        Error::msg(format!("Serialize error: {msg}"))
     }
 }
 
 impl de::Error for Error {
     fn custom<T: std::fmt::Display>(msg: T) -> Self {
-        Error::msg(format!("Deserialize error: {}", msg))
+        Error::msg(format!("Deserialize error: {msg}"))
     }
     fn invalid_type(_: de::Unexpected<'_>, exp: &dyn de::Expected) -> Self {
-        Error::Subtype(format!("{}", exp))
+        Error::Subtype(format!("{exp}"))
     }
 }
 
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Error {
-        Error::msg(format!("io error: {}", e))
+        Error::msg(format!("io error: {e}"))
     }
 }
 
@@ -167,14 +167,14 @@ impl From<ReportError> for Error {
 #[cfg(feature = "random")]
 impl From<arbitrary::Error> for Error {
     fn from(e: arbitrary::Error) -> Error {
-        Error::msg(format!("arbitrary error: {}", e))
+        Error::msg(format!("arbitrary error: {e}"))
     }
 }
 
 #[cfg(feature = "configs")]
 impl From<serde_dhall::Error> for Error {
     fn from(e: serde_dhall::Error) -> Error {
-        Error::msg(format!("dhall error: {}", e))
+        Error::msg(format!("dhall error: {e}"))
     }
 }
 

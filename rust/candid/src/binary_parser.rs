@@ -1,20 +1,20 @@
 use crate::parser::types::FuncMode;
 use crate::parser::typing::TypeEnv;
-use crate::types::internal::{Field, Function, Label, Type};
+use crate::types::internal::{Field, Function, Label, Type, TypeInner};
 use anyhow::{anyhow, Context, Result};
-use binread::io::{Read, Seek, SeekFrom};
+use binread::io::{Read, Seek};
 use binread::{BinRead, BinResult, Error as BError, ReadOptions};
 use std::convert::TryInto;
 
 fn read_leb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, _: ()) -> BinResult<u64> {
-    let pos = reader.seek(SeekFrom::Current(0))?;
+    let pos = reader.stream_position()?;
     leb128::read::unsigned(reader).map_err(|_| BError::Custom {
         pos,
         err: Box::new(ro.variable_name.unwrap_or("Invalid leb128")),
     })
 }
 fn read_sleb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, _: ()) -> BinResult<i64> {
-    let pos = reader.seek(SeekFrom::Current(0))?;
+    let pos = reader.stream_position()?;
     leb128::read::signed(reader).map_err(|_| BError::Custom {
         pos,
         err: Box::new(ro.variable_name.unwrap_or("Invalid sleb128")),
@@ -137,7 +137,7 @@ pub struct PrincipalBytes {
 }
 
 fn index_to_var(ind: i64) -> String {
-    format!("table{}", ind)
+    format!("table{ind}")
 }
 impl IndexType {
     fn to_type(&self, len: u64) -> Result<Type> {
@@ -146,35 +146,36 @@ impl IndexType {
                 if v >= len as i64 {
                     return Err(anyhow!("type index {} out of range", v));
                 }
-                Type::Var(index_to_var(v))
+                TypeInner::Var(index_to_var(v))
             }
-            -1 => Type::Null,
-            -2 => Type::Bool,
-            -3 => Type::Nat,
-            -4 => Type::Int,
-            -5 => Type::Nat8,
-            -6 => Type::Nat16,
-            -7 => Type::Nat32,
-            -8 => Type::Nat64,
-            -9 => Type::Int8,
-            -10 => Type::Int16,
-            -11 => Type::Int32,
-            -12 => Type::Int64,
-            -13 => Type::Float32,
-            -14 => Type::Float64,
-            -15 => Type::Text,
-            -16 => Type::Reserved,
-            -17 => Type::Empty,
-            -24 => Type::Principal,
+            -1 => TypeInner::Null,
+            -2 => TypeInner::Bool,
+            -3 => TypeInner::Nat,
+            -4 => TypeInner::Int,
+            -5 => TypeInner::Nat8,
+            -6 => TypeInner::Nat16,
+            -7 => TypeInner::Nat32,
+            -8 => TypeInner::Nat64,
+            -9 => TypeInner::Int8,
+            -10 => TypeInner::Int16,
+            -11 => TypeInner::Int32,
+            -12 => TypeInner::Int64,
+            -13 => TypeInner::Float32,
+            -14 => TypeInner::Float64,
+            -15 => TypeInner::Text,
+            -16 => TypeInner::Reserved,
+            -17 => TypeInner::Empty,
+            -24 => TypeInner::Principal,
             _ => unreachable!(),
-        })
+        }
+        .into())
     }
 }
 impl ConsType {
     fn to_type(&self, len: u64) -> Result<Type> {
         Ok(match &self {
-            ConsType::Opt(ref ind) => Type::Opt(Box::new(ind.to_type(len)?)),
-            ConsType::Vec(ref ind) => Type::Vec(Box::new(ind.to_type(len)?)),
+            ConsType::Opt(ref ind) => TypeInner::Opt(ind.to_type(len)?),
+            ConsType::Vec(ref ind) => TypeInner::Vec(ind.to_type(len)?),
             ConsType::Record(fs) | ConsType::Variant(fs) => {
                 let mut res = Vec::new();
                 let mut prev = None;
@@ -186,15 +187,15 @@ impl ConsType {
                     }
                     prev = Some(f.id);
                     let field = Field {
-                        id: Label::Id(f.id),
+                        id: Label::Id(f.id).into(),
                         ty: f.index.to_type(len)?,
                     };
                     res.push(field);
                 }
                 if matches!(&self, ConsType::Record(_)) {
-                    Type::Record(res)
+                    TypeInner::Record(res)
                 } else {
-                    Type::Variant(res)
+                    TypeInner::Variant(res)
                 }
             }
             ConsType::Func(f) => {
@@ -206,7 +207,7 @@ impl ConsType {
                 for ret in f.rets.iter() {
                     rets.push(ret.to_type(len)?);
                 }
-                Type::Func(Function {
+                TypeInner::Func(Function {
                     modes: f.ann.iter().map(|x| x.inner.clone()).collect(),
                     args,
                     rets,
@@ -224,10 +225,11 @@ impl ConsType {
                     prev = Some(&m.name);
                     res.push((m.name.clone(), m.ty.to_type(len)?));
                 }
-                Type::Service(res)
+                TypeInner::Service(res)
             }
-            ConsType::Future(_) => Type::Future,
-        })
+            ConsType::Future(_) => TypeInner::Future,
+        }
+        .into())
     }
 }
 impl Table {
@@ -237,19 +239,19 @@ impl Table {
         for (i, t) in self.table.iter().enumerate() {
             let ty = t
                 .to_type(len)
-                .with_context(|| format!("Invalid table entry {}: {:?}", i, t))?;
+                .with_context(|| format!("Invalid table entry {i}: {t:?}"))?;
             env.insert(index_to_var(i as i64), ty);
         }
         // validate method has func type
         for (_, t) in env.iter() {
-            if let Type::Service(ms) = t {
+            if let TypeInner::Service(ms) = t.as_ref() {
                 for (name, ty) in ms.iter() {
-                    if let Type::Var(id) = ty {
-                        if matches!(env.get(id), Some(Type::Func(_))) {
+                    if let TypeInner::Var(id) = ty.as_ref() {
+                        if matches!(env.get(id).map(|t| t.as_ref()), Some(TypeInner::Func(_))) {
                             continue;
                         }
                     }
-                    return Err(anyhow!("Method {} has a non-function type {}", name, ty));
+                    return Err(anyhow!("Method {name} has a non-function type {ty}"));
                 }
             }
         }
@@ -265,7 +267,7 @@ impl Header {
         for (i, t) in self.args.iter().enumerate() {
             args.push(
                 t.to_type(len)
-                    .with_context(|| format!("Invalid argument entry {}: {:?}", i, t))?,
+                    .with_context(|| format!("Invalid argument entry {i}: {t:?}"))?,
             );
         }
         Ok((env, args))

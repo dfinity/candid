@@ -1,5 +1,5 @@
 use crate::parser::typing::TypeEnv;
-use crate::types::Type;
+use crate::types::{Type, TypeInner};
 use crate::Result;
 use std::collections::BTreeSet;
 
@@ -10,8 +10,8 @@ pub fn chase_type<'a>(
     env: &'a TypeEnv,
     t: &'a Type,
 ) -> Result<()> {
-    use Type::*;
-    match t {
+    use TypeInner::*;
+    match t.as_ref() {
         Var(id) => {
             if seen.insert(id) {
                 let t = env.find_type(id)?;
@@ -74,8 +74,8 @@ pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTree
         _env: &'a TypeEnv,
         t: &'a Type,
     ) -> Result<()> {
-        use Type::*;
-        match t {
+        use TypeInner::*;
+        match t.as_ref() {
             Var(id) => {
                 if seen.insert(id) {
                     res.insert(id);

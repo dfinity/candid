@@ -1,11 +1,10 @@
 use super::value::{IDLArgs, IDLField, IDLValue};
+use crate::bindings::candid::pp_text;
 use crate::pretty::*;
-use crate::types::number::pp_num_str;
+use crate::types::{number::pp_num_str, Label};
 use std::fmt;
 
 use ::pretty::RcDoc;
-
-pub use crate::bindings::candid::pp_label;
 
 const MAX_ELEMENTS_FOR_PRETTY_PRINT: usize = 10;
 
@@ -74,14 +73,14 @@ pub fn number_to_string(v: &IDLValue) -> String {
         Int64(n) => pp_num_str(&n.to_string()),
         Float32(f) => {
             if f.trunc() == *f {
-                format!("{}.0", f)
+                format!("{f}.0")
             } else {
                 f.to_string()
             }
         }
         Float64(f) => {
             if f.trunc() == *f {
-                format!("{}.0", f)
+                format!("{f}.0")
             } else {
                 f.to_string()
             }
@@ -94,33 +93,33 @@ impl fmt::Debug for IDLValue {
         use IDLValue::*;
         match self {
             Null => write!(f, "null : null"),
-            Bool(b) => write!(f, "{}", b),
-            Number(n) => write!(f, "{}", n),
-            Int(i) => write!(f, "{} : int", i),
-            Nat(n) => write!(f, "{} : nat", n),
-            Nat8(n) => write!(f, "{} : nat8", n),
+            Bool(b) => write!(f, "{b}"),
+            Number(n) => write!(f, "{n}"),
+            Int(i) => write!(f, "{i} : int"),
+            Nat(n) => write!(f, "{n} : nat"),
+            Nat8(n) => write!(f, "{n} : nat8"),
             Nat16(n) => write!(f, "{} : nat16", pp_num_str(&n.to_string())),
             Nat32(n) => write!(f, "{} : nat32", pp_num_str(&n.to_string())),
             Nat64(n) => write!(f, "{} : nat64", pp_num_str(&n.to_string())),
-            Int8(n) => write!(f, "{} : int8", n),
+            Int8(n) => write!(f, "{n} : int8"),
             Int16(n) => write!(f, "{} : int16", pp_num_str(&n.to_string())),
             Int32(n) => write!(f, "{} : int32", pp_num_str(&n.to_string())),
             Int64(n) => write!(f, "{} : int64", pp_num_str(&n.to_string())),
             Float32(_) => write!(f, "{} : float32", number_to_string(self)),
             Float64(_) => write!(f, "{} : float64", number_to_string(self)),
-            Text(s) => write!(f, "{:?}", s),
+            Text(s) => write!(f, "{s:?}"),
             None => write!(f, "null"),
             Reserved => write!(f, "null : reserved"),
-            Principal(id) => write!(f, "principal \"{}\"", id),
-            Service(id) => write!(f, "service \"{}\"", id),
+            Principal(id) => write!(f, "principal \"{id}\""),
+            Service(id) => write!(f, "service \"{id}\""),
             Func(id, meth) => write!(
                 f,
                 "func \"{}\".{}",
                 id,
                 crate::bindings::candid::ident_string(meth)
             ),
-            Opt(v) if has_type_annotation(v) => write!(f, "opt ({:?})", v),
-            Opt(v) => write!(f, "opt {:?}", v),
+            Opt(v) if has_type_annotation(v) => write!(f, "opt ({v:?})"),
+            Opt(v) => write!(f, "opt {v:?}"),
             Vec(vs) => {
                 if let Some(Nat8(_)) = vs.first() {
                     write!(f, "blob \"")?;
@@ -134,7 +133,7 @@ impl fmt::Debug for IDLValue {
                 } else {
                     write!(f, "vec {{")?;
                     for v in vs.iter() {
-                        write!(f, " {:?};", v)?
+                        write!(f, " {v:?};")?
                     }
                     write!(f, "}}")
                 }
@@ -145,7 +144,7 @@ impl fmt::Debug for IDLValue {
                     if e.id.get_id() == i as u32 {
                         write!(f, " {:?};", e.val)?;
                     } else {
-                        write!(f, " {:?};", e)?;
+                        write!(f, " {e:?};")?;
                     }
                 }
                 write!(f, "}}")
@@ -183,6 +182,13 @@ fn is_tuple(t: &IDLValue) -> bool {
     }
 }
 
+fn pp_label(id: &Label) -> RcDoc {
+    match id {
+        Label::Named(id) => pp_text(id),
+        Label::Id(_) | Label::Unnamed(_) => RcDoc::as_string(id),
+    }
+}
+
 fn pp_field(depth: usize, field: &IDLField, is_variant: bool) -> RcDoc {
     let val_doc = if is_variant && field.val == IDLValue::Null {
         RcDoc::nil()
@@ -201,14 +207,14 @@ pub fn pp_char(v: u8) -> String {
     if (0x20..=0x7e).contains(&v) && v != 0x22 && v != 0x27 && v != 0x60 && v != 0x5c {
         std::char::from_u32(v as u32).unwrap().to_string()
     } else {
-        format!("\\{:02x}", v)
+        format!("\\{v:02x}")
     }
 }
 
 pub fn pp_value(depth: usize, v: &IDLValue) -> RcDoc {
     use IDLValue::*;
     if depth == 0 {
-        return RcDoc::as_string(format!("{:?}", v));
+        return RcDoc::as_string(format!("{v:?}"));
     }
     match v {
         Text(ref s) => RcDoc::as_string(format!("\"{}\"", s.escape_debug())),
@@ -218,7 +224,7 @@ pub fn pp_value(depth: usize, v: &IDLValue) -> RcDoc {
         Opt(v) => kwd("opt").append(pp_value(depth - 1, v)),
         Vec(vs) => {
             if matches!(vs.first(), Some(Nat8(_))) || vs.len() > MAX_ELEMENTS_FOR_PRETTY_PRINT {
-                RcDoc::as_string(format!("{:?}", v))
+                RcDoc::as_string(format!("{v:?}"))
             } else {
                 let body = concat(vs.iter().map(|v| pp_value(depth - 1, v)), ";");
                 kwd("vec").append(enclose_space("{", body, "}"))
@@ -233,7 +239,7 @@ pub fn pp_value(depth: usize, v: &IDLValue) -> RcDoc {
             }
         }
         Variant(v) => kwd("variant").append(enclose_space("{", pp_field(depth, &v.0, true), "}")),
-        _ => RcDoc::as_string(format!("{:?}", v)),
+        _ => RcDoc::as_string(format!("{v:?}")),
     }
 }
 

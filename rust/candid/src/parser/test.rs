@@ -158,7 +158,7 @@ pub fn check(test: Test) -> Result<()> {
             }
             let is_equal = left == right;
             if assert.pass != is_equal {
-                print!(" left:{}, right:{} ", left, right);
+                print!(" left:{left}, right:{right} ");
             }
             assert.pass == is_equal
         } else {

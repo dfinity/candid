@@ -1,6 +1,6 @@
 //! Data structure for Candid type Int, Nat, supporting big integer with LEB128 encoding.
 
-use super::{CandidType, Serializer, Type, TypeId};
+use super::{CandidType, Serializer, Type, TypeInner};
 use crate::Error;
 use num_bigint::{BigInt, BigUint};
 use serde::{
@@ -117,11 +117,8 @@ impl fmt::Display for Nat {
 }
 
 impl CandidType for Int {
-    fn id() -> TypeId {
-        TypeId::of::<Int>()
-    }
     fn _ty() -> Type {
-        Type::Int
+        TypeInner::Int.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -132,11 +129,8 @@ impl CandidType for Int {
 }
 
 impl CandidType for Nat {
-    fn id() -> TypeId {
-        TypeId::of::<Nat>()
-    }
     fn _ty() -> Type {
-        Type::Nat
+        TypeInner::Nat.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -165,7 +159,7 @@ impl<'de> Deserialize<'de> for Int {
             }
             fn visit_str<E: de::Error>(self, v: &str) -> Result<Int, E> {
                 v.parse::<Int>()
-                    .map_err(|_| de::Error::custom(format!("{:?} is not int", v)))
+                    .map_err(|_| de::Error::custom(format!("{v:?} is not int")))
             }
             fn visit_byte_buf<E: de::Error>(self, v: Vec<u8>) -> Result<Int, E> {
                 Ok(Int(match v[0] {
@@ -204,7 +198,7 @@ impl<'de> Deserialize<'de> for Nat {
             }
             fn visit_str<E: de::Error>(self, v: &str) -> Result<Nat, E> {
                 v.parse::<Nat>()
-                    .map_err(|_| de::Error::custom(format!("{:?} is not nat", v)))
+                    .map_err(|_| de::Error::custom(format!("{v:?} is not nat")))
             }
             fn visit_byte_buf<E: de::Error>(self, v: Vec<u8>) -> Result<Nat, E> {
                 if v[0] == 1 {
