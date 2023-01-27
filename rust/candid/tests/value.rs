@@ -145,8 +145,7 @@ fn test_encode(v: &IDLValue, expected: &[u8]) {
     let encoded = args.to_bytes().unwrap();
     assert_eq!(
         encoded, expected,
-        "\nActual\n{:x?}\nExpected\n{:x?}\n",
-        encoded, expected
+        "\nActual\n{encoded:x?}\nExpected\n{expected:x?}\n"
     );
 }
 

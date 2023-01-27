@@ -721,8 +721,7 @@ where
     let encoded = encode(&value);
     assert_eq!(
         encoded, expected,
-        "\nActual\n{:02x?}\nExpected\n{:02x?}\n",
-        encoded, expected
+        "\nActual\n{encoded:02x?}\nExpected\n{expected:02x?}\n"
     );
 }
 

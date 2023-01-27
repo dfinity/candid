@@ -21,7 +21,7 @@ fn parse_type(input: &str) -> Type {
 fn parse_bool_lit() {
     let args = parse_args("(true)");
     assert_eq!(args.args, vec![IDLValue::Bool(true)]);
-    assert_eq!(format!("{}", args), "(true)");
+    assert_eq!(format!("{args}"), "(true)");
 }
 
 #[test]
@@ -40,7 +40,7 @@ fn parse_literals() {
         ]
     );
     assert_eq!(
-        format!("{}", args),
+        format!("{args}"),
         "(\n  true,\n  null : null,\n  42,\n  42.0 : float64,\n  42.42 : float64,\n  -4200000.0 : float64,\n  0.0004242 : float64,\n)"
     );
 }
@@ -57,7 +57,7 @@ fn parse_string_literals() {
         ]
     );
     let args = parse_args("(blob \"DIDL\\00\\01\\7d\\80\\00\")");
-    assert_eq!(format!("{}", args), r#"(blob "DIDL\00\01}\80\00")"#);
+    assert_eq!(format!("{args}"), r#"(blob "DIDL\00\01}\80\00")"#);
     let args = parse_args_err("(\"DIDL\\00\\01\\7d\\80\\00\")");
     assert_eq!(
         format!("{}", args.unwrap_err()),
@@ -102,7 +102,7 @@ fn parse_more_literals() {
         ]
     );
     assert_eq!(
-        format!("{}", args),
+        format!("{args}"),
         "(\n  true,\n  null : null,\n  42 : nat,\n  \"哈哈\",\n  \"string with whitespace\",\n  42 : int,\n  -42 : int,\n  false,\n)"
     );
 }
@@ -127,7 +127,7 @@ fn parse_vec() {
         ])]
     );
     assert_eq!(
-        format!("{}", args),
+        format!("{args}"),
         "(vec { 1 : nat; 2 : nat; 3 : nat; 4 : nat })"
     );
 }
@@ -168,7 +168,7 @@ fn parse_optional_record() {
         ]
     );
     assert_eq!(
-        format!("{}", args),
+        format!("{args}"),
         "(opt record {}, record { 1 = 42 : nat; 2 = false; 44 = \"test\" }, variant { 5 })"
     );
 }
@@ -210,21 +210,21 @@ fn parse_nested_record() {
             }
         ])]
     );
-    assert_eq!(format!("{}", args), "(\n  record {\n    43 = record { \"opt\" = \"hello\"; test = \"test\" };\n    long_label = opt (null : null);\n    label = 42 : nat;\n  },\n)");
+    assert_eq!(format!("{args}"), "(\n  record {\n    43 = record { \"opt\" = \"hello\"; test = \"test\" };\n    long_label = opt (null : null);\n    label = 42 : nat;\n  },\n)");
     let skip_typ = parse_type("record { label: nat }");
     args.args[0] = args.args[0]
         .annotate_type(true, &TypeEnv::new(), &skip_typ)
         .unwrap();
-    assert_eq!(format!("{}", args), "(record { label = 42 : nat })");
+    assert_eq!(format!("{args}"), "(record { label = 42 : nat })");
 }
 
 #[test]
 fn parse_shorthand() {
     let args =
         parse_args("(record { 42; record {}; true; record { 42; 0x2a=42; 42; 42 }; opt 42 })");
-    assert_eq!(format!("{}", args), "(\n  record {\n    42;\n    record {};\n    true;\n    record { 0 = 42; 42 = 42; 43 = 42; 44 = 42 };\n    opt 42;\n  },\n)");
+    assert_eq!(format!("{args}"), "(\n  record {\n    42;\n    record {};\n    true;\n    record { 0 = 42; 42 = 42; 43 = 42; 44 = 42 };\n    opt 42;\n  },\n)");
     let args = parse_args("(variant { 0x2a }, variant { label })");
-    assert_eq!(format!("{}", args), "(variant { 42 }, variant { label })");
+    assert_eq!(format!("{args}"), "(variant { 42 }, variant { label })");
 }
 
 #[test]
