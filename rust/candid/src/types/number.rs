@@ -608,7 +608,10 @@ mod tests {
             inner: Nat::parse(b"60000000000000000").unwrap(),
         };
         let serialized = serde_json::to_string(&test_struct).unwrap();
-        assert_eq!(format!("{}", serialized), "{\"inner\":[2659581952,13969838]}");
+        assert_eq!(
+            format!("{}", serialized),
+            "{\"inner\":[2659581952,13969838]}"
+        );
         let deserialized = serde_json::from_str(&serialized).unwrap();
         assert_eq!(test_struct, deserialized);
     }
