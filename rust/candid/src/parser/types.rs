@@ -178,7 +178,7 @@ impl ToDoc for Dec {
     fn to_doc(&self) -> RcDoc<()> {
         match *self {
             Dec::TypD(ref b) => RcDoc::text("type ").append(b.to_doc()),
-            Dec::ImportD(ref file) => RcDoc::text(format!("import \"{}\"", file)),
+            Dec::ImportD(ref file) => RcDoc::text(format!("import \"{file}\"")),
         }
     }
 }

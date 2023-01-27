@@ -75,12 +75,7 @@ impl IDLArgs {
                 TypeInner::Null => IDLValue::Null,
                 TypeInner::Reserved => IDLValue::Reserved,
                 TypeInner::Opt(_) => IDLValue::None,
-                _ => {
-                    return Err(Error::msg(format!(
-                        "Omitted values cannot be of type {}",
-                        ty
-                    )))
-                }
+                _ => return Err(Error::msg(format!("Omitted values cannot be of type {ty}"))),
             };
             args.push(v);
         }
@@ -233,7 +228,7 @@ impl IDLValue {
                             TypeInner::Reserved => Some(&IDLValue::Reserved),
                             _ => None,
                         })
-                        .ok_or_else(|| Error::msg(format!("record field {} not found", id)))?;
+                        .ok_or_else(|| Error::msg(format!("record field {id} not found")))?;
                     let val = val.annotate_type(from_parser, env, ty)?;
                     res.push(IDLField {
                         id: id.as_ref().clone(),
@@ -271,15 +266,13 @@ impl IDLValue {
                 TypeInner::Int64 => IDLValue::Int64(str.parse::<i64>().map_err(error)?),
                 _ => {
                     return Err(Error::msg(format!(
-                        "type mismatch: {} can not be of type {}",
-                        self, t
+                        "type mismatch: {self} can not be of type {t}"
                     )))
                 }
             },
             _ => {
                 return Err(Error::msg(format!(
-                    "type mismatch: {} cannot be of type {}",
-                    self, t
+                    "type mismatch: {self} cannot be of type {t}"
                 )))
             }
         })

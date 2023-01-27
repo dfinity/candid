@@ -308,7 +308,7 @@ fn arbitrary_text(
                             0x10000..=0x10ffff,
                         ],
                     )?,
-                    _ => return Err(Error::msg(format!("Unknown text config {:?}", kind))),
+                    _ => return Err(Error::msg(format!("Unknown text config {kind:?}"))),
                 };
                 if let Some(ch) = std::char::from_u32(ch) {
                     res.push(ch);
@@ -343,7 +343,7 @@ where
     })
 }
 
-fn arbitrary_variant<'a>(u: &mut Unstructured<'a>, weight: &[usize]) -> Result<usize> {
+fn arbitrary_variant(u: &mut Unstructured, weight: &[usize]) -> Result<usize> {
     // TODO read from end of unstructured to improve stability
     let prefix_sum: Vec<_> = weight
         .iter()

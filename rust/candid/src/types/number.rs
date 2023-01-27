@@ -159,7 +159,7 @@ impl<'de> Deserialize<'de> for Int {
             }
             fn visit_str<E: de::Error>(self, v: &str) -> Result<Int, E> {
                 v.parse::<Int>()
-                    .map_err(|_| de::Error::custom(format!("{:?} is not int", v)))
+                    .map_err(|_| de::Error::custom(format!("{v:?} is not int")))
             }
             fn visit_byte_buf<E: de::Error>(self, v: Vec<u8>) -> Result<Int, E> {
                 Ok(Int(match v[0] {
@@ -198,7 +198,7 @@ impl<'de> Deserialize<'de> for Nat {
             }
             fn visit_str<E: de::Error>(self, v: &str) -> Result<Nat, E> {
                 v.parse::<Nat>()
-                    .map_err(|_| de::Error::custom(format!("{:?} is not nat", v)))
+                    .map_err(|_| de::Error::custom(format!("{v:?} is not nat")))
             }
             fn visit_byte_buf<E: de::Error>(self, v: Vec<u8>) -> Result<Nat, E> {
                 if v[0] == 1 {

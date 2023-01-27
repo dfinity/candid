@@ -53,7 +53,7 @@ fn field_name(id: &str) -> RcDoc {
     }
 }
 
-fn pp_ty<'a, 'b>(ty: &'a Type, recs: &'b RecPoints) -> RcDoc<'a> {
+fn pp_ty<'a>(ty: &'a Type, recs: &RecPoints) -> RcDoc<'a> {
     use TypeInner::*;
     match ty.as_ref() {
         Null => str("()"),
@@ -100,13 +100,13 @@ fn pp_label(id: &Rc<Label>) -> RcDoc {
     }
 }
 
-fn pp_record_field<'a, 'b>(field: &'a Field, recs: &'b RecPoints) -> RcDoc<'a> {
+fn pp_record_field<'a>(field: &'a Field, recs: &RecPoints) -> RcDoc<'a> {
     pp_label(&field.id)
         .append(kwd(":"))
         .append(pp_ty(&field.ty, recs))
 }
 
-fn pp_record_fields<'a, 'b>(fs: &'a [Field], recs: &'b RecPoints) -> RcDoc<'a> {
+fn pp_record_fields<'a>(fs: &'a [Field], recs: &RecPoints) -> RcDoc<'a> {
     if is_tuple(fs) {
         let tuple = RcDoc::concat(fs.iter().map(|f| pp_ty(&f.ty, recs).append(",")));
         enclose("(", tuple, ")")
@@ -116,7 +116,7 @@ fn pp_record_fields<'a, 'b>(fs: &'a [Field], recs: &'b RecPoints) -> RcDoc<'a> {
     }
 }
 
-fn pp_variant_field<'a, 'b>(field: &'a Field, recs: &'b RecPoints) -> RcDoc<'a> {
+fn pp_variant_field<'a>(field: &'a Field, recs: &RecPoints) -> RcDoc<'a> {
     match field.ty.as_ref() {
         TypeInner::Null => pp_label(&field.id),
         TypeInner::Record(fs) => pp_label(&field.id).append(pp_record_fields(fs, recs)),
@@ -124,7 +124,7 @@ fn pp_variant_field<'a, 'b>(field: &'a Field, recs: &'b RecPoints) -> RcDoc<'a> 
     }
 }
 
-fn pp_variant_fields<'a, 'b>(fs: &'a [Field], recs: &'b RecPoints) -> RcDoc<'a> {
+fn pp_variant_fields<'a>(fs: &'a [Field], recs: &RecPoints) -> RcDoc<'a> {
     let fields = concat(fs.iter().map(|f| pp_variant_field(f, recs)), ",");
     enclose_space("{", fields, "}")
 }
@@ -184,7 +184,7 @@ fn pp_function<'a>(id: &'a str, func: &'a Function) -> RcDoc<'a> {
             func.args
                 .iter()
                 .enumerate()
-                .map(|(i, ty)| RcDoc::as_string(format!("arg{}: ", i)).append(pp_ty(ty, &empty))),
+                .map(|(i, ty)| RcDoc::as_string(format!("arg{i}: ")).append(pp_ty(ty, &empty))),
         ),
         ",",
     );
@@ -198,7 +198,7 @@ fn pp_function<'a>(id: &'a str, func: &'a Function) -> RcDoc<'a> {
         .append(enclose("(", args, ")"))
         .append(kwd(" ->"))
         .append(enclose("CallResult<", rets, "> "));
-    let args = RcDoc::concat((0..func.args.len()).map(|i| RcDoc::text(format!("arg{},", i))));
+    let args = RcDoc::concat((0..func.args.len()).map(|i| RcDoc::text(format!("arg{i},"))));
     let method = id.escape_debug().to_string();
     let body = str("ic_cdk::call(self.0, \"")
         .append(method)
@@ -347,7 +347,7 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
                     .into_iter()
                     .enumerate()
                     .map(|(i, ty)| {
-                        path.push(TypePath::Func(format!("arg{}", i)));
+                        path.push(TypePath::Func(format!("arg{i}")));
                         let ty = nominalize(env, path, &ty);
                         path.pop();
                         ty
@@ -358,7 +358,7 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
                     .into_iter()
                     .enumerate()
                     .map(|(i, ty)| {
-                        path.push(TypePath::Func(format!("ret{}", i)));
+                        path.push(TypePath::Func(format!("ret{i}")));
                         let ty = nominalize(env, path, &ty);
                         path.pop();
                         ty

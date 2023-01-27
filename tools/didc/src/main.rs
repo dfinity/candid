@@ -184,7 +184,7 @@ fn main() -> Result<()> {
                 "rs" => candid::bindings::rust::compile(&env, &actor),
                 _ => unreachable!(),
             };
-            println!("{}", content);
+            println!("{content}");
         }
         Command::Test { input, target } => {
             let test = std::fs::read_to_string(&input)
@@ -198,7 +198,7 @@ fn main() -> Result<()> {
                 }
                 _ => unreachable!(),
             };
-            println!("{}", content);
+            println!("{content}");
         }
         Command::Hash { input } => {
             println!("{}", candid::idl_hash(&input));
@@ -222,11 +222,11 @@ fn main() -> Result<()> {
                     for ch in bytes.iter() {
                         res.push_str(&candid::parser::pretty::pp_char(*ch));
                     }
-                    format!("blob \"{}\"", res)
+                    format!("blob \"{res}\"")
                 }
                 _ => unreachable!(),
             };
-            println!("{}", hex);
+            println!("{hex}");
         }
         Command::Decode {
             blob,
@@ -259,7 +259,7 @@ fn main() -> Result<()> {
                 let (env, types) = annotate.get_types(Mode::Decode)?;
                 IDLArgs::from_bytes_with_types(&bytes, &env, &types)?
             };
-            println!("{}", value);
+            println!("{value}");
         }
         Command::Random {
             annotate,
@@ -280,7 +280,7 @@ fn main() -> Result<()> {
                 (Some(str), None) => Configs::from_dhall(&str)?,
                 (None, Some(file)) => {
                     let content = std::fs::read_to_string(&file)
-                        .map_err(|_| Error::msg(format!("could not read {}", file)))?;
+                        .map_err(|_| Error::msg(format!("could not read {file}")))?;
                     Configs::from_dhall(&content)?
                 }
                 _ => unreachable!(),
@@ -301,7 +301,7 @@ fn main() -> Result<()> {
             };
             let args = IDLArgs::any(&seed, &config, &env, &types)?;
             match lang.as_str() {
-                "did" => println!("{}", args),
+                "did" => println!("{args}"),
                 "js" => println!(
                     "{}",
                     candid::bindings::javascript::value::pp_args(&args).pretty(80)

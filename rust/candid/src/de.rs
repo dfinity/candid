@@ -62,8 +62,7 @@ impl<'de> IDLDeserialize<'de> {
                 return T::deserialize(&mut self.de);
             } else {
                 return Err(Error::msg(format!(
-                    "No more values on the wire, the expected type {} is not opt or reserved",
-                    expected_type
+                    "No more values on the wire, the expected type {expected_type} is not opt or reserved"
                 )));
             }
         }
@@ -80,10 +79,7 @@ impl<'de> IDLDeserialize<'de> {
         let v = T::deserialize(&mut self.de)
             .with_context(|| self.de.dump_state())
             .with_context(|| {
-                format!(
-                    "Fail to decode argument {} from {} to {}",
-                    ind, ty, expected_type
-                )
+                format!("Fail to decode argument {ind} from {ty} to {expected_type}")
             })?;
         Ok(v)
     }
@@ -177,7 +173,7 @@ impl<'de> Deserializer<'de> {
         let hex = hex::encode(self.input.get_ref());
         let pos = self.input.position() as usize * 2;
         let (before, after) = hex.split_at(pos);
-        let mut res = format!("input: {}_{}\n", before, after);
+        let mut res = format!("input: {before}_{after}\n");
         if !self.table.0.is_empty() {
             write!(&mut res, "table: {}", self.table).unwrap();
         }
@@ -188,7 +184,7 @@ impl<'de> Deserializer<'de> {
         )
         .unwrap();
         if let Some(field) = &self.field_name {
-            write!(&mut res, ", field_name: {:?}", field).unwrap();
+            write!(&mut res, ", field_name: {field:?}").unwrap();
         }
         res
     }
@@ -196,7 +192,7 @@ impl<'de> Deserializer<'de> {
         let pos = self.input.position() as usize;
         let slice = self.input.get_ref();
         if len > slice.len() || pos + len > slice.len() {
-            return Err(Error::msg(format!("Cannot read {} bytes", len)));
+            return Err(Error::msg(format!("Cannot read {len} bytes")));
         }
         let end = pos + len;
         let res = &slice[pos..end];
@@ -263,12 +259,7 @@ impl<'de> Deserializer<'de> {
                 .0
                 .try_into()
                 .map_err(Error::msg)?),
-            t => {
-                return Err(Error::subtype(format!(
-                    "{} cannot be deserialized to int",
-                    t
-                )))
-            }
+            t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
         };
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
         visitor.visit_byte_buf(bytes)
@@ -487,12 +478,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
                 nat.0.try_into().map_err(Error::msg)?
             }
-            t => {
-                return Err(Error::subtype(format!(
-                    "{} cannot be deserialized to int",
-                    t
-                )))
-            }
+            t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
         };
         visitor.visit_i128(value)
     }
@@ -749,8 +735,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let len = w.len();
                 if index >= len {
                     return Err(Error::msg(format!(
-                        "Variant index {} larger than length {}",
-                        index, len
+                        "Variant index {index} larger than length {len}"
                     )));
                 }
                 let wire = w[index].clone();
@@ -890,7 +875,7 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                                         self.de.expect_type.as_ref(),
                                         TypeInner::Opt(_) | TypeInner::Reserved | TypeInner::Null
                                     ),
-                                    format!("field {} is not optional field", field)
+                                    format!("field {field} is not optional field")
                                 );
                                 self.de.wire_type = TypeInner::Reserved.into();
                             }
@@ -969,7 +954,7 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
                         TypeInner::Record(_) => "struct",
                         _ => "newtype",
                     };
-                    write!(&mut label, ",{},{}", label_type, accessor).map_err(Error::msg)?;
+                    write!(&mut label, ",{label_type},{accessor}").map_err(Error::msg)?;
                 }
                 self.de.set_field_name(Label::Named(label).into());
                 let field = seed.deserialize(&mut *self.de)?;

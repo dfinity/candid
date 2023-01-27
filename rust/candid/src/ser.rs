@@ -373,14 +373,14 @@ impl TypeSerialize {
                 let idx = self
                     .type_map
                     .get(&ty)
-                    .ok_or_else(|| Error::msg(format!("knot type {} not found", ty)))?;
+                    .ok_or_else(|| Error::msg(format!("knot type {ty} not found")))?;
                 sleb128_encode(buf, i64::from(*idx))
             }
             TypeInner::Var(_) => {
                 let idx = self
                     .type_map
                     .get(t)
-                    .ok_or_else(|| Error::msg(format!("var type {} not found", t)))?;
+                    .ok_or_else(|| Error::msg(format!("var type {t} not found")))?;
                 sleb128_encode(buf, i64::from(*idx))
             }
             TypeInner::Future => unreachable!(),
@@ -388,7 +388,7 @@ impl TypeSerialize {
                 let idx = self
                     .type_map
                     .get(t)
-                    .ok_or_else(|| Error::msg(format!("type {} not found", t)))?;
+                    .ok_or_else(|| Error::msg(format!("type {t} not found")))?;
                 sleb128_encode(buf, i64::from(*idx))
             }
         }?;

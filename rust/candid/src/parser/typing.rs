@@ -38,7 +38,7 @@ impl TypeEnv {
             .0
             .keys()
             .filter(|k| self.0.contains_key(*k))
-            .map(|k| (k.clone(), format!("{}/1", k)))
+            .map(|k| (k.clone(), format!("{k}/1")))
             .collect();
         for (k, t) in env.0.into_iter() {
             let t = t.subst(&tau);
@@ -52,7 +52,7 @@ impl TypeEnv {
     }
     pub fn find_type(&self, name: &str) -> Result<&Type> {
         match self.0.get(name) {
-            None => Err(Error::msg(format!("Unbound type identifier {}", name))),
+            None => Err(Error::msg(format!("Unbound type identifier {name}"))),
             Some(t) => Ok(t),
         }
     }
@@ -76,7 +76,7 @@ impl TypeEnv {
         match t.as_ref() {
             TypeInner::Func(f) => Ok(f),
             TypeInner::Var(id) => self.as_func(self.find_type(id)?),
-            _ => Err(Error::msg(format!("not a function type: {}", t))),
+            _ => Err(Error::msg(format!("not a function type: {t}"))),
         }
     }
     pub fn as_service<'a>(&'a self, t: &'a Type) -> Result<&'a [(String, Type)]> {
@@ -84,7 +84,7 @@ impl TypeEnv {
             TypeInner::Service(s) => Ok(s),
             TypeInner::Var(id) => self.as_service(self.find_type(id)?),
             TypeInner::Class(_, ty) => self.as_service(ty),
-            _ => Err(Error::msg(format!("not a service type: {}", t))),
+            _ => Err(Error::msg(format!("not a service type: {t}"))),
         }
     }
     pub fn get_method<'a>(&'a self, t: &'a Type, id: &'a str) -> Result<&'a Function> {
@@ -93,7 +93,7 @@ impl TypeEnv {
                 return self.as_func(ty);
             }
         }
-        Err(Error::msg(format!("cannot find method {}", id)))
+        Err(Error::msg(format!("cannot find method {id}")))
     }
     fn go<'a>(
         &'a self,
@@ -146,7 +146,7 @@ impl TypeEnv {
 impl std::fmt::Display for TypeEnv {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (k, v) in self.0.iter() {
-            writeln!(f, "type {} = {}", k, v)?;
+            writeln!(f, "type {k} = {v}")?;
         }
         Ok(())
     }
@@ -241,8 +241,7 @@ where
         if let Some(prev) = prev {
             if lab == prev {
                 return Err(Error::msg(format!(
-                    "label '{}' hash collision with '{}'",
-                    lab, prev,
+                    "label '{lab}' hash collision with '{prev}'"
                 )));
             }
         }
@@ -312,7 +311,7 @@ fn check_cycle(env: &TypeEnv) -> Result<()> {
     for (id, ty) in env.0.iter() {
         let mut seen = BTreeSet::new();
         if has_cycle(&mut seen, env, ty)? {
-            return Err(Error::msg(format!("{} has cyclic type definition", id)));
+            return Err(Error::msg(format!("{id} has cyclic type definition")));
         }
     }
     Ok(())
@@ -323,7 +322,7 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
         if let Dec::TypD(Binding { id, typ: _ }) = dec {
             let duplicate = env.te.0.insert(id.to_string(), TypeInner::Unknown.into());
             if duplicate.is_some() {
-                return Err(Error::msg(format!("duplicate binding for {}", id)));
+                return Err(Error::msg(format!("duplicate binding for {id}")));
             }
         }
     }
@@ -377,7 +376,7 @@ fn load_imports(
             let path = resolve_path(base, file);
             if visited.insert(path.clone()) {
                 let code = std::fs::read_to_string(&path)
-                    .map_err(|_| Error::msg(format!("Cannot import {:?}", file)))?;
+                    .map_err(|_| Error::msg(format!("Cannot import {file:?}")))?;
                 let code = if is_pretty {
                     pretty_parse::<IDLProg>(path.to_str().unwrap(), &code)?
                 } else {
@@ -411,7 +410,7 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
             .to_path_buf()
     };
     let prog =
-        std::fs::read_to_string(file).map_err(|_| Error::msg(format!("Cannot open {:?}", file)))?;
+        std::fs::read_to_string(file).map_err(|_| Error::msg(format!("Cannot open {file:?}")))?;
     let prog = if is_pretty {
         pretty_parse::<IDLProg>(file.to_str().unwrap(), &prog)?
     } else {

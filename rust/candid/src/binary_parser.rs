@@ -2,19 +2,19 @@ use crate::parser::types::FuncMode;
 use crate::parser::typing::TypeEnv;
 use crate::types::internal::{Field, Function, Label, Type, TypeInner};
 use anyhow::{anyhow, Context, Result};
-use binread::io::{Read, Seek, SeekFrom};
+use binread::io::{Read, Seek};
 use binread::{BinRead, BinResult, Error as BError, ReadOptions};
 use std::convert::TryInto;
 
 fn read_leb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, _: ()) -> BinResult<u64> {
-    let pos = reader.seek(SeekFrom::Current(0))?;
+    let pos = reader.stream_position()?;
     leb128::read::unsigned(reader).map_err(|_| BError::Custom {
         pos,
         err: Box::new(ro.variable_name.unwrap_or("Invalid leb128")),
     })
 }
 fn read_sleb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, _: ()) -> BinResult<i64> {
-    let pos = reader.seek(SeekFrom::Current(0))?;
+    let pos = reader.stream_position()?;
     leb128::read::signed(reader).map_err(|_| BError::Custom {
         pos,
         err: Box::new(ro.variable_name.unwrap_or("Invalid sleb128")),
@@ -137,7 +137,7 @@ pub struct PrincipalBytes {
 }
 
 fn index_to_var(ind: i64) -> String {
-    format!("table{}", ind)
+    format!("table{ind}")
 }
 impl IndexType {
     fn to_type(&self, len: u64) -> Result<Type> {
@@ -239,7 +239,7 @@ impl Table {
         for (i, t) in self.table.iter().enumerate() {
             let ty = t
                 .to_type(len)
-                .with_context(|| format!("Invalid table entry {}: {:?}", i, t))?;
+                .with_context(|| format!("Invalid table entry {i}: {t:?}"))?;
             env.insert(index_to_var(i as i64), ty);
         }
         // validate method has func type
@@ -251,7 +251,7 @@ impl Table {
                             continue;
                         }
                     }
-                    return Err(anyhow!("Method {} has a non-function type {}", name, ty));
+                    return Err(anyhow!("Method {name} has a non-function type {ty}"));
                 }
             }
         }
@@ -267,7 +267,7 @@ impl Header {
         for (i, t) in self.args.iter().enumerate() {
             args.push(
                 t.to_type(len)
-                    .with_context(|| format!("Invalid argument entry {}: {:?}", i, t))?,
+                    .with_context(|| format!("Invalid argument entry {i}: {t:?}"))?,
             );
         }
         Ok((env, args))

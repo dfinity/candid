@@ -43,15 +43,15 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
         }
         (_, Opt(_)) => {
             #[cfg(not(feature = "mute_warnings"))]
-            eprintln!("FIX ME! {} <: {} via special opt rule.\nThis means the sender and receiver type has diverged, and can cause data loss.", t1, t2);
+            eprintln!("FIX ME! {t1} <: {t2} via special opt rule.\nThis means the sender and receiver type has diverged, and can cause data loss.");
             Ok(())
         }
         (Record(fs1), Record(fs2)) => {
             let fields: HashMap<_, _> = fs1.iter().map(|Field { id, ty }| (id, ty)).collect();
             for Field { id, ty: ty2 } in fs2.iter() {
                 match fields.get(id) {
-                    Some(ty1) => subtype(gamma, env, ty1, ty2).with_context(|| format!("Record field {}: {} is not a subtype of {}", id, ty1, ty2))?,
-                    None => subtype(gamma, env, &Opt(Empty.into()).into(), ty2).map_err(|_| anyhow::anyhow!("Record field {}: {} is only in the expected type and is not of opt or reserved type", id, ty2))?,
+                    Some(ty1) => subtype(gamma, env, ty1, ty2).with_context(|| format!("Record field {id}: {ty1} is not a subtype of {ty2}"))?,
+                    None => subtype(gamma, env, &Opt(Empty.into()).into(), ty2).map_err(|_| anyhow::anyhow!("Record field {id}: {ty2} is only in the expected type and is not of opt or reserved type"))?,
                 }
             }
             Ok(())
@@ -61,12 +61,11 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
             for Field { id, ty: ty1 } in fs1.iter() {
                 match fields.get(id) {
                     Some(ty2) => subtype(gamma, env, ty1, ty2).with_context(|| {
-                        format!("Variant field {}: {} is not a subtype of {}", id, ty1, ty2)
+                        format!("Variant field {id}: {ty1} is not a subtype of {ty2}")
                     })?,
                     None => {
                         return Err(Error::msg(format!(
-                            "Variant field {} not found in the expected type",
-                            id
+                            "Variant field {id} not found in the expected type"
                         )))
                     }
                 }
@@ -78,12 +77,11 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
             for (name, ty2) in ms2.iter() {
                 match meths.get(name) {
                     Some(ty1) => subtype(gamma, env, ty1, ty2).with_context(|| {
-                        format!("Method {}: {} is not a subtype of {}", name, ty1, ty2)
+                        format!("Method {name}: {ty1} is not a subtype of {ty2}")
                     })?,
                     None => {
                         return Err(Error::msg(format!(
-                            "Method {} is only in the expected type",
-                            name
+                            "Method {name} is only in the expected type"
                         )))
                     }
                 }
@@ -109,7 +107,7 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
         (_, Class(_, t)) => subtype(gamma, env, t1, t),
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
-        (_, _) => Err(Error::msg(format!("{} is not a subtype of {}", t1, t2))),
+        (_, _) => Err(Error::msg(format!("{t1} is not a subtype of {t2}"))),
     }
 }
 

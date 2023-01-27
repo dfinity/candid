@@ -321,10 +321,10 @@ pub mod value {
             Bool(_) => RcDoc::as_string(v),
             Null => RcDoc::text("null"),
             Reserved => RcDoc::text("null"),
-            Principal(id) => RcDoc::text(format!("Principal.fromText('{}')", id)),
-            Service(id) => RcDoc::text(format!("Principal.fromText('{}')", id)),
+            Principal(id) => RcDoc::text(format!("Principal.fromText('{id}')")),
+            Service(id) => RcDoc::text(format!("Principal.fromText('{id}')")),
             Func(id, meth) => {
-                let id = RcDoc::text(format!("Principal.fromText('{}')", id));
+                let id = RcDoc::text(format!("Principal.fromText('{id}')"));
                 let meth = RcDoc::text(meth);
                 RcDoc::text("[")
                     .append(id)

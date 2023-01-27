@@ -26,7 +26,7 @@ impl TypeId {
 impl std::fmt::Display for TypeId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = NAME.with(|n| n.borrow_mut().get(self));
-        write!(f, "{}", name)
+        write!(f, "{name}")
     }
 }
 pub fn type_of<T>(_: &T) -> TypeId {
@@ -61,7 +61,7 @@ impl TypeName {
                     }
                     Some(v) => {
                         *v += 1;
-                        format!("{}_{}", name, v)
+                        format!("{name}_{v}")
                     }
                 };
                 self.type_name.insert(id.clone(), res.clone());
@@ -318,7 +318,7 @@ impl std::fmt::Display for Label {
             Label::Id(n) | Label::Unnamed(n) => {
                 write!(f, "{}", super::number::pp_num_str(&n.to_string()))
             }
-            Label::Named(id) => write!(f, "{}", id),
+            Label::Named(id) => write!(f, "{id}"),
         }
     }
 }
