@@ -1,6 +1,7 @@
-use super::value::{IDLField, IDLValue, IDLArgs, VariantValue};
-use super::typing::{check_unique, TypeEnv};
-use super::types::{IDLType, PrimType, TypeField, FuncType, FuncMode, Binding, Dec, IDLProg, IDLTypes};
+use crate::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
+use crate::types::{TypeEnv, FuncMode};
+use super::typing::check_unique;
+use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes};
 use super::test::{Assert, Input, Test};
 use super::token::{Token, error2, LexicalError, Span};
 use crate::{Principal, types::Label};

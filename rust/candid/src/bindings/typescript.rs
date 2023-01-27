@@ -1,7 +1,6 @@
 use super::javascript::{ident, is_tuple};
-use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, Type, TypeInner};
+use crate::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 use std::rc::Rc;
 

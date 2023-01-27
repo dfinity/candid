@@ -329,9 +329,10 @@ pub mod pretty;
 #[cfg(feature = "parser")]
 pub mod parser;
 #[cfg(feature = "parser")]
-pub use parser::types::IDLProg;
-#[cfg(feature = "parser")]
-pub use parser::typing::{check_file, check_prog, pretty_check_file};
+pub use parser::{
+    types::IDLProg,
+    typing::{check_file, check_prog, pretty_check_file},
+};
 
 pub mod bindings;
 

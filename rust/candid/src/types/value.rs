@@ -241,7 +241,7 @@ impl IDLValue {
             (IDLValue::Func(_, _), TypeInner::Func(_)) => self.clone(),
             #[cfg(feature = "parser")]
             (IDLValue::Number(str), _) if from_parser => {
-                use super::token::error;
+                use crate::parser::token::error;
                 match t.as_ref() {
                     TypeInner::Int => IDLValue::Int(str.parse::<Int>()?),
                     TypeInner::Nat => IDLValue::Nat(str.parse::<Nat>()?),
