@@ -589,7 +589,6 @@ mod tests {
             inner: Nat::from(1000u64),
         };
         let serialized = bincode::serialize(&test_struct).unwrap();
-        println!("{:?}", serialized);
         // panicked at 'called `Result::unwrap()` on an `Err` value: DeserializeAnyNotSupported'
         let deserialized = bincode::deserialize(&serialized).unwrap();
         assert_eq!(test_struct, deserialized);
@@ -601,7 +600,6 @@ mod tests {
             inner: Nat::from(1000u64),
         };
         let serialized = serde_json::to_string(&test_struct).unwrap();
-        println!("{:?}", serialized);
         let deserialized = serde_json::from_str(&serialized).unwrap();
         assert_eq!(test_struct, deserialized);
 
@@ -612,10 +610,7 @@ mod tests {
             inner: Nat::parse(b"60000000000000000").unwrap(),
         };
         let serialized = serde_json::to_string(&test_struct).unwrap();
-        assert_eq!(
-            format!("{}", serialized),
-            "{\"inner\":[2659581952,13969838]}"
-        );
+        assert_eq!(serialized, "{\"inner\":[2659581952,13969838]}");
         let deserialized = serde_json::from_str(&serialized).unwrap();
         assert_eq!(test_struct, deserialized);
     }
@@ -626,7 +621,6 @@ mod tests {
             inner: Nat::from(1000u64),
         };
         let serialized = serde_cbor::to_vec(&test_struct).unwrap();
-        println!("serialized {:?}", serialized);
         let deserialized = serde_cbor::from_slice(&serialized).unwrap();
         assert_eq!(test_struct, deserialized);
 
@@ -634,7 +628,6 @@ mod tests {
             inner: Nat::parse(b"60000000000000000").unwrap(),
         };
         let serialized = serde_cbor::to_vec(&test_struct).unwrap();
-        println!("serialized {:?}", serialized);
         let deserialized = serde_cbor::from_slice(&serialized).unwrap();
         assert_eq!(test_struct, deserialized);
     }
