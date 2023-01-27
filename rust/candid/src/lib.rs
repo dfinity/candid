@@ -132,7 +132,7 @@
 //! The use of Rust value and `IDLValue` can be intermixed.
 //!
 //! ```
-//! use candid::parser::value::IDLValue;
+//! use candid::types::value::IDLValue;
 //! // Serialize Rust value Some(42u8) and IDLValue "hello"
 //! let bytes = candid::ser::IDLBuilder::new()
 //!     .arg(&Some(42u8))?
@@ -155,7 +155,7 @@
 //! and use `to_bytes()` and `from_bytes()` to encode and decode Candid messages.
 //! We also provide a parser to parse Candid values in text format.
 //!
-//! ```
+//! ```#[cfg(feature = "parser")]
 //! use candid::{IDLArgs, TypeEnv};
 //! // Candid values represented in text format
 //! let text_value = r#"
@@ -185,7 +185,7 @@
 //! ## Operating on Candid AST
 //! We provide a parser and type checker for Candid files specifying the service interface.
 //!
-//! ```
+//! ```#[cfg(feature = "parser")]
 //! use candid::{IDLProg, TypeEnv, check_prog, types::{Type, TypeInner}};
 //! let did_file = r#"
 //!     type List = opt record { head: int; tail: List };
@@ -221,8 +221,8 @@
 //! This is useful when serializing different number types and recursive types.
 //! There is no need to use types for deserialization as the types are available in the Candid message.
 //!
-//! ```
-//! use candid::{IDLArgs, parser::value::IDLValue};
+//! ```#[cfg(feature = "parser")]
+//! use candid::{IDLArgs, types::value::IDLValue};
 //! # use candid::{IDLProg, TypeEnv, check_prog};
 //! # let did_file = r#"
 //! #    type List = opt record { head: int; tail: List };

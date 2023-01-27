@@ -109,8 +109,8 @@ pub(crate) fn export_service() -> TokenStream {
                 .map(|t| generate_arg(quote! { rets }, t))
                 .collect::<Vec<_>>();
             let modes = match modes.as_ref() {
-                "query" => quote! { vec![#candid::parser::types::FuncMode::Query] },
-                "oneway" => quote! { vec![#candid::parser::types::FuncMode::Oneway] },
+                "query" => quote! { vec![#candid::types::FuncMode::Query] },
+                "oneway" => quote! { vec![#candid::types::FuncMode::Oneway] },
                 "update" => quote! { vec![] },
                 _ => unreachable!(),
             };

@@ -1,9 +1,6 @@
-use candid::parser::{
-    types::IDLProg,
-    typing::{check_prog, TypeEnv},
-    value::{IDLArgs, IDLField, IDLValue, VariantValue},
-};
-use candid::types::Label;
+use candid::parser::{types::IDLProg, typing::check_prog};
+use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
+use candid::types::{Label, TypeEnv};
 use candid::{decode_args, decode_one, Decode};
 
 #[test]

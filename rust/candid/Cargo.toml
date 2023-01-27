@@ -63,6 +63,20 @@ name = "benchmark"
 harness = false
 path = "benches/benchmark.rs"
 
+[[test]]
+name = "test_suite"
+required-features = ["parser"]
+[[test]]
+name = "value"
+required-features = ["parser"]
+[[test]]
+name = "parse_value"
+required-features = ["parser"]
+[[test]]
+name = "parse_type"
+required-features = ["parser"]
+
+
 [features]
 configs = ["serde_dhall"]
 random = ["configs", "arbitrary", "fake", "rand"]
