@@ -584,6 +584,7 @@ mod tests {
     #[ignore]
     #[test]
     fn test_serde_with_bincode() {
+        // This ignored/failed test shows that bincode isn't supported.
         let test_struct = TestStruct {
             inner: Nat::from(1000u64),
         };
@@ -604,6 +605,9 @@ mod tests {
         let deserialized = serde_json::from_str(&serialized).unwrap();
         assert_eq!(test_struct, deserialized);
 
+        // Nats serialize as arrays in JSON. The following tests the breakdown
+        // of a big number into an array.
+        // 13969838 * 2^32 + 2659581952 == 60000000000000000
         let test_struct = TestStruct {
             inner: Nat::parse(b"60000000000000000").unwrap(),
         };
