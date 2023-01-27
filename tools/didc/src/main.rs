@@ -219,7 +219,7 @@ fn main() -> Result<()> {
                 "blob" => {
                     let mut res = String::new();
                     for ch in bytes.iter() {
-                        res.push_str(&candid::parser::pretty::pp_char(*ch));
+                        res.push_str(&candid::bindings::candid::value::pp_char(*ch));
                     }
                     format!("blob \"{res}\"")
                 }
@@ -235,7 +235,7 @@ fn main() -> Result<()> {
             let bytes = match format.as_str() {
                 "hex" => hex::decode(&blob)?,
                 "blob" => {
-                    use candid::parser::value::IDLValue;
+                    use candid::types::value::IDLValue;
                     match pretty_parse::<IDLValue>("blob", &blob)? {
                         IDLValue::Vec(vec) => vec
                             .iter()
