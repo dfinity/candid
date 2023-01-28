@@ -3,7 +3,7 @@ use crate::pretty::*;
 use crate::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
-use std::rc::Rc;
+use std::sync::Arc;
 
 type RecPoints<'a> = BTreeSet<&'a str>;
 // The definition of tuple is language specific.
@@ -92,7 +92,7 @@ fn pp_ty<'a>(ty: &'a Type, recs: &RecPoints) -> RcDoc<'a> {
     }
 }
 
-fn pp_label(id: &Rc<Label>) -> RcDoc {
+fn pp_label(id: &Arc<Label>) -> RcDoc {
     match &**id {
         Label::Named(str) => field_name(str),
         Label::Id(n) | Label::Unnamed(n) => str("_").append(RcDoc::as_string(n)).append("_"),

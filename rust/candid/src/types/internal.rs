@@ -4,7 +4,7 @@ use num_enum::TryFromPrimitive;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::Arc;
 
 // This is a re-implementation of std::any::TypeId to get rid of 'static constraint.
 // The current TypeId doesn't consider lifetime while computing the hash, which is
@@ -166,7 +166,7 @@ impl TypeContainer {
     }
 }
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
-pub struct Type(pub Rc<TypeInner>);
+pub struct Type(pub Arc<TypeInner>);
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub enum TypeInner {
     Null,
@@ -214,7 +214,7 @@ impl AsRef<TypeInner> for Type {
 }
 impl From<TypeInner> for Type {
     fn from(t: TypeInner) -> Self {
-        Type(Rc::new(t))
+        Type(Arc::new(t))
     }
 }
 impl TypeInner {
@@ -337,7 +337,7 @@ impl std::hash::Hash for Label {
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Field {
-    pub id: Rc<Label>,
+    pub id: Arc<Label>,
     pub ty: Type,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -3,7 +3,7 @@ use crate::pretty::*;
 use crate::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
-use std::rc::Rc;
+use std::sync::Arc;
 
 // The definition of tuple is language specific.
 pub(crate) fn is_tuple(t: &Type) -> bool {
@@ -136,7 +136,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
     }
 }
 
-fn pp_label(id: &Rc<Label>) -> RcDoc {
+fn pp_label(id: &Arc<Label>) -> RcDoc {
     match &**id {
         Label::Named(str) => quote_ident(str),
         Label::Id(n) | Label::Unnamed(n) => str("_")

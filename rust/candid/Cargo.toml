@@ -1,6 +1,6 @@
 [package]
 name = "candid"
-version = "0.9.0-beta.0"
+version = "0.9.0-beta.1"
 edition = "2018"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
@@ -83,8 +83,8 @@ required-features = ["parser"]
 
 
 [features]
-configs = ["serde_dhall"]
-random = ["configs", "arbitrary", "fake", "rand"]
 parser = ["lalrpop", "lalrpop-util", "logos"]
-all = ["parser", "random"]
+configs = ["serde_dhall"]
+random = ["parser", "configs", "arbitrary", "fake", "rand"]
+all = ["random"]
 mute_warnings = []

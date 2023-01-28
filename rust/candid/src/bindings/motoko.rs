@@ -6,7 +6,7 @@ use crate::pretty::*;
 use crate::types::FuncMode;
 use crate::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
-use std::rc::Rc;
+use std::sync::Arc;
 
 // The definition of tuple is language specific.
 fn is_tuple(t: &Type) -> bool {
@@ -139,7 +139,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
     }
 }
 
-fn pp_label(id: &Rc<Label>) -> RcDoc {
+fn pp_label(id: &Arc<Label>) -> RcDoc {
     match &**id {
         Label::Named(str) => escape(str, false),
         Label::Id(n) | Label::Unnamed(n) => str("_")

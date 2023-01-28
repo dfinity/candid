@@ -1,7 +1,7 @@
 use crate::pretty::*;
 use crate::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
-use std::rc::Rc;
+use std::sync::Arc;
 
 static KEYWORDS: [&str; 29] = [
     "import",
@@ -100,7 +100,7 @@ pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
         Opt(ref t) => kwd("opt").append(pp_ty(t)),
         Vec(ref t) => kwd("vec").append(pp_ty(t)),
         Record(ref fs) => {
-            let t = Type(Rc::new(ty.clone()));
+            let t = Type(Arc::new(ty.clone()));
             if t.is_tuple() {
                 let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ";");
                 kwd("record").append(enclose_space("{", tuple, "}"))
@@ -125,7 +125,7 @@ pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
     }
 }
 
-pub fn pp_label(id: &Rc<Label>) -> RcDoc {
+pub fn pp_label(id: &Arc<Label>) -> RcDoc {
     match &**id {
         Label::Named(id) => pp_text(id),
         Label::Id(_) | Label::Unnamed(_) => RcDoc::as_string(id),
