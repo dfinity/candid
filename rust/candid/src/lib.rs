@@ -302,7 +302,7 @@ pub use candid_derive::{candid_method, export_service, CandidType};
 pub use serde::Deserialize;
 
 pub mod error;
-pub use error::{pretty_parse, pretty_read, Error, Result};
+pub use error::{Error, Result};
 
 pub mod types;
 pub use types::CandidType;
@@ -328,6 +328,8 @@ pub mod pretty;
 
 #[cfg(feature = "parser")]
 pub mod parser;
+#[cfg(feature = "parser")]
+pub use error::{pretty_parse, pretty_read};
 #[cfg(feature = "parser")]
 pub use parser::{
     types::IDLProg,

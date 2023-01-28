@@ -1,14 +1,18 @@
 //! `candid::Result<T> = Result<T, candid::Error>>`
 
-#[cfg(feature = "parser")]
-use crate::parser::token;
+use codespan_reporting::diagnostic::Label;
 use serde::{de, ser};
-
-use codespan_reporting::diagnostic::{Diagnostic, Label};
-use codespan_reporting::files::{Error as ReportError, SimpleFile};
-use codespan_reporting::term::{self, termcolor::StandardStream};
 use std::io;
 use thiserror::Error;
+
+#[cfg(feature = "parser")]
+use crate::parser::token;
+#[cfg(feature = "parser")]
+use codespan_reporting::{
+    diagnostic::Diagnostic,
+    files::{Error as ReportError, SimpleFile},
+    term::{self, termcolor::StandardStream},
+};
 
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
@@ -35,9 +39,9 @@ impl Error {
     pub fn subtype<T: ToString>(msg: T) -> Self {
         Error::Subtype(msg.to_string())
     }
+    #[cfg(feature = "parser")]
     pub fn report(&self) -> Diagnostic<()> {
         match self {
-            #[cfg(feature = "parser")]
             Error::Parse(e) => {
                 use lalrpop_util::ParseError::*;
                 let mut diag = Diagnostic::error().with_message("parser error");
@@ -162,6 +166,7 @@ impl From<binread::Error> for Error {
         Error::Binread(get_binread_labels(&e))
     }
 }
+#[cfg(feature = "parser")]
 impl From<ReportError> for Error {
     fn from(e: ReportError) -> Error {
         Error::msg(e)
@@ -182,6 +187,7 @@ impl From<serde_dhall::Error> for Error {
     }
 }
 
+#[cfg(feature = "parser")]
 pub fn pretty_parse<T>(name: &str, str: &str) -> Result<T>
 where
     T: std::str::FromStr<Err = Error>,
@@ -195,6 +201,7 @@ where
     })
 }
 
+#[cfg(feature = "parser")]
 pub fn pretty_read<T>(reader: &mut std::io::Cursor<&[u8]>) -> Result<T>
 where
     T: binread::BinRead,

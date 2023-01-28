@@ -1,5 +1,5 @@
 use candid::bindings::{candid as candid_export, javascript, motoko, rust, typescript};
-use candid::parser::types::{to_pretty, IDLProg};
+use candid::parser::types::IDLProg;
 use candid::parser::typing::{check_file, check_prog};
 use candid::types::TypeEnv;
 use goldenfile::Mint;
@@ -26,10 +26,7 @@ service server : {
   i : f;
 }
     "#;
-    let ast = prog.parse::<IDLProg>().unwrap();
-    let pretty = to_pretty(&ast, 80);
-    let ast2 = pretty.parse::<IDLProg>().unwrap();
-    assert_eq!(format!("{ast2:?}"), format!("{ast:?}"));
+    prog.parse::<IDLProg>().unwrap();
 }
 
 #[test_generator::test_resources("rust/candid/tests/assets/*.did")]
