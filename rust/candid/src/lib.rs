@@ -132,7 +132,7 @@
 //! The use of Rust value and `IDLValue` can be intermixed.
 //!
 //! ```
-//! use candid::parser::value::IDLValue;
+//! use candid::types::value::IDLValue;
 //! // Serialize Rust value Some(42u8) and IDLValue "hello"
 //! let bytes = candid::ser::IDLBuilder::new()
 //!     .arg(&Some(42u8))?
@@ -155,7 +155,7 @@
 //! and use `to_bytes()` and `from_bytes()` to encode and decode Candid messages.
 //! We also provide a parser to parse Candid values in text format.
 //!
-//! ```
+//! ```#[cfg(feature = "parser")]
 //! use candid::{IDLArgs, TypeEnv};
 //! // Candid values represented in text format
 //! let text_value = r#"
@@ -185,7 +185,7 @@
 //! ## Operating on Candid AST
 //! We provide a parser and type checker for Candid files specifying the service interface.
 //!
-//! ```
+//! ```#[cfg(feature = "parser")]
 //! use candid::{IDLProg, TypeEnv, check_prog, types::{Type, TypeInner}};
 //! let did_file = r#"
 //!     type List = opt record { head: int; tail: List };
@@ -221,8 +221,8 @@
 //! This is useful when serializing different number types and recursive types.
 //! There is no need to use types for deserialization as the types are available in the Candid message.
 //!
-//! ```
-//! use candid::{IDLArgs, parser::value::IDLValue};
+//! ```#[cfg(feature = "parser")]
+//! use candid::{IDLArgs, types::value::IDLValue};
 //! # use candid::{IDLProg, TypeEnv, check_prog};
 //! # let did_file = r#"
 //! #    type List = opt record { head: int; tail: List };
@@ -261,7 +261,7 @@
 //!
 //! [dependencies]
 //! wasm-bindgen = "0.2"
-//! candid = "0.7.0"
+//! candid = "0.9.0"
 //!
 //! [profile.release]
 //! lto = true
@@ -296,44 +296,45 @@
 //!
 //!
 
-#![allow(clippy::upper_case_acronyms)]
-
 pub use candid_derive::{candid_method, export_service, CandidType};
 pub use serde::Deserialize;
 
-//pub mod codegen;
-//pub use codegen::generate_code;
-
-pub mod bindings;
-
 pub mod error;
-pub use error::{pretty_parse, pretty_read, Error, Result};
+pub use error::{Error, Result};
 
 pub mod types;
 pub use types::CandidType;
 pub use types::{
+    arc,
     number::{Int, Nat},
     principal::Principal,
+    rc,
     reference::{Func, Service},
     reserved::{Empty, Reserved},
+    value::{IDLArgs, IDLValue},
+    TypeEnv,
 };
-
-pub mod parser;
-pub use parser::types::IDLProg;
-pub use parser::typing::{check_file, check_prog, pretty_check_file, TypeEnv};
-pub use parser::value::IDLArgs;
 
 #[allow(dead_code)]
 pub mod binary_parser;
 pub mod de;
 pub mod ser;
 
-pub mod arc;
-pub mod rc;
-
 pub mod utils;
 pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
 pub mod pretty;
+
+#[cfg(feature = "parser")]
+pub mod parser;
+#[cfg(feature = "parser")]
+pub use error::{pretty_parse, pretty_read};
+#[cfg(feature = "parser")]
+pub use parser::{
+    types::IDLProg,
+    typing::{check_file, check_prog, pretty_check_file},
+};
+
+pub mod bindings;
 
 // Candid hash function comes from
 // https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf

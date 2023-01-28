@@ -9,13 +9,19 @@ use serde::ser::Error;
 mod impls;
 pub mod internal;
 pub mod subtype;
+pub mod type_env;
+pub mod value;
 
-pub use self::internal::{get_type, Field, Function, Label, Type, TypeId, TypeInner};
+pub use self::internal::{get_type, Field, FuncMode, Function, Label, Type, TypeId, TypeInner};
+pub use type_env::TypeEnv;
 
 pub mod number;
 pub mod principal;
 pub mod reference;
 pub mod reserved;
+
+pub mod arc;
+pub mod rc;
 
 pub trait CandidType {
     // memoized type derivation

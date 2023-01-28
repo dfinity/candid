@@ -1,7 +1,6 @@
 use super::configs::{path_name, Configs};
-use super::typing::TypeEnv;
-use super::value::{IDLArgs, IDLField, IDLValue, VariantValue};
-use crate::types::{Field, Type, TypeInner};
+use crate::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
+use crate::types::{Field, Type, TypeEnv, TypeInner};
 use crate::Deserialize;
 use crate::{Error, Result};
 use arbitrary::{unstructured::Int, Arbitrary, Unstructured};

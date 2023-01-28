@@ -1,7 +1,6 @@
 use super::analysis::{chase_actor, chase_types, infer_rec};
-use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, Type, TypeInner};
+use crate::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
 use std::rc::Rc;
@@ -172,7 +171,7 @@ fn pp_args(args: &[Type]) -> RcDoc {
     enclose("[", doc, "]")
 }
 
-fn pp_modes(modes: &[crate::parser::types::FuncMode]) -> RcDoc {
+fn pp_modes(modes: &[crate::types::FuncMode]) -> RcDoc {
     let doc = concat(
         modes
             .iter()
@@ -269,9 +268,9 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 }
 
 pub mod value {
-    use crate::parser::pretty::number_to_string;
-    use crate::parser::value::{IDLArgs, IDLField, IDLValue};
+    use super::super::candid::value::number_to_string;
     use crate::pretty::*;
+    use crate::types::value::{IDLArgs, IDLField, IDLValue};
     use crate::types::Label;
     use pretty::RcDoc;
 

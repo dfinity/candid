@@ -1,9 +1,9 @@
 //! Serialize a Rust data structure to Candid binary format
 
 use super::error::{Error, Result};
-use super::parser::{typing::TypeEnv, value::IDLValue};
 use super::types;
-use super::types::{internal::Opcode, Field, Type, TypeInner};
+use super::types::value::IDLValue;
+use super::types::{internal::Opcode, Field, Type, TypeEnv, TypeInner};
 use byteorder::{LittleEndian, WriteBytesExt};
 use leb128::write::{signed as sleb128_encode, unsigned as leb128_encode};
 use std::collections::HashMap;
@@ -323,7 +323,7 @@ impl TypeSerialize {
                 }
                 leb128_encode(&mut buf, func.modes.len() as u64)?;
                 for m in func.modes.iter() {
-                    use crate::parser::types::FuncMode;
+                    use crate::types::FuncMode;
                     let m = match m {
                         FuncMode::Query => 1,
                         FuncMode::Oneway => 2,

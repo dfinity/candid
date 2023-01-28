@@ -91,7 +91,6 @@ enum Comment {
     Start,
 }
 
-#[allow(clippy::enum_variant_names)]
 #[derive(Logos, Debug, Clone, PartialEq, Eq)]
 enum Text {
     #[error]

@@ -2,10 +2,9 @@
 // https://github.com/dfinity/motoko/blob/master/design/IDL-Motoko.md
 
 use super::candid::is_valid_as_id;
-use crate::parser::types::FuncMode;
-use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, Type, TypeInner};
+use crate::types::FuncMode;
+use crate::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 use std::rc::Rc;
 

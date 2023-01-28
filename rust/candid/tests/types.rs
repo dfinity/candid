@@ -4,8 +4,8 @@ use std::fmt::Debug;
 
 use candid::{
     candid_method,
-    parser::value::{IDLValue, IDLValueVisitor},
     ser::IDLBuilder,
+    types::value::{IDLValue, IDLValueVisitor},
     types::{get_type, Label, Serializer, Type, TypeInner},
     CandidType, Decode, Deserialize, Encode, Int,
 };

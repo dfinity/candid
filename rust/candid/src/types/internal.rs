@@ -340,10 +340,30 @@ pub struct Field {
     pub id: Rc<Label>,
     pub ty: Type,
 }
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum FuncMode {
+    Oneway,
+    Query,
+}
+impl FuncMode {
+    pub(crate) fn to_doc(&self) -> pretty::RcDoc {
+        match self {
+            FuncMode::Oneway => pretty::RcDoc::text("oneway"),
+            FuncMode::Query => pretty::RcDoc::text("query"),
+        }
+    }
+    pub fn str_to_enum(str: &str) -> Option<Self> {
+        match str {
+            "oneway" => Some(FuncMode::Oneway),
+            "query" => Some(FuncMode::Query),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Function {
-    pub modes: Vec<crate::parser::types::FuncMode>,
+    pub modes: Vec<FuncMode>,
     pub args: Vec<Type>,
     pub rets: Vec<Type>,
 }
@@ -358,7 +378,7 @@ impl fmt::Display for Function {
 }
 impl Function {
     pub fn is_query(&self) -> bool {
-        self.modes.contains(&crate::parser::types::FuncMode::Query)
+        self.modes.contains(&crate::types::FuncMode::Query)
     }
 }
 

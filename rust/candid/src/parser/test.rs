@@ -1,7 +1,7 @@
 use super::types::{Dec, IDLProg, IDLType};
-use super::typing::{check_prog, TypeEnv};
-use super::value::IDLArgs;
-use crate::types::Type;
+use super::typing::check_prog;
+use crate::types::value::IDLArgs;
+use crate::types::{Type, TypeEnv};
 use crate::{Error, Result};
 
 type TupType = Vec<IDLType>;
