@@ -66,15 +66,19 @@ path = "benches/benchmark.rs"
 
 [[test]]
 name = "test_suite"
+path = "tests/test_suite.rs"
 required-features = ["parser"]
 [[test]]
 name = "value"
+path = "tests/value.rs"
 required-features = ["parser"]
 [[test]]
 name = "parse_value"
+path = "tests/parse_value.rs"
 required-features = ["parser"]
 [[test]]
 name = "parse_type"
+path = "tests/parse_type.rs"
 required-features = ["parser"]
 
 
