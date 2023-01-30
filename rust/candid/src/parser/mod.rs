@@ -9,8 +9,10 @@ pub mod types;
 
 pub mod typing;
 
+#[cfg_attr(docsrs, doc(cfg(feature = "configs")))]
 #[cfg(feature = "configs")]
 pub mod configs;
+#[cfg_attr(docsrs, doc(cfg(feature = "random")))]
 #[cfg(feature = "random")]
 pub mod random;
 pub mod test;
