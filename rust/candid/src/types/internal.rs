@@ -381,6 +381,24 @@ impl Function {
         self.modes.contains(&crate::types::FuncMode::Query)
     }
 }
+#[macro_export]
+macro_rules! func {
+    ( ( $($arg:expr),* ) -> ( $($ret:expr),* ) ) => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$($arg),*], rets: vec![$($ret),*], modes: vec![] }))
+    };
+    ( ( $($arg:expr),* ) -> ( $($ret:expr),* ) query ) => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$($arg),*], rets: vec![$($ret),*], modes: vec![$crate::types::FuncMode::Query] }))
+    };
+    ( ( $($arg:expr),* ) -> ( $($ret:expr),* ) oneway ) => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$($arg),*], rets: vec![$($ret),*], modes: vec![$crate::types::FuncMode::Oneway] }))
+    };
+}
+#[macro_export]
+macro_rules! service {
+    { $($meth:tt : $ty:expr);* } => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Service(vec![ $(($meth.to_string(), $ty)),* ]))
+    }
+}
 
 #[derive(Debug, PartialEq, TryFromPrimitive)]
 #[repr(i64)]

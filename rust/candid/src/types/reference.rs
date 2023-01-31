@@ -1,7 +1,10 @@
 //! Data structure for Candid value Func and Service
+//! Note that `Func` and `Service` should not be used directly. We need to define a newtype for `Func` or `Service`,
+//! and manually `impl CandidType` for the newtype, in order to specify the correct reference type.
+//! We have two macros `define_function!` and `define_service!` to help defining the newtype.
 
 use super::principal::Principal;
-use super::{CandidType, Function, Serializer, Type, TypeInner};
+use super::{CandidType, Serializer, Type};
 use serde::de::{self, Deserialize, Visitor};
 use std::convert::TryFrom;
 use std::{fmt, io::Read};
@@ -16,14 +19,45 @@ pub struct Service {
     pub principal: Principal,
 }
 
+#[macro_export]
+/// Define a function reference type.
+/// `define_function!(FuncReference : func!(() -> () query))`
+macro_rules! define_function {
+    ( $vis:vis $func:ident : $ty:expr ) => {
+        #[derive(Deserialize, PartialEq, Debug, Clone)]
+        $vis struct $func(pub Func);
+        impl CandidType for $func {
+            fn _ty() -> $crate::types::Type {
+                $ty
+            }
+            fn idl_serialize<S: $crate::types::Serializer>(&self, serializer: S) -> Result<(), S::Error>
+            {
+                self.0.idl_serialize(serializer)
+            }
+        }
+    }
+}
+#[macro_export]
+/// Define a service reference type.
+macro_rules! define_service {
+    ( $vis:vis $serv:ident : $ty:expr ) => {
+        #[derive(Deserialize, PartialEq, Debug, Clone)]
+        $vis struct $serv(pub Service);
+        impl CandidType for $serv {
+            fn _ty() -> $crate::types::Type {
+                $ty
+            }
+            fn idl_serialize<S: $crate::types::Serializer>(&self, serializer: S) -> Result<(), S::Error>
+            {
+                self.0.idl_serialize(serializer)
+            }
+        }
+    }
+}
+
 impl CandidType for Func {
     fn _ty() -> Type {
-        TypeInner::Func(Function {
-            modes: Vec::new(),
-            args: Vec::new(),
-            rets: Vec::new(),
-        })
-        .into()
+        panic!("Cannot use Func directly. Use `define_function!` macro instead.")
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -34,7 +68,7 @@ impl CandidType for Func {
 }
 impl CandidType for Service {
     fn _ty() -> Type {
-        TypeInner::Service(Vec::new()).into()
+        panic!("Cannot use Service directly. Use `define_service!` macro instead.")
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where

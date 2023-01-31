@@ -126,6 +126,30 @@
 //! # Ok::<(), candid::Error>(())
 //! ```
 //!
+//! ## Operating on reference types
+//! The type of function and service references cannot be derived automatically. We provide
+//! two macros [`define_function!`](macro.define_function.html) and [`define_service!`](macro.define_service.html) to help defining the reference types.
+//!
+//! ```
+//! use candid::{define_function, define_service, func, service, Func, Service, Encode, Decode, Principal, CandidType, Deserialize, types::TypeInner};
+//! let principal = Principal::from_text("aaaaa-aa").unwrap();
+//!
+//! define_function!(pub CustomFunc : func!(() -> (TypeInner::Nat.into())));
+//! let func = CustomFunc(Func {
+//!    principal,
+//!    method: "create_canister".to_string()
+//! });
+//! assert_eq!(func, Decode!(&Encode!(&func)?, CustomFunc)?);
+//!
+//! define_service!(MyService : service! {
+//!   "f": CustomFunc::ty();
+//!   "g": func!(() -> () query)
+//! });
+//! let serv = MyService(Service { principal });
+//! assert_eq!(serv, Decode!(&Encode!(&serv)?, MyService)?);
+//! # Ok::<(), candid::Error>(())
+//! ```
+//!
 //! ## Operating on untyped Candid values
 //! Any valid Candid value can be manipulated in an recursive enum representation [`candid::parser::value::IDLValue`](parser/value/enum.IDLValue.html).
 //! We use `ser.value_arg(v)` and `de.get_value::<IDLValue>()` for encoding and decoding the value.
