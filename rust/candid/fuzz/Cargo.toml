@@ -13,6 +13,7 @@ libfuzzer-sys = "0.4"
 
 [dependencies.candid]
 path = ".."
+features = ["parser"]
 
 # Prevent this from interfering with workspaces
 [workspace]
