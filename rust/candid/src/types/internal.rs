@@ -334,12 +334,28 @@ impl std::hash::Hash for Label {
         self.get_id();
     }
 }
-
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Field {
     pub id: Rc<Label>,
     pub ty: Type,
 }
+#[macro_export]
+/// Construct a field type, which can be used in `TypeInner::Record` and `TypeInner::Variant`.
+///
+/// `field!{ a: TypeInner::Nat.into() }` expands to `Field { id: Label::Named("a"), ty: ... }`
+/// `field!{ 0: TypeInner::Nat.into() }` expands to `Field { id: Label::Id(0), ty: ... }`
+macro_rules! field {
+    { $id:tt : $ty:expr } => {
+        $crate::types::internal::Field {
+            id: match stringify!($id).parse::<u32>() {
+                Ok(id) => $crate::types::Label::Id(id),
+                Err(_) => $crate::types::Label::Named(stringify!($id).to_string()),
+            }.into(),
+            ty: $ty
+        }
+    };
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FuncMode {
     Oneway,
@@ -360,7 +376,6 @@ impl FuncMode {
         }
     }
 }
-
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Function {
     pub modes: Vec<FuncMode>,
@@ -379,6 +394,30 @@ impl fmt::Display for Function {
 impl Function {
     pub fn is_query(&self) -> bool {
         self.modes.contains(&crate::types::FuncMode::Query)
+    }
+}
+#[macro_export]
+/// Construct a function type.
+///
+/// `func!(() -> () query)` expands to `Type(Rc::new(TypeInner::Func(...)))`
+macro_rules! func {
+    ( ( $($arg:expr),* ) -> ( $($ret:expr),* ) ) => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$($arg),*], rets: vec![$($ret),*], modes: vec![] }))
+    };
+    ( ( $($arg:expr),* ) -> ( $($ret:expr),* ) query ) => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$($arg),*], rets: vec![$($ret),*], modes: vec![$crate::types::FuncMode::Query] }))
+    };
+    ( ( $($arg:expr),* ) -> ( $($ret:expr),* ) oneway ) => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$($arg),*], rets: vec![$($ret),*], modes: vec![$crate::types::FuncMode::Oneway] }))
+    };
+}
+#[macro_export]
+/// Construct a service type.
+///
+/// `service!{ "f": func!((HttpRequest::ty()) -> ()) }` expands to `Type(Rc::new(TypeInner::Service(...)))`
+macro_rules! service {
+    { $($meth:tt : $ty:expr);* } => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Service(vec![ $(($meth.to_string(), $ty)),* ]))
     }
 }
 

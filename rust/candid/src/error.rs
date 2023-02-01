@@ -18,6 +18,7 @@ pub type Result<T = ()> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
     #[cfg(feature = "parser")]
     #[error("Candid parser error: {0}")]
     Parse(#[from] token::ParserError),
@@ -39,6 +40,7 @@ impl Error {
     pub fn subtype<T: ToString>(msg: T) -> Self {
         Error::Subtype(msg.to_string())
     }
+    #[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
     #[cfg(feature = "parser")]
     pub fn report(&self) -> Diagnostic<()> {
         match self {
@@ -121,6 +123,7 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label<()>> {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
 #[cfg(feature = "parser")]
 fn report_expected(expected: &[String]) -> Vec<String> {
     if expected.is_empty() {
@@ -166,13 +169,14 @@ impl From<binread::Error> for Error {
         Error::Binread(get_binread_labels(&e))
     }
 }
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
 #[cfg(feature = "parser")]
 impl From<ReportError> for Error {
     fn from(e: ReportError) -> Error {
         Error::msg(e)
     }
 }
-
+#[cfg_attr(docsrs, doc(cfg(feature = "random")))]
 #[cfg(feature = "random")]
 impl From<arbitrary::Error> for Error {
     fn from(e: arbitrary::Error) -> Error {
@@ -180,6 +184,7 @@ impl From<arbitrary::Error> for Error {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "configs")))]
 #[cfg(feature = "configs")]
 impl From<serde_dhall::Error> for Error {
     fn from(e: serde_dhall::Error) -> Error {
@@ -187,6 +192,7 @@ impl From<serde_dhall::Error> for Error {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
 #[cfg(feature = "parser")]
 pub fn pretty_parse<T>(name: &str, str: &str) -> Result<T>
 where
@@ -200,7 +206,7 @@ where
         Err(e)
     })
 }
-
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
 #[cfg(feature = "parser")]
 pub fn pretty_read<T>(reader: &mut std::io::Cursor<&[u8]>) -> Result<T>
 where
