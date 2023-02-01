@@ -16,6 +16,12 @@
 * Deprecate `ToDoc` trait for pretty printing `IDLProg`, use `candid::bindings::candid` module instead
 * Deprecate `candid::codegen`, use `candid::bindings` instead
 
+### Non-breaking changes:
+
+* Macros for constructing type AST nodes: `service!`, `func!` and `field!`
+* Support future types
+* `Nat` serialization for JSON and CBOR
+
 ## 2022-11-17 (Rust 0.8.3 -- 0.8.4)
 
 * Bug fix in TS bindings
