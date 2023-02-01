@@ -339,6 +339,22 @@ pub struct Field {
     pub id: Rc<Label>,
     pub ty: Type,
 }
+#[macro_export]
+/// Construct a field type, which can be used in `TypeInner::Record` and `TypeInner::Variant`.
+///
+/// `field!{ a: TypeInner::Nat.into() }` expands to `Field { id: Label::Named("a"), ty: ... }`
+/// `field!{ 0: TypeInner::Nat.into() }` expands to `Field { id: Label::Id(0), ty: ... }`
+macro_rules! field {
+    { $id:tt : $ty:expr } => {
+        $crate::types::internal::Field {
+            id: match stringify!($id).parse::<u32>() {
+                Ok(id) => $crate::types::Label::Id(id),
+                Err(_) => $crate::types::Label::Named(stringify!($id).to_string()),
+            }.into(),
+            ty: $ty
+        }
+    };
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FuncMode {
@@ -360,7 +376,6 @@ impl FuncMode {
         }
     }
 }
-
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Function {
     pub modes: Vec<FuncMode>,
@@ -382,7 +397,9 @@ impl Function {
     }
 }
 #[macro_export]
-/// Construct a function type. `func!(() -> () query)` expands to `Type(Rc::new(TypeInner::Func(...)))`
+/// Construct a function type.
+///
+/// `func!(() -> () query)` expands to `Type(Rc::new(TypeInner::Func(...)))`
 macro_rules! func {
     ( ( $($arg:expr),* ) -> ( $($ret:expr),* ) ) => {
         Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$($arg),*], rets: vec![$($ret),*], modes: vec![] }))
@@ -395,7 +412,9 @@ macro_rules! func {
     };
 }
 #[macro_export]
-/// Construct a service type. `service!{ "f": func!((HttpRequest::ty()) -> ()) }` expands to `Type(Rc::new(TypeInner::Service(...)))`
+/// Construct a service type.
+///
+/// `service!{ "f": func!((HttpRequest::ty()) -> ()) }` expands to `Type(Rc::new(TypeInner::Service(...)))`
 macro_rules! service {
     { $($meth:tt : $ty:expr);* } => {
         Into::<$crate::types::Type>::into($crate::types::TypeInner::Service(vec![ $(($meth.to_string(), $ty)),* ]))

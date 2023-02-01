@@ -21,7 +21,8 @@ pub struct Service {
 
 #[macro_export]
 /// Define a function reference type.
-/// Example: `define_function!(FuncReference : () -> () query);`
+///
+/// `define_function!(pub MyFunc : () -> () query)` expands to `pub struct MyFunc(Func)`, which implements `CandidType` with the provided type and `MyFunc::new(principal, method)`.
 macro_rules! define_function {
     ( $vis:vis $func:ident : $($ty:tt)+ ) => {
         #[derive($crate::Deserialize, PartialEq, Eq, Debug, Clone)]
@@ -44,7 +45,8 @@ macro_rules! define_function {
 }
 #[macro_export]
 /// Define a service reference type.
-/// Example: `define_service!(MyService : { "f": func!(() -> () query) });`
+///
+/// `define_service!(MyService : { "f": func!(() -> () query) })` expands to `struct MyService(Service)`, which implements `CandidType` with the provided type and `MyService::new(principal)`.
 macro_rules! define_service {
     ( $vis:vis $serv:ident : { $($ty:tt)* } ) => {
         #[derive($crate::Deserialize, PartialEq, Eq, Debug, Clone)]
