@@ -21,35 +21,46 @@ pub struct Service {
 
 #[macro_export]
 /// Define a function reference type.
-/// `define_function!(FuncReference : func!(() -> () query))`
+/// Example: `define_function!(FuncReference : () -> () query);`
 macro_rules! define_function {
-    ( $vis:vis $func:ident : $ty:expr ) => {
-        #[derive(Deserialize, PartialEq, Debug, Clone)]
-        $vis struct $func(pub Func);
-        impl CandidType for $func {
+    ( $vis:vis $func:ident : $($ty:tt)+ ) => {
+        #[derive($crate::Deserialize, PartialEq, Eq, Debug, Clone)]
+        $vis struct $func(pub $crate::types::reference::Func);
+        impl $crate::CandidType for $func {
             fn _ty() -> $crate::types::Type {
-                $ty
+                $crate::func!($($ty)+)
             }
             fn idl_serialize<S: $crate::types::Serializer>(&self, serializer: S) -> Result<(), S::Error>
             {
                 self.0.idl_serialize(serializer)
             }
         }
+        impl $func {
+            pub fn new(principal: $crate::Principal, method: String) -> Self {
+                $func($crate::types::reference::Func { principal, method })
+            }
+        }
     }
 }
 #[macro_export]
 /// Define a service reference type.
+/// Example: `define_service!(MyService : { "f": func!(() -> () query) });`
 macro_rules! define_service {
-    ( $vis:vis $serv:ident : $ty:expr ) => {
-        #[derive(Deserialize, PartialEq, Debug, Clone)]
-        $vis struct $serv(pub Service);
-        impl CandidType for $serv {
+    ( $vis:vis $serv:ident : { $($ty:tt)* } ) => {
+        #[derive($crate::Deserialize, PartialEq, Eq, Debug, Clone)]
+        $vis struct $serv(pub $crate::types::reference::Service);
+        impl $crate::CandidType for $serv {
             fn _ty() -> $crate::types::Type {
-                $ty
+                $crate::service!{$($ty)*}
             }
             fn idl_serialize<S: $crate::types::Serializer>(&self, serializer: S) -> Result<(), S::Error>
             {
                 self.0.idl_serialize(serializer)
+            }
+        }
+        impl $serv {
+            pub fn new(principal: $crate::Principal) -> Self {
+                $serv($crate::types::reference::Service { principal })
             }
         }
     }

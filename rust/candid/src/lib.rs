@@ -131,21 +131,18 @@
 //! two macros [`define_function!`](macro.define_function.html) and [`define_service!`](macro.define_service.html) to help defining the reference types.
 //!
 //! ```
-//! use candid::{define_function, define_service, func, service, Func, Service, Encode, Decode, Principal, CandidType, Deserialize, types::TypeInner};
+//! use candid::{define_function, define_service, func, Encode, Decode, Principal, types::TypeInner};
 //! let principal = Principal::from_text("aaaaa-aa").unwrap();
 //!
-//! define_function!(pub CustomFunc : func!(() -> (TypeInner::Nat.into())));
-//! let func = CustomFunc(Func {
-//!    principal,
-//!    method: "create_canister".to_string()
-//! });
+//! define_function!(pub CustomFunc : () -> (TypeInner::Nat.into()));
+//! let func = CustomFunc::new(principal, "method_name".to_string());
 //! assert_eq!(func, Decode!(&Encode!(&func)?, CustomFunc)?);
 //!
-//! define_service!(MyService : service! {
+//! define_service!(MyService : {
 //!   "f": CustomFunc::ty();
 //!   "g": func!(() -> () query)
 //! });
-//! let serv = MyService(Service { principal });
+//! let serv = MyService::new(principal);
 //! assert_eq!(serv, Decode!(&Encode!(&serv)?, MyService)?);
 //! # Ok::<(), candid::Error>(())
 //! ```

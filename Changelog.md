@@ -1,13 +1,14 @@
 
 # Changelog
 
-## Rust 0.9.0-beta.0
+## Rust 0.9.0-beta
 
 ### Breaking changes:
 
-* The old `candid::Type` is now `candid::TypeInner`, and `Type` is a newtype of `Rc<TypeInner>`. This change significantly improves deserialization performance
 * Deserializer only checks subtyping for reference types, fully conforming to Candid spec 1.4
-* `candid::parser` module is only available under feature flag `"parser"`
+* The old `candid::Type` is now `candid::TypeInner`, and `Type` is a newtype of `Rc<TypeInner>`. This change significantly improves deserialization performance (25% -- 50% improvements)
+* `candid::parser` module is only available under feature flag `"parser"`. This significantly cut down compilation time and Wasm binary size
+* Disable the use of `candid::Func` and `candid::Service` to avoid footguns. Use `define_function!` and `define_service!` macro instead
 * `candid::parser::typing::TypeEnv` moved to `candid::types::TypeEnv`. Use of `candid::TypeEnv` is not affected
 * `candid::parser::types::FuncMode` moved to `candid::types::FuncMode`
 * `candid::parser::value` moved to `candid::types::value`

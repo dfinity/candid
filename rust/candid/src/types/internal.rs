@@ -334,12 +334,12 @@ impl std::hash::Hash for Label {
         self.get_id();
     }
 }
-
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Field {
     pub id: Rc<Label>,
     pub ty: Type,
 }
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FuncMode {
     Oneway,
@@ -382,6 +382,7 @@ impl Function {
     }
 }
 #[macro_export]
+/// Construct a function type. `func!(() -> () query)` expands to `Type(Rc::new(TypeInner::Func(...)))`
 macro_rules! func {
     ( ( $($arg:expr),* ) -> ( $($ret:expr),* ) ) => {
         Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$($arg),*], rets: vec![$($ret),*], modes: vec![] }))
@@ -394,6 +395,7 @@ macro_rules! func {
     };
 }
 #[macro_export]
+/// Construct a service type. `service!{ "f": func!((HttpRequest::ty()) -> ()) }` expands to `Type(Rc::new(TypeInner::Service(...)))`
 macro_rules! service {
     { $($meth:tt : $ty:expr);* } => {
         Into::<$crate::types::Type>::into($crate::types::TypeInner::Service(vec![ $(($meth.to_string(), $ty)),* ]))

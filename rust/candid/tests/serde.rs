@@ -132,24 +132,19 @@ fn test_reserved() {
 
 #[test]
 fn test_reference() {
-    use candid::{
-        define_function, define_service, func, service, types::TypeInner, Func, Principal, Service,
-    };
+    use candid::{define_function, define_service, func, types::TypeInner, Principal};
     let principal = Principal::from_text("w7x7r-cok77-xa").unwrap();
     all_check(principal, "4449444c0001680103caffee");
-    define_function!(CustomFunc: func!(() -> (TypeInner::Nat.into())));
+    define_function!(CustomFunc: () -> (TypeInner::Nat.into()));
     all_check(
-        CustomFunc(Func {
-            principal,
-            method: "method".to_owned(),
-        }),
+        CustomFunc::new(principal, "method".to_owned()),
         "4449444c016a00017d000100010103caffee066d6574686f64",
     );
     let bytes = hex("4449444c016a00017f000100010100016d");
     test_decode(&bytes, &None::<CustomFunc>);
-    define_service!(MyService: service! { "f": CustomFunc::ty(); "g": func!(() -> () query) });
+    define_service!(MyService: { "f": CustomFunc::ty(); "g": func!(() -> () query) });
     all_check(
-        MyService(Service { principal }),
+        MyService::new(principal),
         "4449444c0369020166010167026a00017d006a0000010101000103caffee",
     );
 }
