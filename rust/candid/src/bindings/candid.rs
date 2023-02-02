@@ -165,7 +165,7 @@ fn pp_modes(modes: &[crate::types::FuncMode]) -> RcDoc {
     RcDoc::concat(modes.iter().map(|m| RcDoc::space().append(m.to_doc())))
 }
 
-fn pp_service(serv: &[(String, Type)]) -> RcDoc {
+pub fn pp_service(serv: &[(String, Type)]) -> RcDoc {
     let doc = concat(
         serv.iter().map(|(id, func)| {
             let func_doc = match func.as_ref() {
