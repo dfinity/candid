@@ -161,7 +161,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -
                 .append(vis)
                 .append(name)
                 .append(": ")
-                .append(super::candid::pp_function(func))
+                .append(pp_ty_func(func))
                 .append(");"),
             TypeInner::Service(serv) => str("candid::define_service!(")
                 .append(vis)
@@ -190,6 +190,21 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -
             }
         }
     }))
+}
+
+fn pp_args(args: &[Type]) -> RcDoc {
+    let empty = RecPoints::default();
+    let doc = concat(args.iter().map(|t| pp_ty(t, &empty)), ",");
+    enclose("(", doc, ")")
+}
+fn pp_ty_func(f: &Function) -> RcDoc {
+    let args = pp_args(&f.args);
+    let rets = pp_args(&f.rets);
+    let modes = super::candid::pp_modes(&f.modes);
+    args.append(" ->")
+        .append(RcDoc::space())
+        .append(rets.append(modes))
+        .nest(INDENT_SPACE)
 }
 
 fn pp_function<'a>(id: &'a str, func: &'a Function) -> RcDoc<'a> {

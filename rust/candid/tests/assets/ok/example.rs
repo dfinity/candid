@@ -33,7 +33,11 @@ pub struct nested {
   _42_: candid::Nat,
 }
 
-pub type broker = candid::Service;
+candid::define_service!(pub broker_find_ret0 : {
+  current : () -> (nat32);
+  up : () -> ();
+});
+candid::define_service!(pub broker : { find : (text) -> (broker_find_ret0) });
 #[derive(CandidType, Deserialize)]
 pub enum h_arg1 { A(candid::Nat), B(Option<String>) }
 
@@ -43,7 +47,8 @@ pub struct h_ret0_42 {}
 #[derive(CandidType, Deserialize)]
 pub struct h_ret0 { _42_: h_ret0_42, id: candid::Nat }
 
-pub type f = candid::Func;
+candid::define_function!(pub f_arg1 : (i32) -> (i64));
+candid::define_function!(pub f : (List, f_arg1) -> (Option<List>));
 #[derive(CandidType, Deserialize)]
 pub struct b (candid::Int,candid::Nat,);
 
@@ -75,7 +80,7 @@ impl SERVICE{
   ) -> CallResult<(h_ret0,)> {
     ic_cdk::call(self.0, "h", (arg0,arg1,arg2,)).await
   }
-  pub async fn i(&self, arg0: List, arg1: candid::Func) -> CallResult<
+  pub async fn i(&self, arg0: List, arg1: f_arg1) -> CallResult<
     (Option<List>,)
   > { ic_cdk::call(self.0, "i", (arg0,arg1,)).await }
   pub async fn x(&self, arg0: a, arg1: b) -> CallResult<

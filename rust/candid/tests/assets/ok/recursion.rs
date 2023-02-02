@@ -3,7 +3,7 @@
 use candid::{self, CandidType, Deserialize};
 use ic_cdk::api::call::CallResult;
 
-pub type t = candid::Func;
+candid::define_function!(pub t : (s) -> ());
 #[derive(CandidType, Deserialize)]
 pub struct node { head: candid::Nat, tail: Box<list> }
 
@@ -20,15 +20,14 @@ pub enum tree {
   leaf(candid::Int),
 }
 
+candid::define_function!(pub stream_inner_next : () -> (stream) query);
 #[derive(CandidType, Deserialize)]
-pub struct stream_inner { head: candid::Nat, next: candid::Func }
+pub struct stream_inner { head: candid::Nat, next: stream_inner_next }
 
 #[derive(CandidType, Deserialize)]
 pub struct stream(Option<stream_inner>);
 
-#[derive(CandidType, Deserialize)]
-pub struct s(candid::Service);
-
+candid::define_service!(pub s : { f : t; g : (list) -> (B, tree, stream) });
 pub struct SERVICE(candid::Principal);
 impl SERVICE{
   pub async fn f(&self, arg0: s) -> CallResult<()> {

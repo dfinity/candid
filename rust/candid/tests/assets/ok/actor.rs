@@ -3,8 +3,8 @@
 use candid::{self, CandidType, Deserialize};
 use ic_cdk::api::call::CallResult;
 
-pub type f = candid::Func;
-pub type h = candid::Func;
+candid::define_function!(pub f : (i8) -> (i8));
+candid::define_function!(pub h : (f) -> (f));
 pub type g = f;
 #[derive(CandidType, Deserialize)]
 pub struct o(Option<Box<o>>);

@@ -31,16 +31,15 @@ pub enum r#if {
   leaf(candid::Int),
 }
 
+candid::define_function!(pub stream_inner_next : () -> (stream) query);
 #[derive(CandidType, Deserialize)]
-pub struct stream_inner { head: candid::Nat, next: candid::Func }
+pub struct stream_inner { head: candid::Nat, next: stream_inner_next }
 
 #[derive(CandidType, Deserialize)]
 pub struct stream(Option<stream_inner>);
 
-pub type r#return = candid::Service;
-#[derive(CandidType, Deserialize)]
-pub struct t(candid::Func);
-
+candid::define_service!(pub r#return : { f : t; g : (list) -> (if, stream) });
+candid::define_function!(pub t : (r#return) -> ());
 #[derive(CandidType, Deserialize)]
 pub enum variant_arg0 { A, B, C, D(f64) }
 

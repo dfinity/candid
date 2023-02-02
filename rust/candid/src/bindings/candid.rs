@@ -161,7 +161,7 @@ fn pp_args(args: &[Type]) -> RcDoc {
     enclose("(", doc, ")")
 }
 
-fn pp_modes(modes: &[crate::types::FuncMode]) -> RcDoc {
+pub fn pp_modes(modes: &[crate::types::FuncMode]) -> RcDoc {
     RcDoc::concat(modes.iter().map(|m| RcDoc::space().append(m.to_doc())))
 }
 
