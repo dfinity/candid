@@ -167,7 +167,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -
                 .append(vis)
                 .append(name)
                 .append(": ")
-                .append(super::candid::pp_service(serv))
+                .append(pp_ty_service(serv))
                 .append(");"),
             _ => {
                 if recs.contains(id) {
@@ -205,6 +205,23 @@ fn pp_ty_func(f: &Function) -> RcDoc {
         .append(RcDoc::space())
         .append(rets.append(modes))
         .nest(INDENT_SPACE)
+}
+fn pp_ty_service(serv: &[(String, Type)]) -> RcDoc {
+    let doc = concat(
+        serv.iter().map(|(id, func)| {
+            let func_doc = match func.as_ref() {
+                TypeInner::Func(ref f) => pp_ty_func(f),
+                TypeInner::Var(_) => pp_ty(func, &RecPoints::default()),
+                _ => unreachable!(),
+            };
+            RcDoc::text("\"")
+                .append(id)
+                .append(kwd("\" :"))
+                .append(func_doc)
+        }),
+        ";",
+    );
+    enclose_space("{", doc, "}")
 }
 
 fn pp_function<'a>(id: &'a str, func: &'a Function) -> RcDoc<'a> {
@@ -249,7 +266,7 @@ fn pp_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
         }),
         RcDoc::hardline(),
     );
-    RcDoc::text("pub struct SERVICE(candid::Principal);")
+    RcDoc::text("pub struct SERVICE(pub candid::Principal);")
         .append(RcDoc::hardline())
         .append("impl SERVICE")
         .append(enclose_space("{", body, "}"))

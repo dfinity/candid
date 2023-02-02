@@ -30,7 +30,7 @@ pub struct foo_arg0 { _2_: candid::Int }
 #[derive(CandidType, Deserialize)]
 pub struct foo_ret0 { _2_: candid::Int, _2: candid::Int }
 
-pub struct SERVICE(candid::Principal);
+pub struct SERVICE(pub candid::Principal);
 impl SERVICE{
   pub async fn bab(&self, arg0: candid::Int, arg1: candid::Nat) -> CallResult<
     ()

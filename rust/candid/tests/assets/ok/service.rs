@@ -4,12 +4,12 @@ use candid::{self, CandidType, Deserialize};
 use ic_cdk::api::call::CallResult;
 
 candid::define_function!(pub Func : () -> (Service));
-candid::define_service!(pub Service : { f : Func });
+candid::define_service!(pub Service : { "f" : Func });
 pub type Service2 = Box<Service>;
 #[derive(CandidType, Deserialize)]
 pub enum asVariant_ret0 { a(Service2), b{ f: Option<Func> } }
 
-pub struct SERVICE(candid::Principal);
+pub struct SERVICE(pub candid::Principal);
 impl SERVICE{
   pub async fn asArray(&self) -> CallResult<(Vec<Service2>,Vec<Func>,)> {
     ic_cdk::call(self.0, "asArray", ()).await

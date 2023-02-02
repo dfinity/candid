@@ -27,8 +27,8 @@ pub struct stream_inner { head: candid::Nat, next: stream_inner_next }
 #[derive(CandidType, Deserialize)]
 pub struct stream(Option<stream_inner>);
 
-candid::define_service!(pub s : { f : t; g : (list) -> (B, tree, stream) });
-pub struct SERVICE(candid::Principal);
+candid::define_service!(pub s : { "f" : t; "g" : (list) -> (B, tree, stream) });
+pub struct SERVICE(pub candid::Principal);
 impl SERVICE{
   pub async fn f(&self, arg0: s) -> CallResult<()> {
     ic_cdk::call(self.0, "f", (arg0,)).await

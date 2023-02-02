@@ -11,7 +11,7 @@ pub struct A(Option<B>);
 pub type Z = Box<A>;
 pub type Y = Z;
 pub type X = Y;
-pub struct SERVICE(candid::Principal);
+pub struct SERVICE(pub candid::Principal);
 impl SERVICE{
   pub async fn f(
     &self,

@@ -3,8 +3,8 @@
 use candid::{self, CandidType, Deserialize};
 use ic_cdk::api::call::CallResult;
 
-candid::define_service!(pub s : { next : () -> (s) });
-pub struct SERVICE(candid::Principal);
+candid::define_service!(pub s : { "next" : () -> (s) });
+pub struct SERVICE(pub candid::Principal);
 impl SERVICE{
   pub async fn next(&self) -> CallResult<(s,)> {
     ic_cdk::call(self.0, "next", ()).await

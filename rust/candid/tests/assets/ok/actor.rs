@@ -9,7 +9,7 @@ pub type g = f;
 #[derive(CandidType, Deserialize)]
 pub struct o(Option<Box<o>>);
 
-pub struct SERVICE(candid::Principal);
+pub struct SERVICE(pub candid::Principal);
 impl SERVICE{
   pub async fn f(&self, arg0: candid::Nat) -> CallResult<(h,)> {
     ic_cdk::call(self.0, "f", (arg0,)).await

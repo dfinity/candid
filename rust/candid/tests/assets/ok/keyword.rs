@@ -38,12 +38,15 @@ pub struct stream_inner { head: candid::Nat, next: stream_inner_next }
 #[derive(CandidType, Deserialize)]
 pub struct stream(Option<stream_inner>);
 
-candid::define_service!(pub r#return : { f : t; g : (list) -> (if, stream) });
+candid::define_service!(pub r#return : {
+  "f" : t;
+  "g" : (list) -> (r#if, stream);
+});
 candid::define_function!(pub t : (r#return) -> ());
 #[derive(CandidType, Deserialize)]
 pub enum variant_arg0 { A, B, C, D(f64) }
 
-pub struct SERVICE(candid::Principal);
+pub struct SERVICE(pub candid::Principal);
 impl SERVICE{
   pub async fn Oneway(&self) -> CallResult<()> {
     ic_cdk::call(self.0, "Oneway", ()).await

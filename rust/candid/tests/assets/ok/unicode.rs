@@ -27,7 +27,7 @@ pub enum B {
   _3099250646_,
 }
 
-pub struct SERVICE(candid::Principal);
+pub struct SERVICE(pub candid::Principal);
 impl SERVICE{
   pub async fn _0_(&self, arg0: candid::Nat) -> CallResult<(candid::Nat,)> {
     ic_cdk::call(self.0, "", (arg0,)).await

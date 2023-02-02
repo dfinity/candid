@@ -15,7 +15,7 @@ pub struct t {
   _1020746185_: candid::Nat,
 }
 
-pub struct SERVICE(candid::Principal);
+pub struct SERVICE(pub candid::Principal);
 impl SERVICE{
   pub async fn _2635468193_(&self, arg0: t) -> CallResult<()> {
     ic_cdk::call(self.0, "\n\'\"\'\'\"\"\r\t", (arg0,)).await

@@ -34,10 +34,12 @@ pub struct nested {
 }
 
 candid::define_service!(pub broker_find_ret0 : {
-  current : () -> (nat32);
-  up : () -> ();
+  "current" : () -> (u32);
+  "up" : () -> ();
 });
-candid::define_service!(pub broker : { find : (text) -> (broker_find_ret0) });
+candid::define_service!(pub broker : {
+  "find" : (String) -> (broker_find_ret0);
+});
 #[derive(CandidType, Deserialize)]
 pub enum h_arg1 { A(candid::Nat), B(Option<String>) }
 
@@ -55,7 +57,7 @@ pub struct b (candid::Int,candid::Nat,);
 #[derive(CandidType, Deserialize)]
 pub enum a { a, b(b) }
 
-pub struct SERVICE(candid::Principal);
+pub struct SERVICE(pub candid::Principal);
 impl SERVICE{
   pub async fn f(
     &self,
