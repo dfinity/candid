@@ -132,10 +132,10 @@ fn test_reserved() {
 
 #[test]
 fn test_reference() {
-    use candid::{define_function, define_service, func, types::TypeInner, Principal};
+    use candid::{define_function, define_service, func, Principal};
     let principal = Principal::from_text("w7x7r-cok77-xa").unwrap();
     all_check(principal, "4449444c0001680103caffee");
-    define_function!(CustomFunc: () -> (TypeInner::Nat.into()));
+    define_function!(CustomFunc: () -> (candid::Nat));
     all_check(
         CustomFunc::new(principal, "method".to_owned()),
         "4449444c016a00017d000100010103caffee066d6574686f64",
