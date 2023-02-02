@@ -1,50 +1,50 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use ic_cdk::export::candid::{self, CandidType, Deserialize};
+use candid::{self, CandidType, Deserialize};
 use ic_cdk::api::call::CallResult;
 
 #[derive(CandidType, Deserialize)]
-struct o(Option<Box<o>>);
+pub struct o(Option<Box<o>>);
 
 #[derive(CandidType, Deserialize)]
-struct field_arg0 { test: u16, _1291438163_: u8 }
+pub struct field_arg0 { test: u16, _1291438163_: u8 }
 
 #[derive(CandidType, Deserialize)]
-struct field_ret0 {}
+pub struct field_ret0 {}
 
 #[derive(CandidType, Deserialize)]
-struct fieldnat_arg0 {
+pub struct fieldnat_arg0 {
   _2_: candid::Int,
   #[serde(rename="2")]
   _50_: candid::Nat,
 }
 
 #[derive(CandidType, Deserialize)]
-struct node { head: candid::Nat, tail: Box<list> }
+pub struct node { head: candid::Nat, tail: Box<list> }
 
 #[derive(CandidType, Deserialize)]
-struct list(Option<node>);
+pub struct list(Option<node>);
 
 #[derive(CandidType, Deserialize)]
-enum r#if {
+pub enum r#if {
   branch{ val: candid::Int, left: Box<r#if>, right: Box<r#if> },
   leaf(candid::Int),
 }
 
 #[derive(CandidType, Deserialize)]
-struct stream_inner { head: candid::Nat, next: candid::Func }
+pub struct stream_inner { head: candid::Nat, next: candid::Func }
 
 #[derive(CandidType, Deserialize)]
-struct stream(Option<stream_inner>);
+pub struct stream(Option<stream_inner>);
 
-type r#return = candid::Service;
+pub type r#return = candid::Service;
 #[derive(CandidType, Deserialize)]
-struct t(candid::Func);
+pub struct t(candid::Func);
 
 #[derive(CandidType, Deserialize)]
-enum variant_arg0 { A, B, C, D(f64) }
+pub enum variant_arg0 { A, B, C, D(f64) }
 
-struct SERVICE(candid::Principal);
+pub struct SERVICE(candid::Principal);
 impl SERVICE{
   pub async fn Oneway(&self) -> CallResult<()> {
     ic_cdk::call(self.0, "Oneway", ()).await

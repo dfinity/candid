@@ -1,36 +1,36 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use ic_cdk::export::candid::{self, CandidType, Deserialize};
+use candid::{self, CandidType, Deserialize};
 use ic_cdk::api::call::CallResult;
 
 #[derive(CandidType, Deserialize)]
-struct bar_arg0 { #[serde(rename="2")] _50_: candid::Int }
+pub struct bar_arg0 { #[serde(rename="2")] _50_: candid::Int }
 
 #[derive(CandidType, Deserialize)]
-enum bar_ret0 { e20, e30 }
+pub enum bar_ret0 { e20, e30 }
 
 #[derive(CandidType, Deserialize)]
-struct baz_arg0 { _2_: candid::Int, #[serde(rename="2")] _50_: candid::Nat }
+pub struct baz_arg0 { _2_: candid::Int, #[serde(rename="2")] _50_: candid::Nat }
 
 #[derive(CandidType, Deserialize)]
-struct baz_ret0 {}
+pub struct baz_ret0 {}
 
 #[derive(CandidType, Deserialize)]
-struct tuple (String,String,);
+pub struct tuple (String,String,);
 
 #[derive(CandidType, Deserialize)]
-struct non_tuple { _1_: String, _2_: String }
+pub struct non_tuple { _1_: String, _2_: String }
 
 #[derive(CandidType, Deserialize)]
-enum bib_ret0 { _0_(candid::Int) }
+pub enum bib_ret0 { _0_(candid::Int) }
 
 #[derive(CandidType, Deserialize)]
-struct foo_arg0 { _2_: candid::Int }
+pub struct foo_arg0 { _2_: candid::Int }
 
 #[derive(CandidType, Deserialize)]
-struct foo_ret0 { _2_: candid::Int, _2: candid::Int }
+pub struct foo_ret0 { _2_: candid::Int, _2: candid::Int }
 
-struct SERVICE(candid::Principal);
+pub struct SERVICE(candid::Principal);
 impl SERVICE{
   pub async fn bab(&self, arg0: candid::Int, arg1: candid::Nat) -> CallResult<
     ()

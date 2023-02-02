@@ -1,29 +1,29 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use ic_cdk::export::candid::{self, CandidType, Deserialize};
+use candid::{self, CandidType, Deserialize};
 use ic_cdk::api::call::CallResult;
 
 #[derive(CandidType, Deserialize)]
-struct node { head: candid::Nat, tail: Box<list> }
+pub struct node { head: candid::Nat, tail: Box<list> }
 
 #[derive(CandidType, Deserialize)]
-struct list(Option<node>);
+pub struct list(Option<node>);
 
-type my_type = candid::Principal;
+pub type my_type = candid::Principal;
 #[derive(CandidType, Deserialize)]
-struct List_inner { head: candid::Int, tail: Box<List> }
-
-#[derive(CandidType, Deserialize)]
-struct List(Option<List_inner>);
+pub struct List_inner { head: candid::Int, tail: Box<List> }
 
 #[derive(CandidType, Deserialize)]
-struct nested_3 { _0_: candid::Nat, _42_: candid::Nat, _43_: u8 }
+pub struct List(Option<List_inner>);
 
 #[derive(CandidType, Deserialize)]
-enum nested_41 { _42_, A, B, C }
+pub struct nested_3 { _0_: candid::Nat, _42_: candid::Nat, _43_: u8 }
 
 #[derive(CandidType, Deserialize)]
-struct nested {
+pub enum nested_41 { _42_, A, B, C }
+
+#[derive(CandidType, Deserialize)]
+pub struct nested {
   _0_: candid::Nat,
   _1_: candid::Nat,
   _2_: (candid::Nat,candid::Int,),
@@ -33,24 +33,24 @@ struct nested {
   _42_: candid::Nat,
 }
 
-type broker = candid::Service;
+pub type broker = candid::Service;
 #[derive(CandidType, Deserialize)]
-enum h_arg1 { A(candid::Nat), B(Option<String>) }
+pub enum h_arg1 { A(candid::Nat), B(Option<String>) }
 
 #[derive(CandidType, Deserialize)]
-struct h_ret0_42 {}
+pub struct h_ret0_42 {}
 
 #[derive(CandidType, Deserialize)]
-struct h_ret0 { _42_: h_ret0_42, id: candid::Nat }
+pub struct h_ret0 { _42_: h_ret0_42, id: candid::Nat }
 
-type f = candid::Func;
+pub type f = candid::Func;
 #[derive(CandidType, Deserialize)]
-struct b (candid::Int,candid::Nat,);
+pub struct b (candid::Int,candid::Nat,);
 
 #[derive(CandidType, Deserialize)]
-enum a { a, b(b) }
+pub enum a { a, b(b) }
 
-struct SERVICE(candid::Principal);
+pub struct SERVICE(candid::Principal);
 impl SERVICE{
   pub async fn f(
     &self,

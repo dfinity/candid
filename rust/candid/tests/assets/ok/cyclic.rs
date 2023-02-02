@@ -1,17 +1,17 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use ic_cdk::export::candid::{self, CandidType, Deserialize};
+use candid::{self, CandidType, Deserialize};
 use ic_cdk::api::call::CallResult;
 
-type C = Box<A>;
-type B = Option<C>;
+pub type C = Box<A>;
+pub type B = Option<C>;
 #[derive(CandidType, Deserialize)]
-struct A(Option<B>);
+pub struct A(Option<B>);
 
-type Z = Box<A>;
-type Y = Z;
-type X = Y;
-struct SERVICE(candid::Principal);
+pub type Z = Box<A>;
+pub type Y = Z;
+pub type X = Y;
+pub struct SERVICE(candid::Principal);
 impl SERVICE{
   pub async fn f(
     &self,

@@ -1,17 +1,17 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use ic_cdk::export::candid::{self, CandidType, Deserialize};
+use candid::{self, CandidType, Deserialize};
 use ic_cdk::api::call::CallResult;
 
-type Func = candid::Func;
+pub type Func = candid::Func;
 #[derive(CandidType, Deserialize)]
-struct Service(candid::Service);
+pub struct Service(candid::Service);
 
-type Service2 = Box<Service>;
+pub type Service2 = Box<Service>;
 #[derive(CandidType, Deserialize)]
-enum asVariant_ret0 { a(Service2), b{ f: Option<Func> } }
+pub enum asVariant_ret0 { a(Service2), b{ f: Option<Func> } }
 
-struct SERVICE(candid::Principal);
+pub struct SERVICE(candid::Principal);
 impl SERVICE{
   pub async fn asArray(&self) -> CallResult<(Vec<Service2>,Vec<Func>,)> {
     ic_cdk::call(self.0, "asArray", ()).await

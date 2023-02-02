@@ -133,6 +133,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         let name = ident(id).append(" ");
+        let vis = "pub ";
         match ty.as_ref() {
             TypeInner::Record(fs) => {
                 let separator = if is_tuple(fs) {
@@ -142,6 +143,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -
                 };
                 str(derive)
                     .append(RcDoc::line())
+                    .append(vis)
                     .append("struct ")
                     .append(name)
                     .append(pp_record_fields(fs, recs))
@@ -150,6 +152,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -
             }
             TypeInner::Variant(fs) => str(derive)
                 .append(RcDoc::line())
+                .append(vis)
                 .append("enum ")
                 .append(name)
                 .append(pp_variant_fields(fs, recs))
@@ -158,13 +161,15 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -
                 if recs.contains(id) {
                     str(derive)
                         .append(RcDoc::line())
+                        .append(vis)
                         .append("struct ")
                         .append(ident(id))
                         .append(enclose("(", pp_ty(ty, recs), ")"))
                         .append(";")
                         .append(RcDoc::hardline())
                 } else {
-                    kwd("type")
+                    str(vis)
+                        .append(kwd("type"))
                         .append(name)
                         .append("= ")
                         .append(pp_ty(ty, recs))
@@ -217,7 +222,7 @@ fn pp_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
         }),
         RcDoc::hardline(),
     );
-    RcDoc::text("struct SERVICE(candid::Principal);")
+    RcDoc::text("pub struct SERVICE(candid::Principal);")
         .append(RcDoc::hardline())
         .append("impl SERVICE")
         .append(enclose_space("{", body, "}"))
@@ -226,7 +231,7 @@ fn pp_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     let header = r#"// This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use ic_cdk::export::candid::{self, CandidType, Deserialize};
+use candid::{self, CandidType, Deserialize};
 use ic_cdk::api::call::CallResult;
 "#;
     let (env, actor) = nominalize_all(env, actor);
