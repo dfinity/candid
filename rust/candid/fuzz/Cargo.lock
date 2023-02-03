@@ -153,6 +153,8 @@ version = "0.0.0"
 dependencies = [
  "candid",
  "libfuzzer-sys",
+ "serde",
+ "serde_bytes",
 ]
 
 [[package]]

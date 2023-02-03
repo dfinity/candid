@@ -10,6 +10,8 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+serde_bytes = "0.11"
+serde = "1.0.115"
 
 [dependencies.candid]
 path = ".."
@@ -22,5 +24,11 @@ members = ["."]
 [[bin]]
 name = "parser"
 path = "fuzz_targets/parser.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "type_parser"
+path = "fuzz_targets/type_parser.rs"
 test = false
 doc = false
