@@ -399,22 +399,22 @@ impl Function {
 #[macro_export]
 /// Construct a function type.
 ///
-/// `func!(() -> () query)` expands to `Type(Rc::new(TypeInner::Func(...)))`
+/// `func!((u8, &str) -> (Nat) query)` expands to `Type(Rc::new(TypeInner::Func(...)))`
 macro_rules! func {
-    ( ( $($arg:expr),* ) -> ( $($ret:expr),* ) ) => {
-        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$($arg),*], rets: vec![$($ret),*], modes: vec![] }))
+    ( ( $($arg:ty),* ) -> ( $($ret:ty),* ) ) => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![] }))
     };
-    ( ( $($arg:expr),* ) -> ( $($ret:expr),* ) query ) => {
-        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$($arg),*], rets: vec![$($ret),*], modes: vec![$crate::types::FuncMode::Query] }))
+    ( ( $($arg:ty),* ) -> ( $($ret:ty),* ) query ) => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::Query] }))
     };
-    ( ( $($arg:expr),* ) -> ( $($ret:expr),* ) oneway ) => {
-        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$($arg),*], rets: vec![$($ret),*], modes: vec![$crate::types::FuncMode::Oneway] }))
+    ( ( $($arg:ty),* ) -> ( $($ret:ty),* ) oneway ) => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::Oneway] }))
     };
 }
 #[macro_export]
 /// Construct a service type.
 ///
-/// `service!{ "f": func!((HttpRequest::ty()) -> ()) }` expands to `Type(Rc::new(TypeInner::Service(...)))`
+/// `service!{ "f": func!((HttpRequest) -> ()) }` expands to `Type(Rc::new(TypeInner::Service(...)))`
 macro_rules! service {
     { $($meth:tt : $ty:expr);* } => {
         Into::<$crate::types::Type>::into($crate::types::TypeInner::Service(vec![ $(($meth.to_string(), $ty)),* ]))

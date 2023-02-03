@@ -128,19 +128,20 @@
 //!
 //! ## Operating on reference types
 //! The type of function and service references cannot be derived automatically. We provide
-//! two macros [`define_function!`](macro.define_function.html) and [`define_service!`](macro.define_service.html) to help defining the reference types.
+//! two macros [`define_function!`](macro.define_function.html) and [`define_service!`](macro.define_service.html) to help defining the reference types. To specify reference types in the macro, you need to use the corresponding Rust types,
+//! instead of the Candid types.
 //!
 //! ```
-//! use candid::{define_function, define_service, func, Encode, Decode, Principal, types::TypeInner};
+//! use candid::{define_function, define_service, func, Encode, Decode, Principal};
 //! let principal = Principal::from_text("aaaaa-aa").unwrap();
 //!
-//! define_function!(pub CustomFunc : () -> (TypeInner::Nat.into()));
+//! define_function!(pub CustomFunc : (u8, &str) -> (u128));
 //! let func = CustomFunc::new(principal, "method_name".to_string());
 //! assert_eq!(func, Decode!(&Encode!(&func)?, CustomFunc)?);
 //!
 //! define_service!(MyService : {
 //!   "f": CustomFunc::ty();
-//!   "g": func!(() -> () query)
+//!   "g": func!((candid::Int) -> (candid::Nat, CustomFunc) query)
 //! });
 //! let serv = MyService::new(principal);
 //! assert_eq!(serv, Decode!(&Encode!(&serv)?, MyService)?);

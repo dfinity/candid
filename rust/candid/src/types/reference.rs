@@ -22,7 +22,7 @@ pub struct Service {
 #[macro_export]
 /// Define a function reference type.
 ///
-/// `define_function!(pub MyFunc : () -> () query)` expands to `pub struct MyFunc(Func)`, which implements `CandidType` with the provided type and `MyFunc::new(principal, method)`.
+/// `define_function!(pub MyFunc : (u8, &str) -> (Nat) query)` expands to `pub struct MyFunc(Func)`, which implements `CandidType` with the provided type. We also provide a constructor function `MyFunc::new(principal, method)`.
 macro_rules! define_function {
     ( $vis:vis $func:ident : $($ty:tt)+ ) => {
         #[derive($crate::Deserialize, PartialEq, Eq, Debug, Clone)]
