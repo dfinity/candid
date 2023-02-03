@@ -34,11 +34,11 @@ pub struct nested {
 }
 
 candid::define_service!(pub broker_find_ret0 : {
-  "current" : () -> (u32);
-  "up" : () -> ();
+  "current" : candid::func!(() -> (u32));
+  "up" : candid::func!(() -> ());
 });
 candid::define_service!(pub broker : {
-  "find" : (String) -> (broker_find_ret0);
+  "find" : candid::func!((String) -> (broker_find_ret0));
 });
 #[derive(CandidType, Deserialize)]
 pub enum h_arg1 { A(candid::Nat), B(Option<String>) }

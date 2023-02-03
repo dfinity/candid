@@ -29,7 +29,7 @@ pub struct stream(Option<stream_inner>);
 
 candid::define_service!(pub s : {
   "f" : t::ty();
-  "g" : (list) -> (B, tree, stream);
+  "g" : candid::func!((list) -> (B, tree, stream));
 });
 pub struct SERVICE(pub candid::Principal);
 impl SERVICE{

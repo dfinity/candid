@@ -40,7 +40,7 @@ pub struct stream(Option<stream_inner>);
 
 candid::define_service!(pub r#return : {
   "f" : t::ty();
-  "g" : (list) -> (r#if, stream);
+  "g" : candid::func!((list) -> (r#if, stream));
 });
 candid::define_function!(pub t : (r#return) -> ());
 #[derive(CandidType, Deserialize)]

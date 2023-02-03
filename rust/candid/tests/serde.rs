@@ -147,6 +147,9 @@ fn test_reference() {
         MyService::new(principal),
         "4449444c0369020166010167026a00017d006a0000010101000103caffee",
     );
+    define_service!(S: { "next" : func!(() -> (S)) });
+    let v = S::new(principal);
+    assert_eq!(v, Decode!(&Encode!(&v).unwrap(), S).unwrap());
 }
 
 #[test]
