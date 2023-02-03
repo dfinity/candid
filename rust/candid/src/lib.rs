@@ -11,6 +11,21 @@
 //!
 //! Note that if you are using the [Rust CDK](https://github.com/dfinity/cdk-rs/) to develop Rust canisters, it is encouraged to
 //! use the Candid crate from `ic_cdk::export::candid` to avoid version mismatch.
+//! In this case, whenever a Candid trait is derived (e.g. [`candid::types::CandidType`](types/trait.CandidType.html)),
+//! then `candid_path` has to be set to the re-exported module:
+//!
+//! ```
+//! use ic_cdk::export::candid;
+//!
+//! #[derive(Clone, Debug, CandidType, Deserialize)]
+//! #[candid_path("ic_cdk::export::candid")]
+//! pub struct HttpRequest {
+//!     pub method: String,
+//!     pub url: String,
+//!     pub headers: Vec<HeaderField>,
+//!     pub body: ByteBuf,
+//! }
+//! ```
 //!
 //! ## Operating on native Rust values
 //! We are using a builder pattern to encode/decode Candid messages, see [`candid::ser::IDLBuilder`](ser/struct.IDLBuilder.html) for serialization and [`candid::de::IDLDeserialize`](de/struct.IDLDeserialize.html) for deserialization.
