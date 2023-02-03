@@ -4,7 +4,7 @@ use candid::{self, CandidType, Deserialize};
 use ic_cdk::api::call::CallResult;
 
 candid::define_function!(pub Func : () -> (Service));
-candid::define_service!(pub Service : { "f" : Func });
+candid::define_service!(pub Service : { "f" : Func::ty() });
 pub type Service2 = Box<Service>;
 #[derive(CandidType, Deserialize)]
 pub enum asVariant_ret0 { a(Service2), b{ f: Option<Func> } }

@@ -39,7 +39,7 @@ pub struct stream_inner { head: candid::Nat, next: stream_inner_next }
 pub struct stream(Option<stream_inner>);
 
 candid::define_service!(pub r#return : {
-  "f" : t;
+  "f" : t::ty();
   "g" : (list) -> (r#if, stream);
 });
 candid::define_function!(pub t : (r#return) -> ());

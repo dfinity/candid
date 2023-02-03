@@ -211,7 +211,7 @@ fn pp_ty_service(serv: &[(String, Type)]) -> RcDoc {
         serv.iter().map(|(id, func)| {
             let func_doc = match func.as_ref() {
                 TypeInner::Func(ref f) => pp_ty_func(f),
-                TypeInner::Var(_) => pp_ty(func, &RecPoints::default()),
+                TypeInner::Var(_) => pp_ty(func, &RecPoints::default()).append("::ty()"),
                 _ => unreachable!(),
             };
             RcDoc::text("\"")
