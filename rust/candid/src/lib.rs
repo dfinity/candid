@@ -9,9 +9,6 @@
 //!
 //! Candid provides efficient, flexible and safe ways of converting data between each of these representations.
 //!
-//! Note that if you are using the [Rust CDK](https://github.com/dfinity/cdk-rs/) to develop Rust canisters, it is encouraged to
-//! use the Candid crate from `ic_cdk::export::candid` to avoid version mismatch.
-//!
 //! ## Operating on native Rust values
 //! We are using a builder pattern to encode/decode Candid messages, see [`candid::ser::IDLBuilder`](ser/struct.IDLBuilder.html) for serialization and [`candid::de::IDLDeserialize`](de/struct.IDLDeserialize.html) for deserialization.
 //!
