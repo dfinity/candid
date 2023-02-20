@@ -1,6 +1,6 @@
 [package]
 name = "candid"
-version = "0.9.0-beta.0"
+version = "0.9.0-beta.2"
 edition = "2018"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
@@ -81,10 +81,17 @@ name = "parse_type"
 path = "tests/parse_type.rs"
 required-features = ["parser"]
 
-
 [features]
 configs = ["serde_dhall"]
-random = ["configs", "arbitrary", "fake", "rand"]
+random = ["parser", "configs", "arbitrary", "fake", "rand"]
 parser = ["lalrpop", "lalrpop-util", "logos"]
-all = ["parser", "random"]
+all = ["random"]
 mute_warnings = []
+
+# docs.rs-specific configuration
+# To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+[package.metadata.docs.rs]
+# document all features
+all-features = true
+# defines the configuration attribute `docsrs`
+rustdoc-args = ["--cfg", "docsrs"]

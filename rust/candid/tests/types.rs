@@ -3,10 +3,10 @@
 use std::fmt::Debug;
 
 use candid::{
-    candid_method,
+    candid_method, field,
     ser::IDLBuilder,
     types::value::{IDLValue, IDLValueVisitor},
-    types::{get_type, Label, Serializer, Type, TypeInner},
+    types::{get_type, Serializer, Type, TypeInner},
     CandidType, Decode, Deserialize, Encode, Int,
 };
 use serde::de::DeserializeOwned;
@@ -111,8 +111,8 @@ fn test_struct() {
     assert_eq!(
         A::ty(),
         TypeInner::Record(vec![
-            field("bar", TypeInner::Bool.into()),
-            field("foo", TypeInner::Int.into())
+            field! {bar: TypeInner::Bool.into()},
+            field! {foo: TypeInner::Int.into()}
         ])
         .into()
     );
@@ -126,8 +126,8 @@ fn test_struct() {
     assert_eq!(
         get_type(&res),
         TypeInner::Record(vec![
-            field("g1", TypeInner::Int32.into()),
-            field("g2", TypeInner::Bool.into())
+            field! {g1: TypeInner::Int32.into()},
+            field! {g2: TypeInner::Bool.into()}
         ])
         .into()
     );
@@ -140,11 +140,8 @@ fn test_struct() {
     assert_eq!(
         List::ty(),
         TypeInner::Record(vec![
-            field("head", TypeInner::Int32.into()),
-            field(
-                "tail",
-                TypeInner::Opt(TypeInner::Knot(candid::types::TypeId::of::<List>()).into()).into()
-            )
+            field!{head: TypeInner::Int32.into()},
+            field!{tail: TypeInner::Opt(TypeInner::Knot(candid::types::TypeId::of::<List>()).into()).into()}
         ])
         .into()
     );
@@ -165,24 +162,23 @@ fn test_variant() {
     assert_eq!(
         get_type(&v),
         TypeInner::Variant(vec![
-            field(
-                "Bar",
+            field! {Bar:
                 TypeInner::Record(vec![
-                    unnamed_field(0, TypeInner::Bool.into()),
-                    unnamed_field(1, TypeInner::Int32.into())
+                    field!{0: TypeInner::Bool.into()},
+                    field!{1: TypeInner::Int32.into()}
                 ])
                 .into()
-            ),
-            field(
-                "Baz",
+            },
+            field! {
+                Baz:
                 TypeInner::Record(vec![
-                    field("a", TypeInner::Int32.into()),
-                    field("b", TypeInner::Nat32.into())
+                    field!{a: TypeInner::Int32.into()},
+                    field!{b: TypeInner::Nat32.into()}
                 ])
                 .into()
-            ),
-            field("Foo", TypeInner::Null.into()),
-            field("Newtype", TypeInner::Bool.into()),
+            },
+            field! {Foo: TypeInner::Null.into()},
+            field! {Newtype: TypeInner::Bool.into()},
         ])
         .into()
     );
@@ -295,18 +291,4 @@ fn test_counter() {
     candid::export_service!();
     let expected = "service : { inc : () -> (); read : () -> (nat64) query }";
     assert_eq!(expected, __export_service());
-}
-
-fn field(id: &str, ty: Type) -> candid::types::Field {
-    candid::types::Field {
-        id: Label::Named(id.to_string()).into(),
-        ty,
-    }
-}
-
-fn unnamed_field(id: u32, ty: Type) -> candid::types::Field {
-    candid::types::Field {
-        id: Label::Id(id).into(),
-        ty,
-    }
 }
