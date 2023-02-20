@@ -14,8 +14,9 @@ serde_bytes = "0.11"
 serde = "1.0.115"
 
 [dependencies.candid]
-path = ".."
-features = ["parser"]
+version = "0.8.4"
+# path = ".."
+# features = ["parser"]
 
 # Prevent this from interfering with workspaces
 [workspace]
