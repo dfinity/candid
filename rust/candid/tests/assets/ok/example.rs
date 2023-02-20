@@ -1,29 +1,29 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use ic_cdk::export::candid::{self, CandidType, Deserialize};
+use candid::{self, CandidType, Deserialize};
 use ic_cdk::api::call::CallResult;
 
 #[derive(CandidType, Deserialize)]
-struct node { head: candid::Nat, tail: Box<list> }
+pub struct node { head: candid::Nat, tail: Box<list> }
 
 #[derive(CandidType, Deserialize)]
-struct list(Option<node>);
+pub struct list(Option<node>);
 
-type my_type = candid::Principal;
+pub type my_type = candid::Principal;
 #[derive(CandidType, Deserialize)]
-struct List_inner { head: candid::Int, tail: Box<List> }
-
-#[derive(CandidType, Deserialize)]
-struct List(Option<List_inner>);
+pub struct List_inner { head: candid::Int, tail: Box<List> }
 
 #[derive(CandidType, Deserialize)]
-struct nested_3 { _0_: candid::Nat, _42_: candid::Nat, _43_: u8 }
+pub struct List(Option<List_inner>);
 
 #[derive(CandidType, Deserialize)]
-enum nested_41 { _42_, A, B, C }
+pub struct nested_3 { _0_: candid::Nat, _42_: candid::Nat, _43_: u8 }
 
 #[derive(CandidType, Deserialize)]
-struct nested {
+pub enum nested_41 { _42_, A, B, C }
+
+#[derive(CandidType, Deserialize)]
+pub struct nested {
   _0_: candid::Nat,
   _1_: candid::Nat,
   _2_: (candid::Nat,candid::Int,),
@@ -33,24 +33,31 @@ struct nested {
   _42_: candid::Nat,
 }
 
-type broker = candid::Service;
+candid::define_service!(pub broker_find_ret0 : {
+  "current" : candid::func!(() -> (u32));
+  "up" : candid::func!(() -> ());
+});
+candid::define_service!(pub broker : {
+  "find" : candid::func!((String) -> (broker_find_ret0));
+});
 #[derive(CandidType, Deserialize)]
-enum h_arg1 { A(candid::Nat), B(Option<String>) }
+pub enum h_arg1 { A(candid::Nat), B(Option<String>) }
 
 #[derive(CandidType, Deserialize)]
-struct h_ret0_42 {}
+pub struct h_ret0_42 {}
 
 #[derive(CandidType, Deserialize)]
-struct h_ret0 { _42_: h_ret0_42, id: candid::Nat }
+pub struct h_ret0 { _42_: h_ret0_42, id: candid::Nat }
 
-type f = candid::Func;
+candid::define_function!(pub f_arg1 : (i32) -> (i64));
+candid::define_function!(pub f : (List, f_arg1) -> (Option<List>));
 #[derive(CandidType, Deserialize)]
-struct b (candid::Int,candid::Nat,);
+pub struct b (candid::Int,candid::Nat,);
 
 #[derive(CandidType, Deserialize)]
-enum a { a, b(b) }
+pub enum a { a, b(b) }
 
-struct SERVICE(candid::Principal);
+pub struct SERVICE(pub candid::Principal);
 impl SERVICE{
   pub async fn f(
     &self,
@@ -75,7 +82,7 @@ impl SERVICE{
   ) -> CallResult<(h_ret0,)> {
     ic_cdk::call(self.0, "h", (arg0,arg1,arg2,)).await
   }
-  pub async fn i(&self, arg0: List, arg1: candid::Func) -> CallResult<
+  pub async fn i(&self, arg0: List, arg1: f_arg1) -> CallResult<
     (Option<List>,)
   > { ic_cdk::call(self.0, "i", (arg0,arg1,)).await }
   pub async fn x(&self, arg0: a, arg1: b) -> CallResult<

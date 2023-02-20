@@ -9,9 +9,6 @@
 //!
 //! Candid provides efficient, flexible and safe ways of converting data between each of these representations.
 //!
-//! Note that if you are using the [Rust CDK](https://github.com/dfinity/cdk-rs/) to develop Rust canisters, it is encouraged to
-//! use the Candid crate from `ic_cdk::export::candid` to avoid version mismatch.
-//!
 //! ## Operating on native Rust values
 //! We are using a builder pattern to encode/decode Candid messages, see [`candid::ser::IDLBuilder`](ser/struct.IDLBuilder.html) for serialization and [`candid::de::IDLDeserialize`](de/struct.IDLDeserialize.html) for deserialization.
 //!
@@ -126,6 +123,28 @@
 //! # Ok::<(), candid::Error>(())
 //! ```
 //!
+//! ## Operating on reference types
+//! The type of function and service references cannot be derived automatically. We provide
+//! two macros [`define_function!`](macro.define_function.html) and [`define_service!`](macro.define_service.html) to help defining the reference types. To specify reference types in the macro, you need to use the corresponding Rust types,
+//! instead of the Candid types.
+//!
+//! ```
+//! use candid::{define_function, define_service, func, Encode, Decode, Principal};
+//! let principal = Principal::from_text("aaaaa-aa").unwrap();
+//!
+//! define_function!(pub CustomFunc : (u8, &str) -> (u128));
+//! let func = CustomFunc::new(principal, "method_name".to_string());
+//! assert_eq!(func, Decode!(&Encode!(&func)?, CustomFunc)?);
+//!
+//! define_service!(MyService : {
+//!   "f": CustomFunc::ty();
+//!   "g": func!((candid::Int) -> (candid::Nat, CustomFunc) query)
+//! });
+//! let serv = MyService::new(principal);
+//! assert_eq!(serv, Decode!(&Encode!(&serv)?, MyService)?);
+//! # Ok::<(), candid::Error>(())
+//! ```
+//!
 //! ## Operating on untyped Candid values
 //! Any valid Candid value can be manipulated in an recursive enum representation [`candid::parser::value::IDLValue`](parser/value/enum.IDLValue.html).
 //! We use `ser.value_arg(v)` and `de.get_value::<IDLValue>()` for encoding and decoding the value.
@@ -155,7 +174,9 @@
 //! and use `to_bytes()` and `from_bytes()` to encode and decode Candid messages.
 //! We also provide a parser to parse Candid values in text format.
 //!
-//! ```#[cfg(feature = "parser")]
+//! ```
+//! #[cfg(feature = "parser")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::{IDLArgs, TypeEnv};
 //! // Candid values represented in text format
 //! let text_value = r#"
@@ -176,7 +197,8 @@
 //! let parsed_args: IDLArgs = output.parse()?;
 //! let annotated_args = args.annotate_types(true, &TypeEnv::new(), &parsed_args.get_types())?;
 //! assert_eq!(annotated_args, parsed_args);
-//! # Ok::<(), candid::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //! Note that when parsing Candid values, we assume the number literals are always of type `Int`.
 //! This can be changed by providing the type of the method arguments, which can usually be obtained
@@ -185,7 +207,9 @@
 //! ## Operating on Candid AST
 //! We provide a parser and type checker for Candid files specifying the service interface.
 //!
-//! ```#[cfg(feature = "parser")]
+//! ```
+//! #[cfg(feature = "parser")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::{IDLProg, TypeEnv, check_prog, types::{Type, TypeInner}};
 //! let did_file = r#"
 //!     type List = opt record { head: int; tail: List };
@@ -199,9 +223,6 @@
 //! // Parse did file into an AST
 //! let ast: IDLProg = did_file.parse()?;
 //!
-//! // Pretty-print AST
-//! let pretty: String = candid::parser::types::to_pretty(&ast, 80);
-//!
 //! // Type checking a given .did file
 //! // let (env, opt_actor) = check_file("a.did")?;
 //! // Or alternatively, use check_prog to check in-memory did file
@@ -212,7 +233,8 @@
 //! let method = env.get_method(&actor, "g").unwrap();
 //! assert_eq!(method.is_query(), true);
 //! assert_eq!(method.args, vec![TypeInner::Var("List".to_string()).into()]);
-//! # Ok::<(), candid::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Serializing untyped Candid values with type annotations.
@@ -221,7 +243,9 @@
 //! This is useful when serializing different number types and recursive types.
 //! There is no need to use types for deserialization as the types are available in the Candid message.
 //!
-//! ```#[cfg(feature = "parser")]
+//! ```
+//! #[cfg(feature = "parser")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::{IDLArgs, types::value::IDLValue};
 //! # use candid::{IDLProg, TypeEnv, check_prog};
 //! # let did_file = r#"
@@ -247,7 +271,8 @@
 //!             IDLValue::Nat(42.into()),
 //!             IDLValue::Int8(42)
 //!            ]);
-//! # Ok::<(), candid::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Building the library as a JS/Wasm package
@@ -296,6 +321,10 @@
 //!
 //!
 
+// only enables the `doc_cfg` feature when
+// the `docsrs` configuration attribute is defined
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 pub use candid_derive::{candid_method, export_service, CandidType};
 pub use serde::Deserialize;
 
@@ -324,6 +353,7 @@ pub mod utils;
 pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
 pub mod pretty;
 
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
 #[cfg(feature = "parser")]
 pub mod parser;
 #[cfg(feature = "parser")]

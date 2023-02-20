@@ -10,11 +10,13 @@ use crate::{pretty_parse, types::Type, Error, TypeEnv};
 #[cfg(feature = "parser")]
 use std::path::Path;
 
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
 #[cfg(feature = "parser")]
 pub enum CandidSource<'a> {
     File(&'a Path),
     Text(&'a str),
 }
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
 #[cfg(feature = "parser")]
 impl<'a> CandidSource<'a> {
     pub fn load(&self) -> Result<(TypeEnv, Option<Type>)> {
@@ -30,6 +32,7 @@ impl<'a> CandidSource<'a> {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
 #[cfg(feature = "parser")]
 /// Check compatibility of two service types
 pub fn service_compatible(new: CandidSource, old: CandidSource) -> Result<()> {
