@@ -1,6 +1,6 @@
 #![no_main]
+use candid::{define_function, CandidType, Decode, Deserialize, Nat};
 use libfuzzer_sys::fuzz_target;
-use candid::{Decode, CandidType, Deserialize, Func, Nat};
 use serde_bytes::ByteBuf;
 
 #[derive(CandidType, Deserialize)]
@@ -11,9 +11,10 @@ pub struct Token {
     pub sha256: Option<ByteBuf>,
 }
 
+define_function!(pub callback : (&u8) -> (Nat));
 #[derive(CandidType, Deserialize)]
 pub struct CallbackStrategy {
-    pub callback: Func,
+    pub callback: callback,
     pub token: Token,
 }
 
@@ -36,7 +37,7 @@ pub struct HttpResponse {
 
 fuzz_target!(|data: &[u8]| {
     let payload = data.to_vec();
-    let _decoded = match Decode!(payload.as_slice(),  HttpResponse) {
+    let _decoded = match Decode!(payload.as_slice(), HttpResponse) {
         Ok(_v) => _v,
         Err(_e) => return,
     };
