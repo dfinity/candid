@@ -179,7 +179,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
-            remaining_depth: 1024,
+            remaining_depth: 8192,
         })
     }
     fn dump_state(&self) -> String {
