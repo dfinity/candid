@@ -135,6 +135,18 @@ macro_rules! check {
     }};
 }
 
+macro_rules! check_recursion {
+    ($this:ident $($body:tt)*) => {
+        $this.remaining_depth -= 1;
+        if $this.remaining_depth == 0 {
+            return Err(Error::msg("Recursion limit exceeded"));
+        }
+        let __ret = { $this $($body)* };
+        $this.remaining_depth += 1;
+        __ret
+    };
+}
+
 #[derive(Clone)]
 struct Deserializer<'de> {
     input: Cursor<&'de [u8]>,
@@ -150,6 +162,7 @@ struct Deserializer<'de> {
     // Indicates whether to deserialize with IDLValue.
     // It only affects the field id generation in enum type.
     is_untyped: bool,
+    remaining_depth: u8,
 }
 
 impl<'de> Deserializer<'de> {
@@ -166,6 +179,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
+            remaining_depth: 128,
         })
     }
     fn dump_state(&self) -> String {
@@ -400,6 +414,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         if self.field_name.is_some() {
             return self.deserialize_identifier(visitor);
         }
+        check_recursion! {
         self.unroll_type()?;
         match self.expect_type.as_ref() {
             TypeInner::Int => self.deserialize_int(visitor),
@@ -434,6 +449,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             TypeInner::Func(_) => self.deserialize_function(visitor),
             TypeInner::Future => self.deserialize_future(visitor),
             _ => assert!(false),
+        }
         }
     }
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>
@@ -571,7 +587,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.wire_type = t1.clone();
                 self.expect_type = t2.clone();
                 if BoolValue::read(&mut self.input)?.0 {
-                    self.recoverable_visit_some(visitor)
+                    check_recursion! {
+                        self.recoverable_visit_some(visitor)
+                    }
                 } else {
                     visitor.visit_none()
                 }
@@ -582,7 +600,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     self.expect_type.as_ref(),
                     TypeInner::Null | TypeInner::Reserved | TypeInner::Opt(_)
                 ) {
-                    self.recoverable_visit_some(visitor)
+                    check_recursion! {
+                        self.recoverable_visit_some(visitor)
+                    }
                 } else {
                     self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                     visitor.visit_none()
@@ -595,6 +615,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        check_recursion! {
         self.unroll_type()?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
@@ -618,6 +639,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 Ok(value)
             }
             _ => check!(false),
+        }
         }
     }
     fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
@@ -647,6 +669,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        check_recursion! {
         self.unroll_type()?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
@@ -679,12 +702,15 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             }
             _ => check!(false),
         }
+        }
     }
     fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        self.deserialize_seq(visitor)
+        check_recursion! {
+            self.deserialize_seq(visitor)
+        }
     }
     fn deserialize_tuple_struct<V>(
         self,
@@ -695,7 +721,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.deserialize_seq(visitor)
+        check_recursion! {
+            self.deserialize_seq(visitor)
+        }
     }
     fn deserialize_struct<V>(
         self,
@@ -706,6 +734,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        check_recursion! {
         self.unroll_type()?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Record(e), TypeInner::Record(w)) => {
@@ -717,6 +746,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             }
             _ => check!(false),
         }
+        }
     }
     fn deserialize_enum<V>(
         self,
@@ -727,6 +757,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        check_recursion! {
         self.unroll_type()?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Variant(e), TypeInner::Variant(w)) => {
@@ -747,6 +778,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 visitor.visit_enum(Compound::new(self, Style::Enum { expect, wire }))
             }
             _ => check!(false),
+        }
         }
     }
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value>
