@@ -162,7 +162,7 @@ struct Deserializer<'de> {
     // Indicates whether to deserialize with IDLValue.
     // It only affects the field id generation in enum type.
     is_untyped: bool,
-    remaining_depth: u8,
+    remaining_depth: u16,
 }
 
 impl<'de> Deserializer<'de> {
@@ -179,7 +179,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
-            remaining_depth: 128,
+            remaining_depth: 1024,
         })
     }
     fn dump_state(&self) -> String {
