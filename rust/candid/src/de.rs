@@ -354,7 +354,11 @@ impl<'de> Deserializer<'de> {
     {
         let len = Len::read(&mut self.input)?.0 as u64;
         Len::read(&mut self.input)?;
+        let slice = self.input.get_ref();
         let pos = self.input.position();
+        if pos + len > slice.len() as u64 {
+            return Err(Error::msg(format!("Cannot read {len} bytes")));
+        }
         self.input.set_position(pos + len);
         visitor.visit_unit()
     }
