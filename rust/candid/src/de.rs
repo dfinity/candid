@@ -414,7 +414,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         if self.field_name.is_some() {
             return self.deserialize_identifier(visitor);
         }
-        check_recursion! {
         self.unroll_type()?;
         match self.expect_type.as_ref() {
             TypeInner::Int => self.deserialize_int(visitor),
@@ -449,7 +448,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             TypeInner::Func(_) => self.deserialize_function(visitor),
             TypeInner::Future => self.deserialize_future(visitor),
             _ => assert!(false),
-        }
         }
     }
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>
