@@ -137,12 +137,14 @@ macro_rules! check {
 
 macro_rules! check_recursion {
     ($this:ident $($body:tt)*) => {
-        $this.remaining_depth -= 1;
-        if $this.remaining_depth == 0 {
-            return Err(Error::msg("Recursion limit exceeded"));
+        $this.recursion_depth += 1;
+        match stacker::remaining_stack() {
+            Some(size) if size < 32768 => return Err(Error::msg(format!("Recursion limit exceeded at depth {}", $this.recursion_depth))),
+            None if $this.recursion_depth > 2048 => return Err(Error::msg(format!("Recursion limit exceeded at depth {}. Cannot detect stack size.", $this.recursion_depth))),
+            _ => (),
         }
         let __ret = { $this $($body)* };
-        $this.remaining_depth += 1;
+        $this.recursion_depth -= 1;
         __ret
     };
 }
@@ -162,7 +164,7 @@ struct Deserializer<'de> {
     // Indicates whether to deserialize with IDLValue.
     // It only affects the field id generation in enum type.
     is_untyped: bool,
-    remaining_depth: u16,
+    recursion_depth: u16,
 }
 
 impl<'de> Deserializer<'de> {
@@ -179,7 +181,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
-            remaining_depth: 8192,
+            recursion_depth: 0,
         })
     }
     fn dump_state(&self) -> String {

@@ -37,6 +37,7 @@ sha2 = "0.10.1"
 thiserror = "1.0.20"
 anyhow = "1.0"
 binread = { version = "2.1", features = ["debug_template"] }
+stacker = "0.1"
 
 lalrpop-util = { version = "0.19.0", optional = true }
 logos = { version = "0.12", optional = true }
