@@ -20,6 +20,7 @@
 
 * Macros for constructing type AST nodes: `service!`, `func!` and `field!`
 * Support future types
+* Bound recursion depth in deserialization for non-Wasm target (Wasm canister doesn't have a specified C ABI, and runs in a sandbox. It's okay to stack overflow)
 * `Nat` serialization for JSON and CBOR
 
 ## 2022-11-17 (Rust 0.8.3 -- 0.8.4)

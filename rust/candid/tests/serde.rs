@@ -27,6 +27,12 @@ fn test_error() {
         || test_decode(b"DIDL\0\x01\0\x01", &42),
         "type index 0 out of range",
     );
+    check_error(
+        || {
+            test_decode(b"DIDL\x02\x6c\x01\x0a\x01\x6d\x00\x01\x01                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ", &candid::Reserved)
+        },
+        "Recursion limit exceeded",
+    );
 }
 
 #[test]
