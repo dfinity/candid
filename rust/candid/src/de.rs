@@ -135,6 +135,7 @@ macro_rules! check {
     }};
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 macro_rules! check_recursion {
     ($this:ident $($body:tt)*) => {
         $this.recursion_depth += 1;
@@ -146,6 +147,13 @@ macro_rules! check_recursion {
         let __ret = { $this $($body)* };
         $this.recursion_depth -= 1;
         __ret
+    };
+}
+// No need to check recursion depth for wasm32, because canisters are running in a sandbox
+#[cfg(target_arch = "wasm32")]
+macro_rules! check_recursion {
+    ($this:ident $($body:tt)*) => {
+        $this $($body)*
     };
 }
 
@@ -164,6 +172,7 @@ struct Deserializer<'de> {
     // Indicates whether to deserialize with IDLValue.
     // It only affects the field id generation in enum type.
     is_untyped: bool,
+    #[cfg(not(target_arch = "wasm32"))]
     recursion_depth: u16,
 }
 
@@ -181,6 +190,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
+            #[cfg(not(target_arch = "wasm32"))]
             recursion_depth: 0,
         })
     }
