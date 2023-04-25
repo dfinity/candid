@@ -103,6 +103,7 @@ fn pp_ty<'a>(ty: &'a Type, recs: &RecPoints) -> RcDoc<'a> {
         }
         Principal => str("Principal"),
         Opt(ref t) => str("Option").append(enclose("<", pp_ty(t, recs), ">")),
+        Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
         Vec(ref t) => str("Vec").append(enclose("<", pp_ty(t, recs), ">")),
         Record(ref fs) => pp_record_fields(fs, recs),
         Variant(_) => unreachable!(), // not possible after rewriting

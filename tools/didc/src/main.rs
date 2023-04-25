@@ -180,7 +180,10 @@ fn main() -> Result<()> {
                 "ts" => candid::bindings::typescript::compile(&env, &actor),
                 "did" => candid::bindings::candid::compile(&env, &actor),
                 "mo" => candid::bindings::motoko::compile(&env, &actor),
-                "rs" => candid::bindings::rust::compile(&env, &actor),
+                "rs" => {
+                    let config = candid::bindings::rust::Config::new();
+                    candid::bindings::rust::compile(&config, &env, &actor)
+                }
                 _ => unreachable!(),
             };
             println!("{content}");

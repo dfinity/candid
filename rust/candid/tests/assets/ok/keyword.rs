@@ -66,18 +66,21 @@ impl SERVICE{
   pub async fn oneway_(&self, arg0: u8) -> CallResult<()> {
     ic_cdk::call(self.0, "oneway_", (arg0,)).await
   }
-  pub async fn query(&self, arg0: Vec<u8>) -> CallResult<(Vec<u8>,)> {
-    ic_cdk::call(self.0, "query", (arg0,)).await
-  }
+  pub async fn query(&self, arg0: serde_bytes::ByteBuf) -> CallResult<
+    (serde_bytes::ByteBuf,)
+  > { ic_cdk::call(self.0, "query", (arg0,)).await }
   pub async fn r#return(&self, arg0: o) -> CallResult<(o,)> {
     ic_cdk::call(self.0, "return", (arg0,)).await
   }
   pub async fn service(&self, arg0: r#return) -> CallResult<()> {
     ic_cdk::call(self.0, "service", (arg0,)).await
   }
-  pub async fn tuple(&self, arg0: (candid::Int,Vec<u8>,String,)) -> CallResult<
-    ((candid::Int,u8,),)
-  > { ic_cdk::call(self.0, "tuple", (arg0,)).await }
+  pub async fn tuple(
+    &self,
+    arg0: (candid::Int,serde_bytes::ByteBuf,String,),
+  ) -> CallResult<((candid::Int,u8,),)> {
+    ic_cdk::call(self.0, "tuple", (arg0,)).await
+  }
   pub async fn variant(&self, arg0: variant_arg0) -> CallResult<()> {
     ic_cdk::call(self.0, "variant", (arg0,)).await
   }

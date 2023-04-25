@@ -62,7 +62,7 @@ impl SERVICE{
   pub async fn f(
     &self,
     arg0: list,
-    arg1: Vec<u8>,
+    arg1: serde_bytes::ByteBuf,
     arg2: Option<bool>,
   ) -> CallResult<()> { ic_cdk::call(self.0, "f", (arg0,arg1,arg2,)).await }
   pub async fn g(
