@@ -5,6 +5,27 @@ use pretty::RcDoc;
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
+#[derive(Clone)]
+pub struct Config {
+    pub candid_crate: String,
+    /// Applies to all types for now
+    pub type_attributes: String,
+    /// Only generates SERVICE struct if canister_id is not provided
+    pub canister_id: Option<crate::Principal>,
+    /// Service name when canister id is provided
+    pub service_name: String,
+}
+impl Config {
+    pub fn new() -> Self {
+        Config {
+            candid_crate: "candid".to_string(),
+            type_attributes: "".to_string(),
+            canister_id: None,
+            service_name: "service".to_string(),
+        }
+    }
+}
+
 type RecPoints<'a> = BTreeSet<&'a str>;
 // The definition of tuple is language specific.
 pub(crate) fn is_tuple(fs: &[Field]) -> bool {
@@ -80,7 +101,7 @@ fn pp_ty<'a>(ty: &'a Type, recs: &RecPoints) -> RcDoc<'a> {
                 name
             }
         }
-        Principal => str("candid::Principal"),
+        Principal => str("Principal"),
         Opt(ref t) => str("Option").append(enclose("<", pp_ty(t, recs), ">")),
         Vec(ref t) => str("Vec").append(enclose("<", pp_ty(t, recs), ">")),
         Record(ref fs) => pp_record_fields(fs, recs),
@@ -128,8 +149,17 @@ fn pp_variant_fields<'a>(fs: &'a [Field], recs: &RecPoints) -> RcDoc<'a> {
     enclose_space("{", fields, "}")
 }
 
-fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -> RcDoc<'a> {
-    let derive = "#[derive(CandidType, Deserialize)]";
+fn pp_defs<'a>(
+    config: &'a Config,
+    env: &'a TypeEnv,
+    def_list: &'a [&'a str],
+    recs: &'a RecPoints,
+) -> RcDoc<'a> {
+    let derive = if config.type_attributes.is_empty() {
+        "#[derive(CandidType, Deserialize)]"
+    } else {
+        &config.type_attributes
+    };
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         let name = ident(id).append(" ");
@@ -256,7 +286,7 @@ fn pp_function<'a>(id: &'a str, func: &'a Function) -> RcDoc<'a> {
     sig.append(enclose_space("{", body, "}"))
 }
 
-fn pp_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
+fn pp_actor<'a>(config: &'a Config, env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
     // TODO trace to service before we figure out what canister means in Rust
     let serv = env.as_service(actor).unwrap();
     let body = RcDoc::intersperse(
@@ -266,18 +296,32 @@ fn pp_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
         }),
         RcDoc::hardline(),
     );
-    RcDoc::text("pub struct SERVICE(pub candid::Principal);")
+    let res = RcDoc::text("pub struct SERVICE(pub Principal);")
         .append(RcDoc::hardline())
         .append("impl SERVICE")
         .append(enclose_space("{", body, "}"))
+        .append(RcDoc::hardline());
+    if let Some(cid) = config.canister_id {
+        res.append(format!(
+            r#"pub fn {}() -> SERVICE {{
+  SERVICE(Principal::from_text("{}").unwrap())
+}}"#,
+            config.service_name, cid
+        ))
+    } else {
+        res
+    }
 }
 
-pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
-    let header = r#"// This is an experimental feature to generate Rust binding from Candid.
+pub fn compile(config: &Config, env: &TypeEnv, actor: &Option<Type>) -> String {
+    let header = format!(
+        r#"// This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use candid::{self, CandidType, Deserialize};
+use {}::{{self, CandidType, Deserialize, Principal}};
 use ic_cdk::api::call::CallResult;
-"#;
+"#,
+        config.candid_crate
+    );
     let (env, actor) = nominalize_all(env, actor);
     let def_list: Vec<_> = if let Some(actor) = &actor {
         chase_actor(&env, actor).unwrap()
@@ -285,11 +329,11 @@ use ic_cdk::api::call::CallResult;
         env.0.iter().map(|pair| pair.0.as_ref()).collect()
     };
     let recs = infer_rec(&env, &def_list).unwrap();
-    let defs = pp_defs(&env, &def_list, &recs);
+    let defs = pp_defs(config, &env, &def_list, &recs);
     let doc = match &actor {
         None => defs,
         Some(actor) => {
-            let actor = pp_actor(&env, actor);
+            let actor = pp_actor(config, &env, actor);
             defs.append(actor)
         }
     };

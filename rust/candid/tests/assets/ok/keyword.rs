@@ -1,6 +1,6 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use candid::{self, CandidType, Deserialize};
+use candid::{self, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult;
 
 #[derive(CandidType, Deserialize)]
@@ -46,7 +46,7 @@ candid::define_function!(pub t : (r#return) -> ());
 #[derive(CandidType, Deserialize)]
 pub enum variant_arg0 { A, B, C, D(f64) }
 
-pub struct SERVICE(pub candid::Principal);
+pub struct SERVICE(pub Principal);
 impl SERVICE{
   pub async fn Oneway(&self) -> CallResult<()> {
     ic_cdk::call(self.0, "Oneway", ()).await
@@ -81,4 +81,7 @@ impl SERVICE{
   pub async fn variant(&self, arg0: variant_arg0) -> CallResult<()> {
     ic_cdk::call(self.0, "variant", (arg0,)).await
   }
+}
+pub fn service() -> SERVICE {
+  SERVICE(Principal::from_text("aaaaa-aa").unwrap())
 }
