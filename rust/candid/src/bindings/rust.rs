@@ -6,6 +6,13 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 
 #[derive(Clone)]
+pub enum Target {
+    CanisterCall,
+    Agent,
+    CanisterStub,
+}
+
+#[derive(Clone)]
 pub struct Config {
     pub candid_crate: String,
     /// Applies to all types for now
@@ -14,6 +21,7 @@ pub struct Config {
     pub canister_id: Option<crate::Principal>,
     /// Service name when canister id is provided
     pub service_name: String,
+    pub target: Target,
 }
 impl Config {
     pub fn new() -> Self {
@@ -22,7 +30,13 @@ impl Config {
             type_attributes: "".to_string(),
             canister_id: None,
             service_name: "service".to_string(),
+            target: Target::CanisterCall,
         }
+    }
+}
+impl Default for Config {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -103,6 +117,7 @@ fn pp_ty<'a>(ty: &'a Type, recs: &RecPoints) -> RcDoc<'a> {
         }
         Principal => str("Principal"),
         Opt(ref t) => str("Option").append(enclose("<", pp_ty(t, recs), ">")),
+        // It's a bit tricky to use `deserialize_with = "serde_bytes"`. It's not working for `type t = blob`
         Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
         Vec(ref t) => str("Vec").append(enclose("<", pp_ty(t, recs), ">")),
         Record(ref fs) => pp_record_fields(fs, recs),
@@ -255,11 +270,16 @@ fn pp_ty_service(serv: &[(String, Type)]) -> RcDoc {
     enclose_space("{", doc, "}")
 }
 
-fn pp_function<'a>(id: &'a str, func: &'a Function) -> RcDoc<'a> {
+fn pp_function<'a>(config: &Config, id: &'a str, func: &'a Function) -> RcDoc<'a> {
     let name = ident(id);
     let empty = BTreeSet::new();
+    let arg_prefix = str(match config.target {
+        Target::CanisterCall => "&self",
+        Target::Agent => "&self, agent: &ic_agent::Agent",
+        Target::CanisterStub => unimplemented!(),
+    });
     let args = concat(
-        std::iter::once(str("&self")).chain(
+        std::iter::once(arg_prefix).chain(
             func.args
                 .iter()
                 .enumerate()
@@ -267,23 +287,62 @@ fn pp_function<'a>(id: &'a str, func: &'a Function) -> RcDoc<'a> {
         ),
         ",",
     );
-    let rets = enclose(
-        "(",
-        RcDoc::concat(func.rets.iter().map(|ty| pp_ty(ty, &empty).append(","))),
-        ")",
-    );
+    let rets = match config.target {
+        Target::CanisterCall => enclose(
+            "(",
+            RcDoc::concat(func.rets.iter().map(|ty| pp_ty(ty, &empty).append(","))),
+            ")",
+        ),
+        Target::Agent => match func.rets.len() {
+            0 => str("()"),
+            1 => pp_ty(&func.rets[0], &empty),
+            _ => enclose(
+                "(",
+                RcDoc::intersperse(
+                    func.rets.iter().map(|ty| pp_ty(ty, &empty)),
+                    RcDoc::text(", "),
+                ),
+                ")",
+            ),
+        },
+        Target::CanisterStub => unimplemented!(),
+    };
     let sig = kwd("pub async fn")
         .append(name)
         .append(enclose("(", args, ")"))
         .append(kwd(" ->"))
-        .append(enclose("CallResult<", rets, "> "));
-    let args = RcDoc::concat((0..func.args.len()).map(|i| RcDoc::text(format!("arg{i},"))));
+        .append(enclose("Result<", rets, "> "));
     let method = id.escape_debug().to_string();
-    let body = str("ic_cdk::call(self.0, \"")
-        .append(method)
-        .append("\", ")
-        .append(enclose("(", args, ")"))
-        .append(").await");
+    let body = match config.target {
+        Target::CanisterCall => {
+            let args = RcDoc::concat((0..func.args.len()).map(|i| RcDoc::text(format!("arg{i},"))));
+            str("ic_cdk::call(self.0, \"")
+                .append(method)
+                .append("\", ")
+                .append(enclose("(", args, ")"))
+                .append(").await")
+        }
+        Target::Agent => {
+            let is_query = func.is_query();
+            let builder_method = if is_query { "query" } else { "update" };
+            let call = if is_query { "call" } else { "call_and_wait" };
+            let args = RcDoc::intersperse(
+                (0..func.args.len()).map(|i| RcDoc::text(format!("arg{i}"))),
+                RcDoc::text(", "),
+            );
+            let blob = str("candid::Encode!").append(enclose("(", args, ")?;"));
+            let rets = RcDoc::concat(
+                func.rets
+                    .iter()
+                    .map(|ty| str(", ").append(pp_ty(ty, &empty))),
+            );
+            str("let args = ").append(blob).append(RcDoc::hardline())
+                .append(format!("let bytes = agent.{builder_method}(self.0, \"{method}\").with_arg(args).{call}().await?;"))
+                .append(RcDoc::hardline())
+                .append("Ok(candid::Decode!(&bytes").append(rets).append(")?)")
+        }
+        Target::CanisterStub => unimplemented!(),
+    };
     sig.append(enclose_space("{", body, "}"))
 }
 
@@ -293,21 +352,25 @@ fn pp_actor<'a>(config: &'a Config, env: &'a TypeEnv, actor: &'a Type) -> RcDoc<
     let body = RcDoc::intersperse(
         serv.iter().map(|(id, func)| {
             let func = env.as_func(func).unwrap();
-            pp_function(id, func)
+            pp_function(config, id, func)
         }),
         RcDoc::hardline(),
     );
     let res = RcDoc::text("pub struct SERVICE(pub Principal);")
         .append(RcDoc::hardline())
-        .append("impl SERVICE")
+        .append("impl SERVICE ")
         .append(enclose_space("{", body, "}"))
         .append(RcDoc::hardline());
     if let Some(cid) = config.canister_id {
+        let slice = cid
+            .as_slice()
+            .iter()
+            .map(|b| b.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
         res.append(format!(
-            r#"pub fn {}() -> SERVICE {{
-  SERVICE(Principal::from_text("{}").unwrap())
-}}"#,
-            config.service_name, cid
+            r#"pub const {}: SERVICE = SERVICE(Principal::from_slice(&[{}])); // {}"#,
+            config.service_name, slice, cid
         ))
     } else {
         res
@@ -319,10 +382,15 @@ pub fn compile(config: &Config, env: &TypeEnv, actor: &Option<Type>) -> String {
         r#"// This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
 use {}::{{self, CandidType, Deserialize, Principal}};
-use ic_cdk::api::call::CallResult;
 "#,
         config.candid_crate
     );
+    let header = header
+        + match &config.target {
+            Target::CanisterCall => "use ic_cdk::api::call::CallResult as Result;\n",
+            Target::Agent => "type Result<T> = std::result::Result<T, ic_agent::AgentError>;",
+            Target::CanisterStub => "",
+        };
     let (env, actor) = nominalize_all(env, actor);
     let def_list: Vec<_> = if let Some(actor) = &actor {
         chase_actor(&env, actor).unwrap()
