@@ -186,7 +186,7 @@ fn main() -> Result<()> {
                 }
                 "rs-agent" => {
                     let config = candid::bindings::rust::Config::new();
-                    config.target = candid: bindings::rust::Target::Agent;
+                    config.target = candid::bindings::rust::Target::Agent;
                     candid::bindings::rust::compile(&config, &env, &actor)
                 }
                 _ => unreachable!(),
