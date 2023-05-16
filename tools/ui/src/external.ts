@@ -12,9 +12,12 @@ const messagePrefix = "CandidUI";
 
 // Starting with a hard-coded origin list for security
 const allowedExternalOrigins = [
-  "http://ryjl3-tyaaa-aaaaa-aaaba-cai.localhost:8000", // Motoko Playground (local)
-  "https://m7sm4-2iaaa-aaaab-qabra-cai.raw.ic0.app", // Motoko Playground (mainnet)
-  "https://m7sm4-2iaaa-aaaab-qabra-cai.ic0.app", // Motoko Playground (certified)
+  "localhost:4943", // Local
+  "http://ryjl3-tyaaa-aaaaa-aaaba-cai.localhost:4943", // Motoko Playground (local)
+  "https://m7sm4-2iaaa-aaaab-qabra-cai.raw.icp0.io", // Motoko Playground (mainnet)
+  "https://m7sm4-2iaaa-aaaab-qabra-cai.icp0.io", // Motoko Playground (certified)
+  "https://m7sm4-2iaaa-aaaab-qabra-cai.raw.ic0.app", // Motoko Playground (legacy, mainnet)
+  "https://m7sm4-2iaaa-aaaab-qabra-cai.ic0.app", // Motoko Playground (legacy, certified)
 ];
 
 const messageListeners: MessageListener[] = [];
