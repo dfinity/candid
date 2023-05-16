@@ -91,7 +91,6 @@ enum Comment {
     Start,
 }
 
-#[allow(clippy::enum_variant_names)]
 #[derive(Logos, Debug, Clone, PartialEq, Eq)]
 enum Text {
     #[error]
@@ -110,7 +109,7 @@ enum Text {
 
 impl std::fmt::Display for Token {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(fmt, "{:?}", self)
+        write!(fmt, "{self:?}")
     }
 }
 
@@ -224,7 +223,7 @@ impl<'input> Iterator for Tokenizer<'input> {
                             '\'' => result.push('\''),
                             c => {
                                 return Some(Err(LexicalError::new(
-                                    format!("Unknown escape character {}", c),
+                                    format!("Unknown escape character {c}"),
                                     lex.span(),
                                 )))
                             }
@@ -239,7 +238,7 @@ impl<'input> Iterator for Tokenizer<'input> {
                                 .and_then(|c| {
                                     std::char::from_u32(c).ok_or_else(|| {
                                         LexicalError::new(
-                                            format!("Unicode escape out of range {}", hex),
+                                            format!("Unicode escape out of range {hex}"),
                                             lex.span(),
                                         )
                                     })

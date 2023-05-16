@@ -1,0 +1,167 @@
+/*
+Encoding tests for subtype tests in decoders
+
+Corresponding to spec version version 0.1.4
+
+This test file contains tests for the subtype check that decoders are expected
+to perform upon references.
+
+The shortest way to trigger a test for `t1 <: t2` is to pass `(func () -> (t1))`
+and decode at type `(opt func () -> (t2))`, and check if the result is a
+`reference` or `null`.
+
+The patterns idioms here are thus
+
+assert blob "DIDL\01\6a\00\01XX00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (t2)) "t1 <: t2";
+assert blob "DIDL\01\6a\00\01XX\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (t2)) "t1 </: t2";
+
+where XX is the a primitive type index of t1, or
+
+assert blob "DIDL\02\6a\00\01\01\00XX\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (t2)) "t1 <: t2";
+assert blob "DIDL\02\6a\00\01\01\00XX\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (t2)) "t1 </: t2";
+
+where XX is a type entry table for a non-primitive type t1
+*/
+
+type Vec = vec Vec;
+type EmptyRecord = record { 0 : EmptyRecord };
+type MuRecordOpt = record { 0 : opt MuRecordOpt };
+type EmptyVariant = variant { 0: EmptyVariant };
+
+// some reflexive cases
+assert blob "DIDL\01\6a\00\01\7f\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (null)) "null <: null";
+assert blob "DIDL\01\6a\00\01\7e\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (bool)) "bool <: bool";
+assert blob "DIDL\01\6a\00\01\7d\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (nat)) "nat <: nat";
+assert blob "DIDL\01\6a\00\01\7c\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (int)) "int <: int";
+
+// more basic cases
+assert blob "DIDL\01\6a\00\01\7d\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (int)) "nat <: int";
+assert blob "DIDL\01\6a\00\01\7f\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (nat)) "int </: nat";
+assert blob "DIDL\01\6a\00\01\7d\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (nat8)) "nat </: nat8";
+assert blob "DIDL\01\6a\00\01\7b\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (nat)) "nat8 </: nat";
+
+// options. They are supertypes of anything really
+assert blob "DIDL\01\6a\00\01\7d\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (opt bool)) "nat <: opt bool";
+assert blob "DIDL\02\6a\00\01\01\00\6e\7e\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (opt bool)) "opt bool <: opt bool";
+assert blob "DIDL\01\6a\00\01\7e\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (opt bool)) "bool <: opt bool";
+assert blob "DIDL\02\6a\00\01\01\00\6e\01\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (opt opt nat)) "µ opt <: opt opt nat";
+
+// optional record fields
+assert blob "DIDL\02\6a\00\01\01\00\6c\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (record {})) "record {} <: record {}";
+assert blob "DIDL\02\6a\00\01\01\00\6c\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (record { a : opt empty })) "record {} <: record { a : opt empty }";
+assert blob "DIDL\02\6a\00\01\01\00\6c\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (record { a : opt null })) "record {} <: record { a : opt null }";
+assert blob "DIDL\02\6a\00\01\01\00\6c\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (record { a : reserved })) "record {} <: record { a : reserved }";
+assert blob "DIDL\02\6a\00\01\01\00\6c\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (record { a : empty })) "record {} </: record { a : empty }";
+assert blob "DIDL\02\6a\00\01\01\00\6c\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (record { a : nat })) "record {} </: record { a : nat }";
+assert blob "DIDL\02\6a\00\01\01\00\6c\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (record { a : null })) "record {} </: record { a : null }";
+
+// optional func results
+assert blob "DIDL\02\6a\00\01\01\00\6a\00\00\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (func () -> ())) "func () -> () <: func () -> ()";
+assert blob "DIDL\02\6a\00\01\01\00\6a\00\00\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (func () -> (opt empty))) "func () -> () <: func () -> (opt empty)";
+assert blob "DIDL\02\6a\00\01\01\00\6a\00\00\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (func () -> (opt null))) "func () -> () <: func () -> (opt null)";
+assert blob "DIDL\02\6a\00\01\01\00\6a\00\00\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (func () -> (reserved))) "func () -> () <: func () -> (reserved)";
+assert blob "DIDL\02\6a\00\01\01\00\6a\00\00\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (func () -> (empty))) "func () -> () </: func () -> (empty)";
+assert blob "DIDL\02\6a\00\01\01\00\6a\00\00\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (func () -> (nat))) "func () -> () </: func () -> (nat)";
+assert blob "DIDL\02\6a\00\01\01\00\6a\00\00\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (func () -> (null))) "func () -> () </: func () -> (null)";
+
+// optional func arguments
+assert blob "DIDL\03\6a\00\01\01\00\6a\01\02\00\00\6e\6f\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (func () -> ())) "func (opt empty) -> () <: func () -> ()";
+assert blob "DIDL\03\6a\00\01\01\00\6a\01\02\00\00\6e\7f\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (func () -> ())) "func (opt null) -> () <: func () -> ()";
+assert blob "DIDL\02\6a\00\01\01\00\6a\01\70\00\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (func () -> ())) "func (reserved) -> () <: func () -> ()";
+assert blob "DIDL\02\6a\00\01\01\00\6a\01\6f\00\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (func () -> ())) "func (empty) -> () </: func () -> ()";
+assert blob "DIDL\02\6a\00\01\01\00\6a\01\7d\00\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (func () -> ())) "func (nat) -> () </: func () -> ()";
+assert blob "DIDL\02\6a\00\01\01\00\6a\01\7f\00\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (func () -> ())) "func (null) -> () </: func () -> ()";
+
+// variants
+assert blob "DIDL\02\6a\00\01\01\00\6b\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (variant {})) "variant {} <: variant {}";
+assert blob "DIDL\02\6a\00\01\01\00\6b\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (variant {0 : nat})) "variant {} <: variant {0 : nat}";
+assert blob "DIDL\02\6a\00\01\01\00\6b\01\00\7d\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (variant {0 : nat})) "variant {0 : nat} <: variant {0 : nat}";
+assert blob "DIDL\02\6a\00\01\01\00\6b\01\00\7e\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (variant {0 : nat})) "variant {0 : bool} </: variant {0 : nat}";
+assert blob "DIDL\02\6a\00\01\01\00\6b\01\00\7e\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (variant {1 : bool})) "variant {0 : bool} </: variant {1 : bool}";
+
+// infinite types
+
+assert blob "DIDL\02\6a\00\01\01\00\6c\01\00\01\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (EmptyRecord)) "(µ record) <: (µ record)";
+//assert blob "DIDL\02\6a\00\01\01\00\6c\01\00\01\01\00\01\01\00\01m"
+//   == "(null)" : (opt func () -> (empty)) "(µ record) </: empty";
+assert blob "DIDL\01\6a\00\01\6f\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (EmptyRecord)) "empty <: (µ record)";
+assert blob "DIDL\02\6a\00\01\01\00\6c\01\00\01\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (record {EmptyRecord})) "(µ record) <: record {µ record}";
+assert blob "DIDL\03\6a\00\01\01\00\6c\01\00\02\6c\01\00\02\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (EmptyRecord)) "record {µ record} <: (µ record)";
+assert blob "DIDL\02\6a\00\01\01\00\6c\01\00\01\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (MuRecordOpt)) "(µ record) <: (μ (record opt))";
+
+assert blob "DIDL\02\6a\00\01\01\00\6b\01\00\01\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (EmptyVariant)) "(µ variant) <: (µ variant)";
+assert blob "DIDL\02\6a\00\01\01\00\6b\01\00\01\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (empty)) "(µ variant) </: empty";
+assert blob "DIDL\01\6a\00\01\6f\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (EmptyVariant)) "empty <: (µ variant)";
+assert blob "DIDL\02\6a\00\01\01\00\6b\01\00\01\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (variant {0 : EmptyVariant})) "(µ variant) <: variant {µ variant}";
+assert blob "DIDL\03\6a\00\01\01\00\6b\01\00\02\6b\01\00\02\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (EmptyVariant)) "variant {µ variant} <: (µ variant)";
+
+assert blob "DIDL\02\6a\00\01\01\00\6d\01\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (Vec)) "(µ vec) <: (µ vec)";
+assert blob "DIDL\02\6a\00\01\01\00\6d\01\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (empty)) "(µ vec) </: empty";
+assert blob "DIDL\01\6a\00\01\6f\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (Vec)) "empty <: (µ vec)";
+assert blob "DIDL\02\6a\00\01\01\00\6d\01\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (vec Vec)) "(µ vec) <: vec {µ vec}";
+assert blob "DIDL\03\6a\00\01\01\00\6d\02\6d\02\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (Vec)) "vec {µ vec} <: (µ vec)";
+
+// future types
+// This uses 0x67 for the “future type”; bump (well, decrement) once that
+// becomes a concrete future type
+
+assert blob "DIDL\02\6a\00\01\01\00\67\00\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (opt empty)) "(future type) <: (opt empty)";
+assert blob "DIDL\02\6a\00\01\01\00\67\00\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (nat)) "(future type) </: (nat)";

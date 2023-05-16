@@ -82,7 +82,7 @@ impl Variant {
                     .iter()
                     .map(|ident| {
                         let ident = ident.to_string();
-                        let var = format!("__field{}", ident);
+                        let var = format!("__field{ident}");
                         syn::parse_str(&var).unwrap()
                     })
                     .collect();
@@ -135,18 +135,18 @@ fn enum_from_ast(
     let ty = fs.iter().map(|Variant { ty, .. }| ty);
     let candid = candid_path(custom_candid_path);
     let ty_gen = quote! {
-        #candid::types::Type::Variant(
+        #candid::types::TypeInner::Variant(
             vec![
                 #(#candid::types::Field {
-                    id: #candid::types::Label::Named(#id.to_owned()),
+                    id: #candid::types::Label::Named(#id.to_owned()).into(),
                     ty: #ty }
                 ),*
             ]
-        )
+        ).into()
     };
 
     let id = fs.iter().map(|Variant { real_ident, .. }| {
-        syn::parse_str::<TokenStream>(&format!("{}::{}", name, real_ident)).unwrap()
+        syn::parse_str::<TokenStream>(&format!("{name}::{real_ident}")).unwrap()
     });
     let index = 0..fs.len() as u64;
     let (pattern, members): (Vec<_>, Vec<_>) = fs
@@ -209,7 +209,7 @@ fn struct_from_ast(
         syn::Fields::Named(ref fields) => {
             let (fs, idents, is_bytes) = fields_from_ast(&fields.named, custom_candid_path);
             (
-                quote! { #candid::types::Type::Record(#fs) },
+                quote! { #candid::types::TypeInner::Record(#fs).into() },
                 idents,
                 is_bytes,
             )
@@ -221,14 +221,14 @@ fn struct_from_ast(
                 (quote! { #newtype }, idents, is_bytes)
             } else {
                 (
-                    quote! { #candid::types::Type::Record(#fs) },
+                    quote! { #candid::types::TypeInner::Record(#fs).into() },
                     idents,
                     is_bytes,
                 )
             }
         }
         syn::Fields::Unit => (
-            quote! { #candid::types::Type::Null },
+            quote! { #candid::types::TypeInner::Null.into() },
             Vec::new(),
             Vec::new(),
         ),
@@ -244,14 +244,14 @@ impl Ident {
     fn to_token(&self) -> TokenStream {
         match self {
             Ident::Named(ident) => quote! { #ident },
-            Ident::Unnamed(ref i) => syn::parse_str::<TokenStream>(&format!("{}", i)).unwrap(),
+            Ident::Unnamed(ref i) => syn::parse_str::<TokenStream>(&format!("{i}")).unwrap(),
         }
     }
 }
 impl std::fmt::Display for Ident {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            Ident::Named(ref ident) => f.write_fmt(format_args!("{}", ident)),
+            Ident::Named(ref ident) => f.write_fmt(format_args!("{ident}")),
             Ident::Unnamed(ref i) => f.write_fmt(format_args!("{}", *i)),
         }
     }
@@ -369,9 +369,9 @@ fn fields_from_ast(
         .map(|Field { renamed_ident, .. }| match renamed_ident {
             Ident::Named(ref id) => {
                 let name = id.unraw().to_string();
-                quote! { #candid::types::Label::Named(#name.to_string()) }
+                quote! { #candid::types::Label::Named(#name.to_string()).into() }
             }
-            Ident::Unnamed(ref i) => quote! { #candid::types::Label::Id(#i) },
+            Ident::Unnamed(ref i) => quote! { #candid::types::Label::Id(#i).into() },
         });
     let ty = fs.iter().map(|Field { ty, .. }| ty);
     let ty_gen = quote! {

@@ -1,7 +1,10 @@
 //! Data structure for Candid value Func and Service
+//! Note that `Func` and `Service` should not be used directly. We need to define a newtype for `Func` or `Service`,
+//! and manually `impl CandidType` for the newtype, in order to specify the correct reference type.
+//! We have two macros `define_function!` and `define_service!` to help defining the newtype.
 
 use super::principal::Principal;
-use super::{CandidType, Function, Serializer, Type};
+use super::{CandidType, Serializer, Type};
 use serde::de::{self, Deserialize, Visitor};
 use std::convert::TryFrom;
 use std::{fmt, io::Read};
@@ -16,13 +19,58 @@ pub struct Service {
     pub principal: Principal,
 }
 
+#[macro_export]
+/// Define a function reference type.
+///
+/// `define_function!(pub MyFunc : (u8, &str) -> (Nat) query)` expands to `pub struct MyFunc(Func)`, which implements `CandidType` with the provided type. We also provide a constructor function `MyFunc::new(principal, method)`.
+macro_rules! define_function {
+    ( $vis:vis $func:ident : $($ty:tt)+ ) => {
+        #[derive($crate::Deserialize, PartialEq, Eq, Debug, Clone)]
+        $vis struct $func(pub $crate::types::reference::Func);
+        impl $crate::CandidType for $func {
+            fn _ty() -> $crate::types::Type {
+                $crate::func!($($ty)+)
+            }
+            fn idl_serialize<S: $crate::types::Serializer>(&self, serializer: S) -> Result<(), S::Error>
+            {
+                self.0.idl_serialize(serializer)
+            }
+        }
+        impl $func {
+            pub fn new(principal: $crate::Principal, method: String) -> Self {
+                $func($crate::types::reference::Func { principal, method })
+            }
+        }
+    }
+}
+#[macro_export]
+/// Define a service reference type.
+///
+/// `define_service!(MyService : { "f": func!(() -> () query) })` expands to `struct MyService(Service)`, which implements `CandidType` with the provided type and `MyService::new(principal)`.
+macro_rules! define_service {
+    ( $vis:vis $serv:ident : { $($ty:tt)* } ) => {
+        #[derive($crate::Deserialize, PartialEq, Eq, Debug, Clone)]
+        $vis struct $serv(pub $crate::types::reference::Service);
+        impl $crate::CandidType for $serv {
+            fn _ty() -> $crate::types::Type {
+                $crate::service!{$($ty)*}
+            }
+            fn idl_serialize<S: $crate::types::Serializer>(&self, serializer: S) -> Result<(), S::Error>
+            {
+                self.0.idl_serialize(serializer)
+            }
+        }
+        impl $serv {
+            pub fn new(principal: $crate::Principal) -> Self {
+                $serv($crate::types::reference::Service { principal })
+            }
+        }
+    }
+}
+
 impl CandidType for Func {
     fn _ty() -> Type {
-        Type::Func(Function {
-            modes: Vec::new(),
-            args: Vec::new(),
-            rets: Vec::new(),
-        })
+        panic!("Cannot use Func directly. Use `define_function!` macro instead.")
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -33,7 +81,7 @@ impl CandidType for Func {
 }
 impl CandidType for Service {
     fn _ty() -> Type {
-        Type::Service(Vec::new())
+        panic!("Cannot use Service directly. Use `define_service!` macro instead.")
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where

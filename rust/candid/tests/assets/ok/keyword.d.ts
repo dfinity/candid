@@ -18,10 +18,13 @@ export interface _SERVICE {
   'fieldnat' : ActorMethod<[{ _2_ : bigint, '2' : bigint }], [bigint]>,
   'oneway' : ActorMethod<[number], undefined>,
   'oneway_' : ActorMethod<[number], undefined>,
-  'query' : ActorMethod<[Uint8Array], Uint8Array>,
+  'query' : ActorMethod<[Uint8Array | number[]], Uint8Array | number[]>,
   'return' : ActorMethod<[o], o>,
   'service' : t,
-  'tuple' : ActorMethod<[[bigint, Uint8Array, string]], [bigint, number]>,
+  'tuple' : ActorMethod<
+    [[bigint, Uint8Array | number[], string]],
+    [bigint, number]
+  >,
   'variant' : ActorMethod<
     [{ 'A' : null } | { 'B' : null } | { 'C' : null } | { 'D' : number }],
     undefined

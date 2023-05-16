@@ -4,7 +4,7 @@ use super::{CandidType, Compound, Serializer};
 macro_rules! primitive_impl {
     ($t:ty, $id:tt, $method:ident $($cast:tt)*) => {
         impl CandidType for $t {
-            fn _ty() -> Type { Type::$id }
+            fn _ty() -> Type { TypeInner::$id.into() }
             fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error> where S: Serializer {
                 serializer.$method(*self $($cast)*)
             }
@@ -35,7 +35,7 @@ primitive_impl!(usize, Nat64, serialize_nat64 as u64);
 
 impl CandidType for i128 {
     fn _ty() -> Type {
-        Type::Int
+        TypeInner::Int.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -46,7 +46,7 @@ impl CandidType for i128 {
 }
 impl CandidType for u128 {
     fn _ty() -> Type {
-        Type::Nat
+        TypeInner::Nat.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -58,7 +58,7 @@ impl CandidType for u128 {
 
 impl CandidType for String {
     fn _ty() -> Type {
-        Type::Text
+        TypeInner::Text.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -69,7 +69,7 @@ impl CandidType for String {
 }
 impl CandidType for str {
     fn _ty() -> Type {
-        Type::Text
+        TypeInner::Text.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -81,7 +81,7 @@ impl CandidType for str {
 
 impl CandidType for std::path::Path {
     fn _ty() -> Type {
-        Type::Text
+        TypeInner::Text.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -97,7 +97,7 @@ impl CandidType for std::path::Path {
 
 impl CandidType for std::path::PathBuf {
     fn _ty() -> Type {
-        Type::Text
+        TypeInner::Text.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -112,7 +112,7 @@ where
     T: CandidType,
 {
     fn _ty() -> Type {
-        Type::Opt(Box::new(T::ty()))
+        TypeInner::Opt(T::ty()).into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -127,7 +127,7 @@ where
     T: CandidType,
 {
     fn _ty() -> Type {
-        Type::Vec(Box::new(T::ty()))
+        TypeInner::Vec(T::ty()).into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -142,7 +142,7 @@ where
 }
 impl CandidType for serde_bytes::ByteBuf {
     fn _ty() -> Type {
-        Type::Vec(Box::new(Type::Nat8))
+        TypeInner::Vec(TypeInner::Nat8.into()).into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -153,7 +153,7 @@ impl CandidType for serde_bytes::ByteBuf {
 }
 impl CandidType for serde_bytes::Bytes {
     fn _ty() -> Type {
-        Type::Vec(Box::new(Type::Nat8))
+        TypeInner::Vec(TypeInner::Nat8.into()).into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -172,17 +172,17 @@ macro_rules! map_impl {
             $($typaram: $bound,)*
         {
             fn _ty() -> Type {
-                let tuple = Type::Record(vec![
+                let tuple = TypeInner::Record(vec![
                     Field {
-                        id: Label::Id(0),
+                        id: Label::Id(0).into(),
                         ty: K::ty(),
                     },
                     Field {
-                        id: Label::Id(1),
+                        id: Label::Id(1).into(),
                         ty: V::ty(),
                     },
-                ]);
-                Type::Vec(Box::new(tuple))
+                ]).into();
+                TypeInner::Vec(tuple).into()
             }
             fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
             where
@@ -205,7 +205,7 @@ macro_rules! seq_impl {
             $($typaram: $bound,)*
         {
             fn _ty() -> Type {
-                Type::Vec(Box::new(K::ty()))
+                TypeInner::Vec(K::ty()).into()
             }
             fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
             where
@@ -238,7 +238,7 @@ macro_rules! array_impls {
             impl<T> CandidType for [T; $len]
             where T: CandidType,
             {
-                fn _ty() -> Type { Type::Vec(Box::new(T::ty())) }
+                fn _ty() -> Type { TypeInner::Vec(T::ty()).into() }
                 fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
                 where S: Serializer,
                 {
@@ -266,17 +266,18 @@ where
     E: CandidType,
 {
     fn _ty() -> Type {
-        Type::Variant(vec![
+        TypeInner::Variant(vec![
             // Make sure the field id is sorted by idl_hash
             Field {
-                id: Label::Named("Ok".to_owned()),
+                id: Label::Named("Ok".to_owned()).into(),
                 ty: T::ty(),
             },
             Field {
-                id: Label::Named("Err".to_owned()),
+                id: Label::Named("Err".to_owned()).into(),
                 ty: E::ty(),
             },
         ])
+        .into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -432,9 +433,9 @@ macro_rules! tuple_impls {
                 $($name: CandidType,)+
             {
                 fn _ty() -> Type {
-                    Type::Record(vec![
-                        $(Field{ id: Label::Id($n), ty: $name::ty() },)+
-                    ])
+                    TypeInner::Record(vec![
+                        $(Field{ id: Label::Id($n).into(), ty: $name::ty() },)+
+                    ]).into()
                 }
                 fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
                 where S: Serializer,
@@ -471,16 +472,17 @@ tuple_impls! {
 
 impl CandidType for std::time::SystemTime {
     fn _ty() -> Type {
-        Type::Record(vec![
+        TypeInner::Record(vec![
             Field {
-                id: Label::Named("nanos_since_epoch".to_owned()),
+                id: Label::Named("nanos_since_epoch".to_owned()).into(),
                 ty: u32::ty(),
             },
             Field {
-                id: Label::Named("secs_since_epoch".to_owned()),
+                id: Label::Named("secs_since_epoch".to_owned()).into(),
                 ty: u64::ty(),
             },
         ])
+        .into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
@@ -505,16 +507,17 @@ impl CandidType for std::time::SystemTime {
 
 impl CandidType for std::time::Duration {
     fn _ty() -> Type {
-        Type::Record(vec![
+        TypeInner::Record(vec![
             Field {
-                id: Label::Named("secs".to_owned()),
+                id: Label::Named("secs".to_owned()).into(),
                 ty: u64::ty(),
             },
             Field {
-                id: Label::Named("nanos".to_owned()),
+                id: Label::Named("nanos".to_owned()).into(),
                 ty: u32::ty(),
             },
         ])
+        .into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where

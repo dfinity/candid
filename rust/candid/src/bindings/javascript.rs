@@ -1,14 +1,14 @@
 use super::analysis::{chase_actor, chase_types, infer_rec};
-use crate::parser::typing::TypeEnv;
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, Type};
+use crate::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
+use std::rc::Rc;
 
 // The definition of tuple is language specific.
 pub(crate) fn is_tuple(t: &Type) -> bool {
-    match t {
-        Type::Record(ref fs) => {
+    match t.as_ref() {
+        TypeInner::Record(ref fs) => {
             if fs.is_empty() {
                 return false;
             }
@@ -97,8 +97,8 @@ pub(crate) fn ident(id: &str) -> RcDoc {
 }
 
 fn pp_ty(ty: &Type) -> RcDoc {
-    use Type::*;
-    match *ty {
+    use TypeInner::*;
+    match ty.as_ref() {
         Null => str("IDL.Null"),
         Bool => str("IDL.Bool"),
         Nat => str("IDL.Nat"),
@@ -132,12 +132,12 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Func(ref func) => str("IDL.Func").append(pp_function(func)),
         Service(ref serv) => str("IDL.Service").append(pp_service(serv)),
         Class(_, _) => unreachable!(),
-        Knot(_) | Unknown => unreachable!(),
+        Knot(_) | Unknown | Future => unreachable!(),
     }
 }
 
-fn pp_label(id: &Label) -> RcDoc {
-    match id {
+fn pp_label(id: &Rc<Label>) -> RcDoc {
+    match &**id {
         Label::Named(str) => quote_ident(str),
         Label::Id(n) | Label::Unnamed(n) => str("_")
             .append(RcDoc::as_string(n))
@@ -171,7 +171,7 @@ fn pp_args(args: &[Type]) -> RcDoc {
     enclose("[", doc, "]")
 }
 
-fn pp_modes(modes: &[crate::parser::types::FuncMode]) -> RcDoc {
+fn pp_modes(modes: &[crate::types::FuncMode]) -> RcDoc {
     let doc = concat(
         modes
             .iter()
@@ -217,16 +217,16 @@ fn pp_defs<'a>(
 }
 
 fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
-    match ty {
-        Type::Service(_) => pp_ty(ty),
-        Type::Var(id) => {
+    match ty.as_ref() {
+        TypeInner::Service(_) => pp_ty(ty),
+        TypeInner::Var(id) => {
             if recs.contains(&*id.clone()) {
                 str(id).append(".getType()")
             } else {
                 str(id)
             }
         }
-        Type::Class(_, t) => pp_actor(t, recs),
+        TypeInner::Class(_, t) => pp_actor(t, recs),
         _ => unreachable!(),
     }
 }
@@ -243,7 +243,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let def_list = chase_actor(env, actor).unwrap();
             let recs = infer_rec(env, &def_list).unwrap();
             let defs = pp_defs(env, &def_list, &recs);
-            let init = if let Type::Class(ref args, _) = actor {
+            let init = if let TypeInner::Class(ref args, _) = actor.as_ref() {
                 args.as_slice()
             } else {
                 &[][..]
@@ -268,10 +268,10 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 }
 
 pub mod value {
-    use super::pp_label;
-    use crate::parser::pretty::number_to_string;
-    use crate::parser::value::{IDLArgs, IDLField, IDLValue};
+    use super::super::candid::value::number_to_string;
     use crate::pretty::*;
+    use crate::types::value::{IDLArgs, IDLField, IDLValue};
+    use crate::types::Label;
     use pretty::RcDoc;
 
     fn is_tuple(v: &IDLValue) -> bool {
@@ -288,6 +288,15 @@ pub mod value {
                 true
             }
             _ => false,
+        }
+    }
+    fn pp_label(id: &Label) -> RcDoc {
+        match id {
+            Label::Named(str) => quote_ident(str),
+            Label::Id(n) | Label::Unnamed(n) => str("_")
+                .append(RcDoc::as_string(n))
+                .append("_")
+                .append(RcDoc::space()),
         }
     }
     fn pp_field(field: &IDLField) -> RcDoc {
@@ -311,10 +320,10 @@ pub mod value {
             Bool(_) => RcDoc::as_string(v),
             Null => RcDoc::text("null"),
             Reserved => RcDoc::text("null"),
-            Principal(id) => RcDoc::text(format!("Principal.fromText('{}')", id)),
-            Service(id) => RcDoc::text(format!("Principal.fromText('{}')", id)),
+            Principal(id) => RcDoc::text(format!("Principal.fromText('{id}')")),
+            Service(id) => RcDoc::text(format!("Principal.fromText('{id}')")),
             Func(id, meth) => {
-                let id = RcDoc::text(format!("Principal.fromText('{}')", id));
+                let id = RcDoc::text(format!("Principal.fromText('{id}')"));
                 let meth = RcDoc::text(meth);
                 RcDoc::text("[")
                     .append(id)

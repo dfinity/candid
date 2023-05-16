@@ -9,25 +9,31 @@ use serde::ser::Error;
 mod impls;
 pub mod internal;
 pub mod subtype;
+pub mod type_env;
+pub mod value;
 
-pub use self::internal::{get_type, Field, Function, Label, Type, TypeId};
+pub use self::internal::{get_type, Field, FuncMode, Function, Label, Type, TypeId, TypeInner};
+pub use type_env::TypeEnv;
 
 pub mod number;
 pub mod principal;
 pub mod reference;
 pub mod reserved;
 
+pub mod arc;
+pub mod rc;
+
 pub trait CandidType {
     // memoized type derivation
     fn ty() -> Type {
         let id = Self::id();
         if let Some(t) = self::internal::find_type(&id) {
-            match t {
-                Type::Unknown => Type::Knot(id),
+            match *t {
+                TypeInner::Unknown => TypeInner::Knot(id).into(),
                 _ => t,
             }
         } else {
-            self::internal::env_add(id.clone(), Type::Unknown);
+            self::internal::env_add(id.clone(), TypeInner::Unknown.into());
             let t = Self::_ty();
             self::internal::env_add(id.clone(), t.clone());
             self::internal::env_id(id, t.clone());

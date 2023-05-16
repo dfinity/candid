@@ -1,23 +1,33 @@
 //! `candid::Result<T> = Result<T, candid::Error>>`
 
+use codespan_reporting::diagnostic::Label;
 use serde::{de, ser};
-
-use crate::parser::token;
-use codespan_reporting::diagnostic::{Diagnostic, Label};
-use codespan_reporting::files::{Error as ReportError, SimpleFile};
-use codespan_reporting::term::{self, termcolor::StandardStream};
 use std::io;
 use thiserror::Error;
+
+#[cfg(feature = "parser")]
+use crate::parser::token;
+#[cfg(feature = "parser")]
+use codespan_reporting::{
+    diagnostic::Diagnostic,
+    files::{Error as ReportError, SimpleFile},
+    term::{self, termcolor::StandardStream},
+};
 
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+    #[cfg(feature = "parser")]
     #[error("Candid parser error: {0}")]
     Parse(#[from] token::ParserError),
 
     #[error("binary parser error: {}", .0.get(0).map(|f| format!("{} at byte offset {}", f.message, f.range.start/2)).unwrap_or_else(|| "io error".to_string()))]
     Binread(Vec<Label<()>>),
+
+    #[error("Subtyping error: {0}")]
+    Subtype(String),
 
     #[error(transparent)]
     Custom(#[from] anyhow::Error),
@@ -27,6 +37,11 @@ impl Error {
     pub fn msg<T: ToString>(msg: T) -> Self {
         Error::Custom(anyhow::anyhow!(msg.to_string()))
     }
+    pub fn subtype<T: ToString>(msg: T) -> Self {
+        Error::Subtype(msg.to_string())
+    }
+    #[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+    #[cfg(feature = "parser")]
     pub fn report(&self) -> Diagnostic<()> {
         match self {
             Error::Parse(e) => {
@@ -57,6 +72,7 @@ impl Error {
                 let diag = Diagnostic::error().with_message("decoding error");
                 diag.with_labels(labels.to_vec())
             }
+            Error::Subtype(e) => Diagnostic::error().with_message(e),
             Error::Custom(e) => Diagnostic::error().with_message(e.to_string()),
         }
     }
@@ -107,6 +123,8 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label<()>> {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
 fn report_expected(expected: &[String]) -> Vec<String> {
     if expected.is_empty() {
         return Vec::new();
@@ -127,19 +145,22 @@ fn report_expected(expected: &[String]) -> Vec<String> {
 
 impl ser::Error for Error {
     fn custom<T: std::fmt::Display>(msg: T) -> Self {
-        Error::msg(format!("Serialize error: {}", msg))
+        Error::msg(format!("Serialize error: {msg}"))
     }
 }
 
 impl de::Error for Error {
     fn custom<T: std::fmt::Display>(msg: T) -> Self {
-        Error::msg(format!("Deserialize error: {}", msg))
+        Error::msg(format!("Deserialize error: {msg}"))
+    }
+    fn invalid_type(_: de::Unexpected<'_>, exp: &dyn de::Expected) -> Self {
+        Error::Subtype(format!("{exp}"))
     }
 }
 
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Error {
-        Error::msg(format!("io error: {}", e))
+        Error::msg(format!("io error: {e}"))
     }
 }
 
@@ -148,26 +169,31 @@ impl From<binread::Error> for Error {
         Error::Binread(get_binread_labels(&e))
     }
 }
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
 impl From<ReportError> for Error {
     fn from(e: ReportError) -> Error {
         Error::msg(e)
     }
 }
-
+#[cfg_attr(docsrs, doc(cfg(feature = "random")))]
 #[cfg(feature = "random")]
 impl From<arbitrary::Error> for Error {
     fn from(e: arbitrary::Error) -> Error {
-        Error::msg(format!("arbitrary error: {}", e))
+        Error::msg(format!("arbitrary error: {e}"))
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "configs")))]
 #[cfg(feature = "configs")]
 impl From<serde_dhall::Error> for Error {
     fn from(e: serde_dhall::Error) -> Error {
-        Error::msg(format!("dhall error: {}", e))
+        Error::msg(format!("dhall error: {e}"))
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
 pub fn pretty_parse<T>(name: &str, str: &str) -> Result<T>
 where
     T: std::str::FromStr<Err = Error>,
@@ -180,7 +206,8 @@ where
         Err(e)
     })
 }
-
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
 pub fn pretty_read<T>(reader: &mut std::io::Cursor<&[u8]>) -> Result<T>
 where
     T: binread::BinRead,
@@ -189,7 +216,7 @@ where
         let e = Error::from(e);
         let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
         let config = term::Config::default();
-        let str = hex::encode(&reader.get_ref());
+        let str = hex::encode(reader.get_ref());
         let file = SimpleFile::new("binary", &str);
         term::emit(&mut writer.lock(), &config, &file, &e.report())?;
         Err(e)

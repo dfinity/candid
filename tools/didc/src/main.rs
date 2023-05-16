@@ -5,13 +5,12 @@ use candid::{
     types::Type,
     Error, IDLArgs, TypeEnv,
 };
+use clap::Parser;
 use std::collections::HashSet;
 use std::path::PathBuf;
-use structopt::clap::AppSettings;
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
-#[structopt(global_settings = &[AppSettings::ColoredHelp, AppSettings::DeriveDisplayOrder])]
+#[derive(Parser)]
+#[clap(version, author)]
 enum Command {
     /// Type check Candid file
     Check {
@@ -24,7 +23,7 @@ enum Command {
     Bind {
         /// Specifies did file for code generation
         input: PathBuf,
-        #[structopt(short, long, possible_values = &["js", "ts", "did", "mo", "rs"])]
+        #[clap(short, long, possible_values = &["js", "ts", "did", "mo", "rs"])]
         /// Specifies target language
         target: String,
     },
@@ -32,7 +31,7 @@ enum Command {
     Test {
         /// Specifies .test.did file for test suites generation
         input: PathBuf,
-        #[structopt(short, long, possible_values = &["js", "did"], default_value = "js")]
+        #[clap(short, long, possible_values = &["js", "did"], default_value = "js")]
         /// Specifies target language
         target: String,
     },
@@ -40,12 +39,12 @@ enum Command {
     Hash { input: String },
     /// Encode Candid value
     Encode {
-        #[structopt(parse(try_from_str = parse_args))]
+        #[clap(parse(try_from_str = parse_args))]
         /// Specifies Candid textual format for encoding
         args: IDLArgs,
-        #[structopt(flatten)]
+        #[clap(flatten)]
         annotate: TypeAnnotation,
-        #[structopt(short, long, possible_values = &["hex", "pretty", "blob"], default_value = "hex")]
+        #[clap(short, long, possible_values = &["hex", "pretty", "blob"], default_value = "hex")]
         /// Specifies hex format
         format: String,
     },
@@ -53,57 +52,48 @@ enum Command {
     Decode {
         /// Specifies Candid binary data in hex string
         blob: String,
-        #[structopt(short, long, possible_values = &["hex", "blob"], default_value = "hex")]
+        #[clap(short, long, possible_values = &["hex", "blob"], default_value = "hex")]
         /// Specifies hex format
         format: String,
-        #[structopt(flatten)]
+        #[clap(flatten)]
         annotate: TypeAnnotation,
     },
     /// Generate random Candid values
     Random {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         annotate: TypeAnnotation,
-        #[structopt(short, long, conflicts_with("file"))]
+        #[clap(short, long, conflicts_with("file"))]
         /// Specifies random value generation config in Dhall syntax
         config: Option<String>,
-        #[structopt(short, long)]
+        #[clap(short, long)]
         /// Load random value generation config from file
         file: Option<String>,
-        #[structopt(short, long, possible_values = &["did", "js"], default_value = "did")]
+        #[clap(short, long, possible_values = &["did", "js"], default_value = "did")]
         /// Specifies target language
         lang: String,
-        #[structopt(short, long, requires("method"))]
+        #[clap(short, long, requires("method"))]
         /// Specifies input arguments for a method call, mocking the return result
         args: Option<IDLArgs>,
     },
     /// Check for subtyping
     Subtype {
-        #[structopt(short, long)]
+        #[clap(short, long)]
         defs: Option<PathBuf>,
         ty1: IDLType,
         ty2: IDLType,
     },
-    /// Diff two Candid values
-    Diff {
-        #[structopt(parse(try_from_str = parse_args))]
-        values1: IDLArgs,
-        #[structopt(parse(try_from_str = parse_args))]
-        values2: IDLArgs,
-        #[structopt(flatten)]
-        annotate: TypeAnnotation,
-    },
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct TypeAnnotation {
-    #[structopt(name = "types", short, long)]
-    #[structopt(parse(try_from_str = parse_types))]
+    #[clap(name = "types", short, long)]
+    #[clap(parse(try_from_str = parse_types))]
     /// Annotates values with Candid types
     tys: Option<IDLTypes>,
-    #[structopt(short, long, conflicts_with("types"), requires("defs"))]
+    #[clap(short, long, conflicts_with("types"), requires("defs"))]
     /// Annotates values with a service method, specified in --defs option
     method: Option<String>,
-    #[structopt(short, long)]
+    #[clap(short, long)]
     /// Loads did file for --types or --method to reference type definitions
     defs: Option<PathBuf>,
 }
@@ -156,7 +146,7 @@ fn parse_types(str: &str) -> Result<IDLTypes, Error> {
 }
 
 fn main() -> Result<()> {
-    match Command::from_args() {
+    match Command::parse() {
         Command::Check { input, previous } => {
             let (mut env, opt_t1) = pretty_check_file(&input)?;
             if let Some(previous) = previous {
@@ -193,7 +183,7 @@ fn main() -> Result<()> {
                 "rs" => candid::bindings::rust::compile(&env, &actor),
                 _ => unreachable!(),
             };
-            println!("{}", content);
+            println!("{content}");
         }
         Command::Test { input, target } => {
             let test = std::fs::read_to_string(&input)
@@ -207,7 +197,7 @@ fn main() -> Result<()> {
                 }
                 _ => unreachable!(),
             };
-            println!("{}", content);
+            println!("{content}");
         }
         Command::Hash { input } => {
             println!("{}", candid::idl_hash(&input));
@@ -229,13 +219,13 @@ fn main() -> Result<()> {
                 "blob" => {
                     let mut res = String::new();
                     for ch in bytes.iter() {
-                        res.push_str(&candid::parser::pretty::pp_char(*ch));
+                        res.push_str(&candid::bindings::candid::value::pp_char(*ch));
                     }
-                    format!("blob \"{}\"", res)
+                    format!("blob \"{res}\"")
                 }
                 _ => unreachable!(),
             };
-            println!("{}", hex);
+            println!("{hex}");
         }
         Command::Decode {
             blob,
@@ -245,7 +235,7 @@ fn main() -> Result<()> {
             let bytes = match format.as_str() {
                 "hex" => hex::decode(&blob)?,
                 "blob" => {
-                    use candid::parser::value::IDLValue;
+                    use candid::types::value::IDLValue;
                     match pretty_parse::<IDLValue>("blob", &blob)? {
                         IDLValue::Vec(vec) => vec
                             .iter()
@@ -268,7 +258,7 @@ fn main() -> Result<()> {
                 let (env, types) = annotate.get_types(Mode::Decode)?;
                 IDLArgs::from_bytes_with_types(&bytes, &env, &types)?
             };
-            println!("{}", value);
+            println!("{value}");
         }
         Command::Random {
             annotate,
@@ -289,7 +279,7 @@ fn main() -> Result<()> {
                 (Some(str), None) => Configs::from_dhall(&str)?,
                 (None, Some(file)) => {
                     let content = std::fs::read_to_string(&file)
-                        .map_err(|_| Error::msg(format!("could not read {}", file)))?;
+                        .map_err(|_| Error::msg(format!("could not read {file}")))?;
                     Configs::from_dhall(&content)?
                 }
                 _ => unreachable!(),
@@ -310,35 +300,12 @@ fn main() -> Result<()> {
             };
             let args = IDLArgs::any(&seed, &config, &env, &types)?;
             match lang.as_str() {
-                "did" => println!("{}", args),
+                "did" => println!("{args}"),
                 "js" => println!(
                     "{}",
                     candid::bindings::javascript::value::pp_args(&args).pretty(80)
                 ),
                 _ => unreachable!(),
-            }
-        }
-        Command::Diff {
-            values1,
-            values2,
-            annotate,
-        } => {
-            let (vs1, vs2) = if annotate.is_empty() {
-                (values1.args, values2.args)
-            } else {
-                // Either we assume the types are in decode mode, or forbid the use of --method in diff
-                let (env, types) = annotate.get_types(Mode::Decode)?;
-                (
-                    values1.annotate_types(true, &env, &types)?.args,
-                    values2.annotate_types(true, &env, &types)?.args,
-                )
-            };
-            if vs1.len() != vs2.len() {
-                return Err(Error::msg("value length mismatch").into());
-            }
-            for (v1, v2) in vs1.iter().zip(vs2.iter()) {
-                let edit = candiff::value_diff(v1, v2, &None);
-                println!("{}", candiff::pretty::value_edit(&edit).pretty(80));
             }
         }
     };

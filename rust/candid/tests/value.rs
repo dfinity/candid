@@ -1,9 +1,6 @@
-use candid::parser::{
-    types::IDLProg,
-    typing::{check_prog, TypeEnv},
-    value::{IDLArgs, IDLField, IDLValue, VariantValue},
-};
-use candid::types::Label;
+use candid::parser::{types::IDLProg, typing::check_prog};
+use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
+use candid::types::{Label, TypeEnv};
 use candid::{decode_args, decode_one, Decode};
 
 #[test]
@@ -145,8 +142,7 @@ fn test_encode(v: &IDLValue, expected: &[u8]) {
     let encoded = args.to_bytes().unwrap();
     assert_eq!(
         encoded, expected,
-        "\nActual\n{:x?}\nExpected\n{:x?}\n",
-        encoded, expected
+        "\nActual\n{encoded:x?}\nExpected\n{expected:x?}\n"
     );
 }
 

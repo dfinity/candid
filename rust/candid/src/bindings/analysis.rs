@@ -1,5 +1,4 @@
-use crate::parser::typing::TypeEnv;
-use crate::types::Type;
+use crate::types::{Type, TypeEnv, TypeInner};
 use crate::Result;
 use std::collections::BTreeSet;
 
@@ -10,8 +9,8 @@ pub fn chase_type<'a>(
     env: &'a TypeEnv,
     t: &'a Type,
 ) -> Result<()> {
-    use Type::*;
-    match t {
+    use TypeInner::*;
+    match t.as_ref() {
         Var(id) => {
             if seen.insert(id) {
                 let t = env.find_type(id)?;
@@ -65,51 +64,51 @@ pub fn chase_types<'a>(env: &'a TypeEnv, tys: &'a [Type]) -> Result<Vec<&'a str>
 }
 
 /// Given a `def_list` produced by the `chase_actor` function, infer which types are recursive
-pub fn infer_rec<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTreeSet<&'a str>> {
+pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTreeSet<&'a str>> {
     let mut seen = BTreeSet::new();
     let mut res = BTreeSet::new();
     fn go<'a>(
         seen: &mut BTreeSet<&'a str>,
         res: &mut BTreeSet<&'a str>,
-        env: &'a TypeEnv,
+        _env: &'a TypeEnv,
         t: &'a Type,
     ) -> Result<()> {
-        use Type::*;
-        match t {
+        use TypeInner::*;
+        match t.as_ref() {
             Var(id) => {
                 if seen.insert(id) {
                     res.insert(id);
                 }
             }
-            Opt(ty) | Vec(ty) => go(seen, res, env, ty)?,
+            Opt(ty) | Vec(ty) => go(seen, res, _env, ty)?,
             Record(fs) | Variant(fs) => {
                 for f in fs.iter() {
-                    go(seen, res, env, &f.ty)?;
+                    go(seen, res, _env, &f.ty)?;
                 }
             }
             Func(f) => {
                 for ty in f.args.iter().chain(f.rets.iter()) {
-                    go(seen, res, env, ty)?;
+                    go(seen, res, _env, ty)?;
                 }
             }
             Service(ms) => {
                 for (_, ty) in ms.iter() {
-                    go(seen, res, env, ty)?;
+                    go(seen, res, _env, ty)?;
                 }
             }
             Class(args, t) => {
                 for arg in args.iter() {
-                    go(seen, res, env, arg)?;
+                    go(seen, res, _env, arg)?;
                 }
-                go(seen, res, env, t)?;
+                go(seen, res, _env, t)?;
             }
             _ => (),
         }
         Ok(())
     }
     for var in def_list.iter() {
-        let t = env.0.get(*var).unwrap();
-        go(&mut seen, &mut res, env, t)?;
+        let t = _env.0.get(*var).unwrap();
+        go(&mut seen, &mut res, _env, t)?;
         seen.insert(var);
     }
     Ok(res)

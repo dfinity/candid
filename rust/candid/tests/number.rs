@@ -77,7 +77,7 @@ fn random_u64() {
     }
 }
 
-#[allow(clippy::cognitive_complexity, clippy::cmp_owned)]
+#[allow(clippy::cmp_owned)]
 #[test]
 fn operators() {
     macro_rules! test_type {

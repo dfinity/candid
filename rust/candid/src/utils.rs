@@ -1,14 +1,23 @@
 use crate::de::IDLDeserialize;
 use crate::ser::IDLBuilder;
-use crate::{check_prog, pretty_check_file, pretty_parse, types::Type, TypeEnv};
-use crate::{CandidType, Error, Result};
+use crate::{CandidType, Result};
 use serde::de::Deserialize;
+
+#[cfg(feature = "parser")]
+use crate::{check_prog, pretty_check_file};
+#[cfg(feature = "parser")]
+use crate::{pretty_parse, types::Type, Error, TypeEnv};
+#[cfg(feature = "parser")]
 use std::path::Path;
 
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
 pub enum CandidSource<'a> {
     File(&'a Path),
     Text(&'a str),
 }
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
 impl<'a> CandidSource<'a> {
     pub fn load(&self) -> Result<(TypeEnv, Option<Type>)> {
         Ok(match self {
@@ -23,6 +32,8 @@ impl<'a> CandidSource<'a> {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
 /// Check compatibility of two service types
 pub fn service_compatible(new: CandidSource, old: CandidSource) -> Result<()> {
     let (mut env, t1) = new.load()?;
