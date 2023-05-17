@@ -6,8 +6,8 @@ use candid::{
     Error, IDLArgs, TypeEnv,
 };
 use clap::Parser;
-use std::{collections::HashSet, io};
 use std::path::PathBuf;
+use std::{collections::HashSet, io};
 
 #[derive(Parser)]
 #[clap(version, author)]
@@ -209,10 +209,13 @@ fn main() -> Result<()> {
             format,
             annotate,
         } => {
-            let args = args.unwrap_or_else(|| {
-                let text = io::read_to_string(io::stdin()).expect("Failed to read stdin");
-                parse_args(&text).expect("Failed to parse stdin.")
-            });
+            let args = match args {
+                Some(idl_args) => idl_args,
+                None => {
+                    let text = io::read_to_string(io::stdin())?;
+                    parse_args(&text)?
+                }
+            };
             let bytes = if annotate.is_empty() {
                 args.to_bytes()?
             } else {
@@ -238,9 +241,10 @@ fn main() -> Result<()> {
             format,
             annotate,
         } => {
-            let blob = blob.unwrap_or_else(|| {
-                io::read_to_string(io::stdin()).expect("Failed to read stdin")
-            });
+            let blob = match blob {
+                Some(blob) => blob,
+                None => io::read_to_string(io::stdin())?,
+            };
             let bytes = match format.as_str() {
                 "hex" => hex::decode(&blob)?,
                 "blob" => {
