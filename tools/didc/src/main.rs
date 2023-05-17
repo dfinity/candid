@@ -246,7 +246,12 @@ fn main() -> Result<()> {
                 None => io::read_to_string(io::stdin())?,
             };
             let bytes = match format.as_str() {
-                "hex" => hex::decode(&blob)?,
+                "hex" => hex::decode(
+                    &blob
+                        .chars()
+                        .filter(|c| !c.is_whitespace())
+                        .collect::<String>(),
+                )?,
                 "blob" => {
                     use candid::types::value::IDLValue;
                     match pretty_parse::<IDLValue>("blob", &blob)? {
