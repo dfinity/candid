@@ -248,8 +248,7 @@ fn main() -> Result<()> {
             };
             let bytes = match format.as_str() {
                 "hex" => hex::decode(
-                    &blob
-                        .chars()
+                    blob.chars()
                         .filter(|c| !c.is_whitespace())
                         .collect::<String>(),
                 )?,
