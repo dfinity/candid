@@ -6,7 +6,7 @@ use candid::{
     Error, IDLArgs, TypeEnv,
 };
 use clap::Parser;
-use std::collections::HashSet;
+use std::{collections::HashSet, io};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -41,7 +41,8 @@ enum Command {
     Encode {
         #[clap(parse(try_from_str = parse_args))]
         /// Specifies Candid textual format for encoding
-        args: IDLArgs,
+        /// If omitted, the text will be read from stdin.
+        args: Option<IDLArgs>,
         #[clap(flatten)]
         annotate: TypeAnnotation,
         #[clap(short, long, possible_values = &["hex", "pretty", "blob"], default_value = "hex")]
@@ -50,8 +51,9 @@ enum Command {
     },
     /// Decode Candid binary data
     Decode {
-        /// Specifies Candid binary data in hex string
-        blob: String,
+        /// Specifies Candid binary data in hex string.
+        /// If omitted, the hex will be read from stdin.
+        blob: Option<String>,
         #[clap(short, long, possible_values = &["hex", "blob"], default_value = "hex")]
         /// Specifies hex format
         format: String,
@@ -207,6 +209,10 @@ fn main() -> Result<()> {
             format,
             annotate,
         } => {
+            let args = args.unwrap_or_else(|| {
+                let text = io::read_to_string(io::stdin()).expect("Failed to read stdin");
+                parse_args(&text).expect("Failed to parse stdin.")
+            });
             let bytes = if annotate.is_empty() {
                 args.to_bytes()?
             } else {
@@ -232,6 +238,9 @@ fn main() -> Result<()> {
             format,
             annotate,
         } => {
+            let blob = blob.unwrap_or_else(|| {
+                io::read_to_string(io::stdin()).expect("Failed to read stdin")
+            });
             let bytes = match format.as_str() {
                 "hex" => hex::decode(&blob)?,
                 "blob" => {
