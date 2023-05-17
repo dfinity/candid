@@ -191,7 +191,11 @@ service : {
 A function type describes the list of parameters and results and their respective types. It can optionally be annotated to be *query*, *composite_query* or *oneway*.
 
 * `query` indicates that the function does not modify any state and can potentially be executed more efficiently (e.g., on cached state).
-* `composite_query` is a special `query` function that cannot be called in inter-canister calls. The composite query function can call other query and composite query functions on the same subnet.
+* `composite_query` is a special `query` function that has IC-specific features and limitations:
+  - `composite_query` function can only call other `composite_query` and `query` functions.
+  - `composite_query` function can only be called from other `composite_query` functions (not callable from `query` functions) and from outside of IC.
+  - `composite_query` cannot be made cross-subnets.
+  - All these limitations are temporary due to the implementation. Eventually, `query` and `composite_query` functions will become the same thing.
 * `oneway` function has no return results, and the caller doesn't have to wait for the function return.
 * Other annotations may be added in the future.
 
