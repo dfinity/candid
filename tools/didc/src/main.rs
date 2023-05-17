@@ -6,8 +6,9 @@ use candid::{
     Error, IDLArgs, TypeEnv,
 };
 use clap::Parser;
+use std::collections::HashSet;
+use std::io;
 use std::path::PathBuf;
-use std::{collections::HashSet, io};
 
 #[derive(Parser)]
 #[clap(version, author)]
