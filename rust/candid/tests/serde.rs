@@ -27,6 +27,12 @@ fn test_error() {
         || test_decode(b"DIDL\0\x01\0\x01", &42),
         "type index 0 out of range",
     );
+    check_error(
+        || {
+            test_decode(b"DIDL\x02\x6c\x01\x0a\x01\x6d\x00\x01\x01                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ", &candid::Reserved)
+        },
+        "Recursion limit exceeded",
+    );
 }
 
 #[test]
@@ -132,40 +138,24 @@ fn test_reserved() {
 
 #[test]
 fn test_reference() {
-    use candid::{
-        types::{Function, Type, TypeInner},
-        Func, Principal, Service,
-    };
+    use candid::{define_function, define_service, func, Principal};
     let principal = Principal::from_text("w7x7r-cok77-xa").unwrap();
     all_check(principal, "4449444c0001680103caffee");
-    all_check(Service { principal }, "4449444c01690001000103caffee");
+    define_function!(CustomFunc: () -> (candid::Nat));
     all_check(
-        Func {
-            principal,
-            method: "method".to_owned(),
-        },
-        "4449444c016a0000000100010103caffee066d6574686f64",
+        CustomFunc::new(principal, "method".to_owned()),
+        "4449444c016a00017d000100010103caffee066d6574686f64",
     );
-    #[derive(Deserialize, PartialEq, Debug)]
-    struct CustomFunc(Func);
-    impl CandidType for CustomFunc {
-        fn _ty() -> Type {
-            TypeInner::Func(Function {
-                args: vec![],
-                rets: vec![TypeInner::Nat.into()],
-                modes: vec![],
-            })
-            .into()
-        }
-        fn idl_serialize<S: candid::types::Serializer>(
-            &self,
-            _serializer: S,
-        ) -> Result<(), S::Error> {
-            unimplemented!()
-        }
-    }
     let bytes = hex("4449444c016a00017f000100010100016d");
     test_decode(&bytes, &None::<CustomFunc>);
+    define_service!(MyService: { "f": CustomFunc::ty(); "g": func!(() -> () query) });
+    all_check(
+        MyService::new(principal),
+        "4449444c0369020166010167026a00017d006a0000010101000103caffee",
+    );
+    define_service!(S: { "next" : func!(() -> (S)) });
+    let v = S::new(principal);
+    assert_eq!(v, Decode!(&Encode!(&v).unwrap(), S).unwrap());
 }
 
 #[test]

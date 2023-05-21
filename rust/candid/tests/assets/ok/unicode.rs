@@ -1,10 +1,10 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use ic_cdk::export::candid::{self, CandidType, Deserialize};
+use candid::{self, CandidType, Deserialize};
 use ic_cdk::api::call::CallResult;
 
 #[derive(CandidType, Deserialize)]
-struct A {
+pub struct A {
   #[serde(rename="\u{e000}")]
   _11864174_: candid::Nat,
   #[serde(rename="📦🍦")]
@@ -16,7 +16,7 @@ struct A {
 }
 
 #[derive(CandidType, Deserialize)]
-enum B {
+pub enum B {
   #[serde(rename="")]
   _0_,
   #[serde(rename="空的")]
@@ -27,7 +27,7 @@ enum B {
   _3099250646_,
 }
 
-struct SERVICE(candid::Principal);
+pub struct SERVICE(pub candid::Principal);
 impl SERVICE{
   pub async fn _0_(&self, arg0: candid::Nat) -> CallResult<(candid::Nat,)> {
     ic_cdk::call(self.0, "", (arg0,)).await

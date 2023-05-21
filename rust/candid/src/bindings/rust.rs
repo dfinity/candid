@@ -85,8 +85,8 @@ fn pp_ty<'a>(ty: &'a Type, recs: &RecPoints) -> RcDoc<'a> {
         Vec(ref t) => str("Vec").append(enclose("<", pp_ty(t, recs), ">")),
         Record(ref fs) => pp_record_fields(fs, recs),
         Variant(_) => unreachable!(), // not possible after rewriting
-        Func(_) => str("candid::Func"),
-        Service(_) => str("candid::Service"),
+        Func(_) => unreachable!(),    // not possible after rewriting
+        Service(_) => unreachable!(), // not possible after rewriting
         Class(_, _) => unreachable!(),
         Knot(_) | Unknown | Future => unreachable!(),
     }
@@ -133,6 +133,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         let name = ident(id).append(" ");
+        let vis = "pub ";
         match ty.as_ref() {
             TypeInner::Record(fs) => {
                 let separator = if is_tuple(fs) {
@@ -142,6 +143,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -
                 };
                 str(derive)
                     .append(RcDoc::line())
+                    .append(vis)
                     .append("struct ")
                     .append(name)
                     .append(pp_record_fields(fs, recs))
@@ -150,21 +152,36 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -
             }
             TypeInner::Variant(fs) => str(derive)
                 .append(RcDoc::line())
+                .append(vis)
                 .append("enum ")
                 .append(name)
                 .append(pp_variant_fields(fs, recs))
                 .append(RcDoc::hardline()),
+            TypeInner::Func(func) => str("candid::define_function!(")
+                .append(vis)
+                .append(name)
+                .append(": ")
+                .append(pp_ty_func(func))
+                .append(");"),
+            TypeInner::Service(serv) => str("candid::define_service!(")
+                .append(vis)
+                .append(name)
+                .append(": ")
+                .append(pp_ty_service(serv))
+                .append(");"),
             _ => {
                 if recs.contains(id) {
                     str(derive)
                         .append(RcDoc::line())
+                        .append(vis)
                         .append("struct ")
                         .append(ident(id))
                         .append(enclose("(", pp_ty(ty, recs), ")"))
                         .append(";")
                         .append(RcDoc::hardline())
                 } else {
-                    kwd("type")
+                    str(vis)
+                        .append(kwd("type"))
                         .append(name)
                         .append("= ")
                         .append(pp_ty(ty, recs))
@@ -173,6 +190,38 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], recs: &'a RecPoints) -
             }
         }
     }))
+}
+
+fn pp_args(args: &[Type]) -> RcDoc {
+    let empty = RecPoints::default();
+    let doc = concat(args.iter().map(|t| pp_ty(t, &empty)), ",");
+    enclose("(", doc, ")")
+}
+fn pp_ty_func(f: &Function) -> RcDoc {
+    let args = pp_args(&f.args);
+    let rets = pp_args(&f.rets);
+    let modes = super::candid::pp_modes(&f.modes);
+    args.append(" ->")
+        .append(RcDoc::space())
+        .append(rets.append(modes))
+        .nest(INDENT_SPACE)
+}
+fn pp_ty_service(serv: &[(String, Type)]) -> RcDoc {
+    let doc = concat(
+        serv.iter().map(|(id, func)| {
+            let func_doc = match func.as_ref() {
+                TypeInner::Func(ref f) => enclose("candid::func!(", pp_ty_func(f), ")"),
+                TypeInner::Var(_) => pp_ty(func, &RecPoints::default()).append("::ty()"),
+                _ => unreachable!(),
+            };
+            RcDoc::text("\"")
+                .append(id)
+                .append(kwd("\" :"))
+                .append(func_doc)
+        }),
+        ";",
+    );
+    enclose_space("{", doc, "}")
 }
 
 fn pp_function<'a>(id: &'a str, func: &'a Function) -> RcDoc<'a> {
@@ -217,7 +266,7 @@ fn pp_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
         }),
         RcDoc::hardline(),
     );
-    RcDoc::text("struct SERVICE(candid::Principal);")
+    RcDoc::text("pub struct SERVICE(pub candid::Principal);")
         .append(RcDoc::hardline())
         .append("impl SERVICE")
         .append(enclose_space("{", body, "}"))
@@ -226,7 +275,7 @@ fn pp_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     let header = r#"// This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use ic_cdk::export::candid::{self, CandidType, Deserialize};
+use candid::{self, CandidType, Deserialize};
 use ic_cdk::api::call::CallResult;
 "#;
     let (env, actor) = nominalize_all(env, actor);
@@ -281,7 +330,7 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
             TypeInner::Opt(ty)
         }
         TypeInner::Vec(ty) => {
-            path.push(TypePath::Opt);
+            path.push(TypePath::Vec);
             let ty = nominalize(env, path, ty);
             path.pop();
             TypeInner::Vec(ty)
@@ -337,44 +386,68 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
                 TypeInner::Var(new_var)
             }
         },
-        TypeInner::Func(func) => {
-            let func = func.clone();
-            TypeInner::Func(Function {
-                modes: func.modes,
-                args: func
-                    .args
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, ty)| {
-                        path.push(TypePath::Func(format!("arg{i}")));
-                        let ty = nominalize(env, path, &ty);
-                        path.pop();
-                        ty
-                    })
-                    .collect(),
-                rets: func
-                    .rets
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, ty)| {
-                        path.push(TypePath::Func(format!("ret{i}")));
-                        let ty = nominalize(env, path, &ty);
-                        path.pop();
-                        ty
-                    })
-                    .collect(),
-            })
-        }
-        TypeInner::Service(serv) => TypeInner::Service(
-            serv.iter()
-                .map(|(meth, ty)| {
-                    path.push(TypePath::Id(meth.to_string()));
-                    let ty = nominalize(env, path, ty);
-                    path.pop();
-                    (meth.clone(), ty)
+        TypeInner::Func(func) => match path.last() {
+            None | Some(TypePath::Id(_)) => {
+                let func = func.clone();
+                TypeInner::Func(Function {
+                    modes: func.modes,
+                    args: func
+                        .args
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, ty)| {
+                            path.push(TypePath::Func(format!("arg{i}")));
+                            let ty = nominalize(env, path, &ty);
+                            path.pop();
+                            ty
+                        })
+                        .collect(),
+                    rets: func
+                        .rets
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, ty)| {
+                            path.push(TypePath::Func(format!("ret{i}")));
+                            let ty = nominalize(env, path, &ty);
+                            path.pop();
+                            ty
+                        })
+                        .collect(),
                 })
-                .collect(),
-        ),
+            }
+            Some(_) => {
+                let new_var = path_to_var(path);
+                let ty = nominalize(
+                    env,
+                    &mut vec![TypePath::Id(new_var.clone())],
+                    &TypeInner::Func(func.clone()).into(),
+                );
+                env.0.insert(new_var.clone(), ty);
+                TypeInner::Var(new_var)
+            }
+        },
+        TypeInner::Service(serv) => match path.last() {
+            None | Some(TypePath::Id(_)) => TypeInner::Service(
+                serv.iter()
+                    .map(|(meth, ty)| {
+                        path.push(TypePath::Id(meth.to_string()));
+                        let ty = nominalize(env, path, ty);
+                        path.pop();
+                        (meth.clone(), ty)
+                    })
+                    .collect(),
+            ),
+            Some(_) => {
+                let new_var = path_to_var(path);
+                let ty = nominalize(
+                    env,
+                    &mut vec![TypePath::Id(new_var.clone())],
+                    &TypeInner::Service(serv.clone()).into(),
+                );
+                env.0.insert(new_var.clone(), ty);
+                TypeInner::Var(new_var)
+            }
+        },
         TypeInner::Class(args, ty) => TypeInner::Class(
             args.iter()
                 .map(|ty| {
