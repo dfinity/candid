@@ -1,9 +1,8 @@
 use super::analysis::{chase_actor, chase_types, infer_rec};
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
+use crate::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
-use std::sync::Arc;
 
 // The definition of tuple is language specific.
 pub(crate) fn is_tuple(t: &Type) -> bool {
@@ -136,7 +135,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
     }
 }
 
-fn pp_label(id: &Arc<Label>) -> RcDoc {
+fn pp_label(id: &SharedLabel) -> RcDoc {
     match &**id {
         Label::Named(str) => quote_ident(str),
         Label::Id(n) | Label::Unnamed(n) => str("_")

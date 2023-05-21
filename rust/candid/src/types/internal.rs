@@ -334,9 +334,10 @@ impl std::hash::Hash for Label {
         self.get_id();
     }
 }
+pub type SharedLabel = Arc<Label>;
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Field {
-    pub id: Arc<Label>,
+    pub id: SharedLabel,
     pub ty: Type,
 }
 #[macro_export]
