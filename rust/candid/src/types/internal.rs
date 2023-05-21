@@ -5,11 +5,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 
-#[cfg(not(feature = "arc_type"))]
-use std::rc::Rc;
-#[cfg(feature = "arc_type")]
-use std::sync::Arc as Rc;
-
 // This is a re-implementation of std::any::TypeId to get rid of 'static constraint.
 // The current TypeId doesn't consider lifetime while computing the hash, which is
 // totally fine for Candid type, as we don't care about lifetime at all.
@@ -169,8 +164,17 @@ impl TypeContainer {
         .into()
     }
 }
+#[cfg(feature = "arc_type")]
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
-pub struct Type(pub Rc<TypeInner>);
+#[deprecated(
+    note = "Do not use arc_type feature! There is a 20% to 80% slowdown in deserialization."
+)]
+pub struct Type(pub std::sync::Arc<TypeInner>);
+
+#[cfg(not(feature = "arc_type"))]
+#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+pub struct Type(pub std::rc::Rc<TypeInner>);
+
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub enum TypeInner {
     Null,
@@ -218,7 +222,7 @@ impl AsRef<TypeInner> for Type {
 }
 impl From<TypeInner> for Type {
     fn from(t: TypeInner) -> Self {
-        Type(Rc::new(t))
+        Type(t.into())
     }
 }
 impl TypeInner {
@@ -338,7 +342,16 @@ impl std::hash::Hash for Label {
         self.get_id();
     }
 }
-pub type SharedLabel = Rc<Label>;
+
+#[cfg(feature = "arc_type")]
+#[deprecated(
+    note = "Do not use arc_type feature! There is a 20% to 80% slowdown in deserialization."
+)]
+pub type SharedLabel = std::sync::Arc<Label>;
+
+#[cfg(not(feature = "arc_type"))]
+pub type SharedLabel = std::rc::Rc<Label>;
+
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Field {
     pub id: SharedLabel,
