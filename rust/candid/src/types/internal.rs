@@ -4,7 +4,11 @@ use num_enum::TryFromPrimitive;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
-use std::sync::Arc;
+
+#[cfg(not(feature = "arc_type"))]
+use std::rc::Rc;
+#[cfg(feature = "arc_type")]
+use std::sync::Arc as Rc;
 
 // This is a re-implementation of std::any::TypeId to get rid of 'static constraint.
 // The current TypeId doesn't consider lifetime while computing the hash, which is
@@ -166,7 +170,7 @@ impl TypeContainer {
     }
 }
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
-pub struct Type(pub Arc<TypeInner>);
+pub struct Type(pub Rc<TypeInner>);
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub enum TypeInner {
     Null,
@@ -214,7 +218,7 @@ impl AsRef<TypeInner> for Type {
 }
 impl From<TypeInner> for Type {
     fn from(t: TypeInner) -> Self {
-        Type(Arc::new(t))
+        Type(Rc::new(t))
     }
 }
 impl TypeInner {
@@ -334,7 +338,7 @@ impl std::hash::Hash for Label {
         self.get_id();
     }
 }
-pub type SharedLabel = Arc<Label>;
+pub type SharedLabel = Rc<Label>;
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Field {
     pub id: SharedLabel,
