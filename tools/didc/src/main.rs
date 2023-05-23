@@ -188,7 +188,7 @@ fn main() -> Result<()> {
                     candid::bindings::rust::compile(&config, &env, &actor)
                 }
                 "rs-agent" => {
-                    let config = candid::bindings::rust::Config::new();
+                    let mut config = candid::bindings::rust::Config::new();
                     config.target = candid::bindings::rust::Target::Agent;
                     candid::bindings::rust::compile(&config, &env, &actor)
                 }
