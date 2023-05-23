@@ -70,7 +70,7 @@ This is a summary of the grammar proposed:
 <actortype> ::= { <methtype>;* }
 <methtype>  ::= <name> : (<functype> | <id>)
 <functype>  ::= <tuptype> -> <tuptype> <funcann>*
-<funcann>   ::= oneway | query
+<funcann>   ::= oneway | query | composite_query
 <tuptype>   ::= ( <argtype>,* )
 <argtype>   ::= <datatype>
 <fieldtype> ::= <nat> : <datatype>
@@ -188,11 +188,20 @@ service : {
 
 #### Structure
 
-A function type describes the list of parameters and results and their respective types. It can optionally be annotated to be *query*, which indicates that it does not modify any state and can potentially be executed more efficiently (e.g., on cached state). (Other annotations may be added in the future.)
+A function type describes the list of parameters and results and their respective types. It can optionally be annotated to be *query*, *composite_query* or *oneway*.
+
+* `query` indicates that the function does not modify any state and can potentially be executed more efficiently (e.g., on cached state).
+* `composite_query` is a special `query` function that has IC-specific features and limitations:
+  - `composite_query` function can only call other `composite_query` and `query` functions.
+  - `composite_query` function can only be called from other `composite_query` functions (not callable from `query` functions) and from outside of IC.
+  - `composite_query` cannot be made cross-subnets.
+  - All these limitations are temporary due to the implementation. Eventually, `query` and `composite_query` functions will become the same thing.
+* `oneway` function has no return results, and the caller doesn't have to wait for the function return.
+* Other annotations may be added in the future.
 
 ```
 <functype> ::= ( <argtype>,* ) -> ( <argtype>,* ) <funcann>*
-<funcann>  ::= oneway | query
+<funcann>  ::= oneway | query | composite_query
 <argtype>  ::= <datatype>
 ```
 We identify `<funcann>` lists in a function type up to reordering.
@@ -1169,6 +1178,7 @@ T(<name>:<datatype>) = leb128(|utf8(<name>)|) i8*(utf8(<name>)) I(<datatype>)
 T : <funcann> -> i8*
 T(query)  = i8(1)
 T(oneway) = i8(2)
+T(composite_query) = i8(3)
 
 T* : <X>* -> i8*
 T*(<X>^N) = leb128(N) T(<X>)^N
