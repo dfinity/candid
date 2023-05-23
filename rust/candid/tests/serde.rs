@@ -27,6 +27,14 @@ fn test_error() {
         || test_decode(b"DIDL\0\x01\0\x01", &42),
         "type index 0 out of range",
     );
+    check_error_or(
+        || {
+            test_decode(b"DIDL\x02\x6c\x01\x0a\x01\x6d\x00\x01\x01                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ", &candid::Reserved)
+        },
+        // Depending on stack size, we either get recursion limit or parser error
+        "Recursion limit exceeded",
+        "binary parser error",
+    );
 }
 
 #[test]
@@ -731,6 +739,15 @@ fn check_error<F: FnOnce() -> R + std::panic::UnwindSafe, R>(f: F, str: &str) {
         std::panic::catch_unwind(f)
             .err()
             .and_then(|a| a.downcast_ref::<String>().map(|s| { s.contains(str) })),
+        Some(true)
+    );
+}
+
+fn check_error_or<F: FnOnce() -> R + std::panic::UnwindSafe, R>(f: F, str: &str, or_str: &str) {
+    assert_eq!(
+        std::panic::catch_unwind(f).err().and_then(|a| a
+            .downcast_ref::<String>()
+            .map(|s| { s.contains(str) || s.contains(or_str) })),
         Some(true)
     );
 }

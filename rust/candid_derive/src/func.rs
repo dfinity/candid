@@ -80,9 +80,9 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenSt
     Ok(quote! { #fun })
 }
 
-pub(crate) fn export_service() -> TokenStream {
+pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
     if let Some(meths) = METHODS.lock().unwrap().as_mut() {
-        let candid = candid_path(&None);
+        let candid = candid_path(&path);
         let init = if let Some(opt_args) = INIT.lock().unwrap().as_mut() {
             let res = opt_args.as_ref().map(|args| {
                 let args = args

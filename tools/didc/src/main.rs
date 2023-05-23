@@ -7,6 +7,7 @@ use candid::{
 };
 use clap::Parser;
 use std::collections::HashSet;
+use std::io;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -23,7 +24,7 @@ enum Command {
     Bind {
         /// Specifies did file for code generation
         input: PathBuf,
-        #[clap(short, long, possible_values = &["js", "ts", "did", "mo", "rs"])]
+        #[clap(short, long, possible_values = &["js", "ts", "did", "mo", "rs", "rs-agent"])]
         /// Specifies target language
         target: String,
     },
@@ -41,7 +42,8 @@ enum Command {
     Encode {
         #[clap(parse(try_from_str = parse_args))]
         /// Specifies Candid textual format for encoding
-        args: IDLArgs,
+        /// If omitted, the text will be read from stdin.
+        args: Option<IDLArgs>,
         #[clap(flatten)]
         annotate: TypeAnnotation,
         #[clap(short, long, possible_values = &["hex", "pretty", "blob"], default_value = "hex")]
@@ -50,8 +52,9 @@ enum Command {
     },
     /// Decode Candid binary data
     Decode {
-        /// Specifies Candid binary data in hex string
-        blob: String,
+        /// Specifies Candid binary data in hex string.
+        /// If omitted, the hex will be read from stdin.
+        blob: Option<String>,
         #[clap(short, long, possible_values = &["hex", "blob"], default_value = "hex")]
         /// Specifies hex format
         format: String,
@@ -180,7 +183,15 @@ fn main() -> Result<()> {
                 "ts" => candid::bindings::typescript::compile(&env, &actor),
                 "did" => candid::bindings::candid::compile(&env, &actor),
                 "mo" => candid::bindings::motoko::compile(&env, &actor),
-                "rs" => candid::bindings::rust::compile(&env, &actor),
+                "rs" => {
+                    let config = candid::bindings::rust::Config::new();
+                    candid::bindings::rust::compile(&config, &env, &actor)
+                }
+                "rs-agent" => {
+                    let mut config = candid::bindings::rust::Config::new();
+                    config.target = candid::bindings::rust::Target::Agent;
+                    candid::bindings::rust::compile(&config, &env, &actor)
+                }
                 _ => unreachable!(),
             };
             println!("{content}");
@@ -207,6 +218,13 @@ fn main() -> Result<()> {
             format,
             annotate,
         } => {
+            let args = match args {
+                Some(idl_args) => idl_args,
+                None => {
+                    let text = io::read_to_string(io::stdin())?;
+                    parse_args(&text)?
+                }
+            };
             let bytes = if annotate.is_empty() {
                 args.to_bytes()?
             } else {
@@ -232,8 +250,16 @@ fn main() -> Result<()> {
             format,
             annotate,
         } => {
+            let blob = match blob {
+                Some(blob) => blob,
+                None => io::read_to_string(io::stdin())?,
+            };
             let bytes = match format.as_str() {
-                "hex" => hex::decode(&blob)?,
+                "hex" => hex::decode(
+                    blob.chars()
+                        .filter(|c| !c.is_whitespace())
+                        .collect::<String>(),
+                )?,
                 "blob" => {
                     use candid::types::value::IDLValue;
                     match pretty_parse::<IDLValue>("blob", &blob)? {

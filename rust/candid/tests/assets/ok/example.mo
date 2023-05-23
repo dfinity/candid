@@ -34,7 +34,7 @@ module {
     #leaf : Int;
   };
   public type Self = actor {
-    f : shared (list, [Nat8], ?Bool) -> ();
+    f : shared (list, Blob, ?Bool) -> ();
     g : shared query (my_type, List, ?List, nested) -> async (Int, broker);
     h : shared ([?Text], { #A : Nat; #B : ?Text }, ?List) -> async {
         _42_  : {};

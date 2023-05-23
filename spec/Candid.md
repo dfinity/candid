@@ -70,7 +70,7 @@ This is a summary of the grammar proposed:
 <actortype> ::= { <methtype>;* }
 <methtype>  ::= <name> : (<functype> | <id>)
 <functype>  ::= <tuptype> -> <tuptype> <funcann>*
-<funcann>   ::= oneway | query
+<funcann>   ::= oneway | query | composite_query
 <tuptype>   ::= ( <argtype>,* )
 <argtype>   ::= <datatype>
 <fieldtype> ::= <nat> : <datatype>
@@ -188,11 +188,20 @@ service : {
 
 #### Structure
 
-A function type describes the list of parameters and results and their respective types. It can optionally be annotated to be *query*, which indicates that it does not modify any state and can potentially be executed more efficiently (e.g., on cached state). (Other annotations may be added in the future.)
+A function type describes the list of parameters and results and their respective types. It can optionally be annotated to be *query*, *composite_query* or *oneway*.
+
+* `query` indicates that the function does not modify any state and can potentially be executed more efficiently (e.g., on cached state).
+* `composite_query` is a special `query` function that has IC-specific features and limitations:
+  - `composite_query` function can only call other `composite_query` and `query` functions.
+  - `composite_query` function can only be called from other `composite_query` functions (not callable from `query` functions) and from outside of IC.
+  - `composite_query` cannot be made cross-subnets.
+  - All these limitations are temporary due to the implementation. Eventually, `query` and `composite_query` functions will become the same thing.
+* `oneway` function has no return results, and the caller doesn't have to wait for the function return.
+* Other annotations may be added in the future.
 
 ```
 <functype> ::= ( <argtype>,* ) -> ( <argtype>,* ) <funcann>*
-<funcann>  ::= oneway | query
+<funcann>  ::= oneway | query | composite_query
 <argtype>  ::= <datatype>
 ```
 We identify `<funcann>` lists in a function type up to reordering.
@@ -798,12 +807,12 @@ not (<datatype> <: <datatype'>)
 opt <datatype> <: opt <datatype'>
 ```
 *Note:* These rules are necessary in the presence of the unusual record and variant rules shown below. Without them, certain upgrades may generally be valid one step at a time, but not taken together, which could cause problems for clients catching up with multiple upgrades.
-For example, given a record type `record {666 : opt nat}` it is valid to remove the field `666` by the rule below and evolve the type to `record { 666 : nat }` and then to `record {}`.
+For example, given a record type `record {666 : nat}` it is valid to remove the field `666` by the rule below and evolve the type to `record { 666 : opt nat }` and then to `record {}`.
 A later step might legally re-add a field of the same name but with a different type, producing, e.g.,`record {666 : opt text}`.
 A client having missed some of the  intermediate steps will have to upgrade directly to the newest version of the type.
 If the type cannot be decoded, its value will be treated as `null`.
 
-In practice, users are strongly discouraged to ever remove a record field or a variant tag and later re-add it with a different meaning. Instead of removing an optional record field, it should be replaced with `opt empty`, to prevent re-use of that field.
+In practice, users are strongly discouraged to ever remove a record field or a variant tag and later re-add it with a different meaning. Instead of removing an optional record/variant field, it should be replaced with `opt empty` or `reserved`, to prevent re-use of that field.
 However, there is no general way for the type system to prevent this, since it cannot know the history of a type definition.
 Consequently, the rule above is needed for technical more than for practical reasons.
 Implementations of static upgrade checking are encouraged to warn if this rule is used.
@@ -1169,6 +1178,7 @@ T(<name>:<datatype>) = leb128(|utf8(<name>)|) i8*(utf8(<name>)) I(<datatype>)
 T : <funcann> -> i8*
 T(query)  = i8(1)
 T(oneway) = i8(2)
+T(composite_query) = i8(3)
 
 T* : <X>* -> i8*
 T*(<X>^N) = leb128(N) T(<X>)^N

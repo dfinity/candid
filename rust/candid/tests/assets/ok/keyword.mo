@@ -19,10 +19,10 @@ module {
     fieldnat : shared { _2_  : Int; _50_ : Nat } -> async { _0_  : Int };
     oneway : shared Nat8 -> ();
     oneway__ : shared Nat8 -> ();
-    query_ : shared query [Nat8] -> async [Nat8];
+    query_ : shared query Blob -> async Blob;
     return_ : shared o -> async o;
     service : t;
-    tuple : shared ((Int, [Nat8], Text)) -> async ((Int, Nat8));
+    tuple : shared ((Int, Blob, Text)) -> async ((Int, Nat8));
     variant : shared { #A; #B; #C; #D : Float } -> async ();
   }
 }

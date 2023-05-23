@@ -28,7 +28,7 @@ jobs:
     - name: Build
       run: cargo build
     - name: Run tests
-      run: cargo test --all-features
+      run: cargo test --features all
     - name: fmt
       run: cargo fmt -v -- --check
     - name: lint
