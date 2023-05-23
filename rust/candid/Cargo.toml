@@ -90,6 +90,7 @@ random = ["parser", "configs", "arbitrary", "fake", "rand"]
 parser = ["lalrpop", "lalrpop-util", "logos"]
 all = ["random"]
 mute_warnings = []
+arc_type = []
 
 # docs.rs-specific configuration
 # To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features

@@ -7,6 +7,7 @@ use candid::{
 };
 use clap::Parser;
 use std::collections::HashSet;
+use std::io;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -41,7 +42,8 @@ enum Command {
     Encode {
         #[clap(parse(try_from_str = parse_args))]
         /// Specifies Candid textual format for encoding
-        args: IDLArgs,
+        /// If omitted, the text will be read from stdin.
+        args: Option<IDLArgs>,
         #[clap(flatten)]
         annotate: TypeAnnotation,
         #[clap(short, long, possible_values = &["hex", "pretty", "blob"], default_value = "hex")]
@@ -50,8 +52,9 @@ enum Command {
     },
     /// Decode Candid binary data
     Decode {
-        /// Specifies Candid binary data in hex string
-        blob: String,
+        /// Specifies Candid binary data in hex string.
+        /// If omitted, the hex will be read from stdin.
+        blob: Option<String>,
         #[clap(short, long, possible_values = &["hex", "blob"], default_value = "hex")]
         /// Specifies hex format
         format: String,
@@ -215,6 +218,13 @@ fn main() -> Result<()> {
             format,
             annotate,
         } => {
+            let args = match args {
+                Some(idl_args) => idl_args,
+                None => {
+                    let text = io::read_to_string(io::stdin())?;
+                    parse_args(&text)?
+                }
+            };
             let bytes = if annotate.is_empty() {
                 args.to_bytes()?
             } else {
@@ -240,8 +250,16 @@ fn main() -> Result<()> {
             format,
             annotate,
         } => {
+            let blob = match blob {
+                Some(blob) => blob,
+                None => io::read_to_string(io::stdin())?,
+            };
             let bytes = match format.as_str() {
-                "hex" => hex::decode(&blob)?,
+                "hex" => hex::decode(
+                    blob.chars()
+                        .filter(|c| !c.is_whitespace())
+                        .collect::<String>(),
+                )?,
                 "blob" => {
                     use candid::types::value::IDLValue;
                     match pretty_parse::<IDLValue>("blob", &blob)? {
