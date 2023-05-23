@@ -3,7 +3,7 @@
 use super::{
     error::{Error, Result},
     types::internal::{type_of, TypeId},
-    types::{Field, Label, Type, TypeEnv, TypeInner},
+    types::{Field, Label, SharedLabel, Type, TypeEnv, TypeInner},
     CandidType, Int, Nat,
 };
 use crate::{
@@ -15,7 +15,6 @@ use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
 use std::fmt::Write;
-use std::rc::Rc;
 use std::{collections::VecDeque, io::Cursor, mem::replace};
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
@@ -168,7 +167,7 @@ struct Deserializer<'de> {
     gamma: Gamma,
     // field_name tells deserialize_identifier which field name to process.
     // This field should always be set by set_field_name function.
-    field_name: Option<Rc<Label>>,
+    field_name: Option<SharedLabel>,
     // Indicates whether to deserialize with IDLValue.
     // It only affects the field id generation in enum type.
     is_untyped: bool,
@@ -257,7 +256,7 @@ impl<'de> Deserializer<'de> {
     }
     // Should always call set_field_name to set the field_name. After deserialize_identifier
     // processed the field_name, field_name will be reset to None.
-    fn set_field_name(&mut self, field: Rc<Label>) {
+    fn set_field_name(&mut self, field: SharedLabel) {
         if self.field_name.is_some() {
             unreachable!();
         }
