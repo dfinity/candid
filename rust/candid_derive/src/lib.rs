@@ -23,8 +23,12 @@ pub fn candid_method(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn export_service(_: TokenStream) -> TokenStream {
-    func::export_service().into()
+pub fn export_service(input: TokenStream) -> TokenStream {
+    if input.is_empty() {
+        func::export_service(None).into()
+    } else {
+        func::export_service(Some(input.into())).into()
+    }
 }
 
 #[inline]
