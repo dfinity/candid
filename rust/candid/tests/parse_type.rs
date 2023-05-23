@@ -61,8 +61,13 @@ fn compiler_test(resource: &str) {
                 }
             }
             {
+                let mut config = rust::Config::new();
+                config.canister_id = Some(candid::Principal::from_text("aaaaa-aa").unwrap());
+                if filename.file_name().unwrap().to_str().unwrap() == "management.did" {
+                    config.target = rust::Target::Agent;
+                }
                 let mut output = mint.new_goldenfile(filename.with_extension("rs")).unwrap();
-                let content = rust::compile(&env, &actor);
+                let content = rust::compile(&config, &env, &actor);
                 writeln!(output, "{content}").unwrap();
             }
             {

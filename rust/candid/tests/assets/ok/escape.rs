@@ -1,7 +1,7 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use candid::{self, CandidType, Deserialize};
-use ic_cdk::api::call::CallResult;
+use candid::{self, CandidType, Deserialize, Principal};
+use ic_cdk::api::call::CallResult as Result;
 
 #[derive(CandidType, Deserialize)]
 pub struct t {
@@ -15,9 +15,10 @@ pub struct t {
   _1020746185_: candid::Nat,
 }
 
-pub struct SERVICE(pub candid::Principal);
-impl SERVICE{
-  pub async fn _2635468193_(&self, arg0: t) -> CallResult<()> {
+pub struct SERVICE(pub Principal);
+impl SERVICE {
+  pub async fn _2635468193_(&self, arg0: t) -> Result<()> {
     ic_cdk::call(self.0, "\n\'\"\'\'\"\"\r\t", (arg0,)).await
   }
 }
+pub const service: SERVICE = SERVICE(Principal::from_slice(&[])); // aaaaa-aa

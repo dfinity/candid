@@ -24,7 +24,7 @@ enum Command {
     Bind {
         /// Specifies did file for code generation
         input: PathBuf,
-        #[clap(short, long, possible_values = &["js", "ts", "did", "mo", "rs"])]
+        #[clap(short, long, possible_values = &["js", "ts", "did", "mo", "rs", "rs-agent"])]
         /// Specifies target language
         target: String,
     },
@@ -183,7 +183,15 @@ fn main() -> Result<()> {
                 "ts" => candid::bindings::typescript::compile(&env, &actor),
                 "did" => candid::bindings::candid::compile(&env, &actor),
                 "mo" => candid::bindings::motoko::compile(&env, &actor),
-                "rs" => candid::bindings::rust::compile(&env, &actor),
+                "rs" => {
+                    let config = candid::bindings::rust::Config::new();
+                    candid::bindings::rust::compile(&config, &env, &actor)
+                }
+                "rs-agent" => {
+                    let mut config = candid::bindings::rust::Config::new();
+                    config.target = candid::bindings::rust::Target::Agent;
+                    candid::bindings::rust::compile(&config, &env, &actor)
+                }
                 _ => unreachable!(),
             };
             println!("{content}");
