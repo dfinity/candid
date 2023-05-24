@@ -1,0 +1,28 @@
+type List = opt record { head : int; tail : List };
+type a = variant { a; b : b };
+type b = record { int; nat };
+type broker = service {
+  find : (text) -> (service { current : () -> (nat32); up : () -> () });
+};
+type f = func (List, func (int32) -> (int64)) -> (opt List);
+type my_type = principal;
+type nested = record {
+  0 : nat;
+  1 : nat;
+  2 : record { nat; int };
+  3 : record { 0 : nat; 42 : nat; 43 : nat8 };
+  40 : nat;
+  41 : variant { 42; A; B; C };
+  42 : nat;
+};
+service : {
+  a : (vec nat8, opt bool) -> () oneway;
+  c : (b) -> (int) query;
+  f : (vec nat8, opt bool) -> () oneway;
+  g : (my_type, List, opt List, nested) -> (int, broker) query;
+  h : (vec opt text, variant { A : nat; B : opt text }, opt List) -> (
+      record { 42 : record {}; id : nat },
+    );
+  i : f;
+  x : (a, b) -> (opt a, opt b);
+}

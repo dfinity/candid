@@ -181,6 +181,45 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
+fn combine_actors(env: &Env, actor1: &Option<Type>, actor2: &Option<Type>) -> Result<Option<Type>> {
+    match (actor1, actor2) {
+        (None, None) => Ok(None),
+        (Some(t1), None) => Ok(Some(t1.clone())),
+        (None, Some(t2)) => Ok(Some(t2.clone())),
+        (Some(t1), Some(t2)) => {
+            if let TypeInner::Class(_, _) = t1.as_ref() {
+                return Err(Error::Custom(anyhow::Error::msg(format!(
+                    "Cannot combine class type: {:?}",
+                    t1
+                ))));
+            } else if let TypeInner::Class(_, _) = t2.as_ref() {
+                return Err(Error::Custom(anyhow::Error::msg(format!(
+                    "Cannot combine class type: {:?}",
+                    t2
+                ))));
+            }
+
+            let s1 = env.te.as_service(t1)?;
+            let s2 = env.te.as_service(t2)?;
+            // check that both actors don't have any overlapping names
+            let names1 = s1.iter().map(|(n, _)| n).collect::<BTreeSet<_>>();
+            let names2 = s2.iter().map(|(n, _)| n).collect::<BTreeSet<_>>();
+            let intersection = names1.intersection(&names2).collect::<Vec<_>>();
+            if !intersection.is_empty() {
+                return Err(Error::Custom(anyhow::Error::msg(format!(
+                    "duplicate method names: {:?} {:?} {:?}",
+                    intersection, names1, names2
+                ))));
+            }
+
+            let mut ret = s1.to_vec();
+            ret.extend(s2.iter().cloned());
+
+            Ok(Some(TypeInner::Service(ret).into()))
+        }
+    }
+}
+
 fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
     match actor {
         None => Ok(None),
@@ -216,7 +255,7 @@ fn load_imports(
     base: &Path,
     visited: &mut BTreeSet<PathBuf>,
     prog: &IDLProg,
-    list: &mut Vec<PathBuf>,
+    list: &mut Vec<(PathBuf, IDLProg)>,
 ) -> Result<()> {
     for dec in prog.decs.iter() {
         if let Dec::ImportD(file) = dec {
@@ -231,7 +270,7 @@ fn load_imports(
                 };
                 let base = path.parent().unwrap();
                 load_imports(is_pretty, base, visited, &code, list)?;
-                list.push(path);
+                list.push((path, code));
             }
         }
     }
@@ -262,7 +301,9 @@ pub fn check_init_args(
     Ok(args)
 }
 
-fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> {
+fn check_file_(file: &Path, options: &CheckFileOptions) -> Result<CheckFileResult> {
+    let is_pretty = options.pretty_errors;
+
     let base = if file.is_absolute() {
         file.parent().unwrap().to_path_buf()
     } else {
@@ -286,20 +327,71 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
         te: &mut te,
         pre: false,
     };
-    for import in imports.iter() {
-        let code = std::fs::read_to_string(import)?;
-        let code = code.parse::<IDLProg>()?;
-        check_decs(&mut env, &code.decs)?;
+    let mut actor: Option<Type> = None;
+    for (_, import_prog) in imports.iter() {
+        check_decs(&mut env, &import_prog.decs)?;
+        if options.combine_actors {
+            actor = combine_actors(&env, &actor, &check_actor(&env, &import_prog.actor)?)?;
+        }
     }
     check_decs(&mut env, &prog.decs)?;
-    let actor = check_actor(&env, &prog.actor)?;
-    Ok((te, actor))
+    let actor = if options.combine_actors {
+        combine_actors(&env, &actor, &check_actor(&env, &prog.actor)?)?
+    } else {
+        check_actor(&env, &prog.actor)?
+    };
+
+    let types = te;
+
+    Ok(CheckFileResult {
+        types,
+        actor,
+        imports: imports.into_iter().map(|e| e.0).collect(),
+    })
 }
 
 /// Type check did file including the imports.
 pub fn check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
-    check_file_(file, false)
+    let result = check_file_with_options(
+        file,
+        &CheckFileOptions {
+            pretty_errors: false,
+            ..Default::default()
+        },
+    )?;
+    Ok((result.types, result.actor))
 }
+
 pub fn pretty_check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
-    check_file_(file, true)
+    let result = check_file_with_options(
+        file,
+        &CheckFileOptions {
+            pretty_errors: true,
+            ..Default::default()
+        },
+    )?;
+    Ok((result.types, result.actor))
+}
+
+/// Return type of `check_file_with_options`
+#[derive(Debug, Default, Clone)]
+pub struct CheckFileResult {
+    pub types: TypeEnv,
+    pub actor: Option<Type>,
+    pub imports: BTreeSet<PathBuf>,
+}
+
+/// Options for `check_file_with_options`
+#[derive(Debug, Default, Clone)]
+pub struct CheckFileOptions {
+    pub pretty_errors: bool,
+    pub combine_actors: bool,
+}
+
+/// Type check did file including the imports. This variant
+/// takes options to pretty check the file, and also combine
+/// actors across imports into a single actor (useful for modular)
+/// did files.
+pub fn check_file_with_options(file: &Path, options: &CheckFileOptions) -> Result<CheckFileResult> {
+    check_file_(file, options)
 }

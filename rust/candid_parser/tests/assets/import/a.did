@@ -1,2 +1,7 @@
 import "b/b.did";
 type a = variant {a;b:b};
+
+service server : {
+  a : (test: blob, opt bool) -> () oneway;
+  c : (b) -> (int) query;
+}

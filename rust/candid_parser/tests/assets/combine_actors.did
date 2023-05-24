@@ -1,0 +1,18 @@
+import "import/a.did";
+import "import/b/b.did";
+type my_type = principal;
+type List = opt record { head: int; tail: List };
+type f = func (List, func (int32) -> (int64)) -> (opt List);
+type broker = service {
+  find : (name: text) ->
+    (service {up:() -> (); current:() -> (nat32)});
+};
+type nested = record { nat; nat; record {nat;int;}; record { nat; 0x2a:nat; nat8; }; 42:nat; 40:nat; variant{ A; 0x2a; B; C }; };
+
+service server : {
+  f : (test: blob, opt bool) -> () oneway;
+  g : (my_type, List, opt List, nested) -> (int, broker) query;
+  h : (vec opt text, variant { A: nat; B: opt text }, opt List) -> (record { id: nat; 0x2a: record {} });
+  i : f;
+  x : (a,b) -> (opt a, opt b);
+}
