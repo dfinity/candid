@@ -97,11 +97,13 @@ jobs:
   publish:
     needs: test
     name: Test for ${{ matrix.asset_name }}
-    matrix:
-      include:
-        - asset_name: didc-linux64
-        - asset_name: didc-arm32
-        - asset_name: didc-macos
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - asset_name: didc-linux64
+          - asset_name: didc-arm32
+          - asset_name: didc-macos
     runs-on: ubuntu-latest
     steps:
       - name: Get executable
