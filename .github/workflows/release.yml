@@ -3,8 +3,8 @@ on:
   push:
     tags:
       - '*'
-    branches:
-      - musl
+    branches: # TODO: Remove before merging.
+      - musl  # Pushing the feature branch should test this PR.
 jobs:
   build:
     name: Build for ${{ matrix.name }}
@@ -115,7 +115,7 @@ jobs:
         with:
           name: ${{ matrix.asset_name }}
       - name: Upload binaries to release
-        if: matrix.name == 'never' # TODO: Remove before merging
+        #if: matrix.name == 'never' # TODO: Remove before merging
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
