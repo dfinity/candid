@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "${1:-}" != "--help" ]] || {
+	cat <<-EOF
+		Builds all the files included in a release, for all platforms.
+	EOF
+	exit 0
+}
+
+export PATH="$PATH:$HOME/.local/opt/zig"
+
+# Zig provides a linker for cross platform builds.  The benefit it provides is equivalent to cross but the mechanism is different.
+# Cargo can create libraries for many targets, but making executables requires a linker.  We use just the linker from zig, making this lightweight.
+check_zig() {
+	zig version
+}
+install_zig() {
+	curl --retry 5 -sS --fail https://ziglang.org/download/0.10.1/zig-linux-x86_64-0.10.1.tar.xz >zig-linux-x86_64-0.10.1.tar.xz
+	tar -xJf zig-linux-x86_64-0.10.1.tar.xz
+	mkdir -p ~/.local/opt
+	mv zig-linux-x86_64-0.10.1 ~/.local/opt
+	ln -s zig-linux-x86_64-0.10.1 ~/.local/opt/zig
+	export PATH="$PATH:$HOME/.local/opt/zig"
+}
+check_zigbuild() {
+	cargo-zigbuild --version
+}
+install_zigbuild() {
+	command -v cargo-zigbuild || cargo install cargo-zigbuild
+}
+check_and_install() {
+	item="$1"
+	"check_${item}" || { "install_${item}" && "check_${item}"; }
+}
+
+echo "Installing tools..."
+check_and_install zig
+check_and_install zigbuild
+rustup target add x86_64-apple-darwin
+rustup target add aarch64-apple-darwin
+rustup target add x86_64-unknown-linux-musl
+rustup target add arm-unknown-linux-gnueabihf
+
+readarray builds <<EOF
+didc-arm32	arm-unknown-linux-gnueabihf
+didc-linux64	x86_64-unknown-linux-musl
+didc-macos	universal2-apple-darwin
+EOF
+
+echo "Building..."
+for build in "${builds[@]}"; do
+	build=($build)
+	executable_name="${build[0]}"
+	target="${build[1]}"
+	pushd tools/didc >/dev/null
+	cargo zigbuild --target "$target" --release --locked
+	popd >/dev/null
+	cp "target/$target/release/didc" "$executable_name"
+	echo "  Created $executable_name"
+done
+set +x
+echo All builds are complete.
