@@ -96,8 +96,8 @@ jobs:
           ls -l
           ls -l ${{steps.download.outputs.download-path}}
           #install -m755 "${{steps.download.outputs.download-path}}"
-          chmod +x "${{ matrix.asset_name }}"
-          "./${{ matrix.asset_name }}" --version
+          chmod +x didc
+          ./didc --version
   publish:
     needs: test
     name: Test for ${{ matrix.asset_name }}
@@ -119,6 +119,6 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ matrix.artifact_name }}
+          file: didc
           asset_name: ${{ matrix.asset_name }}
           tag: ${{ github.ref }}
