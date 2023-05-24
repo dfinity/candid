@@ -30,7 +30,7 @@ install_zigbuild() {
 }
 check_and_install() {
 	item="$1"
-	"check_${item}" || { "install_${item}" && "check_${item}"; }
+	"check_${item}" 2>/dev/null || { echo "Installing ${item}..." && "install_${item}" && "check_${item}"; }
 }
 
 echo "Installing tools..."
