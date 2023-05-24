@@ -1,8 +1,7 @@
 use super::javascript::{ident, is_tuple};
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
+use crate::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
-use std::rc::Rc;
 
 fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
     use TypeInner::*;
@@ -87,7 +86,7 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
     }
 }
 
-fn pp_label(id: &Rc<Label>) -> RcDoc {
+fn pp_label(id: &SharedLabel) -> RcDoc {
     match &**id {
         Label::Named(str) => quote_ident(str),
         Label::Id(n) | Label::Unnamed(n) => str("_")

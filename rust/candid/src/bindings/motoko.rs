@@ -4,9 +4,8 @@
 use super::candid::is_valid_as_id;
 use crate::pretty::*;
 use crate::types::FuncMode;
-use crate::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
+use crate::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
-use std::rc::Rc;
 
 // The definition of tuple is language specific.
 fn is_tuple(t: &Type) -> bool {
@@ -111,7 +110,8 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Var(ref s) => escape(s, false),
         Principal => str("Principal"),
         Opt(ref t) => str("?").append(pp_ty(t)),
-        Vec(ref t) => enclose("[", pp_ty(t), "]"), // TODO blob
+        Vec(ref t) if matches!(t.as_ref(), Nat8) => str("Blob"),
+        Vec(ref t) => enclose("[", pp_ty(t), "]"),
         Record(ref fs) => {
             if is_tuple(ty) {
                 let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
@@ -139,7 +139,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
     }
 }
 
-fn pp_label(id: &Rc<Label>) -> RcDoc {
+fn pp_label(id: &SharedLabel) -> RcDoc {
     match &**id {
         Label::Named(str) => escape(str, false),
         Label::Id(n) | Label::Unnamed(n) => str("_")

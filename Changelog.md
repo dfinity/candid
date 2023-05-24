@@ -15,6 +15,7 @@
 * `candid::parser::pretty` moved to `candid::bindings::candid::value`
 * Deprecate `ToDoc` trait for pretty printing `IDLProg`, use `candid::bindings::candid` module instead
 * Deprecate `candid::codegen`, use `candid::bindings` instead
+* In `candid::bindings::rust`, there is a `Config` struct to control how Rust bindings are generated
 
 ### Non-breaking changes:
 
