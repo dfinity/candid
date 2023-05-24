@@ -86,12 +86,16 @@ jobs:
             asset_name: didc-macos
     steps:
       - name: Get executable
+        id: download
         uses: actions/download-artifact@v3
         with:
           name: ${{ matrix.asset_name }}
       - name: Executable runs
         run: |
           set -eux
+          ls -l
+          ls -l ${{steps.download.outputs.download-path}}
+          #install -m755 "${{steps.download.outputs.download-path}}"
           chmod +x "${{ matrix.asset_name }}"
           "./${{ matrix.asset_name }}" --version
   publish:
