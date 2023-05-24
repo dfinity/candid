@@ -100,7 +100,7 @@ jobs:
           ./didc --version
   publish:
     needs: test
-    name: Test for ${{ matrix.asset_name }}
+    name: Publish ${{ matrix.asset_name }}
     strategy:
       fail-fast: false
       matrix:
