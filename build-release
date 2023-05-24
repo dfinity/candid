@@ -6,6 +6,7 @@ set -euo pipefail
 	EOF
 	exit 0
 }
+[[ "${1:-}" != "--verbose" ]] || set -x
 
 export PATH="$PATH:$HOME/.local/opt/zig"
 
@@ -26,11 +27,36 @@ check_zigbuild() {
 	cargo-zigbuild --version
 }
 install_zigbuild() {
-	command -v cargo-zigbuild || cargo install cargo-zigbuild
+	cargo install cargo-zigbuild
 }
 check_and_install() {
 	item="$1"
-	"check_${item}" 2>/dev/null || { echo "Installing ${item}..." && "install_${item}" && "check_${item}"; }
+	"check_${item}" 2>/dev/null ||
+		{
+			echo "Installing ${item}..."
+			chronic "install_${item}" &&
+				"check_${item}"
+		} ||
+		{
+			echo "ERROR: Failed to install $item"
+			exit 1
+		} >&2
+}
+# Polyfill for moreutils chronic:  Silences stdout and stderr, printing them only if a command fails.
+# Usage: chronic <command> [arg...]
+#  E.g.: chronic this should print because this is not a valid command
+#        chronic echo this should be silent because it succeeds
+chronic() {
+	local logfile
+	logfile="$(mktemp .chronic.XXXXXXXX)"
+	"${@}" &>"$logfile" || {
+		printf "%s\n" "============================" "ERROR: Exit code $? for ${*}"
+		cat "$logfile"
+		rm "$logfile"
+		echo "ERROR: Exit code $? for ${*}" # Repeated for additional visibility.
+		exit 1
+	} >&2
+	rm "$logfile"
 }
 
 echo "Installing tools..."
@@ -49,11 +75,13 @@ EOF
 
 echo "Building..."
 for build in "${builds[@]}"; do
+	# shellcheck disable=SC2206 # We want $build to be expanded
 	build=($build)
 	executable_name="${build[0]}"
 	target="${build[1]}"
+	# Note: The darwin target requires that cargo is run in the package directory; -p does not suffice.
 	pushd tools/didc >/dev/null
-	cargo zigbuild --target "$target" --release --locked
+	chronic cargo zigbuild --target "$target" --release --locked
 	popd >/dev/null
 	cp "target/$target/release/didc" "$executable_name"
 	echo "  Created $executable_name"
