@@ -5,20 +5,66 @@ on:
     tags:
       - '*'
     branches:
-      # Commit to this branch and push to test.
-      - test-release
+      - musl
+
 jobs:
   publish:
-    name: Release
-    runs-on: ubuntu-latest
+    name: Release for ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux64
+            artifact_name: target/release/didc
+            asset_name: didc-linux64
+          - os: macos-latest
+            name: macos
+            artifact_name: target/release/didc
+            asset_name: didc-macos
+          - os: ubuntu-latest
+            name: arm
+            artifact_name: target/arm-unknown-linux-gnueabihf/release/didc
+            asset_name: didc-arm32
+
     steps:
     - uses: actions/checkout@v2
-    - name: Build release
-      run: ./build-release
-      #- name: Upload binaries to release
-      #uses: svenstaro/upload-release-action@v2
-      #with:
-      #  repo_token: ${{ secrets.GITHUB_TOKEN }}
-      #  file: ${{ matrix.artifact_name }}
-      #  asset_name: ${{ matrix.asset_name }}
-      #  tag: ${{ github.ref }}
+    - name: Install stable toolchain
+      if: matrix.name != 'arm'
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+    - name: Install stable toolchain
+      if: matrix.name == 'arm'
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+        target: arm-unknown-linux-gnueabihf
+    - name: Build
+      if: matrix.name == 'linux64'
+      run: |
+              rustup target add x86_64-unknown-linux-musl
+              cargo build --release --locked --target x86_64-unknown-linux-musl
+    - name: Build
+      if: matrix.name == 'macos'
+      run: cargo build --release --locked
+    - name: Cross build
+      if: matrix.name == 'arm'
+      uses: actions-rs/cargo@v1
+      with:
+        use-cross: true
+        command: build
+        args: --target arm-unknown-linux-gnueabihf --release --locked
+    - name: Upload binaries to release
+      if: matrix.name == 'never'
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: ${{ matrix.artifact_name }}
+        asset_name: ${{ matrix.asset_name }}
+        tag: ${{ github.ref }}
