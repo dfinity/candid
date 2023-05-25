@@ -1,6 +1,7 @@
 use candid::bindings::{candid as candid_export, javascript, motoko, rust, typescript};
-use candid::parser::types::{to_pretty, IDLProg};
-use candid::parser::typing::{check_file, check_prog, TypeEnv};
+use candid::parser::types::IDLProg;
+use candid::parser::typing::{check_file, check_prog};
+use candid::types::TypeEnv;
 use goldenfile::Mint;
 use std::io::Write;
 use std::path::Path;
@@ -25,10 +26,7 @@ service server : {
   i : f;
 }
     "#;
-    let ast = prog.parse::<IDLProg>().unwrap();
-    let pretty = to_pretty(&ast, 80);
-    let ast2 = pretty.parse::<IDLProg>().unwrap();
-    assert_eq!(format!("{:?}", ast2), format!("{:?}", ast));
+    prog.parse::<IDLProg>().unwrap();
 }
 
 #[test_generator::test_resources("rust/candid/tests/assets/*.did")]
@@ -47,7 +45,7 @@ fn compiler_test(resource: &str) {
                 // Type check output
                 let ast = content.parse::<IDLProg>().unwrap();
                 check_prog(&mut TypeEnv::new(), &ast).unwrap();
-                writeln!(output, "{}", content).unwrap();
+                writeln!(output, "{content}").unwrap();
             }
             {
                 match filename.file_name().unwrap().to_str().unwrap() {
@@ -58,33 +56,38 @@ fn compiler_test(resource: &str) {
                         let mut output =
                             mint.new_goldenfile(filename.with_extension("mo")).unwrap();
                         let content = motoko::compile(&env, &actor);
-                        writeln!(output, "{}", content).unwrap();
+                        writeln!(output, "{content}").unwrap();
                     }
                 }
             }
             {
+                let mut config = rust::Config::new();
+                config.canister_id = Some(candid::Principal::from_text("aaaaa-aa").unwrap());
+                if filename.file_name().unwrap().to_str().unwrap() == "management.did" {
+                    config.target = rust::Target::Agent;
+                }
                 let mut output = mint.new_goldenfile(filename.with_extension("rs")).unwrap();
-                let content = rust::compile(&env, &actor);
-                writeln!(output, "{}", content).unwrap();
+                let content = rust::compile(&config, &env, &actor);
+                writeln!(output, "{content}").unwrap();
             }
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
                 let content = javascript::compile(&env, &actor);
-                writeln!(output, "{}", content).unwrap();
+                writeln!(output, "{content}").unwrap();
             }
             {
                 let mut output = mint
                     .new_goldenfile(filename.with_extension("d.ts"))
                     .unwrap();
                 let content = typescript::compile(&env, &actor);
-                writeln!(output, "{}", content).unwrap();
+                writeln!(output, "{content}").unwrap();
             }
         }
         Err(e) => {
             let mut fail_output = mint
                 .new_goldenfile(filename.with_extension("fail"))
                 .unwrap();
-            writeln!(fail_output, "{}", e).unwrap();
+            writeln!(fail_output, "{e}").unwrap();
         }
     }
 }

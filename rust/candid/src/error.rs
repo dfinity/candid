@@ -1,18 +1,25 @@
 //! `candid::Result<T> = Result<T, candid::Error>>`
 
+use codespan_reporting::diagnostic::Label;
 use serde::{de, ser};
-
-use crate::parser::token;
-use codespan_reporting::diagnostic::{Diagnostic, Label};
-use codespan_reporting::files::{Error as ReportError, SimpleFile};
-use codespan_reporting::term::{self, termcolor::StandardStream};
 use std::io;
 use thiserror::Error;
+
+#[cfg(feature = "parser")]
+use crate::parser::token;
+#[cfg(feature = "parser")]
+use codespan_reporting::{
+    diagnostic::Diagnostic,
+    files::{Error as ReportError, SimpleFile},
+    term::{self, termcolor::StandardStream},
+};
 
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+    #[cfg(feature = "parser")]
     #[error("Candid parser error: {0}")]
     Parse(#[from] token::ParserError),
 
@@ -33,6 +40,8 @@ impl Error {
     pub fn subtype<T: ToString>(msg: T) -> Self {
         Error::Subtype(msg.to_string())
     }
+    #[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+    #[cfg(feature = "parser")]
     pub fn report(&self) -> Diagnostic<()> {
         match self {
             Error::Parse(e) => {
@@ -114,6 +123,8 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label<()>> {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
 fn report_expected(expected: &[String]) -> Vec<String> {
     if expected.is_empty() {
         return Vec::new();
@@ -134,22 +145,22 @@ fn report_expected(expected: &[String]) -> Vec<String> {
 
 impl ser::Error for Error {
     fn custom<T: std::fmt::Display>(msg: T) -> Self {
-        Error::msg(format!("Serialize error: {}", msg))
+        Error::msg(format!("Serialize error: {msg}"))
     }
 }
 
 impl de::Error for Error {
     fn custom<T: std::fmt::Display>(msg: T) -> Self {
-        Error::msg(format!("Deserialize error: {}", msg))
+        Error::msg(format!("Deserialize error: {msg}"))
     }
     fn invalid_type(_: de::Unexpected<'_>, exp: &dyn de::Expected) -> Self {
-        Error::Subtype(format!("{}", exp))
+        Error::Subtype(format!("{exp}"))
     }
 }
 
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Error {
-        Error::msg(format!("io error: {}", e))
+        Error::msg(format!("io error: {e}"))
     }
 }
 
@@ -158,26 +169,31 @@ impl From<binread::Error> for Error {
         Error::Binread(get_binread_labels(&e))
     }
 }
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
 impl From<ReportError> for Error {
     fn from(e: ReportError) -> Error {
         Error::msg(e)
     }
 }
-
+#[cfg_attr(docsrs, doc(cfg(feature = "random")))]
 #[cfg(feature = "random")]
 impl From<arbitrary::Error> for Error {
     fn from(e: arbitrary::Error) -> Error {
-        Error::msg(format!("arbitrary error: {}", e))
+        Error::msg(format!("arbitrary error: {e}"))
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "configs")))]
 #[cfg(feature = "configs")]
 impl From<serde_dhall::Error> for Error {
     fn from(e: serde_dhall::Error) -> Error {
-        Error::msg(format!("dhall error: {}", e))
+        Error::msg(format!("dhall error: {e}"))
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
 pub fn pretty_parse<T>(name: &str, str: &str) -> Result<T>
 where
     T: std::str::FromStr<Err = Error>,
@@ -190,7 +206,8 @@ where
         Err(e)
     })
 }
-
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
 pub fn pretty_read<T>(reader: &mut std::io::Cursor<&[u8]>) -> Result<T>
 where
     T: binread::BinRead,

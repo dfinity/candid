@@ -1,7 +1,6 @@
 use super::configs::{path_name, Configs};
-use super::typing::TypeEnv;
-use super::value::{IDLArgs, IDLField, IDLValue, VariantValue};
-use crate::types::{Field, Type};
+use crate::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
+use crate::types::{Field, Type, TypeEnv, TypeInner};
 use crate::Deserialize;
 use crate::{Error, Result};
 use arbitrary::{unstructured::Int, Arbitrary, Unstructured};
@@ -76,8 +75,8 @@ impl<'a> GenState<'a> {
         let elem = if let Some(lab) = label {
             lab
         } else {
-            match ty {
-                Type::Var(_) => (),
+            match ty.as_ref() {
+                TypeInner::Var(_) => (),
                 _ => {
                     self.depth -= 1;
                     self.size -= 1;
@@ -99,8 +98,8 @@ impl<'a> GenState<'a> {
     }
     fn pop_state(&mut self, old_config: GenConfig, ty: &Type, is_label: bool) {
         if !is_label {
-            match ty {
-                Type::Var(_) => (),
+            match ty.as_ref() {
+                TypeInner::Var(_) => (),
                 _ => {
                     self.depth += 1;
                 }
@@ -121,29 +120,31 @@ impl<'a> GenState<'a> {
             self.pop_state(old_config, ty, false);
             return Ok(v);
         }
-        let res = Ok(match ty {
-            Type::Var(id) => {
+        let res = Ok(match ty.as_ref() {
+            TypeInner::Var(id) => {
                 let ty = self.env.rec_find_type(id)?;
                 self.any(u, ty)?
             }
-            Type::Null => IDLValue::Null,
-            Type::Reserved => IDLValue::Reserved,
-            Type::Bool => IDLValue::Bool(u.arbitrary()?),
-            Type::Int => IDLValue::Int(arbitrary_num::<i128>(u, self.config.range)?.into()),
-            Type::Nat => IDLValue::Nat(arbitrary_num::<u128>(u, self.config.range)?.into()),
-            Type::Nat8 => IDLValue::Nat8(arbitrary_num(u, self.config.range)?),
-            Type::Nat16 => IDLValue::Nat16(arbitrary_num(u, self.config.range)?),
-            Type::Nat32 => IDLValue::Nat32(arbitrary_num(u, self.config.range)?),
-            Type::Nat64 => IDLValue::Nat64(arbitrary_num(u, self.config.range)?),
-            Type::Int8 => IDLValue::Int8(arbitrary_num(u, self.config.range)?),
-            Type::Int16 => IDLValue::Int16(arbitrary_num(u, self.config.range)?),
-            Type::Int32 => IDLValue::Int32(arbitrary_num(u, self.config.range)?),
-            Type::Int64 => IDLValue::Int64(arbitrary_num(u, self.config.range)?),
-            Type::Float32 => IDLValue::Float32(u.arbitrary()?),
-            Type::Float64 => IDLValue::Float64(u.arbitrary()?),
-            Type::Principal => IDLValue::Principal(crate::Principal::anonymous()),
-            Type::Text => IDLValue::Text(arbitrary_text(u, &self.config.text, &self.config.width)?),
-            Type::Opt(t) => {
+            TypeInner::Null => IDLValue::Null,
+            TypeInner::Reserved => IDLValue::Reserved,
+            TypeInner::Bool => IDLValue::Bool(u.arbitrary()?),
+            TypeInner::Int => IDLValue::Int(arbitrary_num::<i128>(u, self.config.range)?.into()),
+            TypeInner::Nat => IDLValue::Nat(arbitrary_num::<u128>(u, self.config.range)?.into()),
+            TypeInner::Nat8 => IDLValue::Nat8(arbitrary_num(u, self.config.range)?),
+            TypeInner::Nat16 => IDLValue::Nat16(arbitrary_num(u, self.config.range)?),
+            TypeInner::Nat32 => IDLValue::Nat32(arbitrary_num(u, self.config.range)?),
+            TypeInner::Nat64 => IDLValue::Nat64(arbitrary_num(u, self.config.range)?),
+            TypeInner::Int8 => IDLValue::Int8(arbitrary_num(u, self.config.range)?),
+            TypeInner::Int16 => IDLValue::Int16(arbitrary_num(u, self.config.range)?),
+            TypeInner::Int32 => IDLValue::Int32(arbitrary_num(u, self.config.range)?),
+            TypeInner::Int64 => IDLValue::Int64(arbitrary_num(u, self.config.range)?),
+            TypeInner::Float32 => IDLValue::Float32(u.arbitrary()?),
+            TypeInner::Float64 => IDLValue::Float64(u.arbitrary()?),
+            TypeInner::Principal => IDLValue::Principal(crate::Principal::anonymous()),
+            TypeInner::Text => {
+                IDLValue::Text(arbitrary_text(u, &self.config.text, &self.config.width)?)
+            }
+            TypeInner::Opt(t) => {
                 let depths = if self.depth <= 0 || self.size <= 0 {
                     [1, 0]
                 } else {
@@ -156,7 +157,7 @@ impl<'a> GenState<'a> {
                     IDLValue::Opt(Box::new(self.any(u, t)?))
                 }
             }
-            Type::Vec(t) => {
+            TypeInner::Vec(t) => {
                 let width = self.config.width.or_else(|| {
                     let elem_size = self.env.size(t).unwrap_or(MAX_DEPTH);
                     Some(std::cmp::max(0, self.size) as usize / elem_size)
@@ -169,20 +170,20 @@ impl<'a> GenState<'a> {
                 }
                 IDLValue::Vec(vec)
             }
-            Type::Record(fs) => {
+            TypeInner::Record(fs) => {
                 let mut res = Vec::new();
                 for Field { id, ty } in fs.iter() {
                     let old_config = self.push_state(ty, Some(id.to_string()));
                     let val = self.any(u, ty)?;
                     self.pop_state(old_config, ty, true);
                     res.push(IDLField {
-                        id: id.clone(),
+                        id: id.as_ref().clone(),
                         val,
                     });
                 }
                 IDLValue::Record(res)
             }
-            Type::Variant(fs) => {
+            TypeInner::Variant(fs) => {
                 let choices = fs
                     .iter()
                     .map(|Field { ty, .. }| self.env.size(ty).unwrap_or(MAX_DEPTH));
@@ -198,7 +199,7 @@ impl<'a> GenState<'a> {
                 let val = self.any(u, ty)?;
                 self.pop_state(old_config, ty, true);
                 let field = IDLField {
-                    id: id.clone(),
+                    id: id.as_ref().clone(),
                     val,
                 };
                 IDLValue::Variant(VariantValue(Box::new(field), idx as u64))
@@ -227,8 +228,8 @@ impl IDLArgs {
 impl TypeEnv {
     /// Approxiamte upper bound for IDLValue size of type t. Returns None if infinite.
     fn size_helper(&self, seen: &mut HashSet<String>, t: &Type) -> Option<usize> {
-        use Type::*;
-        Some(match t {
+        use TypeInner::*;
+        Some(match t.as_ref() {
             Var(id) => {
                 if seen.insert(id.to_string()) {
                     let ty = self.rec_find_type(id).unwrap();
@@ -306,7 +307,7 @@ fn arbitrary_text(
                             0x10000..=0x10ffff,
                         ],
                     )?,
-                    _ => return Err(Error::msg(format!("Unknown text config {:?}", kind))),
+                    _ => return Err(Error::msg(format!("Unknown text config {kind:?}"))),
                 };
                 if let Some(ch) = std::char::from_u32(ch) {
                     res.push(ch);
@@ -341,7 +342,7 @@ where
     })
 }
 
-fn arbitrary_variant<'a>(u: &mut Unstructured<'a>, weight: &[usize]) -> Result<usize> {
+fn arbitrary_variant(u: &mut Unstructured, weight: &[usize]) -> Result<usize> {
     // TODO read from end of unstructured to improve stability
     let prefix_sum: Vec<_> = weight
         .iter()

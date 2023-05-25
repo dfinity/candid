@@ -1,10 +1,10 @@
 [package]
 name = "candid"
-version = "0.9.0-beta"
+version = "0.9.0-beta.4"
 edition = "2018"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
-homepage = "https://sdk.dfinity.org/docs/candid-guide/candid-intro.html"
+homepage = "https://internetcomputer.org/docs/current/developer-docs/build/candid/candid-concepts"
 documentation = "https://docs.rs/candid"
 repository = "https://github.com/dfinity/candid"
 license = "Apache-2.0"
@@ -16,18 +16,16 @@ include = ["src", "Cargo.toml", "build.rs", "LICENSE", "README.md"]
 build = "build.rs"
 
 [build-dependencies]
-lalrpop = "0.19.0"
+lalrpop = { version = "0.19.0", optional = true }
 
 [dependencies]
 byteorder = "1.4.3"
-candid_derive = { path = "../candid_derive", version = "=0.5.0" }
+candid_derive = { path = "../candid_derive", version = "=0.6.1" }
 codespan-reporting = "0.11"
 crc32fast = "1.3.0"
 data-encoding = "2.3.2"
 hex = "0.4.2"
-lalrpop-util = "0.19.0"
 leb128 = "0.2.4"
-logos = "0.12"
 num_enum = "0.5.1"
 num-bigint = { version = "0.4.2", features = ["serde"] }
 num-traits = "0.2.12"
@@ -40,11 +38,17 @@ thiserror = "1.0.20"
 anyhow = "1.0"
 binread = { version = "2.1", features = ["debug_template"] }
 
+lalrpop-util = { version = "0.19.0", optional = true }
+logos = { version = "0.12", optional = true }
+
 arbitrary = { version = "1.0", optional = true }
 # Don't upgrade serde_dhall. It will introduce dependency with invalid license.
 serde_dhall = { version = "0.11", default-features = false, optional = true }
 fake = { version = "2.4", optional = true }
 rand = { version = "0.8", optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+stacker = "0.1"
 
 [dev-dependencies]
 goldenfile = "1.1.0"
@@ -56,13 +60,42 @@ serde_cbor = "0.11.2"
 serde_json = "1.0.74"
 serde_test = "1.0.137"
 impls = "1"
+bincode = "1.3.3"
 
 [[bench]]
 name = "benchmark"
 harness = false
 path = "benches/benchmark.rs"
 
+[[test]]
+name = "test_suite"
+path = "tests/test_suite.rs"
+required-features = ["parser"]
+[[test]]
+name = "value"
+path = "tests/value.rs"
+required-features = ["parser"]
+[[test]]
+name = "parse_value"
+path = "tests/parse_value.rs"
+required-features = ["parser"]
+[[test]]
+name = "parse_type"
+path = "tests/parse_type.rs"
+required-features = ["parser"]
+
 [features]
 configs = ["serde_dhall"]
-random = ["configs", "arbitrary", "fake", "rand"]
+random = ["parser", "configs", "arbitrary", "fake", "rand"]
+parser = ["lalrpop", "lalrpop-util", "logos"]
+all = ["random"]
 mute_warnings = []
+arc_type = []
+
+# docs.rs-specific configuration
+# To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+[package.metadata.docs.rs]
+# document all features
+all-features = true
+# defines the configuration attribute `docsrs`
+rustdoc-args = ["--cfg", "docsrs"]

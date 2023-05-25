@@ -73,16 +73,16 @@ pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenSt
         {
             return Err(Error::new_spanned(
                 &sig.ident,
-                format!("duplicate method name {}", name),
+                format!("duplicate method name {name}"),
             ));
         }
     }
     Ok(quote! { #fun })
 }
 
-pub(crate) fn export_service() -> TokenStream {
+pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
     if let Some(meths) = METHODS.lock().unwrap().as_mut() {
-        let candid = candid_path(&None);
+        let candid = candid_path(&path);
         let init = if let Some(opt_args) = INIT.lock().unwrap().as_mut() {
             let res = opt_args.as_ref().map(|args| {
                 let args = args
@@ -109,8 +109,8 @@ pub(crate) fn export_service() -> TokenStream {
                 .map(|t| generate_arg(quote! { rets }, t))
                 .collect::<Vec<_>>();
             let modes = match modes.as_ref() {
-                "query" => quote! { vec![#candid::parser::types::FuncMode::Query] },
-                "oneway" => quote! { vec![#candid::parser::types::FuncMode::Oneway] },
+                "query" => quote! { vec![#candid::types::FuncMode::Query] },
+                "oneway" => quote! { vec![#candid::types::FuncMode::Oneway] },
                 "update" => quote! { vec![] },
                 _ => unreachable!(),
             };
@@ -121,22 +121,22 @@ pub(crate) fn export_service() -> TokenStream {
                     let mut rets = Vec::new();
                     #(#rets)*
                     let func = Function { args, rets, modes: #modes };
-                    service.push((#name.to_string(), Type::Func(func)));
+                    service.push((#name.to_string(), TypeInner::Func(func).into()));
                 }
             }
         });
         let service = quote! {
-            use #candid::types::{CandidType, Function, Type};
+            use #candid::types::{CandidType, Function, Type, TypeInner};
             let mut service = Vec::<(String, Type)>::new();
             let mut env = #candid::types::internal::TypeContainer::new();
             #(#gen_tys)*
             service.sort_unstable_by_key(|(name, _)| name.clone());
-            let ty = Type::Service(service);
+            let ty = TypeInner::Service(service).into();
         };
         let actor = if let Some(init) = init {
             quote! {
                 #init
-                let actor = Some(Type::Class(init_args, Box::new(ty)));
+                let actor = Some(TypeInner::Class(init_args, ty).into());
             }
         } else {
             quote! { let actor = Some(ty); }

@@ -25,8 +25,11 @@ impl TypeId {
 impl std::fmt::Display for TypeId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = NAME.with(|n| n.borrow_mut().get(self));
-        write!(f, "{}", name)
+        write!(f, "{name}")
     }
+}
+pub fn type_of<T>(_: &T) -> TypeId {
+    TypeId::of::<T>()
 }
 
 #[derive(Default)]
@@ -57,7 +60,7 @@ impl TypeName {
                     }
                     Some(v) => {
                         *v += 1;
-                        format!("{}_{}", name, v)
+                        format!("{name}_{v}")
                     }
                 };
                 self.type_name.insert(id.clone(), res.clone());
@@ -93,75 +96,87 @@ impl TypeContainer {
         self.go(&t)
     }
     fn go(&mut self, t: &Type) -> Type {
-        match t {
-            Type::Opt(ref t) => Type::Opt(Box::new(self.go(t))),
-            Type::Vec(ref t) => Type::Vec(Box::new(self.go(t))),
-            Type::Record(fs) => {
-                let res = Type::Record(
+        match t.as_ref() {
+            TypeInner::Opt(t) => TypeInner::Opt(self.go(t)),
+            TypeInner::Vec(t) => TypeInner::Vec(self.go(t)),
+            TypeInner::Record(fs) => {
+                let res: Type = TypeInner::Record(
                     fs.iter()
                         .map(|Field { id, ty }| Field {
                             id: id.clone(),
                             ty: self.go(ty),
                         })
                         .collect(),
-                );
+                )
+                .into();
                 if t.is_tuple() {
                     return res;
                 }
                 let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
                     self.env.0.insert(id.to_string(), res);
-                    Type::Var(id.to_string())
+                    TypeInner::Var(id.to_string())
                 } else {
                     // if the type is part of an enum, the id won't be recorded.
                     // we want to inline the type in this case.
-                    res
+                    return res;
                 }
             }
-            Type::Variant(fs) => {
-                let res = Type::Variant(
+            TypeInner::Variant(fs) => {
+                let res: Type = TypeInner::Variant(
                     fs.iter()
                         .map(|Field { id, ty }| Field {
                             id: id.clone(),
                             ty: self.go(ty),
                         })
                         .collect(),
-                );
+                )
+                .into();
                 let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
                     self.env.0.insert(id.to_string(), res);
-                    Type::Var(id.to_string())
+                    TypeInner::Var(id.to_string())
                 } else {
-                    res
+                    return res;
                 }
             }
-            Type::Knot(id) => {
+            TypeInner::Knot(id) => {
                 let name = id.to_string();
                 let ty = ENV.with(|e| e.borrow().get(id).unwrap().clone());
                 self.env.0.insert(id.to_string(), ty);
-                Type::Var(name)
+                TypeInner::Var(name)
             }
-            Type::Func(func) => Type::Func(Function {
+            TypeInner::Func(func) => TypeInner::Func(Function {
                 modes: func.modes.clone(),
                 args: func.args.iter().map(|arg| self.go(arg)).collect(),
                 rets: func.rets.iter().map(|arg| self.go(arg)).collect(),
             }),
-            Type::Service(serv) => Type::Service(
+            TypeInner::Service(serv) => TypeInner::Service(
                 serv.iter()
                     .map(|(id, t)| (id.clone(), self.go(t)))
                     .collect(),
             ),
-            Type::Class(inits, ref ty) => Type::Class(
-                inits.iter().map(|t| self.go(t)).collect(),
-                Box::new(self.go(ty)),
-            ),
-            _ => t.clone(),
+            TypeInner::Class(inits, ref ty) => {
+                TypeInner::Class(inits.iter().map(|t| self.go(t)).collect(), self.go(ty))
+            }
+            t => t.clone(),
         }
+        .into()
     }
 }
+#[cfg(feature = "arc_type")]
+#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+#[deprecated(
+    note = "Do not use arc_type feature! There is a 20% to 80% slowdown in deserialization."
+)]
+pub struct Type(pub std::sync::Arc<TypeInner>);
+
+#[cfg(not(feature = "arc_type"))]
+#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+pub struct Type(pub std::rc::Rc<TypeInner>);
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
-pub enum Type {
+pub enum TypeInner {
     Null,
     Bool,
     Nat,
@@ -182,20 +197,38 @@ pub enum Type {
     Knot(TypeId), // For recursive types from Rust
     Var(String),  // For variables from Candid file
     Unknown,
-    Opt(Box<Type>),
-    Vec(Box<Type>),
+    Opt(Type),
+    Vec(Type),
     Record(Vec<Field>),
     Variant(Vec<Field>),
     Func(Function),
     Service(Vec<(String, Type)>),
-    Class(Vec<Type>, Box<Type>),
+    Class(Vec<Type>, Type),
     Principal,
     Future,
 }
-impl Type {
-    pub(crate) fn is_tuple(&self) -> bool {
+impl std::ops::Deref for Type {
+    type Target = TypeInner;
+    #[inline(always)]
+    fn deref(&self) -> &TypeInner {
+        self.0.deref()
+    }
+}
+impl AsRef<TypeInner> for Type {
+    #[inline(always)]
+    fn as_ref(&self) -> &TypeInner {
+        self.0.as_ref()
+    }
+}
+impl From<TypeInner> for Type {
+    fn from(t: TypeInner) -> Self {
+        Type(t.into())
+    }
+}
+impl TypeInner {
+    pub fn is_tuple(&self) -> bool {
         match self {
-            Type::Record(ref fs) => {
+            TypeInner::Record(ref fs) => {
                 for (i, field) in fs.iter().enumerate() {
                     if field.id.get_id() != (i as u32) {
                         return false;
@@ -206,52 +239,67 @@ impl Type {
             _ => false,
         }
     }
-    pub fn subst(self, tau: &std::collections::BTreeMap<String, String>) -> Self {
-        use Type::*;
-        match self {
-            Var(id) => match tau.get(&id) {
-                None => Var(id),
+}
+impl Type {
+    pub fn is_tuple(&self) -> bool {
+        self.as_ref().is_tuple()
+    }
+    pub fn subst(&self, tau: &std::collections::BTreeMap<String, String>) -> Self {
+        use TypeInner::*;
+        match self.as_ref() {
+            Var(id) => match tau.get(id) {
+                None => Var(id.to_string()),
                 Some(new_id) => Var(new_id.to_string()),
             },
-            Opt(t) => Opt(Box::new(t.subst(tau))),
-            Vec(t) => Vec(Box::new(t.subst(tau))),
+            Opt(t) => Opt(t.subst(tau)),
+            Vec(t) => Vec(t.subst(tau)),
             Record(fs) => Record(
-                fs.into_iter()
+                fs.iter()
                     .map(|Field { id, ty }| Field {
-                        id,
+                        id: id.clone(),
                         ty: ty.subst(tau),
                     })
                     .collect(),
             ),
             Variant(fs) => Variant(
-                fs.into_iter()
+                fs.iter()
                     .map(|Field { id, ty }| Field {
-                        id,
+                        id: id.clone(),
                         ty: ty.subst(tau),
                     })
                     .collect(),
             ),
-            Func(func) => Func(Function {
-                modes: func.modes,
-                args: func.args.into_iter().map(|t| t.subst(tau)).collect(),
-                rets: func.rets.into_iter().map(|t| t.subst(tau)).collect(),
-            }),
+            Func(func) => {
+                let func = func.clone();
+                Func(Function {
+                    modes: func.modes,
+                    args: func.args.into_iter().map(|t| t.subst(tau)).collect(),
+                    rets: func.rets.into_iter().map(|t| t.subst(tau)).collect(),
+                })
+            }
             Service(serv) => Service(
-                serv.into_iter()
-                    .map(|(meth, ty)| (meth, ty.subst(tau)))
+                serv.iter()
+                    .map(|(meth, ty)| (meth.clone(), ty.subst(tau)))
                     .collect(),
             ),
-            Class(args, ty) => Class(
-                args.into_iter().map(|t| t.subst(tau)).collect(),
-                Box::new(ty.subst(tau)),
-            ),
-            _ => self,
+            Class(args, ty) => Class(args.iter().map(|t| t.subst(tau)).collect(), ty.subst(tau)),
+            _ => return self.clone(),
         }
+        .into()
     }
 }
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", crate::bindings::candid::pp_ty(self).pretty(80))
+    }
+}
+impl fmt::Display for TypeInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            crate::bindings::candid::pp_ty_inner(self).pretty(80)
+        )
     }
 }
 
@@ -278,7 +326,7 @@ impl std::fmt::Display for Label {
             Label::Id(n) | Label::Unnamed(n) => {
                 write!(f, "{}", super::number::pp_num_str(&n.to_string()))
             }
-            Label::Named(id) => write!(f, "{}", id),
+            Label::Named(id) => write!(f, "{id}"),
         }
     }
 }
@@ -295,15 +343,60 @@ impl std::hash::Hash for Label {
     }
 }
 
-#[derive(Debug, PartialEq, Hash, Eq, Clone)]
-pub struct Field {
-    pub id: Label,
-    pub ty: Type,
-}
+#[cfg(feature = "arc_type")]
+#[deprecated(
+    note = "Do not use arc_type feature! There is a 20% to 80% slowdown in deserialization."
+)]
+pub type SharedLabel = std::sync::Arc<Label>;
+
+#[cfg(not(feature = "arc_type"))]
+pub type SharedLabel = std::rc::Rc<Label>;
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
+pub struct Field {
+    pub id: SharedLabel,
+    pub ty: Type,
+}
+#[macro_export]
+/// Construct a field type, which can be used in `TypeInner::Record` and `TypeInner::Variant`.
+///
+/// `field!{ a: TypeInner::Nat.into() }` expands to `Field { id: Label::Named("a"), ty: ... }`
+/// `field!{ 0: TypeInner::Nat.into() }` expands to `Field { id: Label::Id(0), ty: ... }`
+macro_rules! field {
+    { $id:tt : $ty:expr } => {
+        $crate::types::internal::Field {
+            id: match stringify!($id).parse::<u32>() {
+                Ok(id) => $crate::types::Label::Id(id),
+                Err(_) => $crate::types::Label::Named(stringify!($id).to_string()),
+            }.into(),
+            ty: $ty
+        }
+    };
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum FuncMode {
+    Oneway,
+    Query,
+}
+impl FuncMode {
+    pub(crate) fn to_doc(&self) -> pretty::RcDoc {
+        match self {
+            FuncMode::Oneway => pretty::RcDoc::text("oneway"),
+            FuncMode::Query => pretty::RcDoc::text("query"),
+        }
+    }
+    pub fn str_to_enum(str: &str) -> Option<Self> {
+        match str {
+            "oneway" => Some(FuncMode::Oneway),
+            "query" => Some(FuncMode::Query),
+            _ => None,
+        }
+    }
+}
+#[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Function {
-    pub modes: Vec<crate::parser::types::FuncMode>,
+    pub modes: Vec<FuncMode>,
     pub args: Vec<Type>,
     pub rets: Vec<Type>,
 }
@@ -318,7 +411,31 @@ impl fmt::Display for Function {
 }
 impl Function {
     pub fn is_query(&self) -> bool {
-        self.modes.contains(&crate::parser::types::FuncMode::Query)
+        self.modes.contains(&crate::types::FuncMode::Query)
+    }
+}
+#[macro_export]
+/// Construct a function type.
+///
+/// `func!((u8, &str) -> (Nat) query)` expands to `Type(Rc::new(TypeInner::Func(...)))`
+macro_rules! func {
+    ( ( $($arg:ty),* ) -> ( $($ret:ty),* ) ) => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![] }))
+    };
+    ( ( $($arg:ty),* ) -> ( $($ret:ty),* ) query ) => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::Query] }))
+    };
+    ( ( $($arg:ty),* ) -> ( $($ret:ty),* ) oneway ) => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::Oneway] }))
+    };
+}
+#[macro_export]
+/// Construct a service type.
+///
+/// `service!{ "f": func!((HttpRequest) -> ()) }` expands to `Type(Rc::new(TypeInner::Service(...)))`
+macro_rules! service {
+    { $($meth:tt : $ty:expr);* } => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Service(vec![ $(($meth.to_string(), $ty)),* ]))
     }
 }
 
@@ -352,8 +469,8 @@ pub(crate) enum Opcode {
 }
 
 pub fn is_primitive(t: &Type) -> bool {
-    use self::Type::*;
-    match t {
+    use self::TypeInner::*;
+    match t.as_ref() {
         Null | Bool | Nat | Int | Text => true,
         Nat8 | Nat16 | Nat32 | Nat64 => true,
         Int8 | Int16 | Int32 | Int64 => true,
@@ -370,11 +487,11 @@ pub fn is_primitive(t: &Type) -> bool {
 }
 
 pub fn unroll(t: &Type) -> Type {
-    use self::Type::*;
-    match t {
-        Knot(ref id) => find_type(id).unwrap(),
-        Opt(ref t) => Opt(Box::new(unroll(t))),
-        Vec(ref t) => Vec(Box::new(unroll(t))),
+    use self::TypeInner::*;
+    match t.as_ref() {
+        Knot(ref id) => return find_type(id).unwrap(),
+        Opt(ref t) => Opt(unroll(t)),
+        Vec(ref t) => Vec(unroll(t)),
         Record(fs) => Record(
             fs.iter()
                 .map(|Field { id, ty }| Field {
@@ -391,8 +508,9 @@ pub fn unroll(t: &Type) -> Type {
                 })
                 .collect(),
         ),
-        _ => (*t).clone(),
+        t => t.clone(),
     }
+    .into()
 }
 
 thread_local! {

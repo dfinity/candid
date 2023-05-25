@@ -1,7 +1,5 @@
-use super::token::error;
-use super::typing::TypeEnv;
 use crate::types::number::{Int, Nat};
-use crate::types::{Field, Label, Type};
+use crate::types::{Field, Label, Type, TypeEnv, TypeInner};
 use crate::{Error, Result};
 use serde::de;
 use serde::de::{Deserialize, Visitor};
@@ -71,16 +69,11 @@ impl IDLArgs {
             args.push(v);
         }
         for ty in types[self.args.len()..].iter() {
-            let v = match env.trace_type(ty)? {
-                Type::Null => IDLValue::Null,
-                Type::Reserved => IDLValue::Reserved,
-                Type::Opt(_) => IDLValue::None,
-                _ => {
-                    return Err(Error::msg(format!(
-                        "Omitted values cannot be of type {}",
-                        ty
-                    )))
-                }
+            let v = match env.trace_type(ty)?.as_ref() {
+                TypeInner::Null => IDLValue::Null,
+                TypeInner::Reserved => IDLValue::Reserved,
+                TypeInner::Opt(_) => IDLValue::None,
+                _ => return Err(Error::msg(format!("Omitted values cannot be of type {ty}"))),
             };
             args.push(v);
         }
@@ -136,72 +129,62 @@ impl IDLArgs {
     }
 }
 
-impl std::str::FromStr for IDLArgs {
-    type Err = Error;
-    fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
-        let lexer = super::token::Tokenizer::new(str);
-        Ok(super::grammar::ArgsParser::new().parse(lexer)?)
-    }
-}
-
-impl std::str::FromStr for IDLValue {
-    type Err = Error;
-    fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
-        let lexer = super::token::Tokenizer::new(str);
-        Ok(super::grammar::ArgParser::new().parse(lexer)?)
-    }
-}
-
 impl IDLValue {
     /// Anotate `IDLValue` with the given type, allowing subtyping. If `IDLValue` is parsed from
     /// string, we need to set `from_parser` to true to enable converting numbers to the expected
     /// types, and disable the opt rules.
     pub fn annotate_type(&self, from_parser: bool, env: &TypeEnv, t: &Type) -> Result<Self> {
-        Ok(match (self, t) {
-            (_, Type::Var(id)) => {
+        #[cfg(not(feature = "parser"))]
+        if from_parser {
+            panic!("Please enable \"parser\" feature");
+        }
+        Ok(match (self, t.as_ref()) {
+            (_, TypeInner::Var(id)) => {
                 let ty = env.rec_find_type(id)?;
                 self.annotate_type(from_parser, env, ty)?
             }
-            (_, Type::Knot(ref id)) => {
+            (_, TypeInner::Knot(ref id)) => {
                 let ty = crate::types::internal::find_type(id).unwrap();
                 self.annotate_type(from_parser, env, &ty)?
             }
-            (_, Type::Reserved) => IDLValue::Reserved,
-            (IDLValue::Float64(n), Type::Float32) if from_parser => IDLValue::Float32(*n as f32),
-            (IDLValue::Null, Type::Null) => IDLValue::Null,
-            (IDLValue::Bool(b), Type::Bool) => IDLValue::Bool(*b),
-            (IDLValue::Nat(n), Type::Nat) => IDLValue::Nat(n.clone()),
-            (IDLValue::Int(i), Type::Int) => IDLValue::Int(i.clone()),
-            (IDLValue::Nat(n), Type::Int) => IDLValue::Int(n.clone().into()),
-            (IDLValue::Nat8(n), Type::Nat8) => IDLValue::Nat8(*n),
-            (IDLValue::Nat16(n), Type::Nat16) => IDLValue::Nat16(*n),
-            (IDLValue::Nat32(n), Type::Nat32) => IDLValue::Nat32(*n),
-            (IDLValue::Nat64(n), Type::Nat64) => IDLValue::Nat64(*n),
-            (IDLValue::Int8(n), Type::Int8) => IDLValue::Int8(*n),
-            (IDLValue::Int16(n), Type::Int16) => IDLValue::Int16(*n),
-            (IDLValue::Int32(n), Type::Int32) => IDLValue::Int32(*n),
-            (IDLValue::Int64(n), Type::Int64) => IDLValue::Int64(*n),
-            (IDLValue::Float64(n), Type::Float64) => IDLValue::Float64(*n),
-            (IDLValue::Float32(n), Type::Float32) => IDLValue::Float32(*n),
-            (IDLValue::Text(s), Type::Text) => IDLValue::Text(s.to_owned()),
+            (_, TypeInner::Reserved) => IDLValue::Reserved,
+            (IDLValue::Float64(n), TypeInner::Float32) if from_parser => {
+                IDLValue::Float32(*n as f32)
+            }
+            (IDLValue::Null, TypeInner::Null) => IDLValue::Null,
+            (IDLValue::Bool(b), TypeInner::Bool) => IDLValue::Bool(*b),
+            (IDLValue::Nat(n), TypeInner::Nat) => IDLValue::Nat(n.clone()),
+            (IDLValue::Int(i), TypeInner::Int) => IDLValue::Int(i.clone()),
+            (IDLValue::Nat(n), TypeInner::Int) => IDLValue::Int(n.clone().into()),
+            (IDLValue::Nat8(n), TypeInner::Nat8) => IDLValue::Nat8(*n),
+            (IDLValue::Nat16(n), TypeInner::Nat16) => IDLValue::Nat16(*n),
+            (IDLValue::Nat32(n), TypeInner::Nat32) => IDLValue::Nat32(*n),
+            (IDLValue::Nat64(n), TypeInner::Nat64) => IDLValue::Nat64(*n),
+            (IDLValue::Int8(n), TypeInner::Int8) => IDLValue::Int8(*n),
+            (IDLValue::Int16(n), TypeInner::Int16) => IDLValue::Int16(*n),
+            (IDLValue::Int32(n), TypeInner::Int32) => IDLValue::Int32(*n),
+            (IDLValue::Int64(n), TypeInner::Int64) => IDLValue::Int64(*n),
+            (IDLValue::Float64(n), TypeInner::Float64) => IDLValue::Float64(*n),
+            (IDLValue::Float32(n), TypeInner::Float32) => IDLValue::Float32(*n),
+            (IDLValue::Text(s), TypeInner::Text) => IDLValue::Text(s.to_owned()),
             // opt parsing. NB: Always succeeds!
-            (IDLValue::Null, Type::Opt(_)) => IDLValue::None,
-            (IDLValue::Reserved, Type::Opt(_)) => IDLValue::None,
-            (IDLValue::None, Type::Opt(_)) => IDLValue::None,
-            (IDLValue::Opt(v), Type::Opt(ty)) if from_parser => {
+            (IDLValue::Null, TypeInner::Opt(_)) => IDLValue::None,
+            (IDLValue::Reserved, TypeInner::Opt(_)) => IDLValue::None,
+            (IDLValue::None, TypeInner::Opt(_)) => IDLValue::None,
+            (IDLValue::Opt(v), TypeInner::Opt(ty)) if from_parser => {
                 IDLValue::Opt(Box::new(v.annotate_type(from_parser, env, ty)?))
             }
             // liberal decoding of optionals
-            (IDLValue::Opt(v), Type::Opt(ty)) if !from_parser => v
+            (IDLValue::Opt(v), TypeInner::Opt(ty)) if !from_parser => v
                 .annotate_type(from_parser, env, ty)
                 .map(|v| IDLValue::Opt(Box::new(v)))
                 .unwrap_or(IDLValue::None),
             // try consituent type
-            (v, Type::Opt(ty))
+            (v, TypeInner::Opt(ty))
                 if !from_parser
                     && !matches!(
-                        env.trace_type(ty)?,
-                        Type::Null | Type::Reserved | Type::Opt(_)
+                        env.trace_type(ty)?.as_ref(),
+                        TypeInner::Null | TypeInner::Reserved | TypeInner::Opt(_)
                     ) =>
             {
                 v.annotate_type(from_parser, env, ty)
@@ -209,8 +192,8 @@ impl IDLValue {
                     .unwrap_or(IDLValue::None)
             }
             // fallback
-            (_, Type::Opt(_)) if !from_parser => IDLValue::None,
-            (IDLValue::Vec(vec), Type::Vec(ty)) => {
+            (_, TypeInner::Opt(_)) if !from_parser => IDLValue::None,
+            (IDLValue::Vec(vec), TypeInner::Vec(ty)) => {
                 let mut res = Vec::new();
                 for e in vec.iter() {
                     let v = e.annotate_type(from_parser, env, ty)?;
@@ -218,34 +201,34 @@ impl IDLValue {
                 }
                 IDLValue::Vec(res)
             }
-            (IDLValue::Record(vec), Type::Record(fs)) => {
+            (IDLValue::Record(vec), TypeInner::Record(fs)) => {
                 let fields: HashMap<_, _> =
                     vec.iter().map(|IDLField { id, val }| (id, val)).collect();
                 let mut res = Vec::new();
                 for Field { id, ty } in fs.iter() {
                     let val = fields
-                        .get(&id)
+                        .get(id.as_ref())
                         .cloned()
-                        .or_else(|| match env.trace_type(ty).unwrap() {
-                            Type::Opt(_) => Some(&IDLValue::None),
-                            Type::Reserved => Some(&IDLValue::Reserved),
+                        .or_else(|| match env.trace_type(ty).unwrap().as_ref() {
+                            TypeInner::Opt(_) => Some(&IDLValue::None),
+                            TypeInner::Reserved => Some(&IDLValue::Reserved),
                             _ => None,
                         })
-                        .ok_or_else(|| Error::msg(format!("record field {} not found", id)))?;
+                        .ok_or_else(|| Error::msg(format!("record field {id} not found")))?;
                     let val = val.annotate_type(from_parser, env, ty)?;
                     res.push(IDLField {
-                        id: id.clone(),
+                        id: id.as_ref().clone(),
                         val,
                     });
                 }
                 IDLValue::Record(res)
             }
-            (IDLValue::Variant(v), Type::Variant(fs)) => {
+            (IDLValue::Variant(v), TypeInner::Variant(fs)) => {
                 for (i, f) in fs.iter().enumerate() {
-                    if v.0.id == f.id {
+                    if v.0.id == *f.id {
                         let val = v.0.val.annotate_type(from_parser, env, &f.ty)?;
                         let field = IDLField {
-                            id: f.id.clone(),
+                            id: f.id.as_ref().clone(),
                             val,
                         };
                         return Ok(IDLValue::Variant(VariantValue(Box::new(field), i as u64)));
@@ -253,31 +236,33 @@ impl IDLValue {
                 }
                 return Err(Error::msg(format!("variant field {} not found", v.0.id)));
             }
-            (IDLValue::Principal(id), Type::Principal) => IDLValue::Principal(*id),
-            (IDLValue::Service(_), Type::Service(_)) => self.clone(),
-            (IDLValue::Func(_, _), Type::Func(_)) => self.clone(),
-            (IDLValue::Number(str), t) if from_parser => match t {
-                Type::Int => IDLValue::Int(str.parse::<Int>()?),
-                Type::Nat => IDLValue::Nat(str.parse::<Nat>()?),
-                Type::Nat8 => IDLValue::Nat8(str.parse::<u8>().map_err(error)?),
-                Type::Nat16 => IDLValue::Nat16(str.parse::<u16>().map_err(error)?),
-                Type::Nat32 => IDLValue::Nat32(str.parse::<u32>().map_err(error)?),
-                Type::Nat64 => IDLValue::Nat64(str.parse::<u64>().map_err(error)?),
-                Type::Int8 => IDLValue::Int8(str.parse::<i8>().map_err(error)?),
-                Type::Int16 => IDLValue::Int16(str.parse::<i16>().map_err(error)?),
-                Type::Int32 => IDLValue::Int32(str.parse::<i32>().map_err(error)?),
-                Type::Int64 => IDLValue::Int64(str.parse::<i64>().map_err(error)?),
-                _ => {
-                    return Err(Error::msg(format!(
-                        "type mismatch: {} can not be of type {}",
-                        self, t
-                    )))
+            (IDLValue::Principal(id), TypeInner::Principal) => IDLValue::Principal(*id),
+            (IDLValue::Service(_), TypeInner::Service(_)) => self.clone(),
+            (IDLValue::Func(_, _), TypeInner::Func(_)) => self.clone(),
+            #[cfg(feature = "parser")]
+            (IDLValue::Number(str), _) if from_parser => {
+                use crate::parser::token::error;
+                match t.as_ref() {
+                    TypeInner::Int => IDLValue::Int(str.parse::<Int>()?),
+                    TypeInner::Nat => IDLValue::Nat(str.parse::<Nat>()?),
+                    TypeInner::Nat8 => IDLValue::Nat8(str.parse::<u8>().map_err(error)?),
+                    TypeInner::Nat16 => IDLValue::Nat16(str.parse::<u16>().map_err(error)?),
+                    TypeInner::Nat32 => IDLValue::Nat32(str.parse::<u32>().map_err(error)?),
+                    TypeInner::Nat64 => IDLValue::Nat64(str.parse::<u64>().map_err(error)?),
+                    TypeInner::Int8 => IDLValue::Int8(str.parse::<i8>().map_err(error)?),
+                    TypeInner::Int16 => IDLValue::Int16(str.parse::<i16>().map_err(error)?),
+                    TypeInner::Int32 => IDLValue::Int32(str.parse::<i32>().map_err(error)?),
+                    TypeInner::Int64 => IDLValue::Int64(str.parse::<i64>().map_err(error)?),
+                    _ => {
+                        return Err(Error::msg(format!(
+                            "type mismatch: {self} can not be of type {t}"
+                        )))
+                    }
                 }
-            },
+            }
             _ => {
                 return Err(Error::msg(format!(
-                    "type mismatch: {} cannot be of type {}",
-                    self, t
+                    "type mismatch: {self} cannot be of type {t}"
                 )))
             }
         })
@@ -285,76 +270,77 @@ impl IDLValue {
     // This will only be called when the type is not provided
     pub fn value_ty(&self) -> Type {
         match *self {
-            IDLValue::Null => Type::Null,
-            IDLValue::Bool(_) => Type::Bool,
-            IDLValue::Number(_) => Type::Int, // Number defaults to Int
-            IDLValue::Int(_) => Type::Int,
-            IDLValue::Nat(_) => Type::Nat,
-            IDLValue::Nat8(_) => Type::Nat8,
-            IDLValue::Nat16(_) => Type::Nat16,
-            IDLValue::Nat32(_) => Type::Nat32,
-            IDLValue::Nat64(_) => Type::Nat64,
-            IDLValue::Int8(_) => Type::Int8,
-            IDLValue::Int16(_) => Type::Int16,
-            IDLValue::Int32(_) => Type::Int32,
-            IDLValue::Int64(_) => Type::Int64,
-            IDLValue::Float32(_) => Type::Float32,
-            IDLValue::Float64(_) => Type::Float64,
-            IDLValue::Text(_) => Type::Text,
-            IDLValue::None => Type::Opt(Box::new(Type::Empty)),
-            IDLValue::Reserved => Type::Reserved,
+            IDLValue::Null => TypeInner::Null,
+            IDLValue::Bool(_) => TypeInner::Bool,
+            IDLValue::Number(_) => TypeInner::Int, // Number defaults to Int
+            IDLValue::Int(_) => TypeInner::Int,
+            IDLValue::Nat(_) => TypeInner::Nat,
+            IDLValue::Nat8(_) => TypeInner::Nat8,
+            IDLValue::Nat16(_) => TypeInner::Nat16,
+            IDLValue::Nat32(_) => TypeInner::Nat32,
+            IDLValue::Nat64(_) => TypeInner::Nat64,
+            IDLValue::Int8(_) => TypeInner::Int8,
+            IDLValue::Int16(_) => TypeInner::Int16,
+            IDLValue::Int32(_) => TypeInner::Int32,
+            IDLValue::Int64(_) => TypeInner::Int64,
+            IDLValue::Float32(_) => TypeInner::Float32,
+            IDLValue::Float64(_) => TypeInner::Float64,
+            IDLValue::Text(_) => TypeInner::Text,
+            IDLValue::None => TypeInner::Opt(TypeInner::Empty.into()),
+            IDLValue::Reserved => TypeInner::Reserved,
             IDLValue::Opt(ref v) => {
                 let t = v.deref().value_ty();
-                Type::Opt(Box::new(t))
+                TypeInner::Opt(t)
             }
             IDLValue::Vec(ref vec) => {
                 let t = if vec.is_empty() {
-                    Type::Empty
+                    TypeInner::Empty.into()
                 } else {
                     vec[0].value_ty()
                 };
-                Type::Vec(Box::new(t))
+                TypeInner::Vec(t)
             }
             IDLValue::Record(ref vec) => {
                 let fs: Vec<_> = vec
                     .iter()
                     .map(|IDLField { id, val }| Field {
-                        id: id.clone(),
+                        id: id.clone().into(),
                         ty: val.value_ty(),
                     })
                     .collect();
-                Type::Record(fs)
+                TypeInner::Record(fs)
             }
             IDLValue::Variant(ref v) => {
                 let f = Field {
-                    id: v.0.id.clone(),
+                    id: v.0.id.clone().into(),
                     ty: v.0.val.value_ty(),
                 };
-                Type::Variant(vec![f])
+                TypeInner::Variant(vec![f])
             }
-            IDLValue::Principal(_) => Type::Principal,
-            IDLValue::Service(_) => Type::Service(Vec::new()),
+            IDLValue::Principal(_) => TypeInner::Principal,
+            IDLValue::Service(_) => TypeInner::Service(Vec::new()),
             IDLValue::Func(_, _) => {
                 let f = crate::types::Function {
                     modes: Vec::new(),
                     args: Vec::new(),
                     rets: Vec::new(),
                 };
-                Type::Func(f)
+                TypeInner::Func(f)
             }
         }
+        .into()
     }
 }
 
 impl crate::CandidType for IDLValue {
     fn ty() -> Type {
-        Type::Unknown
+        TypeInner::Unknown.into()
     }
     fn id() -> crate::types::TypeId {
         unreachable!();
     }
     fn _ty() -> Type {
-        Type::Unknown
+        TypeInner::Unknown.into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> std::result::Result<(), S::Error>
     where
@@ -423,6 +409,7 @@ macro_rules! visit_prim {
 }
 
 /// A [`Visitor`] to extract [`IDLValue`]s.
+#[derive(Copy, Clone)]
 pub struct IDLValueVisitor;
 
 impl<'de> Visitor<'de> for IDLValueVisitor {

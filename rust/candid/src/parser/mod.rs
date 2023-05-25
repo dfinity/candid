@@ -6,13 +6,31 @@ pub mod grammar;
 
 pub mod token;
 pub mod types;
-pub mod value;
 
 pub mod typing;
 
+#[cfg_attr(docsrs, doc(cfg(feature = "configs")))]
 #[cfg(feature = "configs")]
 pub mod configs;
-pub mod pretty;
+#[cfg_attr(docsrs, doc(cfg(feature = "random")))]
 #[cfg(feature = "random")]
 pub mod random;
 pub mod test;
+
+pub use crate::types::value::{IDLArgs, IDLValue};
+
+impl std::str::FromStr for IDLArgs {
+    type Err = crate::Error;
+    fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
+        let lexer = token::Tokenizer::new(str);
+        Ok(grammar::ArgsParser::new().parse(lexer)?)
+    }
+}
+
+impl std::str::FromStr for IDLValue {
+    type Err = crate::Error;
+    fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
+        let lexer = token::Tokenizer::new(str);
+        Ok(grammar::ArgParser::new().parse(lexer)?)
+    }
+}

@@ -1,9 +1,9 @@
 //! Serialize a Rust data structure to Candid binary format
 
 use super::error::{Error, Result};
-use super::parser::{typing::TypeEnv, value::IDLValue};
 use super::types;
-use super::types::{internal::Opcode, Field, Type};
+use super::types::value::IDLValue;
+use super::types::{internal::Opcode, Field, Type, TypeEnv, TypeInner};
 use byteorder::{LittleEndian, WriteBytesExt};
 use leb128::write::{signed as sleb128_encode, unsigned as leb128_encode};
 use std::collections::HashMap;
@@ -236,7 +236,7 @@ impl TypeSerialize {
         if self.type_map.contains_key(t) {
             return Ok(());
         }
-        let actual_type = if let Type::Var(id) = t {
+        let actual_type = if let TypeInner::Var(id) = t.as_ref() {
             self.env.rec_find_type(id)?
         } else {
             t
@@ -252,26 +252,26 @@ impl TypeSerialize {
         let unrolled = types::internal::unroll(t);
         if let Some(idx) = self.type_map.get(&unrolled) {
             let idx = *idx;
-            self.type_map.insert((*t).clone(), idx);
+            self.type_map.insert(t.clone(), idx);
             return Ok(());
         }
 
         let idx = self.type_table.len();
-        self.type_map.insert((*t).clone(), idx as i32);
+        self.type_map.insert(t.clone(), idx as i32);
         self.type_table.push(Vec::new());
         let mut buf = Vec::new();
-        match actual_type {
-            Type::Opt(ref ty) => {
+        match actual_type.as_ref() {
+            TypeInner::Opt(ref ty) => {
                 self.build_type(ty)?;
                 sleb128_encode(&mut buf, Opcode::Opt as i64)?;
                 self.encode(&mut buf, ty)?;
             }
-            Type::Vec(ref ty) => {
+            TypeInner::Vec(ref ty) => {
                 self.build_type(ty)?;
                 sleb128_encode(&mut buf, Opcode::Vec as i64)?;
                 self.encode(&mut buf, ty)?;
             }
-            Type::Record(fs) => {
+            TypeInner::Record(fs) => {
                 for Field { ty, .. } in fs.iter() {
                     self.build_type(ty)?;
                 }
@@ -283,7 +283,7 @@ impl TypeSerialize {
                     self.encode(&mut buf, ty)?;
                 }
             }
-            Type::Variant(fs) => {
+            TypeInner::Variant(fs) => {
                 for Field { ty, .. } in fs.iter() {
                     self.build_type(ty)?;
                 }
@@ -295,7 +295,7 @@ impl TypeSerialize {
                     self.encode(&mut buf, ty)?;
                 }
             }
-            Type::Service(ref ms) => {
+            TypeInner::Service(ref ms) => {
                 for (_, ty) in ms.iter() {
                     self.build_type(ty)?;
                 }
@@ -308,7 +308,7 @@ impl TypeSerialize {
                     self.encode(&mut buf, ty)?;
                 }
             }
-            Type::Func(ref func) => {
+            TypeInner::Func(ref func) => {
                 for ty in func.args.iter().chain(func.rets.iter()) {
                     self.build_type(ty)?;
                 }
@@ -323,7 +323,7 @@ impl TypeSerialize {
                 }
                 leb128_encode(&mut buf, func.modes.len() as u64)?;
                 for m in func.modes.iter() {
-                    use crate::parser::types::FuncMode;
+                    use crate::types::FuncMode;
                     let m = match m {
                         FuncMode::Query => 1,
                         FuncMode::Oneway => 2,
@@ -342,53 +342,53 @@ impl TypeSerialize {
         self.build_type(t)
     }
     fn encode(&self, buf: &mut Vec<u8>, t: &Type) -> Result<()> {
-        if let Type::Var(id) = t {
+        if let TypeInner::Var(id) = t.as_ref() {
             let actual_type = self.env.rec_find_type(id)?;
             if types::internal::is_primitive(actual_type) {
                 return self.encode(buf, actual_type);
             }
         }
-        match t {
-            Type::Null => sleb128_encode(buf, Opcode::Null as i64),
-            Type::Bool => sleb128_encode(buf, Opcode::Bool as i64),
-            Type::Nat => sleb128_encode(buf, Opcode::Nat as i64),
-            Type::Int => sleb128_encode(buf, Opcode::Int as i64),
-            Type::Nat8 => sleb128_encode(buf, Opcode::Nat8 as i64),
-            Type::Nat16 => sleb128_encode(buf, Opcode::Nat16 as i64),
-            Type::Nat32 => sleb128_encode(buf, Opcode::Nat32 as i64),
-            Type::Nat64 => sleb128_encode(buf, Opcode::Nat64 as i64),
-            Type::Int8 => sleb128_encode(buf, Opcode::Int8 as i64),
-            Type::Int16 => sleb128_encode(buf, Opcode::Int16 as i64),
-            Type::Int32 => sleb128_encode(buf, Opcode::Int32 as i64),
-            Type::Int64 => sleb128_encode(buf, Opcode::Int64 as i64),
-            Type::Float32 => sleb128_encode(buf, Opcode::Float32 as i64),
-            Type::Float64 => sleb128_encode(buf, Opcode::Float64 as i64),
-            Type::Text => sleb128_encode(buf, Opcode::Text as i64),
-            Type::Reserved => sleb128_encode(buf, Opcode::Reserved as i64),
-            Type::Empty => sleb128_encode(buf, Opcode::Empty as i64),
-            Type::Principal => sleb128_encode(buf, Opcode::Principal as i64),
-            Type::Knot(ref id) => {
+        match t.as_ref() {
+            TypeInner::Null => sleb128_encode(buf, Opcode::Null as i64),
+            TypeInner::Bool => sleb128_encode(buf, Opcode::Bool as i64),
+            TypeInner::Nat => sleb128_encode(buf, Opcode::Nat as i64),
+            TypeInner::Int => sleb128_encode(buf, Opcode::Int as i64),
+            TypeInner::Nat8 => sleb128_encode(buf, Opcode::Nat8 as i64),
+            TypeInner::Nat16 => sleb128_encode(buf, Opcode::Nat16 as i64),
+            TypeInner::Nat32 => sleb128_encode(buf, Opcode::Nat32 as i64),
+            TypeInner::Nat64 => sleb128_encode(buf, Opcode::Nat64 as i64),
+            TypeInner::Int8 => sleb128_encode(buf, Opcode::Int8 as i64),
+            TypeInner::Int16 => sleb128_encode(buf, Opcode::Int16 as i64),
+            TypeInner::Int32 => sleb128_encode(buf, Opcode::Int32 as i64),
+            TypeInner::Int64 => sleb128_encode(buf, Opcode::Int64 as i64),
+            TypeInner::Float32 => sleb128_encode(buf, Opcode::Float32 as i64),
+            TypeInner::Float64 => sleb128_encode(buf, Opcode::Float64 as i64),
+            TypeInner::Text => sleb128_encode(buf, Opcode::Text as i64),
+            TypeInner::Reserved => sleb128_encode(buf, Opcode::Reserved as i64),
+            TypeInner::Empty => sleb128_encode(buf, Opcode::Empty as i64),
+            TypeInner::Principal => sleb128_encode(buf, Opcode::Principal as i64),
+            TypeInner::Knot(ref id) => {
                 let ty = types::internal::find_type(id)
                     .ok_or_else(|| Error::msg("knot TypeId not found"))?;
                 let idx = self
                     .type_map
                     .get(&ty)
-                    .ok_or_else(|| Error::msg(format!("knot type {} not found", ty)))?;
+                    .ok_or_else(|| Error::msg(format!("knot type {ty} not found")))?;
                 sleb128_encode(buf, i64::from(*idx))
             }
-            Type::Var(_) => {
+            TypeInner::Var(_) => {
                 let idx = self
                     .type_map
                     .get(t)
-                    .ok_or_else(|| Error::msg(format!("var type {} not found", t)))?;
+                    .ok_or_else(|| Error::msg(format!("var type {t} not found")))?;
                 sleb128_encode(buf, i64::from(*idx))
             }
-            Type::Future => unreachable!(),
+            TypeInner::Future => unreachable!(),
             _ => {
                 let idx = self
                     .type_map
                     .get(t)
-                    .ok_or_else(|| Error::msg(format!("type {} not found", t)))?;
+                    .ok_or_else(|| Error::msg(format!("type {t} not found")))?;
                 sleb128_encode(buf, i64::from(*idx))
             }
         }?;

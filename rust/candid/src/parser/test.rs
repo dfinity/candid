@@ -1,7 +1,7 @@
 use super::types::{Dec, IDLProg, IDLType};
-use super::typing::{check_prog, TypeEnv};
-use super::value::IDLArgs;
-use crate::types::Type;
+use super::typing::check_prog;
+use crate::types::value::IDLArgs;
+use crate::types::{Type, TypeEnv};
 use crate::{Error, Result};
 
 type TupType = Vec<IDLType>;
@@ -158,7 +158,7 @@ pub fn check(test: Test) -> Result<()> {
             }
             let is_equal = left == right;
             if assert.pass != is_equal {
-                print!(" left:{}, right:{} ", left, right);
+                print!(" left:{left}, right:{right} ");
             }
             assert.pass == is_equal
         } else {
