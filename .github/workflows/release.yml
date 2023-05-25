@@ -92,10 +92,6 @@ jobs:
           name: ${{ matrix.asset_name }}
       - name: Executable runs
         run: |
-          set -eux
-          ls -l
-          ls -l ${{steps.download.outputs.download-path}}
-          #install -m755 "${{steps.download.outputs.download-path}}"
           chmod +x didc
           ./didc --version
   publish:
@@ -115,7 +111,6 @@ jobs:
         with:
           name: ${{ matrix.asset_name }}
       - name: Upload binaries to release
-        #if: matrix.name == 'never' # TODO: Remove before merging
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
