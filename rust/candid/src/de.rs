@@ -133,7 +133,6 @@ macro_rules! check {
         }
     }};
 }
-
 #[cfg(not(target_arch = "wasm32"))]
 macro_rules! check_recursion {
     ($this:ident $($body:tt)*) => {
@@ -635,6 +634,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let expect = e.clone();
                 let wire = w.clone();
                 let len = Len::read(&mut self.input)?.0;
+                if matches!(self.table.trace_type(w)?.as_ref(), TypeInner::Null | TypeInner::Reserved) {
+                    if len > 2 * 1048576 { // 2M message size limit
+                        return Err(Error::msg("vec null/reserved too large"));
+                    }
+                }
                 visitor.visit_seq(Compound::new(self, Style::Vector { len, expect, wire }))
             }
             (TypeInner::Record(e), TypeInner::Record(w)) => {

@@ -1229,7 +1229,7 @@ M(_ : reserved) = .
 M : <val> -> <constype> -> i8*
 M(null : opt <datatype>) = i8(0)
 M(?v   : opt <datatype>) = i8(1) M(v : <datatype>)
-M(v^N  : vec <datatype>) = leb128(N) M(v : <datatype>)^N
+M(v^N  : vec <datatype>) = leb128(N) M(v : <datatype>)^N  // N < 2097152 if <datatype> == null or reserved
 M(kv*  : record {<fieldtype>*}) = M(kv : <fieldtype>)*
 M(kv   : variant {<fieldtype>*}) = leb128(i) M(kv : <fieldtype>*[i])
 
@@ -1247,6 +1247,9 @@ M(ref(r) : principal) = i8(0)
 M(id(v*) : principal) = i8(1) M(v* : vec nat8)
 ```
 
+Note:
+
+* Since `null` and `reserved` values take no space, to prevent unbounded sized message, we limit the length of `vec null` and `vec reserved` to be less than 2MiB.
 
 #### References
 
