@@ -189,7 +189,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
-            zero_sized_values: 2 * 1048576,
+            zero_sized_values: 2_000_000,
             #[cfg(not(target_arch = "wasm32"))]
             recursion_depth: 0,
         })
