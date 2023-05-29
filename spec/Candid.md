@@ -1249,7 +1249,7 @@ M(id(v*) : principal) = i8(1) M(v* : vec nat8)
 
 Note:
 
-* Since `null` and `reserved` values, and records of such values, take no space, to prevent unbounded sized message, we limit the total vector length of such zero-sized values in a message to be 2MiB.
+* Since `null`, `reserved`, `record {}`, and records of such values, take no space, to prevent unbounded sized message, we limit the total vector length of such zero-sized values in a message to be 2MiB.
 
 #### References
 
