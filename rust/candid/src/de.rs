@@ -258,13 +258,11 @@ impl<'de> Deserializer<'de> {
     fn is_zero_sized_type(&self, t: &Type) -> bool {
         match t.as_ref() {
             TypeInner::Null | TypeInner::Reserved => true,
-            TypeInner::Record(fs) => {
-                fs.is_empty()
-                    || fs.iter().all(|f| {
-                        let t = self.table.trace_type(&f.ty).unwrap();
-                        self.is_zero_sized_type(&t)
-                    })
-            }
+            TypeInner::Record(fs) => fs.iter().all(|f| {
+                let t = self.table.trace_type(&f.ty).unwrap();
+                // recursive records have been replaced with empty already, it's safe to call without memoization.
+                self.is_zero_sized_type(&t)
+            }),
             _ => false,
         }
     }
