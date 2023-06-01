@@ -133,7 +133,6 @@ macro_rules! check {
         }
     }};
 }
-
 #[cfg(not(target_arch = "wasm32"))]
 macro_rules! check_recursion {
     ($this:ident $($body:tt)*) => {
@@ -171,6 +170,7 @@ struct Deserializer<'de> {
     // Indicates whether to deserialize with IDLValue.
     // It only affects the field id generation in enum type.
     is_untyped: bool,
+    zero_sized_values: usize,
     #[cfg(not(target_arch = "wasm32"))]
     recursion_depth: u16,
 }
@@ -189,6 +189,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
+            zero_sized_values: 2_000_000,
             #[cfg(not(target_arch = "wasm32"))]
             recursion_depth: 0,
         })
@@ -253,6 +254,17 @@ impl<'de> Deserializer<'de> {
             self.wire_type = self.table.trace_type(&self.wire_type)?;
         }
         Ok(())
+    }
+    fn is_zero_sized_type(&self, t: &Type) -> bool {
+        match t.as_ref() {
+            TypeInner::Null | TypeInner::Reserved => true,
+            TypeInner::Record(fs) => fs.iter().all(|f| {
+                let t = self.table.trace_type(&f.ty).unwrap();
+                // recursive records have been replaced with empty already, it's safe to call without memoization.
+                self.is_zero_sized_type(&t)
+            }),
+            _ => false,
+        }
     }
     // Should always call set_field_name to set the field_name. After deserialize_identifier
     // processed the field_name, field_name will be reset to None.
@@ -635,6 +647,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let expect = e.clone();
                 let wire = w.clone();
                 let len = Len::read(&mut self.input)?.0;
+                if self.is_zero_sized_type(w) {
+                    if self.zero_sized_values < len {
+                        return Err(Error::msg("vec length of zero sized values too large"));
+                    }
+                    self.zero_sized_values -= len;
+                }
                 visitor.visit_seq(Compound::new(self, Style::Vector { len, expect, wire }))
             }
             (TypeInner::Record(e), TypeInner::Record(w)) => {
