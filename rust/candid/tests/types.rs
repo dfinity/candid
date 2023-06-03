@@ -237,6 +237,10 @@ fn test_func() {
     fn id_struct(_: (List<u8>,)) -> Result<List<u8>, candid::Empty> {
         unreachable!()
     }
+    #[candid_method(composite_query)]
+    fn id_struct_composite(_: (List<u8>,)) -> Result<List<u8>, candid::Empty> {
+        unreachable!()
+    }
 
     #[candid_method(init)]
     fn init(_: List<i128>) {}
@@ -261,6 +265,7 @@ type Result_1 = variant { Ok : record { record { A }; A }; Err : text };
 type Wrap = record { head : int8; tail : opt Box };
 service : (List_2) -> {
   id_struct : (record { List }) -> (Result) query;
+  id_struct_composite : (record { List }) -> (Result) composite_query;
   id_variant : (vec A) -> (Result_1);
   "oneway" : (text) -> () oneway;
   "🐂" : (text, int32) -> (text, int32) query;

@@ -67,17 +67,6 @@ pub struct FuncType {
     pub rets: Vec<IDLType>,
 }
 
-impl FuncType {
-    pub fn is_query(&self) -> bool {
-        for m in self.modes.iter() {
-            if let FuncMode::Query = m {
-                return true;
-            }
-        }
-        false
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct TypeField {
     pub label: Label,

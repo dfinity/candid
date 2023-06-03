@@ -46,6 +46,8 @@ pub enum Token {
     Oneway,
     #[token("query")]
     Query,
+    #[token("composite_query")]
+    CompositeQuery,
     #[token("blob")]
     Blob,
     #[token("type")]

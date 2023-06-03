@@ -2,7 +2,7 @@ use crate::pretty::*;
 use crate::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
-static KEYWORDS: [&str; 29] = [
+static KEYWORDS: [&str; 30] = [
     "import",
     "service",
     "func",
@@ -32,6 +32,7 @@ static KEYWORDS: [&str; 29] = [
     "empty",
     "oneway",
     "query",
+    "composite_query",
 ];
 
 fn is_keyword(id: &str) -> bool {
