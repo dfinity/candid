@@ -388,14 +388,6 @@ impl FuncMode {
             FuncMode::CompositeQuery => pretty::RcDoc::text("composite_query"),
         }
     }
-    pub fn str_to_enum(str: &str) -> Option<Self> {
-        match str {
-            "oneway" => Some(FuncMode::Oneway),
-            "query" => Some(FuncMode::Query),
-            "composite_query" => Some(FuncMode::CompositeQuery),
-            _ => None,
-        }
-    }
 }
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Function {
