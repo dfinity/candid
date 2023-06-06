@@ -110,6 +110,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
                 .collect::<Vec<_>>();
             let modes = match modes.as_ref() {
                 "query" => quote! { vec![#candid::types::FuncMode::Query] },
+                "composite_query" => quote! { vec![#candid::types::FuncMode::CompositeQuery] },
                 "oneway" => quote! { vec![#candid::types::FuncMode::Oneway] },
                 "update" => quote! { vec![] },
                 _ => unreachable!(),
@@ -210,7 +211,9 @@ fn get_candid_attribute(attrs: &[syn::NestedMeta]) -> Result<CandidAttribute> {
             Meta(Path(p)) if res.method_type.is_none() => {
                 let mode = p.get_ident().unwrap().to_string();
                 match mode.as_ref() {
-                    "query" | "update" | "oneway" => res.method_type = Some(mode),
+                    "query" | "composite_query" | "update" | "oneway" => {
+                        res.method_type = Some(mode)
+                    }
                     "init" => res.is_init = true,
                     _ => return Err(Error::new_spanned(p, "unknown mode")),
                 }

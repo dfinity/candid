@@ -41,6 +41,6 @@ module {
         id : Nat;
       };
     i : f;
-    x : shared (a, b) -> async (?a, ?b);
+    x : shared composite query (a, b) -> async (?a, ?b);
   }
 }

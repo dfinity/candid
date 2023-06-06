@@ -378,19 +378,14 @@ macro_rules! field {
 pub enum FuncMode {
     Oneway,
     Query,
+    CompositeQuery,
 }
 impl FuncMode {
     pub(crate) fn to_doc(&self) -> pretty::RcDoc {
         match self {
             FuncMode::Oneway => pretty::RcDoc::text("oneway"),
             FuncMode::Query => pretty::RcDoc::text("query"),
-        }
-    }
-    pub fn str_to_enum(str: &str) -> Option<Self> {
-        match str {
-            "oneway" => Some(FuncMode::Oneway),
-            "query" => Some(FuncMode::Query),
-            _ => None,
+            FuncMode::CompositeQuery => pretty::RcDoc::text("composite_query"),
         }
     }
 }
@@ -410,8 +405,11 @@ impl fmt::Display for Function {
     }
 }
 impl Function {
+    /// Check a function is a query or composite_query method
     pub fn is_query(&self) -> bool {
-        self.modes.contains(&crate::types::FuncMode::Query)
+        self.modes
+            .iter()
+            .any(|m| matches!(m, FuncMode::Query | FuncMode::CompositeQuery))
     }
 }
 #[macro_export]
@@ -424,6 +422,9 @@ macro_rules! func {
     };
     ( ( $($arg:ty),* ) -> ( $($ret:ty),* ) query ) => {
         Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::Query] }))
+    };
+    ( ( $($arg:ty),* ) -> ( $($ret:ty),* ) composite_query ) => {
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::CompositeQuery] }))
     };
     ( ( $($arg:ty),* ) -> ( $($ret:ty),* ) oneway ) => {
         Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::Oneway] }))

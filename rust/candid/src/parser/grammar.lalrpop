@@ -27,6 +27,7 @@ extern {
         "service" => Token::Service,
         "oneway" => Token::Oneway,
         "query" => Token::Query,
+        "composite_query" => Token::CompositeQuery,
         "blob" => Token::Blob,
         "type" => Token::Type,
         "import" => Token::Import,
@@ -234,6 +235,7 @@ ArgTyp: IDLType = {
 FuncMode: FuncMode = {
     "oneway" => FuncMode::Oneway,
     "query" => FuncMode::Query,
+    "composite_query" => FuncMode::CompositeQuery,
 }
 
 ActorTyp: Vec<Binding> = {

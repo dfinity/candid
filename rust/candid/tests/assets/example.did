@@ -15,6 +15,6 @@ service server : {
   g : (my_type, List, opt List, nested) -> (int, broker) query;
   h : (vec opt text, variant { A: nat; B: opt text }, opt List) -> (record { id: nat; 0x2a: record {} });
   i : f;
-  x : (a,b) -> (opt a, opt b);
+  x : (a,b) -> (opt a, opt b) composite_query;
 }
 

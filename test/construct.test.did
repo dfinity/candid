@@ -61,6 +61,7 @@ assert blob "DIDL\01\6d\00\01\00\00" == "(vec {})"                          : (V
 assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (Vec) "vec: tree";
 assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (vec vec opt empty) "vec: non-recursive tree";
 assert blob "DIDL\01\6d\7f\01\00\e8\07"                                     : (vec null) "vec null";
+assert blob "DIDL\01\6d\7f\01\00\e8\07"                                     : (vec opt nat) "vec null <: vec opt nat";
 assert blob "DIDL\01\6d\7f\01\00\80\94\eb\dc\03"                           !: (vec opt nat) "space bomb: vec null <: vec opt nat";
 assert blob "DIDL\01\6d\70\01\00\80\94\eb\dc\03"                           !: (opt nat) "space bomb: send vec reserved to opt nat";
 assert blob "DIDL\04\6c\03\01\7f\02\01\03\02\6c\01\01\70\6c\00\6d\00\01\03\80\94\eb\dc\03" !: (vec record {null;record{reserved};record{}}) "space bomb: zero-sized record";

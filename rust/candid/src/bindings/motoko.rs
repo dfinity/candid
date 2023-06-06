@@ -24,17 +24,20 @@ fn is_tuple(t: &Type) -> bool {
         _ => false,
     }
 }
-static KEYWORDS: [&str; 45] = [
+static KEYWORDS: [&str; 48] = [
     "actor",
     "and",
     "async",
+    "async*",
     "assert",
     "await",
+    "await*",
     "break",
     "case",
     "catch",
     "class",
     "continue",
+    "composite",
     "debug",
     "debug_show",
     "else",
@@ -167,6 +170,11 @@ fn pp_function(func: &Function) -> RcDoc {
     match func.modes.as_slice() {
         [FuncMode::Oneway] => kwd("shared").append(args).append(" -> ").append("()"),
         [FuncMode::Query] => kwd("shared query")
+            .append(args)
+            .append(" -> ")
+            .append("async ")
+            .append(rets),
+        [FuncMode::CompositeQuery] => kwd("shared composite query")
             .append(args)
             .append(" -> ")
             .append("async ")

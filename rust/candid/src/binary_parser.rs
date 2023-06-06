@@ -111,7 +111,7 @@ struct Meths {
 }
 #[derive(BinRead, Debug)]
 struct Mode {
-    #[br(try_map = |x:u8| match x { 1u8 => Ok(FuncMode::Query), | 2u8 => Ok(FuncMode::Oneway), | _ => Err("Unknown annotation") })]
+    #[br(try_map = |x:u8| match x { 1u8 => Ok(FuncMode::Query), | 2u8 => Ok(FuncMode::Oneway), | 3u8 => Ok(FuncMode::CompositeQuery), | _ => Err("Unknown annotation") })]
     inner: FuncMode,
 }
 

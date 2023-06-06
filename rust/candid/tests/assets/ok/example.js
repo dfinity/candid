@@ -59,7 +59,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'i' : f,
-    'x' : IDL.Func([a, b], [IDL.Opt(a), IDL.Opt(b)], []),
+    'x' : IDL.Func([a, b], [IDL.Opt(a), IDL.Opt(b)], ['composite_query']),
   });
 };
 export const init = ({ IDL }) => { return []; };

@@ -327,6 +327,7 @@ impl TypeSerialize {
                     let m = match m {
                         FuncMode::Query => 1,
                         FuncMode::Oneway => 2,
+                        FuncMode::CompositeQuery => 3,
                     };
                     sleb128_encode(&mut buf, m)?;
                 }

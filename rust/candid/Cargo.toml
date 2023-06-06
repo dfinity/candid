@@ -93,9 +93,8 @@ mute_warnings = []
 arc_type = []
 
 # docs.rs-specific configuration
-# To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+# To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --features all
 [package.metadata.docs.rs]
-# document all features
-all-features = true
+features = ["all"]
 # defines the configuration attribute `docsrs`
 rustdoc-args = ["--cfg", "docsrs"]

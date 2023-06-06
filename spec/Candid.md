@@ -1,8 +1,8 @@
 # Candid Specification
 
-Version: 0.1.4
+Version: 0.1.5
 
-Date: January 11, 2022
+Date: June 1, 2023
 
 ## Motivation
 
@@ -193,7 +193,7 @@ A function type describes the list of parameters and results and their respectiv
 * `query` indicates that the function does not modify any state and can potentially be executed more efficiently (e.g., on cached state).
 * `composite_query` is a special `query` function that has IC-specific features and limitations:
   - `composite_query` function can only call other `composite_query` and `query` functions.
-  - `composite_query` function can only be called from other `composite_query` functions (not callable from `query` functions) and from outside of IC.
+  - `composite_query` function can only be called from other `composite_query` functions (not callable from `query` or `update` functions) and from outside of IC. Therefore, `query` is not a subtype of `composite_query`.
   - `composite_query` cannot be made cross-subnets.
   - All these limitations are temporary due to the implementation. Eventually, `query` and `composite_query` functions will become the same thing.
 * `oneway` function has no return results, and the caller doesn't have to wait for the function return.
@@ -1249,7 +1249,7 @@ M(id(v*) : principal) = i8(1) M(v* : vec nat8)
 
 Note:
 
-* Since `null`, `reserved`, `record {}`, and records of such values, take no space, to prevent unbounded sized message, we limit the total vector length of such zero-sized values in a message to be 2,000,000 elements. For example, if a message contains two vectors, one at type `vec null` and one at type `vec record {}`, then the length of both vectors combined cannot exceed 2,000,000 elements.
+* Since `null`, `reserved`, `record {}`, and records of such values, take no space, to prevent unbounded sized message, we limit the total vector length of such zero-sized values in a messagev (on the wire) to be 2,000,000 elements. For example, if a message contains two vectors, one at type `vec null` and one at type `vec record {}`, then the length of both vectors combined cannot exceed 2,000,000 elements.
 
 #### References
 
