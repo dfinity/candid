@@ -18,6 +18,7 @@ const allowedExternalOrigins = [
   "https://m7sm4-2iaaa-aaaab-qabra-cai.icp0.io", // Motoko Playground (certified)
   "https://m7sm4-2iaaa-aaaab-qabra-cai.raw.ic0.app", // Motoko Playground (legacy, mainnet)
   "https://m7sm4-2iaaa-aaaab-qabra-cai.ic0.app", // Motoko Playground (legacy, certified)
+  "https://play.motoko.org", // Motoko Playground (custom domain)
 ];
 
 const messageListeners: MessageListener[] = [];
