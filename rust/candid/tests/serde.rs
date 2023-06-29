@@ -150,7 +150,7 @@ fn test_reference() {
     );
     let bytes = hex("4449444c016a00017f000100010100016d");
     test_decode(&bytes, &None::<CustomFunc>);
-    define_service!(MyService: { "f": CustomFunc::ty(); "g": func!(() -> () query) });
+    define_service!(MyService: { "g": func!(() -> () query); "f": CustomFunc::ty() });
     all_check(
         MyService::new(principal),
         "4449444c0369020166010167026a00017d006a0000010101000103caffee",
