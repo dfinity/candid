@@ -49,7 +49,7 @@ window.addEventListener("message", ({ origin, source, data }) => {
               type: "acknowledge",
               acknowledge: message.acknowledge,
             })}`,
-            origin
+            origin as any
           );
         }
       } catch (err) {
