@@ -1,6 +1,6 @@
 use crate::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
 use crate::types::{TypeEnv, FuncMode};
-use super::typing::check_unique;
+use crate::utils::check_unique;
 use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes};
 use super::test::{Assert, Input, Test};
 use super::token::{Token, error2, LexicalError, Span};
@@ -241,9 +241,8 @@ FuncMode: FuncMode = {
 ActorTyp: Vec<Binding> = {
     "{" <mut fs:Sp<SepBy<MethTyp, ";">>> "}" =>? {
         let span = fs.1.clone();
-        fs.0.sort_unstable_by_key(|Binding { id, .. }| id.clone());
-        let labs: Vec<_> = fs.0.iter().map(|f| f.id.clone()).collect();
-        check_unique(labs.iter()).map_err(|e| error2(e, span))?;
+        fs.0.sort_unstable_by(|a,b| a.id.partial_cmp(&b.id).unwrap());
+        check_unique(fs.0.iter().map(|f| &f.id)).map_err(|e| error2(e, span))?;
         Ok(fs.0)
     }
 }

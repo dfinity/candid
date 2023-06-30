@@ -1,14 +1,33 @@
 use crate::de::IDLDeserialize;
 use crate::ser::IDLBuilder;
-use crate::{CandidType, Result};
+use crate::{CandidType, Error, Result};
 use serde::de::Deserialize;
 
 #[cfg(feature = "parser")]
 use crate::{check_prog, pretty_check_file};
 #[cfg(feature = "parser")]
-use crate::{pretty_parse, types::Type, Error, TypeEnv};
+use crate::{pretty_parse, types::Type, TypeEnv};
 #[cfg(feature = "parser")]
 use std::path::Path;
+
+pub fn check_unique<'a, I, T>(sorted: I) -> Result<()>
+where
+    T: 'a + PartialEq + std::fmt::Display,
+    I: Iterator<Item = &'a T>,
+{
+    let mut prev: Option<&T> = None;
+    for lab in sorted {
+        if let Some(prev) = prev {
+            if lab == prev {
+                return Err(Error::msg(format!(
+                    "label '{lab}' hash collision with '{prev}'"
+                )));
+            }
+        }
+        prev = Some(lab);
+    }
+    Ok(())
+}
 
 #[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
 #[cfg(feature = "parser")]

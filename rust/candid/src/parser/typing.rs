@@ -100,25 +100,6 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
     }
 }
 
-pub fn check_unique<'a, I, T>(sorted: I) -> Result<()>
-where
-    T: 'a + PartialEq + std::fmt::Display,
-    I: Iterator<Item = &'a T>,
-{
-    let mut prev: Option<&T> = None;
-    for lab in sorted {
-        if let Some(prev) = prev {
-            if lab == prev {
-                return Err(Error::msg(format!(
-                    "label '{lab}' hash collision with '{prev}'"
-                )));
-            }
-        }
-        prev = Some(lab);
-    }
-    Ok(())
-}
-
 fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
     // field label duplication is checked in the parser
     let mut res = Vec::new();
