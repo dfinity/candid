@@ -232,33 +232,20 @@ seq_impl!(BinaryHeap<K: Ord>);
 seq_impl!(BTreeSet<K: Ord>);
 seq_impl!(HashSet<K: Eq + Hash, H: BuildHasher>);
 
-macro_rules! array_impls {
-    ($($len:tt)+) => {
-        $(
-            impl<T> CandidType for [T; $len]
-            where T: CandidType,
-            {
-                fn _ty() -> Type { TypeInner::Vec(T::ty()).into() }
-                fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
-                where S: Serializer,
-                {
-                    let mut ser = serializer.serialize_vec($len)?;
-                    for e in self.iter() {
-                        Compound::serialize_element(&mut ser, &e)?;
-                    };
-                    Ok(())
-                }
-            }
-        )+
+impl<T: CandidType, const N: usize> CandidType for [T; N]
+{
+    fn _ty() -> Type { TypeInner::Vec(T::ty()).into() }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where S: Serializer,
+    {
+        let mut ser = serializer.serialize_vec(N)?;
+        for e in self.iter() {
+            Compound::serialize_element(&mut ser, &e)?;
+        };
+        Ok(())
     }
 }
 
-array_impls! {
-     1  2  3  4  5  6  7  8  9 10
-    11 12 13 14 15 16 17 18 19 20
-    21 22 23 24 25 26 27 28 29 30
-    31 32 00
-}
 
 impl<T, E> CandidType for Result<T, E>
 where
