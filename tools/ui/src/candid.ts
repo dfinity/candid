@@ -63,7 +63,7 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
       try {
         js = await getDidJsFromTmpHack(canisterId);
       } catch(err) {
-        if (/no query method/.test(err)) {
+        if (/no query method/.test(err as any)) {
           console.warn(err);
           js = undefined;
         } else {
@@ -223,10 +223,10 @@ async function didToJs(candid_source: string): Promise<undefined | string> {
   });
   const didjs: ActorSubclass = Actor.createActor(didjs_interface, { agent, canisterId: didjs_id });
   const js: any = await didjs.did_to_js(candid_source);
-  if (js === []) {
+  if (JSON.stringify(js) === JSON.stringify([])) {
     return undefined;
   }
-  return js[0];  
+  return js[0];
 }
 
 export function render(id: Principal, canister: ActorSubclass, profiling: bigint|undefined) {

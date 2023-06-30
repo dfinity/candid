@@ -63,9 +63,9 @@ The purpose of an IDL is defining the signature, and thereby the *type* of an ac
 
 This is a summary of the grammar proposed:
 ```
-<prog>  ::= <def>;* <actor>;?
+<prog>  ::= <def>;* <actor>?
 <def>   ::= type <id> = <datatype> | import <text>
-<actor> ::= service <id>? : (<tuptype> ->)? (<actortype> | <id>)
+<actor> ::= service <id>? : (<tuptype> ->)? (<actortype> | <id>) ;?
 
 <actortype> ::= { <methtype>;* }
 <methtype>  ::= <name> : (<functype> | <id>)
