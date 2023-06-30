@@ -1,13 +1,13 @@
 
 # Changelog
 
-## Rust 0.9.0-beta
+## 2022-06-30 (Rust 0.9.0)
 
 ### Breaking changes:
 
 * Deserializer only checks subtyping for reference types, fully conforming to Candid spec 1.4. You can now decode `opt variant` even if the variant tags are not the same, allowing upgrading variant types without breaking the client code.
 * The old `candid::Type` is now `candid::TypeInner`, and `Type` is a newtype of `Rc<TypeInner>`. This change significantly improves deserialization performance (25% -- 50% improvements)
-* `candid::parser` module is only available under feature flag `"parser"`. This significantly cut down compilation time and Wasm binary size
+* `candid::parser` module is only available under feature flag `"parser"`. This significantly cuts down compilation time and Wasm binary size
 * Disable the use of `candid::Func` and `candid::Service` to avoid footguns. Use `define_function!` and `define_service!` macro instead
 * `candid::parser::typing::TypeEnv` moved to `candid::types::TypeEnv`. Use of `candid::TypeEnv` is not affected
 * `candid::parser::types::FuncMode` moved to `candid::types::FuncMode`
@@ -22,7 +22,10 @@
 * Macros for constructing type AST nodes: `service!`, `func!` and `field!`
 * Support future types
 * Bound recursion depth in deserialization for non-Wasm target (Wasm canister doesn't have a specified C ABI, and runs in a sandbox. It's okay to stack overflow)
+* Limit the size of vec null/reversed in deserialization
 * `Nat` serialization for JSON and CBOR
+* Support custom candid path for `export_service!`
+* Support `composite_query` function annotation
 
 ## 2022-11-17 (Rust 0.8.3 -- 0.8.4)
 

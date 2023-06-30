@@ -1,6 +1,6 @@
 [package]
 name = "candid"
-version = "0.9.0-beta.4"
+version = "0.9.0"
 edition = "2018"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
