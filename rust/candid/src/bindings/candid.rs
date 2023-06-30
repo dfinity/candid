@@ -211,7 +211,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 }
 
 pub mod value {
-    use crate::bindings::candid::pp_text;
+    use crate::bindings::candid::{ident_string, pp_text};
     use crate::pretty::*;
     use crate::types::value::{IDLArgs, IDLField, IDLValue};
     use crate::types::{number::pp_num_str, Label};
@@ -376,7 +376,11 @@ pub mod value {
     }
     impl fmt::Debug for IDLField {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "{} = {:?}", self.id, self.val)
+            let lab = match &self.id {
+                Label::Named(id) => ident_string(id),
+                id => id.to_string(),
+            };
+            write!(f, "{} = {:?}", lab, self.val)
         }
     }
 
