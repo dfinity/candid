@@ -54,7 +54,7 @@ impl Error {
                     InvalidToken { location } => {
                         Label::primary((), *location..location + 1).with_message("Invalid token")
                     }
-                    UnrecognizedEOF { location, expected } => {
+                    UnrecognizedEof { location, expected } => {
                         diag = diag.with_notes(report_expected(expected));
                         Label::primary((), *location..location + 1).with_message("Unexpected EOF")
                     }
