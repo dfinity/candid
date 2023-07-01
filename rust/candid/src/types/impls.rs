@@ -234,7 +234,7 @@ seq_impl!(HashSet<K: Eq + Hash, H: BuildHasher>);
 
 impl<T: CandidType, const N: usize> CandidType for [T; N] {
     fn _ty() -> Type {
-        TypeInner::Vec(T::ty()).into() 
+        TypeInner::Vec(T::ty()).into()
     }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where
