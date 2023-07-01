@@ -435,9 +435,14 @@ macro_rules! func {
 ///
 /// `service!{ "f": func!((HttpRequest) -> ()) }` expands to `Type(Rc::new(TypeInner::Service(...)))`
 macro_rules! service {
-    { $($meth:tt : $ty:expr);* } => {
-        Into::<$crate::types::Type>::into($crate::types::TypeInner::Service(vec![ $(($meth.to_string(), $ty)),* ]))
-    }
+    { $($meth:tt : $ty:expr);* } => {{
+        let mut ms = vec![ $(($meth.to_string(), $ty)),* ];
+        ms.sort_unstable_by(|a, b| a.0.as_str().partial_cmp(b.0.as_str()).unwrap());
+        if let Err(e) = $crate::utils::check_unique(ms.iter().map(|m| &m.0)) {
+            panic!(e);
+        }
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Service(ms))
+    }}
 }
 
 #[derive(Debug, PartialEq, TryFromPrimitive)]
