@@ -232,20 +232,21 @@ seq_impl!(BinaryHeap<K: Ord>);
 seq_impl!(BTreeSet<K: Ord>);
 seq_impl!(HashSet<K: Eq + Hash, H: BuildHasher>);
 
-impl<T: CandidType, const N: usize> CandidType for [T; N]
-{
-    fn _ty() -> Type { TypeInner::Vec(T::ty()).into() }
+impl<T: CandidType, const N: usize> CandidType for [T; N] {
+    fn _ty() -> Type {
+        TypeInner::Vec(T::ty()).into() 
+    }
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
-    where S: Serializer,
+    where
+        S: Serializer,
     {
         let mut ser = serializer.serialize_vec(N)?;
         for e in self.iter() {
             Compound::serialize_element(&mut ser, &e)?;
-        };
+        }
         Ok(())
     }
 }
-
 
 impl<T, E> CandidType for Result<T, E>
 where
