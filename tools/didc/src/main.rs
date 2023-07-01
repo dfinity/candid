@@ -24,7 +24,7 @@ enum Command {
     Bind {
         /// Specifies did file for code generation
         input: PathBuf,
-        #[clap(short, long, possible_values = &["js", "ts", "did", "mo", "rs", "rs-agent"])]
+        #[clap(short, long, value_parser = ["js", "ts", "did", "mo", "rs", "rs-agent"])]
         /// Specifies target language
         target: String,
     },
@@ -32,7 +32,7 @@ enum Command {
     Test {
         /// Specifies .test.did file for test suites generation
         input: PathBuf,
-        #[clap(short, long, possible_values = &["js", "did"], default_value = "js")]
+        #[clap(short, long, value_parser = ["js", "did"], default_value = "js")]
         /// Specifies target language
         target: String,
     },
@@ -40,13 +40,13 @@ enum Command {
     Hash { input: String },
     /// Encode Candid value
     Encode {
-        #[clap(parse(try_from_str = parse_args))]
+        #[clap(value_parser = parse_args)]
         /// Specifies Candid textual format for encoding
         /// If omitted, the text will be read from stdin.
         args: Option<IDLArgs>,
         #[clap(flatten)]
         annotate: TypeAnnotation,
-        #[clap(short, long, possible_values = &["hex", "pretty", "blob"], default_value = "hex")]
+        #[clap(short, long, value_parser = ["hex", "pretty", "blob"], default_value = "hex")]
         /// Specifies hex format
         format: String,
     },
@@ -55,7 +55,7 @@ enum Command {
         /// Specifies Candid binary data in hex string.
         /// If omitted, the hex will be read from stdin.
         blob: Option<String>,
-        #[clap(short, long, possible_values = &["hex", "blob"], default_value = "hex")]
+        #[clap(short, long, value_parser = ["hex", "blob"], default_value = "hex")]
         /// Specifies hex format
         format: String,
         #[clap(flatten)]
@@ -71,7 +71,7 @@ enum Command {
         #[clap(short, long)]
         /// Load random value generation config from file
         file: Option<String>,
-        #[clap(short, long, possible_values = &["did", "js"], default_value = "did")]
+        #[clap(short, long, value_parser = ["did", "js"], default_value = "did")]
         /// Specifies target language
         lang: String,
         #[clap(short, long, requires("method"))]
@@ -90,7 +90,7 @@ enum Command {
 #[derive(Parser)]
 struct TypeAnnotation {
     #[clap(name = "types", short, long)]
-    #[clap(parse(try_from_str = parse_types))]
+    #[clap(value_parser = parse_types)]
     /// Annotates values with Candid types
     tys: Option<IDLTypes>,
     #[clap(short, long, conflicts_with("types"), requires("defs"))]

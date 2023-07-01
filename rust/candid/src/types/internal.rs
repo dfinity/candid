@@ -439,7 +439,7 @@ macro_rules! service {
         let mut ms = vec![ $(($meth.to_string(), $ty)),* ];
         ms.sort_unstable_by(|a, b| a.0.as_str().partial_cmp(b.0.as_str()).unwrap());
         if let Err(e) = $crate::utils::check_unique(ms.iter().map(|m| &m.0)) {
-            panic!(e);
+            panic!("{e}");
         }
         Into::<$crate::types::Type>::into($crate::types::TypeInner::Service(ms))
     }}

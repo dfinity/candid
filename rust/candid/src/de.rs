@@ -284,7 +284,6 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        use std::convert::TryInto;
         self.unroll_type()?;
         assert!(*self.expect_type == TypeInner::Int);
         let mut bytes = vec![0u8];
@@ -399,7 +398,7 @@ impl<'de> Deserializer<'de> {
         // The only option left seems to be type_name, but it is not guaranteed to be stable, so there is risk here.
             && !tid.name.starts_with("serde::de::impls::OptionVisitor<")
         {
-            panic!("Not a valid visitor: {:?}", tid);
+            panic!("Not a valid visitor: {tid:?}");
         }
         // This is safe, because the visitor either impl Copy or is zero sized
         let v = unsafe { std::ptr::read(&visitor) };
@@ -506,7 +505,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        use std::convert::TryInto;
         self.unroll_type()?;
         assert!(*self.expect_type == TypeInner::Int);
         let value: i128 = match self.wire_type.as_ref() {
@@ -526,7 +524,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        use std::convert::TryInto;
         self.unroll_type()?;
         check!(
             *self.expect_type == TypeInner::Nat && *self.wire_type == TypeInner::Nat,

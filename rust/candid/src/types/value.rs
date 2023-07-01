@@ -430,7 +430,6 @@ impl<'de> Visitor<'de> for IDLValueVisitor {
     visit_prim!(Float64, f64);
     // Deserialize Candid specific types: Bignumber, principal, reversed, service, function
     fn visit_byte_buf<E: de::Error>(self, value: Vec<u8>) -> DResult<E> {
-        use std::convert::TryFrom;
         let (tag, mut bytes) = value.split_at(1);
         match tag[0] {
             0u8 => {
