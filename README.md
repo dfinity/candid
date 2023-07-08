@@ -30,6 +30,7 @@ A list of community maintained Candid libraries:
 * [Dart](https://github.com/levifeldman/ic_tools_dart)
 * [Motoko](https://github.com/edjcase/motoko_candid)
 * [C#](https://github.com/edjCase/ICP.NET/tree/main/src/Candid)
+* [C++](https://github.com/icppWorld/icpp-candid)
 
 ## Tools
 
