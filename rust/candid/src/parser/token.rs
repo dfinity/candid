@@ -89,6 +89,7 @@ enum Comment {
 }
 
 #[derive(Logos, Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)]
 enum Text {
     #[regex(r#"[^\\"]+"#)]
     Text,
