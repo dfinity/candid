@@ -2,14 +2,11 @@ use lalrpop_util::ParseError;
 use logos::{Lexer, Logos};
 
 #[derive(Logos, Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+#[logos(skip r"[ \t\r\n]+")]
+#[logos(skip r"//[^\n]*")] // line comment
 pub enum Token {
-    #[regex(r"[ \t\r\n]+", logos::skip)]
-    // line comment
-    #[regex("//[^\n]*", logos::skip)]
     #[token("/*")]
     StartComment,
-    #[error]
-    UnexpectedToken,
     #[token("=")]
     Equals,
     #[token("(")]
@@ -79,14 +76,12 @@ pub enum Token {
     #[regex("[0-9]*\\.[0-9]*", parse_number)]
     #[regex("[0-9]+(\\.[0-9]*)?[eE][+-]?[0-9]+", parse_number)]
     Float(String),
-    #[regex("true|false", |lex| lex.slice().parse())]
+    #[regex("true|false", |lex| lex.slice().parse().map_err(|_| ()))]
     Boolean(bool),
 }
 
 #[derive(Logos, Debug, Clone, PartialEq, Eq)]
 enum Comment {
-    #[error]
-    Skip,
     #[token("*/")]
     End,
     #[token("/*")]
@@ -95,8 +90,6 @@ enum Comment {
 
 #[derive(Logos, Debug, Clone, PartialEq, Eq)]
 enum Text {
-    #[error]
-    Error,
     #[regex(r#"[^\\"]+"#)]
     Text,
     #[regex(r"\\.")]
@@ -181,23 +174,23 @@ impl<'input> Iterator for Tokenizer<'input> {
         let token = self.lex.next()?;
         let span = self.lex.span();
         match token {
-            Token::UnexpectedToken => {
+            Err(_) => {
                 let err = format!("Unknown token {}", self.lex.slice());
                 Some(Err(LexicalError::new(err, span)))
             }
-            Token::StartComment => {
+            Ok(Token::StartComment) => {
                 let mut lex = self.lex.to_owned().morph::<Comment>();
                 let mut nesting = 1;
                 loop {
                     match lex.next() {
-                        Some(Comment::Skip) => continue,
-                        Some(Comment::End) => {
+                        Some(Err(_)) => continue,
+                        Some(Ok(Comment::End)) => {
                             nesting -= 1;
                             if nesting == 0 {
                                 break;
                             }
                         }
-                        Some(Comment::Start) => nesting += 1,
+                        Some(Ok(Comment::Start)) => nesting += 1,
                         None => {
                             return Some(Err(LexicalError::new(
                                 "Unclosed comment",
@@ -209,14 +202,14 @@ impl<'input> Iterator for Tokenizer<'input> {
                 self.lex = lex.morph::<Token>();
                 self.next()
             }
-            Token::StartString => {
+            Ok(Token::StartString) => {
                 let mut result = String::new();
                 let mut lex = self.lex.to_owned().morph::<Text>();
                 loop {
                     use self::Text::*;
                     match lex.next() {
-                        Some(Text) => result += lex.slice(),
-                        Some(EscapeCharacter) => match lex.slice().chars().nth(1).unwrap() {
+                        Some(Ok(Text)) => result += lex.slice(),
+                        Some(Ok(EscapeCharacter)) => match lex.slice().chars().nth(1).unwrap() {
                             'n' => result.push('\n'),
                             'r' => result.push('\r'),
                             't' => result.push('\t'),
@@ -230,7 +223,7 @@ impl<'input> Iterator for Tokenizer<'input> {
                                 )))
                             }
                         },
-                        Some(Codepoint) => {
+                        Some(Ok(Codepoint)) => {
                             let slice = lex.slice();
                             let hex = slice[3..slice.len() - 1].replace('_', "");
                             match u32::from_str_radix(&hex, 16)
@@ -249,7 +242,7 @@ impl<'input> Iterator for Tokenizer<'input> {
                                 Err(e) => return Some(Err(e)),
                             }
                         }
-                        Some(Byte) => {
+                        Some(Ok(Byte)) => {
                             let hex = &lex.slice()[1..];
                             match u8::from_str_radix(hex, 16) {
                                 Ok(byte) => {
@@ -266,8 +259,8 @@ impl<'input> Iterator for Tokenizer<'input> {
                                 }
                             }
                         }
-                        Some(EndString) => break,
-                        Some(Error) => {
+                        Some(Ok(EndString)) => break,
+                        Some(Err(_)) => {
                             return Some(Err(LexicalError::new(
                                 format!("Unexpected string {}", lex.slice()),
                                 lex.span(),
@@ -284,7 +277,7 @@ impl<'input> Iterator for Tokenizer<'input> {
                 self.lex = lex.morph::<Token>();
                 Some(Ok((span.start, Token::Text(result), self.lex.span().end)))
             }
-            _ => Some(Ok((span.start, token, span.end))),
+            Ok(token) => Some(Ok((span.start, token, span.end))),
         }
     }
 }
