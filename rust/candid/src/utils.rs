@@ -65,6 +65,20 @@ pub fn service_compatible(new: CandidSource, old: CandidSource) -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
+/// Check structural equality of two service types
+pub fn service_equal(new: CandidSource, old: CandidSource) -> Result<()> {
+    let (mut env, t1) = new.load()?;
+    let t1 = t1.ok_or_else(|| Error::msg("new interface has no main service type"))?;
+    let (env2, t2) = old.load()?;
+    let t2 = t2.ok_or_else(|| Error::msg("old interface has no main service type"))?;
+    let mut gamma = std::collections::HashSet::new();
+    let t2 = env.merge_type(env2, t2);
+    crate::types::subtype::equal(&mut gamma, &env, &t1, &t2)?;
+    Ok(())
+}
+
 /// Encode sequence of Rust values into Candid message of type `candid::Result<Vec<u8>>`.
 #[macro_export]
 macro_rules! Encode {
