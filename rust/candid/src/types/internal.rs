@@ -357,6 +357,15 @@ pub struct Field {
     pub id: SharedLabel,
     pub ty: Type,
 }
+impl fmt::Display for Field {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            crate::bindings::candid::pp_field(self, false).pretty(80)
+        )
+    }
+}
 #[macro_export]
 /// Construct a field type, which can be used in `TypeInner::Record` and `TypeInner::Variant`.
 ///

@@ -1,4 +1,5 @@
 use super::internal::{find_type, Field, Label, Type, TypeInner};
+use crate::bindings::candid::pp_args;
 use crate::types::TypeEnv;
 use crate::{Error, Result};
 use anyhow::Context;
@@ -89,9 +90,7 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
             Ok(())
         }
         (Func(f1), Func(f2)) => {
-            let m1: HashSet<_> = f1.modes.iter().collect();
-            let m2: HashSet<_> = f2.modes.iter().collect();
-            if m1 != m2 {
+            if f1.modes != f2.modes {
                 return Err(Error::msg("Function mode mismatch"));
             }
             let args1 = to_tuple(&f1.args);
@@ -108,6 +107,115 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
         (_, _) => Err(Error::msg(format!("{t1} is not a subtype of {t2}"))),
+    }
+}
+
+/// Check if t1 and t2 are structurally equalivalent, ignoring the variable naming differences.
+/// Note that this is more strict than `t1 <: t2` and `t2 <: t2`, because of the special opt rule.
+pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<()> {
+    use TypeInner::*;
+    if t1 == t2 {
+        return Ok(());
+    }
+    if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
+        if !gamma.insert((t1.clone(), t2.clone())) {
+            return Ok(());
+        }
+        let res = match (t1.as_ref(), t2.as_ref()) {
+            (Var(id), _) => equal(gamma, env, env.rec_find_type(id).unwrap(), t2),
+            (_, Var(id)) => equal(gamma, env, t1, env.rec_find_type(id).unwrap()),
+            (Knot(id), _) => equal(gamma, env, &find_type(id).unwrap(), t2),
+            (_, Knot(id)) => equal(gamma, env, t1, &find_type(id).unwrap()),
+            (_, _) => unreachable!(),
+        };
+        if res.is_err() {
+            gamma.remove(&(t1.clone(), t2.clone()));
+        }
+        return res;
+    }
+    match (t1.as_ref(), t2.as_ref()) {
+        (Opt(ty1), Opt(ty2)) => equal(gamma, env, ty1, ty2),
+        (Vec(ty1), Vec(ty2)) => equal(gamma, env, ty1, ty2),
+        (Record(fs1), Record(fs2)) | (Variant(fs1), Variant(fs2)) => {
+            assert_length(fs1, fs2, |x| x.to_string()).context("Different field length")?;
+            for (f1, f2) in fs1.iter().zip(fs2.iter()) {
+                if f1.id != f2.id {
+                    return Err(Error::msg(format!(
+                        "Field name mismatch: {} and {}",
+                        f1.id, f2.id
+                    )));
+                }
+                equal(gamma, env, &f1.ty, &f2.ty).context(format!(
+                    "Field {} has different types: {} and {}",
+                    f1.id, f1.ty, f2.ty
+                ))?;
+            }
+            Ok(())
+        }
+        (Service(ms1), Service(ms2)) => {
+            assert_length(ms1, ms2, |x| format!("method {} : {}", x.0, x.1))
+                .context("Different method length")?;
+            for (m1, m2) in ms1.iter().zip(ms2.iter()) {
+                if m1.0 != m2.0 {
+                    return Err(Error::msg(format!(
+                        "Method name mismatch: {} and {}",
+                        m1.0, m2.0
+                    )));
+                }
+                equal(gamma, env, &m1.1, &m2.1).context(format!(
+                    "Method {} has different types: {} and {}",
+                    m1.0, m1.1, m2.1
+                ))?;
+            }
+            Ok(())
+        }
+        (Func(f1), Func(f2)) => {
+            if f1.modes != f2.modes {
+                return Err(Error::msg("Function mode mismatch"));
+            }
+            let args1 = to_tuple(&f1.args);
+            let args2 = to_tuple(&f2.args);
+            let rets1 = to_tuple(&f1.rets);
+            let rets2 = to_tuple(&f2.rets);
+            equal(gamma, env, &args1, &args2).context("Mismatch in function input type")?;
+            equal(gamma, env, &rets1, &rets2).context("Mismatch in function return type")?;
+            Ok(())
+        }
+        (Class(init1, ty1), Class(init2, ty2)) => {
+            let init_1 = to_tuple(init1);
+            let init_2 = to_tuple(init2);
+            equal(gamma, env, &init_1, &init_2).context(format!(
+                "Mismatch in init args: {} and {}",
+                pp_args(init1).pretty(80),
+                pp_args(init2).pretty(80)
+            ))?;
+            equal(gamma, env, ty1, ty2)
+        }
+        (Unknown, _) => unreachable!(),
+        (_, Unknown) => unreachable!(),
+        (_, _) => Err(Error::msg(format!("{t1} is not equal to {t2}"))),
+    }
+}
+
+fn assert_length<I, F>(left: &[I], right: &[I], display: F) -> Result<()>
+where
+    F: Fn(&I) -> String,
+{
+    let l = left.len();
+    let r = right.len();
+    if l == r {
+        return Ok(());
+    }
+    if l < r {
+        Err(Error::msg(format!(
+            "Left side is missing {}",
+            display(right.last().unwrap())
+        )))
+    } else {
+        Err(Error::msg(format!(
+            "Right side is missing {}",
+            display(left.last().unwrap())
+        )))
     }
 }
 

@@ -65,6 +65,36 @@ pub fn service_compatible(new: CandidSource, old: CandidSource) -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
+/// Check structural equality of two service types
+pub fn service_equal(left: CandidSource, right: CandidSource) -> Result<()> {
+    let (mut env, t1) = left.load()?;
+    let t1 = t1.ok_or_else(|| Error::msg("left interface has no main service type"))?;
+    let (env2, t2) = right.load()?;
+    let t2 = t2.ok_or_else(|| Error::msg("right interface has no main service type"))?;
+    let mut gamma = std::collections::HashSet::new();
+    let t2 = env.merge_type(env2, t2);
+    crate::types::subtype::equal(&mut gamma, &env, &t1, &t2)?;
+    Ok(())
+}
+
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
+/// Take a did file and outputs the init args and the service type (without init args).
+/// If the original did file contains imports, the output flatens the type definitions.
+/// For now, the comments from the original did file is omitted.
+pub fn instantiate_candid(candid: CandidSource) -> Result<(Vec<Type>, (TypeEnv, Type))> {
+    use crate::types::TypeInner;
+    let (env, serv) = candid.load()?;
+    let serv = serv.ok_or_else(|| Error::msg("the Candid interface has no main service type"))?;
+    Ok(match serv.as_ref() {
+        TypeInner::Class(args, ty) => (args.clone(), (env, ty.clone())),
+        TypeInner::Service(_) => (vec![], (env, serv)),
+        _ => unreachable!(),
+    })
+}
+
 /// Encode sequence of Rust values into Candid message of type `candid::Result<Vec<u8>>`.
 #[macro_export]
 macro_rules! Encode {

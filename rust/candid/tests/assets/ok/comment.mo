@@ -3,5 +3,5 @@
 
 module {
   public type id = Nat8;
-  
+
 }
