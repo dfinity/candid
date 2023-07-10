@@ -36,6 +36,11 @@ macro_rules! define_function {
                 self.0.idl_serialize(serializer)
             }
         }
+        impl From<$crate::types::reference::Func> for $func {
+            fn from(v: $crate::types::reference::Func) -> Self {
+                Self(v)
+            }
+        }
         impl $func {
             pub fn new(principal: $crate::Principal, method: String) -> Self {
                 $func($crate::types::reference::Func { principal, method })
@@ -58,6 +63,11 @@ macro_rules! define_service {
             fn idl_serialize<S: $crate::types::Serializer>(&self, serializer: S) -> Result<(), S::Error>
             {
                 self.0.idl_serialize(serializer)
+            }
+        }
+        impl From<$crate::types::reference::Service> for $serv {
+            fn from(v: $crate::types::reference::Service) -> Self {
+                Self(v)
             }
         }
         impl $serv {

@@ -19,6 +19,9 @@ enum Command {
         input: PathBuf,
         /// Specifies a previous version of did file for subtyping check
         previous: Option<PathBuf>,
+        #[clap(short, long, requires("previous"))]
+        /// Compare with structural equality, instead of subtyping
+        strict: bool,
     },
     /// Generate binding for different languages
     Bind {
@@ -150,7 +153,11 @@ fn parse_types(str: &str) -> Result<IDLTypes, Error> {
 
 fn main() -> Result<()> {
     match Command::parse() {
-        Command::Check { input, previous } => {
+        Command::Check {
+            input,
+            previous,
+            strict,
+        } => {
             let (mut env, opt_t1) = pretty_check_file(&input)?;
             if let Some(previous) = previous {
                 let (env2, opt_t2) = pretty_check_file(&previous)?;
@@ -158,7 +165,11 @@ fn main() -> Result<()> {
                     (Some(t1), Some(t2)) => {
                         let mut gamma = HashSet::new();
                         let t2 = env.merge_type(env2, t2);
-                        candid::types::subtype::subtype(&mut gamma, &env, &t1, &t2)?;
+                        if strict {
+                            candid::types::subtype::equal(&mut gamma, &env, &t1, &t2)?;
+                        } else {
+                            candid::types::subtype::subtype(&mut gamma, &env, &t1, &t2)?;
+                        }
                     }
                     _ => {
                         bail!("did file need to contain the main service type for subtyping check")

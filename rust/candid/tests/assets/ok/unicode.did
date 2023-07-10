@@ -1,9 +1,4 @@
-type A = record {
-  "\u{e000}" : nat;
-  "📦🍦" : nat;
-  "字段名" : nat;
-  "字 段 名2" : nat;
-};
+type A = record { "\u{e000}" : nat; "📦🍦" : nat; "字段名" : nat; "字 段 名2" : nat };
 type B = variant { ""; "空的"; "  空的  "; "1⃣️2⃣️3⃣️" };
 service : {
   "" : (nat) -> (nat);

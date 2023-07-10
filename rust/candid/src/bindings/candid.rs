@@ -132,7 +132,7 @@ pub fn pp_label(id: &SharedLabel) -> RcDoc {
     }
 }
 
-fn pp_field(field: &Field, is_variant: bool) -> RcDoc {
+pub(crate) fn pp_field(field: &Field, is_variant: bool) -> RcDoc {
     let ty_doc = if is_variant && *field.ty == TypeInner::Null {
         RcDoc::nil()
     } else {
@@ -156,7 +156,7 @@ pub fn pp_function(func: &Function) -> RcDoc {
         .nest(INDENT_SPACE)
 }
 
-fn pp_args(args: &[Type]) -> RcDoc {
+pub fn pp_args(args: &[Type]) -> RcDoc {
     let doc = concat(args.iter().map(pp_ty), ",");
     enclose("(", doc, ")")
 }
