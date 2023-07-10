@@ -1,6 +1,8 @@
 use ic_cdk::export::candid::{
-    candid_method, check_prog, export_service, types::subtype, types::Type, CandidType,
-    Deserialize, IDLProg, TypeEnv,
+    candid_method, check_prog, export_service,
+    types::subtype,
+    types::{Type, TypeInner},
+    CandidType, Deserialize, IDLProg, TypeEnv,
 };
 
 #[derive(CandidType, Deserialize)]
@@ -23,7 +25,7 @@ pub struct HttpResponse {
     pub body: Vec<u8>,
 }
 
-#[ic_cdk_macros::query]
+#[ic_cdk::query]
 #[candid_method(query)]
 fn did_to_js(prog: String) -> Option<String> {
     let ast = prog.parse::<IDLProg>().ok()?;
@@ -33,7 +35,7 @@ fn did_to_js(prog: String) -> Option<String> {
     Some(res)
 }
 
-#[ic_cdk_macros::query]
+#[ic_cdk::query]
 #[candid_method(query)]
 fn binding(prog: String, lang: String) -> Option<String> {
     use ic_cdk::export::candid::bindings;
@@ -44,11 +46,13 @@ fn binding(prog: String, lang: String) -> Option<String> {
         "ts" => bindings::typescript::compile(&env, &actor),
         "mo" => bindings::motoko::compile(&env, &actor),
         "installed_did" => {
-            let actor = if let Some(Type::Class(_, ty)) = actor {
-                Some(*ty)
-            } else {
-                actor
-            };
+            let actor = actor.and_then(|t: Type| {
+                if let TypeInner::Class(_, ty) = t.as_ref() {
+                    Some(ty.clone())
+                } else {
+                    Some(t)
+                }
+            });
             bindings::candid::compile(&env, &actor)
         }
         _ => return None,
@@ -56,7 +60,7 @@ fn binding(prog: String, lang: String) -> Option<String> {
     Some(res)
 }
 
-#[ic_cdk_macros::query]
+#[ic_cdk::query]
 #[candid_method(query)]
 fn subtype(new: String, old: String) -> Result<(), String> {
     let new = new.parse::<IDLProg>().unwrap();
@@ -67,8 +71,7 @@ fn subtype(new: String, old: String) -> Result<(), String> {
     let old_actor = check_prog(&mut old_env, &old).unwrap().unwrap();
     let mut gamma = std::collections::HashSet::new();
     let old_actor = new_env.merge_type(old_env, old_actor);
-    subtype::subtype(&mut gamma, &new_env, &new_actor, &old_actor)
-        .or_else(|e| Err(e.to_string()))
+    subtype::subtype(&mut gamma, &new_env, &new_actor, &old_actor).or_else(|e| Err(e.to_string()))
 }
 
 fn retrieve(path: &str) -> Option<&'static [u8]> {
@@ -84,7 +87,7 @@ fn get_path(url: &str) -> Option<&str> {
     url.split('?').next()
 }
 
-#[ic_cdk_macros::query]
+#[ic_cdk::query]
 #[candid_method(query)]
 fn http_request(request: HttpRequest) -> HttpResponse {
     //TODO add /canister_id/ as endpoint when ICQC is available.
@@ -110,7 +113,7 @@ fn http_request(request: HttpRequest) -> HttpResponse {
 
 export_service!();
 
-#[ic_cdk_macros::query(name = "__get_candid_interface_tmp_hack")]
+#[ic_cdk::query(name = "__get_candid_interface_tmp_hack")]
 fn export_candid() -> String {
     __export_service()
 }

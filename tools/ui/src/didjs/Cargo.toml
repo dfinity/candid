@@ -8,8 +8,8 @@ path = "lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-ic-cdk = "0.6"
-ic-cdk-macros = "0.6"
-candid = "0.8"
+ic-cdk = { version = "0.10", git = "https://github.com/dfinity/cdk-rs.git", branch = "beta" }
+candid = { version = "0.9", features = ["parser"] }
 serde = "1.0"
 serde_bytes = "0.11"
+

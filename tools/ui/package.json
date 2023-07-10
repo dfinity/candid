@@ -7,9 +7,9 @@
     "build": "webpack"
   },
   "devDependencies": {
-    "@dfinity/agent": "0.16.0",
-    "@dfinity/candid": "0.16.0",
-    "@dfinity/principal": "0.16.0",
+    "@dfinity/agent": "0.17.0",
+    "@dfinity/candid": "0.17.0",
+    "@dfinity/principal": "0.17.0",
     "buffer": "6.0.3",
     "copy-webpack-plugin": "^9.0.1",
     "css-loader": "^6.8.1",
