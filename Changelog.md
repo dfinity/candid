@@ -1,7 +1,26 @@
 
 # Changelog
 
-## 2022-06-30 (Rust 0.9.0)
+## 2023-07-11
+
+### Rust (0.9.1)
+
+* `utils::service_equal` to check if two service are structurally equal under variable renaming.
+* `utils::instantiate_candid` to generate metadata from did file: separate init args, flatten imports. For now, comments in the original did file is not preserved.
+* `impl From<Func/Service>` trait for `define_function/define_service` macros.
+* Make `bindings::candid::pp_args` a public method.
+* Bump dependencies, notably `pretty`, `logos` and `syn`.
+
+### Candid UI
+
+* Bump agent-js to fix the new response code change
+* Bump candid to 0.9
+
+### didc
+
+* Add a strict mode for `didc check` which checks for structural equality instead of backward compatibility.
+
+## 2023-06-30 (Rust 0.9.0)
 
 ### Breaking changes:
 
