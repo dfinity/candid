@@ -10,6 +10,8 @@ the data they exchange, with type safety and extensibility.
 
 * The [spec](spec/) directory contains Candid specifications, including the [Candid language specification](spec/Candid.md) and a soundness proof.
 * The [official manual](https://internetcomputer.org/docs/current/developer-docs/build/candid/candid-intro/) is hosted by dfinity; see [./docs](docs/) for the source code.
+* Roman Kashitsyn's [Candid for engineers](https://mmapped.blog/posts/20-candid-for-engineers.html) blog post.
+* Joachim Breitner's [Candid explainer](https://www.joachim-breitner.de/blog/782-A_Candid_explainer__The_rough_idea) blog post.
 
 ## Implementations
 
