@@ -17,7 +17,11 @@ pub fn derive_idl_type(input: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn candid_method(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let attrs = parse_macro_input!(attr as syn::AttributeArgs);
+    use syn::{parse::Parser, punctuated::Punctuated, Meta, Token};
+    let attrs = match Punctuated::<Meta, Token![,]>::parse_terminated.parse(attr) {
+        Ok(attrs) => attrs.into_iter().collect(),
+        Err(e) => return e.to_compile_error().into(),
+    };
     let fun = parse_macro_input!(item as syn::ItemFn);
     func::candid_method(attrs, fun).map_or_else(|e| e.to_compile_error().into(), Into::into)
 }
@@ -48,12 +52,20 @@ pub(crate) fn candid_path(
         None => quote::quote! { ::candid },
     }
 }
+pub(crate) fn get_lit_str(expr: &syn::Expr) -> std::result::Result<syn::LitStr, ()> {
+    if let syn::Expr::Lit(expr) = expr {
+        if let syn::Lit::Str(lit) = &expr.lit {
+            return Ok(lit.clone());
+        }
+    }
+    Err(())
+}
 
 fn get_custom_candid_path(input: &syn::DeriveInput) -> Result<Option<proc_macro2::TokenStream>> {
     let candid_path_helper_attribute_option = input
         .attrs
         .iter()
-        .find(|attr| attr.path.is_ident("candid_path"));
+        .find(|attr| attr.path().is_ident("candid_path"));
 
     match candid_path_helper_attribute_option {
         Some(candid_path_helper_attribute) => {

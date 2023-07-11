@@ -294,7 +294,7 @@ dependencies = [
  "lazy_static",
  "proc-macro2 1.0.63",
  "quote 1.0.29",
- "syn 1.0.109",
+ "syn 2.0.22",
 ]
 
 [[package]]

@@ -1,4 +1,4 @@
-use super::{candid_path, idl_hash};
+use super::{candid_path, get_lit_str, idl_hash};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::BTreeSet;
@@ -265,12 +265,13 @@ struct Field {
     with_bytes: bool,
 }
 
-fn get_serde_meta_items(attr: &syn::Attribute) -> Result<Vec<syn::NestedMeta>, ()> {
-    if !attr.path.is_ident("serde") {
+fn get_serde_meta_items(attr: &syn::Attribute) -> Result<Vec<syn::Meta>, ()> {
+    if !attr.path().is_ident("serde") {
         return Ok(Vec::new());
     }
-    match attr.parse_meta() {
-        Ok(syn::Meta::List(meta)) => Ok(meta.nested.into_iter().collect()),
+    let nested = attr.parse_args_with(Punctuated::<syn::Meta, Token![,]>::parse_terminated);
+    match nested {
+        Ok(nested) => Ok(nested.into_iter().collect()),
         _ => Err(()),
     }
 }
@@ -281,8 +282,7 @@ struct Attributes {
 }
 
 fn get_attrs(attrs: &[syn::Attribute]) -> Attributes {
-    use syn::Meta::{List, NameValue};
-    use syn::NestedMeta::Meta;
+    use syn::Meta;
     let mut res = Attributes {
         rename: None,
         with_bytes: false,
@@ -290,27 +290,30 @@ fn get_attrs(attrs: &[syn::Attribute]) -> Attributes {
     for item in attrs.iter().flat_map(get_serde_meta_items).flatten() {
         match &item {
             // #[serde(rename = "foo")]
-            Meta(NameValue(m)) if m.path.is_ident("rename") => {
-                if let syn::Lit::Str(lit) = &m.lit {
+            Meta::NameValue(m) if m.path.is_ident("rename") => {
+                if let Ok(lit) = get_lit_str(&m.value) {
                     res.rename = Some(lit.value());
                 }
             }
             // #[serde(rename(serialize = "foo"))]
-            Meta(List(metas)) if metas.path.is_ident("rename") => {
-                for item in metas.nested.iter() {
-                    match item {
-                        Meta(NameValue(m)) if m.path.is_ident("serialize") => {
-                            if let syn::Lit::Str(lit) = &m.lit {
-                                res.rename = Some(lit.value());
+            Meta::List(metas) if metas.path.is_ident("rename") => {
+                let nested = metas.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated);
+                if let Ok(nested) = nested {
+                    for item in nested {
+                        match item {
+                            Meta::NameValue(m) if m.path.is_ident("serialize") => {
+                                if let Ok(lit) = get_lit_str(&m.value) {
+                                    res.rename = Some(lit.value());
+                                }
                             }
+                            _ => continue,
                         }
-                        _ => continue,
                     }
                 }
             }
             // #[serde(with = "serde_bytes")]
-            Meta(NameValue(m)) if m.path.is_ident("with") => {
-                if let syn::Lit::Str(lit) = &m.lit {
+            Meta::NameValue(m) if m.path.is_ident("with") => {
+                if let Ok(lit) = get_lit_str(&m.value) {
                     if lit.value() == "serde_bytes" {
                         res.with_bytes = true;
                     }

@@ -1,10 +1,10 @@
-use super::candid_path;
+use super::{candid_path, get_lit_str};
 use lazy_static::lazy_static;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
-use syn::{AttributeArgs, Error, ItemFn, Result, ReturnType, Signature, Type};
+use syn::{Error, ItemFn, Meta, Result, ReturnType, Signature, Type};
 
 struct Method {
     args: Vec<String>,
@@ -22,8 +22,8 @@ lazy_static! {
     static ref INIT: Mutex<Option<Option<Vec<String>>>> = Mutex::new(Some(Default::default()));
 }
 
-pub(crate) fn candid_method(attrs: AttributeArgs, fun: ItemFn) -> Result<TokenStream> {
-    let attrs = get_candid_attribute(&attrs)?;
+pub(crate) fn candid_method(attrs: Vec<Meta>, fun: ItemFn) -> Result<TokenStream> {
+    let attrs = get_candid_attribute(attrs)?;
     let sig = &fun.sig;
     if !sig.generics.params.is_empty() {
         return Err(Error::new_spanned(
@@ -193,22 +193,20 @@ struct CandidAttribute {
     is_init: bool,
 }
 
-fn get_candid_attribute(attrs: &[syn::NestedMeta]) -> Result<CandidAttribute> {
-    use syn::Meta::{NameValue, Path};
-    use syn::NestedMeta::Meta;
+fn get_candid_attribute(attrs: Vec<Meta>) -> Result<CandidAttribute> {
     let mut res = CandidAttribute {
         rename: None,
         method_type: None,
         is_init: false,
     };
-    for attr in attrs.iter() {
+    for attr in attrs {
         match &attr {
-            Meta(NameValue(m)) if m.path.is_ident("rename") && res.rename.is_none() => {
-                if let syn::Lit::Str(lit) = &m.lit {
+            Meta::NameValue(m) if m.path.is_ident("rename") && res.rename.is_none() => {
+                if let Ok(lit) = get_lit_str(&m.value) {
                     res.rename = Some(lit.value());
                 }
             }
-            Meta(Path(p)) if res.method_type.is_none() => {
+            Meta::Path(p) if res.method_type.is_none() => {
                 let mode = p.get_ident().unwrap().to_string();
                 match mode.as_ref() {
                     "query" | "composite_query" | "update" | "oneway" => {
