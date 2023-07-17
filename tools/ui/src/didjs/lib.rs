@@ -1,5 +1,5 @@
-use ic_cdk::export::candid::{
-    candid_method, check_prog, export_service,
+use candid::{
+    check_prog,
     types::subtype,
     types::{Type, TypeInner},
     CandidType, Deserialize, IDLProg, TypeEnv,
@@ -26,19 +26,17 @@ pub struct HttpResponse {
 }
 
 #[ic_cdk::query]
-#[candid_method(query)]
 fn did_to_js(prog: String) -> Option<String> {
     let ast = prog.parse::<IDLProg>().ok()?;
     let mut env = TypeEnv::new();
     let actor = check_prog(&mut env, &ast).ok()?;
-    let res = ic_cdk::export::candid::bindings::javascript::compile(&env, &actor);
+    let res = candid::bindings::javascript::compile(&env, &actor);
     Some(res)
 }
 
 #[ic_cdk::query]
-#[candid_method(query)]
 fn binding(prog: String, lang: String) -> Option<String> {
-    use ic_cdk::export::candid::bindings;
+    use candid::bindings;
     let ast = prog.parse::<IDLProg>().ok()?;
     let mut env = TypeEnv::new();
     let actor = check_prog(&mut env, &ast).ok()?;
@@ -61,7 +59,6 @@ fn binding(prog: String, lang: String) -> Option<String> {
 }
 
 #[ic_cdk::query]
-#[candid_method(query)]
 fn subtype(new: String, old: String) -> Result<(), String> {
     let new = new.parse::<IDLProg>().unwrap();
     let old = old.parse::<IDLProg>().unwrap();
@@ -88,7 +85,6 @@ fn get_path(url: &str) -> Option<&str> {
 }
 
 #[ic_cdk::query]
-#[candid_method(query)]
 fn http_request(request: HttpRequest) -> HttpResponse {
     //TODO add /canister_id/ as endpoint when ICQC is available.
     let path = get_path(request.url.as_str()).unwrap_or("/");
@@ -111,9 +107,4 @@ fn http_request(request: HttpRequest) -> HttpResponse {
     }
 }
 
-export_service!();
-
-#[ic_cdk::query(name = "__get_candid_interface_tmp_hack")]
-fn export_candid() -> String {
-    __export_service()
-}
+ic_cdk::export_candid!();

@@ -229,6 +229,10 @@ async function didToJs(candid_source: string): Promise<undefined | string> {
   return js[0];
 }
 
+function is_query(func: IDL.FuncClass): boolean {
+  return func.annotations.includes('query') || func.annotations.includes('composite_query');
+}
+
 export function render(id: Principal, canister: ActorSubclass, profiling: bigint|undefined) {
   document.getElementById('canisterId')!.innerText = `${id}`;
   let profiler;
@@ -274,7 +278,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
 
   const buttonQuery = document.createElement('button');
   buttonQuery.className = 'btn';
-  if (idlFunc.annotations.includes('query')) {
+  if (is_query(idlFunc)) {
     buttonQuery.innerText = 'Query';
   } else {
     buttonQuery.innerText = 'Call';
@@ -368,10 +372,10 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       textContainer.innerHTML = decodeSpace(text);
       const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
       log(decodeSpace(`› ${name}${showArgs}`));
-      if (profiler && !idlFunc.annotations.includes('query')) {
+      if (profiler && !is_query(idlFunc)) {
         await renderFlameGraph(profiler);
       }
-      if (!idlFunc.annotations.includes('query')) {
+      if (!is_query(idlFunc)) {
         postToPlayground(Actor.canisterIdOf(canister));
       }
       log(decodeSpace(text));
@@ -396,12 +400,12 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
     })().catch(err => {
       resultDiv.classList.add('error');
       left.innerText = err.message;
-      if (profiler && !idlFunc.annotations.includes('query')) {
+      if (profiler && !is_query(idlFunc)) {
         const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
         log(`[Error] ${name}${showArgs}`);
         renderFlameGraph(profiler);
       }
-      if (!idlFunc.annotations.includes('query')) {
+      if (!is_query(idlFunc)) {
         postToPlayground(Actor.canisterIdOf(canister));
       }
       throw err;

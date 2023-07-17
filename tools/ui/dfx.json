@@ -8,6 +8,11 @@
         "npm run build",
         "cargo build --target wasm32-unknown-unknown --release --package didjs",
         "wasm-opt --strip-debug -Oz target/wasm32-unknown-unknown/release/didjs.wasm -o target/wasm32-unknown-unknown/release/didjs_opt.wasm"
+      ],
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
       ]
     }
   },
