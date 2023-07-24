@@ -110,8 +110,8 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
     }
 }
 
-/// Check if t1 and t2 are structurally equalivalent, ignoring the variable naming differences.
-/// Note that this is more strict than `t1 <: t2` and `t2 <: t2`, because of the special opt rule.
+/// Check if t1 and t2 are structurally equivalent, ignoring the variable naming differences.
+/// Note that this is more strict than `t1 <: t2` and `t2 <: t1`, because of the special opt rule.
 pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<()> {
     use TypeInner::*;
     if t1 == t2 {
@@ -200,21 +200,26 @@ pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<(
 fn assert_length<I, F>(left: &[I], right: &[I], display: F) -> Result<()>
 where
     F: Fn(&I) -> String,
+    I: Clone + std::hash::Hash + std::cmp::Eq,
 {
     let l = left.len();
     let r = right.len();
     if l == r {
         return Ok(());
     }
+    let left: HashSet<_> = left.iter().cloned().collect();
+    let right: HashSet<_> = right.iter().cloned().collect();
     if l < r {
+        let mut diff = right.difference(&left);
         Err(Error::msg(format!(
             "Left side is missing {}",
-            display(right.last().unwrap())
+            display(diff.next().unwrap())
         )))
     } else {
+        let mut diff = left.difference(&right);
         Err(Error::msg(format!(
             "Right side is missing {}",
-            display(left.last().unwrap())
+            display(diff.next().unwrap())
         )))
     }
 }
