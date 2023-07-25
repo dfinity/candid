@@ -1,6 +1,12 @@
 
 # Changelog
 
+## 2023-07-25 (Rust 0.9.2)
+
+* Fix error message for `subtype::equal` to report the correct missing label.
+* Recover subtype error from custom deserializer. This fixes some custom types for not applying special opt rule.
+* Fix Candid UI to support composite query.
+
 ## 2023-07-11
 
 ### Rust (0.9.1)
