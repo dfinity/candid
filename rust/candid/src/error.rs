@@ -151,7 +151,12 @@ impl ser::Error for Error {
 
 impl de::Error for Error {
     fn custom<T: std::fmt::Display>(msg: T) -> Self {
-        Error::msg(format!("Deserialize error: {msg}"))
+        let msg = msg.to_string();
+        if let Some(msg) = msg.strip_prefix("Subtyping error: ") {
+            Error::Subtype(msg.to_string())
+        } else {
+            Error::msg(format!("Deserialize error: {msg}"))
+        }
     }
     fn invalid_type(_: de::Unexpected<'_>, exp: &dyn de::Expected) -> Self {
         Error::Subtype(format!("{exp}"))
