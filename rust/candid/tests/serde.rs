@@ -173,6 +173,20 @@ fn test_option() {
     // Deserialize \mu T.Option<T> to a non-recursive type
     let v: Option<Option<Option<i32>>> = Some(Some(None));
     test_decode(b"DIDL\x01\x6e\0\x01\0\x01\x01\0", &v);
+    // special opt rule
+    #[derive(CandidType, Deserialize, PartialEq, Debug)]
+    struct A {
+        canister_id: Option<candid::Principal>,
+    }
+    #[derive(CandidType, Deserialize, PartialEq, Debug)]
+    struct B {
+        canister_id: Option<i32>,
+    }
+    let bytes = encode(&B {
+        canister_id: Some(42),
+    });
+    let expected = A { canister_id: None };
+    test_decode(&bytes, &expected);
 }
 
 #[test]
