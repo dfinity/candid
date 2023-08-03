@@ -505,16 +505,21 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        use num_traits::ToPrimitive;
         self.unroll_type()?;
         assert!(*self.expect_type == TypeInner::Int);
         let value: i128 = match self.wire_type.as_ref() {
             TypeInner::Int => {
                 let int = Int::decode(&mut self.input).map_err(Error::msg)?;
-                int.0.try_into().map_err(Error::msg)?
+                int.0
+                    .to_i128()
+                    .ok_or_else(|| Error::msg("Cannot convert int to i128"))?
             }
             TypeInner::Nat => {
                 let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
-                nat.0.try_into().map_err(Error::msg)?
+                nat.0
+                    .to_i128()
+                    .ok_or_else(|| Error::msg("Cannot convert nat to i128"))?
             }
             t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
         };
@@ -524,13 +529,17 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        use num_traits::ToPrimitive;
         self.unroll_type()?;
         check!(
             *self.expect_type == TypeInner::Nat && *self.wire_type == TypeInner::Nat,
             "nat"
         );
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
-        let value: u128 = nat.0.try_into().map_err(Error::msg)?;
+        let value = nat
+            .0
+            .to_u128()
+            .ok_or_else(|| Error::msg("Cannot convert nat to u128"))?;
         visitor.visit_u128(value)
     }
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
