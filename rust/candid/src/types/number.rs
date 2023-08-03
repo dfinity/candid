@@ -188,9 +188,10 @@ impl<'de> Deserialize<'de> for Nat {
                 formatter.write_str("Nat value")
             }
             fn visit_i64<E: de::Error>(self, v: i64) -> Result<Nat, E> {
-                Ok(Nat(BigUint::try_from(v).map_err(|_| {
-                    de::Error::custom("int cannot be converted to nat")
-                })?))
+                use num_bigint::ToBigUint;
+                v.to_biguint()
+                    .ok_or_else(|| de::Error::custom("i64 cannot be converted to nat"))
+                    .map(Nat)
             }
             fn visit_u64<E>(self, v: u64) -> Result<Nat, E> {
                 Ok(Nat::from(v))
