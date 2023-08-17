@@ -651,9 +651,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
                 let expect = e.clone();
-                let wire = w.clone();
+                let wire = self.table.trace_type(w)?;
                 let len = Len::read(&mut self.input)?.0;
-                if self.is_zero_sized_type(w) {
+                if self.is_zero_sized_type(&wire) {
                     if self.zero_sized_values < len {
                         return Err(Error::msg("vec length of zero sized values too large"));
                     }

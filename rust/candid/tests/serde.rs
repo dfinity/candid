@@ -526,6 +526,11 @@ fn test_vector() {
     all_check([[[[()]]]], "4449444c046d016d026d036d7f010001010101");
     // Space bomb!
     all_check(vec![(); 1000], "4449444c016d7f0100e807");
+    let bytes = hex("4449444c036c01d6fca702016d026c00010080ade204");
+    check_error(
+        || test_decode(&bytes, &candid::Reserved),
+        "zero sized values too large",
+    );
 }
 
 #[test]
