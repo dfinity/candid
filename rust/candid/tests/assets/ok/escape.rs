@@ -4,7 +4,7 @@ use candid::{self, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult as Result;
 
 #[derive(CandidType, Deserialize)]
-pub struct t {
+pub struct T {
   #[serde(rename="\"")]
   _34_: candid::Nat,
   #[serde(rename="\'")]
@@ -17,7 +17,7 @@ pub struct t {
 
 pub struct SERVICE(pub Principal);
 impl SERVICE {
-  pub async fn _2635468193_(&self, arg0: t) -> Result<()> {
+  pub async fn _2635468193_(&self, arg0: T) -> Result<()> {
     ic_cdk::call(self.0, "\n\'\"\'\'\"\"\r\t", (arg0,)).await
   }
 }

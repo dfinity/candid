@@ -3,5 +3,5 @@
 use candid::{self, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult as Result;
 
-pub type id = u8;
+pub type Id = u8;
 

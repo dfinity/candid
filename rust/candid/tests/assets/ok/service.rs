@@ -7,7 +7,12 @@ candid::define_function!(pub Func : () -> (Service));
 candid::define_service!(pub Service : { "f" : Func::ty() });
 pub type Service2 = Box<Service>;
 #[derive(CandidType, Deserialize)]
-pub enum asVariant_ret0 { a(Service2), b{ f: Option<Func> } }
+pub enum AsVariantRet {
+  #[serde(rename="a")]
+  A(Service2),
+  #[serde(rename="b")]
+  B{ f: Option<Func> },
+}
 
 pub struct SERVICE(pub Principal);
 impl SERVICE {
@@ -20,7 +25,7 @@ impl SERVICE {
   pub async fn asRecord(&self) -> Result<((Service2,Option<Service>,Func,),)> {
     ic_cdk::call(self.0, "asRecord", ()).await
   }
-  pub async fn asVariant(&self) -> Result<(asVariant_ret0,)> {
+  pub async fn asVariant(&self) -> Result<(AsVariantRet,)> {
     ic_cdk::call(self.0, "asVariant", ()).await
   }
 }

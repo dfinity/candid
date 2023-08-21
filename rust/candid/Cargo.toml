@@ -40,6 +40,7 @@ binread = { version = "2.1", features = ["debug_template"] }
 
 lalrpop-util = { version = "0.20.0", optional = true }
 logos = { version = "0.13", optional = true }
+convert_case = { version = "0.6", optional = true }
 
 arbitrary = { version = "1.0", optional = true }
 # Don't upgrade serde_dhall. It will introduce dependency with invalid license.
@@ -86,7 +87,7 @@ required-features = ["parser"]
 [features]
 configs = ["serde_dhall"]
 random = ["parser", "configs", "arbitrary", "fake", "rand"]
-parser = ["lalrpop", "lalrpop-util", "logos"]
+parser = ["lalrpop", "lalrpop-util", "logos", "convert_case"]
 all = ["random"]
 mute_warnings = []
 arc_type = []

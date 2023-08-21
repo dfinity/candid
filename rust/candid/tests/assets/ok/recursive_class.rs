@@ -3,10 +3,10 @@
 use candid::{self, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult as Result;
 
-candid::define_service!(pub s : { "next" : candid::func!(() -> (s)) });
+candid::define_service!(pub S : { "next" : candid::func!(() -> (S)) });
 pub struct SERVICE(pub Principal);
 impl SERVICE {
-  pub async fn next(&self) -> Result<(s,)> {
+  pub async fn next(&self) -> Result<(S,)> {
     ic_cdk::call(self.0, "next", ()).await
   }
 }

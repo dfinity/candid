@@ -1,6 +1,7 @@
 use super::analysis::{chase_actor, infer_rec};
 use crate::pretty::*;
 use crate::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use convert_case::{Case, Casing};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
 
@@ -56,25 +57,32 @@ static KEYWORDS: [&str; 51] = [
     "while", "async", "await", "dyn", "abstract", "become", "box", "do", "final", "macro",
     "override", "priv", "typeof", "unsized", "virtual", "yield", "try",
 ];
-fn ident_(id: &str) -> (RcDoc, bool) {
+fn ident_(id: &str, case: Option<Case>) -> (RcDoc, bool) {
     if id.is_empty()
         || id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
         || id.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
     {
-        (RcDoc::as_string(format!("_{}_", crate::idl_hash(id))), true)
-    } else if ["crate", "self", "super", "Self"].contains(&id) {
-        (str(id).append("_"), true)
-    } else if KEYWORDS.contains(&id) {
-        (str("r#").append(id), false)
+        return (RcDoc::text(format!("_{}_", crate::idl_hash(&id))), true);
+    }
+    let (is_rename, id) = if let Some(case) = case {
+        let new_id = id.to_case(case);
+        (new_id != id, new_id)
     } else {
-        (str(id), false)
+        (false, id.to_owned())
+    };
+    if ["crate", "self", "super", "Self", "Result"].contains(&id.as_str()) {
+        (RcDoc::text(format!("{id}_")), true)
+    } else if KEYWORDS.contains(&id.as_str()) {
+        (RcDoc::text(format!("r#{id}")), is_rename)
+    } else {
+        (RcDoc::text(id), is_rename)
     }
 }
-fn ident(id: &str) -> RcDoc {
-    ident_(id).0
+fn ident(id: &str, case: Option<Case>) -> RcDoc {
+    ident_(id, case).0
 }
-fn field_name(id: &str) -> RcDoc {
-    let (doc, is_rename) = ident_(id);
+fn field_name(id: &str, case: Option<Case>) -> RcDoc {
+    let (doc, is_rename) = ident_(id, case);
     if is_rename {
         str("#[serde(rename=\"")
             .append(id.escape_debug().to_string())
@@ -107,7 +115,7 @@ fn pp_ty<'a>(ty: &'a Type, recs: &RecPoints) -> RcDoc<'a> {
         Reserved => str("candid::Reserved"),
         Empty => str("candid::Empty"),
         Var(ref id) => {
-            let name = ident(id);
+            let name = ident(id, Some(Case::Pascal));
             if recs.contains(id.as_str()) {
                 str("Box<").append(name).append(">")
             } else {
@@ -128,15 +136,15 @@ fn pp_ty<'a>(ty: &'a Type, recs: &RecPoints) -> RcDoc<'a> {
     }
 }
 
-fn pp_label(id: &SharedLabel) -> RcDoc {
+fn pp_label(id: &SharedLabel, is_variant: bool) -> RcDoc {
     match &**id {
-        Label::Named(str) => field_name(str),
+        Label::Named(str) => field_name(str, if is_variant { Some(Case::Pascal) } else { None }),
         Label::Id(n) | Label::Unnamed(n) => str("_").append(RcDoc::as_string(n)).append("_"),
     }
 }
 
 fn pp_record_field<'a>(field: &'a Field, recs: &RecPoints) -> RcDoc<'a> {
-    pp_label(&field.id)
+    pp_label(&field.id, false)
         .append(kwd(":"))
         .append(pp_ty(&field.ty, recs))
 }
@@ -153,9 +161,9 @@ fn pp_record_fields<'a>(fs: &'a [Field], recs: &RecPoints) -> RcDoc<'a> {
 
 fn pp_variant_field<'a>(field: &'a Field, recs: &RecPoints) -> RcDoc<'a> {
     match field.ty.as_ref() {
-        TypeInner::Null => pp_label(&field.id),
-        TypeInner::Record(fs) => pp_label(&field.id).append(pp_record_fields(fs, recs)),
-        _ => pp_label(&field.id).append(enclose("(", pp_ty(&field.ty, recs), ")")),
+        TypeInner::Null => pp_label(&field.id, true),
+        TypeInner::Record(fs) => pp_label(&field.id, true).append(pp_record_fields(fs, recs)),
+        _ => pp_label(&field.id, true).append(enclose("(", pp_ty(&field.ty, recs), ")")),
     }
 }
 
@@ -177,7 +185,7 @@ fn pp_defs<'a>(
     };
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
-        let name = ident(id).append(" ");
+        let name = ident(id, Some(Case::Pascal)).append(" ");
         let vis = "pub ";
         match ty.as_ref() {
             TypeInner::Record(fs) => {
@@ -220,7 +228,7 @@ fn pp_defs<'a>(
                         .append(RcDoc::line())
                         .append(vis)
                         .append("struct ")
-                        .append(ident(id))
+                        .append(ident(id, Some(Case::Pascal)))
                         .append(enclose("(", pp_ty(ty, recs), ")"))
                         .append(";")
                         .append(RcDoc::hardline())
@@ -270,7 +278,7 @@ fn pp_ty_service(serv: &[(String, Type)]) -> RcDoc {
 }
 
 fn pp_function<'a>(config: &Config, id: &'a str, func: &'a Function) -> RcDoc<'a> {
-    let name = ident(id);
+    let name = ident(id, None);
     let empty = BTreeSet::new();
     let arg_prefix = str(match config.target {
         Target::CanisterCall => "&self",
@@ -430,7 +438,7 @@ fn path_to_var(path: &[TypePath]) -> String {
             TypePath::Init => "init",
         })
         .collect();
-    name.join("_")
+    name.join("_").to_case(Case::Pascal)
 }
 // Convert structural typing to nominal typing to fit Rust's type system
 fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
@@ -508,6 +516,11 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
                         .into_iter()
                         .enumerate()
                         .map(|(i, ty)| {
+                            let i = if i == 0 {
+                                "".to_string()
+                            } else {
+                                i.to_string()
+                            };
                             path.push(TypePath::Func(format!("arg{i}")));
                             let ty = nominalize(env, path, &ty);
                             path.pop();
@@ -519,6 +532,11 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
                         .into_iter()
                         .enumerate()
                         .map(|(i, ty)| {
+                            let i = if i == 0 {
+                                "".to_string()
+                            } else {
+                                i.to_string()
+                            };
                             path.push(TypePath::Func(format!("ret{i}")));
                             let ty = nominalize(env, path, &ty);
                             path.pop();
