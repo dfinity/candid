@@ -70,7 +70,7 @@ fn ident_(id: &str, case: Option<Case>) -> (RcDoc, bool) {
     } else {
         (false, id.to_owned())
     };
-    if ["crate", "self", "super", "Self", "Result"].contains(&id.as_str()) {
+    if ["crate", "self", "super", "Self", "Result", "Principal"].contains(&id.as_str()) {
         (RcDoc::text(format!("{id}_")), true)
     } else if KEYWORDS.contains(&id.as_str()) {
         (RcDoc::text(format!("r#{id}")), is_rename)
@@ -278,7 +278,7 @@ fn pp_ty_service(serv: &[(String, Type)]) -> RcDoc {
 }
 
 fn pp_function<'a>(config: &Config, id: &'a str, func: &'a Function) -> RcDoc<'a> {
-    let name = ident(id, None);
+    let name = ident(id, Some(Case::Snake));
     let empty = BTreeSet::new();
     let arg_prefix = str(match config.target {
         Target::CanisterCall => "&self",
@@ -334,19 +334,23 @@ fn pp_function<'a>(config: &Config, id: &'a str, func: &'a Function) -> RcDoc<'a
             let builder_method = if is_query { "query" } else { "update" };
             let call = if is_query { "call" } else { "call_and_wait" };
             let args = RcDoc::intersperse(
-                (0..func.args.len()).map(|i| RcDoc::text(format!("arg{i}"))),
+                (0..func.args.len()).map(|i| RcDoc::text(format!("&arg{i}"))),
                 RcDoc::text(", "),
             );
-            let blob = str("candid::Encode!").append(enclose("(", args, ")?;"));
+            let blob = str("Encode!").append(enclose(
+                "(",
+                args,
+                ").map_err(|e| ic_agent::AgentError::CandidError(e.into()))?;",
+            ));
             let rets = RcDoc::concat(
                 func.rets
                     .iter()
                     .map(|ty| str(", ").append(pp_ty(ty, &empty))),
             );
             str("let args = ").append(blob).append(RcDoc::hardline())
-                .append(format!("let bytes = agent.{builder_method}(self.0, \"{method}\").with_arg(args).{call}().await?;"))
+                .append(format!("let bytes = agent.{builder_method}(&self.0, \"{method}\").with_arg(args).{call}().await?;"))
                 .append(RcDoc::hardline())
-                .append("Ok(candid::Decode!(&bytes").append(rets).append(")?)")
+                .append("Decode!(&bytes").append(rets).append(").map_err(|e| ic_agent::AgentError::CandidError(e.into()))")
         }
         Target::CanisterStub => unimplemented!(),
     };
@@ -388,7 +392,8 @@ pub fn compile(config: &Config, env: &TypeEnv, actor: &Option<Type>) -> String {
     let header = format!(
         r#"// This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use {}::{{self, CandidType, Deserialize, Principal}};
+#![allow(dead_code)]
+use {}::{{self, CandidType, Deserialize, Principal, Encode, Decode}};
 "#,
         config.candid_crate
     );

@@ -60,7 +60,7 @@ macro_rules! define_service {
             fn _ty() -> $crate::types::Type {
                 $crate::service!{$($ty)*}
             }
-            fn idl_serialize<S: $crate::types::Serializer>(&self, serializer: S) -> Result<(), S::Error>
+            fn idl_serialize<S: $crate::types::Serializer>(&self, serializer: S) -> std::result::Result<(), S::Error>
             {
                 self.0.idl_serialize(serializer)
             }
