@@ -28,6 +28,13 @@ impl<'de> IDLDeserialize<'de> {
             .with_context(|| format!("Cannot parse header {}", &hex::encode(bytes)))?;
         Ok(IDLDeserialize { de })
     }
+    /// Create a new deserializer with IDL binary message. The config is used to adjust some parameters in the deserializer.
+    pub fn new_with_config(bytes: &'de [u8], config: Config) -> Result<Self> {
+        let mut de = Deserializer::from_bytes(bytes)
+            .with_context(|| format!("Cannot parse header {}", &hex::encode(bytes)))?;
+        de.zero_sized_values = config.zero_sized_values;
+        Ok(IDLDeserialize { de })
+    }
     /// Deserialize one value from deserializer.
     pub fn get_value<T>(&mut self) -> Result<T>
     where
@@ -98,6 +105,10 @@ impl<'de> IDLDeserialize<'de> {
         }
         Ok(())
     }
+}
+
+pub struct Config {
+    zero_sized_values: usize,
 }
 
 macro_rules! assert {
