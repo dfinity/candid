@@ -60,7 +60,7 @@ impl<'de> IDLDeserialize<'de> {
         if self.de.types.is_empty() {
             if matches!(
                 expected_type.as_ref(),
-                TypeInner::Opt(_) | TypeInner::Reserved
+                TypeInner::Opt(_) | TypeInner::Reserved | TypeInner::Null
             ) {
                 self.de.expect_type = expected_type;
                 self.de.wire_type = TypeInner::Reserved.into();
