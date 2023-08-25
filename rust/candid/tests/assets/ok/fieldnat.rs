@@ -1,6 +1,7 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use candid::{self, CandidType, Deserialize, Principal};
+#![allow(dead_code, unused_imports)]
+use candid::{self, CandidType, Deserialize, Principal, Encode, Decode};
 use ic_cdk::api::call::CallResult as Result;
 
 #[derive(CandidType, Deserialize)]
@@ -30,8 +31,8 @@ pub struct FooArg { _2_: candid::Int }
 #[derive(CandidType, Deserialize)]
 pub struct FooRet { _2_: candid::Int, _2: candid::Int }
 
-pub struct SERVICE(pub Principal);
-impl SERVICE {
+pub struct Service(pub Principal);
+impl Service {
   pub async fn bab(&self, arg0: candid::Int, arg1: candid::Nat) -> Result<()> {
     ic_cdk::call(self.0, "bab", (arg0,arg1,)).await
   }
@@ -54,4 +55,5 @@ impl SERVICE {
     ic_cdk::call(self.0, "foo", (arg0,)).await
   }
 }
-pub const service: SERVICE = SERVICE(Principal::from_slice(&[])); // aaaaa-aa
+pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
+pub const service : Service = Service(CANISTER_ID);

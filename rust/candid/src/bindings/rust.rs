@@ -282,7 +282,7 @@ fn pp_function<'a>(config: &Config, id: &'a str, func: &'a Function) -> RcDoc<'a
     let empty = BTreeSet::new();
     let arg_prefix = str(match config.target {
         Target::CanisterCall => "&self",
-        Target::Agent => "&self, agent: &ic_agent::Agent",
+        Target::Agent => "&self",
         Target::CanisterStub => unimplemented!(),
     });
     let args = concat(
@@ -337,20 +337,16 @@ fn pp_function<'a>(config: &Config, id: &'a str, func: &'a Function) -> RcDoc<'a
                 (0..func.args.len()).map(|i| RcDoc::text(format!("&arg{i}"))),
                 RcDoc::text(", "),
             );
-            let blob = str("Encode!").append(enclose(
-                "(",
-                args,
-                ").map_err(|e| ic_agent::AgentError::CandidError(e.into()))?;",
-            ));
+            let blob = str("Encode!").append(enclose("(", args, ")?;"));
             let rets = RcDoc::concat(
                 func.rets
                     .iter()
                     .map(|ty| str(", ").append(pp_ty(ty, &empty))),
             );
             str("let args = ").append(blob).append(RcDoc::hardline())
-                .append(format!("let bytes = agent.{builder_method}(&self.0, \"{method}\").with_arg(args).{call}().await?;"))
+                .append(format!("let bytes = self.1.{builder_method}(&self.0, \"{method}\").with_arg(args).{call}().await?;"))
                 .append(RcDoc::hardline())
-                .append("Decode!(&bytes").append(rets).append(").map_err(|e| ic_agent::AgentError::CandidError(e.into()))")
+                .append("Ok(Decode!(&bytes").append(rets).append(")?)")
         }
         Target::CanisterStub => unimplemented!(),
     };
@@ -367,9 +363,23 @@ fn pp_actor<'a>(config: &'a Config, env: &'a TypeEnv, actor: &'a Type) -> RcDoc<
         }),
         RcDoc::hardline(),
     );
-    let res = RcDoc::text("pub struct SERVICE(pub Principal);")
+    let struct_name = config.service_name.to_case(Case::Pascal);
+    let service_def = match config.target {
+        Target::CanisterCall => format!("pub struct {}(pub Principal);", struct_name),
+        Target::Agent => format!(
+            "pub struct {}<'a>(pub Principal, pub &'a ic_agent::Agent);",
+            struct_name
+        ),
+        Target::CanisterStub => unimplemented!(),
+    };
+    let service_impl = match config.target {
+        Target::CanisterCall => format!("impl {} ", struct_name),
+        Target::Agent => format!("impl<'a> {}<'a> ", struct_name),
+        Target::CanisterStub => unimplemented!(),
+    };
+    let res = RcDoc::text(service_def)
         .append(RcDoc::hardline())
-        .append("impl SERVICE ")
+        .append(service_impl)
         .append(enclose_space("{", body, "}"))
         .append(RcDoc::hardline());
     if let Some(cid) = config.canister_id {
@@ -379,10 +389,19 @@ fn pp_actor<'a>(config: &'a Config, env: &'a TypeEnv, actor: &'a Type) -> RcDoc<
             .map(|b| b.to_string())
             .collect::<Vec<_>>()
             .join(", ");
-        res.append(format!(
-            r#"pub const {}: SERVICE = SERVICE(Principal::from_slice(&[{}])); // {}"#,
-            config.service_name, slice, cid
-        ))
+        let id = RcDoc::text(format!(
+            "pub const CANISTER_ID : Principal = Principal::from_slice(&[{}]); // {}",
+            slice, cid
+        ));
+        let instance = match config.target {
+            Target::CanisterCall => format!(
+                "pub const {} : {} = {}(CANISTER_ID);",
+                config.service_name, struct_name, struct_name
+            ),
+            Target::Agent => "".to_string(),
+            Target::CanisterStub => unimplemented!(),
+        };
+        res.append(id).append(RcDoc::hardline()).append(instance)
     } else {
         res
     }
@@ -392,7 +411,7 @@ pub fn compile(config: &Config, env: &TypeEnv, actor: &Option<Type>) -> String {
     let header = format!(
         r#"// This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-#![allow(dead_code)]
+#![allow(dead_code, unused_imports)]
 use {}::{{self, CandidType, Deserialize, Principal, Encode, Decode}};
 "#,
         config.candid_crate
@@ -400,7 +419,7 @@ use {}::{{self, CandidType, Deserialize, Principal, Encode, Decode}};
     let header = header
         + match &config.target {
             Target::CanisterCall => "use ic_cdk::api::call::CallResult as Result;\n",
-            Target::Agent => "type Result<T> = std::result::Result<T, ic_agent::AgentError>;",
+            Target::Agent => "type Result<T> = std::result::Result<T, ic_agent::AgentError>;\n",
             Target::CanisterStub => "",
         };
     let (env, actor) = nominalize_all(env, actor);

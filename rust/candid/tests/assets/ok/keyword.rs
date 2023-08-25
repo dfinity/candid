@@ -1,6 +1,7 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use candid::{self, CandidType, Deserialize, Principal};
+#![allow(dead_code, unused_imports)]
+use candid::{self, CandidType, Deserialize, Principal, Encode, Decode};
 use ic_cdk::api::call::CallResult as Result;
 
 #[derive(CandidType, Deserialize)]
@@ -48,12 +49,12 @@ candid::define_function!(pub T : (Return) -> ());
 #[derive(CandidType, Deserialize)]
 pub enum VariantArg { A, B, C, D(f64) }
 
-pub struct SERVICE(pub Principal);
-impl SERVICE {
-  pub async fn Oneway(&self) -> Result<()> {
+pub struct Service(pub Principal);
+impl Service {
+  pub async fn oneway(&self) -> Result<()> {
     ic_cdk::call(self.0, "Oneway", ()).await
   }
-  pub async fn f_(&self, arg0: O) -> Result<(O,)> {
+  pub async fn f(&self, arg0: O) -> Result<(O,)> {
     ic_cdk::call(self.0, "f_", (arg0,)).await
   }
   pub async fn field(&self, arg0: FieldArg) -> Result<(FieldRet,)> {
@@ -65,7 +66,7 @@ impl SERVICE {
   pub async fn oneway(&self, arg0: u8) -> Result<()> {
     ic_cdk::call(self.0, "oneway", (arg0,)).await
   }
-  pub async fn oneway_(&self, arg0: u8) -> Result<()> {
+  pub async fn oneway(&self, arg0: u8) -> Result<()> {
     ic_cdk::call(self.0, "oneway_", (arg0,)).await
   }
   pub async fn query(&self, arg0: serde_bytes::ByteBuf) -> Result<
@@ -87,4 +88,5 @@ impl SERVICE {
     ic_cdk::call(self.0, "variant", (arg0,)).await
   }
 }
-pub const service: SERVICE = SERVICE(Principal::from_slice(&[])); // aaaaa-aa
+pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
+pub const service : Service = Service(CANISTER_ID);

@@ -1,7 +1,9 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use candid::{self, CandidType, Deserialize, Principal};
+#![allow(dead_code, unused_imports)]
+use candid::{self, CandidType, Deserialize, Principal, Encode, Decode};
 type Result<T> = std::result::Result<T, ic_agent::AgentError>;
+
 #[derive(CandidType, Deserialize)]
 pub enum BitcoinNetwork {
   #[serde(rename="mainnet")]
@@ -238,158 +240,129 @@ pub struct UpdateSettingsArg {
   settings: CanisterSettings,
 }
 
-pub struct SERVICE(pub Principal);
-impl SERVICE {
-  pub async fn bitcoin_get_balance(
-    &self, agent: &ic_agent::Agent,
-    arg0: GetBalanceRequest,
-  ) -> Result<Satoshi> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "bitcoin_get_balance").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes, Satoshi)?)
+pub struct Service<'a>(pub Principal, pub &'a ic_agent::Agent);
+impl<'a> Service<'a> {
+  pub async fn bitcoin_get_balance(&self, arg0: GetBalanceRequest) -> Result<
+    Satoshi
+  > {
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "bitcoin_get_balance").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes, Satoshi)?)
   }
   pub async fn bitcoin_get_current_fee_percentiles(
-    &self, agent: &ic_agent::Agent,
+    &self,
     arg0: GetCurrentFeePercentilesRequest,
   ) -> Result<Vec<MillisatoshiPerByte>> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "bitcoin_get_current_fee_percentiles").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes, Vec<MillisatoshiPerByte>)?)
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "bitcoin_get_current_fee_percentiles").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes, Vec<MillisatoshiPerByte>)?)
   }
-  pub async fn bitcoin_get_utxos(
-    &self, agent: &ic_agent::Agent,
-    arg0: GetUtxosRequest,
-  ) -> Result<GetUtxosResponse> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "bitcoin_get_utxos").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes, GetUtxosResponse)?)
+  pub async fn bitcoin_get_utxos(&self, arg0: GetUtxosRequest) -> Result<
+    GetUtxosResponse
+  > {
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "bitcoin_get_utxos").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes, GetUtxosResponse)?)
   }
   pub async fn bitcoin_send_transaction(
-    &self, agent: &ic_agent::Agent,
+    &self,
     arg0: SendTransactionRequest,
   ) -> Result<()> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "bitcoin_send_transaction").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes)?)
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "bitcoin_send_transaction").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes)?)
   }
-  pub async fn canister_status(
-    &self, agent: &ic_agent::Agent,
-    arg0: CanisterStatusArg,
-  ) -> Result<CanisterStatusRet> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "canister_status").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes, CanisterStatusRet)?)
+  pub async fn canister_status(&self, arg0: CanisterStatusArg) -> Result<
+    CanisterStatusRet
+  > {
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "canister_status").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes, CanisterStatusRet)?)
   }
-  pub async fn create_canister(
-    &self, agent: &ic_agent::Agent,
-    arg0: CreateCanisterArg,
-  ) -> Result<CreateCanisterRet> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "create_canister").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes, CreateCanisterRet)?)
+  pub async fn create_canister(&self, arg0: CreateCanisterArg) -> Result<
+    CreateCanisterRet
+  > {
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "create_canister").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes, CreateCanisterRet)?)
   }
-  pub async fn delete_canister(
-    &self, agent: &ic_agent::Agent,
-    arg0: DeleteCanisterArg,
-  ) -> Result<()> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "delete_canister").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes)?)
+  pub async fn delete_canister(&self, arg0: DeleteCanisterArg) -> Result<()> {
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "delete_canister").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes)?)
   }
-  pub async fn deposit_cycles(
-    &self, agent: &ic_agent::Agent,
-    arg0: DepositCyclesArg,
-  ) -> Result<()> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "deposit_cycles").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes)?)
+  pub async fn deposit_cycles(&self, arg0: DepositCyclesArg) -> Result<()> {
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "deposit_cycles").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes)?)
   }
-  pub async fn ecdsa_public_key(
-    &self, agent: &ic_agent::Agent,
-    arg0: EcdsaPublicKeyArg,
-  ) -> Result<EcdsaPublicKeyRet> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "ecdsa_public_key").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes, EcdsaPublicKeyRet)?)
+  pub async fn ecdsa_public_key(&self, arg0: EcdsaPublicKeyArg) -> Result<
+    EcdsaPublicKeyRet
+  > {
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "ecdsa_public_key").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes, EcdsaPublicKeyRet)?)
   }
-  pub async fn http_request(
-    &self, agent: &ic_agent::Agent,
-    arg0: HttpRequestArg,
-  ) -> Result<HttpResponse> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "http_request").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes, HttpResponse)?)
+  pub async fn http_request(&self, arg0: HttpRequestArg) -> Result<
+    HttpResponse
+  > {
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "http_request").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes, HttpResponse)?)
   }
-  pub async fn install_code(
-    &self, agent: &ic_agent::Agent,
-    arg0: InstallCodeArg,
-  ) -> Result<()> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "install_code").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes)?)
+  pub async fn install_code(&self, arg0: InstallCodeArg) -> Result<()> {
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "install_code").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes)?)
   }
   pub async fn provisional_create_canister_with_cycles(
-    &self, agent: &ic_agent::Agent,
+    &self,
     arg0: ProvisionalCreateCanisterWithCyclesArg,
   ) -> Result<ProvisionalCreateCanisterWithCyclesRet> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "provisional_create_canister_with_cycles").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes, ProvisionalCreateCanisterWithCyclesRet)?)
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "provisional_create_canister_with_cycles").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes, ProvisionalCreateCanisterWithCyclesRet)?)
   }
   pub async fn provisional_top_up_canister(
-    &self, agent: &ic_agent::Agent,
+    &self,
     arg0: ProvisionalTopUpCanisterArg,
   ) -> Result<()> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "provisional_top_up_canister").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes)?)
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "provisional_top_up_canister").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes)?)
   }
-  pub async fn raw_rand(&self, agent: &ic_agent::Agent) -> Result<
-    serde_bytes::ByteBuf
+  pub async fn raw_rand(&self) -> Result<serde_bytes::ByteBuf> {
+    let args = Encode!()?;
+    let bytes = self.1.update(&self.0, "raw_rand").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes, serde_bytes::ByteBuf)?)
+  }
+  pub async fn sign_with_ecdsa(&self, arg0: SignWithEcdsaArg) -> Result<
+    SignWithEcdsaRet
   > {
-    let args = candid::Encode!()?;
-    let bytes = agent.update(self.0, "raw_rand").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes, serde_bytes::ByteBuf)?)
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "sign_with_ecdsa").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes, SignWithEcdsaRet)?)
   }
-  pub async fn sign_with_ecdsa(
-    &self, agent: &ic_agent::Agent,
-    arg0: SignWithEcdsaArg,
-  ) -> Result<SignWithEcdsaRet> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "sign_with_ecdsa").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes, SignWithEcdsaRet)?)
+  pub async fn start_canister(&self, arg0: StartCanisterArg) -> Result<()> {
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "start_canister").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes)?)
   }
-  pub async fn start_canister(
-    &self, agent: &ic_agent::Agent,
-    arg0: StartCanisterArg,
-  ) -> Result<()> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "start_canister").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes)?)
+  pub async fn stop_canister(&self, arg0: StopCanisterArg) -> Result<()> {
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "stop_canister").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes)?)
   }
-  pub async fn stop_canister(
-    &self, agent: &ic_agent::Agent,
-    arg0: StopCanisterArg,
-  ) -> Result<()> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "stop_canister").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes)?)
+  pub async fn uninstall_code(&self, arg0: UninstallCodeArg) -> Result<()> {
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "uninstall_code").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes)?)
   }
-  pub async fn uninstall_code(
-    &self, agent: &ic_agent::Agent,
-    arg0: UninstallCodeArg,
-  ) -> Result<()> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "uninstall_code").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes)?)
-  }
-  pub async fn update_settings(
-    &self, agent: &ic_agent::Agent,
-    arg0: UpdateSettingsArg,
-  ) -> Result<()> {
-    let args = candid::Encode!(arg0)?;
-    let bytes = agent.update(self.0, "update_settings").with_arg(args).call_and_wait().await?;
-    Ok(candid::Decode!(&bytes)?)
+  pub async fn update_settings(&self, arg0: UpdateSettingsArg) -> Result<()> {
+    let args = Encode!(&arg0)?;
+    let bytes = self.1.update(&self.0, "update_settings").with_arg(args).call_and_wait().await?;
+    Ok(Decode!(&bytes)?)
   }
 }
-pub const service: SERVICE = SERVICE(Principal::from_slice(&[])); // aaaaa-aa
+pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
+
