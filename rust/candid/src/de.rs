@@ -559,7 +559,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.unroll_type()?;
         check!(
-            *self.expect_type == TypeInner::Null && *self.wire_type == TypeInner::Null,
+            *self.expect_type == TypeInner::Null
+                && matches!(*self.wire_type, TypeInner::Null | TypeInner::Reserved),
             "unit"
         );
         visitor.visit_unit()
