@@ -832,11 +832,11 @@ record { <fieldtype>;* } <: record { <fieldtype'>;* }
 record { <nat> : <datatype>; <fieldtype>;* } <: record { <nat> : <datatype'>; <fieldtype'>;* }
 ```
 
-In order to be able to evolve and extend record types that also occur in inbound position (i.e., are used both as function results and function parameters), the subtype relation also supports *removing* fields from records, provided they are optional (or `reserved`).
+In order to be able to evolve and extend record types that also occur in inbound position (i.e., are used both as function results and function parameters), the subtype relation also supports *removing* fields from records, provided they are optional, null, or `reserved`.
 ```
 <nat> not in <fieldtype>;*
 record { <fieldtype>;* } <: record { <fieldtype'>;* }
-opt empty <: <datatype'>
+null <: <datatype'>
 ------------------------------------------------------------------------------
 record { <fieldtype>;* } <: record { <nat> : <datatype'>; <fieldtype'>;* }
 ```
@@ -980,11 +980,11 @@ In the following rule:
 
  * The `<nat1>*` field names are those present in both the actual and expected type. The values are coerced.
  * the `<nat2>*` field names those only in the actual type. The values are ignored.
- * the `<nat3>*` field names are those only in the expected type, which therefore must be of optional or reserved type. The `null` value is used for these.
+ * the `<nat3>*` field names are those only in the expected type, which therefore must be of null, optional or reserved type. The `null` value is used for these.
 
 ```
 <v1> : <t1> ~> <v1'> : <t1'>
-opt empty <: <t3>
+null <: <t3>
 -------------------------------------------------------------------------------------------
 record { <nat1> = <v1>;* <nat2> = <v2>;* } : record { <nat1> : <t1>;* <nat2> : <t2>;* } ~>
 record { <nat1> = <v1'>;* <nat3> = null;* } : record { <nat1> : <t1'>;* <nat3> : <t3>;* }
@@ -1023,7 +1023,7 @@ NOTE: These rules above imply that a Candid decoder has to be able to decide the
 
 #### Tuple types
 
-Whole argument and result sequences are coerced with the same rules as tuple-like records. In particular, extra arguments are ignored, and optional parameters read as as `null` if the argument is missing or fails to coerce:
+Whole argument and result sequences are coerced with the same rules as tuple-like records. In particular, extra arguments are ignored, and optional/null parameters read as `null` if the argument is missing or fails to coerce:
 
 ```
 record { <v>;* } : record { <t>;* } ~> record { <v'>;* } : record { <t'>;* }

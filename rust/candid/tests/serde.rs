@@ -697,12 +697,12 @@ fn test_multiargs() {
         Vec<(Int, &str)>,
         (Int, String),
         Option<i32>,
-        candid::Reserved,
+        (),
         candid::Reserved
     )
     .unwrap();
     assert_eq!(tuple.2, None);
-    assert_eq!(tuple.3, candid::Reserved);
+    assert_eq!(tuple.3, ());
     assert_eq!(tuple.4, candid::Reserved);
 }
 

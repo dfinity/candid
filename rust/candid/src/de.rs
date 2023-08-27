@@ -53,14 +53,14 @@ impl<'de> IDLDeserialize<'de> {
         if self.de.types.is_empty() {
             if matches!(
                 expected_type.as_ref(),
-                TypeInner::Opt(_) | TypeInner::Reserved
+                TypeInner::Opt(_) | TypeInner::Reserved | TypeInner::Null
             ) {
                 self.de.expect_type = expected_type;
                 self.de.wire_type = TypeInner::Reserved.into();
                 return T::deserialize(&mut self.de);
             } else {
                 return Err(Error::msg(format!(
-                    "No more values on the wire, the expected type {expected_type} is not opt or reserved"
+                    "No more values on the wire, the expected type {expected_type} is not opt, reserved or null"
                 )));
             }
         }
@@ -548,7 +548,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.unroll_type()?;
         check!(
-            *self.expect_type == TypeInner::Null && *self.wire_type == TypeInner::Null,
+            *self.expect_type == TypeInner::Null
+                && matches!(*self.wire_type, TypeInner::Null | TypeInner::Reserved),
             "unit"
         );
         visitor.visit_unit()
