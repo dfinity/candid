@@ -702,7 +702,10 @@ fn test_multiargs() {
     )
     .unwrap();
     assert_eq!(tuple.2, None);
-    assert_eq!(tuple.3, ());
+    #[allow(clippy::unit_cmp)]
+    {
+        assert_eq!(tuple.3, ());
+    }
     assert_eq!(tuple.4, candid::Reserved);
 }
 
