@@ -60,7 +60,7 @@ impl<'de> IDLDeserialize<'de> {
                 return T::deserialize(&mut self.de);
             } else {
                 return Err(Error::msg(format!(
-                    "No more values on the wire, the expected type {expected_type} is not opt, reserved or null"
+                    "No more values on the wire, the expected type {expected_type} is not opt, null, or reserved"
                 )));
             }
         }
