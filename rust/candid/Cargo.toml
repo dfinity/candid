@@ -1,6 +1,6 @@
 [package]
 name = "candid"
-version = "0.9.4"
+version = "0.9.5"
 edition = "2021"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
@@ -89,7 +89,6 @@ random = ["parser", "configs", "arbitrary", "fake", "rand"]
 parser = ["lalrpop", "lalrpop-util", "logos"]
 all = ["random"]
 mute_warnings = []
-arc_type = []
 
 # docs.rs-specific configuration
 # To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --features all
