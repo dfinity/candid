@@ -51,8 +51,14 @@ pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result
             let fields: HashMap<_, _> = fs1.iter().map(|Field { id, ty }| (id, ty)).collect();
             for Field { id, ty: ty2 } in fs2.iter() {
                 match fields.get(id) {
-                    Some(ty1) => subtype(gamma, env, ty1, ty2).with_context(|| format!("Record field {id}: {ty1} is not a subtype of {ty2}"))?,
-                    None => subtype(gamma, env, &Opt(Empty.into()).into(), ty2).map_err(|_| anyhow::anyhow!("Record field {id}: {ty2} is only in the expected type and is not of opt or reserved type"))?,
+                    Some(ty1) => subtype(gamma, env, ty1, ty2).with_context(|| {
+                        format!("Record field {id}: {ty1} is not a subtype of {ty2}")
+                    })?,
+                    None => {
+                        if !matches!(env.trace_type(ty2)?.as_ref(), Null | Reserved | Opt(_)) {
+                            return Err(Error::msg(format!("Record field {id}: {ty2} is only in the expected type and is not of type opt, null or reserved")));
+                        }
+                    }
                 }
             }
             Ok(())
