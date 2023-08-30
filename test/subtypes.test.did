@@ -1,7 +1,7 @@
 /*
 Encoding tests for subtype tests in decoders
 
-Corresponding to spec version version 0.1.4
+Corresponding to spec version version 0.1.6
 
 This test file contains tests for the subtype check that decoders are expected
 to perform upon references.

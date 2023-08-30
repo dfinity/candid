@@ -1,8 +1,8 @@
 # Candid Specification
 
-Version: 0.1.5
+Version: 0.1.6
 
-Date: June 1, 2023
+Date: August 29, 2023
 
 ## Motivation
 
