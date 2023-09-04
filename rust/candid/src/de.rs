@@ -108,7 +108,7 @@ impl<'de> IDLDeserialize<'de> {
 }
 
 pub struct Config {
-    zero_sized_values: usize,
+    pub zero_sized_values: usize,
 }
 
 macro_rules! assert {
