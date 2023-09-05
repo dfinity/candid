@@ -28,6 +28,13 @@ impl<'de> IDLDeserialize<'de> {
             .with_context(|| format!("Cannot parse header {}", &hex::encode(bytes)))?;
         Ok(IDLDeserialize { de })
     }
+    /// Create a new deserializer with IDL binary message. The config is used to adjust some parameters in the deserializer.
+    pub fn new_with_config(bytes: &'de [u8], config: Config) -> Result<Self> {
+        let mut de = Deserializer::from_bytes(bytes)
+            .with_context(|| format!("Cannot parse header {}", &hex::encode(bytes)))?;
+        de.zero_sized_values = config.zero_sized_values;
+        Ok(IDLDeserialize { de })
+    }
     /// Deserialize one value from deserializer.
     pub fn get_value<T>(&mut self) -> Result<T>
     where
@@ -53,14 +60,14 @@ impl<'de> IDLDeserialize<'de> {
         if self.de.types.is_empty() {
             if matches!(
                 expected_type.as_ref(),
-                TypeInner::Opt(_) | TypeInner::Reserved
+                TypeInner::Opt(_) | TypeInner::Reserved | TypeInner::Null
             ) {
                 self.de.expect_type = expected_type;
                 self.de.wire_type = TypeInner::Reserved.into();
                 return T::deserialize(&mut self.de);
             } else {
                 return Err(Error::msg(format!(
-                    "No more values on the wire, the expected type {expected_type} is not opt or reserved"
+                    "No more values on the wire, the expected type {expected_type} is not opt, null, or reserved"
                 )));
             }
         }
@@ -98,6 +105,10 @@ impl<'de> IDLDeserialize<'de> {
         }
         Ok(())
     }
+}
+
+pub struct Config {
+    pub zero_sized_values: usize,
 }
 
 macro_rules! assert {
@@ -548,7 +559,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.unroll_type()?;
         check!(
-            *self.expect_type == TypeInner::Null && *self.wire_type == TypeInner::Null,
+            *self.expect_type == TypeInner::Null
+                && matches!(*self.wire_type, TypeInner::Null | TypeInner::Reserved),
             "unit"
         );
         visitor.visit_unit()
@@ -651,9 +663,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
                 let expect = e.clone();
-                let wire = w.clone();
+                let wire = self.table.trace_type(w)?;
                 let len = Len::read(&mut self.input)?.0;
-                if self.is_zero_sized_type(w) {
+                if self.is_zero_sized_type(&wire) {
                     if self.zero_sized_values < len {
                         return Err(Error::msg("vec length of zero sized values too large"));
                     }

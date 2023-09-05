@@ -164,14 +164,7 @@ impl TypeContainer {
         .into()
     }
 }
-#[cfg(feature = "arc_type")]
-#[derive(Debug, PartialEq, Hash, Eq, Clone)]
-#[deprecated(
-    note = "Do not use arc_type feature! There is a 20% to 80% slowdown in deserialization."
-)]
-pub struct Type(pub std::sync::Arc<TypeInner>);
 
-#[cfg(not(feature = "arc_type"))]
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Type(pub std::rc::Rc<TypeInner>);
 
@@ -343,13 +336,6 @@ impl std::hash::Hash for Label {
     }
 }
 
-#[cfg(feature = "arc_type")]
-#[deprecated(
-    note = "Do not use arc_type feature! There is a 20% to 80% slowdown in deserialization."
-)]
-pub type SharedLabel = std::sync::Arc<Label>;
-
-#[cfg(not(feature = "arc_type"))]
 pub type SharedLabel = std::rc::Rc<Label>;
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
