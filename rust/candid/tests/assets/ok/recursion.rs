@@ -1,43 +1,47 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
-use candid::{self, CandidType, Deserialize, Principal};
+#![allow(dead_code, unused_imports)]
+use candid::{self, CandidType, Deserialize, Principal, Encode, Decode};
 use ic_cdk::api::call::CallResult as Result;
 
-candid::define_function!(pub t : (s) -> ());
+candid::define_function!(pub T : (S) -> ());
 #[derive(CandidType, Deserialize)]
-pub struct node { head: candid::Nat, tail: Box<list> }
+pub struct Node { head: candid::Nat, tail: Box<List> }
 
 #[derive(CandidType, Deserialize)]
-pub struct list(Option<node>);
+pub struct List(Option<Node>);
 
 pub type A = Box<B>;
 #[derive(CandidType, Deserialize)]
 pub struct B(Option<A>);
 
 #[derive(CandidType, Deserialize)]
-pub enum tree {
-  branch{ val: candid::Int, left: Box<tree>, right: Box<tree> },
-  leaf(candid::Int),
+pub enum Tree {
+  #[serde(rename="branch")]
+  Branch{ val: candid::Int, left: Box<Tree>, right: Box<Tree> },
+  #[serde(rename="leaf")]
+  Leaf(candid::Int),
 }
 
-candid::define_function!(pub stream_inner_next : () -> (stream) query);
+candid::define_function!(pub StreamInnerNext : () -> (Stream) query);
 #[derive(CandidType, Deserialize)]
-pub struct stream_inner { head: candid::Nat, next: stream_inner_next }
+pub struct StreamInner { head: candid::Nat, next: StreamInnerNext }
 
 #[derive(CandidType, Deserialize)]
-pub struct stream(Option<stream_inner>);
+pub struct Stream(Option<StreamInner>);
 
-candid::define_service!(pub s : {
-  "f" : t::ty();
-  "g" : candid::func!((list) -> (B, tree, stream));
+candid::define_service!(pub S : {
+  "f" : T::ty();
+  "g" : candid::func!((List) -> (B, Tree, Stream));
 });
-pub struct SERVICE(pub Principal);
-impl SERVICE {
-  pub async fn f(&self, arg0: s) -> Result<()> {
+pub struct Service(pub Principal);
+impl Service {
+  pub async fn f(&self, arg0: S) -> Result<()> {
     ic_cdk::call(self.0, "f", (arg0,)).await
   }
-  pub async fn g(&self, arg0: list) -> Result<(B,tree,stream,)> {
+  pub async fn g(&self, arg0: List) -> Result<(B,Tree,Stream,)> {
     ic_cdk::call(self.0, "g", (arg0,)).await
   }
 }
-pub const service: SERVICE = SERVICE(Principal::from_slice(&[])); // aaaaa-aa
+pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
+pub const service : Service = Service(CANISTER_ID);

@@ -1,11 +1,21 @@
 
 # Changelog
 
-## 2023-07-25 (Rust 0.9.2)
+## 2023-09-05 (Rust 0.9.6)
+
+* Improve Rust binding generation: 1) Fix generated code for agent; 2) Generated names conform to Rust convention: Pascal case for type names and enum tags; snake case for function names.
+* Fix a bug when deriving empty struct/tuple enum tag, e.g., `#[derive(CandidType)] enum T { A{}, B() }`.
+* Add `IDLDeserialize::new_with_config` to control deserializer behavior. For now, you can only bound the size of zero sized values.
+
+## 2023-07-25 (Rust 0.9.2--0.9.5)
 
 * Fix error message for `subtype::equal` to report the correct missing label.
 * Recover subtype error from custom deserializer. This fixes some custom types for not applying special opt rule.
 * Fix Candid UI to support composite query.
+* Internally, move away from `BigInt::try_into` to allow more build targets, e.g. WASI and iOS.
+* Spec change: allow `record {} <: record {null}`.
+* Fix length counting of zero sized values.
+* Remove `arc_type` feature.
 
 ## 2023-07-11
 

@@ -620,6 +620,14 @@ fn test_variant() {
     let bytes = encode(&E::Bar(true, 42.into()));
     test_decode(&bytes, &None::<Unit>);
     check_error(|| test_decode(&bytes, &Unit::Bar), "Subtyping error");
+
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    enum T {
+        A(),
+        B {},
+        C,
+    }
+    all_check(T::A(), "4449444c026b0341014201437f6c00010000");
 }
 
 #[test]
