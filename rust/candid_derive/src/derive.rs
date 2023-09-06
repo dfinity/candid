@@ -17,7 +17,7 @@ pub(crate) fn derive_idl_type(
     let (ty_body, ser_body) = match input.data {
         Data::Enum(ref data) => enum_from_ast(&name, &data.variants, custom_candid_path),
         Data::Struct(ref data) => {
-            let (ty, idents, is_bytes) = struct_from_ast(&data.fields, custom_candid_path);
+            let (ty, idents, is_bytes, _) = struct_from_ast(&data.fields, custom_candid_path);
             (ty, serialize_struct(&idents, &is_bytes, custom_candid_path))
         }
         Data::Union(_) => unimplemented!("doesn't derive union type"),
@@ -37,7 +37,7 @@ pub(crate) fn derive_idl_type(
                 }
         }
     };
-    //panic!(gen.to_string());
+    //panic!("{}", gen.to_string());
     gen
 }
 
@@ -48,6 +48,7 @@ struct Variant {
     ty: TokenStream,
     members: Vec<Ident>,
     with_bytes: bool,
+    style: Style,
 }
 enum Style {
     Struct,
@@ -55,17 +56,8 @@ enum Style {
     Unit,
 }
 impl Variant {
-    fn style(&self) -> Style {
-        if self.members.is_empty() {
-            return Style::Unit;
-        };
-        match self.members[0] {
-            Ident::Named(_) => Style::Struct,
-            Ident::Unnamed(_) => Style::Tuple,
-        }
-    }
     fn to_pattern(&self) -> (TokenStream, Vec<TokenStream>) {
-        match self.style() {
+        match self.style {
             Style::Unit => (quote! {}, Vec::new()),
             Style::Struct => {
                 let id: Vec<_> = self.members.iter().map(|ident| ident.to_token()).collect();
@@ -114,7 +106,7 @@ fn enum_from_ast(
                 ),
                 None => (id.clone(), idl_hash(&id.unraw().to_string())),
             };
-            let (ty, idents, _) = struct_from_ast(&variant.fields, custom_candid_path);
+            let (ty, idents, _, style) = struct_from_ast(&variant.fields, custom_candid_path);
             Variant {
                 real_ident: id,
                 renamed_ident,
@@ -122,6 +114,7 @@ fn enum_from_ast(
                 ty,
                 members: idents,
                 with_bytes: attrs.with_bytes,
+                style,
             }
         })
         .collect();
@@ -203,7 +196,7 @@ fn serialize_struct(
 fn struct_from_ast(
     fields: &syn::Fields,
     custom_candid_path: &Option<TokenStream>,
-) -> (TokenStream, Vec<Ident>, Vec<bool>) {
+) -> (TokenStream, Vec<Ident>, Vec<bool>, Style) {
     let candid = candid_path(custom_candid_path);
     match *fields {
         syn::Fields::Named(ref fields) => {
@@ -212,18 +205,20 @@ fn struct_from_ast(
                 quote! { #candid::types::TypeInner::Record(#fs).into() },
                 idents,
                 is_bytes,
+                Style::Struct,
             )
         }
         syn::Fields::Unnamed(ref fields) => {
             let (fs, idents, is_bytes) = fields_from_ast(&fields.unnamed, custom_candid_path);
             if idents.len() == 1 {
                 let newtype = derive_type(&fields.unnamed[0].ty, custom_candid_path);
-                (quote! { #newtype }, idents, is_bytes)
+                (quote! { #newtype }, idents, is_bytes, Style::Tuple)
             } else {
                 (
                     quote! { #candid::types::TypeInner::Record(#fs).into() },
                     idents,
                     is_bytes,
+                    Style::Tuple,
                 )
             }
         }
@@ -231,6 +226,7 @@ fn struct_from_ast(
             quote! { #candid::types::TypeInner::Null.into() },
             Vec::new(),
             Vec::new(),
+            Style::Unit,
         ),
     }
 }
