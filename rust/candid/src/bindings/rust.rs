@@ -62,7 +62,7 @@ fn ident_(id: &str, case: Option<Case>) -> (RcDoc, bool) {
         || id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
         || id.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
     {
-        return (RcDoc::text(format!("_{}_", crate::idl_hash(&id))), true);
+        return (RcDoc::text(format!("_{}_", crate::idl_hash(id))), true);
     }
     let (is_rename, id) = if let Some(case) = case {
         let new_id = id.to_case(case);
