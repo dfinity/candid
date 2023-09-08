@@ -1,7 +1,7 @@
 use crate::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
 use crate::types::{TypeEnv, FuncMode};
 use crate::utils::check_unique;
-use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes};
+use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs};
 use super::test::{Assert, Input, Test};
 use super::token::{Token, error2, LexicalError, Span};
 use crate::{Principal, types::Label};
@@ -270,6 +270,10 @@ MainActor: IDLType = {
 
 pub IDLProg: IDLProg = {
     <decs:SepBy<Def, ";">> <actor:MainActor?> => IDLProg { decs, actor }
+}
+
+pub IDLInitArgs: IDLInitArgs = {
+    <decs:SepBy<Def, ";">> <args:TupTyp> => IDLInitArgs { decs, args }
 }
 
 // Test file

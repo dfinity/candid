@@ -59,6 +59,13 @@ fn binding(prog: String, lang: String) -> Option<String> {
 }
 
 #[ic_cdk::query]
+fn merge_init_args(prog: String, init_args: String) -> Option<String> {
+    use candid::bindings;
+    let (env, actor) = candid::utils::merge_init_args(&prog, &init_args).ok()?;
+    Some(bindings::candid::compile(&env, &Some(actor)))
+}
+
+#[ic_cdk::query]
 fn subtype(new: String, old: String) -> Result<(), String> {
     let new = new.parse::<IDLProg>().unwrap();
     let old = old.parse::<IDLProg>().unwrap();

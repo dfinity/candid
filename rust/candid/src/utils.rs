@@ -82,7 +82,7 @@ pub fn service_equal(left: CandidSource, right: CandidSource) -> Result<()> {
 #[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
 #[cfg(feature = "parser")]
 /// Take a did file and outputs the init args and the service type (without init args).
-/// If the original did file contains imports, the output flatens the type definitions.
+/// If the original did file contains imports, the output flattens the type definitions.
 /// For now, the comments from the original did file is omitted.
 pub fn instantiate_candid(candid: CandidSource) -> Result<(Vec<Type>, (TypeEnv, Type))> {
     use crate::types::TypeInner;
@@ -93,6 +93,28 @@ pub fn instantiate_candid(candid: CandidSource) -> Result<(Vec<Type>, (TypeEnv, 
         TypeInner::Service(_) => (vec![], (env, serv)),
         _ => unreachable!(),
     })
+}
+
+/// Merge canister metadata candid:args and candid:service into a service constructor.
+/// If candid:service already contains init args, returns the original did file.
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
+pub fn merge_init_args(candid: &str, init: &str) -> Result<(TypeEnv, Type)> {
+    use crate::parser::{types::IDLInitArgs, typing::check_init_args};
+    use crate::types::TypeInner;
+    let candid = CandidSource::Text(candid);
+    let (env, serv) = candid.load()?;
+    let serv = serv.ok_or_else(|| Error::msg("the Candid interface has no main service type"))?;
+    match serv.as_ref() {
+        TypeInner::Class(_, _) => Ok((env, serv)),
+        TypeInner::Service(_) => {
+            let prog = init.parse::<IDLInitArgs>()?;
+            let mut env2 = TypeEnv::new();
+            let args = check_init_args(&mut env2, &env, &prog)?;
+            Ok((env2, TypeInner::Class(args, serv).into()))
+        }
+        _ => unreachable!(),
+    }
 }
 
 /// Encode sequence of Rust values into Candid message of type `candid::Result<Vec<u8>>`.
