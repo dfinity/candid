@@ -356,9 +356,9 @@ impl fmt::Display for Field {
 /// Construct a field type, which can be used in `TypeInner::Record` and `TypeInner::Variant`.
 ///
 /// `field!{ a: TypeInner::Nat.into() }` expands to `Field { id: Label::Named("a"), ty: ... }`
-/// `field!{ 0: TypeInner::Nat.into() }` expands to `Field { id: Label::Id(0), ty: ... }`
+/// `field!{ 0: Nat::ty() }` expands to `Field { id: Label::Id(0), ty: ... }`
 macro_rules! field {
-    { $id:tt : $ty:expr } => {
+    { $id:tt : $ty:expr } => {{
         $crate::types::internal::Field {
             id: match stringify!($id).parse::<u32>() {
                 Ok(id) => $crate::types::Label::Id(id),
@@ -366,7 +366,31 @@ macro_rules! field {
             }.into(),
             ty: $ty
         }
-    };
+    }}
+}
+#[macro_export]
+/// Construct a record type, e.g., `record!{ label: Nat::ty(); 42: String::ty() }`.
+macro_rules! record {
+    { $($id:tt : $ty:expr);* $(;)? } => {{
+        let mut fs: Vec<$crate::types::internal::Field> = vec![ $($crate::field!{$id : $ty}),* ];
+        fs.sort_unstable_by_key(|f| f.id.get_id());
+        if let Err(e) = $crate::utils::check_unique(fs.iter().map(|f| &f.id)) {
+            panic!("{e}");
+        }
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Record(fs))
+    }}
+}
+#[macro_export]
+/// Construct a variant type, e.g., `variant!{ tag: <()>::ty() }`.
+macro_rules! variant {
+    { $($id:tt : $ty:expr);* $(;)? } => {{
+        let mut fs: Vec<$crate::types::internal::Field> = vec![ $($crate::field!{$id : $ty}),* ];
+        fs.sort_unstable_by_key(|f| f.id.get_id());
+        if let Err(e) = $crate::utils::check_unique(fs.iter().map(|f| &f.id)) {
+            panic!("{e}");
+        }
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Variant(fs))
+    }}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -431,7 +455,7 @@ macro_rules! func {
 /// `service!{ "f": func!((HttpRequest) -> ()) }` expands to `Type(Rc::new(TypeInner::Service(...)))`
 macro_rules! service {
     { $($meth:tt : $ty:expr);* $(;)? } => {{
-        let mut ms = vec![ $(($meth.to_string(), $ty)),* ];
+        let mut ms: Vec<(String, $crate::types::Type)> = vec![ $(($meth.to_string(), $ty)),* ];
         ms.sort_unstable_by(|a, b| a.0.as_str().partial_cmp(b.0.as_str()).unwrap());
         if let Err(e) = $crate::utils::check_unique(ms.iter().map(|m| &m.0)) {
             panic!("{e}");

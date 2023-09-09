@@ -248,7 +248,12 @@ pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<Option<Type>> {
     check_actor(&env, &prog.actor)
 }
 /// Type check init args extracted from canister metadata candid:args.
-pub fn check_init_args(te: &mut TypeEnv, main_env: &TypeEnv, prog: &IDLInitArgs) -> Result<Vec<Type>> {
+/// Need to provide `main_env`, because init args may refer to variables from the main did file.
+pub fn check_init_args(
+    te: &mut TypeEnv,
+    main_env: &TypeEnv,
+    prog: &IDLInitArgs,
+) -> Result<Vec<Type>> {
     let mut env = Env { te, pre: false };
     check_decs(&mut env, &prog.decs)?;
     env.te.merge(main_env)?;

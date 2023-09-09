@@ -1,5 +1,6 @@
 use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
 use candid::types::{Label, Type, TypeEnv, TypeInner};
+use candid::{record, variant, CandidType, Nat};
 
 fn parse_args(input: &str) -> IDLArgs {
     input.parse().unwrap()
@@ -136,6 +137,12 @@ fn parse_optional_record() {
     let mut args =
         parse_args("(opt record {}, record { 1=42;44=\"test\"; 2=false }, variant { 5=null })");
     let typ = parse_type("record { 1: nat; 44: text; 2: bool }");
+    assert_eq!(
+        typ,
+        record! { 1: Nat::ty(); 44: String::ty(); 2: bool::ty() }
+    );
+    assert_eq!(args.args[0].value_ty(), TypeInner::Opt(record! {}).into());
+    assert_eq!(args.args[2].value_ty(), variant! { 5: <()>::ty() });
     args.args[1] = args.args[1]
         .annotate_type(true, &TypeEnv::new(), &typ)
         .unwrap();
@@ -179,6 +186,10 @@ fn parse_nested_record() {
     );
     let typ = parse_type(
         "record {label: nat; 0x2b:record { test:text; \"opt\":text }; long_label: opt null }",
+    );
+    assert_eq!(
+        typ,
+        record! {label: Nat::ty(); 43: record!{ test: String::ty(); opt: String::ty() }; long_label: Option::<()>::ty(); }
     );
     args.args[0] = args.args[0]
         .annotate_type(true, &TypeEnv::new(), &typ)
