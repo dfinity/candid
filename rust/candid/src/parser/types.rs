@@ -91,11 +91,24 @@ pub struct IDLProg {
     pub actor: Option<IDLType>,
 }
 
+#[derive(Debug)]
+pub struct IDLInitArgs {
+    pub decs: Vec<Dec>,
+    pub args: Vec<IDLType>,
+}
+
 impl std::str::FromStr for IDLProg {
     type Err = crate::Error;
     fn from_str(str: &str) -> Result<Self> {
         let lexer = super::token::Tokenizer::new(str);
         Ok(super::grammar::IDLProgParser::new().parse(lexer)?)
+    }
+}
+impl std::str::FromStr for IDLInitArgs {
+    type Err = crate::Error;
+    fn from_str(str: &str) -> Result<Self> {
+        let lexer = super::token::Tokenizer::new(str);
+        Ok(super::grammar::IDLInitArgsParser::new().parse(lexer)?)
     }
 }
 
