@@ -30,9 +30,14 @@ impl<'de> IDLDeserialize<'de> {
     }
     /// Create a new deserializer with IDL binary message. The config is used to adjust some parameters in the deserializer.
     pub fn new_with_config(bytes: &'de [u8], config: Config) -> Result<Self> {
-        let mut de = Deserializer::from_bytes(bytes)
-            .with_context(|| format!("Cannot parse header {}", &hex::encode(bytes)))?;
+        let mut de = if config.minize_error_message {
+            Deserializer::from_bytes(bytes)?
+        } else {
+            Deserializer::from_bytes(bytes)
+                .with_context(|| format!("Cannot parse header {}", &hex::encode(bytes)))?
+        };
         de.zero_sized_values = config.zero_sized_values;
+        de.minize_error_message = config.minize_error_message;
         Ok(IDLDeserialize { de })
     }
     /// Deserialize one value from deserializer.
@@ -66,9 +71,13 @@ impl<'de> IDLDeserialize<'de> {
                 self.de.wire_type = TypeInner::Reserved.into();
                 return T::deserialize(&mut self.de);
             } else {
-                return Err(Error::msg(format!(
-                    "No more values on the wire, the expected type {expected_type} is not opt, null, or reserved"
-                )));
+                if self.de.minize_error_message {
+                    return Err(Error::msg("No more values on the wire"));
+                } else {
+                    return Err(Error::msg(format!(
+                        "No more values on the wire, the expected type {expected_type} is not opt, null, or reserved"
+                    )));
+                }
             }
         }
 
@@ -81,11 +90,15 @@ impl<'de> IDLDeserialize<'de> {
         };
         self.de.wire_type = ty.clone();
 
-        let v = T::deserialize(&mut self.de)
+        let v = if self.de.minize_error_message {
+            T::deserialize(&mut self.de)?
+        } else {
+            T::deserialize(&mut self.de)
             .with_context(|| self.de.dump_state())
             .with_context(|| {
                 format!("Fail to decode argument {ind} from {ty} to {expected_type}")
-            })?;
+            })?
+        };
         Ok(v)
     }
     /// Check if we finish deserializing all values.
@@ -100,8 +113,12 @@ impl<'de> IDLDeserialize<'de> {
         let ind = self.de.input.position() as usize;
         let rest = &self.de.input.get_ref()[ind..];
         if !rest.is_empty() {
-            return Err(anyhow!(self.de.dump_state()))
-                .context("Trailing value after finishing deserialization")?;
+            if self.de.minize_error_message {
+                return Err(Error::msg("Trailing value after finishing deserialization"));
+            } else {
+                return Err(anyhow!(self.de.dump_state()))
+                    .context("Trailing value after finishing deserialization")?;
+            }
         }
         Ok(())
     }
@@ -109,6 +126,7 @@ impl<'de> IDLDeserialize<'de> {
 
 pub struct Config {
     pub zero_sized_values: usize,
+    pub minize_error_message: bool,
 }
 
 macro_rules! assert {
@@ -182,6 +200,7 @@ struct Deserializer<'de> {
     // It only affects the field id generation in enum type.
     is_untyped: bool,
     zero_sized_values: usize,
+    minize_error_message: bool,
     #[cfg(not(target_arch = "wasm32"))]
     recursion_depth: u16,
 }
@@ -201,6 +220,7 @@ impl<'de> Deserializer<'de> {
             field_name: None,
             is_untyped: false,
             zero_sized_values: 2_000_000,
+            minize_error_message: false,
             #[cfg(not(target_arch = "wasm32"))]
             recursion_depth: 0,
         })
@@ -236,19 +256,24 @@ impl<'de> Deserializer<'de> {
         Ok(res)
     }
     fn check_subtype(&mut self) -> Result<()> {
-        subtype(
+        let res = subtype(
             &mut self.gamma,
             &self.table,
             &self.wire_type,
             &self.expect_type,
-        )
-        .with_context(|| {
-            format!(
-                "{} is not a subtype of {}",
-                self.wire_type, self.expect_type,
-            )
-        })
-        .map_err(Error::subtype)?;
+        );
+        if res.is_err() {
+            if self.minize_error_message {
+                return Err(Error::subtype(format!("{}", self.wire_type)));
+            } else {
+                res.with_context(|| {
+                    format!(
+                        "{} is not a subtype of {}",
+                        self.wire_type, self.expect_type,
+                    )
+                }).map_err(Error::subtype)?;
+            }
+        }
         Ok(())
     }
     fn unroll_type(&mut self) -> Result<()> {
