@@ -70,14 +70,12 @@ impl<'de> IDLDeserialize<'de> {
                 self.de.expect_type = expected_type;
                 self.de.wire_type = TypeInner::Reserved.into();
                 return T::deserialize(&mut self.de);
+            } else if self.de.minize_error_message {
+                return Err(Error::msg("No more values on the wire"));
             } else {
-                if self.de.minize_error_message {
-                    return Err(Error::msg("No more values on the wire"));
-                } else {
-                    return Err(Error::msg(format!(
-                        "No more values on the wire, the expected type {expected_type} is not opt, null, or reserved"
-                    )));
-                }
+                return Err(Error::msg(format!(
+                    "No more values on the wire, the expected type {expected_type} is not opt, null, or reserved"
+                )));
             }
         }
 
@@ -94,10 +92,10 @@ impl<'de> IDLDeserialize<'de> {
             T::deserialize(&mut self.de)?
         } else {
             T::deserialize(&mut self.de)
-            .with_context(|| self.de.dump_state())
-            .with_context(|| {
-                format!("Fail to decode argument {ind} from {ty} to {expected_type}")
-            })?
+                .with_context(|| self.de.dump_state())
+                .with_context(|| {
+                    format!("Fail to decode argument {ind} from {ty} to {expected_type}")
+                })?
         };
         Ok(v)
     }
@@ -271,7 +269,8 @@ impl<'de> Deserializer<'de> {
                         "{} is not a subtype of {}",
                         self.wire_type, self.expect_type,
                     )
-                }).map_err(Error::subtype)?;
+                })
+                .map_err(Error::subtype)?;
             }
         }
         Ok(())
