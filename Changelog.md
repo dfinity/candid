@@ -1,6 +1,13 @@
 
 # Changelog
 
+## Rust 0.9.7
+
+* Add `utils::merge_init_args` to parse and merge `candid:args` metadata, and add the same endpoint in Candid UI.
+* Add `record!` and `variant!` macro to generate record and variant type AST.
+* Allow trailing comma in `func!` macro.
+* Add `minize_error_message` to `IDLDeserialize::Config`.
+
 ## 2023-09-05 (Rust 0.9.6)
 
 * Improve Rust binding generation: 1) Fix generated code for agent; 2) Generated names conform to Rust convention: Pascal case for type names and enum tags; snake case for function names.
