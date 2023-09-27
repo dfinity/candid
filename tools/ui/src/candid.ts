@@ -148,8 +148,8 @@ export async function getProfiling(canisterId: Principal): Promise<Array<[number
 }
 function decodeProfiling(input: Array<[number, bigint]>) {
   //console.log(input);
-  if (!input) {
-    return [];
+  if (!input || input.length == 0) {
+    return undefined;
   }
   const stack: Array<[number, bigint, any[]]> = [[0,BigInt(0),[]]];
   let prev_id = undefined;
@@ -239,6 +239,7 @@ export function render(id: Principal, canister: ActorSubclass, profiling: bigint
   if (typeof profiling !== 'undefined') {
     log(`Wasm instructions executed ${profiling} instrs.`);
     profiler = async () => { return await getProfiling(id) };
+    renderFlameGraph(profiler);
   }
   const sortedMethods = Actor.interfaceOf(canister)._fields.sort(([a], [b]) => (a > b ? 1 : -1));
   for (const [name, func] of sortedMethods) {
