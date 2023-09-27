@@ -81,18 +81,6 @@ fn ident_(id: &str, case: Option<Case>) -> (RcDoc, bool) {
 fn ident(id: &str, case: Option<Case>) -> RcDoc {
     ident_(id, case).0
 }
-fn field_name(id: &str, case: Option<Case>) -> RcDoc {
-    let (doc, is_rename) = ident_(id, case);
-    if is_rename {
-        str("#[serde(rename=\"")
-            .append(id.escape_debug().to_string())
-            .append("\")]")
-            .append(RcDoc::line())
-            .append(doc)
-    } else {
-        doc
-    }
-}
 
 fn pp_ty<'a>(ty: &'a Type, recs: &RecPoints) -> RcDoc<'a> {
     use TypeInner::*;
@@ -127,7 +115,7 @@ fn pp_ty<'a>(ty: &'a Type, recs: &RecPoints) -> RcDoc<'a> {
         // It's a bit tricky to use `deserialize_with = "serde_bytes"`. It's not working for `type t = blob`
         Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
         Vec(ref t) => str("Vec").append(enclose("<", pp_ty(t, recs), ">")),
-        Record(ref fs) => pp_record_fields(fs, recs),
+        Record(ref fs) => pp_record_fields(fs, recs, ""),
         Variant(_) => unreachable!(), // not possible after rewriting
         Func(_) => unreachable!(),    // not possible after rewriting
         Service(_) => unreachable!(), // not possible after rewriting
@@ -136,34 +124,62 @@ fn pp_ty<'a>(ty: &'a Type, recs: &RecPoints) -> RcDoc<'a> {
     }
 }
 
-fn pp_label(id: &SharedLabel, is_variant: bool) -> RcDoc {
+fn pp_label<'a>(id: &'a SharedLabel, is_variant: bool, vis: &'a str) -> RcDoc<'a> {
+    let vis = if vis.is_empty() {
+        RcDoc::nil()
+    } else {
+        kwd(vis)
+    };
     match &**id {
-        Label::Named(str) => field_name(str, if is_variant { Some(Case::Pascal) } else { None }),
-        Label::Id(n) | Label::Unnamed(n) => str("_").append(RcDoc::as_string(n)).append("_"),
+        Label::Named(id) => {
+            let case = if is_variant { Some(Case::Pascal) } else { None };
+            let (doc, is_rename) = ident_(id, case);
+            if is_rename {
+                str("#[serde(rename=\"")
+                    .append(id.escape_debug().to_string())
+                    .append("\")]")
+                    .append(RcDoc::line())
+                    .append(vis)
+                    .append(doc)
+            } else {
+                vis.append(doc)
+            }
+        }
+        Label::Id(n) | Label::Unnamed(n) => vis.append("_").append(RcDoc::as_string(n)).append("_"),
     }
 }
 
-fn pp_record_field<'a>(field: &'a Field, recs: &RecPoints) -> RcDoc<'a> {
-    pp_label(&field.id, false)
+fn pp_record_field<'a>(field: &'a Field, recs: &RecPoints, vis: &'a str) -> RcDoc<'a> {
+    pp_label(&field.id, false, vis)
         .append(kwd(":"))
         .append(pp_ty(&field.ty, recs))
 }
 
-fn pp_record_fields<'a>(fs: &'a [Field], recs: &RecPoints) -> RcDoc<'a> {
+fn pp_record_fields<'a>(fs: &'a [Field], recs: &RecPoints, vis: &'a str) -> RcDoc<'a> {
     if is_tuple(fs) {
-        let tuple = RcDoc::concat(fs.iter().map(|f| pp_ty(&f.ty, recs).append(",")));
+        let vis = if vis.is_empty() {
+            RcDoc::nil()
+        } else {
+            kwd(vis)
+        };
+        let tuple = RcDoc::concat(
+            fs.iter()
+                .map(|f| vis.clone().append(pp_ty(&f.ty, recs)).append(",")),
+        );
         enclose("(", tuple, ")")
     } else {
-        let fields = concat(fs.iter().map(|f| pp_record_field(f, recs)), ",");
+        let fields = concat(fs.iter().map(|f| pp_record_field(f, recs, vis)), ",");
         enclose_space("{", fields, "}")
     }
 }
 
 fn pp_variant_field<'a>(field: &'a Field, recs: &RecPoints) -> RcDoc<'a> {
     match field.ty.as_ref() {
-        TypeInner::Null => pp_label(&field.id, true),
-        TypeInner::Record(fs) => pp_label(&field.id, true).append(pp_record_fields(fs, recs)),
-        _ => pp_label(&field.id, true).append(enclose("(", pp_ty(&field.ty, recs), ")")),
+        TypeInner::Null => pp_label(&field.id, true, ""),
+        TypeInner::Record(fs) => {
+            pp_label(&field.id, true, "").append(pp_record_fields(fs, recs, ""))
+        }
+        _ => pp_label(&field.id, true, "").append(enclose("(", pp_ty(&field.ty, recs), ")")),
     }
 }
 
@@ -199,7 +215,7 @@ fn pp_defs<'a>(
                     .append(vis)
                     .append("struct ")
                     .append(name)
-                    .append(pp_record_fields(fs, recs))
+                    .append(pp_record_fields(fs, recs, "pub"))
                     .append(separator)
                     .append(RcDoc::hardline())
             }

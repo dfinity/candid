@@ -6,7 +6,7 @@ use ic_cdk::api::call::CallResult as Result;
 
 candid::define_function!(pub T : (S) -> ());
 #[derive(CandidType, Deserialize)]
-pub struct Node { head: candid::Nat, tail: Box<List> }
+pub struct Node { pub head: candid::Nat, pub tail: Box<List> }
 
 #[derive(CandidType, Deserialize)]
 pub struct List(Option<Node>);
@@ -25,7 +25,7 @@ pub enum Tree {
 
 candid::define_function!(pub StreamInnerNext : () -> (Stream) query);
 #[derive(CandidType, Deserialize)]
-pub struct StreamInner { head: candid::Nat, next: StreamInnerNext }
+pub struct StreamInner { pub head: candid::Nat, pub next: StreamInnerNext }
 
 #[derive(CandidType, Deserialize)]
 pub struct Stream(Option<StreamInner>);

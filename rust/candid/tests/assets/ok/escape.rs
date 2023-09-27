@@ -7,13 +7,13 @@ use ic_cdk::api::call::CallResult as Result;
 #[derive(CandidType, Deserialize)]
 pub struct T {
   #[serde(rename="\"")]
-  _34_: candid::Nat,
+  pub _34_: candid::Nat,
   #[serde(rename="\'")]
-  _39_: candid::Nat,
+  pub _39_: candid::Nat,
   #[serde(rename="\"\'")]
-  _7621_: candid::Nat,
+  pub _7621_: candid::Nat,
   #[serde(rename="\\\n\'\"")]
-  _1020746185_: candid::Nat,
+  pub _1020746185_: candid::Nat,
 }
 
 pub struct Service(pub Principal);
