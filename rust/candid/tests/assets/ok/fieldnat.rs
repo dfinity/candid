@@ -5,31 +5,35 @@ use candid::{self, CandidType, Deserialize, Principal, Encode, Decode};
 use ic_cdk::api::call::CallResult as Result;
 
 #[derive(CandidType, Deserialize)]
-pub struct BarArg { #[serde(rename="2")] _50_: candid::Int }
+pub struct BarArg { #[serde(rename="2")] pub _50_: candid::Int }
 
 #[derive(CandidType, Deserialize)]
 pub enum BarRet { #[serde(rename="e20")] E20, #[serde(rename="e30")] E30 }
 
 #[derive(CandidType, Deserialize)]
-pub struct BazArg { _2_: candid::Int, #[serde(rename="2")] _50_: candid::Nat }
+pub struct BazArg {
+  pub _2_: candid::Int,
+  #[serde(rename="2")]
+  pub _50_: candid::Nat,
+}
 
 #[derive(CandidType, Deserialize)]
 pub struct BazRet {}
 
 #[derive(CandidType, Deserialize)]
-pub struct Tuple (String,String,);
+pub struct Tuple (pub String,pub String,);
 
 #[derive(CandidType, Deserialize)]
-pub struct NonTuple { _1_: String, _2_: String }
+pub struct NonTuple { pub _1_: String, pub _2_: String }
 
 #[derive(CandidType, Deserialize)]
 pub enum BibRet { _0_(candid::Int) }
 
 #[derive(CandidType, Deserialize)]
-pub struct FooArg { _2_: candid::Int }
+pub struct FooArg { pub _2_: candid::Int }
 
 #[derive(CandidType, Deserialize)]
-pub struct FooRet { _2_: candid::Int, _2: candid::Int }
+pub struct FooRet { pub _2_: candid::Int, pub _2: candid::Int }
 
 pub struct Service(pub Principal);
 impl Service {

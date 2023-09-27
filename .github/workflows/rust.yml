@@ -32,6 +32,6 @@ jobs:
     - name: fmt
       run: cargo fmt -v -- --check
     - name: lint
-      run: cargo clippy --tests -- -D clippy::all
+      run: cargo clippy --features all --tests -- -D clippy::all
     - name: doc
       run: cargo doc

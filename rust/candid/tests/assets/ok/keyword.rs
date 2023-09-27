@@ -8,20 +8,20 @@ use ic_cdk::api::call::CallResult as Result;
 pub struct O(Option<Box<O>>);
 
 #[derive(CandidType, Deserialize)]
-pub struct FieldArg { test: u16, _1291438163_: u8 }
+pub struct FieldArg { pub test: u16, pub _1291438163_: u8 }
 
 #[derive(CandidType, Deserialize)]
 pub struct FieldRet {}
 
 #[derive(CandidType, Deserialize)]
 pub struct FieldnatArg {
-  _2_: candid::Int,
+  pub _2_: candid::Int,
   #[serde(rename="2")]
-  _50_: candid::Nat,
+  pub _50_: candid::Nat,
 }
 
 #[derive(CandidType, Deserialize)]
-pub struct Node { head: candid::Nat, tail: Box<List> }
+pub struct Node { pub head: candid::Nat, pub tail: Box<List> }
 
 #[derive(CandidType, Deserialize)]
 pub struct List(Option<Node>);
@@ -36,7 +36,7 @@ pub enum If {
 
 candid::define_function!(pub StreamInnerNext : () -> (Stream) query);
 #[derive(CandidType, Deserialize)]
-pub struct StreamInner { head: candid::Nat, next: StreamInnerNext }
+pub struct StreamInner { pub head: candid::Nat, pub next: StreamInnerNext }
 
 #[derive(CandidType, Deserialize)]
 pub struct Stream(Option<StreamInner>);

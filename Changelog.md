@@ -1,6 +1,19 @@
 
 # Changelog
 
+## 2023-09-27
+
+### Rust 0.9.8
+
+* Implement `CandidType` for `std::cmp::Reverse`.
+* Rust codegen: add `pub` for struct fields.
+* Fix `merge_init_types` and `instantiate_candid` when the main actor refers to a variable.
+
+### Candid UI
+
+* Draw flamegraph for canister upgrade
+* Upstream fix from `merge_init_types`
+
 ## Rust 0.9.7
 
 * Add `utils::merge_init_args` to parse and merge `candid:args` metadata, and add the same endpoint in Candid UI.

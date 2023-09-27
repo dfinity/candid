@@ -15,14 +15,14 @@ pub enum BitcoinNetwork {
 pub type BitcoinAddress = String;
 #[derive(CandidType, Deserialize)]
 pub struct GetBalanceRequest {
-  network: BitcoinNetwork,
-  address: BitcoinAddress,
-  min_confirmations: Option<u32>,
+  pub network: BitcoinNetwork,
+  pub address: BitcoinAddress,
+  pub min_confirmations: Option<u32>,
 }
 
 pub type Satoshi = u64;
 #[derive(CandidType, Deserialize)]
-pub struct GetCurrentFeePercentilesRequest { network: BitcoinNetwork }
+pub struct GetCurrentFeePercentilesRequest { pub network: BitcoinNetwork }
 
 pub type MillisatoshiPerByte = u64;
 #[derive(CandidType, Deserialize)]
@@ -35,35 +35,35 @@ pub enum GetUtxosRequestFilterInner {
 
 #[derive(CandidType, Deserialize)]
 pub struct GetUtxosRequest {
-  network: BitcoinNetwork,
-  filter: Option<GetUtxosRequestFilterInner>,
-  address: BitcoinAddress,
+  pub network: BitcoinNetwork,
+  pub filter: Option<GetUtxosRequestFilterInner>,
+  pub address: BitcoinAddress,
 }
 
 pub type BlockHash = serde_bytes::ByteBuf;
 #[derive(CandidType, Deserialize)]
-pub struct Outpoint { txid: serde_bytes::ByteBuf, vout: u32 }
+pub struct Outpoint { pub txid: serde_bytes::ByteBuf, pub vout: u32 }
 
 #[derive(CandidType, Deserialize)]
-pub struct Utxo { height: u32, value: Satoshi, outpoint: Outpoint }
+pub struct Utxo { pub height: u32, pub value: Satoshi, pub outpoint: Outpoint }
 
 #[derive(CandidType, Deserialize)]
 pub struct GetUtxosResponse {
-  next_page: Option<serde_bytes::ByteBuf>,
-  tip_height: u32,
-  tip_block_hash: BlockHash,
-  utxos: Vec<Utxo>,
+  pub next_page: Option<serde_bytes::ByteBuf>,
+  pub tip_height: u32,
+  pub tip_block_hash: BlockHash,
+  pub utxos: Vec<Utxo>,
 }
 
 #[derive(CandidType, Deserialize)]
 pub struct SendTransactionRequest {
-  transaction: serde_bytes::ByteBuf,
-  network: BitcoinNetwork,
+  pub transaction: serde_bytes::ByteBuf,
+  pub network: BitcoinNetwork,
 }
 
 pub type CanisterId = Principal;
 #[derive(CandidType, Deserialize)]
-pub struct CanisterStatusArg { canister_id: CanisterId }
+pub struct CanisterStatusArg { pub canister_id: CanisterId }
 
 #[derive(CandidType, Deserialize)]
 pub enum CanisterStatusRetStatus {
@@ -77,59 +77,59 @@ pub enum CanisterStatusRetStatus {
 
 #[derive(CandidType, Deserialize)]
 pub struct DefiniteCanisterSettings {
-  freezing_threshold: candid::Nat,
-  controllers: Vec<Principal>,
-  memory_allocation: candid::Nat,
-  compute_allocation: candid::Nat,
+  pub freezing_threshold: candid::Nat,
+  pub controllers: Vec<Principal>,
+  pub memory_allocation: candid::Nat,
+  pub compute_allocation: candid::Nat,
 }
 
 #[derive(CandidType, Deserialize)]
 pub struct CanisterStatusRet {
-  status: CanisterStatusRetStatus,
-  memory_size: candid::Nat,
-  cycles: candid::Nat,
-  settings: DefiniteCanisterSettings,
-  idle_cycles_burned_per_day: candid::Nat,
-  module_hash: Option<serde_bytes::ByteBuf>,
+  pub status: CanisterStatusRetStatus,
+  pub memory_size: candid::Nat,
+  pub cycles: candid::Nat,
+  pub settings: DefiniteCanisterSettings,
+  pub idle_cycles_burned_per_day: candid::Nat,
+  pub module_hash: Option<serde_bytes::ByteBuf>,
 }
 
 #[derive(CandidType, Deserialize)]
 pub struct CanisterSettings {
-  freezing_threshold: Option<candid::Nat>,
-  controllers: Option<Vec<Principal>>,
-  memory_allocation: Option<candid::Nat>,
-  compute_allocation: Option<candid::Nat>,
+  pub freezing_threshold: Option<candid::Nat>,
+  pub controllers: Option<Vec<Principal>>,
+  pub memory_allocation: Option<candid::Nat>,
+  pub compute_allocation: Option<candid::Nat>,
 }
 
 #[derive(CandidType, Deserialize)]
-pub struct CreateCanisterArg { settings: Option<CanisterSettings> }
+pub struct CreateCanisterArg { pub settings: Option<CanisterSettings> }
 
 #[derive(CandidType, Deserialize)]
-pub struct CreateCanisterRet { canister_id: CanisterId }
+pub struct CreateCanisterRet { pub canister_id: CanisterId }
 
 #[derive(CandidType, Deserialize)]
-pub struct DeleteCanisterArg { canister_id: CanisterId }
+pub struct DeleteCanisterArg { pub canister_id: CanisterId }
 
 #[derive(CandidType, Deserialize)]
-pub struct DepositCyclesArg { canister_id: CanisterId }
+pub struct DepositCyclesArg { pub canister_id: CanisterId }
 
 #[derive(CandidType, Deserialize)]
 pub enum EcdsaCurve { #[serde(rename="secp256k1")] Secp256K1 }
 
 #[derive(CandidType, Deserialize)]
-pub struct EcdsaPublicKeyArgKeyId { name: String, curve: EcdsaCurve }
+pub struct EcdsaPublicKeyArgKeyId { pub name: String, pub curve: EcdsaCurve }
 
 #[derive(CandidType, Deserialize)]
 pub struct EcdsaPublicKeyArg {
-  key_id: EcdsaPublicKeyArgKeyId,
-  canister_id: Option<CanisterId>,
-  derivation_path: Vec<serde_bytes::ByteBuf>,
+  pub key_id: EcdsaPublicKeyArgKeyId,
+  pub canister_id: Option<CanisterId>,
+  pub derivation_path: Vec<serde_bytes::ByteBuf>,
 }
 
 #[derive(CandidType, Deserialize)]
 pub struct EcdsaPublicKeyRet {
-  public_key: serde_bytes::ByteBuf,
-  chain_code: serde_bytes::ByteBuf,
+  pub public_key: serde_bytes::ByteBuf,
+  pub chain_code: serde_bytes::ByteBuf,
 }
 
 #[derive(CandidType, Deserialize)]
@@ -143,19 +143,19 @@ pub enum HttpRequestArgMethod {
 }
 
 #[derive(CandidType, Deserialize)]
-pub struct HttpHeader { value: String, name: String }
+pub struct HttpHeader { pub value: String, pub name: String }
 
 #[derive(CandidType, Deserialize)]
 pub struct HttpResponse {
-  status: candid::Nat,
-  body: serde_bytes::ByteBuf,
-  headers: Vec<HttpHeader>,
+  pub status: candid::Nat,
+  pub body: serde_bytes::ByteBuf,
+  pub headers: Vec<HttpHeader>,
 }
 
 #[derive(CandidType, Deserialize)]
 pub struct HttpRequestArgTransformInnerFunctionArg {
-  context: serde_bytes::ByteBuf,
-  response: HttpResponse,
+  pub context: serde_bytes::ByteBuf,
+  pub response: HttpResponse,
 }
 
 candid::define_function!(pub HttpRequestArgTransformInnerFunction : (
@@ -163,18 +163,18 @@ candid::define_function!(pub HttpRequestArgTransformInnerFunction : (
   ) -> (HttpResponse) query);
 #[derive(CandidType, Deserialize)]
 pub struct HttpRequestArgTransformInner {
-  function: HttpRequestArgTransformInnerFunction,
-  context: serde_bytes::ByteBuf,
+  pub function: HttpRequestArgTransformInnerFunction,
+  pub context: serde_bytes::ByteBuf,
 }
 
 #[derive(CandidType, Deserialize)]
 pub struct HttpRequestArg {
-  url: String,
-  method: HttpRequestArgMethod,
-  max_response_bytes: Option<u64>,
-  body: Option<serde_bytes::ByteBuf>,
-  transform: Option<HttpRequestArgTransformInner>,
-  headers: Vec<HttpHeader>,
+  pub url: String,
+  pub method: HttpRequestArgMethod,
+  pub max_response_bytes: Option<u64>,
+  pub body: Option<serde_bytes::ByteBuf>,
+  pub transform: Option<HttpRequestArgTransformInner>,
+  pub headers: Vec<HttpHeader>,
 }
 
 pub type WasmModule = serde_bytes::ByteBuf;
@@ -190,54 +190,56 @@ pub enum InstallCodeArgMode {
 
 #[derive(CandidType, Deserialize)]
 pub struct InstallCodeArg {
-  arg: serde_bytes::ByteBuf,
-  wasm_module: WasmModule,
-  mode: InstallCodeArgMode,
-  canister_id: CanisterId,
+  pub arg: serde_bytes::ByteBuf,
+  pub wasm_module: WasmModule,
+  pub mode: InstallCodeArgMode,
+  pub canister_id: CanisterId,
 }
 
 #[derive(CandidType, Deserialize)]
 pub struct ProvisionalCreateCanisterWithCyclesArg {
-  settings: Option<CanisterSettings>,
-  specified_id: Option<CanisterId>,
-  amount: Option<candid::Nat>,
+  pub settings: Option<CanisterSettings>,
+  pub specified_id: Option<CanisterId>,
+  pub amount: Option<candid::Nat>,
 }
 
 #[derive(CandidType, Deserialize)]
-pub struct ProvisionalCreateCanisterWithCyclesRet { canister_id: CanisterId }
+pub struct ProvisionalCreateCanisterWithCyclesRet {
+  pub canister_id: CanisterId,
+}
 
 #[derive(CandidType, Deserialize)]
 pub struct ProvisionalTopUpCanisterArg {
-  canister_id: CanisterId,
-  amount: candid::Nat,
+  pub canister_id: CanisterId,
+  pub amount: candid::Nat,
 }
 
 #[derive(CandidType, Deserialize)]
-pub struct SignWithEcdsaArgKeyId { name: String, curve: EcdsaCurve }
+pub struct SignWithEcdsaArgKeyId { pub name: String, pub curve: EcdsaCurve }
 
 #[derive(CandidType, Deserialize)]
 pub struct SignWithEcdsaArg {
-  key_id: SignWithEcdsaArgKeyId,
-  derivation_path: Vec<serde_bytes::ByteBuf>,
-  message_hash: serde_bytes::ByteBuf,
+  pub key_id: SignWithEcdsaArgKeyId,
+  pub derivation_path: Vec<serde_bytes::ByteBuf>,
+  pub message_hash: serde_bytes::ByteBuf,
 }
 
 #[derive(CandidType, Deserialize)]
-pub struct SignWithEcdsaRet { signature: serde_bytes::ByteBuf }
+pub struct SignWithEcdsaRet { pub signature: serde_bytes::ByteBuf }
 
 #[derive(CandidType, Deserialize)]
-pub struct StartCanisterArg { canister_id: CanisterId }
+pub struct StartCanisterArg { pub canister_id: CanisterId }
 
 #[derive(CandidType, Deserialize)]
-pub struct StopCanisterArg { canister_id: CanisterId }
+pub struct StopCanisterArg { pub canister_id: CanisterId }
 
 #[derive(CandidType, Deserialize)]
-pub struct UninstallCodeArg { canister_id: CanisterId }
+pub struct UninstallCodeArg { pub canister_id: CanisterId }
 
 #[derive(CandidType, Deserialize)]
 pub struct UpdateSettingsArg {
-  canister_id: Principal,
-  settings: CanisterSettings,
+  pub canister_id: Principal,
+  pub settings: CanisterSettings,
 }
 
 pub struct Service<'a>(pub Principal, pub &'a ic_agent::Agent);

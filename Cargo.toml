@@ -4,3 +4,5 @@ members = [
     "rust/candid_derive",
     "tools/didc",
 ]
+resolver = "2"
+

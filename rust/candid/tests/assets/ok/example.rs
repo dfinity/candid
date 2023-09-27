@@ -5,33 +5,33 @@ use candid::{self, CandidType, Deserialize, Principal, Encode, Decode};
 use ic_cdk::api::call::CallResult as Result;
 
 #[derive(CandidType, Deserialize)]
-pub struct Node { head: candid::Nat, tail: Box<List> }
+pub struct Node { pub head: candid::Nat, pub tail: Box<List> }
 
 #[derive(CandidType, Deserialize)]
 pub struct List(Option<Node>);
 
 pub type MyType = Principal;
 #[derive(CandidType, Deserialize)]
-pub struct ListInner { head: candid::Int, tail: Box<List> }
+pub struct ListInner { pub head: candid::Int, pub tail: Box<List> }
 
 #[derive(CandidType, Deserialize)]
 pub struct List(Option<ListInner>);
 
 #[derive(CandidType, Deserialize)]
-pub struct Nested3 { _0_: candid::Nat, _42_: candid::Nat, _43_: u8 }
+pub struct Nested3 { pub _0_: candid::Nat, pub _42_: candid::Nat, pub _43_: u8 }
 
 #[derive(CandidType, Deserialize)]
 pub enum Nested41 { _42_, A, B, C }
 
 #[derive(CandidType, Deserialize)]
 pub struct Nested {
-  _0_: candid::Nat,
-  _1_: candid::Nat,
-  _2_: (candid::Nat,candid::Int,),
-  _3_: Nested3,
-  _40_: candid::Nat,
-  _41_: Nested41,
-  _42_: candid::Nat,
+  pub _0_: candid::Nat,
+  pub _1_: candid::Nat,
+  pub _2_: (candid::Nat,candid::Int,),
+  pub _3_: Nested3,
+  pub _40_: candid::Nat,
+  pub _41_: Nested41,
+  pub _42_: candid::Nat,
 }
 
 candid::define_service!(pub BrokerFindRet : {
@@ -48,12 +48,12 @@ pub enum HArg1 { A(candid::Nat), B(Option<String>) }
 pub struct HRet42 {}
 
 #[derive(CandidType, Deserialize)]
-pub struct HRet { _42_: HRet42, id: candid::Nat }
+pub struct HRet { pub _42_: HRet42, pub id: candid::Nat }
 
 candid::define_function!(pub FArg1 : (i32) -> (i64));
 candid::define_function!(pub F : (List, FArg1) -> (Option<List>));
 #[derive(CandidType, Deserialize)]
-pub struct B (candid::Int,candid::Nat,);
+pub struct B (pub candid::Int,pub candid::Nat,);
 
 #[derive(CandidType, Deserialize)]
 pub enum A { #[serde(rename="a")] A, #[serde(rename="b")] B(B) }

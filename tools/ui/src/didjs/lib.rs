@@ -45,6 +45,7 @@ fn binding(prog: String, lang: String) -> Option<String> {
         "mo" => bindings::motoko::compile(&env, &actor),
         "installed_did" => {
             let actor = actor.and_then(|t: Type| {
+                let t = env.trace_type(&t).ok()?;
                 if let TypeInner::Class(_, ty) = t.as_ref() {
                     Some(ty.clone())
                 } else {
@@ -75,7 +76,7 @@ fn subtype(new: String, old: String) -> Result<(), String> {
     let old_actor = check_prog(&mut old_env, &old).unwrap().unwrap();
     let mut gamma = std::collections::HashSet::new();
     let old_actor = new_env.merge_type(old_env, old_actor);
-    subtype::subtype(&mut gamma, &new_env, &new_actor, &old_actor).or_else(|e| Err(e.to_string()))
+    subtype::subtype(&mut gamma, &new_env, &new_actor, &old_actor).map_err(|e| e.to_string())
 }
 
 fn retrieve(path: &str) -> Option<&'static [u8]> {

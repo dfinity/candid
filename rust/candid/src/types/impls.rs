@@ -299,6 +299,21 @@ where
     }
 }
 
+impl<T> CandidType for std::cmp::Reverse<T>
+where
+    T: CandidType,
+{
+    fn _ty() -> Type {
+        T::ty()
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        self.0.idl_serialize(serializer)
+    }
+}
+
 impl<'a, T> CandidType for &'a T
 where
     T: ?Sized + CandidType,
