@@ -88,6 +88,7 @@ pub fn instantiate_candid(candid: CandidSource) -> Result<(Vec<Type>, (TypeEnv, 
     use crate::types::TypeInner;
     let (env, serv) = candid.load()?;
     let serv = serv.ok_or_else(|| Error::msg("the Candid interface has no main service type"))?;
+    let serv = env.trace_type(&serv)?;
     Ok(match serv.as_ref() {
         TypeInner::Class(args, ty) => (args.clone(), (env, ty.clone())),
         TypeInner::Service(_) => (vec![], (env, serv)),
@@ -105,6 +106,7 @@ pub fn merge_init_args(candid: &str, init: &str) -> Result<(TypeEnv, Type)> {
     let candid = CandidSource::Text(candid);
     let (env, serv) = candid.load()?;
     let serv = serv.ok_or_else(|| Error::msg("the Candid interface has no main service type"))?;
+    let serv = env.trace_type(&serv)?;
     match serv.as_ref() {
         TypeInner::Class(_, _) => Ok((env, serv)),
         TypeInner::Service(_) => {
