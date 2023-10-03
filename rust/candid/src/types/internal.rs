@@ -295,6 +295,68 @@ impl fmt::Display for TypeInner {
         )
     }
 }
+pub(crate) fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
+    use TypeInner::*;
+    if limit <= 1 {
+        return Err(());
+    }
+    let cost = match t.as_ref() {
+        Null | Bool | Text | Nat8 | Int8 => 4,
+        Nat | Int => 3,
+        Nat16 | Nat32 | Nat64 | Int16 | Int32 | Int64 | Empty => 5,
+        Float32 | Float64 => 7,
+        Reserved => 8,
+        Principal => 9,
+        Knot(_) => 5,
+        Var(id) => id.len() as i32,
+        Opt(t) => 4 + text_size(t, limit - 4)?,
+        Vec(t) => 4 + text_size(t, limit - 4)?,
+        Record(fs) | Variant(fs) => {
+            let mut cnt = 0;
+            let mut limit = limit;
+            for f in fs.iter() {
+                let id_size = match f.id.as_ref() {
+                    Label::Named(n) => n.len() as i32,
+                    Label::Id(_) => 4,
+                    _ => 0,
+                };
+                cnt += id_size + text_size(&f.ty, limit - id_size - 3)? + 3;
+                limit -= cnt;
+            }
+            9 + cnt
+        }
+        Func(func) => {
+            let mode = if func.modes.is_empty() { 0 } else { 6 };
+            let mut cnt = mode + 6;
+            let mut limit = limit - cnt;
+            for t in func.args.iter() {
+                cnt += text_size(t, limit)?;
+                limit -= cnt;
+            }
+            for t in func.rets.iter() {
+                cnt += text_size(t, limit)?;
+                limit -= cnt;
+            }
+            cnt
+        }
+        Service(ms) => {
+            let mut cnt = 0;
+            let mut limit = limit;
+            for (name, f) in ms.iter() {
+                let len = name.len() as i32;
+                cnt += len + text_size(f, limit - len - 3)? + 3;
+                limit -= cnt;
+            }
+            10 + cnt
+        }
+        Class(_, _) | Future | Unknown => unimplemented!(),
+    };
+    if cost > limit {
+        Err(())
+    } else {
+        Ok(cost)
+    }
+}
 
 #[derive(Debug, Eq, Clone)]
 pub enum Label {
