@@ -1,5 +1,6 @@
 use candid::types::TypeEnv;
-use candid_parser::bindings::{candid as candid_export, javascript, motoko, rust, typescript};
+use candid::bindings::candid as candid_export;
+use candid_parser::bindings::{javascript, motoko, rust, typescript};
 use candid_parser::parser::types::IDLProg;
 use candid_parser::parser::typing::{check_file, check_prog};
 use goldenfile::Mint;
