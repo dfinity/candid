@@ -19,18 +19,28 @@ pub mod test;
 
 pub use crate::types::value::{IDLArgs, IDLValue};
 
-impl std::str::FromStr for IDLArgs {
-    type Err = crate::Error;
-    fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
-        let lexer = token::Tokenizer::new(str);
-        Ok(grammar::ArgsParser::new().parse(lexer)?)
-    }
+// impl std::str::FromStr for IDLArgs {
+//     type Err = crate::Error;
+//     fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
+//         let lexer = token::Tokenizer::new(str);
+//         Ok(grammar::ArgsParser::new().parse(lexer)?)
+//     }
+// }
+
+// impl std::str::FromStr for IDLValue {
+//     type Err = crate::Error;
+//     fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
+//         let lexer = token::Tokenizer::new(str);
+//         Ok(grammar::ArgParser::new().parse(lexer)?)
+//     }
+// }
+
+pub fn parse_idl_args(s: &str) -> crate::Result<IDLArgs> {
+    let lexer = token::Tokenizer::new(s);
+    Ok(grammar::ArgsParser::new().parse(lexer)?)
 }
 
-impl std::str::FromStr for IDLValue {
-    type Err = crate::Error;
-    fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
-        let lexer = token::Tokenizer::new(str);
-        Ok(grammar::ArgParser::new().parse(lexer)?)
-    }
+pub fn parse_idl_value(s: &str) -> crate::Result<IDLValue> {
+    let lexer = token::Tokenizer::new(s);
+    Ok(grammar::ArgParser::new().parse(lexer)?)
 }

@@ -50,7 +50,7 @@ impl Assert {
 impl Input {
     pub fn parse(&self, env: &TypeEnv, types: &[Type]) -> Result<IDLArgs> {
         match self {
-            Input::Text(ref s) => s.parse::<IDLArgs>()?.annotate_types(true, env, types),
+            Input::Text(ref s) => Ok(super::parse_idl_args(s)?.annotate_types(true, env, types)?),
             Input::Blob(ref bytes) => Ok(IDLArgs::from_bytes_with_types(bytes, env, types)?),
         }
     }
@@ -82,7 +82,7 @@ impl HostTest {
             Input::Text(s) => {
                 // Without type annotation, numbers are all of type int.
                 // Assertion may not pass.
-                let parsed = s.parse::<IDLArgs>();
+                let parsed = crate::parser::parse_idl_args(s);
                 if parsed.is_err() {
                     let desc = format!("(skip) {}", assert.desc());
                     return HostTest { desc, asserts };
@@ -145,7 +145,7 @@ pub fn check(test: Test) -> Result<()> {
         print!("Checking {} {}...", i + 1, assert.desc());
         let mut types = Vec::new();
         for ty in assert.typ.iter() {
-            types.push(env.ast_to_type(ty)?);
+            types.push(super::typing::ast_to_type(&env, ty)?);
         }
         let input = assert.left.parse(&env, &types);
         let pass = if let Some(assert_right) = &assert.right {

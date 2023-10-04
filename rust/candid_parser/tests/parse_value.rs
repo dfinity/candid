@@ -14,7 +14,7 @@ fn parse_type(input: &str) -> Type {
     use candid_parser::parser::types::IDLType;
     let env = TypeEnv::new();
     let ast = input.parse::<IDLType>().unwrap();
-    env.ast_to_type(&ast).unwrap()
+    candid_parser::parser::typing::ast_to_type(&env, &ast).unwrap()
 }
 
 #[test]

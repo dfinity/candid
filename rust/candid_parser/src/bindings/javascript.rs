@@ -404,7 +404,7 @@ import { Principal } from './principal';
         for (i, assert) in test.asserts.iter().enumerate() {
             let mut types = Vec::new();
             for ty in assert.typ.iter() {
-                types.push(env.ast_to_type(ty).unwrap());
+                types.push(crate::parser::typing::ast_to_type(&env, ty).unwrap());
             }
             let host = HostTest::from_assert(assert, &env, &types);
             let mut expects = Vec::new();

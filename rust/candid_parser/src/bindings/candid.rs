@@ -1,5 +1,5 @@
-use crate::pretty::*;
-use crate::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use ::candid::pretty::*;
+use ::candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
 static KEYWORDS: [&str; 30] = [

@@ -31,6 +31,9 @@ pub enum Error {
 
     #[error(transparent)]
     Custom(#[from] anyhow::Error),
+
+    #[error(transparent)]
+    CandidError(#[from] ::candid::Error),
 }
 
 impl Error {
@@ -74,6 +77,7 @@ impl Error {
             }
             Error::Subtype(e) => Diagnostic::error().with_message(e),
             Error::Custom(e) => Diagnostic::error().with_message(e.to_string()),
+            Error::CandidError(e) => Diagnostic::error().with_message(e.to_string()),
         }
     }
 }

@@ -1,7 +1,8 @@
 //! Candid bindings for different languages.
 // This module assumes the input are type checked, it is safe to use unwrap.
 
-pub mod candid;
+// pub mod candid;
+pub use ::candid::bindings::candid;
 
 #[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
 #[cfg(feature = "parser")]

@@ -9,15 +9,24 @@ pub struct Env<'a> {
     pub pre: bool,
 }
 
-impl TypeEnv {
-    /// Convert candid AST to internal Type
-    pub fn ast_to_type(&self, ast: &super::types::IDLType) -> Result<Type> {
-        let env = Env {
-            te: &mut self.clone(),
-            pre: false,
-        };
-        check_type(&env, ast)
-    }
+// impl TypeEnv {
+//     /// Convert candid AST to internal Type
+//     pub fn ast_to_type(&self, ast: &super::types::IDLType) -> Result<Type> {
+//         let env = Env {
+//             te: &mut self.clone(),
+//             pre: false,
+//         };
+//         check_type(&env, ast)
+//     }
+// }
+
+/// Convert candid AST to internal Type
+pub fn ast_to_type(env: &TypeEnv, ast: &super::types::IDLType) -> Result<Type> {
+    let env = Env {
+        te: &mut env.clone(),
+        pre: false,
+    };
+    check_type(&env, ast)
 }
 
 fn check_prim(prim: &PrimType) -> Type {

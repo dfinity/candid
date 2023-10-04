@@ -88,7 +88,7 @@ impl std::str::FromStr for Nat {
     }
 }
 
-pub(crate) fn pp_num_str(s: &str) -> String {
+pub fn pp_num_str(s: &str) -> String {
     let mut groups = Vec::new();
     for chunk in s.as_bytes().rchunks(3) {
         let str = String::from_utf8_lossy(chunk);

@@ -239,7 +239,7 @@ impl IDLValue {
             (IDLValue::Principal(id), TypeInner::Principal) => IDLValue::Principal(*id),
             (IDLValue::Service(_), TypeInner::Service(_)) => self.clone(),
             (IDLValue::Func(_, _), TypeInner::Func(_)) => self.clone(),
-            
+
             _ => {
                 return Err(Error::msg(format!(
                     "type mismatch: {self} cannot be of type {t}"

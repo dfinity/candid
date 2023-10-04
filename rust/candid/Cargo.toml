@@ -13,7 +13,6 @@ readme = "README.md"
 categories = ["encoding", "parsing", "wasm"]
 keywords = ["internet-computer", "idl", "candid", "dfinity", "parser"]
 include = ["src", "Cargo.toml", "build.rs", "LICENSE", "README.md"]
-build = "build.rs"
 
 [build-dependencies]
 lalrpop = { version = "0.20.0", optional = true }
@@ -66,23 +65,6 @@ bincode = "1.3.3"
 name = "benchmark"
 harness = false
 path = "benches/benchmark.rs"
-
-[[test]]
-name = "test_suite"
-path = "tests/test_suite.rs"
-required-features = ["parser"]
-[[test]]
-name = "value"
-path = "tests/value.rs"
-required-features = ["parser"]
-[[test]]
-name = "parse_value"
-path = "tests/parse_value.rs"
-required-features = ["parser"]
-[[test]]
-name = "parse_type"
-path = "tests/parse_type.rs"
-required-features = ["parser"]
 
 [features]
 configs = ["serde_dhall"]

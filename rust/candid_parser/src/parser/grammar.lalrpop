@@ -116,7 +116,7 @@ AnnVal: IDLValue = {
     <Arg> => <>,
     <arg:Sp<Arg>> ":" <typ:Sp<Typ>> =>? {
         let env = TypeEnv::new();
-        let typ = env.ast_to_type(&typ.0).map_err(|e| error2(e, typ.1))?;
+        let typ = crate::parser::typing::ast_to_type(&env, &typ.0).map_err(|e| error2(e, typ.1))?;
         arg.0.annotate_type(true, &env, &typ).map_err(|e| error2(e, arg.1))
     }
 }

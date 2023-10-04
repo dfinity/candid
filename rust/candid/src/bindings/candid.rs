@@ -39,7 +39,7 @@ fn is_keyword(id: &str) -> bool {
     KEYWORDS.contains(&id)
 }
 
-pub(crate) fn is_valid_as_id(id: &str) -> bool {
+pub fn is_valid_as_id(id: &str) -> bool {
     if id.is_empty() || !id.is_ascii() {
         return false;
     }
@@ -161,7 +161,7 @@ pub fn pp_args(args: &[Type]) -> RcDoc {
     enclose("(", doc, ")")
 }
 
-pub(crate) fn pp_modes(modes: &[crate::types::FuncMode]) -> RcDoc {
+pub fn pp_modes(modes: &[crate::types::FuncMode]) -> RcDoc {
     RcDoc::concat(modes.iter().map(|m| RcDoc::space().append(m.to_doc())))
 }
 
