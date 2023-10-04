@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "rust/candid",
+    "rust/candid_parser",
     "rust/candid_derive",
     "tools/didc",
 ]

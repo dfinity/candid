@@ -1,0 +1,6 @@
+service : {
+    "fn1": (nat32) -> ();
+    "fn2": () -> (nat8) query;
+    "fn3": (nat) -> (int) query;
+    "fn4": (bool) -> (empty) query;
+}

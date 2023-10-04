@@ -1,0 +1,8 @@
+type List = record {
+    head: nat32;
+    tail: List;
+};
+type DoubleRecursion = record {
+    a: DoubleRecursionA;
+};
+type DoubleRecursionA = opt DoubleRecursion;

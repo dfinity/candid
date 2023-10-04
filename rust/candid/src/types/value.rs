@@ -239,27 +239,7 @@ impl IDLValue {
             (IDLValue::Principal(id), TypeInner::Principal) => IDLValue::Principal(*id),
             (IDLValue::Service(_), TypeInner::Service(_)) => self.clone(),
             (IDLValue::Func(_, _), TypeInner::Func(_)) => self.clone(),
-            #[cfg(feature = "parser")]
-            (IDLValue::Number(str), _) if from_parser => {
-                use crate::parser::token::error;
-                match t.as_ref() {
-                    TypeInner::Int => IDLValue::Int(str.parse::<Int>()?),
-                    TypeInner::Nat => IDLValue::Nat(str.parse::<Nat>()?),
-                    TypeInner::Nat8 => IDLValue::Nat8(str.parse::<u8>().map_err(error)?),
-                    TypeInner::Nat16 => IDLValue::Nat16(str.parse::<u16>().map_err(error)?),
-                    TypeInner::Nat32 => IDLValue::Nat32(str.parse::<u32>().map_err(error)?),
-                    TypeInner::Nat64 => IDLValue::Nat64(str.parse::<u64>().map_err(error)?),
-                    TypeInner::Int8 => IDLValue::Int8(str.parse::<i8>().map_err(error)?),
-                    TypeInner::Int16 => IDLValue::Int16(str.parse::<i16>().map_err(error)?),
-                    TypeInner::Int32 => IDLValue::Int32(str.parse::<i32>().map_err(error)?),
-                    TypeInner::Int64 => IDLValue::Int64(str.parse::<i64>().map_err(error)?),
-                    _ => {
-                        return Err(Error::msg(format!(
-                            "type mismatch: {self} can not be of type {t}"
-                        )))
-                    }
-                }
-            }
+            
             _ => {
                 return Err(Error::msg(format!(
                     "type mismatch: {self} cannot be of type {t}"

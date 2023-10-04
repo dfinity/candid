@@ -1,17 +1,17 @@
-use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
-use candid::types::{Label, Type, TypeEnv, TypeInner};
-use candid::{record, variant, CandidType, Nat};
+use candid_parser::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
+use candid_parser::types::{Label, Type, TypeEnv, TypeInner};
+use candid_parser::{record, variant, CandidType, Nat};
 
 fn parse_args(input: &str) -> IDLArgs {
     input.parse().unwrap()
 }
 
-fn parse_args_err(input: &str) -> candid::Result<IDLArgs> {
+fn parse_args_err(input: &str) -> candid_parser::Result<IDLArgs> {
     input.parse()
 }
 
 fn parse_type(input: &str) -> Type {
-    use candid::parser::types::IDLType;
+    use candid_parser::parser::types::IDLType;
     let env = TypeEnv::new();
     let ast = input.parse::<IDLType>().unwrap();
     env.ast_to_type(&ast).unwrap()

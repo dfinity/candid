@@ -353,17 +353,6 @@ pub mod utils;
 pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
 pub mod pretty;
 
-#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
-#[cfg(feature = "parser")]
-pub mod parser;
-#[cfg(feature = "parser")]
-pub use error::{pretty_parse, pretty_read};
-#[cfg(feature = "parser")]
-pub use parser::{
-    types::IDLProg,
-    typing::{check_file, check_prog, pretty_check_file},
-};
-
 pub mod bindings;
 
 // Candid hash function comes from
