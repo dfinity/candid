@@ -14,8 +14,6 @@ categories = ["encoding", "parsing", "wasm"]
 keywords = ["internet-computer", "idl", "candid", "dfinity", "parser"]
 include = ["src", "Cargo.toml", "build.rs", "LICENSE", "README.md"]
 
-[build-dependencies]
-lalrpop = { version = "0.20.0", optional = true }
 
 [dependencies]
 byteorder = "1.4.3"
@@ -37,22 +35,10 @@ thiserror = "1.0.20"
 anyhow = "1.0"
 binread = { version = "2.1", features = ["debug_template"] }
 
-lalrpop-util = { version = "0.20.0", optional = true }
-logos = { version = "0.13", optional = true }
-convert_case = { version = "0.6", optional = true }
-
-arbitrary = { version = "1.0", optional = true }
-# Don't upgrade serde_dhall. It will introduce dependency with invalid license.
-serde_dhall = { version = "0.11", default-features = false, optional = true }
-fake = { version = "2.4", optional = true }
-rand = { version = "0.8", optional = true }
-
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 stacker = "0.1"
 
 [dev-dependencies]
-goldenfile = "1.1.0"
-test-generator = "0.3.0"
 rand = "0.8"
 criterion = "0.4"
 serde_cbor = "0.11.2"
@@ -67,15 +53,4 @@ harness = false
 path = "benches/benchmark.rs"
 
 [features]
-configs = ["serde_dhall"]
-random = ["parser", "configs", "arbitrary", "fake", "rand"]
-parser = ["lalrpop", "lalrpop-util", "logos", "convert_case"]
-all = ["random"]
 mute_warnings = []
-
-# docs.rs-specific configuration
-# To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --features all
-[package.metadata.docs.rs]
-features = ["all"]
-# defines the configuration attribute `docsrs`
-rustdoc-args = ["--cfg", "docsrs"]

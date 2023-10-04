@@ -134,10 +134,6 @@ impl IDLValue {
     /// string, we need to set `from_parser` to true to enable converting numbers to the expected
     /// types, and disable the opt rules.
     pub fn annotate_type(&self, from_parser: bool, env: &TypeEnv, t: &Type) -> Result<Self> {
-        #[cfg(not(feature = "parser"))]
-        if from_parser {
-            panic!("Please enable \"parser\" feature");
-        }
         Ok(match (self, t.as_ref()) {
             (_, TypeInner::Var(id)) => {
                 let ty = env.rec_find_type(id)?;

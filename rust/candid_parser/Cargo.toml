@@ -85,7 +85,6 @@ configs = ["serde_dhall"]
 random = ["parser", "configs", "arbitrary", "fake", "rand"]
 parser = ["lalrpop", "lalrpop-util", "logos", "convert_case"]
 all = ["random"]
-mute_warnings = []
 
 # docs.rs-specific configuration
 # To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --features all

@@ -5,7 +5,7 @@ authors = ["DFINITY Team"]
 edition = "2021"
 
 [dependencies]
-candid = { path = "../../rust/candid", features = ["all"] }
+candid = { path = "../../rust/candid" }
 candid_parser = { path = "../../rust/candid_parser", features = ["all"] }
 clap = { version = "4.3", features = ["derive"] }
 pretty-hex = "0.2.1"

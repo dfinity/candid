@@ -104,19 +104,3 @@ impl From<binread::Error> for Error {
         Error::Binread(get_binread_labels(&e))
     }
 }
-
-#[cfg_attr(docsrs, doc(cfg(feature = "random")))]
-#[cfg(feature = "random")]
-impl From<arbitrary::Error> for Error {
-    fn from(e: arbitrary::Error) -> Error {
-        Error::msg(format!("arbitrary error: {e}"))
-    }
-}
-
-#[cfg_attr(docsrs, doc(cfg(feature = "configs")))]
-#[cfg(feature = "configs")]
-impl From<serde_dhall::Error> for Error {
-    fn from(e: serde_dhall::Error) -> Error {
-        Error::msg(format!("dhall error: {e}"))
-    }
-}
