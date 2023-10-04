@@ -211,20 +211,6 @@ impl<'a> GenState<'a> {
     }
 }
 
-// impl IDLArgs {
-//     pub fn any(seed: &[u8], tree: &Configs, env: &TypeEnv, types: &[Type]) -> Result<Self> {
-//         let mut u = arbitrary::Unstructured::new(seed);
-//         let mut args = Vec::new();
-//         for (i, t) in types.iter().enumerate() {
-//             let tree = tree.with_method(&i.to_string());
-//             let mut state = GenState::new(&tree, env);
-//             let v = state.any(&mut u, t)?;
-//             args.push(v);
-//         }
-//         Ok(IDLArgs { args })
-//     }
-// }
-
 pub fn any(seed: &[u8], tree: &Configs, env: &TypeEnv, types: &[Type]) -> Result<IDLArgs> {
     let mut u = arbitrary::Unstructured::new(seed);
     let mut args = Vec::new();
@@ -236,50 +222,6 @@ pub fn any(seed: &[u8], tree: &Configs, env: &TypeEnv, types: &[Type]) -> Result
     }
     Ok(IDLArgs { args })
 }
-
-// impl TypeEnv {
-//     /// Approxiamte upper bound for IDLValue size of type t. Returns None if infinite.
-//     fn size_helper(&self, seen: &mut HashSet<String>, t: &Type) -> Option<usize> {
-//         use TypeInner::*;
-//         Some(match t.as_ref() {
-//             Var(id) => {
-//                 if seen.insert(id.to_string()) {
-//                     let ty = self.rec_find_type(id).unwrap();
-//                     let res = self.size_helper(seen, ty)?;
-//                     seen.remove(id);
-//                     res
-//                 } else {
-//                     return None;
-//                 }
-//             }
-//             Empty => 0,
-//             Opt(t) => 1 + self.size_helper(seen, t)?,
-//             Vec(t) => 1 + self.size_helper(seen, t)? * 2,
-//             Record(fs) => {
-//                 let mut sum = 0;
-//                 for Field { ty, .. } in fs.iter() {
-//                     sum += self.size_helper(seen, ty)?;
-//                 }
-//                 1 + sum
-//             }
-//             Variant(fs) => {
-//                 let mut max = 0;
-//                 for Field { ty, .. } in fs.iter() {
-//                     let s = self.size_helper(seen, ty)?;
-//                     if s > max {
-//                         max = s;
-//                     };
-//                 }
-//                 1 + max
-//             }
-//             _ => 1,
-//         })
-//     }
-//     fn size(&self, t: &Type) -> Option<usize> {
-//         let mut seen = HashSet::new();
-//         self.size_helper(&mut seen, t)
-//     }
-// }
 
 fn size_helper(env: &TypeEnv, seen: &mut HashSet<String>, t: &Type) -> Option<usize> {
     use TypeInner::*;

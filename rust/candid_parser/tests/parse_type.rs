@@ -30,7 +30,7 @@ service server : {
     prog.parse::<IDLProg>().unwrap();
 }
 
-#[test_generator::test_resources("rust/candid/tests/assets/*.did")]
+#[test_generator::test_resources("rust/candid_parser/tests/assets/*.did")]
 fn compiler_test(resource: &str) {
     let base_path = std::env::current_dir().unwrap().join("tests/assets");
     let mut mint = Mint::new(base_path.join("ok"));
