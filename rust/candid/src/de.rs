@@ -230,7 +230,13 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
+            #[cfg(not(target_arch = "wasm32"))]
             zero_sized_values: 2_000_000,
+            #[cfg(target_arch = "wasm32")]
+            zero_sized_values: 0,
+            #[cfg(not(target_arch = "wasm32"))]
+            full_error_message: true,
+            #[cfg(target_arch = "wasm32")]
             full_error_message: false,
             #[cfg(not(target_arch = "wasm32"))]
             recursion_depth: 0,
