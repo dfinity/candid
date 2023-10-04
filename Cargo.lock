@@ -644,6 +644,7 @@ name = "didc"
 version = "0.3.5"
 dependencies = [
  "anyhow",
+ "candid",
  "candid_parser",
  "clap 4.4.5",
  "hex",

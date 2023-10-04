@@ -1,9 +1,13 @@
 use anyhow::{bail, Result};
-use candid::{
-    parser::types::{IDLType, IDLTypes},
-    pretty_check_file, pretty_parse,
-    types::Type,
-    Error, IDLArgs, TypeEnv,
+use candid::{types::Type, IDLArgs, TypeEnv};
+use candid_parser::{
+    error::pretty_diagnose,
+    parser::{
+        parse_idl_args, parse_idl_value,
+        types::{IDLType, IDLTypes},
+        typing::ast_to_type,
+    },
+    pretty_check_file, pretty_parse, Error,
 };
 use clap::Parser;
 use std::collections::HashSet;
@@ -78,6 +82,7 @@ enum Command {
         /// Specifies target language
         lang: String,
         #[clap(short, long, requires("method"))]
+        #[clap(value_parser = parse_args)]
         /// Specifies input arguments for a method call, mocking the return result
         args: Option<IDLArgs>,
     },
@@ -113,7 +118,7 @@ impl TypeAnnotation {
     fn is_empty(&self) -> bool {
         self.tys.is_none() && self.method.is_none()
     }
-    fn get_types(&self, mode: Mode) -> candid::Result<(TypeEnv, Vec<Type>)> {
+    fn get_types(&self, mode: Mode) -> candid_parser::Result<(TypeEnv, Vec<Type>)> {
         let (env, actor) = if let Some(ref file) = self.defs {
             pretty_check_file(file)?
         } else {
@@ -124,7 +129,7 @@ impl TypeAnnotation {
             (Some(tys), None) => {
                 let mut types = Vec::new();
                 for ty in tys.args.iter() {
-                    types.push(env.ast_to_type(ty)?);
+                    types.push(ast_to_type(&env, ty)?);
                 }
                 Ok((env, types))
             }
@@ -145,7 +150,10 @@ impl TypeAnnotation {
 }
 
 fn parse_args(str: &str) -> Result<IDLArgs, Error> {
-    pretty_parse("candid arguments", str)
+    parse_idl_args(str).map_err(|e| {
+        let _ = pretty_diagnose("candid arguments", str, &e);
+        e
+    })
 }
 fn parse_types(str: &str) -> Result<IDLTypes, Error> {
     pretty_parse("type annotations", str)
@@ -183,25 +191,25 @@ fn main() -> Result<()> {
             } else {
                 (TypeEnv::new(), None)
             };
-            let ty1 = env.ast_to_type(&ty1)?;
-            let ty2 = env.ast_to_type(&ty2)?;
+            let ty1 = ast_to_type(&env, &ty1)?;
+            let ty2 = ast_to_type(&env, &ty2)?;
             candid::types::subtype::subtype(&mut HashSet::new(), &env, &ty1, &ty2)?;
         }
         Command::Bind { input, target } => {
             let (env, actor) = pretty_check_file(&input)?;
             let content = match target.as_str() {
-                "js" => candid::bindings::javascript::compile(&env, &actor),
-                "ts" => candid::bindings::typescript::compile(&env, &actor),
-                "did" => candid::bindings::candid::compile(&env, &actor),
-                "mo" => candid::bindings::motoko::compile(&env, &actor),
+                "js" => candid_parser::bindings::javascript::compile(&env, &actor),
+                "ts" => candid_parser::bindings::typescript::compile(&env, &actor),
+                "did" => candid_parser::bindings::candid::compile(&env, &actor),
+                "mo" => candid_parser::bindings::motoko::compile(&env, &actor),
                 "rs" => {
-                    let config = candid::bindings::rust::Config::new();
-                    candid::bindings::rust::compile(&config, &env, &actor)
+                    let config = candid_parser::bindings::rust::Config::new();
+                    candid_parser::bindings::rust::compile(&config, &env, &actor)
                 }
                 "rs-agent" => {
-                    let mut config = candid::bindings::rust::Config::new();
-                    config.target = candid::bindings::rust::Target::Agent;
-                    candid::bindings::rust::compile(&config, &env, &actor)
+                    let mut config = candid_parser::bindings::rust::Config::new();
+                    config.target = candid_parser::bindings::rust::Target::Agent;
+                    candid_parser::bindings::rust::compile(&config, &env, &actor)
                 }
                 _ => unreachable!(),
             };
@@ -210,11 +218,12 @@ fn main() -> Result<()> {
         Command::Test { input, target } => {
             let test = std::fs::read_to_string(&input)
                 .map_err(|_| Error::msg(format!("could not read file {}", input.display())))?;
-            let ast = pretty_parse::<candid::parser::test::Test>(input.to_str().unwrap(), &test)?;
+            let ast =
+                pretty_parse::<candid_parser::parser::test::Test>(input.to_str().unwrap(), &test)?;
             let content = match target.as_str() {
-                "js" => candid::bindings::javascript::test::test_generate(ast),
+                "js" => candid_parser::bindings::javascript::test::test_generate(ast),
                 "did" => {
-                    candid::parser::test::check(ast)?;
+                    candid_parser::parser::test::check(ast)?;
                     "".to_string()
                 }
                 _ => unreachable!(),
@@ -273,7 +282,10 @@ fn main() -> Result<()> {
                 )?,
                 "blob" => {
                     use candid::types::value::IDLValue;
-                    match pretty_parse::<IDLValue>("blob", &blob)? {
+                    match parse_idl_value(&blob).map_err(|e| {
+                        let _ = pretty_diagnose("blob", &blob, &e);
+                        e
+                    })? {
                         IDLValue::Vec(vec) => vec
                             .iter()
                             .map(|v| {
@@ -304,7 +316,7 @@ fn main() -> Result<()> {
             file,
             args,
         } => {
-            use candid::parser::configs::Configs;
+            use candid_parser::parser::configs::Configs;
             use rand::Rng;
             let (env, types) = if args.is_some() {
                 annotate.get_types(Mode::Decode)?
@@ -335,12 +347,12 @@ fn main() -> Result<()> {
                 let mut rng = rand::thread_rng();
                 (0..2048).map(|_| rng.gen::<u8>()).collect()
             };
-            let args = IDLArgs::any(&seed, &config, &env, &types)?;
+            let args = candid_parser::parser::random::any(&seed, &config, &env, &types)?;
             match lang.as_str() {
                 "did" => println!("{args}"),
                 "js" => println!(
                     "{}",
-                    candid::bindings::javascript::value::pp_args(&args).pretty(80)
+                    candid_parser::bindings::javascript::value::pp_args(&args).pretty(80)
                 ),
                 _ => unreachable!(),
             }

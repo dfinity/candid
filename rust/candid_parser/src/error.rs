@@ -208,10 +208,7 @@ where
     T: std::str::FromStr<Err = Error>,
 {
     str.parse::<T>().or_else(|e| {
-        let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
-        let config = term::Config::default();
-        let file = SimpleFile::new(name, str);
-        term::emit(&mut writer.lock(), &config, &file, &e.report())?;
+        pretty_diagnose(name, str, &e)?;
         Err(e)
     })
 }
@@ -223,11 +220,18 @@ where
 {
     T::read(reader).or_else(|e| {
         let e = Error::from(e);
-        let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
-        let config = term::Config::default();
         let str = hex::encode(reader.get_ref());
-        let file = SimpleFile::new("binary", &str);
-        term::emit(&mut writer.lock(), &config, &file, &e.report())?;
+        pretty_diagnose("binary", &str, &e)?;
         Err(e)
     })
+}
+
+#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
+#[cfg(feature = "parser")]
+pub fn pretty_diagnose(file_name: &str, source: &str, e: &Error) -> Result<()> {
+    let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
+    let config = term::Config::default();
+    let file = SimpleFile::new(file_name, source);
+    term::emit(&mut writer.lock(), &config, &file, &e.report())?;
+    Ok(())
 }

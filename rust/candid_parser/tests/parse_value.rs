@@ -1,13 +1,14 @@
-use candid_parser::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
-use candid_parser::types::{Label, Type, TypeEnv, TypeInner};
-use candid_parser::{record, variant, CandidType, Nat};
+use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
+use candid::types::{Label, Type, TypeEnv, TypeInner};
+use candid::{record, variant, CandidType, Nat};
+use candid_parser::parser::parse_idl_args;
 
 fn parse_args(input: &str) -> IDLArgs {
-    input.parse().unwrap()
+    parse_idl_args(input).unwrap()
 }
 
 fn parse_args_err(input: &str) -> candid_parser::Result<IDLArgs> {
-    input.parse()
+    parse_idl_args(input)
 }
 
 fn parse_type(input: &str) -> Type {
