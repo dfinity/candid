@@ -1,2 +1,0 @@
-type t = record { "\"" : nat; "\'" : nat; "\"\'" : nat; "\\\n\'\"" : nat };
-service : { "\n\'\"\'\'\"\"\r\t" : (t) -> () }

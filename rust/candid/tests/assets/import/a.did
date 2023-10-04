@@ -1,2 +1,0 @@
-import "b/b.did";
-type a = variant {a;b:b};
