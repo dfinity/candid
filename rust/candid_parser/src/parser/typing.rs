@@ -1,6 +1,6 @@
 use super::types::*;
-use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
 use crate::{pretty_parse, Error, Result};
+use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 

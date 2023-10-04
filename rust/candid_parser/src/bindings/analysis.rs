@@ -1,5 +1,5 @@
-use candid::types::{Type, TypeEnv, TypeInner};
 use crate::Result;
+use candid::types::{Type, TypeEnv, TypeInner};
 use std::collections::BTreeSet;
 
 /// Same as chase_actor, with seen set as part of the type. Used for chasing type names from type definitions.

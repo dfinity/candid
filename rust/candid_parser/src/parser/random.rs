@@ -1,9 +1,9 @@
 use super::configs::{path_name, Configs};
-use candid::Deserialize;
 use crate::{Error, Result};
 use arbitrary::{unstructured::Int, Arbitrary, Unstructured};
 use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
 use candid::types::{Field, Type, TypeEnv, TypeInner};
+use candid::Deserialize;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 
