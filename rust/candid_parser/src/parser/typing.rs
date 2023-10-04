@@ -1,5 +1,5 @@
 use super::types::*;
-use crate::types::{Field, Function, Type, TypeEnv, TypeInner};
+use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
 use crate::{pretty_parse, Error, Result};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -89,7 +89,7 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
                 return Err(Error::msg("cannot have more than one mode"));
             }
             if func.modes.len() == 1
-                && func.modes[0] == crate::types::FuncMode::Oneway
+                && func.modes[0] == candid::types::FuncMode::Oneway
                 && !t2.is_empty()
             {
                 return Err(Error::msg("oneway function has non-unit return type"));

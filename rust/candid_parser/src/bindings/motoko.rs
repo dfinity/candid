@@ -2,9 +2,9 @@
 // https://github.com/dfinity/motoko/blob/master/design/IDL-Motoko.md
 
 use super::candid::is_valid_as_id;
-use crate::pretty::*;
-use crate::types::FuncMode;
-use crate::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use candid::pretty::*;
+use candid::types::FuncMode;
+use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
 // The definition of tuple is language specific.
@@ -84,7 +84,9 @@ fn escape(id: &str, is_method: bool) -> RcDoc {
             str(id)
         }
     } else if !is_method {
-        str("_").append(crate::idl_hash(id).to_string()).append("_")
+        str("_")
+            .append(candid::idl_hash(id).to_string())
+            .append("_")
     } else {
         panic!("Candid method {id} is not a valid Motoko id");
     }

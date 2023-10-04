@@ -1,7 +1,7 @@
+use candid::types::TypeEnv;
 use candid_parser::bindings::{candid as candid_export, javascript, motoko, rust, typescript};
 use candid_parser::parser::types::IDLProg;
 use candid_parser::parser::typing::{check_file, check_prog};
-use candid_parser::types::TypeEnv;
 use goldenfile::Mint;
 use std::io::Write;
 use std::path::Path;
@@ -62,7 +62,7 @@ fn compiler_test(resource: &str) {
             }
             {
                 let mut config = rust::Config::new();
-                config.canister_id = Some(candid_parser::Principal::from_text("aaaaa-aa").unwrap());
+                config.canister_id = Some(candid::Principal::from_text("aaaaa-aa").unwrap());
                 if filename.file_name().unwrap().to_str().unwrap() == "management.did" {
                     config.target = rust::Target::Agent;
                 }

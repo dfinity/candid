@@ -1,6 +1,6 @@
 use super::analysis::{chase_actor, infer_rec};
-use crate::pretty::*;
-use crate::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use candid::pretty::*;
+use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
@@ -18,7 +18,7 @@ pub struct Config {
     /// Applies to all types for now
     pub type_attributes: String,
     /// Only generates SERVICE struct if canister_id is not provided
-    pub canister_id: Option<crate::Principal>,
+    pub canister_id: Option<candid::Principal>,
     /// Service name when canister id is provided
     pub service_name: String,
     pub target: Target,
@@ -62,7 +62,7 @@ fn ident_(id: &str, case: Option<Case>) -> (RcDoc, bool) {
         || id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
         || id.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
     {
-        return (RcDoc::text(format!("_{}_", crate::idl_hash(id))), true);
+        return (RcDoc::text(format!("_{}_", candid::idl_hash(id))), true);
     }
     let (is_rename, id) = if let Some(case) = case {
         let new_id = id.to_case(case);

@@ -1,9 +1,9 @@
 use super::configs::{path_name, Configs};
-use crate::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
-use crate::types::{Field, Type, TypeEnv, TypeInner};
-use crate::Deserialize;
+use candid::Deserialize;
 use crate::{Error, Result};
 use arbitrary::{unstructured::Int, Arbitrary, Unstructured};
+use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
+use candid::types::{Field, Type, TypeEnv, TypeInner};
 use std::collections::HashSet;
 use std::convert::TryFrom;
 
@@ -140,7 +140,7 @@ impl<'a> GenState<'a> {
             TypeInner::Int64 => IDLValue::Int64(arbitrary_num(u, self.config.range)?),
             TypeInner::Float32 => IDLValue::Float32(u.arbitrary()?),
             TypeInner::Float64 => IDLValue::Float64(u.arbitrary()?),
-            TypeInner::Principal => IDLValue::Principal(crate::Principal::anonymous()),
+            TypeInner::Principal => IDLValue::Principal(candid::Principal::anonymous()),
             TypeInner::Text => {
                 IDLValue::Text(arbitrary_text(u, &self.config.text, &self.config.width)?)
             }

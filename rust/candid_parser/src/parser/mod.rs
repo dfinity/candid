@@ -17,8 +17,6 @@ pub mod configs;
 pub mod random;
 pub mod test;
 
-pub use crate::types::value::{IDLArgs, IDLValue};
-
 // impl std::str::FromStr for IDLArgs {
 //     type Err = crate::Error;
 //     fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
@@ -35,12 +33,12 @@ pub use crate::types::value::{IDLArgs, IDLValue};
 //     }
 // }
 
-pub fn parse_idl_args(s: &str) -> crate::Result<IDLArgs> {
+pub fn parse_idl_args(s: &str) -> crate::Result<candid::IDLArgs> {
     let lexer = token::Tokenizer::new(s);
     Ok(grammar::ArgsParser::new().parse(lexer)?)
 }
 
-pub fn parse_idl_value(s: &str) -> crate::Result<IDLValue> {
+pub fn parse_idl_value(s: &str) -> crate::Result<candid::IDLValue> {
     let lexer = token::Tokenizer::new(s);
     Ok(grammar::ArgParser::new().parse(lexer)?)
 }

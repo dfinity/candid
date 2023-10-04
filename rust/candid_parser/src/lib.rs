@@ -325,37 +325,8 @@
 // the `docsrs` configuration attribute is defined
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-pub use candid_derive::{candid_method, export_service, CandidType};
-pub use serde::Deserialize;
-
 pub mod error;
 pub use error::{Error, Result};
-
-// pub mod types;
-pub use ::candid::types;
-pub use types::CandidType;
-pub use types::{
-    arc,
-    number::{Int, Nat},
-    principal::Principal,
-    rc,
-    reference::{Func, Service},
-    reserved::{Empty, Reserved},
-    value::{IDLArgs, IDLValue},
-    TypeEnv,
-};
-
-#[allow(dead_code)]
-// pub mod binary_parser;
-// pub mod de;
-// pub mod ser;
-pub use ::candid::{binary_parser, de, ser};
-
-// pub mod utils;
-pub use ::candid::utils;
-pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
-// pub mod pretty;
-pub use ::candid::pretty;
 
 #[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
 #[cfg(feature = "parser")]
@@ -369,19 +340,3 @@ pub use parser::{
 };
 
 pub mod bindings;
-
-// Candid hash function comes from
-// https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf
-// Not public API. Only used by tests.
-// Remember to update the same function in candid_derive if you change this function.
-// #[doc(hidden)]
-// #[inline]
-// pub fn idl_hash(id: &str) -> u32 {
-//     let mut s: u32 = 0;
-//     for c in id.as_bytes().iter() {
-//         s = s.wrapping_mul(223).wrapping_add(*c as u32);
-//     }
-//     s
-// }
-
-pub use ::candid::idl_hash;

@@ -1,5 +1,5 @@
-use crate::types::Type;
 use crate::Result;
+use candid::types::Type;
 use serde::de::DeserializeOwned;
 use serde_dhall::{from_simple_value, SimpleValue};
 

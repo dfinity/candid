@@ -1,4 +1,4 @@
-use crate::types::{Type, TypeEnv, TypeInner};
+use candid::types::{Type, TypeEnv, TypeInner};
 use crate::Result;
 use std::collections::BTreeSet;
 

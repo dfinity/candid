@@ -1,4 +1,4 @@
-use crate::types::{FuncMode, Label};
+use candid::types::{FuncMode, Label};
 use crate::Result;
 
 #[derive(Debug, Clone)]
