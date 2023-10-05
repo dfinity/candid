@@ -235,7 +235,23 @@ impl IDLValue {
             (IDLValue::Principal(id), TypeInner::Principal) => IDLValue::Principal(*id),
             (IDLValue::Service(_), TypeInner::Service(_)) => self.clone(),
             (IDLValue::Func(_, _), TypeInner::Func(_)) => self.clone(),
-
+            (IDLValue::Number(str), _) if from_parser => match t.as_ref() {
+                TypeInner::Int => IDLValue::Int(str.parse::<Int>()?),
+                TypeInner::Nat => IDLValue::Nat(str.parse::<Nat>()?),
+                TypeInner::Nat8 => IDLValue::Nat8(str.parse::<u8>()?),
+                TypeInner::Nat16 => IDLValue::Nat16(str.parse::<u16>()?),
+                TypeInner::Nat32 => IDLValue::Nat32(str.parse::<u32>()?),
+                TypeInner::Nat64 => IDLValue::Nat64(str.parse::<u64>()?),
+                TypeInner::Int8 => IDLValue::Int8(str.parse::<i8>()?),
+                TypeInner::Int16 => IDLValue::Int16(str.parse::<i16>()?),
+                TypeInner::Int32 => IDLValue::Int32(str.parse::<i32>()?),
+                TypeInner::Int64 => IDLValue::Int64(str.parse::<i64>()?),
+                _ => {
+                    return Err(Error::msg(format!(
+                        "type mismatch: {self} can not be of type {t}"
+                    )))
+                }
+            },
             _ => {
                 return Err(Error::msg(format!(
                     "type mismatch: {self} cannot be of type {t}"

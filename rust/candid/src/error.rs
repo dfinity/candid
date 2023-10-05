@@ -2,7 +2,7 @@
 
 use codespan_reporting::diagnostic::Label;
 use serde::{de, ser};
-use std::io;
+use std::{io, num::ParseIntError};
 use thiserror::Error;
 
 pub type Result<T = ()> = std::result::Result<T, Error>;
@@ -102,5 +102,11 @@ impl From<io::Error> for Error {
 impl From<binread::Error> for Error {
     fn from(e: binread::Error) -> Error {
         Error::Binread(get_binread_labels(&e))
+    }
+}
+
+impl From<ParseIntError> for Error {
+    fn from(e: ParseIntError) -> Error {
+        Error::msg(format!("ParseIntError: {e}"))
     }
 }
