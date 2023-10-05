@@ -1,6 +1,10 @@
 
 # Changelog
 
+## Rust 0.9.9
+
+* Set different config values for `full_error_message` and `zero_sized_values` for Wasm and non-Wasm target.
+
 ## 2023-09-27
 
 ### Rust 0.9.8
