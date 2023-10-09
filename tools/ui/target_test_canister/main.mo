@@ -4,10 +4,18 @@ import Text "mo:base/Text";
 import Blob "mo:base/Blob";
 
 actor {
-    let owner = Principal.fromText("oigup-gpnce-ytl3m-gkuwt-hf4yc-lci5d-ijsy5-oc4ak-kz3v2-fjbl5-mae");
+    var allowed = Principal.fromText("oigup-gpnce-ytl3m-gkuwt-hf4yc-lci5d-ijsy5-oc4ak-kz3v2-fjbl5-mae");
+
+    public func _set_allowed_principal(principal: Text) : async () {
+        allowed := Principal.fromText(principal);
+    };
+
+    public query func _get_allowed_principal() : async Text {
+        Principal.toText(allowed);
+    };
 
     public shared query ({ caller }) func hello() : async Text {
-        if (caller != owner) {
+        if (caller != allowed) {
             throw Error.reject("Unauthorized");
         };
 
