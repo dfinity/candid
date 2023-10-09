@@ -1,6 +1,9 @@
 import { fetchActor, render, getCycles, getNames } from "./candid";
 import { renderAuth } from "./auth";
 import { Principal } from "@dfinity/principal";
+import { ActorSubclass } from "@dfinity/agent";
+
+let actor: ActorSubclass | undefined;
 
 async function main() {
   const params = new URLSearchParams(window.location.search);
@@ -38,7 +41,7 @@ async function main() {
     document.title = `Canister ${cid}`;
     const canisterId = Principal.fromText(cid);
     const profiling = await getCycles(canisterId);
-    const actor = await fetchActor(canisterId);
+    actor = await fetchActor(canisterId);
     await renderAuth(canisterId);
     const names = await getNames(canisterId);
     render(canisterId, actor, profiling);
@@ -67,3 +70,7 @@ window.addEventListener("popstate", (event) => {
     window.location.reload();
   }
 });
+
+export async function refresh_actor(canisterId: Principal) {
+  actor = await fetchActor(canisterId);
+};

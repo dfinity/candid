@@ -84,6 +84,8 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   authClient = authClient ?? (await AuthClient.create())
   if (await authClient.isAuthenticated()) {
     agent.replaceIdentity(authClient.getIdentity());
+    console.log("Authenticated with Internet Identity Principal")
+    console.log(authClient.getIdentity().getPrincipal().toString())
   }
 
   return Actor.createActor(candid.idlFactory, { agent, canisterId });
