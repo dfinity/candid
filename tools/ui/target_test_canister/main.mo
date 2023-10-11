@@ -1,12 +1,12 @@
 import Principal "mo:base/Principal";
 import Error "mo:base/Error";
 import Text "mo:base/Text";
-import Blob "mo:base/Blob";
+import { responseBody } "./AlternativeOrigin";
 
 actor {
     var allowed = Principal.fromText("oigup-gpnce-ytl3m-gkuwt-hf4yc-lci5d-ijsy5-oc4ak-kz3v2-fjbl5-mae");
 
-    public func _set_allowed_principal(principal: Text) : async () {
+    public func _set_allowed_principal(principal : Text) : async () {
         allowed := Principal.fromText(principal);
     };
 
@@ -51,13 +51,7 @@ actor {
             return {
                 status_code = 200;
                 headers = [("Access-Control-Allow-Origin", "https://identity.ic0.app")];
-                body = Text.encodeUtf8(
-                    "{
-  \"alternativeOrigins\": [
-    \"https://m4ul7-aqaaa-aaaal-qcewq-cai.raw.icp0.io\"
-  ]
-}"
-                );
+                body = responseBody();
                 upgrade = ?false;
             };
         } else {

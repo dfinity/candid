@@ -1,5 +1,5 @@
 import { fetchActor, render, getCycles, getNames } from "./candid";
-import { renderAuth } from "./auth";
+import { renderAuth } from "./auth/auth";
 import { Principal } from "@dfinity/principal";
 import { ActorSubclass } from "@dfinity/agent";
 
@@ -42,7 +42,7 @@ async function main() {
     const canisterId = Principal.fromText(cid);
     const profiling = await getCycles(canisterId);
     actor = await fetchActor(canisterId);
-    await renderAuth(canisterId);
+    await renderAuth();
     const names = await getNames(canisterId);
     render(canisterId, actor, profiling);
     const app = document.getElementById("app");

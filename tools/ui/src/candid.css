@@ -47,7 +47,6 @@
   width: 100%;
   text-align: center;
   font-size: var(--font-md);
-  line-height: var(--header-height);
   color: var(--darkest);
   border-bottom: 1px solid var(--dark);
 
@@ -188,6 +187,7 @@ input[type='checkbox'] ~ .popup-form {
   border: none;
   text-transform: uppercase;
   flex: 1;
+  cursor: pointer;
 }
 .btn:not(:last-child) {
   margin-right: var(--pad-md);
