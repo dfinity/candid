@@ -81,7 +81,12 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   const dataUri = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(js);
   const candid: any = await eval('import("' + dataUri + '")');
 
-  authClient = authClient ?? (await AuthClient.create())
+  authClient = authClient ?? (await AuthClient.create({
+    idleOptions: {
+      disableIdle: true,
+      disableDefaultIdleCallback: true,
+    },
+  }))
   if (await authClient.isAuthenticated()) {
     agent.replaceIdentity(authClient.getIdentity());
     console.log("Authenticated with Internet Identity Principal")
