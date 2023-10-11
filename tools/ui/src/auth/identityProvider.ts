@@ -1,1 +1,1 @@
-export const identityProvider = "https://identity.ic0.app"
+export const identityProvider = "https://identity.internetcomputer.org"

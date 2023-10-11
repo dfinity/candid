@@ -40,7 +40,7 @@ function insertLoginForm() {
       await login(options)
     })
 
-    const {raw, raw_label, domain, domain_label} = domainForm()
+    const { raw, raw_label, domain, domain_label } = domainForm()
 
     auth!.innerHTML = ""
     auth!.appendChild(raw)
@@ -76,11 +76,11 @@ function insertLogout() {
   const auth = document.getElementById("authentication")
   auth!.innerHTML = ""
 
-  insertCopyId()
-  insertLogoutButton()
+  CopyId()
+  LogoutButton()
 }
 
-function insertLogoutButton() {
+function LogoutButton() {
   const auth = document.getElementById("authentication")
 
   const buttonLogout = document.createElement("button")
@@ -95,7 +95,7 @@ function insertLogoutButton() {
   auth!.appendChild(buttonLogout)
 }
 
-function insertCopyId() {
+function CopyId() {
   if (!authClient) {
     return
   }
@@ -148,8 +148,6 @@ function derivationOrigin(options: DerivationOriginOptions): string {
   if (options.domain !== "icp0.io" && options.domain !== "ic0.app") {
     throw new Error("Invalid domain")
   }
-
-  console.log(options.domain)
 
   return options.raw
     ? "https://" + options.canisterId.toString() + ".raw." + options.domain
