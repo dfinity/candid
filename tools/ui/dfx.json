@@ -14,11 +14,6 @@
           "name": "candid:service"
         }
       ]
-    },
-    "target": {
-      "type": "motoko",
-      "main": "target_test_canister/main.mo",
-      "frontend": {}
     }
   },
   "version": 1
