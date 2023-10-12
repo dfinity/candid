@@ -451,8 +451,7 @@ impl<'de> Visitor<'de> for IDLValueVisitor {
             5u8 => {
                 use std::io::Read;
                 let len = leb128::read::unsigned(&mut bytes).map_err(E::custom)? as usize;
-                let mut buf = Vec::new();
-                buf.resize(len, 0);
+                let mut buf = vec![0; len];
                 bytes.read_exact(&mut buf).map_err(E::custom)?;
                 let meth = String::from_utf8(buf).map_err(E::custom)?;
                 let id = crate::Principal::try_from(bytes).map_err(E::custom)?;
