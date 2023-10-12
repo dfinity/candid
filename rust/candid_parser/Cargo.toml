@@ -5,11 +5,10 @@ edition = "2021"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
 homepage = "https://internetcomputer.org/docs/current/developer-docs/build/candid/candid-concepts"
-documentation = "https://docs.rs/candid"
+documentation = "https://docs.rs/candid_parser"
 repository = "https://github.com/dfinity/candid"
 license = "Apache-2.0"
 readme = "README.md"
-
 categories = ["encoding", "parsing", "wasm"]
 keywords = ["internet-computer", "idl", "candid", "dfinity", "parser"]
 include = ["src", "Cargo.toml", "build.rs", "LICENSE", "README.md"]
@@ -19,7 +18,7 @@ build = "build.rs"
 lalrpop = "0.20.0"
 
 [dependencies]
-candid = { path = "../candid", version = "0.9" }
+candid = { path = "../candid", version = "0.10" }
 codespan-reporting = "0.11"
 hex = "0.4.2"
 num-bigint = { version = "0.4.2", features = ["serde"] }
@@ -48,19 +47,6 @@ stacker = "0.1"
 goldenfile = "1.1.0"
 test-generator = "0.3.0"
 rand = "0.8"
-
-# [[test]]
-# name = "test_suite"
-# path = "tests/test_suite.rs"
-# [[test]]
-# name = "value"
-# path = "tests/value.rs"
-# [[test]]
-# name = "parse_value"
-# path = "tests/parse_value.rs"
-# [[test]]
-# name = "parse_type"
-# path = "tests/parse_type.rs"
 
 [features]
 configs = ["serde_dhall"]

@@ -1,6 +1,6 @@
 [package]
 name = "candid"
-version = "0.9.9"
+version = "0.10.0"
 edition = "2021"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
@@ -9,11 +9,9 @@ documentation = "https://docs.rs/candid"
 repository = "https://github.com/dfinity/candid"
 license = "Apache-2.0"
 readme = "README.md"
-
-categories = ["encoding", "parsing", "wasm"]
-keywords = ["internet-computer", "idl", "candid", "dfinity", "parser"]
-include = ["src", "Cargo.toml", "build.rs", "LICENSE", "README.md"]
-
+categories = ["encoding", "wasm"]
+keywords = ["internet-computer", "idl", "candid", "dfinity"]
+include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
 byteorder = "1.4.3"
