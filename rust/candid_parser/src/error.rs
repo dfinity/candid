@@ -1,4 +1,4 @@
-//! `candid::Result<T> = Result<T, candid::Error>>`
+//! When serializing or deserializing Candid goes wrong.
 
 use codespan_reporting::diagnostic::Label;
 use std::io;
