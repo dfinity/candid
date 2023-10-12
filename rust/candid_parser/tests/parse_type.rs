@@ -1,8 +1,8 @@
 use candid::pretty_printer::compile;
 use candid::types::TypeEnv;
 use candid_parser::bindings::{javascript, motoko, rust, typescript};
-use candid_parser::parser::types::IDLProg;
-use candid_parser::parser::typing::{check_file, check_prog};
+use candid_parser::types::IDLProg;
+use candid_parser::typing::{check_file, check_prog};
 use goldenfile::Mint;
 use std::io::Write;
 use std::path::Path;

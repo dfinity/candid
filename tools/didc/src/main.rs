@@ -2,12 +2,10 @@ use anyhow::{bail, Result};
 use candid::{types::Type, IDLArgs, TypeEnv};
 use candid_parser::{
     error::pretty_diagnose,
-    parser::{
-        parse_idl_args, parse_idl_value,
-        types::{IDLType, IDLTypes},
-        typing::ast_to_type,
-    },
-    pretty_check_file, pretty_parse, Error,
+    parse_idl_args, parse_idl_value, pretty_check_file, pretty_parse,
+    types::{IDLType, IDLTypes},
+    typing::ast_to_type,
+    Error,
 };
 use clap::Parser;
 use std::collections::HashSet;
@@ -218,12 +216,11 @@ fn main() -> Result<()> {
         Command::Test { input, target } => {
             let test = std::fs::read_to_string(&input)
                 .map_err(|_| Error::msg(format!("could not read file {}", input.display())))?;
-            let ast =
-                pretty_parse::<candid_parser::parser::test::Test>(input.to_str().unwrap(), &test)?;
+            let ast = pretty_parse::<candid_parser::test::Test>(input.to_str().unwrap(), &test)?;
             let content = match target.as_str() {
                 "js" => candid_parser::bindings::javascript::test::test_generate(ast),
                 "did" => {
-                    candid_parser::parser::test::check(ast)?;
+                    candid_parser::test::check(ast)?;
                     "".to_string()
                 }
                 _ => unreachable!(),
@@ -316,7 +313,7 @@ fn main() -> Result<()> {
             file,
             args,
         } => {
-            use candid_parser::parser::configs::Configs;
+            use candid_parser::configs::Configs;
             use rand::Rng;
             let (env, types) = if args.is_some() {
                 annotate.get_types(Mode::Decode)?
@@ -347,7 +344,7 @@ fn main() -> Result<()> {
                 let mut rng = rand::thread_rng();
                 (0..2048).map(|_| rng.gen::<u8>()).collect()
             };
-            let args = candid_parser::parser::random::any(&seed, &config, &env, &types)?;
+            let args = candid_parser::random::any(&seed, &config, &env, &types)?;
             match lang.as_str() {
                 "did" => println!("{args}"),
                 "js" => println!(

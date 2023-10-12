@@ -357,7 +357,7 @@ pub mod value {
 
 pub mod test {
     use super::value;
-    use crate::parser::test::{HostAssert, HostTest, Test};
+    use crate::test::{HostAssert, HostTest, Test};
     use candid::pretty::*;
     use candid::TypeEnv;
     use pretty::RcDoc;
@@ -404,7 +404,7 @@ import { Principal } from './principal';
         for (i, assert) in test.asserts.iter().enumerate() {
             let mut types = Vec::new();
             for ty in assert.typ.iter() {
-                types.push(crate::parser::typing::ast_to_type(&env, ty).unwrap());
+                types.push(crate::typing::ast_to_type(&env, ty).unwrap());
             }
             let host = HostTest::from_assert(assert, &env, &types);
             let mut expects = Vec::new();

@@ -1,4 +1,4 @@
-use candid_parser::parser::test::{check, Test};
+use candid_parser::test::{check, Test};
 
 #[test_generator::test_resources("test/*.test.did")]
 fn decode_test(resource: &str) {

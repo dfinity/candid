@@ -63,7 +63,7 @@ pub fn instantiate_candid(candid: CandidSource) -> Result<(Vec<Type>, (TypeEnv, 
 /// Merge canister metadata candid:args and candid:service into a service constructor.
 /// If candid:service already contains init args, returns the original did file.
 pub fn merge_init_args(candid: &str, init: &str) -> Result<(TypeEnv, Type)> {
-    use crate::parser::{types::IDLInitArgs, typing::check_init_args};
+    use crate::{types::IDLInitArgs, typing::check_init_args};
     use candid::types::TypeInner;
     let candid = CandidSource::Text(candid);
     let (env, serv) = candid.load()?;

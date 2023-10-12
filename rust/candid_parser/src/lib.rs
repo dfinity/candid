@@ -1,5 +1,9 @@
 //! # Candid Parser
 //!
+//! Provides parser for Candid type and value.
+//!  * `str.parse::<IDLProg>()` parses the Candid signature file to Candid AST.
+//!  * `parse_idl_args()` parses the Candid value in text format to a struct `IDLArg` that can be used for serialization and deserialization between Candid and an enum type `IDLValue` in Rust.
+
 //! ## Parse [`candid::IDLArgs`]
 //!
 //! We provide a parser to parse Candid values in text format.
@@ -7,7 +11,7 @@
 //! ```
 //! # fn f() -> anyhow::Result<()> {
 //! use candid::{IDLArgs, TypeEnv};
-//! use candid_parser::parser::parse_idl_args;
+//! use candid_parser::parse_idl_args;
 //! // Candid values represented in text format
 //! let text_value = r#"
 //!      (42, opt true, vec {1;2;3},
@@ -78,7 +82,7 @@
 //! ```
 //! # fn f() -> anyhow::Result<()> {
 //! use candid::{IDLArgs, types::value::IDLValue};
-//! use candid_parser::parser::parse_idl_args;
+//! use candid_parser::parse_idl_args;
 //! # use candid::TypeEnv;
 //! # use candid_parser::{IDLProg, check_prog};
 //! # let did_file = r#"
@@ -113,15 +117,31 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod error;
-pub use error::{Error, Result};
-
-pub mod parser;
-pub use error::pretty_parse;
-pub use parser::{
-    types::IDLProg,
-    typing::{check_file, check_prog, pretty_check_file},
-};
+pub use error::{pretty_parse, Error, Result};
 
 pub mod bindings;
-
+pub mod grammar;
+pub mod token;
+pub mod types;
 pub mod utils;
+pub use types::IDLProg;
+pub mod typing;
+pub use typing::{check_file, check_prog, pretty_check_file};
+
+#[cfg_attr(docsrs, doc(cfg(feature = "configs")))]
+#[cfg(feature = "configs")]
+pub mod configs;
+#[cfg_attr(docsrs, doc(cfg(feature = "random")))]
+#[cfg(feature = "random")]
+pub mod random;
+pub mod test;
+
+pub fn parse_idl_args(s: &str) -> crate::Result<candid::IDLArgs> {
+    let lexer = token::Tokenizer::new(s);
+    Ok(grammar::ArgsParser::new().parse(lexer)?)
+}
+
+pub fn parse_idl_value(s: &str) -> crate::Result<candid::IDLValue> {
+    let lexer = token::Tokenizer::new(s);
+    Ok(grammar::ArgParser::new().parse(lexer)?)
+}

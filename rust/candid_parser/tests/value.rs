@@ -1,7 +1,7 @@
 use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
 use candid::types::{Label, TypeEnv};
 use candid::{decode_args, decode_one, Decode};
-use candid_parser::parser::{parse_idl_args, types::IDLProg, typing::check_prog};
+use candid_parser::{parse_idl_args, types::IDLProg, typing::check_prog};
 
 #[test]
 fn test_parser() {

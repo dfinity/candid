@@ -4,7 +4,7 @@ use codespan_reporting::diagnostic::Label;
 use std::io;
 use thiserror::Error;
 
-use crate::parser::token;
+use crate::token;
 use codespan_reporting::{
     diagnostic::Diagnostic,
     files::{Error as ReportError, SimpleFile},

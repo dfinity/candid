@@ -82,7 +82,7 @@ impl HostTest {
             Input::Text(s) => {
                 // Without type annotation, numbers are all of type int.
                 // Assertion may not pass.
-                let parsed = crate::parser::parse_idl_args(s);
+                let parsed = crate::parse_idl_args(s);
                 if parsed.is_err() {
                     let desc = format!("(skip) {}", assert.desc());
                     return HostTest { desc, asserts };
