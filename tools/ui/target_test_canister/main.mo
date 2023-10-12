@@ -4,6 +4,9 @@ import Text "mo:base/Text";
 import { responseBody } "./AlternativeOrigin";
 
 actor {
+    // Only this principal is allowed to call the `hello` method.
+    // Anyone can change this principal by calling the `_set_allowed_principal` method 
+    // to test the login flow.
     var allowed = Principal.fromText("oigup-gpnce-ytl3m-gkuwt-hf4yc-lci5d-ijsy5-oc4ak-kz3v2-fjbl5-mae");
 
     public func _set_allowed_principal(principal : Text) : async () {
@@ -22,6 +25,10 @@ actor {
         "Hello World!";
     };
 
+    // Both the `http_request` (query) and `http_request_update` (update) methods
+    // are implemented to 'upgrade to update' so that `/.well-known/ii-alternative-origins`
+    // response can be verified 
+    // See https://internetcomputer.org/docs/current/references/ii-spec#alternative-frontend-origins
     type HttpRequest = {
         method : Text;
         url : Text;
