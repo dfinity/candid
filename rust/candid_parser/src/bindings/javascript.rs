@@ -267,8 +267,8 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 }
 
 pub mod value {
-    use super::super::candid::value::number_to_string;
     use candid::pretty::*;
+    use candid::pretty_printer::value::number_to_string;
     use candid::types::value::{IDLArgs, IDLField, IDLValue};
     use candid::types::Label;
     use pretty::RcDoc;

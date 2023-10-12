@@ -1,5 +1,5 @@
 use super::internal::{find_type, Field, Label, Type, TypeInner};
-use crate::bindings::candid::pp_args;
+use crate::pretty_printer::pp_args;
 use crate::types::TypeEnv;
 use crate::{Error, Result};
 use anyhow::Context;

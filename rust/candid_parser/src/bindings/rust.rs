@@ -269,7 +269,7 @@ fn pp_args(args: &[Type]) -> RcDoc {
 fn pp_ty_func(f: &Function) -> RcDoc {
     let args = pp_args(&f.args);
     let rets = pp_args(&f.rets);
-    let modes = super::candid::pp_modes(&f.modes);
+    let modes = candid::pretty_printer::pp_modes(&f.modes);
     args.append(" ->")
         .append(RcDoc::space())
         .append(rets.append(modes))

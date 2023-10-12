@@ -200,7 +200,7 @@ fn main() -> Result<()> {
             let content = match target.as_str() {
                 "js" => candid_parser::bindings::javascript::compile(&env, &actor),
                 "ts" => candid_parser::bindings::typescript::compile(&env, &actor),
-                "did" => candid::bindings::candid::compile(&env, &actor),
+                "did" => candid::pretty_printer::compile(&env, &actor),
                 "mo" => candid_parser::bindings::motoko::compile(&env, &actor),
                 "rs" => {
                     let config = candid_parser::bindings::rust::Config::new();
@@ -257,7 +257,7 @@ fn main() -> Result<()> {
                 "blob" => {
                     let mut res = String::new();
                     for ch in bytes.iter() {
-                        res.push_str(&candid::bindings::candid::value::pp_char(*ch));
+                        res.push_str(&candid::pretty_printer::value::pp_char(*ch));
                     }
                     format!("blob \"{res}\"")
                 }

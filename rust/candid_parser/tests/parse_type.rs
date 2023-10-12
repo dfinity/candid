@@ -1,4 +1,4 @@
-use candid::bindings::candid as candid_export;
+use candid::pretty_printer::compile;
 use candid::types::TypeEnv;
 use candid_parser::bindings::{javascript, motoko, rust, typescript};
 use candid_parser::parser::types::IDLProg;
@@ -42,7 +42,7 @@ fn compiler_test(resource: &str) {
         Ok((env, actor)) => {
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
-                let content = candid_export::compile(&env, &actor);
+                let content = compile(&env, &actor);
                 // Type check output
                 let ast = content.parse::<IDLProg>().unwrap();
                 check_prog(&mut TypeEnv::new(), &ast).unwrap();

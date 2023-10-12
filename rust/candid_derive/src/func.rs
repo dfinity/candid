@@ -146,7 +146,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
             fn __export_service() -> String {
                 #service
                 #actor
-                let result = #candid::bindings::candid::compile(&env.env, &actor);
+                let result = #candid::pretty_printer::compile(&env.env, &actor);
                 format!("{}", result)
             }
         };
