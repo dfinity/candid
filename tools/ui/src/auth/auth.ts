@@ -20,7 +20,7 @@ function insertLoginForm() {
   if (!cid) {
     throw new Error("No canister ID available for authentication")
   } else {
-    const auth = document.getElementById("authentication")
+    const auth = document.getElementById("authentication")!
 
     const buttonLogin = document.createElement("button")
     buttonLogin.className = "btn"
@@ -40,36 +40,18 @@ function insertLoginForm() {
       await login(options)
     })
 
-    const { raw, raw_label, domain, domain_label } = domainForm()
-
-    auth!.innerHTML = ""
-    auth!.appendChild(raw)
-    auth!.appendChild(raw_label)
-    auth!.appendChild(domain)
-    auth!.appendChild(domain_label)
-    auth!.appendChild(buttonLogin)
+    auth.innerHTML = `
+      <label>
+        <input id="raw" type="checkbox" checked></input>
+        raw
+      </label>
+      <label>
+        <input id="domain" type="checkbox" checked></input>
+        ic0
+      </label>
+    `
+    auth.appendChild(buttonLogin);
   }
-}
-
-function domainForm() {
-  const raw = document.createElement("input")
-  raw.id = "raw"
-  raw.type = "checkbox"
-  raw.checked = true
-
-  const raw_label = document.createElement("label")
-  raw_label.innerText = "raw"
-  raw_label.style.marginRight = "10px"
-
-  const domain = document.createElement("input")
-  domain.id = "domain"
-  domain.type = "checkbox"
-  domain.checked = true
-
-  const domain_label = document.createElement("label")
-  domain_label.innerText = "icp0.io"
-
-  return { raw, raw_label, domain, domain_label }
 }
 
 function insertLogout() {
