@@ -98,7 +98,7 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
 
 export function getProfilerActor(canisterId: Principal): ActorSubclass {
   const profiler_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
-    __get_profiling: IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Int32, IDL.Int64))], ['query']),
+    __get_profiling: IDL.Func([IDL.Int32], [IDL.Vec(IDL.Tuple(IDL.Int32, IDL.Int64)), IDL.Opt(IDL.Int32)], ['query']),
     __get_cycles: IDL.Func([], [IDL.Int64], ['query']),
   });
   return Actor.createActor(profiler_interface, { agent, canisterId });
@@ -155,7 +155,19 @@ async function getDidJsFromMetadata(canisterId: Principal): Promise<undefined | 
 export async function getProfiling(canisterId: Principal): Promise<Array<[number, bigint]>|undefined> {
   try {
     const actor = getProfilerActor(canisterId);
-    const info = await actor.__get_profiling() as Array<[number, bigint]>;
+    let info: Array<[number, bigint]> = [];
+    let idx = 0;
+    let cnt = 0;
+    while (cnt < 50) {
+      const [res, next] = await actor.__get_profiling(idx) as [Array<[number, bigint]>, [number]|[]];
+      info = info.concat(res);
+      if (next.length === 1) {
+        idx = next[0];
+        cnt++;
+      } else {
+        break;
+      }
+    }
     return info;
   } catch(err) {
     console.log(err);
