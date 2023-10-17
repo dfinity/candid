@@ -423,7 +423,11 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        Err(Error::msg("Cannot decode empty type"))
+        Err(if *self.wire_type == TypeInner::Empty {
+            Error::msg("Cannot decode empty type")
+        } else {
+            Error::subtype("Cannot decode empty type")
+        })
     }
     fn deserialize_future<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
