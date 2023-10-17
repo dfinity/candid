@@ -5,6 +5,7 @@ import {
 } from '@dfinity/candid';
 import {Principal} from '@dfinity/principal'
 import './candid.css';
+import { AuthClient } from "@dfinity/auth-client";
 
 declare var flamegraph: any;
 declare var d3: any;
@@ -16,6 +17,8 @@ function is_local(agent: HttpAgent) {
   const hostname = agent._host.hostname;
   return hostname === '127.0.0.1' || hostname.endsWith('localhost');
 }
+
+export let authClient: AuthClient | undefined;
 
 const agent = new HttpAgent();
 if (is_local(agent)) {
@@ -77,6 +80,19 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   }
   const dataUri = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(js);
   const candid: any = await eval('import("' + dataUri + '")');
+
+  authClient = authClient ?? (await AuthClient.create({
+    idleOptions: {
+      disableIdle: true,
+      disableDefaultIdleCallback: true,
+    },
+  }))
+  if (await authClient.isAuthenticated()) {
+    agent.replaceIdentity(authClient.getIdentity());
+    console.log("Authenticated with Internet Identity Principal")
+    console.log(authClient.getIdentity().getPrincipal().toString())
+  }
+
   return Actor.createActor(candid.idlFactory, { agent, canisterId });
 }
 
