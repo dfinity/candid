@@ -25,7 +25,7 @@ function insertLoginForm() {
     const buttonLogin = document.createElement("button")
     buttonLogin.className = "btn"
     buttonLogin.style.margin = "10px"
-    buttonLogin.innerHTML = `${dfinity_logo} Login with Internet Identity`
+    buttonLogin.innerHTML = `${dfinity_logo} Login <span class="hide-narrow">with Internet Identity</span>`
 
     const canisterId = Principal.fromText(cid)
 

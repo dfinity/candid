@@ -330,6 +330,12 @@ textarea:focus {
   background-color: var(--darkest);
 }
 
+@media not screen and (min-width: 800px) {
+  .hide-narrow {
+    display: none;
+  }
+}
+
 @media only screen and (min-width: 800px) {
   :root {
     --header-height: 5.6rem;
