@@ -1,9 +1,9 @@
 :root {
-  font-family: 'Circular Std', 'Roboto', sans-serif;
+  font-family: "Circular Std", "Roboto", sans-serif;
   font-weight: 300;
   font-size: 10px;
-  --font-circular: 'Circular Std', 'Roboto', sans-serif;
-  --font-mono: 'Vremena Grotesk', 'Roboto Mono', monospace;
+  --font-circular: "Circular Std", "Roboto", sans-serif;
+  --font-mono: "Vremena Grotesk", "Roboto Mono", monospace;
   --header-height: 3.8rem;
   --pad-sm: 0.8rem;
   --pad-md: 1.5rem;
@@ -66,7 +66,7 @@
 }
 
 #methods {
-  font-family: 'Vremena Grotesk', 'Roboto Mono', monospace;
+  font-family: "Vremena Grotesk", "Roboto Mono", monospace;
   padding: 0;
   margin: 0;
 }
@@ -95,22 +95,22 @@
 input,
 select {
   font-size: var(--font-md);
-  font-family: 'Circular Std', 'Roboto', sans-serif;
+  font-family: "Circular Std", "Roboto", sans-serif;
   margin-bottom: var(--pad-lg);
 }
-input:not([type='checkbox']),
+input:not([type="checkbox"]),
 select {
   width: 100%;
   height: 4.8rem;
   padding: 1.5rem;
   border: 1px solid var(--dark);
 }
-input[type='number']::-webkit-inner-spin-button {
+input[type="number"]::-webkit-inner-spin-button {
   width: 3rem;
   height: 3rem;
 }
 label {
-  font-family: 'Circular Std', 'Roboto', sans-serif;
+  font-family: "Circular Std", "Roboto", sans-serif;
   margin-right: var(--pad-sm);
 }
 label.small {
@@ -120,7 +120,7 @@ label.small {
   padding-left: var(--pad-md);
   width: 100%;
 }
-input[type='checkbox'] ~ .popup-form {
+input[type="checkbox"] ~ .popup-form {
   padding-left: var(--pad-md);
 }
 .input-container > span > .popup-form,
@@ -178,7 +178,7 @@ input[type='checkbox'] ~ .popup-form {
 }
 
 .btn {
-  font-family: 'Roboto', sans-serif;
+  font-family: "Roboto", sans-serif;
   letter-spacing: 0.05rem;
   background-color: var(--darkest);
   color: var(--lightest);
@@ -191,6 +191,12 @@ input[type='checkbox'] ~ .popup-form {
 }
 .btn:not(:last-child) {
   margin-right: var(--pad-md);
+}
+.btn-auth {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 10px;
 }
 button {
   padding: 0;
@@ -330,6 +336,17 @@ textarea:focus {
   background-color: var(--darkest);
 }
 
+@media not screen and (min-width: 600px) {
+  :root {
+    --header-height: 8rem;
+  }
+
+  #header {
+    flex-direction: column;
+    align-items: start;
+  }
+}
+
 @media not screen and (min-width: 800px) {
   .hide-narrow {
     display: none;
@@ -340,6 +357,10 @@ textarea:focus {
   :root {
     --header-height: 5.6rem;
     --console-width: clamp(28rem, 30vw, 40rem);
+  }
+
+  .show-narrow {
+    display: none;
   }
 
   #header {
@@ -371,7 +392,7 @@ textarea:focus {
   .ui-result span:not(:first-child):not(.status) {
     margin-left: var(--pad-md);
   }
-  input:not([type='checkbox']),
+  input:not([type="checkbox"]),
   select {
     width: 23.2rem;
     height: 4rem;
