@@ -4,7 +4,7 @@
   font-size: 10px;
   --font-circular: 'Circular Std', 'Roboto', sans-serif;
   --font-mono: 'Vremena Grotesk', 'Roboto Mono', monospace;
-  --header-height: 3.8rem;
+  --header-height: 4rem;
   --pad-sm: 0.8rem;
   --pad-md: 1.5rem;
   --pad-lg: 2.4rem;
@@ -123,6 +123,15 @@ label.small {
 input[type='checkbox'] ~ .popup-form {
   padding-left: var(--pad-md);
 }
+.checkbox-label {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 0;
+}
+.checkbox-label input[type='checkbox'] {
+  margin-bottom: 0;
+}
 .input-container > span > .popup-form,
 .ui-result > span > .popup-form {
   padding-left: 0;
@@ -191,6 +200,12 @@ input[type='checkbox'] ~ .popup-form {
 }
 .btn:not(:last-child) {
   margin-right: var(--pad-md);
+}
+.btn-auth {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
 }
 button {
   padding: 0;
@@ -330,6 +345,18 @@ textarea:focus {
   background-color: var(--darkest);
 }
 
+@media not screen and (min-width: 600px) {
+  :root {
+    --header-height: initial;
+  }
+
+  #header {
+    flex-direction: column;
+    padding: 1rem 0;
+    gap: 1rem;
+  }
+}
+
 @media only screen and (min-width: 800px) {
   :root {
     --header-height: 5.6rem;
@@ -339,6 +366,7 @@ textarea:focus {
   #header {
     text-align: left;
     padding-left: 3rem;
+    padding-right: 1rem;
   }
 
   #container {
