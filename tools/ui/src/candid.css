@@ -124,11 +124,13 @@ input[type='checkbox'] ~ .popup-form {
   padding-left: var(--pad-md);
 }
 .checkbox-label {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
   margin-bottom: 0;
 }
 .checkbox-label input[type='checkbox'] {
   margin-bottom: 0;
-  transform: translateY(2px);
 }
 .input-container > span > .popup-form,
 .ui-result > span > .popup-form {
