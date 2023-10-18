@@ -204,7 +204,7 @@ input[type='checkbox'] ~ .popup-form {
 .btn-auth {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   padding: 10px;
 }
 button {
@@ -357,25 +357,16 @@ textarea:focus {
   }
 }
 
-@media not screen and (min-width: 800px) {
-  .hide-narrow {
-    display: none;
-  }
-}
-
 @media only screen and (min-width: 800px) {
   :root {
     --header-height: 5.6rem;
     --console-width: clamp(28rem, 30vw, 40rem);
   }
 
-  .show-narrow {
-    display: none;
-  }
-
   #header {
     text-align: left;
     padding-left: 3rem;
+    padding-right: 1rem;
   }
 
   #container {

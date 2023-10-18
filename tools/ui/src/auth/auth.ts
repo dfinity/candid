@@ -1,7 +1,7 @@
 import { Principal } from "@dfinity/principal"
 import { authClient } from "../candid"
 import { refresh_actor } from "../index"
-import { dfinity_logo, copy_icon } from "./icons"
+import { dfinityLogo, copyIcon } from "./icons"
 import { identityProvider } from "./identityProvider"
 
 export async function renderAuth() {
@@ -24,11 +24,7 @@ function insertLoginForm() {
 
     const buttonLogin = document.createElement("button")
     buttonLogin.className = "btn btn-auth"
-    buttonLogin.innerHTML = `
-      ${dfinity_logo}
-      <span class="show-narrow">Login</span>
-      <span class="hide-narrow">Login with Internet Identity</span>
-    `
+    buttonLogin.innerHTML = `${dfinityLogo} Login`
 
     const canisterId = Principal.fromText(cid)
 
@@ -96,7 +92,7 @@ function CopyId() {
   const copyButton = document.createElement("button")
   copyButton.id = "copyButton"
   copyButton.style.cursor = "pointer"
-  copyButton.innerHTML = `${copy_icon}`
+  copyButton.innerHTML = `${copyIcon}`
 
   copyButton.addEventListener("click", function () {
     navigator.clipboard.writeText(id).catch((err) => {
