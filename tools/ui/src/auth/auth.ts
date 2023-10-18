@@ -44,11 +44,11 @@ function insertLoginForm() {
     })
 
     auth.innerHTML = `
-      <label>
+      <label class="checkbox-label">
         <input id="raw" type="checkbox" checked></input>
         raw
       </label>
-      <label>
+      <label class="checkbox-label">
         <input id="domain" type="checkbox" checked></input>
         ic0
       </label>

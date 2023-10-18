@@ -4,7 +4,7 @@
   font-size: 10px;
   --font-circular: 'Circular Std', 'Roboto', sans-serif;
   --font-mono: 'Vremena Grotesk', 'Roboto Mono', monospace;
-  --header-height: 3.8rem;
+  --header-height: 4rem;
   --pad-sm: 0.8rem;
   --pad-md: 1.5rem;
   --pad-lg: 2.4rem;
@@ -123,6 +123,13 @@ label.small {
 input[type='checkbox'] ~ .popup-form {
   padding-left: var(--pad-md);
 }
+.checkbox-label {
+  margin-bottom: 0;
+}
+.checkbox-label input[type='checkbox'] {
+  margin-bottom: 0;
+  transform: translateY(2px);
+}
 .input-container > span > .popup-form,
 .ui-result > span > .popup-form {
   padding-left: 0;
@@ -196,6 +203,7 @@ input[type='checkbox'] ~ .popup-form {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  padding: 10px;
 }
 button {
   padding: 0;
@@ -337,16 +345,13 @@ textarea:focus {
 
 @media not screen and (min-width: 600px) {
   :root {
-    --header-height: 9rem;
+    --header-height: initial;
   }
 
   #header {
     flex-direction: column;
-    margin-top: 1rem;
-  }
-
-  .btn-auth {
-    padding: 10px;
+    padding: 1rem 0;
+    gap: 1rem;
   }
 }
 
@@ -462,9 +467,5 @@ textarea:focus {
   #output-list,
   #methods-list {
     height: calc(100vh - (var(--header-height) * 2));
-  }
-
-  .btn-auth {
-    margin: 10px;
   }
 }
