@@ -196,7 +196,6 @@ input[type='checkbox'] ~ .popup-form {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin: 10px;
 }
 button {
   padding: 0;
@@ -338,12 +337,16 @@ textarea:focus {
 
 @media not screen and (min-width: 600px) {
   :root {
-    --header-height: 8rem;
+    --header-height: 9rem;
   }
 
   #header {
     flex-direction: column;
-    align-items: start;
+    margin-top: 1rem;
+  }
+
+  .btn-auth {
+    padding: 10px;
   }
 }
 
@@ -459,5 +462,9 @@ textarea:focus {
   #output-list,
   #methods-list {
     height: calc(100vh - (var(--header-height) * 2));
+  }
+
+  .btn-auth {
+    margin: 10px;
   }
 }
