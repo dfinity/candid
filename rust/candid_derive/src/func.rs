@@ -53,9 +53,6 @@ pub(crate) fn candid_method(attrs: Vec<Meta>, fun: ItemFn) -> Result<TokenStream
         match (rets.len(), rets.get(0).map(|x| x.as_str())) {
             (0, None) | (1, Some("Self")) => {
                 if let Some(init) = INIT.lock().unwrap().as_mut() {
-                    if init.is_some() {
-                        return Err(Error::new_spanned(&sig.ident, "duplicate init method"));
-                    };
                     *init = Some(args);
                 }
             }
@@ -67,15 +64,7 @@ pub(crate) fn candid_method(attrs: Vec<Meta>, fun: ItemFn) -> Result<TokenStream
             }
         }
     } else if let Some(map) = METHODS.lock().unwrap().as_mut() {
-        if map
-            .insert(name.clone(), Method { args, rets, modes })
-            .is_some()
-        {
-            return Err(Error::new_spanned(
-                &sig.ident,
-                format!("duplicate method name {name}"),
-            ));
-        }
+        map.insert(name.clone(), Method { args, rets, modes });
     }
     Ok(quote! { #fun })
 }
