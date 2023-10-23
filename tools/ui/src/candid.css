@@ -207,6 +207,13 @@ input[type='checkbox'] ~ .popup-form {
   gap: 8px;
   padding: 10px;
 }
+.btn-auth svg {
+  transition: transform ease-out .05s;
+}
+.btn-auth:not(:hover) svg {
+  transition: transform ease-out .1s;
+  transform: scale(.8);
+}
 button {
   padding: 0;
   border: none;
