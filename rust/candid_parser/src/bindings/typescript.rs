@@ -1,6 +1,6 @@
 use super::javascript::{ident, is_tuple};
-use crate::pretty::*;
-use crate::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use candid::pretty::*;
+use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
 fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {

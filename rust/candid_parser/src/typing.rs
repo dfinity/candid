@@ -1,6 +1,6 @@
 use super::types::*;
-use crate::types::{Field, Function, Type, TypeEnv, TypeInner};
 use crate::{pretty_parse, Error, Result};
+use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -9,15 +9,13 @@ pub struct Env<'a> {
     pub pre: bool,
 }
 
-impl TypeEnv {
-    /// Convert candid AST to internal Type
-    pub fn ast_to_type(&self, ast: &super::types::IDLType) -> Result<Type> {
-        let env = Env {
-            te: &mut self.clone(),
-            pre: false,
-        };
-        check_type(&env, ast)
-    }
+/// Convert candid AST to internal Type
+pub fn ast_to_type(env: &TypeEnv, ast: &super::types::IDLType) -> Result<Type> {
+    let env = Env {
+        te: &mut env.clone(),
+        pre: false,
+    };
+    check_type(&env, ast)
 }
 
 fn check_prim(prim: &PrimType) -> Type {
@@ -80,7 +78,7 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
                 return Err(Error::msg("cannot have more than one mode"));
             }
             if func.modes.len() == 1
-                && func.modes[0] == crate::types::FuncMode::Oneway
+                && func.modes[0] == candid::types::FuncMode::Oneway
                 && !t2.is_empty()
             {
                 return Err(Error::msg("oneway function has non-unit return type"));

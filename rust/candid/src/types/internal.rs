@@ -283,16 +283,12 @@ impl Type {
 }
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", crate::bindings::candid::pp_ty(self).pretty(80))
+        write!(f, "{}", crate::pretty_printer::pp_ty(self).pretty(80))
     }
 }
 impl fmt::Display for TypeInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            crate::bindings::candid::pp_ty_inner(self).pretty(80)
-        )
+        write!(f, "{}", crate::pretty_printer::pp_ty_inner(self).pretty(80))
     }
 }
 pub(crate) fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
@@ -410,7 +406,7 @@ impl fmt::Display for Field {
         write!(
             f,
             "{}",
-            crate::bindings::candid::pp_field(self, false).pretty(80)
+            crate::pretty_printer::pp_field(self, false).pretty(80)
         )
     }
 }
@@ -462,7 +458,7 @@ pub enum FuncMode {
     CompositeQuery,
 }
 impl FuncMode {
-    pub(crate) fn to_doc(&self) -> pretty::RcDoc {
+    pub fn to_doc(&self) -> pretty::RcDoc {
         match self {
             FuncMode::Oneway => pretty::RcDoc::text("oneway"),
             FuncMode::Query => pretty::RcDoc::text("query"),
@@ -478,11 +474,7 @@ pub struct Function {
 }
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            crate::bindings::candid::pp_function(self).pretty(80)
-        )
+        write!(f, "{}", crate::pretty_printer::pp_function(self).pretty(80))
     }
 }
 impl Function {
@@ -528,7 +520,7 @@ macro_rules! service {
 
 #[derive(Debug, PartialEq, TryFromPrimitive)]
 #[repr(i64)]
-pub(crate) enum Opcode {
+pub enum Opcode {
     Null = -1,
     Bool = -2,
     Nat = -3,
@@ -607,7 +599,7 @@ thread_local! {
     static NAME: RefCell<TypeName> = RefCell::new(Default::default());
 }
 
-pub(crate) fn find_type(id: &TypeId) -> Option<Type> {
+pub fn find_type(id: &TypeId) -> Option<Type> {
     ENV.with(|e| e.borrow().get(id).cloned())
 }
 
@@ -620,7 +612,7 @@ pub(crate) fn show_env() {
 pub(crate) fn env_add(id: TypeId, t: Type) {
     ENV.with(|e| drop(e.borrow_mut().insert(id, t)));
 }
-pub(crate) fn env_clear() {
+pub fn env_clear() {
     ENV.with(|e| e.borrow_mut().clear());
 }
 

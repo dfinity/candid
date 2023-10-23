@@ -1,6 +1,13 @@
 
 # Changelog
 
+## Rust 0.10.0
+
+* The original `candid` crate is split into three crates:
+  * `candid`: mainly for Candid data (de-)serialization.
+  * `candid_parser`: used to be the `parser` and `bindings` module in `candid` crate.
+  * `ic_principal`: only for `Principal` and `PrincipalError`.
+
 ## Rust 0.9.9
 
 * Set different config values for `full_error_message` and `zero_sized_values` for Wasm and non-Wasm target.

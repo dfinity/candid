@@ -1,7 +1,9 @@
 [workspace]
 members = [
     "rust/candid",
+    "rust/candid_parser",
     "rust/candid_derive",
+    "rust/ic_principal",
     "tools/didc",
 ]
 resolver = "2"

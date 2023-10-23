@@ -1,6 +1,7 @@
-#![allow(deprecated)]
+// #![allow(deprecated)]
 
-use candid::types::principal::{Principal, PrincipalError};
+use ic_principal::Principal;
+use ic_principal::PrincipalError;
 
 const MANAGEMENT_CANISTER_BYTES: [u8; 0] = [];
 const MANAGEMENT_CANISTER_TEXT: &str = "aaaaa-aa";

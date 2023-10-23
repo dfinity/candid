@@ -1,7 +1,7 @@
-use candid::parser::{types::IDLProg, typing::check_prog};
 use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
 use candid::types::{Label, TypeEnv};
 use candid::{decode_args, decode_one, Decode};
+use candid_parser::{parse_idl_args, types::IDLProg, typing::check_prog};
 
 #[test]
 fn test_parser() {
@@ -36,7 +36,7 @@ service : {
     let actor = check_prog(&mut env, &ast).unwrap().unwrap();
     let method = env.get_method(&actor, "f").unwrap();
     {
-        let args = "(42,42,42,42)".parse::<IDLArgs>().unwrap();
+        let args = parse_idl_args("(42,42,42,42)").unwrap();
         let encoded = args.to_bytes_with_types(&env, &method.args).unwrap();
         let decoded = IDLArgs::from_bytes(&encoded).unwrap();
         assert_eq!(
@@ -51,7 +51,7 @@ service : {
     }
     {
         let str = "(opt record { head = 1000; tail = opt record {head = -2000; tail = null}}, variant {a = 42})";
-        let args = str.parse::<IDLArgs>().unwrap();
+        let args = parse_idl_args(str).unwrap();
         let encoded = args.to_bytes_with_types(&env, &method.rets).unwrap();
         let decoded = IDLArgs::from_bytes(&encoded).unwrap();
         assert_eq!(decoded.to_string(), "(\n  opt record {\n    1_158_359_328 = 1_000 : int16;\n    1_291_237_008 = opt record {\n      1_158_359_328 = -2_000 : int16;\n      1_291_237_008 = null;\n    };\n  },\n  variant { 97 = 42 : nat },\n)");
@@ -120,11 +120,11 @@ fn test_variant() {
 }
 
 fn parse_check(str: &str) {
-    let args = str.parse::<IDLArgs>().unwrap();
+    let args = parse_idl_args(str).unwrap();
     let encoded = args.to_bytes().unwrap();
     let decoded = IDLArgs::from_bytes(&encoded).unwrap();
     let output = decoded.to_string();
-    let back_args = output.parse::<IDLArgs>().unwrap();
+    let back_args = parse_idl_args(&output).unwrap();
     let annotated_args = args
         .annotate_types(true, &TypeEnv::new(), &back_args.get_types())
         .unwrap();

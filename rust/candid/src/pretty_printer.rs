@@ -39,7 +39,7 @@ fn is_keyword(id: &str) -> bool {
     KEYWORDS.contains(&id)
 }
 
-pub(crate) fn is_valid_as_id(id: &str) -> bool {
+pub fn is_valid_as_id(id: &str) -> bool {
     if id.is_empty() || !id.is_ascii() {
         return false;
     }
@@ -161,7 +161,7 @@ pub fn pp_args(args: &[Type]) -> RcDoc {
     enclose("(", doc, ")")
 }
 
-pub(crate) fn pp_modes(modes: &[crate::types::FuncMode]) -> RcDoc {
+pub fn pp_modes(modes: &[crate::types::FuncMode]) -> RcDoc {
     RcDoc::concat(modes.iter().map(|m| RcDoc::space().append(m.to_doc())))
 }
 
@@ -211,7 +211,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 }
 
 pub mod value {
-    use crate::bindings::candid::{ident_string, pp_text};
+    use super::{ident_string, pp_text};
     use crate::pretty::*;
     use crate::types::value::{IDLArgs, IDLField, IDLValue};
     use crate::types::{number::pp_num_str, Label};
@@ -325,12 +325,7 @@ pub mod value {
                 Reserved => write!(f, "null : reserved"),
                 Principal(id) => write!(f, "principal \"{id}\""),
                 Service(id) => write!(f, "service \"{id}\""),
-                Func(id, meth) => write!(
-                    f,
-                    "func \"{}\".{}",
-                    id,
-                    crate::bindings::candid::ident_string(meth)
-                ),
+                Func(id, meth) => write!(f, "func \"{}\".{}", id, ident_string(meth)),
                 Opt(v) if has_type_annotation(v) => write!(f, "opt ({v:?})"),
                 Opt(v) => write!(f, "opt {v:?}"),
                 Vec(vs) => {

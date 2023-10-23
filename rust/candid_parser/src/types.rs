@@ -1,5 +1,5 @@
-use crate::types::{FuncMode, Label};
 use crate::Result;
+use candid::types::{FuncMode, Label};
 
 #[derive(Debug, Clone)]
 pub enum IDLType {

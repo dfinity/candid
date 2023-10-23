@@ -1,9 +1,9 @@
 use super::configs::{path_name, Configs};
-use crate::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
-use crate::types::{Field, Type, TypeEnv, TypeInner};
-use crate::Deserialize;
 use crate::{Error, Result};
 use arbitrary::{unstructured::Int, Arbitrary, Unstructured};
+use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
+use candid::types::{Field, Type, TypeEnv, TypeInner};
+use candid::Deserialize;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 
@@ -115,7 +115,7 @@ impl<'a> GenState<'a> {
         assert!(self.config.depth.is_none());
         if let Some(vec) = &self.config.value {
             let v = u.choose(vec)?;
-            let v = v.parse::<IDLValue>()?;
+            let v: IDLValue = super::parse_idl_value(v)?;
             let v = v.annotate_type(true, self.env, ty)?;
             self.pop_state(old_config, ty, false);
             return Ok(v);
@@ -140,7 +140,7 @@ impl<'a> GenState<'a> {
             TypeInner::Int64 => IDLValue::Int64(arbitrary_num(u, self.config.range)?),
             TypeInner::Float32 => IDLValue::Float32(u.arbitrary()?),
             TypeInner::Float64 => IDLValue::Float64(u.arbitrary()?),
-            TypeInner::Principal => IDLValue::Principal(crate::Principal::anonymous()),
+            TypeInner::Principal => IDLValue::Principal(candid::Principal::anonymous()),
             TypeInner::Text => {
                 IDLValue::Text(arbitrary_text(u, &self.config.text, &self.config.width)?)
             }
@@ -148,7 +148,7 @@ impl<'a> GenState<'a> {
                 let depths = if self.depth <= 0 || self.size <= 0 {
                     [1, 0]
                 } else {
-                    [1, self.env.size(t).unwrap_or(MAX_DEPTH)]
+                    [1, size(self.env, t).unwrap_or(MAX_DEPTH)]
                 };
                 let idx = arbitrary_variant(u, &depths)?;
                 if idx == 0 {
@@ -159,7 +159,7 @@ impl<'a> GenState<'a> {
             }
             TypeInner::Vec(t) => {
                 let width = self.config.width.or_else(|| {
-                    let elem_size = self.env.size(t).unwrap_or(MAX_DEPTH);
+                    let elem_size = size(self.env, t).unwrap_or(MAX_DEPTH);
                     Some(std::cmp::max(0, self.size) as usize / elem_size)
                 });
                 let len = arbitrary_len(u, width)?;
@@ -186,7 +186,7 @@ impl<'a> GenState<'a> {
             TypeInner::Variant(fs) => {
                 let choices = fs
                     .iter()
-                    .map(|Field { ty, .. }| self.env.size(ty).unwrap_or(MAX_DEPTH));
+                    .map(|Field { ty, .. }| size(self.env, ty).unwrap_or(MAX_DEPTH));
                 let sizes: Vec<_> = if self.depth <= 0 || self.size <= 0 {
                     let min = choices.clone().min().unwrap_or(0);
                     choices.map(|d| if d > min { 0 } else { d }).collect()
@@ -211,62 +211,58 @@ impl<'a> GenState<'a> {
     }
 }
 
-impl IDLArgs {
-    pub fn any(seed: &[u8], tree: &Configs, env: &TypeEnv, types: &[Type]) -> Result<Self> {
-        let mut u = arbitrary::Unstructured::new(seed);
-        let mut args = Vec::new();
-        for (i, t) in types.iter().enumerate() {
-            let tree = tree.with_method(&i.to_string());
-            let mut state = GenState::new(&tree, env);
-            let v = state.any(&mut u, t)?;
-            args.push(v);
-        }
-        Ok(IDLArgs { args })
+pub fn any(seed: &[u8], tree: &Configs, env: &TypeEnv, types: &[Type]) -> Result<IDLArgs> {
+    let mut u = arbitrary::Unstructured::new(seed);
+    let mut args = Vec::new();
+    for (i, t) in types.iter().enumerate() {
+        let tree = tree.with_method(&i.to_string());
+        let mut state = GenState::new(&tree, env);
+        let v = state.any(&mut u, t)?;
+        args.push(v);
     }
+    Ok(IDLArgs { args })
 }
 
-impl TypeEnv {
-    /// Approxiamte upper bound for IDLValue size of type t. Returns None if infinite.
-    fn size_helper(&self, seen: &mut HashSet<String>, t: &Type) -> Option<usize> {
-        use TypeInner::*;
-        Some(match t.as_ref() {
-            Var(id) => {
-                if seen.insert(id.to_string()) {
-                    let ty = self.rec_find_type(id).unwrap();
-                    let res = self.size_helper(seen, ty)?;
-                    seen.remove(id);
-                    res
-                } else {
-                    return None;
-                }
+fn size_helper(env: &TypeEnv, seen: &mut HashSet<String>, t: &Type) -> Option<usize> {
+    use TypeInner::*;
+    Some(match t.as_ref() {
+        Var(id) => {
+            if seen.insert(id.to_string()) {
+                let ty = env.rec_find_type(id).unwrap();
+                let res = size_helper(env, seen, ty)?;
+                seen.remove(id);
+                res
+            } else {
+                return None;
             }
-            Empty => 0,
-            Opt(t) => 1 + self.size_helper(seen, t)?,
-            Vec(t) => 1 + self.size_helper(seen, t)? * 2,
-            Record(fs) => {
-                let mut sum = 0;
-                for Field { ty, .. } in fs.iter() {
-                    sum += self.size_helper(seen, ty)?;
-                }
-                1 + sum
+        }
+        Empty => 0,
+        Opt(t) => 1 + size_helper(env, seen, t)?,
+        Vec(t) => 1 + size_helper(env, seen, t)? * 2,
+        Record(fs) => {
+            let mut sum = 0;
+            for Field { ty, .. } in fs.iter() {
+                sum += size_helper(env, seen, ty)?;
             }
-            Variant(fs) => {
-                let mut max = 0;
-                for Field { ty, .. } in fs.iter() {
-                    let s = self.size_helper(seen, ty)?;
-                    if s > max {
-                        max = s;
-                    };
-                }
-                1 + max
+            1 + sum
+        }
+        Variant(fs) => {
+            let mut max = 0;
+            for Field { ty, .. } in fs.iter() {
+                let s = size_helper(env, seen, ty)?;
+                if s > max {
+                    max = s;
+                };
             }
-            _ => 1,
-        })
-    }
-    fn size(&self, t: &Type) -> Option<usize> {
-        let mut seen = HashSet::new();
-        self.size_helper(&mut seen, t)
-    }
+            1 + max
+        }
+        _ => 1,
+    })
+}
+
+fn size(env: &TypeEnv, t: &Type) -> Option<usize> {
+    let mut seen = HashSet::new();
+    size_helper(env, &mut seen, t)
 }
 
 fn choose_range<T: Int>(u: &mut Unstructured, ranges: &[std::ops::RangeInclusive<T>]) -> Result<T> {

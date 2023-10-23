@@ -1,0 +1,61 @@
+[package]
+name = "candid_parser"
+version = "0.1.0"
+edition = "2021"
+authors = ["DFINITY Team"]
+description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
+homepage = "https://internetcomputer.org/docs/current/developer-docs/build/candid/candid-concepts"
+documentation = "https://docs.rs/candid_parser"
+repository = "https://github.com/dfinity/candid"
+license = "Apache-2.0"
+readme = "README.md"
+categories = ["encoding", "parsing", "wasm"]
+keywords = ["internet-computer", "idl", "candid", "dfinity", "parser"]
+include = ["src", "Cargo.toml", "build.rs", "LICENSE", "README.md"]
+build = "build.rs"
+
+[build-dependencies]
+lalrpop = "0.20.0"
+
+[dependencies]
+candid = { path = "../candid", version = "0.10" }
+codespan-reporting = "0.11"
+hex = "0.4.2"
+num-bigint = { version = "0.4.2", features = ["serde"] }
+num-traits = "0.2.12"
+pretty = "0.12.0"
+serde = { version = "1.0.118", features = ["derive"] }
+serde_bytes = "0.11"
+sha2 = "0.10.1"
+thiserror = "1.0.20"
+anyhow = "1.0"
+
+lalrpop-util = "0.20.0"
+logos = "0.13"
+convert_case = "0.6"
+
+arbitrary = { version = "1.0", optional = true }
+# Don't upgrade serde_dhall. It will introduce dependency with invalid license.
+serde_dhall = { version = "0.11", default-features = false, optional = true }
+fake = { version = "2.4", optional = true }
+rand = { version = "0.8", optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+stacker = "0.1"
+
+[dev-dependencies]
+goldenfile = "1.1.0"
+test-generator = "0.3.0"
+rand = "0.8"
+
+[features]
+configs = ["serde_dhall"]
+random = ["configs", "arbitrary", "fake", "rand"]
+all = ["random"]
+
+# docs.rs-specific configuration
+# To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --features all
+[package.metadata.docs.rs]
+features = ["all"]
+# defines the configuration attribute `docsrs`
+rustdoc-args = ["--cfg", "docsrs"]

@@ -1,4 +1,4 @@
-use candid::parser::test::{check, Test};
+use candid_parser::test::{check, Test};
 
 #[test_generator::test_resources("test/*.test.did")]
 fn decode_test(resource: &str) {
@@ -13,7 +13,7 @@ fn decode_test(resource: &str) {
 
 #[test_generator::test_resources("test/*.test.did")]
 fn js_test(resource: &str) {
-    use candid::bindings::javascript::test::test_generate;
+    use candid_parser::bindings::javascript::test::test_generate;
     let path = std::env::current_dir()
         .unwrap()
         .join("../../")

@@ -1,6 +1,6 @@
 use super::analysis::{chase_actor, chase_types, infer_rec};
-use crate::pretty::*;
-use crate::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use candid::pretty::*;
+use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
 
@@ -170,7 +170,7 @@ fn pp_args(args: &[Type]) -> RcDoc {
     enclose("[", doc, "]")
 }
 
-fn pp_modes(modes: &[crate::types::FuncMode]) -> RcDoc {
+fn pp_modes(modes: &[candid::types::FuncMode]) -> RcDoc {
     let doc = concat(
         modes
             .iter()
@@ -267,10 +267,10 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 }
 
 pub mod value {
-    use super::super::candid::value::number_to_string;
-    use crate::pretty::*;
-    use crate::types::value::{IDLArgs, IDLField, IDLValue};
-    use crate::types::Label;
+    use candid::pretty::*;
+    use candid::pretty_printer::value::number_to_string;
+    use candid::types::value::{IDLArgs, IDLField, IDLValue};
+    use candid::types::Label;
     use pretty::RcDoc;
 
     fn is_tuple(v: &IDLValue) -> bool {
@@ -357,9 +357,9 @@ pub mod value {
 
 pub mod test {
     use super::value;
-    use crate::parser::test::{HostAssert, HostTest, Test};
-    use crate::pretty::*;
-    use crate::TypeEnv;
+    use crate::test::{HostAssert, HostTest, Test};
+    use candid::pretty::*;
+    use candid::TypeEnv;
     use pretty::RcDoc;
 
     fn pp_hex(bytes: &[u8]) -> RcDoc {
@@ -367,7 +367,7 @@ pub mod test {
             .append(RcDoc::as_string(hex::encode(bytes)))
             .append("', 'hex')")
     }
-    fn pp_encode<'a>(args: &'a crate::IDLArgs, tys: &'a [crate::types::Type]) -> RcDoc<'a> {
+    fn pp_encode<'a>(args: &'a candid::IDLArgs, tys: &'a [candid::types::Type]) -> RcDoc<'a> {
         let vals = value::pp_args(args);
         let tys = super::pp_args(tys);
         let items = [tys, vals];
@@ -375,7 +375,7 @@ pub mod test {
         str("IDL.encode").append(enclose("(", params, ")"))
     }
 
-    fn pp_decode<'a>(bytes: &'a [u8], tys: &'a [crate::types::Type]) -> RcDoc<'a> {
+    fn pp_decode<'a>(bytes: &'a [u8], tys: &'a [candid::types::Type]) -> RcDoc<'a> {
         let hex = pp_hex(bytes);
         let tys = super::pp_args(tys);
         let items = [tys, hex];
@@ -404,7 +404,7 @@ import { Principal } from './principal';
         for (i, assert) in test.asserts.iter().enumerate() {
             let mut types = Vec::new();
             for ty in assert.typ.iter() {
-                types.push(env.ast_to_type(ty).unwrap());
+                types.push(crate::typing::ast_to_type(&env, ty).unwrap());
             }
             let host = HostTest::from_assert(assert, &env, &types);
             let mut expects = Vec::new();
