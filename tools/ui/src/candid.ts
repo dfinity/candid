@@ -5,6 +5,7 @@ import {
 } from '@dfinity/candid';
 import {Principal} from '@dfinity/principal'
 import './candid.css';
+import { AuthClient } from "@dfinity/auth-client";
 
 declare var flamegraph: any;
 declare var d3: any;
@@ -16,6 +17,8 @@ function is_local(agent: HttpAgent) {
   const hostname = agent._host.hostname;
   return hostname === '127.0.0.1' || hostname.endsWith('localhost');
 }
+
+export let authClient: AuthClient | undefined;
 
 const agent = new HttpAgent();
 if (is_local(agent)) {
@@ -77,12 +80,25 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   }
   const dataUri = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(js);
   const candid: any = await eval('import("' + dataUri + '")');
+
+  authClient = authClient ?? (await AuthClient.create({
+    idleOptions: {
+      disableIdle: true,
+      disableDefaultIdleCallback: true,
+    },
+  }))
+  if (await authClient.isAuthenticated()) {
+    agent.replaceIdentity(authClient.getIdentity());
+    console.log("Authenticated with Internet Identity Principal")
+    console.log(authClient.getIdentity().getPrincipal().toString())
+  }
+
   return Actor.createActor(candid.idlFactory, { agent, canisterId });
 }
 
 export function getProfilerActor(canisterId: Principal): ActorSubclass {
   const profiler_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
-    __get_profiling: IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Int32, IDL.Int64))], ['query']),
+    __get_profiling: IDL.Func([IDL.Int32], [IDL.Vec(IDL.Tuple(IDL.Int32, IDL.Int64)), IDL.Opt(IDL.Int32)], ['query']),
     __get_cycles: IDL.Func([], [IDL.Int64], ['query']),
   });
   return Actor.createActor(profiler_interface, { agent, canisterId });
@@ -139,7 +155,19 @@ async function getDidJsFromMetadata(canisterId: Principal): Promise<undefined | 
 export async function getProfiling(canisterId: Principal): Promise<Array<[number, bigint]>|undefined> {
   try {
     const actor = getProfilerActor(canisterId);
-    const info = await actor.__get_profiling() as Array<[number, bigint]>;
+    let info: Array<[number, bigint]> = [];
+    let idx = 0;
+    let cnt = 0;
+    while (cnt < 50) {
+      const [res, next] = await actor.__get_profiling(idx) as [Array<[number, bigint]>, [number]|[]];
+      info = info.concat(res);
+      if (next.length === 1) {
+        idx = next[0];
+        cnt++;
+      } else {
+        break;
+      }
+    }
     return info;
   } catch(err) {
     console.log(err);

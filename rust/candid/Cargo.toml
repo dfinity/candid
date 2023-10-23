@@ -15,7 +15,7 @@ include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
 byteorder = "1.4.3"
-candid_derive = { path = "../candid_derive", version = "=0.6.3" }
+candid_derive = { path = "../candid_derive", version = "=0.6.4" }
 codespan-reporting = "0.11"
 hex = "0.4.2"
 ic_principal = { path = "../ic_principal", version = "0.1.0" }
