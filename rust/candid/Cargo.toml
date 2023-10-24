@@ -14,20 +14,20 @@ keywords = ["internet-computer", "idl", "candid", "dfinity"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
-byteorder = "1.4.3"
 candid_derive = { path = "../candid_derive", version = "=0.6.4" }
-codespan-reporting = "0.11"
-hex = "0.4.2"
 ic_principal = { path = "../ic_principal", version = "0.1.0" }
+byteorder = "1.4.3"
+codespan-reporting = "0.11"
+hex.workspace = true
 leb128 = "0.2.4"
-num-bigint = { version = "0.4.2", features = ["serde"] }
-num-traits = "0.2.12"
+num-bigint.workspace = true
+num-traits.workspace = true
 paste = "1.0.0"
-pretty = "0.12.0"
-serde = { version = "1.0.118", features = ["derive"] }
+pretty.workspace = true
+serde.workspace = true
 serde_bytes = "0.11"
-thiserror = "1.0.20"
-anyhow = "1.0"
+thiserror.workspace = true
+anyhow.workspace = true
 binread = { version = "2.1", features = ["debug_template"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
