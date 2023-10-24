@@ -46,7 +46,6 @@ harness = false
 path = "benches/benchmark.rs"
 
 [features]
-mute_warnings = []
 #bignum = ["num-bigint", "num-traits"]
 value = []
 printer = ["pretty"]
