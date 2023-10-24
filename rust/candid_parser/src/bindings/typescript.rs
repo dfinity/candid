@@ -1,5 +1,5 @@
 use super::javascript::{ident, is_tuple};
-use candid::pretty::*;
+use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 

@@ -1,5 +1,5 @@
 use super::analysis::{chase_actor, infer_rec};
-use candid::pretty::*;
+use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
@@ -269,7 +269,7 @@ fn pp_args(args: &[Type]) -> RcDoc {
 fn pp_ty_func(f: &Function) -> RcDoc {
     let args = pp_args(&f.args);
     let rets = pp_args(&f.rets);
-    let modes = candid::pretty_printer::pp_modes(&f.modes);
+    let modes = candid::pretty::candid::pp_modes(&f.modes);
     args.append(" ->")
         .append(RcDoc::space())
         .append(rets.append(modes))
