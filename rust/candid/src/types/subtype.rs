@@ -286,6 +286,6 @@ fn pp_args(args: &[crate::types::Type]) -> String {
 }
 #[cfg(feature = "printer")]
 fn pp_args(args: &[crate::types::Type]) -> String {
-    use crate::pretty_printer::pp_args;
+    use crate::pretty::candid::pp_args;
     pp_args(args).pretty(80).to_string()
 }

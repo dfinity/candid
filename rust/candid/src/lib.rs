@@ -236,8 +236,6 @@ pub use error::{Error, Result};
 
 pub mod types;
 pub use types::number::{Int, Nat};
-#[cfg(feature = "value")]
-pub use types::value::{IDLArgs, IDLValue};
 pub use types::CandidType;
 pub use types::{
     arc,
@@ -256,10 +254,10 @@ pub mod ser;
 pub mod utils;
 pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
 
+#[cfg(feature = "value")]
+pub use types::value::{IDLArgs, IDLValue};
 #[cfg(feature = "printer")]
 pub mod pretty;
-#[cfg(feature = "printer")]
-pub mod pretty_printer;
 
 // Candid hash function comes from
 // https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf

@@ -283,13 +283,13 @@ impl Type {
 #[cfg(feature = "printer")]
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", crate::pretty_printer::pp_ty(self).pretty(80))
+        write!(f, "{}", crate::pretty::candid::pp_ty(self).pretty(80))
     }
 }
 #[cfg(feature = "printer")]
 impl fmt::Display for TypeInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", crate::pretty_printer::pp_ty_inner(self).pretty(80))
+        write!(f, "{}", crate::pretty::candid::pp_ty_inner(self).pretty(80))
     }
 }
 #[cfg(not(feature = "printer"))]
@@ -420,7 +420,7 @@ impl fmt::Display for Field {
         write!(
             f,
             "{}",
-            crate::pretty_printer::pp_field(self, false).pretty(80)
+            crate::pretty::candid::pp_field(self, false).pretty(80)
         )
     }
 }
@@ -487,7 +487,7 @@ pub struct Function {
 #[cfg(feature = "printer")]
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", crate::pretty_printer::pp_function(self).pretty(80))
+        write!(f, "{}", crate::pretty::candid::pp_function(self).pretty(80))
     }
 }
 #[cfg(not(feature = "printer"))]

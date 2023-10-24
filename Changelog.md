@@ -7,7 +7,7 @@
 
 * The original `candid` crate is split into three crates:
   * `candid`: mainly for Candid data (de-)serialization.
-    + `candid::bindings::candid` moves to `candid::pretty_printer`, and is only available under feature flag `printer` (enabled by default).
+    + `candid::bindings::candid` moves to `candid::pretty::candid`. `candid::pretty` moves to `candid::pretty::utils`. These modules are only available under feature flag `printer` (enabled by default).
     + `candid::types::number::pp_num_str` moves to `candid::utils::pp_num_str`.
     + `candid::types::value` module is only availble under feature flag `value`.
   * `candid_parser`: used to be the `parser` and `bindings` module in `candid` crate.
