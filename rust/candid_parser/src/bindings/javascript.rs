@@ -1,5 +1,6 @@
 use super::analysis::{chase_actor, chase_types, infer_rec};
 use candid::pretty::*;
+use candid::pretty_printer::pp_mode;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
@@ -174,7 +175,7 @@ fn pp_modes(modes: &[candid::types::FuncMode]) -> RcDoc {
     let doc = concat(
         modes
             .iter()
-            .map(|m| str("'").append(m.to_doc()).append("'")),
+            .map(|m| str("'").append(pp_mode(m)).append("'")),
         ",",
     );
     enclose("[", doc, "]")

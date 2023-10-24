@@ -160,7 +160,7 @@ pub fn pp_args(args: &[Type]) -> RcDoc {
     let doc = concat(args.iter().map(pp_ty), ",");
     enclose("(", doc, ")")
 }
-fn pp_mode(mode: &FuncMode) -> RcDoc {
+pub fn pp_mode(mode: &FuncMode) -> RcDoc {
     match mode {
         FuncMode::Oneway => RcDoc::text("oneway"),
         FuncMode::Query => RcDoc::text("query"),
