@@ -1,6 +1,5 @@
 use super::CandidType;
 use crate::idl_hash;
-use num_enum::TryFromPrimitive;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -518,7 +517,7 @@ macro_rules! service {
     }}
 }
 
-#[derive(Debug, PartialEq, TryFromPrimitive)]
+#[derive(Debug, PartialEq)]
 #[repr(i64)]
 pub enum Opcode {
     Null = -1,
