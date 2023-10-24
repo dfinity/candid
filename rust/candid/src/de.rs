@@ -56,6 +56,7 @@ impl<'de> IDLDeserialize<'de> {
         self.de.is_untyped = false;
         self.deserialize_with_type(T::ty())
     }
+    #[cfg_attr(docsrs, doc(cfg(feature = "value")))]
     #[cfg(feature = "value")]
     pub fn get_value_with_type(
         &mut self,

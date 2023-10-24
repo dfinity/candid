@@ -34,6 +34,7 @@ impl IDLBuilder {
         value.idl_serialize(&mut self.value_ser)?;
         Ok(self)
     }
+    #[cfg_attr(docsrs, doc(cfg(feature = "value")))]
     #[cfg(feature = "value")]
     pub fn value_arg<'a>(&'a mut self, value: &IDLValue) -> Result<&'a mut Self> {
         use super::CandidType;
@@ -41,6 +42,7 @@ impl IDLBuilder {
         value.idl_serialize(&mut self.value_ser)?;
         Ok(self)
     }
+    #[cfg_attr(docsrs, doc(cfg(feature = "value")))]
     #[cfg(feature = "value")]
     /// Annotate IDLValue with (TypeEnv, Type). Note that the TypeEnv will be added to the serializer state.
     /// If the Type can already be resolved by previous TypeEnvs, you don't need to pass TypeEnv again.

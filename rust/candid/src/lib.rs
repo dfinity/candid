@@ -254,8 +254,10 @@ pub mod ser;
 pub mod utils;
 pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
 
+#[cfg_attr(docsrs, doc(cfg(feature = "value")))]
 #[cfg(feature = "value")]
 pub use types::value::{IDLArgs, IDLValue};
+#[cfg_attr(docsrs, doc(cfg(feature = "printer")))]
 #[cfg(feature = "printer")]
 pub mod pretty;
 

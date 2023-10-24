@@ -216,6 +216,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "value")))]
 #[cfg(feature = "value")]
 pub mod value {
     use super::{ident_string, pp_text};

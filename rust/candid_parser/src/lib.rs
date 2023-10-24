@@ -1,5 +1,7 @@
 //! # Candid Parser
 //!
+//! Everything from `candid` crate is re-exported here. Users don't have to add `candid` as their dependency in `Cargo.toml`.
+//!
 //! Provides parser for Candid type and value.
 //!  * `str.parse::<IDLProg>()` parses the Candid signature file to Candid AST.
 //!  * `parse_idl_args()` parses the Candid value in text format to a struct `IDLArg` that can be used for serialization and deserialization between Candid and an enum type `IDLValue` in Rust.
@@ -127,6 +129,8 @@ pub mod utils;
 pub use types::IDLProg;
 pub mod typing;
 pub use typing::{check_file, check_prog, pretty_check_file};
+
+pub use candid::*;
 
 #[cfg_attr(docsrs, doc(cfg(feature = "configs")))]
 #[cfg(feature = "configs")]

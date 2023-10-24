@@ -140,6 +140,7 @@ where
         Ok(())
     }
 }
+#[cfg_attr(docsrs, doc(cfg(feature = "serde_bytes")))]
 #[cfg(feature = "serde_bytes")]
 impl CandidType for serde_bytes::ByteBuf {
     fn _ty() -> Type {
@@ -152,6 +153,7 @@ impl CandidType for serde_bytes::ByteBuf {
         serializer.serialize_blob(self.as_slice())
     }
 }
+#[cfg_attr(docsrs, doc(cfg(feature = "serde_bytes")))]
 #[cfg(feature = "serde_bytes")]
 impl CandidType for serde_bytes::Bytes {
     fn _ty() -> Type {

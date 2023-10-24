@@ -10,6 +10,7 @@ mod impls;
 pub mod internal;
 pub mod subtype;
 pub mod type_env;
+#[cfg_attr(docsrs, doc(cfg(feature = "value")))]
 #[cfg(feature = "value")]
 pub mod value;
 
