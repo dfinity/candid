@@ -218,10 +218,11 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 
 #[cfg(feature = "value")]
 pub mod value {
-    use super::{ident_string, pp_num_str, pp_text};
+    use super::{ident_string, pp_text};
     use crate::pretty::*;
     use crate::types::value::{IDLArgs, IDLField, IDLValue};
     use crate::types::Label;
+    use crate::utils::pp_num_str;
     use std::fmt;
 
     use ::pretty::RcDoc;

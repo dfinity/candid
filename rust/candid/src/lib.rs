@@ -79,6 +79,8 @@
 //! This is difficult to achieve in `Serialize`, especially for enum types. Besides serialization, [`CandidType`](types/trait.CandidType.html)
 //! trait also converts Rust type to Candid type defined as [`candid::types::Type`](types/internal/enum.Type.html).
 //! ```
+//! #[cfg(feature = "serde_bytes")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::{Encode, Decode, CandidType, Deserialize};
 //! #[derive(CandidType, Deserialize)]
 //! # #[derive(Debug, PartialEq)]
@@ -94,7 +96,8 @@
 //! let bytes = Encode!(&list)?;
 //! let res = Decode!(&bytes, List)?;
 //! assert_eq!(res, list);
-//! # Ok::<(), candid::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //! We support serde's rename attributes for each field, namely `#[serde(rename = "foo")]`
 //! and `#[serde(rename(serialize = "foo", deserialize = "foo"))]`.
@@ -252,8 +255,10 @@ pub mod ser;
 
 pub mod utils;
 pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
-pub mod pretty;
 
+#[cfg(feature = "printer")]
+pub mod pretty;
+#[cfg(feature = "printer")]
 pub mod pretty_printer;
 
 // Candid hash function comes from

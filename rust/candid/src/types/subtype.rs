@@ -1,5 +1,4 @@
 use super::internal::{find_type, Field, Label, Type, TypeInner};
-use crate::pretty_printer::pp_args;
 use crate::types::TypeEnv;
 use crate::{Error, Result};
 use anyhow::Context;
@@ -192,8 +191,8 @@ pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<(
             let init_2 = to_tuple(init2);
             equal(gamma, env, &init_1, &init_2).context(format!(
                 "Mismatch in init args: {} and {}",
-                pp_args(init1).pretty(80),
-                pp_args(init2).pretty(80)
+                pp_args(init1),
+                pp_args(init2)
             ))?;
             equal(gamma, env, ty1, ty2)
         }
@@ -241,4 +240,20 @@ fn to_tuple(args: &[Type]) -> Type {
             .collect(),
     )
     .into()
+}
+#[cfg(not(feature = "printer"))]
+fn pp_args(args: &[crate::types::Type]) -> String {
+    use std::fmt::Write;
+    let mut s = String::new();
+    write!(&mut s, "(").unwrap();
+    for arg in args.iter() {
+        write!(&mut s, "{:?}, ", arg).unwrap();
+    }
+    write!(&mut s, ")").unwrap();
+    s
+}
+#[cfg(feature = "printer")]
+fn pp_args(args: &[crate::types::Type]) -> String {
+    use crate::pretty_printer::pp_args;
+    pp_args(args).pretty(80).to_string()
 }
