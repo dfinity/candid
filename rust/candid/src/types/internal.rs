@@ -374,7 +374,7 @@ impl std::fmt::Display for Label {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Label::Id(n) | Label::Unnamed(n) => {
-                write!(f, "{}", crate::pretty_printer::pp_num_str(&n.to_string()))
+                write!(f, "{}", crate::utils::pp_num_str(&n.to_string()))
             }
             Label::Named(id) => write!(f, "{id}"),
         }
@@ -455,15 +455,6 @@ pub enum FuncMode {
     Oneway,
     Query,
     CompositeQuery,
-}
-impl FuncMode {
-    pub fn to_doc(&self) -> pretty::RcDoc {
-        match self {
-            FuncMode::Oneway => pretty::RcDoc::text("oneway"),
-            FuncMode::Query => pretty::RcDoc::text("query"),
-            FuncMode::CompositeQuery => pretty::RcDoc::text("composite_query"),
-        }
-    }
 }
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Function {

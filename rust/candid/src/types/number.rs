@@ -1,7 +1,7 @@
 //! Data structure for Candid type Int, Nat, supporting big integer with LEB128 encoding.
 
 use super::{CandidType, Serializer, Type, TypeInner};
-use crate::{pretty_printer::pp_num_str, Error};
+use crate::{utils::pp_num_str, Error};
 use num_bigint::{BigInt, BigUint};
 use serde::{
     de::{self, Deserialize, SeqAccess, Visitor},

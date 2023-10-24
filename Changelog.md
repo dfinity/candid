@@ -6,7 +6,7 @@
 * The original `candid` crate is split into three crates:
   * `candid`: mainly for Candid data (de-)serialization.
     + `candid::bindings::candid` moves to `candid::pretty_printer`.
-    + `candid::types::number::pp_num_str` moves to `candid::pretty_printer::pp_num_str`.
+    + `candid::types::number::pp_num_str` moves to `candid::utils::pp_num_str`.
     + `candid::types::value` module is only availble under feature flag `value`.
   * `candid_parser`: used to be the `parser` and `bindings` module in `candid` crate.
     + Remove `FromStr` trait for `IDLArgs` and `IDLValue`. Use `parse_idl_args` and `parse_idl_value` respectively instead.

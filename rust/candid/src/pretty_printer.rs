@@ -1,5 +1,5 @@
 use crate::pretty::*;
-use crate::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use crate::types::{Field, FuncMode, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
 static KEYWORDS: [&str; 30] = [
@@ -160,9 +160,15 @@ pub fn pp_args(args: &[Type]) -> RcDoc {
     let doc = concat(args.iter().map(pp_ty), ",");
     enclose("(", doc, ")")
 }
-
-pub fn pp_modes(modes: &[crate::types::FuncMode]) -> RcDoc {
-    RcDoc::concat(modes.iter().map(|m| RcDoc::space().append(m.to_doc())))
+fn pp_mode(mode: &FuncMode) -> RcDoc {
+    match mode {
+        FuncMode::Oneway => RcDoc::text("oneway"),
+        FuncMode::Query => RcDoc::text("query"),
+        FuncMode::CompositeQuery => RcDoc::text("composite_query"),
+    }
+}
+pub fn pp_modes(modes: &[FuncMode]) -> RcDoc {
+    RcDoc::concat(modes.iter().map(|m| RcDoc::space().append(pp_mode(m))))
 }
 
 fn pp_service(serv: &[(String, Type)]) -> RcDoc {
@@ -207,20 +213,6 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let doc = defs.append(actor);
             doc.pretty(LINE_WIDTH).to_string()
         }
-    }
-}
-
-pub fn pp_num_str(s: &str) -> String {
-    let mut groups = Vec::new();
-    for chunk in s.as_bytes().rchunks(3) {
-        let str = String::from_utf8_lossy(chunk);
-        groups.push(str);
-    }
-    groups.reverse();
-    if "-" == groups.first().unwrap() {
-        "-".to_string() + &groups[1..].join("_")
-    } else {
-        groups.join("_")
     }
 }
 
