@@ -5,12 +5,20 @@
 
 * The original `candid` crate is split into three crates:
   * `candid`: mainly for Candid data (de-)serialization.
+    + `candid::bindings::candid` becomes `candid::pretty_printer`.
   * `candid_parser`: used to be the `parser` and `bindings` module in `candid` crate.
+    + Remove `FromStr` trait for `IDLArgs` and `IDLValue`. Use `parse_idl_args` and `parse_idl_value` respectively instead.
+    + `TypeEnv.ast_to_type` becomes `candid_parser::typing::ast_to_type`.
   * `ic_principal`: only for `Principal` and `PrincipalError`.
 
-## Rust 0.9.9
+## Rust 0.9.9 -- 0.9.11
 
 * Set different config values for `full_error_message` and `zero_sized_values` for Wasm and non-Wasm target.
+* Fix subtyping error message for empty type.
+* Remove name duplication check in `candid_method` to avoid errors on certain IDEs.
+* Improvements in Candid UI
+  + Add II button, thanks to @Web3NL.
+  + Support streaming download of profiling data.
 
 ## 2023-09-27
 
