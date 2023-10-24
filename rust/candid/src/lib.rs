@@ -151,6 +151,8 @@
 //! The use of Rust value and `IDLValue` can be intermixed.
 //!
 //! ```
+//! #[cfg(feature = "value")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::types::value::IDLValue;
 //! // Serialize Rust value Some(42u8) and IDLValue "hello"
 //! let bytes = candid::ser::IDLBuilder::new()
@@ -167,7 +169,8 @@
 //!
 //! assert_eq!(x, IDLValue::Opt(Box::new(IDLValue::Nat8(42))));
 //! assert_eq!(y, "hello");
-//! # Ok::<(), candid::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Building the library as a JS/Wasm package

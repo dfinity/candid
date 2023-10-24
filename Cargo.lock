@@ -264,7 +264,6 @@ dependencies = [
  "binread",
  "byteorder",
  "candid_derive",
- "codespan-reporting",
  "criterion",
  "hex",
  "ic_principal",

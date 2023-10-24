@@ -17,7 +17,6 @@ include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 candid_derive = { path = "../candid_derive", version = "=0.6.4" }
 ic_principal = { path = "../ic_principal", version = "0.1.0" }
 byteorder = "1.4.3"
-codespan-reporting = "0.11"
 hex.workspace = true
 leb128 = "0.2.4"
 paste = "1.0.0"
