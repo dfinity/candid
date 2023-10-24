@@ -229,15 +229,16 @@ pub mod error;
 pub use error::{Error, Result};
 
 pub mod types;
+pub use types::number::{Int, Nat};
+#[cfg(feature = "value")]
+pub use types::value::{IDLArgs, IDLValue};
 pub use types::CandidType;
 pub use types::{
     arc,
-    number::{Int, Nat},
     principal::Principal,
     rc,
     reference::{Func, Service},
     reserved::{Empty, Reserved},
-    value::{IDLArgs, IDLValue},
     TypeEnv,
 };
 

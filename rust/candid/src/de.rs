@@ -56,6 +56,7 @@ impl<'de> IDLDeserialize<'de> {
         self.de.is_untyped = false;
         self.deserialize_with_type(T::ty())
     }
+    #[cfg(feature = "value")]
     pub fn get_value_with_type(
         &mut self,
         env: &TypeEnv,
@@ -449,14 +450,19 @@ impl<'de> Deserializer<'de> {
     {
         use de::Deserializer;
         let tid = type_of(&visitor);
-        if tid != TypeId::of::<crate::types::value::IDLValueVisitor>() // derive Copy
-            && tid != TypeId::of::<de::IgnoredAny>() // derive Copy
+        if tid != TypeId::of::<de::IgnoredAny>() // derive Copy
         // OptionVisitor doesn't derive Copy, but has only PhantomData.
         // OptionVisitor is private and we cannot get TypeId of OptionVisitor<T>,
         // we also cannot downcast V to concrete type, because of 'de
         // The only option left seems to be type_name, but it is not guaranteed to be stable, so there is risk here.
             && !tid.name.starts_with("serde::de::impls::OptionVisitor<")
         {
+            #[cfg(feature = "value")]
+            if tid != TypeId::of::<crate::types::value::IDLValueVisitor>() {
+                // derive Copy
+                panic!("Not a valid visitor: {tid:?}");
+            }
+            #[cfg(not(feature = "value"))]
             panic!("Not a valid visitor: {tid:?}");
         }
         // This is safe, because the visitor either impl Copy or is zero sized

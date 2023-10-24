@@ -2,6 +2,7 @@
 
 use super::error::{Error, Result};
 use super::types;
+#[cfg(feature = "value")]
 use super::types::value::IDLValue;
 use super::types::{internal::Opcode, Field, Type, TypeEnv, TypeInner};
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -33,12 +34,14 @@ impl IDLBuilder {
         value.idl_serialize(&mut self.value_ser)?;
         Ok(self)
     }
+    #[cfg(feature = "value")]
     pub fn value_arg<'a>(&'a mut self, value: &IDLValue) -> Result<&'a mut Self> {
         use super::CandidType;
         self.type_ser.push_type(&value.value_ty())?;
         value.idl_serialize(&mut self.value_ser)?;
         Ok(self)
     }
+    #[cfg(feature = "value")]
     /// Annotate IDLValue with (TypeEnv, Type). Note that the TypeEnv will be added to the serializer state.
     /// If the Type can already be resolved by previous TypeEnvs, you don't need to pass TypeEnv again.
     pub fn value_arg_with_type<'a>(

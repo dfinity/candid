@@ -210,15 +210,31 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     }
 }
 
+pub fn pp_num_str(s: &str) -> String {
+    let mut groups = Vec::new();
+    for chunk in s.as_bytes().rchunks(3) {
+        let str = String::from_utf8_lossy(chunk);
+        groups.push(str);
+    }
+    groups.reverse();
+    if "-" == groups.first().unwrap() {
+        "-".to_string() + &groups[1..].join("_")
+    } else {
+        groups.join("_")
+    }
+}
+
+#[cfg(feature = "value")]
 pub mod value {
-    use super::{ident_string, pp_text};
+    use super::{ident_string, pp_num_str, pp_text};
     use crate::pretty::*;
     use crate::types::value::{IDLArgs, IDLField, IDLValue};
-    use crate::types::{number::pp_num_str, Label};
+    use crate::types::Label;
     use std::fmt;
 
     use ::pretty::RcDoc;
 
+    // TODO config this
     const MAX_ELEMENTS_FOR_PRETTY_PRINT: usize = 10;
 
     impl fmt::Display for IDLArgs {

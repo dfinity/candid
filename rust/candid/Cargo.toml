@@ -49,6 +49,18 @@ path = "benches/benchmark.rs"
 [features]
 mute_warnings = []
 #bignum = ["num-bigint", "num-traits"]
-#value = ["bignum"]
+value = []
 default = ["serde_bytes"]
+all = ["default", "value"]
 
+[[test]]
+name = "types"
+path = "tests/types.rs"
+required-features = ["value"]
+
+# docs.rs-specific configuration
+# To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --features all
+[package.metadata.docs.rs]
+features = ["all"]
+# defines the configuration attribute `docsrs`
+rustdoc-args = ["--cfg", "docsrs"]
