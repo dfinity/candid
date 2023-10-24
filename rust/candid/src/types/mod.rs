@@ -10,6 +10,7 @@ mod impls;
 pub mod internal;
 pub mod subtype;
 pub mod type_env;
+//#[cfg(feature = "value")]
 pub mod value;
 
 pub use self::internal::{
@@ -17,6 +18,7 @@ pub use self::internal::{
 };
 pub use type_env::TypeEnv;
 
+//#[cfg(feature = "bignum")]
 pub mod number;
 pub mod principal;
 pub mod reference;

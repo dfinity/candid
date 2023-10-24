@@ -140,6 +140,7 @@ where
         Ok(())
     }
 }
+#[cfg(feature = "serde_bytes")]
 impl CandidType for serde_bytes::ByteBuf {
     fn _ty() -> Type {
         TypeInner::Vec(TypeInner::Nat8.into()).into()
@@ -151,6 +152,7 @@ impl CandidType for serde_bytes::ByteBuf {
         serializer.serialize_blob(self.as_slice())
     }
 }
+#[cfg(feature = "serde_bytes")]
 impl CandidType for serde_bytes::Bytes {
     fn _ty() -> Type {
         TypeInner::Vec(TypeInner::Nat8.into()).into()
