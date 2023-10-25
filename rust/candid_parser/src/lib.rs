@@ -130,6 +130,7 @@ pub use types::IDLProg;
 pub mod typing;
 pub use typing::{check_file, check_prog, pretty_check_file};
 
+pub use candid;
 pub use candid::*;
 
 #[cfg_attr(docsrs, doc(cfg(feature = "configs")))]

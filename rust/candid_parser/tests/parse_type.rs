@@ -1,4 +1,4 @@
-use candid::pretty_printer::compile;
+use candid::pretty::candid::compile;
 use candid::types::TypeEnv;
 use candid_parser::bindings::{javascript, motoko, rust, typescript};
 use candid_parser::types::IDLProg;
