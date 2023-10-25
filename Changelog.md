@@ -10,9 +10,12 @@
     + `candid::bindings::candid` moves to `candid::pretty::candid`. `candid::pretty` moves to `candid::pretty::utils`. These modules are only available under feature flag `printer` (enabled by default).
     + `candid::types::number::pp_num_str` moves to `candid::utils::pp_num_str`.
     + `candid::types::value` module is only availble under feature flag `value`.
+    + `mute_warning` feature flag is removed.
   * `candid_parser`: used to be the `parser` and `bindings` module in `candid` crate.
     + Remove `FromStr` trait for `IDLArgs` and `IDLValue`. Use `parse_idl_args` and `parse_idl_value` respectively instead.
     + `TypeEnv.ast_to_type` becomes `candid_parser::typing::ast_to_type`.
+    + `candid` is re-exported in `candid_parser::candid`.
+    + `candid::*` is re-exported in `candid_parser`.
   * `ic_principal`: only for `Principal` and `PrincipalError`.
 
 ### Non-breaking changes

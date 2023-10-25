@@ -70,11 +70,12 @@ fn subtype_(
         }
         (_, Opt(_)) => {
             let msg = format!("FIX ME! {t1} <: {t2} via special opt rule.\nThis means the sender and receiver type has diverged, and can cause data loss.");
-            Ok(match report {
+            match report {
                 OptReport::Slience => (),
                 OptReport::Warning => eprintln!("{msg}"),
                 OptReport::Error => return Err(Error::msg(msg)),
-            })
+            };
+            Ok(())
         }
         (Record(fs1), Record(fs2)) => {
             let fields: HashMap<_, _> = fs1.iter().map(|Field { id, ty }| (id, ty)).collect();
