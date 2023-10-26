@@ -175,7 +175,8 @@ pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<(
         (Opt(ty1), Opt(ty2)) => equal(gamma, env, ty1, ty2),
         (Vec(ty1), Vec(ty2)) => equal(gamma, env, ty1, ty2),
         (Record(fs1), Record(fs2)) | (Variant(fs1), Variant(fs2)) => {
-            assert_length(fs1, fs2, |x| x.to_string()).context("Different field length")?;
+            assert_length(fs1, fs2, |x| x.id.clone(), |x| x.to_string())
+                .context("Different field length")?;
             for (f1, f2) in fs1.iter().zip(fs2.iter()) {
                 if f1.id != f2.id {
                     return Err(Error::msg(format!(
@@ -191,7 +192,7 @@ pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<(
             Ok(())
         }
         (Service(ms1), Service(ms2)) => {
-            assert_length(ms1, ms2, |x| format!("method {} : {}", x.0, x.1))
+            assert_length(ms1, ms2, |x| x.0.clone(), |x| format!("method {x}"))
                 .context("Different method length")?;
             for (m1, m2) in ms1.iter().zip(ms2.iter()) {
                 if m1.0 != m2.0 {
@@ -235,18 +236,19 @@ pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<(
     }
 }
 
-fn assert_length<I, F>(left: &[I], right: &[I], display: F) -> Result<()>
+fn assert_length<I, F, K, D>(left: &[I], right: &[I], get_key: F, display: D) -> Result<()>
 where
-    F: Fn(&I) -> String,
-    I: Clone + std::hash::Hash + std::cmp::Eq,
+    F: Fn(&I) -> K + Clone,
+    K: std::hash::Hash + std::cmp::Eq,
+    D: Fn(&K) -> String,
 {
     let l = left.len();
     let r = right.len();
     if l == r {
         return Ok(());
     }
-    let left: HashSet<_> = left.iter().cloned().collect();
-    let right: HashSet<_> = right.iter().cloned().collect();
+    let left: HashSet<_> = left.iter().map(get_key.clone()).collect();
+    let right: HashSet<_> = right.iter().map(get_key).collect();
     if l < r {
         let mut diff = right.difference(&left);
         Err(Error::msg(format!(
