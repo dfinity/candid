@@ -119,11 +119,19 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
         self.write(&[v as u8])?;
         Ok(())
     }
+    #[cfg(feature = "bignum")]
     fn serialize_int(self, v: &crate::Int) -> Result<()> {
         v.encode(&mut self.value)
     }
+    #[cfg(feature = "bignum")]
     fn serialize_nat(self, v: &crate::Nat) -> Result<()> {
         v.encode(&mut self.value)
+    }
+    fn serialize_i128(self, v: i128) -> Result<()> {
+        crate::types::leb128::encode_int(&mut self.value, v)
+    }
+    fn serialize_u128(self, v: u128) -> Result<()> {
+        crate::types::leb128::encode_nat(&mut self.value, v)
     }
     serialize_num!(nat8, u8, write_u8);
     serialize_num!(nat16, u16, write_u16::<LittleEndian>);

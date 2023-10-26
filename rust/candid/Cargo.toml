@@ -20,8 +20,6 @@ binread = { version = "2.1", features = ["debug_template"] }
 byteorder = "1.4.3"
 leb128 = "0.2.4"
 paste = "1.0.0"
-num-bigint = { workspace = true }
-num-traits= { workspace = true }
 hex.workspace = true
 serde.workspace = true
 thiserror.workspace = true
@@ -29,6 +27,8 @@ anyhow.workspace = true
 
 serde_bytes = { version = "0.11", optional = true }
 pretty = { workspace = true, optional = true }
+num-bigint = { workspace = true, optional = true }
+num-traits = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 stacker = "0.1"
@@ -46,16 +46,24 @@ harness = false
 path = "benches/benchmark.rs"
 
 [features]
-#bignum = ["num-bigint", "num-traits"]
-value = []
+bignum = ["num-bigint", "num-traits"]
+value = ["bignum"]
 printer = ["pretty"]
-default = ["serde_bytes", "printer"]
+default = ["serde_bytes", "printer", "bignum"]
 all = ["default", "value"]
 
 [[test]]
 name = "types"
 path = "tests/types.rs"
 required-features = ["value"]
+[[test]]
+name = "serde"
+path = "tests/serde.rs"
+required-features = ["bignum"]
+[[test]]
+name = "number"
+path = "tests/number.rs"
+required-features = ["bignum"]
 
 # docs.rs-specific configuration
 # To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --features all

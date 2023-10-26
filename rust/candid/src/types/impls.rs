@@ -41,7 +41,7 @@ impl CandidType for i128 {
     where
         S: Serializer,
     {
-        serializer.serialize_int(&crate::Int::from(*self))
+        serializer.serialize_i128(*self)
     }
 }
 impl CandidType for u128 {
@@ -52,7 +52,7 @@ impl CandidType for u128 {
     where
         S: Serializer,
     {
-        serializer.serialize_nat(&crate::Nat::from(*self))
+        serializer.serialize_u128(*self)
     }
 }
 

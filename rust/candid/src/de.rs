@@ -4,8 +4,10 @@ use super::{
     error::{Error, Result},
     types::internal::{text_size, type_of, TypeId},
     types::{Field, Label, SharedLabel, Type, TypeEnv, TypeInner},
-    CandidType, Int, Nat,
+    CandidType,
 };
+#[cfg(feature = "bignum")]
+use super::{Int, Nat};
 use crate::{
     binary_parser::{BoolValue, Header, Len, PrincipalBytes},
     types::subtype::{subtype, Gamma},
@@ -337,6 +339,8 @@ impl<'de> Deserializer<'de> {
     // int(0), nat(1), principal(2), reserved(3), service(4), function(5)
     // This is necessary for deserializing IDLValue because
     // it has only one visitor and we need a way to know who called the visitor.
+    #[cfg_attr(docsrs, doc(cfg(feature = "bignum")))]
+    #[cfg(feature = "bignum")]
     fn deserialize_int<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -356,6 +360,8 @@ impl<'de> Deserializer<'de> {
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
         visitor.visit_byte_buf(bytes)
     }
+    #[cfg_attr(docsrs, doc(cfg(feature = "bignum")))]
+    #[cfg(feature = "bignum")]
     fn deserialize_nat<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -508,8 +514,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         }
         self.unroll_type()?;
         match self.expect_type.as_ref() {
+            #[cfg(feature = "bignum")]
             TypeInner::Int => self.deserialize_int(visitor),
+            #[cfg(not(feature = "bignum"))]
+            TypeInner::Int => self.deserialize_i128(visitor),
+            #[cfg(feature = "bignum")]
             TypeInner::Nat => self.deserialize_nat(visitor),
+            #[cfg(not(feature = "bignum"))]
+            TypeInner::Nat => self.deserialize_u128(visitor),
             TypeInner::Nat8 => self.deserialize_u8(visitor),
             TypeInner::Nat16 => self.deserialize_u16(visitor),
             TypeInner::Nat32 => self.deserialize_u32(visitor),
@@ -571,22 +583,13 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        use num_traits::ToPrimitive;
+        use crate::types::leb128::{decode_int, decode_nat};
         self.unroll_type()?;
         assert!(*self.expect_type == TypeInner::Int);
         let value: i128 = match self.wire_type.as_ref() {
-            TypeInner::Int => {
-                let int = Int::decode(&mut self.input).map_err(Error::msg)?;
-                int.0
-                    .to_i128()
-                    .ok_or_else(|| Error::msg("Cannot convert int to i128"))?
-            }
-            TypeInner::Nat => {
-                let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
-                nat.0
-                    .to_i128()
-                    .ok_or_else(|| Error::msg("Cannot convert nat to i128"))?
-            }
+            TypeInner::Int => decode_int(&mut self.input)?,
+            TypeInner::Nat => i128::try_from(decode_nat(&mut self.input)?)
+                .map_err(|_| Error::msg("Cannot convert nat to i128"))?,
             t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
         };
         visitor.visit_i128(value)
@@ -595,17 +598,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        use num_traits::ToPrimitive;
         self.unroll_type()?;
         check!(
             *self.expect_type == TypeInner::Nat && *self.wire_type == TypeInner::Nat,
             "nat"
         );
-        let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
-        let value = nat
-            .0
-            .to_u128()
-            .ok_or_else(|| Error::msg("Cannot convert nat to u128"))?;
+        let value = crate::types::leb128::decode_nat(&mut self.input)?;
         visitor.visit_u128(value)
     }
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>

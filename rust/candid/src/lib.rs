@@ -116,6 +116,8 @@
 //! You can also use `i128` and `u128` to represent Candid `int` and `nat` types respectively (decoding will fail if
 //! the number is more than 128 bits).
 //! ```
+//! #[cfg(feature = "bignum")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::{Int, Nat, Encode, Decode};
 //! let x = "-10000000000000000000".parse::<Int>()?;
 //! let bytes = Encode!(&Nat::from(1024), &x)?;
@@ -123,7 +125,8 @@
 //! let (c, d) = Decode!(&bytes, u128, i128)?;
 //! assert_eq!(a + 1, 1025);
 //! assert_eq!(b, Int::parse(b"-10000000000000000000")?);
-//! # Ok::<(), candid::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Operating on reference types
@@ -132,6 +135,8 @@
 //! instead of the Candid types.
 //!
 //! ```
+//! #[cfg(feature = "bignum")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::{define_function, define_service, func, Encode, Decode, Principal};
 //! let principal = Principal::from_text("aaaaa-aa").unwrap();
 //!
@@ -145,7 +150,8 @@
 //! });
 //! let serv = MyService::new(principal);
 //! assert_eq!(serv, Decode!(&Encode!(&serv)?, MyService)?);
-//! # Ok::<(), candid::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Operating on untyped Candid values
@@ -235,6 +241,7 @@ pub mod error;
 pub use error::{Error, Result};
 
 pub mod types;
+#[cfg(feature = "bignum")]
 pub use types::number::{Int, Nat};
 pub use types::CandidType;
 pub use types::{
