@@ -8,9 +8,10 @@
 * The original `candid` crate is split into three crates:
   * `candid`: mainly for Candid data (de-)serialization.
     + `candid::bindings::candid` moves to `candid::pretty::candid`. `candid::pretty` moves to `candid::pretty::utils`. These modules are only available under feature flag `printer` (enabled by default).
+    + `candid::{Int, Nat}` is only available under feature flag `bignum` (enabled by default). If this feature is not enabled, you can use `i128/u128` for `int/nat` type.
     + `candid::types::number::pp_num_str` moves to `candid::utils::pp_num_str`.
     + `candid::types::value` module is only availble under feature flag `value`.
-    + `mute_warning` feature flag is removed.
+    + `mute_warning` feature flag is removed, use `candid::types::subtype_with_config` instead.
   * `candid_parser`: used to be the `parser` and `bindings` module in `candid` crate.
     + Remove `FromStr` trait for `IDLArgs` and `IDLValue`. Use `parse_idl_args` and `parse_idl_value` respectively instead.
     + `TypeEnv.ast_to_type` becomes `candid_parser::typing::ast_to_type`.

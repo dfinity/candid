@@ -10,7 +10,7 @@ use super::{
 use super::{Int, Nat};
 use crate::{
     binary_parser::{BoolValue, Header, Len, PrincipalBytes},
-    types::subtype::{subtype, Gamma},
+    types::subtype::{subtype_with_config, Gamma, OptReport},
 };
 use anyhow::{anyhow, Context};
 use binread::BinRead;
@@ -277,7 +277,8 @@ impl<'de> Deserializer<'de> {
         Ok(res)
     }
     fn check_subtype(&mut self) -> Result<()> {
-        subtype(
+        subtype_with_config(
+            OptReport::Silence,
             &mut self.gamma,
             &self.table,
             &self.wire_type,

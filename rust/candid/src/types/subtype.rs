@@ -9,7 +9,7 @@ pub type Gamma = HashSet<(Type, Type)>;
 /// Error reporting style for the special opt rule
 #[derive(Debug, Copy, Clone)]
 pub enum OptReport {
-    Slience,
+    Silence,
     Warning,
     Error,
 }
@@ -71,7 +71,7 @@ fn subtype_(
         (_, Opt(_)) => {
             let msg = format!("FIX ME! {t1} <: {t2} via special opt rule.\nThis means the sender and receiver type has diverged, and can cause data loss.");
             match report {
-                OptReport::Slience => (),
+                OptReport::Silence => (),
                 OptReport::Warning => eprintln!("{msg}"),
                 OptReport::Error => return Err(Error::msg(msg)),
             };
