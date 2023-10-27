@@ -140,8 +140,24 @@ impl<'de> IDLDeserialize<'de> {
 }
 
 pub struct Config {
-    pub zero_sized_values: usize,
-    pub full_error_message: bool,
+    zero_sized_values: usize,
+    full_error_message: bool,
+}
+impl Config {
+    pub fn new() -> Self {
+        Self {
+            zero_sized_values: 2_000_000,
+            full_error_message: true,
+        }
+    }
+    pub fn set_zero_sized_values(&mut self, n: usize) -> &mut Self {
+        self.zero_sized_values = n;
+        self
+    }
+    pub fn set_full_error_message(&mut self, n: bool) -> &mut Self {
+        self.full_error_message = n;
+        self
+    }
 }
 
 macro_rules! assert {

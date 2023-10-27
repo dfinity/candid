@@ -14,14 +14,14 @@ pub enum Target {
 
 #[derive(Clone)]
 pub struct Config {
-    pub candid_crate: String,
+    candid_crate: String,
     /// Applies to all types for now
-    pub type_attributes: String,
+    type_attributes: String,
     /// Only generates SERVICE struct if canister_id is not provided
-    pub canister_id: Option<candid::Principal>,
+    canister_id: Option<candid::Principal>,
     /// Service name when canister id is provided
-    pub service_name: String,
-    pub target: Target,
+    service_name: String,
+    target: Target,
 }
 impl Config {
     pub fn new() -> Self {
@@ -32,6 +32,26 @@ impl Config {
             service_name: "service".to_string(),
             target: Target::CanisterCall,
         }
+    }
+    pub fn set_candid_crate(&mut self, name: String) -> &mut Self {
+        self.candid_crate = name;
+        self
+    }
+    pub fn set_type_attributes(&mut self, attr: String) -> &mut Self {
+        self.type_attributes = attr;
+        self
+    }
+    pub fn set_canister_id(&mut self, id: candid::Principal) -> &mut Self {
+        self.canister_id = Some(id);
+        self
+    }
+    pub fn set_service_name(&mut self, name: String) -> &mut Self {
+        self.service_name = name;
+        self
+    }
+    pub fn set_target(&mut self, name: Target) -> &mut Self {
+        self.target = name;
+        self
     }
 }
 impl Default for Config {

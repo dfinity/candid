@@ -206,7 +206,7 @@ fn main() -> Result<()> {
                 }
                 "rs-agent" => {
                     let mut config = candid_parser::bindings::rust::Config::new();
-                    config.target = candid_parser::bindings::rust::Target::Agent;
+                    config.set_target(candid_parser::bindings::rust::Target::Agent);
                     candid_parser::bindings::rust::compile(&config, &env, &actor)
                 }
                 _ => unreachable!(),

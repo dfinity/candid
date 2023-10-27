@@ -1,6 +1,9 @@
 use crate::error::{Error, Result};
 use std::io;
 
+// Code copied from https://github.com/gimli-rs/leb128/blob/master/src/lib.rs.
+// Changing the type from i64 to i128
+
 const CONTINUATION_BIT: u8 = 1 << 7;
 const SIGN_BIT: u8 = 1 << 6;
 
