@@ -205,7 +205,7 @@ impl<'a> GenState<'a> {
                 IDLValue::Variant(VariantValue(Box::new(field), idx as u64))
             }
             TypeInner::Func(_) => {
-                IDLValue::Func(crate::Principal::arbitrary(u)?, String::arbitrary(u)?)
+                IDLValue::Func(crate::Principal::arbitrary(u)?, arbitrary_text(u, &self.config.text, &self.config.width)?)
             }
             _ => unimplemented!(),
         });
