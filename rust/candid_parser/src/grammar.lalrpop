@@ -57,10 +57,7 @@ pub Arg: IDLValue = {
     "bool" => IDLValue::Bool(<>),
     NumLiteral => <>,
     Text => IDLValue::Text(<>),
-    Bytes => {
-        let values: Vec<_> = <>.into_iter().map(|v| IDLValue::Nat8(v)).collect();
-        IDLValue::Vec(values)
-    },
+    Bytes => IDLValue::Blob(<>),
     "null" => IDLValue::Null,
     "opt" <Arg> => IDLValue::Opt(Box::new(<>)),
     "vec" "{" <SepBy<AnnVal, ";">> "}" => IDLValue::Vec(<>),

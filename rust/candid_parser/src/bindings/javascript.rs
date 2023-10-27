@@ -334,6 +334,10 @@ pub mod value {
             Text(s) => RcDoc::text(format!("'{}'", s.escape_debug())),
             None => RcDoc::text("[]"),
             Opt(v) => enclose_space("[", pp_value(v), "]"),
+            Blob(blob) => {
+                let body = concat(blob.iter().map(RcDoc::as_string), ",");
+                enclose_space("[", body, "]")
+            }
             Vec(vs) => {
                 let body = concat(vs.iter().map(pp_value), ",");
                 enclose_space("[", body, "]")

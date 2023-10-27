@@ -338,6 +338,13 @@ pub mod value {
                 Func(id, meth) => write!(f, "func \"{}\".{}", id, ident_string(meth)),
                 Opt(v) if has_type_annotation(v) => write!(f, "opt ({v:?})"),
                 Opt(v) => write!(f, "opt {v:?}"),
+                Blob(b) => {
+                    write!(f, "blob \"")?;
+                    for v in b.iter() {
+                        write!(f, "{}", &pp_char(*v))?;
+                    }
+                    write!(f, "\"")
+                }
                 Vec(vs) => {
                     if let Some(Nat8(_)) = vs.first() {
                         write!(f, "blob \"")?;

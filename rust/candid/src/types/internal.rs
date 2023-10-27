@@ -231,10 +231,25 @@ impl TypeInner {
             _ => false,
         }
     }
+    pub fn is_blob(&self, env: &crate::TypeEnv) -> bool {
+        match self {
+            TypeInner::Vec(t) => {
+                let t = match env.trace_type(t) {
+                    Ok(t) => t,
+                    Err(_) => return false,
+                };
+                matches!(*t, TypeInner::Nat8)
+            }
+            _ => false,
+        }
+    }
 }
 impl Type {
     pub fn is_tuple(&self) -> bool {
         self.as_ref().is_tuple()
+    }
+    pub fn is_blob(&self, env: &crate::TypeEnv) -> bool {
+        self.as_ref().is_blob(env)
     }
     pub fn subst(&self, tau: &std::collections::BTreeMap<String, String>) -> Self {
         use TypeInner::*;

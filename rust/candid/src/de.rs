@@ -337,7 +337,7 @@ impl<'de> Deserializer<'de> {
     // Customize deserailization methods
     // Several deserialize functions will call visit_byte_buf.
     // We reserve the first byte to be a tag to distinguish between different callers:
-    // int(0), nat(1), principal(2), reserved(3), service(4), function(5)
+    // int(0), nat(1), principal(2), reserved(3), service(4), function(5), blob(6)
     // This is necessary for deserializing IDLValue because
     // it has only one visitor and we need a way to know who called the visitor.
     #[cfg_attr(docsrs, doc(cfg(feature = "bignum")))]
@@ -426,6 +426,22 @@ impl<'de> Deserializer<'de> {
         leb128::write::unsigned(&mut bytes, len as u64)?;
         bytes.extend_from_slice(meth);
         bytes.extend_from_slice(&id);
+        visitor.visit_byte_buf(bytes)
+    }
+    fn deserialize_blob<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.unroll_type()?;
+        check!(
+            self.expect_type.is_blob(&self.table) && self.wire_type.is_blob(&self.table),
+            "blob"
+        );
+        let len = Len::read(&mut self.input)?.0;
+        let blob = self.borrow_bytes(len)?;
+        let mut bytes = Vec::with_capacity(len + 1);
+        bytes.push(6u8);
+        bytes.extend_from_slice(blob);
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_empty<'a, V>(&'a mut self, _visitor: V) -> Result<V::Value>
@@ -546,6 +562,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             TypeInner::Principal => self.deserialize_principal(visitor),
             // construct types
             TypeInner::Opt(_) => self.deserialize_option(visitor),
+            // This is an optimization for blob, mostly likely used by IDLValue, but it won't help the native Vec<u8>
+            TypeInner::Vec(_) if self.expect_type.is_blob(&self.table) => {
+                self.deserialize_blob(visitor)
+            }
             TypeInner::Vec(_) => self.deserialize_seq(visitor),
             TypeInner::Record(_) => self.deserialize_struct("_", &[], visitor),
             TypeInner::Variant(_) => self.deserialize_enum("_", &[], visitor),
