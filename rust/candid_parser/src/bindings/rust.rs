@@ -15,11 +15,8 @@ pub enum Target {
 #[derive(Clone)]
 pub struct Config {
     candid_crate: String,
-    /// Applies to all types for now
     type_attributes: String,
-    /// Only generates SERVICE struct if canister_id is not provided
     canister_id: Option<candid::Principal>,
-    /// Service name when canister id is provided
     service_name: String,
     target: Target,
 }
@@ -37,14 +34,17 @@ impl Config {
         self.candid_crate = name;
         self
     }
+    /// Applies to all types for now
     pub fn set_type_attributes(&mut self, attr: String) -> &mut Self {
         self.type_attributes = attr;
         self
     }
+    /// Only generates SERVICE struct if canister_id is not provided
     pub fn set_canister_id(&mut self, id: candid::Principal) -> &mut Self {
         self.canister_id = Some(id);
         self
     }
+    /// Service name when canister id is provided
     pub fn set_service_name(&mut self, name: String) -> &mut Self {
         self.service_name = name;
         self
