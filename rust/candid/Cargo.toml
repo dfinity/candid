@@ -14,28 +14,27 @@ keywords = ["internet-computer", "idl", "candid", "dfinity"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
-byteorder = "1.4.3"
-candid_derive = { path = "../candid_derive", version = "=0.6.4" }
-codespan-reporting = "0.11"
-hex = "0.4.2"
+candid_derive = { path = "../candid_derive", version = "=0.6.5" }
 ic_principal = { path = "../ic_principal", version = "0.1.0" }
-leb128 = "0.2.4"
-num_enum = "0.6.1"
-num-bigint = { version = "0.4.2", features = ["serde"] }
-num-traits = "0.2.12"
-paste = "1.0.0"
-pretty = "0.12.0"
-serde = { version = "1.0.118", features = ["derive"] }
-serde_bytes = "0.11"
-thiserror = "1.0.20"
-anyhow = "1.0"
 binread = { version = "2.1", features = ["debug_template"] }
+byteorder = "1.5.0"
+leb128 = "0.2.5"
+paste = "1.0"
+hex.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+
+serde_bytes = { version = "0.11", optional = true }
+pretty = { workspace = true, optional = true }
+num-bigint = { workspace = true, optional = true }
+num-traits = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 stacker = "0.1"
 
 [dev-dependencies]
-rand = "0.8"
+rand.workspace = true
 criterion = "0.4"
 serde_cbor = "0.11.2"
 serde_json = "1.0.74"
@@ -47,4 +46,28 @@ harness = false
 path = "benches/benchmark.rs"
 
 [features]
-mute_warnings = []
+bignum = ["num-bigint", "num-traits"]
+value = ["bignum"]
+printer = ["pretty"]
+default = ["serde_bytes", "printer", "bignum"]
+all = ["default", "value"]
+
+[[test]]
+name = "types"
+path = "tests/types.rs"
+required-features = ["value"]
+[[test]]
+name = "serde"
+path = "tests/serde.rs"
+required-features = ["bignum"]
+[[test]]
+name = "number"
+path = "tests/number.rs"
+required-features = ["bignum"]
+
+# docs.rs-specific configuration
+# To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --features all
+[package.metadata.docs.rs]
+features = ["all"]
+# defines the configuration attribute `docsrs`
+rustdoc-args = ["--cfg", "docsrs"]

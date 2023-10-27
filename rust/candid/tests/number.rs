@@ -1,3 +1,4 @@
+use candid::types::leb128::*;
 use candid::{Int, Nat};
 use num_traits::cast::ToPrimitive;
 
@@ -51,10 +52,16 @@ fn random_i64() {
             let mut encoded = Vec::new();
             Int::from(x).encode(&mut encoded).unwrap();
             assert_eq!(expected, encoded);
+            encoded.clear();
+            encode_int(&mut encoded, x.into()).unwrap();
+            assert_eq!(expected, encoded);
         }
         let mut readable = &expected[..];
         let decoded = Int::decode(&mut readable).unwrap();
         assert_eq!(decoded.0.to_i64().unwrap(), x);
+        readable = &expected[..];
+        let decoded = decode_int(&mut readable).unwrap();
+        assert_eq!(decoded as i64, x);
     }
 }
 
@@ -70,10 +77,16 @@ fn random_u64() {
             let mut encoded = Vec::new();
             Nat::from(x).encode(&mut encoded).unwrap();
             assert_eq!(expected, encoded);
+            encoded.clear();
+            encode_nat(&mut encoded, x.into()).unwrap();
+            assert_eq!(expected, encoded);
         }
         let mut readable = &expected[..];
         let decoded = Nat::decode(&mut readable).unwrap();
         assert_eq!(decoded.0.to_u64().unwrap(), x);
+        readable = &expected[..];
+        let decoded = decode_nat(&mut readable).unwrap();
+        assert_eq!(decoded as u64, x);
     }
 }
 

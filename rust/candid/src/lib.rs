@@ -79,6 +79,8 @@
 //! This is difficult to achieve in `Serialize`, especially for enum types. Besides serialization, [`CandidType`](types/trait.CandidType.html)
 //! trait also converts Rust type to Candid type defined as [`candid::types::Type`](types/internal/enum.Type.html).
 //! ```
+//! #[cfg(feature = "serde_bytes")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::{Encode, Decode, CandidType, Deserialize};
 //! #[derive(CandidType, Deserialize)]
 //! # #[derive(Debug, PartialEq)]
@@ -94,7 +96,8 @@
 //! let bytes = Encode!(&list)?;
 //! let res = Decode!(&bytes, List)?;
 //! assert_eq!(res, list);
-//! # Ok::<(), candid::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //! We support serde's rename attributes for each field, namely `#[serde(rename = "foo")]`
 //! and `#[serde(rename(serialize = "foo", deserialize = "foo"))]`.
@@ -113,6 +116,8 @@
 //! You can also use `i128` and `u128` to represent Candid `int` and `nat` types respectively (decoding will fail if
 //! the number is more than 128 bits).
 //! ```
+//! #[cfg(feature = "bignum")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::{Int, Nat, Encode, Decode};
 //! let x = "-10000000000000000000".parse::<Int>()?;
 //! let bytes = Encode!(&Nat::from(1024), &x)?;
@@ -120,7 +125,8 @@
 //! let (c, d) = Decode!(&bytes, u128, i128)?;
 //! assert_eq!(a + 1, 1025);
 //! assert_eq!(b, Int::parse(b"-10000000000000000000")?);
-//! # Ok::<(), candid::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Operating on reference types
@@ -129,6 +135,8 @@
 //! instead of the Candid types.
 //!
 //! ```
+//! #[cfg(feature = "bignum")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::{define_function, define_service, func, Encode, Decode, Principal};
 //! let principal = Principal::from_text("aaaaa-aa").unwrap();
 //!
@@ -142,7 +150,8 @@
 //! });
 //! let serv = MyService::new(principal);
 //! assert_eq!(serv, Decode!(&Encode!(&serv)?, MyService)?);
-//! # Ok::<(), candid::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Operating on untyped Candid values
@@ -151,6 +160,8 @@
 //! The use of Rust value and `IDLValue` can be intermixed.
 //!
 //! ```
+//! #[cfg(feature = "value")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::types::value::IDLValue;
 //! // Serialize Rust value Some(42u8) and IDLValue "hello"
 //! let bytes = candid::ser::IDLBuilder::new()
@@ -167,7 +178,8 @@
 //!
 //! assert_eq!(x, IDLValue::Opt(Box::new(IDLValue::Nat8(42))));
 //! assert_eq!(y, "hello");
-//! # Ok::<(), candid::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Building the library as a JS/Wasm package
@@ -229,15 +241,15 @@ pub mod error;
 pub use error::{Error, Result};
 
 pub mod types;
+#[cfg(feature = "bignum")]
+pub use types::number::{Int, Nat};
 pub use types::CandidType;
 pub use types::{
     arc,
-    number::{Int, Nat},
     principal::Principal,
     rc,
     reference::{Func, Service},
     reserved::{Empty, Reserved},
-    value::{IDLArgs, IDLValue},
     TypeEnv,
 };
 
@@ -248,9 +260,13 @@ pub mod ser;
 
 pub mod utils;
 pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
-pub mod pretty;
 
-pub mod pretty_printer;
+#[cfg_attr(docsrs, doc(cfg(feature = "value")))]
+#[cfg(feature = "value")]
+pub use types::value::{IDLArgs, IDLValue};
+#[cfg_attr(docsrs, doc(cfg(feature = "printer")))]
+#[cfg(feature = "printer")]
+pub mod pretty;
 
 // Candid hash function comes from
 // https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf

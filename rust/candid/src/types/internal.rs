@@ -1,6 +1,5 @@
 use super::CandidType;
 use crate::idl_hash;
-use num_enum::TryFromPrimitive;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -232,10 +231,25 @@ impl TypeInner {
             _ => false,
         }
     }
+    pub fn is_blob(&self, env: &crate::TypeEnv) -> bool {
+        match self {
+            TypeInner::Vec(t) => {
+                let t = match env.trace_type(t) {
+                    Ok(t) => t,
+                    Err(_) => return false,
+                };
+                matches!(*t, TypeInner::Nat8)
+            }
+            _ => false,
+        }
+    }
 }
 impl Type {
     pub fn is_tuple(&self) -> bool {
         self.as_ref().is_tuple()
+    }
+    pub fn is_blob(&self, env: &crate::TypeEnv) -> bool {
+        self.as_ref().is_blob(env)
     }
     pub fn subst(&self, tau: &std::collections::BTreeMap<String, String>) -> Self {
         use TypeInner::*;
@@ -281,14 +295,28 @@ impl Type {
         .into()
     }
 }
+#[cfg(feature = "printer")]
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", crate::pretty_printer::pp_ty(self).pretty(80))
+        write!(f, "{}", crate::pretty::candid::pp_ty(self).pretty(80))
     }
 }
+#[cfg(feature = "printer")]
 impl fmt::Display for TypeInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", crate::pretty_printer::pp_ty_inner(self).pretty(80))
+        write!(f, "{}", crate::pretty::candid::pp_ty_inner(self).pretty(80))
+    }
+}
+#[cfg(not(feature = "printer"))]
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+#[cfg(not(feature = "printer"))]
+impl fmt::Display for TypeInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 pub(crate) fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
@@ -375,7 +403,7 @@ impl std::fmt::Display for Label {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Label::Id(n) | Label::Unnamed(n) => {
-                write!(f, "{}", super::number::pp_num_str(&n.to_string()))
+                write!(f, "{}", crate::utils::pp_num_str(&n.to_string()))
             }
             Label::Named(id) => write!(f, "{id}"),
         }
@@ -401,15 +429,23 @@ pub struct Field {
     pub id: SharedLabel,
     pub ty: Type,
 }
+#[cfg(feature = "printer")]
 impl fmt::Display for Field {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",
-            crate::pretty_printer::pp_field(self, false).pretty(80)
+            crate::pretty::candid::pp_field(self, false).pretty(80)
         )
     }
 }
+#[cfg(not(feature = "printer"))]
+impl fmt::Display for Field {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 #[macro_export]
 /// Construct a field type, which can be used in `TypeInner::Record` and `TypeInner::Variant`.
 ///
@@ -457,24 +493,22 @@ pub enum FuncMode {
     Query,
     CompositeQuery,
 }
-impl FuncMode {
-    pub fn to_doc(&self) -> pretty::RcDoc {
-        match self {
-            FuncMode::Oneway => pretty::RcDoc::text("oneway"),
-            FuncMode::Query => pretty::RcDoc::text("query"),
-            FuncMode::CompositeQuery => pretty::RcDoc::text("composite_query"),
-        }
-    }
-}
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Function {
     pub modes: Vec<FuncMode>,
     pub args: Vec<Type>,
     pub rets: Vec<Type>,
 }
+#[cfg(feature = "printer")]
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", crate::pretty_printer::pp_function(self).pretty(80))
+        write!(f, "{}", crate::pretty::candid::pp_function(self).pretty(80))
+    }
+}
+#[cfg(not(feature = "printer"))]
+impl fmt::Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 impl Function {
@@ -518,7 +552,7 @@ macro_rules! service {
     }}
 }
 
-#[derive(Debug, PartialEq, TryFromPrimitive)]
+#[derive(Debug, PartialEq)]
 #[repr(i64)]
 pub enum Opcode {
     Null = -1,

@@ -417,6 +417,7 @@ fn test_newtype() {
 }
 
 #[test]
+#[cfg(feature = "serde_bytes")]
 fn test_serde_bytes() {
     use serde_bytes::ByteBuf;
     all_check(
@@ -439,6 +440,7 @@ fn test_serde_bytes() {
 }
 
 #[test]
+#[cfg(feature = "serde_bytes")]
 fn test_rc_bytes() {
     use serde_bytes::ByteBuf;
     use std::rc::Rc;

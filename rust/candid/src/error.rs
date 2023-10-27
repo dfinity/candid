@@ -1,16 +1,21 @@
 //! `candid::Result<T> = Result<T, candid::Error>>`
 
-use codespan_reporting::diagnostic::Label;
 use serde::{de, ser};
 use std::{io, num::ParseIntError};
 use thiserror::Error;
 
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
+#[derive(Debug)]
+pub struct Label {
+    range: std::ops::Range<usize>,
+    message: String,
+}
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("binary parser error: {}", .0.get(0).map(|f| format!("{} at byte offset {}", f.message, f.range.start/2)).unwrap_or_else(|| "io error".to_string()))]
-    Binread(Vec<Label<()>>),
+    Binread(Vec<Label>),
 
     #[error("Subtyping error: {0}")]
     Subtype(String),
@@ -28,19 +33,25 @@ impl Error {
     }
 }
 
-fn get_binread_labels(e: &binread::Error) -> Vec<Label<()>> {
+fn get_binread_labels(e: &binread::Error) -> Vec<Label> {
     use binread::Error::*;
     match e {
         BadMagic { pos, .. } => {
             let pos = (pos * 2) as usize;
-            vec![Label::primary((), pos..pos + 2).with_message("Unexpected bytes")]
+            vec![Label {
+                range: pos..pos + 2,
+                message: "Unexpected bytes".to_string(),
+            }]
         }
         Custom { pos, err } => {
             let pos = (pos * 2) as usize;
             let err = err
                 .downcast_ref::<&str>()
                 .unwrap_or(&"unknown error (there's a bug in error reporting)");
-            vec![Label::primary((), pos..pos + 2).with_message(err.to_string())]
+            vec![Label {
+                range: pos..pos + 2,
+                message: err.to_string(),
+            }]
         }
         EnumErrors {
             pos,
@@ -52,21 +63,33 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label<()>> {
                 .find(|(_, e)| !matches!(e, BadMagic { .. }));
             // Should have at most one non-magic error
             match variant {
-                None => vec![Label::primary((), pos..pos + 2).with_message("Unknown opcode")],
+                None => vec![Label {
+                    range: pos..pos + 2,
+                    message: "Unknown opcode".to_string(),
+                }],
                 Some((id, e)) => {
                     let mut labels = get_binread_labels(e);
-                    labels.push(Label::secondary((), pos..pos + 2).with_message(id.to_string()));
+                    labels.push(Label {
+                        range: pos..pos + 2,
+                        message: id.to_string(),
+                    });
                     labels
                 }
             }
         }
         NoVariantMatch { pos } => {
             let pos = (pos * 2) as usize;
-            vec![Label::primary((), pos..pos + 2).with_message("No variant match")]
+            vec![Label {
+                range: pos..pos + 2,
+                message: "No variant match".to_string(),
+            }]
         }
         AssertFail { pos, message } => {
             let pos = (pos * 2) as usize;
-            vec![Label::primary((), pos..pos + 2).with_message(message)]
+            vec![Label {
+                range: pos..pos + 2,
+                message: message.to_string(),
+            }]
         }
         Io(_) => vec![],
         _ => unreachable!(),

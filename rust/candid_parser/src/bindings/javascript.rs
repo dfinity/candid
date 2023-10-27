@@ -1,5 +1,6 @@
 use super::analysis::{chase_actor, chase_types, infer_rec};
-use candid::pretty::*;
+use candid::pretty::candid::pp_mode;
+use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
@@ -174,7 +175,7 @@ fn pp_modes(modes: &[candid::types::FuncMode]) -> RcDoc {
     let doc = concat(
         modes
             .iter()
-            .map(|m| str("'").append(m.to_doc()).append("'")),
+            .map(|m| str("'").append(pp_mode(m)).append("'")),
         ",",
     );
     enclose("[", doc, "]")
@@ -267,8 +268,8 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 }
 
 pub mod value {
-    use candid::pretty::*;
-    use candid::pretty_printer::value::number_to_string;
+    use candid::pretty::candid::value::number_to_string;
+    use candid::pretty::utils::*;
     use candid::types::value::{IDLArgs, IDLField, IDLValue};
     use candid::types::Label;
     use pretty::RcDoc;
@@ -333,6 +334,10 @@ pub mod value {
             Text(s) => RcDoc::text(format!("'{}'", s.escape_debug())),
             None => RcDoc::text("[]"),
             Opt(v) => enclose_space("[", pp_value(v), "]"),
+            Blob(blob) => {
+                let body = concat(blob.iter().map(RcDoc::as_string), ",");
+                enclose_space("[", body, "]")
+            }
             Vec(vs) => {
                 let body = concat(vs.iter().map(pp_value), ",");
                 enclose_space("[", body, "]")
@@ -358,7 +363,7 @@ pub mod value {
 pub mod test {
     use super::value;
     use crate::test::{HostAssert, HostTest, Test};
-    use candid::pretty::*;
+    use candid::pretty::utils::*;
     use candid::TypeEnv;
     use pretty::RcDoc;
 

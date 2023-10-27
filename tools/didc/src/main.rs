@@ -1,11 +1,11 @@
 use anyhow::{bail, Result};
-use candid::{types::Type, IDLArgs, TypeEnv};
+use candid_parser::candid::types::{subtype, Type};
 use candid_parser::{
     error::pretty_diagnose,
     parse_idl_args, parse_idl_value, pretty_check_file, pretty_parse,
     types::{IDLType, IDLTypes},
     typing::ast_to_type,
-    Error,
+    Error, IDLArgs, IDLValue, TypeEnv,
 };
 use clap::Parser;
 use std::collections::HashSet;
@@ -172,9 +172,9 @@ fn main() -> Result<()> {
                         let mut gamma = HashSet::new();
                         let t2 = env.merge_type(env2, t2);
                         if strict {
-                            candid::types::subtype::equal(&mut gamma, &env, &t1, &t2)?;
+                            subtype::equal(&mut gamma, &env, &t1, &t2)?;
                         } else {
-                            candid::types::subtype::subtype(&mut gamma, &env, &t1, &t2)?;
+                            subtype::subtype(&mut gamma, &env, &t1, &t2)?;
                         }
                     }
                     _ => {
@@ -191,14 +191,14 @@ fn main() -> Result<()> {
             };
             let ty1 = ast_to_type(&env, &ty1)?;
             let ty2 = ast_to_type(&env, &ty2)?;
-            candid::types::subtype::subtype(&mut HashSet::new(), &env, &ty1, &ty2)?;
+            subtype::subtype(&mut HashSet::new(), &env, &ty1, &ty2)?;
         }
         Command::Bind { input, target } => {
             let (env, actor) = pretty_check_file(&input)?;
             let content = match target.as_str() {
                 "js" => candid_parser::bindings::javascript::compile(&env, &actor),
                 "ts" => candid_parser::bindings::typescript::compile(&env, &actor),
-                "did" => candid::pretty_printer::compile(&env, &actor),
+                "did" => candid_parser::pretty::candid::compile(&env, &actor),
                 "mo" => candid_parser::bindings::motoko::compile(&env, &actor),
                 "rs" => {
                     let config = candid_parser::bindings::rust::Config::new();
@@ -206,7 +206,7 @@ fn main() -> Result<()> {
                 }
                 "rs-agent" => {
                     let mut config = candid_parser::bindings::rust::Config::new();
-                    config.target = candid_parser::bindings::rust::Target::Agent;
+                    config.set_target(candid_parser::bindings::rust::Target::Agent);
                     candid_parser::bindings::rust::compile(&config, &env, &actor)
                 }
                 _ => unreachable!(),
@@ -228,7 +228,7 @@ fn main() -> Result<()> {
             println!("{content}");
         }
         Command::Hash { input } => {
-            println!("{}", candid::idl_hash(&input));
+            println!("{}", candid_parser::idl_hash(&input));
         }
         Command::Encode {
             args,
@@ -254,7 +254,7 @@ fn main() -> Result<()> {
                 "blob" => {
                     let mut res = String::new();
                     for ch in bytes.iter() {
-                        res.push_str(&candid::pretty_printer::value::pp_char(*ch));
+                        res.push_str(&candid_parser::pretty::candid::value::pp_char(*ch));
                     }
                     format!("blob \"{res}\"")
                 }
@@ -278,7 +278,6 @@ fn main() -> Result<()> {
                         .collect::<String>(),
                 )?,
                 "blob" => {
-                    use candid::types::value::IDLValue;
                     match parse_idl_value(&blob).map_err(|e| {
                         let _ = pretty_diagnose("blob", &blob, &e);
                         e

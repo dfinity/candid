@@ -1,5 +1,5 @@
-use crate::pretty::*;
-use crate::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use crate::pretty::utils::*;
+use crate::types::{Field, FuncMode, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
 static KEYWORDS: [&str; 30] = [
@@ -160,9 +160,15 @@ pub fn pp_args(args: &[Type]) -> RcDoc {
     let doc = concat(args.iter().map(pp_ty), ",");
     enclose("(", doc, ")")
 }
-
-pub fn pp_modes(modes: &[crate::types::FuncMode]) -> RcDoc {
-    RcDoc::concat(modes.iter().map(|m| RcDoc::space().append(m.to_doc())))
+pub fn pp_mode(mode: &FuncMode) -> RcDoc {
+    match mode {
+        FuncMode::Oneway => RcDoc::text("oneway"),
+        FuncMode::Query => RcDoc::text("query"),
+        FuncMode::CompositeQuery => RcDoc::text("composite_query"),
+    }
+}
+pub fn pp_modes(modes: &[FuncMode]) -> RcDoc {
+    RcDoc::concat(modes.iter().map(|m| RcDoc::space().append(pp_mode(m))))
 }
 
 fn pp_service(serv: &[(String, Type)]) -> RcDoc {
@@ -210,15 +216,19 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "value")))]
+#[cfg(feature = "value")]
 pub mod value {
     use super::{ident_string, pp_text};
-    use crate::pretty::*;
+    use crate::pretty::utils::*;
     use crate::types::value::{IDLArgs, IDLField, IDLValue};
-    use crate::types::{number::pp_num_str, Label};
+    use crate::types::Label;
+    use crate::utils::pp_num_str;
     use std::fmt;
 
     use ::pretty::RcDoc;
 
+    // TODO config this
     const MAX_ELEMENTS_FOR_PRETTY_PRINT: usize = 10;
 
     impl fmt::Display for IDLArgs {
@@ -328,6 +338,13 @@ pub mod value {
                 Func(id, meth) => write!(f, "func \"{}\".{}", id, ident_string(meth)),
                 Opt(v) if has_type_annotation(v) => write!(f, "opt ({v:?})"),
                 Opt(v) => write!(f, "opt {v:?}"),
+                Blob(b) => {
+                    write!(f, "blob \"")?;
+                    for v in b.iter() {
+                        write!(f, "{}", &pp_char(*v))?;
+                    }
+                    write!(f, "\"")
+                }
                 Vec(vs) => {
                     if let Some(Nat8(_)) = vs.first() {
                         write!(f, "blob \"")?;

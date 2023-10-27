@@ -10,6 +10,8 @@ mod impls;
 pub mod internal;
 pub mod subtype;
 pub mod type_env;
+#[cfg_attr(docsrs, doc(cfg(feature = "value")))]
+#[cfg(feature = "value")]
 pub mod value;
 
 pub use self::internal::{
@@ -17,6 +19,8 @@ pub use self::internal::{
 };
 pub use type_env::TypeEnv;
 
+pub mod leb128;
+#[cfg(feature = "bignum")]
 pub mod number;
 pub mod principal;
 pub mod reference;
@@ -56,8 +60,14 @@ pub trait Serializer: Sized {
     type Error: Error;
     type Compound: Compound<Error = Self::Error>;
     fn serialize_bool(self, v: bool) -> Result<(), Self::Error>;
+    #[cfg_attr(docsrs, doc(cfg(feature = "bignum")))]
+    #[cfg(feature = "bignum")]
     fn serialize_int(self, v: &crate::Int) -> Result<(), Self::Error>;
+    fn serialize_i128(self, v: i128) -> Result<(), Self::Error>;
+    #[cfg_attr(docsrs, doc(cfg(feature = "bignum")))]
+    #[cfg(feature = "bignum")]
     fn serialize_nat(self, v: &crate::Nat) -> Result<(), Self::Error>;
+    fn serialize_u128(self, v: u128) -> Result<(), Self::Error>;
     fn serialize_nat8(self, v: u8) -> Result<(), Self::Error>;
     fn serialize_nat16(self, v: u16) -> Result<(), Self::Error>;
     fn serialize_nat32(self, v: u32) -> Result<(), Self::Error>;

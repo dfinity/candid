@@ -22,6 +22,20 @@ where
     Ok(())
 }
 
+pub fn pp_num_str(s: &str) -> String {
+    let mut groups = Vec::new();
+    for chunk in s.as_bytes().rchunks(3) {
+        let str = String::from_utf8_lossy(chunk);
+        groups.push(str);
+    }
+    groups.reverse();
+    if "-" == groups.first().unwrap() {
+        "-".to_string() + &groups[1..].join("_")
+    } else {
+        groups.join("_")
+    }
+}
+
 /// Encode sequence of Rust values into Candid message of type `candid::Result<Vec<u8>>`.
 #[macro_export]
 macro_rules! Encode {

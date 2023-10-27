@@ -1,5 +1,5 @@
 use super::analysis::{chase_actor, infer_rec};
-use candid::pretty::*;
+use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
@@ -14,14 +14,11 @@ pub enum Target {
 
 #[derive(Clone)]
 pub struct Config {
-    pub candid_crate: String,
-    /// Applies to all types for now
-    pub type_attributes: String,
-    /// Only generates SERVICE struct if canister_id is not provided
-    pub canister_id: Option<candid::Principal>,
-    /// Service name when canister id is provided
-    pub service_name: String,
-    pub target: Target,
+    candid_crate: String,
+    type_attributes: String,
+    canister_id: Option<candid::Principal>,
+    service_name: String,
+    target: Target,
 }
 impl Config {
     pub fn new() -> Self {
@@ -32,6 +29,29 @@ impl Config {
             service_name: "service".to_string(),
             target: Target::CanisterCall,
         }
+    }
+    pub fn set_candid_crate(&mut self, name: String) -> &mut Self {
+        self.candid_crate = name;
+        self
+    }
+    /// Applies to all types for now
+    pub fn set_type_attributes(&mut self, attr: String) -> &mut Self {
+        self.type_attributes = attr;
+        self
+    }
+    /// Only generates SERVICE struct if canister_id is not provided
+    pub fn set_canister_id(&mut self, id: candid::Principal) -> &mut Self {
+        self.canister_id = Some(id);
+        self
+    }
+    /// Service name when canister id is provided
+    pub fn set_service_name(&mut self, name: String) -> &mut Self {
+        self.service_name = name;
+        self
+    }
+    pub fn set_target(&mut self, name: Target) -> &mut Self {
+        self.target = name;
+        self
     }
 }
 impl Default for Config {
@@ -269,7 +289,7 @@ fn pp_args(args: &[Type]) -> RcDoc {
 fn pp_ty_func(f: &Function) -> RcDoc {
     let args = pp_args(&f.args);
     let rets = pp_args(&f.rets);
-    let modes = candid::pretty_printer::pp_modes(&f.modes);
+    let modes = candid::pretty::candid::pp_modes(&f.modes);
     args.append(" ->")
         .append(RcDoc::space())
         .append(rets.append(modes))

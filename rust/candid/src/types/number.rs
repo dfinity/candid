@@ -1,7 +1,7 @@
 //! Data structure for Candid type Int, Nat, supporting big integer with LEB128 encoding.
 
 use super::{CandidType, Serializer, Type, TypeInner};
-use crate::Error;
+use crate::{utils::pp_num_str, Error};
 use num_bigint::{BigInt, BigUint};
 use serde::{
     de::{self, Deserialize, SeqAccess, Visitor},
@@ -85,20 +85,6 @@ impl std::str::FromStr for Nat {
     type Err = crate::Error;
     fn from_str(str: &str) -> Result<Self, Self::Err> {
         Self::parse(str.as_bytes())
-    }
-}
-
-pub fn pp_num_str(s: &str) -> String {
-    let mut groups = Vec::new();
-    for chunk in s.as_bytes().rchunks(3) {
-        let str = String::from_utf8_lossy(chunk);
-        groups.push(str);
-    }
-    groups.reverse();
-    if "-" == groups.first().unwrap() {
-        "-".to_string() + &groups[1..].join("_")
-    } else {
-        groups.join("_")
     }
 }
 

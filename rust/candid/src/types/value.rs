@@ -18,6 +18,7 @@ pub enum IDLValue {
     Vec(Vec<IDLValue>),
     Record(Vec<IDLField>),
     Variant(VariantValue),
+    Blob(Vec<u8>),
     Principal(crate::Principal),
     Service(crate::Principal),
     Func(crate::Principal, String),
@@ -189,6 +190,17 @@ impl IDLValue {
             }
             // fallback
             (_, TypeInner::Opt(_)) if !from_parser => IDLValue::None,
+            (IDLValue::Blob(blob), ty) if ty.is_blob(env) => IDLValue::Blob(blob.to_vec()),
+            (IDLValue::Vec(vec), ty) if ty.is_blob(env) => {
+                let blob = vec
+                    .iter()
+                    .filter_map(|x| match *x {
+                        IDLValue::Nat8(n) => Some(n),
+                        _ => None,
+                    })
+                    .collect();
+                IDLValue::Blob(blob)
+            }
             (IDLValue::Vec(vec), TypeInner::Vec(ty)) => {
                 let mut res = Vec::new();
                 for e in vec.iter() {
@@ -284,6 +296,7 @@ impl IDLValue {
                 let t = v.deref().value_ty();
                 TypeInner::Opt(t)
             }
+            IDLValue::Blob(_) => TypeInner::Vec(TypeInner::Nat8.into()),
             IDLValue::Vec(ref vec) => {
                 let t = if vec.is_empty() {
                     TypeInner::Empty.into()
@@ -368,6 +381,7 @@ impl crate::CandidType for IDLValue {
                 }
                 Ok(())
             }
+            IDLValue::Blob(ref blob) => serializer.serialize_blob(blob),
             IDLValue::Record(ref vec) => {
                 let mut ser = serializer.serialize_struct()?;
                 for f in vec.iter() {
@@ -420,7 +434,7 @@ impl<'de> Visitor<'de> for IDLValueVisitor {
     visit_prim!(Int64, i64);
     visit_prim!(Float32, f32);
     visit_prim!(Float64, f64);
-    // Deserialize Candid specific types: Bignumber, principal, reversed, service, function
+    // Deserialize Candid specific types: Bignumber, principal, reversed, service, function, blob
     fn visit_byte_buf<E: de::Error>(self, value: Vec<u8>) -> DResult<E> {
         let (tag, mut bytes) = value.split_at(1);
         match tag[0] {
@@ -436,6 +450,7 @@ impl<'de> Visitor<'de> for IDLValueVisitor {
                 let v = crate::Principal::try_from(bytes).map_err(E::custom)?;
                 Ok(IDLValue::Principal(v))
             }
+            3u8 => Ok(IDLValue::Reserved),
             4u8 => {
                 let v = crate::Principal::try_from(bytes).map_err(E::custom)?;
                 Ok(IDLValue::Service(v))
@@ -449,7 +464,7 @@ impl<'de> Visitor<'de> for IDLValueVisitor {
                 let id = crate::Principal::try_from(bytes).map_err(E::custom)?;
                 Ok(IDLValue::Func(id, meth))
             }
-            3u8 => Ok(IDLValue::Reserved),
+            6u8 => Ok(IDLValue::Blob(bytes.to_vec())),
             _ => Err(de::Error::custom("unknown tag in visit_byte_buf")),
         }
     }
