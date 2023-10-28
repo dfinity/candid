@@ -73,6 +73,7 @@ fn test_value() {
     check(Opt(Box::new(Int(42.into()))), "4449444c016e7c0100012a");
     check(Text("Hi ☃\n".to_string()), "4449444c00017107486920e298830a");
     check(Reserved, "4449444c000170");
+    check(Blob(vec![1, 2, 3, 4]), "4449444c016d7b01000401020304");
     test_decode(&hex("4449444c016e7c010000"), &None);
     check(int_vec(&[0, 1, 2, 3]), "4449444c016d7c01000400010203");
     check(
