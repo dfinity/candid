@@ -8,13 +8,13 @@ pub type Result<T = ()> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct Label {
-    range: std::ops::Range<usize>,
+    pos: usize,
     message: String,
 }
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("binary parser error: {}", .0.get(0).map(|f| format!("{} at byte offset {}", f.message, f.range.start/2)).unwrap_or_else(|| "io error".to_string()))]
+    #[error("binary parser error: {}", .0.get(0).map(|f| format!("{} at byte offset {}", f.message, f.pos/2)).unwrap_or_else(|| "io error".to_string()))]
     Binread(Vec<Label>),
 
     #[error("Subtyping error: {0}")]
@@ -39,7 +39,7 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label> {
         BadMagic { pos, .. } => {
             let pos = (pos * 2) as usize;
             vec![Label {
-                range: pos..pos + 2,
+                pos,
                 message: "Unexpected bytes".to_string(),
             }]
         }
@@ -49,7 +49,7 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label> {
                 .downcast_ref::<&str>()
                 .unwrap_or(&"unknown error (there's a bug in error reporting)");
             vec![Label {
-                range: pos..pos + 2,
+                pos,
                 message: err.to_string(),
             }]
         }
@@ -64,13 +64,13 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label> {
             // Should have at most one non-magic error
             match variant {
                 None => vec![Label {
-                    range: pos..pos + 2,
+                    pos,
                     message: "Unknown opcode".to_string(),
                 }],
                 Some((id, e)) => {
                     let mut labels = get_binread_labels(e);
                     labels.push(Label {
-                        range: pos..pos + 2,
+                        pos,
                         message: id.to_string(),
                     });
                     labels
@@ -80,14 +80,14 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label> {
         NoVariantMatch { pos } => {
             let pos = (pos * 2) as usize;
             vec![Label {
-                range: pos..pos + 2,
+                pos,
                 message: "No variant match".to_string(),
             }]
         }
         AssertFail { pos, message } => {
             let pos = (pos * 2) as usize;
             vec![Label {
-                range: pos..pos + 2,
+                pos,
                 message: message.to_string(),
             }]
         }
