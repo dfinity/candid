@@ -25,6 +25,7 @@
 
 * Add `candid::types::subtype_with_config` to control the error reporting level of special opt rule.
 * Add `Type.is_blob(env)` method to check if a type is a blob type.
+* Fix TS binding for `variant {}`.
 
 ## Rust 0.9.9 -- 0.9.11
 

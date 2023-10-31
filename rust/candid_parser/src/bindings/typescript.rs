@@ -73,12 +73,18 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
                 enclose_space("{", fields, "}")
             }
         }
-        Variant(ref fs) => strict_concat(
-            fs.iter()
-                .map(|f| enclose_space("{", pp_field(env, f, is_ref), "}")),
-            " |",
-        )
-        .nest(INDENT_SPACE),
+        Variant(ref fs) => {
+            if fs.is_empty() {
+                str("never")
+            } else {
+                strict_concat(
+                    fs.iter()
+                        .map(|f| enclose_space("{", pp_field(env, f, is_ref), "}")),
+                    " |",
+                )
+                .nest(INDENT_SPACE)
+            }
+        }
         Func(_) => str("[Principal, string]"),
         Service(_) => str("Principal"),
         Class(_, _) => unreachable!(),

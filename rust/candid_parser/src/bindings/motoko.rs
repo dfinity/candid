@@ -127,8 +127,12 @@ fn pp_ty(ty: &Type) -> RcDoc {
             }
         }
         Variant(ref fs) => {
-            let fields = concat(fs.iter().map(pp_variant), ";");
-            enclose_space("{", fields, "}")
+            if fs.is_empty() {
+                str("{#}")
+            } else {
+                let fields = concat(fs.iter().map(pp_variant), ";");
+                enclose_space("{", fields, "}")
+            }
         }
         Func(ref func) => pp_function(func),
         Service(ref serv) => pp_service(serv),
