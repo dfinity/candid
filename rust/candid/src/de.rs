@@ -4,11 +4,13 @@ use super::{
     error::{Error, Result},
     types::internal::{text_size, type_of, TypeId},
     types::{Field, Label, SharedLabel, Type, TypeEnv, TypeInner},
-    CandidType, Int, Nat,
+    CandidType,
 };
+#[cfg(feature = "bignum")]
+use super::{Int, Nat};
 use crate::{
     binary_parser::{BoolValue, Header, Len, PrincipalBytes},
-    types::subtype::{subtype, Gamma},
+    types::subtype::{subtype_with_config, Gamma, OptReport},
 };
 use anyhow::{anyhow, Context};
 use binread::BinRead;
@@ -56,6 +58,8 @@ impl<'de> IDLDeserialize<'de> {
         self.de.is_untyped = false;
         self.deserialize_with_type(T::ty())
     }
+    #[cfg_attr(docsrs, doc(cfg(feature = "value")))]
+    #[cfg(feature = "value")]
     pub fn get_value_with_type(
         &mut self,
         env: &TypeEnv,
@@ -136,8 +140,29 @@ impl<'de> IDLDeserialize<'de> {
 }
 
 pub struct Config {
-    pub zero_sized_values: usize,
-    pub full_error_message: bool,
+    zero_sized_values: usize,
+    full_error_message: bool,
+}
+impl Config {
+    pub fn new() -> Self {
+        Self {
+            zero_sized_values: 2_000_000,
+            full_error_message: true,
+        }
+    }
+    pub fn set_zero_sized_values(&mut self, n: usize) -> &mut Self {
+        self.zero_sized_values = n;
+        self
+    }
+    pub fn set_full_error_message(&mut self, n: bool) -> &mut Self {
+        self.full_error_message = n;
+        self
+    }
+}
+impl Default for Config {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 macro_rules! assert {
@@ -273,7 +298,8 @@ impl<'de> Deserializer<'de> {
         Ok(res)
     }
     fn check_subtype(&mut self) -> Result<()> {
-        subtype(
+        subtype_with_config(
+            OptReport::Silence,
             &mut self.gamma,
             &self.table,
             &self.wire_type,
@@ -332,9 +358,11 @@ impl<'de> Deserializer<'de> {
     // Customize deserailization methods
     // Several deserialize functions will call visit_byte_buf.
     // We reserve the first byte to be a tag to distinguish between different callers:
-    // int(0), nat(1), principal(2), reserved(3), service(4), function(5)
+    // int(0), nat(1), principal(2), reserved(3), service(4), function(5), blob(6)
     // This is necessary for deserializing IDLValue because
     // it has only one visitor and we need a way to know who called the visitor.
+    #[cfg_attr(docsrs, doc(cfg(feature = "bignum")))]
+    #[cfg(feature = "bignum")]
     fn deserialize_int<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -354,6 +382,8 @@ impl<'de> Deserializer<'de> {
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
         visitor.visit_byte_buf(bytes)
     }
+    #[cfg_attr(docsrs, doc(cfg(feature = "bignum")))]
+    #[cfg(feature = "bignum")]
     fn deserialize_nat<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -419,6 +449,22 @@ impl<'de> Deserializer<'de> {
         bytes.extend_from_slice(&id);
         visitor.visit_byte_buf(bytes)
     }
+    fn deserialize_blob<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.unroll_type()?;
+        check!(
+            self.expect_type.is_blob(&self.table) && self.wire_type.is_blob(&self.table),
+            "blob"
+        );
+        let len = Len::read(&mut self.input)?.0;
+        let blob = self.borrow_bytes(len)?;
+        let mut bytes = Vec::with_capacity(len + 1);
+        bytes.push(6u8);
+        bytes.extend_from_slice(blob);
+        visitor.visit_byte_buf(bytes)
+    }
     fn deserialize_empty<'a, V>(&'a mut self, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -449,14 +495,19 @@ impl<'de> Deserializer<'de> {
     {
         use de::Deserializer;
         let tid = type_of(&visitor);
-        if tid != TypeId::of::<crate::types::value::IDLValueVisitor>() // derive Copy
-            && tid != TypeId::of::<de::IgnoredAny>() // derive Copy
+        if tid != TypeId::of::<de::IgnoredAny>() // derive Copy
         // OptionVisitor doesn't derive Copy, but has only PhantomData.
         // OptionVisitor is private and we cannot get TypeId of OptionVisitor<T>,
         // we also cannot downcast V to concrete type, because of 'de
         // The only option left seems to be type_name, but it is not guaranteed to be stable, so there is risk here.
             && !tid.name.starts_with("serde::de::impls::OptionVisitor<")
         {
+            #[cfg(feature = "value")]
+            if tid != TypeId::of::<crate::types::value::IDLValueVisitor>() {
+                // derive Copy
+                panic!("Not a valid visitor: {tid:?}");
+            }
+            #[cfg(not(feature = "value"))]
             panic!("Not a valid visitor: {tid:?}");
         }
         // This is safe, because the visitor either impl Copy or is zero sized
@@ -501,8 +552,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         }
         self.unroll_type()?;
         match self.expect_type.as_ref() {
+            #[cfg(feature = "bignum")]
             TypeInner::Int => self.deserialize_int(visitor),
+            #[cfg(not(feature = "bignum"))]
+            TypeInner::Int => self.deserialize_i128(visitor),
+            #[cfg(feature = "bignum")]
             TypeInner::Nat => self.deserialize_nat(visitor),
+            #[cfg(not(feature = "bignum"))]
+            TypeInner::Nat => self.deserialize_u128(visitor),
             TypeInner::Nat8 => self.deserialize_u8(visitor),
             TypeInner::Nat16 => self.deserialize_u16(visitor),
             TypeInner::Nat32 => self.deserialize_u32(visitor),
@@ -526,6 +583,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             TypeInner::Principal => self.deserialize_principal(visitor),
             // construct types
             TypeInner::Opt(_) => self.deserialize_option(visitor),
+            // This is an optimization for blob, mostly likely used by IDLValue, but it won't help the native Vec<u8>
+            TypeInner::Vec(_) if self.expect_type.is_blob(&self.table) => {
+                self.deserialize_blob(visitor)
+            }
             TypeInner::Vec(_) => self.deserialize_seq(visitor),
             TypeInner::Record(_) => self.deserialize_struct("_", &[], visitor),
             TypeInner::Variant(_) => self.deserialize_enum("_", &[], visitor),
@@ -564,22 +625,13 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        use num_traits::ToPrimitive;
+        use crate::types::leb128::{decode_int, decode_nat};
         self.unroll_type()?;
         assert!(*self.expect_type == TypeInner::Int);
         let value: i128 = match self.wire_type.as_ref() {
-            TypeInner::Int => {
-                let int = Int::decode(&mut self.input).map_err(Error::msg)?;
-                int.0
-                    .to_i128()
-                    .ok_or_else(|| Error::msg("Cannot convert int to i128"))?
-            }
-            TypeInner::Nat => {
-                let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
-                nat.0
-                    .to_i128()
-                    .ok_or_else(|| Error::msg("Cannot convert nat to i128"))?
-            }
+            TypeInner::Int => decode_int(&mut self.input)?,
+            TypeInner::Nat => i128::try_from(decode_nat(&mut self.input)?)
+                .map_err(|_| Error::msg("Cannot convert nat to i128"))?,
             t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
         };
         visitor.visit_i128(value)
@@ -588,17 +640,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        use num_traits::ToPrimitive;
         self.unroll_type()?;
         check!(
             *self.expect_type == TypeInner::Nat && *self.wire_type == TypeInner::Nat,
             "nat"
         );
-        let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
-        let value = nat
-            .0
-            .to_u128()
-            .ok_or_else(|| Error::msg("Cannot convert nat to u128"))?;
+        let value = crate::types::leb128::decode_nat(&mut self.input)?;
         visitor.visit_u128(value)
     }
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>

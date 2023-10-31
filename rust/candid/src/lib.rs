@@ -79,6 +79,8 @@
 //! This is difficult to achieve in `Serialize`, especially for enum types. Besides serialization, [`CandidType`](types/trait.CandidType.html)
 //! trait also converts Rust type to Candid type defined as [`candid::types::Type`](types/internal/enum.Type.html).
 //! ```
+//! #[cfg(feature = "serde_bytes")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::{Encode, Decode, CandidType, Deserialize};
 //! #[derive(CandidType, Deserialize)]
 //! # #[derive(Debug, PartialEq)]
@@ -94,7 +96,8 @@
 //! let bytes = Encode!(&list)?;
 //! let res = Decode!(&bytes, List)?;
 //! assert_eq!(res, list);
-//! # Ok::<(), candid::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //! We support serde's rename attributes for each field, namely `#[serde(rename = "foo")]`
 //! and `#[serde(rename(serialize = "foo", deserialize = "foo"))]`.
@@ -113,6 +116,8 @@
 //! You can also use `i128` and `u128` to represent Candid `int` and `nat` types respectively (decoding will fail if
 //! the number is more than 128 bits).
 //! ```
+//! #[cfg(feature = "bignum")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::{Int, Nat, Encode, Decode};
 //! let x = "-10000000000000000000".parse::<Int>()?;
 //! let bytes = Encode!(&Nat::from(1024), &x)?;
@@ -120,7 +125,8 @@
 //! let (c, d) = Decode!(&bytes, u128, i128)?;
 //! assert_eq!(a + 1, 1025);
 //! assert_eq!(b, Int::parse(b"-10000000000000000000")?);
-//! # Ok::<(), candid::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Operating on reference types
@@ -129,6 +135,8 @@
 //! instead of the Candid types.
 //!
 //! ```
+//! #[cfg(feature = "bignum")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::{define_function, define_service, func, Encode, Decode, Principal};
 //! let principal = Principal::from_text("aaaaa-aa").unwrap();
 //!
@@ -142,7 +150,8 @@
 //! });
 //! let serv = MyService::new(principal);
 //! assert_eq!(serv, Decode!(&Encode!(&serv)?, MyService)?);
-//! # Ok::<(), candid::Error>(())
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Operating on untyped Candid values
@@ -151,6 +160,8 @@
 //! The use of Rust value and `IDLValue` can be intermixed.
 //!
 //! ```
+//! #[cfg(feature = "value")]
+//! # fn f() -> Result<(), candid::Error> {
 //! use candid::types::value::IDLValue;
 //! // Serialize Rust value Some(42u8) and IDLValue "hello"
 //! let bytes = candid::ser::IDLBuilder::new()
@@ -167,110 +178,6 @@
 //!
 //! assert_eq!(x, IDLValue::Opt(Box::new(IDLValue::Nat8(42))));
 //! assert_eq!(y, "hello");
-//! # Ok::<(), candid::Error>(())
-//! ```
-//!
-//! We provide a data structure [`candid::IDLArgs`](parser/value/struct.IDLArgs.html) to represent a sequence of `IDLValue`s,
-//! and use `to_bytes()` and `from_bytes()` to encode and decode Candid messages.
-//! We also provide a parser to parse Candid values in text format.
-//!
-//! ```
-//! #[cfg(feature = "parser")]
-//! # fn f() -> Result<(), candid::Error> {
-//! use candid::{IDLArgs, TypeEnv};
-//! // Candid values represented in text format
-//! let text_value = r#"
-//!      (42, opt true, vec {1;2;3},
-//!       opt record {label="text"; 42="haha"})
-//! "#;
-//!
-//! // Parse text format into IDLArgs for serialization
-//! let args: IDLArgs = text_value.parse()?;
-//! let encoded: Vec<u8> = args.to_bytes()?;
-//!
-//! // Deserialize into IDLArgs
-//! let decoded: IDLArgs = IDLArgs::from_bytes(&encoded)?;
-//! assert_eq!(encoded, decoded.to_bytes()?);
-//!
-//! // Convert IDLArgs to text format
-//! let output: String = decoded.to_string();
-//! let parsed_args: IDLArgs = output.parse()?;
-//! let annotated_args = args.annotate_types(true, &TypeEnv::new(), &parsed_args.get_types())?;
-//! assert_eq!(annotated_args, parsed_args);
-//! # Ok(())
-//! # }
-//! ```
-//! Note that when parsing Candid values, we assume the number literals are always of type `Int`.
-//! This can be changed by providing the type of the method arguments, which can usually be obtained
-//! by parsing a Candid file in the following section.
-//!
-//! ## Operating on Candid AST
-//! We provide a parser and type checker for Candid files specifying the service interface.
-//!
-//! ```
-//! #[cfg(feature = "parser")]
-//! # fn f() -> Result<(), candid::Error> {
-//! use candid::{IDLProg, TypeEnv, check_prog, types::{Type, TypeInner}};
-//! let did_file = r#"
-//!     type List = opt record { head: int; tail: List };
-//!     type byte = nat8;
-//!     service : {
-//!       f : (byte, int, nat, int8) -> (List);
-//!       g : (List) -> (int) query;
-//!     }
-//! "#;
-//!
-//! // Parse did file into an AST
-//! let ast: IDLProg = did_file.parse()?;
-//!
-//! // Type checking a given .did file
-//! // let (env, opt_actor) = check_file("a.did")?;
-//! // Or alternatively, use check_prog to check in-memory did file
-//! // Note that file import is ignored by check_prog.
-//! let mut env = TypeEnv::new();
-//! let actor: Type = check_prog(&mut env, &ast)?.unwrap();
-//!
-//! let method = env.get_method(&actor, "g").unwrap();
-//! assert_eq!(method.is_query(), true);
-//! assert_eq!(method.args, vec![TypeInner::Var("List".to_string()).into()]);
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! ## Serializing untyped Candid values with type annotations.
-//! With type signatures from the Candid file, [`candid::IDLArgs`](parser/value/struct.IDLArgs.html)
-//! uses `to_bytes_with_types` function to serialize arguments directed by the Candid types.
-//! This is useful when serializing different number types and recursive types.
-//! There is no need to use types for deserialization as the types are available in the Candid message.
-//!
-//! ```
-//! #[cfg(feature = "parser")]
-//! # fn f() -> Result<(), candid::Error> {
-//! use candid::{IDLArgs, types::value::IDLValue};
-//! # use candid::{IDLProg, TypeEnv, check_prog};
-//! # let did_file = r#"
-//! #    type List = opt record { head: int; tail: List };
-//! #    type byte = nat8;
-//! #    service : {
-//! #      f : (byte, int, nat, int8) -> (List);
-//! #      g : (List) -> (int) query;
-//! #    }
-//! # "#;
-//! # let ast = did_file.parse::<IDLProg>()?;
-//! # let mut env = TypeEnv::new();
-//! # let actor = check_prog(&mut env, &ast)?.unwrap();
-//! // Get method type f : (byte, int, nat, int8) -> (List)
-//! let method = env.get_method(&actor, "f").unwrap();
-//! let args = "(42, 42, 42, 42)".parse::<IDLArgs>()?;
-//! // Serialize arguments with candid types
-//! let encoded = args.to_bytes_with_types(&env, &method.args)?;
-//! let decoded = IDLArgs::from_bytes(&encoded)?;
-//! assert_eq!(decoded.args,
-//!        vec![IDLValue::Nat8(42),
-//!             IDLValue::Int(42.into()),
-//!             IDLValue::Nat(42.into()),
-//!             IDLValue::Int8(42)
-//!            ]);
 //! # Ok(())
 //! # }
 //! ```
@@ -287,6 +194,7 @@
 //! [dependencies]
 //! wasm-bindgen = "0.2"
 //! candid = "0.9.0"
+//! candid_parser = "0.1.0"
 //!
 //! [profile.release]
 //! lto = true
@@ -294,14 +202,15 @@
 //! ```
 //! Expose the methods in `lib.rs`
 //! ```ignore
-//! use candid::{check_prog, IDLProg, TypeEnv};
+//! use candid::TypeEnv;
+//! use candid_parser::{check_prog, IDLProg};
 //! use wasm_bindgen::prelude::*;
 //! #[wasm_bindgen]
 //! pub fn did_to_js(prog: String) -> Option<String> {
 //!   let ast = prog.parse::<IDLProg>().ok()?;
 //!   let mut env = TypeEnv::new();
 //!   let actor = check_prog(&mut env, &ast).ok()?;
-//!   Some(candid::bindings::javascript::compile(&env, &actor))
+//!   Some(candid_parser::bindings::javascript::compile(&env, &actor))
 //! }
 //! ```
 //! ### Building
@@ -332,15 +241,15 @@ pub mod error;
 pub use error::{Error, Result};
 
 pub mod types;
+#[cfg(feature = "bignum")]
+pub use types::number::{Int, Nat};
 pub use types::CandidType;
 pub use types::{
     arc,
-    number::{Int, Nat},
     principal::Principal,
     rc,
     reference::{Func, Service},
     reserved::{Empty, Reserved},
-    value::{IDLArgs, IDLValue},
     TypeEnv,
 };
 
@@ -351,20 +260,13 @@ pub mod ser;
 
 pub mod utils;
 pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
+
+#[cfg_attr(docsrs, doc(cfg(feature = "value")))]
+#[cfg(feature = "value")]
+pub use types::value::{IDLArgs, IDLValue};
+#[cfg_attr(docsrs, doc(cfg(feature = "printer")))]
+#[cfg(feature = "printer")]
 pub mod pretty;
-
-#[cfg_attr(docsrs, doc(cfg(feature = "parser")))]
-#[cfg(feature = "parser")]
-pub mod parser;
-#[cfg(feature = "parser")]
-pub use error::{pretty_parse, pretty_read};
-#[cfg(feature = "parser")]
-pub use parser::{
-    types::IDLProg,
-    typing::{check_file, check_prog, pretty_check_file},
-};
-
-pub mod bindings;
 
 // Candid hash function comes from
 // https://caml.inria.fr/pub/papers/garrigue-polymorphic_variants-ml98.pdf

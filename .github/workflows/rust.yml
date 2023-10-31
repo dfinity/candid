@@ -26,9 +26,13 @@ jobs:
           target
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
-      run: cargo build
+      run: |
+        cargo build
     - name: Run tests
-      run: cargo test --features all
+      run: |
+        cargo test --no-default-features
+        cargo test
+        cargo test --features all
     - name: fmt
       run: cargo fmt -v -- --check
     - name: lint

@@ -1,8 +1,19 @@
 [workspace]
 members = [
     "rust/candid",
+    "rust/candid_parser",
     "rust/candid_derive",
+    "rust/ic_principal",
     "tools/didc",
 ]
 resolver = "2"
 
+[workspace.dependencies]
+hex = "0.4.3"
+num-bigint = { version = "0.4", features = ["serde"] }
+num-traits = "0.2"
+pretty = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+anyhow = "1.0"
+rand = "0.8"

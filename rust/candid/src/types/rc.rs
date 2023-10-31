@@ -5,11 +5,10 @@
 //!
 //! ```
 //! use candid::{CandidType, Deserialize};
-//! use serde_bytes::ByteBuf;
 //! use std::rc::Rc;
 //!
 //! #[derive(CandidType, Deserialize, PartialEq)]
-//! struct RcBytes(#[serde(with = "candid::rc")] Rc<ByteBuf>);
+//! struct RcString(#[serde(with = "candid::rc")] Rc<String>);
 //! ```
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
