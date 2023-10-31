@@ -140,7 +140,7 @@ impl<'a> GenState<'a> {
             TypeInner::Int64 => IDLValue::Int64(arbitrary_num(u, self.config.range)?),
             TypeInner::Float32 => IDLValue::Float32(u.arbitrary()?),
             TypeInner::Float64 => IDLValue::Float64(u.arbitrary()?),
-            TypeInner::Principal => IDLValue::Principal(candid::Principal::anonymous()),
+            TypeInner::Principal => IDLValue::Principal(crate::Principal::arbitrary(u)?),
             TypeInner::Text => {
                 IDLValue::Text(arbitrary_text(u, &self.config.text, &self.config.width)?)
             }
@@ -204,6 +204,10 @@ impl<'a> GenState<'a> {
                 };
                 IDLValue::Variant(VariantValue(Box::new(field), idx as u64))
             }
+            TypeInner::Func(_) => IDLValue::Func(
+                crate::Principal::arbitrary(u)?,
+                arbitrary_text(u, &self.config.text, &self.config.width)?,
+            ),
             _ => unimplemented!(),
         });
         self.pop_state(old_config, ty, false);

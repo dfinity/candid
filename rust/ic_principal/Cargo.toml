@@ -34,6 +34,11 @@ optional = true
 version = "0.11.5"
 optional = true
 
+[dependencies.arbitrary]
+version = "1.0"
+optional = true
+
 [features]
 # Default features include serde support.
 default = ['serde', 'serde_bytes']
+arbitrary = ['default', 'dep:arbitrary']

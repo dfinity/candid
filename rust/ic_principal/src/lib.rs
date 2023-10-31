@@ -5,6 +5,9 @@ use std::convert::TryFrom;
 use std::fmt::Write;
 use thiserror::Error;
 
+#[cfg(feature = "arbitrary")]
+use arbitrary::{Arbitrary, Result as ArbitraryResult, Unstructured};
+
 /// An error happened while encoding, decoding or serializing a [`Principal`].
 #[derive(Error, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -356,5 +359,30 @@ impl<'de> serde::Deserialize<'de> for Principal {
                 .deserialize_bytes(deserialize::PrincipalVisitor)
                 .map_err(D::Error::custom)
         }
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a> Arbitrary<'a> for Principal {
+    fn arbitrary(u: &mut Unstructured<'a>) -> ArbitraryResult<Self> {
+        let principal = match u8::arbitrary(u)? {
+            u8::MAX => Principal::management_canister(),
+            254u8 => Principal::anonymous(),
+            _ => {
+                let length: usize = u.int_in_range(1..=Principal::MAX_LENGTH_IN_BYTES)?;
+                let mut result: Vec<u8> = Vec::with_capacity(length);
+                for _ in 0..length {
+                    result.push(u8::arbitrary(u)?);
+                }
+                // non-anonymous principal cannot have type ANONYMOUS
+                // adapt by changing the last byte.
+                let last = result.last_mut().unwrap();
+                if *last == 4_u8 {
+                    *last = u8::MAX
+                }
+                Principal::try_from(&result[..]).unwrap()
+            }
+        };
+        Ok(principal)
     }
 }
