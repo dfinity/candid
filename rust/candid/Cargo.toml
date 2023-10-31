@@ -50,7 +50,7 @@ bignum = ["num-bigint", "num-traits"]
 value = ["bignum"]
 printer = ["pretty"]
 default = ["serde_bytes", "printer", "bignum"]
-all = ["default", "value"]
+all = ["default", "value", "ic_principal/arbitrary"]
 
 [[test]]
 name = "types"

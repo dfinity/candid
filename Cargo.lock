@@ -855,6 +855,7 @@ dependencies = [
 name = "ic_principal"
 version = "0.1.0"
 dependencies = [
+ "arbitrary",
  "crc32fast",
  "data-encoding",
  "hex",
