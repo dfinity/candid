@@ -19,7 +19,7 @@ Candid supports several different programming languages.
 This repository contains some of the implementations developed by DFINITY.
 
 * [Rust](rust/): A serialization library based on Serde, and a compiler for generating bindings for other languages.
-* [Motoko](https://github.com/dfinity/motoko): Compiler support for importing/export Candid files. Also see the [Motoko-Candid type mapping specificatoin](https://github.com/dfinity/motoko/blob/master/design/IDL-Motoko.md).
+* [Motoko](https://github.com/dfinity/motoko): Compiler support for importing/export Candid files. Also see the [Motoko-Candid type mapping specification](https://github.com/dfinity/motoko/blob/master/design/IDL-Motoko.md).
 * [JavaScript](https://github.com/dfinity/agent-js/tree/main/packages/candid): We provide a library for serialization of native JavaScript values, and a visitor class for extending Candid for building generic tools such as UI and random testing.
 
 A list of community maintained Candid libraries:
