@@ -352,7 +352,7 @@ macro_rules! define_op {
 
             #[inline]
             fn $method(self, other: $res) -> $res {
-                $imp::$method(other.0, &self).into()
+                $imp::$method(&self, other.0).into()
             }
         }
     };

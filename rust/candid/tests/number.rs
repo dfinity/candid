@@ -105,10 +105,15 @@ fn operators() {
             assert_eq!(value.clone() % x, 0);
 
             assert_eq!(x + value.clone(), 3);
-            assert_eq!(x - value.clone(), 1);
+            if std::any::TypeId::of::<$res>() == std::any::TypeId::of::<Int>() {
+                assert_eq!(x - value.clone(), -1);
+            } else {
+                let result = std::panic::catch_unwind(|| x - value.clone());
+                assert!(result.is_err());
+            }
             assert_eq!(x * value.clone(), 2);
-            assert_eq!(x / value.clone(), 2);
-            assert_eq!(x % value.clone(), 0);
+            assert_eq!(x / value.clone(), 0);
+            assert_eq!(x % value.clone(), 1);
 
             assert!(value.clone() < <$res>::from(x + 2));
             assert!(<$res>::from(x + 2) > value.clone());
