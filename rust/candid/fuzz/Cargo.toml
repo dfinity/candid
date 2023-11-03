@@ -15,7 +15,7 @@ serde = "1.0.115"
 
 [dependencies.candid]
 path = ".."
-features = ["parser"]
+features = ["all"]
 
 # Prevent this from interfering with workspaces
 [workspace]
