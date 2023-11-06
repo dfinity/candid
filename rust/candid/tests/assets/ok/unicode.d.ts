@@ -1,5 +1,6 @@
 import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
+import type { IDL } from '@dfinity/candid';
 
 export interface A {
   '\u{e000}' : bigint,
@@ -17,3 +18,4 @@ export interface _SERVICE {
   '函数名' : ActorMethod<[A], B>,
   '👀' : ActorMethod<[bigint], bigint>,
 }
+export declare const idlFactory: IDL.InterfaceFactory;

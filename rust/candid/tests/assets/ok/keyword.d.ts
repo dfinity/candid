@@ -1,5 +1,6 @@
 import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
+import type { IDL } from '@dfinity/candid';
 
 export type if_ = {
     'branch' : { 'val' : bigint, 'left' : if_, 'right' : if_ }
@@ -30,3 +31,4 @@ export interface _SERVICE {
     undefined
   >,
 }
+export declare const idlFactory: IDL.InterfaceFactory;
