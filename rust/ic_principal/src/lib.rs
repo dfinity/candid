@@ -191,7 +191,7 @@ impl Principal {
                 // Already checked data_bytes.len() <= MAX_LENGTH_IN_BYTES
                 // safe to unwrap here
                 let result = Self::try_from_slice(data_bytes).unwrap();
-                let expected = format!("{}", result);
+                let expected = format!("{result}");
 
                 // In the Spec:
                 // The textual representation is conventionally printed with lower case letters,
@@ -207,7 +207,7 @@ impl Principal {
 
     /// Convert [`Principal`] to text representation.
     pub fn to_text(&self) -> String {
-        format!("{}", self)
+        format!("{self}")
     }
 
     /// Return the [`Principal`]'s underlying slice of bytes.
@@ -378,7 +378,7 @@ impl<'a> Arbitrary<'a> for Principal {
                 // adapt by changing the last byte.
                 let last = result.last_mut().unwrap();
                 if *last == 4_u8 {
-                    *last = u8::MAX
+                    *last = u8::MAX;
                 }
                 Principal::try_from(&result[..]).unwrap()
             }

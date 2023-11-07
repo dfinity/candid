@@ -201,13 +201,11 @@ pub enum TypeInner {
 }
 impl std::ops::Deref for Type {
     type Target = TypeInner;
-    #[inline(always)]
     fn deref(&self) -> &TypeInner {
-        self.0.deref()
+        &self.0
     }
 }
 impl AsRef<TypeInner> for Type {
-    #[inline(always)]
     fn as_ref(&self) -> &TypeInner {
         self.0.as_ref()
     }
@@ -234,9 +232,8 @@ impl TypeInner {
     pub fn is_blob(&self, env: &crate::TypeEnv) -> bool {
         match self {
             TypeInner::Vec(t) => {
-                let t = match env.trace_type(t) {
-                    Ok(t) => t,
-                    Err(_) => return false,
+                let Ok(t) = env.trace_type(t) else {
+                    return false;
                 };
                 matches!(*t, TypeInner::Nat8)
             }
@@ -338,11 +335,11 @@ pub(crate) fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
         Record(fs) | Variant(fs) => {
             let mut cnt = 0;
             let mut limit = limit;
-            for f in fs.iter() {
+            for f in fs {
                 let id_size = match f.id.as_ref() {
                     Label::Named(n) => n.len() as i32,
                     Label::Id(_) => 4,
-                    _ => 0,
+                    Label::Unnamed(_) => 0,
                 };
                 cnt += id_size + text_size(&f.ty, limit - id_size - 3)? + 3;
                 limit -= cnt;
@@ -353,11 +350,11 @@ pub(crate) fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
             let mode = if func.modes.is_empty() { 0 } else { 6 };
             let mut cnt = mode + 6;
             let mut limit = limit - cnt;
-            for t in func.args.iter() {
+            for t in &func.args {
                 cnt += text_size(t, limit)?;
                 limit -= cnt;
             }
-            for t in func.rets.iter() {
+            for t in &func.rets {
                 cnt += text_size(t, limit)?;
                 limit -= cnt;
             }
@@ -366,7 +363,7 @@ pub(crate) fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
         Service(ms) => {
             let mut cnt = 0;
             let mut limit = limit;
-            for (name, f) in ms.iter() {
+            for (name, f) in ms {
                 let len = name.len() as i32;
                 cnt += len + text_size(f, limit - len - 3)? + 3;
                 limit -= cnt;
@@ -392,9 +389,8 @@ pub enum Label {
 impl Label {
     pub fn get_id(&self) -> u32 {
         match *self {
-            Label::Id(n) => n,
+            Label::Id(n) | Label::Unnamed(n) => n,
             Label::Named(ref n) => idl_hash(n),
-            Label::Unnamed(n) => n,
         }
     }
 }
@@ -512,7 +508,7 @@ impl fmt::Display for Function {
     }
 }
 impl Function {
-    /// Check a function is a query or composite_query method
+    /// Check a function is a `query` or `composite_query` method
     pub fn is_query(&self) -> bool {
         self.modes
             .iter()
@@ -630,7 +626,7 @@ thread_local! {
     static ENV: RefCell<HashMap<TypeId, Type>> = RefCell::new(HashMap::new());
     // only used for TypeContainer
     static ID: RefCell<HashMap<Type, TypeId>> = RefCell::new(HashMap::new());
-    static NAME: RefCell<TypeName> = RefCell::new(Default::default());
+    static NAME: RefCell<TypeName> = RefCell::new(TypeName::default());
 }
 
 pub fn find_type(id: &TypeId) -> Option<Type> {

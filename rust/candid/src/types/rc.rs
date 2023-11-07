@@ -1,5 +1,5 @@
 //! This module provides functions to serialize and deserialize types
-//! under [std::rc::Rc] shared reference type.
+//! under [`std::rc::Rc`] shared reference type.
 //!
 //! # Examples
 //!

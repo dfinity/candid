@@ -14,7 +14,7 @@ pub struct Label {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("binary parser error: {}", .0.get(0).map(|f| format!("{} at byte offset {}", f.message, f.pos/2)).unwrap_or_else(|| "io error".to_string()))]
+    #[error("binary parser error: {}", .0.get(0).map_or_else(|| "io error".to_string(), |f| format!("{} at byte offset {}", f.message, f.pos/2)))]
     Binread(Vec<Label>),
 
     #[error("Subtyping error: {0}")]
@@ -50,7 +50,7 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label> {
                 .unwrap_or(&"unknown error (there's a bug in error reporting)");
             vec![Label {
                 pos,
-                message: err.to_string(),
+                message: (*err).to_string(),
             }]
         }
         EnumErrors {
@@ -71,7 +71,7 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label> {
                     let mut labels = get_binread_labels(e);
                     labels.push(Label {
                         pos,
-                        message: id.to_string(),
+                        message: (*id).to_string(),
                     });
                     labels
                 }

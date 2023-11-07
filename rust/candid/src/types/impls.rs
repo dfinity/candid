@@ -134,7 +134,7 @@ where
         S: Serializer,
     {
         let mut ser = serializer.serialize_vec(self.len())?;
-        for e in self.iter() {
+        for e in self {
             Compound::serialize_element(&mut ser, &e)?;
         }
         Ok(())
@@ -245,7 +245,7 @@ impl<T: CandidType, const N: usize> CandidType for [T; N] {
         S: Serializer,
     {
         let mut ser = serializer.serialize_vec(N)?;
-        for e in self.iter() {
+        for e in self {
             Compound::serialize_element(&mut ser, &e)?;
         }
         Ok(())

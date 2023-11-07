@@ -5,14 +5,14 @@ use binread::io::{Read, Seek};
 use binread::{BinRead, BinResult, Error as BError, ReadOptions};
 use std::convert::TryInto;
 
-fn read_leb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, _: ()) -> BinResult<u64> {
+fn read_leb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, (): ()) -> BinResult<u64> {
     let pos = reader.stream_position()?;
     leb128::read::unsigned(reader).map_err(|_| BError::Custom {
         pos,
         err: Box::new(ro.variable_name.unwrap_or("Invalid leb128")),
     })
 }
-fn read_sleb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, _: ()) -> BinResult<i64> {
+fn read_sleb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, (): ()) -> BinResult<i64> {
     let pos = reader.stream_position()?;
     leb128::read::signed(reader).map_err(|_| BError::Custom {
         pos,
@@ -178,7 +178,7 @@ impl ConsType {
             ConsType::Record(fs) | ConsType::Variant(fs) => {
                 let mut res = Vec::new();
                 let mut prev = None;
-                for f in fs.inner.iter() {
+                for f in &fs.inner {
                     if let Some(prev) = prev {
                         if prev >= f.id {
                             return Err(anyhow!("field id {} collision or not sorted", f.id));
@@ -200,10 +200,10 @@ impl ConsType {
             ConsType::Func(f) => {
                 let mut args = Vec::new();
                 let mut rets = Vec::new();
-                for arg in f.args.iter() {
+                for arg in &f.args {
                     args.push(arg.to_type(len)?);
                 }
-                for ret in f.rets.iter() {
+                for ret in &f.rets {
                     rets.push(ret.to_type(len)?);
                 }
                 TypeInner::Func(Function {
@@ -215,7 +215,7 @@ impl ConsType {
             ConsType::Service(serv) => {
                 let mut res = Vec::new();
                 let mut prev = None;
-                for m in serv.meths.iter() {
+                for m in &serv.meths {
                     if let Some(prev) = prev {
                         if prev >= &m.name {
                             return Err(anyhow!("method name {} duplicate or not sorted", m.name));
@@ -242,9 +242,9 @@ impl Table {
             env.insert(index_to_var(i as i64), ty);
         }
         // validate method has func type
-        for (_, t) in env.iter() {
+        for t in env.values() {
             if let TypeInner::Service(ms) = t.as_ref() {
-                for (name, ty) in ms.iter() {
+                for (name, ty) in ms {
                     if let TypeInner::Var(id) = ty.as_ref() {
                         if matches!(env.get(id).map(|t| t.as_ref()), Some(TypeInner::Func(_))) {
                             continue;

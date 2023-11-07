@@ -10,7 +10,7 @@ impl TypeEnv {
         TypeEnv(BTreeMap::new())
     }
     pub fn merge<'a>(&'a mut self, env: &TypeEnv) -> Result<&'a mut Self> {
-        for (k, v) in env.0.iter() {
+        for (k, v) in &env.0 {
             let entry = self.0.entry(k.to_string()).or_insert_with(|| v.clone());
             if *entry != *v {
                 return Err(Error::msg("inconsistent binding"));
@@ -25,7 +25,7 @@ impl TypeEnv {
             .filter(|k| self.0.contains_key(*k))
             .map(|k| (k.clone(), format!("{k}/1")))
             .collect();
-        for (k, t) in env.0.into_iter() {
+        for (k, t) in env.0 {
             let t = t.subst(&tau);
             if let Some(new_key) = tau.get(&k) {
                 self.0.insert(new_key.clone(), t);
@@ -73,7 +73,7 @@ impl TypeEnv {
         }
     }
     pub fn get_method<'a>(&'a self, t: &'a Type, id: &'a str) -> Result<&'a Function> {
-        for (meth, ty) in self.as_service(t)?.iter() {
+        for (meth, ty) in self.as_service(t)? {
             if meth == id {
                 return self.as_func(ty);
             }
@@ -91,7 +91,7 @@ impl TypeEnv {
         }
         match t.as_ref() {
             TypeInner::Record(fs) => {
-                for f in fs.iter() {
+                for f in fs {
                     self.go(seen, res, &f.ty)?;
                 }
             }
@@ -110,7 +110,7 @@ impl TypeEnv {
     }
     fn check_empty(&self) -> Result<BTreeSet<&str>> {
         let mut res = BTreeSet::new();
-        for (name, t) in self.0.iter() {
+        for (name, t) in &self.0 {
             let mut seen: BTreeSet<&str> = BTreeSet::new();
             let mut local_res = BTreeSet::new();
             seen.insert(name);
@@ -120,8 +120,12 @@ impl TypeEnv {
         Ok(res)
     }
     pub fn replace_empty(&mut self) -> Result<()> {
-        let ids: Vec<_> = self.check_empty()?.iter().map(|x| x.to_string()).collect();
-        for id in ids.into_iter() {
+        let ids: Vec<_> = self
+            .check_empty()?
+            .iter()
+            .map(|x| (*x).to_string())
+            .collect();
+        for id in ids {
             self.0.insert(id, TypeInner::Empty.into());
         }
         Ok(())
@@ -129,7 +133,7 @@ impl TypeEnv {
 }
 impl std::fmt::Display for TypeEnv {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (k, v) in self.0.iter() {
+        for (k, v) in &self.0 {
             writeln!(f, "type {k} = {v}")?;
         }
         Ok(())
