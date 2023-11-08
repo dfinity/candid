@@ -79,7 +79,7 @@ fn subtype_(
         }
         (Record(fs1), Record(fs2)) => {
             let fields: HashMap<_, _> = fs1.iter().map(|Field { id, ty }| (id, ty)).collect();
-            for Field { id, ty: ty2 } in fs2.iter() {
+            for Field { id, ty: ty2 } in fs2 {
                 match fields.get(id) {
                     Some(ty1) => subtype_(report, gamma, env, ty1, ty2).with_context(|| {
                         format!("Record field {id}: {ty1} is not a subtype of {ty2}")
@@ -95,7 +95,7 @@ fn subtype_(
         }
         (Variant(fs1), Variant(fs2)) => {
             let fields: HashMap<_, _> = fs2.iter().map(|Field { id, ty }| (id, ty)).collect();
-            for Field { id, ty: ty1 } in fs1.iter() {
+            for Field { id, ty: ty1 } in fs1 {
                 match fields.get(id) {
                     Some(ty2) => subtype_(report, gamma, env, ty1, ty2).with_context(|| {
                         format!("Variant field {id}: {ty1} is not a subtype_ of {ty2}")
@@ -111,7 +111,7 @@ fn subtype_(
         }
         (Service(ms1), Service(ms2)) => {
             let meths: HashMap<_, _> = ms1.iter().map(|(name, ty)| (name, ty)).collect();
-            for (name, ty2) in ms2.iter() {
+            for (name, ty2) in ms2 {
                 match meths.get(name) {
                     Some(ty1) => subtype_(report, gamma, env, ty1, ty2).with_context(|| {
                         format!("Method {name}: {ty1} is not a subtype of {ty2}")

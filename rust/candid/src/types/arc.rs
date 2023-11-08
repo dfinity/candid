@@ -1,5 +1,5 @@
 //! This module provides functions to serialize and deserialize types
-//! under [std::sync::Arc] shared reference type.
+//! under [`std::sync::Arc`] shared reference type.
 //!
 //! # Examples
 //!

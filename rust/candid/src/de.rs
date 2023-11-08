@@ -718,9 +718,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.unroll_type()?;
         match (self.wire_type.as_ref(), self.expect_type.as_ref()) {
-            (TypeInner::Null, TypeInner::Opt(_)) | (TypeInner::Reserved, TypeInner::Opt(_)) => {
-                visitor.visit_none()
-            }
+            (TypeInner::Null | TypeInner::Reserved, TypeInner::Opt(_)) => visitor.visit_none(),
             (TypeInner::Opt(t1), TypeInner::Opt(t2)) => {
                 self.wire_type = t1.clone();
                 self.expect_type = t2.clone();

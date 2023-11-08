@@ -16,21 +16,18 @@ pub struct Int(pub BigInt);
 pub struct Nat(pub BigUint);
 
 impl From<BigInt> for Int {
-    #[inline(always)]
     fn from(i: BigInt) -> Self {
         Self(i)
     }
 }
 
 impl From<BigUint> for Nat {
-    #[inline(always)]
     fn from(i: BigUint) -> Self {
         Self(i)
     }
 }
 
 impl From<Nat> for Int {
-    #[inline(always)]
     fn from(n: Nat) -> Self {
         let i: BigInt = n.0.into();
         i.into()
@@ -38,21 +35,18 @@ impl From<Nat> for Int {
 }
 
 impl From<Int> for BigInt {
-    #[inline(always)]
     fn from(i: Int) -> Self {
         i.0
     }
 }
 
 impl From<Nat> for BigUint {
-    #[inline(always)]
     fn from(i: Nat) -> Self {
         i.0
     }
 }
 
 impl From<Nat> for BigInt {
-    #[inline(always)]
     fn from(i: Nat) -> Self {
         i.0.into()
     }
@@ -148,9 +142,9 @@ impl<'de> Deserialize<'de> for Int {
                     .map_err(|_| de::Error::custom(format!("{v:?} is not int")))
             }
             fn visit_byte_buf<E: de::Error>(self, v: Vec<u8>) -> Result<Int, E> {
-                Ok(Int(match v[0] {
-                    0 => BigInt::from_signed_bytes_le(&v[1..]),
-                    1 => BigInt::from_biguint(
+                Ok(Int(match v.first() {
+                    Some(0) => BigInt::from_signed_bytes_le(&v[1..]),
+                    Some(1) => BigInt::from_biguint(
                         num_bigint::Sign::Plus,
                         BigUint::from_bytes_le(&v[1..]),
                     ),
@@ -493,7 +487,7 @@ impl std::ops::Add<i32> for Nat {
 impl std::ops::AddAssign<i32> for Nat {
     #[inline]
     fn add_assign(&mut self, other: i32) {
-        self.0 += other as u32
+        self.0 += other as u32;
     }
 }
 
@@ -508,7 +502,7 @@ impl std::ops::Sub<i32> for Nat {
 impl std::ops::SubAssign<i32> for Nat {
     #[inline]
     fn sub_assign(&mut self, other: i32) {
-        self.0 -= other as u32
+        self.0 -= other as u32;
     }
 }
 
@@ -523,7 +517,7 @@ impl std::ops::Mul<i32> for Nat {
 impl std::ops::MulAssign<i32> for Nat {
     #[inline]
     fn mul_assign(&mut self, other: i32) {
-        self.0 *= other as u32
+        self.0 *= other as u32;
     }
 }
 
@@ -538,7 +532,7 @@ impl std::ops::Div<i32> for Nat {
 impl std::ops::DivAssign<i32> for Nat {
     #[inline]
     fn div_assign(&mut self, other: i32) {
-        self.0 /= other as u32
+        self.0 /= other as u32;
     }
 }
 
@@ -553,7 +547,7 @@ impl std::ops::Rem<i32> for Nat {
 impl std::ops::RemAssign<i32> for Nat {
     #[inline]
     fn rem_assign(&mut self, other: i32) {
-        self.0 %= other as u32
+        self.0 %= other as u32;
     }
 }
 
