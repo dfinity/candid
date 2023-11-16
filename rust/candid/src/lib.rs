@@ -120,10 +120,10 @@
 //! # fn f() -> Result<(), candid::Error> {
 //! use candid::{Int, Nat, Encode, Decode};
 //! let x = "-10000000000000000000".parse::<Int>()?;
-//! let bytes = Encode!(&Nat::from(1024), &x)?;
+//! let bytes = Encode!(&Nat::from(1024u32), &x)?;
 //! let (a, b) = Decode!(&bytes, Nat, Int)?;
 //! let (c, d) = Decode!(&bytes, u128, i128)?;
-//! assert_eq!(a + 1, 1025);
+//! assert_eq!(a + 1u8, 1025u32);
 //! assert_eq!(b, Int::parse(b"-10000000000000000000")?);
 //! # Ok(())
 //! # }
