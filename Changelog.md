@@ -1,7 +1,7 @@
 
 # Changelog
 
-## Rust 0.10.0
+## 2023-11-16 (Rust 0.10.0)
 
 ### Breaking changes
 
