@@ -94,7 +94,7 @@ fn parse_more_literals() {
         vec![
             IDLValue::Bool(true),
             IDLValue::Null,
-            IDLValue::Nat(42.into()),
+            IDLValue::Nat(42u8.into()),
             IDLValue::Text("哈哈".to_owned()),
             IDLValue::Text("string with whitespace".to_owned()),
             IDLValue::Int(42.into()),
@@ -121,10 +121,10 @@ fn parse_vec() {
     assert_eq!(
         args.args,
         vec![IDLValue::Vec(vec![
-            IDLValue::Nat(1.into()),
-            IDLValue::Nat(2.into()),
-            IDLValue::Nat(3.into()),
-            IDLValue::Nat(4.into())
+            IDLValue::Nat(1u8.into()),
+            IDLValue::Nat(2u8.into()),
+            IDLValue::Nat(3u8.into()),
+            IDLValue::Nat(4u8.into())
         ])]
     );
     assert_eq!(
@@ -154,7 +154,7 @@ fn parse_optional_record() {
             IDLValue::Record(vec![
                 IDLField {
                     id: Label::Id(1),
-                    val: IDLValue::Nat(42.into())
+                    val: IDLValue::Nat(42u8.into())
                 },
                 IDLField {
                     id: Label::Id(2),
@@ -217,7 +217,7 @@ fn parse_nested_record() {
             },
             IDLField {
                 id: Label::Named("label".to_owned()),
-                val: IDLValue::Nat(42.into())
+                val: IDLValue::Nat(42u8.into())
             }
         ])]
     );
@@ -252,7 +252,7 @@ fn parse_annval() {
         args,
         IDLArgs {
             args: vec![
-                IDLValue::Nat(1.into()),
+                IDLValue::Nat(1u8.into()),
                 IDLValue::Int(123.into()),
                 IDLValue::Int32(456),
                 IDLValue::Float32(789f32),

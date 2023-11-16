@@ -1,5 +1,6 @@
 import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
+import type { IDL } from '@dfinity/candid';
 
 export type T = [T];
 export interface _SERVICE {
@@ -7,3 +8,4 @@ export interface _SERVICE {
   'g' : ActorMethod<[T], { 'a' : T }>,
   'h' : ActorMethod<[[T, never]], { 'a' : T } | { 'b' : {} }>,
 }
+export declare const idlFactory: IDL.InterfaceFactory;

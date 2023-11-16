@@ -44,7 +44,7 @@ service : {
             vec![
                 IDLValue::Nat8(42),
                 IDLValue::Int(42.into()),
-                IDLValue::Nat(42.into()),
+                IDLValue::Nat(42u32.into()),
                 IDLValue::Int8(42),
             ]
         );

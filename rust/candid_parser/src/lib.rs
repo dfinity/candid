@@ -107,7 +107,7 @@
 //! assert_eq!(decoded.args,
 //!        vec![IDLValue::Nat8(42),
 //!             IDLValue::Int(42.into()),
-//!             IDLValue::Nat(42.into()),
+//!             IDLValue::Nat(42u8.into()),
 //!             IDLValue::Int8(42)
 //!            ]);
 //! # Ok(())
