@@ -3,6 +3,7 @@ name = "ic_principal"
 version = "0.1.0"
 authors = ["DFINITY Stiftung <sdk@dfinity.org>"]
 edition = "2021"
+description = "Principal type used on the Internet Computer."
 homepage = "https://internetcomputer.org/docs/current/references/id-encoding-spec"
 documentation = "https://docs.rs/ic_principal"
 repository="https://github.com/dfinity/candid"
