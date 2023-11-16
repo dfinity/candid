@@ -49,7 +49,7 @@ path = "benches/benchmark.rs"
 bignum = ["dep:num-bigint", "dep:num-traits"]
 printer = ["dep:pretty"]
 value = ["bignum", "printer"]
-default = ["dep:serde_bytes", "printer", "bignum"]
+default = ["serde_bytes", "printer", "bignum"]
 all = ["default", "value", "ic_principal/arbitrary"]
 
 [[test]]
