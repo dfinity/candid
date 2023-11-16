@@ -60,6 +60,7 @@ impl<'de> IDLDeserialize<'de> {
     }
     #[cfg_attr(docsrs, doc(cfg(feature = "value")))]
     #[cfg(feature = "value")]
+    /// Deserialize one value as `IDLValue` from deserializer. Note that `expected_type` should not contain `TypeInner::Knot`.
     pub fn get_value_with_type(
         &mut self,
         env: &TypeEnv,

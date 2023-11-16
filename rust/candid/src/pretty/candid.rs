@@ -295,14 +295,14 @@ pub mod value {
             Int32(n) => pp_num_str(&n.to_string()),
             Int64(n) => pp_num_str(&n.to_string()),
             Float32(f) => {
-                if f.trunc() == *f {
+                if f.is_finite() && f.trunc() == *f {
                     format!("{f}.0")
                 } else {
                     f.to_string()
                 }
             }
             Float64(f) => {
-                if f.trunc() == *f {
+                if f.is_finite() && f.trunc() == *f {
                     format!("{f}.0")
                 } else {
                     f.to_string()

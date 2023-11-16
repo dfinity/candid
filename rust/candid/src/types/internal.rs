@@ -640,7 +640,7 @@ pub(crate) fn show_env() {
 }
 
 pub(crate) fn env_add(id: TypeId, t: Type) {
-    ENV.with(|e| drop(e.borrow_mut().insert(id, t)));
+    ENV.with(|e| e.borrow_mut().insert(id, t));
 }
 pub fn env_clear() {
     ENV.with(|e| e.borrow_mut().clear());

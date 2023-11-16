@@ -46,10 +46,10 @@ harness = false
 path = "benches/benchmark.rs"
 
 [features]
-bignum = ["num-bigint", "num-traits"]
-value = ["bignum"]
-printer = ["pretty"]
-default = ["serde_bytes", "printer", "bignum"]
+bignum = ["dep:num-bigint", "dep:num-traits"]
+printer = ["dep:pretty"]
+value = ["bignum", "printer"]
+default = ["dep:serde_bytes", "printer", "bignum"]
 all = ["default", "value", "ic_principal/arbitrary"]
 
 [[test]]
