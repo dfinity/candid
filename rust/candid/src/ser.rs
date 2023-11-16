@@ -2,6 +2,7 @@
 
 use super::error::{Error, Result};
 use super::types;
+#[cfg(feature = "value")]
 use super::types::value::IDLValue;
 use super::types::{internal::Opcode, Field, Type, TypeEnv, TypeInner};
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -33,12 +34,16 @@ impl IDLBuilder {
         value.idl_serialize(&mut self.value_ser)?;
         Ok(self)
     }
+    #[cfg_attr(docsrs, doc(cfg(feature = "value")))]
+    #[cfg(feature = "value")]
     pub fn value_arg<'a>(&'a mut self, value: &IDLValue) -> Result<&'a mut Self> {
         use super::CandidType;
         self.type_ser.push_type(&value.value_ty())?;
         value.idl_serialize(&mut self.value_ser)?;
         Ok(self)
     }
+    #[cfg_attr(docsrs, doc(cfg(feature = "value")))]
+    #[cfg(feature = "value")]
     /// Annotate IDLValue with (TypeEnv, Type). Note that the TypeEnv will be added to the serializer state.
     /// If the Type can already be resolved by previous TypeEnvs, you don't need to pass TypeEnv again.
     pub fn value_arg_with_type<'a>(
@@ -114,11 +119,19 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
         self.write(&[v as u8])?;
         Ok(())
     }
+    #[cfg(feature = "bignum")]
     fn serialize_int(self, v: &crate::Int) -> Result<()> {
         v.encode(&mut self.value)
     }
+    #[cfg(feature = "bignum")]
     fn serialize_nat(self, v: &crate::Nat) -> Result<()> {
         v.encode(&mut self.value)
+    }
+    fn serialize_i128(self, v: i128) -> Result<()> {
+        crate::types::leb128::encode_int(&mut self.value, v)
+    }
+    fn serialize_u128(self, v: u128) -> Result<()> {
+        crate::types::leb128::encode_nat(&mut self.value, v)
     }
     serialize_num!(nat8, u8, write_u8);
     serialize_num!(nat16, u16, write_u16::<LittleEndian>);
@@ -272,36 +285,36 @@ impl TypeSerialize {
                 self.encode(&mut buf, ty)?;
             }
             TypeInner::Record(fs) => {
-                for Field { ty, .. } in fs.iter() {
+                for Field { ty, .. } in fs {
                     self.build_type(ty)?;
                 }
 
                 sleb128_encode(&mut buf, Opcode::Record as i64)?;
                 leb128_encode(&mut buf, fs.len() as u64)?;
-                for Field { id, ty } in fs.iter() {
+                for Field { id, ty } in fs {
                     leb128_encode(&mut buf, u64::from(id.get_id()))?;
                     self.encode(&mut buf, ty)?;
                 }
             }
             TypeInner::Variant(fs) => {
-                for Field { ty, .. } in fs.iter() {
+                for Field { ty, .. } in fs {
                     self.build_type(ty)?;
                 }
 
                 sleb128_encode(&mut buf, Opcode::Variant as i64)?;
                 leb128_encode(&mut buf, fs.len() as u64)?;
-                for Field { id, ty } in fs.iter() {
+                for Field { id, ty } in fs {
                     leb128_encode(&mut buf, u64::from(id.get_id()))?;
                     self.encode(&mut buf, ty)?;
                 }
             }
             TypeInner::Service(ref ms) => {
-                for (_, ty) in ms.iter() {
+                for (_, ty) in ms {
                     self.build_type(ty)?;
                 }
                 sleb128_encode(&mut buf, Opcode::Service as i64)?;
                 leb128_encode(&mut buf, ms.len() as u64)?;
-                for (id, ty) in ms.iter() {
+                for (id, ty) in ms {
                     let mut name = Vec::from(id.as_bytes());
                     leb128_encode(&mut buf, name.len() as u64)?;
                     buf.append(&mut name);
@@ -314,15 +327,15 @@ impl TypeSerialize {
                 }
                 sleb128_encode(&mut buf, Opcode::Func as i64)?;
                 leb128_encode(&mut buf, func.args.len() as u64)?;
-                for ty in func.args.iter() {
+                for ty in &func.args {
                     self.encode(&mut buf, ty)?;
                 }
                 leb128_encode(&mut buf, func.rets.len() as u64)?;
-                for ty in func.rets.iter() {
+                for ty in &func.rets {
                     self.encode(&mut buf, ty)?;
                 }
                 leb128_encode(&mut buf, func.modes.len() as u64)?;
-                for m in func.modes.iter() {
+                for m in &func.modes {
                     use crate::types::FuncMode;
                     let m = match m {
                         FuncMode::Query => 1,
@@ -402,7 +415,7 @@ impl TypeSerialize {
 
         leb128_encode(&mut self.result, self.args.len() as u64)?;
         let mut ty_encode = Vec::new();
-        for t in self.args.iter() {
+        for t in &self.args {
             self.encode(&mut ty_encode, t)?;
         }
         self.result.append(&mut ty_encode);

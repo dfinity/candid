@@ -3,11 +3,11 @@
 use std::fmt::Debug;
 
 use candid::{
-    candid_method, field,
+    candid_method, record,
     ser::IDLBuilder,
     types::value::{IDLValue, IDLValueVisitor},
     types::{get_type, Serializer, Type, TypeInner},
-    CandidType, Decode, Deserialize, Encode, Int,
+    variant, CandidType, Decode, Deserialize, Encode, Int,
 };
 use serde::de::DeserializeOwned;
 
@@ -110,11 +110,7 @@ fn test_struct() {
     }
     assert_eq!(
         A::ty(),
-        TypeInner::Record(vec![
-            field! {bar: TypeInner::Bool.into()},
-            field! {foo: TypeInner::Int.into()}
-        ])
-        .into()
+        record! { foo: TypeInner::Int.into(); bar: TypeInner::Bool.into() }
     );
 
     #[derive(Debug, CandidType)]
@@ -125,11 +121,7 @@ fn test_struct() {
     let res = G { g1: 42, g2: true };
     assert_eq!(
         get_type(&res),
-        TypeInner::Record(vec![
-            field! {g1: TypeInner::Int32.into()},
-            field! {g2: TypeInner::Bool.into()}
-        ])
-        .into()
+        record! { g1: TypeInner::Int32.into(); g2: TypeInner::Bool.into() }
     );
 
     #[derive(Debug, CandidType)]
@@ -139,11 +131,7 @@ fn test_struct() {
     }
     assert_eq!(
         List::ty(),
-        TypeInner::Record(vec![
-            field!{head: TypeInner::Int32.into()},
-            field!{tail: TypeInner::Opt(TypeInner::Knot(candid::types::TypeId::of::<List>()).into()).into()}
-        ])
-        .into()
+        record! { head: TypeInner::Int32.into(); tail: TypeInner::Opt(TypeInner::Knot(candid::types::TypeId::of::<List>()).into()).into() }
     );
 }
 
@@ -161,26 +149,12 @@ fn test_variant() {
     let v = E::Bar(true, 42);
     assert_eq!(
         get_type(&v),
-        TypeInner::Variant(vec![
-            field! {Bar:
-                TypeInner::Record(vec![
-                    field!{0: TypeInner::Bool.into()},
-                    field!{1: TypeInner::Int32.into()}
-                ])
-                .into()
-            },
-            field! {
-                Baz:
-                TypeInner::Record(vec![
-                    field!{a: TypeInner::Int32.into()},
-                    field!{b: TypeInner::Nat32.into()}
-                ])
-                .into()
-            },
-            field! {Foo: TypeInner::Null.into()},
-            field! {Newtype: TypeInner::Bool.into()},
-        ])
-        .into()
+        variant! {
+            Baz: record!{ a: TypeInner::Int32.into(); b: TypeInner::Nat32.into() };
+            Foo: TypeInner::Null.into();
+            Bar: record!{ 0: TypeInner::Bool.into(); 1: TypeInner::Int32.into() };
+            Newtype: TypeInner::Bool.into();
+        }
     );
 }
 

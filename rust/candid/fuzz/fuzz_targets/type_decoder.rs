@@ -11,10 +11,10 @@ pub struct Token {
     pub sha256: Option<ByteBuf>,
 }
 
-define_function!(pub callback : (&u8) -> (Nat));
+define_function!(pub Callback : (&u8) -> (Nat));
 #[derive(CandidType, Deserialize)]
 pub struct CallbackStrategy {
-    pub callback: callback,
+    pub callback: Callback,
     pub token: Token,
 }
 

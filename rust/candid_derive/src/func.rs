@@ -18,8 +18,8 @@ struct Method {
 // Hopefully, we can have an attribute on impl, then we don't need global state.
 lazy_static! {
     static ref METHODS: Mutex<Option<BTreeMap<String, Method>>> =
-        Mutex::new(Some(Default::default()));
-    static ref INIT: Mutex<Option<Option<Vec<String>>>> = Mutex::new(Some(Default::default()));
+        Mutex::new(Some(BTreeMap::default()));
+    static ref INIT: Mutex<Option<Option<Vec<String>>>> = Mutex::new(Some(Option::default()));
 }
 
 pub(crate) fn candid_method(attrs: Vec<Meta>, fun: ItemFn) -> Result<TokenStream> {
@@ -135,7 +135,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
             fn __export_service() -> String {
                 #service
                 #actor
-                let result = #candid::bindings::candid::compile(&env.env, &actor);
+                let result = #candid::pretty::candid::compile(&env.env, &actor);
                 format!("{}", result)
             }
         };
@@ -199,7 +199,7 @@ fn get_candid_attribute(attrs: Vec<Meta>) -> Result<CandidAttribute> {
                 let mode = p.get_ident().unwrap().to_string();
                 match mode.as_ref() {
                     "query" | "composite_query" | "update" | "oneway" => {
-                        res.method_type = Some(mode)
+                        res.method_type = Some(mode);
                     }
                     "init" => res.is_init = true,
                     _ => return Err(Error::new_spanned(p, "unknown mode")),

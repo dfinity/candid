@@ -1,0 +1,6 @@
+type T = record { T };
+service : {
+  f : (record {}) -> (variant {});
+  g : (T) -> (variant {a:T});
+  h : (record {T; empty}) -> (variant {a:T; b:record {}});
+}

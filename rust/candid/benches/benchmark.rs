@@ -92,8 +92,9 @@ fn bench_collections(c: &mut Criterion) {
         });
     }
     {
-        let map: BTreeMap<String, Nat> =
-            (0..65536).map(|i| (i.to_string(), Nat::from(i))).collect();
+        let map: BTreeMap<String, Nat> = (0u32..65536u32)
+            .map(|i| (i.to_string(), Nat::from(i)))
+            .collect();
         group.bench_function("vec (text, nat)", |b| {
             b.iter_batched(
                 || map.clone(),

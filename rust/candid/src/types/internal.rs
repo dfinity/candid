@@ -1,6 +1,5 @@
 use super::CandidType;
 use crate::idl_hash;
-use num_enum::TryFromPrimitive;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -202,13 +201,11 @@ pub enum TypeInner {
 }
 impl std::ops::Deref for Type {
     type Target = TypeInner;
-    #[inline(always)]
     fn deref(&self) -> &TypeInner {
-        self.0.deref()
+        &self.0
     }
 }
 impl AsRef<TypeInner> for Type {
-    #[inline(always)]
     fn as_ref(&self) -> &TypeInner {
         self.0.as_ref()
     }
@@ -232,10 +229,24 @@ impl TypeInner {
             _ => false,
         }
     }
+    pub fn is_blob(&self, env: &crate::TypeEnv) -> bool {
+        match self {
+            TypeInner::Vec(t) => {
+                let Ok(t) = env.trace_type(t) else {
+                    return false;
+                };
+                matches!(*t, TypeInner::Nat8)
+            }
+            _ => false,
+        }
+    }
 }
 impl Type {
     pub fn is_tuple(&self) -> bool {
         self.as_ref().is_tuple()
+    }
+    pub fn is_blob(&self, env: &crate::TypeEnv) -> bool {
+        self.as_ref().is_blob(env)
     }
     pub fn subst(&self, tau: &std::collections::BTreeMap<String, String>) -> Self {
         use TypeInner::*;
@@ -281,18 +292,28 @@ impl Type {
         .into()
     }
 }
+#[cfg(feature = "printer")]
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", crate::bindings::candid::pp_ty(self).pretty(80))
+        write!(f, "{}", crate::pretty::candid::pp_ty(self).pretty(80))
     }
 }
+#[cfg(feature = "printer")]
 impl fmt::Display for TypeInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            crate::bindings::candid::pp_ty_inner(self).pretty(80)
-        )
+        write!(f, "{}", crate::pretty::candid::pp_ty_inner(self).pretty(80))
+    }
+}
+#[cfg(not(feature = "printer"))]
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+#[cfg(not(feature = "printer"))]
+impl fmt::Display for TypeInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 pub(crate) fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
@@ -314,11 +335,11 @@ pub(crate) fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
         Record(fs) | Variant(fs) => {
             let mut cnt = 0;
             let mut limit = limit;
-            for f in fs.iter() {
+            for f in fs {
                 let id_size = match f.id.as_ref() {
                     Label::Named(n) => n.len() as i32,
                     Label::Id(_) => 4,
-                    _ => 0,
+                    Label::Unnamed(_) => 0,
                 };
                 cnt += id_size + text_size(&f.ty, limit - id_size - 3)? + 3;
                 limit -= cnt;
@@ -329,11 +350,11 @@ pub(crate) fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
             let mode = if func.modes.is_empty() { 0 } else { 6 };
             let mut cnt = mode + 6;
             let mut limit = limit - cnt;
-            for t in func.args.iter() {
+            for t in &func.args {
                 cnt += text_size(t, limit)?;
                 limit -= cnt;
             }
-            for t in func.rets.iter() {
+            for t in &func.rets {
                 cnt += text_size(t, limit)?;
                 limit -= cnt;
             }
@@ -342,7 +363,7 @@ pub(crate) fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
         Service(ms) => {
             let mut cnt = 0;
             let mut limit = limit;
-            for (name, f) in ms.iter() {
+            for (name, f) in ms {
                 let len = name.len() as i32;
                 cnt += len + text_size(f, limit - len - 3)? + 3;
                 limit -= cnt;
@@ -368,9 +389,8 @@ pub enum Label {
 impl Label {
     pub fn get_id(&self) -> u32 {
         match *self {
-            Label::Id(n) => n,
+            Label::Id(n) | Label::Unnamed(n) => n,
             Label::Named(ref n) => idl_hash(n),
-            Label::Unnamed(n) => n,
         }
     }
 }
@@ -379,7 +399,7 @@ impl std::fmt::Display for Label {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Label::Id(n) | Label::Unnamed(n) => {
-                write!(f, "{}", super::number::pp_num_str(&n.to_string()))
+                write!(f, "{}", crate::utils::pp_num_str(&n.to_string()))
             }
             Label::Named(id) => write!(f, "{id}"),
         }
@@ -405,15 +425,23 @@ pub struct Field {
     pub id: SharedLabel,
     pub ty: Type,
 }
+#[cfg(feature = "printer")]
 impl fmt::Display for Field {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",
-            crate::bindings::candid::pp_field(self, false).pretty(80)
+            crate::pretty::candid::pp_field(self, false).pretty(80)
         )
     }
 }
+#[cfg(not(feature = "printer"))]
+impl fmt::Display for Field {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 #[macro_export]
 /// Construct a field type, which can be used in `TypeInner::Record` and `TypeInner::Variant`.
 ///
@@ -461,32 +489,26 @@ pub enum FuncMode {
     Query,
     CompositeQuery,
 }
-impl FuncMode {
-    pub(crate) fn to_doc(&self) -> pretty::RcDoc {
-        match self {
-            FuncMode::Oneway => pretty::RcDoc::text("oneway"),
-            FuncMode::Query => pretty::RcDoc::text("query"),
-            FuncMode::CompositeQuery => pretty::RcDoc::text("composite_query"),
-        }
-    }
-}
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Function {
     pub modes: Vec<FuncMode>,
     pub args: Vec<Type>,
     pub rets: Vec<Type>,
 }
+#[cfg(feature = "printer")]
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            crate::bindings::candid::pp_function(self).pretty(80)
-        )
+        write!(f, "{}", crate::pretty::candid::pp_function(self).pretty(80))
+    }
+}
+#[cfg(not(feature = "printer"))]
+impl fmt::Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 impl Function {
-    /// Check a function is a query or composite_query method
+    /// Check a function is a `query` or `composite_query` method
     pub fn is_query(&self) -> bool {
         self.modes
             .iter()
@@ -526,9 +548,9 @@ macro_rules! service {
     }}
 }
 
-#[derive(Debug, PartialEq, TryFromPrimitive)]
+#[derive(Debug, PartialEq)]
 #[repr(i64)]
-pub(crate) enum Opcode {
+pub enum Opcode {
     Null = -1,
     Bool = -2,
     Nat = -3,
@@ -604,10 +626,10 @@ thread_local! {
     static ENV: RefCell<HashMap<TypeId, Type>> = RefCell::new(HashMap::new());
     // only used for TypeContainer
     static ID: RefCell<HashMap<Type, TypeId>> = RefCell::new(HashMap::new());
-    static NAME: RefCell<TypeName> = RefCell::new(Default::default());
+    static NAME: RefCell<TypeName> = RefCell::new(TypeName::default());
 }
 
-pub(crate) fn find_type(id: &TypeId) -> Option<Type> {
+pub fn find_type(id: &TypeId) -> Option<Type> {
     ENV.with(|e| e.borrow().get(id).cloned())
 }
 
@@ -618,9 +640,9 @@ pub(crate) fn show_env() {
 }
 
 pub(crate) fn env_add(id: TypeId, t: Type) {
-    ENV.with(|e| drop(e.borrow_mut().insert(id, t)));
+    ENV.with(|e| e.borrow_mut().insert(id, t));
 }
-pub(crate) fn env_clear() {
+pub fn env_clear() {
     ENV.with(|e| e.borrow_mut().clear());
 }
 

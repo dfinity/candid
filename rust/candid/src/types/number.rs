@@ -1,7 +1,7 @@
 //! Data structure for Candid type Int, Nat, supporting big integer with LEB128 encoding.
 
 use super::{CandidType, Serializer, Type, TypeInner};
-use crate::Error;
+use crate::{utils::pp_num_str, Error};
 use num_bigint::{BigInt, BigUint};
 use serde::{
     de::{self, Deserialize, SeqAccess, Visitor},
@@ -16,21 +16,18 @@ pub struct Int(pub BigInt);
 pub struct Nat(pub BigUint);
 
 impl From<BigInt> for Int {
-    #[inline(always)]
     fn from(i: BigInt) -> Self {
         Self(i)
     }
 }
 
 impl From<BigUint> for Nat {
-    #[inline(always)]
     fn from(i: BigUint) -> Self {
         Self(i)
     }
 }
 
 impl From<Nat> for Int {
-    #[inline(always)]
     fn from(n: Nat) -> Self {
         let i: BigInt = n.0.into();
         i.into()
@@ -38,21 +35,18 @@ impl From<Nat> for Int {
 }
 
 impl From<Int> for BigInt {
-    #[inline(always)]
     fn from(i: Int) -> Self {
         i.0
     }
 }
 
 impl From<Nat> for BigUint {
-    #[inline(always)]
     fn from(i: Nat) -> Self {
         i.0
     }
 }
 
 impl From<Nat> for BigInt {
-    #[inline(always)]
     fn from(i: Nat) -> Self {
         i.0.into()
     }
@@ -85,20 +79,6 @@ impl std::str::FromStr for Nat {
     type Err = crate::Error;
     fn from_str(str: &str) -> Result<Self, Self::Err> {
         Self::parse(str.as_bytes())
-    }
-}
-
-pub(crate) fn pp_num_str(s: &str) -> String {
-    let mut groups = Vec::new();
-    for chunk in s.as_bytes().rchunks(3) {
-        let str = String::from_utf8_lossy(chunk);
-        groups.push(str);
-    }
-    groups.reverse();
-    if "-" == groups.first().unwrap() {
-        "-".to_string() + &groups[1..].join("_")
-    } else {
-        groups.join("_")
     }
 }
 
@@ -162,9 +142,9 @@ impl<'de> Deserialize<'de> for Int {
                     .map_err(|_| de::Error::custom(format!("{v:?} is not int")))
             }
             fn visit_byte_buf<E: de::Error>(self, v: Vec<u8>) -> Result<Int, E> {
-                Ok(Int(match v[0] {
-                    0 => BigInt::from_signed_bytes_le(&v[1..]),
-                    1 => BigInt::from_biguint(
+                Ok(Int(match v.first() {
+                    Some(0) => BigInt::from_signed_bytes_le(&v[1..]),
+                    Some(1) => BigInt::from_biguint(
                         num_bigint::Sign::Plus,
                         BigUint::from_bytes_le(&v[1..]),
                     ),
@@ -366,7 +346,7 @@ macro_rules! define_op {
 
             #[inline]
             fn $method(self, other: $res) -> $res {
-                $imp::$method(other.0, &self).into()
+                $imp::$method(&self, other.0).into()
             }
         }
     };
@@ -479,97 +459,6 @@ define_op_0_assign!(impl SubAssign<Int> for Int, sub_assign);
 define_op_0_assign!(impl MulAssign<Int> for Int, mul_assign);
 define_op_0_assign!(impl DivAssign<Int> for Int, div_assign);
 define_op_0_assign!(impl RemAssign<Int> for Int, rem_assign);
-
-// Special cases for literals which are i32, for Nat which isn't support in BigUint,
-// so we add a conversion to u32.
-impl From<i32> for Nat {
-    #[inline]
-    fn from(v: i32) -> Self {
-        Self::from(v as u32)
-    }
-}
-impl PartialEq<i32> for Nat {
-    #[inline]
-    #[must_use]
-    fn eq(&self, v: &i32) -> bool {
-        self.0.eq(&(*v as u32).into())
-    }
-}
-
-impl std::ops::Add<i32> for Nat {
-    type Output = Self;
-
-    #[inline]
-    fn add(self, other: i32) -> Self {
-        (self.0 + (other as u32)).into()
-    }
-}
-impl std::ops::AddAssign<i32> for Nat {
-    #[inline]
-    fn add_assign(&mut self, other: i32) {
-        self.0 += other as u32
-    }
-}
-
-impl std::ops::Sub<i32> for Nat {
-    type Output = Self;
-
-    #[inline]
-    fn sub(self, other: i32) -> Self {
-        (self.0 - (other as u32)).into()
-    }
-}
-impl std::ops::SubAssign<i32> for Nat {
-    #[inline]
-    fn sub_assign(&mut self, other: i32) {
-        self.0 -= other as u32
-    }
-}
-
-impl std::ops::Mul<i32> for Nat {
-    type Output = Self;
-
-    #[inline]
-    fn mul(self, other: i32) -> Self {
-        (self.0 * (other as u32)).into()
-    }
-}
-impl std::ops::MulAssign<i32> for Nat {
-    #[inline]
-    fn mul_assign(&mut self, other: i32) {
-        self.0 *= other as u32
-    }
-}
-
-impl std::ops::Div<i32> for Nat {
-    type Output = Self;
-
-    #[inline]
-    fn div(self, other: i32) -> Self {
-        (self.0 / (other as u32)).into()
-    }
-}
-impl std::ops::DivAssign<i32> for Nat {
-    #[inline]
-    fn div_assign(&mut self, other: i32) {
-        self.0 /= other as u32
-    }
-}
-
-impl std::ops::Rem<i32> for Nat {
-    type Output = Self;
-
-    #[inline]
-    fn rem(self, other: i32) -> Self {
-        (self.0 % (other as u32)).into()
-    }
-}
-impl std::ops::RemAssign<i32> for Nat {
-    #[inline]
-    fn rem_assign(&mut self, other: i32) {
-        self.0 %= other as u32
-    }
-}
 
 #[cfg(test)]
 mod tests {

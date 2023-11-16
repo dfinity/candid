@@ -1,0 +1,320 @@
+use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs};
+use super::test::{Assert, Input, Test};
+use super::token::{Token, error2, LexicalError, Span};
+use candid::{Principal, types::Label};
+use candid::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
+use candid::types::{TypeEnv, FuncMode};
+use candid::utils::check_unique;
+
+grammar;
+
+extern {
+    type Location = usize;
+    type Error = LexicalError;
+    enum Token {
+        "decimal" => Token::Decimal(<String>),
+        "hex" => Token::Hex(<String>),
+        "float" => Token::Float(<String>),
+        "bool" => Token::Boolean(<bool>),
+        "text" => Token::Text(<String>),
+        "id" => Token::Id(<String>),
+        "null" => Token::Null,
+        "opt" => Token::Opt,
+        "vec" => Token::Vec,
+        "record" => Token::Record,
+        "variant" => Token::Variant,
+        "func" => Token::Func,
+        "service" => Token::Service,
+        "oneway" => Token::Oneway,
+        "query" => Token::Query,
+        "composite_query" => Token::CompositeQuery,
+        "blob" => Token::Blob,
+        "type" => Token::Type,
+        "import" => Token::Import,
+        "principal" => Token::Principal,
+        "sign" => Token::Sign(<char>),
+        "=" => Token::Equals,
+        "==" => Token::TestEqual,
+        "!=" => Token::NotEqual,
+        "!:" => Token::NotDecode,
+        "(" => Token::LParen,
+        ")" => Token::RParen,
+        "{" => Token::LBrace,
+        "}" => Token::RBrace,
+        "," => Token::Comma,
+        "." => Token::Dot,
+        ";" => Token::Semi,
+        ":" => Token::Colon,
+        "->" => Token::Arrow,
+    }
+}
+
+
+// Value
+pub Args: IDLArgs = "(" <SepBy<AnnVal, ",">> ")" => IDLArgs { args: <> };
+
+pub Arg: IDLValue = {
+    "bool" => IDLValue::Bool(<>),
+    NumLiteral => <>,
+    Text => IDLValue::Text(<>),
+    Bytes => IDLValue::Blob(<>),
+    "null" => IDLValue::Null,
+    "opt" <Arg> => IDLValue::Opt(Box::new(<>)),
+    "vec" "{" <SepBy<AnnVal, ";">> "}" => IDLValue::Vec(<>),
+    "record" "{" <Sp<SepBy<RecordField, ";">>> "}" =>? {
+        let mut id: u32 = 0;
+        let span = <>.1.clone();
+        let mut fs: Vec<IDLField> = <>.0.into_iter().map(|f| {
+          match f.id {
+            Label::Unnamed(_) => {
+              id = id + 1;
+              IDLField { id: Label::Unnamed(id - 1), val: f.val }
+            }
+            _ => {
+              id = f.id.get_id() + 1;
+              f
+            }
+          }
+        }).collect();
+        fs.sort_unstable_by_key(|IDLField { id, .. }| id.get_id());
+        check_unique(fs.iter().map(|f| &f.id)).map_err(|e| error2(e, span))?;
+        Ok(IDLValue::Record(fs))
+    },
+    "variant" "{" <VariantField> "}" => IDLValue::Variant(VariantValue(Box::new(<>), 0)),
+    "principal" <Sp<Text>> =>? Ok(IDLValue::Principal(Principal::from_text(&<>.0).map_err(|e| error2(e, <>.1))?)),
+    "service" <Sp<Text>> =>? Ok(IDLValue::Service(Principal::from_text(&<>.0).map_err(|e| error2(e, <>.1))?)),
+    "func" <id:Sp<Text>> "." <meth:Name> =>? {
+      let id = Principal::from_text(&id.0).map_err(|e| error2(e, id.1))?;
+      Ok(IDLValue::Func(id, meth))
+    },
+    "(" <AnnVal> ")" => <>,
+}
+
+Text: String = {
+    Sp<"text"> =>? {
+        if std::str::from_utf8(<>.0.as_bytes()).is_err() {
+          Err(error2("Not valid unicode text", <>.1))
+        } else {
+          Ok(<>.0)
+        }
+    }
+}
+
+Bytes: Vec<u8> = {
+    "blob" <"text"> => <>.into_bytes(),
+}
+
+Number: String = {
+    "decimal" => <>,
+    "hex" => num_bigint::BigInt::parse_bytes(<>.as_bytes(), 16).unwrap().to_str_radix(10),
+}
+
+AnnVal: IDLValue = {
+    <Arg> => <>,
+    <arg:Sp<Arg>> ":" <typ:Sp<Typ>> =>? {
+        let env = TypeEnv::new();
+        let typ = crate::typing::ast_to_type(&env, &typ.0).map_err(|e| error2(e, typ.1))?;
+        arg.0.annotate_type(true, &env, &typ).map_err(|e| error2(e, arg.1))
+    }
+}
+
+NumLiteral: IDLValue = {
+    <sign:"sign"?> <n:Number> => {
+        let num = match sign {
+            Some('-') => format!("-{}", n),
+            _ => n,
+        };
+        IDLValue::Number(num)
+    },
+    <sign:"sign"?> <n:Sp<"float">> =>? {
+        let span = n.1.clone();
+        let num = match sign {
+            Some('-') => format!("-{}", n.0),
+            _ => n.0,
+        };
+        let f = num.parse::<f64>().map_err(|_| error2("not a float", span))?;
+        Ok(IDLValue::Float64(f))
+    },
+}
+
+FieldId: u32 = {
+    Sp<"decimal"> =>? <>.0.parse::<u32>().map_err(|_| error2("field id out of u32 range", <>.1)),
+    Sp<"hex"> =>? u32::from_str_radix(&<>.0, 16).map_err(|_| error2("field id out of u32 range", <>.1)),
+}
+
+Field: IDLField = {
+    <n:FieldId> "=" <v:AnnVal> =>? Ok(IDLField { id: Label::Id(n), val: v }),
+    <n:Name> "=" <v:AnnVal> => IDLField { id: Label::Named(n), val: v },
+}
+
+VariantField: IDLField = {
+    Field => <>,
+    Name => IDLField { id: Label::Named(<>), val: IDLValue::Null },
+    FieldId =>? Ok(IDLField { id: Label::Id(<>), val: IDLValue::Null }),
+}
+
+RecordField: IDLField = {
+    Field => <>,
+    AnnVal => IDLField { id: Label::Unnamed(0), val:<> },
+}
+
+// Type
+pub Typs: IDLTypes = TupTyp => IDLTypes { args:<> };
+
+pub Typ: IDLType = {
+    PrimTyp => <>,
+    "opt" <Typ> => IDLType::OptT(Box::new(<>)),
+    "vec" <Typ> => IDLType::VecT(Box::new(<>)),
+    "blob" => IDLType::VecT(Box::new(IDLType::PrimT(PrimType::Nat8))),
+    "record" "{" <Sp<SepBy<RecordFieldTyp, ";">>> "}" =>? {
+        let mut id: u32 = 0;
+        let span = <>.1.clone();
+        let mut fs: Vec<TypeField> = <>.0.iter().map(|f| {
+          let label = match f.label {
+              Label::Unnamed(_) => { id = id + 1; Label::Unnamed(id - 1) },
+              ref l => { id = l.get_id() + 1; l.clone() },
+          };
+          TypeField { label, typ: f.typ.clone() }
+        }).collect();
+        fs.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
+        check_unique(fs.iter().map(|f| &f.label)).map_err(|e| error2(e, span))?;
+        Ok(IDLType::RecordT(fs))
+    },
+    "variant" "{" <mut fs:Sp<SepBy<VariantFieldTyp, ";">>> "}" =>? {
+        let span = fs.1.clone();
+        fs.0.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
+        check_unique(fs.0.iter().map(|f| &f.label)).map_err(|e| error2(e, span))?;
+        Ok(IDLType::VariantT(fs.0))
+    },
+    "func" <FuncTyp> => IDLType::FuncT(<>),
+    "service" <ActorTyp> => IDLType::ServT(<>),
+    "principal" => IDLType::PrincipalT,
+}
+
+PrimTyp: IDLType = {
+    "null" => IDLType::PrimT(PrimType::Null),
+    "id" => {
+      match PrimType::str_to_enum(&<>) {
+        Some(p) => IDLType::PrimT(p),
+        None => IDLType::VarT(<>),
+      }
+    },
+}
+
+FieldTyp: TypeField = {
+    <n:FieldId> ":" <t:Typ> =>? Ok(TypeField { label: Label::Id(n), typ: t }),
+    <n:Name> ":" <t:Typ> => TypeField { label: Label::Named(n), typ: t },
+}
+
+RecordFieldTyp: TypeField = {
+    FieldTyp => <>,
+    Typ => TypeField { label: Label::Unnamed(0), typ: <> },
+}
+
+VariantFieldTyp: TypeField = {
+    FieldTyp => <>,
+    Name => TypeField { label: Label::Named(<>), typ: IDLType::PrimT(PrimType::Null) },
+    FieldId =>? Ok(TypeField { label: Label::Id(<>), typ: IDLType::PrimT(PrimType::Null) }),
+}
+
+TupTyp: Vec<IDLType> = "(" <SepBy<ArgTyp, ",">> ")" => <>;
+
+FuncTyp: FuncType = {
+    <args:TupTyp> "->" <rets:TupTyp> <modes:FuncMode*> =>
+        FuncType { modes, args, rets },
+}
+
+ArgTyp: IDLType = {
+    Typ => <>,
+    Name ":" <Typ> => <>,
+}
+
+FuncMode: FuncMode = {
+    "oneway" => FuncMode::Oneway,
+    "query" => FuncMode::Query,
+    "composite_query" => FuncMode::CompositeQuery,
+}
+
+ActorTyp: Vec<Binding> = {
+    "{" <mut fs:Sp<SepBy<MethTyp, ";">>> "}" =>? {
+        let span = fs.1.clone();
+        fs.0.sort_unstable_by(|a,b| a.id.partial_cmp(&b.id).unwrap());
+        check_unique(fs.0.iter().map(|f| &f.id)).map_err(|e| error2(e, span))?;
+        Ok(fs.0)
+    }
+}
+
+MethTyp: Binding = {
+    <n:Name> ":" <f:FuncTyp> => Binding { id: n, typ: IDLType::FuncT(f) },
+    <n:Name> ":" <id:"id"> => Binding { id: n, typ: IDLType::VarT(id) },
+}
+
+// Type declarations
+Def: Dec = {
+    "type" <id:"id"> "=" <t:Typ> => Dec::TypD(Binding { id: id, typ: t }),
+    "import" <Text> => Dec::ImportD(<>),
+}
+
+Actor: IDLType = {
+    ActorTyp => IDLType::ServT(<>),
+    "id" => IDLType::VarT(<>),
+}
+
+MainActor: IDLType = {
+    "service" "id"? ":" <t:Actor> ";"? => <>,
+    "service" "id"? ":" <args:TupTyp> "->" <t:Actor> ";"? => IDLType::ClassT(args, Box::new(t)),
+}
+
+pub IDLProg: IDLProg = {
+    <decs:SepBy<Def, ";">> <actor:MainActor?> => IDLProg { decs, actor }
+}
+
+pub IDLInitArgs: IDLInitArgs = {
+    <decs:SepBy<Def, ";">> <args:TupTyp> => IDLInitArgs { decs, args }
+}
+
+// Test file
+
+Input: Input = {
+    Text => Input::Text(<>),
+    Bytes => Input::Blob(<>),
+}
+
+Assert: Assert = <id:Sp<"id">> <assert:Assertion> =>? {
+    if id.0 != "assert" {
+        Err(error2("not an assert", id.1))
+    } else { Ok(assert) }
+};
+
+Assertion: Assert = {
+    <left:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: None, typ, pass: true, desc },
+    <left:Input> "!:" <typ:TupTyp> <desc:Text?> => Assert { left, right: None, typ, pass: false, desc },
+    <left:Input> "==" <right:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: Some(right), typ, pass: true, desc },
+    <left:Input> "!=" <right:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: Some(right), typ, pass: false, desc },
+}
+
+pub Test: Test = {
+    <defs:SepBy<Def, ";">> <asserts:SepBy<Assert, ";">> => Test { defs, asserts },
+}
+
+// Common util
+Name: String = {
+    "id" => <>,
+    Text => <>,
+}
+
+// Also allows trailing separator
+#[inline]
+SepBy<T, S>: Vec<T> = {
+    <mut v:(<T> S)*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
+#[inline]
+Sp<T>: (T, Span) =
+    <l: @L> <t: T> <r: @R> => (t, l..r);

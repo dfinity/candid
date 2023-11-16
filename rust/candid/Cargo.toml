@@ -1,6 +1,6 @@
 [package]
 name = "candid"
-version = "0.9.11"
+version = "0.10.0"
 edition = "2021"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
@@ -9,57 +9,35 @@ documentation = "https://docs.rs/candid"
 repository = "https://github.com/dfinity/candid"
 license = "Apache-2.0"
 readme = "README.md"
-
-categories = ["encoding", "parsing", "wasm"]
-keywords = ["internet-computer", "idl", "candid", "dfinity", "parser"]
-include = ["src", "Cargo.toml", "build.rs", "LICENSE", "README.md"]
-build = "build.rs"
-
-[build-dependencies]
-lalrpop = { version = "0.20.0", optional = true }
+categories = ["encoding", "wasm"]
+keywords = ["internet-computer", "idl", "candid", "dfinity"]
+include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
-byteorder = "1.4.3"
-candid_derive = { path = "../candid_derive", version = "=0.6.4" }
-codespan-reporting = "0.11"
-crc32fast = "1.3.0"
-data-encoding = "2.4.0"
-hex = "0.4.2"
-leb128 = "0.2.4"
-num_enum = "0.6.1"
-num-bigint = { version = "0.4.2", features = ["serde"] }
-num-traits = "0.2.12"
-paste = "1.0.0"
-pretty = "0.12.0"
-serde = { version = "1.0.118", features = ["derive"] }
-serde_bytes = "0.11"
-sha2 = "0.10.1"
-thiserror = "1.0.20"
-anyhow = "1.0"
+candid_derive = { path = "../candid_derive", version = "=0.6.5" }
+ic_principal = { path = "../ic_principal", version = "0.1.0" }
 binread = { version = "2.1", features = ["debug_template"] }
+byteorder = "1.5.0"
+leb128 = "0.2.5"
+paste = "1.0"
+hex.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
 
-lalrpop-util = { version = "0.20.0", optional = true }
-logos = { version = "0.13", optional = true }
-convert_case = { version = "0.6", optional = true }
-
-arbitrary = { version = "1.0", optional = true }
-# Don't upgrade serde_dhall. It will introduce dependency with invalid license.
-serde_dhall = { version = "0.11", default-features = false, optional = true }
-fake = { version = "2.4", optional = true }
-rand = { version = "0.8", optional = true }
+serde_bytes = { version = "0.11", optional = true }
+pretty = { workspace = true, optional = true }
+num-bigint = { workspace = true, optional = true }
+num-traits = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 stacker = "0.1"
 
 [dev-dependencies]
-goldenfile = "1.1.0"
-test-generator = "0.3.0"
-rand = "0.8"
+rand.workspace = true
 criterion = "0.4"
 serde_cbor = "0.11.2"
 serde_json = "1.0.74"
-serde_test = "1.0.137"
-impls = "1"
 bincode = "1.3.3"
 
 [[bench]]
@@ -67,29 +45,25 @@ name = "benchmark"
 harness = false
 path = "benches/benchmark.rs"
 
-[[test]]
-name = "test_suite"
-path = "tests/test_suite.rs"
-required-features = ["parser"]
-[[test]]
-name = "value"
-path = "tests/value.rs"
-required-features = ["parser"]
-[[test]]
-name = "parse_value"
-path = "tests/parse_value.rs"
-required-features = ["parser"]
-[[test]]
-name = "parse_type"
-path = "tests/parse_type.rs"
-required-features = ["parser"]
-
 [features]
-configs = ["serde_dhall"]
-random = ["parser", "configs", "arbitrary", "fake", "rand"]
-parser = ["lalrpop", "lalrpop-util", "logos", "convert_case"]
-all = ["random"]
-mute_warnings = []
+bignum = ["dep:num-bigint", "dep:num-traits"]
+printer = ["dep:pretty"]
+value = ["bignum", "printer"]
+default = ["serde_bytes", "printer", "bignum"]
+all = ["default", "value", "ic_principal/arbitrary"]
+
+[[test]]
+name = "types"
+path = "tests/types.rs"
+required-features = ["value"]
+[[test]]
+name = "serde"
+path = "tests/serde.rs"
+required-features = ["bignum"]
+[[test]]
+name = "number"
+path = "tests/number.rs"
+required-features = ["bignum"]
 
 # docs.rs-specific configuration
 # To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --features all

@@ -41,7 +41,7 @@ impl CandidType for i128 {
     where
         S: Serializer,
     {
-        serializer.serialize_int(&crate::Int::from(*self))
+        serializer.serialize_i128(*self)
     }
 }
 impl CandidType for u128 {
@@ -52,7 +52,7 @@ impl CandidType for u128 {
     where
         S: Serializer,
     {
-        serializer.serialize_nat(&crate::Nat::from(*self))
+        serializer.serialize_u128(*self)
     }
 }
 
@@ -134,12 +134,14 @@ where
         S: Serializer,
     {
         let mut ser = serializer.serialize_vec(self.len())?;
-        for e in self.iter() {
+        for e in self {
             Compound::serialize_element(&mut ser, &e)?;
         }
         Ok(())
     }
 }
+#[cfg_attr(docsrs, doc(cfg(feature = "serde_bytes")))]
+#[cfg(feature = "serde_bytes")]
 impl CandidType for serde_bytes::ByteBuf {
     fn _ty() -> Type {
         TypeInner::Vec(TypeInner::Nat8.into()).into()
@@ -151,6 +153,8 @@ impl CandidType for serde_bytes::ByteBuf {
         serializer.serialize_blob(self.as_slice())
     }
 }
+#[cfg_attr(docsrs, doc(cfg(feature = "serde_bytes")))]
+#[cfg(feature = "serde_bytes")]
 impl CandidType for serde_bytes::Bytes {
     fn _ty() -> Type {
         TypeInner::Vec(TypeInner::Nat8.into()).into()
@@ -241,7 +245,7 @@ impl<T: CandidType, const N: usize> CandidType for [T; N] {
         S: Serializer,
     {
         let mut ser = serializer.serialize_vec(N)?;
-        for e in self.iter() {
+        for e in self {
             Compound::serialize_element(&mut ser, &e)?;
         }
         Ok(())

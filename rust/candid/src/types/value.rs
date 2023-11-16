@@ -18,6 +18,7 @@ pub enum IDLValue {
     Vec(Vec<IDLValue>),
     Record(Vec<IDLField>),
     Variant(VariantValue),
+    Blob(Vec<u8>),
     Principal(crate::Principal),
     Service(crate::Principal),
     Func(crate::Principal, String),
@@ -134,10 +135,6 @@ impl IDLValue {
     /// string, we need to set `from_parser` to true to enable converting numbers to the expected
     /// types, and disable the opt rules.
     pub fn annotate_type(&self, from_parser: bool, env: &TypeEnv, t: &Type) -> Result<Self> {
-        #[cfg(not(feature = "parser"))]
-        if from_parser {
-            panic!("Please enable \"parser\" feature");
-        }
         Ok(match (self, t.as_ref()) {
             (_, TypeInner::Var(id)) => {
                 let ty = env.rec_find_type(id)?;
@@ -193,6 +190,17 @@ impl IDLValue {
             }
             // fallback
             (_, TypeInner::Opt(_)) if !from_parser => IDLValue::None,
+            (IDLValue::Blob(blob), ty) if ty.is_blob(env) => IDLValue::Blob(blob.to_vec()),
+            (IDLValue::Vec(vec), ty) if ty.is_blob(env) => {
+                let blob = vec
+                    .iter()
+                    .filter_map(|x| match *x {
+                        IDLValue::Nat8(n) => Some(n),
+                        _ => None,
+                    })
+                    .collect();
+                IDLValue::Blob(blob)
+            }
             (IDLValue::Vec(vec), TypeInner::Vec(ty)) => {
                 let mut res = Vec::new();
                 for e in vec.iter() {
@@ -239,27 +247,23 @@ impl IDLValue {
             (IDLValue::Principal(id), TypeInner::Principal) => IDLValue::Principal(*id),
             (IDLValue::Service(_), TypeInner::Service(_)) => self.clone(),
             (IDLValue::Func(_, _), TypeInner::Func(_)) => self.clone(),
-            #[cfg(feature = "parser")]
-            (IDLValue::Number(str), _) if from_parser => {
-                use crate::parser::token::error;
-                match t.as_ref() {
-                    TypeInner::Int => IDLValue::Int(str.parse::<Int>()?),
-                    TypeInner::Nat => IDLValue::Nat(str.parse::<Nat>()?),
-                    TypeInner::Nat8 => IDLValue::Nat8(str.parse::<u8>().map_err(error)?),
-                    TypeInner::Nat16 => IDLValue::Nat16(str.parse::<u16>().map_err(error)?),
-                    TypeInner::Nat32 => IDLValue::Nat32(str.parse::<u32>().map_err(error)?),
-                    TypeInner::Nat64 => IDLValue::Nat64(str.parse::<u64>().map_err(error)?),
-                    TypeInner::Int8 => IDLValue::Int8(str.parse::<i8>().map_err(error)?),
-                    TypeInner::Int16 => IDLValue::Int16(str.parse::<i16>().map_err(error)?),
-                    TypeInner::Int32 => IDLValue::Int32(str.parse::<i32>().map_err(error)?),
-                    TypeInner::Int64 => IDLValue::Int64(str.parse::<i64>().map_err(error)?),
-                    _ => {
-                        return Err(Error::msg(format!(
-                            "type mismatch: {self} can not be of type {t}"
-                        )))
-                    }
+            (IDLValue::Number(str), _) if from_parser => match t.as_ref() {
+                TypeInner::Int => IDLValue::Int(str.parse::<Int>()?),
+                TypeInner::Nat => IDLValue::Nat(str.parse::<Nat>()?),
+                TypeInner::Nat8 => IDLValue::Nat8(str.parse::<u8>()?),
+                TypeInner::Nat16 => IDLValue::Nat16(str.parse::<u16>()?),
+                TypeInner::Nat32 => IDLValue::Nat32(str.parse::<u32>()?),
+                TypeInner::Nat64 => IDLValue::Nat64(str.parse::<u64>()?),
+                TypeInner::Int8 => IDLValue::Int8(str.parse::<i8>()?),
+                TypeInner::Int16 => IDLValue::Int16(str.parse::<i16>()?),
+                TypeInner::Int32 => IDLValue::Int32(str.parse::<i32>()?),
+                TypeInner::Int64 => IDLValue::Int64(str.parse::<i64>()?),
+                _ => {
+                    return Err(Error::msg(format!(
+                        "type mismatch: {self} can not be of type {t}"
+                    )))
                 }
-            }
+            },
             _ => {
                 return Err(Error::msg(format!(
                     "type mismatch: {self} cannot be of type {t}"
@@ -292,6 +296,7 @@ impl IDLValue {
                 let t = v.deref().value_ty();
                 TypeInner::Opt(t)
             }
+            IDLValue::Blob(_) => TypeInner::Vec(TypeInner::Nat8.into()),
             IDLValue::Vec(ref vec) => {
                 let t = if vec.is_empty() {
                     TypeInner::Empty.into()
@@ -376,6 +381,7 @@ impl crate::CandidType for IDLValue {
                 }
                 Ok(())
             }
+            IDLValue::Blob(ref blob) => serializer.serialize_blob(blob),
             IDLValue::Record(ref vec) => {
                 let mut ser = serializer.serialize_struct()?;
                 for f in vec.iter() {
@@ -428,7 +434,7 @@ impl<'de> Visitor<'de> for IDLValueVisitor {
     visit_prim!(Int64, i64);
     visit_prim!(Float32, f32);
     visit_prim!(Float64, f64);
-    // Deserialize Candid specific types: Bignumber, principal, reversed, service, function
+    // Deserialize Candid specific types: Bignumber, principal, reversed, service, function, blob
     fn visit_byte_buf<E: de::Error>(self, value: Vec<u8>) -> DResult<E> {
         let (tag, mut bytes) = value.split_at(1);
         match tag[0] {
@@ -444,6 +450,7 @@ impl<'de> Visitor<'de> for IDLValueVisitor {
                 let v = crate::Principal::try_from(bytes).map_err(E::custom)?;
                 Ok(IDLValue::Principal(v))
             }
+            3u8 => Ok(IDLValue::Reserved),
             4u8 => {
                 let v = crate::Principal::try_from(bytes).map_err(E::custom)?;
                 Ok(IDLValue::Service(v))
@@ -457,7 +464,7 @@ impl<'de> Visitor<'de> for IDLValueVisitor {
                 let id = crate::Principal::try_from(bytes).map_err(E::custom)?;
                 Ok(IDLValue::Func(id, meth))
             }
-            3u8 => Ok(IDLValue::Reserved),
+            6u8 => Ok(IDLValue::Blob(bytes.to_vec())),
             _ => Err(de::Error::custom("unknown tag in visit_byte_buf")),
         }
     }
