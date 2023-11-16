@@ -9,6 +9,7 @@
   * `candid`: mainly for Candid data (de-)serialization.
     + `candid::bindings::candid` moves to `candid::pretty::candid`. `candid::pretty` moves to `candid::pretty::utils`. These modules are only available under feature flag `printer` (enabled by default).
     + `candid::{Int, Nat}` is only available under feature flag `bignum` (enabled by default). If this feature is not enabled, you can use `i128/u128` for `int/nat` type.
+    + Remove operator for `i32` and `Nat`.
     + Add `IDLValue::Blob(Vec<u8>)` enum for efficient handling of blob value.
     + `candid::types::number::pp_num_str` moves to `candid::utils::pp_num_str`.
     + `candid::types::value` module is only availble under feature flag `value`.

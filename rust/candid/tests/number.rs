@@ -29,10 +29,10 @@ fn test_numbers() {
 
 #[test]
 fn pretty_print_numbers() {
-    assert_eq!(format!("{}", Nat::from(42)), "42");
-    assert_eq!(format!("{}", Nat::from(100)), "100");
-    assert_eq!(format!("{}", Nat::from(100000)), "100_000");
-    assert_eq!(format!("{}", Nat::from(1_234_567_890)), "1_234_567_890");
+    assert_eq!(format!("{}", Nat::from(42u8)), "42");
+    assert_eq!(format!("{}", Nat::from(100u8)), "100");
+    assert_eq!(format!("{}", Nat::from(100000u32)), "100_000");
+    assert_eq!(format!("{}", Nat::from(1_234_567_890u32)), "1_234_567_890");
     assert_eq!(format!("{}", Int::from(0)), "0");
     assert_eq!(format!("{}", Int::from(-1)), "-1");
     assert_eq!(format!("{}", Int::from(-123)), "-123");
@@ -93,10 +93,34 @@ fn random_u64() {
 #[allow(clippy::cmp_owned)]
 #[test]
 fn operators() {
-    macro_rules! test_type {
-        ($res: ty, $( $t: ty )*) => ($(
+    macro_rules! test_type_nat {
+        ($( $t: ty )*) => ($(
             let x: $t = 1;
-            let value = <$res>::from(x + 1);
+            let value = <Nat>::from(x + 1);
+
+            assert_eq!(value.clone() + x, 3u32);
+            assert_eq!(value.clone() - x, 1u32);
+            assert_eq!(value.clone() * x, 2u32);
+            assert_eq!(value.clone() / x, 2u32);
+            assert_eq!(value.clone() % x, 0u32);
+
+            assert_eq!(x + value.clone(), 3u32);
+            let result = std::panic::catch_unwind(|| x - value.clone());
+            assert!(result.is_err());
+            assert_eq!(x * value.clone(), 2u32);
+            assert_eq!(x / value.clone(), 0u32);
+            assert_eq!(x % value.clone(), 1u32);
+
+            assert!(value.clone() < <Nat>::from(x + 2));
+            assert!(<Nat>::from(x + 2) > value.clone());
+            assert!(x < <Nat>::from(x + 2));
+            assert!(<Nat>::from(x + 2) > x);
+        )*)
+    }
+    macro_rules! test_type_int {
+        ($( $t: ty )*) => ($(
+            let x: $t = 1;
+            let value = <Int>::from(x + 1);
 
             assert_eq!(value.clone() + x, 3);
             assert_eq!(value.clone() - x, 1);
@@ -105,25 +129,20 @@ fn operators() {
             assert_eq!(value.clone() % x, 0);
 
             assert_eq!(x + value.clone(), 3);
-            if std::any::TypeId::of::<$res>() == std::any::TypeId::of::<Int>() {
-                assert_eq!(x - value.clone(), -1);
-            } else {
-                let result = std::panic::catch_unwind(|| x - value.clone());
-                assert!(result.is_err());
-            }
+            assert_eq!(x - value.clone(), -1);
             assert_eq!(x * value.clone(), 2);
             assert_eq!(x / value.clone(), 0);
             assert_eq!(x % value.clone(), 1);
 
-            assert!(value.clone() < <$res>::from(x + 2));
-            assert!(<$res>::from(x + 2) > value.clone());
-            assert!(x < <$res>::from(x + 2));
-            assert!(<$res>::from(x + 2) > x);
+            assert!(value.clone() < <Int>::from(x + 2));
+            assert!(<Int>::from(x + 2) > value.clone());
+            assert!(x < <Int>::from(x + 2));
+            assert!(<Int>::from(x + 2) > x);
         )*)
     }
 
-    test_type!( Nat, usize u8 u16 u32 u64 u128 );
-    test_type!( Int, usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 );
+    test_type_nat!( usize u8 u16 u32 u64 u128 );
+    test_type_int!( usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 );
 }
 
 fn check(num: &str, int_hex: &str, nat_hex: &str) {
