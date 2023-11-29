@@ -1,9 +1,5 @@
-use candid::{
-    check_prog,
-    types::subtype,
-    types::{Type, TypeInner},
-    CandidType, Deserialize, IDLProg, TypeEnv,
-};
+use candid::types::{subtype, Type, TypeInner};
+use candid_parser::{check_prog, CandidType, Deserialize, IDLProg, TypeEnv};
 
 #[derive(CandidType, Deserialize)]
 pub struct HeaderField(pub String, pub String);
@@ -30,13 +26,13 @@ fn did_to_js(prog: String) -> Option<String> {
     let ast = prog.parse::<IDLProg>().ok()?;
     let mut env = TypeEnv::new();
     let actor = check_prog(&mut env, &ast).ok()?;
-    let res = candid::bindings::javascript::compile(&env, &actor);
+    let res = candid_parser::bindings::javascript::compile(&env, &actor);
     Some(res)
 }
 
 #[ic_cdk::query]
 fn binding(prog: String, lang: String) -> Option<String> {
-    use candid::bindings;
+    use candid_parser::bindings;
     let ast = prog.parse::<IDLProg>().ok()?;
     let mut env = TypeEnv::new();
     let actor = check_prog(&mut env, &ast).ok()?;
@@ -52,7 +48,7 @@ fn binding(prog: String, lang: String) -> Option<String> {
                     Some(t)
                 }
             });
-            bindings::candid::compile(&env, &actor)
+            candid::pretty::candid::compile(&env, &actor)
         }
         _ => return None,
     };
@@ -61,9 +57,8 @@ fn binding(prog: String, lang: String) -> Option<String> {
 
 #[ic_cdk::query]
 fn merge_init_args(prog: String, init_args: String) -> Option<String> {
-    use candid::bindings;
-    let (env, actor) = candid::utils::merge_init_args(&prog, &init_args).ok()?;
-    Some(bindings::candid::compile(&env, &Some(actor)))
+    let (env, actor) = candid_parser::utils::merge_init_args(&prog, &init_args).ok()?;
+    Some(candid::pretty::candid::compile(&env, &Some(actor)))
 }
 
 #[ic_cdk::query]

@@ -8,8 +8,9 @@ path = "lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-ic-cdk = "0.10"
-candid = { version = "0.9", features = ["parser"] }
+ic-cdk = "0.12"
+candid = "0.10"
+candid_parser = "0.1"
 serde = "1.0"
 serde_bytes = "0.11"
 
