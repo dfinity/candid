@@ -441,7 +441,7 @@ pub mod value {
     }
 
     pub fn pp_char(v: u8) -> String {
-        let is_ascii = (0x20u8..=0x7eu8).contains(v);
+        let is_ascii = (0x20u8..=0x7eu8).contains(&v);
         if is_ascii && v != 0x22 && v != 0x27 && v != 0x60 && v != 0x5c {
             std::char::from_u32(v as u32).unwrap().to_string()
         } else {
