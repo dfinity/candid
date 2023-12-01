@@ -340,8 +340,15 @@ pub mod value {
                 Opt(v) => write!(f, "opt {v:?}"),
                 Blob(b) => {
                     write!(f, "blob \"")?;
-                    for v in b.iter() {
-                        write!(f, "{}", &pp_char(*v))?;
+                    let is_ascii = b.iter().all(|c| (0x20..=0x7e).contains(&c));
+                    if is_ascii {
+                        for v in b.iter() {
+                            write!(f, "{}", pp_char(*v))?;
+                        }
+                    } else {
+                        for v in b.iter() {
+                            write!(f, "\\{v:02x}")?;
+                        }
                     }
                     write!(f, "\"")
                 }
@@ -350,6 +357,7 @@ pub mod value {
                         write!(f, "blob \"")?;
                         for v in vs.iter() {
                             match v {
+                                // only here for completeness. The deserializer should generate IDLValue::Blob instead.
                                 Nat8(v) => write!(f, "{}", &pp_char(*v))?,
                                 _ => unreachable!(),
                             }
@@ -433,13 +441,13 @@ pub mod value {
     }
 
     pub fn pp_char(v: u8) -> String {
-        if (0x20..=0x7e).contains(&v) && v != 0x22 && v != 0x27 && v != 0x60 && v != 0x5c {
+        let is_ascii = (0x20..=0x7e).contains(&v);
+        if is_ascii && v != 0x22 && v != 0x27 && v != 0x60 && v != 0x5c {
             std::char::from_u32(v as u32).unwrap().to_string()
         } else {
             format!("\\{v:02x}")
         }
     }
-
     pub fn pp_value(depth: usize, v: &IDLValue) -> RcDoc {
         use IDLValue::*;
         if depth == 0 {
