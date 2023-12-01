@@ -340,7 +340,7 @@ pub mod value {
                 Opt(v) => write!(f, "opt {v:?}"),
                 Blob(b) => {
                     write!(f, "blob \"")?;
-                    let is_ascii = b.iter().all(|c| (0x20..=0x7e).contains(&c));
+                    let is_ascii = b.iter().all(|c| (0x20u8..=0x7eu8).contains(c));
                     if is_ascii {
                         for v in b.iter() {
                             write!(f, "{}", pp_char(*v))?;
@@ -441,7 +441,7 @@ pub mod value {
     }
 
     pub fn pp_char(v: u8) -> String {
-        let is_ascii = (0x20..=0x7e).contains(&v);
+        let is_ascii = (0x20u8..=0x7eu8).contains(v);
         if is_ascii && v != 0x22 && v != 0x27 && v != 0x60 && v != 0x5c {
             std::char::from_u32(v as u32).unwrap().to_string()
         } else {
