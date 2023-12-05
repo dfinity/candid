@@ -5,7 +5,7 @@ import { dfinityLogo, copyIcon } from "./icons"
 
 export async function renderAuth() {
   const is_logged = await authClient?.isAuthenticated();
-  is_logged ? insertLogout() : insertLoginForm();
+  is_logged ? await insertLogout() : insertLoginForm();
 }
 
 function is_valid_url(url: string): boolean {
@@ -18,7 +18,21 @@ function is_valid_url(url: string): boolean {
   return obj.protocol === "http:" || obj.protocol === "https:";
 }
 
-function insertLoginForm() {
+async function check_alternative_origin(): Promise<boolean> {
+  try {
+    const url = window.location.origin;
+    const response = await fetch(`${url}/.well-known/ii-alternative-origins`);
+    const data = await response.json();
+    if (data.hasProperty("alternativeOrigins") && Array.isArray(data["alternativeOrigins"])) {
+      return data["alternativeOrigins"].some((origin: string) => origin === url);
+    }
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function insertLoginForm() {
   const auth = document.getElementById("authentication")!;
   const buttonLogin = document.createElement("button");
   buttonLogin.className = "btn btn-auth";
@@ -38,11 +52,17 @@ function insertLoginForm() {
     if (provider && !is_valid_url(provider)) {
       throw new Error("Please provide a valid internet identity url in ii parameter");
     }
-    const origin = params.get("origin");
-    if (origin && !is_valid_url(origin)) {
-      throw new Error("Please provide a valid derivationOrigin url in origin parameter");
-    }
     const cid = Principal.fromText(params.get("id")!);
+    let origin = params.get("origin");
+    if (!origin && is_mainnet && await check_alternative_origin()) {
+      origin = `https://${cid.toText()}.icp0.io`;
+    }
+    if (origin) {
+      if (!is_valid_url(origin)) {
+        throw new Error("Please provide a valid derivationOrigin url in origin parameter");
+      }
+      buttonLogin.title = "derivationOrigin is enabled. Remember to disable alternative origin in the production canister.";
+    }
 
     buttonLogin.addEventListener("click", async () => {
       let config: any = {
@@ -60,6 +80,7 @@ function insertLoginForm() {
     });
   } catch (err) {
     buttonLogin.disabled = true;
+    buttonLogin.classList.add("disabled");
     buttonLogin.title = (err as any).toString();
   }
 }
