@@ -1,6 +1,6 @@
 use crate::types::number::{Int, Nat};
 use crate::types::{Field, Label, Type, TypeEnv, TypeInner};
-use crate::{CandidType, Decode, Encode, Error, Result};
+use crate::{CandidType, Error, Result};
 use serde::de;
 use serde::de::{Deserialize, Visitor};
 use std::collections::HashMap;
@@ -356,10 +356,10 @@ impl IDLValue {
     where
         T: CandidType,
     {
+        use crate::Encode;
         let blob = Encode!(data)?;
-        let parsed: IDLValue = Decode!(&blob, IDLValue)?;
-        let annotated: IDLValue = parsed.annotate_type(false, &TypeEnv::default(), &T::ty())?;
-        Ok(annotated)
+        let args = IDLArgs::from_bytes_with_types(&blob, &TypeEnv::default(), &[T::ty()])?;
+        Ok(args.args[0].clone())
     }
 }
 
