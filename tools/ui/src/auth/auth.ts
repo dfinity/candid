@@ -141,6 +141,6 @@ function CopyId() {
 }
 
 async function logout() {
-  authClient?.logout();
+  await authClient?.logout();
   window.location.reload();
 }
