@@ -1,6 +1,6 @@
 use crate::types::number::{Int, Nat};
 use crate::types::{Field, Label, Type, TypeEnv, TypeInner};
-use crate::{Error, Result};
+use crate::{CandidType, Decode, Encode, Error, Result};
 use serde::de;
 use serde::de::{Deserialize, Visitor};
 use std::collections::HashMap;
@@ -334,6 +334,32 @@ impl IDLValue {
             }
         }
         .into()
+    }
+
+    /// Converts data that implements [`CandidType`] into an [`IDLValue`].
+    ///
+    /// # Example: Convert data to candid text format
+    /// ```
+    /// # use candid::{CandidType, IDLValue};
+    /// #[derive(CandidType)]
+    /// struct MyStruct {
+    ///    a: u8,
+    ///   b: String,
+    /// }
+    /// let my_struct = MyStruct { a: 42, b: "hello".to_string() };
+    /// let idl_value = IDLValue::try_from_candid_type(&my_struct).unwrap();
+    /// let expected_text = "record { a = 42 : nat8; b = \"hello\" }";
+    /// let actual_text = idl_value.to_string();
+    /// assert_eq!(expected_text, actual_text);
+    /// ```
+    pub fn try_from_candid_type<T>(data: &T) -> Result<Self>
+    where
+        T: CandidType,
+    {
+        let blob = Encode!(data)?;
+        let parsed: IDLValue = Decode!(&blob, IDLValue)?;
+        let annotated: IDLValue = parsed.annotate_type(false, &TypeEnv::default(), &T::ty())?;
+        Ok(annotated)
     }
 }
 
