@@ -1,8 +1,8 @@
 # Candid Specification
 
-Version: 0.1.6
+Version: 0.1.7
 
-Date: August 29, 2023
+Date: Dec 12, 2024
 
 ## Motivation
 
@@ -64,7 +64,7 @@ The purpose of an IDL is defining the signature, and thereby the *type* of an ac
 This is a summary of the grammar proposed:
 ```
 <prog>  ::= <def>;* <actor>?
-<def>   ::= type <id> = <datatype> | import <text>
+<def>   ::= type <id> = <datatype> | import <text> | import* <text>
 <actor> ::= service <id>? : (<tuptype> ->)? (<actortype> | <id>) ;?
 
 <actortype> ::= { <methtype>;* }
@@ -519,20 +519,25 @@ type B = A;  // error: cyclic type definition
 In order to allow splitting interface definitions up into multiple files or share common definitions between multiple interfaces, *import* declarations are provided.
 
 ```
-<def>   ::= ... | import <text>
+<def>   ::= ... | import <text> | import* <text>
 ```
 
-An import refers to another interface file by URL. The semantics is that of textual inclusion, except that definitions from the imported file must not refer to definitions from the importing file.
+There are two forms of import: `import` and `import*`. Both `import` and `import*` refer to another interface file by URL. The type definitions from the imported file are textually included in the importing file. The definitions from the imported file must not refer to definitions from the importing file.
+
+In addition, `import*` includes the main service from the imported file and merges the service definition with the main service in the importing file. The methods in the imported file must not have the same name as the importing file.
+
+`import` ignores the main service definition from the imported file.
 
 ##### Example
 
 File `A.did`:
 ```
 type A = service { f : () -> () };
+service : A
 ```
 File `B.did`:
 ```
-import "A.did"
+import "A.did";  // Cannot use import* because of method name duplication
 service B : A ;
 ```
 
