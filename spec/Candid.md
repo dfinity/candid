@@ -64,7 +64,7 @@ The purpose of an IDL is defining the signature, and thereby the *type* of an ac
 This is a summary of the grammar proposed:
 ```
 <prog>  ::= <def>;* <actor>?
-<def>   ::= type <id> = <datatype> | import <text> | import* <text>
+<def>   ::= type <id> = <datatype> | import <text> | import_service <text>
 <actor> ::= service <id>? : (<tuptype> ->)? (<actortype> | <id>) ;?
 
 <actortype> ::= { <methtype>;* }
@@ -519,14 +519,17 @@ type B = A;  // error: cyclic type definition
 In order to allow splitting interface definitions up into multiple files or share common definitions between multiple interfaces, *import* declarations are provided.
 
 ```
-<def>   ::= ... | import <text> | import* <text>
+<def>   ::= ... | import <text> | import_service <text>
 ```
 
-There are two forms of import: `import` and `import*`. Both `import` and `import*` refer to another interface file by URL. The type definitions from the imported file are textually included in the importing file. The definitions from the imported file must not refer to definitions from the importing file.
-
-In addition, `import*` includes the main service from the imported file and merges the service definition with the main service in the importing file. The methods in the imported file must not have the same name as the importing file.
+There are two forms of import: `import` and `import_service`. Both `import` and `import_service` refer to another interface file by URL. The type definitions from the imported file are textually included in the importing file. The definitions from the imported file must not refer to definitions from the importing file.
 
 `import` ignores the main service definition from the imported file.
+
+`import_service` includes the main service from the imported file and merges the service definition with the main service in the importing file. There are two constraints with the main service definition in the imported file:
+
+* The main service cannot be a service constructor.
+* The methods from the imported file must not have the same method name as the importing file.
 
 ##### Example
 
@@ -537,7 +540,7 @@ service : A
 ```
 File `B.did`:
 ```
-import "A.did";  // Cannot use import* because of method name duplication
+import "A.did";  // Cannot use import_service because of method name duplication
 service B : A ;
 ```
 
