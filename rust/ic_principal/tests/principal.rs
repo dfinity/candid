@@ -1,18 +1,23 @@
 // #![allow(deprecated)]
 
 use ic_principal::Principal;
+#[cfg(feature = "convert")]
 use ic_principal::PrincipalError;
 
 const MANAGEMENT_CANISTER_BYTES: [u8; 0] = [];
+#[allow(dead_code)]
 const MANAGEMENT_CANISTER_TEXT: &str = "aaaaa-aa";
 
 const ANONYMOUS_CANISTER_BYTES: [u8; 1] = [4u8];
+#[allow(dead_code)]
 const ANONYMOUS_CANISTER_TEXT: &str = "2vxsx-fae";
 
 const TEST_CASE_BYTES: [u8; 9] = [0xef, 0xcd, 0xab, 0, 0, 0, 0, 0, 1];
+#[allow(dead_code)]
 const TEST_CASE_TEXT: &str = "2chl6-4hpzw-vqaaa-aaaaa-c";
 
-mod convert_from_bytes {
+#[cfg(feature = "convert")]
+mod try_convert_from_bytes {
     use super::*;
 
     #[test]
@@ -35,6 +40,10 @@ mod convert_from_bytes {
             Err(PrincipalError::BytesTooLong())
         );
     }
+}
+
+mod convert_from_bytes {
+    use super::*;
 
     #[test]
     fn from_test_case_ok() {
@@ -56,6 +65,7 @@ mod convert_from_bytes {
     }
 }
 
+#[cfg(feature = "convert")]
 mod convert_from_text {
     use super::*;
 
@@ -173,6 +183,7 @@ mod convert_to_bytes {
     }
 
     #[test]
+    #[cfg(feature = "convert")]
     fn test_case_to_bytes_correct() {
         assert_eq!(
             Principal::from_text(TEST_CASE_TEXT).unwrap().as_slice(),
@@ -181,6 +192,7 @@ mod convert_to_bytes {
     }
 }
 
+#[cfg(feature = "convert")]
 mod convert_to_text {
     use super::*;
 
@@ -211,6 +223,7 @@ mod convert_to_text {
     }
 }
 
+#[cfg(feature = "serde")]
 mod ser_de {
     use super::*;
     use serde_test::{assert_tokens, Configure, Token};
@@ -232,24 +245,32 @@ mod ser_de {
 
 #[test]
 fn impl_traits() {
+    #[cfg(feature = "serde")]
     use serde::{Deserialize, Serialize};
+    #[cfg(feature = "convert")]
     use std::convert::TryFrom;
-    use std::fmt::{Debug, Display};
+    use std::fmt::Debug;
+    #[cfg(feature = "convert")]
+    use std::fmt::Display;
     use std::hash::Hash;
+    #[cfg(feature = "convert")]
     use std::str::FromStr;
 
     assert!(impls::impls!(
-        Principal: Debug & Display & Clone & Copy & Eq & PartialOrd & Ord & Hash
+        Principal: Debug & Clone & Copy & Eq & PartialOrd & Ord & Hash
     ));
 
+    #[cfg(feature = "convert")]
     assert!(
-        impls::impls!(Principal: FromStr & TryFrom<&'static str> & TryFrom<Vec<u8>> & TryFrom<&'static Vec<u8>> & TryFrom<&'static [u8]> & AsRef<[u8]>)
+        impls::impls!(Principal: Display & FromStr & TryFrom<&'static str> & TryFrom<Vec<u8>> & TryFrom<&'static Vec<u8>> & TryFrom<&'static [u8]> & AsRef<[u8]>)
     );
 
+    #[cfg(feature = "serde")]
     assert!(impls::impls!(Principal: Serialize & Deserialize<'static>));
 }
 
 #[test]
+#[cfg(feature = "convert")]
 fn long_blobs_ending_04_is_valid_principal() {
     let blob: [u8; 18] = [
         10, 116, 105, 100, 0, 0, 0, 0, 0, 144, 0, 51, 1, 1, 0, 0, 0, 4,
@@ -258,6 +279,7 @@ fn long_blobs_ending_04_is_valid_principal() {
 }
 
 #[test]
+#[cfg(feature = "self_authenticating")]
 fn self_authenticating_ok() {
     // self_authenticating doesn't verify the input bytes
     // this test checks:
@@ -265,10 +287,9 @@ fn self_authenticating_ok() {
     // 2. 0x02 was added in the end
     // 3. total length is 29
     let p1 = Principal::self_authenticating([]);
-    let p2 = Principal::try_from_slice(&[
+    let p2 = Principal::from_slice(&[
         209, 74, 2, 140, 42, 58, 43, 201, 71, 97, 2, 187, 40, 130, 52, 196, 21, 162, 176, 31, 130,
         142, 166, 42, 197, 179, 228, 47, 2,
-    ])
-    .unwrap();
+    ]);
     assert_eq!(p1, p2);
 }
