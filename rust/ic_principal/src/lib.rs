@@ -106,7 +106,7 @@ pub struct Principal {
 }
 
 impl Principal {
-    const MAX_LENGTH_IN_BYTES: usize = 29;
+    pub const MAX_LENGTH_IN_BYTES: usize = 29;
     #[allow(dead_code)]
     const CRC_LENGTH_IN_BYTES: usize = 4;
 
