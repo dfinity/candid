@@ -1,15 +1,19 @@
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha224};
-use std::convert::TryFrom;
-use std::fmt::Write;
-use thiserror::Error;
-
 #[cfg(feature = "arbitrary")]
 use arbitrary::{Arbitrary, Result as ArbitraryResult, Unstructured};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "self_authenticating")]
+use sha2::{Digest, Sha224};
+#[cfg(feature = "convert")]
+use std::convert::TryFrom;
+#[cfg(feature = "convert")]
+use std::fmt::Write;
+#[cfg(feature = "convert")]
+use thiserror::Error;
 
 /// An error happened while encoding, decoding or serializing a [`Principal`].
 #[derive(Error, Clone, Debug, Eq, PartialEq)]
+#[cfg(feature = "convert")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum PrincipalError {
     #[error("Bytes is longer than 29 bytes.")]
@@ -49,12 +53,15 @@ pub enum PrincipalError {
 ///
 /// Example of using a Principal object:
 /// ```
+/// # #[cfg(feature = "convert")] {
 /// use ic_principal::Principal;
 ///
 /// let text = "aaaaa-aa";  // The management canister ID.
 /// let principal = Principal::from_text(text).expect("Could not decode the principal.");
 /// assert_eq!(principal.as_slice(), &[]);
 /// assert_eq!(principal.to_text(), text);
+///
+/// # }
 /// ```
 ///
 /// Serialization is enabled with the "serde" feature. It supports serializing
@@ -62,6 +69,7 @@ pub enum PrincipalError {
 /// readable serializers.
 ///
 /// ```
+/// # #[cfg(all(feature = "convert", feature = "serde"))] {
 /// use ic_principal::Principal;
 /// use serde::{Deserialize, Serialize};
 /// use std::str::FromStr;
@@ -85,6 +93,7 @@ pub enum PrincipalError {
 ///     serde_cbor::to_vec(&Data { id: id.clone() }).unwrap(),
 ///     &[161, 98, 105, 100, 73, 239, 205, 171, 0, 0, 0, 0, 0, 1],
 /// );
+/// # }
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Principal {
@@ -98,8 +107,10 @@ pub struct Principal {
 
 impl Principal {
     const MAX_LENGTH_IN_BYTES: usize = 29;
+    #[allow(dead_code)]
     const CRC_LENGTH_IN_BYTES: usize = 4;
 
+    #[allow(dead_code)]
     const SELF_AUTHENTICATING_TAG: u8 = 2;
     const ANONYMOUS_TAG: u8 = 4;
 
@@ -112,6 +123,7 @@ impl Principal {
     }
 
     /// Construct a self-authenticating ID from public key
+    #[cfg(feature = "self_authenticating")]
     pub fn self_authenticating<P: AsRef<[u8]>>(public_key: P) -> Self {
         let public_key = public_key.as_ref();
         let hash = Sha224::digest(public_key);
@@ -132,39 +144,48 @@ impl Principal {
         Self { len: 1, bytes }
     }
 
+    /// Returns `None` if the slice exceeds the max length.
+    const fn from_slice_core(slice: &[u8]) -> Option<Self> {
+        match slice.len() {
+            len @ 0..=Self::MAX_LENGTH_IN_BYTES => {
+                let mut bytes = [0; Self::MAX_LENGTH_IN_BYTES];
+                let mut i = 0;
+                while i < len {
+                    bytes[i] = slice[i];
+                    i += 1;
+                }
+                Some(Self {
+                    len: len as u8,
+                    bytes,
+                })
+            }
+            _ => None,
+        }
+    }
+
     /// Construct a [`Principal`] from a slice of bytes.
     ///
     /// # Panics
     ///
     /// Panics if the slice is longer than 29 bytes.
     pub const fn from_slice(slice: &[u8]) -> Self {
-        match Self::try_from_slice(slice) {
-            Ok(v) => v,
+        match Self::from_slice_core(slice) {
+            Some(principal) => principal,
             _ => panic!("slice length exceeds capacity"),
         }
     }
 
     /// Construct a [`Principal`] from a slice of bytes.
+    #[cfg(feature = "convert")]
     pub const fn try_from_slice(slice: &[u8]) -> Result<Self, PrincipalError> {
-        const MAX_LENGTH_IN_BYTES: usize = Principal::MAX_LENGTH_IN_BYTES;
-        match slice.len() {
-            len @ 0..=MAX_LENGTH_IN_BYTES => {
-                let mut bytes = [0; MAX_LENGTH_IN_BYTES];
-                let mut i = 0;
-                while i < len {
-                    bytes[i] = slice[i];
-                    i += 1;
-                }
-                Ok(Self {
-                    len: len as u8,
-                    bytes,
-                })
-            }
-            _ => Err(PrincipalError::BytesTooLong()),
+        match Self::from_slice_core(slice) {
+            Some(principal) => Ok(principal),
+            None => Err(PrincipalError::BytesTooLong()),
         }
     }
 
     /// Parse a [`Principal`] from text representation.
+    #[cfg(feature = "convert")]
     pub fn from_text<S: AsRef<str>>(text: S) -> Result<Self, PrincipalError> {
         // Strategy: Parse very liberally, then pretty-print and compare output
         // This is both simpler and yields better error messages
@@ -206,6 +227,7 @@ impl Principal {
     }
 
     /// Convert [`Principal`] to text representation.
+    #[cfg(feature = "convert")]
     pub fn to_text(&self) -> String {
         format!("{self}")
     }
@@ -217,6 +239,7 @@ impl Principal {
     }
 }
 
+#[cfg(feature = "convert")]
 impl std::fmt::Display for Principal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let blob: &[u8] = self.as_slice();
@@ -244,6 +267,7 @@ impl std::fmt::Display for Principal {
     }
 }
 
+#[cfg(feature = "convert")]
 impl std::str::FromStr for Principal {
     type Err = PrincipalError;
 
@@ -252,6 +276,7 @@ impl std::str::FromStr for Principal {
     }
 }
 
+#[cfg(feature = "convert")]
 impl TryFrom<&str> for Principal {
     type Error = PrincipalError;
 
@@ -260,6 +285,7 @@ impl TryFrom<&str> for Principal {
     }
 }
 
+#[cfg(feature = "convert")]
 impl TryFrom<Vec<u8>> for Principal {
     type Error = PrincipalError;
 
@@ -268,6 +294,7 @@ impl TryFrom<Vec<u8>> for Principal {
     }
 }
 
+#[cfg(feature = "convert")]
 impl TryFrom<&Vec<u8>> for Principal {
     type Error = PrincipalError;
 
@@ -276,6 +303,7 @@ impl TryFrom<&Vec<u8>> for Principal {
     }
 }
 
+#[cfg(feature = "convert")]
 impl TryFrom<&[u8]> for Principal {
     type Error = PrincipalError;
 
