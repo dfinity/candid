@@ -217,7 +217,7 @@ fn load_imports(
     base: &Path,
     visited: &mut BTreeMap<PathBuf, bool>,
     prog: &IDLProg,
-    list: &mut Vec<PathBuf>,
+    list: &mut Vec<(PathBuf, String)>,
 ) -> Result<()> {
     for dec in prog.decs.iter() {
         let include_serv = matches!(dec, Dec::ImportServ(_));
@@ -236,7 +236,7 @@ fn load_imports(
                     };
                     let base = path.parent().unwrap();
                     load_imports(is_pretty, base, visited, &code, list)?;
-                    list.push(path);
+                    list.push((path, file.to_string()));
                 }
             }
         }
@@ -272,7 +272,7 @@ fn merge_actor(
     env: &Env,
     actor: &Option<Type>,
     imported: &Option<Type>,
-    file: &Path,
+    file: &str,
 ) -> Result<Option<Type>> {
     match imported {
         None => Err(Error::msg(format!(
@@ -291,7 +291,8 @@ fn merge_actor(
                         let serv = env.te.as_service(&t)?;
                         let mut ms: Vec<_> = serv.iter().chain(meths.iter()).cloned().collect();
                         ms.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-                        check_unique(ms.iter().map(|m| &m.0))?;
+                        check_unique(ms.iter().map(|m| &m.0))
+                            .map_err(|e| Error::msg(format!("duplicate method name: {e}")))?;
                         let res: Type = TypeInner::Service(ms).into();
                         Ok(Some(res))
                     }
@@ -324,8 +325,8 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
     load_imports(is_pretty, &base, &mut visited, &prog, &mut imports)?;
     let imports: Vec<_> = imports
         .iter()
-        .map(|file| match visited.get(file) {
-            Some(x) => (*x, file),
+        .map(|file| match visited.get(&file.0) {
+            Some(x) => (*x, &file.0, &file.1),
             None => unreachable!(),
         })
         .collect();
@@ -335,19 +336,19 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
         pre: false,
     };
     let mut actor: Option<Type> = None;
-    for (include_serv, import) in imports.iter() {
-        let code = std::fs::read_to_string(import)?;
+    for (include_serv, path, name) in imports.iter() {
+        let code = std::fs::read_to_string(path)?;
         let code = code.parse::<IDLProg>()?;
         check_decs(&mut env, &code.decs)?;
         if *include_serv {
             let t = check_actor(&env, &code.actor)?;
-            actor = merge_actor(&env, &actor, &t, import)?;
+            actor = merge_actor(&env, &actor, &t, name)?;
         }
     }
     check_decs(&mut env, &prog.decs)?;
     let mut res = check_actor(&env, &prog.actor)?;
     if actor.is_some() {
-        res = merge_actor(&env, &res, &actor, file)?;
+        res = merge_actor(&env, &res, &actor, "")?;
     }
     Ok((te, res))
 }
