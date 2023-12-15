@@ -76,7 +76,8 @@ pub struct TypeField {
 #[derive(Debug)]
 pub enum Dec {
     TypD(Binding),
-    ImportD(String),
+    ImportType(String),
+    ImportServ(String),
 }
 
 #[derive(Debug, Clone)]
