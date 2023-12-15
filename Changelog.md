@@ -1,6 +1,27 @@
 
 # Changelog
 
+## 2023-12-15
+
+### Candid 0.10.1
+
+* Add `candid::types::value::try_from_candid_type` to convert Rust type to `IDLValue`.
+* Display `IDLValue::Blob` in ascii character only when the whole blob are ascii characters.
+
+
+### candid_parser 0.1.1
+
+* Add `import service` in parser to allow merging services.
+
+### ic_principal 0.1.1
+
+* Export `PRINCIPAL_MAX_LENGTH` as a public constant.
+* Make all dependencies optional.
+
+### Candid UI
+
+* Add II integration with URL parameter `ii` and `origin`.
+
 ## 2023-11-16 (Rust 0.10.0)
 
 ### Breaking changes
