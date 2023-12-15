@@ -1,6 +1,7 @@
 use super::types::*;
 use crate::{pretty_parse, Error, Result};
 use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
+use candid::utils::check_unique;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -135,7 +136,7 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
                 let t = check_type(env, typ)?;
                 env.te.0.insert(id.to_string(), t);
             }
-            Dec::ImportD(_) => (),
+            Dec::ImportType(_) | Dec::ImportServ(_) => (),
         }
     }
     Ok(())
@@ -216,10 +217,14 @@ fn load_imports(
     base: &Path,
     visited: &mut BTreeSet<PathBuf>,
     prog: &IDLProg,
-    list: &mut Vec<PathBuf>,
+    list: &mut Vec<(bool, PathBuf)>,
 ) -> Result<()> {
     for dec in prog.decs.iter() {
-        if let Dec::ImportD(file) = dec {
+        let include_serv = match dec {
+            Dec::ImportServ(_) => true,
+            Dec::TypD(_) | Dec::ImportType(_) => false,
+        };
+        if let Dec::ImportType(file) | Dec::ImportServ(file) = dec {
             let path = resolve_path(base, file);
             if visited.insert(path.clone()) {
                 let code = std::fs::read_to_string(&path)
@@ -231,7 +236,7 @@ fn load_imports(
                 };
                 let base = path.parent().unwrap();
                 load_imports(is_pretty, base, visited, &code, list)?;
-                list.push(path);
+                list.push((include_serv, path));
             }
         }
     }
@@ -262,6 +267,39 @@ pub fn check_init_args(
     Ok(args)
 }
 
+fn merge_actor(
+    env: &Env,
+    actor: &Option<Type>,
+    imported: &Option<Type>,
+    file: &Path,
+) -> Result<Option<Type>> {
+    match imported {
+        None => Err(Error::msg(format!(
+            "Imported service file {file:?} has no main service"
+        ))),
+        Some(t) => {
+            let t = env.te.trace_type(t)?;
+            match t.as_ref() {
+                TypeInner::Class(_, _) => Err(Error::msg(format!(
+                    "Imported service file {file:?} has a service constructor"
+                ))),
+                TypeInner::Service(meths) => match actor {
+                    None => Ok(Some(t)),
+                    Some(t) => {
+                        let t = env.te.trace_type(t)?;
+                        let serv = env.te.as_service(&t)?;
+                        let res: Vec<_> = serv.iter().chain(meths.iter()).cloned().collect();
+                        check_unique(res.iter().map(|m| &m.0))?;
+                        let res: Type = TypeInner::Service(res).into();
+                        Ok(Some(res))
+                    }
+                },
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+
 fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> {
     let base = if file.is_absolute() {
         file.parent().unwrap().to_path_buf()
@@ -286,14 +324,22 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
         te: &mut te,
         pre: false,
     };
-    for import in imports.iter() {
+    let mut actor: Option<Type> = None;
+    for (include_serv, import) in imports.iter() {
         let code = std::fs::read_to_string(import)?;
         let code = code.parse::<IDLProg>()?;
         check_decs(&mut env, &code.decs)?;
+        if *include_serv {
+            let t = check_actor(&env, &code.actor)?;
+            actor = merge_actor(&env, &actor, &t, import)?;
+        }
     }
     check_decs(&mut env, &prog.decs)?;
-    let actor = check_actor(&env, &prog.actor)?;
-    Ok((te, actor))
+    let mut res = check_actor(&env, &prog.actor)?;
+    if actor.is_some() {
+        res = merge_actor(&env, &res, &actor, file)?;
+    }
+    Ok((te, res))
 }
 
 /// Type check did file including the imports.
