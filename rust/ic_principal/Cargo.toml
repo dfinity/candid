@@ -1,6 +1,6 @@
 [package]
 name = "ic_principal"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["DFINITY Stiftung <sdk@dfinity.org>"]
 edition = "2021"
 description = "Principal type used on the Internet Computer."

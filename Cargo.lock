@@ -853,7 +853,7 @@ dependencies = [
 
 [[package]]
 name = "ic_principal"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "arbitrary",
  "crc32fast",
