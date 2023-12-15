@@ -538,7 +538,7 @@ service : A
 ```
 File `B.did`:
 ```
-import "A.did";  // Cannot use import_service because of method name duplication
+import "A.did";  // Cannot use `import service` because of method name duplication
 service B : A ;
 ```
 
