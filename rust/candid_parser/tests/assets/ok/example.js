@@ -1,8 +1,34 @@
 export const idlFactory = ({ IDL }) => {
+  const B = IDL.Rec();
   const List = IDL.Rec();
   const list = IDL.Rec();
+  const stream = IDL.Rec();
+  const t = IDL.Rec();
+  const tree = IDL.Rec();
+  const b = IDL.Tuple(IDL.Int, IDL.Nat);
   const node = IDL.Record({ 'head' : IDL.Nat, 'tail' : list });
   list.fill(IDL.Opt(node));
+  const A = B;
+  B.fill(IDL.Opt(A));
+  tree.fill(
+    IDL.Variant({
+      'branch' : IDL.Record({ 'val' : IDL.Int, 'left' : tree, 'right' : tree }),
+      'leaf' : IDL.Int,
+    })
+  );
+  stream.fill(
+    IDL.Opt(
+      IDL.Record({
+        'head' : IDL.Nat,
+        'next' : IDL.Func([], [stream], ['query']),
+      })
+    )
+  );
+  const s = IDL.Service({
+    'f' : t,
+    'g' : IDL.Func([list], [B, tree, stream], []),
+  });
+  t.fill(IDL.Func([s], [], []));
   const my_type = IDL.Principal;
   List.fill(IDL.Opt(IDL.Record({ 'head' : IDL.Int, 'tail' : List })));
   const nested = IDL.Record({
@@ -36,15 +62,17 @@ export const idlFactory = ({ IDL }) => {
       [IDL.Opt(List)],
       [],
     );
-  const b = IDL.Tuple(IDL.Int, IDL.Nat);
   const a = IDL.Variant({ 'a' : IDL.Null, 'b' : b });
   return IDL.Service({
-    'f' : IDL.Func(
+    'bbbbb' : IDL.Func([b], [], []),
+    'f' : t,
+    'f1' : IDL.Func(
         [list, IDL.Vec(IDL.Nat8), IDL.Opt(IDL.Bool)],
         [],
         ['oneway'],
       ),
-    'g' : IDL.Func(
+    'g' : IDL.Func([list], [B, tree, stream], []),
+    'g1' : IDL.Func(
         [my_type, List, IDL.Opt(List), nested],
         [IDL.Int, broker],
         ['query'],

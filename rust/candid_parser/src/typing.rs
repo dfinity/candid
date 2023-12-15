@@ -2,7 +2,7 @@ use super::types::*;
 use crate::{pretty_parse, Error, Result};
 use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
 use candid::utils::check_unique;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 pub struct Env<'a> {
@@ -215,28 +215,29 @@ fn resolve_path(base: &Path, file: &str) -> PathBuf {
 fn load_imports(
     is_pretty: bool,
     base: &Path,
-    visited: &mut BTreeSet<PathBuf>,
+    visited: &mut BTreeMap<PathBuf, bool>,
     prog: &IDLProg,
-    list: &mut Vec<(bool, PathBuf)>,
+    list: &mut Vec<PathBuf>,
 ) -> Result<()> {
     for dec in prog.decs.iter() {
-        let include_serv = match dec {
-            Dec::ImportServ(_) => true,
-            Dec::TypD(_) | Dec::ImportType(_) => false,
-        };
+        let include_serv = matches!(dec, Dec::ImportServ(_));
         if let Dec::ImportType(file) | Dec::ImportServ(file) = dec {
             let path = resolve_path(base, file);
-            if visited.insert(path.clone()) {
-                let code = std::fs::read_to_string(&path)
-                    .map_err(|_| Error::msg(format!("Cannot import {file:?}")))?;
-                let code = if is_pretty {
-                    pretty_parse::<IDLProg>(path.to_str().unwrap(), &code)?
-                } else {
-                    code.parse::<IDLProg>()?
-                };
-                let base = path.parent().unwrap();
-                load_imports(is_pretty, base, visited, &code, list)?;
-                list.push((include_serv, path));
+            match visited.get_mut(&path) {
+                Some(x) => *x = *x || include_serv,
+                None => {
+                    visited.insert(path.clone(), include_serv);
+                    let code = std::fs::read_to_string(&path)
+                        .map_err(|_| Error::msg(format!("Cannot import {file:?}")))?;
+                    let code = if is_pretty {
+                        pretty_parse::<IDLProg>(path.to_str().unwrap(), &code)?
+                    } else {
+                        code.parse::<IDLProg>()?
+                    };
+                    let base = path.parent().unwrap();
+                    load_imports(is_pretty, base, visited, &code, list)?;
+                    list.push(path);
+                }
             }
         }
     }
@@ -288,9 +289,10 @@ fn merge_actor(
                     Some(t) => {
                         let t = env.te.trace_type(t)?;
                         let serv = env.te.as_service(&t)?;
-                        let res: Vec<_> = serv.iter().chain(meths.iter()).cloned().collect();
-                        check_unique(res.iter().map(|m| &m.0))?;
-                        let res: Type = TypeInner::Service(res).into();
+                        let mut ms: Vec<_> = serv.iter().chain(meths.iter()).cloned().collect();
+                        ms.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+                        check_unique(ms.iter().map(|m| &m.0))?;
+                        let res: Type = TypeInner::Service(ms).into();
                         Ok(Some(res))
                     }
                 },
@@ -317,8 +319,16 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
     } else {
         prog.parse::<IDLProg>()?
     };
+    let mut visited = BTreeMap::new();
     let mut imports = Vec::new();
-    load_imports(is_pretty, &base, &mut BTreeSet::new(), &prog, &mut imports)?;
+    load_imports(is_pretty, &base, &mut visited, &prog, &mut imports)?;
+    let imports: Vec<_> = imports
+        .iter()
+        .map(|file| match visited.get(file) {
+            Some(x) => (*x, file),
+            None => unreachable!(),
+        })
+        .collect();
     let mut te = TypeEnv::new();
     let mut env = Env {
         te: &mut te,

@@ -1,2 +1,5 @@
 import "b/b.did";
 type a = variant {a;b:b};
+service : (a,b) -> {
+  f : (b) -> (a);
+}
