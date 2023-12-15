@@ -1,7 +1,8 @@
 use super::types::*;
 use crate::{pretty_parse, Error, Result};
 use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
-use std::collections::BTreeSet;
+use candid::utils::check_unique;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 pub struct Env<'a> {
@@ -135,7 +136,7 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
                 let t = check_type(env, typ)?;
                 env.te.0.insert(id.to_string(), t);
             }
-            Dec::ImportD(_) => (),
+            Dec::ImportType(_) | Dec::ImportServ(_) => (),
         }
     }
     Ok(())
@@ -214,24 +215,29 @@ fn resolve_path(base: &Path, file: &str) -> PathBuf {
 fn load_imports(
     is_pretty: bool,
     base: &Path,
-    visited: &mut BTreeSet<PathBuf>,
+    visited: &mut BTreeMap<PathBuf, bool>,
     prog: &IDLProg,
-    list: &mut Vec<PathBuf>,
+    list: &mut Vec<(PathBuf, String)>,
 ) -> Result<()> {
     for dec in prog.decs.iter() {
-        if let Dec::ImportD(file) = dec {
+        let include_serv = matches!(dec, Dec::ImportServ(_));
+        if let Dec::ImportType(file) | Dec::ImportServ(file) = dec {
             let path = resolve_path(base, file);
-            if visited.insert(path.clone()) {
-                let code = std::fs::read_to_string(&path)
-                    .map_err(|_| Error::msg(format!("Cannot import {file:?}")))?;
-                let code = if is_pretty {
-                    pretty_parse::<IDLProg>(path.to_str().unwrap(), &code)?
-                } else {
-                    code.parse::<IDLProg>()?
-                };
-                let base = path.parent().unwrap();
-                load_imports(is_pretty, base, visited, &code, list)?;
-                list.push(path);
+            match visited.get_mut(&path) {
+                Some(x) => *x = *x || include_serv,
+                None => {
+                    visited.insert(path.clone(), include_serv);
+                    let code = std::fs::read_to_string(&path)
+                        .map_err(|_| Error::msg(format!("Cannot import {file:?}")))?;
+                    let code = if is_pretty {
+                        pretty_parse::<IDLProg>(path.to_str().unwrap(), &code)?
+                    } else {
+                        code.parse::<IDLProg>()?
+                    };
+                    let base = path.parent().unwrap();
+                    load_imports(is_pretty, base, visited, &code, list)?;
+                    list.push((path, file.to_string()));
+                }
             }
         }
     }
@@ -262,6 +268,42 @@ pub fn check_init_args(
     Ok(args)
 }
 
+fn merge_actor(
+    env: &Env,
+    actor: &Option<Type>,
+    imported: &Option<Type>,
+    file: &str,
+) -> Result<Option<Type>> {
+    match imported {
+        None => Err(Error::msg(format!(
+            "Imported service file {file:?} has no main service"
+        ))),
+        Some(t) => {
+            let t = env.te.trace_type(t)?;
+            match t.as_ref() {
+                TypeInner::Class(_, _) => Err(Error::msg(format!(
+                    "Imported service file {file:?} has a service constructor"
+                ))),
+                TypeInner::Service(meths) => match actor {
+                    None => Ok(Some(t)),
+                    Some(t) => {
+                        let t = env.te.trace_type(t)?;
+                        let serv = env.te.as_service(&t)?;
+                        let mut ms: Vec<_> = serv.iter().chain(meths.iter()).cloned().collect();
+                        ms.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+                        check_unique(ms.iter().map(|m| &m.0)).map_err(|e| {
+                            Error::msg(format!("Duplicate imported method name: {e}"))
+                        })?;
+                        let res: Type = TypeInner::Service(ms).into();
+                        Ok(Some(res))
+                    }
+                },
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+
 fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> {
     let base = if file.is_absolute() {
         file.parent().unwrap().to_path_buf()
@@ -279,21 +321,37 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
     } else {
         prog.parse::<IDLProg>()?
     };
+    let mut visited = BTreeMap::new();
     let mut imports = Vec::new();
-    load_imports(is_pretty, &base, &mut BTreeSet::new(), &prog, &mut imports)?;
+    load_imports(is_pretty, &base, &mut visited, &prog, &mut imports)?;
+    let imports: Vec<_> = imports
+        .iter()
+        .map(|file| match visited.get(&file.0) {
+            Some(x) => (*x, &file.0, &file.1),
+            None => unreachable!(),
+        })
+        .collect();
     let mut te = TypeEnv::new();
     let mut env = Env {
         te: &mut te,
         pre: false,
     };
-    for import in imports.iter() {
-        let code = std::fs::read_to_string(import)?;
+    let mut actor: Option<Type> = None;
+    for (include_serv, path, name) in imports.iter() {
+        let code = std::fs::read_to_string(path)?;
         let code = code.parse::<IDLProg>()?;
         check_decs(&mut env, &code.decs)?;
+        if *include_serv {
+            let t = check_actor(&env, &code.actor)?;
+            actor = merge_actor(&env, &actor, &t, name)?;
+        }
     }
     check_decs(&mut env, &prog.decs)?;
-    let actor = check_actor(&env, &prog.actor)?;
-    Ok((te, actor))
+    let mut res = check_actor(&env, &prog.actor)?;
+    if actor.is_some() {
+        res = merge_actor(&env, &res, &actor, "")?;
+    }
+    Ok((te, res))
 }
 
 /// Type check did file including the imports.

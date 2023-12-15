@@ -252,7 +252,8 @@ MethTyp: Binding = {
 // Type declarations
 Def: Dec = {
     "type" <id:"id"> "=" <t:Typ> => Dec::TypD(Binding { id: id, typ: t }),
-    "import" <Text> => Dec::ImportD(<>),
+    "import" <Text> => Dec::ImportType(<>),
+    "import" "service" <Text> => Dec::ImportServ(<>),
 }
 
 Actor: IDLType = {
