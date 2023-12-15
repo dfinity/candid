@@ -292,7 +292,7 @@ fn merge_actor(
                         let mut ms: Vec<_> = serv.iter().chain(meths.iter()).cloned().collect();
                         ms.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
                         check_unique(ms.iter().map(|m| &m.0))
-                            .map_err(|e| Error::msg(format!("duplicate method name: {e}")))?;
+                            .map_err(|e| Error::msg(format!("Duplicate imported method name: {e}")))?;
                         let res: Type = TypeInner::Service(ms).into();
                         Ok(Some(res))
                     }
