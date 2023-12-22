@@ -6,6 +6,7 @@ use candid::types::{
 };
 use candid::{IDLArgs, Int, Nat, Principal};
 use dialoguer::{theme::ColorfulTheme, Confirm, Editor, Input, Select};
+use std::path::Path;
 
 fn show_type(ty: &Type) -> String {
     if text_size(ty, 80).is_ok() {
@@ -14,13 +15,23 @@ fn show_type(ty: &Type) -> String {
         String::new()
     }
 }
+fn parse_blob(s: &str) -> Result<Vec<u8>> {
+    let raw = format!("blob \"{}\"", s);
+    if let IDLValue::Blob(blob) = crate::parse_idl_value(&raw)? {
+        Ok(blob)
+    } else {
+        Err(anyhow::anyhow!("Invalid blob"))
+    }
+}
 
 /// Ask for user input from terminal based on the provided Candid types. A textual version of Candid UI.
 pub fn input_args(env: &TypeEnv, tys: &[Type]) -> Result<IDLArgs> {
     let len = tys.len();
     let mut args = Vec::new();
     for (i, ty) in tys.iter().enumerate() {
-        println!("Enter argument {} of {}:", i + 1, len);
+        if len > 1 {
+            println!("Enter argument {} of {}:", i + 1, len);
+        }
         let val = input(env, ty)?;
         args.push(val);
     }
@@ -113,9 +124,9 @@ pub fn input(env: &TypeEnv, ty: &Type) -> Result<IDLValue> {
         TypeInner::Text => {
             let text = Input::<String>::with_theme(&theme)
                 .allow_empty(true)
-                .with_prompt("Enter a text (type :editor to use editor)")
+                .with_prompt("Enter a text (type :e to use editor)")
                 .interact()?;
-            let text = if text == ":editor" {
+            let text = if text == ":e" {
                 if let Some(rv) = Editor::new().edit("Enter your text")? {
                     rv
                 } else {
@@ -145,17 +156,12 @@ pub fn input(env: &TypeEnv, ty: &Type) -> Result<IDLValue> {
                 .interact()?;
             let blob = match mode {
                 0 => {
-                    use crate::parse_idl_value;
                     let raw = Input::<String>::with_theme(&theme)
                         .with_prompt("Enter a blob (characters or \\xx)")
+                        .validate_with(|s: &String| parse_blob(s).map(|_| ()))
                         .allow_empty(true)
                         .interact()?;
-                    let raw = format!("blob \"{}\"", raw);
-                    if let IDLValue::Blob(blob) = parse_idl_value(&raw)? {
-                        blob
-                    } else {
-                        Vec::new()
-                    }
+                    parse_blob(&raw)?
                 }
                 1 => {
                     let blob = Input::<String>::with_theme(&theme)
@@ -171,10 +177,20 @@ pub fn input(env: &TypeEnv, ty: &Type) -> Result<IDLValue> {
                         .interact_text()?;
                     hex::decode(blob)?
                 }
-                2 => Input::<String>::with_theme(&theme) // TODO
-                    .with_prompt("Enter a file path")
-                    .interact()?
-                    .into_bytes(),
+                2 => {
+                    let path = Input::<String>::with_theme(&theme)
+                        .with_prompt("Enter a file path")
+                        .validate_with(|s: &String| {
+                            if Path::new(s).exists() {
+                                Ok(())
+                            } else {
+                                Err("file doesn't exist")
+                            }
+                        })
+                        .interact()?;
+                    std::fs::read(path)?
+                }
+
                 _ => unreachable!(),
             };
             IDLValue::Blob(blob)
@@ -198,7 +214,7 @@ pub fn input(env: &TypeEnv, ty: &Type) -> Result<IDLValue> {
             let mut fields = Vec::new();
             for f in fs.iter() {
                 let name = style.apply_to(format!("{}", f.id));
-                let val = if let TypeInner::Opt(ty) = f.ty.as_ref() {
+                let val = if let TypeInner::Opt(ty) = env.trace_type(&f.ty)?.as_ref() {
                     let prompt = format!("Enter optional field {name}{}?", show_type(&f.ty));
                     let yes = Confirm::with_theme(&theme).with_prompt(prompt).interact()?;
                     if yes {

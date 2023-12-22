@@ -316,6 +316,7 @@ impl fmt::Display for TypeInner {
         write!(f, "{:?}", self)
     }
 }
+#[allow(clippy::result_unit_err)]
 pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
     use TypeInner::*;
     if limit <= 1 {
