@@ -66,6 +66,11 @@ enum Command {
         #[clap(flatten)]
         annotate: TypeAnnotation,
     },
+    /// Generate textual Candid values based on a terminal dialog
+    Assist {
+        #[clap(flatten)]
+        annotate: TypeAnnotation,
+    },
     /// Generate random Candid values
     Random {
         #[clap(flatten)]
@@ -230,6 +235,11 @@ fn main() -> Result<()> {
         Command::Hash { input } => {
             println!("{}", candid_parser::idl_hash(&input));
         }
+        Command::Assist { annotate } => {
+            let (env, types) = annotate.get_types(Mode::Encode)?;
+            let args = candid_parser::assist::input_args(&env, &types)?;
+            println!("{args}");
+        }
         Command::Encode {
             args,
             format,
@@ -282,16 +292,7 @@ fn main() -> Result<()> {
                         let _ = pretty_diagnose("blob", &blob, &e);
                         e
                     })? {
-                        IDLValue::Vec(vec) => vec
-                            .iter()
-                            .map(|v| {
-                                if let IDLValue::Nat8(u) = v {
-                                    *u
-                                } else {
-                                    unreachable!()
-                                }
-                            })
-                            .collect(),
+                        IDLValue::Blob(blob) => blob,
                         _ => unreachable!(),
                     }
                 }

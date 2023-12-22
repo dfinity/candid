@@ -37,7 +37,8 @@ fake = { version = "2.4", optional = true }
 rand = { version = "0.8", optional = true }
 num-traits = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-
+dialoguer = { version = "0.11", optional = true }
+console = { version = "0.15", optional = true }
 
 [dev-dependencies]
 goldenfile = "1.1.0"
@@ -47,7 +48,8 @@ rand.workspace = true
 [features]
 configs = ["serde_dhall"]
 random = ["configs", "arbitrary", "fake", "rand", "num-traits", "serde"]
-all = ["random"]
+assist = ["dep:dialoguer", "dep:console"]
+all = ["random", "assist"]
 
 # docs.rs-specific configuration
 # To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --features all

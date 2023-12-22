@@ -133,6 +133,9 @@ pub use typing::{check_file, check_prog, pretty_check_file};
 pub use candid;
 pub use candid::*;
 
+#[cfg_attr(docsrs, doc(cfg(feature = "assist")))]
+#[cfg(feature = "assist")]
+pub mod assist;
 #[cfg_attr(docsrs, doc(cfg(feature = "configs")))]
 #[cfg(feature = "configs")]
 pub mod configs;
