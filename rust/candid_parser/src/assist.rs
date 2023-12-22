@@ -5,7 +5,9 @@ use candid::types::{
     Type, TypeEnv, TypeInner,
 };
 use candid::{IDLArgs, Int, Nat, Principal};
-use dialoguer::{theme::ColorfulTheme, Confirm, Editor, Input, Select};
+use console::{style, Style, StyledObject};
+use dialoguer::{theme::Theme, Confirm, Editor, Input, Select};
+use std::fmt;
 use std::path::Path;
 
 fn show_type(ty: &Type) -> String {
@@ -32,15 +34,15 @@ pub fn input_args(env: &TypeEnv, tys: &[Type]) -> Result<IDLArgs> {
         if len > 1 {
             println!("Enter argument {} of {}:", i + 1, len);
         }
-        let val = input(env, ty)?;
+        let val = input(env, ty, 0)?;
         args.push(val);
     }
     Ok(IDLArgs { args })
 }
 
 /// Ask for user input from terminal based on the provided Candid type. A textual version of Candid UI.
-pub fn input(env: &TypeEnv, ty: &Type) -> Result<IDLValue> {
-    let theme = ColorfulTheme::default();
+pub fn input(env: &TypeEnv, ty: &Type, dep: usize) -> Result<IDLValue> {
+    let theme = IndentTheme::new(dep * 2);
     let style = console::Style::new().bright().green();
     Ok(match ty.as_ref() {
         TypeInner::Reserved => IDLValue::Reserved,
@@ -51,8 +53,12 @@ pub fn input(env: &TypeEnv, ty: &Type) -> Result<IDLValue> {
         TypeInner::Empty => unreachable!(), // TODO: proactively avoid empty
         TypeInner::Var(id) => {
             let t = env.rec_find_type(id)?;
-            println!("Enter a value for {}{}", style.apply_to(id), show_type(t));
-            input(env, t)?
+            theme.println(format!(
+                "Enter a value for {}{}",
+                style.apply_to(id),
+                show_type(t)
+            ));
+            input(env, t, dep)?
         }
         TypeInner::Bool => {
             let v = Select::with_theme(&theme)
@@ -142,7 +148,7 @@ pub fn input(env: &TypeEnv, ty: &Type) -> Result<IDLValue> {
                 .with_prompt("Do you want to enter an optional value?")
                 .interact()?;
             if yes {
-                let val = input(env, ty)?;
+                let val = input(env, ty, dep + 1)?;
                 IDLValue::Opt(Box::new(val))
             } else {
                 IDLValue::None
@@ -202,7 +208,7 @@ pub fn input(env: &TypeEnv, ty: &Type) -> Result<IDLValue> {
                     .with_prompt("Do you want to enter a new vector element?")
                     .interact()?;
                 if yes {
-                    let val = input(env, ty)?;
+                    let val = input(env, ty, dep + 1)?;
                     vals.push(val);
                 } else {
                     break;
@@ -218,13 +224,13 @@ pub fn input(env: &TypeEnv, ty: &Type) -> Result<IDLValue> {
                     let prompt = format!("Enter optional field {name}{}?", show_type(&f.ty));
                     let yes = Confirm::with_theme(&theme).with_prompt(prompt).interact()?;
                     if yes {
-                        IDLValue::Opt(Box::new(input(env, ty)?))
+                        IDLValue::Opt(Box::new(input(env, ty, dep + 1)?))
                     } else {
                         IDLValue::None
                     }
                 } else {
-                    println!("Enter field {name}{}", show_type(&f.ty));
-                    input(env, &f.ty)?
+                    theme.println(format!("Enter field {name}{}", show_type(&f.ty)));
+                    input(env, &f.ty, dep + 1)?
                 };
                 fields.push(IDLField {
                     id: (*f.id).clone(),
@@ -239,7 +245,7 @@ pub fn input(env: &TypeEnv, ty: &Type) -> Result<IDLValue> {
                 .with_prompt("Select a variant")
                 .items(&tags)
                 .interact()?;
-            let val = input(env, &fs[idx].ty)?;
+            let val = input(env, &fs[idx].ty, dep + 1)?;
             let field = IDLField {
                 id: (*fs[idx].id).clone(),
                 val,
@@ -266,4 +272,212 @@ pub fn input(env: &TypeEnv, ty: &Type) -> Result<IDLValue> {
             IDLValue::Func(id, method)
         }
     })
+}
+
+struct IndentTheme {
+    indent: usize,
+    defaults_style: Style,
+    prompt_style: Style,
+    prompt_prefix: StyledObject<String>,
+    prompt_suffix: StyledObject<String>,
+    success_prefix: StyledObject<String>,
+    success_suffix: StyledObject<String>,
+    error_prefix: StyledObject<String>,
+    error_style: Style,
+    hint_style: Style,
+    values_style: Style,
+    active_item_style: Style,
+    inactive_item_style: Style,
+    active_item_prefix: StyledObject<String>,
+    inactive_item_prefix: StyledObject<String>,
+}
+impl IndentTheme {
+    fn new(indent: usize) -> Self {
+        Self {
+            indent,
+            defaults_style: Style::new().for_stderr().cyan(),
+            prompt_style: Style::new().for_stderr().bold(),
+            prompt_prefix: style("?".to_string()).for_stderr().yellow(),
+            prompt_suffix: style("›".to_string()).for_stderr().black().bright(),
+            success_prefix: style("✔".to_string()).for_stderr().green(),
+            success_suffix: style("·".to_string()).for_stderr().black().bright(),
+            error_prefix: style("✘".to_string()).for_stderr().red(),
+            error_style: Style::new().for_stderr().red(),
+            hint_style: Style::new().for_stderr().black().bright(),
+            values_style: Style::new().for_stderr().green(),
+            active_item_style: Style::new().for_stderr().cyan(),
+            inactive_item_style: Style::new().for_stderr(),
+            active_item_prefix: style("❯".to_string()).for_stderr().green(),
+            inactive_item_prefix: style(" ".to_string()).for_stderr(),
+        }
+    }
+    fn indent(&self, f: &mut dyn fmt::Write) -> fmt::Result {
+        let spaces = " ".repeat(self.indent);
+        write!(f, "{spaces}")
+    }
+    fn println(&self, prompt: String) {
+        let spaces = " ".repeat(self.indent);
+        println!("{spaces}{prompt}");
+    }
+}
+impl Theme for IndentTheme {
+    fn format_prompt(&self, f: &mut dyn fmt::Write, prompt: &str) -> fmt::Result {
+        self.indent(f)?;
+        write!(
+            f,
+            "{} {} ",
+            &self.prompt_prefix,
+            self.prompt_style.apply_to(prompt)
+        )?;
+        write!(f, "{}", &self.prompt_suffix)
+    }
+    fn format_error(&self, f: &mut dyn fmt::Write, err: &str) -> fmt::Result {
+        self.indent(f)?;
+        write!(
+            f,
+            "{} {}",
+            &self.error_prefix,
+            self.error_style.apply_to(err)
+        )
+    }
+    fn format_input_prompt(
+        &self,
+        f: &mut dyn fmt::Write,
+        prompt: &str,
+        default: Option<&str>,
+    ) -> fmt::Result {
+        self.indent(f)?;
+        if !prompt.is_empty() {
+            write!(
+                f,
+                "{} {} ",
+                &self.prompt_prefix,
+                self.prompt_style.apply_to(prompt)
+            )?;
+        }
+
+        match default {
+            Some(default) => write!(
+                f,
+                "{} {} ",
+                self.hint_style.apply_to(&format!("({})", default)),
+                &self.prompt_suffix
+            ),
+            None => write!(f, "{} ", &self.prompt_suffix),
+        }
+    }
+    fn format_confirm_prompt(
+        &self,
+        f: &mut dyn fmt::Write,
+        prompt: &str,
+        default: Option<bool>,
+    ) -> fmt::Result {
+        self.indent(f)?;
+        if !prompt.is_empty() {
+            write!(
+                f,
+                "{} {} ",
+                &self.prompt_prefix,
+                self.prompt_style.apply_to(prompt)
+            )?;
+        }
+
+        match default {
+            None => write!(
+                f,
+                "{} {}",
+                self.hint_style.apply_to("(y/n)"),
+                &self.prompt_suffix
+            ),
+            Some(true) => write!(
+                f,
+                "{} {} {}",
+                self.hint_style.apply_to("(y/n)"),
+                &self.prompt_suffix,
+                self.defaults_style.apply_to("yes")
+            ),
+            Some(false) => write!(
+                f,
+                "{} {} {}",
+                self.hint_style.apply_to("(y/n)"),
+                &self.prompt_suffix,
+                self.defaults_style.apply_to("no")
+            ),
+        }
+    }
+    fn format_confirm_prompt_selection(
+        &self,
+        f: &mut dyn fmt::Write,
+        prompt: &str,
+        selection: Option<bool>,
+    ) -> fmt::Result {
+        self.indent(f)?;
+        if !prompt.is_empty() {
+            write!(
+                f,
+                "{} {} ",
+                &self.success_prefix,
+                self.prompt_style.apply_to(prompt)
+            )?;
+        }
+        let selection = selection.map(|b| if b { "yes" } else { "no" });
+
+        match selection {
+            Some(selection) => {
+                write!(
+                    f,
+                    "{} {}",
+                    &self.success_suffix,
+                    self.values_style.apply_to(selection)
+                )
+            }
+            None => {
+                write!(f, "{}", &self.success_suffix)
+            }
+        }
+    }
+    fn format_input_prompt_selection(
+        &self,
+        f: &mut dyn fmt::Write,
+        prompt: &str,
+        sel: &str,
+    ) -> fmt::Result {
+        self.indent(f)?;
+        if !prompt.is_empty() {
+            write!(
+                f,
+                "{} {} ",
+                &self.success_prefix,
+                self.prompt_style.apply_to(prompt)
+            )?;
+        }
+
+        write!(
+            f,
+            "{} {}",
+            &self.success_suffix,
+            self.values_style.apply_to(sel)
+        )
+    }
+    fn format_select_prompt_item(
+        &self,
+        f: &mut dyn fmt::Write,
+        text: &str,
+        active: bool,
+    ) -> fmt::Result {
+        self.indent(f)?;
+        let details = if active {
+            (
+                &self.active_item_prefix,
+                self.active_item_style.apply_to(text),
+            )
+        } else {
+            (
+                &self.inactive_item_prefix,
+                self.inactive_item_style.apply_to(text),
+            )
+        };
+
+        write!(f, "{} {}", details.0, details.1)
+    }
 }
