@@ -48,7 +48,7 @@ pub fn input(env: &TypeEnv, ty: &Type) -> Result<IDLValue> {
         TypeInner::Knot(_) | TypeInner::Unknown | TypeInner::Future | TypeInner::Class(_, _) => {
             unreachable!()
         }
-        TypeInner::Empty => unreachable!(),
+        TypeInner::Empty => unreachable!(), // TODO: proactively avoid empty
         TypeInner::Var(id) => {
             let t = env.rec_find_type(id)?;
             println!("Enter a value for {}{}", style.apply_to(id), show_type(t));
@@ -184,7 +184,7 @@ pub fn input(env: &TypeEnv, ty: &Type) -> Result<IDLValue> {
                             if Path::new(s).exists() {
                                 Ok(())
                             } else {
-                                Err("file doesn't exist")
+                                Err("File doesn't exist")
                             }
                         })
                         .interact()?;
