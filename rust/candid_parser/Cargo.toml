@@ -37,7 +37,7 @@ fake = { version = "2.4", optional = true }
 rand = { version = "0.8", optional = true }
 num-traits = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-dialoguer = { version = "0.11", optional = true }
+dialoguer = { version = "0.11", default-features = false, features = ["editor", "completion"], optional = true }
 console = { version = "0.15", optional = true }
 
 [dev-dependencies]

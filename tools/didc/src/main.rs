@@ -236,8 +236,10 @@ fn main() -> Result<()> {
             println!("{}", candid_parser::idl_hash(&input));
         }
         Command::Assist { annotate } => {
+            use candid_parser::assist::{input_args, Context};
             let (env, types) = annotate.get_types(Mode::Encode)?;
-            let args = candid_parser::assist::input_args(&env, &types)?;
+            let ctx = Context::new(env);
+            let args = input_args(&ctx, &types)?;
             println!("{args}");
         }
         Command::Encode {

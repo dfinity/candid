@@ -1,3 +1,4 @@
+use crate::parse_idl_value;
 use anyhow::Result;
 use candid::types::{
     internal::text_size,
@@ -6,9 +7,63 @@ use candid::types::{
 };
 use candid::{IDLArgs, Int, Nat, Principal};
 use console::{style, Style, StyledObject};
-use dialoguer::{theme::Theme, Confirm, Editor, Input, Select};
+use dialoguer::{theme::Theme, Completion, Confirm, Editor, Input, Select};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
+
+pub struct Context {
+    env: TypeEnv,
+    completion: BTreeMap<String, BTreeMap<String, String>>,
+}
+impl Context {
+    pub fn new(env: TypeEnv) -> Self {
+        let mut completion = BTreeMap::new();
+        let principal: BTreeMap<String, String> = [("ic", "aaaaa-aa"), ("anonymous", "2vxsx-fae")]
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        completion.insert("principal".to_string(), principal);
+        Self { env, completion }
+    }
+    pub fn set_completion(
+        &mut self,
+        list: BTreeMap<String, BTreeMap<String, String>>,
+    ) -> &mut Self {
+        self.completion = list;
+        self
+    }
+    fn project_type(&self, typ: &str) -> Candidate {
+        let inner = match self.completion.get(typ) {
+            None => BTreeMap::new(),
+            Some(m) => m.clone(),
+        };
+        Candidate { inner }
+    }
+}
+
+struct Candidate {
+    inner: BTreeMap<String, String>,
+}
+impl Candidate {
+    fn get_keys(&self) -> String {
+        self.inner.keys().cloned().collect::<Vec<_>>().join(", ")
+    }
+}
+impl Completion for Candidate {
+    fn get(&self, input: &str) -> Option<String> {
+        let matches: Vec<_> = self
+            .inner
+            .iter()
+            .filter(|(k, _)| k.starts_with(input))
+            .collect();
+        if matches.len() == 1 {
+            Some(matches[0].1.to_string())
+        } else {
+            None
+        }
+    }
+}
 
 fn show_type(ty: &Type) -> String {
     if text_size(ty, 80).is_ok() {
@@ -19,7 +74,7 @@ fn show_type(ty: &Type) -> String {
 }
 fn parse_blob(s: &str) -> Result<Vec<u8>> {
     let raw = format!("blob \"{}\"", s);
-    if let IDLValue::Blob(blob) = crate::parse_idl_value(&raw)? {
+    if let IDLValue::Blob(blob) = parse_idl_value(&raw)? {
         Ok(blob)
     } else {
         Err(anyhow::anyhow!("Invalid blob"))
@@ -27,23 +82,23 @@ fn parse_blob(s: &str) -> Result<Vec<u8>> {
 }
 
 /// Ask for user input from terminal based on the provided Candid types. A textual version of Candid UI.
-pub fn input_args(env: &TypeEnv, tys: &[Type]) -> Result<IDLArgs> {
+pub fn input_args(ctx: &Context, tys: &[Type]) -> Result<IDLArgs> {
     let len = tys.len();
     let mut args = Vec::new();
     for (i, ty) in tys.iter().enumerate() {
         if len > 1 {
             println!("Enter argument {} of {}:", i + 1, len);
         }
-        let val = input(env, ty, 0)?;
+        let val = input(ctx, ty, 0)?;
         args.push(val);
     }
     Ok(IDLArgs { args })
 }
 
 /// Ask for user input from terminal based on the provided Candid type. A textual version of Candid UI.
-pub fn input(env: &TypeEnv, ty: &Type, dep: usize) -> Result<IDLValue> {
-    let theme = IndentTheme::new(dep * 2);
-    let style = console::Style::new().bright().green();
+pub fn input(ctx: &Context, ty: &Type, dep: usize) -> Result<IDLValue> {
+    let theme = IndentTheme::new(dep);
+    let style = theme.values_style.clone();
     Ok(match ty.as_ref() {
         TypeInner::Reserved => IDLValue::Reserved,
         TypeInner::Null => IDLValue::Null,
@@ -52,13 +107,13 @@ pub fn input(env: &TypeEnv, ty: &Type, dep: usize) -> Result<IDLValue> {
         }
         TypeInner::Empty => unreachable!(), // TODO: proactively avoid empty
         TypeInner::Var(id) => {
-            let t = env.rec_find_type(id)?;
+            let t = ctx.env.rec_find_type(id)?;
             theme.println(format!(
                 "Enter a value for {}{}",
                 style.apply_to(id),
                 show_type(t)
             ));
-            input(env, t, dep)?
+            input(ctx, t, dep)?
         }
         TypeInner::Bool => {
             let v = Select::with_theme(&theme)
@@ -148,17 +203,17 @@ pub fn input(env: &TypeEnv, ty: &Type, dep: usize) -> Result<IDLValue> {
                 .with_prompt("Do you want to enter an optional value?")
                 .interact()?;
             if yes {
-                let val = input(env, ty, dep + 1)?;
+                let val = input(ctx, ty, dep + 1)?;
                 IDLValue::Opt(Box::new(val))
             } else {
                 IDLValue::None
             }
         }
-        TypeInner::Vec(_) if ty.is_blob(env) => {
+        TypeInner::Vec(_) if ty.is_blob(&ctx.env) => {
             let mode = Select::with_theme(&theme)
                 .with_prompt("Select a way to enter blob")
                 .default(0)
-                .items(&["blob", "hex", "file"])
+                .items(&["byte string", "hex", "file"])
                 .interact()?;
             let blob = match mode {
                 0 => {
@@ -208,7 +263,7 @@ pub fn input(env: &TypeEnv, ty: &Type, dep: usize) -> Result<IDLValue> {
                     .with_prompt("Do you want to enter a new vector element?")
                     .interact()?;
                 if yes {
-                    let val = input(env, ty, dep + 1)?;
+                    let val = input(ctx, ty, dep + 1)?;
                     vals.push(val);
                 } else {
                     break;
@@ -220,17 +275,17 @@ pub fn input(env: &TypeEnv, ty: &Type, dep: usize) -> Result<IDLValue> {
             let mut fields = Vec::new();
             for f in fs.iter() {
                 let name = style.apply_to(format!("{}", f.id));
-                let val = if let TypeInner::Opt(ty) = env.trace_type(&f.ty)?.as_ref() {
+                let val = if let TypeInner::Opt(ty) = ctx.env.trace_type(&f.ty)?.as_ref() {
                     let prompt = format!("Enter optional field {name}{}?", show_type(&f.ty));
                     let yes = Confirm::with_theme(&theme).with_prompt(prompt).interact()?;
                     if yes {
-                        IDLValue::Opt(Box::new(input(env, ty, dep + 1)?))
+                        IDLValue::Opt(Box::new(input(ctx, ty, dep + 1)?))
                     } else {
                         IDLValue::None
                     }
                 } else {
                     theme.println(format!("Enter field {name}{}", show_type(&f.ty)));
-                    input(env, &f.ty, dep + 1)?
+                    input(ctx, &f.ty, dep + 1)?
                 };
                 fields.push(IDLField {
                     id: (*f.id).clone(),
@@ -245,27 +300,35 @@ pub fn input(env: &TypeEnv, ty: &Type, dep: usize) -> Result<IDLValue> {
                 .with_prompt("Select a variant")
                 .items(&tags)
                 .interact()?;
-            let val = input(env, &fs[idx].ty, dep + 1)?;
+            let val = input(ctx, &fs[idx].ty, dep + 1)?;
             let field = IDLField {
                 id: (*fs[idx].id).clone(),
                 val,
             };
             IDLValue::Variant(VariantValue(Box::new(field), idx as u64))
         }
-        TypeInner::Principal => IDLValue::Principal(
-            Input::<Principal>::with_theme(&theme)
-                .with_prompt("Enter a principal")
-                .interact()?,
-        ),
+        TypeInner::Principal => {
+            let completion = ctx.project_type("principal");
+            let keys = completion.get_keys();
+            if !keys.is_empty() {
+                theme.hint(format!("auto-completions: {keys}"));
+            }
+            IDLValue::Principal(
+                Input::<Principal>::with_theme(&theme)
+                    .with_prompt("Enter a principal")
+                    .completion_with(&completion)
+                    .interact_text()?,
+            )
+        }
         TypeInner::Service(_) => IDLValue::Service(
             Input::<Principal>::with_theme(&theme)
                 .with_prompt("Enter a canister id")
-                .interact()?,
+                .interact_text()?,
         ),
         TypeInner::Func(_) => {
             let id = Input::<Principal>::with_theme(&theme)
                 .with_prompt("Enter a canister id")
-                .interact()?;
+                .interact_text()?;
             let method = Input::<String>::with_theme(&theme)
                 .with_prompt("Enter a method name")
                 .interact()?;
@@ -312,12 +375,16 @@ impl IndentTheme {
         }
     }
     fn indent(&self, f: &mut dyn fmt::Write) -> fmt::Result {
-        let spaces = " ".repeat(self.indent);
+        let spaces = " ".repeat(self.indent * 2);
         write!(f, "{spaces}")
     }
     fn println(&self, prompt: String) {
-        let spaces = " ".repeat(self.indent);
+        let spaces = " ".repeat(self.indent * 2);
         println!("{spaces}{prompt}");
+    }
+    fn hint(&self, prompt: String) {
+        let spaces = " ".repeat(self.indent * 2);
+        println!("{spaces}{}", self.hint_style.apply_to(prompt));
     }
 }
 impl Theme for IndentTheme {
