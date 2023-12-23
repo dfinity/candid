@@ -257,7 +257,7 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "candid"
-version = "0.10.1"
+version = "0.10.2"
 dependencies = [
  "anyhow",
  "bincode",
@@ -293,7 +293,7 @@ dependencies = [
 
 [[package]]
 name = "candid_parser"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -629,7 +629,7 @@ dependencies = [
 
 [[package]]
 name = "didc"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "anyhow",
  "candid_parser",

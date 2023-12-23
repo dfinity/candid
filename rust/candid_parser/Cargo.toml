@@ -1,6 +1,6 @@
 [package]
 name = "candid_parser"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer. This crate contains the parser and the binding generator for Candid."
