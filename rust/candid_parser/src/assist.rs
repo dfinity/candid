@@ -42,45 +42,6 @@ impl Context {
     }
 }
 
-struct Candidate {
-    inner: BTreeMap<String, String>,
-}
-impl Candidate {
-    fn get_keys(&self) -> String {
-        self.inner.keys().cloned().collect::<Vec<_>>().join(", ")
-    }
-}
-impl Completion for Candidate {
-    fn get(&self, input: &str) -> Option<String> {
-        let matches: Vec<_> = self
-            .inner
-            .iter()
-            .filter(|(k, _)| k.starts_with(input))
-            .collect();
-        if matches.len() == 1 {
-            Some(matches[0].1.to_string())
-        } else {
-            None
-        }
-    }
-}
-
-fn show_type(ty: &Type) -> String {
-    if text_size(ty, 80).is_ok() {
-        format!(" : {ty}")
-    } else {
-        String::new()
-    }
-}
-fn parse_blob(s: &str) -> Result<Vec<u8>> {
-    let raw = format!("blob \"{}\"", s);
-    if let IDLValue::Blob(blob) = parse_idl_value(&raw)? {
-        Ok(blob)
-    } else {
-        Err(anyhow::anyhow!("Invalid blob"))
-    }
-}
-
 /// Ask for user input from terminal based on the provided Candid types. A textual version of Candid UI.
 pub fn input_args(ctx: &Context, tys: &[Type]) -> Result<IDLArgs> {
     let len = tys.len();
@@ -308,11 +269,7 @@ pub fn input(ctx: &Context, ty: &Type, dep: usize) -> Result<IDLValue> {
             IDLValue::Variant(VariantValue(Box::new(field), idx as u64))
         }
         TypeInner::Principal => {
-            let completion = ctx.project_type("principal");
-            let keys = completion.get_keys();
-            if !keys.is_empty() {
-                theme.hint(format!("auto-completions: {keys}"));
-            }
+            let completion = get_candidate(ctx, &theme, "principal");
             IDLValue::Principal(
                 Input::<Principal>::with_theme(&theme)
                     .with_prompt("Enter a principal")
@@ -320,14 +277,20 @@ pub fn input(ctx: &Context, ty: &Type, dep: usize) -> Result<IDLValue> {
                     .interact_text()?,
             )
         }
-        TypeInner::Service(_) => IDLValue::Service(
-            Input::<Principal>::with_theme(&theme)
-                .with_prompt("Enter a canister id")
-                .interact_text()?,
-        ),
+        TypeInner::Service(_) => {
+            let completion = get_candidate(ctx, &theme, "principal");
+            IDLValue::Service(
+                Input::<Principal>::with_theme(&theme)
+                    .with_prompt("Enter a canister id")
+                    .completion_with(&completion)
+                    .interact_text()?,
+            )
+        }
         TypeInner::Func(_) => {
+            let completion = get_candidate(ctx, &theme, "principal");
             let id = Input::<Principal>::with_theme(&theme)
                 .with_prompt("Enter a canister id")
+                .completion_with(&completion)
                 .interact_text()?;
             let method = Input::<String>::with_theme(&theme)
                 .with_prompt("Enter a method name")
@@ -335,6 +298,53 @@ pub fn input(ctx: &Context, ty: &Type, dep: usize) -> Result<IDLValue> {
             IDLValue::Func(id, method)
         }
     })
+}
+
+struct Candidate {
+    inner: BTreeMap<String, String>,
+}
+impl Candidate {
+    fn get_keys(&self) -> String {
+        self.inner.keys().cloned().collect::<Vec<_>>().join(", ")
+    }
+}
+impl Completion for Candidate {
+    fn get(&self, input: &str) -> Option<String> {
+        let matches: Vec<_> = self
+            .inner
+            .iter()
+            .filter(|(k, _)| k.starts_with(input))
+            .collect();
+        if matches.len() == 1 {
+            Some(matches[0].1.clone())
+        } else {
+            None
+        }
+    }
+}
+fn get_candidate(ctx: &Context, theme: &IndentTheme, ty: &str) -> Candidate {
+    let completion = ctx.project_type(ty);
+    let keys = completion.get_keys();
+    if !keys.is_empty() {
+        theme.hint(format!("Auto-completions: {keys}"));
+    }
+    completion
+}
+
+fn show_type(ty: &Type) -> String {
+    if text_size(ty, 80).is_ok() {
+        format!(" : {ty}")
+    } else {
+        String::new()
+    }
+}
+fn parse_blob(s: &str) -> Result<Vec<u8>> {
+    let raw = format!("blob \"{}\"", s);
+    if let IDLValue::Blob(blob) = parse_idl_value(&raw)? {
+        Ok(blob)
+    } else {
+        Err(anyhow::anyhow!("Invalid blob"))
+    }
 }
 
 struct IndentTheme {
