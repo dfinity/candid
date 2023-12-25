@@ -39,6 +39,7 @@ num-traits = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 dialoguer = { version = "0.11", default-features = false, features = ["editor", "completion"], optional = true }
 console = { version = "0.15", optional = true }
+ctrlc = { version = "3.4", optional = true }
 
 [dev-dependencies]
 goldenfile = "1.1.0"
@@ -48,7 +49,7 @@ rand.workspace = true
 [features]
 configs = ["serde_dhall"]
 random = ["configs", "arbitrary", "fake", "rand", "num-traits", "serde"]
-assist = ["dep:dialoguer", "dep:console"]
+assist = ["dep:dialoguer", "dep:console", "dep:ctrlc"]
 all = ["random", "assist"]
 
 # docs.rs-specific configuration
