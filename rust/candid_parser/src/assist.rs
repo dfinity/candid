@@ -45,10 +45,10 @@ impl Context {
 /// Ask for user input from terminal based on the provided Candid types. A textual version of Candid UI.
 pub fn input_args(ctx: &Context, tys: &[Type]) -> Result<IDLArgs> {
     // Patch ctrlc untill https://github.com/console-rs/dialoguer/issues/77 is fixed
-    ctrlc::set_handler(move || {
+    let _ = ctrlc::try_set_handler(move || {
         let term = console::Term::stdout();
         let _ = term.show_cursor();
-    })?;
+    });
     let len = tys.len();
     let mut args = Vec::new();
     for (i, ty) in tys.iter().enumerate() {
