@@ -50,7 +50,7 @@ pub(crate) fn candid_method(attrs: Vec<Meta>, fun: ItemFn) -> Result<TokenStream
         ));
     }
     if attrs.is_init {
-        match (rets.len(), rets.get(0).map(|x| x.as_str())) {
+        match (rets.len(), rets.first().map(|x| x.as_str())) {
             (0, None) | (1, Some("Self")) => {
                 if let Some(init) = INIT.lock().unwrap().as_mut() {
                     *init = Some(args);
