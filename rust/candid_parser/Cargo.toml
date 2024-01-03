@@ -1,6 +1,6 @@
 [package]
 name = "candid_parser"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer. This crate contains the parser and the binding generator for Candid."
@@ -37,7 +37,9 @@ fake = { version = "2.4", optional = true }
 rand = { version = "0.8", optional = true }
 num-traits = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-
+dialoguer = { version = "0.11", default-features = false, features = ["editor", "completion"], optional = true }
+console = { version = "0.15", optional = true }
+ctrlc = { version = "3.4", optional = true }
 
 [dev-dependencies]
 goldenfile = "1.1.0"
@@ -47,7 +49,8 @@ rand.workspace = true
 [features]
 configs = ["serde_dhall"]
 random = ["configs", "arbitrary", "fake", "rand", "num-traits", "serde"]
-all = ["random"]
+assist = ["dep:dialoguer", "dep:console", "dep:ctrlc"]
+all = ["random", "assist"]
 
 # docs.rs-specific configuration
 # To test locally: RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --features all

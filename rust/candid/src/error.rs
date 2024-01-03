@@ -14,7 +14,7 @@ pub struct Label {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("binary parser error: {}", .0.get(0).map_or_else(|| "io error".to_string(), |f| format!("{} at byte offset {}", f.message, f.pos/2)))]
+    #[error("binary parser error: {}", .0.first().map_or_else(|| "io error".to_string(), |f| format!("{} at byte offset {}", f.message, f.pos/2)))]
     Binread(Vec<Label>),
 
     #[error("Subtyping error: {0}")]

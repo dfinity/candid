@@ -340,7 +340,9 @@ pub mod value {
                 Opt(v) => write!(f, "opt {v:?}"),
                 Blob(b) => {
                     write!(f, "blob \"")?;
-                    let is_ascii = b.iter().all(|c| (0x20u8..=0x7eu8).contains(c));
+                    let is_ascii = b
+                        .iter()
+                        .all(|c| (0x20u8..=0x7eu8).contains(c) || [0x09, 0x0a, 0x0d].contains(c));
                     if is_ascii {
                         for v in b.iter() {
                             write!(f, "{}", pp_char(*v))?;

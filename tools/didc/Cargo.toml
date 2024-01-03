@@ -1,6 +1,6 @@
 [package]
 name = "didc"
-version = "0.3.5"
+version = "0.3.6"
 authors = ["DFINITY Team"]
 edition = "2021"
 
@@ -8,6 +8,7 @@ edition = "2021"
 candid_parser = { path = "../../rust/candid_parser", features = ["all"] }
 clap = { version = "4.3", features = ["derive"] }
 pretty-hex = "0.2.1"
-hex = "0.4.2"
-anyhow = "1.0.32"
-rand = "0.8"
+hex.workspace = true
+anyhow.workspace = true
+rand.workspace = true
+

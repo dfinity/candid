@@ -110,7 +110,7 @@ fn subtype_(
             Ok(())
         }
         (Service(ms1), Service(ms2)) => {
-            let meths: HashMap<_, _> = ms1.iter().map(|(name, ty)| (name, ty)).collect();
+            let meths: HashMap<_, _> = ms1.iter().cloned().collect();
             for (name, ty2) in ms2 {
                 match meths.get(name) {
                     Some(ty1) => subtype_(report, gamma, env, ty1, ty2).with_context(|| {

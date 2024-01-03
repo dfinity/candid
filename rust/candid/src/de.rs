@@ -373,11 +373,7 @@ impl<'de> Deserializer<'de> {
         let mut bytes = vec![0u8];
         let int = match self.wire_type.as_ref() {
             TypeInner::Int => Int::decode(&mut self.input).map_err(Error::msg)?,
-            TypeInner::Nat => Int(Nat::decode(&mut self.input)
-                .map_err(Error::msg)?
-                .0
-                .try_into()
-                .map_err(Error::msg)?),
+            TypeInner::Nat => Int(Nat::decode(&mut self.input).map_err(Error::msg)?.0.into()),
             t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
         };
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());

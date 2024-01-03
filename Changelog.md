@@ -1,13 +1,27 @@
 
 # Changelog
 
+## 2023-01-03
+
+### Candid 0.10.2
+
+* Fix display `IDLValue::Blob` to allow "\n\t" in ascii characters.
+
+### candid_parser 0.1.2
+
+* Add an "assist" feature. Given a type, construct Candid value in the terminal with interactive dialogue.
+
+### didc 0.3.6
+
+* Add `didc assist` command.
+* Fix `didc decode --format blob`.
+
 ## 2023-12-15
 
 ### Candid 0.10.1
 
 * Add `candid::types::value::try_from_candid_type` to convert Rust type to `IDLValue`.
 * Display `IDLValue::Blob` in ascii character only when the whole blob are ascii characters.
-
 
 ### candid_parser 0.1.1
 
