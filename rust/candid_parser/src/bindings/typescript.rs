@@ -192,7 +192,9 @@ import type { IDL } from '@dfinity/candid';
         None => RcDoc::nil(),
         Some(actor) => pp_actor(env, actor)
             .append(RcDoc::line())
-            .append("export declare const idlFactory: IDL.InterfaceFactory;"),
+            .append("export declare const idlFactory: IDL.InterfaceFactory;")
+            .append(RcDoc::line())
+            .append("export declare const init: ({ IDL }: { IDL: IDL }) => IDL.Type[];"),
     };
     let doc = RcDoc::text(header)
         .append(RcDoc::line())

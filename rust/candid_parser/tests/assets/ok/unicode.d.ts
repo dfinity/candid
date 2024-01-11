@@ -19,3 +19,4 @@ export interface _SERVICE {
   '👀' : ActorMethod<[bigint], bigint>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
+export declare const init: ({ IDL }: { IDL: IDL }) => IDL.Type[];

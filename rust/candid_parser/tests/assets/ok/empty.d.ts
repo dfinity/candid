@@ -9,3 +9,4 @@ export interface _SERVICE {
   'h' : ActorMethod<[[T, never]], { 'a' : T } | { 'b' : {} }>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
+export declare const init: ({ IDL }: { IDL: IDL }) => IDL.Type[];

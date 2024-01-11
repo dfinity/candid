@@ -10,3 +10,4 @@ export type Y = Z;
 export type Z = A;
 export interface _SERVICE { 'f' : ActorMethod<[A, B, C, X, Y, Z], undefined> }
 export declare const idlFactory: IDL.InterfaceFactory;
+export declare const init: ({ IDL }: { IDL: IDL }) => IDL.Type[];
