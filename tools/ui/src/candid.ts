@@ -20,7 +20,7 @@ function isKnownMainnet(agent: HttpAgent) {
 
 export let authClient: AuthClient | undefined;
 
-const agent = new HttpAgent();
+const agent = new HttpAgent({ host: window.location.host });
 if (!isKnownMainnet(agent)) {
   agent.fetchRootKey();
 }
