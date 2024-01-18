@@ -12,16 +12,16 @@ declare var d3: any;
 
 const names: Record<number,string> = {};
 
-function is_local(agent: HttpAgent) {
+function isKnownMainnet(agent: HttpAgent) {
   // @ts-ignore
   const hostname = agent._host.hostname;
-  return hostname === '127.0.0.1' || hostname.endsWith('localhost');
+  return hostname.endsWith('.icp0.io') || hostname.endsWith('.ic0.app');
 }
 
 export let authClient: AuthClient | undefined;
 
-const agent = new HttpAgent();
-if (is_local(agent)) {
+const agent = new HttpAgent({ host: window.location.host });
+if (!isKnownMainnet(agent)) {
   agent.fetchRootKey();
 }
 
