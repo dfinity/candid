@@ -117,7 +117,7 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "candid"
-version = "0.10.0"
+version = "0.10.2"
 dependencies = [
  "anyhow",
  "binread",
@@ -415,14 +415,12 @@ checksum = "a54b5297861c651551676e8c43df805dad175cc33bc97dbd992edbbb85dcbcdf"
 
 [[package]]
 name = "ic_principal"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "arbitrary",
  "crc32fast",
  "data-encoding",
- "hex",
  "serde",
- "serde_bytes",
  "sha2",
  "thiserror",
 ]
