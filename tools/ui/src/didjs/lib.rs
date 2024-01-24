@@ -74,11 +74,17 @@ fn subtype(new: String, old: String) -> Result<(), String> {
     subtype::subtype(&mut gamma, &new_env, &new_actor, &old_actor).map_err(|e| e.to_string())
 }
 
-fn retrieve(path: &str) -> Option<&'static [u8]> {
+fn retrieve(path: &str) -> Option<(&str, &'static [u8])> {
     match path {
-        "/index.html" | "/" => Some(include_bytes!("../../dist/didjs/index.html")),
-        "/favicon.ico" => Some(include_bytes!("../../dist/didjs/favicon.ico")),
-        "/index.js" => Some(include_bytes!("../../dist/didjs/index.js")),
+        "/index.html" | "/" => Some(("text/html", include_bytes!("../../dist/didjs/index.html"))),
+        "/favicon.ico" => Some((
+            "image/x-icon",
+            include_bytes!("../../dist/didjs/favicon.ico"),
+        )),
+        "/index.js" => Some((
+            "application/javascript",
+            include_bytes!("../../dist/didjs/index.js"),
+        )),
         _ => None,
     }
 }
@@ -91,11 +97,11 @@ fn get_path(url: &str) -> Option<&str> {
 fn http_request(request: HttpRequest) -> HttpResponse {
     //TODO add /canister_id/ as endpoint when ICQC is available.
     let path = get_path(request.url.as_str()).unwrap_or("/");
-    if let Some(bytes) = retrieve(path) {
+    if let Some((content_type, bytes)) = retrieve(path) {
         HttpResponse {
             status_code: 200,
             headers: vec![
-                //HeaderField("Content-Encoding".to_string(), "gzip".to_string()),
+                HeaderField("Content-Type".to_string(), content_type.to_string()),
                 HeaderField("Content-Length".to_string(), format!("{}", bytes.len())),
                 HeaderField("Cache-Control".to_string(), format!("max-age={}", 600)),
             ],
