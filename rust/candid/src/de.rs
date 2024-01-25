@@ -256,10 +256,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
-            #[cfg(not(target_arch = "wasm32"))]
             zero_sized_values: 2_000_000,
-            #[cfg(target_arch = "wasm32")]
-            zero_sized_values: 0,
             #[cfg(not(target_arch = "wasm32"))]
             full_error_message: true,
             #[cfg(target_arch = "wasm32")]
@@ -337,16 +334,12 @@ impl<'de> Deserializer<'de> {
         }
         Ok(())
     }
-    fn is_zero_sized_type(&self, t: &Type) -> bool {
-        match t.as_ref() {
-            TypeInner::Null | TypeInner::Reserved => true,
-            TypeInner::Record(fs) => fs.iter().all(|f| {
-                let t = self.table.trace_type(&f.ty).unwrap();
-                // recursive records have been replaced with empty already, it's safe to call without memoization.
-                self.is_zero_sized_type(&t)
-            }),
-            _ => false,
+    fn update_zero_sized_value(&mut self) -> Result<()> {
+        if self.zero_sized_values == 0 {
+            return Err(Error::msg("Too many zero sized values"));
         }
+        self.zero_sized_values -= 1;
+        Ok(())
     }
     // Should always call set_field_name to set the field_name. After deserialize_identifier
     // processed the field_name, field_name will be reset to None.
@@ -413,6 +406,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.update_zero_sized_value()?;
         let bytes = vec![3u8];
         visitor.visit_byte_buf(bytes)
     }
@@ -655,6 +649,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 && matches!(*self.wire_type, TypeInner::Null | TypeInner::Reserved),
             "unit"
         );
+        self.update_zero_sized_value()?;
         visitor.visit_unit()
     }
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
@@ -755,12 +750,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let expect = e.clone();
                 let wire = self.table.trace_type(w)?;
                 let len = Len::read(&mut self.input)?.0;
-                if self.is_zero_sized_type(&wire) {
-                    if self.zero_sized_values < len {
-                        return Err(Error::msg("vec length of zero sized values too large"));
-                    }
-                    self.zero_sized_values -= len;
-                }
                 visitor.visit_seq(Compound::new(self, Style::Vector { len, expect, wire }))
             }
             (TypeInner::Record(e), TypeInner::Record(w)) => {
@@ -772,6 +761,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                         "{} is not a tuple type",
                         self.wire_type
                     )));
+                }
+                if w.is_empty() {
+                    self.update_zero_sized_value()?;
                 }
                 let value =
                     visitor.visit_seq(Compound::new(self, Style::Struct { expect, wire }))?;
@@ -879,6 +871,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             (TypeInner::Record(e), TypeInner::Record(w)) => {
                 let expect = e.clone().into();
                 let wire = w.clone().into();
+                if w.is_empty() {
+                    self.update_zero_sized_value()?;
+                }
                 let value =
                     visitor.visit_map(Compound::new(self, Style::Struct { expect, wire }))?;
                 Ok(value)
