@@ -2,6 +2,7 @@
 name = "candid"
 version = "0.10.2"
 edition = "2021"
+rust-version.workspace = true
 authors = ["DFINITY Team"]
 description = "Candid is an interface description language (IDL) for interacting with canisters running on the Internet Computer."
 homepage = "https://internetcomputer.org/docs/current/developer-docs/build/candid/candid-concepts"

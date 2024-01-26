@@ -8,6 +8,9 @@ members = [
 ]
 resolver = "2"
 
+[workspace.package]
+rust-version = "1.70.0"
+
 [workspace.dependencies]
 hex = "0.4.3"
 num-bigint = { version = "0.4", features = ["serde"] }
