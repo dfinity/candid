@@ -334,7 +334,8 @@ impl<'de> Deserializer<'de> {
         }
         Ok(())
     }
-    fn update_zero_sized_value(&mut self) -> Result<()> {
+    fn dec_zero_sized_value(&mut self) -> Result<()> {
+        //eprintln!("{}", self.zero_sized_values);
         if self.zero_sized_values == 0 {
             return Err(Error::msg("Too many zero sized values"));
         }
@@ -406,7 +407,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.update_zero_sized_value()?;
+        self.dec_zero_sized_value()?;
         let bytes = vec![3u8];
         visitor.visit_byte_buf(bytes)
     }
@@ -649,7 +650,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 && matches!(*self.wire_type, TypeInner::Null | TypeInner::Reserved),
             "unit"
         );
-        self.update_zero_sized_value()?;
+        self.dec_zero_sized_value()?;
         visitor.visit_unit()
     }
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
@@ -710,7 +711,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.unroll_type()?;
         match (self.wire_type.as_ref(), self.expect_type.as_ref()) {
-            (TypeInner::Null | TypeInner::Reserved, TypeInner::Opt(_)) => visitor.visit_none(),
+            (TypeInner::Null | TypeInner::Reserved, TypeInner::Opt(_)) => {
+                self.dec_zero_sized_value()?;
+                visitor.visit_none()
+            }
             (TypeInner::Opt(t1), TypeInner::Opt(t2)) => {
                 self.wire_type = t1.clone();
                 self.expect_type = t2.clone();
@@ -763,7 +767,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     )));
                 }
                 if w.is_empty() {
-                    self.update_zero_sized_value()?;
+                    self.dec_zero_sized_value()?;
                 }
                 let value =
                     visitor.visit_seq(Compound::new(self, Style::Struct { expect, wire }))?;
@@ -872,7 +876,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let expect = e.clone().into();
                 let wire = w.clone().into();
                 if w.is_empty() {
-                    self.update_zero_sized_value()?;
+                    self.dec_zero_sized_value()?;
                 }
                 let value =
                     visitor.visit_map(Compound::new(self, Style::Struct { expect, wire }))?;
@@ -1138,6 +1142,7 @@ impl<'de, 'a> de::VariantAccess<'de> for Compound<'a, 'de> {
             *self.de.expect_type == TypeInner::Null && *self.de.wire_type == TypeInner::Null,
             "unit_variant"
         );
+        self.de.dec_zero_sized_value()?;
         Ok(())
     }
 

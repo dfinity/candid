@@ -533,6 +533,10 @@ fn test_vector() {
         || test_decode(&bytes, &candid::Reserved),
         "Too many zero sized values",
     );
+    check_error(
+        || test_decode(&hex("4449444c016d7f01008094ebdc03"), &vec![None::<u128>]),
+        "Too many zero sized values",
+    );
 }
 
 #[test]
