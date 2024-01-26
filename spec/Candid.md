@@ -1,8 +1,8 @@
 # Candid Specification
 
-Version: 0.1.7
+Version: 0.1.8
 
-Date: Dec 12, 2024
+Date: Jan 25, 2024
 
 ## Motivation
 
@@ -1255,7 +1255,7 @@ M(id(v*) : principal) = i8(1) M(v* : vec nat8)
 
 Note:
 
-* Since `null`, `reserved`, `record {}`, and records of such values, take no space, to prevent unbounded sized message, we limit the total vector length of such zero-sized values in a messagev (on the wire) to be 2,000,000 elements. For example, if a message contains two vectors, one at type `vec null` and one at type `vec record {}`, then the length of both vectors combined cannot exceed 2,000,000 elements.
+* Since `null`, `reserved` and `record {}` take no space, to prevent unbounded sized message, we limit the total number of such zero-sized values in a message (on the wire) to be 2,000,000 elements. For example, a value of type `record { null; reserved; record { record {} } }` contains 3 zero-sized values; a value of type `vec opt record { null; null }` with length 100 contains at most 200 zero-sized values (it is 200 when the vector contains no `null` values); if a message contains two vectors, one at type `vec null` and one at type `vec record {}`, then the length of both vectors combined cannot exceed 2,000,000 elements.
 
 #### References
 
