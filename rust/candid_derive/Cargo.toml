@@ -2,6 +2,7 @@
 name = "candid_derive"
 version = "0.6.5"
 edition = "2021"
+rust-version.workspace = true
 authors = ["DFINITY Team"]
 description = "Macros implementation of #[derive(CandidType)] for the Candid."
 homepage = "https://docs.rs/candid_derive"
