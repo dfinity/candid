@@ -1255,7 +1255,7 @@ M(id(v*) : principal) = i8(1) M(v* : vec nat8)
 
 Note:
 
-* Since `null`, `reserved` and `record {}` take no space, to prevent unbounded sized message, we limit the total number of such zero-sized values in a message (on the wire) to be 2,000,000 elements. For example, a value of type `record { null; reserved; record { record {} } }` contains 3 zero-sized values; a value of type `vec opt record { null; null }` with length 100 contains at most 200 zero-sized values (it is 200 when the vector contains no `null` values); if a message contains two vectors, one at type `vec null` and one at type `vec record {}`, then the length of both vectors combined cannot exceed 2,000,000 elements.
+* Since `null`, `reserved` and `record {}` take no space, to prevent unbounded sized message, we limit the total number of such zero-sized values in a message (on the wire) to be 2,000,000 elements. For example, a value of type `record { null; reserved; record { record {} } }` contains 3 zero-sized values (technically `record { record {} }` and the whole record value are also zero-sized, but to avoid overcounting, we only count the occurrences of `null`, `reserved` and `record {}`); a value of type `vec opt record { null; null }` with length 100 contains at most 200 zero-sized values (it is 200 when the vector contains no `null` values); if a message contains two vectors, one at type `vec null` and one at type `vec record {}`, then the length of both vectors combined cannot exceed 2,000,000 elements.
 
 #### References
 
