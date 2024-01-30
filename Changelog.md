@@ -1,6 +1,21 @@
 
 # Changelog
 
+## 2023-01-30
+
+### Candid 0.10.3
+
+* Fix parser when converting `vec { number }` into `blob` type.
+
+### candid_parser 0.1.3
+
+* Add Typescript binding for init args.
+
+### Candid UI
+
+* Fix HTTP header.
+* Fix agent routing when running in remote environments.
+
 ## 2023-01-03
 
 ### Candid 0.10.2
