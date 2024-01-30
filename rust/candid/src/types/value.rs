@@ -194,8 +194,9 @@ impl IDLValue {
             (IDLValue::Vec(vec), ty) if ty.is_blob(env) => {
                 let blob = vec
                     .iter()
-                    .filter_map(|x| match *x {
-                        IDLValue::Nat8(n) => Some(n),
+                    .filter_map(|x| match x {
+                        IDLValue::Nat8(n) => Some(*n),
+                        IDLValue::Number(n) => n.parse::<u8>().ok(),
                         _ => None,
                     })
                     .collect();
