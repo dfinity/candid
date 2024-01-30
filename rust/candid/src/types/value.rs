@@ -192,17 +192,22 @@ impl IDLValue {
             (_, TypeInner::Opt(_)) if !from_parser => IDLValue::None,
             (IDLValue::Blob(blob), ty) if ty.is_blob(env) => IDLValue::Blob(blob.to_vec()),
             (IDLValue::Vec(vec), ty) if ty.is_blob(env) => {
-                let blob = vec
-                    .iter()
-                    .filter_map(|x| match *x {
-                        IDLValue::Nat8(n) => Some(n),
-                        _ => None,
-                    })
-                    .collect();
+                let mut blob = Vec::with_capacity(vec.len());
+                for e in vec.iter() {
+                    match e {
+                        IDLValue::Nat8(n) => blob.push(*n),
+                        IDLValue::Number(n) => blob.push(n.parse::<u8>()?),
+                        _ => {
+                            return Err(Error::msg(format!(
+                                "type mismatch: {e} cannot be of type nat8"
+                            )))
+                        }
+                    }
+                }
                 IDLValue::Blob(blob)
             }
             (IDLValue::Vec(vec), TypeInner::Vec(ty)) => {
-                let mut res = Vec::new();
+                let mut res = Vec::with_capacity(vec.len());
                 for e in vec.iter() {
                     let v = e.annotate_type(from_parser, env, ty)?;
                     res.push(v);
