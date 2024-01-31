@@ -1,7 +1,7 @@
 
 # Changelog
 
-## 2023-01-30
+## 2024-01-30
 
 ### Candid 0.10.3
 
@@ -16,7 +16,7 @@
 * Fix HTTP header.
 * Fix agent routing when running in remote environments.
 
-## 2023-01-03
+## 2024-01-03
 
 ### Candid 0.10.2
 
