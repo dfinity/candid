@@ -1,8 +1,8 @@
 # Candid Specification
 
-Version: 0.1.7
+Version: 0.1.8
 
-Date: Dec 12, 2024
+Date: Feb 2, 2024
 
 ## Motivation
 
@@ -1253,9 +1253,43 @@ M(ref(r) : principal) = i8(0)
 M(id(v*) : principal) = i8(1) M(v* : vec nat8)
 ```
 
-Note:
+##### Wire cost model
 
-* Since `null`, `reserved`, `record {}`, and records of such values, take no space, to prevent unbounded sized message, we limit the total vector length of such zero-sized values in a messagev (on the wire) to be 2,000,000 elements. For example, if a message contains two vectors, one at type `vec null` and one at type `vec record {}`, then the length of both vectors combined cannot exceed 2,000,000 elements.
+Some values on the wire take fewer space than the values on the host language, e.g., `null`, `reserved` and `record { record {} }` take no space on the wire. To prevent sending messages of exponential size, we introduce a cost model `C` for the values on the wire.
+
+```
+C : <val> -> <primtype> -> nat
+C(n : nat)      = 1
+C(i : int)      = 1
+C(n : nat<N>)   = 1
+C(i : int<N>)   = 1
+C(z : float<N>) = 1
+C(b : bool)     = 1
+C(t : text)     = |t|
+C(_ : null)     = 1
+C(_ : reserved) = 1
+C(_ : empty) undefined
+
+C : <val> -> <constype> -> nat
+C(null : opt <datatype>) = 1
+C(?v   : opt <datatype>) = 1 + C(v : <datatype>)
+C(v^N  : vec <datatype>) = sum_i C(v[i] : <datatype>)
+C(kv*  : record {<fieldtype>*}) = sum_i C(kv : <fieldtype>*[i])
+C(kv   : variant {<fieldtype>*}) = 1 + C(kv : <fieldtype>*[i])
+
+C : (<nat>, <val>) -> <fieldtype> -> nat
+C((k,v) : k:<datatype>) = C(v : <datatype>)
+
+C : <val> -> <reftype> -> nat
+C(ref(r) : service <actortype>) = 1
+C(id(v*) : service <actortype>) = |v*|
+
+C(ref(r)   : func <functype>) = 1
+C(pub(s,n) : func <functype>) = C(s : service {}) + C(n : text)
+
+C(ref(r) : principal) = 1
+C(id(v*) : principal) = |v*|
+```
 
 #### References
 
@@ -1318,9 +1352,9 @@ Deserialisation at an expected type sequence `(<t'>,*)` proceeds by
 
  * checking for the magic number `DIDL`
  * using the inverse of the `T` function to decode the type definitions `(<t>,*)`
- * check that `(<t>,*) <: (<t'>,*)`, else fail
  * using the inverse of the `M` function, indexed by `(<t>,*)`, to decode the values `(<v>,*)`
- * use the coercion function `C[(<t>,*) <: (<t'>,*)]((<v>,*))` to understand the decoded values at the expected type.
+ * using the cost model `C` to check if `C((<v>,*))` exceed a threshold
+ * use the coercion function `v : t ~> v' : t'` to derive the decoded values at the expected type.
 
 ### Deserialisation of future types
 
