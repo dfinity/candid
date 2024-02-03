@@ -823,7 +823,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         check_recursion! {
         self.unroll_type()?;
-        self.dec_value_cost(2)?;
+        self.dec_value_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
                 let e = self.table.trace_type(e)?;
@@ -1095,6 +1095,7 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                 if *len == 0 {
                     return Ok(None);
                 }
+                self.de.dec_value_cost(1)?;
                 self.de.expect_type = expect.0.clone();
                 self.de.wire_type = wire.0.clone();
                 *len -= 1;
