@@ -46,7 +46,7 @@ impl<'de> IDLDeserialize<'de> {
                 "Cannot parse header".to_string()
             }
         })?;
-        de.zero_sized_values = config.zero_sized_values;
+        de.value_cost = config.value_cost;
         de.full_error_message = config.full_error_message;
         Ok(IDLDeserialize { de })
     }
@@ -141,18 +141,18 @@ impl<'de> IDLDeserialize<'de> {
 }
 
 pub struct Config {
-    zero_sized_values: usize,
+    value_cost: usize,
     full_error_message: bool,
 }
 impl Config {
     pub fn new() -> Self {
         Self {
-            zero_sized_values: 2_000_000,
+            value_cost: 2_000_000,
             full_error_message: true,
         }
     }
-    pub fn set_zero_sized_values(&mut self, n: usize) -> &mut Self {
-        self.zero_sized_values = n;
+    pub fn set_value_cost(&mut self, n: usize) -> &mut Self {
+        self.value_cost = n;
         self
     }
     pub fn set_full_error_message(&mut self, n: bool) -> &mut Self {
@@ -236,7 +236,7 @@ struct Deserializer<'de> {
     // Indicates whether to deserialize with IDLValue.
     // It only affects the field id generation in enum type.
     is_untyped: bool,
-    zero_sized_values: usize,
+    value_cost: usize,
     full_error_message: bool,
     #[cfg(not(target_arch = "wasm32"))]
     recursion_depth: u16,
@@ -256,10 +256,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
-            #[cfg(not(target_arch = "wasm32"))]
-            zero_sized_values: 2_000_000,
-            #[cfg(target_arch = "wasm32")]
-            zero_sized_values: 0,
+            value_cost: 2_000_000,
             #[cfg(not(target_arch = "wasm32"))]
             full_error_message: true,
             #[cfg(target_arch = "wasm32")]
@@ -337,16 +334,12 @@ impl<'de> Deserializer<'de> {
         }
         Ok(())
     }
-    fn is_zero_sized_type(&self, t: &Type) -> bool {
-        match t.as_ref() {
-            TypeInner::Null | TypeInner::Reserved => true,
-            TypeInner::Record(fs) => fs.iter().all(|f| {
-                let t = self.table.trace_type(&f.ty).unwrap();
-                // recursive records have been replaced with empty already, it's safe to call without memoization.
-                self.is_zero_sized_type(&t)
-            }),
-            _ => false,
+    fn dec_value_cost(&mut self, n: usize) -> Result<()> {
+        if self.value_cost < n {
+            return Err(Error::msg("Values on the wire exceed the cost limit"));
         }
+        self.value_cost -= n;
+        Ok(())
     }
     // Should always call set_field_name to set the field_name. After deserialize_identifier
     // processed the field_name, field_name will be reset to None.
@@ -376,6 +369,7 @@ impl<'de> Deserializer<'de> {
             TypeInner::Nat => Int(Nat::decode(&mut self.input).map_err(Error::msg)?.0.into()),
             t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
         };
+        self.dec_value_cost(1)?;
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
         visitor.visit_byte_buf(bytes)
     }
@@ -390,6 +384,7 @@ impl<'de> Deserializer<'de> {
             *self.expect_type == TypeInner::Nat && *self.wire_type == TypeInner::Nat,
             "nat"
         );
+        self.dec_value_cost(1)?;
         let mut bytes = vec![1u8];
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
         bytes.extend_from_slice(&nat.0.to_bytes_le());
@@ -405,14 +400,16 @@ impl<'de> Deserializer<'de> {
             "principal"
         );
         let mut bytes = vec![2u8];
-        let id = PrincipalBytes::read(&mut self.input)?.inner;
-        bytes.extend_from_slice(&id);
+        let id = PrincipalBytes::read(&mut self.input)?;
+        self.dec_value_cost(id.len as usize + 1)?;
+        bytes.extend_from_slice(&id.inner);
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_reserved<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
+        self.dec_value_cost(1)?;
         let bytes = vec![3u8];
         visitor.visit_byte_buf(bytes)
     }
@@ -423,8 +420,9 @@ impl<'de> Deserializer<'de> {
         self.unroll_type()?;
         self.check_subtype()?;
         let mut bytes = vec![4u8];
-        let id = PrincipalBytes::read(&mut self.input)?.inner;
-        bytes.extend_from_slice(&id);
+        let id = PrincipalBytes::read(&mut self.input)?;
+        self.dec_value_cost(id.len as usize + 1)?;
+        bytes.extend_from_slice(&id.inner);
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_function<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
@@ -437,13 +435,14 @@ impl<'de> Deserializer<'de> {
             return Err(Error::msg("Opaque reference not supported"));
         }
         let mut bytes = vec![5u8];
-        let id = PrincipalBytes::read(&mut self.input)?.inner;
+        let id = PrincipalBytes::read(&mut self.input)?;
         let len = Len::read(&mut self.input)?.0;
         let meth = self.borrow_bytes(len)?;
+        self.dec_value_cost(id.len as usize + len + 1)?;
         // TODO find a better way
         leb128::write::unsigned(&mut bytes, len as u64)?;
         bytes.extend_from_slice(meth);
-        bytes.extend_from_slice(&id);
+        bytes.extend_from_slice(&id.inner);
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_blob<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
@@ -456,6 +455,7 @@ impl<'de> Deserializer<'de> {
             "blob"
         );
         let len = Len::read(&mut self.input)?.0;
+        self.dec_value_cost(len + 1)?;
         let blob = self.borrow_bytes(len)?;
         let mut bytes = Vec::with_capacity(len + 1);
         bytes.push(6u8);
@@ -476,6 +476,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.dec_value_cost(1)?;
         let len = Len::read(&mut self.input)?.0 as u64;
         Len::read(&mut self.input)?;
         let slice_len = self.input.get_ref().len() as u64;
@@ -531,6 +532,7 @@ macro_rules! primitive_impl {
             where V: Visitor<'de> {
                 self.unroll_type()?;
                 check!(*self.expect_type == $type && *self.wire_type == $type, stringify!($type));
+                self.dec_value_cost(1)?;
                 let val = self.input.$($value)*().map_err(|_| Error::msg(format!("Cannot read {} value", stringify!($type))))?;
                 visitor.[<visit_ $ty>](val)
             }
@@ -631,6 +633,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 .map_err(|_| Error::msg("Cannot convert nat to i128"))?,
             t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
         };
+        self.dec_value_cost(1)?;
         visitor.visit_i128(value)
     }
     fn deserialize_u128<V>(self, visitor: V) -> Result<V::Value>
@@ -642,6 +645,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             *self.expect_type == TypeInner::Nat && *self.wire_type == TypeInner::Nat,
             "nat"
         );
+        self.dec_value_cost(1)?;
         let value = crate::types::leb128::decode_nat(&mut self.input)?;
         visitor.visit_u128(value)
     }
@@ -655,6 +659,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 && matches!(*self.wire_type, TypeInner::Null | TypeInner::Reserved),
             "unit"
         );
+        self.dec_value_cost(1)?;
         visitor.visit_unit()
     }
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
@@ -666,6 +671,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             *self.expect_type == TypeInner::Bool && *self.wire_type == TypeInner::Bool,
             "bool"
         );
+        self.dec_value_cost(1)?;
         let res = BoolValue::read(&mut self.input)?;
         visitor.visit_bool(res.0)
     }
@@ -679,6 +685,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             "text"
         );
         let len = Len::read(&mut self.input)?.0;
+        self.dec_value_cost(len + 1)?;
         let bytes = self.borrow_bytes(len)?.to_owned();
         let value = String::from_utf8(bytes).map_err(Error::msg)?;
         visitor.visit_string(value)
@@ -693,6 +700,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             "text"
         );
         let len = Len::read(&mut self.input)?.0;
+        self.dec_value_cost(len + 1)?;
         let slice = self.borrow_bytes(len)?;
         let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
         visitor.visit_borrowed_str(value)
@@ -701,12 +709,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.dec_value_cost(1)?;
         self.deserialize_unit(visitor)
     }
     fn deserialize_newtype_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
+        self.dec_value_cost(1)?;
         visitor.visit_newtype_struct(self)
     }
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>
@@ -714,6 +724,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
+        if matches!(
+            self.wire_type.as_ref(),
+            TypeInner::Null | TypeInner::Reserved | TypeInner::Opt(_)
+        ) {
+            self.dec_value_cost(1)?;
+        }
         match (self.wire_type.as_ref(), self.expect_type.as_ref()) {
             (TypeInner::Null | TypeInner::Reserved, TypeInner::Opt(_)) => visitor.visit_none(),
             (TypeInner::Opt(t1), TypeInner::Opt(t2)) => {
@@ -750,17 +766,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         check_recursion! {
         self.unroll_type()?;
+        self.dec_value_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
                 let expect = e.clone();
                 let wire = self.table.trace_type(w)?;
                 let len = Len::read(&mut self.input)?.0;
-                if self.is_zero_sized_type(&wire) {
-                    if self.zero_sized_values < len {
-                        return Err(Error::msg("vec length of zero sized values too large"));
-                    }
-                    self.zero_sized_values -= len;
-                }
                 visitor.visit_seq(Compound::new(self, Style::Vector { len, expect, wire }))
             }
             (TypeInner::Record(e), TypeInner::Record(w)) => {
@@ -789,6 +800,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             "vec nat8"
         );
         let len = Len::read(&mut self.input)?.0;
+        self.dec_value_cost(len as usize + 1)?;
         let bytes = self.borrow_bytes(len)?.to_owned();
         visitor.visit_byte_buf(bytes)
     }
@@ -798,6 +810,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             TypeInner::Principal => self.deserialize_principal(visitor),
             TypeInner::Vec(t) if **t == TypeInner::Nat8 => {
                 let len = Len::read(&mut self.input)?.0;
+                self.dec_value_cost(len as usize + 1)?;
                 let slice = self.borrow_bytes(len)?;
                 visitor.visit_borrowed_bytes(slice)
             }
@@ -810,6 +823,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         check_recursion! {
         self.unroll_type()?;
+        self.dec_value_cost(2)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
                 let e = self.table.trace_type(e)?;
@@ -875,6 +889,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         check_recursion! {
         self.unroll_type()?;
+        self.dec_value_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Record(e), TypeInner::Record(w)) => {
                 let expect = e.clone().into();
@@ -898,6 +913,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         check_recursion! {
         self.unroll_type()?;
+        self.dec_value_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Variant(e), TypeInner::Variant(w)) => {
                 let index = Len::read(&mut self.input)?.0;
@@ -1143,6 +1159,7 @@ impl<'de, 'a> de::VariantAccess<'de> for Compound<'a, 'de> {
             *self.de.expect_type == TypeInner::Null && *self.de.wire_type == TypeInner::Null,
             "unit_variant"
         );
+        self.de.dec_value_cost(1)?;
         Ok(())
     }
 

@@ -1265,7 +1265,7 @@ C(n : nat<N>)   = 1
 C(i : int<N>)   = 1
 C(z : float<N>) = 1
 C(b : bool)     = 1
-C(t : text)     = |t|
+C(t : text)     = 1 + |t|
 C(_ : null)     = 1
 C(_ : reserved) = 1
 C(_ : empty) undefined
@@ -1273,8 +1273,8 @@ C(_ : empty) undefined
 C : <val> -> <constype> -> nat
 C(null : opt <datatype>) = 1
 C(?v   : opt <datatype>) = 1 + C(v : <datatype>)
-C(v^N  : vec <datatype>) = sum_i C(v[i] : <datatype>)
-C(kv*  : record {<fieldtype>*}) = sum_i C(kv : <fieldtype>*[i])
+C(v^N  : vec <datatype>) = 1 + sum_i C(v[i] : <datatype>)
+C(kv*  : record {<fieldtype>*}) = 1 + sum_i C(kv : <fieldtype>*[i])
 C(kv   : variant {<fieldtype>*}) = 1 + C(kv : <fieldtype>*[i])
 
 C : (<nat>, <val>) -> <fieldtype> -> nat
@@ -1282,13 +1282,13 @@ C((k,v) : k:<datatype>) = C(v : <datatype>)
 
 C : <val> -> <reftype> -> nat
 C(ref(r) : service <actortype>) = 1
-C(id(v*) : service <actortype>) = |v*|
+C(id(v*) : service <actortype>) = 1 + |v*|
 
 C(ref(r)   : func <functype>) = 1
-C(pub(s,n) : func <functype>) = C(s : service {}) + C(n : text)
+C(pub(s,n) : func <functype>) = 1 + C(s : service {}) + C(n : text)
 
 C(ref(r) : principal) = 1
-C(id(v*) : principal) = |v*|
+C(id(v*) : principal) = 1 + |v*|
 ```
 
 #### References
@@ -1362,7 +1362,7 @@ Deserialisation uses the following mechanism for robustness towards future exten
 
 * A serialised type may be headed by an opcode other than the ones defined above (i.e., less than -24). Any such opcode is followed by an LEB128-encoded count, and then a number of bytes corresponding to this count. A type represented that way is called a *future type*.
 
-* A value corresponding to a future type is called a *future value*. It is represented by two LEB128-encoded counts, *m* and *n*, followed by a *m* bytes in the memory representation M and accompanied by *n* corresponding references in R.
+* A value corresponding to a future type is called a *future value*. It is represented by two LEB128-encoded counts, *m* and *n*, followed by a *m* bytes in the memory representation M and accompanied by *n* corresponding references in R. The cost `C` of a future value is 1, since wire data is completely skipped.
 
 These measures allow the serialisation format to be extended with new types in the future, as long as their representation and the representation of the corresponding values include a length prefix matching the above scheme, and thereby allowing an older deserialiser not understanding them to skip over them. The subtyping rules ensure that upgradability is maintained in this situation, i.e., an old deserialiser has no need to understand the encoded data.
 
