@@ -756,6 +756,15 @@ where
     let decoded_macro = Decode!(bytes, T).unwrap();
     assert_eq!(decoded_one, *expected);
     assert_eq!(decoded_macro, *expected);
+    #[cfg(feature = "value")]
+    {
+        use candid::types::value::IDLValue;
+        let mut deserializer = candid::de::IDLDeserialize::new(bytes).unwrap();
+        let decoded = deserializer.get_value::<IDLValue>().unwrap();
+        let cost = deserializer.value_cost();
+        let _ = deserializer.done().unwrap();
+        assert_eq!(cost, decoded.cost());
+    }
 }
 
 fn encode<T: CandidType>(value: &T) -> Vec<u8> {

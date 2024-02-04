@@ -128,6 +128,9 @@ impl IDLArgs {
         de.done()?;
         Ok(IDLArgs { args })
     }
+    pub fn cost(&self) -> usize {
+        self.args.iter().map(IDLValue::cost).sum::<usize>()
+    }
 }
 
 impl IDLValue {
@@ -365,6 +368,45 @@ impl IDLValue {
         let blob = Encode!(data)?;
         let args = IDLArgs::from_bytes_with_types(&blob, &TypeEnv::default(), &[T::ty()])?;
         Ok(args.args[0].clone())
+    }
+    /// Return the value cost of the IDLValue. It can only match the cost reported by the deserializer when decoded untyped and the LEB128 encoding is compact.
+    pub fn cost(&self) -> usize {
+        match self {
+            IDLValue::Null => 1,
+            IDLValue::Bool(_) => 1,
+            IDLValue::Text(s) => 1 + s.len(),
+            IDLValue::Int(i) => {
+                let mut leb = Vec::new();
+                i.encode(&mut leb).unwrap();
+                leb.len()
+            }
+            IDLValue::Nat(n) => {
+                let mut leb = Vec::new();
+                n.encode(&mut leb).unwrap();
+                leb.len()
+            }
+            IDLValue::Nat8(_) => 1,
+            IDLValue::Nat16(_) => 2,
+            IDLValue::Nat32(_) => 4,
+            IDLValue::Nat64(_) => 8,
+            IDLValue::Int8(_) => 1,
+            IDLValue::Int16(_) => 2,
+            IDLValue::Int32(_) => 4,
+            IDLValue::Int64(_) => 8,
+            IDLValue::Float32(_) => 4,
+            IDLValue::Float64(_) => 8,
+            IDLValue::None => 1,
+            IDLValue::Opt(v) => 1 + v.cost(),
+            IDLValue::Vec(vec) => 1 + vec.iter().map(IDLValue::cost).sum::<usize>(),
+            IDLValue::Record(vec) => 1 + vec.iter().map(|f| 1 + f.val.cost()).sum::<usize>(),
+            IDLValue::Variant(v) => 1 + v.0.val.cost(),
+            IDLValue::Blob(blob) => 1 + blob.len(),
+            IDLValue::Principal(id) => 1 + id.as_slice().len(),
+            IDLValue::Service(id) => 1 + id.as_slice().len(),
+            IDLValue::Func(id, meth) => 3 + id.as_slice().len() + meth.len(),
+            IDLValue::Reserved => 1,
+            IDLValue::Number(_) => unreachable!(),
+        }
     }
 }
 

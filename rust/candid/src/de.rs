@@ -20,6 +20,7 @@ use std::fmt::Write;
 use std::{collections::VecDeque, io::Cursor, mem::replace};
 
 const MAX_TYPE_LEN: i32 = 500;
+const DEFAULT_VALUE_COST: usize = 3_000_000;
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
 pub struct IDLDeserialize<'de> {
@@ -138,6 +139,10 @@ impl<'de> IDLDeserialize<'de> {
         }
         Ok(())
     }
+    /// Return the value cost on the wire
+    pub fn value_cost(&self) -> usize {
+        DEFAULT_VALUE_COST - self.de.value_cost
+    }
 }
 
 pub struct Config {
@@ -147,7 +152,7 @@ pub struct Config {
 impl Config {
     pub fn new() -> Self {
         Self {
-            value_cost: 2_000_000,
+            value_cost: DEFAULT_VALUE_COST,
             full_error_message: true,
         }
     }
@@ -256,7 +261,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
-            value_cost: 2_000_000,
+            value_cost: DEFAULT_VALUE_COST,
             #[cfg(not(target_arch = "wasm32"))]
             full_error_message: true,
             #[cfg(target_arch = "wasm32")]
@@ -440,7 +445,7 @@ impl<'de> Deserializer<'de> {
         let id = PrincipalBytes::read(&mut self.input)?;
         let len = Len::read(&mut self.input)?.0;
         let meth = self.borrow_bytes(len)?;
-        self.dec_value_cost(id.len as usize + len + 1)?;
+        self.dec_value_cost(id.len as usize + len + 3)?;
         // TODO find a better way
         leb128::write::unsigned(&mut bytes, len as u64)?;
         bytes.extend_from_slice(meth);
@@ -804,7 +809,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             "vec nat8"
         );
         let len = Len::read(&mut self.input)?.0;
-        self.dec_value_cost(len as usize + 1)?;
+        self.dec_value_cost(len + 1)?;
         let bytes = self.borrow_bytes(len)?.to_owned();
         visitor.visit_byte_buf(bytes)
     }
@@ -814,7 +819,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             TypeInner::Principal => self.deserialize_principal(visitor),
             TypeInner::Vec(t) if **t == TypeInner::Nat8 => {
                 let len = Len::read(&mut self.input)?.0;
-                self.dec_value_cost(len as usize + 1)?;
+                self.dec_value_cost(len + 1)?;
                 let slice = self.borrow_bytes(len)?;
                 visitor.visit_borrowed_bytes(slice)
             }
