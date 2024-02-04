@@ -1259,11 +1259,11 @@ Some values on the wire take fewer space than the values on the host language, e
 
 ```
 C : <val> -> <primtype> -> nat
-C(n : nat)      = 1
-C(i : int)      = 1
-C(n : nat<N>)   = 1
-C(i : int<N>)   = 1
-C(z : float<N>) = 1
+C(n : nat)      = |leb128(n)|
+C(i : int)      = |sleb128(i)|
+C(n : nat<N>)   = N / 8
+C(i : int<N>)   = N / 8
+C(z : float<N>) = N / 8
 C(b : bool)     = 1
 C(t : text)     = 1 + |t|
 C(_ : null)     = 1
@@ -1275,10 +1275,10 @@ C(null : opt <datatype>) = 1
 C(?v   : opt <datatype>) = 1 + C(v : <datatype>)
 C(v^N  : vec <datatype>) = 1 + sum_i C(v[i] : <datatype>)
 C(kv*  : record {<fieldtype>*}) = 1 + sum_i C(kv : <fieldtype>*[i])
-C(kv   : variant {<fieldtype>*}) = 1 + C(kv : <fieldtype>*[i])
+C(kv   : variant {<fieldtype>*}) = C(kv : <fieldtype>*[i])
 
 C : (<nat>, <val>) -> <fieldtype> -> nat
-C((k,v) : k:<datatype>) = C(v : <datatype>)
+C((k,v) : k:<datatype>) = 1 + C(v : <datatype>)
 
 C : <val> -> <reftype> -> nat
 C(ref(r) : service <actortype>) = 1

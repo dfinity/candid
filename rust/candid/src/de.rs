@@ -364,12 +364,13 @@ impl<'de> Deserializer<'de> {
         self.unroll_type()?;
         assert!(*self.expect_type == TypeInner::Int);
         let mut bytes = vec![0u8];
+        let pos = self.input.position();
         let int = match self.wire_type.as_ref() {
             TypeInner::Int => Int::decode(&mut self.input).map_err(Error::msg)?,
             TypeInner::Nat => Int(Nat::decode(&mut self.input).map_err(Error::msg)?.0.into()),
             t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
         };
-        self.dec_value_cost(1)?;
+        self.dec_value_cost((self.input.position() - pos) as usize)?;
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
         visitor.visit_byte_buf(bytes)
     }
@@ -384,9 +385,10 @@ impl<'de> Deserializer<'de> {
             *self.expect_type == TypeInner::Nat && *self.wire_type == TypeInner::Nat,
             "nat"
         );
-        self.dec_value_cost(1)?;
         let mut bytes = vec![1u8];
+        let pos = self.input.position();
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
+        self.dec_value_cost((self.input.position() - pos) as usize)?;
         bytes.extend_from_slice(&nat.0.to_bytes_le());
         visitor.visit_byte_buf(bytes)
     }
@@ -526,13 +528,13 @@ impl<'de> Deserializer<'de> {
 }
 
 macro_rules! primitive_impl {
-    ($ty:ident, $type:expr, $($value:tt)*) => {
+    ($ty:ident, $type:expr, $cost:literal, $($value:tt)*) => {
         paste::item! {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
                 self.unroll_type()?;
                 check!(*self.expect_type == $type && *self.wire_type == $type, stringify!($type));
-                self.dec_value_cost(1)?;
+                self.dec_value_cost($cost)?;
                 let val = self.input.$($value)*().map_err(|_| Error::msg(format!("Cannot read {} value", stringify!($type))))?;
                 visitor.[<visit_ $ty>](val)
             }
@@ -606,16 +608,16 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         v
     }
 
-    primitive_impl!(i8, TypeInner::Int8, read_i8);
-    primitive_impl!(i16, TypeInner::Int16, read_i16::<LittleEndian>);
-    primitive_impl!(i32, TypeInner::Int32, read_i32::<LittleEndian>);
-    primitive_impl!(i64, TypeInner::Int64, read_i64::<LittleEndian>);
-    primitive_impl!(u8, TypeInner::Nat8, read_u8);
-    primitive_impl!(u16, TypeInner::Nat16, read_u16::<LittleEndian>);
-    primitive_impl!(u32, TypeInner::Nat32, read_u32::<LittleEndian>);
-    primitive_impl!(u64, TypeInner::Nat64, read_u64::<LittleEndian>);
-    primitive_impl!(f32, TypeInner::Float32, read_f32::<LittleEndian>);
-    primitive_impl!(f64, TypeInner::Float64, read_f64::<LittleEndian>);
+    primitive_impl!(i8, TypeInner::Int8, 1, read_i8);
+    primitive_impl!(i16, TypeInner::Int16, 2, read_i16::<LittleEndian>);
+    primitive_impl!(i32, TypeInner::Int32, 4, read_i32::<LittleEndian>);
+    primitive_impl!(i64, TypeInner::Int64, 8, read_i64::<LittleEndian>);
+    primitive_impl!(u8, TypeInner::Nat8, 1, read_u8);
+    primitive_impl!(u16, TypeInner::Nat16, 2, read_u16::<LittleEndian>);
+    primitive_impl!(u32, TypeInner::Nat32, 4, read_u32::<LittleEndian>);
+    primitive_impl!(u64, TypeInner::Nat64, 8, read_u64::<LittleEndian>);
+    primitive_impl!(f32, TypeInner::Float32, 4, read_f32::<LittleEndian>);
+    primitive_impl!(f64, TypeInner::Float64, 8, read_f64::<LittleEndian>);
 
     fn is_human_readable(&self) -> bool {
         false
@@ -627,13 +629,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         use crate::types::leb128::{decode_int, decode_nat};
         self.unroll_type()?;
         assert!(*self.expect_type == TypeInner::Int);
+        let pos = self.input.position();
         let value: i128 = match self.wire_type.as_ref() {
             TypeInner::Int => decode_int(&mut self.input)?,
             TypeInner::Nat => i128::try_from(decode_nat(&mut self.input)?)
                 .map_err(|_| Error::msg("Cannot convert nat to i128"))?,
             t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
         };
-        self.dec_value_cost(1)?;
+        self.dec_value_cost((self.input.position() - pos) as usize)?;
         visitor.visit_i128(value)
     }
     fn deserialize_u128<V>(self, visitor: V) -> Result<V::Value>
@@ -645,8 +648,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             *self.expect_type == TypeInner::Nat && *self.wire_type == TypeInner::Nat,
             "nat"
         );
-        self.dec_value_cost(1)?;
+        let pos = self.input.position();
         let value = crate::types::leb128::decode_nat(&mut self.input)?;
+        self.dec_value_cost((self.input.position() - pos) as usize)?;
         visitor.visit_u128(value)
     }
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
@@ -1015,6 +1019,7 @@ impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
                 if expect.is_empty() && wire.is_empty() {
                     return Ok(None);
                 }
+                self.de.dec_value_cost(1)?;
                 self.de.expect_type = expect
                     .pop_front()
                     .map(|f| f.ty)
@@ -1044,6 +1049,7 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                 match (expect.front(), wire.front()) {
                     (Some(e), Some(w)) => {
                         use std::cmp::Ordering;
+                        self.de.dec_value_cost(1)?;
                         match e.id.get_id().cmp(&w.id.get_id()) {
                             Ordering::Equal => {
                                 self.de.set_field_name(e.id.clone());
@@ -1073,6 +1079,7 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                         }
                     }
                     (None, Some(_)) => {
+                        self.de.dec_value_cost(1)?;
                         self.de.set_field_name(Label::Named("_".to_owned()).into());
                         self.de.wire_type = wire.pop_front().unwrap().ty;
                         self.de.expect_type = TypeInner::Reserved.into();
@@ -1110,6 +1117,7 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
     {
         match &self.style {
             Style::Map { expect, wire, .. } => {
+                self.de.dec_value_cost(1)?;
                 self.de.expect_type = expect.1.clone();
                 self.de.wire_type = wire.1.clone();
                 seed.deserialize(&mut *self.de)
