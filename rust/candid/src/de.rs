@@ -725,7 +725,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.dec_value_cost(1)?;
         visitor.visit_newtype_struct(self)
     }
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>
@@ -851,6 +850,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                                 let expect = (ek.clone(), ev.clone());
                                 let wire = (wk.clone(), wv.clone());
                                 let len = Len::read(&mut self.input)?.0;
+                                self.dec_value_cost(len)?;
                                 visitor.visit_map(Compound::new(
                                     self,
                                     Style::Map { len, expect, wire },
@@ -1024,7 +1024,9 @@ impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
                 if expect.is_empty() && wire.is_empty() {
                     return Ok(None);
                 }
-                self.de.dec_value_cost(1)?;
+                if !wire.is_empty() {
+                    self.de.dec_value_cost(1)?;
+                }
                 self.de.expect_type = expect
                     .pop_front()
                     .map(|f| f.ty)
@@ -1054,15 +1056,16 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                 match (expect.front(), wire.front()) {
                     (Some(e), Some(w)) => {
                         use std::cmp::Ordering;
-                        self.de.dec_value_cost(1)?;
                         match e.id.get_id().cmp(&w.id.get_id()) {
                             Ordering::Equal => {
+                                self.de.dec_value_cost(1)?;
                                 self.de.set_field_name(e.id.clone());
                                 self.de.expect_type = expect.pop_front().unwrap().ty;
                                 self.de.wire_type = wire.pop_front().unwrap().ty;
                             }
                             Ordering::Less => {
                                 // by subtyping rules, expect_type can only be opt, reserved or null.
+                                self.de.value_cost += 1; // correct the later decrement from serialize_option of producing None.
                                 let field = e.id.clone();
                                 self.de.set_field_name(field.clone());
                                 let expect = expect.pop_front().unwrap().ty;
@@ -1077,6 +1080,7 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                                 self.de.wire_type = TypeInner::Reserved.into();
                             }
                             Ordering::Greater => {
+                                self.de.dec_value_cost(1)?;
                                 self.de.set_field_name(Label::Named("_".to_owned()).into());
                                 self.de.wire_type = wire.pop_front().unwrap().ty;
                                 self.de.expect_type = TypeInner::Reserved.into();
@@ -1090,6 +1094,7 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                         self.de.expect_type = TypeInner::Reserved.into();
                     }
                     (Some(e), None) => {
+                        self.de.value_cost += 1; // correct the later decrement from serialize_option of producing None.
                         self.de.set_field_name(e.id.clone());
                         self.de.expect_type = expect.pop_front().unwrap().ty;
                         self.de.wire_type = TypeInner::Reserved.into();

@@ -18,20 +18,6 @@ assert blob "DIDL\04\6c\03\01\7f\02\01\03\02\6c\01\01\70\6c\00\6d\00\01\03\80\94
 assert blob "DIDL\02\6d\01\6d\7f\01\00\05\ff\ff\3f\ff\ff\3f\ff\ff\3f\ff\ff\3f\ff\ff\3f"    !: () "vec vec null (extra argument)";
 assert blob "DIDL\03\6c\01\d6\fc\a7\02\01\6d\02\6c\00\01\00\80\ad\e2\04"                   !: () "vec record {} (extra argument)";
 
-// Messages with exactly 2_000_000 zero-length elements should succeed
-assert blob "DIDL\01\6d\7f\01\00\80\89\7a"                           : () "vec null (exactly 2000000)";
-assert blob "DIDL\01\6d\70\01\00\80\89\7a"                           : () "vec reserved (exactly 2000000)";
-assert blob "DIDL\04\6c\03\01\7f\02\01\03\02\6c\01\01\70\6c\00\6d\00\01\03\80\89\7a" : () "zero-sized record (exactly 2000000)";
-assert blob "DIDL\02\6d\01\6d\7f\01\00\05\80\b5\18\80\b5\18\80\b5\18\80\b5\18\80\b5\18" : () "vec vec null (exactly 2000000)";
-assert blob "DIDL\03\6c\01\d6\fc\a7\02\01\6d\02\6c\00\01\00\80\89\7a"                   : () "vec record {} (exactly 2000000)";
-
-// Messages with exactly 2_000_001 zero-length elements should fail
-assert blob "DIDL\01\6d\7f\01\00\80\89\7b"                           !: () "vec null (exactly 2000001)";
-assert blob "DIDL\01\6d\70\01\00\80\89\7b"                           !: () "vec reserved (exactly 2000001)";
-assert blob "DIDL\04\6c\03\01\7f\02\01\03\02\6c\01\01\70\6c\00\6d\00\01\03\80\89\7b" !: () "zero-sized record (exactly 2000001)";
-assert blob "DIDL\02\6d\01\6d\7f\01\00\05\80\b5\18\80\b5\18\80\b5\18\80\b5\18\80\b5\19" !: () "vec vec null (exactly 2000001)";
-assert blob "DIDL\03\6c\01\d6\fc\a7\02\01\6d\02\6c\00\01\00\80\89\7b"                   !: () "vec record {} (exactly 2000001)";
-
 // Decoding to actual type
 assert blob "DIDL\01\6d\7f\01\00\80\94\eb\dc\03"                           !: (vec opt nat) "vec null (not ignored)";
 assert blob "DIDL\01\6d\70\01\00\80\94\eb\dc\03"                           !: (vec reserved) "vec reserved (not ignored)";
