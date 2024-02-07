@@ -760,14 +760,14 @@ where
     {
         use candid::types::value::IDLValue;
         let mut deserializer = candid::de::IDLDeserialize::new(bytes).unwrap();
-        let _ = deserializer.get_value::<T>().unwrap();
+        deserializer.get_value::<T>().unwrap();
         let cost1 = deserializer.value_cost();
-        let _ = deserializer.done().unwrap();
+        deserializer.done().unwrap();
 
         let mut deserializer = candid::de::IDLDeserialize::new(bytes).unwrap();
         let value = deserializer.get_value::<IDLValue>().unwrap();
         let cost2 = deserializer.value_cost();
-        let _ = deserializer.done().unwrap();
+        deserializer.done().unwrap();
         assert_eq!(cost1, cost2);
         assert_eq!(cost2, value.cost());
     }
