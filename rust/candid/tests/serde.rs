@@ -656,6 +656,25 @@ fn test_field_rename() {
     }
     let v = E1::Field2;
     all_check(v, "4449444c016b02617f627f010001");
+    #[derive(CandidType, Deserialize, PartialEq, Debug)]
+    enum E2 {
+        #[serde(rename = "1-2 + 3")]
+        A(i8),
+        #[serde(rename = "a-b")]
+        B(u8),
+    }
+    all_check(E2::A(42), "4449444c016b02b684a7027bb493ee970d770100012a");
+    #[derive(CandidType, Deserialize, PartialEq, Debug)]
+    struct S2 {
+        #[serde(rename = "1-2 + 3")]
+        a: i8,
+        #[serde(rename = "a-b")]
+        b: u8,
+    }
+    all_check(
+        S2 { a: 42, b: 42 },
+        "4449444c016c02b684a7027bb493ee970d7701002a2a",
+    );
 }
 
 #[test]
