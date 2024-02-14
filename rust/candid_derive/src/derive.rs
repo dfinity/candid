@@ -43,7 +43,7 @@ pub(crate) fn derive_idl_type(
 
 struct Variant {
     real_ident: syn::Ident,
-    renamed_ident: syn::Ident,
+    renamed_ident: String,
     hash: u32,
     ty: TokenStream,
     members: Vec<Ident>,
@@ -100,11 +100,12 @@ fn enum_from_ast(
             let id = variant.ident.clone();
             let attrs = get_attrs(&variant.attrs);
             let (renamed_ident, hash) = match attrs.rename {
-                Some(ref rename) => (
-                    proc_macro2::Ident::new(rename, proc_macro2::Span::call_site()),
-                    idl_hash(rename),
-                ),
-                None => (id.clone(), idl_hash(&id.unraw().to_string())),
+                Some(ref rename) => (rename.clone(), idl_hash(rename)),
+                None => {
+                    let id = id.unraw().to_string();
+                    let hash = idl_hash(&id);
+                    (id, hash)
+                }
             };
             let (ty, idents, _, style) = struct_from_ast(&variant.fields, custom_candid_path);
             Variant {
@@ -122,9 +123,7 @@ fn enum_from_ast(
     assert_eq!(unique.len(), fs.len());
     fs.sort_unstable_by_key(|Variant { hash, .. }| *hash);
 
-    let id = fs
-        .iter()
-        .map(|Variant { renamed_ident, .. }| renamed_ident.unraw().to_string());
+    let id = fs.iter().map(|Variant { renamed_ident, .. }| renamed_ident);
     let ty = fs.iter().map(|Variant { ty, .. }| ty);
     let candid = candid_path(custom_candid_path);
     let ty_gen = quote! {
@@ -234,13 +233,16 @@ fn struct_from_ast(
 #[derive(Clone)]
 enum Ident {
     Named(syn::Ident),
+    Renamed(String),
     Unnamed(u32),
 }
+
 impl Ident {
     fn to_token(&self) -> TokenStream {
         match self {
             Ident::Named(ident) => quote! { #ident },
             Ident::Unnamed(ref i) => syn::parse_str::<TokenStream>(&format!("{i}")).unwrap(),
+            Ident::Renamed(_) => unreachable!(),
         }
     }
 }
@@ -248,6 +250,7 @@ impl std::fmt::Display for Ident {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
             Ident::Named(ref ident) => f.write_fmt(format_args!("{ident}")),
+            Ident::Renamed(ref ident) => f.write_fmt(format_args!("{ident}")),
             Ident::Unnamed(ref i) => f.write_fmt(format_args!("{}", *i)),
         }
     }
@@ -336,9 +339,7 @@ fn fields_from_ast(
                     let real_ident = Ident::Named(ident.clone());
                     match attrs.rename {
                         Some(ref renamed) => {
-                            let ident =
-                                proc_macro2::Ident::new(renamed, proc_macro2::Span::call_site());
-                            let renamed_ident = Ident::Named(ident);
+                            let renamed_ident = Ident::Renamed(renamed.clone());
                             (real_ident, renamed_ident, idl_hash(renamed))
                         }
                         None => (
@@ -369,6 +370,9 @@ fn fields_from_ast(
             Ident::Named(ref id) => {
                 let name = id.unraw().to_string();
                 quote! { #candid::types::Label::Named(#name.to_string()).into() }
+            }
+            Ident::Renamed(ref id) => {
+                quote! { #candid::types::Label::Named(#id.to_string()).into() }
             }
             Ident::Unnamed(ref i) => quote! { #candid::types::Label::Id(#i).into() },
         });

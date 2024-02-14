@@ -1,8 +1,7 @@
 use anyhow::{bail, Result};
 use candid_parser::candid::types::{subtype, Type};
 use candid_parser::{
-    error::pretty_diagnose,
-    parse_idl_args, parse_idl_value, pretty_check_file, pretty_parse,
+    parse_idl_args, parse_idl_value, pretty_check_file, pretty_parse, pretty_wrap,
     types::{IDLType, IDLTypes},
     typing::ast_to_type,
     Error, IDLArgs, IDLValue, TypeEnv,
@@ -153,10 +152,7 @@ impl TypeAnnotation {
 }
 
 fn parse_args(str: &str) -> Result<IDLArgs, Error> {
-    parse_idl_args(str).map_err(|e| {
-        let _ = pretty_diagnose("candid arguments", str, &e);
-        e
-    })
+    pretty_wrap("candid arguments", str, parse_idl_args)
 }
 fn parse_types(str: &str) -> Result<IDLTypes, Error> {
     pretty_parse("type annotations", str)
@@ -289,15 +285,10 @@ fn main() -> Result<()> {
                         .filter(|c| !c.is_whitespace())
                         .collect::<String>(),
                 )?,
-                "blob" => {
-                    match parse_idl_value(&blob).map_err(|e| {
-                        let _ = pretty_diagnose("blob", &blob, &e);
-                        e
-                    })? {
-                        IDLValue::Blob(blob) => blob,
-                        _ => unreachable!(),
-                    }
-                }
+                "blob" => match pretty_wrap("blob", &blob, parse_idl_value)? {
+                    IDLValue::Blob(blob) => blob,
+                    _ => unreachable!(),
+                },
                 _ => unreachable!(),
             };
             let value = if annotate.is_empty() {

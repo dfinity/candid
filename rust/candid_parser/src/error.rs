@@ -117,6 +117,19 @@ where
     })
 }
 
+/// Wrap the parser error and pretty print the error message.
+/// ```
+/// use candid_parser::{pretty_wrap, parse_idl_args};
+/// pretty_wrap("parse IDL args", "(42, record {})", parse_idl_args)?;
+/// # Ok::<(), candid_parser::Error>(())
+/// ```
+pub fn pretty_wrap<T>(name: &str, str: &str, f: impl FnOnce(&str) -> Result<T>) -> Result<T> {
+    f(str).or_else(|e| {
+        pretty_diagnose(name, str, &e)?;
+        Err(e)
+    })
+}
+
 pub fn pretty_diagnose(file_name: &str, source: &str, e: &Error) -> Result<()> {
     let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
     let config = term::Config::default();
