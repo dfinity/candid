@@ -119,7 +119,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod error;
-pub use error::{pretty_parse, Error, Result};
+pub use error::{pretty_parse, pretty_wrap, Error, Result};
 
 pub mod bindings;
 pub mod grammar;
