@@ -81,6 +81,7 @@ impl<'de> IDLDeserialize<'de> {
                 expected_type.as_ref(),
                 TypeInner::Opt(_) | TypeInner::Reserved | TypeInner::Null
             ) {
+                self.de.value_cost += 1; // correct the later decrement from producing None
                 self.de.expect_type = expected_type;
                 self.de.wire_type = TypeInner::Reserved.into();
                 return T::deserialize(&mut self.de);
@@ -123,7 +124,7 @@ impl<'de> IDLDeserialize<'de> {
         self.de.types.is_empty()
     }
     /// Return error if there are unprocessed bytes in the input.
-    pub fn done(mut self) -> Result<()> {
+    pub fn done(&mut self) -> Result<()> {
         while !self.is_done() {
             self.get_value::<crate::Reserved>()?;
         }
@@ -582,6 +583,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             TypeInner::Reserved => {
                 if self.wire_type.as_ref() != &TypeInner::Reserved {
                     self.deserialize_ignored_any(serde::de::IgnoredAny)?;
+                    self.value_cost += 1; // correct the later decrement from producing reserved
                 }
                 self.deserialize_reserved(visitor)
             }
@@ -1058,10 +1060,14 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                         use std::cmp::Ordering;
                         match e.id.get_id().cmp(&w.id.get_id()) {
                             Ordering::Equal => {
-                                self.de.dec_value_cost(1)?;
                                 self.de.set_field_name(e.id.clone());
                                 self.de.expect_type = expect.pop_front().unwrap().ty;
                                 self.de.wire_type = wire.pop_front().unwrap().ty;
+                                if *self.de.expect_type != TypeInner::Reserved
+                                    || *self.de.wire_type == TypeInner::Reserved
+                                {
+                                    self.de.dec_value_cost(1)?;
+                                }
                             }
                             Ordering::Less => {
                                 // by subtyping rules, expect_type can only be opt, reserved or null.
@@ -1080,18 +1086,24 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                                 self.de.wire_type = TypeInner::Reserved.into();
                             }
                             Ordering::Greater => {
-                                self.de.dec_value_cost(1)?;
                                 self.de.set_field_name(Label::Named("_".to_owned()).into());
                                 self.de.wire_type = wire.pop_front().unwrap().ty;
                                 self.de.expect_type = TypeInner::Reserved.into();
+                                if *self.de.expect_type != TypeInner::Reserved
+                                    || *self.de.wire_type == TypeInner::Reserved
+                                {
+                                    self.de.dec_value_cost(1)?;
+                                }
                             }
                         }
                     }
                     (None, Some(_)) => {
-                        self.de.dec_value_cost(1)?;
                         self.de.set_field_name(Label::Named("_".to_owned()).into());
                         self.de.wire_type = wire.pop_front().unwrap().ty;
                         self.de.expect_type = TypeInner::Reserved.into();
+                        if *self.de.wire_type == TypeInner::Reserved {
+                            self.de.dec_value_cost(1)?;
+                        }
                     }
                     (Some(e), None) => {
                         self.de.value_cost += 1; // correct the later decrement from serialize_option of producing None.

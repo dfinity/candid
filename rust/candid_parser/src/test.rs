@@ -51,7 +51,30 @@ impl Input {
     pub fn parse(&self, env: &TypeEnv, types: &[Type]) -> Result<IDLArgs> {
         match self {
             Input::Text(ref s) => Ok(super::parse_idl_args(s)?.annotate_types(true, env, types)?),
-            Input::Blob(ref bytes) => Ok(IDLArgs::from_bytes_with_types(bytes, env, types)?),
+            Input::Blob(ref bytes) => {
+                use candid::types::value::IDLValue;
+                let mut de = candid::de::IDLDeserialize::new(&bytes)?;
+                let mut raw = Vec::new();
+                while !de.is_done() {
+                    let v = de.get_value::<IDLValue>()?;
+                    raw.push(v);
+                }
+                de.done()?;
+                let cost_raw = de.value_cost();
+                let raw = IDLArgs::new(&raw);
+                let mut de = candid::de::IDLDeserialize::new(&bytes)?;
+                let mut args = Vec::new();
+                for ty in types.iter() {
+                    let v = de.get_value_with_type(env, ty)?;
+                    args.push(v);
+                }
+                de.done()?;
+                let cost = de.value_cost();
+                assert_eq!(cost, cost_raw);
+                assert_eq!(cost_raw, raw.cost());
+                //Ok(IDLArgs::from_bytes_with_types(bytes, env, types)?)
+                Ok(IDLArgs { args })
+            }
         }
     }
     fn check_round_trip(&self, v: &IDLArgs, env: &TypeEnv, types: &[Type]) -> Result<bool> {
