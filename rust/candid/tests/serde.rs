@@ -531,7 +531,7 @@ fn test_vector() {
     let bytes = hex("4449444c036c01d6fca702016d026c00010080ade204");
     check_error(
         || test_decode(&bytes, &candid::Reserved),
-        "zero sized values too large",
+        "Decoding cost exceeds the limit",
     );
 }
 
