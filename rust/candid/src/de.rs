@@ -29,13 +29,14 @@ pub struct IDLDeserialize<'de> {
 impl<'de> IDLDeserialize<'de> {
     /// Create a new deserializer with IDL binary message.
     pub fn new(bytes: &'de [u8]) -> Result<Self> {
-        let de = Deserializer::from_bytes(bytes).with_context(|| {
+        let mut de = Deserializer::from_bytes(bytes).with_context(|| {
             if bytes.len() <= 500 {
                 format!("Cannot parse header {}", &hex::encode(bytes))
             } else {
                 "Cannot parse header".to_string()
             }
         })?;
+        de.add_cost(de.input.position() as usize * 2)?;
         Ok(IDLDeserialize { de })
     }
     /// Create a new deserializer with IDL binary message. The config is used to adjust some parameters in the deserializer.
@@ -49,6 +50,7 @@ impl<'de> IDLDeserialize<'de> {
         })?;
         de.decoding_cost = config.decoding_cost;
         de.full_error_message = config.full_error_message;
+        de.add_cost(de.input.position() as usize * 2)?;
         Ok(IDLDeserialize { de })
     }
     /// Deserialize one value from deserializer.
