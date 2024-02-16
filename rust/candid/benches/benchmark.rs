@@ -87,7 +87,7 @@ fn bench_collections(c: &mut Criterion) {
                 || vec.clone(),
                 |vec| {
                     let bytes = Encode!(&vec).unwrap();
-                    Decode!([COST] & bytes, Vec<candid::Int>).unwrap();
+                    Decode!([COST]; &bytes, Vec<candid::Int>).unwrap();
                 },
                 BatchSize::SmallInput,
             )
@@ -102,7 +102,7 @@ fn bench_collections(c: &mut Criterion) {
                 || map.clone(),
                 |map| {
                     let bytes = Encode!(&map).unwrap();
-                    Decode!(&bytes, BTreeMap<String, Nat>).unwrap();
+                    Decode!([COST]; &bytes, BTreeMap<String, Nat>).unwrap();
                 },
                 BatchSize::SmallInput,
             )
@@ -132,7 +132,7 @@ fn bench_recursion(c: &mut Criterion) {
         c.bench_with_input(BenchmarkId::new("option list", n), &list, |b, list| {
             b.iter(|| {
                 let bytes = Encode!(list).unwrap();
-                Decode!(&bytes, Option<Box<List>>).unwrap()
+                Decode!([COST]; &bytes, Option<Box<List>>).unwrap()
             })
         });
     }
@@ -143,7 +143,7 @@ fn bench_recursion(c: &mut Criterion) {
         c.bench_with_input(BenchmarkId::new("variant list", n), &list, |b, list| {
             b.iter(|| {
                 let bytes = Encode!(list).unwrap();
-                Decode!(&bytes, VariantList).unwrap()
+                Decode!([COST]; &bytes, VariantList).unwrap()
             })
         });
     }
@@ -179,7 +179,7 @@ fn bench_profile(c: &mut Criterion) {
         |b, vec| {
             b.iter(|| {
                 let bytes = Encode!(vec).unwrap();
-                Decode!(&bytes, Vec<Profile>).unwrap()
+                Decode!([COST]; &bytes, Vec<Profile>).unwrap()
             })
         },
     );
