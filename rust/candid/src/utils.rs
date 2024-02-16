@@ -1,4 +1,4 @@
-use crate::de::IDLDeserialize;
+use crate::de::{DecoderConfig, IDLDeserialize};
 use crate::ser::IDLBuilder;
 use crate::{CandidType, Error, Result};
 use serde::de::Deserialize;
@@ -61,6 +61,11 @@ macro_rules! Decode {
             .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
                       .and_then(|res| de.done().and(Ok(res))))
     }};
+    ( [ $cost:expr ] $hex:expr $(,$ty:ty)* ) => {{
+        $crate::de::IDLDeserialize::new_with_config($hex, $crate::de::DecoderConfig::new_cost($cost))
+            .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
+                      .and_then(|res| de.done().and(Ok(res))))
+    }};
     (@GetValue [$($ans:ident)*] $de:ident $ty:ty, $($tail:ty,)* ) => {{
         $de.get_value::<$ty>()
             .and_then(|val| Decode!(@GetValue [$($ans)* val] $de $($tail,)* ))
@@ -95,6 +100,15 @@ where
     de.done()?;
     Ok(res)
 }
+pub fn decode_args_with_config<'a, Tuple>(bytes: &'a [u8], config: DecoderConfig) -> Result<Tuple>
+where
+    Tuple: ArgumentDecoder<'a>,
+{
+    let mut de = IDLDeserialize::new_with_config(bytes, config)?;
+    let res = ArgumentDecoder::decode(&mut de)?;
+    de.done()?;
+    Ok(res)
+}
 
 /// Decode a single argument.
 ///
@@ -114,6 +128,13 @@ where
     T: Deserialize<'a> + CandidType,
 {
     let (res,) = decode_args(bytes)?;
+    Ok(res)
+}
+pub fn decode_one_with_config<'a, T>(bytes: &'a [u8], config: DecoderConfig) -> Result<T>
+where
+    T: Deserialize<'a> + CandidType,
+{
+    let (res,) = decode_args_with_config(bytes, config)?;
     Ok(res)
 }
 

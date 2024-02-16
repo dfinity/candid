@@ -40,7 +40,7 @@ impl<'de> IDLDeserialize<'de> {
         Ok(IDLDeserialize { de })
     }
     /// Create a new deserializer with IDL binary message. The config is used to adjust some parameters in the deserializer.
-    pub fn new_with_config(bytes: &'de [u8], config: Config) -> Result<Self> {
+    pub fn new_with_config(bytes: &'de [u8], config: DecoderConfig) -> Result<Self> {
         let mut de = Deserializer::from_bytes(bytes).with_context(|| {
             if config.full_error_message || bytes.len() <= 500 {
                 format!("Cannot parse header {}", &hex::encode(bytes))
@@ -143,15 +143,21 @@ impl<'de> IDLDeserialize<'de> {
     }
 }
 
-pub struct Config {
+pub struct DecoderConfig {
     decoding_cost: Option<usize>,
     full_error_message: bool,
 }
-impl Config {
+impl DecoderConfig {
     pub fn new() -> Self {
         Self {
             decoding_cost: Some(DEFAULT_DECODING_COST),
-            full_error_message: true,
+            full_error_message: false,
+        }
+    }
+    pub fn new_cost(cost: usize) -> Self {
+        Self {
+            decoding_cost: Some(cost),
+            full_error_message: false,
         }
     }
     pub fn set_decoding_cost(&mut self, n: Option<usize>) -> &mut Self {
@@ -163,7 +169,7 @@ impl Config {
         self
     }
 }
-impl Default for Config {
+impl Default for DecoderConfig {
     fn default() -> Self {
         Self::new()
     }
@@ -259,7 +265,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
-            decoding_cost: Some(DEFAULT_DECODING_COST),
+            decoding_cost: None,
             #[cfg(not(target_arch = "wasm32"))]
             full_error_message: true,
             #[cfg(target_arch = "wasm32")]

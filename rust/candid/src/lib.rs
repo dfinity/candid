@@ -256,10 +256,14 @@ pub use types::{
 #[allow(dead_code)]
 pub mod binary_parser;
 pub mod de;
+pub use de::DecoderConfig;
 pub mod ser;
 
 pub mod utils;
-pub use utils::{decode_args, decode_one, encode_args, encode_one, write_args};
+pub use utils::{
+    decode_args, decode_args_with_config, decode_one, decode_one_with_config, encode_args,
+    encode_one, write_args,
+};
 
 #[cfg_attr(docsrs, doc(cfg(feature = "value")))]
 #[cfg(feature = "value")]

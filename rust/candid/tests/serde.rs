@@ -1,4 +1,7 @@
-use candid::{decode_one, encode_one, CandidType, Decode, Deserialize, Encode, Int, Nat};
+use candid::{
+    decode_one_with_config, encode_one, CandidType, Decode, DecoderConfig, Deserialize, Encode,
+    Int, Nat,
+};
 
 #[test]
 fn test_error() {
@@ -771,8 +774,9 @@ fn test_decode<'de, T>(bytes: &'de [u8], expected: &T)
 where
     T: PartialEq + serde::de::Deserialize<'de> + std::fmt::Debug + CandidType,
 {
-    let decoded_one = decode_one::<T>(bytes).unwrap();
-    let decoded_macro = Decode!(bytes, T).unwrap();
+    let cost = 20_000_000;
+    let decoded_one = decode_one_with_config::<T>(bytes, DecoderConfig::new_cost(cost)).unwrap();
+    let decoded_macro = Decode!([cost] bytes, T).unwrap();
     assert_eq!(decoded_one, *expected);
     assert_eq!(decoded_macro, *expected);
 }

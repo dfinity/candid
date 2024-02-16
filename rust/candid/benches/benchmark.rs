@@ -2,6 +2,8 @@ use candid::{CandidType, Decode, Deserialize, Encode, Int, Nat, Principal};
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use std::collections::BTreeMap;
 
+const COST: usize = 20_000_000;
+
 fn bench_blob(c: &mut Criterion) {
     use serde_bytes::{ByteBuf, Bytes};
     let vec: Vec<u8> = vec![0x61; 524288];
@@ -11,7 +13,7 @@ fn bench_blob(c: &mut Criterion) {
             || vec.clone(),
             |vec| {
                 let bytes = Encode!(&ByteBuf::from(vec)).unwrap();
-                Decode!(&bytes, ByteBuf).unwrap();
+                Decode!([COST] & bytes, ByteBuf).unwrap();
             },
             BatchSize::SmallInput,
         )
@@ -21,7 +23,7 @@ fn bench_blob(c: &mut Criterion) {
             || vec.clone(),
             |vec| {
                 let bytes = Encode!(&Bytes::new(vec)).unwrap();
-                Decode!(&bytes, &Bytes).unwrap();
+                Decode!([COST] & bytes, &Bytes).unwrap();
             },
             BatchSize::SmallInput,
         )
@@ -32,7 +34,7 @@ fn bench_blob(c: &mut Criterion) {
             || text.clone(),
             |text| {
                 let bytes = Encode!(&text).unwrap();
-                Decode!(&bytes, String).unwrap();
+                Decode!([COST] & bytes, String).unwrap();
             },
             BatchSize::SmallInput,
         )
@@ -42,7 +44,7 @@ fn bench_blob(c: &mut Criterion) {
             || text.clone(),
             |text| {
                 let bytes = Encode!(text).unwrap();
-                Decode!(&bytes, &str).unwrap();
+                Decode!([COST] & bytes, &str).unwrap();
             },
             BatchSize::SmallInput,
         )
@@ -59,7 +61,7 @@ fn bench_collections(c: &mut Criterion) {
                 || vec8.clone(),
                 |vec| {
                     let bytes = Encode!(&vec).unwrap();
-                    Decode!(&bytes, Vec<u8>).unwrap();
+                    Decode!([COST] & bytes, Vec<u8>).unwrap();
                 },
                 BatchSize::SmallInput,
             )
@@ -72,7 +74,7 @@ fn bench_collections(c: &mut Criterion) {
                 || vec64.clone(),
                 |vec| {
                     let bytes = Encode!(&vec).unwrap();
-                    Decode!(&bytes, Vec<i64>).unwrap();
+                    Decode!([COST] & bytes, Vec<i64>).unwrap();
                 },
                 BatchSize::SmallInput,
             )
@@ -85,7 +87,7 @@ fn bench_collections(c: &mut Criterion) {
                 || vec.clone(),
                 |vec| {
                     let bytes = Encode!(&vec).unwrap();
-                    Decode!(&bytes, Vec<candid::Int>).unwrap();
+                    Decode!([COST] & bytes, Vec<candid::Int>).unwrap();
                 },
                 BatchSize::SmallInput,
             )

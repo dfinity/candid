@@ -1,6 +1,6 @@
 use crate::types::number::{Int, Nat};
 use crate::types::{Field, Label, Type, TypeEnv, TypeInner};
-use crate::{CandidType, Error, Result};
+use crate::{CandidType, DecoderConfig, Error, Result};
 use serde::de;
 use serde::de::{Deserialize, Visitor};
 use std::collections::HashMap;
@@ -118,8 +118,33 @@ impl IDLArgs {
         de.done()?;
         Ok(IDLArgs { args })
     }
+    pub fn from_bytes_with_types_with_config(
+        bytes: &[u8],
+        env: &TypeEnv,
+        types: &[Type],
+        config: DecoderConfig,
+    ) -> Result<Self> {
+        let mut de = crate::de::IDLDeserialize::new_with_config(bytes, config)?;
+        let mut args = Vec::new();
+        for ty in types.iter() {
+            let v = de.get_value_with_type(env, ty)?;
+            args.push(v);
+        }
+        de.done()?;
+        Ok(IDLArgs { args })
+    }
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let mut de = crate::de::IDLDeserialize::new(bytes)?;
+        let mut args = Vec::new();
+        while !de.is_done() {
+            let v = de.get_value::<IDLValue>()?;
+            args.push(v);
+        }
+        de.done()?;
+        Ok(IDLArgs { args })
+    }
+    pub fn from_bytes_with_config(bytes: &[u8], config: DecoderConfig) -> Result<Self> {
+        let mut de = crate::de::IDLDeserialize::new_with_config(bytes, config)?;
         let mut args = Vec::new();
         while !de.is_done() {
             let v = de.get_value::<IDLValue>()?;
