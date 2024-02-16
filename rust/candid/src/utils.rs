@@ -61,7 +61,7 @@ macro_rules! Decode {
             .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
                       .and_then(|res| de.done().and(Ok(res))))
     }};
-    ( [ $cost:expr ] $hex:expr $(,$ty:ty)* ) => {{
+    ( [ $cost:expr ] ; $hex:expr $(,$ty:ty)* ) => {{
         $crate::de::IDLDeserialize::new_with_config($hex, $crate::de::DecoderConfig::new_cost($cost))
             .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
                       .and_then(|res| de.done().and(Ok(res))))

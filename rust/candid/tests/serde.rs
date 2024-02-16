@@ -776,7 +776,7 @@ where
 {
     let cost = 20_000_000;
     let decoded_one = decode_one_with_config::<T>(bytes, DecoderConfig::new_cost(cost)).unwrap();
-    let decoded_macro = Decode!([cost] bytes, T).unwrap();
+    let decoded_macro = Decode!([cost]; bytes, T).unwrap();
     assert_eq!(decoded_one, *expected);
     assert_eq!(decoded_macro, *expected);
 }

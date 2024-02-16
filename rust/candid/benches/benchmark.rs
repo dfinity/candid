@@ -13,7 +13,7 @@ fn bench_blob(c: &mut Criterion) {
             || vec.clone(),
             |vec| {
                 let bytes = Encode!(&ByteBuf::from(vec)).unwrap();
-                Decode!([COST] & bytes, ByteBuf).unwrap();
+                Decode!([COST]; &bytes, ByteBuf).unwrap();
             },
             BatchSize::SmallInput,
         )
@@ -23,7 +23,7 @@ fn bench_blob(c: &mut Criterion) {
             || vec.clone(),
             |vec| {
                 let bytes = Encode!(&Bytes::new(vec)).unwrap();
-                Decode!([COST] & bytes, &Bytes).unwrap();
+                Decode!([COST]; &bytes, &Bytes).unwrap();
             },
             BatchSize::SmallInput,
         )
@@ -34,7 +34,7 @@ fn bench_blob(c: &mut Criterion) {
             || text.clone(),
             |text| {
                 let bytes = Encode!(&text).unwrap();
-                Decode!([COST] & bytes, String).unwrap();
+                Decode!([COST]; &bytes, String).unwrap();
             },
             BatchSize::SmallInput,
         )
@@ -44,7 +44,7 @@ fn bench_blob(c: &mut Criterion) {
             || text.clone(),
             |text| {
                 let bytes = Encode!(text).unwrap();
-                Decode!([COST] & bytes, &str).unwrap();
+                Decode!([COST]; &bytes, &str).unwrap();
             },
             BatchSize::SmallInput,
         )
@@ -61,7 +61,7 @@ fn bench_collections(c: &mut Criterion) {
                 || vec8.clone(),
                 |vec| {
                     let bytes = Encode!(&vec).unwrap();
-                    Decode!([COST] & bytes, Vec<u8>).unwrap();
+                    Decode!([COST]; &bytes, Vec<u8>).unwrap();
                 },
                 BatchSize::SmallInput,
             )
@@ -74,7 +74,7 @@ fn bench_collections(c: &mut Criterion) {
                 || vec64.clone(),
                 |vec| {
                     let bytes = Encode!(&vec).unwrap();
-                    Decode!([COST] & bytes, Vec<i64>).unwrap();
+                    Decode!([COST]; &bytes, Vec<i64>).unwrap();
                 },
                 BatchSize::SmallInput,
             )
