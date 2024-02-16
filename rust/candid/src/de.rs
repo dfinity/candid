@@ -20,7 +20,7 @@ use std::fmt::Write;
 use std::{collections::VecDeque, io::Cursor, mem::replace};
 
 const MAX_TYPE_LEN: i32 = 500;
-const DEFAULT_DECODING_COST: usize = 3_000_000;
+const DEFAULT_DECODING_COST: usize = 20_000_000;
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
 pub struct IDLDeserialize<'de> {
