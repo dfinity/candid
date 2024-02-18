@@ -1,0 +1,20 @@
+[package]
+name = "bench"
+edition = "2021"
+
+[[bin]]
+name = "bench"
+path = "bench.rs"
+
+[dependencies]
+candid = { path = "../candid" }
+candid_parser = { path = "../candid_parser" }
+canbench-rs = "0.1"
+ic-cdk = "0.12"
+serde = "1.0"
+serde_bytes = "0.11"
+
+[patch.crates-io]
+candid = { path = "../candid" }
+candid_derive = { path = "../candid_derive" }
+ic_principal = { path = "../ic_principal" }

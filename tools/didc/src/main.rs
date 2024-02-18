@@ -234,9 +234,11 @@ fn main() -> Result<()> {
         Command::Assist { annotate } => {
             use candid_parser::assist::{input_args, Context};
             let (env, types) = annotate.get_types(Mode::Encode)?;
-            let ctx = Context::new(env);
+            let ctx = Context::new(env.clone());
             let args = input_args(&ctx, &types)?;
             println!("{args}");
+            let bytes = args.to_bytes_with_types(&env, &types)?;
+            println!("{}", hex::encode(&bytes));
         }
         Command::Encode {
             args,
