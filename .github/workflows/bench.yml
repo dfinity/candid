@@ -20,6 +20,7 @@ jobs:
         profile: minimal
         toolchain: stable
         override: true
+        target: wasm32-unknown-unknown
     - name: Cache cargo build
       uses: actions/cache@v4
       with:
