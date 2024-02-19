@@ -31,8 +31,8 @@ jobs:
     - name: Install canbench
       run: cargo install canbench
     - name: Run perf for base branch
+      if: false
       run: |
-        ls -al
         pushd main/rust/bench
         canbench --persist
         popd
