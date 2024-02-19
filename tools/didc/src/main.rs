@@ -238,7 +238,7 @@ fn main() -> Result<()> {
             let args = input_args(&ctx, &types)?;
             println!("{args}");
             let bytes = args.to_bytes_with_types(&env, &types)?;
-            println!("{}", hex::encode(&bytes));
+            println!("{}", hex::encode(bytes));
         }
         Command::Encode {
             args,
