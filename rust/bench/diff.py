@@ -7,15 +7,15 @@ def load_yaml(input_file):
   with open(input_file, 'r') as f:
     data = yaml.safe_load(f)["benches"]
 
-  print("| Name | Max Memory | Encode | Decode |")
+  print("| Name | Max Mem(Kb) | Encode | Decode |")
   print("| --- | --- | --- | --- |")
   for name in data.keys():
     if name not in special_benchmarks:
       scope = data[name]["scopes"]
-      mem = data[name]["total"]["heap_increase"] * 64 / 1024
+      mem = data[name]["total"]["heap_increase"] * 64
       encode = scope["1. Encoding"]["instructions"]
       decode = scope["2. Decoding"]["instructions"]
-      print(f"| {name} | {mem:.2f} | {encode:_} | {decode:_} |")
+      print(f"| {name} | {mem:_} | {encode:_} | {decode:_} |")
 
   print()
   print(f"* Parser cost: {data['nns']['scopes']['0. Parsing']['instructions']:_}")

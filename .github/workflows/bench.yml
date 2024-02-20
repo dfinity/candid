@@ -56,6 +56,7 @@ jobs:
         {
           cat /tmp/table.md
           echo "<details><summary>Click to see raw report</summary>"
+          echo
           echo "\`\`\`"
           cat /tmp/perf.txt
           echo "\`\`\`"
