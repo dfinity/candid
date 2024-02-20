@@ -8,7 +8,7 @@ mod nns;
 const N: usize = 2097152;
 
 #[bench(raw)]
-fn bench_blob() -> BenchResult {
+fn blob() -> BenchResult {
     use serde_bytes::ByteBuf;
     let vec: Vec<u8> = vec![0x61; N];
     bench_fn(|| {
@@ -24,7 +24,7 @@ fn bench_blob() -> BenchResult {
 }
 
 #[bench(raw)]
-fn bench_text() -> BenchResult {
+fn text() -> BenchResult {
     let vec: Vec<u8> = vec![0x61; N];
     let text = String::from_utf8(vec).unwrap();
     bench_fn(|| {
@@ -40,7 +40,7 @@ fn bench_text() -> BenchResult {
 }
 
 #[bench(raw)]
-fn bench_vec_int64() -> BenchResult {
+fn vec_int64() -> BenchResult {
     let vec: Vec<i64> = vec![-1; N];
     bench_fn(|| {
         let bytes = {
@@ -55,7 +55,7 @@ fn bench_vec_int64() -> BenchResult {
 }
 
 #[bench(raw)]
-fn bench_btreemap() -> BenchResult {
+fn btreemap() -> BenchResult {
     let n = 1048576;
     let map: BTreeMap<String, Nat> = (0u32..n as u32)
         .map(|i| (i.to_string(), Nat::from(i)))
@@ -73,7 +73,7 @@ fn bench_btreemap() -> BenchResult {
 }
 
 #[bench(raw)]
-fn bench_option_list() -> BenchResult {
+fn option_list() -> BenchResult {
     let n = 2048;
     #[derive(CandidType, Deserialize)]
     struct List {
@@ -99,7 +99,7 @@ fn bench_option_list() -> BenchResult {
 }
 
 #[bench(raw)]
-fn bench_variant_list() -> BenchResult {
+fn variant_list() -> BenchResult {
     let n = 2048;
     #[derive(CandidType, Deserialize)]
     enum VariantList {
@@ -122,7 +122,7 @@ fn bench_variant_list() -> BenchResult {
 }
 
 #[bench(raw)]
-fn bench_nns() -> BenchResult {
+fn nns() -> BenchResult {
     use candid_parser::utils::CandidSource;
     let nns_did = CandidSource::Text(include_str!("./nns.did"));
     let motion_proposal = r#"
@@ -195,18 +195,18 @@ fn bench_nns() -> BenchResult {
 )
 "#;
     bench_fn(|| {
-        let _p = bench_scope("1. Parsing");
+        let _p = bench_scope("0. Parsing");
         let (env, serv) = nns_did.load().unwrap();
         let args = candid_parser::parse_idl_args(motion_proposal).unwrap();
         let serv = serv.unwrap();
         let arg_tys = &env.get_method(&serv, "manage_neuron").unwrap().args;
         drop(_p);
         let bytes = {
-            let _p = bench_scope("2. Encoding");
+            let _p = bench_scope("1. Encoding");
             args.to_bytes_with_types(&env, arg_tys).unwrap()
         };
         {
-            let _p = bench_scope("3. Decoding");
+            let _p = bench_scope("2. Decoding");
             Decode!(&bytes, nns::ManageNeuron).unwrap();
         }
     })
