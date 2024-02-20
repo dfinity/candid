@@ -53,9 +53,8 @@ jobs:
         pushd rust/bench
         canbench --less-verbose --persist > /tmp/perf.txt
         python diff.py > /tmp/table.md
-        cat /tmp/table.md
         {
-          echo /tmp/table.md
+          cat /tmp/table.md
           echo "\`\`\`"
           cat /tmp/perf.txt
           echo "\`\`\`"
