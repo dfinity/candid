@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 mod nns;
 
 const N: usize = 2097152;
+const COST: usize = 20_000_000;
 
 #[bench(raw)]
 fn bench_blob() -> BenchResult {
@@ -18,7 +19,7 @@ fn bench_blob() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!(&bytes, ByteBuf).unwrap();
+            Decode!([COST]; &bytes, ByteBuf).unwrap();
         }
     })
 }
@@ -34,11 +35,11 @@ fn bench_text() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!(&bytes, String).unwrap();
+            Decode!([COST]; &bytes, String).unwrap();
         }
     })
 }
-
+/*
 #[bench(raw)]
 fn bench_vec_int64() -> BenchResult {
     let vec: Vec<i64> = vec![-1; N];
@@ -49,11 +50,11 @@ fn bench_vec_int64() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!(&bytes, Vec<i64>).unwrap();
+            Decode!([COST]; &bytes, Vec<i64>).unwrap();
         }
     })
 }
-
+*/
 #[bench(raw)]
 fn bench_btreemap() -> BenchResult {
     let n = 1048576;
@@ -67,7 +68,7 @@ fn bench_btreemap() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!(&bytes, BTreeMap<String, Nat>).unwrap();
+            Decode!([COST]; &bytes, BTreeMap<String, Nat>).unwrap();
         }
     })
 }
@@ -93,7 +94,7 @@ fn bench_option_list() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!(&bytes, Option<Box<List>>).unwrap();
+            Decode!([COST]; &bytes, Option<Box<List>>).unwrap();
         }
     })
 }
@@ -116,7 +117,7 @@ fn bench_variant_list() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!(&bytes, VariantList).unwrap();
+            Decode!([COST]; &bytes, VariantList).unwrap();
         }
     })
 }
@@ -207,8 +208,16 @@ fn bench_nns() -> BenchResult {
         };
         {
             let _p = bench_scope("3. Decoding");
-            Decode!(&bytes, nns::ManageNeuron).unwrap();
+            Decode!([COST]; &bytes, nns::ManageNeuron).unwrap();
         }
+    })
+}
+
+#[bench(raw)]
+fn bench_extra_args() -> BenchResult {
+    let bytes = hex::decode("4449444c036c01d6fca702016d026c00010080ade204").unwrap();
+    bench_fn(|| {
+        let _ = Decode!([COST]; &bytes);
     })
 }
 

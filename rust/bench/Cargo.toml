@@ -13,6 +13,7 @@ canbench-rs = "0.1"
 ic-cdk = "0.12"
 serde = "1.0"
 serde_bytes = "0.11"
+hex = "0.4.3"
 
 [patch.crates-io]
 candid = { path = "../candid" }

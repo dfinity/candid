@@ -349,7 +349,7 @@ impl<'de> Deserializer<'de> {
     fn add_cost(&mut self, cost: usize) -> Result<()> {
         if let Some(n) = self.decoding_cost {
             // Double the cost when untyped or skipping values
-            let cost = if self.is_untyped { cost * 2 } else { cost };
+            let cost = if self.is_untyped { cost * 50 } else { cost };
             if n < cost {
                 return Err(Error::msg("Decoding cost exceeds the limit"));
             }
