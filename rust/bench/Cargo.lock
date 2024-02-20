@@ -57,6 +57,7 @@ dependencies = [
  "canbench-rs",
  "candid",
  "candid_parser",
+ "hex",
  "ic-cdk",
  "serde",
  "serde_bytes",

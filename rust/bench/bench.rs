@@ -212,4 +212,12 @@ fn nns() -> BenchResult {
     })
 }
 
+#[bench(raw)]
+fn extra_args() -> BenchResult {
+    let bytes = hex::decode("4449444c036c01d6fca702016d026c00010080ade204").unwrap();
+    bench_fn(|| {
+        let _ = Decode!(&bytes);
+    })
+}
+
 fn main() {}

@@ -55,9 +55,11 @@ jobs:
         python diff.py > /tmp/table.md
         {
           cat /tmp/table.md
+          echo "<details><summary>Click to see raw report</summary>"
           echo "\`\`\`"
           cat /tmp/perf.txt
           echo "\`\`\`"
+          echo "</details>"
         } > /tmp/message.txt
     - name: Post comment
       uses: thollander/actions-comment-pull-request@v2
