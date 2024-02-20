@@ -20,7 +20,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
         profile: minimal
-        toolchain: $ {{ env.RUSTC_VERSION }}
+        toolchain: ${{ env.RUSTC_VERSION }}
         override: true
         target: wasm32-unknown-unknown
     - uses: actions/setup-python@v4
