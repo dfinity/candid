@@ -7,27 +7,64 @@ jobs:
   runBenchMark:
     name: run benchmark
     runs-on: ubuntu-latest
+    env:
+      RUSTC_VERSION: 1.75.0
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+    - name: Checkout base branch
+      uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        ref: ${{ github.base_ref }}
+        path: main/
     - name: Install stable toolchain
       uses: actions-rs/toolchain@v1
       with:
         profile: minimal
-        toolchain: stable
+        toolchain: ${{ env.RUSTC_VERSION }}
         override: true
+        target: wasm32-unknown-unknown
+    - uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyyaml
     - name: Cache cargo build
-      uses: actions/cache@v2
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
+          ~/.cargo/bin
           target
         key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
-    - uses: boa-dev/criterion-compare-action@master
+    - name: Install canbench
+      run: cargo install canbench
+    - name: Run perf for base branch
+      if: false
+      run: |
+        pushd main/rust/bench
+        canbench --persist
+        popd
+        cp main/rust/bench/canbench_results.yml rust/bench/
+    - name: Run perf for PR beanch
+      run: |
+        pushd rust/bench
+        canbench --less-verbose --persist > /tmp/perf.txt
+        python diff.py > /tmp/table.md
+        {
+          cat /tmp/table.md
+          echo "<details><summary>Click to see raw report</summary>"
+          echo
+          echo "\`\`\`"
+          cat /tmp/perf.txt
+          echo "\`\`\`"
+          echo "</details>"
+        } > /tmp/message.txt
+    - name: Post comment
+      uses: thollander/actions-comment-pull-request@v2
       with:
-        cwd: rust/candid
-        benchName: benchmark  # needed to address https://bheisler.github.io/criterion.rs/book/faq.html#cargo-bench-gives-unrecognized-option-errors-for-valid-command-line-options
-        branchName: ${{ github.base_ref }}
-        token: ${{ secrets.GITHUB_TOKEN }}
+        filePath: /tmp/message.txt
+        comment_tag: canbench
+

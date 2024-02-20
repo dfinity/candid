@@ -1,0 +1,110 @@
+benches:
+  blob:
+    total:
+      instructions: 32549713
+      heap_increase: 66
+      stable_memory_increase: 0
+    scopes:
+      1. Encoding:
+        instructions: 20464391
+        heap_increase: 66
+        stable_memory_increase: 0
+      2. Decoding:
+        instructions: 12083336
+        heap_increase: 0
+        stable_memory_increase: 0
+  btreemap:
+    total:
+      instructions: 19846587346
+      heap_increase: 1179
+      stable_memory_increase: 0
+    scopes:
+      1. Encoding:
+        instructions: 4814047546
+        heap_increase: 257
+        stable_memory_increase: 0
+      2. Decoding:
+        instructions: 15032537614
+        heap_increase: 922
+        stable_memory_increase: 0
+  extra_args:
+    total:
+      instructions: 65236
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  nns:
+    total:
+      instructions: 34666300
+      heap_increase: 3
+      stable_memory_increase: 0
+    scopes:
+      0. Parsing:
+        instructions: 18351044
+        heap_increase: 3
+        stable_memory_increase: 0
+      1. Encoding:
+        instructions: 2277031
+        heap_increase: 0
+        stable_memory_increase: 0
+      2. Decoding:
+        instructions: 13288232
+        heap_increase: 0
+        stable_memory_increase: 0
+  option_list:
+    total:
+      instructions: 39063564
+      heap_increase: 9
+      stable_memory_increase: 0
+    scopes:
+      1. Encoding:
+        instructions: 7311271
+        heap_increase: 0
+        stable_memory_increase: 0
+      2. Decoding:
+        instructions: 31750543
+        heap_increase: 9
+        stable_memory_increase: 0
+  text:
+    total:
+      instructions: 46689130
+      heap_increase: 99
+      stable_memory_increase: 0
+    scopes:
+      1. Encoding:
+        instructions: 28847755
+        heap_increase: 99
+        stable_memory_increase: 0
+      2. Decoding:
+        instructions: 17839633
+        heap_increase: 0
+        stable_memory_increase: 0
+  variant_list:
+    total:
+      instructions: 31300568
+      heap_increase: 2
+      stable_memory_increase: 0
+    scopes:
+      1. Encoding:
+        instructions: 7519005
+        heap_increase: 0
+        stable_memory_increase: 0
+      2. Decoding:
+        instructions: 23779875
+        heap_increase: 2
+        stable_memory_increase: 0
+  vec_int64:
+    total:
+      instructions: 1065157980
+      heap_increase: 1031
+      stable_memory_increase: 0
+    scopes:
+      1. Encoding:
+        instructions: 341608537
+        heap_increase: 1031
+        stable_memory_increase: 0
+      2. Decoding:
+        instructions: 723547678
+        heap_increase: 0
+        stable_memory_increase: 0
+version: 0.1.1
