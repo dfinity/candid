@@ -42,9 +42,14 @@ jobs:
       run: |
         pushd rust/bench
         canbench --less-verbose > /tmp/perf.txt
+        {
+          echo "\`\`\`"
+          cat /tmp/perf.txt
+          echo "\`\`\`"
+        } > /tmp/message.txt
     - name: Post comment
       uses: thollander/actions-comment-pull-request@v2
       with:
-        filePath: /tmp/perf.txt
+        filePath: /tmp/message.txt
         comment_tag: canbench
 
