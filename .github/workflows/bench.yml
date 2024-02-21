@@ -40,7 +40,7 @@ jobs:
           target
         key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
     - name: Install canbench
-      run: cargo install canbench
+      run: cargo install canbench --force
     - name: Run perf for base branch
       if: false
       run: |
