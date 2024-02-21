@@ -44,7 +44,7 @@ def print_table(data, base):
         encode = display_diff(encode, base_encode)
         decode = display_diff(decode, base_decode)
       else:
-        name = name + " (new)"
+        name = "**" + name + " (new)**"
         mem = f"{mem:_}"
         encode = f"{encode:_}"
         decode = f"{decode:_}"
