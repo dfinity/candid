@@ -1,8 +1,6 @@
 name: Rust Bench
 on:
   pull_request:
-    paths:
-    - 'rust/candid/**'
 jobs:
   runBenchMark:
     name: run benchmark
