@@ -52,7 +52,7 @@ jobs:
       run: |
         pushd rust/bench
         canbench --less-verbose --persist > /tmp/perf.txt
-        python diff.py canbench_results.yml main/rust/bench/canbench_results.yml > /tmp/table.md
+        python diff.py canbench_results.yml ../../main/rust/bench/canbench_results.yml > /tmp/table.md
         {
           cat /tmp/table.md
           echo "<details><summary>Click to see raw report</summary>"
