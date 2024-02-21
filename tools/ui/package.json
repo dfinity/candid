@@ -10,7 +10,7 @@
     "@dfinity/agent": "0.21.4",
     "@dfinity/candid": "0.21.4",
     "@dfinity/auth-client": "0.21.4",
-    "@dfinity/identity": "0.21.4",
+    "@dfinity/identity": "1.0.1",
     "@dfinity/principal": "0.21.4",
     "buffer": "6.0.3",
     "copy-webpack-plugin": "^9.0.1",
