@@ -1,8 +1,6 @@
 name: Rust Bench
 on:
   pull_request:
-    paths:
-    - 'rust/candid/**'
 jobs:
   runBenchMark:
     name: run benchmark
@@ -40,7 +38,7 @@ jobs:
           target
         key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
     - name: Install canbench
-      run: cargo install canbench
+      run: cargo install canbench --force
     - name: Run perf for base branch
       if: false
       run: |
@@ -52,7 +50,7 @@ jobs:
       run: |
         pushd rust/bench
         canbench --less-verbose --persist > /tmp/perf.txt
-        python diff.py > /tmp/table.md
+        python diff.py canbench_results.yml ../../main/rust/bench/canbench_results.yml > /tmp/table.md
         {
           cat /tmp/table.md
           echo "<details><summary>Click to see raw report</summary>"
