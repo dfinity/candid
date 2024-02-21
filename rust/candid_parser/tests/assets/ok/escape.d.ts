@@ -10,4 +10,4 @@ export interface t {
 }
 export interface _SERVICE { '\n\'\"\'\'\"\"\r\t' : ActorMethod<[t], undefined> }
 export declare const idlFactory: IDL.InterfaceFactory;
-export declare const init: ({ IDL }: { IDL: IDL }) => IDL.Type[];
+export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

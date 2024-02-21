@@ -8,4 +8,4 @@ export interface _SERVICE {
   'set' : ActorMethod<[List], List>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
-export declare const init: ({ IDL }: { IDL: IDL }) => IDL.Type[];
+export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

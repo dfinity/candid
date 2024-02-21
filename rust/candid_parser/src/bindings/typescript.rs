@@ -194,7 +194,7 @@ import type { IDL } from '@dfinity/candid';
             .append(RcDoc::line())
             .append("export declare const idlFactory: IDL.InterfaceFactory;")
             .append(RcDoc::line())
-            .append("export declare const init: ({ IDL }: { IDL: IDL }) => IDL.Type[];"),
+            .append("export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];"),
     };
     let doc = RcDoc::text(header)
         .append(RcDoc::line())
