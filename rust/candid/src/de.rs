@@ -41,7 +41,7 @@ impl<'de> IDLDeserialize<'de> {
                 "Cannot parse header".to_string()
             }
         })?;
-        de.add_cost(de.input.position() as usize * 2)?;
+        de.add_cost(de.input.position() as usize * 4)?;
         Ok(IDLDeserialize { de })
     }
     /// Deserialize one value from deserializer.

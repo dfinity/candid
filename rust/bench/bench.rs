@@ -219,7 +219,7 @@ fn extra_args() -> BenchResult {
     let vec_null = hex::decode("4449444c036c01d6fca702016d026c00010080ade204").unwrap();
     let vec_opt_record = hex::decode("4449444c176c02017f027f6c02010002006c02000101016c02000201026c02000301036c02000401046c02000501056c02000601066c02000701076c02000801086c02000901096c02000a010a6c02000b010b6c02000c010c6c02000d020d6c02000e010e6c02000f010f6c02001001106c02001101116c02001201126c02001301136e146d150116050101010101").unwrap();
     bench_fn(|| {
-        //assert!(Decode!([COST; SKIP]; &vec_null).is_err());
+        assert!(Decode!([COST; SKIP]; &vec_null).is_err());
         assert!(Decode!([COST; SKIP]; &vec_opt_record).is_err());
     })
 }
