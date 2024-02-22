@@ -54,12 +54,13 @@ impl Input {
     pub fn parse(&self, env: &TypeEnv, types: &[Type]) -> Result<IDLArgs> {
         match self {
             Input::Text(ref s) => Ok(super::parse_idl_args(s)?.annotate_types(true, env, types)?),
-            Input::Blob(ref bytes) => Ok(IDLArgs::from_bytes_with_types_with_config(
-                bytes,
-                env,
-                types,
-                DecoderConfig::new_cost(DECODING_COST),
-            )?),
+            Input::Blob(ref bytes) => {
+                let mut config = DecoderConfig::new();
+                config.set_decoding_quota(DECODING_COST);
+                Ok(IDLArgs::from_bytes_with_types_with_config(
+                    bytes, env, types, config,
+                )?)
+            }
         }
     }
     fn check_round_trip(&self, v: &IDLArgs, env: &TypeEnv, types: &[Type]) -> Result<bool> {
@@ -113,13 +114,11 @@ impl HostTest {
                 if !assert.pass && assert.right.is_none() {
                     asserts.push(NotDecode(bytes, types));
                 } else {
-                    let args = IDLArgs::from_bytes_with_types_with_config(
-                        &bytes,
-                        env,
-                        &types,
-                        DecoderConfig::new_cost(DECODING_COST),
-                    )
-                    .unwrap();
+                    let mut config = DecoderConfig::new();
+                    config.set_decoding_quota(DECODING_COST);
+                    let args =
+                        IDLArgs::from_bytes_with_types_with_config(&bytes, env, &types, config)
+                            .unwrap();
                     asserts.push(Decode(bytes.clone(), types.clone(), true, args));
                     // round tripping
                     // asserts.push(Encode(args, types.clone(), true, bytes.clone()));

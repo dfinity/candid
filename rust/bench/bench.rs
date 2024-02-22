@@ -7,6 +7,7 @@ mod nns;
 
 const N: usize = 2097152;
 const COST: usize = 20_000_000;
+const SKIP: usize = 10_000;
 
 #[bench(raw)]
 fn blob() -> BenchResult {
@@ -19,7 +20,7 @@ fn blob() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!([COST]; &bytes, ByteBuf).unwrap();
+            Decode!([COST; SKIP]; &bytes, ByteBuf).unwrap();
         }
     })
 }
@@ -35,7 +36,7 @@ fn text() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!([COST]; &bytes, String).unwrap();
+            Decode!([COST; SKIP]; &bytes, String).unwrap();
         }
     })
 }
@@ -50,7 +51,7 @@ fn vec_int16() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!([COST]; &bytes, Vec<i16>).unwrap();
+            Decode!([COST; SKIP]; &bytes, Vec<i16>).unwrap();
         }
     })
 }
@@ -68,7 +69,7 @@ fn btreemap() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!([COST]; &bytes, BTreeMap<String, Nat>).unwrap();
+            Decode!([COST; SKIP]; &bytes, BTreeMap<String, Nat>).unwrap();
         }
     })
 }
@@ -94,7 +95,7 @@ fn option_list() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!([COST]; &bytes, Option<Box<List>>).unwrap();
+            Decode!([COST; SKIP]; &bytes, Option<Box<List>>).unwrap();
         }
     })
 }
@@ -117,7 +118,7 @@ fn variant_list() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!([COST]; &bytes, VariantList).unwrap();
+            Decode!([COST; SKIP]; &bytes, VariantList).unwrap();
         }
     })
 }
@@ -208,16 +209,18 @@ fn nns() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!([COST]; &bytes, nns::ManageNeuron).unwrap();
+            Decode!([COST; SKIP]; &bytes, nns::ManageNeuron).unwrap();
         }
     })
 }
 
 #[bench(raw)]
 fn extra_args() -> BenchResult {
-    let bytes = hex::decode("4449444c036c01d6fca702016d026c00010080ade204").unwrap();
+    let vec_null = hex::decode("4449444c036c01d6fca702016d026c00010080ade204").unwrap();
+    let vec_opt_record = hex::decode("4449444c176c02017f027f6c02010002006c02000101016c02000201026c02000301036c02000401046c02000501056c02000601066c02000701076c02000801086c02000901096c02000a010a6c02000b010b6c02000c010c6c02000d020d6c02000e010e6c02000f010f6c02001001106c02001101116c02001201126c02001301136e146d150116050101010101").unwrap();
     bench_fn(|| {
-        let _ = Decode!([COST]; &bytes);
+        //assert!(Decode!([COST; SKIP]; &vec_null).is_err());
+        assert!(Decode!([COST; SKIP]; &vec_opt_record).is_err());
     })
 }
 

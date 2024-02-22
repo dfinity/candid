@@ -20,7 +20,6 @@ use std::fmt::Write;
 use std::{collections::VecDeque, io::Cursor, mem::replace};
 
 const MAX_TYPE_LEN: i32 = 500;
-const DEFAULT_DECODING_COST: usize = 20_000_000;
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
 pub struct IDLDeserialize<'de> {
@@ -29,27 +28,19 @@ pub struct IDLDeserialize<'de> {
 impl<'de> IDLDeserialize<'de> {
     /// Create a new deserializer with IDL binary message.
     pub fn new(bytes: &'de [u8]) -> Result<Self> {
-        let mut de = Deserializer::from_bytes(bytes).with_context(|| {
-            if bytes.len() <= 500 {
-                format!("Cannot parse header {}", &hex::encode(bytes))
-            } else {
-                "Cannot parse header".to_string()
-            }
-        })?;
-        de.add_cost(de.input.position() as usize * 2)?;
-        Ok(IDLDeserialize { de })
+        let config = DecoderConfig::new();
+        Self::new_with_config(bytes, config)
     }
     /// Create a new deserializer with IDL binary message. The config is used to adjust some parameters in the deserializer.
     pub fn new_with_config(bytes: &'de [u8], config: DecoderConfig) -> Result<Self> {
-        let mut de = Deserializer::from_bytes(bytes).with_context(|| {
-            if config.full_error_message || bytes.len() <= 500 {
+        let full_error_message = config.full_error_message;
+        let mut de = Deserializer::from_bytes(bytes, config).with_context(|| {
+            if full_error_message || bytes.len() <= 500 {
                 format!("Cannot parse header {}", &hex::encode(bytes))
             } else {
                 "Cannot parse header".to_string()
             }
         })?;
-        de.decoding_cost = config.decoding_cost;
-        de.full_error_message = config.full_error_message;
         de.add_cost(de.input.position() as usize * 2)?;
         Ok(IDLDeserialize { de })
     }
@@ -86,7 +77,8 @@ impl<'de> IDLDeserialize<'de> {
                 self.de.expect_type = expected_type;
                 self.de.wire_type = TypeInner::Reserved.into();
                 return T::deserialize(&mut self.de);
-            } else if self.de.full_error_message || text_size(&expected_type, MAX_TYPE_LEN).is_ok()
+            } else if self.de.config.full_error_message
+                || text_size(&expected_type, MAX_TYPE_LEN).is_ok()
             {
                 return Err(Error::msg(format!(
                     "No more values on the wire, the expected type {expected_type} is not opt, null, or reserved"
@@ -106,7 +98,7 @@ impl<'de> IDLDeserialize<'de> {
         self.de.wire_type = ty.clone();
 
         let mut v = T::deserialize(&mut self.de).with_context(|| {
-            if self.de.full_error_message
+            if self.de.config.full_error_message
                 || (text_size(&ty, MAX_TYPE_LEN).is_ok()
                     && text_size(&expected_type, MAX_TYPE_LEN).is_ok())
             {
@@ -115,7 +107,7 @@ impl<'de> IDLDeserialize<'de> {
                 format!("Fail to decode argument {ind}")
             }
         });
-        if self.de.full_error_message {
+        if self.de.config.full_error_message {
             v = v.with_context(|| self.de.dump_state());
         }
         Ok(v?)
@@ -132,7 +124,7 @@ impl<'de> IDLDeserialize<'de> {
         let ind = self.de.input.position() as usize;
         let rest = &self.de.input.get_ref()[ind..];
         if !rest.is_empty() {
-            if !self.de.full_error_message {
+            if !self.de.config.full_error_message {
                 return Err(Error::msg("Trailing value after finishing deserialization"));
             } else {
                 return Err(anyhow!(self.de.dump_state()))
@@ -143,25 +135,29 @@ impl<'de> IDLDeserialize<'de> {
     }
 }
 
+#[derive(Clone)]
 pub struct DecoderConfig {
-    decoding_cost: Option<usize>,
+    decoding_quota: Option<usize>,
+    skipping_quota: Option<usize>,
     full_error_message: bool,
 }
 impl DecoderConfig {
     pub fn new() -> Self {
         Self {
-            decoding_cost: Some(DEFAULT_DECODING_COST),
+            decoding_quota: None,
+            skipping_quota: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            full_error_message: true,
+            #[cfg(target_arch = "wasm32")]
             full_error_message: false,
         }
     }
-    pub fn new_cost(cost: usize) -> Self {
-        Self {
-            decoding_cost: Some(cost),
-            full_error_message: false,
-        }
+    pub fn set_decoding_quota(&mut self, n: usize) -> &mut Self {
+        self.decoding_quota = Some(n);
+        self
     }
-    pub fn set_decoding_cost(&mut self, n: Option<usize>) -> &mut Self {
-        self.decoding_cost = n;
+    pub fn set_skipping_quota(&mut self, n: usize) -> &mut Self {
+        self.skipping_quota = Some(n);
         self
     }
     pub fn set_full_error_message(&mut self, n: bool) -> &mut Self {
@@ -245,14 +241,13 @@ struct Deserializer<'de> {
     // Indicates whether to deserialize with IDLValue.
     // It only affects the field id generation in enum type.
     is_untyped: bool,
-    decoding_cost: Option<usize>,
-    full_error_message: bool,
+    config: DecoderConfig,
     #[cfg(not(target_arch = "wasm32"))]
     recursion_depth: u16,
 }
 
 impl<'de> Deserializer<'de> {
-    fn from_bytes(bytes: &'de [u8]) -> Result<Self> {
+    fn from_bytes(bytes: &'de [u8], config: DecoderConfig) -> Result<Self> {
         let mut reader = Cursor::new(bytes);
         let header = Header::read(&mut reader)?;
         let (env, types) = header.to_types()?;
@@ -265,11 +260,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
-            decoding_cost: None,
-            #[cfg(not(target_arch = "wasm32"))]
-            full_error_message: true,
-            #[cfg(target_arch = "wasm32")]
-            full_error_message: false,
+            config,
             #[cfg(not(target_arch = "wasm32"))]
             recursion_depth: 0,
         })
@@ -314,7 +305,7 @@ impl<'de> Deserializer<'de> {
             &self.expect_type,
         )
         .with_context(|| {
-            if self.full_error_message
+            if self.config.full_error_message
                 || (text_size(&self.wire_type, MAX_TYPE_LEN).is_ok()
                     && text_size(&self.expect_type, MAX_TYPE_LEN).is_ok())
             {
@@ -347,13 +338,20 @@ impl<'de> Deserializer<'de> {
         Ok(())
     }
     fn add_cost(&mut self, cost: usize) -> Result<()> {
-        if let Some(n) = self.decoding_cost {
-            // Double the cost when untyped or skipping values
+        if let Some(n) = self.config.decoding_quota {
             let cost = if self.is_untyped { cost * 50 } else { cost };
             if n < cost {
                 return Err(Error::msg("Decoding cost exceeds the limit"));
             }
-            self.decoding_cost = Some(n - cost);
+            self.config.decoding_quota = Some(n - cost);
+        }
+        if self.is_untyped {
+            if let Some(n) = self.config.skipping_quota {
+                if n < cost {
+                    return Err(Error::msg("Skipping cost exceeds the limit"));
+                }
+                self.config.skipping_quota = Some(n - cost);
+            }
         }
         Ok(())
     }
@@ -536,7 +534,7 @@ impl<'de> Deserializer<'de> {
             }
             Err(Error::Subtype(_)) => {
                 // Remember the backtracking cost
-                self.decoding_cost = self_clone.decoding_cost;
+                self.config = self_clone.config;
                 self.add_cost(10)?;
                 self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                 visitor.visit_none()

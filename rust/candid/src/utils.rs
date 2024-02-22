@@ -61,8 +61,10 @@ macro_rules! Decode {
             .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
                       .and_then(|res| de.done().and(Ok(res))))
     }};
-    ( [ $cost:expr ] ; $hex:expr $(,$ty:ty)* ) => {{
-        $crate::de::IDLDeserialize::new_with_config($hex, $crate::de::DecoderConfig::new_cost($cost))
+    ( [ $cost:expr; $skip:expr ] ; $hex:expr $(,$ty:ty)* ) => {{
+        let mut config = $crate::de::DecoderConfig::new();
+        config.set_decoding_quota($cost).set_skipping_quota($skip);
+        $crate::de::IDLDeserialize::new_with_config($hex, config)
             .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
                       .and_then(|res| de.done().and(Ok(res))))
     }};
