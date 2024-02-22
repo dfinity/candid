@@ -58,7 +58,7 @@ impl Input {
                 let mut config = DecoderConfig::new();
                 config.set_decoding_quota(DECODING_COST);
                 Ok(IDLArgs::from_bytes_with_types_with_config(
-                    bytes, env, types, config,
+                    bytes, env, types, &config,
                 )?)
             }
         }
@@ -117,7 +117,7 @@ impl HostTest {
                     let mut config = DecoderConfig::new();
                     config.set_decoding_quota(DECODING_COST);
                     let args =
-                        IDLArgs::from_bytes_with_types_with_config(&bytes, env, &types, config)
+                        IDLArgs::from_bytes_with_types_with_config(&bytes, env, &types, &config)
                             .unwrap();
                     asserts.push(Decode(bytes.clone(), types.clone(), true, args));
                     // round tripping

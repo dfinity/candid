@@ -29,13 +29,12 @@ impl<'de> IDLDeserialize<'de> {
     /// Create a new deserializer with IDL binary message.
     pub fn new(bytes: &'de [u8]) -> Result<Self> {
         let config = DecoderConfig::new();
-        Self::new_with_config(bytes, config)
+        Self::new_with_config(bytes, &config)
     }
     /// Create a new deserializer with IDL binary message. The config is used to adjust some parameters in the deserializer.
-    pub fn new_with_config(bytes: &'de [u8], config: DecoderConfig) -> Result<Self> {
-        let full_error_message = config.full_error_message;
+    pub fn new_with_config(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
         let mut de = Deserializer::from_bytes(bytes, config).with_context(|| {
-            if full_error_message || bytes.len() <= 500 {
+            if config.full_error_message || bytes.len() <= 500 {
                 format!("Cannot parse header {}", &hex::encode(bytes))
             } else {
                 "Cannot parse header".to_string()
@@ -247,7 +246,7 @@ struct Deserializer<'de> {
 }
 
 impl<'de> Deserializer<'de> {
-    fn from_bytes(bytes: &'de [u8], config: DecoderConfig) -> Result<Self> {
+    fn from_bytes(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
         let mut reader = Cursor::new(bytes);
         let header = Header::read(&mut reader)?;
         let (env, types) = header.to_types()?;
@@ -260,7 +259,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
-            config,
+            config: config.clone(),
             #[cfg(not(target_arch = "wasm32"))]
             recursion_depth: 0,
         })

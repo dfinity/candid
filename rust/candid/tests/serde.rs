@@ -779,12 +779,12 @@ fn test_decode<'de, T>(bytes: &'de [u8], expected: &T)
 where
     T: PartialEq + serde::de::Deserialize<'de> + std::fmt::Debug + CandidType,
 {
-    let cost = 20_000_000;
-    let skip = 100_000;
     let mut config = DecoderConfig::new();
-    config.set_decoding_quota(cost).set_skipping_quota(skip);
-    let decoded_one = decode_one_with_config::<T>(bytes, config).unwrap();
-    let decoded_macro = Decode!([cost; skip]; bytes, T).unwrap();
+    config
+        .set_decoding_quota(20_000_000)
+        .set_skipping_quota(10_000);
+    let decoded_one = decode_one_with_config::<T>(bytes, &config).unwrap();
+    let decoded_macro = Decode!([config]; bytes, T).unwrap();
     assert_eq!(decoded_one, *expected);
     assert_eq!(decoded_macro, *expected);
 }

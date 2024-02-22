@@ -61,10 +61,8 @@ macro_rules! Decode {
             .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
                       .and_then(|res| de.done().and(Ok(res))))
     }};
-    ( [ $cost:expr; $skip:expr ] ; $hex:expr $(,$ty:ty)* ) => {{
-        let mut config = $crate::de::DecoderConfig::new();
-        config.set_decoding_quota($cost).set_skipping_quota($skip);
-        $crate::de::IDLDeserialize::new_with_config($hex, config)
+    ( [ $config:expr ] ; $hex:expr $(,$ty:ty)* ) => {{
+        $crate::de::IDLDeserialize::new_with_config($hex, &$config)
             .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
                       .and_then(|res| de.done().and(Ok(res))))
     }};
@@ -102,7 +100,7 @@ where
     de.done()?;
     Ok(res)
 }
-pub fn decode_args_with_config<'a, Tuple>(bytes: &'a [u8], config: DecoderConfig) -> Result<Tuple>
+pub fn decode_args_with_config<'a, Tuple>(bytes: &'a [u8], config: &DecoderConfig) -> Result<Tuple>
 where
     Tuple: ArgumentDecoder<'a>,
 {
@@ -132,7 +130,7 @@ where
     let (res,) = decode_args(bytes)?;
     Ok(res)
 }
-pub fn decode_one_with_config<'a, T>(bytes: &'a [u8], config: DecoderConfig) -> Result<T>
+pub fn decode_one_with_config<'a, T>(bytes: &'a [u8], config: &DecoderConfig) -> Result<T>
 where
     T: Deserialize<'a> + CandidType,
 {

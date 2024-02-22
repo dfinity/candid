@@ -122,7 +122,7 @@ impl IDLArgs {
         bytes: &[u8],
         env: &TypeEnv,
         types: &[Type],
-        config: DecoderConfig,
+        config: &DecoderConfig,
     ) -> Result<Self> {
         let mut de = crate::de::IDLDeserialize::new_with_config(bytes, config)?;
         let mut args = Vec::new();
@@ -143,7 +143,7 @@ impl IDLArgs {
         de.done()?;
         Ok(IDLArgs { args })
     }
-    pub fn from_bytes_with_config(bytes: &[u8], config: DecoderConfig) -> Result<Self> {
+    pub fn from_bytes_with_config(bytes: &[u8], config: &DecoderConfig) -> Result<Self> {
         let mut de = crate::de::IDLDeserialize::new_with_config(bytes, config)?;
         let mut args = Vec::new();
         while !de.is_done() {
