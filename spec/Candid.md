@@ -1,8 +1,8 @@
 # Candid Specification
 
-Version: 0.1.7
+Version: 0.1.8
 
-Date: Dec 12, 2023
+Date: Feb 22, 2024
 
 ## Motivation
 
@@ -1253,10 +1253,6 @@ M(ref(r) : principal) = i8(0)
 M(id(v*) : principal) = i8(1) M(v* : vec nat8)
 ```
 
-Note:
-
-* Since `null`, `reserved`, `record {}`, and records of such values, take no space, to prevent unbounded sized message, we limit the total vector length of such zero-sized values in a messagev (on the wire) to be 2,000,000 elements. For example, if a message contains two vectors, one at type `vec null` and one at type `vec record {}`, then the length of both vectors combined cannot exceed 2,000,000 elements.
-
 #### References
 
 `R` maps an Candid value to the sequence of references contained in that value. The definition is indexed by type.
@@ -1318,9 +1314,12 @@ Deserialisation at an expected type sequence `(<t'>,*)` proceeds by
 
  * checking for the magic number `DIDL`
  * using the inverse of the `T` function to decode the type definitions `(<t>,*)`
- * check that `(<t>,*) <: (<t'>,*)`, else fail
  * using the inverse of the `M` function, indexed by `(<t>,*)`, to decode the values `(<v>,*)`
- * use the coercion function `C[(<t>,*) <: (<t'>,*)]((<v>,*))` to understand the decoded values at the expected type.
+ * use the coercion function `v : t ~> v' : t'` to understand the decoded values at the expected type.
+
+Note on implementation:
+
+Due to the wire format and subtyping, deserializing different messages at a fixed type sequence `(<t'>,*)` requires significantly different resources, e.g., stack size, time and memory. The implementation is encouraged to self-meter the deserialisation cost to prevent: 1) stack overflow; 2) spending too much time on unneeded data, due to subtyping; 3) deserialising data of exponential size.
 
 ### Deserialisation of future types
 
