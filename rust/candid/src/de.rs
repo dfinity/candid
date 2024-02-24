@@ -132,13 +132,17 @@ impl<'de> IDLDeserialize<'de> {
         }
         Ok(())
     }
+    /// Return the current DecoderConfig, mainly to extract the remaining quota.
+    pub fn get_config(&self) -> DecoderConfig {
+        self.de.config.clone()
+    }
 }
 
 #[derive(Clone)]
 /// Config the deserialization quota, used to prevent spending too much time in decoding malicious payload.
 pub struct DecoderConfig {
-    decoding_quota: Option<usize>,
-    skipping_quota: Option<usize>,
+    pub decoding_quota: Option<usize>,
+    pub skipping_quota: Option<usize>,
     full_error_message: bool,
 }
 impl DecoderConfig {
@@ -215,6 +219,20 @@ impl DecoderConfig {
     pub fn set_full_error_message(&mut self, n: bool) -> &mut Self {
         self.full_error_message = n;
         self
+    }
+    /// Given the original config, compute the decoding cost
+    pub fn compute_cost(&self, original: &Self) -> Self {
+        let decoding_quota = original
+            .decoding_quota
+            .and_then(|n| Some(n - self.decoding_quota?));
+        let skipping_quota = original
+            .skipping_quota
+            .and_then(|n| Some(n - self.skipping_quota?));
+        Self {
+            decoding_quota,
+            skipping_quota,
+            full_error_message: original.full_error_message,
+        }
     }
 }
 impl Default for DecoderConfig {
