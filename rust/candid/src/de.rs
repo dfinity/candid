@@ -163,12 +163,11 @@ impl DecoderConfig {
     /// If your canister endpoint has variable-length data types and expects that the valid data will be small,
     /// you can set this limit to prevent spending too much time decoding invalid data.
     ///
-    /// The cost of decoding a message is roughly defined as follows
+    /// The cost of decoding a message = 4 * the byte length of the header (the byte before the value part) + the cost of decoding each value.
+    ///
+    /// The cost of decoding a value is roughly defined as follows
     /// (it's not precise because the cost also depends on how Rust data types are defined),
     /// ```text
-    /// C : <type table> -> nat
-    /// C(type table) = |type table| * 4
-    ///
     /// C : <val> -> <primtype> -> nat
     /// C(n : nat)      = |leb128(n)|
     /// C(i : int)      = |sleb128(i)|

@@ -61,11 +61,12 @@ macro_rules! Encode {
 /// assert_eq!(value1, 42);
 /// assert_eq!(value2, "hello");
 ///
-/// // Decode with quota limit
+/// // Decode with quota
 /// let mut config = DecoderConfig::new();
-/// config.set_decoding_quota(1000).set_skipping_quota(1000);
+/// config.set_decoding_quota(1000).set_skipping_quota(50);
 /// let (value1, value2) = Decode!([config]; &bytes, u32, String)?;
 /// let ((value1, value2), cost) = Decode!(@Debug [config]; &bytes, u32, String)?;
+/// // `cost` reports the decoding cost, not the remaining quota
 /// assert_eq!(cost.decoding_quota, Some(846));
 /// assert_eq!(cost.skipping_quota, Some(16));
 /// # Ok::<(), candid::Error>(())
