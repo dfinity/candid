@@ -116,7 +116,7 @@ impl<'de> IDLDeserialize<'de> {
         self.de.types.is_empty()
     }
     /// Return error if there are unprocessed bytes in the input.
-    pub fn done(mut self) -> Result<()> {
+    pub fn done(&mut self) -> Result<()> {
         while !self.is_done() {
             self.get_value::<crate::Reserved>()?;
         }
@@ -135,12 +135,16 @@ impl<'de> IDLDeserialize<'de> {
 }
 
 #[derive(Clone)]
+/// Config the deserialization quota, used to prevent spending too much time in decoding malicious payload.
 pub struct DecoderConfig {
     decoding_quota: Option<usize>,
     skipping_quota: Option<usize>,
     full_error_message: bool,
 }
 impl DecoderConfig {
+    /// Creates a config with no quota. This allows developers to handle large Candid
+    /// data internally, e.g., persisting states to stable memory.
+    /// When using Candid in canister endpoints, we recommend setting the quota to prevent malicious payload.
     pub fn new() -> Self {
         Self {
             decoding_quota: None,
@@ -151,14 +155,63 @@ impl DecoderConfig {
             full_error_message: false,
         }
     }
+    /// Limit the total amount of work the deserailizer can perform. Deserialization errors out when the limit is reached.
+    /// If your canister endpoint has variable-length data types and expects that the valid data will be small,
+    /// you can set this limit to prevent spending too much time decoding invalid data.
+    ///
+    /// The cost of decoding a message is roughly defined as follows
+    /// (it's not precise because the cost also depends on how Rust data types are defined),
+    /// ```text
+    /// C : <type table> -> nat
+    /// C(type table) = |type table| * 4
+    ///
+    /// C : <val> -> <primtype> -> nat
+    /// C(n : nat)      = |leb128(n)|
+    /// C(i : int)      = |sleb128(i)|
+    /// C(n : nat<N>)   = N / 8
+    /// C(i : int<N>)   = N / 8
+    /// C(z : float<N>) = N / 8
+    /// C(b : bool)     = 1
+    /// C(t : text)     = 1 + |t|
+    /// C(_ : null)     = 1
+    /// C(_ : reserved) = 1
+    /// C(_ : empty)    = undefined
+    ///
+    /// C : <val> -> <constype> -> nat
+    /// C(null : opt <datatype>)  = 2
+    /// C(?v   : opt <datatype>)  = 2 + C(v : <datatype>)
+    /// C(?v   : opt <datatype'>) = 2 + C(v : <datatype>) * 50 + 10  // when v cannot be converted to <datatype'>
+    /// C(v^N  : vec <datatype>)  = 2 + 3 * N + sum_i C(v[i] : <datatype>)
+    /// C(kv*  : record {<fieldtype>*})  = 2 + sum_skipped_i C(kv : <fieldtype>*[skipped_i]) * 50 + sum_expected_i C(kv : <fieldtype>*[expected_i])
+    /// C(kv   : variant {<fieldtype>*}) = 2 + C(kv : <fieldtype>*[i])
+    ///
+    /// C : (<nat>, <val>) -> <fieldtype> -> nat
+    /// C((k,v) : k:<datatype>) = 7 + |k| + C(v : <datatype>)  // record field
+    /// C((k,v) : k:<datatype>) = 5 + |k| + C(v : <datatype>)  // variant field
+    ///
+    /// C : <val> -> <reftype> -> nat
+    /// C(id(v*)        : service <actortype>) = 2 + |v*| + |type table|
+    /// C((id(v*),name) : func <functype>)     = 4 + |v*| + |name| + |type table|
+    /// C(id(v*)        : principal)           = 1 + |v*|
+    ///
+    /// C(v : <type>) = C(v : <type>) * 50   // when v is skipped
+    /// ```
     pub fn set_decoding_quota(&mut self, n: usize) -> &mut Self {
         self.decoding_quota = Some(n);
         self
     }
+    /// Limit the amount of work for skipping unneeded data on the wire. This includes extra arguments, extra fields
+    /// and mismatched option values. Decoding values to `IDLValue` is also counted towards this limit.
+    /// For the cost model, please refer to the docs in [`set_decoding_quota`](#method.set_decoding_quota).
+    /// Note that unlike the decoding_quota, we will not apply the 50x penalty for skipped values in this counter.
+    /// When using Candid in canister endpoints, it's strongly encouraged to set this quota to a small value, e.g., 10_000.
     pub fn set_skipping_quota(&mut self, n: usize) -> &mut Self {
         self.skipping_quota = Some(n);
         self
     }
+    /// When set to false, error message only displays the concrete type when the type is small.
+    /// The error message also doesn't include the decoding states.
+    /// When set to true, error message always shows the full type and decoding states.
     pub fn set_full_error_message(&mut self, n: bool) -> &mut Self {
         self.full_error_message = n;
         self
@@ -645,14 +698,13 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         use crate::types::leb128::{decode_int, decode_nat};
         self.unroll_type()?;
         assert!(*self.expect_type == TypeInner::Int);
-        let pos = self.input.position();
+        self.add_cost(16)?;
         let value: i128 = match self.wire_type.as_ref() {
             TypeInner::Int => decode_int(&mut self.input)?,
             TypeInner::Nat => i128::try_from(decode_nat(&mut self.input)?)
                 .map_err(|_| Error::msg("Cannot convert nat to i128"))?,
             t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
         };
-        self.add_cost((self.input.position() - pos) as usize)?;
         visitor.visit_i128(value)
     }
     fn deserialize_u128<V>(self, visitor: V) -> Result<V::Value>
@@ -664,9 +716,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             *self.expect_type == TypeInner::Nat && *self.wire_type == TypeInner::Nat,
             "nat"
         );
-        let pos = self.input.position();
+        self.add_cost(16)?;
         let value = crate::types::leb128::decode_nat(&mut self.input)?;
-        self.add_cost((self.input.position() - pos) as usize)?;
         visitor.visit_u128(value)
     }
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
