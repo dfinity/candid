@@ -1,16 +1,20 @@
 use canbench_rs::{bench, bench_fn, bench_scope, BenchResult};
-use candid::{CandidType, Decode, Deserialize, Encode, Int, Nat};
+use candid::{CandidType, Decode, DecoderConfig, Deserialize, Encode, Int, Nat};
 use std::collections::BTreeMap;
 
 #[allow(clippy::all)]
 mod nns;
 
 const N: usize = 2097152;
+const COST: usize = 20_000_000;
+const SKIP: usize = 10_000;
 
 #[bench(raw)]
 fn blob() -> BenchResult {
     use serde_bytes::ByteBuf;
     let vec: Vec<u8> = vec![0x61; N];
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
     bench_fn(|| {
         let bytes = {
             let _p = bench_scope("1. Encoding");
@@ -18,7 +22,7 @@ fn blob() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!(&bytes, ByteBuf).unwrap();
+            Decode!([config]; &bytes, ByteBuf).unwrap();
         }
     })
 }
@@ -27,6 +31,8 @@ fn blob() -> BenchResult {
 fn text() -> BenchResult {
     let vec: Vec<u8> = vec![0x61; N];
     let text = String::from_utf8(vec).unwrap();
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
     bench_fn(|| {
         let bytes = {
             let _p = bench_scope("1. Encoding");
@@ -34,14 +40,16 @@ fn text() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!(&bytes, String).unwrap();
+            Decode!([config]; &bytes, String).unwrap();
         }
     })
 }
 
 #[bench(raw)]
-fn vec_int64() -> BenchResult {
-    let vec: Vec<i64> = vec![-1; N];
+fn vec_int16() -> BenchResult {
+    let vec: Vec<i16> = vec![-1; N];
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
     bench_fn(|| {
         let bytes = {
             let _p = bench_scope("1. Encoding");
@@ -49,13 +57,15 @@ fn vec_int64() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!(&bytes, Vec<i64>).unwrap();
+            Decode!([config]; &bytes, Vec<i16>).unwrap();
         }
     })
 }
 
 #[bench(raw)]
 fn btreemap() -> BenchResult {
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
     let n = 1048576;
     let map: BTreeMap<String, Nat> = (0u32..n as u32)
         .map(|i| (i.to_string(), Nat::from(i)))
@@ -67,13 +77,15 @@ fn btreemap() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!(&bytes, BTreeMap<String, Nat>).unwrap();
+            Decode!([config]; &bytes, BTreeMap<String, Nat>).unwrap();
         }
     })
 }
 
 #[bench(raw)]
 fn option_list() -> BenchResult {
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
     let n = 2048;
     #[derive(CandidType, Deserialize)]
     struct List {
@@ -93,13 +105,15 @@ fn option_list() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!(&bytes, Option<Box<List>>).unwrap();
+            Decode!([config]; &bytes, Option<Box<List>>).unwrap();
         }
     })
 }
 
 #[bench(raw)]
 fn variant_list() -> BenchResult {
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
     let n = 2048;
     #[derive(CandidType, Deserialize)]
     enum VariantList {
@@ -116,7 +130,7 @@ fn variant_list() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!(&bytes, VariantList).unwrap();
+            Decode!([config]; &bytes, VariantList).unwrap();
         }
     })
 }
@@ -124,6 +138,8 @@ fn variant_list() -> BenchResult {
 #[bench(raw)]
 fn nns() -> BenchResult {
     use candid_parser::utils::CandidSource;
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
     let nns_did = CandidSource::Text(include_str!("./nns.did"));
     let motion_proposal = r#"
 (
@@ -207,16 +223,20 @@ fn nns() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!(&bytes, nns::ManageNeuron).unwrap();
+            Decode!([config]; &bytes, nns::ManageNeuron).unwrap();
         }
     })
 }
 
 #[bench(raw)]
 fn extra_args() -> BenchResult {
-    let bytes = hex::decode("4449444c036c01d6fca702016d026c00010080ade204").unwrap();
+    let mut config = DecoderConfig::new();
+    config.set_skipping_quota(SKIP);
+    let vec_null = hex::decode("4449444c036c01d6fca702016d026c00010080ade204").unwrap();
+    let vec_opt_record = hex::decode("4449444c176c02017f027f6c02010002006c02000101016c02000201026c02000301036c02000401046c02000501056c02000601066c02000701076c02000801086c02000901096c02000a010a6c02000b010b6c02000c010c6c02000d020d6c02000e010e6c02000f010f6c02001001106c02001101116c02001201126c02001301136e146d150116050101010101").unwrap();
     bench_fn(|| {
-        let _ = Decode!(&bytes);
+        assert!(Decode!([config]; &vec_null).is_err());
+        assert!(Decode!([config]; &vec_opt_record).is_err());
     })
 }
 

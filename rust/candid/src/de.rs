@@ -28,26 +28,19 @@ pub struct IDLDeserialize<'de> {
 impl<'de> IDLDeserialize<'de> {
     /// Create a new deserializer with IDL binary message.
     pub fn new(bytes: &'de [u8]) -> Result<Self> {
-        let de = Deserializer::from_bytes(bytes).with_context(|| {
-            if bytes.len() <= 500 {
-                format!("Cannot parse header {}", &hex::encode(bytes))
-            } else {
-                "Cannot parse header".to_string()
-            }
-        })?;
-        Ok(IDLDeserialize { de })
+        let config = DecoderConfig::new();
+        Self::new_with_config(bytes, &config)
     }
     /// Create a new deserializer with IDL binary message. The config is used to adjust some parameters in the deserializer.
-    pub fn new_with_config(bytes: &'de [u8], config: Config) -> Result<Self> {
-        let mut de = Deserializer::from_bytes(bytes).with_context(|| {
+    pub fn new_with_config(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
+        let mut de = Deserializer::from_bytes(bytes, config).with_context(|| {
             if config.full_error_message || bytes.len() <= 500 {
                 format!("Cannot parse header {}", &hex::encode(bytes))
             } else {
                 "Cannot parse header".to_string()
             }
         })?;
-        de.zero_sized_values = config.zero_sized_values;
-        de.full_error_message = config.full_error_message;
+        de.add_cost(de.input.position() as usize * 4)?;
         Ok(IDLDeserialize { de })
     }
     /// Deserialize one value from deserializer.
@@ -83,7 +76,8 @@ impl<'de> IDLDeserialize<'de> {
                 self.de.expect_type = expected_type;
                 self.de.wire_type = TypeInner::Reserved.into();
                 return T::deserialize(&mut self.de);
-            } else if self.de.full_error_message || text_size(&expected_type, MAX_TYPE_LEN).is_ok()
+            } else if self.de.config.full_error_message
+                || text_size(&expected_type, MAX_TYPE_LEN).is_ok()
             {
                 return Err(Error::msg(format!(
                     "No more values on the wire, the expected type {expected_type} is not opt, null, or reserved"
@@ -103,7 +97,7 @@ impl<'de> IDLDeserialize<'de> {
         self.de.wire_type = ty.clone();
 
         let mut v = T::deserialize(&mut self.de).with_context(|| {
-            if self.de.full_error_message
+            if self.de.config.full_error_message
                 || (text_size(&ty, MAX_TYPE_LEN).is_ok()
                     && text_size(&expected_type, MAX_TYPE_LEN).is_ok())
             {
@@ -112,7 +106,7 @@ impl<'de> IDLDeserialize<'de> {
                 format!("Fail to decode argument {ind}")
             }
         });
-        if self.de.full_error_message {
+        if self.de.config.full_error_message {
             v = v.with_context(|| self.de.dump_state());
         }
         Ok(v?)
@@ -122,14 +116,14 @@ impl<'de> IDLDeserialize<'de> {
         self.de.types.is_empty()
     }
     /// Return error if there are unprocessed bytes in the input.
-    pub fn done(mut self) -> Result<()> {
+    pub fn done(&mut self) -> Result<()> {
         while !self.is_done() {
             self.get_value::<crate::Reserved>()?;
         }
         let ind = self.de.input.position() as usize;
         let rest = &self.de.input.get_ref()[ind..];
         if !rest.is_empty() {
-            if !self.de.full_error_message {
+            if !self.de.config.full_error_message {
                 return Err(Error::msg("Trailing value after finishing deserialization"));
             } else {
                 return Err(anyhow!(self.de.dump_state()))
@@ -138,29 +132,109 @@ impl<'de> IDLDeserialize<'de> {
         }
         Ok(())
     }
+    /// Return the current DecoderConfig, mainly to extract the remaining quota.
+    pub fn get_config(&self) -> DecoderConfig {
+        self.de.config.clone()
+    }
 }
 
-pub struct Config {
-    zero_sized_values: usize,
+#[derive(Clone)]
+/// Config the deserialization quota, used to prevent spending too much time in decoding malicious payload.
+pub struct DecoderConfig {
+    pub decoding_quota: Option<usize>,
+    pub skipping_quota: Option<usize>,
     full_error_message: bool,
 }
-impl Config {
+impl DecoderConfig {
+    /// Creates a config with no quota. This allows developers to handle large Candid
+    /// data internally, e.g., persisting states to stable memory.
+    /// When using Candid in canister endpoints, we recommend setting the quota to prevent malicious payload.
     pub fn new() -> Self {
         Self {
-            zero_sized_values: 2_000_000,
+            decoding_quota: None,
+            skipping_quota: None,
+            #[cfg(not(target_arch = "wasm32"))]
             full_error_message: true,
+            #[cfg(target_arch = "wasm32")]
+            full_error_message: false,
         }
     }
-    pub fn set_zero_sized_values(&mut self, n: usize) -> &mut Self {
-        self.zero_sized_values = n;
+    /// Limit the total amount of work the deserailizer can perform. Deserialization errors out when the limit is reached.
+    /// If your canister endpoint has variable-length data types and expects that the valid data will be small,
+    /// you can set this limit to prevent spending too much time decoding invalid data.
+    ///
+    /// The cost of decoding a message = 4 * the byte length of the header (the byte before the value part) + the cost of decoding each value.
+    ///
+    /// The cost of decoding a value is roughly defined as follows
+    /// (it's not precise because the cost also depends on how Rust data types are defined),
+    /// ```text
+    /// C : <val> -> <primtype> -> nat
+    /// C(n : nat)      = |leb128(n)|
+    /// C(i : int)      = |sleb128(i)|
+    /// C(n : nat<N>)   = N / 8
+    /// C(i : int<N>)   = N / 8
+    /// C(z : float<N>) = N / 8
+    /// C(b : bool)     = 1
+    /// C(t : text)     = 1 + |t|
+    /// C(_ : null)     = 1
+    /// C(_ : reserved) = 1
+    /// C(_ : empty)    = undefined
+    ///
+    /// C : <val> -> <constype> -> nat
+    /// C(null : opt <datatype>)  = 2
+    /// C(?v   : opt <datatype>)  = 2 + C(v : <datatype>)
+    /// C(v^N  : vec <datatype>)  = 2 + 3 * N + sum_i C(v[i] : <datatype>)
+    /// C(kv*  : record {<fieldtype>*})  = 2 + sum_i C(kv : <fieldtype>*[i])
+    /// C(kv   : variant {<fieldtype>*}) = 2 + C(kv : <fieldtype>*[i])
+    ///
+    /// C : (<nat>, <val>) -> <fieldtype> -> nat
+    /// C((k,v) : k:<datatype>) = 7 + |k| + C(v : <datatype>)  // record field
+    /// C((k,v) : k:<datatype>) = 5 + |k| + C(v : <datatype>)  // variant field
+    ///
+    /// C : <val> -> <reftype> -> nat
+    /// C(id(v*)        : service <actortype>) = 2 + |v*| + |type table|
+    /// C((id(v*),name) : func <functype>)     = 4 + |v*| + |name| + |type table|
+    /// C(id(v*)        : principal)           = 1 + |v*|
+    ///
+    /// When a value `v : t` on the wire is skipped, due to being extra arguments, extra fields and mismatched option types,
+    /// we apply a 50x penalty on `C(v : t)` in the decoding cost.
+    /// ```
+    pub fn set_decoding_quota(&mut self, n: usize) -> &mut Self {
+        self.decoding_quota = Some(n);
         self
     }
+    /// Limit the amount of work for skipping unneeded data on the wire. This includes extra arguments, extra fields
+    /// and mismatched option values. Decoding values to `IDLValue` is also counted towards this limit.
+    /// For the cost model, please refer to the docs in [`set_decoding_quota`](#method.set_decoding_quota).
+    /// Note that unlike the decoding_quota, we will not apply the 50x penalty for skipped values in this counter.
+    /// When using Candid in canister endpoints, it's strongly encouraged to set this quota to a small value, e.g., 10_000.
+    pub fn set_skipping_quota(&mut self, n: usize) -> &mut Self {
+        self.skipping_quota = Some(n);
+        self
+    }
+    /// When set to false, error message only displays the concrete type when the type is small.
+    /// The error message also doesn't include the decoding states.
+    /// When set to true, error message always shows the full type and decoding states.
     pub fn set_full_error_message(&mut self, n: bool) -> &mut Self {
         self.full_error_message = n;
         self
     }
+    /// Given the original config, compute the decoding cost
+    pub fn compute_cost(&self, original: &Self) -> Self {
+        let decoding_quota = original
+            .decoding_quota
+            .and_then(|n| Some(n - self.decoding_quota?));
+        let skipping_quota = original
+            .skipping_quota
+            .and_then(|n| Some(n - self.skipping_quota?));
+        Self {
+            decoding_quota,
+            skipping_quota,
+            full_error_message: original.full_error_message,
+        }
+    }
 }
-impl Default for Config {
+impl Default for DecoderConfig {
     fn default() -> Self {
         Self::new()
     }
@@ -236,14 +310,13 @@ struct Deserializer<'de> {
     // Indicates whether to deserialize with IDLValue.
     // It only affects the field id generation in enum type.
     is_untyped: bool,
-    zero_sized_values: usize,
-    full_error_message: bool,
+    config: DecoderConfig,
     #[cfg(not(target_arch = "wasm32"))]
     recursion_depth: u16,
 }
 
 impl<'de> Deserializer<'de> {
-    fn from_bytes(bytes: &'de [u8]) -> Result<Self> {
+    fn from_bytes(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
         let mut reader = Cursor::new(bytes);
         let header = Header::read(&mut reader)?;
         let (env, types) = header.to_types()?;
@@ -256,14 +329,7 @@ impl<'de> Deserializer<'de> {
             gamma: Gamma::default(),
             field_name: None,
             is_untyped: false,
-            #[cfg(not(target_arch = "wasm32"))]
-            zero_sized_values: 2_000_000,
-            #[cfg(target_arch = "wasm32")]
-            zero_sized_values: 0,
-            #[cfg(not(target_arch = "wasm32"))]
-            full_error_message: true,
-            #[cfg(target_arch = "wasm32")]
-            full_error_message: false,
+            config: config.clone(),
             #[cfg(not(target_arch = "wasm32"))]
             recursion_depth: 0,
         })
@@ -299,6 +365,7 @@ impl<'de> Deserializer<'de> {
         Ok(res)
     }
     fn check_subtype(&mut self) -> Result<()> {
+        self.add_cost(self.table.0.len())?;
         subtype_with_config(
             OptReport::Silence,
             &mut self.gamma,
@@ -307,7 +374,7 @@ impl<'de> Deserializer<'de> {
             &self.expect_type,
         )
         .with_context(|| {
-            if self.full_error_message
+            if self.config.full_error_message
                 || (text_size(&self.wire_type, MAX_TYPE_LEN).is_ok()
                     && text_size(&self.expect_type, MAX_TYPE_LEN).is_ok())
             {
@@ -327,26 +394,35 @@ impl<'de> Deserializer<'de> {
             self.expect_type.as_ref(),
             TypeInner::Var(_) | TypeInner::Knot(_)
         ) {
+            self.add_cost(1)?;
             self.expect_type = self.table.trace_type(&self.expect_type)?;
         }
         if matches!(
             self.wire_type.as_ref(),
             TypeInner::Var(_) | TypeInner::Knot(_)
         ) {
+            self.add_cost(1)?;
             self.wire_type = self.table.trace_type(&self.wire_type)?;
         }
         Ok(())
     }
-    fn is_zero_sized_type(&self, t: &Type) -> bool {
-        match t.as_ref() {
-            TypeInner::Null | TypeInner::Reserved => true,
-            TypeInner::Record(fs) => fs.iter().all(|f| {
-                let t = self.table.trace_type(&f.ty).unwrap();
-                // recursive records have been replaced with empty already, it's safe to call without memoization.
-                self.is_zero_sized_type(&t)
-            }),
-            _ => false,
+    fn add_cost(&mut self, cost: usize) -> Result<()> {
+        if let Some(n) = self.config.decoding_quota {
+            let cost = if self.is_untyped { cost * 50 } else { cost };
+            if n < cost {
+                return Err(Error::msg("Decoding cost exceeds the limit"));
+            }
+            self.config.decoding_quota = Some(n - cost);
         }
+        if self.is_untyped {
+            if let Some(n) = self.config.skipping_quota {
+                if n < cost {
+                    return Err(Error::msg("Skipping cost exceeds the limit"));
+                }
+                self.config.skipping_quota = Some(n - cost);
+            }
+        }
+        Ok(())
     }
     // Should always call set_field_name to set the field_name. After deserialize_identifier
     // processed the field_name, field_name will be reset to None.
@@ -371,11 +447,13 @@ impl<'de> Deserializer<'de> {
         self.unroll_type()?;
         assert!(*self.expect_type == TypeInner::Int);
         let mut bytes = vec![0u8];
+        let pos = self.input.position();
         let int = match self.wire_type.as_ref() {
             TypeInner::Int => Int::decode(&mut self.input).map_err(Error::msg)?,
             TypeInner::Nat => Int(Nat::decode(&mut self.input).map_err(Error::msg)?.0.into()),
             t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
         };
+        self.add_cost((self.input.position() - pos) as usize)?;
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
         visitor.visit_byte_buf(bytes)
     }
@@ -391,7 +469,9 @@ impl<'de> Deserializer<'de> {
             "nat"
         );
         let mut bytes = vec![1u8];
+        let pos = self.input.position();
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
+        self.add_cost((self.input.position() - pos) as usize)?;
         bytes.extend_from_slice(&nat.0.to_bytes_le());
         visitor.visit_byte_buf(bytes)
     }
@@ -405,14 +485,16 @@ impl<'de> Deserializer<'de> {
             "principal"
         );
         let mut bytes = vec![2u8];
-        let id = PrincipalBytes::read(&mut self.input)?.inner;
-        bytes.extend_from_slice(&id);
+        let id = PrincipalBytes::read(&mut self.input)?;
+        self.add_cost(id.len as usize + 1)?;
+        bytes.extend_from_slice(&id.inner);
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_reserved<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
+        self.add_cost(1)?;
         let bytes = vec![3u8];
         visitor.visit_byte_buf(bytes)
     }
@@ -423,8 +505,9 @@ impl<'de> Deserializer<'de> {
         self.unroll_type()?;
         self.check_subtype()?;
         let mut bytes = vec![4u8];
-        let id = PrincipalBytes::read(&mut self.input)?.inner;
-        bytes.extend_from_slice(&id);
+        let id = PrincipalBytes::read(&mut self.input)?;
+        self.add_cost(id.len as usize + 1)?;
+        bytes.extend_from_slice(&id.inner);
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_function<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
@@ -437,13 +520,14 @@ impl<'de> Deserializer<'de> {
             return Err(Error::msg("Opaque reference not supported"));
         }
         let mut bytes = vec![5u8];
-        let id = PrincipalBytes::read(&mut self.input)?.inner;
+        let id = PrincipalBytes::read(&mut self.input)?;
         let len = Len::read(&mut self.input)?.0;
         let meth = self.borrow_bytes(len)?;
+        self.add_cost(id.len as usize + len + 3)?;
         // TODO find a better way
         leb128::write::unsigned(&mut bytes, len as u64)?;
         bytes.extend_from_slice(meth);
-        bytes.extend_from_slice(&id);
+        bytes.extend_from_slice(&id.inner);
         visitor.visit_byte_buf(bytes)
     }
     fn deserialize_blob<'a, V>(&'a mut self, visitor: V) -> Result<V::Value>
@@ -456,6 +540,7 @@ impl<'de> Deserializer<'de> {
             "blob"
         );
         let len = Len::read(&mut self.input)?.0;
+        self.add_cost(len + 1)?;
         let blob = self.borrow_bytes(len)?;
         let mut bytes = Vec::with_capacity(len + 1);
         bytes.push(6u8);
@@ -477,6 +562,7 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         let len = Len::read(&mut self.input)?.0 as u64;
+        self.add_cost(len as usize + 1)?;
         Len::read(&mut self.input)?;
         let slice_len = self.input.get_ref().len() as u64;
         let pos = self.input.position();
@@ -516,6 +602,9 @@ impl<'de> Deserializer<'de> {
                 Ok(v)
             }
             Err(Error::Subtype(_)) => {
+                // Remember the backtracking cost
+                self.config = self_clone.config;
+                self.add_cost(10)?;
                 self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                 visitor.visit_none()
             }
@@ -525,12 +614,13 @@ impl<'de> Deserializer<'de> {
 }
 
 macro_rules! primitive_impl {
-    ($ty:ident, $type:expr, $($value:tt)*) => {
+    ($ty:ident, $type:expr, $cost:literal, $($value:tt)*) => {
         paste::item! {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
                 self.unroll_type()?;
                 check!(*self.expect_type == $type && *self.wire_type == $type, stringify!($type));
+                self.add_cost($cost)?;
                 let val = self.input.$($value)*().map_err(|_| Error::msg(format!("Cannot read {} value", stringify!($type))))?;
                 visitor.[<visit_ $ty>](val)
             }
@@ -604,16 +694,16 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         v
     }
 
-    primitive_impl!(i8, TypeInner::Int8, read_i8);
-    primitive_impl!(i16, TypeInner::Int16, read_i16::<LittleEndian>);
-    primitive_impl!(i32, TypeInner::Int32, read_i32::<LittleEndian>);
-    primitive_impl!(i64, TypeInner::Int64, read_i64::<LittleEndian>);
-    primitive_impl!(u8, TypeInner::Nat8, read_u8);
-    primitive_impl!(u16, TypeInner::Nat16, read_u16::<LittleEndian>);
-    primitive_impl!(u32, TypeInner::Nat32, read_u32::<LittleEndian>);
-    primitive_impl!(u64, TypeInner::Nat64, read_u64::<LittleEndian>);
-    primitive_impl!(f32, TypeInner::Float32, read_f32::<LittleEndian>);
-    primitive_impl!(f64, TypeInner::Float64, read_f64::<LittleEndian>);
+    primitive_impl!(i8, TypeInner::Int8, 1, read_i8);
+    primitive_impl!(i16, TypeInner::Int16, 2, read_i16::<LittleEndian>);
+    primitive_impl!(i32, TypeInner::Int32, 4, read_i32::<LittleEndian>);
+    primitive_impl!(i64, TypeInner::Int64, 8, read_i64::<LittleEndian>);
+    primitive_impl!(u8, TypeInner::Nat8, 1, read_u8);
+    primitive_impl!(u16, TypeInner::Nat16, 2, read_u16::<LittleEndian>);
+    primitive_impl!(u32, TypeInner::Nat32, 4, read_u32::<LittleEndian>);
+    primitive_impl!(u64, TypeInner::Nat64, 8, read_u64::<LittleEndian>);
+    primitive_impl!(f32, TypeInner::Float32, 4, read_f32::<LittleEndian>);
+    primitive_impl!(f64, TypeInner::Float64, 8, read_f64::<LittleEndian>);
 
     fn is_human_readable(&self) -> bool {
         false
@@ -625,6 +715,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         use crate::types::leb128::{decode_int, decode_nat};
         self.unroll_type()?;
         assert!(*self.expect_type == TypeInner::Int);
+        self.add_cost(16)?;
         let value: i128 = match self.wire_type.as_ref() {
             TypeInner::Int => decode_int(&mut self.input)?,
             TypeInner::Nat => i128::try_from(decode_nat(&mut self.input)?)
@@ -642,6 +733,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             *self.expect_type == TypeInner::Nat && *self.wire_type == TypeInner::Nat,
             "nat"
         );
+        self.add_cost(16)?;
         let value = crate::types::leb128::decode_nat(&mut self.input)?;
         visitor.visit_u128(value)
     }
@@ -655,6 +747,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 && matches!(*self.wire_type, TypeInner::Null | TypeInner::Reserved),
             "unit"
         );
+        self.add_cost(1)?;
         visitor.visit_unit()
     }
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
@@ -666,6 +759,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             *self.expect_type == TypeInner::Bool && *self.wire_type == TypeInner::Bool,
             "bool"
         );
+        self.add_cost(1)?;
         let res = BoolValue::read(&mut self.input)?;
         visitor.visit_bool(res.0)
     }
@@ -679,6 +773,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             "text"
         );
         let len = Len::read(&mut self.input)?.0;
+        self.add_cost(len + 1)?;
         let bytes = self.borrow_bytes(len)?.to_owned();
         let value = String::from_utf8(bytes).map_err(Error::msg)?;
         visitor.visit_string(value)
@@ -693,6 +788,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             "text"
         );
         let len = Len::read(&mut self.input)?.0;
+        self.add_cost(len + 1)?;
         let slice = self.borrow_bytes(len)?;
         let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
         visitor.visit_borrowed_str(value)
@@ -701,12 +797,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.add_cost(1)?;
         self.deserialize_unit(visitor)
     }
     fn deserialize_newtype_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
+        self.add_cost(1)?;
         visitor.visit_newtype_struct(self)
     }
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>
@@ -714,6 +812,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
+        self.add_cost(1)?;
         match (self.wire_type.as_ref(), self.expect_type.as_ref()) {
             (TypeInner::Null | TypeInner::Reserved, TypeInner::Opt(_)) => visitor.visit_none(),
             (TypeInner::Opt(t1), TypeInner::Opt(t2)) => {
@@ -750,17 +849,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         check_recursion! {
         self.unroll_type()?;
+        self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
                 let expect = e.clone();
                 let wire = self.table.trace_type(w)?;
                 let len = Len::read(&mut self.input)?.0;
-                if self.is_zero_sized_type(&wire) {
-                    if self.zero_sized_values < len {
-                        return Err(Error::msg("vec length of zero sized values too large"));
-                    }
-                    self.zero_sized_values -= len;
-                }
                 visitor.visit_seq(Compound::new(self, Style::Vector { len, expect, wire }))
             }
             (TypeInner::Record(e), TypeInner::Record(w)) => {
@@ -789,6 +883,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             "vec nat8"
         );
         let len = Len::read(&mut self.input)?.0;
+        self.add_cost(len + 1)?;
         let bytes = self.borrow_bytes(len)?.to_owned();
         visitor.visit_byte_buf(bytes)
     }
@@ -798,6 +893,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             TypeInner::Principal => self.deserialize_principal(visitor),
             TypeInner::Vec(t) if **t == TypeInner::Nat8 => {
                 let len = Len::read(&mut self.input)?.0;
+                self.add_cost(len + 1)?;
                 let slice = self.borrow_bytes(len)?;
                 visitor.visit_borrowed_bytes(slice)
             }
@@ -810,6 +906,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         check_recursion! {
         self.unroll_type()?;
+        self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
                 let e = self.table.trace_type(e)?;
@@ -848,6 +945,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         check_recursion! {
+            self.add_cost(1)?;
             self.deserialize_seq(visitor)
         }
     }
@@ -861,6 +959,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         check_recursion! {
+            self.add_cost(1)?;
             self.deserialize_seq(visitor)
         }
     }
@@ -875,6 +974,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         check_recursion! {
         self.unroll_type()?;
+        self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Record(e), TypeInner::Record(w)) => {
                 let expect = e.clone().into();
@@ -898,6 +998,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         check_recursion! {
         self.unroll_type()?;
+        self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Variant(e), TypeInner::Variant(w)) => {
                 let index = Len::read(&mut self.input)?.0;
@@ -926,8 +1027,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         match self.field_name.take() {
             Some(l) => match l.as_ref() {
-                Label::Named(name) => visitor.visit_string(name.to_string()),
-                Label::Id(hash) | Label::Unnamed(hash) => visitor.visit_u32(*hash),
+                Label::Named(name) => {
+                    self.add_cost(name.len())?;
+                    visitor.visit_string(name.to_string())
+                }
+                Label::Id(hash) | Label::Unnamed(hash) => {
+                    self.add_cost(4)?;
+                    visitor.visit_u32(*hash)
+                }
             },
             None => assert!(false),
         }
@@ -978,6 +1085,7 @@ impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
     where
         T: de::DeserializeSeed<'de>,
     {
+        self.de.add_cost(3)?;
         match self.style {
             Style::Vector {
                 ref mut len,
@@ -1020,6 +1128,7 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
     where
         K: de::DeserializeSeed<'de>,
     {
+        self.de.add_cost(4)?;
         match self.style {
             Style::Struct {
                 ref mut expect,
@@ -1093,11 +1202,15 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
     {
         match &self.style {
             Style::Map { expect, wire, .. } => {
+                self.de.add_cost(3)?;
                 self.de.expect_type = expect.1.clone();
                 self.de.wire_type = wire.1.clone();
                 seed.deserialize(&mut *self.de)
             }
-            _ => seed.deserialize(&mut *self.de),
+            _ => {
+                self.de.add_cost(1)?;
+                seed.deserialize(&mut *self.de)
+            }
         }
     }
 }
@@ -1110,6 +1223,7 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
     where
         V: de::DeserializeSeed<'de>,
     {
+        self.de.add_cost(4)?;
         match &self.style {
             Style::Enum { expect, wire } => {
                 self.de.expect_type = expect.ty.clone();
@@ -1143,6 +1257,7 @@ impl<'de, 'a> de::VariantAccess<'de> for Compound<'a, 'de> {
             *self.de.expect_type == TypeInner::Null && *self.de.wire_type == TypeInner::Null,
             "unit_variant"
         );
+        self.de.add_cost(1)?;
         Ok(())
     }
 
@@ -1150,6 +1265,7 @@ impl<'de, 'a> de::VariantAccess<'de> for Compound<'a, 'de> {
     where
         T: de::DeserializeSeed<'de>,
     {
+        self.de.add_cost(1)?;
         seed.deserialize(self.de)
     }
 
@@ -1157,6 +1273,7 @@ impl<'de, 'a> de::VariantAccess<'de> for Compound<'a, 'de> {
     where
         V: Visitor<'de>,
     {
+        self.de.add_cost(1)?;
         de::Deserializer::deserialize_tuple(self.de, len, visitor)
     }
 
@@ -1164,6 +1281,7 @@ impl<'de, 'a> de::VariantAccess<'de> for Compound<'a, 'de> {
     where
         V: Visitor<'de>,
     {
+        self.de.add_cost(1)?;
         de::Deserializer::deserialize_struct(self.de, "_", fields, visitor)
     }
 }

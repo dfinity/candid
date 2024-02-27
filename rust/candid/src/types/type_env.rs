@@ -1,6 +1,6 @@
 use crate::types::{Function, Type, TypeInner};
 use crate::{Error, Result};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Default)]
 pub struct TypeEnv(pub BTreeMap<String, Type>);
@@ -80,50 +80,50 @@ impl TypeEnv {
         }
         Err(Error::msg(format!("cannot find method {id}")))
     }
-    fn go<'a>(
+    fn is_empty<'a>(
         &'a self,
-        seen: &mut BTreeSet<&'a str>,
-        res: &mut BTreeSet<&'a str>,
-        t: &'a Type,
-    ) -> Result<()> {
-        if !res.is_empty() {
-            return Ok(());
-        }
-        match t.as_ref() {
-            TypeInner::Record(fs) => {
-                for f in fs {
-                    self.go(seen, res, &f.ty)?;
-                }
+        res: &mut BTreeMap<&'a str, Option<bool>>,
+        id: &'a str,
+    ) -> Result<bool> {
+        match res.get(id) {
+            None => {
+                res.insert(id, None);
+                let t = self.find_type(id)?;
+                let result = match t.as_ref() {
+                    TypeInner::Record(fs) => {
+                        for f in fs {
+                            // Assume env only comes from type table, f.ty is either primitive or var.
+                            if let TypeInner::Var(f_id) = f.ty.as_ref() {
+                                if self.is_empty(res, f_id)? {
+                                    res.insert(id, Some(true));
+                                    return Ok(true);
+                                }
+                            }
+                        }
+                        false
+                    }
+                    TypeInner::Var(id) => self.is_empty(res, id)?,
+                    _ => false,
+                };
+                res.insert(id, Some(result));
+                Ok(result)
             }
-            TypeInner::Var(id) => {
-                if seen.insert(id) {
-                    let t = self.find_type(id)?;
-                    self.go(seen, res, t)?;
-                    seen.remove(&id.as_str());
-                } else {
-                    *res = seen.clone();
-                }
+            Some(None) => {
+                res.insert(id, Some(true));
+                Ok(true)
             }
-            _ => (),
+            Some(Some(b)) => Ok(*b),
         }
-        Ok(())
-    }
-    fn check_empty(&self) -> Result<BTreeSet<&str>> {
-        let mut res = BTreeSet::new();
-        for (name, t) in &self.0 {
-            let mut seen: BTreeSet<&str> = BTreeSet::new();
-            let mut local_res = BTreeSet::new();
-            seen.insert(name);
-            self.go(&mut seen, &mut local_res, t)?;
-            res.append(&mut local_res);
-        }
-        Ok(res)
     }
     pub fn replace_empty(&mut self) -> Result<()> {
-        let ids: Vec<_> = self
-            .check_empty()?
+        let mut res = BTreeMap::new();
+        for name in self.0.keys() {
+            self.is_empty(&mut res, name)?;
+        }
+        let ids: Vec<_> = res
             .iter()
-            .map(|x| (*x).to_string())
+            .filter(|(_, v)| matches!(v, Some(true)))
+            .map(|(id, _)| id.to_string())
             .collect();
         for id in ids {
             self.0.insert(id, TypeInner::Empty.into());

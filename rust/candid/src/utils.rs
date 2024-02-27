@@ -1,4 +1,4 @@
-use crate::de::IDLDeserialize;
+use crate::de::{DecoderConfig, IDLDeserialize};
 use crate::ser::IDLBuilder;
 use crate::{CandidType, Error, Result};
 use serde::de::Deserialize;
@@ -54,12 +54,37 @@ macro_rules! Encode {
 /// Decode Candid message into a tuple of Rust values of the given types.
 /// Produces `Err` if the message fails to decode at any given types.
 /// If the message contains only one value, it returns the value directly instead of a tuple.
+/// ```
+/// use candid::{Encode, Decode, DecoderConfig};
+/// let bytes = Encode!(&42u32, &"hello", &"extra arguments")?;
+/// let (value1, value2) = Decode!(&bytes, u32, String)?;
+/// assert_eq!(value1, 42);
+/// assert_eq!(value2, "hello");
+///
+/// // Decode with quota
+/// let mut config = DecoderConfig::new();
+/// config.set_decoding_quota(1000).set_skipping_quota(50);
+/// let (value1, value2) = Decode!([config]; &bytes, u32, String)?;
+/// let ((value1, value2), cost) = Decode!(@Debug [config]; &bytes, u32, String)?;
+/// // `cost` reports the decoding cost, not the remaining quota
+/// assert_eq!(cost.decoding_quota, Some(846));
+/// assert_eq!(cost.skipping_quota, Some(16));
+/// # Ok::<(), candid::Error>(())
+/// ```
 #[macro_export]
 macro_rules! Decode {
     ( $hex:expr $(,$ty:ty)* ) => {{
-        $crate::de::IDLDeserialize::new($hex)
+        Decode!([$crate::de::DecoderConfig::new()]; $hex $(,$ty)*)
+    }};
+    ( [ $config:expr ] ; $hex:expr $(,$ty:ty)* ) => {{
+        $crate::de::IDLDeserialize::new_with_config($hex, &$config)
             .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
                       .and_then(|res| de.done().and(Ok(res))))
+    }};
+    (@Debug [ $config:expr ] ; $hex:expr $(,$ty:ty)* ) => {{
+        $crate::de::IDLDeserialize::new_with_config($hex, &$config)
+            .and_then(|mut de| Decode!(@GetValue [] de $($ty,)*)
+                      .and_then(|res| de.done().and(Ok((res, de.get_config().compute_cost(&$config))))))
     }};
     (@GetValue [$($ans:ident)*] $de:ident $ty:ty, $($tail:ty,)* ) => {{
         $de.get_value::<$ty>()
@@ -95,6 +120,28 @@ where
     de.done()?;
     Ok(res)
 }
+pub fn decode_args_with_config<'a, Tuple>(bytes: &'a [u8], config: &DecoderConfig) -> Result<Tuple>
+where
+    Tuple: ArgumentDecoder<'a>,
+{
+    let mut de = IDLDeserialize::new_with_config(bytes, config)?;
+    let res = ArgumentDecoder::decode(&mut de)?;
+    de.done()?;
+    Ok(res)
+}
+pub fn decode_args_with_config_debug<'a, Tuple>(
+    bytes: &'a [u8],
+    config: &DecoderConfig,
+) -> Result<(Tuple, DecoderConfig)>
+where
+    Tuple: ArgumentDecoder<'a>,
+{
+    let mut de = IDLDeserialize::new_with_config(bytes, config)?;
+    let res = ArgumentDecoder::decode(&mut de)?;
+    de.done()?;
+    let cost = de.get_config().compute_cost(config);
+    Ok((res, cost))
+}
 
 /// Decode a single argument.
 ///
@@ -114,6 +161,13 @@ where
     T: Deserialize<'a> + CandidType,
 {
     let (res,) = decode_args(bytes)?;
+    Ok(res)
+}
+pub fn decode_one_with_config<'a, T>(bytes: &'a [u8], config: &DecoderConfig) -> Result<T>
+where
+    T: Deserialize<'a> + CandidType,
+{
+    let (res,) = decode_args_with_config(bytes, config)?;
     Ok(res)
 }
 

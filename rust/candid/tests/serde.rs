@@ -1,4 +1,7 @@
-use candid::{decode_one, encode_one, CandidType, Decode, Deserialize, Encode, Int, Nat};
+use candid::{
+    decode_one_with_config, encode_one, CandidType, Decode, DecoderConfig, Deserialize, Encode,
+    Int, Nat,
+};
 
 #[test]
 fn test_error() {
@@ -31,9 +34,9 @@ fn test_error() {
         || {
             test_decode(b"DIDL\x02\x6c\x01\x0a\x01\x6d\x00\x01\x01                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ", &candid::Reserved)
         },
-        // Depending on stack size, we either get recursion limit or parser error
+        // Depending on stack size, we either reach recursion limit or skipping limit
         "Recursion limit exceeded",
-        "binary parser error",
+        "Skipping cost exceeds the limit",
     );
 }
 
@@ -437,6 +440,11 @@ fn test_serde_bytes() {
     };
     test_encode(&vec, &hex("4449444c026c02620163016d7b01000301020303010203"));
     test_decode(&hex("4449444c026c02620163016d7b01000301020303010203"), &vec);
+    // test cost
+    let bytes = hex("4449444c016d7b010003010203");
+    let config = get_config();
+    let cost = Decode!(@Debug [config]; &bytes, ByteBuf).unwrap().1;
+    assert_eq!(cost.decoding_quota, Some(41)); // header cost 9 * 4 + 1 + 4
 }
 
 #[test]
@@ -531,7 +539,12 @@ fn test_vector() {
     let bytes = hex("4449444c036c01d6fca702016d026c00010080ade204");
     check_error(
         || test_decode(&bytes, &candid::Reserved),
-        "zero sized values too large",
+        "Skipping cost exceeds the limit",
+    );
+    let bytes = hex("4449444c176c02017f027f6c02010002006c02000101016c02000201026c02000301036c02000401046c02000501056c02000601066c02000701076c02000801086c02000901096c02000a010a6c02000b010b6c02000c010c6c02000d020d6c02000e010e6c02000f010f6c02001001106c02001101116c02001201126c02001301136e146d150116050101010101");
+    check_error(
+        || test_decode(&bytes, &candid::Reserved),
+        "Skipping cost exceeds the limit",
     );
 }
 
@@ -767,12 +780,21 @@ where
     );
 }
 
+fn get_config() -> DecoderConfig {
+    let mut config = DecoderConfig::new();
+    config
+        .set_decoding_quota(20_000_000)
+        .set_skipping_quota(10_000);
+    config
+}
+
 fn test_decode<'de, T>(bytes: &'de [u8], expected: &T)
 where
     T: PartialEq + serde::de::Deserialize<'de> + std::fmt::Debug + CandidType,
 {
-    let decoded_one = decode_one::<T>(bytes).unwrap();
-    let decoded_macro = Decode!(bytes, T).unwrap();
+    let config = get_config();
+    let decoded_one = decode_one_with_config::<T>(bytes, &config).unwrap();
+    let decoded_macro = Decode!([config]; bytes, T).unwrap();
     assert_eq!(decoded_one, *expected);
     assert_eq!(decoded_macro, *expected);
 }
