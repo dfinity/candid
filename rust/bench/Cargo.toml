@@ -1,3 +1,5 @@
+[workspace]
+
 [package]
 name = "bench"
 edition = "2021"
