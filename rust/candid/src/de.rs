@@ -183,9 +183,8 @@ impl DecoderConfig {
     /// C : <val> -> <constype> -> nat
     /// C(null : opt <datatype>)  = 2
     /// C(?v   : opt <datatype>)  = 2 + C(v : <datatype>)
-    /// C(?v   : opt <datatype'>) = 2 + C(v : <datatype>) * 50 + 10  // when v cannot be converted to <datatype'>
     /// C(v^N  : vec <datatype>)  = 2 + 3 * N + sum_i C(v[i] : <datatype>)
-    /// C(kv*  : record {<fieldtype>*})  = 2 + sum_skipped_i C(kv : <fieldtype>*[skipped_i]) * 50 + sum_expected_i C(kv : <fieldtype>*[expected_i])
+    /// C(kv*  : record {<fieldtype>*})  = 2 + sum_i C(kv : <fieldtype>*[i])
     /// C(kv   : variant {<fieldtype>*}) = 2 + C(kv : <fieldtype>*[i])
     ///
     /// C : (<nat>, <val>) -> <fieldtype> -> nat
@@ -197,7 +196,8 @@ impl DecoderConfig {
     /// C((id(v*),name) : func <functype>)     = 4 + |v*| + |name| + |type table|
     /// C(id(v*)        : principal)           = 1 + |v*|
     ///
-    /// C(v : <type>) = C(v : <type>) * 50   // when v is skipped
+    /// When a value `v : t` on the wire is skipped, due to being extra arguments, extra fields and mismatched option types,
+    /// we apply a 50x penalty on `C(v : t)` in the decoding cost.
     /// ```
     pub fn set_decoding_quota(&mut self, n: usize) -> &mut Self {
         self.decoding_quota = Some(n);
