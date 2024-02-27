@@ -2,7 +2,9 @@
 // Space bomb tests
 
 // Messages in this test all take a lot of time, memory and stack space to decode.
-// An implementation with self-metering should reject the message relatively early
+// With infinite resources, these are all valid Candid messages.
+// When using Candid in a resource limited environment, for example one consensus round in a blockchain,
+// an implementation with self-metering should reject these messages relatively early
 // without going through the whole deserialisation process.
 
 // \80\94\eb\dc\03  is 1000_000_000
