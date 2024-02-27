@@ -6,7 +6,6 @@ members = [
     "rust/ic_principal",
     "tools/didc",
 ]
-exclude = ["rust/bench"]
 resolver = "2"
 
 [workspace.package]
