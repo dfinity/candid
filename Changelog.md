@@ -1,6 +1,18 @@
 
 # Changelog
 
+## 2024-02-27
+
+### Candid 0.10.4
+
+* Support `#[serde(rename = "")]` with arbitrary string.
+* Fix a performance bug in the type table parsing.
+* Allow setting decoding quota for deserialization with the following new functions: `candid::decode_args_with_config`, `candid::utils::decode_args_with_config_debug`, `candid::decode_one_with_config`, `candid::Decode!([config]; &bytes, T)`, `candid::Decode!(@Debug [config]; &bytes, T)`, `IDLArgs::from_bytes_with_types_with_config` and `IDLArgs::from_bytes_with_config`. The original decoding method remains to be non-metered.
+
+### candid_parser 0.1.4
+
+* Fix Typescript binding for init args.
+
 ## 2024-01-30
 
 ### Candid 0.10.3
