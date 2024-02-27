@@ -34,12 +34,12 @@ jobs:
         path: |
           ~/.cargo
           target
+          rust/bench/target
         key: ${{ runner.os }}-bench-0.1.1-${{ hashFiles('**/Cargo.lock') }}
     - name: Install canbench
       run: cargo install canbench
     - name: Run perf for base branch
       run: |
-        cp rust/bench/Cargo.toml main/rust/bench
         pushd main/rust/bench
         canbench --persist
         popd
