@@ -48,7 +48,7 @@ assert blob "DIDL\01\6e\7c\01\00\01"                                !: (opt int)
 assert blob "DIDL\01\6e\7c\01\00\00\2a"                             !: (opt int) "opt: too long";
 assert blob "DIDL\02\6e\01\6e\7c\01\00\01\01\2a" == "(opt opt 42)"   : (opt opt int) "opt: nested";
 assert blob "DIDL\01\6e\00\01\00\01\01\00" == "(opt opt null)"       : (Opt) "opt: recursion";
-assert blob "DIDL\01\6e\00\01\00\01\01\00" == "(opt opt null)"       : (opt opt opt empty) "opt: non-recurisve type";
+assert blob "DIDL\01\6e\00\01\00\01\01\00" == "(opt opt null)"       : (opt opt opt empty) "opt: non-recursive type";
 assert blob "DIDL\02\6e\01\6e\00\01\00\01\01\00" == "(opt opt null)" : (Opt) "opt: mutual recursion";
 assert blob "DIDL\00\00" == "(null)"                                 : (Opt) "opt: extra arg";
 
