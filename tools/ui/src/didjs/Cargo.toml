@@ -8,7 +8,7 @@ path = "lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-ic-cdk = "0.12"
+ic-cdk = "0.13"
 candid = "0.10"
 candid_parser = "0.1"
 serde = "1.0"
