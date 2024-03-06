@@ -38,7 +38,6 @@ A list of community maintained Candid libraries:
 ## Tools
 
 * [didc](tools/didc): Candid CLI. Download [prebuilt binary](https://github.com/dfinity/candid/releases).
-* [candiff](tools/candiff): Diff Candid values structurally
 * [ui](tools/ui): Candid UI canister. See deployed [canister](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.ic0.app/) on the IC
 * [ic-repl](https://github.com/chenyan2002/ic-repl): A REPL environment to communicate with canisters using Candid
 
