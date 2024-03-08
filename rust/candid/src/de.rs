@@ -40,7 +40,7 @@ impl<'de> IDLDeserialize<'de> {
                 "Cannot parse header".to_string()
             }
         })?;
-        de.add_cost(de.input.position() as usize * 4)?;
+        de.add_cost((de.input.position() as usize).saturating_mul(4))?;
         Ok(IDLDeserialize { de })
     }
     /// Deserialize one value from deserializer.
@@ -192,9 +192,9 @@ impl DecoderConfig {
     /// C((k,v) : k:<datatype>) = 5 + |k| + C(v : <datatype>)  // variant field
     ///
     /// C : <val> -> <reftype> -> nat
-    /// C(id(v*)        : service <actortype>) = 2 + |v*| + |type table|
-    /// C((id(v*),name) : func <functype>)     = 4 + |v*| + |name| + |type table|
-    /// C(id(v*)        : principal)           = 1 + |v*|
+    /// C(id(v*)        : service <actortype>) = 2 + C(id(v*) : principal) + |type table|
+    /// C((id(v*),name) : func <functype>)     = 2 + C(id(v*) : principal) + C(name : text) + |type table|
+    /// C(id(v*)        : principal)           = max(30, |v*|)
     ///
     /// When a value `v : t` on the wire is skipped, due to being extra arguments, extra fields and mismatched option types,
     /// we apply a 50x penalty on `C(v : t)` in the decoding cost.
@@ -408,7 +408,11 @@ impl<'de> Deserializer<'de> {
     }
     fn add_cost(&mut self, cost: usize) -> Result<()> {
         if let Some(n) = self.config.decoding_quota {
-            let cost = if self.is_untyped { cost * 50 } else { cost };
+            let cost = if self.is_untyped {
+                cost.saturating_mul(50)
+            } else {
+                cost
+            };
             if n < cost {
                 return Err(Error::msg("Decoding cost exceeds the limit"));
             }
@@ -486,7 +490,7 @@ impl<'de> Deserializer<'de> {
         );
         let mut bytes = vec![2u8];
         let id = PrincipalBytes::read(&mut self.input)?;
-        self.add_cost(id.len as usize + 1)?;
+        self.add_cost(std::cmp::max(30, id.len as usize))?;
         bytes.extend_from_slice(&id.inner);
         visitor.visit_byte_buf(bytes)
     }
@@ -506,7 +510,7 @@ impl<'de> Deserializer<'de> {
         self.check_subtype()?;
         let mut bytes = vec![4u8];
         let id = PrincipalBytes::read(&mut self.input)?;
-        self.add_cost(id.len as usize + 1)?;
+        self.add_cost(std::cmp::max(30, id.len as usize))?;
         bytes.extend_from_slice(&id.inner);
         visitor.visit_byte_buf(bytes)
     }
@@ -523,7 +527,11 @@ impl<'de> Deserializer<'de> {
         let id = PrincipalBytes::read(&mut self.input)?;
         let len = Len::read(&mut self.input)?.0;
         let meth = self.borrow_bytes(len)?;
-        self.add_cost(id.len as usize + len + 3)?;
+        self.add_cost(
+            std::cmp::max(30, id.len as usize)
+                .saturating_add(len)
+                .saturating_add(2),
+        )?;
         // TODO find a better way
         leb128::write::unsigned(&mut bytes, len as u64)?;
         bytes.extend_from_slice(meth);
@@ -540,7 +548,7 @@ impl<'de> Deserializer<'de> {
             "blob"
         );
         let len = Len::read(&mut self.input)?.0;
-        self.add_cost(len + 1)?;
+        self.add_cost(len.saturating_add(1))?;
         let blob = self.borrow_bytes(len)?;
         let mut bytes = Vec::with_capacity(len + 1);
         bytes.push(6u8);
@@ -562,7 +570,7 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         let len = Len::read(&mut self.input)?.0 as u64;
-        self.add_cost(len as usize + 1)?;
+        self.add_cost((len as usize).saturating_add(1))?;
         Len::read(&mut self.input)?;
         let slice_len = self.input.get_ref().len() as u64;
         let pos = self.input.position();
@@ -773,7 +781,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             "text"
         );
         let len = Len::read(&mut self.input)?.0;
-        self.add_cost(len + 1)?;
+        self.add_cost(len.saturating_add(1))?;
         let bytes = self.borrow_bytes(len)?.to_owned();
         let value = String::from_utf8(bytes).map_err(Error::msg)?;
         visitor.visit_string(value)
@@ -788,7 +796,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             "text"
         );
         let len = Len::read(&mut self.input)?.0;
-        self.add_cost(len + 1)?;
+        self.add_cost(len.saturating_add(1))?;
         let slice = self.borrow_bytes(len)?;
         let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
         visitor.visit_borrowed_str(value)
@@ -883,7 +891,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             "vec nat8"
         );
         let len = Len::read(&mut self.input)?.0;
-        self.add_cost(len + 1)?;
+        self.add_cost(len.saturating_add(1))?;
         let bytes = self.borrow_bytes(len)?.to_owned();
         visitor.visit_byte_buf(bytes)
     }
@@ -893,7 +901,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             TypeInner::Principal => self.deserialize_principal(visitor),
             TypeInner::Vec(t) if **t == TypeInner::Nat8 => {
                 let len = Len::read(&mut self.input)?.0;
-                self.add_cost(len + 1)?;
+                self.add_cost(len.saturating_add(1))?;
                 let slice = self.borrow_bytes(len)?;
                 visitor.visit_borrowed_bytes(slice)
             }
