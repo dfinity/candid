@@ -37,7 +37,9 @@ pub struct HttpResponse {
 
 fuzz_target!(|data: &[u8]| {
     let payload = data.to_vec();
-    let _decoded = match Decode!(payload.as_slice(), HttpResponse) {
+    let mut config = candid::DecoderConfig::new();
+    config.set_skipping_quota(10_000);
+    let _decoded = match Decode!([config]; payload.as_slice(), HttpResponse) {
         Ok(_v) => _v,
         Err(_e) => return,
     };
