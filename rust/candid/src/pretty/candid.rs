@@ -188,7 +188,6 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 
 fn pp_defs(env: &TypeEnv) -> RcDoc {
     lines(env.0.iter()
-        .filter(|(id, _)|{ !(*id == "blob") })
         .map(|(id, ty)| {
         kwd("type")
             .append(ident(id))
