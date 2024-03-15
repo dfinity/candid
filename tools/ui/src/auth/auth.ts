@@ -59,7 +59,7 @@ async function insertLoginForm() {
     }
     if (origin) {
       if (!is_valid_url(origin)) {
-        throw new Error("Please provide a valid URL in `origin` query parameter");
+        throw new Error("Please provide a valid URL in the `origin` query parameter");
       }
       console.warn("`derivationOrigin` is enabled. Remember to disable alternative origins in the production canister.");
     }
