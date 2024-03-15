@@ -2,15 +2,26 @@ use crate::types::{Function, Type, TypeInner};
 use crate::{Error, Result};
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, Default)]
-pub struct TypeEnv(pub BTreeMap<String, Type>);
+#[derive(Debug, Clone /* Default */)]
+pub struct TypeEnv(
+    pub BTreeMap<String, Type>,
+    pub Type // vec nat8
+    );
+
+impl Default for TypeEnv {
+    fn default() -> Self { TypeEnv {
+            0:BTreeMap::new(),
+            1:TypeInner::Vec(TypeInner::Nat8.into()).into()
+      }
+    }
+}
 
 impl TypeEnv {
     pub fn new() -> Self {
-        let mut map = BTreeMap::new();
-        map.insert("blob".into(),
-                   TypeInner::Vec(TypeInner::Nat8.into()).into());
-        TypeEnv(map)
+        TypeEnv {
+            0: BTreeMap::new(),
+            1: TypeInner::Vec(TypeInner::Nat8.into()).into()
+        }
     }
     pub fn merge<'a>(&'a mut self, env: &TypeEnv) -> Result<&'a mut Self> {
         for (k, v) in &env.0 {
@@ -39,9 +50,9 @@ impl TypeEnv {
         ty.subst(&tau)
     }
     pub fn find_type(&self, name: &str) -> Result<&Type> {
-//        if name == "blob" {
-//            return Ok(TypeInner::Vec(TypeInner::Nat8.into()).into());
-//        };
+       if name == "blob" {
+           return Ok(&self.1);
+       };
         match self.0.get(name) {
             None => Err(Error::msg(format!("Unbound type identifier {name}"))),
             Some(t) => Ok(t),

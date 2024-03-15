@@ -655,7 +655,7 @@ fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
 }
 
 fn nominalize_all(env: &TypeEnv, actor: &Option<Type>) -> (TypeEnv, Option<Type>) {
-    let mut res = TypeEnv(Default::default());
+    let mut res = TypeEnv(Default::default(), TypeInner::Vec(TypeInner::Nat8.into()).into());
     for (id, ty) in env.0.iter() {
         let ty = nominalize(&mut res, &mut vec![TypePath::Id(id.clone())], ty);
         res.0.insert(id.to_string(), ty);
