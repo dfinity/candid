@@ -47,10 +47,10 @@ async function insertLoginForm() {
       provider = "https://identity.internetcomputer.org";
     }
     if (!provider) {
-      throw new Error("Please provide internet identity url in ii parameter");
+      throw new Error("Please provide a URL to your local Internet Identity service using the `ii` query parameter");
     }
     if (provider && !is_valid_url(provider)) {
-      throw new Error("Please provide a valid internet identity url in ii parameter");
+      throw new Error("Please provide a URL to your local Internet Identity service using the `ii` query parameter");
     }
     const cid = Principal.fromText(params.get("id")!);
     let origin = params.get("origin");
@@ -59,9 +59,9 @@ async function insertLoginForm() {
     }
     if (origin) {
       if (!is_valid_url(origin)) {
-        throw new Error("Please provide a valid derivationOrigin url in origin parameter");
+        throw new Error("Please provide a valid URL in the `origin` query parameter");
       }
-      buttonLogin.title = "derivationOrigin is enabled. Remember to disable alternative origin in the production canister.";
+      console.warn("`derivationOrigin` is enabled. Remember to disable alternative origins in the production canister.");
     }
 
     buttonLogin.addEventListener("click", async () => {
@@ -79,6 +79,7 @@ async function insertLoginForm() {
       await authClient?.login(config);
     });
   } catch (err) {
+    console.error(err);
     buttonLogin.disabled = true;
     buttonLogin.classList.add("disabled");
     buttonLogin.title = (err as any).toString();
