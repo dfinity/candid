@@ -1,6 +1,6 @@
 type bitcoin_address = text;
 type bitcoin_network = variant { mainnet; testnet };
-type block_hash = vec nat8;
+type block_hash = blob;
 type canister_id = principal;
 type canister_settings = record {
   freezing_threshold : opt nat;
@@ -23,11 +23,11 @@ type get_balance_request = record {
 type get_current_fee_percentiles_request = record { network : bitcoin_network };
 type get_utxos_request = record {
   network : bitcoin_network;
-  filter : opt variant { page : vec nat8; min_confirmations : nat32 };
+  filter : opt variant { page : blob; min_confirmations : nat32 };
   address : bitcoin_address;
 };
 type get_utxos_response = record {
-  next_page : opt vec nat8;
+  next_page : opt blob;
   tip_height : nat32;
   tip_block_hash : block_hash;
   utxos : vec utxo;
@@ -35,19 +35,19 @@ type get_utxos_response = record {
 type http_header = record { value : text; name : text };
 type http_response = record {
   status : nat;
-  body : vec nat8;
+  body : blob;
   headers : vec http_header;
 };
 type millisatoshi_per_byte = nat64;
-type outpoint = record { txid : vec nat8; vout : nat32 };
+type outpoint = record { txid : blob; vout : nat32 };
 type satoshi = nat64;
 type send_transaction_request = record {
-  transaction : vec nat8;
+  transaction : blob;
   network : bitcoin_network;
 };
 type user_id = principal;
 type utxo = record { height : nat32; value : satoshi; outpoint : outpoint };
-type wasm_module = vec nat8;
+type wasm_module = blob;
 service : {
   bitcoin_get_balance : (get_balance_request) -> (satoshi);
   bitcoin_get_current_fee_percentiles : (
@@ -62,7 +62,7 @@ service : {
         cycles : nat;
         settings : definite_canister_settings;
         idle_cycles_burned_per_day : nat;
-        module_hash : opt vec nat8;
+        module_hash : opt blob;
       },
     );
   create_canister : (record { settings : opt canister_settings }) -> (
@@ -74,27 +74,27 @@ service : {
       record {
         key_id : record { name : text; curve : ecdsa_curve };
         canister_id : opt canister_id;
-        derivation_path : vec vec nat8;
+        derivation_path : vec blob;
       },
-    ) -> (record { public_key : vec nat8; chain_code : vec nat8 });
+    ) -> (record { public_key : blob; chain_code : blob });
   http_request : (
       record {
         url : text;
         method : variant { get; head; post };
         max_response_bytes : opt nat64;
-        body : opt vec nat8;
+        body : opt blob;
         transform : opt record {
           function : func (
-              record { context : vec nat8; response : http_response },
+              record { context : blob; response : http_response },
             ) -> (http_response) query;
-          context : vec nat8;
+          context : blob;
         };
         headers : vec http_header;
       },
     ) -> (http_response);
   install_code : (
       record {
-        arg : vec nat8;
+        arg : blob;
         wasm_module : wasm_module;
         mode : variant { reinstall; upgrade; install };
         canister_id : canister_id;
@@ -110,14 +110,14 @@ service : {
   provisional_top_up_canister : (
       record { canister_id : canister_id; amount : nat },
     ) -> ();
-  raw_rand : () -> (vec nat8);
+  raw_rand : () -> (blob);
   sign_with_ecdsa : (
       record {
         key_id : record { name : text; curve : ecdsa_curve };
-        derivation_path : vec vec nat8;
-        message_hash : vec nat8;
+        derivation_path : vec blob;
+        message_hash : blob;
       },
-    ) -> (record { signature : vec nat8 });
+    ) -> (record { signature : blob });
   start_canister : (record { canister_id : canister_id }) -> ();
   stop_canister : (record { canister_id : canister_id }) -> ();
   uninstall_code : (record { canister_id : canister_id }) -> ();
