@@ -254,7 +254,7 @@ impl Table {
                 }
             }
         }
-        Ok(TypeEnv(env,TypeInner::Vec(TypeInner::Nat8.into()).into() ))
+        Ok(TypeEnv(env))
     }
 }
 impl Header {

@@ -1,28 +1,18 @@
 use crate::types::{Function, Type, TypeInner};
 use crate::{Error, Result};
 use std::collections::BTreeMap;
+use std::boxed::Box;
 
-#[derive(Debug, Clone /* Default */)]
-pub struct TypeEnv(
-    pub BTreeMap<String, Type>,
-    pub Type // vec nat8
-    );
 
-impl Default for TypeEnv {
-    fn default() -> Self { TypeEnv {
-            0:BTreeMap::new(),
-            1:TypeInner::Vec(TypeInner::Nat8.into()).into()
-      }
-    }
-}
+#[derive(Debug, Clone, Default)]
+pub struct TypeEnv(pub BTreeMap<String, Type>);
 
 impl TypeEnv {
+
     pub fn new() -> Self {
-        TypeEnv {
-            0: BTreeMap::new(),
-            1: TypeInner::Vec(TypeInner::Nat8.into()).into()
-        }
+        TypeEnv { 0: BTreeMap::new() }
     }
+
     pub fn merge<'a>(&'a mut self, env: &TypeEnv) -> Result<&'a mut Self> {
         for (k, v) in &env.0 {
             let entry = self.0.entry(k.to_string()).or_insert_with(|| v.clone());
@@ -50,8 +40,8 @@ impl TypeEnv {
         ty.subst(&tau)
     }
     pub fn find_type(&self, name: &str) -> Result<&Type> {
-       if name == "blob" {
-           return Ok(&self.1);
+        if name == "blob" {
+            return Ok(Box::<Type>::leak(Box::<Type>::new(TypeInner::Vec(TypeInner::Nat8.into()).into())));
        };
         match self.0.get(name) {
             None => Err(Error::msg(format!("Unbound type identifier {name}"))),
