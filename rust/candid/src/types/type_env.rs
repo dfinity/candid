@@ -38,9 +38,6 @@ impl TypeEnv {
         ty.subst(&tau)
     }
     pub fn find_type(&self, name: &str) -> Result<&Type> {
-        //        if name == "blob" {
-        //            return Ok(TypeInner::Vec(TypeInner::Nat8.into()).into());
-        //        };
         match self.0.get(name) {
             None => Err(Error::msg(format!("Unbound type identifier {name}"))),
             Some(t) => Ok(t),
