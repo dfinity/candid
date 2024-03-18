@@ -8,8 +8,7 @@ pub struct TypeEnv(pub BTreeMap<String, Type>);
 impl TypeEnv {
     pub fn new() -> Self {
         let mut map = BTreeMap::new();
-        map.insert("blob".into(),
-                   TypeInner::Vec(TypeInner::Nat8.into()).into());
+        map.insert("blob".into(), TypeInner::Vec(TypeInner::Nat8.into()).into());
         TypeEnv(map)
     }
     pub fn merge<'a>(&'a mut self, env: &TypeEnv) -> Result<&'a mut Self> {
@@ -39,9 +38,9 @@ impl TypeEnv {
         ty.subst(&tau)
     }
     pub fn find_type(&self, name: &str) -> Result<&Type> {
-//        if name == "blob" {
-//            return Ok(TypeInner::Vec(TypeInner::Nat8.into()).into());
-//        };
+        //        if name == "blob" {
+        //            return Ok(TypeInner::Vec(TypeInner::Nat8.into()).into());
+        //        };
         match self.0.get(name) {
             None => Err(Error::msg(format!("Unbound type identifier {name}"))),
             Some(t) => Ok(t),

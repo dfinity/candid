@@ -116,13 +116,13 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("IDL.Text"),
         Reserved => str("IDL.Reserved"),
         Empty => str("IDL.Empty"),
-        Var(ref s) =>
+        Var(ref s) => {
             if s == "blob" {
-              str("IDL.Vec").append(enclose("(", str("IDL.Nat8") , ")"))
+                str("IDL.Vec").append(enclose("(", str("IDL.Nat8"), ")"))
             } else {
                 ident(s)
             }
-        ,
+        }
         Principal => str("IDL.Principal"),
         Opt(ref t) => str("IDL.Opt").append(enclose("(", pp_ty(t), ")")),
         Vec(ref t) => str("IDL.Vec").append(enclose("(", pp_ty(t), ")")),
@@ -205,9 +205,7 @@ fn pp_defs<'a>(
         recs.iter()
             .map(|id| kwd("const").append(ident(id)).append(" = IDL.Rec();")),
     );
-    let defs = lines(def_list.iter().
-      filter(|id|{ **id != "blob" }).
-      map(|id| {
+    let defs = lines(def_list.iter().filter(|id| **id != "blob").map(|id| {
         let ty = env.find_type(id).unwrap();
         if recs.contains(id) {
             ident(id)

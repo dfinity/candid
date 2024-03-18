@@ -223,9 +223,7 @@ fn pp_defs<'a>(
     } else {
         &config.type_attributes
     };
-    lines(def_list.iter().
-        filter(|id|{ **id != "blob" }).
-        map(|id| {
+    lines(def_list.iter().filter(|id| **id != "blob").map(|id| {
         let ty = env.find_type(id).unwrap();
         let name = ident(id, Some(Case::Pascal)).append(" ");
         let vis = "pub ";
