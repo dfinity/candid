@@ -1,0 +1,27 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+package(default_visibility = ["//visibility:public"])
+
+DEPENDENCIES = [
+    "@crate_index//:arbitrary",
+    "@crate_index//:crc32fast",
+    "@crate_index//:data-encoding",
+    "@crate_index//:serde",
+    "@crate_index//:sha2",
+]
+
+DEV_DEPENDENCIES = [
+    "@crate_index//:serde_cbor",
+    "@crate_index//:serde_json",
+    "@crate_index//:serde_test",
+]
+
+rust_library(
+    name = "ic_principal",
+    srcs = glob(["src/*.rs"]),
+    crate_name = "ic_principal",
+    version = "0.1.1",
+    deps = DEPENDENCIES,
+    #crate_features = [ "arbitrary", "convert", "self_authenticating", "serde" ],
+    crate_features = [ "convert", "serde" ],
+)

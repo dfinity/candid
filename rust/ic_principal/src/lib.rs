@@ -8,31 +8,36 @@ use sha2::{Digest, Sha224};
 use std::convert::TryFrom;
 #[cfg(feature = "convert")]
 use std::fmt::Write;
-#[cfg(feature = "convert")]
-use thiserror::Error;
+use std::fmt;
+use std::error::Error;
 
 /// An error happened while encoding, decoding or serializing a [`Principal`].
-#[derive(Error, Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg(feature = "convert")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum PrincipalError {
-    #[error("Bytes is longer than 29 bytes.")]
     BytesTooLong(),
-
-    #[error("Text must be in valid Base32 encoding.")]
     InvalidBase32(),
-
-    #[error("Text is too short.")]
     TextTooShort(),
-
-    #[error("Text is too long.")]
     TextTooLong(),
-
-    #[error("CRC32 check sequence doesn't match with calculated from Principal bytes.")]
     CheckSequenceNotMatch(),
-
-    #[error(r#"Text should be separated by - (dash) every 5 characters: expected "{0}""#)]
     AbnormalGrouped(Principal),
+}
+
+impl Error for PrincipalError {
+}
+
+impl fmt::Display for PrincipalError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PrincipalError::BytesTooLong() => write!(f, "Bytes is longer than 29 bytes."),
+            PrincipalError::InvalidBase32() => write!(f, "Text must be in valid Base32 encoding."),
+            PrincipalError::TextTooShort() => write!(f, "Text is too short."),
+            PrincipalError::TextTooLong() => write!(f, "Text is too long."),
+            PrincipalError::CheckSequenceNotMatch() => write!(f, "CRC32 check sequence doesn't match with calculated from Principal bytes."),
+            PrincipalError::AbnormalGrouped(p) => write!(f, "Text should be separated by - (dash) every 5 characters: expected \"{}\"", p),
+        }
+    }
 }
 
 /// Generic ID on Internet Computer.
