@@ -112,10 +112,15 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("Text"),
         Reserved => str("Any"),
         Empty => str("None"),
-        Var(ref s) => escape(s, false),
+        Var(ref s) => {
+            if s == "blob" {
+                str("Blob")
+            } else {
+                escape(s, false)
+            }
+        }
         Principal => str("Principal"),
         Opt(ref t) => str("?").append(pp_ty(t)),
-        Vec(ref t) if matches!(t.as_ref(), Nat8) => str("Blob"),
         Vec(ref t) => enclose("[", pp_ty(t), "]"),
         Record(ref fs) => {
             if is_tuple(ty) {
@@ -220,13 +225,18 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 }
 
 fn pp_defs(env: &TypeEnv) -> RcDoc {
-    lines(env.0.iter().map(|(id, ty)| {
-        kwd("public type")
-            .append(escape(id, false))
-            .append(" = ")
-            .append(pp_ty(ty))
-            .append(";")
-    }))
+    lines(
+        env.0
+            .iter()
+            .filter(|(id, _)| *id != "blob")
+            .map(|(id, ty)| {
+                kwd("public type")
+                    .append(escape(id, false))
+                    .append(" = ")
+                    .append(pp_ty(ty))
+                    .append(";")
+            }),
+    )
 }
 
 fn pp_actor(ty: &Type) -> RcDoc {
