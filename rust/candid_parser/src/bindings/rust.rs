@@ -123,11 +123,16 @@ fn pp_ty<'a>(ty: &'a Type, recs: &RecPoints) -> RcDoc<'a> {
         Reserved => str("candid::Reserved"),
         Empty => str("candid::Empty"),
         Var(ref id) => {
+            if id == "blob" {
+                str("serde_bytes::ByteBuf")
+            }
+            else {
             let name = ident(id, Some(Case::Pascal));
             if recs.contains(id.as_str()) {
                 str("Box<").append(name).append(">")
             } else {
                 name
+            }
             }
         }
         Principal => str("Principal"),
@@ -219,7 +224,9 @@ fn pp_defs<'a>(
     } else {
         &config.type_attributes
     };
-    lines(def_list.iter().map(|id| {
+    lines(def_list.iter().
+        filter(|id|{ !(**id == "blob") }).
+        map(|id| {
         let ty = env.find_type(id).unwrap();
         let name = ident(id, Some(Case::Pascal)).append(" ");
         let vis = "pub ";
