@@ -165,7 +165,6 @@ pub Typ: IDLType = {
     PrimTyp => <>,
     "opt" <Typ> => IDLType::OptT(Box::new(<>)),
     "vec" <Typ> => IDLType::VecT(Box::new(<>)),
-//    "blob" => IDLType::VecT(Box::new(IDLType::PrimT(PrimType::Nat8))),
     "blob" => IDLType::VarT("blob".to_string()),
     "record" "{" <Sp<SepBy<RecordFieldTyp, ";">>> "}" =>? {
         let mut id: u32 = 0;

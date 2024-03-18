@@ -10,7 +10,7 @@ pub struct TypeEnv(pub BTreeMap<String, Type>);
 impl TypeEnv {
 
     pub fn new() -> Self {
-        TypeEnv { 0: BTreeMap::new() }
+        TypeEnv(BTreeMap::new())
     }
 
     pub fn merge<'a>(&'a mut self, env: &TypeEnv) -> Result<&'a mut Self> {

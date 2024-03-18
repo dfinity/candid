@@ -12,7 +12,7 @@ pub fn chase_type<'a>(
     use TypeInner::*;
     match t.as_ref() {
         Var(id) => {
-            if !(id == "blob") && seen.insert(id) {
+            if  !(id == "blob") && seen.insert(id) {
                 let t = env.find_type(id)?;
                 chase_type(seen, res, env, t)?;
                 res.push(id);
