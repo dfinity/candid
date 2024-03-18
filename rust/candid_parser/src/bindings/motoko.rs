@@ -121,7 +121,6 @@ fn pp_ty(ty: &Type) -> RcDoc {
         }
         Principal => str("Principal"),
         Opt(ref t) => str("?").append(pp_ty(t)),
-        //        Vec(ref t) if matches!(t.as_ref(), Nat8) => str("Blob"), // Why?
         Vec(ref t) => enclose("[", pp_ty(t), "]"),
         Record(ref fs) => {
             if is_tuple(ty) {
