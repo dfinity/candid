@@ -206,7 +206,7 @@ fn pp_defs<'a>(
             .map(|id| kwd("const").append(ident(id)).append(" = IDL.Rec();")),
     );
     let defs = lines(def_list.iter().
-      filter(|id|{ !(**id == "blob") }).
+      filter(|id|{ **id != "blob" }).
       map(|id| {
         let ty = env.find_type(id).unwrap();
         if recs.contains(id) {

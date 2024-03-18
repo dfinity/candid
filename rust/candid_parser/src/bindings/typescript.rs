@@ -26,13 +26,12 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         Var(ref id) => {
             if id == "blob" {
               str("Uint8Array | number[]")
-            } else
-            if is_ref {
+            } else if is_ref {
                 let ty = env.rec_find_type(id).unwrap();
                 if matches!(ty.as_ref(), Service(_) | Func(_)) {
                     pp_ty(env, ty, false)
                 } else {
-                    ident(id)
+                        ident(id)
                 }
             } else {
                 ident(id)
@@ -146,7 +145,7 @@ fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
 
 fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
     lines(def_list.iter().
-        filter(|id|{ !(**id == "blob") }).
+        filter(|id|{ **id != "blob" }).
         map(|id| {
         let ty = env.find_type(id).unwrap();
         let export = match ty.as_ref() {
