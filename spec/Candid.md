@@ -1181,7 +1181,7 @@ T(service {<methtype>*}) =
 T : <methtype> -> i8*
 T(<name>:<datatype>) = leb128(|utf8(<name>)|) i8*(utf8(<name>)) I(<datatype>)
 
-T : <funcann> -> i8*
+T : <funcann> -> i8
 T(query)  = i8(1)
 T(oneway) = i8(2)
 T(composite_query) = i8(3)
