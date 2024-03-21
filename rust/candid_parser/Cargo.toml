@@ -32,8 +32,7 @@ logos = "0.13"
 convert_case = "0.6"
 
 arbitrary = { workspace = true, optional = true }
-# Don't upgrade serde_dhall. It will introduce dependency with invalid license.
-serde_dhall = { version = "0.11", default-features = false, optional = true }
+toml = { version = "0.8", default-features = false, features = ["parse"], optional = true }
 fake = { version = "2.4", optional = true }
 rand = { version = "0.8", optional = true }
 num-traits = { workspace = true, optional = true }
@@ -48,7 +47,7 @@ test-generator = "0.3.0"
 rand.workspace = true
 
 [features]
-configs = ["serde_dhall"]
+configs = ["toml"]
 random = ["configs", "arbitrary", "fake", "rand", "num-traits", "serde"]
 assist = ["dep:dialoguer", "dep:console", "dep:ctrlc"]
 all = ["random", "assist"]

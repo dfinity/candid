@@ -310,18 +310,19 @@ fn main() -> Result<()> {
         } => {
             use candid_parser::configs::Configs;
             use rand::Rng;
+            use std::str::FromStr;
             let (env, types) = if args.is_some() {
                 annotate.get_types(Mode::Decode)?
             } else {
                 annotate.get_types(Mode::Encode)?
             };
             let config = match (config, file) {
-                (None, None) => Configs::from_dhall("{=}")?,
-                (Some(str), None) => Configs::from_dhall(&str)?,
+                (None, None) => Configs::from_str("")?,
+                (Some(str), None) => Configs::from_str(&str)?,
                 (None, Some(file)) => {
                     let content = std::fs::read_to_string(&file)
                         .map_err(|_| Error::msg(format!("could not read {file}")))?;
-                    Configs::from_dhall(&content)?
+                    Configs::from_str(&content)?
                 }
                 _ => unreachable!(),
             };
