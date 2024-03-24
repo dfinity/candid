@@ -119,7 +119,7 @@ pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
                 _ => unreachable!(),
             }
         }
-        Knot(ref id) => RcDoc::text(format!("{id}")),
+        Knot(ref id) => str(id.name),
         Unknown => str("unknown"),
         Future => str("future"),
     }

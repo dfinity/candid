@@ -1,4 +1,4 @@
-use candid::types::Type;
+use candid::types::{Type, TypeInner};
 use serde::de::DeserializeOwned;
 use toml::Value;
 
@@ -80,5 +80,34 @@ fn has_leaf(v: &Value) -> bool {
 }
 
 pub fn path_name(t: &Type) -> String {
-    t.to_string().split(' ').next().unwrap().to_string()
+    match t.as_ref() {
+        TypeInner::Null => "null",
+        TypeInner::Bool => "bool",
+        TypeInner::Nat => "nat",
+        TypeInner::Int => "int",
+        TypeInner::Nat8 => "nat8",
+        TypeInner::Nat16 => "nat16",
+        TypeInner::Nat32 => "nat32",
+        TypeInner::Nat64 => "nat64",
+        TypeInner::Int8 => "int8",
+        TypeInner::Int16 => "int16",
+        TypeInner::Int32 => "int32",
+        TypeInner::Int64 => "int64",
+        TypeInner::Float32 => "float32",
+        TypeInner::Float64 => "float64",
+        TypeInner::Text => "text",
+        TypeInner::Reserved => "reserved",
+        TypeInner::Empty => "empty",
+        TypeInner::Var(id) => id,
+        TypeInner::Knot(id) => id.name,
+        TypeInner::Principal => "principal",
+        TypeInner::Opt(_) => "opt",
+        TypeInner::Vec(_) => "vec",
+        TypeInner::Record(_) => "record",
+        TypeInner::Variant(_) => "variant",
+        TypeInner::Func(_) => "func",
+        TypeInner::Service(_) => "service",
+        TypeInner::Class(..) | TypeInner::Unknown | TypeInner::Future => unreachable!(),
+    }
+    .to_string()
 }
