@@ -371,7 +371,8 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
             }
             10 + cnt
         }
-        Future | Unknown => 7,
+        Future => 6,
+        Unknown => 7,
         Class(..) => unreachable!(),
     };
     if cost > limit {
