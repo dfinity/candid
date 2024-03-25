@@ -29,7 +29,7 @@ type tree = variant {
 service : {
   bbbbb : (b) -> ();
   f : t;
-  f1 : (list, vec nat8, opt bool) -> () oneway;
+  f1 : (list, blob, opt bool) -> () oneway;
   g : (list) -> (B, tree, stream);
   g1 : (my_type, List, opt List, nested) -> (int, broker) query;
   h : (vec opt text, variant { A : nat; B : opt text }, opt List) -> (
