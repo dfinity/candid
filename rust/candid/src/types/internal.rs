@@ -329,7 +329,7 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
         Float32 | Float64 => 7,
         Reserved => 8,
         Principal => 9,
-        Knot(id) => id.name.len() as i32,
+        Knot(_) => 10,
         Var(id) => id.len() as i32,
         Opt(t) => 4 + text_size(t, limit - 4)?,
         Vec(t) => 4 + text_size(t, limit - 4)?,
