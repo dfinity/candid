@@ -1,6 +1,33 @@
 use candid::types::{Type, TypeInner};
 use serde::de::DeserializeOwned;
+use std::collections::BTreeMap;
 use toml::Value;
+
+pub trait ConfigState: DeserializeOwned {
+    fn update(&mut self, config: &Self, is_recursive: bool);
+    fn push_state(&mut self, path: &[String]);
+}
+
+pub struct StateTree<T: ConfigState> {
+    state: Option<T>,
+    subtree: BTreeMap<String, StateTree<T>>,
+}
+impl<T: ConfigState> StateTree<T> {
+    pub fn from_configs(kind: &str, configs: &Configs) -> Self {
+        if let Value::Table(map) = &configs.0 {
+            if let Some(v) = map.get(kind) {
+                generate_state_tree(v, None)
+            } else {
+                Self {
+                    state: None,
+                    subtree: BTreeMap::new(),
+                }
+            }
+        } else {
+            unreachable!()
+        }
+    }
+}
 
 pub struct Configs(Value);
 
@@ -76,6 +103,14 @@ fn has_leaf(v: &Value) -> bool {
         false
     } else {
         false
+    }
+}
+
+fn generate_state_tree<T: ConfigState>(v: &Value, parent: Option<&T>) -> StateTree<T> {
+    if let Value::Table(map) = v {
+        unimplemented!()
+    } else {
+        unimplemented!()
     }
 }
 
