@@ -98,6 +98,7 @@ pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
         Var(ref s) => str(s),
         Principal => str("principal"),
         Opt(ref t) => kwd("opt").append(pp_ty(t)),
+        Vec(ref t) if matches!(t.as_ref(), Nat8) => str("blob"),
         Vec(ref t) => kwd("vec").append(pp_ty(t)),
         Record(ref fs) => {
             let t = Type(ty.clone().into());
@@ -119,7 +120,7 @@ pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
                 _ => unreachable!(),
             }
         }
-        Knot(ref id) => RcDoc::text(format!("{id}")),
+        Knot(ref id) => str(id.name),
         Unknown => str("unknown"),
         Future => str("future"),
     }

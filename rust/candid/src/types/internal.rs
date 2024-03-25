@@ -329,7 +329,7 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
         Float32 | Float64 => 7,
         Reserved => 8,
         Principal => 9,
-        Knot(_) => 5,
+        Knot(id) => id.name.len() as i32,
         Var(id) => id.len() as i32,
         Opt(t) => 4 + text_size(t, limit - 4)?,
         Vec(t) => 4 + text_size(t, limit - 4)?,
@@ -371,7 +371,8 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
             }
             10 + cnt
         }
-        Class(_, _) | Future | Unknown => unimplemented!(),
+        Future | Unknown => 7,
+        Class(..) => unreachable!(),
     };
     if cost > limit {
         Err(())
