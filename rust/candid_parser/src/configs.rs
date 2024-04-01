@@ -1,31 +1,100 @@
+use anyhow::Result;
 use candid::types::{Type, TypeInner};
 use serde::de::DeserializeOwned;
 use std::collections::BTreeMap;
 use toml::Value;
 
-pub trait ConfigState: DeserializeOwned {
-    fn update(&mut self, config: &Self, is_recursive: bool);
-    fn push_state(&mut self, path: &[String]);
+pub struct State<'a, T: ConfigState> {
+    tree: &'a mut ConfigTree<T>,
+    path: Vec<String>,
+    config: T,
+}
+pub enum StateElem<'a> {
+    Type(&'a Type),
+    Label(&'a str),
+}
+impl<'a> std::fmt::Display for StateElem<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            StateElem::Type(t) => write!(f, "{}", path_name(t)),
+            StateElem::Label(l) => write!(f, "{}", l),
+        }
+    }
+}
+impl<'a, T: ConfigState> State<'a, T> {
+    pub fn new(tree: &'a mut ConfigTree<T>) -> Self {
+        let mut config = T::default();
+        if let Some(state) = &tree.state {
+            config.merge_config(state, false);
+        }
+        Self {
+            tree,
+            path: Vec::new(),
+            config,
+        }
+    }
+    pub fn push_state(&mut self, elem: &StateElem) -> T {
+        self.config.update_mutable_state(elem);
+        let old_config = self.config.clone();
+        self.path.push(elem.to_string());
+        if let Some((state, is_recursive)) = self.tree.get_config(&self.path) {
+            self.config.merge_config(state, is_recursive);
+        }
+        old_config
+    }
+    pub fn pop_state(&mut self, old_config: T, elem: StateElem) {
+        self.config = old_config;
+        /*let elem =*/
+        self.path.pop();
+        self.config.restore_mutable_state(&elem);
+    }
 }
 
-pub struct StateTree<T: ConfigState> {
-    state: Option<T>,
-    subtree: BTreeMap<String, StateTree<T>>,
+pub trait ConfigState: DeserializeOwned + Default + Clone {
+    fn merge_config(&mut self, config: &Self, is_recursive: bool);
+    fn update_mutable_state(&mut self, elem: &StateElem);
+    fn restore_mutable_state(&mut self, elem: &StateElem);
 }
-impl<T: ConfigState> StateTree<T> {
-    pub fn from_configs(kind: &str, configs: &Configs) -> Self {
-        if let Value::Table(map) = &configs.0 {
-            if let Some(v) = map.get(kind) {
-                generate_state_tree(v, None)
+#[derive(Debug)]
+pub struct ConfigTree<T: ConfigState> {
+    state: Option<T>,
+    max_depth: u8,
+    subtree: BTreeMap<String, ConfigTree<T>>,
+}
+impl<T: ConfigState> ConfigTree<T> {
+    pub fn from_configs(kind: &str, configs: Configs) -> Result<Self> {
+        if let Value::Table(mut map) = configs.0 {
+            if let Some(v) = map.remove(kind) {
+                generate_state_tree(v)
             } else {
-                Self {
+                Ok(Self {
                     state: None,
                     subtree: BTreeMap::new(),
-                }
+                    max_depth: 0,
+                })
             }
         } else {
             unreachable!()
         }
+    }
+    pub fn get_config(&self, path: &[String]) -> Option<(&T, bool)> {
+        let len = path.len();
+        let start = len.saturating_sub(self.max_depth as usize);
+        for i in (start..len).rev() {
+            let tail = &path[i..];
+            match self.match_exact_path(tail) {
+                Some(v) => return Some((v, is_repeated(path, tail))),
+                None => continue,
+            }
+        }
+        None
+    }
+    fn match_exact_path(&self, path: &[String]) -> Option<&T> {
+        let mut result = self;
+        for elem in path.iter() {
+            result = result.subtree.get(elem)?;
+        }
+        result.state.as_ref()
     }
 }
 
@@ -88,8 +157,15 @@ impl std::str::FromStr for Configs {
 }
 
 fn is_repeated(path: &[String], matched: &[String]) -> bool {
-    let (test, _) = path.split_at(path.len() - matched.len());
-    test.join(".").contains(&matched.join("."))
+    let iter = path.as_ref().windows(matched.len());
+    for slice in iter {
+        if slice == matched {
+            return true;
+        }
+    }
+    false
+    //let (test, _) = path.split_at(path.len() - matched.len());
+    //test.join(".").contains(&matched.join("."))
 }
 
 fn has_leaf(v: &Value) -> bool {
@@ -105,12 +181,42 @@ fn has_leaf(v: &Value) -> bool {
         false
     }
 }
+fn special_key(key: &str) -> bool {
+    key.starts_with('_') || key.starts_with('[')
+}
 
-fn generate_state_tree<T: ConfigState>(v: &Value, parent: Option<&T>) -> StateTree<T> {
+fn generate_state_tree<T: ConfigState>(v: Value) -> Result<ConfigTree<T>> {
+    let mut subtree = BTreeMap::new();
+    let mut leaves = toml::Table::new();
+    let mut depth = 0;
     if let Value::Table(map) = v {
-        unimplemented!()
+        for (k, v) in map.into_iter() {
+            match v {
+                Value::Table(_) => {
+                    let v = generate_state_tree(v)?;
+                    let dep = if special_key(&k) {
+                        v.max_depth
+                    } else {
+                        v.max_depth + 1
+                    };
+                    depth = std::cmp::max(depth, dep);
+                    subtree.insert(k, v);
+                }
+                v => drop(leaves.insert(k, v)),
+            }
+        }
+        let state = if !leaves.is_empty() {
+            Some(leaves.try_into::<T>()?)
+        } else {
+            None
+        };
+        Ok(ConfigTree {
+            state,
+            subtree,
+            max_depth: depth,
+        })
     } else {
-        unimplemented!()
+        Err(anyhow::anyhow!("Expected table"))
     }
 }
 
@@ -142,7 +248,47 @@ pub fn path_name(t: &Type) -> String {
         TypeInner::Variant(_) => "variant",
         TypeInner::Func(_) => "func",
         TypeInner::Service(_) => "service",
-        TypeInner::Class(..) | TypeInner::Unknown | TypeInner::Future => unreachable!(),
+        TypeInner::Future => "future",
+        TypeInner::Class(..) | TypeInner::Unknown => unreachable!(),
     }
     .to_string()
+}
+
+#[test]
+fn parse() {
+    use serde::Deserialize;
+    #[derive(Debug, Deserialize, Clone, PartialEq, Default)]
+    struct T {
+        depth: Option<u32>,
+        size: Option<u32>,
+        text: Option<String>,
+    }
+    impl ConfigState for T {
+        fn merge_config(&mut self, config: &Self, is_recursive: bool) {
+            unimplemented!()
+        }
+        fn update_mutable_state(&mut self, elem: &StateElem) {
+            unimplemented!()
+        }
+        fn restore_mutable_state(&mut self, elem: &StateElem) {
+            unimplemented!()
+        }
+    }
+    let toml = r#"
+[random]
+list = { depth = 20, size = 50 }
+val.text = "42"
+left.list = { depth = 1 }
+vec.nat8.text = "blob"
+Vec = { width = 2, size = 10 }
+    "#;
+    let configs = toml.parse::<Configs>().unwrap();
+    let tree: ConfigTree<T> = ConfigTree::from_configs("random", configs).unwrap();
+    assert_eq!(tree.state, None);
+    assert_eq!(tree.subtree.len(), 5);
+    assert_eq!(tree.max_depth, 2);
+    assert_eq!(
+        tree.get_config(&["list".to_string()]).unwrap().0.depth,
+        Some(20)
+    );
 }

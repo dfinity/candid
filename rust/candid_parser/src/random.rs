@@ -1,4 +1,5 @@
-use super::configs::{path_name, Configs};
+use super::configs::{path_name, ConfigState, Configs};
+use crate::configs::StateElem;
 use crate::{Error, Result};
 use arbitrary::{unstructured::Int, Arbitrary, Unstructured};
 use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
@@ -27,6 +28,33 @@ impl Default for GenConfig {
             value: None,
             depth: Some(10),
             size: Some(100),
+        }
+    }
+}
+impl ConfigState for GenConfig {
+    fn merge_config(&mut self, config: &Self, is_recursive: bool) {
+        self.range = config.range;
+        self.text = config.text.clone();
+        self.width = config.width;
+        self.value = config.value.clone();
+        if !is_recursive {
+            self.depth = config.depth;
+            self.size = config.size;
+        }
+    }
+    fn update_mutable_state(&mut self, elem: &StateElem) {
+        if let StateElem::Type(t) = elem {
+            if !matches!(t.as_ref(), TypeInner::Var(_)) {
+                self.depth = self.depth.map(|d| d - 1);
+                self.size = self.size.map(|s| s - 1);
+            }
+        }
+    }
+    fn restore_mutable_state(&mut self, elem: &StateElem) {
+        if let StateElem::Type(t) = elem {
+            if !matches!(t.as_ref(), TypeInner::Var(_)) {
+                self.depth = self.depth.map(|d| d + 1);
+            }
         }
     }
 }
