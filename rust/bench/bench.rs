@@ -136,7 +136,7 @@ fn variant_list() -> BenchResult {
 }
 
 #[bench(raw)]
-fn nns_manage_neuron() -> BenchResult {
+fn nns() -> BenchResult {
     use candid_parser::utils::CandidSource;
     let mut config = DecoderConfig::new();
     config.set_decoding_quota(COST).set_skipping_quota(SKIP);

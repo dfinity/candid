@@ -51,8 +51,8 @@ def print_table(data, base):
       print(f"| {name} | {mem} | {encode} | {decode} |")
 
   print()
-  parse = data["nns_manage_neuron"]["scopes"]["0. Parsing"]["instructions"]
-  base_parse = base["nns_manage_neuron"]["scopes"]["0. Parsing"]["instructions"]
+  parse = data["nns"]["scopes"]["0. Parsing"]["instructions"]
+  base_parse = base["nns"]["scopes"]["0. Parsing"]["instructions"]
   print(f"* Parser cost: {display_diff(parse, base_parse)}")
   extra = data["extra_args"]["total"]["instructions"]
   base_extra = base["extra_args"]["total"]["instructions"]
