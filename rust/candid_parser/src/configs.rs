@@ -58,8 +58,9 @@ pub trait ConfigState: DeserializeOwned + Default + Clone {
 #[derive(Debug)]
 pub struct ConfigTree<T: ConfigState> {
     state: Option<T>,
-    max_depth: u8,
     subtree: BTreeMap<String, ConfigTree<T>>,
+    // max_depth is only here to optimize the performance of `get_config`
+    max_depth: u8,
 }
 impl<T: ConfigState> ConfigTree<T> {
     pub fn from_configs(kind: &str, configs: Configs) -> Result<Self> {
@@ -76,6 +77,14 @@ impl<T: ConfigState> ConfigTree<T> {
         } else {
             unreachable!()
         }
+    }
+    /// Return the subtree starting with prefix
+    pub fn with_method(&self, prefix: Vec<String>) -> Option<&Self> {
+        let mut tree = self;
+        for elem in prefix.iter() {
+            tree = tree.subtree.get(elem)?;
+        }
+        Some(tree)
     }
     pub fn get_config(&self, path: &[String]) -> Option<(&T, bool)> {
         let len = path.len();
