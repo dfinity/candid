@@ -229,6 +229,26 @@ fn nns() -> BenchResult {
 }
 
 #[bench(raw)]
+fn nns_proposals() -> BenchResult {
+    use crate::nns::ListProposalInfoResponse;
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
+    let list_proposals_info_response = ListProposalInfoResponse {
+      proposal_info: vec![],
+    };
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            Encode!(&list_proposals_info_response).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            Decode!([config]; &bytes, ListProposalInfoResponse).unwrap();
+        }
+    })
+}
+
+#[bench(raw)]
 fn extra_args() -> BenchResult {
     let mut config = DecoderConfig::new();
     config.set_skipping_quota(SKIP);
