@@ -626,9 +626,9 @@ pub fn unroll(t: &Type) -> Type {
 }
 
 thread_local! {
-    static ENV: RefCell<BTreeMap<TypeId, Type>> = RefCell::new(BTreeMap::new());
+    static ENV: RefCell<BTreeMap<TypeId, Type>> = const { RefCell::new(BTreeMap::new()) };
     // only used for TypeContainer
-    static ID: RefCell<BTreeMap<Type, TypeId>> = RefCell::new(BTreeMap::new());
+    static ID: RefCell<BTreeMap<Type, TypeId>> = const { RefCell::new(BTreeMap::new()) };
     static NAME: RefCell<TypeName> = RefCell::new(TypeName::default());
 }
 
