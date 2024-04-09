@@ -7,7 +7,7 @@ use std::fmt;
 // This is a re-implementation of std::any::TypeId to get rid of 'static constraint.
 // The current TypeId doesn't consider lifetime while computing the hash, which is
 // totally fine for Candid type, as we don't care about lifetime at all.
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub struct TypeId {
     id: usize,
     pub name: &'static str,
@@ -164,10 +164,10 @@ impl TypeContainer {
     }
 }
 
-#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 pub struct Type(pub std::rc::Rc<TypeInner>);
 
-#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 pub enum TypeInner {
     Null,
     Bool,
@@ -382,7 +382,7 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
     }
 }
 
-#[derive(Debug, Eq, Clone)]
+#[derive(Debug, Eq, Clone, PartialOrd, Ord)]
 pub enum Label {
     Id(u32),
     Named(String),
@@ -423,7 +423,7 @@ impl std::hash::Hash for Label {
 
 pub type SharedLabel = std::rc::Rc<Label>;
 
-#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 pub struct Field {
     pub id: SharedLabel,
     pub ty: Type,
@@ -486,13 +486,13 @@ macro_rules! variant {
     }}
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum FuncMode {
     Oneway,
     Query,
     CompositeQuery,
 }
-#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 pub struct Function {
     pub modes: Vec<FuncMode>,
     pub args: Vec<Type>,
