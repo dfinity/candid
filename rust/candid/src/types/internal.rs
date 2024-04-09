@@ -1,7 +1,7 @@
 use super::CandidType;
 use crate::idl_hash;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt;
 
 // This is a re-implementation of std::any::TypeId to get rid of 'static constraint.
@@ -33,8 +33,8 @@ pub fn type_of<T>(_: &T) -> TypeId {
 
 #[derive(Default)]
 struct TypeName {
-    type_name: HashMap<TypeId, String>,
-    name_index: HashMap<String, usize>,
+    type_name: BTreeMap<TypeId, String>,
+    name_index: BTreeMap<String, usize>,
 }
 impl TypeName {
     fn get(&mut self, id: &TypeId) -> String {
@@ -626,9 +626,9 @@ pub fn unroll(t: &Type) -> Type {
 }
 
 thread_local! {
-    static ENV: RefCell<HashMap<TypeId, Type>> = RefCell::new(HashMap::new());
+    static ENV: RefCell<BTreeMap<TypeId, Type>> = RefCell::new(BTreeMap::new());
     // only used for TypeContainer
-    static ID: RefCell<HashMap<Type, TypeId>> = RefCell::new(HashMap::new());
+    static ID: RefCell<BTreeMap<Type, TypeId>> = RefCell::new(BTreeMap::new());
     static NAME: RefCell<TypeName> = RefCell::new(TypeName::default());
 }
 
