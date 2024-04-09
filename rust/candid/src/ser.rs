@@ -262,12 +262,12 @@ impl TypeSerialize {
         // from the type table.
         // Someone should implement Pottier's O(nlogn) algorithm
         // http://gallium.inria.fr/~fpottier/publis/gauthier-fpottier-icfp04.pdf
-        let unrolled = types::internal::unroll(t);
+        /*let unrolled = types::internal::unroll(t);
         if let Some(idx) = self.type_map.get(&unrolled) {
             let idx = *idx;
             self.type_map.insert(t.clone(), idx);
             return Ok(());
-        }
+        }*/
 
         let idx = self.type_table.len();
         self.type_map.insert(t.clone(), idx as i32);
