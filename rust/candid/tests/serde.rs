@@ -25,6 +25,15 @@ fn test_error() {
         "Trailing value after finishing deserialization",
     );
     check_error(|| test_decode(b"DIDL\0\x01\x7e", &true), "io error");
+    check_error(
+        || {
+            test_decode(
+                b"DIDL\x01\x6c\x02\x07\x78\x08\x00\x01\x00\x2a\x00\x00\x00\x00\x00\x00\x00",
+                &true,
+            )
+        },
+        "Cannot decode empty type",
+    );
     // Out of bounds type index
     check_error(
         || test_decode(b"DIDL\0\x01\0\x01", &42),
