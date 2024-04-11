@@ -7,7 +7,7 @@ use std::fmt;
 // This is a re-implementation of std::any::TypeId to get rid of 'static constraint.
 // The current TypeId doesn't consider lifetime while computing the hash, which is
 // totally fine for Candid type, as we don't care about lifetime at all.
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub struct TypeId {
     id: usize,
     pub name: &'static str,
