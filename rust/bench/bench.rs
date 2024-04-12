@@ -1,6 +1,6 @@
 use canbench_rs::{bench, bench_fn, bench_scope, BenchResult};
 use candid::{CandidType, Decode, DecoderConfig, Deserialize, Encode, Int, Nat};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[allow(clippy::all)]
 mod nns;
@@ -238,7 +238,7 @@ fn nns_list_proposal() -> BenchResult {
         status: 42,
         topic: 42,
         failure_reason: None,
-        ballots: vec![],
+        ballots: HashMap::new(),
         proposal_timestamp_seconds: 42,
         reward_event_round: 42,
         deadline_timestamp_seconds: Some(42),

@@ -12,10 +12,21 @@ path = "bench.rs"
 candid = { path = "../candid" }
 candid_parser = { path = "../candid_parser" }
 canbench-rs = "0.1"
+comparable = { version = "0.5", features = ["derive"] }
+hex = "0.4.3"
 ic-cdk = "0.12"
+prost = "0.12.3"
 serde = "1.0"
 serde_bytes = "0.11"
-hex = "0.4.3"
+strum_macros = "0.26.2"
+strum = { version = "0.26.2", features = ["derive"] }
+ic-base-types = { git = "https://github.com/dfinity/ic", rev = "e22827b4" }
+icp-ledger = { git = "https://github.com/dfinity/ic", rev = "e22827b4" }
+ic-nns-common = { git = "https://github.com/dfinity/ic", rev = "e22827b4" }
+ic-sns-init = { git = "https://github.com/dfinity/ic", rev = "e22827b4" }
+ic-sns-root = { git = "https://github.com/dfinity/ic", rev = "e22827b4" }
+ic-sns-swap = { git = "https://github.com/dfinity/ic", rev = "e22827b4" }
+ic-nervous-system-proto = { git = "https://github.com/dfinity/ic", rev = "e22827b4" }
 
 [patch.crates-io]
 candid = { path = "../candid" }
