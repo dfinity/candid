@@ -7,7 +7,9 @@ pub struct TypeEnv(pub BTreeMap<String, Type>);
 
 impl TypeEnv {
     pub fn new() -> Self {
-        TypeEnv(BTreeMap::new())
+        let mut map = BTreeMap::new();
+        map.insert("blob".into(), TypeInner::Vec(TypeInner::Nat8.into()).into());
+        TypeEnv(map)
     }
     pub fn merge<'a>(&'a mut self, env: &TypeEnv) -> Result<&'a mut Self> {
         for (k, v) in &env.0 {
