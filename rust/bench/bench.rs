@@ -230,35 +230,51 @@ fn nns() -> BenchResult {
 
 #[bench(raw)]
 fn nns_list_proposal() -> BenchResult {
-    use crate::nns::{ListProposalInfoResponse, ProposalInfo};
+    use crate::nns::proposal::Action;
+    use crate::nns::{ExecuteNnsFunction, ListProposalInfoResponse, Proposal, ProposalInfo, Tally};
+    use candid::encode_args;
+    use ic_nns_common::pb::v1::{NeuronId, ProposalId};
     let mut config = DecoderConfig::new();
     config.set_decoding_quota(COST).set_skipping_quota(SKIP);
     let proposal = ProposalInfo {
-        id: None,
-        status: 42,
-        topic: 42,
+        id: Some(ProposalId { id: 1 }),
+        status: 4,
+        topic: 7,
         failure_reason: None,
         ballots: HashMap::new(),
-        proposal_timestamp_seconds: 42,
-        reward_event_round: 42,
-        deadline_timestamp_seconds: Some(42),
-        failed_timestamp_seconds: 42,
-        reject_cost_e8s: 42,
+        proposal_timestamp_seconds: 1_710_834_579,
+        reward_event_round: 0,
+        deadline_timestamp_seconds: Some(1_711_180_179),
+        failed_timestamp_seconds: 0,
+        reject_cost_e8s: 100_000_000,
         derived_proposal_information: None,
-        latest_tally: None,
-        reward_status: 42,
-        decided_timestamp_seconds: 42,
-        proposal: None,
-        proposer: None,
-        executed_timestamp_seconds: 42,
+        latest_tally: Some(Tally {
+          no: 0,
+          yes: 1_404_004_106,
+          total: 1_558_444_556,
+          timestamp_seconds: 1_710_834_579,
+        }),
+        reward_status: 1,
+        decided_timestamp_seconds: 1_710_834_579,
+        proposal: Some(Proposal {
+          url: "".to_string(),
+          title: Some("<proposal created by submit_external_proposal_with_test_id>".to_string()),
+          action: Some(Action::ExecuteNnsFunction(ExecuteNnsFunction {
+            nns_function: 14,
+            payload: b"\x44\x49\x44\x4c\x03\x6c\x02\xbe\xce\xea\x02\x01\xf6\xd5\xb3\xe1\x02\x02\x6e\x68\x6d\x68\x01\x00\x00\x02\x01\x1d\xf2\xa9\xa9\xd3\x1f\x73\x47\xc0\x20\x1d\xab\x14\x25\xaf\x4b\x66\x0e\xa1\x38\xdb\x41\x72\x44\x59\xae\xae\xfb\xdc\x02\x01\x1d\x38\x71\x9a\xd7\xbc\xfe\x06\xd7\xc1\x72\xd8\xfb\x2e\x52\xfa\xbb\x9e\x96\x4d\x45\x27\x86\xa2\x77\x39\x2c\xc5\x39\x02".to_vec(),
+          })),
+          summary: "".to_string(),
+        }),
+        proposer: Some(NeuronId { id: 449_479_075_714_955_186 }),
+        executed_timestamp_seconds: 1_710_834_579,
     };
     let list_proposals_info_response = ListProposalInfoResponse {
-        proposal_info: std::iter::repeat(proposal).take(1000).collect(),
+        proposal_info: std::iter::repeat(proposal).take(1).collect(),
     };
     bench_fn(|| {
         let bytes = {
             let _p = bench_scope("1. Encoding");
-            Encode!(&list_proposals_info_response).unwrap()
+            encode_args((list_proposals_info_response,)).unwrap()
         };
         {
             let _p = bench_scope("2. Decoding");
