@@ -232,7 +232,7 @@ fn nns() -> BenchResult {
 fn nns_list_proposal() -> BenchResult {
     use crate::nns::proposal::Action;
     use crate::nns::{ExecuteNnsFunction, ListProposalInfoResponse, Proposal, ProposalInfo, Tally};
-    use candid::encode_args;
+    use candid::{decode_args_with_config, encode_args};
     use ic_nns_common::pb::v1::{NeuronId, ProposalId};
     let mut config = DecoderConfig::new();
     config.set_decoding_quota(COST).set_skipping_quota(SKIP);
@@ -278,7 +278,7 @@ fn nns_list_proposal() -> BenchResult {
         };
         {
             let _p = bench_scope("2. Decoding");
-            Decode!([config]; &bytes, ListProposalInfoResponse).unwrap();
+            decode_args_with_config::<(ListProposalInfoResponse,)>(&bytes, &config).unwrap();
         }
     })
 }
