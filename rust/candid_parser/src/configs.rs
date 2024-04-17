@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use toml::Value;
 
 pub struct State<'a, T: ConfigState> {
-    tree: &'a mut ConfigTree<T>,
+    tree: &'a ConfigTree<T>,
     path: Vec<String>,
     pub config: T,
     pub env: &'a TypeEnv,
@@ -23,7 +23,7 @@ impl<'a> std::fmt::Display for StateElem<'a> {
     }
 }
 impl<'a, T: ConfigState> State<'a, T> {
-    pub fn new(tree: &'a mut ConfigTree<T>, env: &'a TypeEnv) -> Self {
+    pub fn new(tree: &'a ConfigTree<T>, env: &'a TypeEnv) -> Self {
         let mut config = T::default();
         if let Some(state) = &tree.state {
             config.merge_config(state, false);
@@ -35,7 +35,7 @@ impl<'a, T: ConfigState> State<'a, T> {
             env,
         }
     }
-    /// Return the old state AFTER `update_state`.
+    /// Update config based on the new elem in the path. Return the old state AFTER `update_state`.
     pub fn push_state(&mut self, elem: &StateElem) -> T {
         self.config.update_state(elem);
         let old_config = self.config.clone();
@@ -47,7 +47,7 @@ impl<'a, T: ConfigState> State<'a, T> {
     }
     pub fn pop_state(&mut self, old_config: T, elem: StateElem) {
         self.config = old_config;
-        self.path.pop();
+        assert_eq!(self.path.pop(), Some(elem.to_string()));
         self.config.restore_state(&elem);
     }
 }
@@ -111,54 +111,6 @@ impl<T: ConfigState> ConfigTree<T> {
 
 pub struct Configs(Value);
 
-impl Configs {
-    pub fn with_method(&self, method: &str) -> Self {
-        let path = format!("[{method}]");
-        let mut res = self.0.clone();
-        if let Value::Table(ref mut map) = res {
-            if let Some(Value::Table(subtree)) = map.remove(&path) {
-                map.extend(&mut subtree.into_iter());
-            }
-            Configs(res)
-        } else {
-            unreachable!()
-        }
-    }
-    fn get_helper(&self, path: &[String]) -> Option<&Value> {
-        let mut result = &self.0;
-        for elem in path.iter() {
-            if let Value::Table(map) = result {
-                result = map.get(elem)?;
-            } else {
-                unreachable!()
-            }
-        }
-        if has_leaf(result) {
-            Some(result)
-        } else {
-            None
-        }
-    }
-    /// Get config that starts somewhere in the path and ends at the end of the path.
-    /// The second return bool is whether the matched path appears earlier in the path (inside a recursion).
-    /// Empty path returns the top-level config.
-    pub fn get<T: DeserializeOwned>(&self, path: &[String]) -> Option<(T, bool)> {
-        if path.is_empty() {
-            return Some((self.0.clone().try_into::<T>().ok()?, false));
-        }
-        for i in (0..path.len()).rev() {
-            let (_, tail) = path.split_at(i);
-            match self.get_helper(tail) {
-                Some(v) => {
-                    let parsed_config = v.clone().try_into::<T>().ok()?;
-                    return Some((parsed_config, is_repeated(path, tail)));
-                }
-                None => continue,
-            }
-        }
-        None
-    }
-}
 impl std::str::FromStr for Configs {
     type Err = crate::Error;
     fn from_str(v: &str) -> Result<Self, Self::Err> {
@@ -179,19 +131,6 @@ fn is_repeated(path: &[String], matched: &[String]) -> bool {
     //test.join(".").contains(&matched.join("."))
 }
 
-fn has_leaf(v: &Value) -> bool {
-    if let Value::Table(map) = v {
-        for (_, val) in map.iter() {
-            match val {
-                Value::Table(_) => continue,
-                _ => return true,
-            }
-        }
-        false
-    } else {
-        false
-    }
-}
 fn special_key(key: &str) -> bool {
     key.starts_with('_') || key.starts_with('[')
 }
@@ -275,13 +214,13 @@ fn parse() {
         text: Option<String>,
     }
     impl ConfigState for T {
-        fn merge_config(&mut self, config: &Self, is_recursive: bool) {
+        fn merge_config(&mut self, _config: &Self, _is_recursive: bool) {
             unimplemented!()
         }
-        fn update_state(&mut self, elem: &StateElem) {
+        fn update_state(&mut self, _elem: &StateElem) {
             unimplemented!()
         }
-        fn restore_state(&mut self, elem: &StateElem) {
+        fn restore_state(&mut self, _elem: &StateElem) {
             unimplemented!()
         }
     }
