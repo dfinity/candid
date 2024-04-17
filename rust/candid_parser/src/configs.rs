@@ -1,5 +1,5 @@
 use anyhow::Result;
-use candid::types::{Type, TypeInner};
+use candid::types::{Type, TypeEnv, TypeInner};
 use serde::de::DeserializeOwned;
 use std::collections::BTreeMap;
 use toml::Value;
@@ -7,7 +7,8 @@ use toml::Value;
 pub struct State<'a, T: ConfigState> {
     tree: &'a mut ConfigTree<T>,
     path: Vec<String>,
-    config: T,
+    pub config: T,
+    pub env: &'a TypeEnv,
 }
 pub enum StateElem<'a> {
     Type(&'a Type),
@@ -22,7 +23,7 @@ impl<'a> std::fmt::Display for StateElem<'a> {
     }
 }
 impl<'a, T: ConfigState> State<'a, T> {
-    pub fn new(tree: &'a mut ConfigTree<T>) -> Self {
+    pub fn new(tree: &'a mut ConfigTree<T>, env: &'a TypeEnv) -> Self {
         let mut config = T::default();
         if let Some(state) = &tree.state {
             config.merge_config(state, false);
@@ -31,10 +32,12 @@ impl<'a, T: ConfigState> State<'a, T> {
             tree,
             path: Vec::new(),
             config,
+            env,
         }
     }
+    /// Return the old state AFTER `update_state`.
     pub fn push_state(&mut self, elem: &StateElem) -> T {
-        self.config.update_mutable_state(elem);
+        self.config.update_state(elem);
         let old_config = self.config.clone();
         self.path.push(elem.to_string());
         if let Some((state, is_recursive)) = self.tree.get_config(&self.path) {
@@ -44,16 +47,15 @@ impl<'a, T: ConfigState> State<'a, T> {
     }
     pub fn pop_state(&mut self, old_config: T, elem: StateElem) {
         self.config = old_config;
-        /*let elem =*/
         self.path.pop();
-        self.config.restore_mutable_state(&elem);
+        self.config.restore_state(&elem);
     }
 }
 
 pub trait ConfigState: DeserializeOwned + Default + Clone {
     fn merge_config(&mut self, config: &Self, is_recursive: bool);
-    fn update_mutable_state(&mut self, elem: &StateElem);
-    fn restore_mutable_state(&mut self, elem: &StateElem);
+    fn update_state(&mut self, elem: &StateElem);
+    fn restore_state(&mut self, elem: &StateElem);
 }
 #[derive(Debug)]
 pub struct ConfigTree<T: ConfigState> {
@@ -276,10 +278,10 @@ fn parse() {
         fn merge_config(&mut self, config: &Self, is_recursive: bool) {
             unimplemented!()
         }
-        fn update_mutable_state(&mut self, elem: &StateElem) {
+        fn update_state(&mut self, elem: &StateElem) {
             unimplemented!()
         }
-        fn restore_mutable_state(&mut self, elem: &StateElem) {
+        fn restore_state(&mut self, elem: &StateElem) {
             unimplemented!()
         }
     }
