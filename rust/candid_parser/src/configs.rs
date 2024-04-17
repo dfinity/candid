@@ -2,7 +2,7 @@ use anyhow::Result;
 use candid::types::{Type, TypeEnv, TypeInner};
 use serde::de::DeserializeOwned;
 use std::collections::BTreeMap;
-use toml::Value;
+use toml::{Table, Value};
 
 pub struct State<'a, T: ConfigState> {
     tree: &'a ConfigTree<T>,
@@ -66,18 +66,15 @@ pub struct ConfigTree<T: ConfigState> {
 }
 impl<T: ConfigState> ConfigTree<T> {
     pub fn from_configs(kind: &str, configs: Configs) -> Result<Self> {
-        if let Value::Table(mut map) = configs.0 {
-            if let Some(v) = map.remove(kind) {
-                generate_state_tree(v)
-            } else {
-                Ok(Self {
-                    state: None,
-                    subtree: BTreeMap::new(),
-                    max_depth: 0,
-                })
-            }
+        let mut map = configs.0;
+        if let Some(v) = map.remove(kind) {
+            generate_state_tree(v)
         } else {
-            unreachable!()
+            Ok(Self {
+                state: None,
+                subtree: BTreeMap::new(),
+                max_depth: 0,
+            })
         }
     }
     /// Return the subtree starting with prefix
@@ -109,12 +106,12 @@ impl<T: ConfigState> ConfigTree<T> {
     }
 }
 
-pub struct Configs(Value);
+pub struct Configs(Table);
 
 impl std::str::FromStr for Configs {
     type Err = crate::Error;
     fn from_str(v: &str) -> Result<Self, Self::Err> {
-        let v = v.parse::<Value>()?;
+        let v = v.parse::<Table>()?;
         Ok(Configs(v))
     }
 }
@@ -166,7 +163,7 @@ fn generate_state_tree<T: ConfigState>(v: Value) -> Result<ConfigTree<T>> {
             max_depth: depth,
         })
     } else {
-        Err(anyhow::anyhow!("Expected table"))
+        Err(anyhow::anyhow!("Expected a table"))
     }
 }
 
