@@ -6,9 +6,10 @@ left = { depth = 1, range = [-200, -100] }
 right.tree = { depth = 5, range = [100, 200] }
 vec.nat8.range = [ 65, 90 ]
 Vec = { width = 2, size = 10 }
+text = "company"
 
-[random."[h]"]
-"[0]".a.range = [ 42, 42 ]
+[random."method:h"]
+"arg:0".a.range = [ 42, 42 ]
 b.range = [ 0, 1 ]
 
 [random.profile.record]

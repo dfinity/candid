@@ -7,6 +7,7 @@ use toml::{Table, Value};
 pub struct State<'a, T: ConfigState> {
     tree: &'a ConfigTree<T>,
     path: Vec<String>,
+    open_tree: Option<&'a ConfigTree<T>>,
     pub config: T,
     pub env: &'a TypeEnv,
 }
@@ -14,14 +15,15 @@ pub enum StateElem<'a> {
     Type(&'a Type),
     Label(&'a str),
 }
-impl<'a> std::fmt::Display for StateElem<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            StateElem::Type(t) => write!(f, "{}", path_name(t)),
-            StateElem::Label(l) => write!(f, "{}", l),
-        }
-    }
+pub struct Scope<'a> {
+    pub method: &'a str,
+    pub position: Option<ScopePos>,
 }
+pub enum ScopePos {
+    Arg,
+    Ret,
+}
+
 impl<'a, T: ConfigState> State<'a, T> {
     pub fn new(tree: &'a ConfigTree<T>, env: &'a TypeEnv) -> Self {
         let mut config = T::default();
@@ -30,9 +32,30 @@ impl<'a, T: ConfigState> State<'a, T> {
         }
         Self {
             tree,
+            open_tree: None,
             path: Vec::new(),
             config,
             env,
+        }
+    }
+    /// Match paths in the scope first. If `scope` is None, clear the scope.
+    pub fn with_scope(&mut self, scope: &Option<Scope>, idx: usize) {
+        match scope {
+            None => self.open_tree = None,
+            Some(scope) => {
+                let mut path = vec![format!("method:{}", scope.method)];
+                match self.tree.with_prefix(&path) {
+                    Some(tree) => {
+                        match scope.position {
+                            Some(ScopePos::Arg) => path.push(format!("arg:{}", idx)),
+                            Some(ScopePos::Ret) => path.push(format!("ret:{}", idx)),
+                            None => (),
+                        }
+                        self.open_tree = self.tree.with_prefix(&path).or(Some(tree));
+                    }
+                    None => self.open_tree = None,
+                }
+            }
         }
     }
     /// Update config based on the new elem in the path. Return the old state AFTER `update_state`.
@@ -40,7 +63,14 @@ impl<'a, T: ConfigState> State<'a, T> {
         self.config.update_state(elem);
         let old_config = self.config.clone();
         self.path.push(elem.to_string());
-        if let Some((state, is_recursive)) = self.tree.get_config(&self.path) {
+        let new_state = if let Some(subtree) = self.open_tree {
+            subtree
+                .get_config(&self.path)
+                .or_else(|| self.tree.get_config(&self.path))
+        } else {
+            self.tree.get_config(&self.path)
+        };
+        if let Some((state, is_recursive)) = new_state {
             self.config.merge_config(state, is_recursive);
         }
         old_config
@@ -70,15 +100,11 @@ impl<T: ConfigState> ConfigTree<T> {
         if let Some(v) = map.remove(kind) {
             generate_state_tree(v)
         } else {
-            Ok(Self {
-                state: None,
-                subtree: BTreeMap::new(),
-                max_depth: 0,
-            })
+            generate_state_tree(Value::Table(map))
         }
     }
     /// Return the subtree starting with prefix
-    pub fn with_method(&self, prefix: Vec<String>) -> Option<&Self> {
+    pub fn with_prefix(&self, prefix: &[String]) -> Option<&Self> {
         let mut tree = self;
         for elem in prefix.iter() {
             tree = tree.subtree.get(elem)?;
@@ -115,6 +141,14 @@ impl std::str::FromStr for Configs {
         Ok(Configs(v))
     }
 }
+impl<'a> std::fmt::Display for StateElem<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            StateElem::Type(t) => write!(f, "{}", path_name(t)),
+            StateElem::Label(l) => write!(f, "{}", l),
+        }
+    }
+}
 
 fn is_repeated(path: &[String], matched: &[String]) -> bool {
     let iter = path.as_ref().windows(matched.len());
@@ -124,12 +158,10 @@ fn is_repeated(path: &[String], matched: &[String]) -> bool {
         }
     }
     false
-    //let (test, _) = path.split_at(path.len() - matched.len());
-    //test.join(".").contains(&matched.join("."))
 }
 
 fn special_key(key: &str) -> bool {
-    key.starts_with('_') || key.starts_with('[')
+    key.starts_with("method:") || key.starts_with("arg:") || key.starts_with("ret:")
 }
 
 fn generate_state_tree<T: ConfigState>(v: Value) -> Result<ConfigTree<T>> {

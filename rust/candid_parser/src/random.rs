@@ -1,4 +1,4 @@
-use super::configs::{ConfigState, Configs, State};
+use super::configs::{ConfigState, Configs, Scope, State};
 use crate::configs::StateElem;
 use crate::{Error, Result};
 use arbitrary::{unstructured::Int, Arbitrary, Unstructured};
@@ -180,13 +180,21 @@ impl<'a> RandState<'a> {
     }
 }
 
-pub fn any(seed: &[u8], configs: Configs, env: &TypeEnv, types: &[Type]) -> Result<IDLArgs> {
+pub fn any(
+    seed: &[u8],
+    configs: Configs,
+    env: &TypeEnv,
+    types: &[Type],
+    scope: &Option<Scope>,
+) -> Result<IDLArgs> {
     let mut u = arbitrary::Unstructured::new(seed);
-    let mut tree = super::configs::ConfigTree::from_configs("random", configs)?;
+    let tree = super::configs::ConfigTree::from_configs("random", configs)?;
     let mut args = Vec::new();
-    for (_i, t) in types.iter().enumerate() {
-        //let tree = tree.with_method(&i.to_string());
-        let mut state = RandState(State::new(&mut tree, env));
+    for (i, t) in types.iter().enumerate() {
+        let mut state = State::new(&tree, env);
+        state.with_scope(scope, i);
+        let mut state = RandState(state);
+        state.0.push_state(&StateElem::Label(&i.to_string()));
         let v = state.any(&mut u, t)?;
         args.push(v);
     }

@@ -75,7 +75,7 @@ enum Command {
         #[clap(flatten)]
         annotate: TypeAnnotation,
         #[clap(short, long, conflicts_with("file"))]
-        /// Specifies random value generation config in Dhall syntax
+        /// Specifies random value generation config in TOML syntax
         config: Option<String>,
         #[clap(short, long)]
         /// Load random value generation config from file
@@ -308,7 +308,7 @@ fn main() -> Result<()> {
             file,
             args,
         } => {
-            use candid_parser::configs::Configs;
+            use candid_parser::configs::{Configs, Scope, ScopePos};
             use rand::Rng;
             use std::str::FromStr;
             let (env, types) = if args.is_some() {
@@ -326,11 +326,6 @@ fn main() -> Result<()> {
                 }
                 _ => unreachable!(),
             };
-            let config = if let Some(ref method) = annotate.method {
-                config.with_method(method)
-            } else {
-                config
-            };
             // TODO figure out how many bytes of entropy we need
             let seed: Vec<u8> = if let Some(ref args) = args {
                 let (env, types) = annotate.get_types(Mode::Encode)?;
@@ -340,7 +335,15 @@ fn main() -> Result<()> {
                 let mut rng = rand::thread_rng();
                 (0..2048).map(|_| rng.gen::<u8>()).collect()
             };
-            let args = candid_parser::random::any(&seed, &config, &env, &types)?;
+            let scope = annotate.method.as_ref().and_then(|method| {
+                let position = Some(if args.is_some() {
+                    ScopePos::Ret
+                } else {
+                    ScopePos::Arg
+                });
+                Some(Scope { position, method })
+            });
+            let args = candid_parser::random::any(&seed, config, &env, &types, &scope)?;
             match lang.as_str() {
                 "did" => println!("{args}"),
                 "js" => println!(
