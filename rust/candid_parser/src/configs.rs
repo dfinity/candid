@@ -115,7 +115,7 @@ impl<T: ConfigState> ConfigTree<T> {
         let len = path.len();
         let start = len.saturating_sub(self.max_depth as usize);
         for i in (start..len).rev() {
-            let tail = &path[i..];
+            let (path, tail) = path.split_at(i);
             match self.match_exact_path(tail) {
                 Some(v) => return Some((v, is_repeated(path, tail))),
                 None => continue,
@@ -243,14 +243,17 @@ fn parse() {
         text: Option<String>,
     }
     impl ConfigState for T {
-        fn merge_config(&mut self, _config: &Self, _is_recursive: bool) {
-            unimplemented!()
+        fn merge_config(&mut self, config: &Self, is_recursive: bool) {
+            *self = config.clone();
+            if is_recursive {
+                self.size = Some(0);
+            }
         }
         fn update_state(&mut self, _elem: &StateElem) {
-            unimplemented!()
+            self.size = self.size.map(|s| s + 1);
         }
         fn restore_state(&mut self, _elem: &StateElem) {
-            unimplemented!()
+            self.size = self.size.map(|s| s - 1);
         }
     }
     let toml = r#"
@@ -260,14 +263,50 @@ val.text = "42"
 left.list = { depth = 1 }
 vec.nat8.text = "blob"
 Vec = { width = 2, size = 10 }
+"method:f"."arg:0".list = { depth = 2, size = 20 }
+"method:f".list = { depth = 3, size = 30 }
     "#;
     let configs = toml.parse::<Configs>().unwrap();
     let tree: ConfigTree<T> = ConfigTree::from_configs("random", configs).unwrap();
     assert_eq!(tree.state, None);
-    assert_eq!(tree.subtree.len(), 5);
+    assert_eq!(tree.subtree.len(), 6);
     assert_eq!(tree.max_depth, 2);
     assert_eq!(
         tree.get_config(&["list".to_string()]).unwrap().0.depth,
         Some(20)
     );
+    let env = TypeEnv::default();
+    let mut state = State::new(&tree, &env);
+    state.with_scope(
+        &Some(Scope {
+            method: "f",
+            position: Some(ScopePos::Arg),
+        }),
+        0,
+    );
+    let old = state.push_state(&StateElem::Label("list"));
+    assert_eq!(state.config.depth, Some(2));
+    assert_eq!(state.config.size, Some(20));
+    assert_eq!(state.config.text, None);
+    assert_eq!(old.size, None);
+    state.push_state(&StateElem::Label("val"));
+    assert_eq!(state.config.text, Some("42".to_string()));
+    state.with_scope(
+        &Some(Scope {
+            method: "f",
+            position: None,
+        }),
+        0,
+    );
+    state.push_state(&StateElem::Label("list"));
+    assert_eq!(state.config.depth, Some(3));
+    assert_eq!(state.config.size, Some(0));
+    state.with_scope(&None, 0);
+    let old = state.push_state(&StateElem::Label("list"));
+    assert_eq!(state.config.depth, Some(20));
+    assert_eq!(state.config.size, Some(0));
+    assert_eq!(old.size, Some(1));
+    state.pop_state(old, StateElem::Label("list"));
+    assert_eq!(state.config.size, Some(0));
+    assert_eq!(state.config.depth, Some(3));
 }
