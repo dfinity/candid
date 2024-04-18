@@ -335,13 +335,13 @@ fn main() -> Result<()> {
                 let mut rng = rand::thread_rng();
                 (0..2048).map(|_| rng.gen::<u8>()).collect()
             };
-            let scope = annotate.method.as_ref().and_then(|method| {
+            let scope = annotate.method.as_ref().map(|method| {
                 let position = Some(if args.is_some() {
                     ScopePos::Ret
                 } else {
                     ScopePos::Arg
                 });
-                Some(Scope { position, method })
+                Scope { position, method }
             });
             let args = candid_parser::random::any(&seed, config, &env, &types, &scope)?;
             match lang.as_str() {
