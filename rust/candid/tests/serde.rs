@@ -260,8 +260,9 @@ fn test_struct() {
     );
 
     let list: Option<List> = None;
-    // without memoization on the unrolled type, type table will have 3 entries.
-    all_check(list, "4449444c026e016c02a0d2aca8047c90eddae70400010000");
+    // with memoization on the unrolled type, type table will have 2 entries.
+    // all_check(list, "4449444c026e016c02a0d2aca8047c90eddae70400010000");
+    all_check(list, "4449444c036e016c02a0d2aca8047c90eddae704026e01010000");
 }
 
 #[test]

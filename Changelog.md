@@ -1,6 +1,15 @@
 
 # Changelog
 
+## 2024-04-11
+
+### Candid 0.10.7 -- 0.10.5
+
+* Switch `HashMap` to `BTreeMap` in serialization and `T::ty()`. This leads to around 20% perf improvement for serializing complicated types.
+* Disable memoization for unrolled types in serialization to save cycle cost. In some cases, type table can get slightly larger, but it's worth the trade off.
+* Fix bug in `text_size`
+* Fix decoding cost calculation overflow
+
 ## 2024-02-27
 
 ### Candid 0.10.4

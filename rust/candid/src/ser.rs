@@ -7,7 +7,7 @@ use super::types::value::IDLValue;
 use super::types::{internal::Opcode, Field, Type, TypeEnv, TypeInner};
 use byteorder::{LittleEndian, WriteBytesExt};
 use leb128::write::{signed as sleb128_encode, unsigned as leb128_encode};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::io;
 use std::vec::Vec;
 
@@ -224,7 +224,7 @@ impl<'a> types::Compound for Compound<'a> {
 #[derive(Default)]
 pub struct TypeSerialize {
     type_table: Vec<Vec<u8>>,
-    type_map: HashMap<Type, i32>,
+    type_map: BTreeMap<Type, i32>,
     env: TypeEnv,
     args: Vec<Type>,
     result: Vec<u8>,
@@ -235,7 +235,7 @@ impl TypeSerialize {
     pub fn new() -> Self {
         TypeSerialize {
             type_table: Vec::new(),
-            type_map: HashMap::new(),
+            type_map: BTreeMap::new(),
             env: TypeEnv::new(),
             args: Vec::new(),
             result: Vec::new(),
@@ -262,12 +262,13 @@ impl TypeSerialize {
         // from the type table.
         // Someone should implement Pottier's O(nlogn) algorithm
         // http://gallium.inria.fr/~fpottier/publis/gauthier-fpottier-icfp04.pdf
-        let unrolled = types::internal::unroll(t);
-        if let Some(idx) = self.type_map.get(&unrolled) {
-            let idx = *idx;
-            self.type_map.insert(t.clone(), idx);
-            return Ok(());
-        }
+        // Disable this "optimization", as unroll is expensive and has to be called on every recursion.
+        // let unrolled = types::internal::unroll(t);
+        // if let Some(idx) = self.type_map.get(&unrolled) {
+        //    let idx = *idx;
+        //    self.type_map.insert(t.clone(), idx);
+        //    return Ok(());
+        // }
 
         let idx = self.type_table.len();
         self.type_map.insert(t.clone(), idx as i32);

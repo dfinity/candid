@@ -229,6 +229,45 @@ fn nns() -> BenchResult {
 }
 
 #[bench(raw)]
+fn nns_list_proposal() -> BenchResult {
+    use crate::nns::{ListProposalInfoResponse, ProposalInfo};
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
+    let proposal = ProposalInfo {
+        id: None,
+        status: 42,
+        topic: 42,
+        failure_reason: None,
+        ballots: vec![],
+        proposal_timestamp_seconds: 42,
+        reward_event_round: 42,
+        deadline_timestamp_seconds: Some(42),
+        failed_timestamp_seconds: 42,
+        reject_cost_e8s: 42,
+        derived_proposal_information: None,
+        latest_tally: None,
+        reward_status: 42,
+        decided_timestamp_seconds: 42,
+        proposal: None,
+        proposer: None,
+        executed_timestamp_seconds: 42,
+    };
+    let list_proposals_info_response = ListProposalInfoResponse {
+        proposal_info: std::iter::repeat(proposal).take(1000).collect(),
+    };
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            Encode!(&list_proposals_info_response).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            Decode!([config]; &bytes, ListProposalInfoResponse).unwrap();
+        }
+    })
+}
+
+#[bench(raw)]
 fn extra_args() -> BenchResult {
     let mut config = DecoderConfig::new();
     config.set_skipping_quota(SKIP);
