@@ -1,4 +1,8 @@
 use super::analysis::{chase_actor, infer_rec};
+use crate::{
+    configs::{ConfigState, ConfigTree, Configs, StateElem},
+    Deserialize,
+};
 use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use convert_case::{Case, Casing};
@@ -12,19 +16,22 @@ pub enum Target {
     CanisterStub,
 }
 
-#[derive(Clone)]
+//#[derive(Clone)]
 pub struct Config {
     candid_crate: String,
     type_attributes: String,
+    tree: ConfigTree<BindingConfig>,
     canister_id: Option<candid::Principal>,
     service_name: String,
     target: Target,
 }
 impl Config {
-    pub fn new() -> Self {
+    pub fn new(configs: Configs) -> Self {
+        let tree = ConfigTree::from_configs("rust", configs).unwrap();
         Config {
             candid_crate: "candid".to_string(),
             type_attributes: "".to_string(),
+            tree,
             canister_id: None,
             service_name: "service".to_string(),
             target: Target::CanisterCall,
@@ -54,10 +61,28 @@ impl Config {
         self
     }
 }
-impl Default for Config {
-    fn default() -> Self {
-        Self::new()
+#[derive(Default, Deserialize, Clone)]
+pub struct BindingConfig {
+    name: Option<String>,
+    use_type: Option<String>,
+    attributes: Option<String>,
+    visibility: Option<String>,
+}
+impl ConfigState for BindingConfig {
+    fn merge_config(&mut self, config: &Self, _is_recursive: bool) {
+        self.name = config.name.clone();
+        self.use_type = config.use_type.clone();
+        self.attributes = config.attributes.clone();
+        if config.visibility.is_some() {
+            self.visibility = config.visibility.clone();
+        }
     }
+    fn update_state(&mut self, _elem: &StateElem) {}
+    fn restore_state(&mut self, _elem: &StateElem) {}
+}
+pub struct State<'a> {
+    state: crate::configs::State<'a, BindingConfig>,
+    recs: RecPoints<'a>,
 }
 
 type RecPoints<'a> = BTreeSet<&'a str>;
@@ -207,78 +232,90 @@ fn pp_variant_fields<'a>(fs: &'a [Field], recs: &RecPoints) -> RcDoc<'a> {
     let fields = concat(fs.iter().map(|f| pp_variant_field(f, recs)), ",");
     enclose_space("{", fields, "}")
 }
-
-fn pp_defs<'a>(
-    config: &'a Config,
-    env: &'a TypeEnv,
-    def_list: &'a [&'a str],
-    recs: &'a RecPoints,
-) -> RcDoc<'a> {
-    let derive = if config.type_attributes.is_empty() {
-        "#[derive(CandidType, Deserialize)]"
-    } else {
-        &config.type_attributes
-    };
-    lines(def_list.iter().map(|id| {
-        let ty = env.find_type(id).unwrap();
-        let name = ident(id, Some(Case::Pascal)).append(" ");
-        let vis = "pub ";
-        match ty.as_ref() {
-            TypeInner::Record(fs) => {
-                let separator = if is_tuple(fs) {
-                    RcDoc::text(";")
-                } else {
-                    RcDoc::nil()
-                };
-                str(derive)
-                    .append(RcDoc::line())
-                    .append(vis)
-                    .append("struct ")
-                    .append(name)
-                    .append(pp_record_fields(fs, recs, "pub"))
-                    .append(separator)
-                    .append(RcDoc::hardline())
-            }
-            TypeInner::Variant(fs) => str(derive)
-                .append(RcDoc::line())
-                .append(vis)
-                .append("enum ")
-                .append(name)
-                .append(pp_variant_fields(fs, recs))
-                .append(RcDoc::hardline()),
-            TypeInner::Func(func) => str("candid::define_function!(")
-                .append(vis)
-                .append(name)
-                .append(": ")
-                .append(pp_ty_func(func))
-                .append(");"),
-            TypeInner::Service(serv) => str("candid::define_service!(")
-                .append(vis)
-                .append(name)
-                .append(": ")
-                .append(pp_ty_service(serv))
-                .append(");"),
-            _ => {
-                if recs.contains(id) {
-                    str(derive)
+impl<'a> State<'a> {
+    fn pp_defs(&mut self, def_list: &'a [&'a str]) -> RcDoc<'a> {
+        lines(def_list.iter().map(|id| {
+            let old = self.state.push_state(&StateElem::Label(id));
+            let ty = self.state.env.find_type(id).unwrap();
+            let name = self
+                .state
+                .config
+                .name
+                .clone()
+                .map(RcDoc::text)
+                .unwrap_or_else(|| ident(id, Some(Case::Pascal)).append(" "));
+            let vis = self
+                .state
+                .config
+                .visibility
+                .clone()
+                .map(|v| RcDoc::text(v).append(" "))
+                .unwrap_or(RcDoc::text("pub "));
+            let derive = self
+                .state
+                .config
+                .attributes
+                .clone()
+                .map(RcDoc::text)
+                .unwrap_or(RcDoc::text("#[derive(CandidType, Deserialize)]"));
+            let res = match ty.as_ref() {
+                TypeInner::Record(fs) => {
+                    let separator = if is_tuple(fs) {
+                        RcDoc::text(";")
+                    } else {
+                        RcDoc::nil()
+                    };
+                    derive
                         .append(RcDoc::line())
                         .append(vis)
                         .append("struct ")
-                        .append(ident(id, Some(Case::Pascal)))
-                        .append(enclose("(", pp_ty(ty, recs), ")"))
-                        .append(";")
-                        .append(RcDoc::hardline())
-                } else {
-                    str(vis)
-                        .append(kwd("type"))
                         .append(name)
-                        .append("= ")
-                        .append(pp_ty(ty, recs))
-                        .append(";")
+                        .append(pp_record_fields(fs, &self.recs, "pub"))
+                        .append(separator)
+                        .append(RcDoc::hardline())
                 }
-            }
-        }
-    }))
+                TypeInner::Variant(fs) => derive
+                    .append(RcDoc::line())
+                    .append(vis)
+                    .append("enum ")
+                    .append(name)
+                    .append(pp_variant_fields(fs, &self.recs))
+                    .append(RcDoc::hardline()),
+                TypeInner::Func(func) => str("candid::define_function!(")
+                    .append(vis)
+                    .append(name)
+                    .append(": ")
+                    .append(pp_ty_func(func))
+                    .append(");"),
+                TypeInner::Service(serv) => str("candid::define_service!(")
+                    .append(vis)
+                    .append(name)
+                    .append(": ")
+                    .append(pp_ty_service(serv))
+                    .append(");"),
+                _ => {
+                    if self.recs.contains(id) {
+                        derive
+                            .append(RcDoc::line())
+                            .append(vis)
+                            .append("struct ")
+                            .append(ident(id, Some(Case::Pascal)))
+                            .append(enclose("(", pp_ty(ty, &self.recs), ")"))
+                            .append(";")
+                            .append(RcDoc::hardline())
+                    } else {
+                        vis.append(kwd("type"))
+                            .append(name)
+                            .append("= ")
+                            .append(pp_ty(ty, &self.recs))
+                            .append(";")
+                    }
+                }
+            };
+            self.state.pop_state(old, StateElem::Label(id));
+            res
+        }))
+    }
 }
 
 fn pp_args(args: &[Type]) -> RcDoc {
@@ -465,7 +502,11 @@ use {}::{{self, CandidType, Deserialize, Principal, Encode, Decode}};
         env.0.iter().map(|pair| pair.0.as_ref()).collect()
     };
     let recs = infer_rec(&env, &def_list).unwrap();
-    let defs = pp_defs(config, &env, &def_list, &recs);
+    let mut state = State {
+        state: crate::configs::State::new(&config.tree, &env),
+        recs,
+    };
+    let defs = state.pp_defs(&def_list);
     let doc = match &actor {
         None => defs,
         Some(actor) => {
