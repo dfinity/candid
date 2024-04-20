@@ -218,21 +218,33 @@ fn pp_record_fields<'a>(fs: &'a [Field], recs: &RecPoints, vis: &'a str) -> RcDo
     }
 }
 
-fn pp_variant_field<'a>(field: &'a Field, recs: &RecPoints) -> RcDoc<'a> {
-    match field.ty.as_ref() {
-        TypeInner::Null => pp_label(&field.id, true, ""),
-        TypeInner::Record(fs) => {
-            pp_label(&field.id, true, "").append(pp_record_fields(fs, recs, ""))
-        }
-        _ => pp_label(&field.id, true, "").append(enclose("(", pp_ty(&field.ty, recs), ")")),
-    }
-}
-
-fn pp_variant_fields<'a>(fs: &'a [Field], recs: &RecPoints) -> RcDoc<'a> {
-    let fields = concat(fs.iter().map(|f| pp_variant_field(f, recs)), ",");
-    enclose_space("{", fields, "}")
-}
 impl<'a> State<'a> {
+    fn pp_variant_field(&mut self, field: &'a Field) -> RcDoc<'a> {
+        let label = field.id.to_string();
+        let old = self.state.push_state(&StateElem::Label(&label));
+        let res = match field.ty.as_ref() {
+            TypeInner::Null => pp_label(&field.id, true, ""),
+            TypeInner::Record(fs) => {
+                pp_label(&field.id, true, "").append(pp_record_fields(fs, &self.recs, ""))
+            }
+            _ => pp_label(&field.id, true, "").append(enclose(
+                "(",
+                pp_ty(&field.ty, &self.recs),
+                ")",
+            )),
+        };
+        self.state.pop_state(old, StateElem::Label(&label));
+        res
+    }
+
+    fn pp_variant_fields(&mut self, fs: &'a [Field]) -> RcDoc<'a> {
+        let old = self.state.push_state(&StateElem::Label("variant"));
+        let fields: Vec<_> = fs.iter().map(|f| self.pp_variant_field(f)).collect();
+        let fields = concat(fields.into_iter(), ",");
+        let res = enclose_space("{", fields, "}");
+        self.state.pop_state(old, StateElem::Label("variant"));
+        res
+    }
     fn pp_defs(&mut self, def_list: &'a [&'a str]) -> RcDoc<'a> {
         lines(def_list.iter().map(|id| {
             let old = self.state.push_state(&StateElem::Label(id));
@@ -279,7 +291,7 @@ impl<'a> State<'a> {
                     .append(vis)
                     .append("enum ")
                     .append(name)
-                    .append(pp_variant_fields(fs, &self.recs))
+                    .append(self.pp_variant_fields(fs))
                     .append(RcDoc::hardline()),
                 TypeInner::Func(func) => str("candid::define_function!(")
                     .append(vis)
