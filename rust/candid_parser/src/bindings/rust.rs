@@ -19,7 +19,6 @@ pub enum Target {
 //#[derive(Clone)]
 pub struct Config {
     candid_crate: String,
-    type_attributes: String,
     tree: ConfigTree<BindingConfig>,
     canister_id: Option<candid::Principal>,
     service_name: String,
@@ -30,7 +29,6 @@ impl Config {
         let tree = ConfigTree::from_configs("rust", configs).unwrap();
         Config {
             candid_crate: "candid".to_string(),
-            type_attributes: "".to_string(),
             tree,
             canister_id: None,
             service_name: "service".to_string(),
@@ -39,11 +37,6 @@ impl Config {
     }
     pub fn set_candid_crate(&mut self, name: String) -> &mut Self {
         self.candid_crate = name;
-        self
-    }
-    /// Applies to all types for now
-    pub fn set_type_attributes(&mut self, attr: String) -> &mut Self {
-        self.type_attributes = attr;
         self
     }
     /// Only generates SERVICE struct if canister_id is not provided
@@ -222,6 +215,13 @@ impl<'a> State<'a> {
     fn pp_variant_field(&mut self, field: &'a Field) -> RcDoc<'a> {
         let label = field.id.to_string();
         let old = self.state.push_state(&StateElem::Label(&label));
+        let attr = self
+            .state
+            .config
+            .attributes
+            .clone()
+            .map(|a| RcDoc::text(a).append(RcDoc::line()))
+            .unwrap_or(RcDoc::nil());
         let res = match field.ty.as_ref() {
             TypeInner::Null => pp_label(&field.id, true, ""),
             TypeInner::Record(fs) => {
@@ -234,7 +234,7 @@ impl<'a> State<'a> {
             )),
         };
         self.state.pop_state(old, StateElem::Label(&label));
-        res
+        attr.append(res)
     }
 
     fn pp_variant_fields(&mut self, fs: &'a [Field]) -> RcDoc<'a> {
