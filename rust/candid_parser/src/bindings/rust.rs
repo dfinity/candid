@@ -120,124 +120,119 @@ fn ident(id: &str, case: Option<Case>) -> RcDoc {
     ident_(id, case).0
 }
 
-fn pp_ty<'a>(ty: &'a Type, recs: &RecPoints) -> RcDoc<'a> {
-    use TypeInner::*;
-    match ty.as_ref() {
-        Null => str("()"),
-        Bool => str("bool"),
-        Nat => str("candid::Nat"),
-        Int => str("candid::Int"),
-        Nat8 => str("u8"),
-        Nat16 => str("u16"),
-        Nat32 => str("u32"),
-        Nat64 => str("u64"),
-        Int8 => str("i8"),
-        Int16 => str("i16"),
-        Int32 => str("i32"),
-        Int64 => str("i64"),
-        Float32 => str("f32"),
-        Float64 => str("f64"),
-        Text => str("String"),
-        Reserved => str("candid::Reserved"),
-        Empty => str("candid::Empty"),
-        Var(ref id) => {
-            let name = ident(id, Some(Case::Pascal));
-            if recs.contains(id.as_str()) {
-                str("Box<").append(name).append(">")
-            } else {
-                name
+impl<'a> State<'a> {
+    fn pp_ty<'b>(&mut self, ty: &'b Type, is_ref: bool) -> RcDoc<'b> {
+        use TypeInner::*;
+        match ty.as_ref() {
+            Null => str("()"),
+            Bool => str("bool"),
+            Nat => str("candid::Nat"),
+            Int => str("candid::Int"),
+            Nat8 => str("u8"),
+            Nat16 => str("u16"),
+            Nat32 => str("u32"),
+            Nat64 => str("u64"),
+            Int8 => str("i8"),
+            Int16 => str("i16"),
+            Int32 => str("i32"),
+            Int64 => str("i64"),
+            Float32 => str("f32"),
+            Float64 => str("f64"),
+            Text => str("String"),
+            Reserved => str("candid::Reserved"),
+            Empty => str("candid::Empty"),
+            Var(ref id) => {
+                let name = ident(id, Some(Case::Pascal));
+                if !is_ref && self.recs.contains(id.as_str()) {
+                    str("Box<").append(name).append(">")
+                } else {
+                    name
+                }
             }
+            Principal => str("Principal"),
+            Opt(ref t) => str("Option").append(enclose("<", self.pp_ty(t, is_ref), ">")),
+            // It's a bit tricky to use `deserialize_with = "serde_bytes"`. It's not working for `type t = blob`
+            Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
+            Vec(ref t) => str("Vec").append(enclose("<", self.pp_ty(t, is_ref), ">")),
+            Record(ref fs) => self.pp_record_fields(fs, ""),
+            Variant(_) => unreachable!(), // not possible after rewriting
+            Func(_) => unreachable!(),    // not possible after rewriting
+            Service(_) => unreachable!(), // not possible after rewriting
+            Class(_, _) => unreachable!(),
+            Knot(_) | Unknown | Future => unreachable!(),
         }
-        Principal => str("Principal"),
-        Opt(ref t) => str("Option").append(enclose("<", pp_ty(t, recs), ">")),
-        // It's a bit tricky to use `deserialize_with = "serde_bytes"`. It's not working for `type t = blob`
-        Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
-        Vec(ref t) => str("Vec").append(enclose("<", pp_ty(t, recs), ">")),
-        Record(ref fs) => pp_record_fields(fs, recs, ""),
-        Variant(_) => unreachable!(), // not possible after rewriting
-        Func(_) => unreachable!(),    // not possible after rewriting
-        Service(_) => unreachable!(), // not possible after rewriting
-        Class(_, _) => unreachable!(),
-        Knot(_) | Unknown | Future => unreachable!(),
     }
-}
-
-fn pp_label<'a>(id: &'a SharedLabel, is_variant: bool, vis: &'a str) -> RcDoc<'a> {
-    let vis = if vis.is_empty() {
-        RcDoc::nil()
-    } else {
-        kwd(vis)
-    };
-    match &**id {
-        Label::Named(id) => {
-            let case = if is_variant { Some(Case::Pascal) } else { None };
-            let (doc, is_rename) = ident_(id, case);
-            if is_rename {
-                str("#[serde(rename=\"")
-                    .append(id.escape_debug().to_string())
-                    .append("\")]")
-                    .append(RcDoc::line())
-                    .append(vis)
-                    .append(doc)
-            } else {
-                vis.append(doc)
-            }
-        }
-        Label::Id(n) | Label::Unnamed(n) => vis.append("_").append(RcDoc::as_string(n)).append("_"),
-    }
-}
-
-fn pp_record_field<'a>(field: &'a Field, recs: &RecPoints, vis: &'a str) -> RcDoc<'a> {
-    pp_label(&field.id, false, vis)
-        .append(kwd(":"))
-        .append(pp_ty(&field.ty, recs))
-}
-
-fn pp_record_fields<'a>(fs: &'a [Field], recs: &RecPoints, vis: &'a str) -> RcDoc<'a> {
-    if is_tuple(fs) {
+    fn pp_label<'b>(&mut self, id: &'b SharedLabel, is_variant: bool, vis: &'b str) -> RcDoc<'b> {
+        let label = id.to_string();
+        let old = self.state.push_state(&StateElem::Label(&label));
         let vis = if vis.is_empty() {
             RcDoc::nil()
         } else {
             kwd(vis)
         };
-        let tuple = RcDoc::concat(
-            fs.iter()
-                .map(|f| vis.clone().append(pp_ty(&f.ty, recs)).append(",")),
-        );
-        enclose("(", tuple, ")")
-    } else {
-        let fields = concat(fs.iter().map(|f| pp_record_field(f, recs, vis)), ",");
-        enclose_space("{", fields, "}")
-    }
-}
-
-impl<'a> State<'a> {
-    fn pp_variant_field(&mut self, field: &'a Field) -> RcDoc<'a> {
-        let label = field.id.to_string();
-        let old = self.state.push_state(&StateElem::Label(&label));
-        let attr = self
-            .state
-            .config
-            .attributes
-            .clone()
-            .map(|a| RcDoc::text(a).append(RcDoc::line()))
-            .unwrap_or(RcDoc::nil());
-        let res = match field.ty.as_ref() {
-            TypeInner::Null => pp_label(&field.id, true, ""),
-            TypeInner::Record(fs) => {
-                pp_label(&field.id, true, "").append(pp_record_fields(fs, &self.recs, ""))
+        let res = match &**id {
+            Label::Named(id) => {
+                let case = if is_variant { Some(Case::Pascal) } else { None };
+                let (doc, is_rename) = ident_(id, case);
+                if is_rename {
+                    str("#[serde(rename=\"")
+                        .append(id.escape_debug().to_string())
+                        .append("\")]")
+                        .append(RcDoc::line())
+                        .append(vis)
+                        .append(doc)
+                } else {
+                    vis.append(doc)
+                }
             }
-            _ => pp_label(&field.id, true, "").append(enclose(
-                "(",
-                pp_ty(&field.ty, &self.recs),
-                ")",
-            )),
+            Label::Id(n) | Label::Unnamed(n) => {
+                vis.append("_").append(RcDoc::as_string(n)).append("_")
+            }
         };
         self.state.pop_state(old, StateElem::Label(&label));
-        attr.append(res)
+        res
+    }
+    fn pp_record_field<'b>(&mut self, field: &'b Field, vis: &'b str) -> RcDoc<'b> {
+        self.pp_label(&field.id, false, vis)
+            .append(kwd(":"))
+            .append(self.pp_ty(&field.ty, false))
+    }
+    fn pp_record_fields<'b>(&mut self, fs: &'b [Field], vis: &'b str) -> RcDoc<'b> {
+        let old = self.state.push_state(&StateElem::Label("record"));
+        let res = if is_tuple(fs) {
+            let vis = if vis.is_empty() {
+                RcDoc::nil()
+            } else {
+                kwd(vis)
+            };
+            let tuple = RcDoc::concat(
+                fs.iter()
+                    .map(|f| vis.clone().append(self.pp_ty(&f.ty, false)).append(",")),
+            );
+            enclose("(", tuple, ")")
+        } else {
+            let fields: Vec<_> = fs.iter().map(|f| self.pp_record_field(f, vis)).collect();
+            let fields = concat(fields.into_iter(), ",");
+            enclose_space("{", fields, "}")
+        };
+        self.state.pop_state(old, StateElem::Label("record"));
+        res
+    }
+    fn pp_variant_field<'b>(&mut self, field: &'b Field) -> RcDoc<'b> {
+        match field.ty.as_ref() {
+            TypeInner::Null => self.pp_label(&field.id, true, ""),
+            TypeInner::Record(fs) => self
+                .pp_label(&field.id, true, "")
+                .append(self.pp_record_fields(fs, "")),
+            _ => self.pp_label(&field.id, true, "").append(enclose(
+                "(",
+                self.pp_ty(&field.ty, false),
+                ")",
+            )),
+        }
     }
 
-    fn pp_variant_fields(&mut self, fs: &'a [Field]) -> RcDoc<'a> {
+    fn pp_variant_fields<'b>(&mut self, fs: &'b [Field]) -> RcDoc<'b> {
         let old = self.state.push_state(&StateElem::Label("variant"));
         let fields: Vec<_> = fs.iter().map(|f| self.pp_variant_field(f)).collect();
         let fields = concat(fields.into_iter(), ",");
@@ -282,7 +277,7 @@ impl<'a> State<'a> {
                         .append(vis)
                         .append("struct ")
                         .append(name)
-                        .append(pp_record_fields(fs, &self.recs, "pub"))
+                        .append(self.pp_record_fields(fs, "pub"))
                         .append(separator)
                         .append(RcDoc::hardline())
                 }
@@ -297,13 +292,13 @@ impl<'a> State<'a> {
                     .append(vis)
                     .append(name)
                     .append(": ")
-                    .append(pp_ty_func(func))
+                    .append(self.pp_ty_func(func))
                     .append(");"),
                 TypeInner::Service(serv) => str("candid::define_service!(")
                     .append(vis)
                     .append(name)
                     .append(": ")
-                    .append(pp_ty_service(serv))
+                    .append(self.pp_ty_service(serv))
                     .append(");"),
                 _ => {
                     if self.recs.contains(id) {
@@ -312,14 +307,14 @@ impl<'a> State<'a> {
                             .append(vis)
                             .append("struct ")
                             .append(ident(id, Some(Case::Pascal)))
-                            .append(enclose("(", pp_ty(ty, &self.recs), ")"))
+                            .append(enclose("(", self.pp_ty(ty, false), ")"))
                             .append(";")
                             .append(RcDoc::hardline())
                     } else {
                         vis.append(kwd("type"))
                             .append(name)
                             .append("= ")
-                            .append(pp_ty(ty, &self.recs))
+                            .append(self.pp_ty(ty, false))
                             .append(";")
                     }
                 }
@@ -328,70 +323,73 @@ impl<'a> State<'a> {
             res
         }))
     }
-}
-
-fn pp_args(args: &[Type]) -> RcDoc {
-    let empty = RecPoints::default();
-    let doc = concat(args.iter().map(|t| pp_ty(t, &empty)), ",");
-    enclose("(", doc, ")")
-}
-fn pp_ty_func(f: &Function) -> RcDoc {
-    let args = pp_args(&f.args);
-    let rets = pp_args(&f.rets);
-    let modes = candid::pretty::candid::pp_modes(&f.modes);
-    args.append(" ->")
-        .append(RcDoc::space())
-        .append(rets.append(modes))
-        .nest(INDENT_SPACE)
-}
-fn pp_ty_service(serv: &[(String, Type)]) -> RcDoc {
-    let doc = concat(
-        serv.iter().map(|(id, func)| {
+    fn pp_args<'b>(&mut self, args: &'b [Type]) -> RcDoc<'b> {
+        let doc: Vec<_> = args.iter().map(|t| self.pp_ty(t, true)).collect();
+        let doc = concat(doc.into_iter(), ",");
+        enclose("(", doc, ")")
+    }
+    fn pp_ty_func<'b>(&mut self, f: &'b Function) -> RcDoc<'b> {
+        let args = self.pp_args(&f.args);
+        let rets = self.pp_args(&f.rets);
+        let modes = candid::pretty::candid::pp_modes(&f.modes);
+        args.append(" ->")
+            .append(RcDoc::space())
+            .append(rets.append(modes))
+            .nest(INDENT_SPACE)
+    }
+    fn pp_ty_service<'b>(&mut self, serv: &'b [(String, Type)]) -> RcDoc<'b> {
+        let mut list = Vec::new();
+        for (id, func) in serv.iter() {
             let func_doc = match func.as_ref() {
-                TypeInner::Func(ref f) => enclose("candid::func!(", pp_ty_func(f), ")"),
-                TypeInner::Var(_) => pp_ty(func, &RecPoints::default()).append("::ty()"),
+                TypeInner::Func(ref f) => enclose("candid::func!(", self.pp_ty_func(f), ")"),
+                TypeInner::Var(_) => self.pp_ty(func, true).append("::ty()"),
                 _ => unreachable!(),
             };
-            RcDoc::text("\"")
-                .append(id)
-                .append(kwd("\" :"))
-                .append(func_doc)
-        }),
-        ";",
-    );
-    enclose_space("{", doc, "}")
+            list.push(
+                RcDoc::text("\"")
+                    .append(id)
+                    .append(kwd("\" :"))
+                    .append(func_doc),
+            );
+        }
+        let doc = concat(list.into_iter(), ";");
+        enclose_space("{", doc, "}")
+    }
 }
 
-fn pp_function<'a>(config: &Config, id: &'a str, func: &'a Function) -> RcDoc<'a> {
+fn pp_function<'a>(config: &'a Config, id: &'a str, func: &'a Function) -> RcDoc<'a> {
+    let env = TypeEnv::default();
+    let mut state = State {
+        state: crate::configs::State::new(&config.tree, &env),
+        recs: RecPoints::default(),
+    };
     let name = ident(id, Some(Case::Snake));
-    let empty = BTreeSet::new();
     let arg_prefix = str(match config.target {
         Target::CanisterCall => "&self",
         Target::Agent => "&self",
         Target::CanisterStub => unimplemented!(),
     });
-    let args = concat(
-        std::iter::once(arg_prefix).chain(
-            func.args
-                .iter()
-                .enumerate()
-                .map(|(i, ty)| RcDoc::as_string(format!("arg{i}: ")).append(pp_ty(ty, &empty))),
-        ),
-        ",",
-    );
+    let args: Vec<_> = func
+        .args
+        .iter()
+        .enumerate()
+        .map(|(i, ty)| RcDoc::as_string(format!("arg{i}: ")).append(state.pp_ty(ty, true)))
+        .collect();
+    let args = concat(std::iter::once(arg_prefix).chain(args), ",");
+    let rets: Vec<_> = func
+        .rets
+        .iter()
+        .map(|ty| state.pp_ty(ty, true).append(","))
+        .collect();
     let rets = match config.target {
-        Target::CanisterCall => enclose(
-            "(",
-            RcDoc::concat(func.rets.iter().map(|ty| pp_ty(ty, &empty).append(","))),
-            ")",
-        ),
+        Target::CanisterCall => enclose("(", RcDoc::concat(rets), ")"),
         Target::Agent => match func.rets.len() {
             0 => str("()"),
-            1 => pp_ty(&func.rets[0], &empty),
+            1 => state.pp_ty(&func.rets[0], true),
             _ => enclose(
                 "(",
                 RcDoc::intersperse(
-                    func.rets.iter().map(|ty| pp_ty(ty, &empty)),
+                    func.rets.iter().map(|ty| state.pp_ty(ty, true)),
                     RcDoc::text(", "),
                 ),
                 ")",
@@ -426,7 +424,7 @@ fn pp_function<'a>(config: &Config, id: &'a str, func: &'a Function) -> RcDoc<'a
             let rets = RcDoc::concat(
                 func.rets
                     .iter()
-                    .map(|ty| str(", ").append(pp_ty(ty, &empty))),
+                    .map(|ty| str(", ").append(state.pp_ty(ty, true))),
             );
             str("let args = ").append(blob).append(RcDoc::hardline())
                 .append(format!("let bytes = self.1.{builder_method}(&self.0, \"{method}\").with_arg(args).{call}().await?;"))

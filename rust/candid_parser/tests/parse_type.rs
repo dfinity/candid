@@ -1,7 +1,7 @@
 use candid::pretty::candid::compile;
 use candid::types::TypeEnv;
 use candid_parser::bindings::{javascript, motoko, rust, typescript};
-use candid_parser::configs::{ConfigTree, Configs};
+use candid_parser::configs::Configs;
 use candid_parser::types::IDLProg;
 use candid_parser::typing::{check_file, check_prog};
 use goldenfile::Mint;
