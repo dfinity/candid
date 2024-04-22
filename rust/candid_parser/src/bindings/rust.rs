@@ -131,8 +131,8 @@ impl<'a> State<'a> {
         use TypeInner::*;
         let elem = StateElem::Type(ty);
         let old = self.state.push_state(&elem);
-        let res = if let Some(t) = self.state.config.use_type.clone() {
-            RcDoc::text(t)
+        let res = if let Some(t) = &self.state.config.use_type {
+            RcDoc::text(t.clone())
         } else {
             match ty.as_ref() {
                 Null => str("()"),
@@ -153,7 +153,11 @@ impl<'a> State<'a> {
                 Reserved => str("candid::Reserved"),
                 Empty => str("candid::Empty"),
                 Var(ref id) => {
-                    let name = ident(id, Some(Case::Pascal));
+                    let name = if let Some(name) = &self.state.config.name {
+                        RcDoc::text(name.clone())
+                    } else {
+                        ident(id, Some(Case::Pascal))
+                    };
                     if !is_ref && self.recs.contains(id.as_str()) {
                         str("Box<").append(name).append(">")
                     } else {
@@ -193,8 +197,8 @@ impl<'a> State<'a> {
             .unwrap_or(RcDoc::nil());
         let res = match &**id {
             Label::Named(id) => {
-                let (doc, is_rename) = if let Some(name) = self.state.config.name.clone() {
-                    (RcDoc::text(name), true)
+                let (doc, is_rename) = if let Some(name) = &self.state.config.name {
+                    (RcDoc::text(name.clone()), true)
                 } else {
                     let case = if is_variant { Some(Case::Pascal) } else { None };
                     ident_(id, case)
