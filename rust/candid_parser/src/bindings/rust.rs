@@ -119,7 +119,13 @@ fn ident_(id: &str, case: Option<Case>) -> (RcDoc, bool) {
 fn ident(id: &str, case: Option<Case>) -> RcDoc {
     ident_(id, case).0
 }
-
+fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
+    match vis {
+        Some(vis) if vis.is_empty() => RcDoc::nil(),
+        Some(vis) => RcDoc::text(vis.clone()).append(" "),
+        None => RcDoc::text("pub "),
+    }
+}
 impl<'a> State<'a> {
     fn pp_ty<'b>(&mut self, ty: &'b Type, is_ref: bool) -> RcDoc<'b> {
         use TypeInner::*;
@@ -166,33 +172,37 @@ impl<'a> State<'a> {
         let label = id.to_string();
         let old = self.state.push_state(&StateElem::Label(&label));
         let vis = if need_vis {
-            RcDoc::text(
-                self.state
-                    .config
-                    .visibility
-                    .clone()
-                    .unwrap_or("pub".to_string()),
-            )
-            .append(" ")
+            pp_vis(&self.state.config.visibility)
         } else {
             RcDoc::nil()
         };
+        let attr = self
+            .state
+            .config
+            .attributes
+            .clone()
+            .map(|s| RcDoc::text(s).append(RcDoc::line()))
+            .unwrap_or(RcDoc::nil());
         let res = match &**id {
             Label::Named(id) => {
-                let case = if is_variant { Some(Case::Pascal) } else { None };
-                let (doc, is_rename) = ident_(id, case);
-                if is_rename {
-                    str("#[serde(rename=\"")
+                let (doc, is_rename) = if let Some(name) = self.state.config.name.clone() {
+                    (RcDoc::text(name), true)
+                } else {
+                    let case = if is_variant { Some(Case::Pascal) } else { None };
+                    ident_(id, case)
+                };
+                let attr = if is_rename {
+                    attr.append("#[serde(rename=\"")
                         .append(id.escape_debug().to_string())
                         .append("\")]")
                         .append(RcDoc::line())
-                        .append(vis)
-                        .append(doc)
                 } else {
-                    vis.append(doc)
-                }
+                    attr
+                };
+                attr.append(vis).append(doc)
             }
             Label::Id(n) | Label::Unnamed(n) => {
+                // TODO rename
                 vis.append("_").append(RcDoc::as_string(n)).append("_")
             }
         };
@@ -204,14 +214,7 @@ impl<'a> State<'a> {
             let lab = i.to_string();
             let old = self.state.push_state(&StateElem::Label(&lab));
             let vis = if need_vis {
-                RcDoc::text(
-                    self.state
-                        .config
-                        .visibility
-                        .clone()
-                        .unwrap_or("pub".to_string()),
-                )
-                .append(" ")
+                pp_vis(&self.state.config.visibility)
             } else {
                 RcDoc::nil()
             };
@@ -229,6 +232,7 @@ impl<'a> State<'a> {
     fn pp_record_fields<'b>(&mut self, fs: &'b [Field], need_vis: bool) -> RcDoc<'b> {
         let old = self.state.push_state(&StateElem::Label("record"));
         let res = if is_tuple(fs) {
+            // TODO check if there is no name/attr in the label subtree
             self.pp_tuple(fs, need_vis)
         } else {
             let fields: Vec<_> = fs
@@ -274,13 +278,7 @@ impl<'a> State<'a> {
                 .clone()
                 .map(RcDoc::text)
                 .unwrap_or_else(|| ident(id, Some(Case::Pascal)).append(" "));
-            let vis = self
-                .state
-                .config
-                .visibility
-                .clone()
-                .map(|v| RcDoc::text(v).append(" "))
-                .unwrap_or(RcDoc::text("pub "));
+            let vis = pp_vis(&self.state.config.visibility);
             let derive = self
                 .state
                 .config
