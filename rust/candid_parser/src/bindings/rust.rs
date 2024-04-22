@@ -154,7 +154,7 @@ impl<'a> State<'a> {
             // It's a bit tricky to use `deserialize_with = "serde_bytes"`. It's not working for `type t = blob`
             Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
             Vec(ref t) => str("Vec").append(enclose("<", self.pp_ty(t, is_ref), ">")),
-            Record(ref fs) => self.pp_record_fields(fs, ""),
+            Record(ref fs) => self.pp_record_fields(fs, false),
             Variant(_) => unreachable!(), // not possible after rewriting
             Func(_) => unreachable!(),    // not possible after rewriting
             Service(_) => unreachable!(), // not possible after rewriting
@@ -162,13 +162,20 @@ impl<'a> State<'a> {
             Knot(_) | Unknown | Future => unreachable!(),
         }
     }
-    fn pp_label<'b>(&mut self, id: &'b SharedLabel, is_variant: bool, vis: &'b str) -> RcDoc<'b> {
+    fn pp_label<'b>(&mut self, id: &'b SharedLabel, is_variant: bool, need_vis: bool) -> RcDoc<'b> {
         let label = id.to_string();
         let old = self.state.push_state(&StateElem::Label(&label));
-        let vis = if vis.is_empty() {
-            RcDoc::nil()
+        let vis = if need_vis {
+            RcDoc::text(
+                self.state
+                    .config
+                    .visibility
+                    .clone()
+                    .unwrap_or("pub".to_string()),
+            )
+            .append(" ")
         } else {
-            kwd(vis)
+            RcDoc::nil()
         };
         let res = match &**id {
             Label::Named(id) => {
@@ -192,26 +199,42 @@ impl<'a> State<'a> {
         self.state.pop_state(old, StateElem::Label(&label));
         res
     }
-    fn pp_record_field<'b>(&mut self, field: &'b Field, vis: &'b str) -> RcDoc<'b> {
-        self.pp_label(&field.id, false, vis)
+    fn pp_tuple<'b>(&mut self, fs: &'b [Field], need_vis: bool) -> RcDoc<'b> {
+        let tuple = fs.iter().enumerate().map(|(i, f)| {
+            let lab = i.to_string();
+            let old = self.state.push_state(&StateElem::Label(&lab));
+            let vis = if need_vis {
+                RcDoc::text(
+                    self.state
+                        .config
+                        .visibility
+                        .clone()
+                        .unwrap_or("pub".to_string()),
+                )
+                .append(" ")
+            } else {
+                RcDoc::nil()
+            };
+            let res = vis.append(self.pp_ty(&f.ty, false)).append(",");
+            self.state.pop_state(old, StateElem::Label(&lab));
+            res
+        });
+        enclose("(", RcDoc::concat(tuple), ")")
+    }
+    fn pp_record_field<'b>(&mut self, field: &'b Field, need_vis: bool) -> RcDoc<'b> {
+        self.pp_label(&field.id, false, need_vis)
             .append(kwd(":"))
             .append(self.pp_ty(&field.ty, false))
     }
-    fn pp_record_fields<'b>(&mut self, fs: &'b [Field], vis: &'b str) -> RcDoc<'b> {
+    fn pp_record_fields<'b>(&mut self, fs: &'b [Field], need_vis: bool) -> RcDoc<'b> {
         let old = self.state.push_state(&StateElem::Label("record"));
         let res = if is_tuple(fs) {
-            let vis = if vis.is_empty() {
-                RcDoc::nil()
-            } else {
-                kwd(vis)
-            };
-            let tuple = RcDoc::concat(
-                fs.iter()
-                    .map(|f| vis.clone().append(self.pp_ty(&f.ty, false)).append(",")),
-            );
-            enclose("(", tuple, ")")
+            self.pp_tuple(fs, need_vis)
         } else {
-            let fields: Vec<_> = fs.iter().map(|f| self.pp_record_field(f, vis)).collect();
+            let fields: Vec<_> = fs
+                .iter()
+                .map(|f| self.pp_record_field(f, need_vis))
+                .collect();
             let fields = concat(fields.into_iter(), ",");
             enclose_space("{", fields, "}")
         };
@@ -220,11 +243,11 @@ impl<'a> State<'a> {
     }
     fn pp_variant_field<'b>(&mut self, field: &'b Field) -> RcDoc<'b> {
         match field.ty.as_ref() {
-            TypeInner::Null => self.pp_label(&field.id, true, ""),
+            TypeInner::Null => self.pp_label(&field.id, true, false),
             TypeInner::Record(fs) => self
-                .pp_label(&field.id, true, "")
-                .append(self.pp_record_fields(fs, "")),
-            _ => self.pp_label(&field.id, true, "").append(enclose(
+                .pp_label(&field.id, true, false)
+                .append(self.pp_record_fields(fs, false)),
+            _ => self.pp_label(&field.id, true, false).append(enclose(
                 "(",
                 self.pp_ty(&field.ty, false),
                 ")",
@@ -277,7 +300,7 @@ impl<'a> State<'a> {
                         .append(vis)
                         .append("struct ")
                         .append(name)
-                        .append(self.pp_record_fields(fs, "pub"))
+                        .append(self.pp_record_fields(fs, true))
                         .append(separator)
                         .append(RcDoc::hardline())
                 }
