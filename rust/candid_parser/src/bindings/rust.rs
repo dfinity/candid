@@ -266,7 +266,6 @@ impl<'a> State<'a> {
             )),
         }
     }
-
     fn pp_variant_fields<'b>(&mut self, fs: &'b [Field]) -> RcDoc<'b> {
         let old = self.state.push_state(&StateElem::Label("variant"));
         let fields: Vec<_> = fs.iter().map(|f| self.pp_variant_field(f)).collect();
@@ -285,7 +284,7 @@ impl<'a> State<'a> {
                 .name
                 .clone()
                 .map(RcDoc::text)
-                .unwrap_or_else(|| ident(id, Some(Case::Pascal)).append(" "));
+                .unwrap_or_else(|| ident(id, Some(Case::Pascal)));
             let vis = pp_vis(&self.state.config.visibility);
             let derive = self
                 .state
@@ -306,6 +305,7 @@ impl<'a> State<'a> {
                         .append(vis)
                         .append("struct ")
                         .append(name)
+                        .append(" ")
                         .append(self.pp_record_fields(fs, true))
                         .append(separator)
                         .append(RcDoc::hardline())
@@ -315,18 +315,19 @@ impl<'a> State<'a> {
                     .append(vis)
                     .append("enum ")
                     .append(name)
+                    .append(" ")
                     .append(self.pp_variant_fields(fs))
                     .append(RcDoc::hardline()),
                 TypeInner::Func(func) => str("candid::define_function!(")
                     .append(vis)
                     .append(name)
-                    .append(": ")
+                    .append(" : ")
                     .append(self.pp_ty_func(func))
                     .append(");"),
                 TypeInner::Service(serv) => str("candid::define_service!(")
                     .append(vis)
                     .append(name)
-                    .append(": ")
+                    .append(" : ")
                     .append(self.pp_ty_service(serv))
                     .append(");"),
                 _ => {
@@ -335,14 +336,14 @@ impl<'a> State<'a> {
                             .append(RcDoc::line())
                             .append(vis)
                             .append("struct ")
-                            .append(ident(id, Some(Case::Pascal)))
+                            .append(name)
                             .append(enclose("(", self.pp_ty(ty, false), ")"))
                             .append(";")
                             .append(RcDoc::hardline())
                     } else {
                         vis.append(kwd("type"))
                             .append(name)
-                            .append("= ")
+                            .append(" = ")
                             .append(self.pp_ty(ty, false))
                             .append(";")
                     }
@@ -352,21 +353,38 @@ impl<'a> State<'a> {
             res
         }))
     }
-    fn pp_args<'b>(&mut self, args: &'b [Type]) -> RcDoc<'b> {
-        let doc: Vec<_> = args.iter().map(|t| self.pp_ty(t, true)).collect();
+    fn pp_args<'b>(&mut self, args: &'b [Type], prefix: &'b str) -> RcDoc<'b> {
+        let doc: Vec<_> = args
+            .iter()
+            .enumerate()
+            .map(|(i, t)| {
+                let lab = format!("{prefix}{i}");
+                let old = self.state.push_state(&StateElem::Label(&lab));
+                let res = self.pp_ty(t, true);
+                self.state.pop_state(old, StateElem::Label(&lab));
+                res
+            })
+            .collect();
         let doc = concat(doc.into_iter(), ",");
         enclose("(", doc, ")")
     }
     fn pp_ty_func<'b>(&mut self, f: &'b Function) -> RcDoc<'b> {
-        let args = self.pp_args(&f.args);
-        let rets = self.pp_args(&f.rets);
+        let lab = StateElem::Label("func");
+        let old = self.state.push_state(&lab);
+        let args = self.pp_args(&f.args, "arg");
+        let rets = self.pp_args(&f.rets, "ret");
         let modes = candid::pretty::candid::pp_modes(&f.modes);
-        args.append(" ->")
+        let res = args
+            .append(" ->")
             .append(RcDoc::space())
             .append(rets.append(modes))
-            .nest(INDENT_SPACE)
+            .nest(INDENT_SPACE);
+        self.state.pop_state(old, lab);
+        res
     }
     fn pp_ty_service<'b>(&mut self, serv: &'b [(String, Type)]) -> RcDoc<'b> {
+        let lab = StateElem::Label("service");
+        let old = self.state.push_state(&lab);
         let mut list = Vec::new();
         for (id, func) in serv.iter() {
             let func_doc = match func.as_ref() {
@@ -382,7 +400,9 @@ impl<'a> State<'a> {
             );
         }
         let doc = concat(list.into_iter(), ";");
-        enclose_space("{", doc, "}")
+        let res = enclose_space("{", doc, "}");
+        self.state.pop_state(old, lab);
+        res
     }
 }
 
