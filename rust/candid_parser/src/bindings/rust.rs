@@ -54,7 +54,7 @@ impl Config {
         self
     }
 }
-#[derive(Default, Deserialize, Clone)]
+#[derive(Default, Deserialize, Clone, Debug)]
 pub struct BindingConfig {
     name: Option<String>,
     use_type: Option<String>,

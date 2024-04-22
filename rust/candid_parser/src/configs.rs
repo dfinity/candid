@@ -72,6 +72,8 @@ impl<'a, T: ConfigState> State<'a, T> {
         };
         if let Some((state, is_recursive)) = new_state {
             self.config.merge_config(state, is_recursive);
+        } else {
+            self.config.merge_config(&T::default(), false);
         }
         old_config
     }
@@ -82,7 +84,7 @@ impl<'a, T: ConfigState> State<'a, T> {
     }
 }
 
-pub trait ConfigState: DeserializeOwned + Default + Clone {
+pub trait ConfigState: DeserializeOwned + Default + Clone + std::fmt::Debug {
     fn merge_config(&mut self, config: &Self, is_recursive: bool);
     fn update_state(&mut self, elem: &StateElem);
     fn restore_state(&mut self, elem: &StateElem);
