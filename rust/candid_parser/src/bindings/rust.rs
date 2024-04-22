@@ -129,44 +129,52 @@ fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
 impl<'a> State<'a> {
     fn pp_ty<'b>(&mut self, ty: &'b Type, is_ref: bool) -> RcDoc<'b> {
         use TypeInner::*;
-        match ty.as_ref() {
-            Null => str("()"),
-            Bool => str("bool"),
-            Nat => str("candid::Nat"),
-            Int => str("candid::Int"),
-            Nat8 => str("u8"),
-            Nat16 => str("u16"),
-            Nat32 => str("u32"),
-            Nat64 => str("u64"),
-            Int8 => str("i8"),
-            Int16 => str("i16"),
-            Int32 => str("i32"),
-            Int64 => str("i64"),
-            Float32 => str("f32"),
-            Float64 => str("f64"),
-            Text => str("String"),
-            Reserved => str("candid::Reserved"),
-            Empty => str("candid::Empty"),
-            Var(ref id) => {
-                let name = ident(id, Some(Case::Pascal));
-                if !is_ref && self.recs.contains(id.as_str()) {
-                    str("Box<").append(name).append(">")
-                } else {
-                    name
+        let elem = StateElem::Type(ty);
+        let old = self.state.push_state(&elem);
+        let res = if let Some(t) = self.state.config.use_type.clone() {
+            RcDoc::text(t)
+        } else {
+            match ty.as_ref() {
+                Null => str("()"),
+                Bool => str("bool"),
+                Nat => str("candid::Nat"),
+                Int => str("candid::Int"),
+                Nat8 => str("u8"),
+                Nat16 => str("u16"),
+                Nat32 => str("u32"),
+                Nat64 => str("u64"),
+                Int8 => str("i8"),
+                Int16 => str("i16"),
+                Int32 => str("i32"),
+                Int64 => str("i64"),
+                Float32 => str("f32"),
+                Float64 => str("f64"),
+                Text => str("String"),
+                Reserved => str("candid::Reserved"),
+                Empty => str("candid::Empty"),
+                Var(ref id) => {
+                    let name = ident(id, Some(Case::Pascal));
+                    if !is_ref && self.recs.contains(id.as_str()) {
+                        str("Box<").append(name).append(">")
+                    } else {
+                        name
+                    }
                 }
+                Principal => str("Principal"),
+                Opt(ref t) => str("Option").append(enclose("<", self.pp_ty(t, is_ref), ">")),
+                // It's a bit tricky to use `deserialize_with = "serde_bytes"`. It's not working for `type t = blob`
+                Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
+                Vec(ref t) => str("Vec").append(enclose("<", self.pp_ty(t, is_ref), ">")),
+                Record(ref fs) => self.pp_record_fields(fs, false),
+                Variant(_) => unreachable!(), // not possible after rewriting
+                Func(_) => unreachable!(),    // not possible after rewriting
+                Service(_) => unreachable!(), // not possible after rewriting
+                Class(_, _) => unreachable!(),
+                Knot(_) | Unknown | Future => unreachable!(),
             }
-            Principal => str("Principal"),
-            Opt(ref t) => str("Option").append(enclose("<", self.pp_ty(t, is_ref), ">")),
-            // It's a bit tricky to use `deserialize_with = "serde_bytes"`. It's not working for `type t = blob`
-            Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
-            Vec(ref t) => str("Vec").append(enclose("<", self.pp_ty(t, is_ref), ">")),
-            Record(ref fs) => self.pp_record_fields(fs, false),
-            Variant(_) => unreachable!(), // not possible after rewriting
-            Func(_) => unreachable!(),    // not possible after rewriting
-            Service(_) => unreachable!(), // not possible after rewriting
-            Class(_, _) => unreachable!(),
-            Knot(_) | Unknown | Future => unreachable!(),
-        }
+        };
+        self.state.pop_state(old, elem);
+        res
     }
     fn pp_label<'b>(&mut self, id: &'b SharedLabel, is_variant: bool, need_vis: bool) -> RcDoc<'b> {
         let label = id.to_string();

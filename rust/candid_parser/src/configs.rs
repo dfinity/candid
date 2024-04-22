@@ -222,6 +222,7 @@ pub fn path_name(t: &Type) -> String {
         TypeInner::Knot(id) => id.name,
         TypeInner::Principal => "principal",
         TypeInner::Opt(_) => "opt",
+        TypeInner::Vec(t) if matches!(t.as_ref(), TypeInner::Nat8) => "blob",
         TypeInner::Vec(_) => "vec",
         TypeInner::Record(_) => "record",
         TypeInner::Variant(_) => "variant",
