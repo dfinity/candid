@@ -58,6 +58,13 @@ impl<'a, T: ConfigState> State<'a, T> {
             }
         }
     }
+    fn get_root_config(&self) -> Option<&'a T> {
+        if let Some(subtree) = self.open_tree {
+            subtree.state.as_ref().or_else(|| self.tree.state.as_ref())
+        } else {
+            self.tree.state.as_ref()
+        }
+    }
     /// Update config based on the new elem in the path. Return the old state AFTER `update_state`.
     pub fn push_state(&mut self, elem: &StateElem) -> T {
         self.config.update_state(elem);
@@ -73,7 +80,10 @@ impl<'a, T: ConfigState> State<'a, T> {
         if let Some((state, is_recursive)) = new_state {
             self.config.merge_config(state, is_recursive);
         } else {
-            self.config.merge_config(&T::default(), false);
+            self.config = T::default();
+            if let Some(state) = self.get_root_config() {
+                self.config.merge_config(state, false);
+            }
         }
         old_config
     }
@@ -115,6 +125,7 @@ impl<T: ConfigState> ConfigTree<T> {
     }
     pub fn get_config(&self, path: &[String]) -> Option<(&T, bool)> {
         let len = path.len();
+        assert!(len > 0);
         let start = len.saturating_sub(self.max_depth as usize);
         for i in (start..len).rev() {
             let (path, tail) = path.split_at(i);
