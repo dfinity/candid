@@ -279,8 +279,13 @@ impl<'a> State<'a> {
         res
     }
     fn pp_defs(&mut self, def_list: &'a [&'a str]) -> RcDoc<'a> {
-        lines(def_list.iter().map(|id| {
+        let mut res = Vec::with_capacity(def_list.len());
+        for id in def_list {
             let old = self.state.push_state(&StateElem::Label(id));
+            if self.state.config.use_type.is_some() {
+                self.state.pop_state(old, StateElem::Label(id));
+                continue;
+            }
             let ty = self.state.env.find_type(id).unwrap();
             let name = self
                 .state
@@ -297,7 +302,7 @@ impl<'a> State<'a> {
                 .clone()
                 .map(RcDoc::text)
                 .unwrap_or(RcDoc::text("#[derive(CandidType, Deserialize)]"));
-            let res = match ty.as_ref() {
+            let line = match ty.as_ref() {
                 TypeInner::Record(fs) => {
                     let separator = if is_tuple(fs) {
                         RcDoc::text(";")
@@ -354,8 +359,9 @@ impl<'a> State<'a> {
                 }
             };
             self.state.pop_state(old, StateElem::Label(id));
-            res
-        }))
+            res.push(line)
+        }
+        lines(res.into_iter())
     }
     fn pp_args<'b>(&mut self, args: &'b [Type], prefix: &'b str) -> RcDoc<'b> {
         let doc: Vec<_> = args
