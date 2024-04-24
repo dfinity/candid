@@ -181,8 +181,6 @@ impl<'a> State<'a> {
         res
     }
     fn pp_label<'b>(&mut self, id: &'b SharedLabel, is_variant: bool, need_vis: bool) -> RcDoc<'b> {
-        let label = id.to_string();
-        let old = self.state.push_state(&StateElem::Label(&label));
         let vis = if need_vis {
             pp_vis(&self.state.config.visibility)
         } else {
@@ -195,7 +193,7 @@ impl<'a> State<'a> {
             .clone()
             .map(|s| RcDoc::text(s).append(RcDoc::line()))
             .unwrap_or(RcDoc::nil());
-        let res = match &**id {
+        match &**id {
             Label::Named(id) => {
                 let (doc, is_rename) = if let Some(name) = &self.state.config.name {
                     (RcDoc::text(name.clone()), true)
@@ -217,9 +215,7 @@ impl<'a> State<'a> {
                 // TODO rename
                 vis.append("_").append(RcDoc::as_string(n)).append("_")
             }
-        };
-        self.state.pop_state(old, StateElem::Label(&label));
-        res
+        }
     }
     fn pp_tuple<'b>(&mut self, fs: &'b [Field], need_vis: bool) -> RcDoc<'b> {
         let tuple = fs.iter().enumerate().map(|(i, f)| {
@@ -237,9 +233,14 @@ impl<'a> State<'a> {
         enclose("(", RcDoc::concat(tuple), ")")
     }
     fn pp_record_field<'b>(&mut self, field: &'b Field, need_vis: bool) -> RcDoc<'b> {
-        self.pp_label(&field.id, false, need_vis)
+        let lab = field.id.to_string();
+        let old = self.state.push_state(&StateElem::Label(&lab));
+        let res = self
+            .pp_label(&field.id, false, need_vis)
             .append(kwd(":"))
-            .append(self.pp_ty(&field.ty, false))
+            .append(self.pp_ty(&field.ty, false));
+        self.state.pop_state(old, StateElem::Label(&lab));
+        res
     }
     fn pp_record_fields<'b>(&mut self, fs: &'b [Field], need_vis: bool) -> RcDoc<'b> {
         let old = self.state.push_state(&StateElem::Label("record"));
@@ -258,7 +259,9 @@ impl<'a> State<'a> {
         res
     }
     fn pp_variant_field<'b>(&mut self, field: &'b Field) -> RcDoc<'b> {
-        match field.ty.as_ref() {
+        let lab = field.id.to_string();
+        let old = self.state.push_state(&StateElem::Label(&lab));
+        let res = match field.ty.as_ref() {
             TypeInner::Null => self.pp_label(&field.id, true, false),
             TypeInner::Record(fs) => self
                 .pp_label(&field.id, true, false)
@@ -268,7 +271,9 @@ impl<'a> State<'a> {
                 self.pp_ty(&field.ty, false),
                 ")",
             )),
-        }
+        };
+        self.state.pop_state(old, StateElem::Label(&lab));
+        res
     }
     fn pp_variant_fields<'b>(&mut self, fs: &'b [Field]) -> RcDoc<'b> {
         let old = self.state.push_state(&StateElem::Label("variant"));

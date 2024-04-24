@@ -23,7 +23,7 @@ impl Default for GenConfig {
     fn default() -> Self {
         GenConfig {
             range: None,
-            text: Some("ascii".to_string()),
+            text: None,
             width: Some(10),
             value: None,
             depth: Some(10),

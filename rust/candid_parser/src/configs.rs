@@ -58,13 +58,13 @@ impl<'a, T: ConfigState> State<'a, T> {
             }
         }
     }
-    fn get_root_config(&self) -> Option<&'a T> {
+    /*fn get_root_config(&self) -> Option<&'a T> {
         if let Some(subtree) = self.open_tree {
             subtree.state.as_ref().or_else(|| self.tree.state.as_ref())
         } else {
             self.tree.state.as_ref()
         }
-    }
+    }*/
     /// Update config based on the new elem in the path. Return the old state AFTER `update_state`.
     pub fn push_state(&mut self, elem: &StateElem) -> T {
         self.config.update_state(elem);
@@ -79,11 +79,17 @@ impl<'a, T: ConfigState> State<'a, T> {
         };
         if let Some((state, is_recursive)) = new_state {
             self.config.merge_config(state, is_recursive);
+            //eprintln!("match path: {:?}, state: {:?}", self.path, self.config);
         } else {
-            self.config = T::default();
-            if let Some(state) = self.get_root_config() {
+            //eprintln!("path: {:?}", self.path);
+            // random needs to merge with all None configs (no op)
+            // bindgen needs to merge with root config?
+            self.config.merge_config(&T::default(), false);
+            /*if let Some(state) = self.get_root_config() {
                 self.config.merge_config(state, false);
-            }
+            } else {
+                self.config.merge_config(&T::default(), false);
+            }*/
         }
         old_config
     }
@@ -95,6 +101,7 @@ impl<'a, T: ConfigState> State<'a, T> {
 }
 
 pub trait ConfigState: DeserializeOwned + Default + Clone + std::fmt::Debug {
+    // TODO some flags need to know the path/current item to decide what to do
     fn merge_config(&mut self, config: &Self, is_recursive: bool);
     fn update_state(&mut self, elem: &StateElem);
     fn restore_state(&mut self, elem: &StateElem);
