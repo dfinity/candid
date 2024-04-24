@@ -6,8 +6,8 @@ use toml::{Table, Value};
 
 pub struct State<'a, T: ConfigState> {
     tree: &'a ConfigTree<T>,
-    path: Vec<String>,
     open_tree: Option<&'a ConfigTree<T>>,
+    pub path: Vec<String>,
     pub config: T,
     pub env: &'a TypeEnv,
 }
@@ -58,13 +58,6 @@ impl<'a, T: ConfigState> State<'a, T> {
             }
         }
     }
-    /*fn get_root_config(&self) -> Option<&'a T> {
-        if let Some(subtree) = self.open_tree {
-            subtree.state.as_ref().or_else(|| self.tree.state.as_ref())
-        } else {
-            self.tree.state.as_ref()
-        }
-    }*/
     /// Update config based on the new elem in the path. Return the old state AFTER `update_state`.
     pub fn push_state(&mut self, elem: &StateElem) -> T {
         self.config.update_state(elem);
@@ -82,14 +75,7 @@ impl<'a, T: ConfigState> State<'a, T> {
             //eprintln!("match path: {:?}, state: {:?}", self.path, self.config);
         } else {
             //eprintln!("path: {:?}", self.path);
-            // random needs to merge with all None configs (no op)
-            // bindgen needs to merge with root config?
-            self.config.merge_config(&T::default(), false);
-            /*if let Some(state) = self.get_root_config() {
-                self.config.merge_config(state, false);
-            } else {
-                self.config.merge_config(&T::default(), false);
-            }*/
+            self.config.merge_config(&T::unmatched_config(), false);
         }
         old_config
     }
@@ -105,6 +91,9 @@ pub trait ConfigState: DeserializeOwned + Default + Clone + std::fmt::Debug {
     fn merge_config(&mut self, config: &Self, is_recursive: bool);
     fn update_state(&mut self, elem: &StateElem);
     fn restore_state(&mut self, elem: &StateElem);
+    fn unmatched_config() -> Self {
+        Self::default()
+    }
 }
 #[derive(Debug)]
 pub struct ConfigTree<T: ConfigState> {

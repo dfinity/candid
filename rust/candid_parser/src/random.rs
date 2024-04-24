@@ -23,7 +23,7 @@ impl Default for GenConfig {
     fn default() -> Self {
         GenConfig {
             range: None,
-            text: None,
+            text: Some("ascii".to_string()),
             width: Some(10),
             value: None,
             depth: Some(10),
@@ -59,6 +59,16 @@ impl ConfigState for GenConfig {
             if !matches!(t.as_ref(), TypeInner::Var(_)) {
                 self.depth = self.depth.map(|d| d + 1);
             }
+        }
+    }
+    fn unmatched_config() -> Self {
+        GenConfig {
+            range: None,
+            text: None,
+            width: None,
+            value: None,
+            depth: None,
+            size: None,
         }
     }
 }
