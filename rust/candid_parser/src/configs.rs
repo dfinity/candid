@@ -7,18 +7,22 @@ use toml::{Table, Value};
 pub struct State<'a, T: ConfigState> {
     tree: &'a ConfigTree<T>,
     open_tree: Option<&'a ConfigTree<T>>,
-    pub path: Vec<String>,
+    path: Vec<String>,
     pub config: T,
     pub env: &'a TypeEnv,
 }
+#[derive(Debug)]
 pub enum StateElem<'a> {
     Type(&'a Type),
+    TypeStr(&'a str),
     Label(&'a str),
 }
+#[derive(Debug)]
 pub struct Scope<'a> {
     pub method: &'a str,
     pub position: Option<ScopePos>,
 }
+#[derive(Debug)]
 pub enum ScopePos {
     Arg,
     Ret,
@@ -28,7 +32,7 @@ impl<'a, T: ConfigState> State<'a, T> {
     pub fn new(tree: &'a ConfigTree<T>, env: &'a TypeEnv) -> Self {
         let mut config = T::default();
         if let Some(state) = &tree.state {
-            config.merge_config(state, false);
+            config.merge_config(state, None, false);
         }
         Self {
             tree,
@@ -52,6 +56,9 @@ impl<'a, T: ConfigState> State<'a, T> {
                             None => (),
                         }
                         self.open_tree = self.tree.with_prefix(&path).or(Some(tree));
+                        if let Some(state) = self.open_tree.unwrap().state.as_ref() {
+                            self.config.merge_config(state, None, false);
+                        }
                     }
                     None => self.open_tree = None,
                 }
@@ -71,11 +78,12 @@ impl<'a, T: ConfigState> State<'a, T> {
             self.tree.get_config(&self.path)
         };
         if let Some((state, is_recursive)) = new_state {
-            self.config.merge_config(state, is_recursive);
+            self.config.merge_config(state, Some(elem), is_recursive);
             //eprintln!("match path: {:?}, state: {:?}", self.path, self.config);
         } else {
-            //eprintln!("path: {:?}", self.path);
-            self.config.merge_config(&T::unmatched_config(), false);
+            self.config
+                .merge_config(&T::unmatched_config(), Some(elem), false);
+            //eprintln!("path: {:?}, state: {:?}", self.path, self.config);
         }
         old_config
     }
@@ -87,8 +95,7 @@ impl<'a, T: ConfigState> State<'a, T> {
 }
 
 pub trait ConfigState: DeserializeOwned + Default + Clone + std::fmt::Debug {
-    // TODO some flags need to know the path/current item to decide what to do
-    fn merge_config(&mut self, config: &Self, is_recursive: bool);
+    fn merge_config(&mut self, config: &Self, elem: Option<&StateElem>, is_recursive: bool);
     fn update_state(&mut self, elem: &StateElem);
     fn restore_state(&mut self, elem: &StateElem);
     fn unmatched_config() -> Self {
@@ -155,6 +162,7 @@ impl<'a> std::fmt::Display for StateElem<'a> {
         match self {
             StateElem::Type(t) => write!(f, "{}", path_name(t)),
             StateElem::Label(l) => write!(f, "{}", l),
+            StateElem::TypeStr(s) => write!(f, "{}", s),
         }
     }
 }
@@ -253,7 +261,7 @@ fn parse() {
         text: Option<String>,
     }
     impl ConfigState for T {
-        fn merge_config(&mut self, config: &Self, is_recursive: bool) {
+        fn merge_config(&mut self, config: &Self, _elem: Option<&StateElem>, is_recursive: bool) {
             *self = config.clone();
             if is_recursive {
                 self.size = Some(0);

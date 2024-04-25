@@ -32,7 +32,7 @@ impl Default for GenConfig {
     }
 }
 impl ConfigState for GenConfig {
-    fn merge_config(&mut self, config: &Self, is_recursive: bool) {
+    fn merge_config(&mut self, config: &Self, _elem: Option<&StateElem>, is_recursive: bool) {
         self.range = config.range.or(self.range);
         if config.text.is_some() {
             self.text = config.text.clone();

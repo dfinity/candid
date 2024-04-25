@@ -62,10 +62,17 @@ pub struct BindingConfig {
     visibility: Option<String>,
 }
 impl ConfigState for BindingConfig {
-    fn merge_config(&mut self, config: &Self, _is_recursive: bool) {
+    fn merge_config(&mut self, config: &Self, elem: Option<&StateElem>, _is_recursive: bool) {
         self.name = config.name.clone();
         self.use_type = config.use_type.clone();
-        self.attributes = config.attributes.clone();
+        // matched attributes can survive across labels in order to apply attributes to all labels at this level
+        if matches!(elem, Some(StateElem::Label(_))) {
+            if let Some(attr) = &config.attributes {
+                self.attributes = Some(attr.clone());
+            }
+        } else {
+            self.attributes = config.attributes.clone();
+        }
         if config.visibility.is_some() {
             self.visibility = config.visibility.clone();
         }
@@ -243,7 +250,7 @@ impl<'a> State<'a> {
         res
     }
     fn pp_record_fields<'b>(&mut self, fs: &'b [Field], need_vis: bool) -> RcDoc<'b> {
-        let old = self.state.push_state(&StateElem::Label("record"));
+        let old = self.state.push_state(&StateElem::TypeStr("record"));
         let res = if is_tuple(fs) {
             // TODO check if there is no name/attr in the label subtree
             self.pp_tuple(fs, need_vis)
@@ -255,7 +262,7 @@ impl<'a> State<'a> {
             let fields = concat(fields.into_iter(), ",");
             enclose_space("{", fields, "}")
         };
-        self.state.pop_state(old, StateElem::Label("record"));
+        self.state.pop_state(old, StateElem::TypeStr("record"));
         res
     }
     fn pp_variant_field<'b>(&mut self, field: &'b Field) -> RcDoc<'b> {
@@ -276,11 +283,11 @@ impl<'a> State<'a> {
         res
     }
     fn pp_variant_fields<'b>(&mut self, fs: &'b [Field]) -> RcDoc<'b> {
-        let old = self.state.push_state(&StateElem::Label("variant"));
+        let old = self.state.push_state(&StateElem::TypeStr("variant"));
         let fields: Vec<_> = fs.iter().map(|f| self.pp_variant_field(f)).collect();
         let fields = concat(fields.into_iter(), ",");
         let res = enclose_space("{", fields, "}");
-        self.state.pop_state(old, StateElem::Label("variant"));
+        self.state.pop_state(old, StateElem::TypeStr("variant"));
         res
     }
     fn pp_defs(&mut self, def_list: &'a [&'a str]) -> RcDoc<'a> {
@@ -384,7 +391,7 @@ impl<'a> State<'a> {
         enclose("(", doc, ")")
     }
     fn pp_ty_func<'b>(&mut self, f: &'b Function) -> RcDoc<'b> {
-        let lab = StateElem::Label("func");
+        let lab = StateElem::TypeStr("func");
         let old = self.state.push_state(&lab);
         let args = self.pp_args(&f.args, "arg");
         let rets = self.pp_args(&f.rets, "ret");
@@ -398,7 +405,7 @@ impl<'a> State<'a> {
         res
     }
     fn pp_ty_service<'b>(&mut self, serv: &'b [(String, Type)]) -> RcDoc<'b> {
-        let lab = StateElem::Label("service");
+        let lab = StateElem::TypeStr("service");
         let old = self.state.push_state(&lab);
         let mut list = Vec::new();
         for (id, func) in serv.iter() {
