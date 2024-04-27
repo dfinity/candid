@@ -30,6 +30,7 @@ anyhow.workspace = true
 lalrpop-util = "0.20.0"
 logos = "0.13"
 convert_case = "0.6"
+handlebars = "5.1"
 
 arbitrary = { workspace = true, optional = true }
 toml = { version = "0.8", default-features = false, features = ["parse"], optional = true }
@@ -47,8 +48,8 @@ test-generator = "0.3.0"
 rand.workspace = true
 
 [features]
-configs = ["toml"]
-random = ["configs", "arbitrary", "fake", "rand", "num-traits", "serde"]
+configs = ["dep:toml", "dep:serde"]
+random = ["configs", "dep:arbitrary", "dep:fake", "dep:rand", "dep:num-traits"]
 assist = ["dep:dialoguer", "dep:console", "dep:ctrlc"]
 all = ["random", "assist"]
 

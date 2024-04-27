@@ -1,0 +1,21 @@
+// This is an experimental feature to generate Rust binding from Candid.
+// You may want to manually adjust some of the types.
+#![allow(dead_code, unused_imports)]
+use {{candid_crate}}::{self, CandidType, Deserialize, Principal, Encode, Decode};
+use ic_cdk::api::call::CallResult as Result;
+
+{{type_defs}}
+{{#if methods}}
+pub struct {{PascalCase service_name}}(pub Principal);
+impl {{PascalCase service_name}} {
+  {{#each methods}}
+  pub async fn {{snake_case this.name}}(&self{{#each this.args}}, {{this.0}}: {{this.1}}{{/each}}) -> Result<({{#each this.rets}}{{this}},{{/each}})> {
+    ic_cdk::call(self.0, "{{this.name}}", ({{#each this.args}}{{this.0}},{{/each}})).await
+  }
+  {{/each}}
+}
+{{#if canister_id}}
+pub const CANISTER_ID : Principal = Principal::from_slice(&[{{principal_slice canister_id}}]); // {{canister_id}}
+pub const {{service_name}} : {{service_name}} = {{service_name}}(CANISTER_ID);
+{{/if}}
+{{/if}}

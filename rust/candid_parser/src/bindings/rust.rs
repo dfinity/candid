@@ -7,6 +7,7 @@ use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
+use serde::Serialize;
 use std::collections::BTreeSet;
 
 #[derive(Clone)]
@@ -427,7 +428,37 @@ impl<'a> State<'a> {
         res
     }
 }
-
+fn pp_function<'a>(config: &'a Config, id: &'a str, func: &'a Function) -> Method {
+    let env = TypeEnv::default();
+    let mut state = State {
+        state: crate::configs::State::new(&config.tree, &env),
+        recs: RecPoints::default(),
+    };
+    let args: Vec<_> = func
+        .args
+        .iter()
+        .enumerate()
+        .map(|(i, ty)| (RcDoc::<()>::text(format!("arg{i}")), state.pp_ty(ty, true)))
+        .collect();
+    let rets: Vec<_> = func.rets.iter().map(|ty| state.pp_ty(ty, true)).collect();
+    Method {
+        name: id.to_string(),
+        args: args
+            .into_iter()
+            .map(|(id, t)| {
+                (
+                    id.pretty(LINE_WIDTH).to_string(),
+                    t.pretty(LINE_WIDTH).to_string(),
+                )
+            })
+            .collect(),
+        rets: rets
+            .into_iter()
+            .map(|x| x.pretty(LINE_WIDTH).to_string())
+            .collect(),
+    }
+}
+/*
 fn pp_function<'a>(config: &'a Config, id: &'a str, func: &'a Function) -> RcDoc<'a> {
     let env = TypeEnv::default();
     let mut state = State {
@@ -506,7 +537,18 @@ fn pp_function<'a>(config: &'a Config, id: &'a str, func: &'a Function) -> RcDoc
     };
     sig.append(enclose_space("{", body, "}"))
 }
-
+*/
+fn pp_actor<'a>(config: &'a Config, env: &'a TypeEnv, actor: &'a Type) -> Vec<Method> {
+    // TODO trace to service before we figure out what canister means in Rust
+    let serv = env.as_service(actor).unwrap();
+    let mut res = Vec::new();
+    for (id, func) in serv.iter() {
+        let func = env.as_func(func).unwrap();
+        res.push(pp_function(config, id, func));
+    }
+    res
+}
+/*
 fn pp_actor<'a>(config: &'a Config, env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
     // TODO trace to service before we figure out what canister means in Rust
     let serv = env.as_service(actor).unwrap();
@@ -559,8 +601,53 @@ fn pp_actor<'a>(config: &'a Config, env: &'a TypeEnv, actor: &'a Type) -> RcDoc<
     } else {
         res
     }
+}*/
+#[derive(Serialize)]
+pub struct Output {
+    candid_crate: String,
+    service_name: String,
+    canister_id: Option<crate::Principal>,
+    type_defs: String,
+    methods: Vec<Method>,
+}
+#[derive(Serialize)]
+pub struct Method {
+    name: String,
+    args: Vec<(String, String)>,
+    rets: Vec<String>,
+    //mode: String,
 }
 
+pub fn compile(config: &Config, env: &TypeEnv, actor: &Option<Type>) -> String {
+    let source = include_str!("rust_call.hbs");
+    let hbs = get_hbs();
+    let (env, actor) = nominalize_all(env, actor);
+    let def_list: Vec<_> = if let Some(actor) = &actor {
+        chase_actor(&env, actor).unwrap()
+    } else {
+        env.0.iter().map(|pair| pair.0.as_ref()).collect()
+    };
+    let recs = infer_rec(&env, &def_list).unwrap();
+    let mut state = State {
+        state: crate::configs::State::new(&config.tree, &env),
+        recs,
+    };
+    let defs = state.pp_defs(&def_list);
+    let methods = if let Some(actor) = &actor {
+        pp_actor(config, &env, actor)
+    } else {
+        Vec::new()
+    };
+    let data = Output {
+        candid_crate: config.candid_crate.clone(),
+        service_name: config.service_name.to_case(Case::Pascal),
+        canister_id: Some(crate::Principal::from_slice(&[1, 2, 3])),
+        type_defs: defs.pretty(LINE_WIDTH).to_string(),
+        methods,
+    };
+    hbs.render_template(source, &data).unwrap()
+}
+/*
 pub fn compile(config: &Config, env: &TypeEnv, actor: &Option<Type>) -> String {
     let header = format!(
         r#"// This is an experimental feature to generate Rust binding from Candid.
@@ -598,7 +685,7 @@ use {}::{{self, CandidType, Deserialize, Principal, Encode, Decode}};
     let doc = RcDoc::text(header).append(RcDoc::line()).append(doc);
     doc.pretty(LINE_WIDTH).to_string()
 }
-
+*/
 pub enum TypePath {
     Id(String),
     Opt,
@@ -786,4 +873,64 @@ fn nominalize_all(env: &TypeEnv, actor: &Option<Type>) -> (TypeEnv, Option<Type>
         .as_ref()
         .map(|ty| nominalize(&mut res, &mut vec![], ty));
     (res, actor)
+}
+
+fn get_hbs() -> handlebars::Handlebars<'static> {
+    use handlebars::*;
+    let mut hbs = Handlebars::new();
+    hbs.register_escape_fn(handlebars::no_escape);
+    //hbs.set_strict_mode(true);
+    hbs.register_helper(
+        "PascalCase",
+        Box::new(
+            |h: &Helper,
+             _: &Handlebars,
+             _: &Context,
+             _: &mut RenderContext,
+             out: &mut dyn Output|
+             -> HelperResult {
+                let s = h.param(0).unwrap().value().as_str().unwrap();
+                out.write(s.to_case(Case::Pascal).as_ref())?;
+                Ok(())
+            },
+        ),
+    );
+    hbs.register_helper(
+        "snake_case",
+        Box::new(
+            |h: &Helper,
+             _: &Handlebars,
+             _: &Context,
+             _: &mut RenderContext,
+             out: &mut dyn Output|
+             -> HelperResult {
+                let s = h.param(0).unwrap().value().as_str().unwrap();
+                out.write(s.to_case(Case::Snake).as_ref())?;
+                Ok(())
+            },
+        ),
+    );
+    hbs.register_helper(
+        "principal_slice",
+        Box::new(
+            |h: &Helper,
+             _: &Handlebars,
+             _: &Context,
+             _: &mut RenderContext,
+             out: &mut dyn Output|
+             -> HelperResult {
+                let s = h.param(0).unwrap().value().as_str().unwrap();
+                let id = crate::Principal::from_text(s).unwrap();
+                let slice = id
+                    .as_slice()
+                    .iter()
+                    .map(|b| b.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                out.write(slice.as_str())?;
+                Ok(())
+            },
+        ),
+    );
+    hbs
 }
