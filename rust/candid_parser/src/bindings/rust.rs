@@ -425,15 +425,33 @@ impl<'a> State<'a> {
         res
     }
     fn pp_function(&mut self, id: &str, func: &Function) -> Method {
+        let old = self.state.push_state(&StateElem::Label(id));
         let args: Vec<_> = func
             .args
             .iter()
             .enumerate()
-            .map(|(i, ty)| (RcDoc::<()>::text(format!("arg{i}")), self.pp_ty(ty, true)))
+            .map(|(i, ty)| {
+                let lab = format!("arg{i}");
+                let old = self.state.push_state(&StateElem::Label(&lab));
+                let res = (RcDoc::<()>::text(lab.clone()), self.pp_ty(ty, true));
+                self.state.pop_state(old, StateElem::Label(&lab));
+                res
+            })
             .collect();
-        let rets: Vec<_> = func.rets.iter().map(|ty| self.pp_ty(ty, true)).collect();
+        let rets: Vec<_> = func
+            .rets
+            .iter()
+            .enumerate()
+            .map(|(i, ty)| {
+                let lab = format!("ret{i}");
+                let old = self.state.push_state(&StateElem::Label(&lab));
+                let res = self.pp_ty(ty, true);
+                self.state.pop_state(old, StateElem::Label(&lab));
+                res
+            })
+            .collect();
         let mode = if func.is_query() { "query" } else { "update" }.to_string();
-        Method {
+        let res = Method {
             name: id.to_string(),
             args: args
                 .into_iter()
@@ -449,7 +467,9 @@ impl<'a> State<'a> {
                 .map(|x| x.pretty(LINE_WIDTH).to_string())
                 .collect(),
             mode,
-        }
+        };
+        self.state.pop_state(old, StateElem::Label(id));
+        res
     }
     fn pp_actor(&mut self, actor: &Type) -> Vec<Method> {
         // TODO trace to service before we figure out what canister means in Rust
