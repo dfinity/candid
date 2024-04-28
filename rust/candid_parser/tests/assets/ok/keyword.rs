@@ -6,26 +6,20 @@ use ic_cdk::api::call::CallResult as Result;
 
 #[derive(CandidType, Deserialize)]
 pub struct O(Option<Box<O>>);
-
 #[derive(CandidType, Deserialize)]
 pub struct FieldArg { pub test: u16, pub _1291438163_: u8 }
-
 #[derive(CandidType, Deserialize)]
 pub struct FieldRet {}
-
 #[derive(CandidType, Deserialize)]
 pub struct FieldnatArg {
   pub _2_: candid::Int,
   #[serde(rename="2")]
   pub _50_: candid::Nat,
 }
-
 #[derive(CandidType, Deserialize)]
 pub struct Node { pub head: candid::Nat, pub tail: Box<List> }
-
 #[derive(CandidType, Deserialize)]
 pub struct List(Option<Node>);
-
 #[derive(CandidType, Deserialize)]
 pub enum If {
   #[serde(rename="branch")]
@@ -33,14 +27,11 @@ pub enum If {
   #[serde(rename="leaf")]
   Leaf(candid::Int),
 }
-
 candid::define_function!(pub StreamInnerNext : () -> (Stream) query);
 #[derive(CandidType, Deserialize)]
 pub struct StreamInner { pub head: candid::Nat, pub next: StreamInnerNext }
-
 #[derive(CandidType, Deserialize)]
 pub struct Stream(Option<StreamInner>);
-
 candid::define_service!(pub Return : {
   "f" : T::ty();
   "g" : candid::func!((List) -> (If, Stream));
@@ -69,19 +60,16 @@ impl Service {
   pub async fn oneway(&self, arg0: u8) -> Result<()> {
     ic_cdk::call(self.0, "oneway_", (arg0,)).await
   }
-  pub async fn query(&self, arg0: serde_bytes::ByteBuf) -> Result<
-    (serde_bytes::ByteBuf,)
-  > { ic_cdk::call(self.0, "query", (arg0,)).await }
+  pub async fn query(&self, arg0: serde_bytes::ByteBuf) -> Result<(serde_bytes::ByteBuf,)> {
+    ic_cdk::call(self.0, "query", (arg0,)).await
+  }
   pub async fn r#return(&self, arg0: O) -> Result<(O,)> {
     ic_cdk::call(self.0, "return", (arg0,)).await
   }
   pub async fn service(&self, arg0: Return) -> Result<()> {
     ic_cdk::call(self.0, "service", (arg0,)).await
   }
-  pub async fn tuple(
-    &self,
-    arg0: (candid::Int,serde_bytes::ByteBuf,String,),
-  ) -> Result<((candid::Int,u8,),)> {
+  pub async fn tuple(&self, arg0: (candid::Int,serde_bytes::ByteBuf,String,)) -> Result<((candid::Int,u8,),)> {
     ic_cdk::call(self.0, "tuple", (arg0,)).await
   }
   pub async fn variant(&self, arg0: VariantArg) -> Result<()> {
@@ -90,3 +78,4 @@ impl Service {
 }
 pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
 pub const service : Service = Service(CANISTER_ID);
+

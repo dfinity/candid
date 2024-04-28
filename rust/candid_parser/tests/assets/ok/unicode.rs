@@ -15,7 +15,6 @@ pub struct A {
   #[serde(rename="字 段 名2")]
   pub _3133479156_: candid::Nat,
 }
-
 #[derive(CandidType, Deserialize)]
 pub enum B {
   #[serde(rename="")]
@@ -39,9 +38,10 @@ impl Service {
   pub async fn _3300066460_(&self, arg0: A) -> Result<(B,)> {
     ic_cdk::call(self.0, "函数名", (arg0,)).await
   }
-  pub async fn _2669435454_(&self, arg0: candid::Nat) -> Result<
-    (candid::Nat,)
-  > { ic_cdk::call(self.0, "👀", (arg0,)).await }
+  pub async fn _2669435454_(&self, arg0: candid::Nat) -> Result<(candid::Nat,)> {
+    ic_cdk::call(self.0, "👀", (arg0,)).await
+  }
 }
 pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
 pub const service : Service = Service(CANISTER_ID);
+
