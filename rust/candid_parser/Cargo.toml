@@ -26,18 +26,18 @@ num-bigint.workspace = true
 pretty.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
+serde.workspace = true
 
 lalrpop-util = "0.20.0"
 logos = "0.13"
 convert_case = "0.6"
 handlebars = "5.1"
+toml = { version = "0.8", default-features = false, features = ["parse"] }
 
 arbitrary = { workspace = true, optional = true }
-toml = { version = "0.8", default-features = false, features = ["parse"], optional = true }
 fake = { version = "2.4", optional = true }
 rand = { version = "0.8", optional = true }
 num-traits = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
 dialoguer = { version = "0.11", default-features = false, features = ["editor", "completion"], optional = true }
 console = { version = "0.15", optional = true }
 ctrlc = { version = "3.4", optional = true }
@@ -48,8 +48,7 @@ test-generator = "0.3.0"
 rand.workspace = true
 
 [features]
-configs = ["dep:toml", "dep:serde"]
-random = ["configs", "dep:arbitrary", "dep:fake", "dep:rand", "dep:num-traits"]
+random = ["dep:arbitrary", "dep:fake", "dep:rand", "dep:num-traits"]
 assist = ["dep:dialoguer", "dep:console", "dep:ctrlc"]
 all = ["random", "assist"]
 

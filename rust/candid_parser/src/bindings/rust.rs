@@ -330,7 +330,6 @@ impl<'a> State<'a> {
                         .append(" ")
                         .append(self.pp_record_fields(fs, true))
                         .append(separator)
-                        .append(RcDoc::hardline())
                 }
                 TypeInner::Variant(fs) => derive
                     .append(RcDoc::line())
@@ -338,8 +337,7 @@ impl<'a> State<'a> {
                     .append("enum ")
                     .append(name)
                     .append(" ")
-                    .append(self.pp_variant_fields(fs))
-                    .append(RcDoc::hardline()),
+                    .append(self.pp_variant_fields(fs)),
                 TypeInner::Func(func) => str("candid::define_function!(")
                     .append(vis)
                     .append(name)
@@ -361,7 +359,6 @@ impl<'a> State<'a> {
                             .append(name)
                             .append(enclose("(", self.pp_ty(ty, false), ")"))
                             .append(";")
-                            .append(RcDoc::hardline())
                     } else {
                         vis.append(kwd("type"))
                             .append(name)
@@ -441,6 +438,7 @@ fn pp_function<'a>(config: &'a Config, id: &'a str, func: &'a Function) -> Metho
         .map(|(i, ty)| (RcDoc::<()>::text(format!("arg{i}")), state.pp_ty(ty, true)))
         .collect();
     let rets: Vec<_> = func.rets.iter().map(|ty| state.pp_ty(ty, true)).collect();
+    let mode = if func.is_query() { "query" } else { "update" }.to_string();
     Method {
         name: id.to_string(),
         args: args
@@ -456,88 +454,9 @@ fn pp_function<'a>(config: &'a Config, id: &'a str, func: &'a Function) -> Metho
             .into_iter()
             .map(|x| x.pretty(LINE_WIDTH).to_string())
             .collect(),
+        mode,
     }
 }
-/*
-fn pp_function<'a>(config: &'a Config, id: &'a str, func: &'a Function) -> RcDoc<'a> {
-    let env = TypeEnv::default();
-    let mut state = State {
-        state: crate::configs::State::new(&config.tree, &env),
-        recs: RecPoints::default(),
-    };
-    let name = ident(id, Some(Case::Snake));
-    let arg_prefix = str(match config.target {
-        Target::CanisterCall => "&self",
-        Target::Agent => "&self",
-        Target::CanisterStub => unimplemented!(),
-    });
-    let args: Vec<_> = func
-        .args
-        .iter()
-        .enumerate()
-        .map(|(i, ty)| RcDoc::as_string(format!("arg{i}: ")).append(state.pp_ty(ty, true)))
-        .collect();
-    let args = concat(std::iter::once(arg_prefix).chain(args), ",");
-    let rets: Vec<_> = func
-        .rets
-        .iter()
-        .map(|ty| state.pp_ty(ty, true).append(","))
-        .collect();
-    let rets = match config.target {
-        Target::CanisterCall => enclose("(", RcDoc::concat(rets), ")"),
-        Target::Agent => match func.rets.len() {
-            0 => str("()"),
-            1 => state.pp_ty(&func.rets[0], true),
-            _ => enclose(
-                "(",
-                RcDoc::intersperse(
-                    func.rets.iter().map(|ty| state.pp_ty(ty, true)),
-                    RcDoc::text(", "),
-                ),
-                ")",
-            ),
-        },
-        Target::CanisterStub => unimplemented!(),
-    };
-    let sig = kwd("pub async fn")
-        .append(name)
-        .append(enclose("(", args, ")"))
-        .append(kwd(" ->"))
-        .append(enclose("Result<", rets, "> "));
-    let method = id.escape_debug().to_string();
-    let body = match config.target {
-        Target::CanisterCall => {
-            let args = RcDoc::concat((0..func.args.len()).map(|i| RcDoc::text(format!("arg{i},"))));
-            str("ic_cdk::call(self.0, \"")
-                .append(method)
-                .append("\", ")
-                .append(enclose("(", args, ")"))
-                .append(").await")
-        }
-        Target::Agent => {
-            let is_query = func.is_query();
-            let builder_method = if is_query { "query" } else { "update" };
-            let call = if is_query { "call" } else { "call_and_wait" };
-            let args = RcDoc::intersperse(
-                (0..func.args.len()).map(|i| RcDoc::text(format!("&arg{i}"))),
-                RcDoc::text(", "),
-            );
-            let blob = str("Encode!").append(enclose("(", args, ")?;"));
-            let rets = RcDoc::concat(
-                func.rets
-                    .iter()
-                    .map(|ty| str(", ").append(state.pp_ty(ty, true))),
-            );
-            str("let args = ").append(blob).append(RcDoc::hardline())
-                .append(format!("let bytes = self.1.{builder_method}(&self.0, \"{method}\").with_arg(args).{call}().await?;"))
-                .append(RcDoc::hardline())
-                .append("Ok(Decode!(&bytes").append(rets).append(")?)")
-        }
-        Target::CanisterStub => unimplemented!(),
-    };
-    sig.append(enclose_space("{", body, "}"))
-}
-*/
 fn pp_actor<'a>(config: &'a Config, env: &'a TypeEnv, actor: &'a Type) -> Vec<Method> {
     // TODO trace to service before we figure out what canister means in Rust
     let serv = env.as_service(actor).unwrap();
@@ -548,60 +467,6 @@ fn pp_actor<'a>(config: &'a Config, env: &'a TypeEnv, actor: &'a Type) -> Vec<Me
     }
     res
 }
-/*
-fn pp_actor<'a>(config: &'a Config, env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
-    // TODO trace to service before we figure out what canister means in Rust
-    let serv = env.as_service(actor).unwrap();
-    let body = RcDoc::intersperse(
-        serv.iter().map(|(id, func)| {
-            let func = env.as_func(func).unwrap();
-            pp_function(config, id, func)
-        }),
-        RcDoc::hardline(),
-    );
-    let struct_name = config.service_name.to_case(Case::Pascal);
-    let service_def = match config.target {
-        Target::CanisterCall => format!("pub struct {}(pub Principal);", struct_name),
-        Target::Agent => format!(
-            "pub struct {}<'a>(pub Principal, pub &'a ic_agent::Agent);",
-            struct_name
-        ),
-        Target::CanisterStub => unimplemented!(),
-    };
-    let service_impl = match config.target {
-        Target::CanisterCall => format!("impl {} ", struct_name),
-        Target::Agent => format!("impl<'a> {}<'a> ", struct_name),
-        Target::CanisterStub => unimplemented!(),
-    };
-    let res = RcDoc::text(service_def)
-        .append(RcDoc::hardline())
-        .append(service_impl)
-        .append(enclose_space("{", body, "}"))
-        .append(RcDoc::hardline());
-    if let Some(cid) = config.canister_id {
-        let slice = cid
-            .as_slice()
-            .iter()
-            .map(|b| b.to_string())
-            .collect::<Vec<_>>()
-            .join(", ");
-        let id = RcDoc::text(format!(
-            "pub const CANISTER_ID : Principal = Principal::from_slice(&[{}]); // {}",
-            slice, cid
-        ));
-        let instance = match config.target {
-            Target::CanisterCall => format!(
-                "pub const {} : {} = {}(CANISTER_ID);",
-                config.service_name, struct_name, struct_name
-            ),
-            Target::Agent => "".to_string(),
-            Target::CanisterStub => unimplemented!(),
-        };
-        res.append(id).append(RcDoc::hardline()).append(instance)
-    } else {
-        res
-    }
-}*/
 #[derive(Serialize)]
 pub struct Output {
     candid_crate: String,
@@ -615,11 +480,15 @@ pub struct Method {
     name: String,
     args: Vec<(String, String)>,
     rets: Vec<String>,
-    //mode: String,
+    mode: String,
 }
 
 pub fn compile(config: &Config, env: &TypeEnv, actor: &Option<Type>) -> String {
-    let source = include_str!("rust_call.hbs");
+    let source = match &config.target {
+        Target::CanisterCall => include_str!("rust_call.hbs"),
+        Target::Agent => include_str!("rust_agent.hbs"),
+        Target::CanisterStub => unimplemented!(),
+    };
     let hbs = get_hbs();
     let (env, actor) = nominalize_all(env, actor);
     let def_list: Vec<_> = if let Some(actor) = &actor {
@@ -641,51 +510,12 @@ pub fn compile(config: &Config, env: &TypeEnv, actor: &Option<Type>) -> String {
     let data = Output {
         candid_crate: config.candid_crate.clone(),
         service_name: config.service_name.to_case(Case::Pascal),
-        canister_id: Some(crate::Principal::from_slice(&[1, 2, 3])),
+        canister_id: config.canister_id,
         type_defs: defs.pretty(LINE_WIDTH).to_string(),
         methods,
     };
     hbs.render_template(source, &data).unwrap()
 }
-/*
-pub fn compile(config: &Config, env: &TypeEnv, actor: &Option<Type>) -> String {
-    let header = format!(
-        r#"// This is an experimental feature to generate Rust binding from Candid.
-// You may want to manually adjust some of the types.
-#![allow(dead_code, unused_imports)]
-use {}::{{self, CandidType, Deserialize, Principal, Encode, Decode}};
-"#,
-        config.candid_crate
-    );
-    let header = header
-        + match &config.target {
-            Target::CanisterCall => "use ic_cdk::api::call::CallResult as Result;\n",
-            Target::Agent => "type Result<T> = std::result::Result<T, ic_agent::AgentError>;\n",
-            Target::CanisterStub => "",
-        };
-    let (env, actor) = nominalize_all(env, actor);
-    let def_list: Vec<_> = if let Some(actor) = &actor {
-        chase_actor(&env, actor).unwrap()
-    } else {
-        env.0.iter().map(|pair| pair.0.as_ref()).collect()
-    };
-    let recs = infer_rec(&env, &def_list).unwrap();
-    let mut state = State {
-        state: crate::configs::State::new(&config.tree, &env),
-        recs,
-    };
-    let defs = state.pp_defs(&def_list);
-    let doc = match &actor {
-        None => defs,
-        Some(actor) => {
-            let actor = pp_actor(config, &env, actor);
-            defs.append(actor)
-        }
-    };
-    let doc = RcDoc::text(header).append(RcDoc::line()).append(doc);
-    doc.pretty(LINE_WIDTH).to_string()
-}
-*/
 pub enum TypePath {
     Id(String),
     Opt,
@@ -879,9 +709,9 @@ fn get_hbs() -> handlebars::Handlebars<'static> {
     use handlebars::*;
     let mut hbs = Handlebars::new();
     hbs.register_escape_fn(handlebars::no_escape);
-    //hbs.set_strict_mode(true);
+    hbs.set_strict_mode(true);
     hbs.register_helper(
-        "PascalCase",
+        "escape_debug",
         Box::new(
             |h: &Helper,
              _: &Handlebars,
@@ -890,7 +720,7 @@ fn get_hbs() -> handlebars::Handlebars<'static> {
              out: &mut dyn Output|
              -> HelperResult {
                 let s = h.param(0).unwrap().value().as_str().unwrap();
-                out.write(s.to_case(Case::Pascal).as_ref())?;
+                out.write(&s.escape_debug().to_string())?;
                 Ok(())
             },
         ),
@@ -906,6 +736,47 @@ fn get_hbs() -> handlebars::Handlebars<'static> {
              -> HelperResult {
                 let s = h.param(0).unwrap().value().as_str().unwrap();
                 out.write(s.to_case(Case::Snake).as_ref())?;
+                Ok(())
+            },
+        ),
+    );
+    hbs.register_helper(
+        "id",
+        Box::new(
+            |h: &Helper,
+             _: &Handlebars,
+             _: &Context,
+             _: &mut RenderContext,
+             out: &mut dyn Output|
+             -> HelperResult {
+                let s = h.param(0).unwrap().value().as_str().unwrap();
+                out.write(&ident(s, Some(Case::Snake)).pretty(LINE_WIDTH).to_string())?;
+                Ok(())
+            },
+        ),
+    );
+    hbs.register_helper(
+        "vec_to_arity",
+        Box::new(
+            |h: &Helper,
+             _: &Handlebars,
+             _: &Context,
+             _: &mut RenderContext,
+             out: &mut dyn Output|
+             -> HelperResult {
+                let vec: Vec<_> = h
+                    .param(0)
+                    .unwrap()
+                    .value()
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_str().unwrap())
+                    .collect();
+                match vec.len() {
+                    1 => out.write(vec[0])?,
+                    _ => out.write(&format!("({})", vec.join(", ")))?,
+                }
                 Ok(())
             },
         ),
