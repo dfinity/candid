@@ -177,7 +177,7 @@ impl<'a> State<'a> {
                 // It's a bit tricky to use `deserialize_with = "serde_bytes"`. It's not working for `type t = blob`
                 Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
                 Vec(ref t) => str("Vec").append(enclose("<", self.pp_ty(t, is_ref), ">")),
-                Record(ref fs) => self.pp_record_fields(fs, false),
+                Record(ref fs) => self.pp_record_fields(fs, false, is_ref),
                 Variant(_) => unreachable!(), // not possible after rewriting
                 Func(_) => unreachable!(),    // not possible after rewriting
                 Service(_) => unreachable!(), // not possible after rewriting
@@ -225,7 +225,7 @@ impl<'a> State<'a> {
             }
         }
     }
-    fn pp_tuple<'b>(&mut self, fs: &'b [Field], need_vis: bool) -> RcDoc<'b> {
+    fn pp_tuple<'b>(&mut self, fs: &'b [Field], need_vis: bool, is_ref: bool) -> RcDoc<'b> {
         let tuple = fs.iter().enumerate().map(|(i, f)| {
             let lab = i.to_string();
             let old = self.state.push_state(&StateElem::Label(&lab));
@@ -234,31 +234,31 @@ impl<'a> State<'a> {
             } else {
                 RcDoc::nil()
             };
-            let res = vis.append(self.pp_ty(&f.ty, false)).append(",");
+            let res = vis.append(self.pp_ty(&f.ty, is_ref)).append(",");
             self.state.pop_state(old, StateElem::Label(&lab));
             res
         });
         enclose("(", RcDoc::concat(tuple), ")")
     }
-    fn pp_record_field<'b>(&mut self, field: &'b Field, need_vis: bool) -> RcDoc<'b> {
+    fn pp_record_field<'b>(&mut self, field: &'b Field, need_vis: bool, is_ref: bool) -> RcDoc<'b> {
         let lab = field.id.to_string();
         let old = self.state.push_state(&StateElem::Label(&lab));
         let res = self
             .pp_label(&field.id, false, need_vis)
             .append(kwd(":"))
-            .append(self.pp_ty(&field.ty, false));
+            .append(self.pp_ty(&field.ty, is_ref));
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
-    fn pp_record_fields<'b>(&mut self, fs: &'b [Field], need_vis: bool) -> RcDoc<'b> {
+    fn pp_record_fields<'b>(&mut self, fs: &'b [Field], need_vis: bool, is_ref: bool) -> RcDoc<'b> {
         let old = self.state.push_state(&StateElem::TypeStr("record"));
         let res = if is_tuple(fs) {
             // TODO check if there is no name/attr in the label subtree
-            self.pp_tuple(fs, need_vis)
+            self.pp_tuple(fs, need_vis, is_ref)
         } else {
             let fields: Vec<_> = fs
                 .iter()
-                .map(|f| self.pp_record_field(f, need_vis))
+                .map(|f| self.pp_record_field(f, need_vis, is_ref))
                 .collect();
             let fields = concat(fields.into_iter(), ",");
             enclose_space("{", fields, "}")
@@ -273,7 +273,7 @@ impl<'a> State<'a> {
             TypeInner::Null => self.pp_label(&field.id, true, false),
             TypeInner::Record(fs) => self
                 .pp_label(&field.id, true, false)
-                .append(self.pp_record_fields(fs, false)),
+                .append(self.pp_record_fields(fs, false, false)),
             _ => self.pp_label(&field.id, true, false).append(enclose(
                 "(",
                 self.pp_ty(&field.ty, false),
@@ -328,7 +328,7 @@ impl<'a> State<'a> {
                         .append("struct ")
                         .append(name)
                         .append(" ")
-                        .append(self.pp_record_fields(fs, true))
+                        .append(self.pp_record_fields(fs, true, false))
                         .append(separator)
                 }
                 TypeInner::Variant(fs) => derive
@@ -424,48 +424,43 @@ impl<'a> State<'a> {
         self.state.pop_state(old, lab);
         res
     }
-}
-fn pp_function<'a>(config: &'a Config, id: &'a str, func: &'a Function) -> Method {
-    let env = TypeEnv::default();
-    let mut state = State {
-        state: crate::configs::State::new(&config.tree, &env),
-        recs: RecPoints::default(),
-    };
-    let args: Vec<_> = func
-        .args
-        .iter()
-        .enumerate()
-        .map(|(i, ty)| (RcDoc::<()>::text(format!("arg{i}")), state.pp_ty(ty, true)))
-        .collect();
-    let rets: Vec<_> = func.rets.iter().map(|ty| state.pp_ty(ty, true)).collect();
-    let mode = if func.is_query() { "query" } else { "update" }.to_string();
-    Method {
-        name: id.to_string(),
-        args: args
-            .into_iter()
-            .map(|(id, t)| {
-                (
-                    id.pretty(LINE_WIDTH).to_string(),
-                    t.pretty(LINE_WIDTH).to_string(),
-                )
-            })
-            .collect(),
-        rets: rets
-            .into_iter()
-            .map(|x| x.pretty(LINE_WIDTH).to_string())
-            .collect(),
-        mode,
+    fn pp_function(&mut self, id: &str, func: &Function) -> Method {
+        let args: Vec<_> = func
+            .args
+            .iter()
+            .enumerate()
+            .map(|(i, ty)| (RcDoc::<()>::text(format!("arg{i}")), self.pp_ty(ty, true)))
+            .collect();
+        let rets: Vec<_> = func.rets.iter().map(|ty| self.pp_ty(ty, true)).collect();
+        let mode = if func.is_query() { "query" } else { "update" }.to_string();
+        Method {
+            name: id.to_string(),
+            args: args
+                .into_iter()
+                .map(|(id, t)| {
+                    (
+                        id.pretty(LINE_WIDTH).to_string(),
+                        t.pretty(LINE_WIDTH).to_string(),
+                    )
+                })
+                .collect(),
+            rets: rets
+                .into_iter()
+                .map(|x| x.pretty(LINE_WIDTH).to_string())
+                .collect(),
+            mode,
+        }
     }
-}
-fn pp_actor<'a>(config: &'a Config, env: &'a TypeEnv, actor: &'a Type) -> Vec<Method> {
-    // TODO trace to service before we figure out what canister means in Rust
-    let serv = env.as_service(actor).unwrap();
-    let mut res = Vec::new();
-    for (id, func) in serv.iter() {
-        let func = env.as_func(func).unwrap();
-        res.push(pp_function(config, id, func));
+    fn pp_actor(&mut self, actor: &Type) -> Vec<Method> {
+        // TODO trace to service before we figure out what canister means in Rust
+        let serv = self.state.env.as_service(actor).unwrap();
+        let mut res = Vec::new();
+        for (id, func) in serv.iter() {
+            let func = self.state.env.as_func(func).unwrap();
+            res.push(self.pp_function(id, func));
+        }
+        res
     }
-    res
 }
 #[derive(Serialize)]
 pub struct Output {
@@ -503,7 +498,7 @@ pub fn compile(config: &Config, env: &TypeEnv, actor: &Option<Type>) -> String {
     };
     let defs = state.pp_defs(&def_list);
     let methods = if let Some(actor) = &actor {
-        pp_actor(config, &env, actor)
+        state.pp_actor(actor)
     } else {
         Vec::new()
     };
