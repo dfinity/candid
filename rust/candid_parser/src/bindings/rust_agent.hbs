@@ -6,8 +6,8 @@ type Result<T> = std::result::Result<T, ic_agent::AgentError>;
 
 {{type_defs}}
 {{#if methods}}
-pub struct {{service_name}}<'a>(pub Principal, pub &'a ic_agent::Agent);
-impl<'a> {{service_name}}<'a> {
+pub struct {{PascalCase service_name}}<'a>(pub Principal, pub &'a ic_agent::Agent);
+impl<'a> {{PascalCase service_name}}<'a> {
   {{#each methods}}
   pub async fn {{id this.name}}(&self{{#each this.args}}, {{this.0}}: {{this.1}}{{/each}}) -> Result<{{vec_to_arity this.rets}}> {
     let args = Encode!({{#each this.args}}&{{this.0}}{{#unless @last}},{{/unless}}{{/each}})?;

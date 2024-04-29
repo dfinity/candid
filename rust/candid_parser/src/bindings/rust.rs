@@ -8,53 +8,8 @@ use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInne
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
 use serde::Serialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Clone)]
-pub enum Target {
-    CanisterCall,
-    Agent,
-    CanisterStub,
-}
-
-//#[derive(Clone)]
-pub struct Config {
-    candid_crate: String,
-    tree: ConfigTree<BindingConfig>,
-    canister_id: Option<candid::Principal>,
-    service_name: String,
-    target: Target,
-}
-impl Config {
-    pub fn new(configs: Configs) -> Self {
-        let tree = ConfigTree::from_configs("rust", configs).unwrap();
-        Config {
-            candid_crate: "candid".to_string(),
-            tree,
-            canister_id: None,
-            service_name: "service".to_string(),
-            target: Target::CanisterCall,
-        }
-    }
-    pub fn set_candid_crate(&mut self, name: String) -> &mut Self {
-        self.candid_crate = name;
-        self
-    }
-    /// Only generates SERVICE struct if canister_id is not provided
-    pub fn set_canister_id(&mut self, id: candid::Principal) -> &mut Self {
-        self.canister_id = Some(id);
-        self
-    }
-    /// Service name when canister id is provided
-    pub fn set_service_name(&mut self, name: String) -> &mut Self {
-        self.service_name = name;
-        self
-    }
-    pub fn set_target(&mut self, name: Target) -> &mut Self {
-        self.target = name;
-        self
-    }
-}
 #[derive(Default, Deserialize, Clone, Debug)]
 pub struct BindingConfig {
     name: Option<String>,
@@ -482,29 +437,19 @@ impl<'a> State<'a> {
         res
     }
 }
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Output {
-    candid_crate: String,
-    service_name: String,
-    canister_id: Option<crate::Principal>,
     type_defs: String,
     methods: Vec<Method>,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Method {
     name: String,
     args: Vec<(String, String)>,
     rets: Vec<String>,
     mode: String,
 }
-
-pub fn compile(config: &Config, env: &TypeEnv, actor: &Option<Type>) -> String {
-    let source = match &config.target {
-        Target::CanisterCall => include_str!("rust_call.hbs"),
-        Target::Agent => include_str!("rust_agent.hbs"),
-        Target::CanisterStub => unimplemented!(),
-    };
-    let hbs = get_hbs();
+pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> Output {
     let (env, actor) = nominalize_all(env, actor);
     let def_list: Vec<_> = if let Some(actor) = &actor {
         chase_actor(&env, actor).unwrap()
@@ -513,7 +458,7 @@ pub fn compile(config: &Config, env: &TypeEnv, actor: &Option<Type>) -> String {
     };
     let recs = infer_rec(&env, &def_list).unwrap();
     let mut state = State {
-        state: crate::configs::State::new(&config.tree, &env),
+        state: crate::configs::State::new(&tree.0, &env),
         recs,
     };
     let defs = state.pp_defs(&def_list);
@@ -522,15 +467,63 @@ pub fn compile(config: &Config, env: &TypeEnv, actor: &Option<Type>) -> String {
     } else {
         Vec::new()
     };
-    let data = Output {
-        candid_crate: config.candid_crate.clone(),
-        service_name: config.service_name.to_case(Case::Pascal),
-        canister_id: config.canister_id,
+    Output {
         type_defs: defs.pretty(LINE_WIDTH).to_string(),
         methods,
-    };
-    hbs.render_template(source, &data).unwrap()
+    }
 }
+pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) -> String {
+    let hbs = get_hbs();
+    #[derive(Serialize)]
+    struct HBOutput {
+        #[serde(flatten)]
+        external: BTreeMap<String, String>,
+        type_defs: String,
+        methods: Vec<Method>,
+    }
+    let data = HBOutput {
+        type_defs: output.type_defs,
+        methods: output.methods,
+        external: config.0,
+    };
+    hbs.render_template(template, &data).unwrap()
+}
+pub struct Config(ConfigTree<BindingConfig>);
+impl Config {
+    pub fn new(configs: Configs) -> Self {
+        Self(ConfigTree::from_configs("rust", configs).unwrap())
+    }
+}
+pub struct ExternalConfig(pub BTreeMap<String, String>);
+impl Default for ExternalConfig {
+    fn default() -> Self {
+        Self(
+            [
+                ("candid_crate", "candid"),
+                ("service_name", "service"),
+                ("target", "canister_call"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect(),
+        )
+    }
+}
+pub fn compile(
+    tree: &Config,
+    env: &TypeEnv,
+    actor: &Option<Type>,
+    external: ExternalConfig,
+) -> String {
+    let source = match external.0.get("target").map(|s| s.as_str()) {
+        Some("canister_call") | None => include_str!("rust_call.hbs"),
+        Some("agent") => include_str!("rust_agent.hbs"),
+        _ => unimplemented!(),
+    };
+    let output = emit_bindgen(tree, env, actor);
+    output_handlebar(output, external, source)
+}
+
 pub enum TypePath {
     Id(String),
     Opt,
@@ -751,6 +744,21 @@ fn get_hbs() -> handlebars::Handlebars<'static> {
              -> HelperResult {
                 let s = h.param(0).unwrap().value().as_str().unwrap();
                 out.write(s.to_case(Case::Snake).as_ref())?;
+                Ok(())
+            },
+        ),
+    );
+    hbs.register_helper(
+        "PascalCase",
+        Box::new(
+            |h: &Helper,
+             _: &Handlebars,
+             _: &Context,
+             _: &mut RenderContext,
+             out: &mut dyn Output|
+             -> HelperResult {
+                let s = h.param(0).unwrap().value().as_str().unwrap();
+                out.write(s.to_case(Case::Pascal).as_ref())?;
                 Ok(())
             },
         ),

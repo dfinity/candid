@@ -6,8 +6,8 @@ use ic_cdk::api::call::CallResult as Result;
 
 {{type_defs}}
 {{#if methods}}
-pub struct {{service_name}}(pub Principal);
-impl {{service_name}} {
+pub struct {{PascalCase service_name}}(pub Principal);
+impl {{PascalCase service_name}} {
   {{#each methods}}
   pub async fn {{id this.name}}(&self{{#each this.args}}, {{this.0}}: {{this.1}}{{/each}}) -> Result<({{#each this.rets}}{{this}},{{/each}})> {
     ic_cdk::call(self.0, "{{escape_debug this.name}}", ({{#each this.args}}{{this.0}},{{/each}})).await
@@ -16,6 +16,6 @@ impl {{service_name}} {
 }
 {{#if canister_id}}
 pub const CANISTER_ID : Principal = Principal::from_slice(&[{{principal_slice canister_id}}]); // {{canister_id}}
-pub const {{snake_case service_name}} : {{service_name}} = {{service_name}}(CANISTER_ID);
+pub const {{snake_case service_name}} : {{PascalCase service_name}} = {{PascalCase service_name}}(CANISTER_ID);
 {{/if}}
 {{/if}}

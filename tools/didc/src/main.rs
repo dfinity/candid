@@ -216,13 +216,16 @@ fn main() -> Result<()> {
                 "did" => candid_parser::pretty::candid::compile(&env, &actor),
                 "mo" => candid_parser::bindings::motoko::compile(&env, &actor),
                 "rs" => {
-                    let config = candid_parser::bindings::rust::Config::new(configs);
-                    candid_parser::bindings::rust::compile(&config, &env, &actor)
+                    use candid_parser::bindings::rust::{compile, Config, ExternalConfig};
+                    let config = Config::new(configs);
+                    compile(&config, &env, &actor, ExternalConfig::default())
                 }
                 "rs-agent" => {
-                    let mut config = candid_parser::bindings::rust::Config::new(configs);
-                    config.set_target(candid_parser::bindings::rust::Target::Agent);
-                    candid_parser::bindings::rust::compile(&config, &env, &actor)
+                    use candid_parser::bindings::rust::{compile, Config, ExternalConfig};
+                    let config = Config::new(configs);
+                    let mut external = ExternalConfig::default();
+                    external.0.insert("target".to_string(), "agent".to_string());
+                    compile(&config, &env, &actor, external)
                 }
                 _ => unreachable!(),
             };
