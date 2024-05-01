@@ -20,8 +20,15 @@ pub struct BindingConfig {
 impl ConfigState for BindingConfig {
     fn merge_config(&mut self, config: &Self, elem: Option<&StateElem>, _is_recursive: bool) {
         self.name = config.name.clone();
-        self.use_type = config.use_type.clone();
-        // matched attributes can survive across labels in order to apply attributes to all labels at this level
+        // match use_type can survive across types, so that label.use_type works
+        if !matches!(elem, Some(StateElem::Label(_))) {
+            if let Some(use_type) = &config.use_type {
+                self.use_type = Some(use_type.clone());
+            }
+        } else {
+            self.use_type = config.use_type.clone();
+        }
+        // matched attributes can survive across labels, so that record.attributes works
         if matches!(elem, Some(StateElem::Label(_))) {
             if let Some(attr) = &config.attributes {
                 self.attributes = Some(attr.clone());
@@ -381,6 +388,12 @@ impl<'a> State<'a> {
     }
     fn pp_function(&mut self, id: &str, func: &Function) -> Method {
         let old = self.state.push_state(&StateElem::Label(id));
+        let name = self
+            .state
+            .config
+            .name
+            .clone()
+            .unwrap_or_else(|| ident(id, Some(Case::Snake)).pretty(LINE_WIDTH).to_string());
         let args: Vec<_> = func
             .args
             .iter()
@@ -388,9 +401,15 @@ impl<'a> State<'a> {
             .map(|(i, ty)| {
                 let lab = format!("arg{i}");
                 let old = self.state.push_state(&StateElem::Label(&lab));
-                let res = (RcDoc::<()>::text(lab.clone()), self.pp_ty(ty, true));
+                let name = self
+                    .state
+                    .config
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| lab.clone());
+                let res = self.pp_ty(ty, true);
                 self.state.pop_state(old, StateElem::Label(&lab));
-                res
+                (name, res)
             })
             .collect();
         let rets: Vec<_> = func
@@ -407,15 +426,11 @@ impl<'a> State<'a> {
             .collect();
         let mode = if func.is_query() { "query" } else { "update" }.to_string();
         let res = Method {
-            name: id.to_string(),
+            name,
+            original_name: id.to_string(),
             args: args
                 .into_iter()
-                .map(|(id, t)| {
-                    (
-                        id.pretty(LINE_WIDTH).to_string(),
-                        t.pretty(LINE_WIDTH).to_string(),
-                    )
-                })
+                .map(|(id, t)| (id, t.pretty(LINE_WIDTH).to_string()))
                 .collect(),
             rets: rets
                 .into_iter()
@@ -426,25 +441,51 @@ impl<'a> State<'a> {
         self.state.pop_state(old, StateElem::Label(id));
         res
     }
-    fn pp_actor(&mut self, actor: &Type) -> Vec<Method> {
-        // TODO trace to service before we figure out what canister means in Rust
-        let serv = self.state.env.as_service(actor).unwrap();
+    fn pp_actor(&mut self, actor: &Type) -> (Vec<Method>, Option<Vec<(String, String)>>) {
+        let actor = self.state.env.trace_type(actor).unwrap();
+        let init = if let TypeInner::Class(args, _) = actor.as_ref() {
+            let old = self.state.push_state(&StateElem::Label("init"));
+            let args: Vec<_> = args
+                .iter()
+                .enumerate()
+                .map(|(i, ty)| {
+                    let lab = format!("arg{i}");
+                    let old = self.state.push_state(&StateElem::Label(&lab));
+                    let name = self
+                        .state
+                        .config
+                        .name
+                        .clone()
+                        .unwrap_or_else(|| lab.clone());
+                    let res = self.pp_ty(ty, true);
+                    self.state.pop_state(old, StateElem::Label(&lab));
+                    (name, res.pretty(LINE_WIDTH).to_string())
+                })
+                .collect();
+            self.state.pop_state(old, StateElem::Label("init"));
+            Some(args)
+        } else {
+            None
+        };
+        let serv = self.state.env.as_service(&actor).unwrap();
         let mut res = Vec::new();
         for (id, func) in serv.iter() {
             let func = self.state.env.as_func(func).unwrap();
             res.push(self.pp_function(id, func));
         }
-        res
+        (res, init)
     }
 }
 #[derive(Serialize, Debug)]
 pub struct Output {
     type_defs: String,
     methods: Vec<Method>,
+    init_args: Option<Vec<(String, String)>>,
 }
 #[derive(Serialize, Debug)]
 pub struct Method {
     name: String,
+    original_name: String,
     args: Vec<(String, String)>,
     rets: Vec<String>,
     mode: String,
@@ -462,14 +503,15 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> Outpu
         recs,
     };
     let defs = state.pp_defs(&def_list);
-    let methods = if let Some(actor) = &actor {
+    let (methods, init_args) = if let Some(actor) = &actor {
         state.pp_actor(actor)
     } else {
-        Vec::new()
+        (Vec::new(), None)
     };
     Output {
         type_defs: defs.pretty(LINE_WIDTH).to_string(),
         methods,
+        init_args,
     }
 }
 pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) -> String {
@@ -759,21 +801,6 @@ fn get_hbs() -> handlebars::Handlebars<'static> {
              -> HelperResult {
                 let s = h.param(0).unwrap().value().as_str().unwrap();
                 out.write(s.to_case(Case::Pascal).as_ref())?;
-                Ok(())
-            },
-        ),
-    );
-    hbs.register_helper(
-        "id",
-        Box::new(
-            |h: &Helper,
-             _: &Handlebars,
-             _: &Context,
-             _: &mut RenderContext,
-             out: &mut dyn Output|
-             -> HelperResult {
-                let s = h.param(0).unwrap().value().as_str().unwrap();
-                out.write(&ident(s, Some(Case::Snake)).pretty(LINE_WIDTH).to_string())?;
                 Ok(())
             },
         ),
