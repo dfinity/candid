@@ -65,13 +65,23 @@ fn compiler_test(resource: &str) {
             {
                 use rust::{Config, ExternalConfig};
                 use std::str::FromStr;
-                let config = Config::new(Configs::from_str("").unwrap());
+                let mut config = Config::new(Configs::from_str("").unwrap());
                 let mut external = ExternalConfig::default();
                 external
                     .0
                     .insert("canister_id".to_string(), "aaaaa-aa".to_string());
-                if filename.file_name().unwrap().to_str().unwrap() == "management.did" {
-                    external.0.insert("target".to_string(), "agent".to_string());
+                match filename.file_name().unwrap().to_str().unwrap() {
+                    "management.did" => {
+                        drop(external.0.insert("target".to_string(), "agent".to_string()))
+                    }
+                    "example.did" => {
+                        let configs = std::fs::read_to_string(base_path.join("example.toml"))
+                            .unwrap()
+                            .parse::<Configs>()
+                            .unwrap();
+                        config = Config::new(configs);
+                    }
+                    _ => (),
                 }
                 let mut output = mint.new_goldenfile(filename.with_extension("rs")).unwrap();
                 let content = rust::compile(&config, &env, &actor, external);
