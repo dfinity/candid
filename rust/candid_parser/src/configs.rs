@@ -126,6 +126,45 @@ impl<T: ConfigState> ConfigTree<T> {
         }
         Some(tree)
     }
+    pub fn add_config(&mut self, path: &[String], config: T) {
+        let n = path.len();
+        let mut tree: &Self = self;
+        let mut i = 0;
+        while i < n {
+            if let Some(subtree) = tree.subtree.get(&path[i]) {
+                tree = subtree;
+                i += 1;
+            } else {
+                break;
+            }
+        }
+        let mut node = Self {
+            state: Some(config.clone()),
+            subtree: BTreeMap::default(),
+            max_depth: 0,
+        };
+        for k in (i + 1..n).rev() {
+            node = Self {
+                state: None,
+                max_depth: node.max_depth + 1,
+                subtree: [(path[k].clone(), node)].into_iter().collect(),
+            }
+        }
+        let mut tree = self;
+        let mut d = n as u8;
+        #[allow(clippy::needless_range_loop)]
+        for k in 0..i {
+            tree.max_depth = std::cmp::max(d, tree.max_depth);
+            tree = tree.subtree.get_mut(&path[k]).unwrap();
+            d -= 1;
+        }
+        if i == n {
+            tree.state = Some(config);
+        } else {
+            tree.subtree.insert(path[i].clone(), node);
+            tree.max_depth = std::cmp::max(d, tree.max_depth);
+        }
+    }
     pub fn get_config(&self, path: &[String]) -> Option<(&T, bool)> {
         let len = path.len();
         assert!(len > 0);
@@ -285,7 +324,7 @@ Vec = { width = 2, size = 10 }
 "method:f".list = { depth = 3, size = 30 }
     "#;
     let configs = toml.parse::<Configs>().unwrap();
-    let tree: ConfigTree<T> = ConfigTree::from_configs("random", configs).unwrap();
+    let mut tree: ConfigTree<T> = ConfigTree::from_configs("random", configs).unwrap();
     assert_eq!(tree.state, None);
     assert_eq!(tree.subtree.len(), 6);
     assert_eq!(tree.max_depth, 2);
@@ -293,6 +332,58 @@ Vec = { width = 2, size = 10 }
         tree.get_config(&["list".to_string()]).unwrap().0.depth,
         Some(20)
     );
+    let t = T {
+        text: None,
+        depth: Some(100),
+        size: None,
+    };
+    tree.add_config(&[], t.clone());
+    assert_eq!(tree.state, Some(t.clone()));
+    tree.add_config(&["left".to_string(), "list".to_string()], t.clone());
+    assert_eq!(
+        tree.match_exact_path(&["left".to_string(), "list".to_string()])
+            .unwrap()
+            .depth,
+        Some(100)
+    );
+    assert_eq!(
+        tree.match_exact_path(&["left".to_string(), "a".to_string()]),
+        None
+    );
+    tree.add_config(&["left".to_string(), "a".to_string()], t.clone());
+    assert_eq!(
+        tree.match_exact_path(&["left".to_string(), "a".to_string()])
+            .unwrap()
+            .depth,
+        Some(100)
+    );
+    assert_eq!(tree.max_depth, 2);
+    tree.add_config(
+        &["a".to_string(), "b".to_string(), "c".to_string()],
+        t.clone(),
+    );
+    assert_eq!(
+        tree.match_exact_path(&["a".to_string(), "b".to_string(), "c".to_string()])
+            .unwrap()
+            .depth,
+        Some(100)
+    );
+    assert_eq!(tree.max_depth, 3);
+    tree.add_config(
+        &["a".to_string(), "b".to_string(), "d".to_string()],
+        t.clone(),
+    );
+    assert_eq!(tree.max_depth, 3);
+    tree.add_config(
+        &[
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+        ],
+        t.clone(),
+    );
+    assert_eq!(tree.max_depth, 4);
     let env = TypeEnv::default();
     let mut state = State::new(&tree, &env);
     state.with_scope(
