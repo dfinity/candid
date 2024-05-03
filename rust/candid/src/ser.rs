@@ -169,9 +169,9 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
         self.serialize_principal(blob)?;
         self.serialize_text(meth)
     }
-    fn serialize_option<T: ?Sized>(self, v: Option<&T>) -> Result<()>
+    fn serialize_option<T>(self, v: Option<&T>) -> Result<()>
     where
-        T: super::CandidType,
+        T: super::CandidType + ?Sized,
     {
         match v {
             None => {
@@ -207,9 +207,9 @@ pub struct Compound<'a> {
 }
 impl<'a> types::Compound for Compound<'a> {
     type Error = Error;
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<()>
+    fn serialize_element<T>(&mut self, value: &T) -> Result<()>
     where
-        T: types::CandidType,
+        T: types::CandidType + ?Sized,
     {
         value.idl_serialize(&mut *self.ser)?;
         Ok(())

@@ -6,19 +6,23 @@ use toml::{Table, Value};
 
 pub struct State<'a, T: ConfigState> {
     tree: &'a ConfigTree<T>,
-    path: Vec<String>,
     open_tree: Option<&'a ConfigTree<T>>,
+    path: Vec<String>,
     pub config: T,
     pub env: &'a TypeEnv,
 }
+#[derive(Debug)]
 pub enum StateElem<'a> {
     Type(&'a Type),
+    TypeStr(&'a str),
     Label(&'a str),
 }
+#[derive(Debug)]
 pub struct Scope<'a> {
     pub method: &'a str,
     pub position: Option<ScopePos>,
 }
+#[derive(Debug)]
 pub enum ScopePos {
     Arg,
     Ret,
@@ -28,7 +32,7 @@ impl<'a, T: ConfigState> State<'a, T> {
     pub fn new(tree: &'a ConfigTree<T>, env: &'a TypeEnv) -> Self {
         let mut config = T::default();
         if let Some(state) = &tree.state {
-            config.merge_config(state, false);
+            config.merge_config(state, None, false);
         }
         Self {
             tree,
@@ -52,6 +56,9 @@ impl<'a, T: ConfigState> State<'a, T> {
                             None => (),
                         }
                         self.open_tree = self.tree.with_prefix(&path).or(Some(tree));
+                        if let Some(state) = self.open_tree.unwrap().state.as_ref() {
+                            self.config.merge_config(state, None, false);
+                        }
                     }
                     None => self.open_tree = None,
                 }
@@ -71,7 +78,12 @@ impl<'a, T: ConfigState> State<'a, T> {
             self.tree.get_config(&self.path)
         };
         if let Some((state, is_recursive)) = new_state {
-            self.config.merge_config(state, is_recursive);
+            self.config.merge_config(state, Some(elem), is_recursive);
+            //eprintln!("match path: {:?}, state: {:?}", self.path, self.config);
+        } else {
+            self.config
+                .merge_config(&T::unmatched_config(), Some(elem), false);
+            //eprintln!("path: {:?}, state: {:?}", self.path, self.config);
         }
         old_config
     }
@@ -82,10 +94,13 @@ impl<'a, T: ConfigState> State<'a, T> {
     }
 }
 
-pub trait ConfigState: DeserializeOwned + Default + Clone {
-    fn merge_config(&mut self, config: &Self, is_recursive: bool);
+pub trait ConfigState: DeserializeOwned + Default + Clone + std::fmt::Debug {
+    fn merge_config(&mut self, config: &Self, elem: Option<&StateElem>, is_recursive: bool);
     fn update_state(&mut self, elem: &StateElem);
     fn restore_state(&mut self, elem: &StateElem);
+    fn unmatched_config() -> Self {
+        Self::default()
+    }
 }
 #[derive(Debug)]
 pub struct ConfigTree<T: ConfigState> {
@@ -111,8 +126,48 @@ impl<T: ConfigState> ConfigTree<T> {
         }
         Some(tree)
     }
+    pub fn add_config(&mut self, path: &[String], config: T) {
+        let n = path.len();
+        let mut tree: &Self = self;
+        let mut i = 0;
+        while i < n {
+            if let Some(subtree) = tree.subtree.get(&path[i]) {
+                tree = subtree;
+                i += 1;
+            } else {
+                break;
+            }
+        }
+        let mut node = Self {
+            state: Some(config.clone()),
+            subtree: BTreeMap::default(),
+            max_depth: 0,
+        };
+        for k in (i + 1..n).rev() {
+            node = Self {
+                state: None,
+                max_depth: node.max_depth + 1,
+                subtree: [(path[k].clone(), node)].into_iter().collect(),
+            }
+        }
+        let mut tree = self;
+        let mut d = n as u8;
+        #[allow(clippy::needless_range_loop)]
+        for k in 0..i {
+            tree.max_depth = std::cmp::max(d, tree.max_depth);
+            tree = tree.subtree.get_mut(&path[k]).unwrap();
+            d -= 1;
+        }
+        if i == n {
+            tree.state = Some(config);
+        } else {
+            tree.subtree.insert(path[i].clone(), node);
+            tree.max_depth = std::cmp::max(d, tree.max_depth);
+        }
+    }
     pub fn get_config(&self, path: &[String]) -> Option<(&T, bool)> {
         let len = path.len();
+        assert!(len > 0);
         let start = len.saturating_sub(self.max_depth as usize);
         for i in (start..len).rev() {
             let (path, tail) = path.split_at(i);
@@ -146,6 +201,7 @@ impl<'a> std::fmt::Display for StateElem<'a> {
         match self {
             StateElem::Type(t) => write!(f, "{}", path_name(t)),
             StateElem::Label(l) => write!(f, "{}", l),
+            StateElem::TypeStr(s) => write!(f, "{}", s),
         }
     }
 }
@@ -222,6 +278,7 @@ pub fn path_name(t: &Type) -> String {
         TypeInner::Knot(id) => id.name,
         TypeInner::Principal => "principal",
         TypeInner::Opt(_) => "opt",
+        TypeInner::Vec(t) if matches!(t.as_ref(), TypeInner::Nat8) => "blob",
         TypeInner::Vec(_) => "vec",
         TypeInner::Record(_) => "record",
         TypeInner::Variant(_) => "variant",
@@ -243,7 +300,7 @@ fn parse() {
         text: Option<String>,
     }
     impl ConfigState for T {
-        fn merge_config(&mut self, config: &Self, is_recursive: bool) {
+        fn merge_config(&mut self, config: &Self, _elem: Option<&StateElem>, is_recursive: bool) {
             *self = config.clone();
             if is_recursive {
                 self.size = Some(0);
@@ -267,7 +324,7 @@ Vec = { width = 2, size = 10 }
 "method:f".list = { depth = 3, size = 30 }
     "#;
     let configs = toml.parse::<Configs>().unwrap();
-    let tree: ConfigTree<T> = ConfigTree::from_configs("random", configs).unwrap();
+    let mut tree: ConfigTree<T> = ConfigTree::from_configs("random", configs).unwrap();
     assert_eq!(tree.state, None);
     assert_eq!(tree.subtree.len(), 6);
     assert_eq!(tree.max_depth, 2);
@@ -275,6 +332,58 @@ Vec = { width = 2, size = 10 }
         tree.get_config(&["list".to_string()]).unwrap().0.depth,
         Some(20)
     );
+    let t = T {
+        text: None,
+        depth: Some(100),
+        size: None,
+    };
+    tree.add_config(&[], t.clone());
+    assert_eq!(tree.state, Some(t.clone()));
+    tree.add_config(&["left".to_string(), "list".to_string()], t.clone());
+    assert_eq!(
+        tree.match_exact_path(&["left".to_string(), "list".to_string()])
+            .unwrap()
+            .depth,
+        Some(100)
+    );
+    assert_eq!(
+        tree.match_exact_path(&["left".to_string(), "a".to_string()]),
+        None
+    );
+    tree.add_config(&["left".to_string(), "a".to_string()], t.clone());
+    assert_eq!(
+        tree.match_exact_path(&["left".to_string(), "a".to_string()])
+            .unwrap()
+            .depth,
+        Some(100)
+    );
+    assert_eq!(tree.max_depth, 2);
+    tree.add_config(
+        &["a".to_string(), "b".to_string(), "c".to_string()],
+        t.clone(),
+    );
+    assert_eq!(
+        tree.match_exact_path(&["a".to_string(), "b".to_string(), "c".to_string()])
+            .unwrap()
+            .depth,
+        Some(100)
+    );
+    assert_eq!(tree.max_depth, 3);
+    tree.add_config(
+        &["a".to_string(), "b".to_string(), "d".to_string()],
+        t.clone(),
+    );
+    assert_eq!(tree.max_depth, 3);
+    tree.add_config(
+        &[
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+        ],
+        t.clone(),
+    );
+    assert_eq!(tree.max_depth, 4);
     let env = TypeEnv::default();
     let mut state = State::new(&tree, &env);
     state.with_scope(

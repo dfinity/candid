@@ -5,6 +5,7 @@ use candid::{self, CandidType, Deserialize, Principal, Encode, Decode};
 use ic_cdk::api::call::CallResult as Result;
 
 candid::define_service!(pub S : { "next" : candid::func!(() -> (S)) });
+
 pub struct Service(pub Principal);
 impl Service {
   pub async fn next(&self) -> Result<(S,)> {
@@ -13,3 +14,4 @@ impl Service {
 }
 pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
 pub const service : Service = Service(CANISTER_ID);
+

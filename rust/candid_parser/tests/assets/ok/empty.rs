@@ -6,16 +6,12 @@ use ic_cdk::api::call::CallResult as Result;
 
 #[derive(CandidType, Deserialize)]
 pub struct FArg {}
-
 #[derive(CandidType, Deserialize)]
 pub enum FRet {}
-
 #[derive(CandidType, Deserialize)]
 pub struct T (pub Box<T>,);
-
 #[derive(CandidType, Deserialize)]
 pub enum GRet { #[serde(rename="a")] A(Box<T>) }
-
 #[derive(CandidType, Deserialize)]
 pub enum HRet { #[serde(rename="a")] A(Box<T>), #[serde(rename="b")] B{} }
 
@@ -33,3 +29,4 @@ impl Service {
 }
 pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
 pub const service : Service = Service(CANISTER_ID);
+

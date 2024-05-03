@@ -1,6 +1,7 @@
 use candid::pretty::candid::compile;
 use candid::types::TypeEnv;
 use candid_parser::bindings::{javascript, motoko, rust, typescript};
+use candid_parser::configs::Configs;
 use candid_parser::types::IDLProg;
 use candid_parser::typing::{check_file, check_prog};
 use goldenfile::Mint;
@@ -62,13 +63,28 @@ fn compiler_test(resource: &str) {
                 }
             }
             {
-                let mut config = rust::Config::new();
-                config.set_canister_id(candid::Principal::from_text("aaaaa-aa").unwrap());
-                if filename.file_name().unwrap().to_str().unwrap() == "management.did" {
-                    config.set_target(rust::Target::Agent);
+                use rust::{Config, ExternalConfig};
+                use std::str::FromStr;
+                let mut config = Config::new(Configs::from_str("").unwrap());
+                let mut external = ExternalConfig::default();
+                external
+                    .0
+                    .insert("canister_id".to_string(), "aaaaa-aa".to_string());
+                match filename.file_name().unwrap().to_str().unwrap() {
+                    "management.did" => {
+                        drop(external.0.insert("target".to_string(), "agent".to_string()))
+                    }
+                    "example.did" => {
+                        let configs = std::fs::read_to_string(base_path.join("example.toml"))
+                            .unwrap()
+                            .parse::<Configs>()
+                            .unwrap();
+                        config = Config::new(configs);
+                    }
+                    _ => (),
                 }
                 let mut output = mint.new_goldenfile(filename.with_extension("rs")).unwrap();
-                let content = rust::compile(&config, &env, &actor);
+                let content = rust::compile(&config, &env, &actor, external);
                 writeln!(output, "{content}").unwrap();
             }
             {

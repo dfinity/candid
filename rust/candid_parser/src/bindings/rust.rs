@@ -1,63 +1,51 @@
 use super::analysis::{chase_actor, infer_rec};
+use crate::{
+    configs::{ConfigState, ConfigTree, Configs, StateElem},
+    Deserialize,
+};
 use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
-use std::collections::BTreeSet;
+use serde::Serialize;
+use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Clone)]
-pub enum Target {
-    CanisterCall,
-    Agent,
-    CanisterStub,
+#[derive(Default, Deserialize, Clone, Debug)]
+pub struct BindingConfig {
+    name: Option<String>,
+    use_type: Option<String>,
+    attributes: Option<String>,
+    visibility: Option<String>,
 }
-
-#[derive(Clone)]
-pub struct Config {
-    candid_crate: String,
-    type_attributes: String,
-    canister_id: Option<candid::Principal>,
-    service_name: String,
-    target: Target,
-}
-impl Config {
-    pub fn new() -> Self {
-        Config {
-            candid_crate: "candid".to_string(),
-            type_attributes: "".to_string(),
-            canister_id: None,
-            service_name: "service".to_string(),
-            target: Target::CanisterCall,
+impl ConfigState for BindingConfig {
+    fn merge_config(&mut self, config: &Self, elem: Option<&StateElem>, _is_recursive: bool) {
+        self.name.clone_from(&config.name);
+        // match use_type can survive across types, so that label.use_type works
+        if !matches!(elem, Some(StateElem::Label(_))) {
+            if let Some(use_type) = &config.use_type {
+                self.use_type = Some(use_type.clone());
+            }
+        } else {
+            self.use_type.clone_from(&config.use_type);
+        }
+        // matched attributes can survive across labels, so that record.attributes works
+        if matches!(elem, Some(StateElem::Label(_))) {
+            if let Some(attr) = &config.attributes {
+                self.attributes = Some(attr.clone());
+            }
+        } else {
+            self.attributes.clone_from(&config.attributes);
+        }
+        if config.visibility.is_some() {
+            self.visibility.clone_from(&config.visibility);
         }
     }
-    pub fn set_candid_crate(&mut self, name: String) -> &mut Self {
-        self.candid_crate = name;
-        self
-    }
-    /// Applies to all types for now
-    pub fn set_type_attributes(&mut self, attr: String) -> &mut Self {
-        self.type_attributes = attr;
-        self
-    }
-    /// Only generates SERVICE struct if canister_id is not provided
-    pub fn set_canister_id(&mut self, id: candid::Principal) -> &mut Self {
-        self.canister_id = Some(id);
-        self
-    }
-    /// Service name when canister id is provided
-    pub fn set_service_name(&mut self, name: String) -> &mut Self {
-        self.service_name = name;
-        self
-    }
-    pub fn set_target(&mut self, name: Target) -> &mut Self {
-        self.target = name;
-        self
-    }
+    fn update_state(&mut self, _elem: &StateElem) {}
+    fn restore_state(&mut self, _elem: &StateElem) {}
 }
-impl Default for Config {
-    fn default() -> Self {
-        Self::new()
-    }
+pub struct State<'a> {
+    state: crate::configs::State<'a, BindingConfig>,
+    recs: RecPoints<'a>,
 }
 
 type RecPoints<'a> = BTreeSet<&'a str>;
@@ -101,363 +89,408 @@ fn ident_(id: &str, case: Option<Case>) -> (RcDoc, bool) {
 fn ident(id: &str, case: Option<Case>) -> RcDoc {
     ident_(id, case).0
 }
-
-fn pp_ty<'a>(ty: &'a Type, recs: &RecPoints) -> RcDoc<'a> {
-    use TypeInner::*;
-    match ty.as_ref() {
-        Null => str("()"),
-        Bool => str("bool"),
-        Nat => str("candid::Nat"),
-        Int => str("candid::Int"),
-        Nat8 => str("u8"),
-        Nat16 => str("u16"),
-        Nat32 => str("u32"),
-        Nat64 => str("u64"),
-        Int8 => str("i8"),
-        Int16 => str("i16"),
-        Int32 => str("i32"),
-        Int64 => str("i64"),
-        Float32 => str("f32"),
-        Float64 => str("f64"),
-        Text => str("String"),
-        Reserved => str("candid::Reserved"),
-        Empty => str("candid::Empty"),
-        Var(ref id) => {
-            let name = ident(id, Some(Case::Pascal));
-            if recs.contains(id.as_str()) {
-                str("Box<").append(name).append(">")
-            } else {
-                name
-            }
-        }
-        Principal => str("Principal"),
-        Opt(ref t) => str("Option").append(enclose("<", pp_ty(t, recs), ">")),
-        // It's a bit tricky to use `deserialize_with = "serde_bytes"`. It's not working for `type t = blob`
-        Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
-        Vec(ref t) => str("Vec").append(enclose("<", pp_ty(t, recs), ">")),
-        Record(ref fs) => pp_record_fields(fs, recs, ""),
-        Variant(_) => unreachable!(), // not possible after rewriting
-        Func(_) => unreachable!(),    // not possible after rewriting
-        Service(_) => unreachable!(), // not possible after rewriting
-        Class(_, _) => unreachable!(),
-        Knot(_) | Unknown | Future => unreachable!(),
+fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
+    match vis {
+        Some(vis) if vis.is_empty() => RcDoc::nil(),
+        Some(vis) => RcDoc::text(vis.clone()).append(" "),
+        None => RcDoc::text("pub "),
     }
 }
-
-fn pp_label<'a>(id: &'a SharedLabel, is_variant: bool, vis: &'a str) -> RcDoc<'a> {
-    let vis = if vis.is_empty() {
-        RcDoc::nil()
-    } else {
-        kwd(vis)
-    };
-    match &**id {
-        Label::Named(id) => {
-            let case = if is_variant { Some(Case::Pascal) } else { None };
-            let (doc, is_rename) = ident_(id, case);
-            if is_rename {
-                str("#[serde(rename=\"")
-                    .append(id.escape_debug().to_string())
-                    .append("\")]")
-                    .append(RcDoc::line())
-                    .append(vis)
-                    .append(doc)
-            } else {
-                vis.append(doc)
-            }
-        }
-        Label::Id(n) | Label::Unnamed(n) => vis.append("_").append(RcDoc::as_string(n)).append("_"),
-    }
-}
-
-fn pp_record_field<'a>(field: &'a Field, recs: &RecPoints, vis: &'a str) -> RcDoc<'a> {
-    pp_label(&field.id, false, vis)
-        .append(kwd(":"))
-        .append(pp_ty(&field.ty, recs))
-}
-
-fn pp_record_fields<'a>(fs: &'a [Field], recs: &RecPoints, vis: &'a str) -> RcDoc<'a> {
-    if is_tuple(fs) {
-        let vis = if vis.is_empty() {
-            RcDoc::nil()
+impl<'a> State<'a> {
+    fn pp_ty<'b>(&mut self, ty: &'b Type, is_ref: bool) -> RcDoc<'b> {
+        use TypeInner::*;
+        let elem = StateElem::Type(ty);
+        let old = self.state.push_state(&elem);
+        let res = if let Some(t) = &self.state.config.use_type {
+            RcDoc::text(t.clone())
         } else {
-            kwd(vis)
-        };
-        let tuple = RcDoc::concat(
-            fs.iter()
-                .map(|f| vis.clone().append(pp_ty(&f.ty, recs)).append(",")),
-        );
-        enclose("(", tuple, ")")
-    } else {
-        let fields = concat(fs.iter().map(|f| pp_record_field(f, recs, vis)), ",");
-        enclose_space("{", fields, "}")
-    }
-}
-
-fn pp_variant_field<'a>(field: &'a Field, recs: &RecPoints) -> RcDoc<'a> {
-    match field.ty.as_ref() {
-        TypeInner::Null => pp_label(&field.id, true, ""),
-        TypeInner::Record(fs) => {
-            pp_label(&field.id, true, "").append(pp_record_fields(fs, recs, ""))
-        }
-        _ => pp_label(&field.id, true, "").append(enclose("(", pp_ty(&field.ty, recs), ")")),
-    }
-}
-
-fn pp_variant_fields<'a>(fs: &'a [Field], recs: &RecPoints) -> RcDoc<'a> {
-    let fields = concat(fs.iter().map(|f| pp_variant_field(f, recs)), ",");
-    enclose_space("{", fields, "}")
-}
-
-fn pp_defs<'a>(
-    config: &'a Config,
-    env: &'a TypeEnv,
-    def_list: &'a [&'a str],
-    recs: &'a RecPoints,
-) -> RcDoc<'a> {
-    let derive = if config.type_attributes.is_empty() {
-        "#[derive(CandidType, Deserialize)]"
-    } else {
-        &config.type_attributes
-    };
-    lines(def_list.iter().map(|id| {
-        let ty = env.find_type(id).unwrap();
-        let name = ident(id, Some(Case::Pascal)).append(" ");
-        let vis = "pub ";
-        match ty.as_ref() {
-            TypeInner::Record(fs) => {
-                let separator = if is_tuple(fs) {
-                    RcDoc::text(";")
-                } else {
-                    RcDoc::nil()
-                };
-                str(derive)
-                    .append(RcDoc::line())
-                    .append(vis)
-                    .append("struct ")
-                    .append(name)
-                    .append(pp_record_fields(fs, recs, "pub"))
-                    .append(separator)
-                    .append(RcDoc::hardline())
+            match ty.as_ref() {
+                Null => str("()"),
+                Bool => str("bool"),
+                Nat => str("candid::Nat"),
+                Int => str("candid::Int"),
+                Nat8 => str("u8"),
+                Nat16 => str("u16"),
+                Nat32 => str("u32"),
+                Nat64 => str("u64"),
+                Int8 => str("i8"),
+                Int16 => str("i16"),
+                Int32 => str("i32"),
+                Int64 => str("i64"),
+                Float32 => str("f32"),
+                Float64 => str("f64"),
+                Text => str("String"),
+                Reserved => str("candid::Reserved"),
+                Empty => str("candid::Empty"),
+                Var(ref id) => {
+                    let name = if let Some(name) = &self.state.config.name {
+                        RcDoc::text(name.clone())
+                    } else {
+                        ident(id, Some(Case::Pascal))
+                    };
+                    if !is_ref && self.recs.contains(id.as_str()) {
+                        str("Box<").append(name).append(">")
+                    } else {
+                        name
+                    }
+                }
+                Principal => str("Principal"),
+                Opt(ref t) => str("Option").append(enclose("<", self.pp_ty(t, is_ref), ">")),
+                // It's a bit tricky to use `deserialize_with = "serde_bytes"`. It's not working for `type t = blob`
+                Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
+                Vec(ref t) => str("Vec").append(enclose("<", self.pp_ty(t, is_ref), ">")),
+                Record(ref fs) => self.pp_record_fields(fs, false, is_ref),
+                Variant(_) => unreachable!(), // not possible after rewriting
+                Func(_) => unreachable!(),    // not possible after rewriting
+                Service(_) => unreachable!(), // not possible after rewriting
+                Class(_, _) => unreachable!(),
+                Knot(_) | Unknown | Future => unreachable!(),
             }
-            TypeInner::Variant(fs) => str(derive)
-                .append(RcDoc::line())
-                .append(vis)
-                .append("enum ")
-                .append(name)
-                .append(pp_variant_fields(fs, recs))
-                .append(RcDoc::hardline()),
-            TypeInner::Func(func) => str("candid::define_function!(")
-                .append(vis)
-                .append(name)
-                .append(": ")
-                .append(pp_ty_func(func))
-                .append(");"),
-            TypeInner::Service(serv) => str("candid::define_service!(")
-                .append(vis)
-                .append(name)
-                .append(": ")
-                .append(pp_ty_service(serv))
-                .append(");"),
-            _ => {
-                if recs.contains(id) {
-                    str(derive)
+        };
+        self.state.pop_state(old, elem);
+        res
+    }
+    fn pp_label<'b>(&mut self, id: &'b SharedLabel, is_variant: bool, need_vis: bool) -> RcDoc<'b> {
+        let vis = if need_vis {
+            pp_vis(&self.state.config.visibility)
+        } else {
+            RcDoc::nil()
+        };
+        let attr = self
+            .state
+            .config
+            .attributes
+            .clone()
+            .map(|s| RcDoc::text(s).append(RcDoc::line()))
+            .unwrap_or(RcDoc::nil());
+        match &**id {
+            Label::Named(id) => {
+                let (doc, is_rename) = if let Some(name) = &self.state.config.name {
+                    (RcDoc::text(name.clone()), true)
+                } else {
+                    let case = if is_variant { Some(Case::Pascal) } else { None };
+                    ident_(id, case)
+                };
+                let attr = if is_rename {
+                    attr.append("#[serde(rename=\"")
+                        .append(id.escape_debug().to_string())
+                        .append("\")]")
+                        .append(RcDoc::line())
+                } else {
+                    attr
+                };
+                attr.append(vis).append(doc)
+            }
+            Label::Id(n) | Label::Unnamed(n) => {
+                // TODO rename
+                vis.append("_").append(RcDoc::as_string(n)).append("_")
+            }
+        }
+    }
+    fn pp_tuple<'b>(&mut self, fs: &'b [Field], need_vis: bool, is_ref: bool) -> RcDoc<'b> {
+        let tuple = fs.iter().enumerate().map(|(i, f)| {
+            let lab = i.to_string();
+            let old = self.state.push_state(&StateElem::Label(&lab));
+            let vis = if need_vis {
+                pp_vis(&self.state.config.visibility)
+            } else {
+                RcDoc::nil()
+            };
+            let res = vis.append(self.pp_ty(&f.ty, is_ref)).append(",");
+            self.state.pop_state(old, StateElem::Label(&lab));
+            res
+        });
+        enclose("(", RcDoc::concat(tuple), ")")
+    }
+    fn pp_record_field<'b>(&mut self, field: &'b Field, need_vis: bool, is_ref: bool) -> RcDoc<'b> {
+        let lab = field.id.to_string();
+        let old = self.state.push_state(&StateElem::Label(&lab));
+        let res = self
+            .pp_label(&field.id, false, need_vis)
+            .append(kwd(":"))
+            .append(self.pp_ty(&field.ty, is_ref));
+        self.state.pop_state(old, StateElem::Label(&lab));
+        res
+    }
+    fn pp_record_fields<'b>(&mut self, fs: &'b [Field], need_vis: bool, is_ref: bool) -> RcDoc<'b> {
+        let old = self.state.push_state(&StateElem::TypeStr("record"));
+        let res = if is_tuple(fs) {
+            // TODO check if there is no name/attr in the label subtree
+            self.pp_tuple(fs, need_vis, is_ref)
+        } else {
+            let fields: Vec<_> = fs
+                .iter()
+                .map(|f| self.pp_record_field(f, need_vis, is_ref))
+                .collect();
+            let fields = concat(fields.into_iter(), ",");
+            enclose_space("{", fields, "}")
+        };
+        self.state.pop_state(old, StateElem::TypeStr("record"));
+        res
+    }
+    fn pp_variant_field<'b>(&mut self, field: &'b Field) -> RcDoc<'b> {
+        let lab = field.id.to_string();
+        let old = self.state.push_state(&StateElem::Label(&lab));
+        let res = match field.ty.as_ref() {
+            TypeInner::Null => self.pp_label(&field.id, true, false),
+            TypeInner::Record(fs) => self
+                .pp_label(&field.id, true, false)
+                .append(self.pp_record_fields(fs, false, false)),
+            _ => self.pp_label(&field.id, true, false).append(enclose(
+                "(",
+                self.pp_ty(&field.ty, false),
+                ")",
+            )),
+        };
+        self.state.pop_state(old, StateElem::Label(&lab));
+        res
+    }
+    fn pp_variant_fields<'b>(&mut self, fs: &'b [Field]) -> RcDoc<'b> {
+        let old = self.state.push_state(&StateElem::TypeStr("variant"));
+        let fields: Vec<_> = fs.iter().map(|f| self.pp_variant_field(f)).collect();
+        let fields = concat(fields.into_iter(), ",");
+        let res = enclose_space("{", fields, "}");
+        self.state.pop_state(old, StateElem::TypeStr("variant"));
+        res
+    }
+    fn pp_defs(&mut self, def_list: &'a [&'a str]) -> RcDoc<'a> {
+        let mut res = Vec::with_capacity(def_list.len());
+        for id in def_list {
+            let old = self.state.push_state(&StateElem::Label(id));
+            if self.state.config.use_type.is_some() {
+                self.state.pop_state(old, StateElem::Label(id));
+                continue;
+            }
+            let ty = self.state.env.find_type(id).unwrap();
+            let name = self
+                .state
+                .config
+                .name
+                .clone()
+                .map(RcDoc::text)
+                .unwrap_or_else(|| ident(id, Some(Case::Pascal)));
+            let vis = pp_vis(&self.state.config.visibility);
+            let derive = self
+                .state
+                .config
+                .attributes
+                .clone()
+                .map(RcDoc::text)
+                .unwrap_or(RcDoc::text("#[derive(CandidType, Deserialize)]"));
+            let line = match ty.as_ref() {
+                TypeInner::Record(fs) => {
+                    let separator = if is_tuple(fs) {
+                        RcDoc::text(";")
+                    } else {
+                        RcDoc::nil()
+                    };
+                    derive
                         .append(RcDoc::line())
                         .append(vis)
                         .append("struct ")
-                        .append(ident(id, Some(Case::Pascal)))
-                        .append(enclose("(", pp_ty(ty, recs), ")"))
-                        .append(";")
-                        .append(RcDoc::hardline())
-                } else {
-                    str(vis)
-                        .append(kwd("type"))
                         .append(name)
-                        .append("= ")
-                        .append(pp_ty(ty, recs))
-                        .append(";")
+                        .append(" ")
+                        .append(self.pp_record_fields(fs, true, false))
+                        .append(separator)
                 }
-            }
-        }
-    }))
-}
-
-fn pp_args(args: &[Type]) -> RcDoc {
-    let empty = RecPoints::default();
-    let doc = concat(args.iter().map(|t| pp_ty(t, &empty)), ",");
-    enclose("(", doc, ")")
-}
-fn pp_ty_func(f: &Function) -> RcDoc {
-    let args = pp_args(&f.args);
-    let rets = pp_args(&f.rets);
-    let modes = candid::pretty::candid::pp_modes(&f.modes);
-    args.append(" ->")
-        .append(RcDoc::space())
-        .append(rets.append(modes))
-        .nest(INDENT_SPACE)
-}
-fn pp_ty_service(serv: &[(String, Type)]) -> RcDoc {
-    let doc = concat(
-        serv.iter().map(|(id, func)| {
-            let func_doc = match func.as_ref() {
-                TypeInner::Func(ref f) => enclose("candid::func!(", pp_ty_func(f), ")"),
-                TypeInner::Var(_) => pp_ty(func, &RecPoints::default()).append("::ty()"),
-                _ => unreachable!(),
+                TypeInner::Variant(fs) => derive
+                    .append(RcDoc::line())
+                    .append(vis)
+                    .append("enum ")
+                    .append(name)
+                    .append(" ")
+                    .append(self.pp_variant_fields(fs)),
+                TypeInner::Func(func) => str("candid::define_function!(")
+                    .append(vis)
+                    .append(name)
+                    .append(" : ")
+                    .append(self.pp_ty_func(func))
+                    .append(");"),
+                TypeInner::Service(serv) => str("candid::define_service!(")
+                    .append(vis)
+                    .append(name)
+                    .append(" : ")
+                    .append(self.pp_ty_service(serv))
+                    .append(");"),
+                _ => {
+                    if self.recs.contains(id) {
+                        derive
+                            .append(RcDoc::line())
+                            .append(vis)
+                            .append("struct ")
+                            .append(name)
+                            .append(enclose("(", self.pp_ty(ty, false), ")"))
+                            .append(";")
+                    } else {
+                        vis.append(kwd("type"))
+                            .append(name)
+                            .append(" = ")
+                            .append(self.pp_ty(ty, false))
+                            .append(";")
+                    }
+                }
             };
-            RcDoc::text("\"")
-                .append(id)
-                .append(kwd("\" :"))
-                .append(func_doc)
-        }),
-        ";",
-    );
-    enclose_space("{", doc, "}")
-}
-
-fn pp_function<'a>(config: &Config, id: &'a str, func: &'a Function) -> RcDoc<'a> {
-    let name = ident(id, Some(Case::Snake));
-    let empty = BTreeSet::new();
-    let arg_prefix = str(match config.target {
-        Target::CanisterCall => "&self",
-        Target::Agent => "&self",
-        Target::CanisterStub => unimplemented!(),
-    });
-    let args = concat(
-        std::iter::once(arg_prefix).chain(
-            func.args
-                .iter()
-                .enumerate()
-                .map(|(i, ty)| RcDoc::as_string(format!("arg{i}: ")).append(pp_ty(ty, &empty))),
-        ),
-        ",",
-    );
-    let rets = match config.target {
-        Target::CanisterCall => enclose(
-            "(",
-            RcDoc::concat(func.rets.iter().map(|ty| pp_ty(ty, &empty).append(","))),
-            ")",
-        ),
-        Target::Agent => match func.rets.len() {
-            0 => str("()"),
-            1 => pp_ty(&func.rets[0], &empty),
-            _ => enclose(
-                "(",
-                RcDoc::intersperse(
-                    func.rets.iter().map(|ty| pp_ty(ty, &empty)),
-                    RcDoc::text(", "),
-                ),
-                ")",
-            ),
-        },
-        Target::CanisterStub => unimplemented!(),
-    };
-    let sig = kwd("pub async fn")
-        .append(name)
-        .append(enclose("(", args, ")"))
-        .append(kwd(" ->"))
-        .append(enclose("Result<", rets, "> "));
-    let method = id.escape_debug().to_string();
-    let body = match config.target {
-        Target::CanisterCall => {
-            let args = RcDoc::concat((0..func.args.len()).map(|i| RcDoc::text(format!("arg{i},"))));
-            str("ic_cdk::call(self.0, \"")
-                .append(method)
-                .append("\", ")
-                .append(enclose("(", args, ")"))
-                .append(").await")
+            self.state.pop_state(old, StateElem::Label(id));
+            res.push(line)
         }
-        Target::Agent => {
-            let is_query = func.is_query();
-            let builder_method = if is_query { "query" } else { "update" };
-            let call = if is_query { "call" } else { "call_and_wait" };
-            let args = RcDoc::intersperse(
-                (0..func.args.len()).map(|i| RcDoc::text(format!("&arg{i}"))),
-                RcDoc::text(", "),
-            );
-            let blob = str("Encode!").append(enclose("(", args, ")?;"));
-            let rets = RcDoc::concat(
-                func.rets
-                    .iter()
-                    .map(|ty| str(", ").append(pp_ty(ty, &empty))),
-            );
-            str("let args = ").append(blob).append(RcDoc::hardline())
-                .append(format!("let bytes = self.1.{builder_method}(&self.0, \"{method}\").with_arg(args).{call}().await?;"))
-                .append(RcDoc::hardline())
-                .append("Ok(Decode!(&bytes").append(rets).append(")?)")
-        }
-        Target::CanisterStub => unimplemented!(),
-    };
-    sig.append(enclose_space("{", body, "}"))
-}
-
-fn pp_actor<'a>(config: &'a Config, env: &'a TypeEnv, actor: &'a Type) -> RcDoc<'a> {
-    // TODO trace to service before we figure out what canister means in Rust
-    let serv = env.as_service(actor).unwrap();
-    let body = RcDoc::intersperse(
-        serv.iter().map(|(id, func)| {
-            let func = env.as_func(func).unwrap();
-            pp_function(config, id, func)
-        }),
-        RcDoc::hardline(),
-    );
-    let struct_name = config.service_name.to_case(Case::Pascal);
-    let service_def = match config.target {
-        Target::CanisterCall => format!("pub struct {}(pub Principal);", struct_name),
-        Target::Agent => format!(
-            "pub struct {}<'a>(pub Principal, pub &'a ic_agent::Agent);",
-            struct_name
-        ),
-        Target::CanisterStub => unimplemented!(),
-    };
-    let service_impl = match config.target {
-        Target::CanisterCall => format!("impl {} ", struct_name),
-        Target::Agent => format!("impl<'a> {}<'a> ", struct_name),
-        Target::CanisterStub => unimplemented!(),
-    };
-    let res = RcDoc::text(service_def)
-        .append(RcDoc::hardline())
-        .append(service_impl)
-        .append(enclose_space("{", body, "}"))
-        .append(RcDoc::hardline());
-    if let Some(cid) = config.canister_id {
-        let slice = cid
-            .as_slice()
+        lines(res.into_iter())
+    }
+    fn pp_args<'b>(&mut self, args: &'b [Type], prefix: &'b str) -> RcDoc<'b> {
+        let doc: Vec<_> = args
             .iter()
-            .map(|b| b.to_string())
-            .collect::<Vec<_>>()
-            .join(", ");
-        let id = RcDoc::text(format!(
-            "pub const CANISTER_ID : Principal = Principal::from_slice(&[{}]); // {}",
-            slice, cid
-        ));
-        let instance = match config.target {
-            Target::CanisterCall => format!(
-                "pub const {} : {} = {}(CANISTER_ID);",
-                config.service_name, struct_name, struct_name
-            ),
-            Target::Agent => "".to_string(),
-            Target::CanisterStub => unimplemented!(),
-        };
-        res.append(id).append(RcDoc::hardline()).append(instance)
-    } else {
+            .enumerate()
+            .map(|(i, t)| {
+                let lab = format!("{prefix}{i}");
+                let old = self.state.push_state(&StateElem::Label(&lab));
+                let res = self.pp_ty(t, true);
+                self.state.pop_state(old, StateElem::Label(&lab));
+                res
+            })
+            .collect();
+        let doc = concat(doc.into_iter(), ",");
+        enclose("(", doc, ")")
+    }
+    fn pp_ty_func<'b>(&mut self, f: &'b Function) -> RcDoc<'b> {
+        let lab = StateElem::TypeStr("func");
+        let old = self.state.push_state(&lab);
+        let args = self.pp_args(&f.args, "arg");
+        let rets = self.pp_args(&f.rets, "ret");
+        let modes = candid::pretty::candid::pp_modes(&f.modes);
+        let res = args
+            .append(" ->")
+            .append(RcDoc::space())
+            .append(rets.append(modes))
+            .nest(INDENT_SPACE);
+        self.state.pop_state(old, lab);
         res
     }
-}
-
-pub fn compile(config: &Config, env: &TypeEnv, actor: &Option<Type>) -> String {
-    let header = format!(
-        r#"// This is an experimental feature to generate Rust binding from Candid.
-// You may want to manually adjust some of the types.
-#![allow(dead_code, unused_imports)]
-use {}::{{self, CandidType, Deserialize, Principal, Encode, Decode}};
-"#,
-        config.candid_crate
-    );
-    let header = header
-        + match &config.target {
-            Target::CanisterCall => "use ic_cdk::api::call::CallResult as Result;\n",
-            Target::Agent => "type Result<T> = std::result::Result<T, ic_agent::AgentError>;\n",
-            Target::CanisterStub => "",
+    fn pp_ty_service<'b>(&mut self, serv: &'b [(String, Type)]) -> RcDoc<'b> {
+        let lab = StateElem::TypeStr("service");
+        let old = self.state.push_state(&lab);
+        let mut list = Vec::new();
+        for (id, func) in serv.iter() {
+            let func_doc = match func.as_ref() {
+                TypeInner::Func(ref f) => enclose("candid::func!(", self.pp_ty_func(f), ")"),
+                TypeInner::Var(_) => self.pp_ty(func, true).append("::ty()"),
+                _ => unreachable!(),
+            };
+            list.push(
+                RcDoc::text("\"")
+                    .append(id)
+                    .append(kwd("\" :"))
+                    .append(func_doc),
+            );
+        }
+        let doc = concat(list.into_iter(), ";");
+        let res = enclose_space("{", doc, "}");
+        self.state.pop_state(old, lab);
+        res
+    }
+    fn pp_function(&mut self, id: &str, func: &Function) -> Method {
+        let old = self.state.push_state(&StateElem::Label(id));
+        let name = self
+            .state
+            .config
+            .name
+            .clone()
+            .unwrap_or_else(|| ident(id, Some(Case::Snake)).pretty(LINE_WIDTH).to_string());
+        let args: Vec<_> = func
+            .args
+            .iter()
+            .enumerate()
+            .map(|(i, ty)| {
+                let lab = format!("arg{i}");
+                let old = self.state.push_state(&StateElem::Label(&lab));
+                let name = self
+                    .state
+                    .config
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| lab.clone());
+                let res = self.pp_ty(ty, true);
+                self.state.pop_state(old, StateElem::Label(&lab));
+                (name, res)
+            })
+            .collect();
+        let rets: Vec<_> = func
+            .rets
+            .iter()
+            .enumerate()
+            .map(|(i, ty)| {
+                let lab = format!("ret{i}");
+                let old = self.state.push_state(&StateElem::Label(&lab));
+                let res = self.pp_ty(ty, true);
+                self.state.pop_state(old, StateElem::Label(&lab));
+                res
+            })
+            .collect();
+        let mode = if func.is_query() { "query" } else { "update" }.to_string();
+        let res = Method {
+            name,
+            original_name: id.to_string(),
+            args: args
+                .into_iter()
+                .map(|(id, t)| (id, t.pretty(LINE_WIDTH).to_string()))
+                .collect(),
+            rets: rets
+                .into_iter()
+                .map(|x| x.pretty(LINE_WIDTH).to_string())
+                .collect(),
+            mode,
         };
+        self.state.pop_state(old, StateElem::Label(id));
+        res
+    }
+    fn pp_actor(&mut self, actor: &Type) -> (Vec<Method>, Option<Vec<(String, String)>>) {
+        let actor = self.state.env.trace_type(actor).unwrap();
+        let init = if let TypeInner::Class(args, _) = actor.as_ref() {
+            let old = self.state.push_state(&StateElem::Label("init"));
+            let args: Vec<_> = args
+                .iter()
+                .enumerate()
+                .map(|(i, ty)| {
+                    let lab = format!("arg{i}");
+                    let old = self.state.push_state(&StateElem::Label(&lab));
+                    let name = self
+                        .state
+                        .config
+                        .name
+                        .clone()
+                        .unwrap_or_else(|| lab.clone());
+                    let res = self.pp_ty(ty, true);
+                    self.state.pop_state(old, StateElem::Label(&lab));
+                    (name, res.pretty(LINE_WIDTH).to_string())
+                })
+                .collect();
+            self.state.pop_state(old, StateElem::Label("init"));
+            Some(args)
+        } else {
+            None
+        };
+        let serv = self.state.env.as_service(&actor).unwrap();
+        let mut res = Vec::new();
+        for (id, func) in serv.iter() {
+            let func = self.state.env.as_func(func).unwrap();
+            res.push(self.pp_function(id, func));
+        }
+        (res, init)
+    }
+}
+#[derive(Serialize, Debug)]
+pub struct Output {
+    type_defs: String,
+    methods: Vec<Method>,
+    init_args: Option<Vec<(String, String)>>,
+}
+#[derive(Serialize, Debug)]
+pub struct Method {
+    name: String,
+    original_name: String,
+    args: Vec<(String, String)>,
+    rets: Vec<String>,
+    mode: String,
+}
+pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> Output {
     let (env, actor) = nominalize_all(env, actor);
     let def_list: Vec<_> = if let Some(actor) = &actor {
         chase_actor(&env, actor).unwrap()
@@ -465,16 +498,72 @@ use {}::{{self, CandidType, Deserialize, Principal, Encode, Decode}};
         env.0.iter().map(|pair| pair.0.as_ref()).collect()
     };
     let recs = infer_rec(&env, &def_list).unwrap();
-    let defs = pp_defs(config, &env, &def_list, &recs);
-    let doc = match &actor {
-        None => defs,
-        Some(actor) => {
-            let actor = pp_actor(config, &env, actor);
-            defs.append(actor)
-        }
+    let mut state = State {
+        state: crate::configs::State::new(&tree.0, &env),
+        recs,
     };
-    let doc = RcDoc::text(header).append(RcDoc::line()).append(doc);
-    doc.pretty(LINE_WIDTH).to_string()
+    let defs = state.pp_defs(&def_list);
+    let (methods, init_args) = if let Some(actor) = &actor {
+        state.pp_actor(actor)
+    } else {
+        (Vec::new(), None)
+    };
+    Output {
+        type_defs: defs.pretty(LINE_WIDTH).to_string(),
+        methods,
+        init_args,
+    }
+}
+pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) -> String {
+    let hbs = get_hbs();
+    #[derive(Serialize)]
+    struct HBOutput {
+        #[serde(flatten)]
+        external: BTreeMap<String, String>,
+        type_defs: String,
+        methods: Vec<Method>,
+    }
+    let data = HBOutput {
+        type_defs: output.type_defs,
+        methods: output.methods,
+        external: config.0,
+    };
+    hbs.render_template(template, &data).unwrap()
+}
+pub struct Config(ConfigTree<BindingConfig>);
+impl Config {
+    pub fn new(configs: Configs) -> Self {
+        Self(ConfigTree::from_configs("rust", configs).unwrap())
+    }
+}
+pub struct ExternalConfig(pub BTreeMap<String, String>);
+impl Default for ExternalConfig {
+    fn default() -> Self {
+        Self(
+            [
+                ("candid_crate", "candid"),
+                ("service_name", "service"),
+                ("target", "canister_call"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect(),
+        )
+    }
+}
+pub fn compile(
+    tree: &Config,
+    env: &TypeEnv,
+    actor: &Option<Type>,
+    external: ExternalConfig,
+) -> String {
+    let source = match external.0.get("target").map(|s| s.as_str()) {
+        Some("canister_call") | None => include_str!("rust_call.hbs"),
+        Some("agent") => include_str!("rust_agent.hbs"),
+        _ => unimplemented!(),
+    };
+    let output = emit_bindgen(tree, env, actor);
+    output_handlebar(output, external, source)
 }
 
 pub enum TypePath {
@@ -664,4 +753,105 @@ fn nominalize_all(env: &TypeEnv, actor: &Option<Type>) -> (TypeEnv, Option<Type>
         .as_ref()
         .map(|ty| nominalize(&mut res, &mut vec![], ty));
     (res, actor)
+}
+
+fn get_hbs() -> handlebars::Handlebars<'static> {
+    use handlebars::*;
+    let mut hbs = Handlebars::new();
+    hbs.register_escape_fn(handlebars::no_escape);
+    hbs.set_strict_mode(true);
+    hbs.register_helper(
+        "escape_debug",
+        Box::new(
+            |h: &Helper,
+             _: &Handlebars,
+             _: &Context,
+             _: &mut RenderContext,
+             out: &mut dyn Output|
+             -> HelperResult {
+                let s = h.param(0).unwrap().value().as_str().unwrap();
+                out.write(&s.escape_debug().to_string())?;
+                Ok(())
+            },
+        ),
+    );
+    hbs.register_helper(
+        "snake_case",
+        Box::new(
+            |h: &Helper,
+             _: &Handlebars,
+             _: &Context,
+             _: &mut RenderContext,
+             out: &mut dyn Output|
+             -> HelperResult {
+                let s = h.param(0).unwrap().value().as_str().unwrap();
+                out.write(s.to_case(Case::Snake).as_ref())?;
+                Ok(())
+            },
+        ),
+    );
+    hbs.register_helper(
+        "PascalCase",
+        Box::new(
+            |h: &Helper,
+             _: &Handlebars,
+             _: &Context,
+             _: &mut RenderContext,
+             out: &mut dyn Output|
+             -> HelperResult {
+                let s = h.param(0).unwrap().value().as_str().unwrap();
+                out.write(s.to_case(Case::Pascal).as_ref())?;
+                Ok(())
+            },
+        ),
+    );
+    hbs.register_helper(
+        "vec_to_arity",
+        Box::new(
+            |h: &Helper,
+             _: &Handlebars,
+             _: &Context,
+             _: &mut RenderContext,
+             out: &mut dyn Output|
+             -> HelperResult {
+                let vec: Vec<_> = h
+                    .param(0)
+                    .unwrap()
+                    .value()
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_str().unwrap())
+                    .collect();
+                match vec.len() {
+                    1 => out.write(vec[0])?,
+                    _ => out.write(&format!("({})", vec.join(", ")))?,
+                }
+                Ok(())
+            },
+        ),
+    );
+    hbs.register_helper(
+        "principal_slice",
+        Box::new(
+            |h: &Helper,
+             _: &Handlebars,
+             _: &Context,
+             _: &mut RenderContext,
+             out: &mut dyn Output|
+             -> HelperResult {
+                let s = h.param(0).unwrap().value().as_str().unwrap();
+                let id = crate::Principal::from_text(s).unwrap();
+                let slice = id
+                    .as_slice()
+                    .iter()
+                    .map(|b| b.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                out.write(slice.as_str())?;
+                Ok(())
+            },
+        ),
+    );
+    hbs
 }

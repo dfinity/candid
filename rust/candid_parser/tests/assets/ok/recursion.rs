@@ -7,14 +7,11 @@ use ic_cdk::api::call::CallResult as Result;
 candid::define_function!(pub T : (S) -> ());
 #[derive(CandidType, Deserialize)]
 pub struct Node { pub head: candid::Nat, pub tail: Box<List> }
-
 #[derive(CandidType, Deserialize)]
 pub struct List(Option<Node>);
-
 pub type A = Box<B>;
 #[derive(CandidType, Deserialize)]
 pub struct B(Option<A>);
-
 #[derive(CandidType, Deserialize)]
 pub enum Tree {
   #[serde(rename="branch")]
@@ -22,18 +19,16 @@ pub enum Tree {
   #[serde(rename="leaf")]
   Leaf(candid::Int),
 }
-
 candid::define_function!(pub StreamInnerNext : () -> (Stream) query);
 #[derive(CandidType, Deserialize)]
 pub struct StreamInner { pub head: candid::Nat, pub next: StreamInnerNext }
-
 #[derive(CandidType, Deserialize)]
 pub struct Stream(Option<StreamInner>);
-
 candid::define_service!(pub S : {
   "f" : T::ty();
   "g" : candid::func!((List) -> (B, Tree, Stream));
 });
+
 pub struct Service(pub Principal);
 impl Service {
   pub async fn f(&self, arg0: S) -> Result<()> {
@@ -45,3 +40,4 @@ impl Service {
 }
 pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
 pub const service : Service = Service(CANISTER_ID);
+
