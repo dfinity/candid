@@ -187,6 +187,7 @@ impl<T: ConfigState> ConfigTree<T> {
     }
 }
 
+#[derive(Clone)]
 pub struct Configs(Table);
 
 impl std::str::FromStr for Configs {
