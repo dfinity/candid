@@ -1,14 +1,32 @@
 
 # Changelog
 
+## 2024-05-03
+
+### candid_parser 0.2.0-beta.0
+
+* Breaking changes:
+  + Rewrite `configs` and `random` modules, adapting TOML format as the parser. `configs` module is no longer under a feature flag, and no longer depend on dhall.
+  + Rewrite Rust bindgen to use the new `configs` module. Use `emit_bindgen` to generate type bindings, and use `output_handlebar` to provide a handlebar template for the generated module. `compile` function provides a default template. The generated file without config is exactly the same as before.
+
+* TO-DOs
+  + Spec for path and matching semantics
+  + Warning for unused path
+  + Rust bindgen:
+    * Generate `use_type` tests. How to handle recursive types?
+    * Threading state through `nominalize`
+    * When the path starts with method, duplicate type definition when necessary.
+    * Number label renaming
+
 ## 2024-04-11
 
-### Candid 0.10.7 -- 0.10.5
+### Candid 0.10.5 -- 0.10.8
 
 * Switch `HashMap` to `BTreeMap` in serialization and `T::ty()`. This leads to around 20% perf improvement for serializing complicated types.
 * Disable memoization for unrolled types in serialization to save cycle cost. In some cases, type table can get slightly larger, but it's worth the trade off.
 * Fix bug in `text_size`
 * Fix decoding cost calculation overflow
+* Fix length check in decoding principal type
 
 ## 2024-02-27
 
