@@ -99,11 +99,9 @@ impl From<arbitrary::Error> for Error {
     }
 }
 
-#[cfg_attr(docsrs, doc(cfg(feature = "configs")))]
-#[cfg(feature = "configs")]
-impl From<serde_dhall::Error> for Error {
-    fn from(e: serde_dhall::Error) -> Error {
-        Error::msg(format!("dhall error: {e}"))
+impl From<toml::de::Error> for Error {
+    fn from(e: toml::de::Error) -> Error {
+        Error::msg(format!("toml error: {e}"))
     }
 }
 

@@ -81,9 +81,9 @@ pub trait Serializer: Sized {
     fn serialize_text(self, v: &str) -> Result<(), Self::Error>;
     fn serialize_null(self, v: ()) -> Result<(), Self::Error>;
     fn serialize_empty(self) -> Result<(), Self::Error>;
-    fn serialize_option<T: ?Sized>(self, v: Option<&T>) -> Result<(), Self::Error>
+    fn serialize_option<T>(self, v: Option<&T>) -> Result<(), Self::Error>
     where
-        T: CandidType;
+        T: CandidType + ?Sized;
     fn serialize_struct(self) -> Result<Self::Compound, Self::Error>;
     fn serialize_vec(self, len: usize) -> Result<Self::Compound, Self::Error>;
     fn serialize_blob(self, v: &[u8]) -> Result<(), Self::Error>;
@@ -94,9 +94,9 @@ pub trait Serializer: Sized {
 
 pub trait Compound {
     type Error;
-    fn serialize_element<T: ?Sized>(&mut self, v: &T) -> Result<(), Self::Error>
+    fn serialize_element<T>(&mut self, v: &T) -> Result<(), Self::Error>
     where
-        T: CandidType;
+        T: CandidType + ?Sized;
     // Used for simulating serde(with = "serde_bytes"). We can remove this when specialization is stable in Rust,
     // or generalize this function to take a closure for with.
     #[doc(hidden)]

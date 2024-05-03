@@ -6,3 +6,4 @@ use ic_cdk::api::call::CallResult as Result;
 
 pub type Id = u8;
 
+
