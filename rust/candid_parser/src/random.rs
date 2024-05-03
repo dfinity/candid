@@ -35,11 +35,11 @@ impl ConfigState for GenConfig {
     fn merge_config(&mut self, config: &Self, _elem: Option<&StateElem>, is_recursive: bool) {
         self.range = config.range.or(self.range);
         if config.text.is_some() {
-            self.text = config.text.clone();
+            self.text.clone_from(&config.text);
         }
         self.width = config.width.or(self.width);
         if config.value.is_some() {
-            self.value = config.value.clone();
+            self.value.clone_from(&config.value);
         }
         if !is_recursive {
             self.depth = config.depth.or(self.depth);

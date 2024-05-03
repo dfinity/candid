@@ -19,14 +19,14 @@ pub struct BindingConfig {
 }
 impl ConfigState for BindingConfig {
     fn merge_config(&mut self, config: &Self, elem: Option<&StateElem>, _is_recursive: bool) {
-        self.name = config.name.clone();
+        self.name.clone_from(&config.name);
         // match use_type can survive across types, so that label.use_type works
         if !matches!(elem, Some(StateElem::Label(_))) {
             if let Some(use_type) = &config.use_type {
                 self.use_type = Some(use_type.clone());
             }
         } else {
-            self.use_type = config.use_type.clone();
+            self.use_type.clone_from(&config.use_type);
         }
         // matched attributes can survive across labels, so that record.attributes works
         if matches!(elem, Some(StateElem::Label(_))) {
@@ -34,10 +34,10 @@ impl ConfigState for BindingConfig {
                 self.attributes = Some(attr.clone());
             }
         } else {
-            self.attributes = config.attributes.clone();
+            self.attributes.clone_from(&config.attributes);
         }
         if config.visibility.is_some() {
-            self.visibility = config.visibility.clone();
+            self.visibility.clone_from(&config.visibility);
         }
     }
     fn update_state(&mut self, _elem: &StateElem) {}
