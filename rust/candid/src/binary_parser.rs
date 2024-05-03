@@ -129,7 +129,7 @@ pub struct Len(
 pub struct PrincipalBytes {
     #[br(assert(flag == 1u8, "Opaque reference not supported"))]
     pub flag: u8,
-    #[br(parse_with = read_leb)]
+    #[br(parse_with = read_leb, assert(len <= 29, "Principal is longer than 29 bytes"))]
     pub len: u64,
     #[br(count = len)]
     pub inner: Vec<u8>,
