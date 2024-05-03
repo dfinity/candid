@@ -6,8 +6,9 @@ use toml::{Table, Value};
 
 pub struct State<'a, T: ConfigState> {
     tree: &'a ConfigTree<T>,
-    open_tree: Option<&'a ConfigTree<T>>,
     path: Vec<String>,
+    open_tree: Option<&'a ConfigTree<T>>,
+    open_path: Vec<String>,
     pub config: T,
     pub env: &'a TypeEnv,
 }
@@ -37,6 +38,7 @@ impl<'a, T: ConfigState> State<'a, T> {
         Self {
             tree,
             open_tree: None,
+            open_path: Vec::new(),
             path: Vec::new(),
             config,
             env,
@@ -45,7 +47,10 @@ impl<'a, T: ConfigState> State<'a, T> {
     /// Match paths in the scope first. If `scope` is None, clear the scope.
     pub fn with_scope(&mut self, scope: &Option<Scope>, idx: usize) {
         match scope {
-            None => self.open_tree = None,
+            None => {
+                self.open_tree = None;
+                self.open_path.clear();
+            }
             Some(scope) => {
                 let mut path = vec![format!("method:{}", scope.method)];
                 match self.tree.with_prefix(&path) {
@@ -55,12 +60,24 @@ impl<'a, T: ConfigState> State<'a, T> {
                             Some(ScopePos::Ret) => path.push(format!("ret:{}", idx)),
                             None => (),
                         }
-                        self.open_tree = self.tree.with_prefix(&path).or(Some(tree));
+                        match self.tree.with_prefix(&path) {
+                            Some(subtree) => {
+                                self.open_tree = Some(subtree);
+                                self.open_path = path;
+                            }
+                            None => {
+                                self.open_tree = Some(tree);
+                                self.open_path = vec![path[0].clone()];
+                            }
+                        }
                         if let Some(state) = self.open_tree.unwrap().state.as_ref() {
                             self.config.merge_config(state, None, false);
                         }
                     }
-                    None => self.open_tree = None,
+                    None => {
+                        self.open_tree = None;
+                        self.open_path.clear();
+                    }
                 }
             }
         }
@@ -394,6 +411,7 @@ Vec = { width = 2, size = 10 }
         }),
         0,
     );
+    assert_eq!(state.open_path, vec!["method:f", "arg:0"]);
     let old = state.push_state(&StateElem::Label("list"));
     assert_eq!(state.config.depth, Some(2));
     assert_eq!(state.config.size, Some(20));
@@ -404,10 +422,11 @@ Vec = { width = 2, size = 10 }
     state.with_scope(
         &Some(Scope {
             method: "f",
-            position: None,
+            position: Some(ScopePos::Ret),
         }),
         0,
     );
+    assert_eq!(state.open_path, vec!["method:f"]);
     state.push_state(&StateElem::Label("list"));
     assert_eq!(state.config.depth, Some(3));
     assert_eq!(state.config.size, Some(0));
