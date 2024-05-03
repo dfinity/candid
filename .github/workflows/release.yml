@@ -61,7 +61,7 @@ jobs:
           command: build
           args: --target arm-unknown-linux-gnueabihf --release --locked
       - name: 'Upload assets'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.asset_name }}
           path: ${{ matrix.artifact_name }}
