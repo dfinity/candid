@@ -1,7 +1,7 @@
 use anyhow::Result;
 use candid::types::{Type, TypeEnv, TypeInner};
 use serde::de::DeserializeOwned;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use toml::{Table, Value};
 
 pub struct State<'a, T: ConfigState> {
@@ -9,6 +9,7 @@ pub struct State<'a, T: ConfigState> {
     path: Vec<String>,
     open_tree: Option<&'a ConfigTree<T>>,
     open_path: Vec<String>,
+    stats: BTreeMap<Vec<String>, u32>,
     pub config: T,
     pub env: &'a TypeEnv,
 }
@@ -40,6 +41,7 @@ impl<'a, T: ConfigState> State<'a, T> {
             open_tree: None,
             open_path: Vec::new(),
             path: Vec::new(),
+            stats: BTreeMap::new(),
             config,
             env,
         }
@@ -87,14 +89,27 @@ impl<'a, T: ConfigState> State<'a, T> {
         self.config.update_state(elem);
         let old_config = self.config.clone();
         self.path.push(elem.to_string());
+        let mut from_open = false;
         let new_state = if let Some(subtree) = self.open_tree {
-            subtree
-                .get_config(&self.path)
-                .or_else(|| self.tree.get_config(&self.path))
+            from_open = true;
+            subtree.get_config(&self.path).or_else(|| {
+                from_open = false;
+                self.tree.get_config(&self.path)
+            })
         } else {
             self.tree.get_config(&self.path)
         };
-        if let Some((state, is_recursive)) = new_state {
+        if let Some((state, is_recursive, idx)) = new_state {
+            let mut matched_path = if from_open {
+                self.open_path.clone()
+            } else {
+                vec![]
+            };
+            matched_path.extend_from_slice(&self.path[idx..]);
+            self.stats
+                .entry(matched_path)
+                .and_modify(|v| *v += 1)
+                .or_insert(1);
             self.config.merge_config(state, Some(elem), is_recursive);
             //eprintln!("match path: {:?}, state: {:?}", self.path, self.config);
         } else {
@@ -108,6 +123,26 @@ impl<'a, T: ConfigState> State<'a, T> {
         self.config = old_config;
         assert_eq!(self.path.pop(), Some(elem.to_string()));
         self.config.restore_state(&elem);
+    }
+    pub fn report_unused(&self) -> Vec<String> {
+        let mut res = BTreeSet::new();
+        self.tree.traverse(&mut vec![], &mut res);
+        for k in self.stats.keys() {
+            res.remove(k);
+        }
+        res.remove(&vec![]);
+        res.into_iter().map(|v| v.join(".")).collect()
+    }
+    pub fn get_stats(mut self) -> BTreeMap<String, u32> {
+        let mut res = BTreeSet::new();
+        self.tree.traverse(&mut vec![], &mut res);
+        for e in res {
+            self.stats.entry(e).or_insert(0);
+        }
+        self.stats
+            .into_iter()
+            .map(|(k, v)| (k.join("."), v))
+            .collect()
     }
 }
 
@@ -144,6 +179,7 @@ impl<T: ConfigState> ConfigTree<T> {
         Some(tree)
     }
     pub fn add_config(&mut self, path: &[String], config: T) {
+        // TODO: correctly count the depth of scoped paths
         let n = path.len();
         let mut tree: &Self = self;
         let mut i = 0;
@@ -182,14 +218,15 @@ impl<T: ConfigState> ConfigTree<T> {
             tree.max_depth = std::cmp::max(d, tree.max_depth);
         }
     }
-    pub fn get_config(&self, path: &[String]) -> Option<(&T, bool)> {
+    /// Returns the config, is_recursive, and the index of the matched path
+    pub fn get_config(&self, path: &[String]) -> Option<(&T, bool, usize)> {
         let len = path.len();
         assert!(len > 0);
         let start = len.saturating_sub(self.max_depth as usize);
         for i in (start..len).rev() {
             let (path, tail) = path.split_at(i);
             match self.match_exact_path(tail) {
-                Some(v) => return Some((v, is_repeated(path, tail))),
+                Some(v) => return Some((v, is_repeated(path, tail), i)),
                 None => continue,
             }
         }
@@ -201,6 +238,16 @@ impl<T: ConfigState> ConfigTree<T> {
             result = result.subtree.get(elem)?;
         }
         result.state.as_ref()
+    }
+    pub fn traverse(&self, path: &mut Vec<String>, res: &mut BTreeSet<Vec<String>>) {
+        if self.state.is_some() {
+            res.insert(path.clone());
+        }
+        for (k, v) in self.subtree.iter() {
+            path.push(k.clone());
+            v.traverse(path, res);
+            path.pop();
+        }
     }
 }
 
@@ -272,8 +319,7 @@ fn generate_state_tree<T: ConfigState>(v: Value) -> Result<ConfigTree<T>> {
         Err(anyhow::anyhow!("Expected a table"))
     }
 }
-
-pub fn path_name(t: &Type) -> String {
+fn path_name(t: &Type) -> String {
     match t.as_ref() {
         TypeInner::Null => "null",
         TypeInner::Bool => "bool",
@@ -438,4 +484,17 @@ Vec = { width = 2, size = 10 }
     state.pop_state(old, StateElem::Label("list"));
     assert_eq!(state.config.size, Some(0));
     assert_eq!(state.config.depth, Some(3));
+    let stats = state.report_unused();
+    assert_eq!(
+        stats.iter().map(|x| x.as_str()).collect::<Vec<&str>>(),
+        [
+            "Vec",
+            "a.b.c",
+            "a.b.c.d",
+            "a.b.d",
+            "left.a",
+            "left.list",
+            "vec.nat8"
+        ]
+    );
 }

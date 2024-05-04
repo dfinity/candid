@@ -508,6 +508,10 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> Outpu
     } else {
         (Vec::new(), None)
     };
+    let unused = state.state.report_unused();
+    for e in unused {
+        eprintln!("WARNING: path {e} is not used.");
+    }
     Output {
         type_defs: defs.pretty(LINE_WIDTH).to_string(),
         methods,
