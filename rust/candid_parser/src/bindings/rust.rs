@@ -490,7 +490,7 @@ pub struct Method {
     rets: Vec<String>,
     mode: String,
 }
-pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> Output {
+pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Output, Vec<String>) {
     let (env, actor) = nominalize_all(env, actor);
     let def_list: Vec<_> = if let Some(actor) = &actor {
         chase_actor(&env, actor).unwrap()
@@ -509,14 +509,14 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> Outpu
         (Vec::new(), None)
     };
     let unused = state.state.report_unused();
-    for e in unused {
-        eprintln!("WARNING: path {e} is not used.");
-    }
-    Output {
-        type_defs: defs.pretty(LINE_WIDTH).to_string(),
-        methods,
-        init_args,
-    }
+    (
+        Output {
+            type_defs: defs.pretty(LINE_WIDTH).to_string(),
+            methods,
+            init_args,
+        },
+        unused,
+    )
 }
 pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) -> String {
     let hbs = get_hbs();
@@ -526,11 +526,13 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         external: BTreeMap<String, String>,
         type_defs: String,
         methods: Vec<Method>,
+        init_args: Option<Vec<(String, String)>>,
     }
     let data = HBOutput {
         type_defs: output.type_defs,
         methods: output.methods,
         external: config.0,
+        init_args: output.init_args,
     };
     hbs.render_template(template, &data).unwrap()
 }
@@ -564,9 +566,13 @@ pub fn compile(
     let source = match external.0.get("target").map(|s| s.as_str()) {
         Some("canister_call") | None => include_str!("rust_call.hbs"),
         Some("agent") => include_str!("rust_agent.hbs"),
+        Some("stub") => include_str!("rust_stub.hbs"),
         _ => unimplemented!(),
     };
-    let output = emit_bindgen(tree, env, actor);
+    let (output, unused) = emit_bindgen(tree, env, actor);
+    for e in unused {
+        eprintln!("WARNING: path {e} is unused");
+    }
     output_handlebar(output, external, source)
 }
 

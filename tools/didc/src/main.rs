@@ -30,7 +30,7 @@ enum Command {
     Bind {
         /// Specifies did file for code generation
         input: PathBuf,
-        #[clap(short, long, value_parser = ["js", "ts", "did", "mo", "rs", "rs-agent"])]
+        #[clap(short, long, value_parser = ["js", "ts", "did", "mo", "rs", "rs-agent", "rs-stub"])]
         /// Specifies target language
         target: String,
         #[clap(short, long)]
@@ -220,11 +220,16 @@ fn main() -> Result<()> {
                     let config = Config::new(configs);
                     compile(&config, &env, &actor, ExternalConfig::default())
                 }
-                "rs-agent" => {
+                "rs-agent" | "rs-stub" => {
                     use candid_parser::bindings::rust::{compile, Config, ExternalConfig};
                     let config = Config::new(configs);
                     let mut external = ExternalConfig::default();
-                    external.0.insert("target".to_string(), "agent".to_string());
+                    let target = match target.as_str() {
+                        "rs-agent" => "agent",
+                        "rs-stub" => "stub",
+                        _ => unreachable!(),
+                    };
+                    external.0.insert("target".to_string(), target.to_string());
                     compile(&config, &env, &actor, external)
                 }
                 _ => unreachable!(),
