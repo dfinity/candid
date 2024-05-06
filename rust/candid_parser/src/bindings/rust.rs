@@ -542,6 +542,7 @@ impl Config {
         Self(ConfigTree::from_configs("rust", configs).unwrap())
     }
 }
+#[derive(Deserialize)]
 pub struct ExternalConfig(pub BTreeMap<String, String>);
 impl Default for ExternalConfig {
     fn default() -> Self {
@@ -763,6 +764,100 @@ fn nominalize_all(env: &TypeEnv, actor: &Option<Type>) -> (TypeEnv, Option<Type>
         .as_ref()
         .map(|ty| nominalize(&mut res, &mut vec![], ty));
     (res, actor)
+}
+
+pub fn get_endpoint_from_rust_source(source: &str) {
+    use syn::visit::{self, Visit};
+    use syn::{ImplItemFn, ItemFn};
+    //use syn::spanned::Spanned;
+    struct FnVisitor(Vec<CDKMethod>);
+    impl<'ast> Visit<'ast> for FnVisitor {
+        fn visit_item_fn(&mut self, node: &'ast ItemFn) {
+            if let Some(m) = get_cdk_function(&node.attrs, &node.sig) {
+                self.0.push(m);
+            }
+            // handle nested functions
+            visit::visit_item_fn(self, node);
+        }
+        fn visit_impl_item_fn(&mut self, node: &'ast ImplItemFn) {
+            if let Some(m) = get_cdk_function(&node.attrs, &node.sig) {
+                self.0.push(m);
+            }
+            // handle nested functions
+            visit::visit_impl_item_fn(self, node);
+        }
+    }
+    let ast = syn::parse_file(source).unwrap();
+    let mut visitor = FnVisitor(Vec::new());
+    visitor.visit_file(&ast);
+    println!("{:#?}", visitor.0);
+}
+#[derive(Debug)]
+struct CDKMethod {
+    func_name: String,
+    export_name: Option<String>,
+    args: Vec<String>,
+    rets: Vec<String>,
+    mode: String,
+}
+fn get_cdk_function(attrs: &[syn::Attribute], sig: &syn::Signature) -> Option<CDKMethod> {
+    use quote::ToTokens;
+    use serde_tokenstream::from_tokenstream;
+    use syn::{FnArg, Meta, ReturnType};
+    #[derive(Deserialize, Debug)]
+    struct Attribute {
+        composite: Option<bool>,
+        name: Option<String>,
+    }
+    let func_name = sig.ident.to_string();
+    let mut mode = "".to_string();
+    let mut export_name = None;
+    for attr in attrs {
+        let attr_name = &attr.meta.path().segments.last().unwrap().ident;
+        if attr_name != "update" && attr_name != "query" && attr_name != "init" {
+            continue;
+        }
+        mode = attr_name.to_string();
+        if let Meta::List(list) = &attr.meta {
+            let attr: Attribute = from_tokenstream(&list.tokens).unwrap();
+            if attr.composite.is_some_and(|x| x) {
+                mode = "composite_query".to_string();
+            }
+            if let Some(name) = attr.name {
+                export_name = Some(name);
+            }
+        }
+    }
+    let args = sig
+        .inputs
+        .iter()
+        .filter_map(|arg| match arg {
+            FnArg::Receiver(_) => None,
+            FnArg::Typed(pat) => Some(pat.ty.to_token_stream().to_string()),
+        })
+        .collect();
+    let rets = match &sig.output {
+        ReturnType::Default => Vec::new(),
+        ReturnType::Type(_, ty) => match ty.as_ref() {
+            syn::Type::Tuple(ty) => ty
+                .elems
+                .iter()
+                .map(|x| x.to_token_stream().to_string())
+                .collect(),
+            _ => vec![ty.to_token_stream().to_string()],
+        },
+    };
+    if !mode.is_empty() {
+        Some(CDKMethod {
+            func_name,
+            export_name,
+            args,
+            rets,
+            mode,
+        })
+    } else {
+        None
+    }
 }
 
 fn get_hbs() -> handlebars::Handlebars<'static> {

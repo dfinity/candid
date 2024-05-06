@@ -250,10 +250,20 @@ impl<T: ConfigState> ConfigTree<T> {
         }
     }
 }
-
 #[derive(Clone)]
 pub struct Configs(Table);
-
+impl Configs {
+    pub fn get_subtable(&self, path: &[String]) -> Option<&Table> {
+        let mut res = &self.0;
+        for k in path {
+            match res.get(k)? {
+                Value::Table(t) => res = t,
+                _ => return None,
+            }
+        }
+        Some(res)
+    }
+}
 impl std::str::FromStr for Configs {
     type Err = crate::Error;
     fn from_str(v: &str) -> Result<Self, Self::Err> {
@@ -270,7 +280,6 @@ impl<'a> std::fmt::Display for StateElem<'a> {
         }
     }
 }
-
 fn is_repeated(path: &[String], matched: &[String]) -> bool {
     let iter = path.as_ref().windows(matched.len());
     for slice in iter {
@@ -280,11 +289,9 @@ fn is_repeated(path: &[String], matched: &[String]) -> bool {
     }
     false
 }
-
 fn special_key(key: &str) -> bool {
     key.starts_with("method:") || key.starts_with("arg:") || key.starts_with("ret:")
 }
-
 fn generate_state_tree<T: ConfigState>(v: Value) -> Result<ConfigTree<T>> {
     let mut subtree = BTreeMap::new();
     let mut leaves = toml::Table::new();
