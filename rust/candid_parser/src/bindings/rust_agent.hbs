@@ -11,7 +11,7 @@ impl<'a> {{PascalCase service_name}}<'a> {
   {{#each methods}}
   pub async fn {{this.name}}(&self{{#each this.args}}, {{this.0}}: {{this.1}}{{/each}}) -> Result<{{vec_to_arity this.rets}}> {
     let args = Encode!({{#each this.args}}&{{this.0}}{{#unless @last}},{{/unless}}{{/each}})?;
-    let bytes = self.1.{{this.mode}}(&self.0, "{{escape_debug this.original_name}}").with_arg(args).{{#if (eq this.mode "query")}}call{{else}}call_and_wait(){{/if}}.await?;
+    let bytes = self.1.{{#if (eq this.mode "update")}}update{{else}}query{{/if}}(&self.0, "{{escape_debug this.original_name}}").with_arg(args).{{#if (eq this.mode "update")}}call_and_wait{{else}}call{{/if}}().await?;
     Ok(Decode!(&bytes{{#each this.rets}}, {{this}}{{/each}})?)
   }
   {{/each}}

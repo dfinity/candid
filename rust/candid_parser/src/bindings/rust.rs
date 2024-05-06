@@ -387,6 +387,7 @@ impl<'a> State<'a> {
         res
     }
     fn pp_function(&mut self, id: &str, func: &Function) -> Method {
+        use candid::types::internal::FuncMode;
         let old = self.state.push_state(&StateElem::Label(id));
         let name = self
             .state
@@ -424,7 +425,13 @@ impl<'a> State<'a> {
                 res
             })
             .collect();
-        let mode = if func.is_query() { "query" } else { "update" }.to_string();
+        let mode = match func.modes.first() {
+            None => "update",
+            Some(FuncMode::Query) => "query",
+            Some(FuncMode::CompositeQuery) => "composite_query",
+            Some(FuncMode::Oneway) => "update",
+        }
+        .to_string();
         let res = Method {
             name,
             original_name: id.to_string(),
@@ -954,6 +961,38 @@ fn get_hbs() -> handlebars::Handlebars<'static> {
                     .collect::<Vec<_>>()
                     .join(", ");
                 out.write(slice.as_str())?;
+                Ok(())
+            },
+        ),
+    );
+    hbs.register_helper(
+        "cdk_attribute",
+        Box::new(
+            |h: &Helper,
+             _: &Handlebars,
+             _: &Context,
+             _: &mut RenderContext,
+             out: &mut dyn Output|
+             -> HelperResult {
+                let mode = h.param(0).unwrap().value().as_str().unwrap();
+                let name = h.param(1).unwrap().value().as_str().unwrap();
+                let original_name = h.param(2).unwrap().value().as_str().unwrap();
+                if mode == "update" {
+                    out.write("update")?;
+                } else {
+                    out.write("query")?;
+                }
+                let mut attrs = Vec::new();
+                if mode == "composite_query" {
+                    attrs.push("composite = true".to_string());
+                }
+                if name != original_name {
+                    attrs.push(format!("name = \"{}\"", original_name.escape_debug()));
+                }
+                let attrs = attrs.join(", ");
+                if !attrs.is_empty() {
+                    out.write(&format!("({attrs})"))?;
+                }
                 Ok(())
             },
         ),

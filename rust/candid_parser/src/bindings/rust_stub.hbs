@@ -10,7 +10,7 @@ fn init({{#each init_args}}{{#if (not @first)}}, {{/if}}{{this.0}}: {{this.1}}{{
 }
 {{/if}}
 {{#each methods}}
-#[ic_cdk::{{this.mode}}{{#if (ne this.original_name this.name)}}(name = "{{escape_debug this.original_name}}"){{/if}}]
+#[ic_cdk::{{cdk_attribute this.mode this.name this.original_name}}]
 fn {{this.name}}({{#each this.args}}{{#if (not @first)}}, {{/if}}{{this.0}}: {{this.1}}{{/each}}) -> {{vec_to_arity this.rets}} {
 }
 {{/each}}
