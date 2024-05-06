@@ -774,9 +774,9 @@ fn nominalize_all(env: &TypeEnv, actor: &Option<Type>) -> (TypeEnv, Option<Type>
 }
 
 pub fn get_endpoint_from_rust_source(source: &str) {
+    use syn::spanned::Spanned;
     use syn::visit::{self, Visit};
     use syn::{ImplItemFn, ItemFn};
-    //use syn::spanned::Spanned;
     struct FnVisitor(Vec<CDKMethod>);
     impl<'ast> Visit<'ast> for FnVisitor {
         fn visit_item_fn(&mut self, node: &'ast ItemFn) {
@@ -797,41 +797,72 @@ pub fn get_endpoint_from_rust_source(source: &str) {
     let ast = syn::parse_file(source).unwrap();
     let mut visitor = FnVisitor(Vec::new());
     visitor.visit_file(&ast);
-    println!("{:#?}", visitor.0);
+    for m in visitor.0 {
+        println!("{} {}", m.func_name, m.mode);
+        if let Some((_, meta)) = &m.export_name {
+            let range = meta.span().byte_range();
+            println!(" export {}", &source[range]);
+        }
+        if let Some(composite) = &m.composite {
+            let range = composite.span().byte_range();
+            println!(" composite {}", &source[range]);
+        }
+        for arg in m.args {
+            let range = arg.span().byte_range();
+            println!(" arg {}", &source[range]);
+        }
+        for ret in m.rets {
+            let range = ret.span().byte_range();
+            println!(" ret {}", &source[range]);
+        }
+    }
 }
-#[derive(Debug)]
 struct CDKMethod {
-    func_name: String,
-    export_name: Option<String>,
-    args: Vec<String>,
-    rets: Vec<String>,
-    mode: String,
+    func_name: syn::Ident,
+    export_name: Option<(String, syn::Meta)>,
+    composite: Option<syn::Meta>,
+    mode: syn::Ident,
+    args: Vec<syn::Type>,
+    rets: Vec<syn::Type>,
 }
 fn get_cdk_function(attrs: &[syn::Attribute], sig: &syn::Signature) -> Option<CDKMethod> {
-    use quote::ToTokens;
-    use serde_tokenstream::from_tokenstream;
-    use syn::{FnArg, Meta, ReturnType};
-    #[derive(Deserialize, Debug)]
-    struct Attribute {
-        composite: Option<bool>,
-        name: Option<String>,
-    }
-    let func_name = sig.ident.to_string();
-    let mut mode = "".to_string();
+    use syn::parse::Parser;
+    use syn::{Expr, ExprLit, FnArg, Lit, Meta, ReturnType};
+    let func_name = sig.ident.clone();
+    let mut mode = None;
     let mut export_name = None;
+    let mut composite = None;
     for attr in attrs {
         let attr_name = &attr.meta.path().segments.last().unwrap().ident;
         if attr_name != "update" && attr_name != "query" && attr_name != "init" {
             continue;
         }
-        mode = attr_name.to_string();
+        mode = Some(attr_name.clone());
         if let Meta::List(list) = &attr.meta {
-            let attr: Attribute = from_tokenstream(&list.tokens).unwrap();
-            if attr.composite.is_some_and(|x| x) {
-                mode = "composite_query".to_string();
-            }
-            if let Some(name) = attr.name {
-                export_name = Some(name);
+            let nested = syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated
+                .parse2(list.tokens.clone())
+                .unwrap();
+            for meta in nested {
+                if let Meta::NameValue(ref m) = meta {
+                    if m.path.is_ident("name") {
+                        if let Expr::Lit(ExprLit {
+                            lit: Lit::Str(name),
+                            ..
+                        }) = &m.value
+                        {
+                            export_name = Some((name.value(), meta));
+                        }
+                    } else if m.path.is_ident("composite") {
+                        if let Expr::Lit(ExprLit {
+                            lit: Lit::Bool(b), ..
+                        }) = &m.value
+                        {
+                            if b.value {
+                                composite = Some(meta);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -840,33 +871,25 @@ fn get_cdk_function(attrs: &[syn::Attribute], sig: &syn::Signature) -> Option<CD
         .iter()
         .filter_map(|arg| match arg {
             FnArg::Receiver(_) => None,
-            FnArg::Typed(pat) => Some(pat.ty.to_token_stream().to_string()),
+            FnArg::Typed(pat) => Some(*pat.ty.clone()),
         })
         .collect();
     let rets = match &sig.output {
         ReturnType::Default => Vec::new(),
         ReturnType::Type(_, ty) => match ty.as_ref() {
-            syn::Type::Tuple(ty) => ty
-                .elems
-                .iter()
-                .map(|x| x.to_token_stream().to_string())
-                .collect(),
-            _ => vec![ty.to_token_stream().to_string()],
+            syn::Type::Tuple(ty) => ty.elems.iter().map(|t| (*t).clone()).collect(),
+            _ => vec![*ty.clone()],
         },
     };
-    if !mode.is_empty() {
-        Some(CDKMethod {
-            func_name,
-            export_name,
-            args,
-            rets,
-            mode,
-        })
-    } else {
-        None
-    }
+    mode.map(|mode| CDKMethod {
+        func_name,
+        export_name,
+        composite,
+        args,
+        rets,
+        mode,
+    })
 }
-
 fn get_hbs() -> handlebars::Handlebars<'static> {
     use handlebars::*;
     let mut hbs = Handlebars::new();

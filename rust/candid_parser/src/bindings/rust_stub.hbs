@@ -7,10 +7,12 @@ use {{candid_crate}}::{self, CandidType, Deserialize, Principal};
 {{#if init_args}}
 #[ic_cdk::init]
 fn init({{#each init_args}}{{#if (not @first)}}, {{/if}}{{this.0}}: {{this.1}}{{/each}}) {
+  unimplemented!()
 }
 {{/if}}
 {{#each methods}}
 #[ic_cdk::{{cdk_attribute this.mode this.name this.original_name}}]
 fn {{this.name}}({{#each this.args}}{{#if (not @first)}}, {{/if}}{{this.0}}: {{this.1}}{{/each}}) -> {{vec_to_arity this.rets}} {
+  unimplemented!()
 }
 {{/each}}
