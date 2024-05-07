@@ -485,17 +485,17 @@ impl<'a> State<'a> {
 }
 #[derive(Serialize, Debug)]
 pub struct Output {
-    type_defs: String,
-    methods: Vec<Method>,
-    init_args: Option<Vec<(String, String)>>,
+    pub type_defs: String,
+    pub methods: Vec<Method>,
+    pub init_args: Option<Vec<(String, String)>>,
 }
 #[derive(Serialize, Debug)]
 pub struct Method {
-    name: String,
-    original_name: String,
-    args: Vec<(String, String)>,
-    rets: Vec<String>,
-    mode: String,
+    pub name: String,
+    pub original_name: String,
+    pub args: Vec<(String, String)>,
+    pub rets: Vec<String>,
+    pub mode: String,
 }
 pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Output, Vec<String>) {
     let (env, actor) = nominalize_all(env, actor);
