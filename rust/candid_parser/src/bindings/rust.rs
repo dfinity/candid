@@ -773,14 +773,18 @@ fn nominalize_all(env: &TypeEnv, actor: &Option<Type>) -> (TypeEnv, Option<Type>
     (res, actor)
 }
 pub fn check_rust(source: &str, candid: &Output) {
-    use crate::error::pretty_diagnose;
+    use codespan_reporting::{
+        files::SimpleFile,
+        term::{self, termcolor::StandardStream},
+    };
     let rust = get_endpoint_from_rust_source(source);
-    diff_did_and_rust(candid, &rust)
-        .or_else(|e| {
-            pretty_diagnose("check_rust", source, &e)?;
-            Err(e)
-        })
-        .unwrap();
+    let diags = diff_did_and_rust(candid, &rust);
+    let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
+    let config = term::Config::default();
+    let file = SimpleFile::new("rust code", source);
+    for diag in diags {
+        term::emit(&mut writer.lock(), &config, &file, &diag).unwrap();
+    }
 }
 fn get_endpoint_from_rust_source(source: &str) -> Vec<CDKMethod> {
     use syn::visit::{self, Visit};
@@ -840,10 +844,11 @@ impl CDKMethod {
         }
     }
 }
-fn diff_did_and_rust(candid: &Output, rust: &[CDKMethod]) -> crate::Result<()> {
-    use crate::error::Error::{Custom, Parse};
-    use crate::token::error2;
+use codespan_reporting::diagnostic::Diagnostic;
+fn diff_did_and_rust(candid: &Output, rust: &[CDKMethod]) -> Vec<Diagnostic<()>> {
+    use codespan_reporting::diagnostic::Label;
     use syn::spanned::Spanned;
+    let mut res = Vec::new();
     let rust: BTreeMap<_, _> = rust
         .iter()
         .map(|m| {
@@ -856,41 +861,48 @@ fn diff_did_and_rust(candid: &Output, rust: &[CDKMethod]) -> crate::Result<()> {
         })
         .collect();
     for m in &candid.methods {
+        let diag = Diagnostic::error()
+            .with_message(format!("Error with Candid method {}", m.original_name));
+        let mut labels = Vec::new();
+        let mut notes = Vec::new();
         if let Some(func) = rust.get(&m.original_name) {
             if m.original_name == m.name {
             } else {
                 if let Some((name, meta)) = &func.export_name {
                     if *name != m.original_name {
-                        return Err(Parse(error2(
-                            format!("expect {}", m.original_name.escape_debug()),
-                            meta.span().byte_range(),
-                        )));
+                        labels
+                            .push(Label::primary((), meta.span().byte_range()).with_message(
+                                format!("expect {}", m.original_name.escape_debug()),
+                            ));
                     }
                 } else {
-                    return Err(Parse(error2(
-                        format!("missing (name = \"{}\")", m.original_name.escape_debug()),
-                        func.mode.span().byte_range(),
-                    )));
+                    labels.push(
+                        Label::primary((), func.mode.span().byte_range()).with_message(format!(
+                            "missing (name = \"{}\")",
+                            m.original_name.escape_debug()
+                        )),
+                    );
                 }
             }
             let args = func.args.iter().zip(m.args.iter().map(|x| &x.1));
             for (rust_arg, candid_arg) in args {
                 let parsed_candid_arg: syn::Type = syn::parse_str(candid_arg).unwrap();
                 if parsed_candid_arg != *rust_arg {
-                    return Err(Parse(error2(
-                        format!("expect type: {}", candid_arg),
-                        rust_arg.span().byte_range(),
-                    )));
+                    labels.push(
+                        Label::primary((), rust_arg.span().byte_range())
+                            .with_message(format!("expect type: {}", candid_arg)),
+                    );
                 }
             }
         } else {
-            return Err(Custom(anyhow::anyhow!(
-                "method \"{}\" not found in Rust code",
+            notes.push(format!(
+                "method \"{}\" missing from Rust code",
                 m.original_name
-            )));
+            ));
         }
+        res.push(diag.with_labels(labels).with_notes(notes));
     }
-    Ok(())
+    res
 }
 fn get_cdk_function(attrs: &[syn::Attribute], sig: &syn::Signature) -> Option<CDKMethod> {
     use syn::parse::Parser;
