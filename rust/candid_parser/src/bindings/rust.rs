@@ -772,9 +772,17 @@ fn nominalize_all(env: &TypeEnv, actor: &Option<Type>) -> (TypeEnv, Option<Type>
         .map(|ty| nominalize(&mut res, &mut vec![], ty));
     (res, actor)
 }
-
-pub fn get_endpoint_from_rust_source(source: &str) {
-    use syn::spanned::Spanned;
+pub fn check_rust(source: &str, candid: &Output) {
+    use crate::error::pretty_diagnose;
+    let rust = get_endpoint_from_rust_source(source);
+    diff_did_and_rust(candid, &rust)
+        .or_else(|e| {
+            pretty_diagnose("check_rust", source, &e)?;
+            Err(e)
+        })
+        .unwrap();
+}
+fn get_endpoint_from_rust_source(source: &str) -> Vec<CDKMethod> {
     use syn::visit::{self, Visit};
     use syn::{ImplItemFn, ItemFn};
     struct FnVisitor(Vec<CDKMethod>);
@@ -797,25 +805,10 @@ pub fn get_endpoint_from_rust_source(source: &str) {
     let ast = syn::parse_file(source).unwrap();
     let mut visitor = FnVisitor(Vec::new());
     visitor.visit_file(&ast);
-    for m in visitor.0 {
-        println!("{} {}", m.func_name, m.mode);
-        if let Some((_, meta)) = &m.export_name {
-            let range = meta.span().byte_range();
-            println!(" export {}", &source[range]);
-        }
-        if let Some(composite) = &m.composite {
-            let range = composite.span().byte_range();
-            println!(" composite {}", &source[range]);
-        }
-        for arg in m.args {
-            let range = arg.span().byte_range();
-            println!(" arg {}", &source[range]);
-        }
-        for ret in m.rets {
-            let range = ret.span().byte_range();
-            println!(" ret {}", &source[range]);
-        }
+    for m in &visitor.0 {
+        m.debug_print(source);
     }
+    visitor.0
 }
 struct CDKMethod {
     func_name: syn::Ident,
@@ -824,6 +817,80 @@ struct CDKMethod {
     mode: syn::Ident,
     args: Vec<syn::Type>,
     rets: Vec<syn::Type>,
+}
+impl CDKMethod {
+    fn debug_print(&self, source: &str) {
+        use syn::spanned::Spanned;
+        println!("{} {}", self.func_name, self.mode);
+        if let Some((_, meta)) = &self.export_name {
+            let range = meta.span().byte_range();
+            println!(" export {}", &source[range]);
+        }
+        if let Some(composite) = &self.composite {
+            let range = composite.span().byte_range();
+            println!(" composite {}", &source[range]);
+        }
+        for arg in &self.args {
+            let range = arg.span().byte_range();
+            println!(" arg {}", &source[range]);
+        }
+        for ret in &self.rets {
+            let range = ret.span().byte_range();
+            println!(" ret {}", &source[range]);
+        }
+    }
+}
+fn diff_did_and_rust(candid: &Output, rust: &[CDKMethod]) -> crate::Result<()> {
+    use crate::error::Error::{Custom, Parse};
+    use crate::token::error2;
+    use syn::spanned::Spanned;
+    let rust: BTreeMap<_, _> = rust
+        .iter()
+        .map(|m| {
+            let name = m
+                .export_name
+                .as_ref()
+                .map(|x| x.0.clone())
+                .unwrap_or(m.func_name.to_string());
+            (name, m)
+        })
+        .collect();
+    for m in &candid.methods {
+        if let Some(func) = rust.get(&m.original_name) {
+            if m.original_name == m.name {
+            } else {
+                if let Some((name, meta)) = &func.export_name {
+                    if *name != m.original_name {
+                        return Err(Parse(error2(
+                            format!("expect {}", m.original_name.escape_debug()),
+                            meta.span().byte_range(),
+                        )));
+                    }
+                } else {
+                    return Err(Parse(error2(
+                        format!("missing (name = \"{}\")", m.original_name.escape_debug()),
+                        func.mode.span().byte_range(),
+                    )));
+                }
+            }
+            let args = func.args.iter().zip(m.args.iter().map(|x| &x.1));
+            for (rust_arg, candid_arg) in args {
+                let parsed_candid_arg: syn::Type = syn::parse_str(candid_arg).unwrap();
+                if parsed_candid_arg != *rust_arg {
+                    return Err(Parse(error2(
+                        format!("expect type: {}", candid_arg),
+                        rust_arg.span().byte_range(),
+                    )));
+                }
+            }
+        } else {
+            return Err(Custom(anyhow::anyhow!(
+                "method \"{}\" not found in Rust code",
+                m.original_name
+            )));
+        }
+    }
+    Ok(())
 }
 fn get_cdk_function(attrs: &[syn::Attribute], sig: &syn::Signature) -> Option<CDKMethod> {
     use syn::parse::Parser;

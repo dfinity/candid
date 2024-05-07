@@ -216,15 +216,18 @@ fn main() -> Result<()> {
                 "did" => candid_parser::pretty::candid::compile(&env, &actor),
                 "mo" => candid_parser::bindings::motoko::compile(&env, &actor),
                 "rs" => {
-                    use candid_parser::bindings::rust::{compile, Config, ExternalConfig};
+                    use candid_parser::bindings::rust::{
+                        check_rust, compile, emit_bindgen, Config, ExternalConfig,
+                    };
                     let external = configs
                         .get_subtable(&["external".to_string(), "rust".to_string()])
                         .map(|x| x.clone().try_into().unwrap())
                         .unwrap_or(ExternalConfig::default());
                     let config = Config::new(configs);
                     if let Some(file) = external.0.get("output_file") {
+                        let (output, _) = emit_bindgen(&config, &env, &actor);
                         let file = std::fs::read_to_string(file).unwrap();
-                        candid_parser::bindings::rust::get_endpoint_from_rust_source(&file);
+                        check_rust(&file, &output);
                         String::new()
                     } else {
                         compile(&config, &env, &actor, external)
