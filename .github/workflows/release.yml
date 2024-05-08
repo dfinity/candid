@@ -4,7 +4,7 @@ on:
     tags:
       - '*'
     branches: # TODO: Remove before merging.
-      - musl  # Pushing the feature branch should test this PR.
+      - fix-ci  # Pushing the feature branch should test this PR.
 jobs:
   build:
     name: Build for ${{ matrix.name }}
@@ -17,7 +17,7 @@ jobs:
             name: linux64
             artifact_name: target/x86_64-unknown-linux-musl/release/didc
             asset_name: didc-linux64
-          - os: macos-latest
+          - os: macos-12
             name: macos
             artifact_name: target/release/didc
             asset_name: didc-macos
@@ -26,7 +26,7 @@ jobs:
             artifact_name: target/arm-unknown-linux-gnueabihf/release/didc
             asset_name: didc-arm32
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Install stable toolchain
         if: matrix.name != 'arm'
         uses: actions-rs/toolchain@v1
