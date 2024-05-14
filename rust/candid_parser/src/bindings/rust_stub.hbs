@@ -1,0 +1,18 @@
+// This is an experimental feature to generate Rust binding from Candid.
+// You may want to manually adjust some of the types.
+#![allow(dead_code, unused_imports)]
+use {{candid_crate}}::{self, CandidType, Deserialize, Principal};
+
+{{type_defs}}
+{{#if init_args}}
+#[ic_cdk::init]
+fn init({{#each init_args}}{{#if (not @first)}}, {{/if}}{{this.0}}: {{this.1}}{{/each}}) {
+  unimplemented!()
+}
+{{/if}}
+{{#each methods}}
+#[ic_cdk::{{cdk_attribute this.mode this.name this.original_name}}]
+fn {{this.name}}({{#each this.args}}{{#if (not @first)}}, {{/if}}{{this.0}}: {{this.1}}{{/each}}) -> {{vec_to_arity this.rets}} {
+  unimplemented!()
+}
+{{/each}}

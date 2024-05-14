@@ -387,6 +387,7 @@ impl<'a> State<'a> {
         res
     }
     fn pp_function(&mut self, id: &str, func: &Function) -> Method {
+        use candid::types::internal::FuncMode;
         let old = self.state.push_state(&StateElem::Label(id));
         let name = self
             .state
@@ -424,7 +425,13 @@ impl<'a> State<'a> {
                 res
             })
             .collect();
-        let mode = if func.is_query() { "query" } else { "update" }.to_string();
+        let mode = match func.modes.first() {
+            None => "update",
+            Some(FuncMode::Query) => "query",
+            Some(FuncMode::CompositeQuery) => "composite_query",
+            Some(FuncMode::Oneway) => "update",
+        }
+        .to_string();
         let res = Method {
             name,
             original_name: id.to_string(),
@@ -478,19 +485,19 @@ impl<'a> State<'a> {
 }
 #[derive(Serialize, Debug)]
 pub struct Output {
-    type_defs: String,
-    methods: Vec<Method>,
-    init_args: Option<Vec<(String, String)>>,
+    pub type_defs: String,
+    pub methods: Vec<Method>,
+    pub init_args: Option<Vec<(String, String)>>,
 }
 #[derive(Serialize, Debug)]
 pub struct Method {
-    name: String,
-    original_name: String,
-    args: Vec<(String, String)>,
-    rets: Vec<String>,
-    mode: String,
+    pub name: String,
+    pub original_name: String,
+    pub args: Vec<(String, String)>,
+    pub rets: Vec<String>,
+    pub mode: String,
 }
-pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> Output {
+pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Output, Vec<String>) {
     let (env, actor) = nominalize_all(env, actor);
     let def_list: Vec<_> = if let Some(actor) = &actor {
         chase_actor(&env, actor).unwrap()
@@ -508,11 +515,15 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> Outpu
     } else {
         (Vec::new(), None)
     };
-    Output {
-        type_defs: defs.pretty(LINE_WIDTH).to_string(),
-        methods,
-        init_args,
-    }
+    let unused = state.state.report_unused();
+    (
+        Output {
+            type_defs: defs.pretty(LINE_WIDTH).to_string(),
+            methods,
+            init_args,
+        },
+        unused,
+    )
 }
 pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) -> String {
     let hbs = get_hbs();
@@ -522,11 +533,13 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         external: BTreeMap<String, String>,
         type_defs: String,
         methods: Vec<Method>,
+        init_args: Option<Vec<(String, String)>>,
     }
     let data = HBOutput {
         type_defs: output.type_defs,
         methods: output.methods,
         external: config.0,
+        init_args: output.init_args,
     };
     hbs.render_template(template, &data).unwrap()
 }
@@ -536,6 +549,7 @@ impl Config {
         Self(ConfigTree::from_configs("rust", configs).unwrap())
     }
 }
+#[derive(Deserialize)]
 pub struct ExternalConfig(pub BTreeMap<String, String>);
 impl Default for ExternalConfig {
     fn default() -> Self {
@@ -560,9 +574,13 @@ pub fn compile(
     let source = match external.0.get("target").map(|s| s.as_str()) {
         Some("canister_call") | None => include_str!("rust_call.hbs"),
         Some("agent") => include_str!("rust_agent.hbs"),
+        Some("stub") => include_str!("rust_stub.hbs"),
         _ => unimplemented!(),
     };
-    let output = emit_bindgen(tree, env, actor);
+    let (output, unused) = emit_bindgen(tree, env, actor);
+    for e in unused {
+        eprintln!("WARNING: path {e} is unused");
+    }
     output_handlebar(output, external, source)
 }
 
@@ -754,7 +772,6 @@ fn nominalize_all(env: &TypeEnv, actor: &Option<Type>) -> (TypeEnv, Option<Type>
         .map(|ty| nominalize(&mut res, &mut vec![], ty));
     (res, actor)
 }
-
 fn get_hbs() -> handlebars::Handlebars<'static> {
     use handlebars::*;
     let mut hbs = Handlebars::new();
@@ -849,6 +866,38 @@ fn get_hbs() -> handlebars::Handlebars<'static> {
                     .collect::<Vec<_>>()
                     .join(", ");
                 out.write(slice.as_str())?;
+                Ok(())
+            },
+        ),
+    );
+    hbs.register_helper(
+        "cdk_attribute",
+        Box::new(
+            |h: &Helper,
+             _: &Handlebars,
+             _: &Context,
+             _: &mut RenderContext,
+             out: &mut dyn Output|
+             -> HelperResult {
+                let mode = h.param(0).unwrap().value().as_str().unwrap();
+                let name = h.param(1).unwrap().value().as_str().unwrap();
+                let original_name = h.param(2).unwrap().value().as_str().unwrap();
+                if mode == "update" {
+                    out.write("update")?;
+                } else {
+                    out.write("query")?;
+                }
+                let mut attrs = Vec::new();
+                if mode == "composite_query" {
+                    attrs.push("composite = true".to_string());
+                }
+                if name != original_name {
+                    attrs.push(format!("name = \"{}\"", original_name.escape_debug()));
+                }
+                let attrs = attrs.join(", ");
+                if !attrs.is_empty() {
+                    out.write(&format!("({attrs})"))?;
+                }
                 Ok(())
             },
         ),
