@@ -1,6 +1,6 @@
 use crate::Result;
 use candid::types::{Type, TypeEnv, TypeInner};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Same as chase_actor, with seen set as part of the type. Used for chasing type names from type definitions.
 pub fn chase_type<'a>(
@@ -51,6 +51,47 @@ pub fn chase_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> Result<Vec<&'a str>
     let mut seen = BTreeSet::new();
     let mut res = Vec::new();
     chase_type(&mut seen, &mut res, env, actor)?;
+    Ok(res)
+}
+/// Given an actor, return a map from variable names to the (methods, arg) that use them.
+pub fn chase_def_use<'a>(
+    env: &'a TypeEnv,
+    actor: &'a Type,
+) -> Result<BTreeMap<String, Vec<String>>> {
+    let mut res = BTreeMap::new();
+    let actor = env.trace_type(actor)?;
+    if let TypeInner::Class(args, _) = actor.as_ref() {
+        for (i, arg) in args.iter().enumerate() {
+            let mut used = Vec::new();
+            chase_type(&mut BTreeSet::new(), &mut used, env, arg)?;
+            for var in used {
+                res.entry(var.to_string())
+                    .or_insert_with(Vec::new)
+                    .push(format!("init.arg{}", i));
+            }
+        }
+    }
+    for (id, ty) in env.as_service(&actor)? {
+        let func = env.as_func(ty)?;
+        for (i, arg) in func.args.iter().enumerate() {
+            let mut used = Vec::new();
+            chase_type(&mut BTreeSet::new(), &mut used, env, arg)?;
+            for var in used {
+                res.entry(var.to_string())
+                    .or_insert_with(Vec::new)
+                    .push(format!("{}.arg{}", id, i));
+            }
+        }
+        for (i, arg) in func.rets.iter().enumerate() {
+            let mut used = Vec::new();
+            chase_type(&mut BTreeSet::new(), &mut used, env, arg)?;
+            for var in used {
+                res.entry(var.to_string())
+                    .or_insert_with(Vec::new)
+                    .push(format!("{}.ret{}", id, i));
+            }
+        }
+    }
     Ok(res)
 }
 

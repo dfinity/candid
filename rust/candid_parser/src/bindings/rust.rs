@@ -1,4 +1,4 @@
-use super::analysis::{chase_actor, infer_rec};
+use super::analysis::{chase_actor, chase_def_use, infer_rec};
 use crate::{
     configs::{ConfigState, ConfigTree, Configs, StateElem},
     Deserialize,
@@ -46,6 +46,7 @@ impl ConfigState for BindingConfig {
 pub struct State<'a> {
     state: crate::configs::State<'a, BindingConfig>,
     recs: RecPoints<'a>,
+    def_use: BTreeMap<String, Vec<String>>,
 }
 
 type RecPoints<'a> = BTreeSet<&'a str>;
@@ -499,15 +500,22 @@ pub struct Method {
 }
 pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Output, Vec<String>) {
     let (env, actor) = nominalize_all(env, actor);
-    let def_list: Vec<_> = if let Some(actor) = &actor {
-        chase_actor(&env, actor).unwrap()
+    let (def_list, def_use) = if let Some(actor) = &actor {
+        (
+            chase_actor(&env, actor).unwrap(),
+            chase_def_use(&env, actor).unwrap(),
+        )
     } else {
-        env.0.iter().map(|pair| pair.0.as_ref()).collect()
+        (
+            env.0.iter().map(|pair| pair.0.as_ref()).collect::<Vec<_>>(),
+            BTreeMap::new(),
+        )
     };
     let recs = infer_rec(&env, &def_list).unwrap();
     let mut state = State {
         state: crate::configs::State::new(&tree.0, &env),
         recs,
+        def_use,
     };
     let defs = state.pp_defs(&def_list);
     let (methods, init_args) = if let Some(actor) = &actor {
