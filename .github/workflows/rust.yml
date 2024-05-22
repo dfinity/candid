@@ -39,3 +39,19 @@ jobs:
       run: cargo clippy --features all --tests -- -D warnings
     - name: doc
       run: cargo doc
+  fuzzing:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust (nightly)
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        override: true
+    - name: Install cargo-fuzz
+      run: |
+        cargo install cargo-fuzz
+    - name: Build fuzzers
+      run: |
+        cd rust/candid
+        cargo +nightly fuzz build
