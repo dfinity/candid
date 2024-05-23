@@ -15,7 +15,27 @@ SUBCOMMANDS:
     encode    Encode Candid value
     decode    Decode Candid binary data
     random    Generate random Candid values
-    diff      Diff two Candid values
+```
+
+## TOML config
+
+`didc bind -t rs` and `didc random` can take a TOML file to configure how `didc` generate Rust binding or random values.
+
+Rust bindgen can take an external Handlebar template with the following TOML file,
+
+```toml
+[didc.rust]
+target = "custom"  # Other targets: canister_call, agent, stub
+template = "template.hbs"  # required for custom target
+# any tags mentioned from hbs
+candid_crate = "candid"
+service_name = "service"
+
+[rust]
+visibility = "pub(crate)"
+attributes = "#[derive(CandidType, Deserialize, Debug)]"
+GetBlocksResponse.attributes = "#[derive(CandidType, Deserialize, Debug, Clone, Serialize)]"
+GetBlocksResponseArchivedBlocksItem.name = "ABetterName"
 ```
 
 ## Examples
@@ -41,10 +61,6 @@ $ didc decode '4449444c016d7c027c002a0301027d'
 $ didc decode '4449444c016d7c027c002a0301027d' -t '(int)'
 (42)
 
-$ didc diff '(record{1;2;3}, 42)' '(record{1;5;9}, 42)'
-record { edit { 1 put { 5 } }; edit { 2 put { 9 } }; }
-skip
-
 $ didc bind hello.did -t js
 export const idlFactory = ({ IDL }) => {
   return IDL.Service({ 'greet' : IDL.Func([IDL.Text], [IDL.Text], []) });
@@ -53,9 +69,9 @@ export const idlFactory = ({ IDL }) => {
 $ didc random -t '(int, text)'
 (-72_594_379_354_493_140_610_202_928_640_651_761_468, "_J`:t7^>")
 
-$ didc random -t '(int, text)' -c '{ range = Some [-10, +10], text = "name" }'
+$ didc random -t '(int, text)' -c 'random = { range = [-10, +10], text = "name" }'
 (-6, "Cindy Klocko")
 
-$ didc random -d service.did -m method -f random.dhall -a '("seed argument")' -l js
+$ didc random -d service.did -m method -c random.toml -a '("seed argument")' -l js
 [new BigNumber('-4'), 'Marcus Kris']
 ```
