@@ -1,6 +1,6 @@
 build_cmd:
   cargo build --release --target wasm32-unknown-unknown &&
-  gzip ./target/wasm32-unknown-unknown/release/bench.wasm
+  gzip -f ./target/wasm32-unknown-unknown/release/bench.wasm
 
 wasm_path:
   ./target/wasm32-unknown-unknown/release/bench.wasm.gz
