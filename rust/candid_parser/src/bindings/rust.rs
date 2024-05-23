@@ -8,6 +8,7 @@ use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInne
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
 use serde::Serialize;
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Default, Deserialize, Clone, Debug)]
@@ -572,16 +573,23 @@ pub fn compile(
     external: ExternalConfig,
 ) -> String {
     let source = match external.0.get("target").map(|s| s.as_str()) {
-        Some("canister_call") | None => include_str!("rust_call.hbs"),
-        Some("agent") => include_str!("rust_agent.hbs"),
-        Some("stub") => include_str!("rust_stub.hbs"),
+        Some("canister_call") | None => Cow::Borrowed(include_str!("rust_call.hbs")),
+        Some("agent") => Cow::Borrowed(include_str!("rust_agent.hbs")),
+        Some("stub") => Cow::Borrowed(include_str!("rust_stub.hbs")),
+        Some("custom") => {
+            let template = external
+                .0
+                .get("template")
+                .expect("template field expected for custom target");
+            Cow::Owned(std::fs::read_to_string(template).unwrap())
+        }
         _ => unimplemented!(),
     };
     let (output, unused) = emit_bindgen(tree, env, actor);
     for e in unused {
         eprintln!("WARNING: path {e} is unused");
     }
-    output_handlebar(output, external, source)
+    output_handlebar(output, external, &source)
 }
 
 pub enum TypePath {
