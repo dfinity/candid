@@ -38,16 +38,17 @@ jobs:
         key: ${{ runner.os }}-bench-0.1.4-${{ hashFiles('**/Cargo.lock') }}
     - name: Install canbench
       run: cargo install canbench
-    - name: Run perf for base branch
-      run: |
-        pushd main/rust/bench
-        canbench --persist
-        popd
-        cp main/rust/bench/canbench_results.yml rust/bench/
+#    - name: Run perf for base branch
+#      run: |
+#        pushd main/rust/bench
+#        canbench --persist
+#        popd
+#        cp main/rust/bench/canbench_results.yml rust/bench/
     - name: Run perf for PR beanch
       run: |
         pushd rust/bench
-        canbench --less-verbose --persist > /tmp/perf.txt
+        #canbench --less-verbose --persist > /tmp/perf.txt
+        canbench --persist
         python diff.py canbench_results.yml ../../main/rust/bench/canbench_results.yml > /tmp/table.md
         {
           cat /tmp/table.md
