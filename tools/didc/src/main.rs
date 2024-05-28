@@ -36,6 +36,9 @@ enum Command {
         #[clap(short, long)]
         /// Specifies binding generation config in TOML syntax
         config: Option<String>,
+        #[clap(short, long, num_args = 1.., value_delimiter = ',')]
+        /// Specifies a subset of methods to generate bindings. Allowed format: "-m foo,bar", "-m foo bar", "-m foo -m bar"
+        methods: Vec<String>,
     },
     /// Generate test suites for different languages
     Test {
@@ -207,9 +210,13 @@ fn main() -> Result<()> {
             input,
             target,
             config,
+            methods,
         } => {
             let configs = load_config(&config)?;
-            let (env, actor) = pretty_check_file(&input)?;
+            let (env, mut actor) = pretty_check_file(&input)?;
+            if !methods.is_empty() {
+                actor = candid_parser::bindings::analysis::project_methods(&env, &actor, &methods);
+            }
             let content = match target.as_str() {
                 "js" => candid_parser::bindings::javascript::compile(&env, &actor),
                 "ts" => candid_parser::bindings::typescript::compile(&env, &actor),
