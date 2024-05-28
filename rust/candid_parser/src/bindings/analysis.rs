@@ -2,6 +2,17 @@ use crate::Result;
 use candid::types::{Type, TypeEnv, TypeInner};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Select a subset of methods from an actor.
+pub fn project_methods(env: &TypeEnv, actor: &Option<Type>, methods: &[String]) -> Option<Type> {
+    let service = env.as_service(actor.as_ref()?).ok()?;
+    let filtered = service
+        .iter()
+        .filter(|(name, _)| methods.contains(name))
+        .cloned()
+        .collect();
+    Some(TypeInner::Service(filtered).into())
+}
+
 /// Same as chase_actor, with seen set as part of the type. Used for chasing type names from type definitions.
 pub fn chase_type<'a>(
     seen: &mut BTreeSet<&'a str>,

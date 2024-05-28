@@ -35,7 +35,7 @@ jobs:
           ~/.cargo
           target
           rust/bench/target
-        key: ${{ runner.os }}-bench-0.1.3-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-bench-0.1.4-${{ hashFiles('**/Cargo.lock') }}
     - name: Install canbench
       run: cargo install canbench
     - name: Run perf for base branch
