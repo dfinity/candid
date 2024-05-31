@@ -1,18 +1,18 @@
 //! `candid::Result<T> = Result<T, candid::Error>>`
 
 use serde::{de, ser};
-use std::{io, num::ParseIntError};
+use std::{io, num::ParseIntError, sync::Arc};
 use thiserror::Error;
 
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Label {
     pos: usize,
     message: String,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum Error {
     #[error("binary parser error: {}", .0.first().map_or_else(|| "io error".to_string(), |f| format!("{} at byte offset {}", f.message, f.pos/2)))]
     Binread(Vec<Label>),
@@ -21,12 +21,12 @@ pub enum Error {
     Subtype(String),
 
     #[error(transparent)]
-    Custom(#[from] anyhow::Error),
+    Custom(#[from] Arc<anyhow::Error>),
 }
 
 impl Error {
     pub fn msg<T: ToString>(msg: T) -> Self {
-        Error::Custom(anyhow::anyhow!(msg.to_string()))
+        anyhow::anyhow!(msg.to_string()).into()
     }
     pub fn subtype<T: ToString>(msg: T) -> Self {
         Error::Subtype(msg.to_string())
@@ -131,5 +131,11 @@ impl From<binread::Error> for Error {
 impl From<ParseIntError> for Error {
     fn from(e: ParseIntError) -> Error {
         Error::msg(format!("ParseIntError: {e}"))
+    }
+}
+
+impl From<anyhow::Error> for Error {
+    fn from(e: anyhow::Error) -> Error {
+        Error::Custom(Arc::new(e))
     }
 }
