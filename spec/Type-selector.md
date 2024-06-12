@@ -27,7 +27,7 @@ For the first part, we define a type selector `<selector>` similar to CSS select
 <selector> := <scopes> (. <path>)? | <path>
 <path> := <name> (. <name>)*
 <scopes> := <scope> (. <scope>)*
-<scope> := method:<name> | arg:<num> | ret:<num>
+<scope> := func:<name> | arg:<num> | ret:<num>
 ```
 
 `<path>` is a sequence of names separated by "`.`". It is a pattern used to select the Candid type node you want to customize. For example, given the following Candid interface,
@@ -42,7 +42,7 @@ service : {
 
 Paths `left.tree`, `branch.record.left` and `tree.variant.branch.record.left` all match the left branch of a tree. Path `left` will match the "left" field in both `tree` and `pair`. We greedily match the path with a shorter pattern. For example, if you have both path `left` and `left.tree`, we will always match `left`, and `left.tree` will never be matched (we will issue a warning, if a path is never matched). If you want to match `left.tree`, you can replace the `left` path with `pair.record.left`.
 
-`<scopes>` is a special form of path, where each name has a prefix of `method:`, `arg:`, or `ret:`. It indicates that the path can only be matched when it’s inside a scope of a method or argument position. A scoped path match always takes precedence over non-scoped path. For example, `method:f.left` matches the `left` field in `pair`, but not the `left` field in `tree`, and the global `left` path will not be matched when processing method `f`; `method:f.arg:1.left` matches the `left` field in the second input argument of `f`; `ret:0.left` matches the first return type of all methods.
+`<scopes>` is a special form of path, where each name has a prefix of `func:`, `arg:`, or `ret:`. It indicates that the path can only be matched when it’s inside a scope of a function or argument position. A scoped path match always takes precedence over non-scoped path. For example, `func:f.left` matches the `left` field in `pair`, but not the `left` field in `tree`, and the global `left` path will not be matched when processing function `f`; `func:f.arg:1.left` matches the `left` field in the second input argument of `f`; `ret:0.left` matches the first return type of all functions.
 
 Open question: The path doesn’t distinguish between label and type name. We cannot match just label `left`, but not type name `left`. We could add a prefix like `label:left`, but it means more things to type for the end user. We could work around this problem by providing a longer path if needed.
 
