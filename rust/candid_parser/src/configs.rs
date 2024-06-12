@@ -54,7 +54,7 @@ impl<'a, T: ConfigState> State<'a, T> {
                 self.open_path.clear();
             }
             Some(scope) => {
-                let mut path = vec![format!("method:{}", scope.method)];
+                let mut path = vec![format!("func:{}", scope.method)];
                 match self.tree.with_prefix(&path) {
                     Some(tree) => {
                         match scope.position {
@@ -290,7 +290,7 @@ fn is_repeated(path: &[String], matched: &[String]) -> bool {
     false
 }
 fn special_key(key: &str) -> bool {
-    key.starts_with("method:") || key.starts_with("arg:") || key.starts_with("ret:")
+    key.starts_with("func:") || key.starts_with("arg:") || key.starts_with("ret:")
 }
 fn generate_state_tree<T: ConfigState>(v: Value) -> Result<ConfigTree<T>> {
     let mut subtree = BTreeMap::new();
@@ -391,8 +391,8 @@ val.text = "42"
 left.list = { depth = 1 }
 vec.nat8.text = "blob"
 Vec = { width = 2, size = 10 }
-"method:f"."arg:0".list = { depth = 2, size = 20 }
-"method:f".list = { depth = 3, size = 30 }
+"func:f"."arg:0".list = { depth = 2, size = 20 }
+"func:f".list = { depth = 3, size = 30 }
     "#;
     let configs = toml.parse::<Configs>().unwrap();
     let mut tree: ConfigTree<T> = ConfigTree::from_configs("random", configs).unwrap();
@@ -464,7 +464,7 @@ Vec = { width = 2, size = 10 }
         }),
         0,
     );
-    assert_eq!(state.open_path, vec!["method:f", "arg:0"]);
+    assert_eq!(state.open_path, vec!["func:f", "arg:0"]);
     let old = state.push_state(&StateElem::Label("list"));
     assert_eq!(state.config.depth, Some(2));
     assert_eq!(state.config.size, Some(20));
@@ -479,7 +479,7 @@ Vec = { width = 2, size = 10 }
         }),
         0,
     );
-    assert_eq!(state.open_path, vec!["method:f"]);
+    assert_eq!(state.open_path, vec!["func:f"]);
     state.push_state(&StateElem::Label("list"));
     assert_eq!(state.config.depth, Some(3));
     assert_eq!(state.config.size, Some(0));
