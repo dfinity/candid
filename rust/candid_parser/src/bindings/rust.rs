@@ -44,10 +44,9 @@ impl ConfigState for BindingConfig {
     fn update_state(&mut self, _elem: &StateElem) {}
     fn restore_state(&mut self, _elem: &StateElem) {}
 }
-pub struct State<'a> {
+struct State<'a> {
     state: crate::configs::State<'a, BindingConfig>,
     recs: RecPoints<'a>,
-    def_use: BTreeMap<String, Vec<String>>,
 }
 
 type RecPoints<'a> = BTreeSet<&'a str>;
@@ -500,23 +499,25 @@ pub struct Method {
     pub mode: String,
 }
 pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Output, Vec<String>) {
-    let (env, actor) = nominalize_all(env, actor);
-    let (def_list, def_use) = if let Some(actor) = &actor {
-        (
-            chase_actor(&env, actor).unwrap(),
-            chase_def_use(&env, actor).unwrap(),
-        )
+    let def_use = if let Some(actor) = &actor {
+        chase_def_use(env, actor).unwrap()
     } else {
-        (
-            env.0.iter().map(|pair| pair.0.as_ref()).collect::<Vec<_>>(),
-            BTreeMap::new(),
-        )
+        BTreeMap::new()
+    };
+    let mut state = NominalState {
+        state: crate::configs::State::new(&tree.0, env),
+        def_use: def_use,
+    };
+    let (env, actor) = state.nominalize_all(actor);
+    let def_list = if let Some(actor) = &actor {
+        chase_actor(&env, actor).unwrap()
+    } else {
+        env.0.iter().map(|pair| pair.0.as_ref()).collect::<Vec<_>>()
     };
     let recs = infer_rec(&env, &def_list).unwrap();
     let mut state = State {
         state: crate::configs::State::new(&tree.0, &env),
         recs,
-        def_use,
     };
     let defs = state.pp_defs(&def_list);
     let (methods, init_args) = if let Some(actor) = &actor {
@@ -623,170 +624,176 @@ fn path_to_var(path: &[TypePath]) -> String {
         .collect();
     name.join("_").to_case(Case::Pascal)
 }
-// Convert structural typing to nominal typing to fit Rust's type system
-fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
-    match t.as_ref() {
-        TypeInner::Opt(ty) => {
-            path.push(TypePath::Opt);
-            let ty = nominalize(env, path, ty);
-            path.pop();
-            TypeInner::Opt(ty)
-        }
-        TypeInner::Vec(ty) => {
-            path.push(TypePath::Vec);
-            let ty = nominalize(env, path, ty);
-            path.pop();
-            TypeInner::Vec(ty)
-        }
-        TypeInner::Record(fs) => {
-            if matches!(
-                path.last(),
-                None | Some(TypePath::VariantField(_)) | Some(TypePath::Id(_))
-            ) || is_tuple(fs)
-            {
-                let fs: Vec<_> = fs
-                    .iter()
-                    .map(|Field { id, ty }| {
-                        path.push(TypePath::RecordField(id.to_string()));
-                        let ty = nominalize(env, path, ty);
-                        path.pop();
-                        Field { id: id.clone(), ty }
-                    })
-                    .collect();
-                TypeInner::Record(fs)
-            } else {
-                let new_var = path_to_var(path);
-                let ty = nominalize(
-                    env,
-                    &mut vec![TypePath::Id(new_var.clone())],
-                    &TypeInner::Record(fs.to_vec()).into(),
-                );
-                env.0.insert(new_var.clone(), ty);
-                TypeInner::Var(new_var)
+struct NominalState<'a> {
+    state: crate::configs::State<'a, BindingConfig>,
+    def_use: BTreeMap<String, Vec<String>>,
+}
+impl<'a> NominalState<'a> {
+    // Convert structural typing to nominal typing to fit Rust's type system
+    fn nominalize(&self, env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
+        match t.as_ref() {
+            TypeInner::Opt(ty) => {
+                path.push(TypePath::Opt);
+                let ty = self.nominalize(env, path, ty);
+                path.pop();
+                TypeInner::Opt(ty)
             }
-        }
-        TypeInner::Variant(fs) => match path.last() {
-            None | Some(TypePath::Id(_)) => {
-                let fs: Vec<_> = fs
-                    .iter()
-                    .map(|Field { id, ty }| {
-                        path.push(TypePath::VariantField(id.to_string()));
-                        let ty = nominalize(env, path, ty);
-                        path.pop();
-                        Field { id: id.clone(), ty }
-                    })
-                    .collect();
-                TypeInner::Variant(fs)
+            TypeInner::Vec(ty) => {
+                path.push(TypePath::Vec);
+                let ty = self.nominalize(env, path, ty);
+                path.pop();
+                TypeInner::Vec(ty)
             }
-            Some(_) => {
-                let new_var = path_to_var(path);
-                let ty = nominalize(
-                    env,
-                    &mut vec![TypePath::Id(new_var.clone())],
-                    &TypeInner::Variant(fs.to_vec()).into(),
-                );
-                env.0.insert(new_var.clone(), ty);
-                TypeInner::Var(new_var)
-            }
-        },
-        TypeInner::Func(func) => match path.last() {
-            None | Some(TypePath::Id(_)) => {
-                let func = func.clone();
-                TypeInner::Func(Function {
-                    modes: func.modes,
-                    args: func
-                        .args
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, ty)| {
-                            let i = if i == 0 {
-                                "".to_string()
-                            } else {
-                                i.to_string()
-                            };
-                            path.push(TypePath::Func(format!("arg{i}")));
-                            let ty = nominalize(env, path, &ty);
+            TypeInner::Record(fs) => {
+                if matches!(
+                    path.last(),
+                    None | Some(TypePath::VariantField(_)) | Some(TypePath::Id(_))
+                ) || is_tuple(fs)
+                {
+                    let fs: Vec<_> = fs
+                        .iter()
+                        .map(|Field { id, ty }| {
+                            path.push(TypePath::RecordField(id.to_string()));
+                            let ty = self.nominalize(env, path, ty);
                             path.pop();
-                            ty
+                            Field { id: id.clone(), ty }
+                        })
+                        .collect();
+                    TypeInner::Record(fs)
+                } else {
+                    let new_var = path_to_var(path);
+                    let ty = self.nominalize(
+                        env,
+                        &mut vec![TypePath::Id(new_var.clone())],
+                        &TypeInner::Record(fs.to_vec()).into(),
+                    );
+                    env.0.insert(new_var.clone(), ty);
+                    TypeInner::Var(new_var)
+                }
+            }
+            TypeInner::Variant(fs) => match path.last() {
+                None | Some(TypePath::Id(_)) => {
+                    let fs: Vec<_> = fs
+                        .iter()
+                        .map(|Field { id, ty }| {
+                            path.push(TypePath::VariantField(id.to_string()));
+                            let ty = self.nominalize(env, path, ty);
+                            path.pop();
+                            Field { id: id.clone(), ty }
+                        })
+                        .collect();
+                    TypeInner::Variant(fs)
+                }
+                Some(_) => {
+                    let new_var = path_to_var(path);
+                    let ty = self.nominalize(
+                        env,
+                        &mut vec![TypePath::Id(new_var.clone())],
+                        &TypeInner::Variant(fs.to_vec()).into(),
+                    );
+                    env.0.insert(new_var.clone(), ty);
+                    TypeInner::Var(new_var)
+                }
+            },
+            TypeInner::Func(func) => match path.last() {
+                None | Some(TypePath::Id(_)) => {
+                    let func = func.clone();
+                    TypeInner::Func(Function {
+                        modes: func.modes,
+                        args: func
+                            .args
+                            .into_iter()
+                            .enumerate()
+                            .map(|(i, ty)| {
+                                let i = if i == 0 {
+                                    "".to_string()
+                                } else {
+                                    i.to_string()
+                                };
+                                path.push(TypePath::Func(format!("arg{i}")));
+                                let ty = self.nominalize(env, path, &ty);
+                                path.pop();
+                                ty
+                            })
+                            .collect(),
+                        rets: func
+                            .rets
+                            .into_iter()
+                            .enumerate()
+                            .map(|(i, ty)| {
+                                let i = if i == 0 {
+                                    "".to_string()
+                                } else {
+                                    i.to_string()
+                                };
+                                path.push(TypePath::Func(format!("ret{i}")));
+                                let ty = self.nominalize(env, path, &ty);
+                                path.pop();
+                                ty
+                            })
+                            .collect(),
+                    })
+                }
+                Some(_) => {
+                    let new_var = path_to_var(path);
+                    let ty = self.nominalize(
+                        env,
+                        &mut vec![TypePath::Id(new_var.clone())],
+                        &TypeInner::Func(func.clone()).into(),
+                    );
+                    env.0.insert(new_var.clone(), ty);
+                    TypeInner::Var(new_var)
+                }
+            },
+            TypeInner::Service(serv) => match path.last() {
+                None | Some(TypePath::Id(_)) => TypeInner::Service(
+                    serv.iter()
+                        .map(|(meth, ty)| {
+                            path.push(TypePath::Id(meth.to_string()));
+                            let ty = self.nominalize(env, path, ty);
+                            path.pop();
+                            (meth.clone(), ty)
                         })
                         .collect(),
-                    rets: func
-                        .rets
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, ty)| {
-                            let i = if i == 0 {
-                                "".to_string()
-                            } else {
-                                i.to_string()
-                            };
-                            path.push(TypePath::Func(format!("ret{i}")));
-                            let ty = nominalize(env, path, &ty);
-                            path.pop();
-                            ty
-                        })
-                        .collect(),
-                })
-            }
-            Some(_) => {
-                let new_var = path_to_var(path);
-                let ty = nominalize(
-                    env,
-                    &mut vec![TypePath::Id(new_var.clone())],
-                    &TypeInner::Func(func.clone()).into(),
-                );
-                env.0.insert(new_var.clone(), ty);
-                TypeInner::Var(new_var)
-            }
-        },
-        TypeInner::Service(serv) => match path.last() {
-            None | Some(TypePath::Id(_)) => TypeInner::Service(
-                serv.iter()
-                    .map(|(meth, ty)| {
-                        path.push(TypePath::Id(meth.to_string()));
-                        let ty = nominalize(env, path, ty);
+                ),
+                Some(_) => {
+                    let new_var = path_to_var(path);
+                    let ty = self.nominalize(
+                        env,
+                        &mut vec![TypePath::Id(new_var.clone())],
+                        &TypeInner::Service(serv.clone()).into(),
+                    );
+                    env.0.insert(new_var.clone(), ty);
+                    TypeInner::Var(new_var)
+                }
+            },
+            TypeInner::Class(args, ty) => TypeInner::Class(
+                args.iter()
+                    .map(|ty| {
+                        path.push(TypePath::Init);
+                        let ty = self.nominalize(env, path, ty);
                         path.pop();
-                        (meth.clone(), ty)
+                        ty
                     })
                     .collect(),
+                self.nominalize(env, path, ty),
             ),
-            Some(_) => {
-                let new_var = path_to_var(path);
-                let ty = nominalize(
-                    env,
-                    &mut vec![TypePath::Id(new_var.clone())],
-                    &TypeInner::Service(serv.clone()).into(),
-                );
-                env.0.insert(new_var.clone(), ty);
-                TypeInner::Var(new_var)
-            }
-        },
-        TypeInner::Class(args, ty) => TypeInner::Class(
-            args.iter()
-                .map(|ty| {
-                    path.push(TypePath::Init);
-                    let ty = nominalize(env, path, ty);
-                    path.pop();
-                    ty
-                })
-                .collect(),
-            nominalize(env, path, ty),
-        ),
-        _ => return t.clone(),
+            _ => return t.clone(),
+        }
+        .into()
     }
-    .into()
-}
 
-fn nominalize_all(env: &TypeEnv, actor: &Option<Type>) -> (TypeEnv, Option<Type>) {
-    let mut res = TypeEnv(Default::default());
-    for (id, ty) in env.0.iter() {
-        let ty = nominalize(&mut res, &mut vec![TypePath::Id(id.clone())], ty);
-        res.0.insert(id.to_string(), ty);
+    fn nominalize_all(&self, actor: &Option<Type>) -> (TypeEnv, Option<Type>) {
+        let mut res = TypeEnv(Default::default());
+        for (id, ty) in self.state.env.0.iter() {
+            let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.clone())], ty);
+            res.0.insert(id.to_string(), ty);
+        }
+        let actor = actor
+            .as_ref()
+            .map(|ty| self.nominalize(&mut res, &mut vec![], ty));
+        (res, actor)
     }
-    let actor = actor
-        .as_ref()
-        .map(|ty| nominalize(&mut res, &mut vec![], ty));
-    (res, actor)
 }
 fn get_hbs() -> handlebars::Handlebars<'static> {
     use handlebars::*;
