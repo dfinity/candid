@@ -166,6 +166,19 @@ impl CandidType for serde_bytes::Bytes {
         serializer.serialize_blob(self)
     }
 }
+#[cfg_attr(docsrs, doc(cfg(feature = "serde_bytes")))]
+#[cfg(feature = "serde_bytes")]
+impl<const N: usize> CandidType for serde_bytes::ByteArray<N> {
+    fn _ty() -> Type {
+        TypeInner::Vec(TypeInner::Nat8.into()).into()
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_blob(self.as_slice())
+    }
+}
 
 macro_rules! map_impl {
     ($ty:ident < K $(: $kbound1:ident $(+ $kbound2:ident)*)*, V $(, $typaram:ident : $bound:ident)* >) => {
