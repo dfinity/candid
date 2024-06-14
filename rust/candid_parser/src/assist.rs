@@ -154,11 +154,7 @@ pub fn input(ctx: &Context, ty: &Type, dep: usize) -> Result<IDLValue> {
                 .with_prompt("Enter a text (type :e to use editor)")
                 .interact()?;
             let text = if text == ":e" {
-                if let Some(rv) = Editor::new().edit("Enter your text")? {
-                    rv
-                } else {
-                    String::new()
-                }
+                Editor::new().edit("Enter your text")?.unwrap_or_default()
             } else {
                 text
             };
