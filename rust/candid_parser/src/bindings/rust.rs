@@ -630,8 +630,10 @@ struct NominalState<'a> {
 }
 impl<'a> NominalState<'a> {
     // Convert structural typing to nominal typing to fit Rust's type system
-    fn nominalize(&self, env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
-        match t.as_ref() {
+    fn nominalize(&mut self, env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
+        let elem = StateElem::Type(t);
+        let old = self.state.push_state(&elem);
+        let res = match t.as_ref() {
             TypeInner::Opt(ty) => {
                 path.push(TypePath::Opt);
                 let ty = self.nominalize(env, path, ty);
@@ -780,10 +782,12 @@ impl<'a> NominalState<'a> {
             ),
             _ => return t.clone(),
         }
-        .into()
+        .into();
+        self.state.pop_state(old, elem);
+        res
     }
 
-    fn nominalize_all(&self, actor: &Option<Type>) -> (TypeEnv, Option<Type>) {
+    fn nominalize_all(&mut self, actor: &Option<Type>) -> (TypeEnv, Option<Type>) {
         let mut res = TypeEnv(Default::default());
         for (id, ty) in self.state.env.0.iter() {
             let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.clone())], ty);
