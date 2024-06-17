@@ -1,6 +1,6 @@
 use super::analysis::{chase_actor, chase_def_use, infer_rec};
 use crate::{
-    configs::{ConfigState, ConfigTree, Configs, StateElem},
+    configs::{ConfigState, ConfigTree, Configs, Context, StateElem},
     Deserialize,
 };
 use candid::pretty::utils::*;
@@ -19,10 +19,13 @@ pub struct BindingConfig {
     visibility: Option<String>,
 }
 impl ConfigState for BindingConfig {
-    fn merge_config(&mut self, config: &Self, elem: Option<&StateElem>, _is_recursive: bool) {
+    fn merge_config(&mut self, config: &Self, ctx: Option<Context>) {
         self.name.clone_from(&config.name);
         // match use_type can survive across types, so that label.use_type works
-        if !matches!(elem, Some(StateElem::Label(_))) {
+        if ctx
+            .as_ref()
+            .is_some_and(|ctx| matches!(ctx.elem, StateElem::Type(_) | StateElem::TypeStr(_)))
+        {
             if let Some(use_type) = &config.use_type {
                 self.use_type = Some(use_type.clone());
             }
@@ -30,7 +33,10 @@ impl ConfigState for BindingConfig {
             self.use_type.clone_from(&config.use_type);
         }
         // matched attributes can survive across labels, so that record.attributes works
-        if matches!(elem, Some(StateElem::Label(_))) {
+        if ctx
+            .as_ref()
+            .is_some_and(|ctx| matches!(ctx.elem, StateElem::Label(_)))
+        {
             if let Some(attr) = &config.attributes {
                 self.attributes = Some(attr.clone());
             }
@@ -41,8 +47,8 @@ impl ConfigState for BindingConfig {
             self.visibility.clone_from(&config.visibility);
         }
     }
-    fn update_state(&mut self, _elem: &StateElem) {}
-    fn restore_state(&mut self, _elem: &StateElem) {}
+    fn update_state(&mut self, _ctx: Context) {}
+    fn restore_state(&mut self, _ctx: Context) {}
 }
 struct State<'a> {
     state: crate::configs::State<'a, BindingConfig>,

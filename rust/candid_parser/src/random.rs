@@ -1,5 +1,4 @@
-use super::configs::{ConfigState, Configs, Scope, State};
-use crate::configs::StateElem;
+use super::configs::{ConfigState, Configs, Context, Scope, State, StateElem};
 use crate::{Error, Result};
 use arbitrary::{unstructured::Int, Arbitrary, Unstructured};
 use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
@@ -32,7 +31,7 @@ impl Default for GenConfig {
     }
 }
 impl ConfigState for GenConfig {
-    fn merge_config(&mut self, config: &Self, _elem: Option<&StateElem>, is_recursive: bool) {
+    fn merge_config(&mut self, config: &Self, ctx: Option<Context>) {
         self.range = config.range.or(self.range);
         if config.text.is_some() {
             self.text.clone_from(&config.text);
@@ -41,21 +40,21 @@ impl ConfigState for GenConfig {
         if config.value.is_some() {
             self.value.clone_from(&config.value);
         }
-        if !is_recursive {
+        if ctx.as_ref().is_some_and(|c| !c.is_recursive) {
             self.depth = config.depth.or(self.depth);
             self.size = config.size.or(self.size);
         }
     }
-    fn update_state(&mut self, elem: &StateElem) {
-        if let StateElem::Type(t) = elem {
+    fn update_state(&mut self, ctx: Context) {
+        if let StateElem::Type(t) = ctx.elem {
             if !matches!(t.as_ref(), TypeInner::Var(_)) {
                 self.depth = self.depth.map(|d| d - 1);
                 self.size = self.size.map(|s| s - 1);
             }
         }
     }
-    fn restore_state(&mut self, elem: &StateElem) {
-        if let StateElem::Type(t) = elem {
+    fn restore_state(&mut self, ctx: Context) {
+        if let StateElem::Type(t) = ctx.elem {
             if !matches!(t.as_ref(), TypeInner::Var(_)) {
                 self.depth = self.depth.map(|d| d + 1);
             }

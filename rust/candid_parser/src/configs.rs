@@ -34,7 +34,7 @@ impl<'a, T: ConfigState> State<'a, T> {
     pub fn new(tree: &'a ConfigTree<T>, env: &'a TypeEnv) -> Self {
         let mut config = T::default();
         if let Some(state) = &tree.state {
-            config.merge_config(state, None, false);
+            config.merge_config(state, None);
         }
         Self {
             tree,
@@ -73,7 +73,7 @@ impl<'a, T: ConfigState> State<'a, T> {
                             }
                         }
                         if let Some(state) = self.open_tree.unwrap().state.as_ref() {
-                            self.config.merge_config(state, None, false);
+                            self.config.merge_config(state, None);
                         }
                     }
                     None => {
@@ -86,7 +86,11 @@ impl<'a, T: ConfigState> State<'a, T> {
     }
     /// Update config based on the new elem in the path. Return the old state AFTER `update_state`.
     pub fn push_state(&mut self, elem: &StateElem) -> T {
-        self.config.update_state(elem);
+        let ctx = Context {
+            elem,
+            is_recursive: false,
+        };
+        self.config.update_state(ctx);
         let old_config = self.config.clone();
         self.path.push(elem.to_string());
         let mut from_open = false;
@@ -110,11 +114,15 @@ impl<'a, T: ConfigState> State<'a, T> {
                 .entry(matched_path)
                 .and_modify(|v| *v += 1)
                 .or_insert(1);
-            self.config.merge_config(state, Some(elem), is_recursive);
+            let ctx = Context { elem, is_recursive };
+            self.config.merge_config(state, Some(ctx));
             //eprintln!("match path: {:?}, state: {:?}", self.path, self.config);
         } else {
-            self.config
-                .merge_config(&T::unmatched_config(), Some(elem), false);
+            let ctx = Context {
+                elem,
+                is_recursive: false,
+            };
+            self.config.merge_config(&T::unmatched_config(), Some(ctx));
             //eprintln!("path: {:?}, state: {:?}", self.path, self.config);
         }
         old_config
@@ -122,7 +130,11 @@ impl<'a, T: ConfigState> State<'a, T> {
     pub fn pop_state(&mut self, old_config: T, elem: StateElem) {
         self.config = old_config;
         assert_eq!(self.path.pop(), Some(elem.to_string()));
-        self.config.restore_state(&elem);
+        let ctx = Context {
+            elem: &elem,
+            is_recursive: false,
+        };
+        self.config.restore_state(ctx);
     }
     pub fn report_unused(&self) -> Vec<String> {
         let mut res = BTreeSet::new();
@@ -145,11 +157,16 @@ impl<'a, T: ConfigState> State<'a, T> {
             .collect()
     }
 }
+#[derive(Debug)]
+pub struct Context<'a> {
+    pub elem: &'a StateElem<'a>,
+    pub is_recursive: bool,
+}
 
 pub trait ConfigState: DeserializeOwned + Default + Clone + std::fmt::Debug {
-    fn merge_config(&mut self, config: &Self, elem: Option<&StateElem>, is_recursive: bool);
-    fn update_state(&mut self, elem: &StateElem);
-    fn restore_state(&mut self, elem: &StateElem);
+    fn merge_config(&mut self, config: &Self, ctx: Option<Context>);
+    fn update_state(&mut self, ctx: Context);
+    fn restore_state(&mut self, ctx: Context);
     fn unmatched_config() -> Self {
         Self::default()
     }
@@ -356,7 +373,8 @@ fn path_name(t: &Type) -> String {
         TypeInner::Func(_) => "func",
         TypeInner::Service(_) => "service",
         TypeInner::Future => "future",
-        TypeInner::Class(..) | TypeInner::Unknown => unreachable!(),
+        TypeInner::Class(..) => "func:init",
+        TypeInner::Unknown => unreachable!(),
     }
     .to_string()
 }
@@ -371,16 +389,16 @@ fn parse() {
         text: Option<String>,
     }
     impl ConfigState for T {
-        fn merge_config(&mut self, config: &Self, _elem: Option<&StateElem>, is_recursive: bool) {
+        fn merge_config(&mut self, config: &Self, ctx: Option<Context>) {
             *self = config.clone();
-            if is_recursive {
+            if ctx.is_some_and(|c| c.is_recursive) {
                 self.size = Some(0);
             }
         }
-        fn update_state(&mut self, _elem: &StateElem) {
+        fn update_state(&mut self, _ctx: Context) {
             self.size = self.size.map(|s| s + 1);
         }
-        fn restore_state(&mut self, _elem: &StateElem) {
+        fn restore_state(&mut self, _ctx: Context) {
             self.size = self.size.map(|s| s - 1);
         }
     }
