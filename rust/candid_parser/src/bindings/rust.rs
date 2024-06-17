@@ -47,6 +47,7 @@ impl ConfigState for BindingConfig {
 struct State<'a> {
     state: crate::configs::State<'a, BindingConfig>,
     recs: RecPoints<'a>,
+    def_use: BTreeMap<String, Vec<String>>,
 }
 
 type RecPoints<'a> = BTreeSet<&'a str>;
@@ -499,25 +500,26 @@ pub struct Method {
     pub mode: String,
 }
 pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Output, Vec<String>) {
-    let def_use = if let Some(actor) = &actor {
-        chase_def_use(env, actor).unwrap()
-    } else {
-        BTreeMap::new()
-    };
     let mut state = NominalState {
         state: crate::configs::State::new(&tree.0, env),
-        def_use: def_use,
     };
     let (env, actor) = state.nominalize_all(actor);
-    let def_list = if let Some(actor) = &actor {
-        chase_actor(&env, actor).unwrap()
+    let (def_list, def_use) = if let Some(actor) = &actor {
+        (
+            chase_actor(&env, actor).unwrap(),
+            chase_def_use(&env, actor).unwrap(),
+        )
     } else {
-        env.0.iter().map(|pair| pair.0.as_ref()).collect::<Vec<_>>()
+        (
+            env.0.iter().map(|pair| pair.0.as_ref()).collect::<Vec<_>>(),
+            BTreeMap::new(),
+        )
     };
     let recs = infer_rec(&env, &def_list).unwrap();
     let mut state = State {
         state: crate::configs::State::new(&tree.0, &env),
         recs,
+        def_use,
     };
     let defs = state.pp_defs(&def_list);
     let (methods, init_args) = if let Some(actor) = &actor {
@@ -626,7 +628,6 @@ fn path_to_var(path: &[TypePath]) -> String {
 }
 struct NominalState<'a> {
     state: crate::configs::State<'a, BindingConfig>,
-    def_use: BTreeMap<String, Vec<String>>,
 }
 impl<'a> NominalState<'a> {
     // Convert structural typing to nominal typing to fit Rust's type system
@@ -655,15 +656,23 @@ impl<'a> NominalState<'a> {
                     let fs: Vec<_> = fs
                         .iter()
                         .map(|Field { id, ty }| {
+                            let lab = id.to_string();
+                            let elem = StateElem::Label(&lab);
+                            let old = self.state.push_state(&elem);
                             path.push(TypePath::RecordField(id.to_string()));
                             let ty = self.nominalize(env, path, ty);
                             path.pop();
+                            self.state.pop_state(old, elem);
                             Field { id: id.clone(), ty }
                         })
                         .collect();
                     TypeInner::Record(fs)
                 } else {
-                    let new_var = path_to_var(path);
+                    let new_var = if let Some(name) = &self.state.config.name {
+                        name.to_string()
+                    } else {
+                        path_to_var(path)
+                    };
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
@@ -678,16 +687,23 @@ impl<'a> NominalState<'a> {
                     let fs: Vec<_> = fs
                         .iter()
                         .map(|Field { id, ty }| {
+                            let lab = id.to_string();
+                            let old = self.state.push_state(&StateElem::Label(&lab));
                             path.push(TypePath::VariantField(id.to_string()));
                             let ty = self.nominalize(env, path, ty);
                             path.pop();
+                            self.state.pop_state(old, StateElem::Label(&lab));
                             Field { id: id.clone(), ty }
                         })
                         .collect();
                     TypeInner::Variant(fs)
                 }
                 Some(_) => {
-                    let new_var = path_to_var(path);
+                    let new_var = if let Some(name) = &self.state.config.name {
+                        name.to_string()
+                    } else {
+                        path_to_var(path)
+                    };
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
@@ -707,6 +723,8 @@ impl<'a> NominalState<'a> {
                             .into_iter()
                             .enumerate()
                             .map(|(i, ty)| {
+                                let lab = format!("arg:{i}");
+                                let old = self.state.push_state(&StateElem::Label(&lab));
                                 let i = if i == 0 {
                                     "".to_string()
                                 } else {
@@ -715,6 +733,7 @@ impl<'a> NominalState<'a> {
                                 path.push(TypePath::Func(format!("arg{i}")));
                                 let ty = self.nominalize(env, path, &ty);
                                 path.pop();
+                                self.state.pop_state(old, StateElem::Label(&lab));
                                 ty
                             })
                             .collect(),
@@ -723,6 +742,8 @@ impl<'a> NominalState<'a> {
                             .into_iter()
                             .enumerate()
                             .map(|(i, ty)| {
+                                let lab = format!("ret:{i}");
+                                let old = self.state.push_state(&StateElem::Label(&lab));
                                 let i = if i == 0 {
                                     "".to_string()
                                 } else {
@@ -731,13 +752,18 @@ impl<'a> NominalState<'a> {
                                 path.push(TypePath::Func(format!("ret{i}")));
                                 let ty = self.nominalize(env, path, &ty);
                                 path.pop();
+                                self.state.pop_state(old, StateElem::Label(&lab));
                                 ty
                             })
                             .collect(),
                     })
                 }
                 Some(_) => {
-                    let new_var = path_to_var(path);
+                    let new_var = if let Some(name) = &self.state.config.name {
+                        name.to_string()
+                    } else {
+                        path_to_var(path)
+                    };
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
@@ -751,15 +777,22 @@ impl<'a> NominalState<'a> {
                 None | Some(TypePath::Id(_)) => TypeInner::Service(
                     serv.iter()
                         .map(|(meth, ty)| {
+                            let lab = meth.to_string();
+                            let old = self.state.push_state(&StateElem::Label(&lab));
                             path.push(TypePath::Id(meth.to_string()));
                             let ty = self.nominalize(env, path, ty);
                             path.pop();
+                            self.state.pop_state(old, StateElem::Label(&lab));
                             (meth.clone(), ty)
                         })
                         .collect(),
                 ),
                 Some(_) => {
-                    let new_var = path_to_var(path);
+                    let new_var = if let Some(name) = &self.state.config.name {
+                        name.to_string()
+                    } else {
+                        path_to_var(path)
+                    };
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
@@ -772,15 +805,18 @@ impl<'a> NominalState<'a> {
             TypeInner::Class(args, ty) => TypeInner::Class(
                 args.iter()
                     .map(|ty| {
+                        let elem = StateElem::Label("func:init");
+                        let old = self.state.push_state(&elem);
                         path.push(TypePath::Init);
                         let ty = self.nominalize(env, path, ty);
                         path.pop();
+                        self.state.pop_state(old, elem);
                         ty
                     })
                     .collect(),
                 self.nominalize(env, path, ty),
             ),
-            _ => return t.clone(),
+            t => t.clone(),
         }
         .into();
         self.state.pop_state(old, elem);
@@ -790,8 +826,11 @@ impl<'a> NominalState<'a> {
     fn nominalize_all(&mut self, actor: &Option<Type>) -> (TypeEnv, Option<Type>) {
         let mut res = TypeEnv(Default::default());
         for (id, ty) in self.state.env.0.iter() {
+            let elem = StateElem::Label(id);
+            let old = self.state.push_state(&elem);
             let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.clone())], ty);
             res.0.insert(id.to_string(), ty);
+            self.state.pop_state(old, elem);
         }
         let actor = actor
             .as_ref()
