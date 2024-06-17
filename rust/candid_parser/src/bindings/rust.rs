@@ -47,8 +47,8 @@ impl ConfigState for BindingConfig {
             self.visibility.clone_from(&config.visibility);
         }
     }
-    fn update_state(&mut self, _ctx: Context) {}
-    fn restore_state(&mut self, _ctx: Context) {}
+    fn update_state(&mut self, _elem: &StateElem) {}
+    fn restore_state(&mut self, _elem: &StateElem) {}
 }
 struct State<'a> {
     state: crate::configs::State<'a, BindingConfig>,

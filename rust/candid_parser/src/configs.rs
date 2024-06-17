@@ -86,11 +86,7 @@ impl<'a, T: ConfigState> State<'a, T> {
     }
     /// Update config based on the new elem in the path. Return the old state AFTER `update_state`.
     pub fn push_state(&mut self, elem: &StateElem) -> T {
-        let ctx = Context {
-            elem,
-            is_recursive: false,
-        };
-        self.config.update_state(ctx);
+        self.config.update_state(elem);
         let old_config = self.config.clone();
         self.path.push(elem.to_string());
         let mut from_open = false;
@@ -130,11 +126,7 @@ impl<'a, T: ConfigState> State<'a, T> {
     pub fn pop_state(&mut self, old_config: T, elem: StateElem) {
         self.config = old_config;
         assert_eq!(self.path.pop(), Some(elem.to_string()));
-        let ctx = Context {
-            elem: &elem,
-            is_recursive: false,
-        };
-        self.config.restore_state(ctx);
+        self.config.restore_state(&elem);
     }
     pub fn report_unused(&self) -> Vec<String> {
         let mut res = BTreeSet::new();
@@ -165,8 +157,8 @@ pub struct Context<'a> {
 
 pub trait ConfigState: DeserializeOwned + Default + Clone + std::fmt::Debug {
     fn merge_config(&mut self, config: &Self, ctx: Option<Context>);
-    fn update_state(&mut self, ctx: Context);
-    fn restore_state(&mut self, ctx: Context);
+    fn update_state(&mut self, elem: &StateElem);
+    fn restore_state(&mut self, elem: &StateElem);
     fn unmatched_config() -> Self {
         Self::default()
     }
@@ -395,10 +387,10 @@ fn parse() {
                 self.size = Some(0);
             }
         }
-        fn update_state(&mut self, _ctx: Context) {
+        fn update_state(&mut self, _elem: &StateElem) {
             self.size = self.size.map(|s| s + 1);
         }
-        fn restore_state(&mut self, _ctx: Context) {
+        fn restore_state(&mut self, _elem: &StateElem) {
             self.size = self.size.map(|s| s - 1);
         }
     }

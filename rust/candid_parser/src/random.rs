@@ -45,16 +45,16 @@ impl ConfigState for GenConfig {
             self.size = config.size.or(self.size);
         }
     }
-    fn update_state(&mut self, ctx: Context) {
-        if let StateElem::Type(t) = ctx.elem {
+    fn update_state(&mut self, elem: &StateElem) {
+        if let StateElem::Type(t) = elem {
             if !matches!(t.as_ref(), TypeInner::Var(_)) {
                 self.depth = self.depth.map(|d| d - 1);
                 self.size = self.size.map(|s| s - 1);
             }
         }
     }
-    fn restore_state(&mut self, ctx: Context) {
-        if let StateElem::Type(t) = ctx.elem {
+    fn restore_state(&mut self, elem: &StateElem) {
+        if let StateElem::Type(t) = elem {
             if !matches!(t.as_ref(), TypeInner::Var(_)) {
                 self.depth = self.depth.map(|d| d + 1);
             }
