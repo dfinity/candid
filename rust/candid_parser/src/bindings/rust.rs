@@ -57,6 +57,22 @@ impl ConfigState for BindingConfig {
     }
     fn update_state(&mut self, _elem: &StateElem) {}
     fn restore_state(&mut self, _elem: &StateElem) {}
+    fn list_properties(&self) -> Vec<String> {
+        let mut res = Vec::new();
+        if self.name.is_some() {
+            res.push("name");
+        }
+        if self.use_type.is_some() {
+            res.push("use_type");
+        }
+        if self.attributes.is_some() {
+            res.push("attributes");
+        }
+        if self.visibility.is_some() {
+            res.push("visibility");
+        }
+        res.into_iter().map(|f| f.to_string()).collect()
+    }
 }
 struct State<'a> {
     state: crate::configs::State<'a, BindingConfig>,
@@ -112,13 +128,29 @@ fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
         None => RcDoc::text("pub "),
     }
 }
+
 impl<'a> State<'a> {
+    fn check_name_use(&self, id: &str) {
+        if let Some(path) = self.state.config_source.get("name") {
+            let path = path.join(".");
+            if crate::configs::is_scoped_key(&path) {
+                match self.def_use.get(id) {
+                    Some(uses) if uses.len() > 1 => {
+                        panic!("{id} is used by multiple functions. Try to refactor the did file.");
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
     fn pp_ty<'b>(&mut self, ty: &'b Type, is_ref: bool) -> RcDoc<'b> {
         use TypeInner::*;
         let elem = StateElem::Type(ty);
         let old = self.state.push_state(&elem);
         let res = if let Some(t) = &self.state.config.use_type {
-            RcDoc::text(t.clone())
+            let res = RcDoc::text(t.clone());
+            self.state.update_stats("use_type");
+            res
         } else {
             match ty.as_ref() {
                 Null => str("()"),
@@ -140,7 +172,10 @@ impl<'a> State<'a> {
                 Empty => str("candid::Empty"),
                 Var(ref id) => {
                     let name = if let Some(name) = &self.state.config.name {
-                        RcDoc::text(name.clone())
+                        self.check_name_use(id);
+                        let res = RcDoc::text(name.clone());
+                        self.state.update_stats("name");
+                        res
                     } else {
                         ident(id, Some(Case::Pascal))
                     };
@@ -168,6 +203,7 @@ impl<'a> State<'a> {
     }
     fn pp_label<'b>(&mut self, id: &'b SharedLabel, is_variant: bool, need_vis: bool) -> RcDoc<'b> {
         let vis = if need_vis {
+            self.state.update_stats("visibility");
             pp_vis(&self.state.config.visibility)
         } else {
             RcDoc::nil()
@@ -179,10 +215,14 @@ impl<'a> State<'a> {
             .clone()
             .map(|s| RcDoc::text(s).append(RcDoc::line()))
             .unwrap_or(RcDoc::nil());
+        self.state.update_stats("attributes");
         match &**id {
             Label::Named(id) => {
                 let (doc, is_rename) = if let Some(name) = &self.state.config.name {
-                    (RcDoc::text(name.clone()), true)
+                    self.check_name_use(id);
+                    let res = (RcDoc::text(name.clone()), true);
+                    self.state.update_stats("name");
+                    res
                 } else {
                     let case = if is_variant { Some(Case::Pascal) } else { None };
                     ident_(id, case)
@@ -208,6 +248,7 @@ impl<'a> State<'a> {
             let lab = i.to_string();
             let old = self.state.push_state(&StateElem::Label(&lab));
             let vis = if need_vis {
+                self.state.update_stats("visibility");
                 pp_vis(&self.state.config.visibility)
             } else {
                 RcDoc::nil()
@@ -285,6 +326,9 @@ impl<'a> State<'a> {
                 .clone()
                 .map(RcDoc::text)
                 .unwrap_or_else(|| ident(id, Some(Case::Pascal)));
+            self.state.update_stats("name");
+            self.state.update_stats("visibility");
+            self.state.update_stats("attributes");
             let vis = pp_vis(&self.state.config.visibility);
             let derive = self
                 .state
@@ -411,6 +455,7 @@ impl<'a> State<'a> {
             .name
             .clone()
             .unwrap_or_else(|| ident(id, Some(Case::Snake)).pretty(LINE_WIDTH).to_string());
+        self.state.update_stats("name");
         let args: Vec<_> = func
             .args
             .iter()
@@ -424,6 +469,7 @@ impl<'a> State<'a> {
                     .name
                     .clone()
                     .unwrap_or_else(|| lab.clone());
+                self.state.update_stats("name");
                 let res = self.pp_ty(ty, true);
                 self.state.pop_state(old, StateElem::Label(&lab));
                 (name, res)
@@ -480,6 +526,7 @@ impl<'a> State<'a> {
                         .name
                         .clone()
                         .unwrap_or_else(|| lab.clone());
+                    self.state.update_stats("name");
                     let res = self.pp_ty(ty, true);
                     self.state.pop_state(old, StateElem::Label(&lab));
                     (name, res.pretty(LINE_WIDTH).to_string())
@@ -518,6 +565,7 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
         state: crate::configs::State::new(&tree.0, env),
     };
     let (env, actor) = state.nominalize_all(actor);
+    let old_stats = state.state.stats.clone();
     let (def_list, def_use) = if let Some(actor) = &actor {
         (
             chase_actor(&env, actor).unwrap(),
@@ -535,6 +583,7 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
         recs,
         def_use,
     };
+    state.state.stats = old_stats;
     let defs = state.pp_defs(&def_list);
     let (methods, init_args) = if let Some(actor) = &actor {
         state.pp_actor(actor)
@@ -683,7 +732,9 @@ impl<'a> NominalState<'a> {
                     TypeInner::Record(fs)
                 } else {
                     let new_var = if let Some(name) = &self.state.config.name {
-                        name.to_string()
+                        let res = name.to_string();
+                        self.state.update_stats("name");
+                        res
                     } else {
                         path_to_var(path)
                     };
@@ -714,7 +765,9 @@ impl<'a> NominalState<'a> {
                 }
                 Some(_) => {
                     let new_var = if let Some(name) = &self.state.config.name {
-                        name.to_string()
+                        let res = name.to_string();
+                        self.state.update_stats("name");
+                        res
                     } else {
                         path_to_var(path)
                     };
@@ -774,7 +827,9 @@ impl<'a> NominalState<'a> {
                 }
                 Some(_) => {
                     let new_var = if let Some(name) = &self.state.config.name {
-                        name.to_string()
+                        let res = name.to_string();
+                        self.state.update_stats("name");
+                        res
                     } else {
                         path_to_var(path)
                     };
@@ -803,7 +858,9 @@ impl<'a> NominalState<'a> {
                 ),
                 Some(_) => {
                     let new_var = if let Some(name) = &self.state.config.name {
-                        name.to_string()
+                        let res = name.to_string();
+                        self.state.update_stats("name");
+                        res
                     } else {
                         path_to_var(path)
                     };

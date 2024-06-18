@@ -9,7 +9,7 @@ pub struct State<'a, T: ConfigState> {
     path: Vec<String>,
     open_tree: Option<&'a ConfigTree<T>>,
     open_path: Vec<String>,
-    stats: BTreeMap<Vec<String>, u32>,
+    pub stats: BTreeMap<Vec<String>, u32>,
     pub config: T,
     pub config_source: BTreeMap<String, Vec<String>>,
     pub env: &'a TypeEnv,
@@ -115,10 +115,6 @@ impl<'a, T: ConfigState> State<'a, T> {
             let ctx = Context { elem, is_recursive };
             let delta = self.config.merge_config(state, Some(ctx));
             self.update_config_source(delta, &matched_path);
-            self.stats
-                .entry(matched_path)
-                .and_modify(|v| *v += 1)
-                .or_insert(1);
         } else {
             let ctx = Context {
                 elem,
@@ -135,6 +131,13 @@ impl<'a, T: ConfigState> State<'a, T> {
         self.restore_from_backup(old_config);
         assert_eq!(self.path.pop(), Some(elem.to_string()));
         self.config.restore_state(&elem);
+    }
+    pub fn update_stats(&mut self, key: &str) {
+        if let Some(path) = self.config_source.get(key) {
+            let mut path = path.clone();
+            path.push(key.to_string());
+            self.stats.entry(path).and_modify(|v| *v += 1).or_insert(1);
+        }
     }
     pub fn report_unused(&self) -> Vec<String> {
         let mut res = BTreeSet::new();
@@ -183,6 +186,8 @@ pub trait ConfigState: DeserializeOwned + Default + Clone + std::fmt::Debug {
     fn merge_config(&mut self, config: &Self, ctx: Option<Context>) -> Vec<String>;
     fn update_state(&mut self, elem: &StateElem);
     fn restore_state(&mut self, elem: &StateElem);
+    /// List the properties in the current config, used for analyzing unused properties.
+    fn list_properties(&self) -> Vec<String>;
     fn unmatched_config() -> Self {
         Self::default()
     }
@@ -273,8 +278,12 @@ impl<T: ConfigState> ConfigTree<T> {
         result.state.as_ref()
     }
     pub fn traverse(&self, path: &mut Vec<String>, res: &mut BTreeSet<Vec<String>>) {
-        if self.state.is_some() {
-            res.insert(path.clone());
+        if let Some(state) = &self.state {
+            for prop in state.list_properties() {
+                let mut path = path.clone();
+                path.push(prop);
+                res.insert(path);
+            }
         }
         for (k, v) in self.subtree.iter() {
             path.push(k.clone());
@@ -322,7 +331,7 @@ fn is_repeated(path: &[String], matched: &[String]) -> bool {
     }
     false
 }
-fn special_key(key: &str) -> bool {
+pub fn is_scoped_key(key: &str) -> bool {
     key.starts_with("func:") || key.starts_with("arg:") || key.starts_with("ret:")
 }
 fn generate_state_tree<T: ConfigState>(v: Value) -> Result<ConfigTree<T>> {
@@ -334,7 +343,7 @@ fn generate_state_tree<T: ConfigState>(v: Value) -> Result<ConfigTree<T>> {
             match v {
                 Value::Table(_) => {
                     let v = generate_state_tree(v)?;
-                    let dep = if special_key(&k) {
+                    let dep = if is_scoped_key(&k) {
                         v.max_depth
                     } else {
                         v.max_depth + 1
@@ -420,6 +429,19 @@ fn parse() {
         fn restore_state(&mut self, _elem: &StateElem) {
             self.size = self.size.map(|s| s - 1);
         }
+        fn list_properties(&self) -> Vec<String> {
+            let mut res = Vec::new();
+            if self.depth.is_some() {
+                res.push("depth");
+            }
+            if self.size.is_some() {
+                res.push("size");
+            }
+            if self.text.is_some() {
+                res.push("text");
+            }
+            res.into_iter().map(|f| f.to_string()).collect()
+        }
     }
     let toml = r#"
 [random]
@@ -503,6 +525,9 @@ Vec = { width = 2, size = 10 }
     );
     assert_eq!(state.open_path, vec!["func:f", "arg:0"]);
     let old = state.push_state(&StateElem::Label("list"));
+    state.update_stats("depth");
+    state.update_stats("size");
+    state.update_stats("text");
     assert_eq!(state.config.depth, Some(2));
     assert_eq!(state.config.size, Some(20));
     assert_eq!(state.config.text, None);
@@ -512,6 +537,7 @@ Vec = { width = 2, size = 10 }
     );
     assert_eq!(old.config.size, None);
     state.push_state(&StateElem::Label("val"));
+    state.update_stats("text");
     assert_eq!(state.config.text, Some("42".to_string()));
     state.with_scope(
         &Some(Scope {
@@ -522,6 +548,8 @@ Vec = { width = 2, size = 10 }
     );
     assert_eq!(state.open_path, vec!["func:f"]);
     state.push_state(&StateElem::Label("list"));
+    state.update_stats("depth");
+    state.update_stats("size");
     assert_eq!(state.config.depth, Some(3));
     assert_eq!(state.config.size, Some(0));
     assert_eq!(
@@ -531,25 +559,32 @@ Vec = { width = 2, size = 10 }
     assert_eq!(state.config_source.get("size").unwrap().join("."), "val");
     state.with_scope(&None, 0);
     let old = state.push_state(&StateElem::Label("list"));
+    state.update_stats("depth");
+    state.update_stats("size");
     assert_eq!(state.config.depth, Some(20));
     assert_eq!(state.config.size, Some(0));
     assert_eq!(state.config_source.get("depth").unwrap().join("."), "list");
     assert_eq!(state.config_source.get("size").unwrap().join("."), "val");
     assert_eq!(old.config.size, Some(1));
     state.pop_state(old, StateElem::Label("list"));
+    state.update_stats("size");
+    state.update_stats("depth");
     assert_eq!(state.config.size, Some(0));
     assert_eq!(state.config.depth, Some(3));
     let stats = state.report_unused();
     assert_eq!(
         stats.iter().map(|x| x.as_str()).collect::<Vec<&str>>(),
         [
-            "Vec",
-            "a.b.c",
-            "a.b.c.d",
-            "a.b.d",
-            "left.a",
-            "left.list",
-            "vec.nat8"
+            "Vec.size",
+            "a.b.c.d.depth",
+            "a.b.c.depth",
+            "a.b.d.depth",
+            "depth",
+            "func:f.list.size",
+            "left.a.depth",
+            "left.list.depth",
+            "list.size",
+            "vec.nat8.text"
         ]
     );
 }

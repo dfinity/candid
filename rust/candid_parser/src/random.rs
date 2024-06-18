@@ -86,6 +86,28 @@ impl ConfigState for GenConfig {
             size: None,
         }
     }
+    fn list_properties(&self) -> Vec<String> {
+        let mut res = Vec::new();
+        if self.range.is_some() {
+            res.push("range".to_string());
+        }
+        if self.text.is_some() {
+            res.push("text".to_string());
+        }
+        if self.width.is_some() {
+            res.push("width".to_string());
+        }
+        if self.value.is_some() {
+            res.push("value".to_string());
+        }
+        if self.depth.is_some() {
+            res.push("depth".to_string());
+        }
+        if self.size.is_some() {
+            res.push("size".to_string());
+        }
+        res
+    }
 }
 
 pub struct RandState<'a>(State<'a, GenConfig>);
@@ -97,6 +119,7 @@ impl<'a> RandState<'a> {
             let v: IDLValue = super::parse_idl_value(v)?;
             let v = v.annotate_type(true, self.0.env, ty)?;
             self.0.pop_state(old_config, StateElem::Type(ty));
+            self.0.update_stats("value");
             return Ok(v);
         }
         let res = Ok(match ty.as_ref() {
@@ -107,24 +130,60 @@ impl<'a> RandState<'a> {
             TypeInner::Null => IDLValue::Null,
             TypeInner::Reserved => IDLValue::Reserved,
             TypeInner::Bool => IDLValue::Bool(u.arbitrary()?),
-            TypeInner::Int => IDLValue::Int(arbitrary_num::<i128>(u, self.0.config.range)?.into()),
-            TypeInner::Nat => IDLValue::Nat(arbitrary_num::<u128>(u, self.0.config.range)?.into()),
-            TypeInner::Nat8 => IDLValue::Nat8(arbitrary_num(u, self.0.config.range)?),
-            TypeInner::Nat16 => IDLValue::Nat16(arbitrary_num(u, self.0.config.range)?),
-            TypeInner::Nat32 => IDLValue::Nat32(arbitrary_num(u, self.0.config.range)?),
-            TypeInner::Nat64 => IDLValue::Nat64(arbitrary_num(u, self.0.config.range)?),
-            TypeInner::Int8 => IDLValue::Int8(arbitrary_num(u, self.0.config.range)?),
-            TypeInner::Int16 => IDLValue::Int16(arbitrary_num(u, self.0.config.range)?),
-            TypeInner::Int32 => IDLValue::Int32(arbitrary_num(u, self.0.config.range)?),
-            TypeInner::Int64 => IDLValue::Int64(arbitrary_num(u, self.0.config.range)?),
+            TypeInner::Int => {
+                self.0.update_stats("range");
+                IDLValue::Int(arbitrary_num::<i128>(u, self.0.config.range)?.into())
+            }
+            TypeInner::Nat => {
+                self.0.update_stats("range");
+                IDLValue::Nat(arbitrary_num::<u128>(u, self.0.config.range)?.into())
+            }
+            TypeInner::Nat8 => {
+                self.0.update_stats("range");
+                IDLValue::Nat8(arbitrary_num(u, self.0.config.range)?)
+            }
+            TypeInner::Nat16 => {
+                self.0.update_stats("range");
+                IDLValue::Nat16(arbitrary_num(u, self.0.config.range)?)
+            }
+            TypeInner::Nat32 => {
+                self.0.update_stats("range");
+                IDLValue::Nat32(arbitrary_num(u, self.0.config.range)?)
+            }
+            TypeInner::Nat64 => {
+                self.0.update_stats("range");
+                IDLValue::Nat64(arbitrary_num(u, self.0.config.range)?)
+            }
+            TypeInner::Int8 => {
+                self.0.update_stats("range");
+                IDLValue::Int8(arbitrary_num(u, self.0.config.range)?)
+            }
+            TypeInner::Int16 => {
+                self.0.update_stats("range");
+                IDLValue::Int16(arbitrary_num(u, self.0.config.range)?)
+            }
+            TypeInner::Int32 => {
+                self.0.update_stats("range");
+                IDLValue::Int32(arbitrary_num(u, self.0.config.range)?)
+            }
+            TypeInner::Int64 => {
+                self.0.update_stats("range");
+                IDLValue::Int64(arbitrary_num(u, self.0.config.range)?)
+            }
             TypeInner::Float32 => IDLValue::Float32(u.arbitrary()?),
             TypeInner::Float64 => IDLValue::Float64(u.arbitrary()?),
-            TypeInner::Text => IDLValue::Text(arbitrary_text(
-                u,
-                &self.0.config.text,
-                &self.0.config.width,
-            )?),
+            TypeInner::Text => {
+                self.0.update_stats("text");
+                self.0.update_stats("width");
+                IDLValue::Text(arbitrary_text(
+                    u,
+                    &self.0.config.text,
+                    &self.0.config.width,
+                )?)
+            }
             TypeInner::Opt(t) => {
+                self.0.update_stats("depth");
+                self.0.update_stats("size");
                 let depths = if self.0.config.depth.is_some_and(|d| d <= 0)
                     || self.0.config.size.is_some_and(|s| s <= 0)
                 {
@@ -140,8 +199,10 @@ impl<'a> RandState<'a> {
                 }
             }
             TypeInner::Vec(t) => {
+                self.0.update_stats("width");
                 let width = self.0.config.width.or_else(|| {
                     let elem_size = size(self.0.env, t).unwrap_or(MAX_DEPTH);
+                    self.0.update_stats("size");
                     Some(std::cmp::max(0, self.0.config.size.unwrap_or(0)) as usize / elem_size)
                 });
                 let len = arbitrary_len(u, width)?;
@@ -171,6 +232,8 @@ impl<'a> RandState<'a> {
                 let choices = fs
                     .iter()
                     .map(|Field { ty, .. }| size(self.0.env, ty).unwrap_or(MAX_DEPTH));
+                self.0.update_stats("size");
+                self.0.update_stats("depth");
                 let sizes: Vec<_> = if self.0.config.depth.is_some_and(|d| d <= 0)
                     || self.0.config.size.is_some_and(|s| s <= 0)
                 {
@@ -193,10 +256,14 @@ impl<'a> RandState<'a> {
                 IDLValue::Variant(VariantValue(Box::new(field), idx as u64))
             }
             TypeInner::Principal => IDLValue::Principal(crate::Principal::arbitrary(u)?),
-            TypeInner::Func(_) => IDLValue::Func(
-                crate::Principal::arbitrary(u)?,
-                arbitrary_text(u, &self.0.config.text, &self.0.config.width)?,
-            ),
+            TypeInner::Func(_) => {
+                self.0.update_stats("text");
+                self.0.update_stats("width");
+                IDLValue::Func(
+                    crate::Principal::arbitrary(u)?,
+                    arbitrary_text(u, &self.0.config.text, &self.0.config.width)?,
+                )
+            }
             TypeInner::Service(_) => IDLValue::Service(crate::Principal::arbitrary(u)?),
             _ => unimplemented!(),
         });
