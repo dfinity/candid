@@ -31,19 +31,35 @@ impl Default for GenConfig {
     }
 }
 impl ConfigState for GenConfig {
-    fn merge_config(&mut self, config: &Self, ctx: Option<Context>) {
-        self.range = config.range.or(self.range);
+    fn merge_config(&mut self, config: &Self, ctx: Option<Context>) -> Vec<String> {
+        let mut res = Vec::new();
+        if config.range.is_some() {
+            self.range = config.range;
+            res.push("range");
+        }
         if config.text.is_some() {
             self.text.clone_from(&config.text);
+            res.push("text");
         }
-        self.width = config.width.or(self.width);
+        if config.width.is_some() {
+            self.width = config.width;
+            res.push("width");
+        }
         if config.value.is_some() {
             self.value.clone_from(&config.value);
+            res.push("value");
         }
         if ctx.as_ref().is_some_and(|c| !c.is_recursive) {
-            self.depth = config.depth.or(self.depth);
-            self.size = config.size.or(self.size);
+            if config.depth.is_some() {
+                self.depth = config.depth;
+                res.push("depth");
+            }
+            if config.size.is_some() {
+                self.size = config.size;
+                res.push("size");
+            }
         }
+        res.into_iter().map(|s| s.to_string()).collect()
     }
     fn update_state(&mut self, elem: &StateElem) {
         if let StateElem::Type(t) = elem {

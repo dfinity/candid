@@ -19,8 +19,10 @@ pub struct BindingConfig {
     visibility: Option<String>,
 }
 impl ConfigState for BindingConfig {
-    fn merge_config(&mut self, config: &Self, ctx: Option<Context>) {
+    fn merge_config(&mut self, config: &Self, ctx: Option<Context>) -> Vec<String> {
+        let mut res = Vec::new();
         self.name.clone_from(&config.name);
+        res.push("name");
         // match use_type can survive across types, so that label.use_type works
         if ctx
             .as_ref()
@@ -28,9 +30,11 @@ impl ConfigState for BindingConfig {
         {
             if let Some(use_type) = &config.use_type {
                 self.use_type = Some(use_type.clone());
+                res.push("use_type");
             }
         } else {
             self.use_type.clone_from(&config.use_type);
+            res.push("use_type");
         }
         // matched attributes can survive across labels, so that record.attributes works
         if ctx
@@ -39,13 +43,17 @@ impl ConfigState for BindingConfig {
         {
             if let Some(attr) = &config.attributes {
                 self.attributes = Some(attr.clone());
+                res.push("attributes");
             }
         } else {
             self.attributes.clone_from(&config.attributes);
+            res.push("attributes");
         }
         if config.visibility.is_some() {
             self.visibility.clone_from(&config.visibility);
+            res.push("visibility");
         }
+        res.into_iter().map(|f| f.to_string()).collect()
     }
     fn update_state(&mut self, _elem: &StateElem) {}
     fn restore_state(&mut self, _elem: &StateElem) {}

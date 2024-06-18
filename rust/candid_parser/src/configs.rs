@@ -11,7 +11,12 @@ pub struct State<'a, T: ConfigState> {
     open_path: Vec<String>,
     stats: BTreeMap<Vec<String>, u32>,
     pub config: T,
+    pub config_source: BTreeMap<String, Vec<String>>,
     pub env: &'a TypeEnv,
+}
+pub struct ConfigBackup<T> {
+    config: T,
+    config_source: BTreeMap<String, Vec<String>>,
 }
 #[derive(Debug)]
 pub enum StateElem<'a> {
@@ -43,6 +48,7 @@ impl<'a, T: ConfigState> State<'a, T> {
             path: Vec::new(),
             stats: BTreeMap::new(),
             config,
+            config_source: BTreeMap::new(),
             env,
         }
     }
@@ -85,9 +91,9 @@ impl<'a, T: ConfigState> State<'a, T> {
         }
     }
     /// Update config based on the new elem in the path. Return the old state AFTER `update_state`.
-    pub fn push_state(&mut self, elem: &StateElem) -> T {
+    pub fn push_state(&mut self, elem: &StateElem) -> ConfigBackup<T> {
         self.config.update_state(elem);
-        let old_config = self.config.clone();
+        let old_config = self.to_backup();
         self.path.push(elem.to_string());
         let mut from_open = false;
         let new_state = if let Some(subtree) = self.open_tree {
@@ -106,25 +112,27 @@ impl<'a, T: ConfigState> State<'a, T> {
                 vec![]
             };
             matched_path.extend_from_slice(&self.path[idx..]);
+            let ctx = Context { elem, is_recursive };
+            let delta = self.config.merge_config(state, Some(ctx));
+            self.update_config_source(delta, &matched_path);
             self.stats
                 .entry(matched_path)
                 .and_modify(|v| *v += 1)
                 .or_insert(1);
-            let ctx = Context { elem, is_recursive };
-            self.config.merge_config(state, Some(ctx));
-            //eprintln!("match path: {:?}, state: {:?}", self.path, self.config);
         } else {
             let ctx = Context {
                 elem,
                 is_recursive: false,
             };
-            self.config.merge_config(&T::unmatched_config(), Some(ctx));
-            //eprintln!("path: {:?}, state: {:?}", self.path, self.config);
+            let delta = self.config.merge_config(&T::unmatched_config(), Some(ctx));
+            for field in delta {
+                self.config_source.remove(&field);
+            }
         }
         old_config
     }
-    pub fn pop_state(&mut self, old_config: T, elem: StateElem) {
-        self.config = old_config;
+    pub fn pop_state(&mut self, old_config: ConfigBackup<T>, elem: StateElem) {
+        self.restore_from_backup(old_config);
         assert_eq!(self.path.pop(), Some(elem.to_string()));
         self.config.restore_state(&elem);
     }
@@ -148,6 +156,21 @@ impl<'a, T: ConfigState> State<'a, T> {
             .map(|(k, v)| (k.join("."), v))
             .collect()
     }
+    fn update_config_source(&mut self, delta: Vec<String>, path: &[String]) {
+        for field in delta {
+            self.config_source.insert(field, path.to_vec());
+        }
+    }
+    fn to_backup(&self) -> ConfigBackup<T> {
+        ConfigBackup {
+            config: self.config.clone(),
+            config_source: self.config_source.clone(),
+        }
+    }
+    fn restore_from_backup(&mut self, bak: ConfigBackup<T>) {
+        self.config = bak.config;
+        self.config_source = bak.config_source;
+    }
 }
 #[derive(Debug)]
 pub struct Context<'a> {
@@ -156,7 +179,8 @@ pub struct Context<'a> {
 }
 
 pub trait ConfigState: DeserializeOwned + Default + Clone + std::fmt::Debug {
-    fn merge_config(&mut self, config: &Self, ctx: Option<Context>);
+    /// Specifies the merging semantics of two configs, returns a vector of updated config fields.
+    fn merge_config(&mut self, config: &Self, ctx: Option<Context>) -> Vec<String>;
     fn update_state(&mut self, elem: &StateElem);
     fn restore_state(&mut self, elem: &StateElem);
     fn unmatched_config() -> Self {
@@ -381,11 +405,14 @@ fn parse() {
         text: Option<String>,
     }
     impl ConfigState for T {
-        fn merge_config(&mut self, config: &Self, ctx: Option<Context>) {
+        fn merge_config(&mut self, config: &Self, ctx: Option<Context>) -> Vec<String> {
+            let mut res = vec!["depth", "text", "size"];
             *self = config.clone();
             if ctx.is_some_and(|c| c.is_recursive) {
                 self.size = Some(0);
+                res.pop();
             }
+            res.into_iter().map(|f| f.to_string()).collect()
         }
         fn update_state(&mut self, _elem: &StateElem) {
             self.size = self.size.map(|s| s + 1);
@@ -479,7 +506,11 @@ Vec = { width = 2, size = 10 }
     assert_eq!(state.config.depth, Some(2));
     assert_eq!(state.config.size, Some(20));
     assert_eq!(state.config.text, None);
-    assert_eq!(old.size, None);
+    assert_eq!(
+        state.config_source.get("depth").unwrap().join("."),
+        "func:f.arg:0.list"
+    );
+    assert_eq!(old.config.size, None);
     state.push_state(&StateElem::Label("val"));
     assert_eq!(state.config.text, Some("42".to_string()));
     state.with_scope(
@@ -493,11 +524,18 @@ Vec = { width = 2, size = 10 }
     state.push_state(&StateElem::Label("list"));
     assert_eq!(state.config.depth, Some(3));
     assert_eq!(state.config.size, Some(0));
+    assert_eq!(
+        state.config_source.get("depth").unwrap().join("."),
+        "func:f.list"
+    );
+    assert_eq!(state.config_source.get("size").unwrap().join("."), "val");
     state.with_scope(&None, 0);
     let old = state.push_state(&StateElem::Label("list"));
     assert_eq!(state.config.depth, Some(20));
     assert_eq!(state.config.size, Some(0));
-    assert_eq!(old.size, Some(1));
+    assert_eq!(state.config_source.get("depth").unwrap().join("."), "list");
+    assert_eq!(state.config_source.get("size").unwrap().join("."), "val");
+    assert_eq!(old.config.size, Some(1));
     state.pop_state(old, StateElem::Label("list"));
     assert_eq!(state.config.size, Some(0));
     assert_eq!(state.config.depth, Some(3));
