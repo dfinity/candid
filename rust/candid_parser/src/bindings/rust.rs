@@ -1,4 +1,4 @@
-use super::analysis::{chase_actor, chase_def_use, infer_rec};
+use super::analysis::{chase_actor, infer_rec};
 use crate::{
     configs::{ConfigState, ConfigTree, Configs, Context, StateElem},
     Deserialize,
@@ -77,7 +77,6 @@ impl ConfigState for BindingConfig {
 struct State<'a> {
     state: crate::configs::State<'a, BindingConfig>,
     recs: RecPoints<'a>,
-    def_use: BTreeMap<String, Vec<String>>,
 }
 
 type RecPoints<'a> = BTreeSet<&'a str>;
@@ -130,19 +129,6 @@ fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
 }
 
 impl<'a> State<'a> {
-    fn check_name_use(&self, id: &str) {
-        if let Some(path) = self.state.config_source.get("name") {
-            let path = path.join(".");
-            if crate::configs::is_scoped_key(&path) {
-                match self.def_use.get(id) {
-                    Some(uses) if uses.len() > 1 => {
-                        panic!("{id} is used by multiple functions. Try to refactor the did file.");
-                    }
-                    _ => (),
-                }
-            }
-        }
-    }
     fn pp_ty<'b>(&mut self, ty: &'b Type, is_ref: bool) -> RcDoc<'b> {
         use TypeInner::*;
         let elem = StateElem::Type(ty);
@@ -172,7 +158,6 @@ impl<'a> State<'a> {
                 Empty => str("candid::Empty"),
                 Var(ref id) => {
                     let name = if let Some(name) = &self.state.config.name {
-                        self.check_name_use(id);
                         let res = RcDoc::text(name.clone());
                         self.state.update_stats("name");
                         res
@@ -219,7 +204,6 @@ impl<'a> State<'a> {
         match &**id {
             Label::Named(id) => {
                 let (doc, is_rename) = if let Some(name) = &self.state.config.name {
-                    self.check_name_use(id);
                     let res = (RcDoc::text(name.clone()), true);
                     self.state.update_stats("name");
                     res
@@ -566,22 +550,15 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
     };
     let (env, actor) = state.nominalize_all(actor);
     let old_stats = state.state.stats.clone();
-    let (def_list, def_use) = if let Some(actor) = &actor {
-        (
-            chase_actor(&env, actor).unwrap(),
-            chase_def_use(&env, actor).unwrap(),
-        )
+    let def_list = if let Some(actor) = &actor {
+        chase_actor(&env, actor).unwrap()
     } else {
-        (
-            env.0.iter().map(|pair| pair.0.as_ref()).collect::<Vec<_>>(),
-            BTreeMap::new(),
-        )
+        env.0.iter().map(|pair| pair.0.as_ref()).collect::<Vec<_>>()
     };
     let recs = infer_rec(&env, &def_list).unwrap();
     let mut state = State {
         state: crate::configs::State::new(&tree.0, &env),
         recs,
-        def_use,
     };
     state.state.stats = old_stats;
     let defs = state.pp_defs(&def_list);
@@ -790,14 +767,14 @@ impl<'a> NominalState<'a> {
                             .into_iter()
                             .enumerate()
                             .map(|(i, ty)| {
-                                let lab = format!("arg:{i}");
+                                let lab = format!("arg{i}");
                                 let old = self.state.push_state(&StateElem::Label(&lab));
-                                let i = if i == 0 {
+                                let idx = if i == 0 {
                                     "".to_string()
                                 } else {
                                     i.to_string()
                                 };
-                                path.push(TypePath::Func(format!("arg{i}")));
+                                path.push(TypePath::Func(format!("arg{idx}")));
                                 let ty = self.nominalize(env, path, &ty);
                                 path.pop();
                                 self.state.pop_state(old, StateElem::Label(&lab));
@@ -809,14 +786,14 @@ impl<'a> NominalState<'a> {
                             .into_iter()
                             .enumerate()
                             .map(|(i, ty)| {
-                                let lab = format!("ret:{i}");
+                                let lab = format!("ret{i}");
                                 let old = self.state.push_state(&StateElem::Label(&lab));
-                                let i = if i == 0 {
+                                let idx = if i == 0 {
                                     "".to_string()
                                 } else {
                                     i.to_string()
                                 };
-                                path.push(TypePath::Func(format!("ret{i}")));
+                                path.push(TypePath::Func(format!("ret{idx}")));
                                 let ty = self.nominalize(env, path, &ty);
                                 path.pop();
                                 self.state.pop_state(old, StateElem::Label(&lab));
@@ -876,7 +853,7 @@ impl<'a> NominalState<'a> {
             TypeInner::Class(args, ty) => TypeInner::Class(
                 args.iter()
                     .map(|ty| {
-                        let elem = StateElem::Label("func:init");
+                        let elem = StateElem::Label("init");
                         let old = self.state.push_state(&elem);
                         path.push(TypePath::Init);
                         let ty = self.nominalize(env, path, ty);
