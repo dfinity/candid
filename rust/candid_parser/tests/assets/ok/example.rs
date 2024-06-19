@@ -83,7 +83,11 @@ pub(crate) struct HRet42 {}
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct HRet { pub(crate) _42_: HRet42, pub(crate) id: u128 }
 candid::define_function!(pub(crate) FArg1 : (i32) -> (i64));
-candid::define_function!(pub(crate) F : (MyList, FArg1) -> (Option<MyList>));
+pub(crate) type Res = std::result::Result<u128, candid::Empty>;
+candid::define_function!(pub(crate) F : (MyList, FArg1) -> (
+    Option<MyList>,
+    Res,
+  ));
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) enum A { #[serde(rename="a")] A, #[serde(rename="b")] B(B) }
 
@@ -107,10 +111,10 @@ impl Service {
   pub async fn h(&self, arg0: Vec<Option<String>>, arg1: HArg1, arg2: Option<MyList>) -> Result<(HRet,)> {
     ic_cdk::call(self.0, "h", (arg0,arg1,arg2,)).await
   }
-  pub async fn i(&self, arg0: MyList, arg1: FArg1) -> Result<(Option<MyList>,)> {
+  pub async fn i(&self, arg0: MyList, arg1: FArg1) -> Result<(Option<MyList>,Res,)> {
     ic_cdk::call(self.0, "i", (arg0,arg1,)).await
   }
-  pub async fn x(&self, arg0: A, arg1: B) -> Result<(Option<A>,Option<B>,)> {
+  pub async fn x(&self, arg0: A, arg1: B) -> Result<(Option<A>,Option<B>,std::result::Result<(), ()>,)> {
     ic_cdk::call(self.0, "x", (arg0,arg1,)).await
   }
 }

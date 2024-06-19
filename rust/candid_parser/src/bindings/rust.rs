@@ -89,6 +89,17 @@ pub(crate) fn is_tuple(fs: &[Field]) -> bool {
         .enumerate()
         .any(|(i, field)| field.id.get_id() != (i as u32))
 }
+fn as_result(fs: &[Field]) -> Option<(&Type, &Type)> {
+    match fs {
+        [Field { id: ok, ty: t_ok }, Field { id: err, ty: t_err }]
+            if **ok == Label::Named("Ok".to_string())
+                && **err == Label::Named("Err".to_string()) =>
+        {
+            Some((t_ok, t_err))
+        }
+        _ => None,
+    }
+}
 static KEYWORDS: [&str; 51] = [
     "as", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn", "for",
     "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return",
@@ -176,8 +187,16 @@ impl<'a> State<'a> {
                 Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
                 Vec(ref t) => str("Vec").append(enclose("<", self.pp_ty(t, is_ref), ">")),
                 Record(ref fs) => self.pp_record_fields(fs, false, is_ref),
-                Variant(_) => unreachable!(), // not possible after rewriting
-                Func(_) => unreachable!(),    // not possible after rewriting
+                Variant(ref fs) => {
+                    // only possible for result variant
+                    let (ok, err) = as_result(fs).unwrap();
+                    let body = self
+                        .pp_ty(ok, is_ref)
+                        .append(", ")
+                        .append(self.pp_ty(err, is_ref));
+                    str("std::result::Result").append(enclose("<", body, ">"))
+                }
+                Func(_) => unreachable!(), // not possible after rewriting
                 Service(_) => unreachable!(), // not possible after rewriting
                 Class(_, _) => unreachable!(),
                 Knot(_) | Unknown | Future => unreachable!(),
@@ -337,13 +356,23 @@ impl<'a> State<'a> {
                         .append(self.pp_record_fields(fs, true, false))
                         .append(separator)
                 }
-                TypeInner::Variant(fs) => derive
-                    .append(RcDoc::line())
-                    .append(vis)
-                    .append("enum ")
-                    .append(name)
-                    .append(" ")
-                    .append(self.pp_variant_fields(fs)),
+                TypeInner::Variant(fs) => {
+                    if as_result(fs).is_some() {
+                        vis.append(kwd("type"))
+                            .append(name)
+                            .append(" = ")
+                            .append(self.pp_ty(ty, false))
+                            .append(";")
+                    } else {
+                        derive
+                            .append(RcDoc::line())
+                            .append(vis)
+                            .append("enum ")
+                            .append(name)
+                            .append(" ")
+                            .append(self.pp_variant_fields(fs))
+                    }
+                }
                 TypeInner::Func(func) => str("candid::define_function!(")
                     .append(vis)
                     .append(name)
@@ -724,8 +753,8 @@ impl<'a> NominalState<'a> {
                     TypeInner::Var(new_var)
                 }
             }
-            TypeInner::Variant(fs) => match path.last() {
-                None | Some(TypePath::Id(_)) => {
+            TypeInner::Variant(fs) => {
+                if matches!(path.last(), None | Some(TypePath::Id(_))) || as_result(fs).is_some() {
                     let fs: Vec<_> = fs
                         .iter()
                         .map(|Field { id, ty }| {
@@ -739,8 +768,7 @@ impl<'a> NominalState<'a> {
                         })
                         .collect();
                     TypeInner::Variant(fs)
-                }
-                Some(_) => {
+                } else {
                     let new_var = if let Some(name) = &self.state.config.name {
                         let res = name.to_string();
                         self.state.update_stats("name");
@@ -756,7 +784,7 @@ impl<'a> NominalState<'a> {
                     env.0.insert(new_var.clone(), ty);
                     TypeInner::Var(new_var)
                 }
-            },
+            }
             TypeInner::Func(func) => match path.last() {
                 None | Some(TypePath::Id(_)) => {
                     let func = func.clone();

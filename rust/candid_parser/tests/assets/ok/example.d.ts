@@ -9,7 +9,7 @@ export type a = { 'a' : null } |
   { 'b' : b };
 export type b = [bigint, bigint];
 export interface broker { 'find' : ActorMethod<[string], Principal> }
-export type f = ActorMethod<[List, [Principal, string]], [] | [List]>;
+export type f = ActorMethod<[List, [Principal, string]], [[] | [List], res]>;
 export type list = [] | [node];
 export type my_type = Principal;
 export interface nested {
@@ -25,6 +25,8 @@ export interface nested {
   _42_ : bigint,
 }
 export interface node { 'head' : bigint, 'tail' : list }
+export type res = { 'Ok' : bigint } |
+  { 'Err' : never };
 export interface s { 'f' : t, 'g' : ActorMethod<[list], [B, tree, stream]> }
 export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
 export type t = ActorMethod<[Principal], undefined>;
@@ -48,7 +50,10 @@ export interface _SERVICE {
     { _42_ : {}, 'id' : bigint }
   >,
   'i' : f,
-  'x' : ActorMethod<[a, b], [[] | [a], [] | [b]]>,
+  'x' : ActorMethod<
+    [a, b],
+    [[] | [a], [] | [b], { 'Ok' : null } | { 'Err' : null }]
+  >,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

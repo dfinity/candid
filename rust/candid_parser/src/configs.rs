@@ -38,8 +38,12 @@ pub enum ScopePos {
 impl<'a, T: ConfigState> State<'a, T> {
     pub fn new(tree: &'a ConfigTree<T>, env: &'a TypeEnv) -> Self {
         let mut config = T::default();
+        let mut config_source = BTreeMap::new();
         if let Some(state) = &tree.state {
-            config.merge_config(state, None);
+            let delta = config.merge_config(state, None);
+            for field in delta {
+                config_source.insert(field, vec![]);
+            }
         }
         Self {
             tree,
@@ -48,7 +52,7 @@ impl<'a, T: ConfigState> State<'a, T> {
             path: Vec::new(),
             stats: BTreeMap::new(),
             config,
-            config_source: BTreeMap::new(),
+            config_source,
             env,
         }
     }
@@ -79,7 +83,9 @@ impl<'a, T: ConfigState> State<'a, T> {
                             }
                         }
                         if let Some(state) = self.open_tree.unwrap().state.as_ref() {
-                            self.config.merge_config(state, None);
+                            let delta = self.config.merge_config(state, None);
+                            let path = self.open_path.clone();
+                            self.update_config_source(delta, &path);
                         }
                     }
                     None => {
