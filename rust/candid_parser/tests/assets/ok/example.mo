@@ -48,6 +48,10 @@ module {
         id : Nat;
       };
     i : f;
-    x : shared composite query (a, b) -> async (?a, ?b, { #Ok; #Err });
+    x : shared composite query (a, b) -> async (
+        ?a,
+        ?b,
+        { #Ok; #Err : { #a; #b } },
+      );
   }
 }

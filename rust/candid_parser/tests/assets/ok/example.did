@@ -37,5 +37,9 @@ service : {
       record { 42 : record {}; id : nat },
     );
   i : f;
-  x : (a, b) -> (opt a, opt b, variant { Ok; Err }) composite_query;
+  x : (a, b) -> (
+      opt a,
+      opt b,
+      variant { Ok; Err : variant { a; b } },
+    ) composite_query;
 }

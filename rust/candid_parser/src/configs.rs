@@ -6,7 +6,7 @@ use toml::{Table, Value};
 
 pub struct State<'a, T: ConfigState> {
     tree: &'a ConfigTree<T>,
-    path: Vec<String>,
+    pub path: Vec<String>,
     open_tree: Option<&'a ConfigTree<T>>,
     open_path: Vec<String>,
     pub stats: BTreeMap<Vec<String>, u32>,

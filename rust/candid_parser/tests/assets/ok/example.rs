@@ -90,6 +90,8 @@ candid::define_function!(pub(crate) F : (MyList, FArg1) -> (
   ));
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) enum A { #[serde(rename="a")] A, #[serde(rename="b")] B(B) }
+#[derive(CandidType, Deserialize, Debug)]
+pub(crate) enum Error { #[serde(rename="a")] A, #[serde(rename="b")] B }
 
 pub struct Service(pub Principal);
 impl Service {
@@ -114,7 +116,7 @@ impl Service {
   pub async fn i(&self, arg0: MyList, arg1: FArg1) -> Result<(Option<MyList>,Res,)> {
     ic_cdk::call(self.0, "i", (arg0,arg1,)).await
   }
-  pub async fn x(&self, arg0: A, arg1: B) -> Result<(Option<A>,Option<B>,std::result::Result<(), ()>,)> {
+  pub async fn x(&self, arg0: A, arg1: B) -> Result<(Option<A>,Option<B>,std::result::Result<(), Error>,)> {
     ic_cdk::call(self.0, "x", (arg0,arg1,)).await
   }
 }

@@ -52,7 +52,12 @@ export interface _SERVICE {
   'i' : f,
   'x' : ActorMethod<
     [a, b],
-    [[] | [a], [] | [b], { 'Ok' : null } | { 'Err' : null }]
+    [
+      [] | [a],
+      [] | [b],
+      { 'Ok' : null } |
+        { 'Err' : { 'a' : null } | { 'b' : null } },
+    ]
   >,
 }
 export declare const idlFactory: IDL.InterfaceFactory;

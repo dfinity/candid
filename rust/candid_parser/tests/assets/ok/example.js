@@ -93,7 +93,10 @@ export const idlFactory = ({ IDL }) => {
         [
           IDL.Opt(a),
           IDL.Opt(b),
-          IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Null }),
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : IDL.Variant({ 'a' : IDL.Null, 'b' : IDL.Null }),
+          }),
         ],
         ['composite_query'],
       ),

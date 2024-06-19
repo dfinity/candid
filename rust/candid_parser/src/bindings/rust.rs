@@ -702,7 +702,12 @@ impl<'a> NominalState<'a> {
     // Convert structural typing to nominal typing to fit Rust's type system
     fn nominalize(&mut self, env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
         let elem = StateElem::Type(t);
-        let old = self.state.push_state(&elem);
+        let old = if matches!(t.as_ref(), TypeInner::Func(_)) {
+            // strictly speaking, we want to avoid func label from the main service. But this is probably good enough.
+            None
+        } else {
+            Some(self.state.push_state(&elem))
+        };
         let res = match t.as_ref() {
             TypeInner::Opt(ty) => {
                 path.push(TypePath::Opt);
@@ -895,7 +900,9 @@ impl<'a> NominalState<'a> {
             t => t.clone(),
         }
         .into();
-        self.state.pop_state(old, elem);
+        if let Some(old) = old {
+            self.state.pop_state(old, elem);
+        }
         res
     }
 
