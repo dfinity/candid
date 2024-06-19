@@ -27,7 +27,7 @@ For the first part, we define a type selector `<selector>` similar to CSS select
 <selector> := <scopes> (. <path>)? | <path>
 <path> := <name> (. <name>)*
 <scopes> := <scope> (. <scope>)*
-<scope> := func:<name> | arg:<num> | ret:<num>
+<scope> := func:<name> | func:init | arg:<num> | ret:<num>
 ```
 
 `<path>` is a sequence of names separated by "`.`". It is a pattern used to select the Candid type node you want to customize. For example, given the following Candid interface,
@@ -43,6 +43,13 @@ service : {
 Paths `left.tree`, `branch.record.left` and `tree.variant.branch.record.left` all match the left branch of a tree. Path `left` will match the "left" field in both `tree` and `pair`. We greedily match the path with a shorter pattern. For example, if you have both path `left` and `left.tree`, we will always match `left`, and `left.tree` will never be matched (we will issue a warning, if a path is never matched). If you want to match `left.tree`, you can replace the `left` path with `pair.record.left`.
 
 `<scopes>` is a special form of path, where each name has a prefix of `func:`, `arg:`, or `ret:`. It indicates that the path can only be matched when it’s inside a scope of a function or argument position. A scoped path match always takes precedence over non-scoped path. For example, `func:f.left` matches the `left` field in `pair`, but not the `left` field in `tree`, and the global `left` path will not be matched when processing function `f`; `func:f.arg:1.left` matches the `left` field in the second input argument of `f`; `ret:0.left` matches the first return type of all functions.
+
+Note that scoped path may not be available for some applications. For example, bindgen and deserialization don't support scoped path. In these applications, when a type variable is shared among multiple functions, scoped path can lead to duplication of type definitions, which makes the client code harder to maintain. You can still use non-scoped paths to match functions or arguments. We establish the following convention:
+
+* `func:<name>` can be matched with `<name>`.
+* `func:init`, the initialization arguments of the service constructor, can be matched with `init`.
+* `arg:<num>` can be matched with `arg<num>`.
+* `ret:<num>` can be matched with `ret<num>`.
 
 Open question: The path doesn’t distinguish between label and type name. We cannot match just label `left`, but not type name `left`. We could add a prefix like `label:left`, but it means more things to type for the end user. We could work around this problem by providing a longer path if needed.
 
@@ -76,7 +83,7 @@ Based on the above requirements, we choose TOML to specify our configurations fo
 
 A TOML config is always tied to a particular did file, similar to how CSS is tied to a particular HTML/JS file. Users can specify multiple config sections for different applications. A few known top level labels are `random`, `display`, `rust`, `motoko`, `typescript`. Developers are free to add new top-level labels. If the TOML file only contains config for one application, the top-level label can be omitted.
 
-The following is an example TOML config file for the Candid interface we showed earlier. It contains the configs for two applications: `random` and `rust`. The random config specifies that when generating a tree, the left branch is at most of depth 1, and the right branch is at most depth 5. The numbers on the leaves of the left branch are in [-200, -100], and the numbers on the leaves of the right branch are in [100, 200]. When generating Rust bindings, all types have `pub(crate)` visibility. The top-level structs and enums have attribute `#[derive(CandidType, Deserialize, Clone, Debug)]`, and we use `i128` to represent the `int` type.
+The following is an example TOML config file for the Candid interface we showed earlier. It contains the configs for two applications: `random` and `rust`. The random config specifies that when generating a tree, the left branch is at most of depth 1, and the right branch is at most depth 5. The numbers on the leaves of the left branch are in [-200, -100], and the numbers on the leaves of the right branch are in [100, 200]. When generating Rust bindings, all types have `pub(crate)` visibility. The top-level structs and enums have attribute `#[derive(CandidType, Deserialize, Clone, Debug)]`, and we use `i128` to represent the `int` type. The first argument name of function `f` is `input`.
 
 ```toml
 [random]
@@ -87,6 +94,7 @@ right.tree = { depth = 5, range = [100, 200] }
 visibility = "pub(crate)"
 attributes = "#[derive(CandidType, Deserialize, Clone, Debug)]"
 int.use_type = "i128"
+f.arg0.name = "input"
 ```
 
 Note that TOML is just one implemented way to specify configs for the end user. Any format that can be parsed into [candid_parser::configs::ConfigTree](https://docs.rs/candid_parser/0.2.0-beta.1/candid_parser/configs/struct.ConfigTree.html) is acceptable. Users can also add configs programmatically in Rust via [add_config](https://docs.rs/candid_parser/0.2.0-beta.1/candid_parser/configs/struct.ConfigTree.html#method.add_config). For deserialization validation, we also want to support specifying config via Rust attributes.
@@ -101,6 +109,8 @@ To generate Rust binding, we define the following config properties:
 * `use_type`: Map a Candid type to a known/user-defined Rust type. It applies to the current node, or the next type node when the current node is a label. This allows `label.use_type = "T"` to indicate that we want to map the type of label to T. Otherwise, we have to use `label.type.use_type = "T"`.
 * `attributes`: Set the attributes for struct/enum or fields. It applies to the current node, or the next label when the current node is a type. This allows us to apply field attributes to all fields in a struct/enum with `record.attributes`.
 * `visibility`: Set the visibility for a type variable or label. It applies to the subtree rooted at the current node. For example, `tree.visibility` applies to the type variable tree and its fields.
+
+Note that scoped path is not available in binding generation. You can use the non-scoped path to match functions.
 
 ## Random value generation
 
