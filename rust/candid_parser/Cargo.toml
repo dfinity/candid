@@ -33,13 +33,13 @@ logos = "0.14"
 convert_case = "0.6"
 handlebars = "5.1"
 toml = { version = "0.8", default-features = false, features = ["parse"] }
+console = "0.15"
 
 arbitrary = { workspace = true, optional = true }
 fake = { version = "2.4", optional = true }
 rand = { version = "0.8", optional = true }
 num-traits = { workspace = true, optional = true }
 dialoguer = { version = "0.11", default-features = false, features = ["editor", "completion"], optional = true }
-console = { version = "0.15", optional = true }
 ctrlc = { version = "3.4", optional = true }
 
 [dev-dependencies]
@@ -49,7 +49,7 @@ rand.workspace = true
 
 [features]
 random = ["dep:arbitrary", "dep:fake", "dep:rand", "dep:num-traits"]
-assist = ["dep:dialoguer", "dep:console", "dep:ctrlc"]
+assist = ["dep:dialoguer", "dep:ctrlc"]
 all = ["random", "assist"]
 
 # docs.rs-specific configuration

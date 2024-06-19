@@ -5,6 +5,7 @@ use crate::{
 };
 use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use console::style;
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
 use serde::Serialize;
@@ -667,7 +668,11 @@ pub fn compile(
     };
     let (output, unused) = emit_bindgen(tree, env, actor);
     for e in unused {
-        eprintln!("WARNING: path {e} is unused");
+        eprintln!(
+            "{} path {} is unused",
+            style("WARNING:").red().bold(),
+            style(e).green()
+        );
     }
     output_handlebar(output, external, &source)
 }
