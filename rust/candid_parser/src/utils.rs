@@ -80,3 +80,19 @@ pub fn merge_init_args(candid: &str, init: &str) -> Result<(TypeEnv, Type)> {
         _ => unreachable!(),
     }
 }
+/// Check if a Rust type implements a Candid type. The candid type is given using the init args format.
+/// Note that this only checks structural equality, not equivalence. For recursive types, it may reject
+/// an unrolled type.
+pub fn check_rust_type<T: candid::CandidType>(candid_args: &str) -> Result<()> {
+    use crate::{types::IDLInitArgs, typing::check_init_args};
+    use candid::types::{internal::TypeContainer, subtype::equal, TypeEnv};
+    let parsed = candid_args.parse::<IDLInitArgs>()?;
+    let mut env = TypeEnv::new();
+    let args = check_init_args(&mut env, &TypeEnv::new(), &parsed)?;
+    let mut rust_env = TypeContainer::new();
+    let ty = rust_env.add::<T>();
+    let ty = env.merge_type(rust_env.env, ty);
+    let mut gamma = std::collections::HashSet::new();
+    equal(&mut gamma, &env, &args[0], &ty)?;
+    Ok(())
+}

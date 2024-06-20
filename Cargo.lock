@@ -187,6 +187,7 @@ dependencies = [
  "binread",
  "byteorder",
  "candid_derive",
+ "candid_parser",
  "hex",
  "ic_principal",
  "leb128",

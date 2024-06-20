@@ -2,6 +2,7 @@ use candid::{
     decode_one_with_config, encode_one, CandidType, Decode, DecoderConfig, Deserialize, Encode,
     Int, Nat,
 };
+use candid_parser::utils::check_rust_type;
 
 #[test]
 fn test_error() {
@@ -263,6 +264,8 @@ fn test_struct() {
     // with memoization on the unrolled type, type table will have 2 entries.
     // all_check(list, "4449444c026e016c02a0d2aca8047c90eddae70400010000");
     all_check(list, "4449444c036e016c02a0d2aca8047c90eddae704026e01010000");
+    check_rust_type::<List>("type List = record {head: int; tail: opt List}; (List)").unwrap();
+    check_rust_type::<List>("type T = record {head: int; tail: opt T}; (T)").unwrap();
 }
 
 #[test]
@@ -289,6 +292,10 @@ fn optional_fields() {
         bar: bool,
         baz: Option<New>,
     }
+    check_rust_type::<NewStruct>(
+        "(record { foo: opt nat8; bar: bool; baz: opt variant { Foo; Bar: bool; Baz: bool }})",
+    )
+    .unwrap();
     let bytes = encode(&OldStruct {
         bar: true,
         baz: Some(Old::Foo),
@@ -334,6 +341,13 @@ fn test_equivalent_types() {
     struct TypeB {
         typea: Option<TypeA>,
     }
+    check_rust_type::<RootType>(
+        r#"
+type A = record { typeb: opt B };
+type B = record { typea: opt A };
+(record { typeas: vec A })"#,
+    )
+    .unwrap();
     // Encode to the following types leads to equivalent but different representations of TypeA
     all_check(
         RootType { typeas: Vec::new() },
@@ -569,6 +583,7 @@ fn test_tuple() {
         (Int::from(42), "💩".to_string()),
         "4449444c016c02007c017101002a04f09f92a9",
     );
+    check_rust_type::<(Int, String)>("(record {int; text})").unwrap();
     let none: Option<String> = None;
     let bytes =
         hex("4449444c046c04007c017e020103026d7c6e036c02a0d2aca8047c90eddae7040201002b010302030400");
@@ -677,6 +692,7 @@ fn test_field_rename() {
         #[serde(rename = "a-b")]
         B(u8),
     }
+    check_rust_type::<E2>(r#"(variant { "1-2 + 3": int8; "a-b": nat8 })"#).unwrap();
     all_check(E2::A(42), "4449444c016b02b684a7027bb493ee970d770100012a");
     #[derive(CandidType, Deserialize, PartialEq, Debug)]
     struct S2 {
@@ -698,7 +714,7 @@ fn test_generics() {
         g1: T,
         g2: E,
     }
-
+    check_rust_type::<G<i32, bool>>("(record {g1: int32; g2: bool})").unwrap();
     let res = G {
         g1: Int::from(42),
         g2: true,

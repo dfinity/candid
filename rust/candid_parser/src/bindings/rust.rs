@@ -78,6 +78,7 @@ impl ConfigState for BindingConfig {
 struct State<'a> {
     state: crate::configs::State<'a, BindingConfig>,
     recs: RecPoints<'a>,
+    tests: BTreeMap<String, String>,
 }
 
 type RecPoints<'a> = BTreeSet<&'a str>;
@@ -141,12 +142,42 @@ fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
 }
 
 impl<'a> State<'a> {
+    fn generate_test(&mut self, src: &Type, use_type: &str) {
+        if self.tests.contains_key(use_type) {
+            return;
+        }
+        let def_list = chase_actor(self.state.env, src).unwrap();
+        let env = TypeEnv(
+            self.state
+                .env
+                .0
+                .iter()
+                .filter(|(k, _)| def_list.contains(&k.as_str()))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        );
+        let src = candid::pretty::candid::pp_init_args(&env, &[src.clone()])
+            .pretty(80)
+            .to_string();
+        let match_path = self.state.config_source.get("use_type").unwrap().join(".");
+        let body = format!(
+            r##"#[test]
+fn test_{use_type}() {{
+  // Generated from path {match_path}.use_type = "{use_type}"
+  let candid_src = r#"{src}"#;
+  candid_parser::utils::check_rust_type::<{use_type}>(candid_src).unwrap();
+}}
+"##
+        );
+        self.tests.insert(use_type.to_string(), body);
+    }
     fn pp_ty<'b>(&mut self, ty: &'b Type, is_ref: bool) -> RcDoc<'b> {
         use TypeInner::*;
         let elem = StateElem::Type(ty);
         let old = self.state.push_state(&elem);
         let res = if let Some(t) = &self.state.config.use_type {
             let res = RcDoc::text(t.clone());
+            self.generate_test(ty, &t.clone());
             self.state.update_stats("use_type");
             res
         } else {
@@ -565,6 +596,7 @@ pub struct Output {
     pub type_defs: String,
     pub methods: Vec<Method>,
     pub init_args: Option<Vec<(String, String)>>,
+    pub tests: String,
 }
 #[derive(Serialize, Debug)]
 pub struct Method {
@@ -589,6 +621,7 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
     let mut state = State {
         state: crate::configs::State::new(&tree.0, &env),
         recs,
+        tests: BTreeMap::new(),
     };
     state.state.stats = old_stats;
     let defs = state.pp_defs(&def_list);
@@ -597,12 +630,14 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
     } else {
         (Vec::new(), None)
     };
+    let tests = state.tests.into_values().collect::<Vec<_>>().join("\n");
     let unused = state.state.report_unused();
     (
         Output {
             type_defs: defs.pretty(LINE_WIDTH).to_string(),
             methods,
             init_args,
+            tests,
         },
         unused,
     )
@@ -616,12 +651,14 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         type_defs: String,
         methods: Vec<Method>,
         init_args: Option<Vec<(String, String)>>,
+        tests: String,
     }
     let data = HBOutput {
         type_defs: output.type_defs,
         methods: output.methods,
         external: config.0,
         init_args: output.init_args,
+        tests: output.tests,
     };
     hbs.render_template(template, &data).unwrap()
 }
