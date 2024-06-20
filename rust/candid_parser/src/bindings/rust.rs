@@ -160,14 +160,14 @@ impl<'a> State<'a> {
             .pretty(80)
             .to_string();
         let match_path = self.state.config_source.get("use_type").unwrap().join(".");
+        let test_name = use_type.replace(|c: char| !c.is_ascii_alphanumeric(), "_");
         let body = format!(
             r##"#[test]
-fn test_{use_type}() {{
-  // Generated from path {match_path}.use_type = "{use_type}"
+fn test_{test_name}() {{
+  // Generated from {match_path}.use_type = "{use_type}"
   let candid_src = r#"{src}"#;
   candid_parser::utils::check_rust_type::<{use_type}>(candid_src).unwrap();
-}}
-"##
+}}"##
         );
         self.tests.insert(use_type.to_string(), body);
     }

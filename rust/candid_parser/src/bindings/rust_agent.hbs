@@ -20,4 +20,6 @@ impl<'a> {{PascalCase service_name}}<'a> {
 pub const CANISTER_ID : Principal = Principal::from_slice(&[{{principal_slice canister_id}}]); // {{canister_id}}
 {{/if}}
 {{/if}}
+{{#if tests}}
 {{tests}}
+{{/if}}

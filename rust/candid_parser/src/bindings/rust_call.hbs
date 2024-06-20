@@ -19,4 +19,6 @@ pub const CANISTER_ID : Principal = Principal::from_slice(&[{{principal_slice ca
 pub const {{snake_case service_name}} : {{PascalCase service_name}} = {{PascalCase service_name}}(CANISTER_ID);
 {{/if}}
 {{/if}}
+{{#if tests}}
 {{tests}}
+{{/if}}
