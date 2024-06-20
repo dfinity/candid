@@ -11,10 +11,6 @@
 * Non-breaking changes:
   + `utils::check_rust_type` function to check if a Rust type implements the provided candid type.
 
-* TO-DOs
-  + Rust bindgen:
-    * Number label renaming
-
 ## 2024-04-11
 
 ### Candid 0.10.5 -- 0.10.9
