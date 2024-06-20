@@ -57,9 +57,10 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
   });
+  const res = IDL.Variant({ 'Ok' : IDL.Nat, 'Err' : IDL.Empty });
   const f = IDL.Func(
       [List, IDL.Func([IDL.Int32], [IDL.Int64], [])],
-      [IDL.Opt(List)],
+      [IDL.Opt(List), res],
       [],
     );
   const a = IDL.Variant({ 'a' : IDL.Null, 'b' : b });
@@ -87,7 +88,18 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'i' : f,
-    'x' : IDL.Func([a, b], [IDL.Opt(a), IDL.Opt(b)], ['composite_query']),
+    'x' : IDL.Func(
+        [a, b],
+        [
+          IDL.Opt(a),
+          IDL.Opt(b),
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : IDL.Variant({ 'a' : IDL.Null, 'b' : IDL.Null }),
+          }),
+        ],
+        ['composite_query'],
+      ),
   });
 };
 export const init = ({ IDL }) => { return []; };

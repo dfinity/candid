@@ -6,12 +6,17 @@ use toml::{Table, Value};
 
 pub struct State<'a, T: ConfigState> {
     tree: &'a ConfigTree<T>,
-    path: Vec<String>,
+    pub path: Vec<String>,
     open_tree: Option<&'a ConfigTree<T>>,
     open_path: Vec<String>,
-    stats: BTreeMap<Vec<String>, u32>,
+    pub stats: BTreeMap<Vec<String>, u32>,
     pub config: T,
+    pub config_source: BTreeMap<String, Vec<String>>,
     pub env: &'a TypeEnv,
+}
+pub struct ConfigBackup<T> {
+    config: T,
+    config_source: BTreeMap<String, Vec<String>>,
 }
 #[derive(Debug)]
 pub enum StateElem<'a> {
@@ -33,8 +38,12 @@ pub enum ScopePos {
 impl<'a, T: ConfigState> State<'a, T> {
     pub fn new(tree: &'a ConfigTree<T>, env: &'a TypeEnv) -> Self {
         let mut config = T::default();
+        let mut config_source = BTreeMap::new();
         if let Some(state) = &tree.state {
-            config.merge_config(state, None, false);
+            let delta = config.merge_config(state, None);
+            for field in delta {
+                config_source.insert(field, vec![]);
+            }
         }
         Self {
             tree,
@@ -43,6 +52,7 @@ impl<'a, T: ConfigState> State<'a, T> {
             path: Vec::new(),
             stats: BTreeMap::new(),
             config,
+            config_source,
             env,
         }
     }
@@ -54,7 +64,7 @@ impl<'a, T: ConfigState> State<'a, T> {
                 self.open_path.clear();
             }
             Some(scope) => {
-                let mut path = vec![format!("method:{}", scope.method)];
+                let mut path = vec![format!("func:{}", scope.method)];
                 match self.tree.with_prefix(&path) {
                     Some(tree) => {
                         match scope.position {
@@ -73,7 +83,9 @@ impl<'a, T: ConfigState> State<'a, T> {
                             }
                         }
                         if let Some(state) = self.open_tree.unwrap().state.as_ref() {
-                            self.config.merge_config(state, None, false);
+                            let delta = self.config.merge_config(state, None);
+                            let path = self.open_path.clone();
+                            self.update_config_source(delta, &path);
                         }
                     }
                     None => {
@@ -85,9 +97,9 @@ impl<'a, T: ConfigState> State<'a, T> {
         }
     }
     /// Update config based on the new elem in the path. Return the old state AFTER `update_state`.
-    pub fn push_state(&mut self, elem: &StateElem) -> T {
+    pub fn push_state(&mut self, elem: &StateElem) -> ConfigBackup<T> {
         self.config.update_state(elem);
-        let old_config = self.config.clone();
+        let old_config = self.to_backup();
         self.path.push(elem.to_string());
         let mut from_open = false;
         let new_state = if let Some(subtree) = self.open_tree {
@@ -106,23 +118,32 @@ impl<'a, T: ConfigState> State<'a, T> {
                 vec![]
             };
             matched_path.extend_from_slice(&self.path[idx..]);
-            self.stats
-                .entry(matched_path)
-                .and_modify(|v| *v += 1)
-                .or_insert(1);
-            self.config.merge_config(state, Some(elem), is_recursive);
-            //eprintln!("match path: {:?}, state: {:?}", self.path, self.config);
+            let ctx = Context { elem, is_recursive };
+            let delta = self.config.merge_config(state, Some(ctx));
+            self.update_config_source(delta, &matched_path);
         } else {
-            self.config
-                .merge_config(&T::unmatched_config(), Some(elem), false);
-            //eprintln!("path: {:?}, state: {:?}", self.path, self.config);
+            let ctx = Context {
+                elem,
+                is_recursive: false,
+            };
+            let delta = self.config.merge_config(&T::unmatched_config(), Some(ctx));
+            for field in delta {
+                self.config_source.remove(&field);
+            }
         }
         old_config
     }
-    pub fn pop_state(&mut self, old_config: T, elem: StateElem) {
-        self.config = old_config;
+    pub fn pop_state(&mut self, old_config: ConfigBackup<T>, elem: StateElem) {
+        self.restore_from_backup(old_config);
         assert_eq!(self.path.pop(), Some(elem.to_string()));
         self.config.restore_state(&elem);
+    }
+    pub fn update_stats(&mut self, key: &str) {
+        if let Some(path) = self.config_source.get(key) {
+            let mut path = path.clone();
+            path.push(key.to_string());
+            self.stats.entry(path).and_modify(|v| *v += 1).or_insert(1);
+        }
     }
     pub fn report_unused(&self) -> Vec<String> {
         let mut res = BTreeSet::new();
@@ -144,12 +165,35 @@ impl<'a, T: ConfigState> State<'a, T> {
             .map(|(k, v)| (k.join("."), v))
             .collect()
     }
+    fn update_config_source(&mut self, delta: Vec<String>, path: &[String]) {
+        for field in delta {
+            self.config_source.insert(field, path.to_vec());
+        }
+    }
+    fn to_backup(&self) -> ConfigBackup<T> {
+        ConfigBackup {
+            config: self.config.clone(),
+            config_source: self.config_source.clone(),
+        }
+    }
+    fn restore_from_backup(&mut self, bak: ConfigBackup<T>) {
+        self.config = bak.config;
+        self.config_source = bak.config_source;
+    }
+}
+#[derive(Debug)]
+pub struct Context<'a> {
+    pub elem: &'a StateElem<'a>,
+    pub is_recursive: bool,
 }
 
 pub trait ConfigState: DeserializeOwned + Default + Clone + std::fmt::Debug {
-    fn merge_config(&mut self, config: &Self, elem: Option<&StateElem>, is_recursive: bool);
+    /// Specifies the merging semantics of two configs, returns a vector of updated config fields.
+    fn merge_config(&mut self, config: &Self, ctx: Option<Context>) -> Vec<String>;
     fn update_state(&mut self, elem: &StateElem);
     fn restore_state(&mut self, elem: &StateElem);
+    /// List the properties in the current config, used for analyzing unused properties.
+    fn list_properties(&self) -> Vec<String>;
     fn unmatched_config() -> Self {
         Self::default()
     }
@@ -240,8 +284,12 @@ impl<T: ConfigState> ConfigTree<T> {
         result.state.as_ref()
     }
     pub fn traverse(&self, path: &mut Vec<String>, res: &mut BTreeSet<Vec<String>>) {
-        if self.state.is_some() {
-            res.insert(path.clone());
+        if let Some(state) = &self.state {
+            for prop in state.list_properties() {
+                let mut path = path.clone();
+                path.push(prop);
+                res.insert(path);
+            }
         }
         for (k, v) in self.subtree.iter() {
             path.push(k.clone());
@@ -289,8 +337,8 @@ fn is_repeated(path: &[String], matched: &[String]) -> bool {
     }
     false
 }
-fn special_key(key: &str) -> bool {
-    key.starts_with("method:") || key.starts_with("arg:") || key.starts_with("ret:")
+pub fn is_scoped_key(key: &str) -> bool {
+    key.starts_with("func:") || key.starts_with("arg:") || key.starts_with("ret:")
 }
 fn generate_state_tree<T: ConfigState>(v: Value) -> Result<ConfigTree<T>> {
     let mut subtree = BTreeMap::new();
@@ -301,7 +349,7 @@ fn generate_state_tree<T: ConfigState>(v: Value) -> Result<ConfigTree<T>> {
             match v {
                 Value::Table(_) => {
                     let v = generate_state_tree(v)?;
-                    let dep = if special_key(&k) {
+                    let dep = if is_scoped_key(&k) {
                         v.max_depth
                     } else {
                         v.max_depth + 1
@@ -356,7 +404,8 @@ fn path_name(t: &Type) -> String {
         TypeInner::Func(_) => "func",
         TypeInner::Service(_) => "service",
         TypeInner::Future => "future",
-        TypeInner::Class(..) | TypeInner::Unknown => unreachable!(),
+        TypeInner::Class(..) => "func:init",
+        TypeInner::Unknown => unreachable!(),
     }
     .to_string()
 }
@@ -371,17 +420,33 @@ fn parse() {
         text: Option<String>,
     }
     impl ConfigState for T {
-        fn merge_config(&mut self, config: &Self, _elem: Option<&StateElem>, is_recursive: bool) {
+        fn merge_config(&mut self, config: &Self, ctx: Option<Context>) -> Vec<String> {
+            let mut res = vec!["depth", "text", "size"];
             *self = config.clone();
-            if is_recursive {
+            if ctx.is_some_and(|c| c.is_recursive) {
                 self.size = Some(0);
+                res.pop();
             }
+            res.into_iter().map(|f| f.to_string()).collect()
         }
         fn update_state(&mut self, _elem: &StateElem) {
             self.size = self.size.map(|s| s + 1);
         }
         fn restore_state(&mut self, _elem: &StateElem) {
             self.size = self.size.map(|s| s - 1);
+        }
+        fn list_properties(&self) -> Vec<String> {
+            let mut res = Vec::new();
+            if self.depth.is_some() {
+                res.push("depth");
+            }
+            if self.size.is_some() {
+                res.push("size");
+            }
+            if self.text.is_some() {
+                res.push("text");
+            }
+            res.into_iter().map(|f| f.to_string()).collect()
         }
     }
     let toml = r#"
@@ -391,8 +456,8 @@ val.text = "42"
 left.list = { depth = 1 }
 vec.nat8.text = "blob"
 Vec = { width = 2, size = 10 }
-"method:f"."arg:0".list = { depth = 2, size = 20 }
-"method:f".list = { depth = 3, size = 30 }
+"func:f"."arg:0".list = { depth = 2, size = 20 }
+"func:f".list = { depth = 3, size = 30 }
     "#;
     let configs = toml.parse::<Configs>().unwrap();
     let mut tree: ConfigTree<T> = ConfigTree::from_configs("random", configs).unwrap();
@@ -464,13 +529,21 @@ Vec = { width = 2, size = 10 }
         }),
         0,
     );
-    assert_eq!(state.open_path, vec!["method:f", "arg:0"]);
+    assert_eq!(state.open_path, vec!["func:f", "arg:0"]);
     let old = state.push_state(&StateElem::Label("list"));
+    state.update_stats("depth");
+    state.update_stats("size");
+    state.update_stats("text");
     assert_eq!(state.config.depth, Some(2));
     assert_eq!(state.config.size, Some(20));
     assert_eq!(state.config.text, None);
-    assert_eq!(old.size, None);
+    assert_eq!(
+        state.config_source.get("depth").unwrap().join("."),
+        "func:f.arg:0.list"
+    );
+    assert_eq!(old.config.size, None);
     state.push_state(&StateElem::Label("val"));
+    state.update_stats("text");
     assert_eq!(state.config.text, Some("42".to_string()));
     state.with_scope(
         &Some(Scope {
@@ -479,29 +552,45 @@ Vec = { width = 2, size = 10 }
         }),
         0,
     );
-    assert_eq!(state.open_path, vec!["method:f"]);
+    assert_eq!(state.open_path, vec!["func:f"]);
     state.push_state(&StateElem::Label("list"));
+    state.update_stats("depth");
+    state.update_stats("size");
     assert_eq!(state.config.depth, Some(3));
     assert_eq!(state.config.size, Some(0));
+    assert_eq!(
+        state.config_source.get("depth").unwrap().join("."),
+        "func:f.list"
+    );
+    assert_eq!(state.config_source.get("size").unwrap().join("."), "val");
     state.with_scope(&None, 0);
     let old = state.push_state(&StateElem::Label("list"));
+    state.update_stats("depth");
+    state.update_stats("size");
     assert_eq!(state.config.depth, Some(20));
     assert_eq!(state.config.size, Some(0));
-    assert_eq!(old.size, Some(1));
+    assert_eq!(state.config_source.get("depth").unwrap().join("."), "list");
+    assert_eq!(state.config_source.get("size").unwrap().join("."), "val");
+    assert_eq!(old.config.size, Some(1));
     state.pop_state(old, StateElem::Label("list"));
+    state.update_stats("size");
+    state.update_stats("depth");
     assert_eq!(state.config.size, Some(0));
     assert_eq!(state.config.depth, Some(3));
     let stats = state.report_unused();
     assert_eq!(
         stats.iter().map(|x| x.as_str()).collect::<Vec<&str>>(),
         [
-            "Vec",
-            "a.b.c",
-            "a.b.c.d",
-            "a.b.d",
-            "left.a",
-            "left.list",
-            "vec.nat8"
+            "Vec.size",
+            "a.b.c.d.depth",
+            "a.b.c.depth",
+            "a.b.d.depth",
+            "depth",
+            "func:f.list.size",
+            "left.a.depth",
+            "left.list.depth",
+            "list.size",
+            "vec.nat8.text"
         ]
     );
 }

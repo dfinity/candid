@@ -13,7 +13,10 @@ module {
         up : shared () -> async ();
       };
   };
-  public type f = shared (List, shared Int32 -> async Int64) -> async ?List;
+  public type f = shared (List, shared Int32 -> async Int64) -> async (
+      ?List,
+      res,
+    );
   public type list = ?node;
   public type my_type = Principal;
   public type nested = {
@@ -26,6 +29,7 @@ module {
     _42_  : Nat;
   };
   public type node = { head : Nat; tail : list };
+  public type res = { #Ok : Nat; #Err : None };
   public type s = actor { f : t; g : shared list -> async (B, tree, stream) };
   public type stream = ?{ head : Nat; next : shared query () -> async stream };
   public type t = shared s -> async ();
@@ -44,6 +48,10 @@ module {
         id : Nat;
       };
     i : f;
-    x : shared composite query (a, b) -> async (?a, ?b);
+    x : shared composite query (a, b) -> async (
+        ?a,
+        ?b,
+        { #Ok; #Err : { #a; #b } },
+      );
   }
 }
