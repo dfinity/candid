@@ -110,7 +110,9 @@ To generate Rust binding, we define the following config properties:
 * `attributes`: Set the attributes for struct/enum or fields. It applies to the current node, or the next label when the current node is a type. This allows us to apply field attributes to all fields in a struct/enum with `record.attributes`.
 * `visibility`: Set the visibility for a type variable or label. It applies to the subtree rooted at the current node. For example, `tree.visibility` applies to the type variable tree and its fields.
 
-Note that scoped path is not available in binding generation. You can use the non-scoped path to match functions.
+**Note**
++ Scoped path is not available in binding generation. You can use the non-scoped path, e.g., `init.arg0`, `f.ret0`, to match functions.
++ The bindgen generates a unit test for each instance of `use_type`. This is to ensure that the user provided type always conforms to Candid type.
 
 ## Random value generation
 
