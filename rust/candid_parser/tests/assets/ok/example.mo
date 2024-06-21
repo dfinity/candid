@@ -28,6 +28,10 @@ module {
     _41_  : { #_42_ ; #A; #B; #C };
     _42_  : Nat;
   };
+  public type nested_res = {
+    #Ok : { #Ok; #Err };
+    #Err : { #Ok : { content : Text }; #Err : { _0_  : Int } };
+  };
   public type node = { head : Nat; tail : list };
   public type res = { #Ok : (Int, Nat); #Err : { error : Text } };
   public type s = actor { f : t; g : shared list -> async (B, tree, stream) };
@@ -42,7 +46,11 @@ module {
     f : t;
     f1 : shared (list, Blob, ?Bool) -> ();
     g : shared list -> async (B, tree, stream);
-    g1 : shared query (my_type, List, ?List, nested) -> async (Int, broker);
+    g1 : shared query (my_type, List, ?List, nested) -> async (
+        Int,
+        broker,
+        nested_res,
+      );
     h : shared ([?Text], { #A : Nat; #B : ?Text }, ?List) -> async {
         _42_  : {};
         id : Nat;

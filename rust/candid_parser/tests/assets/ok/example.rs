@@ -77,6 +77,13 @@ candid::define_service!(pub(crate) Broker : {
   "find" : candid::func!((String) -> (BrokerReturn));
 });
 #[derive(CandidType, Deserialize, Debug)]
+pub(crate) struct NestedResErrOk { pub(crate) content: String }
+pub(crate) type NestedRes = std::result::Result<
+  std::result::Result<(), ()>, std::result::Result<
+    NestedResErrOk, (candid::Int,)
+  >
+>;
+#[derive(CandidType, Deserialize, Debug)]
 pub(crate) enum HArg1 { A(u128), B(Option<String>) }
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct HRet42 {}
@@ -111,7 +118,7 @@ impl Service {
   pub async fn g(&self, arg0: List) -> Result<(B,Tree,Stream,)> {
     ic_cdk::call(self.0, "g", (arg0,)).await
   }
-  pub async fn G11(&self, id: CanisterId, list: MyList, is_okay: Option<MyList>, arg3: Nested) -> Result<(i128,Broker,)> {
+  pub async fn G11(&self, id: CanisterId, list: MyList, is_okay: Option<MyList>, arg3: Nested) -> Result<(i128,Broker,NestedRes,)> {
     ic_cdk::call(self.0, "g1", (id,list,is_okay,arg3,)).await
   }
   pub async fn h(&self, arg0: Vec<Option<String>>, arg1: HArg1, arg2: Option<MyList>) -> Result<(HRet,)> {

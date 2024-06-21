@@ -57,6 +57,13 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
   });
+  const nested_res = IDL.Variant({
+    'Ok' : IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Null }),
+    'Err' : IDL.Variant({
+      'Ok' : IDL.Record({ 'content' : IDL.Text }),
+      'Err' : IDL.Tuple(IDL.Int),
+    }),
+  });
   const res = IDL.Variant({
     'Ok' : IDL.Tuple(IDL.Int, IDL.Nat),
     'Err' : IDL.Record({ 'error' : IDL.Text }),
@@ -78,7 +85,7 @@ export const idlFactory = ({ IDL }) => {
     'g' : IDL.Func([list], [B, tree, stream], []),
     'g1' : IDL.Func(
         [my_type, List, IDL.Opt(List), nested],
-        [IDL.Int, broker],
+        [IDL.Int, broker, nested_res],
         ['query'],
       ),
     'h' : IDL.Func(

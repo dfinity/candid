@@ -18,6 +18,10 @@ type nested = record {
   41 : variant { 42; A; B; C };
   42 : nat;
 };
+type nested_res = variant {
+  Ok : variant { Ok; Err };
+  Err : variant { Ok : record { content : text }; Err : record { int } };
+};
 type node = record { head : nat; tail : list };
 type res = variant { Ok : record { int; nat }; Err : record { error : text } };
 type s = service { f : t; g : (list) -> (B, tree, stream) };
@@ -32,7 +36,7 @@ service : {
   f : t;
   f1 : (list, blob, opt bool) -> () oneway;
   g : (list) -> (B, tree, stream);
-  g1 : (my_type, List, opt List, nested) -> (int, broker) query;
+  g1 : (my_type, List, opt List, nested) -> (int, broker, nested_res) query;
   h : (vec opt text, variant { A : nat; B : opt text }, opt List) -> (
       record { 42 : record {}; id : nat },
     );
