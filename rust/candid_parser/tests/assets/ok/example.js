@@ -57,7 +57,10 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
   });
-  const res = IDL.Variant({ 'Ok' : IDL.Nat, 'Err' : IDL.Empty });
+  const res = IDL.Variant({
+    'Ok' : IDL.Tuple(IDL.Int, IDL.Nat),
+    'Err' : IDL.Record({ 'error' : IDL.Text }),
+  });
   const f = IDL.Func(
       [List, IDL.Func([IDL.Int32], [IDL.Int64], [])],
       [IDL.Opt(List), res],
@@ -94,7 +97,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(a),
           IDL.Opt(b),
           IDL.Variant({
-            'Ok' : IDL.Null,
+            'Ok' : IDL.Record({ 'result' : IDL.Text }),
             'Err' : IDL.Variant({ 'a' : IDL.Null, 'b' : IDL.Null }),
           }),
         ],

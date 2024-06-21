@@ -83,13 +83,17 @@ pub(crate) struct HRet42 {}
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct HRet { pub(crate) _42_: HRet42, pub(crate) id: u128 }
 candid::define_function!(pub(crate) FArg1 : (i32) -> (i64));
-pub(crate) type Res = std::result::Result<u128, candid::Empty>;
+#[derive(CandidType, Deserialize, Debug)]
+pub(crate) struct ResErr { pub(crate) error: String }
+pub(crate) type Res = std::result::Result<(candid::Int,u128,), ResErr>;
 candid::define_function!(pub(crate) F : (MyList, FArg1) -> (
     Option<MyList>,
     Res,
   ));
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) enum A { #[serde(rename="a")] A, #[serde(rename="b")] B(B) }
+#[derive(CandidType, Deserialize, Debug)]
+pub(crate) struct XRet2Ok { pub(crate) result: String }
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) enum Error { #[serde(rename="a")] A, #[serde(rename="b")] B }
 
@@ -116,7 +120,7 @@ impl Service {
   pub async fn i(&self, arg0: MyList, arg1: FArg1) -> Result<(Option<MyList>,Res,)> {
     ic_cdk::call(self.0, "i", (arg0,arg1,)).await
   }
-  pub async fn x(&self, arg0: A, arg1: B) -> Result<(Option<A>,Option<B>,std::result::Result<(), Error>,)> {
+  pub async fn x(&self, arg0: A, arg1: B) -> Result<(Option<A>,Option<B>,std::result::Result<XRet2Ok, Error>,)> {
     ic_cdk::call(self.0, "x", (arg0,arg1,)).await
   }
 }

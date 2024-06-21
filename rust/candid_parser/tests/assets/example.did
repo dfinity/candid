@@ -9,13 +9,13 @@ type broker = service {
     (service {up:() -> (); current:() -> (nat32)});
 };
 type nested = record { nat; nat; record {nat;int;}; record { nat; 0x2a:nat; nat8; }; 42:nat; 40:nat; variant{ A; 0x2a; B; C }; };
-type res = variant { Ok: nat; Err: empty };
+type res = variant { Ok: record{int;nat}; Err: record{ error: text } };
 
 service server : {
   f1 : (list, test: blob, opt bool) -> () oneway;
   g1 : (my_type, List, opt List, nested) -> (int, broker) query;
   h : (vec opt text, variant { A: nat; B: opt text }, opt List) -> (record { id: nat; 0x2a: record {} });
   i : f;
-  x : (a,b) -> (opt a, opt b, variant { Ok; Err: variant {a;b} }) composite_query;
+  x : (a,b) -> (opt a, opt b, variant { Ok: record { result: text }; Err: variant {a;b} }) composite_query;
 }
 

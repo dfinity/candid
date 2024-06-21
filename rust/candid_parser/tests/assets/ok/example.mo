@@ -29,7 +29,7 @@ module {
     _42_  : Nat;
   };
   public type node = { head : Nat; tail : list };
-  public type res = { #Ok : Nat; #Err : None };
+  public type res = { #Ok : (Int, Nat); #Err : { error : Text } };
   public type s = actor { f : t; g : shared list -> async (B, tree, stream) };
   public type stream = ?{ head : Nat; next : shared query () -> async stream };
   public type t = shared s -> async ();
@@ -51,7 +51,7 @@ module {
     x : shared composite query (a, b) -> async (
         ?a,
         ?b,
-        { #Ok; #Err : { #a; #b } },
+        { #Ok : { result : Text }; #Err : { #a; #b } },
       );
   }
 }

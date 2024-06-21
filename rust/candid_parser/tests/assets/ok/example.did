@@ -19,7 +19,7 @@ type nested = record {
   42 : nat;
 };
 type node = record { head : nat; tail : list };
-type res = variant { Ok : nat; Err : empty };
+type res = variant { Ok : record { int; nat }; Err : record { error : text } };
 type s = service { f : t; g : (list) -> (B, tree, stream) };
 type stream = opt record { head : nat; next : func () -> (stream) query };
 type t = func (s) -> ();
@@ -40,6 +40,6 @@ service : {
   x : (a, b) -> (
       opt a,
       opt b,
-      variant { Ok; Err : variant { a; b } },
+      variant { Ok : record { result : text }; Err : variant { a; b } },
     ) composite_query;
 }

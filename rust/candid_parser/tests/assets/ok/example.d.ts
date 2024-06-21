@@ -25,8 +25,8 @@ export interface nested {
   _42_ : bigint,
 }
 export interface node { 'head' : bigint, 'tail' : list }
-export type res = { 'Ok' : bigint } |
-  { 'Err' : never };
+export type res = { 'Ok' : [bigint, bigint] } |
+  { 'Err' : { 'error' : string } };
 export interface s { 'f' : t, 'g' : ActorMethod<[list], [B, tree, stream]> }
 export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
 export type t = ActorMethod<[Principal], undefined>;
@@ -55,7 +55,7 @@ export interface _SERVICE {
     [
       [] | [a],
       [] | [b],
-      { 'Ok' : null } |
+      { 'Ok' : { 'result' : string } } |
         { 'Err' : { 'a' : null } | { 'b' : null } },
     ]
   >,

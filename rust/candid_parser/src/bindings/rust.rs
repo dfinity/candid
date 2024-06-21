@@ -720,6 +720,7 @@ pub enum TypePath {
     Vec,
     RecordField(String),
     VariantField(String),
+    ResultField(String),
     Func(String),
     Init,
 }
@@ -728,7 +729,9 @@ fn path_to_var(path: &[TypePath]) -> String {
         .iter()
         .map(|node| match node {
             TypePath::Id(id) => id.as_str(),
-            TypePath::RecordField(f) | TypePath::VariantField(f) => f.as_str(),
+            TypePath::RecordField(f) | TypePath::VariantField(f) | TypePath::ResultField(f) => {
+                f.as_str()
+            }
             TypePath::Opt => "inner",
             TypePath::Vec => "item",
             TypePath::Func(id) => id.as_str(),
@@ -801,13 +804,19 @@ impl<'a> NominalState<'a> {
                 }
             }
             TypeInner::Variant(fs) => {
-                if matches!(path.last(), None | Some(TypePath::Id(_))) || as_result(fs).is_some() {
+                let is_result = as_result(fs).is_some();
+                if matches!(path.last(), None | Some(TypePath::Id(_))) || is_result {
                     let fs: Vec<_> = fs
                         .iter()
                         .map(|Field { id, ty }| {
                             let lab = id.to_string();
                             let old = self.state.push_state(&StateElem::Label(&lab));
-                            path.push(TypePath::VariantField(id.to_string()));
+                            if is_result {
+                                // so that inner record gets a new name
+                                path.push(TypePath::ResultField(id.to_string()));
+                            } else {
+                                path.push(TypePath::VariantField(id.to_string()));
+                            }
                             let ty = self.nominalize(env, path, ty);
                             path.pop();
                             self.state.pop_state(old, StateElem::Label(&lab));
