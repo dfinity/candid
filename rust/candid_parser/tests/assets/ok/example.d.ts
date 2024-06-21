@@ -24,9 +24,11 @@ export interface nested {
     { 'C' : null },
   _42_ : bigint,
 }
+export type nested_res = { 'Ok' : { 'Ok' : null } | { 'Err' : null } } |
+  { 'Err' : { 'Ok' : { 'content' : string } } | { 'Err' : [bigint] } };
 export interface node { 'head' : bigint, 'tail' : list }
-export type res = { 'Ok' : bigint } |
-  { 'Err' : never };
+export type res = { 'Ok' : [bigint, bigint] } |
+  { 'Err' : { 'error' : string } };
 export interface s { 'f' : t, 'g' : ActorMethod<[list], [B, tree, stream]> }
 export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
 export type t = ActorMethod<[Principal], undefined>;
@@ -39,7 +41,10 @@ export interface _SERVICE {
   'f' : t,
   'f1' : ActorMethod<[list, Uint8Array | number[], [] | [boolean]], undefined>,
   'g' : ActorMethod<[list], [B, tree, stream]>,
-  'g1' : ActorMethod<[my_type, List, [] | [List], nested], [bigint, Principal]>,
+  'g1' : ActorMethod<
+    [my_type, List, [] | [List], nested],
+    [bigint, Principal, nested_res]
+  >,
   'h' : ActorMethod<
     [
       Array<[] | [string]>,
@@ -55,7 +60,7 @@ export interface _SERVICE {
     [
       [] | [a],
       [] | [b],
-      { 'Ok' : null } |
+      { 'Ok' : { 'result' : string } } |
         { 'Err' : { 'a' : null } | { 'b' : null } },
     ]
   >,
