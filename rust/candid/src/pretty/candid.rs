@@ -205,6 +205,9 @@ fn pp_actor(ty: &Type) -> RcDoc {
     }
 }
 
+pub fn pp_init_args<'a>(env: &'a TypeEnv, args: &'a [Type]) -> RcDoc<'a> {
+    pp_defs(env).append(pp_args(args))
+}
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     match actor {
         None => pp_defs(env).pretty(LINE_WIDTH).to_string(),

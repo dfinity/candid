@@ -1,10 +1,11 @@
 use super::analysis::{chase_actor, infer_rec};
 use crate::{
-    configs::{ConfigState, ConfigTree, Configs, StateElem},
+    configs::{ConfigState, ConfigTree, Configs, Context, StateElem},
     Deserialize,
 };
 use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use console::style;
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
 use serde::Serialize;
@@ -19,34 +20,65 @@ pub struct BindingConfig {
     visibility: Option<String>,
 }
 impl ConfigState for BindingConfig {
-    fn merge_config(&mut self, config: &Self, elem: Option<&StateElem>, _is_recursive: bool) {
+    fn merge_config(&mut self, config: &Self, ctx: Option<Context>) -> Vec<String> {
+        let mut res = Vec::new();
         self.name.clone_from(&config.name);
+        res.push("name");
         // match use_type can survive across types, so that label.use_type works
-        if !matches!(elem, Some(StateElem::Label(_))) {
+        if ctx
+            .as_ref()
+            .is_some_and(|ctx| matches!(ctx.elem, StateElem::Type(_) | StateElem::TypeStr(_)))
+        {
             if let Some(use_type) = &config.use_type {
                 self.use_type = Some(use_type.clone());
+                res.push("use_type");
             }
         } else {
             self.use_type.clone_from(&config.use_type);
+            res.push("use_type");
         }
         // matched attributes can survive across labels, so that record.attributes works
-        if matches!(elem, Some(StateElem::Label(_))) {
+        if ctx
+            .as_ref()
+            .is_some_and(|ctx| matches!(ctx.elem, StateElem::Label(_)))
+        {
             if let Some(attr) = &config.attributes {
                 self.attributes = Some(attr.clone());
+                res.push("attributes");
             }
         } else {
             self.attributes.clone_from(&config.attributes);
+            res.push("attributes");
         }
         if config.visibility.is_some() {
             self.visibility.clone_from(&config.visibility);
+            res.push("visibility");
         }
+        res.into_iter().map(|f| f.to_string()).collect()
     }
     fn update_state(&mut self, _elem: &StateElem) {}
     fn restore_state(&mut self, _elem: &StateElem) {}
+    fn list_properties(&self) -> Vec<String> {
+        let mut res = Vec::new();
+        if self.name.is_some() {
+            res.push("name");
+        }
+        if self.use_type.is_some() {
+            res.push("use_type");
+        }
+        if self.attributes.is_some() {
+            res.push("attributes");
+        }
+        if self.visibility.is_some() {
+            res.push("visibility");
+        }
+        res.into_iter().map(|f| f.to_string()).collect()
+    }
 }
-pub struct State<'a> {
+struct State<'a> {
     state: crate::configs::State<'a, BindingConfig>,
     recs: RecPoints<'a>,
+    tests: BTreeMap<String, String>,
 }
 
 type RecPoints<'a> = BTreeSet<&'a str>;
@@ -58,6 +90,17 @@ pub(crate) fn is_tuple(fs: &[Field]) -> bool {
     !fs.iter()
         .enumerate()
         .any(|(i, field)| field.id.get_id() != (i as u32))
+}
+fn as_result(fs: &[Field]) -> Option<(&Type, &Type)> {
+    match fs {
+        [Field { id: ok, ty: t_ok }, Field { id: err, ty: t_err }]
+            if **ok == Label::Named("Ok".to_string())
+                && **err == Label::Named("Err".to_string()) =>
+        {
+            Some((t_ok, t_err))
+        }
+        _ => None,
+    }
 }
 static KEYWORDS: [&str; 51] = [
     "as", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn", "for",
@@ -97,13 +140,46 @@ fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
         None => RcDoc::text("pub "),
     }
 }
+
 impl<'a> State<'a> {
+    fn generate_test(&mut self, src: &Type, use_type: &str) {
+        if self.tests.contains_key(use_type) {
+            return;
+        }
+        let def_list = chase_actor(self.state.env, src).unwrap();
+        let env = TypeEnv(
+            self.state
+                .env
+                .0
+                .iter()
+                .filter(|(k, _)| def_list.contains(&k.as_str()))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        );
+        let src = candid::pretty::candid::pp_init_args(&env, &[src.clone()])
+            .pretty(80)
+            .to_string();
+        let match_path = self.state.config_source.get("use_type").unwrap().join(".");
+        let test_name = use_type.replace(|c: char| !c.is_ascii_alphanumeric(), "_");
+        let body = format!(
+            r##"#[test]
+fn test_{test_name}() {{
+  // Generated from {match_path}.use_type = "{use_type}"
+  let candid_src = r#"{src}"#;
+  candid_parser::utils::check_rust_type::<{use_type}>(candid_src).unwrap();
+}}"##
+        );
+        self.tests.insert(use_type.to_string(), body);
+    }
     fn pp_ty<'b>(&mut self, ty: &'b Type, is_ref: bool) -> RcDoc<'b> {
         use TypeInner::*;
         let elem = StateElem::Type(ty);
         let old = self.state.push_state(&elem);
         let res = if let Some(t) = &self.state.config.use_type {
-            RcDoc::text(t.clone())
+            let res = RcDoc::text(t.clone());
+            self.generate_test(ty, &t.clone());
+            self.state.update_stats("use_type");
+            res
         } else {
             match ty.as_ref() {
                 Null => str("()"),
@@ -125,7 +201,9 @@ impl<'a> State<'a> {
                 Empty => str("candid::Empty"),
                 Var(ref id) => {
                     let name = if let Some(name) = &self.state.config.name {
-                        RcDoc::text(name.clone())
+                        let res = RcDoc::text(name.clone());
+                        self.state.update_stats("name");
+                        res
                     } else {
                         ident(id, Some(Case::Pascal))
                     };
@@ -141,8 +219,16 @@ impl<'a> State<'a> {
                 Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
                 Vec(ref t) => str("Vec").append(enclose("<", self.pp_ty(t, is_ref), ">")),
                 Record(ref fs) => self.pp_record_fields(fs, false, is_ref),
-                Variant(_) => unreachable!(), // not possible after rewriting
-                Func(_) => unreachable!(),    // not possible after rewriting
+                Variant(ref fs) => {
+                    // only possible for result variant
+                    let (ok, err) = as_result(fs).unwrap();
+                    let body = self
+                        .pp_ty(ok, is_ref)
+                        .append(", ")
+                        .append(self.pp_ty(err, is_ref));
+                    str("std::result::Result").append(enclose("<", body, ">"))
+                }
+                Func(_) => unreachable!(), // not possible after rewriting
                 Service(_) => unreachable!(), // not possible after rewriting
                 Class(_, _) => unreachable!(),
                 Knot(_) | Unknown | Future => unreachable!(),
@@ -153,6 +239,7 @@ impl<'a> State<'a> {
     }
     fn pp_label<'b>(&mut self, id: &'b SharedLabel, is_variant: bool, need_vis: bool) -> RcDoc<'b> {
         let vis = if need_vis {
+            self.state.update_stats("visibility");
             pp_vis(&self.state.config.visibility)
         } else {
             RcDoc::nil()
@@ -164,10 +251,13 @@ impl<'a> State<'a> {
             .clone()
             .map(|s| RcDoc::text(s).append(RcDoc::line()))
             .unwrap_or(RcDoc::nil());
+        self.state.update_stats("attributes");
         match &**id {
             Label::Named(id) => {
                 let (doc, is_rename) = if let Some(name) = &self.state.config.name {
-                    (RcDoc::text(name.clone()), true)
+                    let res = (RcDoc::text(name.clone()), true);
+                    self.state.update_stats("name");
+                    res
                 } else {
                     let case = if is_variant { Some(Case::Pascal) } else { None };
                     ident_(id, case)
@@ -193,6 +283,7 @@ impl<'a> State<'a> {
             let lab = i.to_string();
             let old = self.state.push_state(&StateElem::Label(&lab));
             let vis = if need_vis {
+                self.state.update_stats("visibility");
                 pp_vis(&self.state.config.visibility)
             } else {
                 RcDoc::nil()
@@ -270,6 +361,9 @@ impl<'a> State<'a> {
                 .clone()
                 .map(RcDoc::text)
                 .unwrap_or_else(|| ident(id, Some(Case::Pascal)));
+            self.state.update_stats("name");
+            self.state.update_stats("visibility");
+            self.state.update_stats("attributes");
             let vis = pp_vis(&self.state.config.visibility);
             let derive = self
                 .state
@@ -294,13 +388,23 @@ impl<'a> State<'a> {
                         .append(self.pp_record_fields(fs, true, false))
                         .append(separator)
                 }
-                TypeInner::Variant(fs) => derive
-                    .append(RcDoc::line())
-                    .append(vis)
-                    .append("enum ")
-                    .append(name)
-                    .append(" ")
-                    .append(self.pp_variant_fields(fs)),
+                TypeInner::Variant(fs) => {
+                    if as_result(fs).is_some() {
+                        vis.append(kwd("type"))
+                            .append(name)
+                            .append(" = ")
+                            .append(self.pp_ty(ty, false))
+                            .append(";")
+                    } else {
+                        derive
+                            .append(RcDoc::line())
+                            .append(vis)
+                            .append("enum ")
+                            .append(name)
+                            .append(" ")
+                            .append(self.pp_variant_fields(fs))
+                    }
+                }
                 TypeInner::Func(func) => str("candid::define_function!(")
                     .append(vis)
                     .append(name)
@@ -396,6 +500,7 @@ impl<'a> State<'a> {
             .name
             .clone()
             .unwrap_or_else(|| ident(id, Some(Case::Snake)).pretty(LINE_WIDTH).to_string());
+        self.state.update_stats("name");
         let args: Vec<_> = func
             .args
             .iter()
@@ -409,6 +514,7 @@ impl<'a> State<'a> {
                     .name
                     .clone()
                     .unwrap_or_else(|| lab.clone());
+                self.state.update_stats("name");
                 let res = self.pp_ty(ty, true);
                 self.state.pop_state(old, StateElem::Label(&lab));
                 (name, res)
@@ -465,6 +571,7 @@ impl<'a> State<'a> {
                         .name
                         .clone()
                         .unwrap_or_else(|| lab.clone());
+                    self.state.update_stats("name");
                     let res = self.pp_ty(ty, true);
                     self.state.pop_state(old, StateElem::Label(&lab));
                     (name, res.pretty(LINE_WIDTH).to_string())
@@ -489,6 +596,7 @@ pub struct Output {
     pub type_defs: String,
     pub methods: Vec<Method>,
     pub init_args: Option<Vec<(String, String)>>,
+    pub tests: String,
 }
 #[derive(Serialize, Debug)]
 pub struct Method {
@@ -499,29 +607,37 @@ pub struct Method {
     pub mode: String,
 }
 pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Output, Vec<String>) {
-    let (env, actor) = nominalize_all(env, actor);
-    let def_list: Vec<_> = if let Some(actor) = &actor {
+    let mut state = NominalState {
+        state: crate::configs::State::new(&tree.0, env),
+    };
+    let (env, actor) = state.nominalize_all(actor);
+    let old_stats = state.state.stats.clone();
+    let def_list = if let Some(actor) = &actor {
         chase_actor(&env, actor).unwrap()
     } else {
-        env.0.iter().map(|pair| pair.0.as_ref()).collect()
+        env.0.iter().map(|pair| pair.0.as_ref()).collect::<Vec<_>>()
     };
     let recs = infer_rec(&env, &def_list).unwrap();
     let mut state = State {
         state: crate::configs::State::new(&tree.0, &env),
         recs,
+        tests: BTreeMap::new(),
     };
+    state.state.stats = old_stats;
     let defs = state.pp_defs(&def_list);
     let (methods, init_args) = if let Some(actor) = &actor {
         state.pp_actor(actor)
     } else {
         (Vec::new(), None)
     };
+    let tests = state.tests.into_values().collect::<Vec<_>>().join("\n");
     let unused = state.state.report_unused();
     (
         Output {
             type_defs: defs.pretty(LINE_WIDTH).to_string(),
             methods,
             init_args,
+            tests,
         },
         unused,
     )
@@ -535,12 +651,14 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         type_defs: String,
         methods: Vec<Method>,
         init_args: Option<Vec<(String, String)>>,
+        tests: String,
     }
     let data = HBOutput {
         type_defs: output.type_defs,
         methods: output.methods,
         external: config.0,
         init_args: output.init_args,
+        tests: output.tests,
     };
     hbs.render_template(template, &data).unwrap()
 }
@@ -587,7 +705,11 @@ pub fn compile(
     };
     let (output, unused) = emit_bindgen(tree, env, actor);
     for e in unused {
-        eprintln!("WARNING: path {e} is unused");
+        eprintln!(
+            "{} path {} is unused",
+            style("WARNING:").red().bold(),
+            style(e).green()
+        );
     }
     output_handlebar(output, external, &source)
 }
@@ -598,6 +720,7 @@ pub enum TypePath {
     Vec,
     RecordField(String),
     VariantField(String),
+    ResultField(String),
     Func(String),
     Init,
 }
@@ -606,7 +729,9 @@ fn path_to_var(path: &[TypePath]) -> String {
         .iter()
         .map(|node| match node {
             TypePath::Id(id) => id.as_str(),
-            TypePath::RecordField(f) | TypePath::VariantField(f) => f.as_str(),
+            TypePath::RecordField(f) | TypePath::VariantField(f) | TypePath::ResultField(f) => {
+                f.as_str()
+            }
             TypePath::Opt => "inner",
             TypePath::Vec => "item",
             TypePath::Func(id) => id.as_str(),
@@ -615,170 +740,237 @@ fn path_to_var(path: &[TypePath]) -> String {
         .collect();
     name.join("_").to_case(Case::Pascal)
 }
-// Convert structural typing to nominal typing to fit Rust's type system
-fn nominalize(env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
-    match t.as_ref() {
-        TypeInner::Opt(ty) => {
-            path.push(TypePath::Opt);
-            let ty = nominalize(env, path, ty);
-            path.pop();
-            TypeInner::Opt(ty)
-        }
-        TypeInner::Vec(ty) => {
-            path.push(TypePath::Vec);
-            let ty = nominalize(env, path, ty);
-            path.pop();
-            TypeInner::Vec(ty)
-        }
-        TypeInner::Record(fs) => {
-            if matches!(
-                path.last(),
-                None | Some(TypePath::VariantField(_)) | Some(TypePath::Id(_))
-            ) || is_tuple(fs)
-            {
-                let fs: Vec<_> = fs
-                    .iter()
-                    .map(|Field { id, ty }| {
-                        path.push(TypePath::RecordField(id.to_string()));
-                        let ty = nominalize(env, path, ty);
-                        path.pop();
-                        Field { id: id.clone(), ty }
-                    })
-                    .collect();
-                TypeInner::Record(fs)
-            } else {
-                let new_var = path_to_var(path);
-                let ty = nominalize(
-                    env,
-                    &mut vec![TypePath::Id(new_var.clone())],
-                    &TypeInner::Record(fs.to_vec()).into(),
-                );
-                env.0.insert(new_var.clone(), ty);
-                TypeInner::Var(new_var)
+struct NominalState<'a> {
+    state: crate::configs::State<'a, BindingConfig>,
+}
+impl<'a> NominalState<'a> {
+    // Convert structural typing to nominal typing to fit Rust's type system
+    fn nominalize(&mut self, env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
+        let elem = StateElem::Type(t);
+        let old = if matches!(t.as_ref(), TypeInner::Func(_)) {
+            // strictly speaking, we want to avoid func label from the main service. But this is probably good enough.
+            None
+        } else {
+            Some(self.state.push_state(&elem))
+        };
+        let res = match t.as_ref() {
+            TypeInner::Opt(ty) => {
+                path.push(TypePath::Opt);
+                let ty = self.nominalize(env, path, ty);
+                path.pop();
+                TypeInner::Opt(ty)
             }
-        }
-        TypeInner::Variant(fs) => match path.last() {
-            None | Some(TypePath::Id(_)) => {
-                let fs: Vec<_> = fs
-                    .iter()
-                    .map(|Field { id, ty }| {
-                        path.push(TypePath::VariantField(id.to_string()));
-                        let ty = nominalize(env, path, ty);
-                        path.pop();
-                        Field { id: id.clone(), ty }
-                    })
-                    .collect();
-                TypeInner::Variant(fs)
+            TypeInner::Vec(ty) => {
+                path.push(TypePath::Vec);
+                let ty = self.nominalize(env, path, ty);
+                path.pop();
+                TypeInner::Vec(ty)
             }
-            Some(_) => {
-                let new_var = path_to_var(path);
-                let ty = nominalize(
-                    env,
-                    &mut vec![TypePath::Id(new_var.clone())],
-                    &TypeInner::Variant(fs.to_vec()).into(),
-                );
-                env.0.insert(new_var.clone(), ty);
-                TypeInner::Var(new_var)
-            }
-        },
-        TypeInner::Func(func) => match path.last() {
-            None | Some(TypePath::Id(_)) => {
-                let func = func.clone();
-                TypeInner::Func(Function {
-                    modes: func.modes,
-                    args: func
-                        .args
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, ty)| {
-                            let i = if i == 0 {
-                                "".to_string()
-                            } else {
-                                i.to_string()
-                            };
-                            path.push(TypePath::Func(format!("arg{i}")));
-                            let ty = nominalize(env, path, &ty);
+            TypeInner::Record(fs) => {
+                if matches!(
+                    path.last(),
+                    None | Some(TypePath::VariantField(_)) | Some(TypePath::Id(_))
+                ) || is_tuple(fs)
+                {
+                    let fs: Vec<_> = fs
+                        .iter()
+                        .map(|Field { id, ty }| {
+                            let lab = id.to_string();
+                            let elem = StateElem::Label(&lab);
+                            let old = self.state.push_state(&elem);
+                            path.push(TypePath::RecordField(id.to_string()));
+                            let ty = self.nominalize(env, path, ty);
                             path.pop();
-                            ty
+                            self.state.pop_state(old, elem);
+                            Field { id: id.clone(), ty }
+                        })
+                        .collect();
+                    TypeInner::Record(fs)
+                } else {
+                    let new_var = if let Some(name) = &self.state.config.name {
+                        let res = name.to_string();
+                        self.state.update_stats("name");
+                        res
+                    } else {
+                        path_to_var(path)
+                    };
+                    let ty = self.nominalize(
+                        env,
+                        &mut vec![TypePath::Id(new_var.clone())],
+                        &TypeInner::Record(fs.to_vec()).into(),
+                    );
+                    env.0.insert(new_var.clone(), ty);
+                    TypeInner::Var(new_var)
+                }
+            }
+            TypeInner::Variant(fs) => {
+                let is_result = as_result(fs).is_some();
+                if matches!(path.last(), None | Some(TypePath::Id(_))) || is_result {
+                    let fs: Vec<_> = fs
+                        .iter()
+                        .map(|Field { id, ty }| {
+                            let lab = id.to_string();
+                            let old = self.state.push_state(&StateElem::Label(&lab));
+                            if is_result {
+                                // so that inner record gets a new name
+                                path.push(TypePath::ResultField(id.to_string()));
+                            } else {
+                                path.push(TypePath::VariantField(id.to_string()));
+                            }
+                            let ty = self.nominalize(env, path, ty);
+                            path.pop();
+                            self.state.pop_state(old, StateElem::Label(&lab));
+                            Field { id: id.clone(), ty }
+                        })
+                        .collect();
+                    TypeInner::Variant(fs)
+                } else {
+                    let new_var = if let Some(name) = &self.state.config.name {
+                        let res = name.to_string();
+                        self.state.update_stats("name");
+                        res
+                    } else {
+                        path_to_var(path)
+                    };
+                    let ty = self.nominalize(
+                        env,
+                        &mut vec![TypePath::Id(new_var.clone())],
+                        &TypeInner::Variant(fs.to_vec()).into(),
+                    );
+                    env.0.insert(new_var.clone(), ty);
+                    TypeInner::Var(new_var)
+                }
+            }
+            TypeInner::Func(func) => match path.last() {
+                None | Some(TypePath::Id(_)) => {
+                    let func = func.clone();
+                    TypeInner::Func(Function {
+                        modes: func.modes,
+                        args: func
+                            .args
+                            .into_iter()
+                            .enumerate()
+                            .map(|(i, ty)| {
+                                let lab = format!("arg{i}");
+                                let old = self.state.push_state(&StateElem::Label(&lab));
+                                let idx = if i == 0 {
+                                    "".to_string()
+                                } else {
+                                    i.to_string()
+                                };
+                                path.push(TypePath::Func(format!("arg{idx}")));
+                                let ty = self.nominalize(env, path, &ty);
+                                path.pop();
+                                self.state.pop_state(old, StateElem::Label(&lab));
+                                ty
+                            })
+                            .collect(),
+                        rets: func
+                            .rets
+                            .into_iter()
+                            .enumerate()
+                            .map(|(i, ty)| {
+                                let lab = format!("ret{i}");
+                                let old = self.state.push_state(&StateElem::Label(&lab));
+                                let idx = if i == 0 {
+                                    "".to_string()
+                                } else {
+                                    i.to_string()
+                                };
+                                path.push(TypePath::Func(format!("ret{idx}")));
+                                let ty = self.nominalize(env, path, &ty);
+                                path.pop();
+                                self.state.pop_state(old, StateElem::Label(&lab));
+                                ty
+                            })
+                            .collect(),
+                    })
+                }
+                Some(_) => {
+                    let new_var = if let Some(name) = &self.state.config.name {
+                        let res = name.to_string();
+                        self.state.update_stats("name");
+                        res
+                    } else {
+                        path_to_var(path)
+                    };
+                    let ty = self.nominalize(
+                        env,
+                        &mut vec![TypePath::Id(new_var.clone())],
+                        &TypeInner::Func(func.clone()).into(),
+                    );
+                    env.0.insert(new_var.clone(), ty);
+                    TypeInner::Var(new_var)
+                }
+            },
+            TypeInner::Service(serv) => match path.last() {
+                None | Some(TypePath::Id(_)) => TypeInner::Service(
+                    serv.iter()
+                        .map(|(meth, ty)| {
+                            let lab = meth.to_string();
+                            let old = self.state.push_state(&StateElem::Label(&lab));
+                            path.push(TypePath::Id(meth.to_string()));
+                            let ty = self.nominalize(env, path, ty);
+                            path.pop();
+                            self.state.pop_state(old, StateElem::Label(&lab));
+                            (meth.clone(), ty)
                         })
                         .collect(),
-                    rets: func
-                        .rets
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, ty)| {
-                            let i = if i == 0 {
-                                "".to_string()
-                            } else {
-                                i.to_string()
-                            };
-                            path.push(TypePath::Func(format!("ret{i}")));
-                            let ty = nominalize(env, path, &ty);
-                            path.pop();
-                            ty
-                        })
-                        .collect(),
-                })
-            }
-            Some(_) => {
-                let new_var = path_to_var(path);
-                let ty = nominalize(
-                    env,
-                    &mut vec![TypePath::Id(new_var.clone())],
-                    &TypeInner::Func(func.clone()).into(),
-                );
-                env.0.insert(new_var.clone(), ty);
-                TypeInner::Var(new_var)
-            }
-        },
-        TypeInner::Service(serv) => match path.last() {
-            None | Some(TypePath::Id(_)) => TypeInner::Service(
-                serv.iter()
-                    .map(|(meth, ty)| {
-                        path.push(TypePath::Id(meth.to_string()));
-                        let ty = nominalize(env, path, ty);
+                ),
+                Some(_) => {
+                    let new_var = if let Some(name) = &self.state.config.name {
+                        let res = name.to_string();
+                        self.state.update_stats("name");
+                        res
+                    } else {
+                        path_to_var(path)
+                    };
+                    let ty = self.nominalize(
+                        env,
+                        &mut vec![TypePath::Id(new_var.clone())],
+                        &TypeInner::Service(serv.clone()).into(),
+                    );
+                    env.0.insert(new_var.clone(), ty);
+                    TypeInner::Var(new_var)
+                }
+            },
+            TypeInner::Class(args, ty) => TypeInner::Class(
+                args.iter()
+                    .map(|ty| {
+                        let elem = StateElem::Label("init");
+                        let old = self.state.push_state(&elem);
+                        path.push(TypePath::Init);
+                        let ty = self.nominalize(env, path, ty);
                         path.pop();
-                        (meth.clone(), ty)
+                        self.state.pop_state(old, elem);
+                        ty
                     })
                     .collect(),
+                self.nominalize(env, path, ty),
             ),
-            Some(_) => {
-                let new_var = path_to_var(path);
-                let ty = nominalize(
-                    env,
-                    &mut vec![TypePath::Id(new_var.clone())],
-                    &TypeInner::Service(serv.clone()).into(),
-                );
-                env.0.insert(new_var.clone(), ty);
-                TypeInner::Var(new_var)
-            }
-        },
-        TypeInner::Class(args, ty) => TypeInner::Class(
-            args.iter()
-                .map(|ty| {
-                    path.push(TypePath::Init);
-                    let ty = nominalize(env, path, ty);
-                    path.pop();
-                    ty
-                })
-                .collect(),
-            nominalize(env, path, ty),
-        ),
-        _ => return t.clone(),
+            t => t.clone(),
+        }
+        .into();
+        if let Some(old) = old {
+            self.state.pop_state(old, elem);
+        }
+        res
     }
-    .into()
-}
 
-fn nominalize_all(env: &TypeEnv, actor: &Option<Type>) -> (TypeEnv, Option<Type>) {
-    let mut res = TypeEnv(Default::default());
-    for (id, ty) in env.0.iter() {
-        let ty = nominalize(&mut res, &mut vec![TypePath::Id(id.clone())], ty);
-        res.0.insert(id.to_string(), ty);
+    fn nominalize_all(&mut self, actor: &Option<Type>) -> (TypeEnv, Option<Type>) {
+        let mut res = TypeEnv(Default::default());
+        for (id, ty) in self.state.env.0.iter() {
+            let elem = StateElem::Label(id);
+            let old = self.state.push_state(&elem);
+            let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.clone())], ty);
+            res.0.insert(id.to_string(), ty);
+            self.state.pop_state(old, elem);
+        }
+        let actor = actor
+            .as_ref()
+            .map(|ty| self.nominalize(&mut res, &mut vec![], ty));
+        (res, actor)
     }
-    let actor = actor
-        .as_ref()
-        .map(|ty| nominalize(&mut res, &mut vec![], ty));
-    (res, actor)
 }
 fn get_hbs() -> handlebars::Handlebars<'static> {
     use handlebars::*;
