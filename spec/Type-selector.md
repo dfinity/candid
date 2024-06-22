@@ -21,7 +21,7 @@ There are two parts in the config language: 1) A way to quickly select particula
 
 ### Type selector
 
-For the first part, we define a type selector `<selector>` similar to CSS selector.
+For the first part, we define a type selector `<selector>` similar to a CSS selector.
 
 ```
 <selector> := <scopes> (. <path>)? | <path>
@@ -42,7 +42,7 @@ service : {
 
 Paths `left.tree`, `branch.record.left` and `tree.variant.branch.record.left` all match the left branch of a tree. Path `left` will match the "left" field in both `tree` and `pair`. We greedily match the path with a shorter pattern. For example, if you have both path `left` and `left.tree`, we will always match `left`, and `left.tree` will never be matched (we will issue a warning, if a path is never matched). If you want to match `left.tree`, you can replace the `left` path with `pair.record.left`.
 
-`<scopes>` is a special form of path, where each name has a prefix of `func:`, `arg:`, or `ret:`. It indicates that the path can only be matched when it’s inside a scope of a function or argument position. A scoped path match always takes precedence over non-scoped path. For example, `func:f.left` matches the `left` field in `pair`, but not the `left` field in `tree`, and the global `left` path will not be matched when processing function `f`; `func:f.arg:1.left` matches the `left` field in the second input argument of `f`; `ret:0.left` matches the first return type of all functions.
+`<scopes>` is a special form of path, where each name has a prefix of `func:`, `arg:`, or `ret:`. It indicates that the path can only be matched when it’s inside a scope of a function or argument position. A scoped path match always takes precedence over a non-scoped path. For example, `func:f.left` matches the `left` field in `pair`, but not the `left` field in `tree`, and the global `left` path will not be matched when processing function `f`; `func:f.arg:1.left` matches the `left` field in the second input argument of `f`; `ret:0.left` matches the first return type of all functions.
 
 Note that scoped path may not be available for some applications. For example, bindgen and deserialization don't support scoped path. In these applications, when a type variable is shared among multiple functions, scoped path can lead to duplication of type definitions, which makes the client code harder to maintain. You can still use non-scoped paths to match functions or arguments. We establish the following convention:
 
@@ -68,7 +68,7 @@ trait Config {
 
 As the application traverses through the Candid type AST, we check if there is any path match with the current type node. If there is a match, we load the associated config and merge it with the current config.
 
-`merge_config` specifies the merging semantics of the key-value pairs. Specifically, whether these properties apply to the subtree rooted at the selected type node, or just the node itself. The merging semantics can depend on the `context`, which indicates the type of the current node (type or label), and wether the matched path is the first occurence of the type path. Some properties, such as depth, can only apply to the first occurrence of the match. Otherwise, we get an infinite loop.
+`merge_config` specifies the merging semantics of the key-value pairs. Specifically, whether these properties apply to the subtree rooted at the selected type node, or just the node itself. The merging semantics can depend on the `context`, which indicates the type of the current node (type or label), and whether the matched path is the first occurrence of the type path. Some properties, such as depth, can only apply to the first occurrence of the match. Otherwise, we get an infinite loop.
 
 When there is a path match, the matched key-value pairs is provided to the `merge_config` function to merge the current config with the matched config. If there is no path match, `unmatched_config` is provided to the `merge_config` function, which usually is an empty config.
 
