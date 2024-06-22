@@ -299,7 +299,7 @@ impl<T: ConfigState> ConfigTree<T> {
     }
 }
 #[derive(Clone)]
-pub struct Configs(Table);
+pub struct Configs(pub Table);
 impl Configs {
     pub fn get_subtable(&self, path: &[String]) -> Option<&Table> {
         let mut res = &self.0;
