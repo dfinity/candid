@@ -421,10 +421,11 @@ fn test_{test_name}() {{
                     if self.recs.contains(id) {
                         derive
                             .append(RcDoc::line())
-                            .append(vis)
+                            .append(vis.clone())
                             .append("struct ")
                             .append(name)
-                            .append(enclose("(", self.pp_ty(ty, false), ")"))
+                            // TODO: Unfortunately, the visibility of the inner newtype is also controlled by var.visibility
+                            .append(enclose("(", vis.append(self.pp_ty(ty, false)), ")"))
                             .append(";")
                     } else {
                         vis.append(kwd("type"))

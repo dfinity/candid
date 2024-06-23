@@ -5,7 +5,7 @@ use candid::{self, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult as Result;
 
 #[derive(CandidType, Deserialize)]
-pub struct List(Option<(candid::Int,Box<List>,)>);
+pub struct List(pub Option<(candid::Int,Box<List>,)>);
 
 pub struct Service(pub Principal);
 impl Service {

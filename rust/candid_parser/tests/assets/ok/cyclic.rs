@@ -7,7 +7,7 @@ use ic_cdk::api::call::CallResult as Result;
 pub type C = Box<A>;
 pub type B = Option<C>;
 #[derive(CandidType, Deserialize)]
-pub struct A(Option<B>);
+pub struct A(pub Option<B>);
 pub type Z = Box<A>;
 pub type Y = Z;
 pub type X = Y;

@@ -9,10 +9,10 @@ pub(crate) struct B (pub(crate) candid::Int,pub(crate) u128,);
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct Node { pub(crate) head: u128, pub(crate) tail: Box<List> }
 #[derive(CandidType, Deserialize, Debug)]
-pub(crate) struct List(Option<Node>);
+pub(crate) struct List(pub(crate) Option<Node>);
 pub(crate) type A = Box<B>;
 #[derive(CandidType, Deserialize, Debug)]
-pub(crate) struct B(Option<A>);
+pub(crate) struct B(pub(crate) Option<A>);
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) enum Tree {
   #[serde(rename="branch")]
@@ -27,7 +27,7 @@ pub(crate) struct StreamInner {
   pub(crate) next: StreamInnerNext,
 }
 #[derive(CandidType, Deserialize, Debug)]
-pub(crate) struct Stream(Option<StreamInner>);
+pub(crate) struct Stream(pub(crate) Option<StreamInner>);
 candid::define_service!(pub(crate) S : {
   "f" : T::ty();
   "g" : candid::func!((List) -> (B, Tree, Stream));
@@ -43,7 +43,7 @@ pub(crate) struct ListInner {
   tail: Arc<MyList>,
 }
 #[derive(CandidType, Deserialize, Debug)]
-pub(crate) struct MyList(Option<ListInner>);
+pub(crate) struct MyList(pub(crate) Option<ListInner>);
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct Nested3 {
   pub(crate) _0_: u128,

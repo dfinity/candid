@@ -5,7 +5,7 @@ use candid::{self, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult as Result;
 
 #[derive(CandidType, Deserialize)]
-pub struct O(Option<Box<O>>);
+pub struct O(pub Option<Box<O>>);
 #[derive(CandidType, Deserialize)]
 pub struct FieldArg { pub test: u16, pub _1291438163_: u8 }
 #[derive(CandidType, Deserialize)]
@@ -19,7 +19,7 @@ pub struct FieldnatArg {
 #[derive(CandidType, Deserialize)]
 pub struct Node { pub head: candid::Nat, pub tail: Box<List> }
 #[derive(CandidType, Deserialize)]
-pub struct List(Option<Node>);
+pub struct List(pub Option<Node>);
 #[derive(CandidType, Deserialize)]
 pub enum If {
   #[serde(rename="branch")]
@@ -31,7 +31,7 @@ candid::define_function!(pub StreamInnerNext : () -> (Stream) query);
 #[derive(CandidType, Deserialize)]
 pub struct StreamInner { pub head: candid::Nat, pub next: StreamInnerNext }
 #[derive(CandidType, Deserialize)]
-pub struct Stream(Option<StreamInner>);
+pub struct Stream(pub Option<StreamInner>);
 candid::define_service!(pub Return : {
   "f" : T::ty();
   "g" : candid::func!((List) -> (If, Stream));
