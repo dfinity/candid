@@ -183,10 +183,10 @@ fn test_{test_name}() {{
         let old = self.state.push_state(&elem);
         let res = if let Some(t) = &self.state.config.use_type {
             let (t, need_test) = parse_use_type(t);
-            let res = RcDoc::text(t.clone());
             if need_test {
-                self.generate_test(ty, &t.clone());
+                self.generate_test(ty, &t);
             }
+            let res = RcDoc::text(t);
             self.state.update_stats("use_type");
             res
         } else {
