@@ -79,9 +79,7 @@ candid::define_service!(pub(crate) Broker : {
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct NestedResErrOk { pub(crate) content: String }
 pub(crate) type NestedRes = std::result::Result<
-  std::result::Result<(), ()>, std::result::Result<
-    NestedResErrOk, (candid::Int,)
-  >
+  my::Result<(), ()>, another::Result<NestedResErrOk, (candid::Int,)>
 >;
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) enum HArg1 { A(u128), B(Option<String>) }

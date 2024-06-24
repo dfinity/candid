@@ -222,11 +222,28 @@ fn test_{test_name}() {{
                 Variant(ref fs) => {
                     // only possible for result variant
                     let (ok, err) = as_result(fs).unwrap();
-                    let body = self
-                        .pp_ty(ok, is_ref)
-                        .append(", ")
-                        .append(self.pp_ty(err, is_ref));
-                    str("std::result::Result").append(enclose("<", body, ">"))
+                    // This is a hacky way to redirect Result type
+                    let old = self
+                        .state
+                        .push_state(&StateElem::TypeStr("std::result::Result"));
+                    let result = if let Some(t) = &self.state.config.use_type {
+                        let res = t.clone();
+                        // not generating test for this use_type. rustc should be able to catch type mismatches.
+                        self.state.update_stats("use_type");
+                        res
+                    } else {
+                        "std::result::Result".to_string()
+                    };
+                    self.state
+                        .pop_state(old, StateElem::TypeStr("std::result::Result"));
+                    let old = self.state.push_state(&StateElem::Label("Ok"));
+                    let ok = self.pp_ty(ok, is_ref);
+                    self.state.pop_state(old, StateElem::Label("Ok"));
+                    let old = self.state.push_state(&StateElem::Label("Err"));
+                    let err = self.pp_ty(err, is_ref);
+                    self.state.pop_state(old, StateElem::Label("Err"));
+                    let body = ok.append(", ").append(err);
+                    RcDoc::text(result).append(enclose("<", body, ">"))
                 }
                 Func(_) => unreachable!(), // not possible after rewriting
                 Service(_) => unreachable!(), // not possible after rewriting
@@ -305,9 +322,13 @@ fn test_{test_name}() {{
         res
     }
     fn pp_record_fields<'b>(&mut self, fs: &'b [Field], need_vis: bool, is_ref: bool) -> RcDoc<'b> {
-        let old = self.state.push_state(&StateElem::TypeStr("record"));
+        let old = if self.state.path.last() == Some(&"record".to_string()) {
+            // don't push record again when coming from pp_ty
+            None
+        } else {
+            Some(self.state.push_state(&StateElem::TypeStr("record")))
+        };
         let res = if is_tuple(fs) {
-            // TODO check if there is no name/attr in the label subtree
             self.pp_tuple(fs, need_vis, is_ref)
         } else {
             let fields: Vec<_> = fs
@@ -317,7 +338,9 @@ fn test_{test_name}() {{
             let fields = concat(fields.into_iter(), ",");
             enclose_space("{", fields, "}")
         };
-        self.state.pop_state(old, StateElem::TypeStr("record"));
+        if let Some(old) = old {
+            self.state.pop_state(old, StateElem::TypeStr("record"));
+        }
         res
     }
     fn pp_variant_field<'b>(&mut self, field: &'b Field) -> RcDoc<'b> {

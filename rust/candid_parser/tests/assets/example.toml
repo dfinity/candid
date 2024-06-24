@@ -10,3 +10,5 @@ nat.use_type = "u128"
 BrokerFindRet = { name = "BrokerReturn", visibility = "pub" }
 g1 = { name = "G11", arg0.name = "id", arg1.name = "list", arg2.name = "is_okay", ret0.use_type = "i128" }
 x.ret2.variant.Err.variant.name = "Error"
+nested_res.variant.Ok.variant."std::result::Result".use_type = "my::Result"
+nested_res.variant.Err.variant."std::result::Result".use_type = "another::Result"
