@@ -84,7 +84,8 @@ fn compiler_test(resource: &str) {
                     _ => (),
                 }
                 let mut output = mint.new_goldenfile(filename.with_extension("rs")).unwrap();
-                let content = rust::compile(&config, &env, &actor, external);
+                let (content, unused) = rust::compile(&config, &env, &actor, external);
+                assert!(unused.is_empty());
                 writeln!(output, "{content}").unwrap();
             }
             {

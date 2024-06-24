@@ -414,6 +414,7 @@ dependencies = [
  "anyhow",
  "candid_parser",
  "clap",
+ "console",
  "hex",
  "pretty-hex",
  "rand",

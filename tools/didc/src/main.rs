@@ -8,6 +8,7 @@ use candid_parser::{
     Error, IDLArgs, IDLValue, TypeEnv,
 };
 use clap::Parser;
+use console::style;
 use std::collections::HashSet;
 use std::io;
 use std::path::PathBuf;
@@ -169,6 +170,15 @@ fn load_config(input: &Option<String>) -> Result<Configs, Error> {
         Some(str) => Configs::from_str(str),
     }
 }
+fn warn_unused(unused: &[String]) {
+    for e in unused {
+        eprintln!(
+            "{} path {} is unused.",
+            style("WARNING:").red().bold(),
+            style(e).green(),
+        );
+    }
+}
 
 fn main() -> Result<()> {
     match Command::parse() {
@@ -229,7 +239,9 @@ fn main() -> Result<()> {
                         .map(|x| x.clone().try_into().unwrap())
                         .unwrap_or(ExternalConfig::default());
                     let config = Config::new(configs);
-                    compile(&config, &env, &actor, external)
+                    let (res, unused) = compile(&config, &env, &actor, external);
+                    warn_unused(&unused);
+                    res
                 }
                 "rs-agent" | "rs-stub" => {
                     use candid_parser::bindings::rust::{compile, Config, ExternalConfig};
@@ -241,7 +253,9 @@ fn main() -> Result<()> {
                         _ => unreachable!(),
                     };
                     external.0.insert("target".to_string(), target.to_string());
-                    compile(&config, &env, &actor, external)
+                    let (res, unused) = compile(&config, &env, &actor, external);
+                    warn_unused(&unused);
+                    res
                 }
                 _ => unreachable!(),
             };

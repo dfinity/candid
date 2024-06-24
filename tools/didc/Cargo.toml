@@ -11,4 +11,5 @@ pretty-hex = "0.2.1"
 hex.workspace = true
 anyhow.workspace = true
 rand.workspace = true
+console.workspace = true
 

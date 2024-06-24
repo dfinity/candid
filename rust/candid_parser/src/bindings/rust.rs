@@ -5,7 +5,6 @@ use crate::{
 };
 use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
-use console::style;
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
 use serde::Serialize;
@@ -713,7 +712,7 @@ pub fn compile(
     env: &TypeEnv,
     actor: &Option<Type>,
     external: ExternalConfig,
-) -> String {
+) -> (String, Vec<String>) {
     let source = match external.0.get("target").map(|s| s.as_str()) {
         Some("canister_call") | None => Cow::Borrowed(include_str!("rust_call.hbs")),
         Some("agent") => Cow::Borrowed(include_str!("rust_agent.hbs")),
@@ -728,14 +727,7 @@ pub fn compile(
         _ => unimplemented!(),
     };
     let (output, unused) = emit_bindgen(tree, env, actor);
-    for e in unused {
-        eprintln!(
-            "{} path {} is unused",
-            style("WARNING:").red().bold(),
-            style(e).green()
-        );
-    }
-    output_handlebar(output, external, &source)
+    (output_handlebar(output, external, &source), unused)
 }
 
 pub enum TypePath {
