@@ -6,7 +6,7 @@ Nested41.variant.A = { name = "AAA", attributes = "#[serde(skip_deserializing)]"
 ListInner.attributes = "#derive[CandidType, Deserialize, Clone]"
 ListInner.record = { visibility = "", head.name = "HEAD", attributes = "#[serde(skip_deserializing)]", tail.use_type = "Arc<MyList>" }
 my_type = { visibility = "", name = "CanisterId" }
-nat.use_type = "u128"
+nat.use_type = "u128 (no test)"
 BrokerFindRet = { name = "BrokerReturn", visibility = "pub" }
 g1 = { name = "G11", arg0.name = "id", arg1.name = "list", arg2.name = "is_okay", ret0.use_type = "i128" }
 x.ret2.variant.Err.variant.name = "Error"

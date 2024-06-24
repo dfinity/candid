@@ -145,10 +145,4 @@ fn test_i128() {
   let candid_src = r#"(int)"#;
   candid_parser::utils::check_rust_type::<i128>(candid_src).unwrap();
 }
-#[test]
-fn test_u128() {
-  // Generated from nat.use_type = "u128"
-  let candid_src = r#"(nat)"#;
-  candid_parser::utils::check_rust_type::<u128>(candid_src).unwrap();
-}
 

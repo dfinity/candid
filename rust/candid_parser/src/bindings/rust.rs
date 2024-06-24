@@ -101,6 +101,13 @@ fn as_result(fs: &[Field]) -> Option<(&Type, &Type)> {
         _ => None,
     }
 }
+fn parse_use_type(input: &str) -> (String, bool) {
+    if let Some((t, "")) = input.rsplit_once("(no test)") {
+        (t.trim_end().to_string(), false)
+    } else {
+        (input.to_string(), true)
+    }
+}
 static KEYWORDS: [&str; 51] = [
     "as", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn", "for",
     "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return",
@@ -175,8 +182,11 @@ fn test_{test_name}() {{
         let elem = StateElem::Type(ty);
         let old = self.state.push_state(&elem);
         let res = if let Some(t) = &self.state.config.use_type {
+            let (t, need_test) = parse_use_type(t);
             let res = RcDoc::text(t.clone());
-            self.generate_test(ty, &t.clone());
+            if need_test {
+                self.generate_test(ty, &t.clone());
+            }
             self.state.update_stats("use_type");
             res
         } else {
@@ -226,7 +236,7 @@ fn test_{test_name}() {{
                         .state
                         .push_state(&StateElem::TypeStr("std::result::Result"));
                     let result = if let Some(t) = &self.state.config.use_type {
-                        let res = t.clone();
+                        let (res, _) = parse_use_type(t);
                         // not generating test for this use_type. rustc should be able to catch type mismatches.
                         self.state.update_stats("use_type");
                         res
