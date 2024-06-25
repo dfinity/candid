@@ -216,7 +216,7 @@ dependencies = [
 
 [[package]]
 name = "candid_parser"
-version = "0.2.0-beta.2"
+version = "0.2.0-beta.3"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -414,6 +414,7 @@ dependencies = [
  "anyhow",
  "candid_parser",
  "clap",
+ "console",
  "hex",
  "pretty-hex",
  "rand",

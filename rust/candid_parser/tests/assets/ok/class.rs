@@ -2,20 +2,25 @@
 // You may want to manually adjust some of the types.
 #![allow(dead_code, unused_imports)]
 use candid::{self, CandidType, Deserialize, Principal};
-use ic_cdk::api::call::CallResult as Result;
 
 #[derive(CandidType, Deserialize)]
-pub struct List(Option<(candid::Int,Box<List>,)>);
+pub struct List(pub Option<(candid::Int,Box<List>,)>);
+#[derive(CandidType, Deserialize)]
+pub struct Profile { pub age: u8, pub name: String }
 
-pub struct Service(pub Principal);
-impl Service {
-  pub async fn get(&self) -> Result<(List,)> {
-    ic_cdk::call(self.0, "get", ()).await
-  }
-  pub async fn set(&self, arg0: List) -> Result<(List,)> {
-    ic_cdk::call(self.0, "set", (arg0,)).await
-  }
+#[ic_cdk::init]
+fn init(arg0: candid::Int, arg1: List, arg2: Profile) {
+  unimplemented!()
 }
-pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
-pub const service : Service = Service(CANISTER_ID);
+#[ic_cdk::update]
+fn get() -> List {
+  unimplemented!()
+}
+#[ic_cdk::update]
+fn set(arg0: List) -> List {
+  unimplemented!()
+}
+#[link_section = "icp:public candid:service"]
+pub static __SERVICE: [u8; 94] = *br#"type List = opt record { int; List };
+service : { get : () -> (List); set : (List) -> (List) }"#;
 

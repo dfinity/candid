@@ -8,7 +8,7 @@ candid::define_function!(pub F : (i8) -> (i8));
 candid::define_function!(pub H : (F) -> (F));
 pub type G = F;
 #[derive(CandidType, Deserialize)]
-pub struct O(Option<Box<O>>);
+pub struct O(pub Option<Box<O>>);
 
 pub struct Service(pub Principal);
 impl Service {

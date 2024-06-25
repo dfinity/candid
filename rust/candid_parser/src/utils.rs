@@ -1,4 +1,5 @@
 use crate::{check_prog, pretty_check_file, pretty_parse, Error, Result};
+use candid::types::TypeInner;
 use candid::{types::Type, TypeEnv};
 use std::path::Path;
 
@@ -49,7 +50,6 @@ pub fn service_equal(left: CandidSource, right: CandidSource) -> Result<()> {
 /// If the original did file contains imports, the output flattens the type definitions.
 /// For now, the comments from the original did file is omitted.
 pub fn instantiate_candid(candid: CandidSource) -> Result<(Vec<Type>, (TypeEnv, Type))> {
-    use candid::types::TypeInner;
     let (env, serv) = candid.load()?;
     let serv = serv.ok_or_else(|| Error::msg("the Candid interface has no main service type"))?;
     let serv = env.trace_type(&serv)?;
@@ -58,6 +58,23 @@ pub fn instantiate_candid(candid: CandidSource) -> Result<(Vec<Type>, (TypeEnv, 
         TypeInner::Service(_) => (vec![], (env, serv)),
         _ => unreachable!(),
     })
+}
+pub fn get_metadata(env: &TypeEnv, serv: &Option<Type>) -> Option<String> {
+    let serv = serv.clone()?;
+    let serv = env.trace_type(&serv).ok()?;
+    let serv = match serv.as_ref() {
+        TypeInner::Class(_, ty) => ty.clone(),
+        TypeInner::Service(_) => serv,
+        _ => unreachable!(),
+    };
+    let def_list = crate::bindings::analysis::chase_actor(env, &serv).ok()?;
+    let mut filtered = TypeEnv::new();
+    for d in def_list {
+        if let Some(t) = env.0.get(d) {
+            filtered.0.insert(d.to_string(), t.clone());
+        }
+    }
+    Some(candid::pretty::candid::compile(&filtered, &Some(serv)))
 }
 
 /// Merge canister metadata candid:args and candid:service into a service constructor.
