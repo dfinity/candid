@@ -40,6 +40,8 @@ A list of community maintained Candid libraries:
 * [didc](tools/didc): Candid CLI. Download [prebuilt binary](https://github.com/dfinity/candid/releases).
 * [ui](tools/ui): Candid UI canister. See deployed [canister](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.ic0.app/) on the IC
 * [ic-repl](https://github.com/chenyan2002/ic-repl): A REPL environment to communicate with canisters using Candid
+* [Explain Candid](https://fxa77-fiaaa-aaaae-aaana-cai.raw.icp0.io/explain): An online tool that decodes and explains a given Candid message. (Thanks to Ben Lynn)
+* [Candid playground](https://sehgq-cqaaa-aaaap-ahc4q-cai.icp0.io/playground): A playground that generates UI dynamically as you type in the Candid definitions. (Thanks to B3Forge)
 
 ## Tests
 
