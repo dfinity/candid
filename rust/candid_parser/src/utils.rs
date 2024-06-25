@@ -68,14 +68,13 @@ pub fn get_metadata(env: &TypeEnv, serv: &Option<Type>) -> Option<String> {
         _ => unreachable!(),
     };
     let def_list = crate::bindings::analysis::chase_actor(env, &serv).ok()?;
-    let env = TypeEnv(
-        env.0
-            .iter()
-            .filter(|&(k, _)| def_list.contains(&k.as_str()))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect(),
-    );
-    Some(candid::pretty::candid::compile(&env, &Some(serv)))
+    let mut filtered = TypeEnv::new();
+    for d in def_list {
+        if let Some(t) = env.0.get(d) {
+            filtered.0.insert(d.to_string(), t.clone());
+        }
+    }
+    Some(candid::pretty::candid::compile(&filtered, &Some(serv)))
 }
 
 /// Merge canister metadata candid:args and candid:service into a service constructor.

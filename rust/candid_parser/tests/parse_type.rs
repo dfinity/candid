@@ -74,6 +74,9 @@ fn compiler_test(resource: &str) {
                     "management.did" => {
                         drop(external.0.insert("target".to_string(), "agent".to_string()))
                     }
+                    "class.did" => {
+                        drop(external.0.insert("target".to_string(), "stub".to_string()))
+                    }
                     "example.did" => {
                         let configs = std::fs::read_to_string(base_path.join("example.toml"))
                             .unwrap()
