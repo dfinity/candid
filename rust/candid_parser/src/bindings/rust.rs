@@ -721,12 +721,18 @@ pub fn compile(
     tree: &Config,
     env: &TypeEnv,
     actor: &Option<Type>,
-    external: ExternalConfig,
+    mut external: ExternalConfig,
 ) -> (String, Vec<String>) {
     let source = match external.0.get("target").map(|s| s.as_str()) {
         Some("canister_call") | None => Cow::Borrowed(include_str!("rust_call.hbs")),
         Some("agent") => Cow::Borrowed(include_str!("rust_agent.hbs")),
-        Some("stub") => Cow::Borrowed(include_str!("rust_stub.hbs")),
+        Some("stub") => {
+            let metadata = crate::utils::get_metadata(env, actor);
+            if let Some(metadata) = metadata {
+                external.0.insert("metadata".to_string(), metadata);
+            }
+            Cow::Borrowed(include_str!("rust_stub.hbs"))
+        }
         Some("custom") => {
             let template = external
                 .0
