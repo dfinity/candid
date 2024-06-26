@@ -1,16 +1,36 @@
-use crate::Result;
+use crate::{Error, Result};
 use candid::types::{Type, TypeEnv, TypeInner};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Select a subset of methods from an actor.
-pub fn project_methods(env: &TypeEnv, actor: &Option<Type>, methods: &[String]) -> Option<Type> {
-    let service = env.as_service(actor.as_ref()?).ok()?;
+pub fn project_methods(
+    env: &TypeEnv,
+    actor: &Option<Type>,
+    mut methods: Vec<String>,
+) -> Result<Type> {
+    let actor = actor
+        .as_ref()
+        .ok_or_else(|| Error::Custom(anyhow::anyhow!("no actor")))?;
+    let service = env.as_service(actor)?;
     let filtered = service
         .iter()
-        .filter(|(name, _)| methods.contains(name))
+        .filter(|(name, _)| {
+            if let Some(idx) = methods.iter().position(|m| m == name) {
+                methods.swap_remove(idx);
+                true
+            } else {
+                false
+            }
+        })
         .cloned()
         .collect();
-    Some(TypeInner::Service(filtered).into())
+    if !methods.is_empty() {
+        return Err(Error::Custom(anyhow::anyhow!(
+            "methods not found: {:?}",
+            methods
+        )));
+    }
+    Ok(TypeInner::Service(filtered).into())
 }
 
 /// Same as chase_actor, with seen set as part of the type. Used for chasing type names from type definitions.

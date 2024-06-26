@@ -225,7 +225,9 @@ fn main() -> Result<()> {
             let configs = load_config(&config)?;
             let (env, mut actor) = pretty_check_file(&input)?;
             if !methods.is_empty() {
-                actor = candid_parser::bindings::analysis::project_methods(&env, &actor, &methods);
+                actor = Some(candid_parser::bindings::analysis::project_methods(
+                    &env, &actor, methods,
+                )?);
             }
             let content = match target.as_str() {
                 "js" => candid_parser::bindings::javascript::compile(&env, &actor),
