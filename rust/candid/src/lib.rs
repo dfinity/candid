@@ -250,6 +250,7 @@ pub use types::{
     rc,
     reference::{Func, Service},
     reserved::{Empty, Reserved},
+    result::MotokoResult,
     TypeEnv,
 };
 

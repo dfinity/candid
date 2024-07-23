@@ -25,6 +25,7 @@ pub mod number;
 pub mod principal;
 pub mod reference;
 pub mod reserved;
+pub mod result;
 
 pub mod arc;
 pub mod rc;
