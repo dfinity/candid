@@ -285,7 +285,13 @@ fn test_{test_name}() {{
                     self.state.update_stats("name");
                     res
                 } else {
-                    let case = if is_variant { Some(Case::Pascal) } else { None };
+                    let case = if is_variant {
+                        Some(Case::Pascal)
+                    } else if !id.starts_with('_') {
+                        Some(Case::Snake)
+                    } else {
+                        None
+                    };
                     ident_(id, case)
                 };
                 let attr = if is_rename {
