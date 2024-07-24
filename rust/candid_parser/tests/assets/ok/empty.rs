@@ -17,13 +17,13 @@ pub enum HRet { #[serde(rename="a")] A(Box<T>), #[serde(rename="b")] B{} }
 
 pub struct Service(pub Principal);
 impl Service {
-  pub async fn f(&self, arg0: FArg) -> Result<(FRet,)> {
+  pub async fn f(&self, arg0: &FArg) -> Result<(FRet,)> {
     ic_cdk::call(self.0, "f", (arg0,)).await
   }
-  pub async fn g(&self, arg0: T) -> Result<(GRet,)> {
+  pub async fn g(&self, arg0: &T) -> Result<(GRet,)> {
     ic_cdk::call(self.0, "g", (arg0,)).await
   }
-  pub async fn h(&self, arg0: (T,candid::Empty,)) -> Result<(HRet,)> {
+  pub async fn h(&self, arg0: &(T,candid::Empty,)) -> Result<(HRet,)> {
     ic_cdk::call(self.0, "h", (arg0,)).await
   }
 }

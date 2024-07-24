@@ -18,7 +18,7 @@ pub struct T {
 
 pub struct Service(pub Principal);
 impl Service {
-  pub async fn _2635468193_(&self, arg0: T) -> Result<()> {
+  pub async fn _2635468193_(&self, arg0: &T) -> Result<()> {
     ic_cdk::call(self.0, "\n\'\"\'\'\"\"\r\t", (arg0,)).await
   }
 }

@@ -29,25 +29,25 @@ pub struct FooRet { pub _2_: candid::Int, pub _2: candid::Int }
 
 pub struct Service(pub Principal);
 impl Service {
-  pub async fn bab(&self, arg0: candid::Int, arg1: candid::Nat) -> Result<()> {
+  pub async fn bab(&self, arg0: &candid::Int, arg1: &candid::Nat) -> Result<()> {
     ic_cdk::call(self.0, "bab", (arg0,arg1,)).await
   }
-  pub async fn bar(&self, arg0: BarArg) -> Result<(BarRet,)> {
+  pub async fn bar(&self, arg0: &BarArg) -> Result<(BarRet,)> {
     ic_cdk::call(self.0, "bar", (arg0,)).await
   }
-  pub async fn bas(&self, arg0: (candid::Int,candid::Int,)) -> Result<((String,candid::Nat,),)> {
+  pub async fn bas(&self, arg0: &(candid::Int,candid::Int,)) -> Result<((String,candid::Nat,),)> {
     ic_cdk::call(self.0, "bas", (arg0,)).await
   }
-  pub async fn baz(&self, arg0: BazArg) -> Result<(BazRet,)> {
+  pub async fn baz(&self, arg0: &BazArg) -> Result<(BazRet,)> {
     ic_cdk::call(self.0, "baz", (arg0,)).await
   }
-  pub async fn bba(&self, arg0: Tuple) -> Result<(NonTuple,)> {
+  pub async fn bba(&self, arg0: &Tuple) -> Result<(NonTuple,)> {
     ic_cdk::call(self.0, "bba", (arg0,)).await
   }
-  pub async fn bib(&self, arg0: (candid::Int,)) -> Result<(BibRet,)> {
+  pub async fn bib(&self, arg0: &(candid::Int,)) -> Result<(BibRet,)> {
     ic_cdk::call(self.0, "bib", (arg0,)).await
   }
-  pub async fn foo(&self, arg0: FooArg) -> Result<(FooRet,)> {
+  pub async fn foo(&self, arg0: &FooArg) -> Result<(FooRet,)> {
     ic_cdk::call(self.0, "foo", (arg0,)).await
   }
 }

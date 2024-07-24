@@ -31,10 +31,10 @@ candid::define_service!(pub S : {
 
 pub struct Service(pub Principal);
 impl Service {
-  pub async fn f(&self, arg0: S) -> Result<()> {
+  pub async fn f(&self, arg0: &S) -> Result<()> {
     ic_cdk::call(self.0, "f", (arg0,)).await
   }
-  pub async fn g(&self, arg0: List) -> Result<(B,Tree,Stream,)> {
+  pub async fn g(&self, arg0: &List) -> Result<(B,Tree,Stream,)> {
     ic_cdk::call(self.0, "g", (arg0,)).await
   }
 }
