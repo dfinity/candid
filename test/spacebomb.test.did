@@ -26,7 +26,7 @@ assert blob "DIDL\01\6d\7f\01\00\80\94\eb\dc\03"                           !: (v
 assert blob "DIDL\01\6d\70\01\00\80\94\eb\dc\03"                           !: (vec reserved) "vec reserved (not ignored)";
 assert blob "DIDL\04\6c\03\01\7f\02\01\03\02\6c\01\01\70\6c\00\6d\00\01\03\80\94\eb\dc\03" !: (vec record {null;record{reserved};record{}}) "zero-sized record (not ignored)";
 assert blob "DIDL\02\6d\01\6d\7f\01\00\05\ff\ff\3f\ff\ff\3f\ff\ff\3f\ff\ff\3f\ff\ff\3f"    !: (vec vec null) "vec vec null (not ignored)";
-assert blob "DIDL\03\6d\01\6c\00\01\00\80\ad\e2\04"                                        !: (vec record {}) "vec record {} (not ignored)";
+assert blob "DIDL\02\6d\01\6c\00\01\00\80\ad\e2\04"                                        !: (vec record {}) "vec record {} (not ignored)";
 
 // Decoding under opt
 assert blob "DIDL\01\6d\7f\01\00\80\94\eb\dc\03"                           !: (opt nat) "vec null (subtyping)";
