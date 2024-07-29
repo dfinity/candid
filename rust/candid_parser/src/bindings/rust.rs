@@ -90,13 +90,19 @@ pub(crate) fn is_tuple(fs: &[Field]) -> bool {
         .enumerate()
         .any(|(i, field)| field.id.get_id() != (i as u32))
 }
-fn as_result(fs: &[Field]) -> Option<(&Type, &Type)> {
+fn as_result(fs: &[Field]) -> Option<(&Type, &Type, bool)> {
     match fs {
         [Field { id: ok, ty: t_ok }, Field { id: err, ty: t_err }]
             if **ok == Label::Named("Ok".to_string())
                 && **err == Label::Named("Err".to_string()) =>
         {
-            Some((t_ok, t_err))
+            Some((t_ok, t_err, false))
+        }
+        [Field { id: ok, ty: t_ok }, Field { id: err, ty: t_err }]
+            if **ok == Label::Named("ok".to_string())
+                && **err == Label::Named("err".to_string()) =>
+        {
+            Some((t_ok, t_err, true))
         }
         _ => None,
     }
@@ -230,7 +236,7 @@ fn test_{test_name}() {{
                 Record(ref fs) => self.pp_record_fields(fs, false, is_ref),
                 Variant(ref fs) => {
                     // only possible for result variant
-                    let (ok, err) = as_result(fs).unwrap();
+                    let (ok, err, is_motoko) = as_result(fs).unwrap();
                     // This is a hacky way to redirect Result type
                     let old = self
                         .state
@@ -240,6 +246,8 @@ fn test_{test_name}() {{
                         // not generating test for this use_type. rustc should be able to catch type mismatches.
                         self.state.update_stats("use_type");
                         res
+                    } else if is_motoko {
+                        "candid::MotokoResult".to_string()
                     } else {
                         "std::result::Result".to_string()
                     };
@@ -285,7 +293,13 @@ fn test_{test_name}() {{
                     self.state.update_stats("name");
                     res
                 } else {
-                    let case = if is_variant { Some(Case::Pascal) } else { None };
+                    let case = if is_variant {
+                        Some(Case::Pascal)
+                    } else if !id.starts_with('_') {
+                        Some(Case::Snake)
+                    } else {
+                        None
+                    };
                     ident_(id, case)
                 };
                 let attr = if is_rename {

@@ -104,28 +104,28 @@ pub(crate) enum Error { #[serde(rename="a")] A, #[serde(rename="b")] B }
 
 pub struct Service(pub Principal);
 impl Service {
-  pub async fn bbbbb(&self, arg0: B) -> Result<()> {
+  pub async fn bbbbb(&self, arg0: &B) -> Result<()> {
     ic_cdk::call(self.0, "bbbbb", (arg0,)).await
   }
-  pub async fn f(&self, arg0: S) -> Result<()> {
+  pub async fn f(&self, arg0: &S) -> Result<()> {
     ic_cdk::call(self.0, "f", (arg0,)).await
   }
-  pub async fn f_1(&self, arg0: List, arg1: serde_bytes::ByteBuf, arg2: Option<bool>) -> Result<()> {
+  pub async fn f_1(&self, arg0: &List, arg1: &serde_bytes::ByteBuf, arg2: &Option<bool>) -> Result<()> {
     ic_cdk::call(self.0, "f1", (arg0,arg1,arg2,)).await
   }
-  pub async fn g(&self, arg0: List) -> Result<(B,Tree,Stream,)> {
+  pub async fn g(&self, arg0: &List) -> Result<(B,Tree,Stream,)> {
     ic_cdk::call(self.0, "g", (arg0,)).await
   }
-  pub async fn G11(&self, id: CanisterId, list: MyList, is_okay: Option<MyList>, arg3: Nested) -> Result<(i128,Broker,NestedRes,)> {
+  pub async fn G11(&self, id: &CanisterId, list: &MyList, is_okay: &Option<MyList>, arg3: &Nested) -> Result<(i128,Broker,NestedRes,)> {
     ic_cdk::call(self.0, "g1", (id,list,is_okay,arg3,)).await
   }
-  pub async fn h(&self, arg0: Vec<Option<String>>, arg1: HArg1, arg2: Option<MyList>) -> Result<(HRet,)> {
+  pub async fn h(&self, arg0: &Vec<Option<String>>, arg1: &HArg1, arg2: &Option<MyList>) -> Result<(HRet,)> {
     ic_cdk::call(self.0, "h", (arg0,arg1,arg2,)).await
   }
-  pub async fn i(&self, arg0: MyList, arg1: FArg1) -> Result<(Option<MyList>,Res,)> {
+  pub async fn i(&self, arg0: &MyList, arg1: &FArg1) -> Result<(Option<MyList>,Res,)> {
     ic_cdk::call(self.0, "i", (arg0,arg1,)).await
   }
-  pub async fn x(&self, arg0: A, arg1: B) -> Result<(Option<A>,Option<B>,std::result::Result<XRet2Ok, Error>,)> {
+  pub async fn x(&self, arg0: &A, arg1: &B) -> Result<(Option<A>,Option<B>,std::result::Result<XRet2Ok, Error>,)> {
     ic_cdk::call(self.0, "x", (arg0,arg1,)).await
   }
 }

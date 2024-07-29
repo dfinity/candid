@@ -12,16 +12,16 @@ pub struct O(pub Option<Box<O>>);
 
 pub struct Service(pub Principal);
 impl Service {
-  pub async fn f(&self, arg0: candid::Nat) -> Result<(H,)> {
+  pub async fn f(&self, arg0: &candid::Nat) -> Result<(H,)> {
     ic_cdk::call(self.0, "f", (arg0,)).await
   }
-  pub async fn g(&self, arg0: i8) -> Result<(i8,)> {
+  pub async fn g(&self, arg0: &i8) -> Result<(i8,)> {
     ic_cdk::call(self.0, "g", (arg0,)).await
   }
-  pub async fn h(&self, arg0: i8) -> Result<(i8,)> {
+  pub async fn h(&self, arg0: &i8) -> Result<(i8,)> {
     ic_cdk::call(self.0, "h", (arg0,)).await
   }
-  pub async fn o(&self, arg0: O) -> Result<(O,)> {
+  pub async fn o(&self, arg0: &O) -> Result<(O,)> {
     ic_cdk::call(self.0, "o", (arg0,)).await
   }
 }

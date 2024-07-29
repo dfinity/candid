@@ -9,7 +9,7 @@ type Result<T> = std::result::Result<T, ic_agent::AgentError>;
 pub struct {{PascalCase service_name}}<'a>(pub Principal, pub &'a ic_agent::Agent);
 impl<'a> {{PascalCase service_name}}<'a> {
   {{#each methods}}
-  pub async fn {{this.name}}(&self{{#each this.args}}, {{this.0}}: {{this.1}}{{/each}}) -> Result<{{vec_to_arity this.rets}}> {
+  pub async fn {{this.name}}(&self{{#each this.args}}, {{this.0}}: &{{this.1}}{{/each}}) -> Result<{{vec_to_arity this.rets}}> {
     let args = Encode!({{#each this.args}}&{{this.0}}{{#unless @last}},{{/unless}}{{/each}})?;
     let bytes = self.1.{{#if (eq this.mode "update")}}update{{else}}query{{/if}}(&self.0, "{{escape_debug this.original_name}}").with_arg(args).{{#if (eq this.mode "update")}}call_and_wait{{else}}call{{/if}}().await?;
     Ok(Decode!(&bytes{{#each this.rets}}, {{this}}{{/each}})?)

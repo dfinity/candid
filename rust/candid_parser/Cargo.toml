@@ -1,6 +1,6 @@
 [package]
 name = "candid_parser"
-version = "0.2.0-beta.3"
+version = "0.2.0-beta.4"
 edition = "2021"
 rust-version.workspace = true
 authors = ["DFINITY Team"]
@@ -31,7 +31,7 @@ serde.workspace = true
 lalrpop-util = "0.20.0"
 logos = "0.14"
 convert_case = "0.6"
-handlebars = "5.1"
+handlebars = "6.0"
 toml = { version = "0.8", default-features = false, features = ["parse"] }
 
 arbitrary = { workspace = true, optional = true }

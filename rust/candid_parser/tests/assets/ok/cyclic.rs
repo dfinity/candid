@@ -14,7 +14,7 @@ pub type X = Y;
 
 pub struct Service(pub Principal);
 impl Service {
-  pub async fn f(&self, arg0: A, arg1: B, arg2: C, arg3: X, arg4: Y, arg5: Z) -> Result<()> {
+  pub async fn f(&self, arg0: &A, arg1: &B, arg2: &C, arg3: &X, arg4: &Y, arg5: &Z) -> Result<()> {
     ic_cdk::call(self.0, "f", (arg0,arg1,arg2,arg3,arg4,arg5,)).await
   }
 }
