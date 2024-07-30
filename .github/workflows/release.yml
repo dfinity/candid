@@ -82,8 +82,6 @@ jobs:
             asset_name: didc-macos
           - os: macos-12
             asset_name: didc-macos
-          - os: macos-11
-            asset_name: didc-macos
     steps:
       - name: Get executable
         id: download
