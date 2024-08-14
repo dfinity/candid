@@ -96,14 +96,14 @@ impl<'de> IDLDeserialize<'de> {
         };
         self.de.wire_type = ty.clone();
 
-        let mut v = T::deserialize(&mut self.de).with_context(|| {
+        let mut v = T::deserialize(&mut self.de).with_context(|| -> String {
             if self.de.config.full_error_message
                 || (text_size(&ty, MAX_TYPE_LEN).is_ok()
                     && text_size(&expected_type, MAX_TYPE_LEN).is_ok())
             {
-                format!("Fail to decode argument {ind} from {ty} to {expected_type}")
+                format!("Fail to decode argument {ind} from {ty} to {expected_type} when deserializing to {}", std::any::type_name::<T>())
             } else {
-                format!("Fail to decode argument {ind}")
+                format!("Fail to decode argument {ind} when deserializing to {}", std::any::type_name::<T>())
             }
         });
         if self.de.config.full_error_message {
@@ -985,8 +985,16 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Record(e), TypeInner::Record(w)) => {
-                let expect = e.clone().into();
-                let wire = w.clone().into();
+                // Remove expected keys that don't exist on the wire.
+                // Serde will still complain unless the user has explicitly allowed the field to not be populated.
+                let wire_keys = w.iter().cloned().map(|w| (w.id.get_id(), w)).collect::<std::collections::BTreeMap<_, _>>();
+                let kv = e.iter().filter_map(|e| {
+                    let id = e.id.get_id();
+                    wire_keys.get(&id).map(|wire| (id, (e.clone(), wire.clone())))}
+                ).collect::<Vec<_>>();
+
+                let wire = kv.iter().map(|(_, (_, w))| w.clone()).collect::<VecDeque<Field>>();
+                let expect = kv.iter().map(|(_, (e, _))| e.clone()).collect::<VecDeque<Field>>();
                 let value =
                     visitor.visit_map(Compound::new(self, Style::Struct { expect, wire }))?;
                 Ok(value)
