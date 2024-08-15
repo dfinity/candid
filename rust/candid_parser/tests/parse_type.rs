@@ -74,6 +74,9 @@ fn compiler_test(resource: &str) {
                     "management.did" => {
                         drop(external.0.insert("target".to_string(), "agent".to_string()))
                     }
+                    "class.did" => {
+                        drop(external.0.insert("target".to_string(), "stub".to_string()))
+                    }
                     "example.did" => {
                         let configs = std::fs::read_to_string(base_path.join("example.toml"))
                             .unwrap()
@@ -84,7 +87,8 @@ fn compiler_test(resource: &str) {
                     _ => (),
                 }
                 let mut output = mint.new_goldenfile(filename.with_extension("rs")).unwrap();
-                let content = rust::compile(&config, &env, &actor, external);
+                let (content, unused) = rust::compile(&config, &env, &actor, external);
+                assert!(unused.is_empty());
                 writeln!(output, "{content}").unwrap();
             }
             {

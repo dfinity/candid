@@ -1,5 +1,6 @@
+type Profile = record { age: nat8; name: text };
 type List = opt record { int; List };
-service : (int, List) -> {
+service : (int, List, Profile) -> {
   get : () -> (List);
   set : (List) -> (List);
 }

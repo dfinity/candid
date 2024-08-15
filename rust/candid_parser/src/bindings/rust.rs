@@ -5,7 +5,6 @@ use crate::{
 };
 use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
-use console::style;
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
 use serde::Serialize;
@@ -91,15 +90,28 @@ pub(crate) fn is_tuple(fs: &[Field]) -> bool {
         .enumerate()
         .any(|(i, field)| field.id.get_id() != (i as u32))
 }
-fn as_result(fs: &[Field]) -> Option<(&Type, &Type)> {
+fn as_result(fs: &[Field]) -> Option<(&Type, &Type, bool)> {
     match fs {
         [Field { id: ok, ty: t_ok }, Field { id: err, ty: t_err }]
             if **ok == Label::Named("Ok".to_string())
                 && **err == Label::Named("Err".to_string()) =>
         {
-            Some((t_ok, t_err))
+            Some((t_ok, t_err, false))
+        }
+        [Field { id: ok, ty: t_ok }, Field { id: err, ty: t_err }]
+            if **ok == Label::Named("ok".to_string())
+                && **err == Label::Named("err".to_string()) =>
+        {
+            Some((t_ok, t_err, true))
         }
         _ => None,
+    }
+}
+fn parse_use_type(input: &str) -> (String, bool) {
+    if let Some((t, "")) = input.rsplit_once("(no test)") {
+        (t.trim_end().to_string(), false)
+    } else {
+        (input.to_string(), true)
     }
 }
 static KEYWORDS: [&str; 51] = [
@@ -176,8 +188,11 @@ fn test_{test_name}() {{
         let elem = StateElem::Type(ty);
         let old = self.state.push_state(&elem);
         let res = if let Some(t) = &self.state.config.use_type {
-            let res = RcDoc::text(t.clone());
-            self.generate_test(ty, &t.clone());
+            let (t, need_test) = parse_use_type(t);
+            if need_test {
+                self.generate_test(ty, &t);
+            }
+            let res = RcDoc::text(t);
             self.state.update_stats("use_type");
             res
         } else {
@@ -221,12 +236,31 @@ fn test_{test_name}() {{
                 Record(ref fs) => self.pp_record_fields(fs, false, is_ref),
                 Variant(ref fs) => {
                     // only possible for result variant
-                    let (ok, err) = as_result(fs).unwrap();
-                    let body = self
-                        .pp_ty(ok, is_ref)
-                        .append(", ")
-                        .append(self.pp_ty(err, is_ref));
-                    str("std::result::Result").append(enclose("<", body, ">"))
+                    let (ok, err, is_motoko) = as_result(fs).unwrap();
+                    // This is a hacky way to redirect Result type
+                    let old = self
+                        .state
+                        .push_state(&StateElem::TypeStr("std::result::Result"));
+                    let result = if let Some(t) = &self.state.config.use_type {
+                        let (res, _) = parse_use_type(t);
+                        // not generating test for this use_type. rustc should be able to catch type mismatches.
+                        self.state.update_stats("use_type");
+                        res
+                    } else if is_motoko {
+                        "candid::MotokoResult".to_string()
+                    } else {
+                        "std::result::Result".to_string()
+                    };
+                    self.state
+                        .pop_state(old, StateElem::TypeStr("std::result::Result"));
+                    let old = self.state.push_state(&StateElem::Label("Ok"));
+                    let ok = self.pp_ty(ok, is_ref);
+                    self.state.pop_state(old, StateElem::Label("Ok"));
+                    let old = self.state.push_state(&StateElem::Label("Err"));
+                    let err = self.pp_ty(err, is_ref);
+                    self.state.pop_state(old, StateElem::Label("Err"));
+                    let body = ok.append(", ").append(err);
+                    RcDoc::text(result).append(enclose("<", body, ">"))
                 }
                 Func(_) => unreachable!(), // not possible after rewriting
                 Service(_) => unreachable!(), // not possible after rewriting
@@ -259,7 +293,13 @@ fn test_{test_name}() {{
                     self.state.update_stats("name");
                     res
                 } else {
-                    let case = if is_variant { Some(Case::Pascal) } else { None };
+                    let case = if is_variant {
+                        Some(Case::Pascal)
+                    } else if !id.starts_with('_') {
+                        Some(Case::Snake)
+                    } else {
+                        None
+                    };
                     ident_(id, case)
                 };
                 let attr = if is_rename {
@@ -305,9 +345,13 @@ fn test_{test_name}() {{
         res
     }
     fn pp_record_fields<'b>(&mut self, fs: &'b [Field], need_vis: bool, is_ref: bool) -> RcDoc<'b> {
-        let old = self.state.push_state(&StateElem::TypeStr("record"));
+        let old = if self.state.path.last() == Some(&"record".to_string()) {
+            // don't push record again when coming from pp_ty
+            None
+        } else {
+            Some(self.state.push_state(&StateElem::TypeStr("record")))
+        };
         let res = if is_tuple(fs) {
-            // TODO check if there is no name/attr in the label subtree
             self.pp_tuple(fs, need_vis, is_ref)
         } else {
             let fields: Vec<_> = fs
@@ -317,7 +361,9 @@ fn test_{test_name}() {{
             let fields = concat(fields.into_iter(), ",");
             enclose_space("{", fields, "}")
         };
-        self.state.pop_state(old, StateElem::TypeStr("record"));
+        if let Some(old) = old {
+            self.state.pop_state(old, StateElem::TypeStr("record"));
+        }
         res
     }
     fn pp_variant_field<'b>(&mut self, field: &'b Field) -> RcDoc<'b> {
@@ -421,10 +467,11 @@ fn test_{test_name}() {{
                     if self.recs.contains(id) {
                         derive
                             .append(RcDoc::line())
-                            .append(vis)
+                            .append(vis.clone())
                             .append("struct ")
                             .append(name)
-                            .append(enclose("(", self.pp_ty(ty, false), ")"))
+                            // TODO: Unfortunately, the visibility of the inner newtype is also controlled by var.visibility
+                            .append(enclose("(", vis.append(self.pp_ty(ty, false)), ")"))
                             .append(";")
                     } else {
                         vis.append(kwd("type"))
@@ -688,12 +735,18 @@ pub fn compile(
     tree: &Config,
     env: &TypeEnv,
     actor: &Option<Type>,
-    external: ExternalConfig,
-) -> String {
+    mut external: ExternalConfig,
+) -> (String, Vec<String>) {
     let source = match external.0.get("target").map(|s| s.as_str()) {
         Some("canister_call") | None => Cow::Borrowed(include_str!("rust_call.hbs")),
         Some("agent") => Cow::Borrowed(include_str!("rust_agent.hbs")),
-        Some("stub") => Cow::Borrowed(include_str!("rust_stub.hbs")),
+        Some("stub") => {
+            let metadata = crate::utils::get_metadata(env, actor);
+            if let Some(metadata) = metadata {
+                external.0.insert("metadata".to_string(), metadata);
+            }
+            Cow::Borrowed(include_str!("rust_stub.hbs"))
+        }
         Some("custom") => {
             let template = external
                 .0
@@ -704,14 +757,7 @@ pub fn compile(
         _ => unimplemented!(),
     };
     let (output, unused) = emit_bindgen(tree, env, actor);
-    for e in unused {
-        eprintln!(
-            "{} path {} is unused",
-            style("WARNING:").red().bold(),
-            style(e).green()
-        );
-    }
-    output_handlebar(output, external, &source)
+    (output_handlebar(output, external, &source), unused)
 }
 
 pub enum TypePath {

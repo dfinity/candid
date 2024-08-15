@@ -3,6 +3,10 @@
 
 ## 2024-05-03
 
+### Candid 0.10.10
+
+* Add `candid::MotokoResult` type. Use `motoko_result.into_result()` to convert the value into Rust result, and `rust_result.into()` to get Motoko result.
+
 ### candid_parser 0.2.0-beta
 
 * Breaking changes:

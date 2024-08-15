@@ -147,9 +147,9 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
     serialize_num!(float64, f64, write_f64::<LittleEndian>);
 
     fn serialize_text(self, v: &str) -> Result<()> {
-        let mut buf = Vec::from(v.as_bytes());
+        let buf = v.as_bytes();
         self.write_leb128(buf.len() as u64)?;
-        self.value.append(&mut buf);
+        self.value.extend_from_slice(buf);
         Ok(())
     }
     fn serialize_null(self, _v: ()) -> Result<()> {
@@ -316,9 +316,9 @@ impl TypeSerialize {
                 sleb128_encode(&mut buf, Opcode::Service as i64)?;
                 leb128_encode(&mut buf, ms.len() as u64)?;
                 for (id, ty) in ms {
-                    let mut name = Vec::from(id.as_bytes());
+                    let name = id.as_bytes();
                     leb128_encode(&mut buf, name.len() as u64)?;
-                    buf.append(&mut name);
+                    buf.extend_from_slice(name);
                     self.encode(&mut buf, ty)?;
                 }
             }

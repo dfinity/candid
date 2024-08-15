@@ -19,3 +19,7 @@ fn {{this.name}}({{#each this.args}}{{#if (not @first)}}, {{/if}}{{this.0}}: {{t
 {{#if tests}}
 {{tests}}
 {{/if}}
+{{#if metadata}}
+#[link_section = "icp:public candid:service"]
+pub static __SERVICE: [u8; {{len metadata}}] = *br#"{{metadata}}"#;
+{{/if}}

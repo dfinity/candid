@@ -3,7 +3,8 @@
 
 module {
   public type List = ?(Int, List);
-  public type Self = (Int, List) -> async actor {
+  public type Profile = { age : Nat8; name : Text };
+  public type Self = (Int, List, Profile) -> async actor {
     get : shared () -> async List;
     set : shared List -> async List;
   }

@@ -29,16 +29,16 @@ pub enum B {
 
 pub struct Service(pub Principal);
 impl Service {
-  pub async fn _0_(&self, arg0: candid::Nat) -> Result<(candid::Nat,)> {
+  pub async fn _0_(&self, arg0: &candid::Nat) -> Result<(candid::Nat,)> {
     ic_cdk::call(self.0, "", (arg0,)).await
   }
   pub async fn _356566390_(&self) -> Result<()> {
     ic_cdk::call(self.0, "✈️  🚗 ⛱️ ", ()).await
   }
-  pub async fn _3300066460_(&self, arg0: A) -> Result<(B,)> {
+  pub async fn _3300066460_(&self, arg0: &A) -> Result<(B,)> {
     ic_cdk::call(self.0, "函数名", (arg0,)).await
   }
-  pub async fn _2669435454_(&self, arg0: candid::Nat) -> Result<(candid::Nat,)> {
+  pub async fn _2669435454_(&self, arg0: &candid::Nat) -> Result<(candid::Nat,)> {
     ic_cdk::call(self.0, "👀", (arg0,)).await
   }
 }
