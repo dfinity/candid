@@ -277,6 +277,7 @@ fn get_serde_meta_items(attr: &syn::Attribute) -> Result<Vec<syn::Meta>, ()> {
 
 struct Attributes {
     rename: Option<String>,
+    aliases: Vec<String>,
     with_bytes: bool,
 }
 
@@ -284,6 +285,7 @@ fn get_attrs(attrs: &[syn::Attribute]) -> Attributes {
     use syn::Meta;
     let mut res = Attributes {
         rename: None,
+        aliases: Vec::new(),
         with_bytes: false,
     };
     for item in attrs.iter().flat_map(get_serde_meta_items).flatten() {
@@ -310,6 +312,12 @@ fn get_attrs(attrs: &[syn::Attribute]) -> Attributes {
                     }
                 }
             }
+            // #[serde(alias = "foo")]
+            Meta::NameValue(m) if m.path.is_ident("alias") => {
+                if let Ok(lit) = get_lit_str(&m.value) {
+                    res.aliases.push(lit.value());
+                }
+            }
             // #[serde(with = "serde_bytes")]
             Meta::NameValue(m) if m.path.is_ident("with") => {
                 if let Ok(lit) = get_lit_str(&m.value) {
@@ -332,7 +340,7 @@ fn fields_from_ast(
     let mut fs: Vec<_> = fields
         .iter()
         .enumerate()
-        .map(|(i, field)| {
+        .flat_map(|(i, field)| {
             let attrs = get_attrs(&field.attrs);
             let (real_ident, renamed_ident, hash) = match field.ident {
                 Some(ref ident) => {
@@ -351,13 +359,29 @@ fn fields_from_ast(
                 }
                 None => (Ident::Unnamed(i as u32), Ident::Unnamed(i as u32), i as u32),
             };
-            Field {
-                real_ident,
+            let ty = derive_type(&field.ty, custom_candid_path);
+            let with_bytes = attrs.with_bytes;
+
+            // Create the main field
+            let main_field = Field {
+                real_ident: real_ident.clone(),
                 renamed_ident,
                 hash,
-                ty: derive_type(&field.ty, custom_candid_path),
-                with_bytes: attrs.with_bytes,
-            }
+                ty: ty.clone(),
+                with_bytes,
+            };
+
+            // Create alias fields
+            let alias_fields = attrs.aliases.into_iter().map(move |alias| Field {
+                real_ident: real_ident.clone(),
+                renamed_ident: Ident::Renamed(alias.clone()),
+                hash: idl_hash(&alias),
+                ty: ty.clone(),
+                with_bytes,
+            });
+
+            // Combine main field and alias fields
+            std::iter::once(main_field).chain(alias_fields)
         })
         .collect();
     let unique: BTreeSet<_> = fs.iter().map(|Field { hash, .. }| hash).collect();
