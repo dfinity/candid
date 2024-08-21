@@ -605,9 +605,7 @@ impl<'de> Deserializer<'de> {
         let v = unsafe { std::ptr::read(&visitor) };
         let mut self_clone = self.clone();
         match v.visit_some(&mut *self) {
-            Ok(v) => {
-                Ok(v)
-            }
+            Ok(v) => Ok(v),
             Err(Error::Subtype(_)) => {
                 *self = Self {
                     // Remember the backtracking cost
