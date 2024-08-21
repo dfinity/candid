@@ -603,7 +603,7 @@ impl<'de> Deserializer<'de> {
         }
         // This is safe, because the visitor either impl Copy or is zero sized
         let v = unsafe { std::ptr::read(&visitor) };
-        let mut self_clone = self.clone();
+        let self_clone = self.clone();
         match v.visit_some(&mut *self) {
             Ok(v) => Ok(v),
             Err(Error::Subtype(_)) => {
