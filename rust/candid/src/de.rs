@@ -17,8 +17,7 @@ use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
 use std::fmt::Write;
-use std::{collections::VecDeque, io::Cursor, mem::replace};
-use std::rc::Rc;
+use std::{collections::VecDeque, io::Cursor, mem::replace, rc::Rc};
 
 const MAX_TYPE_LEN: i32 = 500;
 
