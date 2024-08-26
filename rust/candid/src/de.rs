@@ -17,7 +17,7 @@ use binread::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
 use std::fmt::Write;
-use std::{collections::VecDeque, io::Cursor, mem::replace};
+use std::{collections::VecDeque, io::Cursor, mem::replace, rc::Rc};
 
 const MAX_TYPE_LEN: i32 = 500;
 
@@ -59,7 +59,7 @@ impl<'de> IDLDeserialize<'de> {
         env: &TypeEnv,
         expected_type: &Type,
     ) -> Result<crate::types::value::IDLValue> {
-        self.de.table.merge(env)?;
+        Rc::make_mut(&mut self.de.table).merge(env)?;
         self.de.is_untyped = true;
         self.deserialize_with_type(expected_type.clone())
     }
@@ -298,7 +298,7 @@ macro_rules! check_recursion {
 #[derive(Clone)]
 struct Deserializer<'de> {
     input: Cursor<&'de [u8]>,
-    table: TypeEnv,
+    table: Rc<TypeEnv>,
     types: VecDeque<(usize, Type)>,
     wire_type: Type,
     expect_type: Type,
@@ -322,7 +322,7 @@ impl<'de> Deserializer<'de> {
         let (env, types) = header.to_types()?;
         Ok(Deserializer {
             input: reader,
-            table: env,
+            table: env.into(),
             types: types.into_iter().enumerate().collect(),
             wire_type: TypeInner::Unknown.into(),
             expect_type: TypeInner::Unknown.into(),
@@ -603,15 +603,15 @@ impl<'de> Deserializer<'de> {
         }
         // This is safe, because the visitor either impl Copy or is zero sized
         let v = unsafe { std::ptr::read(&visitor) };
-        let mut self_clone = self.clone();
-        match v.visit_some(&mut self_clone) {
-            Ok(v) => {
-                *self = self_clone;
-                Ok(v)
-            }
+        let self_clone = self.clone();
+        match v.visit_some(&mut *self) {
+            Ok(v) => Ok(v),
             Err(Error::Subtype(_)) => {
-                // Remember the backtracking cost
-                self.config = self_clone.config;
+                *self = Self {
+                    // Remember the backtracking cost
+                    config: self.config.clone(),
+                    ..self_clone
+                };
                 self.add_cost(10)?;
                 self.deserialize_ignored_any(serde::de::IgnoredAny)?;
                 visitor.visit_none()
