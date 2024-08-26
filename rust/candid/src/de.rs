@@ -1133,7 +1133,7 @@ impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
         match &self.style {
             Style::Vector { len, .. } => Some(*len),
             Style::Struct { expect, wire, .. } => Some(expect.len().min(wire.len())),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -1234,7 +1234,7 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
         match &self.style {
             Style::Map { len, .. } => Some(*len),
             Style::Struct { expect, wire, .. } => Some(expect.len().min(wire.len())),
-            _ => None
+            _ => None,
         }
     }
 }
