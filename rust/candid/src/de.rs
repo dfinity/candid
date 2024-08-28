@@ -1128,6 +1128,14 @@ impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
             _ => Err(Error::subtype("expect vector or tuple")),
         }
     }
+
+    fn size_hint(&self) -> Option<usize> {
+        match &self.style {
+            Style::Vector { len, .. } => Some(*len),
+            Style::Struct { expect, wire, .. } => Some(expect.len().min(wire.len())),
+            _ => None,
+        }
+    }
 }
 
 impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
@@ -1219,6 +1227,14 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
                 self.de.add_cost(1)?;
                 seed.deserialize(&mut *self.de)
             }
+        }
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        match &self.style {
+            Style::Map { len, .. } => Some(*len),
+            Style::Struct { expect, wire, .. } => Some(expect.len().min(wire.len())),
+            _ => None,
         }
     }
 }
