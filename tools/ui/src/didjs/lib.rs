@@ -1,31 +1,33 @@
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use candid::types::{subtype, Type, TypeInner};
-use candid_parser::{check_prog, IDLProg, TypeEnv};
-use ic_asset_certification::{
-    Asset, AssetConfig, AssetEncoding, AssetFallbackConfig, AssetRedirectKind, AssetRouter,
-};
-use ic_cdk::{
-    api::{data_certificate, set_certified_data},
-    *,
-};
-use ic_certification::HashTree;
-use ic_http_certification::{HeaderField, HttpCertificationTree, HttpRequest, HttpResponse};
-use include_dir::{include_dir, Dir};
+use candid_parser::{check_prog, CandidType, Deserialize, IDLProg, TypeEnv};
+use ic_cdk::api::{data_certificate, set_certified_data};
+use ic_cdk::{init, post_upgrade};
+use ic_certification::{labeled, leaf, HashTree};
+use ic_http_certification::DefaultCelBuilder;
+use ic_representation_independent_hash::hash;
 use serde::Serialize;
-use std::{cell::RefCell, rc::Rc};
 
-thread_local! {
-    static HTTP_TREE: Rc<RefCell<HttpCertificationTree>> = Default::default();
+#[derive(CandidType, Deserialize)]
+pub struct HeaderField(pub String, pub String);
 
-    // initializing the asset router with an HTTP certification tree is optional.
-    // if direct access to the HTTP certification tree is not needed for certifying
-    // requests and responses outside of the asset router, then this step can be skipped.
-    static ASSET_ROUTER: RefCell<AssetRouter<'static>> = RefCell::new(AssetRouter::with_tree(HTTP_TREE.with(|tree| tree.clone())));
+#[derive(CandidType, Deserialize)]
+pub struct HttpRequest {
+    pub method: String,
+    pub url: String,
+    pub headers: Vec<HeaderField>,
+    #[serde(with = "serde_bytes")]
+    pub body: Vec<u8>,
 }
 
-static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist/didjs/");
-const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
+#[derive(CandidType, Deserialize)]
+pub struct HttpResponse {
+    pub status_code: u16,
+    pub headers: Vec<HeaderField>,
+    #[serde(with = "serde_bytes")]
+    pub body: Vec<u8>,
+}
 
 #[ic_cdk::query]
 fn did_to_js(prog: String) -> Option<String> {
@@ -80,152 +82,78 @@ fn subtype(new: String, old: String) -> Result<(), String> {
     subtype::subtype(&mut gamma, &new_env, &new_actor, &old_actor).map_err(|e| e.to_string())
 }
 
-#[init]
-fn init() {
-    certify_all_assets();
-}
-
-#[post_upgrade]
-fn post_upgrade() {
-    init();
-}
-
-#[query]
-fn http_request(req: HttpRequest) -> HttpResponse {
-    serve_asset(&req)
-}
-
-/// Rescursively collect all assets from the provided directory
-fn collect_assets<'content, 'path>(
-    dir: &'content Dir<'path>,
-    assets: &mut Vec<Asset<'content, 'path>>,
-) {
-    for file in dir.files() {
-        assets.push(Asset::new(file.path().to_string_lossy(), file.contents()));
-    }
-
-    for dir in dir.dirs() {
-        collect_assets(dir, assets);
+fn retrieve(path: &str) -> Option<(&str, &'static [u8])> {
+    match path {
+        "/index.html" | "/" => Some(("text/html", include_bytes!("../../dist/didjs/index.html"))),
+        "/favicon.ico" => Some((
+            "image/x-icon",
+            include_bytes!("../../dist/didjs/favicon.ico"),
+        )),
+        "/index.js" => Some((
+            "application/javascript",
+            include_bytes!("../../dist/didjs/index.js"),
+        )),
+        _ => None,
     }
 }
 
-// Certification
-fn certify_all_assets() {
-    // 1. Define the asset certification configurations.
-    let encodings = vec![
-        AssetEncoding::Brotli.default_config(),
-        AssetEncoding::Gzip.default_config(),
-    ];
+fn get_path(url: &str) -> Option<&str> {
+    url.split('?').next()
+}
 
-    let asset_configs = vec![
-        AssetConfig::File {
-            path: "index.html".to_string(),
-            content_type: Some("text/html".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                "public, no-cache, no-store".to_string(),
-            )]),
-            fallback_for: vec![AssetFallbackConfig {
-                scope: "/".to_string(),
-            }],
-            aliased_by: vec!["/".to_string()],
-            encodings: encodings.clone(),
-        },
-        AssetConfig::Pattern {
-            pattern: "**/*.js".to_string(),
-            content_type: Some("text/javascript".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
-            encodings: encodings.clone(),
-        },
-        AssetConfig::Pattern {
-            pattern: "**/*.css".to_string(),
-            content_type: Some("text/css".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
-            encodings,
-        },
-        AssetConfig::Pattern {
-            pattern: "**/*.ico".to_string(),
-            content_type: Some("image/x-icon".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
-            encodings: vec![],
-        },
-        AssetConfig::Pattern {
-            pattern: "**/*.svg".to_string(),
-            content_type: Some("image/svg+xml".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
-            encodings: vec![],
-        },
-        AssetConfig::Redirect {
-            from: "/old-url".to_string(),
-            to: "/".to_string(),
-            kind: AssetRedirectKind::Permanent,
-        },
-    ];
-
-    // 2. Collect all assets from the frontend build directory.
-    let mut assets = Vec::new();
-    collect_assets(&ASSETS_DIR, &mut assets);
-
-    ASSET_ROUTER.with_borrow_mut(|asset_router| {
-        // 3. Certify the assets using the `certify_assets` function from the `ic-asset-certification` crate.
-        if let Err(err) = asset_router.certify_assets(assets, asset_configs) {
-            ic_cdk::trap(&format!("Failed to certify assets: {}", err));
+#[ic_cdk::query]
+fn http_request(request: HttpRequest) -> HttpResponse {
+    //TODO add /canister_id/ as endpoint when ICQC is available.
+    let path = get_path(request.url.as_str()).unwrap_or("/");
+    let mut response = if let Some((content_type, bytes)) = retrieve(path) {
+        HttpResponse {
+            status_code: 200,
+            headers: vec![
+                HeaderField("Content-Type".to_string(), content_type.to_string()),
+                HeaderField("Content-Length".to_string(), format!("{}", bytes.len())),
+                HeaderField("Cache-Control".to_string(), format!("max-age={}", 600)),
+            ],
+            body: bytes.to_vec(),
         }
-
-        // 4. Set the canister's certified data.
-        set_certified_data(&asset_router.root_hash());
-    });
-}
-
-// Handlers
-fn serve_asset(req: &HttpRequest) -> HttpResponse {
-    ASSET_ROUTER.with_borrow(|asset_router| {
-        if let Ok((mut response, witness, expr_path)) = asset_router.serve_asset(req) {
-            add_certificate_header(&mut response, &witness, &expr_path);
-
-            response
-        } else {
-            ic_cdk::trap("Failed to serve asset");
+    } else {
+        HttpResponse {
+            status_code: 404,
+            headers: Vec::new(),
+            body: path.as_bytes().to_vec(),
         }
-    })
+    };
+    add_certification_headers(&mut response);
+    response
 }
 
-fn get_asset_headers(additional_headers: Vec<HeaderField>) -> Vec<HeaderField> {
-    // set up the default headers and include additional headers provided by the caller
-    let mut headers = vec![
-        ("strict-transport-security".to_string(), "max-age=31536000; includeSubDomains".to_string()),
-        ("x-frame-options".to_string(), "DENY".to_string()),
-        ("x-content-type-options".to_string(), "nosniff".to_string()),
-        ("content-security-policy".to_string(), "default-src 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests; block-all-mixed-content".to_string()),
-        ("referrer-policy".to_string(), "no-referrer".to_string()),
-        ("permissions-policy".to_string(), "accelerometer=(),ambient-light-sensor=(),autoplay=(),battery=(),camera=(),display-capture=(),document-domain=(),encrypted-media=(),fullscreen=(),gamepad=(),geolocation=(),gyroscope=(),layout-animations=(self),legacy-image-formats=(self),magnetometer=(),microphone=(),midi=(),oversized-images=(self),payment=(),picture-in-picture=(),publickey-credentials-get=(),speaker-selection=(),sync-xhr=(self),unoptimized-images=(self),unsized-media=(self),usb=(),screen-wake-lock=(),web-share=(),xr-spatial-tracking=()".to_string()),
-        ("cross-origin-embedder-policy".to_string(), "require-corp".to_string()),
-        ("cross-origin-opener-policy".to_string(), "same-origin".to_string()),
-    ];
-    headers.extend(additional_headers);
-
-    headers
-}
+// Certify that frontend asset certification is skipped for this canister.
 
 const IC_CERTIFICATE_HEADER: &str = "IC-Certificate";
-fn add_certificate_header(response: &mut HttpResponse, witness: &HashTree, expr_path: &[String]) {
+const IC_CERTIFICATE_EXPRESSION_HEADER: &str = "IC-CertificateExpression";
+
+fn skip_certification_cel_expr() -> String {
+    DefaultCelBuilder::skip_certification().to_string()
+}
+
+fn skip_certification_asset_tree() -> HashTree {
+    let cel_expr_hash = hash(skip_certification_cel_expr().as_bytes());
+    labeled(
+        "http_expr",
+        labeled("<*>", labeled(cel_expr_hash, leaf(vec![]))),
+    )
+}
+
+fn add_certification_headers(response: &mut HttpResponse) {
     let certified_data = data_certificate().expect("No data certificate available");
-    let witness = cbor_encode(witness);
+    let witness = cbor_encode(&skip_certification_asset_tree());
+    let expr_path = ["http_expr", "<*>"];
     let expr_path = cbor_encode(&expr_path);
 
-    response.headers.push((
+    response.headers.push(HeaderField(
+        IC_CERTIFICATE_EXPRESSION_HEADER.to_string(),
+        skip_certification_cel_expr(),
+    ));
+    response.headers.push(HeaderField(
         IC_CERTIFICATE_HEADER.to_string(),
         format!(
             "certificate=:{}:, tree=:{}:, expr_path=:{}:, version=2",
@@ -246,6 +174,16 @@ fn cbor_encode(value: &impl Serialize) -> Vec<u8> {
         .serialize(&mut serializer)
         .expect("Failed to serialize value");
     serializer.into_inner()
+}
+
+#[init]
+fn init() {
+    set_certified_data(&skip_certification_asset_tree().digest());
+}
+
+#[post_upgrade]
+fn post_upgrade() {
+    init();
 }
 
 ic_cdk::export_candid!();
