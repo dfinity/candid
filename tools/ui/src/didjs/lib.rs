@@ -1,5 +1,13 @@
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 use candid::types::{subtype, Type, TypeInner};
 use candid_parser::{check_prog, CandidType, Deserialize, IDLProg, TypeEnv};
+use ic_cdk::api::{data_certificate, set_certified_data};
+use ic_cdk::{init, post_upgrade};
+use ic_certification::{labeled, leaf, HashTree};
+use ic_http_certification::DefaultCelBuilder;
+use ic_representation_independent_hash::hash;
+use serde::Serialize;
 
 #[derive(CandidType, Deserialize)]
 pub struct HeaderField(pub String, pub String);
@@ -97,7 +105,7 @@ fn get_path(url: &str) -> Option<&str> {
 fn http_request(request: HttpRequest) -> HttpResponse {
     //TODO add /canister_id/ as endpoint when ICQC is available.
     let path = get_path(request.url.as_str()).unwrap_or("/");
-    if let Some((content_type, bytes)) = retrieve(path) {
+    let mut response = if let Some((content_type, bytes)) = retrieve(path) {
         HttpResponse {
             status_code: 200,
             headers: vec![
@@ -113,7 +121,69 @@ fn http_request(request: HttpRequest) -> HttpResponse {
             headers: Vec::new(),
             body: path.as_bytes().to_vec(),
         }
-    }
+    };
+    add_certification_headers(&mut response);
+    response
+}
+
+// Certify that frontend asset certification is skipped for this canister.
+
+const IC_CERTIFICATE_HEADER: &str = "IC-Certificate";
+const IC_CERTIFICATE_EXPRESSION_HEADER: &str = "IC-CertificateExpression";
+
+fn skip_certification_cel_expr() -> String {
+    DefaultCelBuilder::skip_certification().to_string()
+}
+
+fn skip_certification_asset_tree() -> HashTree {
+    let cel_expr_hash = hash(skip_certification_cel_expr().as_bytes());
+    labeled(
+        "http_expr",
+        labeled("<*>", labeled(cel_expr_hash, leaf(vec![]))),
+    )
+}
+
+fn add_certification_headers(response: &mut HttpResponse) {
+    let certified_data = data_certificate().expect("No data certificate available");
+    let witness = cbor_encode(&skip_certification_asset_tree());
+    let expr_path = ["http_expr", "<*>"];
+    let expr_path = cbor_encode(&expr_path);
+
+    response.headers.push(HeaderField(
+        IC_CERTIFICATE_EXPRESSION_HEADER.to_string(),
+        skip_certification_cel_expr(),
+    ));
+    response.headers.push(HeaderField(
+        IC_CERTIFICATE_HEADER.to_string(),
+        format!(
+            "certificate=:{}:, tree=:{}:, expr_path=:{}:, version=2",
+            BASE64.encode(certified_data),
+            BASE64.encode(witness),
+            BASE64.encode(expr_path)
+        ),
+    ));
+}
+
+// Encoding
+fn cbor_encode(value: &impl Serialize) -> Vec<u8> {
+    let mut serializer = serde_cbor::Serializer::new(Vec::new());
+    serializer
+        .self_describe()
+        .expect("Failed to self describe CBOR");
+    value
+        .serialize(&mut serializer)
+        .expect("Failed to serialize value");
+    serializer.into_inner()
+}
+
+#[init]
+fn init() {
+    set_certified_data(&skip_certification_asset_tree().digest());
+}
+
+#[post_upgrade]
+fn post_upgrade() {
+    init();
 }
 
 ic_cdk::export_candid!();
