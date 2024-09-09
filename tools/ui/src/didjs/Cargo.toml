@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 base64 = "0.22.1"
 candid = "0.10"
 candid_parser = "0.1"
-ic-cdk = "0.13"
+ic-cdk = "0.16"
 ic-certification = { git = "https://github.com/dfinity/response-verification", rev = "da70db93832f88ecc556ae082612aedec47d3816" }
 ic-http-certification = { git = "https://github.com/dfinity/response-verification", rev = "da70db93832f88ecc556ae082612aedec47d3816" }
 ic-representation-independent-hash = { git = "https://github.com/dfinity/response-verification", rev = "da70db93832f88ecc556ae082612aedec47d3816" }

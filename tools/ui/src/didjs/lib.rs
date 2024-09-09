@@ -112,6 +112,8 @@ fn http_request(request: HttpRequest) -> HttpResponse {
                 HeaderField("Content-Type".to_string(), content_type.to_string()),
                 HeaderField("Content-Length".to_string(), format!("{}", bytes.len())),
                 HeaderField("Cache-Control".to_string(), format!("max-age={}", 600)),
+                HeaderField("Cross-Origin-Embedder-Policy".to_string(), "require-corp".to_string()),
+                HeaderField("Cross-Origin-Resource-Policy".to_string(), "cross-origin".to_string()),
             ],
             body: bytes.to_vec(),
         }
