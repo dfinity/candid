@@ -7,11 +7,11 @@
     "build": "webpack"
   },
   "devDependencies": {
-    "@dfinity/agent": "1.0.1",
-    "@dfinity/candid": "1.0.1",
-    "@dfinity/auth-client": "1.0.1",
-    "@dfinity/identity": "1.0.1",
-    "@dfinity/principal": "1.0.1",
+    "@dfinity/agent": "2.1.0",
+    "@dfinity/candid": "2.1.0",
+    "@dfinity/auth-client": "2.1.0",
+    "@dfinity/identity": "2.1.0",
+    "@dfinity/principal": "2.1.0",
     "buffer": "6.0.3",
     "copy-webpack-plugin": "^9.0.1",
     "css-loader": "^6.8.1",
