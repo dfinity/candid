@@ -14,13 +14,13 @@ const names: Record<number,string> = {};
 
 function isKnownMainnet(agent: HttpAgent) {
   // @ts-ignore
-  const hostname = agent._host.hostname;
+  const hostname = agent.host.hostname;
   return hostname.endsWith('.icp0.io') || hostname.endsWith('.ic0.app');
 }
 
 export let authClient: AuthClient | undefined;
 
-const agent = new HttpAgent();
+const agent = HttpAgent.createSync();
 if (!isKnownMainnet(agent)) {
   agent.fetchRootKey();
 }
