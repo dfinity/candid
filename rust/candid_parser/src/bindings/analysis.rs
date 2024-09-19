@@ -126,8 +126,16 @@ pub fn chase_def_use<'a>(
     Ok(res)
 }
 
-pub fn chase_types<'a>(env: &'a TypeEnv, tys: &'a [Type]) -> Result<Vec<&'a str>> {
-    let mut seen = BTreeSet::new();
+pub fn chase_types<'a>(
+    env: &'a TypeEnv,
+    tys: &'a [Type],
+    seen: Option<&BTreeSet<&'a str>>,
+) -> Result<Vec<&'a str>> {
+    let mut seen = if let Some(seen) = seen {
+        BTreeSet::from_iter(seen.iter().cloned())
+    } else {
+        BTreeSet::new()
+    };
     let mut res = Vec::new();
     for t in tys.iter() {
         chase_type(&mut seen, &mut res, env, t)?;
