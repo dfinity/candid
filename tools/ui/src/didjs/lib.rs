@@ -111,7 +111,7 @@ fn http_request(request: HttpRequest) -> HttpResponse<'static> {
                     "cross-origin".to_string(),
                 ),
             ])
-            .with_body(bytes.to_vec())
+            .with_body(bytes)
             .build()
     } else {
         HttpResponse::builder()

@@ -1,5 +1,5 @@
 import { EXTERNAL_CONFIG_PROMISE } from './external';
-import { Actor, HttpAgent, ActorSubclass, CanisterStatus } from '@dfinity/agent';
+import { Actor, HttpAgent, ActorSubclass, CanisterStatus, getManagementCanister } from '@dfinity/agent';
 import {
   IDL, InputBox, renderInput, renderValue
 } from '@dfinity/candid';
@@ -102,6 +102,53 @@ export function getProfilerActor(canisterId: Principal): ActorSubclass {
     __get_cycles: IDL.Func([], [IDL.Int64], ['query']),
   });
   return Actor.createActor(profiler_interface, { agent, canisterId });
+}
+function uint8ArrayToDisplay(array: Uint8Array | number[]) {
+  const uint8Array = new Uint8Array(array);
+  try {
+    return new TextDecoder().decode(uint8Array);
+  } catch (e) {
+    return Array.from(uint8Array)
+      .map(byte => byte.toString(16).padStart(2, '0'))
+      .join(' ');
+  }
+}
+function timestampToString(nanoseconds: bigint) {
+  const milliseconds = Number(nanoseconds / 1000000n);
+  const date = new Date(milliseconds);
+  const timeString = date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const ms = date.getMilliseconds().toString().padStart(3, '0');
+  return `${timeString}.${ms}`;
+}
+
+let last_log_idx: bigint = -1n;
+export async function getCanisterLogs(canisterId: Principal, logger: any) {
+  try {
+    const actor = getManagementCanister({ agent });
+    const logs = await actor.fetch_canister_logs({ canister_id: canisterId });
+    let array = logs.canister_log_records;
+    const idx = array.findIndex((e) => e.idx > last_log_idx);
+    if (idx > 0) {
+      array = array.slice(idx);
+    }
+    if (array.length > 0) {
+      last_log_idx = array[array.length - 1].idx;
+      const display = array.map((e) => {
+        const stamp = timestampToString(e.timestamp_nanos);
+        const content = uint8ArrayToDisplay(e.content);
+        return `[${stamp}]: ${content}`;
+      });
+      const content = display.join("<br>");
+      logger(content);
+    }
+  } catch(err) {
+    console.error(err);
+  }
 }
 
 function postToPlayground(id: Principal) {
@@ -263,6 +310,7 @@ function is_query(func: IDL.FuncClass): boolean {
 
 export function render(id: Principal, canister: ActorSubclass, profiling: bigint|undefined) {
   document.getElementById('canisterId')!.innerText = `${id}`;
+  getCanisterLogs(id, log);
   let profiler;
   if (typeof profiling !== 'undefined') {
     log(`Wasm instructions executed ${profiling} instrs.`);
@@ -401,11 +449,13 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       textContainer.innerHTML = decodeSpace(text);
       const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
       log(decodeSpace(`› ${name}${showArgs}`));
-      if (profiler && !is_query(idlFunc)) {
-        await renderFlameGraph(profiler);
-      }
       if (!is_query(idlFunc)) {
-        postToPlayground(Actor.canisterIdOf(canister));
+        const id = Actor.canisterIdOf(canister);
+        await getCanisterLogs(id, log);
+        postToPlayground(id);
+        if (profiler) {
+          await renderFlameGraph(profiler);
+        }
       }
       log(decodeSpace(text));
 
@@ -429,13 +479,15 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
     })().catch(err => {
       resultDiv.classList.add('error');
       left.innerText = err.message;
-      if (profiler && !is_query(idlFunc)) {
-        const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
-        log(`[Error] ${name}${showArgs}`);
-        renderFlameGraph(profiler);
-      }
       if (!is_query(idlFunc)) {
-        postToPlayground(Actor.canisterIdOf(canister));
+        const id = Actor.canisterIdOf(canister);
+        getCanisterLogs(id, log);
+        postToPlayground(id);
+        if (profiler) {
+          const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
+          log(`[Error] ${name}${showArgs}`);
+          renderFlameGraph(profiler);
+        }
       }
       throw err;
     });
