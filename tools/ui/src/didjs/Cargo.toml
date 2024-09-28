@@ -8,13 +8,9 @@ path = "lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-base64 = "0.22.1"
 candid = "0.10"
 candid_parser = "0.1"
 ic-cdk = "0.16"
-ic-certification = { git = "https://github.com/dfinity/response-verification", rev = "da70db93832f88ecc556ae082612aedec47d3816" }
-ic-http-certification = { git = "https://github.com/dfinity/response-verification", rev = "da70db93832f88ecc556ae082612aedec47d3816" }
-ic-representation-independent-hash = { git = "https://github.com/dfinity/response-verification", rev = "da70db93832f88ecc556ae082612aedec47d3816" }
+ic-http-certification = { git = "https://github.com/dfinity/response-verification", rev = "35dd2bd316682cbd3d33720af7e1dd14ffc47b50" }
 serde = "1.0"
 serde_bytes = "0.11"
-serde_cbor = "0.11.2"

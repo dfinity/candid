@@ -47,10 +47,11 @@ async function insertLoginForm() {
       provider = "https://identity.internetcomputer.org";
     }
     if (!provider) {
-      throw new Error("Please provide a URL to your local Internet Identity service using the `ii` query parameter");
+      console.warn("If you want to use Internet Identity, please provide a URL to your local Internet Identity service using the `ii` query parameter");
+      return;
     }
     if (provider && !is_valid_url(provider)) {
-      throw new Error("Please provide a URL to your local Internet Identity service using the `ii` query parameter");
+      throw new Error("Please provide a valid URL to your local Internet Identity service using the `ii` query parameter");
     }
     const cid = Principal.fromText(params.get("id")!);
     let origin = params.get("origin");
