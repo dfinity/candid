@@ -141,7 +141,7 @@ export async function getCanisterLogs(canisterId: Principal, logger: any) {
       const display = array.map((e) => {
         const stamp = timestampToString(e.timestamp_nanos);
         const content = uint8ArrayToDisplay(e.content);
-        return `[${stamp}]: ${content}`;
+        return `[${stamp}] ${content}`;
       });
       const content = display.join("<br>");
       logger(content);
@@ -413,6 +413,8 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
   function callAndRender(args: any[]) {
     (async () => {
       resultDiv.classList.remove('error');
+      const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
+      log(decodeSpace(`› ${name}${showArgs}`));
       const callResult = await call(args) as any;
       let result: any;
       if (idlFunc.retTypes.length === 0) {
@@ -447,8 +449,6 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       left.appendChild(textContainer);
       const text = encodeStr(IDL.FuncClass.argsToString(idlFunc.retTypes, result));
       textContainer.innerHTML = decodeSpace(text);
-      const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
-      log(decodeSpace(`› ${name}${showArgs}`));
       if (!is_query(idlFunc)) {
         const id = Actor.canisterIdOf(canister);
         await getCanisterLogs(id, log);
@@ -484,8 +484,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
         getCanisterLogs(id, log);
         postToPlayground(id);
         if (profiler) {
-          const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
-          log(`[Error] ${name}${showArgs}`);
+          log(`Error occured, flamegraph can be incomplete`);
           renderFlameGraph(profiler);
         }
       }
