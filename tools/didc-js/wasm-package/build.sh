@@ -113,13 +113,15 @@ OUT_DIR="$BUILD_DIR/$BUILD_TARGET"
 
 rm -rf $OUT_DIR
 
-./node_modules/wasm-pack/run.js build --target $BUILD_TARGET --out-name $LIBRARY_NAME --out-dir $OUT_DIR $RUST_BUILD_MODE
+if [[ "$BUILD_TARGET" == "nodejs" ]]; then
+  echo "Building the library for node..."
 
-# delete the generated files
-find $OUT_DIR -name ".gitignore" -type f -delete || early_exit
-find $OUT_DIR -name "README.md" -type f -delete || early_exit
-find $OUT_DIR -name "package.json" -type f -delete || early_exit
-find $OUT_DIR -name "LICENSE" -type f -delete || early_exit
+  ./node_modules/wasm-pack/run.js build --target $BUILD_TARGET --out-name $LIBRARY_NAME --out-dir $OUT_DIR $RUST_BUILD_MODE --no-pack
+else
+  echo "Building the library for the web..."
+
+  ./node_modules/wasm-pack/run.js build --target $BUILD_TARGET --out-name $LIBRARY_NAME --out-dir $OUT_DIR $RUST_BUILD_MODE --no-pack
+fi
 
 if [[ "$BUILD_MODE" == "production" ]]; then
   echo "Minifying the js files..."

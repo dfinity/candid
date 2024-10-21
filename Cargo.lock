@@ -500,14 +500,12 @@ dependencies = [
  "console_error_panic_hook",
  "getrandom",
  "hex",
- "idl2json",
  "js-sys",
  "log",
  "pretty-hex",
  "rand",
  "serde",
  "serde-wasm-bindgen",
- "serde_json",
  "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-console-logger",
@@ -716,18 +714,6 @@ dependencies = [
  "serde",
  "sha2",
  "thiserror",
-]
-
-[[package]]
-name = "idl2json"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96c98794e1d7ff2814db503a7fb3aed059b8c816cbaaaa7cf7420ab39edbca41"
-dependencies = [
- "candid 0.10.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "candid_parser 0.1.4",
- "serde_json",
- "sha2",
 ]
 
 [[package]]

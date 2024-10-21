@@ -1,6 +1,6 @@
 import wasmModule, { encode, decode } from "@dfinity/didc";
 
-describe("WebAssembly", () => {
+describe("WebAssembly nodejs", () => {
   it("the wasm module can be imported", () => {
     expect(wasmModule).not.toBeUndefined();
   });

@@ -18,7 +18,7 @@ fn start() {
     log::set_max_level(log::LevelFilter::Trace);
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = getServiceMethods)]
 pub fn get_service_methods(idl: String) -> Result<Vec<String>, JsError> {
     core::get_service_methods(idl).map_err(Into::into)
 }

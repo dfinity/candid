@@ -26,7 +26,5 @@ log.workspace = true
 getrandom = { workspace = true, features = ["js"] }
 serde.workspace = true
 serde-wasm-bindgen.workspace = true
-idl2json.workspace = true
-serde_json.workspace = true
 thiserror.workspace = true
 js-sys.workspace = true

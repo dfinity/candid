@@ -1,9 +1,5 @@
 use crate::validation::Validate;
 use candid::IDLArgs;
-use candid_parser::types::IDLTypes;
-use idl2json::{
-    candid_types::internal_candid_type_to_idl_type, idl_args2json_with_weak_names, Idl2JsonOptions,
-};
 
 use crate::{
     errors::LibraryError,
@@ -89,7 +85,7 @@ pub fn decode(args: DecodeArgs) -> Result<String, LibraryError> {
         EncodeFormat::Blob => decode_candid_blob(&args.input)?,
     };
 
-    let (idl_args, idl_types) = match (args.service_method, &idl.actor) {
+    let idl_args = match (args.service_method, &idl.actor) {
         (Some(method), Some(actor)) => {
             let method = idl.env.get_method(actor, &method).map_err(|_| {
                 LibraryError::IdlMethodNotFound {
@@ -97,53 +93,22 @@ pub fn decode(args: DecodeArgs) -> Result<String, LibraryError> {
                 }
             })?;
 
-            (
-                IDLArgs::from_bytes_with_types(&args_bytes, &idl.env, &method.rets).map_err(
-                    |e| LibraryError::IdlArgsFromBytesFailed {
-                        reason: format!("Could not decode args from bytes {}", e),
-                    },
-                )?,
-                IDLTypes {
-                    args: method
-                        .rets
-                        .iter()
-                        .map(internal_candid_type_to_idl_type)
-                        .collect(),
-                },
-            )
+            IDLArgs::from_bytes_with_types(&args_bytes, &idl.env, &method.rets).map_err(|e| {
+                LibraryError::IdlArgsFromBytesFailed {
+                    reason: format!("Could not decode args from bytes {}", e),
+                }
+            })?
         }
         (Some(method), None) => Err(LibraryError::IdlMethodNotFound { method })?,
-        (None, _) => (
+        (None, _) => {
             IDLArgs::from_bytes(&args_bytes).map_err(|e| LibraryError::IdlArgsFromBytesFailed {
                 reason: format!("Could not decode args from bytes {}", e),
-            })?,
-            IDLTypes { args: Vec::new() },
-        ),
+            })?
+        }
     };
 
     let decoded_idl_args = match args.target_format {
         DecodeFormat::Candid => idl_args.to_string(),
-        DecodeFormat::Json => {
-            let json = idl_args2json_with_weak_names(
-                &idl_args,
-                &idl_types,
-                &Idl2JsonOptions {
-                    prog: vec![idl.prog],
-                    ..Default::default()
-                },
-            )
-            .to_string();
-
-            match idl_args.args.len() {
-                // Remove the outer array brackets that is added by default when we know
-                // that the IDLArgs is a single value
-                1 => json
-                    .trim_start_matches('[')
-                    .trim_end_matches(']')
-                    .to_string(),
-                _ => json,
-            }
-        }
     };
 
     Ok(decoded_idl_args)

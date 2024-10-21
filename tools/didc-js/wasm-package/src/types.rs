@@ -35,7 +35,7 @@ export interface DecodeArgs {
   /**
    * The format to decode the value in. Default is 'candid'.
    */
-  targetFormat?: 'candid' | 'json';
+  targetFormat?: 'candid';
   /**
    * A method to pick from the service. If not provided, the entire idl is used.
    */
@@ -100,7 +100,6 @@ pub struct DecodeArgs {
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum DecodeFormat {
     Candid,
-    Json,
 }
 
 impl FromStr for DecodeFormat {
@@ -109,7 +108,6 @@ impl FromStr for DecodeFormat {
     fn from_str(variant: &str) -> Result<DecodeFormat, Self::Err> {
         match variant {
             "candid" => Ok(DecodeFormat::Candid),
-            "json" => Ok(DecodeFormat::Json),
             _ => Err(LibraryError::ValidationError {
                 reason: format!("Invalid target format: {}", variant),
             }),
@@ -261,12 +259,9 @@ mod tests {
     #[test]
     fn can_map_decode_format_enum() {
         let candid = "candid".parse::<DecodeFormat>();
-        let json = "json".parse::<DecodeFormat>();
 
         assert!(candid.is_ok());
-        assert!(json.is_ok());
         assert_eq!(candid.unwrap(), DecodeFormat::Candid);
-        assert_eq!(json.unwrap(), DecodeFormat::Json);
     }
 
     #[test]

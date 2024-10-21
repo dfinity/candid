@@ -5,7 +5,7 @@ A multi-purpose Candid tool for JavaScript projects, including encoding and deco
 ## Usage
 
 ```javascript
-import { get_service_methods, encode, decode } from "@dfinity/didc";
+import { getServiceMethods, encode, decode } from "@dfinity/didc";
 
 // The IDL in text format to be used, most canisters expose their IDL through
 // the `candid:service` public metadata.
@@ -47,4 +47,24 @@ const decoded = decode({
   inputFormat: "hex",
   targetFormat: "candid",
 });
+```
+
+### Web Usage
+
+For web usage, you need to initialize the async wasm module before using the functions.
+
+```javascript
+import init, { encode } from "@dfinity/didc";
+
+(async function() {
+  await init();
+
+  // then you can use the functions
+  const encoded = encode({
+    idl: IDL,
+    input: "(record { number=90; })",
+    serviceMethod: "store_number",
+    targetFormat: "hex",
+  });
+})();
 ```
