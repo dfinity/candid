@@ -41,6 +41,10 @@ export interface DecodeArgs {
    */
   serviceMethod?: string;
   /**
+   * Wether to use the service method return type to decode the value. Default is true if serviceMethod is provided.
+   */
+  useServiceMethodReturnType?: boolean;
+  /**
    * The format of the input value. Default is 'hex'.
    */
   inputFormat?: 'hex' | 'blob';
@@ -95,6 +99,7 @@ pub struct DecodeArgs {
     pub input_format: EncodeFormat,
     pub input: String,
     pub service_method: Option<String>,
+    pub use_service_method_return_type: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -209,6 +214,13 @@ impl TryFrom<JsDecodeArgs> for DecodeArgs {
             })?
             .as_string();
 
+        let use_service_method_return_type =
+            js_sys::Reflect::get(&obj, &JsValue::from_str("useServiceMethodReturnType"))
+                .map_err(|_| LibraryError::MappingError {
+                    reason: "Could not get 'useServiceMethodReturnType' from JsValue".to_string(),
+                })?
+                .as_bool();
+
         let target_form = js_sys::Reflect::get(&obj, &JsValue::from_str("targetFormat"))
             .map_err(|_| LibraryError::MappingError {
                 reason: "Could not get 'targetFormat' from JsValue".to_string(),
@@ -237,6 +249,7 @@ impl TryFrom<JsDecodeArgs> for DecodeArgs {
             input_format,
             input,
             service_method,
+            use_service_method_return_type,
         })
     }
 }

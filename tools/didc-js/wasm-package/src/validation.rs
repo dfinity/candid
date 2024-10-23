@@ -74,6 +74,7 @@ mod tests {
             input_format: EncodeFormat::Hex,
             input: "test".to_string(),
             service_method: None,
+            use_service_method_return_type: None,
         };
 
         assert!(args.validate().is_ok());

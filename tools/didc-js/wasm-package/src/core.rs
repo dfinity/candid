@@ -93,7 +93,12 @@ pub fn decode(args: DecodeArgs) -> Result<String, LibraryError> {
                 }
             })?;
 
-            IDLArgs::from_bytes_with_types(&args_bytes, &idl.env, &method.rets).map_err(|e| {
+            let method_types = match args.use_service_method_return_type {
+                None | Some(true) => &method.rets,
+                Some(false) => &method.args,
+            };
+
+            IDLArgs::from_bytes_with_types(&args_bytes, &idl.env, method_types).map_err(|e| {
                 LibraryError::IdlArgsFromBytesFailed {
                     reason: format!("Could not decode args from bytes {}", e),
                 }
