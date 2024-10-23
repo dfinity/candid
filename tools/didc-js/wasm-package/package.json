@@ -32,7 +32,6 @@
     "lint": "cargo clippy --locked --verbose --tests -- -D clippy::all && cargo fmt"
   },
   "devDependencies": {
-    "terser": "5.36.0",
     "wasm-pack": "0.13.0"
   }
 }

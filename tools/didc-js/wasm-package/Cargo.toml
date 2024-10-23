@@ -12,6 +12,9 @@ license = "Apache-2.0"
 path = "./src/lib.rs"
 crate-type = ["cdylib"]
 
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--enable-mutable-globals"]
+
 [dependencies]
 candid = "0.10"
 candid_parser = "0.1"

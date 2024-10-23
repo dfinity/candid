@@ -122,8 +122,3 @@ else
 
   ./node_modules/wasm-pack/run.js build --target $BUILD_TARGET --out-name $LIBRARY_NAME --out-dir $OUT_DIR $RUST_BUILD_MODE --no-pack
 fi
-
-if [[ "$BUILD_MODE" == "production" ]]; then
-  echo "Minifying the js files..."
-  npx terser $OUT_DIR/$LIBRARY_NAME.js --compress --mangle --output $OUT_DIR/$LIBRARY_NAME.js
-fi

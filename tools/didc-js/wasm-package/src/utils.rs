@@ -25,13 +25,12 @@ pub fn parse_idl_args(args: &str) -> Result<IDLArgs, LibraryError> {
 #[derive(Debug)]
 pub struct ParsedIDL {
     pub env: TypeEnv,
-    pub prog: IDLProg,
     pub actor: Option<Type>,
 }
 
 impl ParsedIDL {
-    pub fn new(env: TypeEnv, prog: IDLProg, actor: Option<Type>) -> Self {
-        Self { env, prog, actor }
+    pub fn new(env: TypeEnv, actor: Option<Type>) -> Self {
+        Self { env, actor }
     }
 }
 
@@ -44,7 +43,7 @@ pub fn parse_idl(idl: &str) -> Result<ParsedIDL, LibraryError> {
         reason: e.to_string(),
     })?;
 
-    Ok(ParsedIDL::new(env, ast, actor))
+    Ok(ParsedIDL::new(env, actor))
 }
 
 /// Decode the provided hex input from text to bytes.

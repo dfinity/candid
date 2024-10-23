@@ -25,7 +25,7 @@ export const IDL = `
 // Gets the service methods from the IDL and returns an array of the methods.
 //
 // Example returned value: ['store_number', 'get_number']
-const methods = get_service_methods(IDL);
+const methods = getServiceMethods(IDL);
 
 // Encodes a candid text representation of a value to a hex representation.
 //
@@ -56,15 +56,13 @@ For web usage, you need to initialize the async wasm module before using the fun
 ```javascript
 import init, { encode } from "@dfinity/didc";
 
-(async function() {
-  await init();
+await init();
 
-  // then you can use the functions
-  const encoded = encode({
-    idl: IDL,
-    input: "(record { number=90; })",
-    serviceMethod: "store_number",
-    targetFormat: "hex",
-  });
-})();
+// then you can use the functions because the wasm will be initialized
+const encoded = encode({
+  idl: IDL,
+  input: "(record { number=90; })",
+  serviceMethod: "store_number",
+  targetFormat: "hex",
+});
 ```
