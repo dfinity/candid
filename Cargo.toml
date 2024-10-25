@@ -5,6 +5,7 @@ members = [
     "rust/candid_derive",
     "rust/ic_principal",
     "tools/didc",
+    "tools/didc-js/wasm-package",
 ]
 resolver = "2"
 

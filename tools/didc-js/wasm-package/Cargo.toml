@@ -1,0 +1,33 @@
+[package]
+name = "didc-js"
+description = "Utility tools for candid in JavaScript."
+version = "0.0.0"
+authors = ["DFINITY Team"]
+edition = "2021"
+publish = false
+repository = "https://github.com/dfinity/candid"
+license = "Apache-2.0"
+
+[lib]
+path = "./src/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--enable-mutable-globals"]
+
+[dependencies]
+candid = "0.10"
+candid_parser = "0.1"
+pretty-hex = "0.4.1"
+hex.workspace = true
+anyhow.workspace = true
+rand.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"
+wasm-bindgen-console-logger = "0.1"
+log = "0.4"
+getrandom = { version = "0.2", features = ["js"] }
+serde-wasm-bindgen = "0.5"
+js-sys = "0.3"

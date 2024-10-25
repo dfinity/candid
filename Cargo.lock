@@ -173,6 +173,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bumpalo"
+version = "3.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
+
+[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -186,10 +192,10 @@ dependencies = [
  "bincode",
  "binread",
  "byteorder",
- "candid_derive",
- "candid_parser",
+ "candid_derive 0.6.6",
+ "candid_parser 0.2.0-beta.4",
  "hex",
- "ic_principal",
+ "ic_principal 0.1.1",
  "leb128",
  "num-bigint",
  "num-traits",
@@ -205,6 +211,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "candid"
+version = "0.10.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c30ee7f886f296b6422c0ff017e89dd4f831521dfdcc76f3f71aae1ce817222"
+dependencies = [
+ "anyhow",
+ "binread",
+ "byteorder",
+ "candid_derive 0.6.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hex",
+ "ic_principal 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "leb128",
+ "num-bigint",
+ "num-traits",
+ "paste",
+ "pretty",
+ "serde",
+ "serde_bytes",
+ "stacker",
+ "thiserror",
+]
+
+[[package]]
 name = "candid_derive"
 version = "0.6.6"
 dependencies = [
@@ -215,12 +244,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "candid_derive"
+version = "0.6.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3de398570c386726e7a59d9887b68763c481477f9a043fb998a2e09d428df1a9"
+dependencies = [
+ "lazy_static",
+ "proc-macro2 1.0.86",
+ "quote 1.0.36",
+ "syn 2.0.72",
+]
+
+[[package]]
+name = "candid_parser"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "48a3da76f989cd350b7342c64c6c6008341bb6186f6832ef04e56dc50ba0fd76"
+dependencies = [
+ "anyhow",
+ "candid 0.10.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "codespan-reporting",
+ "convert_case",
+ "hex",
+ "lalrpop",
+ "lalrpop-util",
+ "logos 0.13.0",
+ "num-bigint",
+ "pretty",
+ "thiserror",
+]
+
+[[package]]
 name = "candid_parser"
 version = "0.2.0-beta.4"
 dependencies = [
  "anyhow",
  "arbitrary",
- "candid",
+ "candid 0.10.10",
  "codespan-reporting",
  "console",
  "convert_case",
@@ -232,7 +292,7 @@ dependencies = [
  "hex",
  "lalrpop",
  "lalrpop-util",
- "logos",
+ "logos 0.14.0",
  "num-bigint",
  "num-traits",
  "pretty",
@@ -331,6 +391,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "convert_case"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -412,12 +482,33 @@ name = "didc"
 version = "0.4.0"
 dependencies = [
  "anyhow",
- "candid_parser",
+ "candid_parser 0.2.0-beta.4",
  "clap",
  "console",
  "hex",
  "pretty-hex",
  "rand",
+]
+
+[[package]]
+name = "didc-js"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "candid 0.10.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "candid_parser 0.1.4",
+ "console_error_panic_hook",
+ "getrandom",
+ "hex",
+ "js-sys",
+ "log",
+ "pretty-hex",
+ "rand",
+ "serde",
+ "serde-wasm-bindgen",
+ "thiserror",
+ "wasm-bindgen",
+ "wasm-bindgen-console-logger",
 ]
 
 [[package]]
@@ -533,8 +624,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4567c8db10ae91089c99af84c68c38da3ec2f087c3f82960bcdbf3656b6f4d7"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "wasi",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -610,6 +703,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic_principal"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1762deb6f7c8d8c2bdee4b6c5a47b60195b74e9b5280faa5ba29692f8e17429c"
+dependencies = [
+ "arbitrary",
+ "crc32fast",
+ "data-encoding",
+ "serde",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
 name = "impls"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -647,6 +754,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 
 [[package]]
+name = "js-sys"
+version = "0.3.72"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a88f1bda2bd75b0452a14784937d796722fdebfe50df998aeb3f0b7603019a9"
+dependencies = [
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "lalrpop"
 version = "0.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -660,7 +776,7 @@ dependencies = [
  "petgraph",
  "pico-args",
  "regex",
- "regex-syntax",
+ "regex-syntax 0.8.4",
  "string_cache",
  "term",
  "tiny-keccak",
@@ -729,11 +845,34 @@ checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 
 [[package]]
 name = "logos"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c000ca4d908ff18ac99b93a062cb8958d331c3220719c52e77cb19cc6ac5d2c1"
+dependencies = [
+ "logos-derive 0.13.0",
+]
+
+[[package]]
+name = "logos"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "161971eb88a0da7ae0c333e1063467c5b5727e7fb6b710b8db4814eade3a42e8"
 dependencies = [
- "logos-derive",
+ "logos-derive 0.14.0",
+]
+
+[[package]]
+name = "logos-codegen"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc487311295e0002e452025d6b580b77bb17286de87b57138f3b5db711cded68"
+dependencies = [
+ "beef",
+ "fnv",
+ "proc-macro2 1.0.86",
+ "quote 1.0.36",
+ "regex-syntax 0.6.29",
+ "syn 2.0.72",
 ]
 
 [[package]]
@@ -747,8 +886,17 @@ dependencies = [
  "lazy_static",
  "proc-macro2 1.0.86",
  "quote 1.0.36",
- "regex-syntax",
+ "regex-syntax 0.8.4",
  "syn 2.0.72",
+]
+
+[[package]]
+name = "logos-derive"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbfc0d229f1f42d790440136d941afd806bc9e949e2bcb8faa813b0f00d1267e"
+dependencies = [
+ "logos-codegen 0.13.0",
 ]
 
 [[package]]
@@ -757,7 +905,7 @@ version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c2a69b3eb68d5bd595107c9ee58d7e07fe2bb5e360cc85b0f084dedac80de0a"
 dependencies = [
- "logos-codegen",
+ "logos-codegen 0.14.0",
 ]
 
 [[package]]
@@ -1051,7 +1199,7 @@ dependencies = [
  "aho-corasick",
  "memchr",
  "regex-automata",
- "regex-syntax",
+ "regex-syntax 0.8.4",
 ]
 
 [[package]]
@@ -1062,8 +1210,14 @@ checksum = "38caf58cc5ef2fed281f89292ef23f6365465ed9a41b7a7754eb4e26496c92df"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-syntax",
+ "regex-syntax 0.8.4",
 ]
+
+[[package]]
+name = "regex-syntax"
+version = "0.6.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f162c6dd7b008981e4d40210aca20b4bd0f9b60ca9271061b07f78537722f2e1"
 
 [[package]]
 name = "regex-syntax"
@@ -1118,6 +1272,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc76f558e0cbb2a839d37354c575f1dc3fdc6546b5be373ba43d95f231bf7c12"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde-wasm-bindgen"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3b143e2833c57ab9ad3ea280d21fd34e285a42837aeb0ee301f4f41890fa00e"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -1476,6 +1641,71 @@ name = "wasi"
 version = "0.11.0+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
+
+[[package]]
+name = "wasm-bindgen"
+version = "0.2.95"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "128d1e363af62632b8eb57219c8fd7877144af57558fb2ef0368d0087bddeb2e"
+dependencies = [
+ "cfg-if",
+ "once_cell",
+ "wasm-bindgen-macro",
+]
+
+[[package]]
+name = "wasm-bindgen-backend"
+version = "0.2.95"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb6dd4d3ca0ddffd1dd1c9c04f94b868c37ff5fac97c30b97cff2d74fce3a358"
+dependencies = [
+ "bumpalo",
+ "log",
+ "once_cell",
+ "proc-macro2 1.0.86",
+ "quote 1.0.36",
+ "syn 2.0.72",
+ "wasm-bindgen-shared",
+]
+
+[[package]]
+name = "wasm-bindgen-console-logger"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7530a275e7faf7b5b83aabdf78244fb8d9a68a2ec4b26935a05ecc0c9b0185ed"
+dependencies = [
+ "log",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "wasm-bindgen-macro"
+version = "0.2.95"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e79384be7f8f5a9dd5d7167216f022090cf1f9ec128e6e6a482a2cb5c5422c56"
+dependencies = [
+ "quote 1.0.36",
+ "wasm-bindgen-macro-support",
+]
+
+[[package]]
+name = "wasm-bindgen-macro-support"
+version = "0.2.95"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26c6ab57572f7a24a4985830b120de1594465e5d500f24afe89e16b4e833ef68"
+dependencies = [
+ "proc-macro2 1.0.86",
+ "quote 1.0.36",
+ "syn 2.0.72",
+ "wasm-bindgen-backend",
+ "wasm-bindgen-shared",
+]
+
+[[package]]
+name = "wasm-bindgen-shared"
+version = "0.2.95"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65fc09f10666a9f147042251e0dda9c18f166ff7de300607007e96bdebc1068d"
 
 [[package]]
 name = "winapi"
