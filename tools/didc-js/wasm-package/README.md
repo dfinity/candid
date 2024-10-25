@@ -48,21 +48,3 @@ const decoded = decode({
   targetFormat: "candid",
 });
 ```
-
-### Web Usage
-
-For web usage, you need to initialize the async wasm module before using the functions.
-
-```javascript
-import init, { encode } from "@dfinity/didc";
-
-await init();
-
-// then you can use the functions because the wasm will be initialized
-const encoded = encode({
-  idl: IDL,
-  input: "(record { number=90; })",
-  serviceMethod: "store_number",
-  targetFormat: "hex",
-});
-```
