@@ -27,17 +27,17 @@ export const IDL = `
 // Example returned value: ['store_number', 'get_number']
 const methods = getServiceMethods(IDL);
 
-// Encodes a candid text representation of a value to a hex representation.
+// Encodes a candid in text format to a hex representation.
 //
 // Example returned value: '4449444c016c01c98dea8b0a7801005a00000000000000'
-const encoded encode({
+const encoded = encode({
   idl: IDL,
   input: "(record { number=90; })",
   serviceMethod: "store_number",
   targetFormat: "hex",
 });
 
-// Decodes a hex representation of a candid value to a text representation.
+// Decodes a hex representation of a candid value to a text format.
 //
 // Example returned value: '(90 : nat64)'
 const decoded = decode({
