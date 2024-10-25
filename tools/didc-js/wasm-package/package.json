@@ -14,7 +14,9 @@
   ],
   "packageManager": "pnpm@9.12.2",
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
   "main": "./dist/nodejs/didc.js",
   "browser": "./dist/web/didc.js",
