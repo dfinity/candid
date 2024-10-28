@@ -120,5 +120,5 @@ if [[ "$BUILD_TARGET" == "nodejs" ]]; then
 else
   echo "Building the library for the web..."
 
-  ./node_modules/wasm-pack/run.js build --target $BUILD_TARGET --out-name $LIBRARY_NAME --out-dir $OUT_DIR $RUST_BUILD_MODE --no-pack
+  ./node_modules/wasm-pack/run.js build --target bundler --out-name $LIBRARY_NAME --out-dir $OUT_DIR $RUST_BUILD_MODE --no-pack
 fi
