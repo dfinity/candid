@@ -1,0 +1,39 @@
+{
+  "name": "@dfinity/didc",
+  "description": "Utility tools for candid.",
+  "version": "0.0.2",
+  "author": "DFINITY Stiftung",
+  "license": "Apache-2.0",
+  "repository": "github:dfinity/candid",
+  "bugs": "https://github.com/dfinity/candid/issues",
+  "keywords": [
+    "internet-computer",
+    "icp",
+    "dfinity",
+    "candid"
+  ],
+  "packageManager": "pnpm@9.12.2",
+  "files": [
+    "dist/**/*",
+    "LICENSE",
+    "README.md"
+  ],
+  "main": "./dist/nodejs/didc.js",
+  "browser": "./dist/web/didc.js",
+  "types": "./dist/web/didc.d.ts",
+  "engines": {
+    "node": "^20",
+    "pnpm": "^9",
+    "npm": "please use pnpm",
+    "yarn": "please use pnpm"
+  },
+  "scripts": {
+    "build": "./build.sh --target web && ./build.sh --target nodejs",
+    "dev": "./build.sh --target web --mode development && ./build.sh --target nodejs --mode development",
+    "test": "cargo test",
+    "lint": "cargo clippy --locked --verbose --tests -- -D clippy::all && cargo fmt"
+  },
+  "devDependencies": {
+    "wasm-pack": "0.13.0"
+  }
+}

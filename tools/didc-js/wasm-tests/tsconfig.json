@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "NodeNext",
+    "target": "es2022",
+    "strict": true,
+    "esModuleInterop": true,
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}

@@ -1,0 +1,3 @@
+packages:
+  - "wasm-package"
+  - "wasm-tests"
