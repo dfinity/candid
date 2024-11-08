@@ -147,7 +147,7 @@ export async function getCanisterLogs(canisterId: Principal, logger: any) {
       logger(content);
     }
   } catch(err) {
-    console.error(err);
+    console.warn(err);
   }
 }
 
