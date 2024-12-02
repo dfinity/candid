@@ -194,6 +194,56 @@ fn test_option() {
 }
 
 #[test]
+fn test_struct_with_option() {
+    #[derive(CandidType, Deserialize, PartialEq, Debug)]
+    struct Old {
+        field: i32,
+    }
+
+    #[derive(CandidType, Deserialize, PartialEq, Debug)]
+    struct New {
+        field: i32,
+        new_field: Option<i32>,
+    }
+
+    let old_bytes = encode(&Old { field: 1 });
+    let new_bytes_with_none = encode(&New {
+        field: 2,
+        new_field: None,
+    });
+    let new_bytes_with_some = encode(&New {
+        field: 3,
+        new_field: Some(4),
+    });
+
+    test_decode(&old_bytes, &Old { field: 1 });
+    test_decode(&new_bytes_with_none, &Old { field: 2 });
+    test_decode(&new_bytes_with_some, &Old { field: 3 });
+
+    test_decode(
+        &old_bytes,
+        &New {
+            field: 1,
+            new_field: None,
+        },
+    );
+    test_decode(
+        &new_bytes_with_none,
+        &New {
+            field: 2,
+            new_field: None,
+        },
+    );
+    test_decode(
+        &new_bytes_with_some,
+        &New {
+            field: 3,
+            new_field: Some(4),
+        },
+    );
+}
+
+#[test]
 fn test_struct() {
     #[derive(PartialEq, Debug, Deserialize, CandidType)]
     struct A1 {
