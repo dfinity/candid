@@ -89,6 +89,7 @@ impl TypeEnv {
             None => {
                 res.insert(id, None);
                 let t = self.find_type(id)?;
+                // If you add a new variant in the match, also update replace_empty below
                 let result = match t.as_ref() {
                     TypeInner::Record(fs) => {
                         for f in fs {
@@ -117,8 +118,11 @@ impl TypeEnv {
     }
     pub fn replace_empty(&mut self) -> Result<()> {
         let mut res = BTreeMap::new();
-        for name in self.0.keys() {
-            self.is_empty(&mut res, name)?;
+        for (name, ty) in self.0.iter() {
+            // Record & Var are the only types we handle in is_empty
+            if matches!(ty.as_ref(), TypeInner::Record(_) | TypeInner::Var(_)) {
+                self.is_empty(&mut res, name)?;
+            }
         }
         let ids: Vec<_> = res
             .iter()
