@@ -636,7 +636,7 @@ macro_rules! primitive_impl {
     };
 }
 
-impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
+impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     type Error = Error;
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value>
     where
@@ -1086,7 +1086,7 @@ impl<'a, 'de> Compound<'a, 'de> {
     }
 }
 
-impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
+impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
     type Error = Error;
 
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>>
@@ -1138,7 +1138,7 @@ impl<'de, 'a> de::SeqAccess<'de> for Compound<'a, 'de> {
     }
 }
 
-impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
+impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
     type Error = Error;
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>>
     where
@@ -1239,7 +1239,7 @@ impl<'de, 'a> de::MapAccess<'de> for Compound<'a, 'de> {
     }
 }
 
-impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
+impl<'de> de::EnumAccess<'de> for Compound<'_, 'de> {
     type Error = Error;
     type Variant = Self;
 
@@ -1273,7 +1273,7 @@ impl<'de, 'a> de::EnumAccess<'de> for Compound<'a, 'de> {
     }
 }
 
-impl<'de, 'a> de::VariantAccess<'de> for Compound<'a, 'de> {
+impl<'de> de::VariantAccess<'de> for Compound<'_, 'de> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<()> {

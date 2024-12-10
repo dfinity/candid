@@ -331,7 +331,7 @@ where
     }
 }
 
-impl<'a, T> CandidType for &'a T
+impl<T> CandidType for &T
 where
     T: ?Sized + CandidType,
 {
@@ -348,7 +348,7 @@ where
         (**self).idl_serialize(serializer)
     }
 }
-impl<'a, T> CandidType for &'a mut T
+impl<T> CandidType for &mut T
 where
     T: ?Sized + CandidType,
 {
@@ -366,7 +366,7 @@ where
     }
 }
 
-impl<'a, T> CandidType for std::borrow::Cow<'a, T>
+impl<T> CandidType for std::borrow::Cow<'_, T>
 where
     T: ?Sized + CandidType + ToOwned,
 {

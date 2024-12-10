@@ -789,7 +789,7 @@ fn path_to_var(path: &[TypePath]) -> String {
 struct NominalState<'a> {
     state: crate::configs::State<'a, BindingConfig>,
 }
-impl<'a> NominalState<'a> {
+impl NominalState<'_> {
     // Convert structural typing to nominal typing to fit Rust's type system
     fn nominalize(&mut self, env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
         let elem = StateElem::Type(t);
