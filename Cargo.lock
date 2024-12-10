@@ -187,6 +187,29 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 [[package]]
 name = "candid"
 version = "0.10.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c30ee7f886f296b6422c0ff017e89dd4f831521dfdcc76f3f71aae1ce817222"
+dependencies = [
+ "anyhow",
+ "binread",
+ "byteorder",
+ "candid_derive 0.6.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hex",
+ "ic_principal 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "leb128",
+ "num-bigint",
+ "num-traits",
+ "paste",
+ "pretty",
+ "serde",
+ "serde_bytes",
+ "stacker",
+ "thiserror",
+]
+
+[[package]]
+name = "candid"
+version = "0.10.11"
 dependencies = [
  "anyhow",
  "bincode",
@@ -206,29 +229,6 @@ dependencies = [
  "serde_bytes",
  "serde_cbor",
  "serde_json",
- "stacker",
- "thiserror",
-]
-
-[[package]]
-name = "candid"
-version = "0.10.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c30ee7f886f296b6422c0ff017e89dd4f831521dfdcc76f3f71aae1ce817222"
-dependencies = [
- "anyhow",
- "binread",
- "byteorder",
- "candid_derive 0.6.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "hex",
- "ic_principal 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "leb128",
- "num-bigint",
- "num-traits",
- "paste",
- "pretty",
- "serde",
- "serde_bytes",
  "stacker",
  "thiserror",
 ]
@@ -262,7 +262,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48a3da76f989cd350b7342c64c6c6008341bb6186f6832ef04e56dc50ba0fd76"
 dependencies = [
  "anyhow",
- "candid 0.10.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "candid 0.10.10",
  "codespan-reporting",
  "convert_case",
  "hex",
@@ -280,7 +280,7 @@ version = "0.2.0-beta.4"
 dependencies = [
  "anyhow",
  "arbitrary",
- "candid 0.10.10",
+ "candid 0.10.11",
  "codespan-reporting",
  "console",
  "convert_case",
@@ -495,7 +495,7 @@ name = "didc-js"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "candid 0.10.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "candid 0.10.10",
  "candid_parser 0.1.4",
  "console_error_panic_hook",
  "getrandom",
