@@ -126,7 +126,7 @@ impl<'de> Deserialize<'de> for Int {
         D: serde::Deserializer<'de>,
     {
         struct IntVisitor;
-        impl<'de> Visitor<'de> for IntVisitor {
+        impl Visitor<'_> for IntVisitor {
             type Value = Int;
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("Int value")

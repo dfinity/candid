@@ -50,7 +50,7 @@ impl<'de> Deserialize<'de> for Empty {
         D: serde::Deserializer<'de>,
     {
         struct EmptyVisitor;
-        impl<'de> Visitor<'de> for EmptyVisitor {
+        impl Visitor<'_> for EmptyVisitor {
             type Value = Empty;
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("Cannot decode empty value")

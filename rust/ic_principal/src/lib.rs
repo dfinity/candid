@@ -340,7 +340,7 @@ mod deserialize {
     // as there's no need for it.
     pub(super) struct PrincipalVisitor;
 
-    impl<'de> serde::de::Visitor<'de> for PrincipalVisitor {
+    impl serde::de::Visitor<'_> for PrincipalVisitor {
         type Value = super::Principal;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

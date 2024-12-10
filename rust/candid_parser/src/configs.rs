@@ -319,7 +319,7 @@ impl std::str::FromStr for Configs {
         Ok(Configs(v))
     }
 }
-impl<'a> std::fmt::Display for StateElem<'a> {
+impl std::fmt::Display for StateElem<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             StateElem::Type(t) => write!(f, "{}", path_name(t)),

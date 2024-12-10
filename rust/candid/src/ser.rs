@@ -205,7 +205,7 @@ impl<'a> types::Serializer for &'a mut ValueSerializer {
 pub struct Compound<'a> {
     ser: &'a mut ValueSerializer,
 }
-impl<'a> types::Compound for Compound<'a> {
+impl types::Compound for Compound<'_> {
     type Error = Error;
     fn serialize_element<T>(&mut self, value: &T) -> Result<()>
     where

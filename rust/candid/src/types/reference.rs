@@ -104,7 +104,7 @@ impl CandidType for Service {
 /// A [`Visitor`] to extract [`Func`]s.
 pub struct FuncVisitor;
 
-impl<'de> Visitor<'de> for FuncVisitor {
+impl Visitor<'_> for FuncVisitor {
     type Value = Func;
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("Func value")
@@ -138,7 +138,7 @@ impl<'de> Deserialize<'de> for Service {
         D: serde::Deserializer<'de>,
     {
         struct ServVisitor;
-        impl<'de> Visitor<'de> for ServVisitor {
+        impl Visitor<'_> for ServVisitor {
             type Value = Service;
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("Service value")
