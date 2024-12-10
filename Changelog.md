@@ -1,6 +1,10 @@
 
 # Changelog
 
+## [Unreleased]
+
+* Add `IDLBuilder.try_reserve_value_serializer_capacity()` to reserve capacity before serializing a large amount of data.
+
 ## 2024-05-03
 
 ### Candid 0.10.10

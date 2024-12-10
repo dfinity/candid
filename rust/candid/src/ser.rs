@@ -7,7 +7,7 @@ use super::types::value::IDLValue;
 use super::types::{internal::Opcode, Field, Type, TypeEnv, TypeInner};
 use byteorder::{LittleEndian, WriteBytesExt};
 use leb128::write::{signed as sleb128_encode, unsigned as leb128_encode};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, TryReserveError};
 use std::io;
 use std::vec::Vec;
 
@@ -71,6 +71,14 @@ impl IDLBuilder {
         self.serialize(&mut vec)?;
         Ok(vec)
     }
+    /// If serializing a large amount of data, you can try to reserve the capacity of the
+    /// value serializer ahead of time to avoid reallocation.
+    pub fn try_reserve_value_serializer_capacity(
+        &mut self,
+        additional: usize,
+    ) -> std::result::Result<(), TryReserveError> {
+        self.value_ser.try_reserve(additional)
+    }
 }
 
 /// A structure for serializing Rust values to IDL.
@@ -98,6 +106,10 @@ impl ValueSerializer {
         use std::io::Write;
         self.value.write_all(bytes)?;
         Ok(())
+    }
+    #[doc(hidden)]
+    pub fn try_reserve(&mut self, additional: usize) -> std::result::Result<(), TryReserveError> {
+        self.value.try_reserve(additional)
     }
 }
 

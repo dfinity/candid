@@ -1,6 +1,7 @@
 //! `candid::Result<T> = Result<T, candid::Error>>`
 
 use serde::{de, ser};
+use std::collections::TryReserveError;
 use std::{io, num::ParseIntError};
 use thiserror::Error;
 
@@ -16,6 +17,9 @@ pub struct Label {
 pub enum Error {
     #[error("binary parser error: {}", .0.first().map_or_else(|| "io error".to_string(), |f| format!("{} at byte offset {}", f.message, f.pos/2)))]
     Binread(Vec<Label>),
+
+    #[error(transparent)]
+    Reserve(#[from] TryReserveError),
 
     #[error("Subtyping error: {0}")]
     Subtype(String),
