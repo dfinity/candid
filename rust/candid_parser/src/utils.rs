@@ -8,7 +8,7 @@ pub enum CandidSource<'a> {
     Text(&'a str),
 }
 
-impl<'a> CandidSource<'a> {
+impl CandidSource<'_> {
     pub fn load(&self) -> Result<(TypeEnv, Option<Type>)> {
         Ok(match self {
             CandidSource::File(path) => pretty_check_file(path)?,

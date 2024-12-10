@@ -111,7 +111,7 @@ impl ConfigState for GenConfig {
 }
 
 pub struct RandState<'a>(State<'a, GenConfig>);
-impl<'a> RandState<'a> {
+impl RandState<'_> {
     pub fn any(&mut self, u: &mut Unstructured, ty: &Type) -> Result<IDLValue> {
         let old_config = self.0.push_state(&StateElem::Type(ty));
         if let Some(vec) = &self.0.config.value {

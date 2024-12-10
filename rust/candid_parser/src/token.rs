@@ -169,7 +169,7 @@ pub fn error2<E: ToString>(err: E, span: Span) -> ParserError {
     }
 }
 
-impl<'input> Iterator for Tokenizer<'input> {
+impl Iterator for Tokenizer<'_> {
     type Item = Result<(usize, Token, usize), LexicalError>;
     fn next(&mut self) -> Option<Self::Item> {
         let token = self.lex.next()?;
