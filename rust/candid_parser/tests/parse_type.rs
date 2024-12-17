@@ -7,6 +7,7 @@ use candid_parser::typing::{check_file, check_prog};
 use goldenfile::Mint;
 use std::io::Write;
 use std::path::Path;
+use std::panic::AssertUnwindSafe;
 
 #[test]
 fn parse_idl_prog() {
@@ -52,7 +53,7 @@ fn compiler_test(resource: &str) {
             {
                 match filename.file_name().unwrap().to_str().unwrap() {
                     "unicode.did" | "escape.did" => {
-                        check_error(|| motoko::compile(&env, &actor), "not a valid Motoko id")
+                        check_error(AssertUnwindSafe(|| motoko::compile(&env, &actor)), "not a valid Motoko id")
                     }
                     _ => {
                         let mut output =

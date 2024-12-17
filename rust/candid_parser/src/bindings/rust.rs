@@ -4,6 +4,7 @@ use crate::{
     Deserialize,
 };
 use candid::pretty::utils::*;
+use candid::types::type_env::SortedIter;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
@@ -220,7 +221,7 @@ fn test_{test_name}() {{
                         self.state.update_stats("name");
                         res
                     } else {
-                        ident(id, Some(Case::Pascal))
+                        ident(id.as_str(), Some(Case::Pascal))
                     };
                     if !is_ref && self.recs.contains(id.as_str()) {
                         str("Box<").append(name).append(">")
@@ -393,13 +394,13 @@ fn test_{test_name}() {{
     }
     fn pp_defs(&mut self, def_list: &'a [&'a str]) -> RcDoc<'a> {
         let mut res = Vec::with_capacity(def_list.len());
-        for id in def_list {
+        for &id in def_list {
             let old = self.state.push_state(&StateElem::Label(id));
             if self.state.config.use_type.is_some() {
                 self.state.pop_state(old, StateElem::Label(id));
                 continue;
             }
-            let ty = self.state.env.find_type(id).unwrap();
+            let ty = self.state.env.find_type(&id.into()).unwrap();
             let name = self
                 .state
                 .config
@@ -662,7 +663,10 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
     let def_list = if let Some(actor) = &actor {
         chase_actor(&env, actor).unwrap()
     } else {
-        env.0.iter().map(|pair| pair.0.as_ref()).collect::<Vec<_>>()
+        env.0
+            .to_sorted_iter()
+            .map(|pair| pair.0.as_str())
+            .collect::<Vec<_>>()
     };
     let recs = infer_rec(&env, &def_list).unwrap();
     let mut state = State {
@@ -845,8 +849,8 @@ impl NominalState<'_> {
                         &mut vec![TypePath::Id(new_var.clone())],
                         &TypeInner::Record(fs.to_vec()).into(),
                     );
-                    env.0.insert(new_var.clone(), ty);
-                    TypeInner::Var(new_var)
+                    env.0.insert(new_var.clone().into(), ty);
+                    TypeInner::Var(new_var.into())
                 }
             }
             TypeInner::Variant(fs) => {
@@ -883,8 +887,8 @@ impl NominalState<'_> {
                         &mut vec![TypePath::Id(new_var.clone())],
                         &TypeInner::Variant(fs.to_vec()).into(),
                     );
-                    env.0.insert(new_var.clone(), ty);
-                    TypeInner::Var(new_var)
+                    env.0.insert(new_var.clone().into(), ty);
+                    TypeInner::Var(new_var.into())
                 }
             }
             TypeInner::Func(func) => match path.last() {
@@ -945,8 +949,8 @@ impl NominalState<'_> {
                         &mut vec![TypePath::Id(new_var.clone())],
                         &TypeInner::Func(func.clone()).into(),
                     );
-                    env.0.insert(new_var.clone(), ty);
-                    TypeInner::Var(new_var)
+                    env.0.insert(new_var.clone().into(), ty);
+                    TypeInner::Var(new_var.into())
                 }
             },
             TypeInner::Service(serv) => match path.last() {
@@ -976,8 +980,8 @@ impl NominalState<'_> {
                         &mut vec![TypePath::Id(new_var.clone())],
                         &TypeInner::Service(serv.clone()).into(),
                     );
-                    env.0.insert(new_var.clone(), ty);
-                    TypeInner::Var(new_var)
+                    env.0.insert(new_var.clone().into(), ty);
+                    TypeInner::Var(new_var.into())
                 }
             },
             TypeInner::Class(args, ty) => TypeInner::Class(
@@ -1005,11 +1009,11 @@ impl NominalState<'_> {
 
     fn nominalize_all(&mut self, actor: &Option<Type>) -> (TypeEnv, Option<Type>) {
         let mut res = TypeEnv(Default::default());
-        for (id, ty) in self.state.env.0.iter() {
-            let elem = StateElem::Label(id);
+        for (id, ty) in self.state.env.0.to_sorted_iter() {
+            let elem = StateElem::Label(id.as_str());
             let old = self.state.push_state(&elem);
-            let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.clone())], ty);
-            res.0.insert(id.to_string(), ty);
+            let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.as_str().to_string())], ty);
+            res.0.insert(id.clone(), ty);
             self.state.pop_state(old, elem);
         }
         let actor = actor
