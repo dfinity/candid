@@ -69,7 +69,7 @@
 //!
 //! let method = env.get_method(&actor, "g").unwrap();
 //! assert_eq!(method.is_query(), true);
-//! assert_eq!(method.args, vec![TypeInner::Var("List".to_string()).into()]);
+//! assert_eq!(method.args, vec![TypeInner::Var("List".into()).into()]);
 //! # Ok(())
 //! # }
 //! ```

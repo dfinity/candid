@@ -95,7 +95,7 @@ pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
         Text => str("text"),
         Reserved => str("reserved"),
         Empty => str("empty"),
-        Var(ref s) => str(s),
+        Var(ref s) => str(s.as_str()),
         Principal => str("principal"),
         Opt(ref t) => kwd("opt").append(pp_ty(t)),
         Vec(ref t) if matches!(t.as_ref(), Nat8) => str("blob"),
@@ -116,7 +116,7 @@ pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
             let doc = pp_args(args).append(" ->").append(RcDoc::space());
             match t.as_ref() {
                 Service(ref serv) => doc.append(pp_service(serv)),
-                Var(ref s) => doc.append(s),
+                Var(ref s) => doc.append(s.as_str()),
                 _ => unreachable!(),
             }
         }
@@ -188,9 +188,9 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 }
 
 fn pp_defs(env: &TypeEnv) -> RcDoc {
-    lines(env.0.iter().map(|(id, ty)| {
+    lines(env.to_sorted_iter().map(|(id, ty)| {
         kwd("type")
-            .append(ident(id))
+            .append(ident(id.as_str()))
             .append(kwd("="))
             .append(pp_ty(ty))
             .append(";")

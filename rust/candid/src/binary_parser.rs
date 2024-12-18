@@ -1,4 +1,5 @@
-use crate::types::internal::{Field, Function, Label, Type, TypeInner};
+use crate::types::internal::{Field, Function, Label, Type, TypeInner, TypeKey};
+use crate::types::type_env::TypeMap;
 use crate::types::{FuncMode, TypeEnv};
 use anyhow::{anyhow, Context, Result};
 use binread::io::{Read, Seek};
@@ -135,9 +136,6 @@ pub struct PrincipalBytes {
     pub inner: Vec<u8>,
 }
 
-fn index_to_var(ind: i64) -> String {
-    format!("table{ind}")
-}
 impl IndexType {
     fn to_type(&self, len: u64) -> Result<Type> {
         Ok(match self.index {
@@ -145,7 +143,7 @@ impl IndexType {
                 if v >= len as i64 {
                     return Err(anyhow!("type index {} out of range", v));
                 }
-                TypeInner::Var(index_to_var(v))
+                TypeInner::Var(TypeKey::indexed(v))
             }
             -1 => TypeInner::Null,
             -2 => TypeInner::Bool,
@@ -233,13 +231,12 @@ impl ConsType {
 }
 impl Table {
     fn to_env(&self, len: u64) -> Result<TypeEnv> {
-        use std::collections::BTreeMap;
-        let mut env = BTreeMap::new();
+        let mut env = TypeMap::default();
         for (i, t) in self.table.iter().enumerate() {
             let ty = t
                 .to_type(len)
                 .with_context(|| format!("Invalid table entry {i}: {t:?}"))?;
-            env.insert(index_to_var(i as i64), ty);
+            env.insert(TypeKey::indexed(i as i64), ty);
         }
         // validate method has func type
         for t in env.values() {

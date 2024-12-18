@@ -1,4 +1,5 @@
 use crate::{check_prog, pretty_check_file, pretty_parse, Error, Result};
+use candid::types::internal::TypeKey;
 use candid::types::TypeInner;
 use candid::{types::Type, TypeEnv};
 use std::path::Path;
@@ -70,8 +71,8 @@ pub fn get_metadata(env: &TypeEnv, serv: &Option<Type>) -> Option<String> {
     let def_list = crate::bindings::analysis::chase_actor(env, &serv).ok()?;
     let mut filtered = TypeEnv::new();
     for d in def_list {
-        if let Some(t) = env.0.get(d) {
-            filtered.0.insert(d.to_string(), t.clone());
+        if let Some(t) = env.0.get(&TypeKey::from(d)) {
+            filtered.0.insert(d.to_string().into(), t.clone());
         }
     }
     Some(candid::pretty::candid::compile(&filtered, &Some(serv)))
