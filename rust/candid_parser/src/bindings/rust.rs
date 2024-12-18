@@ -4,7 +4,6 @@ use crate::{
     Deserialize,
 };
 use candid::pretty::utils::*;
-use candid::types::type_env::SortedIter;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
@@ -1009,7 +1008,7 @@ impl NominalState<'_> {
 
     fn nominalize_all(&mut self, actor: &Option<Type>) -> (TypeEnv, Option<Type>) {
         let mut res = TypeEnv(Default::default());
-        for (id, ty) in self.state.env.0.to_sorted_iter() {
+        for (id, ty) in self.state.env.to_sorted_iter() {
             let elem = StateElem::Label(id.as_str());
             let old = self.state.push_state(&elem);
             let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.as_str().to_string())], ty);

@@ -1,6 +1,5 @@
 use super::javascript::{ident, is_tuple};
 use candid::pretty::utils::*;
-use candid::types::type_env::SortedIter;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
@@ -187,7 +186,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 "#;
-    let def_list: Vec<_> = env.0.to_sorted_iter().map(|pair| pair.0.as_str()).collect();
+    let def_list: Vec<_> = env.to_sorted_iter().map(|pair| pair.0.as_str()).collect();
     let defs = pp_defs(env, &def_list);
     let actor = match actor {
         None => RcDoc::nil(),

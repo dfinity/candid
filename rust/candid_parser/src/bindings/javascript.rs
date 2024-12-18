@@ -1,7 +1,6 @@
 use super::analysis::{chase_actor, chase_types, infer_rec};
 use candid::pretty::candid::pp_mode;
 use candid::pretty::utils::*;
-use candid::types::type_env::SortedIter;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
@@ -235,7 +234,7 @@ fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     match actor {
         None => {
-            let def_list: Vec<_> = env.0.to_sorted_iter().map(|pair| pair.0.as_str()).collect();
+            let def_list: Vec<_> = env.to_sorted_iter().map(|pair| pair.0.as_str()).collect();
             let recs = infer_rec(env, &def_list).unwrap();
             let doc = pp_defs(env, &def_list, &recs);
             doc.pretty(LINE_WIDTH).to_string()

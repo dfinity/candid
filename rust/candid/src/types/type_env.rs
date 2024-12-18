@@ -9,26 +9,6 @@ pub type TypeMap<V> = HashMap<TypeKey, V, FixedState>;
 #[derive(Debug, Clone, Default)]
 pub struct TypeEnv(pub TypeMap<Type>);
 
-pub trait SortedIter<T> {
-    /// Creates an iterator that iterates over the elements in the order of keys.
-    ///
-    /// The implementation collects elements into a temporary vector and sorts the vector.
-    fn to_sorted_iter<'a>(&'a self) -> impl Iterator<Item = (&'a TypeKey, &'a T)>
-    where
-        T: 'a;
-}
-
-impl<T> SortedIter<T> for TypeMap<T> {
-    fn to_sorted_iter<'a>(&'a self) -> impl Iterator<Item = (&'a TypeKey, &'a T)>
-    where
-        T: 'a,
-    {
-        let mut vec: Vec<_> = self.iter().collect();
-        vec.sort_unstable_by_key(|elem| elem.0);
-        vec.into_iter()
-    }
-}
-
 impl TypeEnv {
     pub fn new() -> Self {
         TypeEnv(TypeMap::default())
@@ -156,11 +136,21 @@ impl TypeEnv {
         }
         Ok(())
     }
+
+    /// Creates an iterator that iterates over the types in the order of keys.
+    ///
+    /// The implementation collects elements into a temporary vector and sorts the vector.
+    pub fn to_sorted_iter(&self) -> impl Iterator<Item=(&TypeKey, &Type)>
+    {
+        let mut vec: Vec<_> = self.iter().collect();
+        vec.sort_unstable_by_key(|elem| elem.0);
+        vec.into_iter()
+    }
 }
 
 impl std::fmt::Display for TypeEnv {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (k, v) in self.0.to_sorted_iter() {
+        for (k, v) in self.to_sorted_iter() {
             writeln!(f, "type {k} = {v}")?;
         }
         Ok(())

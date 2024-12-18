@@ -3,7 +3,6 @@
 
 use candid::pretty::candid::is_valid_as_id;
 use candid::pretty::utils::*;
-use candid::types::type_env::SortedIter;
 use candid::types::FuncMode;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
@@ -221,7 +220,7 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 }
 
 fn pp_defs(env: &TypeEnv) -> RcDoc {
-    lines(env.0.to_sorted_iter().map(|(id, ty)| {
+    lines(env.to_sorted_iter().map(|(id, ty)| {
         kwd("public type")
             .append(escape(id.as_str(), false))
             .append(" = ")

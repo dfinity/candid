@@ -1,5 +1,4 @@
 use crate::pretty::utils::*;
-use crate::types::type_env::SortedIter;
 use crate::types::{Field, FuncMode, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
@@ -189,7 +188,7 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 }
 
 fn pp_defs(env: &TypeEnv) -> RcDoc {
-    lines(env.0.to_sorted_iter().map(|(id, ty)| {
+    lines(env.to_sorted_iter().map(|(id, ty)| {
         kwd("type")
             .append(ident(id.as_str()))
             .append(kwd("="))
