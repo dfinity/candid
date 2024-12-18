@@ -662,8 +662,7 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
     let def_list = if let Some(actor) = &actor {
         chase_actor(&env, actor).unwrap()
     } else {
-        env.0
-            .to_sorted_iter()
+        env.to_sorted_iter()
             .map(|pair| pair.0.as_str())
             .collect::<Vec<_>>()
     };
@@ -1011,7 +1010,11 @@ impl NominalState<'_> {
         for (id, ty) in self.state.env.to_sorted_iter() {
             let elem = StateElem::Label(id.as_str());
             let old = self.state.push_state(&elem);
-            let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.as_str().to_string())], ty);
+            let ty = self.nominalize(
+                &mut res,
+                &mut vec![TypePath::Id(id.as_str().to_string())],
+                ty,
+            );
             res.0.insert(id.clone(), ty);
             self.state.pop_state(old, elem);
         }

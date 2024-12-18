@@ -142,7 +142,7 @@ impl TypeEnv {
     /// The implementation collects elements into a temporary vector and sorts the vector.
     pub fn to_sorted_iter(&self) -> impl Iterator<Item=(&TypeKey, &Type)>
     {
-        let mut vec: Vec<_> = self.iter().collect();
+        let mut vec: Vec<_> = self.0.iter().collect();
         vec.sort_unstable_by_key(|elem| elem.0);
         vec.into_iter()
     }
