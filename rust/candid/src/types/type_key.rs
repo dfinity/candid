@@ -41,7 +41,7 @@ impl TypeKey {
             index: idx,
             name: Default::default(),
         }
-            .into()
+        .into()
     }
 
     pub fn as_str(&self) -> &str {
