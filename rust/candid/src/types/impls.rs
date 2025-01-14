@@ -457,7 +457,7 @@ where
         S: Serializer,
     {
         use serde::ser::Error;
-        Err(S::Error::custom("`Empty` cannot be serialized"))
+        Err(S::Error::custom("`PhantomData` cannot be serialized"))
     }
 }
 
