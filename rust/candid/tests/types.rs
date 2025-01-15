@@ -96,6 +96,10 @@ fn test_primitive() {
         get_type(&[0, 1, 2, 3]),
         TypeInner::Vec(TypeInner::Int32.into()).into()
     );
+    assert_eq!(
+        get_type(&std::marker::PhantomData::<u32>),
+        TypeInner::Nat32.into()
+    );
 }
 
 #[test]

@@ -445,6 +445,22 @@ where
     }
 }
 
+impl<T> CandidType for std::marker::PhantomData<T>
+where
+    T: CandidType,
+{
+    fn _ty() -> Type {
+        T::ty()
+    }
+    fn idl_serialize<S>(&self, _: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::Error;
+        Err(S::Error::custom("`PhantomData` cannot be serialized"))
+    }
+}
+
 macro_rules! tuple_impls {
     ($($len:expr => ($($n:tt $name:ident)+))+) => {
         $(

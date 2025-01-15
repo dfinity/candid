@@ -1,6 +1,12 @@
 
 # Changelog
 
+## 2025-01-15
+
+### Candid 0.10.12
+
+* Implement `CandidType` for `std::marker::PhantomData`.
+
 ## 2024-12-10
 
 ### Candid 0.10.11
