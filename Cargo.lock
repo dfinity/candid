@@ -215,7 +215,7 @@ dependencies = [
 
 [[package]]
 name = "candid"
-version = "0.10.11"
+version = "0.10.12"
 dependencies = [
  "anyhow",
  "bincode",
@@ -288,7 +288,7 @@ version = "0.2.0-beta.4"
 dependencies = [
  "anyhow",
  "arbitrary",
- "candid 0.10.11",
+ "candid 0.10.12",
  "codespan-reporting",
  "console",
  "convert_case",
