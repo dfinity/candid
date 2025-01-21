@@ -138,7 +138,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("Text"),
         Reserved => str("Any"),
         Empty => str("None"),
-        Var(ref s) => escape(s, false),
+        Var(ref s) => escape(s.as_str(), false),
         Principal => str("Principal"),
         Opt(ref t) => str("?").append(pp_ty(t)),
         Vec(ref t) => pp_vec(t, None),
@@ -315,12 +315,12 @@ fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
 
 fn pp_defs<'a>(env: &'a TypeEnv, prog: &'a IDLMergedProg) -> RcDoc<'a> {
     lines(env.0.iter().map(|(id, ty)| {
-        let syntax = prog.lookup(id);
+        let syntax = prog.lookup(id.as_str());
         let docs = syntax
             .map(|b| pp_docs(b.docs.as_ref()))
             .unwrap_or(RcDoc::nil());
         docs.append(kwd("public type"))
-            .append(escape(id, false))
+            .append(escape(id.as_str(), false))
             .append(" = ")
             .append(pp_ty_rich(ty, syntax.map(|b| &b.typ)))
             .append(";")

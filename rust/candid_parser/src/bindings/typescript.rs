@@ -77,7 +77,7 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
             if is_ref && matches!(ty.as_ref(), Service(_)) {
                 return pp_inline_service();
             }
-            ident(id)
+            ident(id.as_str())
         }
         Principal => str("Principal"),
         Opt(ref t) => pp_opt(env, t, None, is_ref),
@@ -238,7 +238,7 @@ fn pp_service<'a>(
         }
         let func = match func.as_ref() {
             TypeInner::Func(ref func) => pp_function(env, func),
-            TypeInner::Var(ref id) => ident(id),
+            TypeInner::Var(ref id) => ident(id.as_str()),
             _ => unreachable!(),
         };
         docs.append(quote_ident(id)).append(kwd(":")).append(func)
@@ -263,8 +263,8 @@ fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
 }
 
 fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], prog: &'a IDLMergedProg) -> RcDoc<'a> {
-    lines(def_list.iter().map(|id| {
-        let ty = env.find_type(id).unwrap();
+    lines(def_list.iter().map(|&id| {
+        let ty = env.find_type(&id.into()).unwrap();
         let syntax = prog.lookup(id);
         let syntax_ty = syntax.map(|s| &s.typ);
         let docs = syntax
@@ -287,7 +287,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], prog: &'a IDLMergedPro
             TypeInner::Var(ref inner_id) => kwd("export type")
                 .append(ident(id))
                 .append(" = ")
-                .append(ident(inner_id))
+                .append(ident(inner_id.as_str()))
                 .append(";"),
             _ => kwd("export type")
                 .append(ident(id))
@@ -305,7 +305,7 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type, syntax: Option<&'a IDLType>) -> 
         TypeInner::Service(_) => service_doc.append(pp_ty_rich(env, ty, syntax, false)),
         TypeInner::Var(id) => service_doc
             .append(kwd("extends"))
-            .append(str(id))
+            .append(str(id.as_str()))
             .append(str(" {}")),
         TypeInner::Class(_, t) => {
             if let Some(IDLType::ClassT(_, syntax_t)) = syntax {
@@ -324,7 +324,7 @@ import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 "#;
     let syntax_actor = prog.resolve_actor().ok().flatten();
-    let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
+    let def_list: Vec<_> = env.to_sorted_iter().map(|pair| pair.0.as_str()).collect();
     let defs = pp_defs(env, &def_list, prog);
     let actor = match actor {
         None => RcDoc::nil(),

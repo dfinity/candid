@@ -119,7 +119,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("IDL.Text"),
         Reserved => str("IDL.Reserved"),
         Empty => str("IDL.Empty"),
-        Var(ref s) => ident(s),
+        Var(ref s) => ident(s.as_str()),
         Principal => str("IDL.Principal"),
         Opt(ref t) => str("IDL.Opt").append(enclose("(", pp_ty(t), ")")),
         Vec(ref t) => str("IDL.Vec").append(enclose("(", pp_ty(t), ")")),
@@ -206,8 +206,8 @@ fn pp_defs<'a>(
         recs.iter()
             .map(|id| kwd("const").append(ident(id)).append(" = IDL.Rec();")),
     );
-    let defs = lines(def_list.iter().map(|id| {
-        let ty = env.find_type(id).unwrap();
+    let defs = lines(def_list.iter().map(|&id| {
+        let ty = env.find_type(&id.into()).unwrap();
         if recs.contains(id) {
             ident(id)
                 .append(".fill")
@@ -227,10 +227,10 @@ fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
     match ty.as_ref() {
         TypeInner::Service(_) => pp_ty(ty),
         TypeInner::Var(id) => {
-            if recs.contains(&*id.clone()) {
-                str(id).append(".getType()")
+            if recs.contains(id.as_str()) {
+                str(id.as_str()).append(".getType()")
             } else {
-                str(id)
+                str(id.as_str())
             }
         }
         TypeInner::Class(_, t) => pp_actor(t, recs),
@@ -241,7 +241,7 @@ fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     match actor {
         None => {
-            let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
+            let def_list: Vec<_> = env.to_sorted_iter().map(|pair| pair.0.as_str()).collect();
             let recs = infer_rec(env, &def_list).unwrap();
             let doc = pp_defs(env, &def_list, &recs);
             doc.pretty(LINE_WIDTH).to_string()
