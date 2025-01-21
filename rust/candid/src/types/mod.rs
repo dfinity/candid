@@ -29,6 +29,7 @@ pub mod result;
 
 pub mod arc;
 pub mod rc;
+mod type_key;
 
 pub trait CandidType {
     // memoized type derivation
