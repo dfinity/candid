@@ -194,6 +194,29 @@ pub fn write_args<Tuple: ArgumentEncoder, Writer: std::io::Write>(
     ser.serialize(writer)
 }
 
+/// Serialize an encoding of a tuple and write it to a `Write` buffer.
+///
+/// ```
+/// # use candid::Decode;
+/// # use candid::utils::write_args_ref;
+/// let golden1 = 1u64;
+/// let golden2 = "hello";
+/// let mut buffer = Vec::new();
+/// write_args_ref(&mut buffer, &(golden1, golden2)).unwrap();
+///
+/// let (value1, value2) = Decode!(&buffer, u64, String).unwrap();
+/// assert_eq!(golden1, value1);
+/// assert_eq!(golden2, value2);
+/// ```
+pub fn write_args_ref<Tuple: ArgumentEncoder, Writer: std::io::Write>(
+    writer: &mut Writer,
+    arguments: &Tuple,
+) -> Result<()> {
+    let mut ser = IDLBuilder::new();
+    arguments.encode_ref(&mut ser)?;
+    ser.serialize(writer)
+}
+
 /// Serialize an encoding of a tuple to a vector of bytes.
 ///
 /// ```
@@ -210,6 +233,25 @@ pub fn write_args<Tuple: ArgumentEncoder, Writer: std::io::Write>(
 pub fn encode_args<Tuple: ArgumentEncoder>(arguments: Tuple) -> Result<Vec<u8>> {
     let mut result = Vec::new();
     write_args(&mut result, arguments)?;
+    Ok(result)
+}
+
+/// Serialize an encoding of a tuple to a vector of bytes.
+///
+/// ```
+/// # use candid::Decode;
+/// # use candid::utils::encode_args_ref;
+/// let golden1 = 1u64;
+/// let golden2 = "hello";
+/// let buffer = encode_args_ref(&(golden1, golden2)).unwrap();
+///
+/// let (value1, value2) = Decode!(&buffer, u64, String).unwrap();
+/// assert_eq!(golden1, value1);
+/// assert_eq!(golden2, value2);
+/// ```
+pub fn encode_args_ref<Tuple: ArgumentEncoder>(arguments: &Tuple) -> Result<Vec<u8>> {
+    let mut result = Vec::new();
+    write_args_ref(&mut result, arguments)?;
     Ok(result)
 }
 
@@ -245,11 +287,18 @@ impl<'a> ArgumentDecoder<'a> for () {
 pub trait ArgumentEncoder {
     /// Encode a value of type [Self].
     fn encode(self, ser: &mut IDLBuilder) -> Result<()>;
+
+    /// Encode a reference value of type [Self].
+    fn encode_ref(&self, ser: &mut IDLBuilder) -> Result<()>;
 }
 
 /// Decode an empty tuple.
 impl ArgumentEncoder for () {
-    fn encode(self, _de: &mut IDLBuilder) -> Result<()> {
+    fn encode(self, _ser: &mut IDLBuilder) -> Result<()> {
+        Ok(())
+    }
+
+    fn encode_ref(&self, _ser: &mut IDLBuilder) -> Result<()> {
         Ok(())
     }
 }
@@ -280,6 +329,15 @@ macro_rules! encode_impl {
             $( $typename: CandidType ),*
         {
             fn encode(self, ser: &mut IDLBuilder) -> Result<()> {
+                let ( $( $id, )* ) = self;
+                $(
+                ser.arg(&$id)?;
+                )*
+
+                Ok(())
+            }
+
+            fn encode_ref(&self, ser: &mut IDLBuilder) -> Result<()> {
                 let ( $( $id, )* ) = self;
                 $(
                 ser.arg(&$id)?;
