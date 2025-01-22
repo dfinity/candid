@@ -198,7 +198,7 @@ pub fn write_args<Tuple: ArgumentEncoder, Writer: std::io::Write>(
 ///
 /// ```
 /// # use candid::Decode;
-/// # use candid::write_args;
+/// # use candid::utils::write_args_ref;
 /// let golden1 = 1u64;
 /// let golden2 = "hello";
 /// let mut buffer = Vec::new();
@@ -240,7 +240,7 @@ pub fn encode_args<Tuple: ArgumentEncoder>(arguments: Tuple) -> Result<Vec<u8>> 
 ///
 /// ```
 /// # use candid::Decode;
-/// # use candid::encode_args;
+/// # use candid::utils::encode_args_ref;
 /// let golden1 = 1u64;
 /// let golden2 = "hello";
 /// let buffer = encode_args_ref(&(golden1, golden2)).unwrap();
