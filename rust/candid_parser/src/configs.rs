@@ -393,7 +393,7 @@ fn path_name(t: &Type) -> String {
         TypeInner::Text => "text",
         TypeInner::Reserved => "reserved",
         TypeInner::Empty => "empty",
-        TypeInner::Var(id) => id.as_str(),
+        TypeInner::Var(id) => id,
         TypeInner::Knot(id) => id.name,
         TypeInner::Principal => "principal",
         TypeInner::Opt(_) => "opt",

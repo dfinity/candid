@@ -1,1 +1,0 @@
-ignore-interior-mutability = ["candid::types::type_key::TypeKey"]
