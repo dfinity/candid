@@ -112,7 +112,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("Text"),
         Reserved => str("Any"),
         Empty => str("None"),
-        Var(ref s) => escape(s.as_str(), false),
+        Var(ref s) => escape(s, false),
         Principal => str("Principal"),
         Opt(ref t) => str("?").append(pp_ty(t)),
         Vec(ref t) if matches!(t.as_ref(), Nat8) => str("Blob"),
@@ -140,7 +140,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
             let doc = pp_args(args).append(" -> async ");
             match t.as_ref() {
                 Service(ref serv) => doc.append(pp_service(serv)),
-                Var(ref s) => doc.append(s.as_str()),
+                Var(ref s) => doc.append(s),
                 _ => unreachable!(),
             }
         }
@@ -220,9 +220,9 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 }
 
 fn pp_defs(env: &TypeEnv) -> RcDoc {
-    lines(env.to_sorted_iter().map(|(id, ty)| {
+    lines(env.0.iter().map(|(id, ty)| {
         kwd("public type")
-            .append(escape(id.as_str(), false))
+            .append(escape(id, false))
             .append(" = ")
             .append(pp_ty(ty))
             .append(";")

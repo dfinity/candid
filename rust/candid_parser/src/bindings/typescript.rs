@@ -29,10 +29,10 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
                 if matches!(ty.as_ref(), Service(_) | Func(_)) {
                     pp_ty(env, ty, false)
                 } else {
-                    ident(id.as_str())
+                    ident(id)
                 }
             } else {
-                ident(id.as_str())
+                ident(id)
             }
         }
         Principal => str("Principal"),
@@ -142,8 +142,8 @@ fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
 }
 
 fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
-    lines(def_list.iter().map(|&id| {
-        let ty = env.find_type(&id.into()).unwrap();
+    lines(def_list.iter().map(|id| {
+        let ty = env.find_type(id).unwrap();
         let export = match ty.as_ref() {
             TypeInner::Record(_) if !ty.is_tuple() => kwd("export interface")
                 .append(ident(id))
@@ -174,7 +174,7 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
             kwd("export interface _SERVICE").append(pp_service(env, serv))
         }
         TypeInner::Var(id) => kwd("export interface _SERVICE extends")
-            .append(str(id.as_str()))
+            .append(str(id))
             .append(str(" {}")),
         TypeInner::Class(_, t) => pp_actor(env, t),
         _ => unreachable!(),
@@ -186,7 +186,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 "#;
-    let def_list: Vec<_> = env.to_sorted_iter().map(|pair| pair.0.as_str()).collect();
+    let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
     let defs = pp_defs(env, &def_list);
     let actor = match actor {
         None => RcDoc::nil(),

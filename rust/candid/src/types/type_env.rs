@@ -1,22 +1,17 @@
-use crate::types::internal::TypeKey;
 use crate::types::{Function, Type, TypeInner};
 use crate::{Error, Result};
-use foldhash::fast::FixedState;
-use hashbrown::HashMap;
-
-pub type TypeMap<V> = HashMap<TypeKey, V, FixedState>;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Default)]
-pub struct TypeEnv(pub TypeMap<Type>);
+pub struct TypeEnv(pub BTreeMap<String, Type>);
 
 impl TypeEnv {
     pub fn new() -> Self {
-        TypeEnv(TypeMap::default())
+        TypeEnv(BTreeMap::new())
     }
-
     pub fn merge<'a>(&'a mut self, env: &TypeEnv) -> Result<&'a mut Self> {
-        for (k, v) in env.0.iter() {
-            let entry = self.0.entry(k.clone()).or_insert_with(|| v.clone());
+        for (k, v) in &env.0 {
+            let entry = self.0.entry(k.to_string()).or_insert_with(|| v.clone());
             if *entry != *v {
                 return Err(Error::msg("inconsistent binding"));
             }
@@ -24,11 +19,11 @@ impl TypeEnv {
         Ok(self)
     }
     pub fn merge_type(&mut self, env: TypeEnv, ty: Type) -> Type {
-        let tau: TypeMap<TypeKey> = env
+        let tau: BTreeMap<String, String> = env
             .0
             .keys()
             .filter(|k| self.0.contains_key(*k))
-            .map(|k| (k.clone(), format!("{k}/1").into()))
+            .map(|k| (k.clone(), format!("{k}/1")))
             .collect();
         for (k, t) in env.0 {
             let t = t.subst(&tau);
@@ -40,14 +35,13 @@ impl TypeEnv {
         }
         ty.subst(&tau)
     }
-    pub fn find_type(&self, key: &TypeKey) -> Result<&Type> {
-        match self.0.get(key) {
-            None => Err(Error::msg(format!("Unbound type identifier {key}"))),
+    pub fn find_type(&self, name: &str) -> Result<&Type> {
+        match self.0.get(name) {
+            None => Err(Error::msg(format!("Unbound type identifier {name}"))),
             Some(t) => Ok(t),
         }
     }
-
-    pub fn rec_find_type(&self, name: &TypeKey) -> Result<&Type> {
+    pub fn rec_find_type(&self, name: &str) -> Result<&Type> {
         let t = self.find_type(name)?;
         match t.as_ref() {
             TypeInner::Var(id) => self.rec_find_type(id),
@@ -88,8 +82,8 @@ impl TypeEnv {
     }
     fn is_empty<'a>(
         &'a self,
-        res: &mut HashMap<&'a TypeKey, Option<bool>, FixedState>,
-        id: &'a TypeKey,
+        res: &mut BTreeMap<&'a str, Option<bool>>,
+        id: &'a str,
     ) -> Result<bool> {
         match res.get(id) {
             None => {
@@ -122,34 +116,24 @@ impl TypeEnv {
         }
     }
     pub fn replace_empty(&mut self) -> Result<()> {
-        let mut res = HashMap::default();
-        for key in self.0.keys() {
-            self.is_empty(&mut res, key)?;
+        let mut res = BTreeMap::new();
+        for name in self.0.keys() {
+            self.is_empty(&mut res, name)?;
         }
         let ids: Vec<_> = res
-            .into_iter()
+            .iter()
             .filter(|(_, v)| matches!(v, Some(true)))
-            .map(|(id, _)| id.to_owned())
+            .map(|(id, _)| id.to_string())
             .collect();
         for id in ids {
             self.0.insert(id, TypeInner::Empty.into());
         }
         Ok(())
     }
-
-    /// Creates an iterator that iterates over the types in the order of keys.
-    ///
-    /// The implementation collects elements into a temporary vector and sorts the vector.
-    pub fn to_sorted_iter(&self) -> impl Iterator<Item = (&TypeKey, &Type)> {
-        let mut vec: Vec<_> = self.0.iter().collect();
-        vec.sort_unstable_by_key(|elem| elem.0);
-        vec.into_iter()
-    }
 }
-
 impl std::fmt::Display for TypeEnv {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (k, v) in self.to_sorted_iter() {
+        for (k, v) in &self.0 {
             writeln!(f, "type {k} = {v}")?;
         }
         Ok(())

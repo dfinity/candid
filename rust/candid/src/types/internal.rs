@@ -1,13 +1,8 @@
 use super::CandidType;
 use crate::idl_hash;
-use crate::types::type_env::TypeMap;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt;
-use std::fmt::Debug;
-use std::hash::Hash;
-
-pub use crate::types::type_key::TypeKey;
 
 // This is a re-implementation of std::any::TypeId to get rid of 'static constraint.
 // The current TypeId doesn't consider lifetime while computing the hash, which is
@@ -29,7 +24,7 @@ impl TypeId {
 impl std::fmt::Display for TypeId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = NAME.with(|n| n.borrow_mut().get(self));
-        f.write_str(&name)
+        write!(f, "{name}")
     }
 }
 pub fn type_of<T>(_: &T) -> TypeId {
@@ -118,9 +113,8 @@ impl TypeContainer {
                 }
                 let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
-                    let type_key = TypeKey::from(id.to_string());
-                    self.env.0.insert(type_key.clone(), res);
-                    TypeInner::Var(type_key)
+                    self.env.0.insert(id.to_string(), res);
+                    TypeInner::Var(id.to_string())
                 } else {
                     // if the type is part of an enum, the id won't be recorded.
                     // we want to inline the type in this case.
@@ -139,18 +133,17 @@ impl TypeContainer {
                 .into();
                 let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
-                    let type_key = TypeKey::from(id.to_string());
-                    self.env.0.insert(type_key.clone(), res);
-                    TypeInner::Var(type_key)
+                    self.env.0.insert(id.to_string(), res);
+                    TypeInner::Var(id.to_string())
                 } else {
                     return res;
                 }
             }
             TypeInner::Knot(id) => {
+                let name = id.to_string();
                 let ty = ENV.with(|e| e.borrow().get(id).unwrap().clone());
-                let type_key = TypeKey::from(id.to_string());
-                self.env.0.insert(type_key.clone(), ty);
-                TypeInner::Var(type_key)
+                self.env.0.insert(id.to_string(), ty);
+                TypeInner::Var(name)
             }
             TypeInner::Func(func) => TypeInner::Func(Function {
                 modes: func.modes.clone(),
@@ -194,7 +187,7 @@ pub enum TypeInner {
     Reserved,
     Empty,
     Knot(TypeId), // For recursive types from Rust
-    Var(TypeKey), // For variables from Candid file
+    Var(String),  // For variables from Candid file
     Unknown,
     Opt(Type),
     Vec(Type),
@@ -255,12 +248,12 @@ impl Type {
     pub fn is_blob(&self, env: &crate::TypeEnv) -> bool {
         self.as_ref().is_blob(env)
     }
-    pub fn subst(&self, tau: &TypeMap<TypeKey>) -> Self {
+    pub fn subst(&self, tau: &std::collections::BTreeMap<String, String>) -> Self {
         use TypeInner::*;
         match self.as_ref() {
             Var(id) => match tau.get(id) {
-                None => Var(id.clone()),
-                Some(new_id) => Var(new_id.clone()),
+                None => Var(id.to_string()),
+                Some(new_id) => Var(new_id.to_string()),
             },
             Opt(t) => Opt(t.subst(tau)),
             Vec(t) => Vec(t.subst(tau)),
@@ -337,7 +330,7 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
         Reserved => 8,
         Principal => 9,
         Knot(_) => 10,
-        Var(id) => id.as_str().len() as i32,
+        Var(id) => id.len() as i32,
         Opt(t) => 4 + text_size(t, limit - 4)?,
         Vec(t) => 4 + text_size(t, limit - 4)?,
         Record(fs) | Variant(fs) => {

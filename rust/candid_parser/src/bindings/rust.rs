@@ -220,7 +220,7 @@ fn test_{test_name}() {{
                         self.state.update_stats("name");
                         res
                     } else {
-                        ident(id.as_str(), Some(Case::Pascal))
+                        ident(id, Some(Case::Pascal))
                     };
                     if !is_ref && self.recs.contains(id.as_str()) {
                         str("Box<").append(name).append(">")
@@ -393,13 +393,13 @@ fn test_{test_name}() {{
     }
     fn pp_defs(&mut self, def_list: &'a [&'a str]) -> RcDoc<'a> {
         let mut res = Vec::with_capacity(def_list.len());
-        for &id in def_list {
+        for id in def_list {
             let old = self.state.push_state(&StateElem::Label(id));
             if self.state.config.use_type.is_some() {
                 self.state.pop_state(old, StateElem::Label(id));
                 continue;
             }
-            let ty = self.state.env.find_type(&id.into()).unwrap();
+            let ty = self.state.env.find_type(id).unwrap();
             let name = self
                 .state
                 .config
@@ -662,9 +662,7 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
     let def_list = if let Some(actor) = &actor {
         chase_actor(&env, actor).unwrap()
     } else {
-        env.to_sorted_iter()
-            .map(|pair| pair.0.as_str())
-            .collect::<Vec<_>>()
+        env.0.iter().map(|pair| pair.0.as_ref()).collect::<Vec<_>>()
     };
     let recs = infer_rec(&env, &def_list).unwrap();
     let mut state = State {
@@ -847,8 +845,8 @@ impl NominalState<'_> {
                         &mut vec![TypePath::Id(new_var.clone())],
                         &TypeInner::Record(fs.to_vec()).into(),
                     );
-                    env.0.insert(new_var.clone().into(), ty);
-                    TypeInner::Var(new_var.into())
+                    env.0.insert(new_var.clone(), ty);
+                    TypeInner::Var(new_var)
                 }
             }
             TypeInner::Variant(fs) => {
@@ -885,8 +883,8 @@ impl NominalState<'_> {
                         &mut vec![TypePath::Id(new_var.clone())],
                         &TypeInner::Variant(fs.to_vec()).into(),
                     );
-                    env.0.insert(new_var.clone().into(), ty);
-                    TypeInner::Var(new_var.into())
+                    env.0.insert(new_var.clone(), ty);
+                    TypeInner::Var(new_var)
                 }
             }
             TypeInner::Func(func) => match path.last() {
@@ -947,8 +945,8 @@ impl NominalState<'_> {
                         &mut vec![TypePath::Id(new_var.clone())],
                         &TypeInner::Func(func.clone()).into(),
                     );
-                    env.0.insert(new_var.clone().into(), ty);
-                    TypeInner::Var(new_var.into())
+                    env.0.insert(new_var.clone(), ty);
+                    TypeInner::Var(new_var)
                 }
             },
             TypeInner::Service(serv) => match path.last() {
@@ -978,8 +976,8 @@ impl NominalState<'_> {
                         &mut vec![TypePath::Id(new_var.clone())],
                         &TypeInner::Service(serv.clone()).into(),
                     );
-                    env.0.insert(new_var.clone().into(), ty);
-                    TypeInner::Var(new_var.into())
+                    env.0.insert(new_var.clone(), ty);
+                    TypeInner::Var(new_var)
                 }
             },
             TypeInner::Class(args, ty) => TypeInner::Class(
@@ -1007,15 +1005,11 @@ impl NominalState<'_> {
 
     fn nominalize_all(&mut self, actor: &Option<Type>) -> (TypeEnv, Option<Type>) {
         let mut res = TypeEnv(Default::default());
-        for (id, ty) in self.state.env.to_sorted_iter() {
-            let elem = StateElem::Label(id.as_str());
+        for (id, ty) in self.state.env.0.iter() {
+            let elem = StateElem::Label(id);
             let old = self.state.push_state(&elem);
-            let ty = self.nominalize(
-                &mut res,
-                &mut vec![TypePath::Id(id.as_str().to_string())],
-                ty,
-            );
-            res.0.insert(id.clone(), ty);
+            let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.clone())], ty);
+            res.0.insert(id.to_string(), ty);
             self.state.pop_state(old, elem);
         }
         let actor = actor
