@@ -1,6 +1,12 @@
 
 # Changelog
 
+## 2025-01-22
+
+### Candid 0.10.13
+
+* Add `ArgumentEncoder::encode_ref`, `utils::{write_args, encode_args}` that don't consume the value when encoding.
+
 ## 2025-01-15
 
 ### Candid 0.10.12
