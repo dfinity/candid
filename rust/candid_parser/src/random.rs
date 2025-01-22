@@ -300,7 +300,7 @@ fn size_helper(env: &TypeEnv, seen: &mut HashSet<String>, t: &Type) -> Option<us
             if seen.insert(id.to_string()) {
                 let ty = env.rec_find_type(id).unwrap();
                 let res = size_helper(env, seen, ty)?;
-                seen.remove(id);
+                seen.remove(id.as_str());
                 res
             } else {
                 return None;

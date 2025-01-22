@@ -1,6 +1,14 @@
 
 # Changelog
 
+## Unreleased
+
+### Candid
+
+* [BREAKING]: type representation was optimized to improve performance:
+  * In `Type::Var(var)` `var` now has type `TypeKey` instead of `String`. Calling `var.as_str()` returns `&str` and `var.to_string()` returns a `String`. The string representation of indexed variables remains `table{index}` to maintain compatibility with previous versions.
+  * `TypeEnv` now contains a `HashMap` instead of `BTreeMap`. Code that relied on the iteration order of the map (e.g. `env.0.iter()`) should make use of the newly added `TypeEnv::to_sorted_iter()` method which returns types sorted by their keys.
+
 ## 2025-01-15
 
 ### Candid 0.10.12
