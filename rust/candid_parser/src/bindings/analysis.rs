@@ -1,5 +1,4 @@
 use crate::{Error, Result};
-use candid::types::internal::TypeKey;
 use candid::types::{Type, TypeEnv, TypeInner};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -44,10 +43,10 @@ pub fn chase_type<'a>(
     use TypeInner::*;
     match t.as_ref() {
         Var(id) => {
-            if seen.insert(id.as_str()) {
+            if seen.insert(id) {
                 let t = env.find_type(id)?;
                 chase_type(seen, res, env, t)?;
-                res.push(id.as_str());
+                res.push(id);
             }
         }
         Opt(ty) | Vec(ty) => chase_type(seen, res, env, ty)?,
@@ -149,8 +148,8 @@ pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTree
         use TypeInner::*;
         match t.as_ref() {
             Var(id) => {
-                if seen.insert(id.as_str()) {
-                    res.insert(id.as_str());
+                if seen.insert(id) {
+                    res.insert(id);
                 }
             }
             Opt(ty) | Vec(ty) => go(seen, res, _env, ty)?,
@@ -179,8 +178,8 @@ pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTree
         }
         Ok(())
     }
-    for &var in def_list.iter() {
-        let t = _env.0.get(&TypeKey::from(var)).unwrap();
+    for var in def_list.iter() {
+        let t = _env.0.get(*var).unwrap();
         go(&mut seen, &mut res, _env, t)?;
         seen.insert(var);
     }
