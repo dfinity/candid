@@ -93,14 +93,14 @@ fn compiler_test(resource: &str) {
             }
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
-                let content = javascript::compile(&env, &actor);
+                let content = javascript::compile(&env, &actor, false);
                 writeln!(output, "{content}").unwrap();
             }
             {
                 let mut output = mint
                     .new_goldenfile(filename.with_extension("d.ts"))
                     .unwrap();
-                let content = typescript::compile(&env, &actor);
+                let content = typescript::compile(&env, &actor, false);
                 writeln!(output, "{content}").unwrap();
             }
         }
