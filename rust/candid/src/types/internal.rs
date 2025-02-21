@@ -416,8 +416,8 @@ impl PartialEq for Label {
 }
 
 impl std::hash::Hash for Label {
-    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {
-        self.get_id();
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        state.write_u32(self.get_id());
     }
 }
 
