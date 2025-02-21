@@ -1,6 +1,7 @@
 use super::CandidType;
 use crate::idl_hash;
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -382,7 +383,7 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
     }
 }
 
-#[derive(Debug, Eq, Clone, PartialOrd, Ord)]
+#[derive(Debug, Clone)]
 pub enum Label {
     Id(u32),
     Named(String),
@@ -415,9 +416,23 @@ impl PartialEq for Label {
     }
 }
 
+impl Eq for Label {}
+
+impl PartialOrd for Label {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Label {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.get_id().cmp(&other.get_id())
+    }
+}
+
 impl std::hash::Hash for Label {
-    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {
-        self.get_id();
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        state.write_u32(self.get_id());
     }
 }
 
