@@ -419,15 +419,15 @@ impl PartialEq for Label {
 impl Eq for Label {}
 
 impl PartialOrd for Label {
-	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-		Some(self.cmp(other))
-	}
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Ord for Label {
-	fn cmp(&self, other: &Self) -> Ordering {
-		self.get_id().cmp(&other.get_id())
-	}
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.get_id().cmp(&other.get_id())
+    }
 }
 
 impl std::hash::Hash for Label {
