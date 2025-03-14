@@ -15,6 +15,7 @@ use candid::parser::typing::{check_type, Env, TypeEnv};
 
 use candiff::{
     //Type,
+    ArgTuple,
     pretty,
     Value,
 };
@@ -76,6 +77,9 @@ enum CliCommand {
         /// Input format
         #[structopt(short = "i", long = "input-format", default_value = "text")]
         format: CliFormat,
+        /// Input is a single bare value, not a tuple of values (the default).
+        #[structopt(short = "b", long = "input-bare")]
+        input_bare: bool,
         input1: String,
         input2: String,
         /// Optional (common) input type
@@ -182,21 +186,26 @@ fn main() {
         }
         CliCommand::DiffValue {
             format,
+            input_bare,
             input1,
             input2,
             input_type,
             debug_output,
         } => {
+            if input_bare {
+                unimplemented!("comparing bare values; use enclosing '(' ')' for now.")
+            };
+            assert_eq!(input_bare, false);
             match format {
                 CliFormat::Text => {
-                    match (Value::from_str(&input1), Value::from_str(&input2)) {
+                    match (ArgTuple::from_str(&input1), ArgTuple::from_str(&input2)) {
                         (Err(e1), Err(e2)) => error!(
                             "Both values failed to parse:\nFirst: {}\nSecond: {}",
                             e1, e2
                         ),
                         (Err(e1), _) => error!("First value failed to parse (only): {}\n", e1),
                         (_, Err(e2)) => error!("Second value failed to parse (only): {}\n", e2),
-                        (Ok(v1), Ok(v2)) => {
+                        (Ok(vs1), Ok(vs2)) => {
                             let input_type = match input_type {
                                 None => {
                                     warn!("No input type provided; All numbers remain textual.");
@@ -213,9 +222,16 @@ fn main() {
                                     }
                                 },
                             };
-                            trace!("value_1 = {:?}", v1);
-                            trace!("value_2 = {:?}", v2);
+                            trace!("values_1 = {:?}", vs1);
+                            trace!("values_2 = {:?}", vs2);
                             // check the type, and then annotate the value with that type, possibly transforming it
+
+                            // temp limitation: assume exactly one value per tuple
+                            assert_eq!(vs1.args.len(), 1);
+                            assert_eq!(vs2.args.len(), 1);
+                            let v1 = vs1.args[0].clone();
+                            let v2 = vs2.args[0].clone();
+
                             let (v1, v2, input_type) = match input_type {
                                 None => (v1, v2, None),
                                 Some(ty) => {
