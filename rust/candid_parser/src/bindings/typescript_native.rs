@@ -1,15 +1,15 @@
 use super::javascript::is_tuple;
-use candid::pretty::utils::*;
-use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
-use pretty::RcDoc;
+use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
+use std::io::Write;
+use swc_core::common::comments::SingleThreadedComments;
+use swc_core::common::errors::{ColorConfig, Handler};
+use swc_core::common::source_map::SourceMap;
+use swc_core::common::sync::Lrc;
+use swc_core::common::{FileName, Span, SyntaxContext, DUMMY_SP};
+use swc_core::ecma::ast::*;
+use swc_core::ecma::codegen::{text_writer::JsWriter, Config, Emitter};
 
-fn indent4<'a>() -> RcDoc<'a> {
-    RcDoc::space()
-        .append(RcDoc::space())
-        .append(RcDoc::space())
-        .append(RcDoc::space())
-}
-
+// Map of JavaScript/TypeScript keywords to escape
 static KEYWORDS: [&str; 125] = [
     // Original JavaScript keywords
     "abstract",
@@ -143,58 +143,740 @@ static KEYWORDS: [&str; 125] = [
     "window",
 ];
 
-pub(crate) fn ident(id: &str) -> RcDoc {
-    if KEYWORDS.contains(&id) {
-        str(id).append("_")
+pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str) -> String {
+    // Create source map for location information
+    let cm = Lrc::new(SourceMap::default());
+    let comments = SingleThreadedComments::default();
+
+    // Create an empty module to hold all declarations
+    let mut module = Module {
+        span: DUMMY_SP,
+        body: vec![],
+        shebang: None,
+    };
+
+    // Add imports
+    add_imports(&mut module, service_name);
+
+    // Add Principal type import
+    add_principal_import(&mut module);
+
+    // Add helper types (Option<T>, Some<T>, None)
+    add_option_helpers(&mut module);
+
+    // Generate type definitions from the environment
+    add_type_definitions(env, &mut module);
+
+    // Add actor implementation if provided
+    if let Some(actor_type) = actor {
+        add_actor_implementation(env, &mut module, actor_type, service_name);
+    }
+
+    // Generate code from the AST
+    let mut buf = vec![];
+    {
+        let writer = JsWriter::new(cm.clone(), "\n", &mut buf, None);
+        let mut emitter = Emitter {
+            cfg: Config::default().with_minify(false),
+            cm: cm.clone(),
+            comments: Some(&comments),
+            wr: Box::new(writer),
+        };
+
+        emitter.emit_module(&module).unwrap();
+    }
+
+    String::from_utf8(buf).unwrap()
+}
+
+// Ensure identifier is not a reserved keyword
+fn create_ident(name: &str) -> Ident {
+    let ident_name = if KEYWORDS.contains(&name) {
+        format!("{}_", name)
     } else {
-        str(id)
+        name.to_string()
+    };
+
+    Ident::new(ident_name.into(), DUMMY_SP, SyntaxContext::empty())
+}
+
+// Add standard imports
+fn add_imports(module: &mut Module, service_name: &str) {
+    let dashed_name = service_name.replace('-', "_");
+
+    // Import Actor
+    module
+        .body
+        .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+            span: DUMMY_SP,
+            specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
+                span: DUMMY_SP,
+                local: Ident::new(
+                    format!("_{}", service_name).into(),
+                    DUMMY_SP,
+                    SyntaxContext::empty(),
+                ),
+                imported: Some(ModuleExportName::Ident(Ident::new(
+                    service_name.into(),
+                    DUMMY_SP,
+                    SyntaxContext::empty(),
+                ))),
+                is_type_only: false,
+            })],
+            src: Box::new(Str {
+                span: DUMMY_SP,
+                value: format!("./{}", dashed_name).into(),
+                raw: None,
+            }),
+            type_only: false,
+            with: None,
+            phase: Default::default(),
+        })));
+
+    // Import ActorSubclass
+    module
+        .body
+        .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+            span: DUMMY_SP,
+            specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
+                span: DUMMY_SP,
+                local: Ident::new("ActorSubclass".into(), DUMMY_SP, SyntaxContext::empty()),
+                imported: None,
+                is_type_only: true,
+            })],
+            src: Box::new(Str {
+                span: DUMMY_SP,
+                value: "@dfinity/agent".into(),
+                raw: None,
+            }),
+            type_only: false,
+            with: None,
+            phase: Default::default(),
+        })));
+
+    // Import _SERVICE
+    module
+        .body
+        .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+            span: DUMMY_SP,
+            specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
+                span: DUMMY_SP,
+                local: Ident::new("_SERVICE".into(), DUMMY_SP, SyntaxContext::empty()),
+                imported: None,
+                is_type_only: false,
+            })],
+            src: Box::new(Str {
+                span: DUMMY_SP,
+                value: format!("./{}/{}.did", dashed_name, dashed_name).into(),
+                raw: None,
+            }),
+            type_only: false,
+            with: None,
+            phase: Default::default(),
+        })));
+}
+
+// Add Principal type import
+fn add_principal_import(module: &mut Module) {
+    module
+        .body
+        .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+            span: DUMMY_SP,
+            specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
+                span: DUMMY_SP,
+                local: Ident::new("Principal".into(), DUMMY_SP, SyntaxContext::empty()),
+                imported: None,
+                is_type_only: false,
+            })],
+            src: Box::new(Str {
+                span: DUMMY_SP,
+                value: "@dfinity/principal".into(),
+                raw: None,
+            }),
+            type_only: true,
+            with: None,
+            phase: Default::default(),
+        })));
+}
+
+// Add Option helper types
+fn add_option_helpers(module: &mut Module) {
+    // Some<T> type
+    let some_type = create_some_type();
+    module
+        .body
+        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(Box::new(
+            some_type,
+        )))));
+
+    // None type
+    let none_type = create_none_type();
+    module
+        .body
+        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(Box::new(
+            none_type,
+        )))));
+
+    // Option<T> type
+    let option_type = create_option_type();
+    module
+        .body
+        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(Box::new(
+            option_type,
+        )))));
+}
+
+fn create_some_type() -> TsTypeAliasDecl {
+    TsTypeAliasDecl {
+        span: DUMMY_SP,
+        declare: false,
+        id: Ident::new("Some".into(), DUMMY_SP, SyntaxContext::empty()),
+        type_params: Some(Box::new(TsTypeParamDecl {
+            span: DUMMY_SP,
+            params: vec![TsTypeParam {
+                span: DUMMY_SP,
+                name: Ident::new("T".into(), DUMMY_SP, SyntaxContext::empty()),
+                constraint: None,
+                default: None,
+                is_in: false,
+                is_out: false,
+                is_const: false,
+            }],
+        })),
+        type_ann: Box::new(TsType::TsTypeLit(TsTypeLit {
+            span: DUMMY_SP,
+            members: vec![
+                TsTypeElement::TsPropertySignature(TsPropertySignature {
+                    span: DUMMY_SP,
+                    readonly: false,
+                    key: Box::new(Expr::Ident(Ident::new(
+                        "_tag".into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ))),
+                    computed: false,
+                    optional: false,
+                    type_ann: Some(Box::new(TsTypeAnn {
+                        span: DUMMY_SP,
+                        type_ann: Box::new(TsType::TsLitType(TsLitType {
+                            span: DUMMY_SP,
+                            lit: TsLit::Str(Str {
+                                span: DUMMY_SP,
+                                value: "Some".into(),
+                                raw: None,
+                            }),
+                        })),
+                    })),
+                }),
+                TsTypeElement::TsPropertySignature(TsPropertySignature {
+                    span: DUMMY_SP,
+                    readonly: false,
+                    key: Box::new(Expr::Ident(Ident::new(
+                        "value".into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ))),
+                    computed: false,
+                    optional: false,
+                    type_ann: Some(Box::new(TsTypeAnn {
+                        span: DUMMY_SP,
+                        type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                            span: DUMMY_SP,
+                            type_name: TsEntityName::Ident(Ident::new(
+                                "T".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            )),
+                            type_params: None,
+                        })),
+                    })),
+                }),
+            ],
+        })),
     }
 }
 
-fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
+fn create_none_type() -> TsTypeAliasDecl {
+    TsTypeAliasDecl {
+        span: DUMMY_SP,
+        declare: false,
+        id: Ident::new("None".into(), DUMMY_SP, SyntaxContext::empty()),
+        type_params: None,
+        type_ann: Box::new(TsType::TsTypeLit(TsTypeLit {
+            span: DUMMY_SP,
+            members: vec![TsTypeElement::TsPropertySignature(TsPropertySignature {
+                span: DUMMY_SP,
+                readonly: false,
+                key: Box::new(Expr::Ident(Ident::new(
+                    "_tag".into(),
+                    DUMMY_SP,
+                    SyntaxContext::empty(),
+                ))),
+                computed: false,
+                optional: false,
+                type_ann: Some(Box::new(TsTypeAnn {
+                    span: DUMMY_SP,
+                    type_ann: Box::new(TsType::TsLitType(TsLitType {
+                        span: DUMMY_SP,
+                        lit: TsLit::Str(Str {
+                            span: DUMMY_SP,
+                            value: "None".into(),
+                            raw: None,
+                        }),
+                    })),
+                })),
+            })],
+        })),
+    }
+}
+
+fn create_option_type() -> TsTypeAliasDecl {
+    TsTypeAliasDecl {
+        span: DUMMY_SP,
+        declare: false,
+        id: Ident::new("Option".into(), DUMMY_SP, SyntaxContext::empty()),
+        type_params: Some(Box::new(TsTypeParamDecl {
+            span: DUMMY_SP,
+            params: vec![TsTypeParam {
+                span: DUMMY_SP,
+                name: Ident::new("T".into(), DUMMY_SP, SyntaxContext::empty()),
+                constraint: None,
+                default: None,
+                is_in: false,
+                is_out: false,
+                is_const: false,
+            }],
+        })),
+        type_ann: Box::new(TsType::TsUnionOrIntersectionType(
+            TsUnionOrIntersectionType::TsUnionType(TsUnionType {
+                span: DUMMY_SP,
+                types: vec![
+                    Box::new(TsType::TsTypeRef(TsTypeRef {
+                        span: DUMMY_SP,
+                        type_name: TsEntityName::Ident(Ident::new(
+                            "Some".into(),
+                            DUMMY_SP,
+                            SyntaxContext::empty(),
+                        )),
+                        type_params: Some(Box::new(TsTypeParamInstantiation {
+                            span: DUMMY_SP,
+                            params: vec![Box::new(TsType::TsTypeRef(TsTypeRef {
+                                span: DUMMY_SP,
+                                type_name: TsEntityName::Ident(Ident::new(
+                                    "T".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                )),
+                                type_params: None,
+                            }))],
+                        })),
+                    })),
+                    Box::new(TsType::TsTypeRef(TsTypeRef {
+                        span: DUMMY_SP,
+                        type_name: TsEntityName::Ident(Ident::new(
+                            "None".into(),
+                            DUMMY_SP,
+                            SyntaxContext::empty(),
+                        )),
+                        type_params: None,
+                    })),
+                ],
+            }),
+        )),
+    }
+}
+
+// Add all type definitions from the environment
+fn add_type_definitions(env: &TypeEnv, module: &mut Module) {
+    for (id, _) in &env.0 {
+        if let Ok(ty) = env.find_type(id) {
+            match ty.as_ref() {
+                TypeInner::Record(_) if !is_tuple(ty) => {
+                    // Generate interface for record types
+                    let interface = create_interface_from_record(env, id, ty);
+                    module
+                        .body
+                        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(Box::new(
+                            interface,
+                        )))));
+                }
+                TypeInner::Service(ref serv) => {
+                    // Generate interface for service types
+                    let interface = create_interface_from_service(env, id, serv);
+                    module
+                        .body
+                        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(Box::new(
+                            interface,
+                        )))));
+                }
+                TypeInner::Func(ref func) => {
+                    // Generate type alias for function types
+                    let type_alias = create_type_alias_from_function(env, id, func);
+                    module
+                        .body
+                        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(Box::new(
+                            type_alias,
+                        )))));
+                }
+                _ => {
+                    // Generate type alias for other types
+                    let type_alias = create_type_alias(env, id, ty);
+                    module
+                        .body
+                        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(Box::new(
+                            type_alias,
+                        )))));
+                }
+            }
+        }
+    }
+}
+
+// Create TS interface from Candid record
+fn create_interface_from_record(env: &TypeEnv, id: &str, ty: &Type) -> TsInterfaceDecl {
+    let members = if let TypeInner::Record(ref fields) = ty.as_ref() {
+        fields
+            .iter()
+            .map(|field| create_property_signature(env, field))
+            .collect()
+    } else {
+        vec![]
+    };
+
+    TsInterfaceDecl {
+        span: DUMMY_SP,
+        declare: false,
+        id: create_ident(id),
+        type_params: None,
+        extends: vec![],
+        body: TsInterfaceBody {
+            span: DUMMY_SP,
+            body: members,
+        },
+    }
+}
+
+// Create TS interface from Candid service
+fn create_interface_from_service(
+    env: &TypeEnv,
+    id: &str,
+    serv: &Vec<(String, Type)>,
+) -> TsInterfaceDecl {
+    let members = serv
+        .iter()
+        .map(|(method_id, method_ty)| match method_ty.as_ref() {
+            TypeInner::Func(ref func) => create_method_signature(env, method_id, func),
+            _ => create_property_signature_from_type(env, method_id, method_ty),
+        })
+        .collect();
+
+    TsInterfaceDecl {
+        span: DUMMY_SP,
+        declare: false,
+        id: create_ident(id),
+        type_params: None,
+        extends: vec![],
+        body: TsInterfaceBody {
+            span: DUMMY_SP,
+            body: members,
+        },
+    }
+}
+
+// Create TS type alias from Candid function
+fn create_type_alias_from_function(env: &TypeEnv, id: &str, func: &Function) -> TsTypeAliasDecl {
+    TsTypeAliasDecl {
+        span: DUMMY_SP,
+        declare: false,
+        id: create_ident(id),
+        type_params: None,
+        type_ann: Box::new(create_function_type(env, func)),
+    }
+}
+
+// Create general TS type alias
+fn create_type_alias(env: &TypeEnv, id: &str, ty: &Type) -> TsTypeAliasDecl {
+    TsTypeAliasDecl {
+        span: DUMMY_SP,
+        declare: false,
+        id: create_ident(id),
+        type_params: None,
+        type_ann: Box::new(convert_type(env, ty, false)),
+    }
+}
+
+// Create TS property signature from Candid field
+fn create_property_signature(env: &TypeEnv, field: &Field) -> TsTypeElement {
+    let field_name = match &*field.id {
+        Label::Named(str) => Box::new(Expr::Ident(create_ident(str))),
+        Label::Id(n) | Label::Unnamed(n) => Box::new(Expr::Ident(Ident::new(
+            format!("_{}_", n).into(),
+            DUMMY_SP,
+            SyntaxContext::empty(),
+        ))),
+    };
+
+    // Check if the field type is optional
+    let (is_optional, type_ann) = if let TypeInner::Opt(ref inner_type) = field.ty.as_ref() {
+        (true, convert_type(env, inner_type, true))
+    } else {
+        (false, convert_type(env, &field.ty, true))
+    };
+
+    TsTypeElement::TsPropertySignature(TsPropertySignature {
+        span: DUMMY_SP,
+        readonly: false,
+        key: field_name,
+        computed: false,
+        optional: is_optional,
+        type_ann: Some(Box::new(TsTypeAnn {
+            span: DUMMY_SP,
+            type_ann: Box::new(type_ann),
+        })),
+    })
+}
+
+// Create TS property signature from Candid type
+fn create_property_signature_from_type(env: &TypeEnv, name: &str, ty: &Type) -> TsTypeElement {
+    TsTypeElement::TsPropertySignature(TsPropertySignature {
+        span: DUMMY_SP,
+        readonly: false,
+        key: Box::new(Expr::Ident(create_ident(name))),
+        computed: false,
+        optional: false,
+        type_ann: Some(Box::new(TsTypeAnn {
+            span: DUMMY_SP,
+            type_ann: Box::new(convert_type(env, ty, true)),
+        })),
+    })
+}
+
+// Create TS method signature from Candid function
+fn create_method_signature(env: &TypeEnv, method_id: &str, func: &Function) -> TsTypeElement {
+    // Create parameters
+    let params = func
+        .args
+        .iter()
+        .enumerate()
+        .map(|(i, ty)| {
+            TsFnParam::Ident(BindingIdent {
+                id: Ident::new(format!("arg{}", i).into(), DUMMY_SP, SyntaxContext::empty()),
+                type_ann: Some(Box::new(TsTypeAnn {
+                    span: DUMMY_SP,
+                    type_ann: Box::new(convert_type(env, ty, true)),
+                })),
+            })
+        })
+        .collect();
+
+    // Create return type
+    let return_type = match func.rets.len() {
+        0 => TsType::TsKeywordType(TsKeywordType {
+            span: DUMMY_SP,
+            kind: TsKeywordTypeKind::TsVoidKeyword,
+        }),
+        1 => convert_type(env, &func.rets[0], true),
+        _ => {
+            // Create a tuple type for multiple return values
+            TsType::TsTupleType(TsTupleType {
+                span: DUMMY_SP,
+                elem_types: func
+                    .rets
+                    .iter()
+                    .map(|ty| TsTupleElement {
+                        span: DUMMY_SP,
+                        label: None,
+                        ty: Box::new(convert_type(env, ty, true)),
+                    })
+                    .collect(),
+            })
+        }
+    };
+
+    // Wrap return type in Promise
+    let promise_return_type = TsType::TsTypeRef(TsTypeRef {
+        span: DUMMY_SP,
+        type_name: TsEntityName::Ident(Ident::new(
+            "Promise".into(),
+            DUMMY_SP,
+            SyntaxContext::empty(),
+        )),
+        type_params: Some(Box::new(TsTypeParamInstantiation {
+            span: DUMMY_SP,
+            params: vec![Box::new(return_type)],
+        })),
+    });
+
+    TsTypeElement::TsMethodSignature(TsMethodSignature {
+        span: DUMMY_SP,
+        key: Box::new(Expr::Ident(create_ident(method_id))),
+        computed: false,
+        optional: false,
+        params,
+        type_ann: Some(Box::new(TsTypeAnn {
+            span: DUMMY_SP,
+            type_ann: Box::new(promise_return_type),
+        })),
+        type_params: None,
+    })
+}
+
+// Create a function type representation
+fn create_function_type(env: &TypeEnv, func: &Function) -> TsType {
+    // Create parameters
+    let params = func
+        .args
+        .iter()
+        .enumerate()
+        .map(|(i, ty)| {
+            TsFnParam::Ident(BindingIdent {
+                id: Ident::new(format!("arg{}", i).into(), DUMMY_SP, SyntaxContext::empty()),
+                type_ann: Some(Box::new(TsTypeAnn {
+                    span: DUMMY_SP,
+                    type_ann: Box::new(convert_type(env, ty, true)),
+                })),
+            })
+        })
+        .collect();
+
+    // Create return type
+    let return_type = match func.rets.len() {
+        0 => TsType::TsKeywordType(TsKeywordType {
+            span: DUMMY_SP,
+            kind: TsKeywordTypeKind::TsVoidKeyword,
+        }),
+        1 => convert_type(env, &func.rets[0], true),
+        _ => {
+            // Create a tuple type for multiple return values
+            TsType::TsTupleType(TsTupleType {
+                span: DUMMY_SP,
+                elem_types: func
+                    .rets
+                    .iter()
+                    .map(|ty| TsTupleElement {
+                        span: DUMMY_SP,
+                        label: None,
+                        ty: Box::new(convert_type(env, ty, true)),
+                    })
+                    .collect(),
+            })
+        }
+    };
+
+    TsType::TsFnOrConstructorType(TsFnOrConstructorType::TsFnType(TsFnType {
+        span: DUMMY_SP,
+        params,
+        type_params: None,
+        type_ann: Box::new(TsTypeAnn {
+            span: DUMMY_SP,
+            type_ann: Box::new(return_type),
+        }),
+    }))
+}
+
+// Convert Candid type to TypeScript type
+fn convert_type(env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
     use TypeInner::*;
+
     match ty.as_ref() {
-        // Primitive types remain unchanged
-        Null => str("null"),
-        Bool => str("boolean"),
-        Nat => str("bigint"),
-        Int => str("bigint"),
-        Nat8 => str("number"),
-        Nat16 => str("number"),
-        Nat32 => str("number"),
-        Nat64 => str("bigint"),
-        Int8 => str("number"),
-        Int16 => str("number"),
-        Int32 => str("number"),
-        Int64 => str("bigint"),
-        Float32 => str("number"),
-        Float64 => str("number"),
-        Text => str("string"),
-        Reserved => str("any"),
-        Empty => str("never"),
+        // Primitive types
+        Null => TsType::TsKeywordType(TsKeywordType {
+            span: DUMMY_SP,
+            kind: TsKeywordTypeKind::TsNullKeyword,
+        }),
+        Bool => TsType::TsKeywordType(TsKeywordType {
+            span: DUMMY_SP,
+            kind: TsKeywordTypeKind::TsBooleanKeyword,
+        }),
+        Nat | Int | Nat64 | Int64 => TsType::TsKeywordType(TsKeywordType {
+            span: DUMMY_SP,
+            kind: TsKeywordTypeKind::TsBigIntKeyword,
+        }),
+        Nat8 | Nat16 | Nat32 | Int8 | Int16 | Int32 | Float32 | Float64 => {
+            TsType::TsKeywordType(TsKeywordType {
+                span: DUMMY_SP,
+                kind: TsKeywordTypeKind::TsNumberKeyword,
+            })
+        }
+        Text => TsType::TsKeywordType(TsKeywordType {
+            span: DUMMY_SP,
+            kind: TsKeywordTypeKind::TsStringKeyword,
+        }),
+        // Special types
+        Reserved => TsType::TsKeywordType(TsKeywordType {
+            span: DUMMY_SP,
+            kind: TsKeywordTypeKind::TsAnyKeyword,
+        }),
+        Empty => TsType::TsKeywordType(TsKeywordType {
+            span: DUMMY_SP,
+            kind: TsKeywordTypeKind::TsNeverKeyword,
+        }),
+        Principal => TsType::TsTypeRef(TsTypeRef {
+            span: DUMMY_SP,
+            type_name: TsEntityName::Ident(Ident::new(
+                "Principal".into(),
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            )),
+            type_params: None,
+        }),
+        // Reference types
         Var(ref id) => {
             if is_ref {
                 let ty = env.rec_find_type(id).unwrap();
                 if matches!(ty.as_ref(), Service(_) | Func(_)) {
-                    pp_ty(env, ty, false)
+                    convert_type(env, ty, false)
                 } else {
-                    ident(id)
+                    TsType::TsTypeRef(TsTypeRef {
+                        span: DUMMY_SP,
+                        type_name: TsEntityName::Ident(create_ident(id)),
+                        type_params: None,
+                    })
                 }
             } else {
-                ident(id)
+                TsType::TsTypeRef(TsTypeRef {
+                    span: DUMMY_SP,
+                    type_name: TsEntityName::Ident(create_ident(id)),
+                    type_params: None,
+                })
             }
         }
-        Principal => str("Principal"),
+        // Optional types
         Opt(ref t) => {
-            // For nested options, use Option<T> helper
-            // For simple options, use T | null
             match t.as_ref() {
-                TypeInner::Opt(_) => str("Option<")
-                    .append(pp_ty(env, t, is_ref))
-                    .append(str(">")),
-                _ => pp_ty(env, t, is_ref).append(str(" | null")),
+                Opt(_) => {
+                    // Use Option<T> for nested optionals
+                    TsType::TsTypeRef(TsTypeRef {
+                        span: DUMMY_SP,
+                        type_name: TsEntityName::Ident(Ident::new(
+                            "Option".into(),
+                            DUMMY_SP,
+                            SyntaxContext::empty(),
+                        )),
+                        type_params: Some(Box::new(TsTypeParamInstantiation {
+                            span: DUMMY_SP,
+                            params: vec![Box::new(convert_type(env, t, is_ref))],
+                        })),
+                    })
+                }
+                _ => {
+                    // Use T | null for simple optionals
+                    TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
+                        TsUnionType {
+                            span: DUMMY_SP,
+                            types: vec![
+                                Box::new(convert_type(env, t, is_ref)),
+                                Box::new(TsType::TsKeywordType(TsKeywordType {
+                                    span: DUMMY_SP,
+                                    kind: TsKeywordTypeKind::TsNullKeyword,
+                                })),
+                            ],
+                        },
+                    ))
+                }
             }
         }
+        // Vector types
         Vec(ref t) => {
             let ty = match t.as_ref() {
                 Var(ref id) => {
@@ -210,466 +892,542 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
                 }
                 _ => t,
             };
+
             match ty.as_ref() {
-                Nat8 => str("Uint8Array | number[]"),
-                Nat16 => str("Uint16Array | number[]"),
-                Nat32 => str("Uint32Array | number[]"),
-                Nat64 => str("BigUint64Array | bigint[]"),
-                Int8 => str("Int8Array | number[]"),
-                Int16 => str("Int16Array | number[]"),
-                Int32 => str("Int32Array | number[]"),
-                Int64 => str("BigInt64Array | bigint[]"),
-                // Directly create array notation without enclose which adds newlines
-                _ => str("Array<").append(pp_ty(env, t, is_ref)).append(str(">")),
+                Nat8 => create_union_array_type("Uint8Array", "number"),
+                Nat16 => create_union_array_type("Uint16Array", "number"),
+                Nat32 => create_union_array_type("Uint32Array", "number"),
+                Nat64 => create_union_array_type("BigUint64Array", "bigint"),
+                Int8 => create_union_array_type("Int8Array", "number"),
+                Int16 => create_union_array_type("Int16Array", "number"),
+                Int32 => create_union_array_type("Int32Array", "number"),
+                Int64 => create_union_array_type("BigInt64Array", "bigint"),
+                _ => {
+                    // Generic array type
+                    TsType::TsTypeRef(TsTypeRef {
+                        span: DUMMY_SP,
+                        type_name: TsEntityName::Ident(Ident::new(
+                            "Array".into(),
+                            DUMMY_SP,
+                            SyntaxContext::empty(),
+                        )),
+                        type_params: Some(Box::new(TsTypeParamInstantiation {
+                            span: DUMMY_SP,
+                            params: vec![Box::new(convert_type(env, t, is_ref))],
+                        })),
+                    })
+                }
             }
         }
+        // Record types
         Record(ref fs) => {
             if is_tuple(ty) {
-                // Use direct intersperse to keep tuples on one line without line breaks
-                let tuple_items = fs.iter().map(|f| pp_ty(env, &f.ty, is_ref));
-                str("[")
-                    .append(RcDoc::intersperse(tuple_items, str(", ")))
-                    .append(str("]"))
+                // Create tuple type
+                TsType::TsTupleType(TsTupleType {
+                    span: DUMMY_SP,
+                    elem_types: fs
+                        .iter()
+                        .map(|f| TsTupleElement {
+                            span: DUMMY_SP,
+                            label: None,
+                            ty: Box::new(convert_type(env, &f.ty, is_ref)),
+                        })
+                        .collect(),
+                })
             } else {
-                // Use direct intersperse for record fields too
-                let fields = fs.iter().map(|f| pp_field(env, f, is_ref));
-                str("{ ")
-                    .append(RcDoc::intersperse(fields, str(", ")))
-                    .append(str(" }"))
+                // Create record type
+                TsType::TsTypeLit(TsTypeLit {
+                    span: DUMMY_SP,
+                    members: fs
+                        .iter()
+                        .map(|f| create_property_signature(env, f))
+                        .collect(),
+                })
             }
         }
+        // Variant types
         Variant(ref fs) => {
             if fs.is_empty() {
-                str("never")
+                TsType::TsKeywordType(TsKeywordType {
+                    span: DUMMY_SP,
+                    kind: TsKeywordTypeKind::TsNeverKeyword,
+                })
             } else {
-                // Replace strict_concat with direct intersperse for variants
-                let variants = fs
-                    .iter()
-                    .map(|f| str("{ ").append(pp_field(env, f, is_ref)).append(str(" }")));
-                RcDoc::intersperse(variants, str(" | "))
+                // Create union of object types
+                TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
+                    TsUnionType {
+                        span: DUMMY_SP,
+                        types: fs
+                            .iter()
+                            .map(|f| {
+                                Box::new(TsType::TsTypeLit(TsTypeLit {
+                                    span: DUMMY_SP,
+                                    members: vec![create_property_signature(env, f)],
+                                }))
+                            })
+                            .collect(),
+                    },
+                ))
             }
         }
-
-        Func(ref func) => {
-            // Represent functions as regular TypeScript function types
-            pp_function_type(env, func)
-        }
-        Service(_) => str("Principal"),
-        Class(_, _) => unreachable!(),
-        Knot(_) | Unknown | Future => unreachable!(),
+        // Function types
+        Func(ref func) => create_function_type(env, func),
+        // Service types
+        Service(_) => TsType::TsTypeRef(TsTypeRef {
+            span: DUMMY_SP,
+            type_name: TsEntityName::Ident(Ident::new(
+                "Principal".into(),
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            )),
+            type_params: None,
+        }),
+        // Unsupported types
+        Class(_, _) | Knot(_) | Unknown | Future => TsType::TsKeywordType(TsKeywordType {
+            span: DUMMY_SP,
+            kind: TsKeywordTypeKind::TsAnyKeyword,
+        }),
     }
 }
 
-fn pp_function_type<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
-    let args_docs = func.args.iter().enumerate().map(|(i, ty)| {
-        str("arg")
-            .append(RcDoc::as_string(i))
-            .append(str(": "))
-            .append(pp_ty(env, ty, true))
-    });
-
-    // Use direct intersperse for arguments to keep them on one line
-    let args = RcDoc::intersperse(args_docs, str(", "));
-
-    let rets = match func.rets.len() {
-        0 => str("void"),
-        1 => pp_ty(env, &func.rets[0], true),
-        _ => {
-            // Use direct intersperse for multiple return types
-            let ret_types = func.rets.iter().map(|ty| pp_ty(env, ty, true));
-            str("[")
-                .append(RcDoc::intersperse(ret_types, str(", ")))
-                .append(str("]"))
-        }
-    };
-
-    str("(").append(args).append(str(") => ")).append(rets)
-}
-
-fn pp_label(id: &SharedLabel) -> RcDoc {
-    match &**id {
-        Label::Named(str) => ident(str),
-        Label::Id(n) | Label::Unnamed(n) => str("_")
-            .append(RcDoc::as_string(n))
-            .append("_")
-            .append(RcDoc::space()),
-    }
-}
-
-fn pp_field<'a>(env: &'a TypeEnv, field: &'a Field, is_ref: bool) -> RcDoc<'a> {
-    // Check if the field type is optional
-    let is_optional = matches!(field.ty.as_ref(), TypeInner::Opt(_));
-
-    let field_name = pp_label(&field.id);
-
-    // If it's an optional field, add a question mark and unwrap the inner type
-    if is_optional {
-        if let TypeInner::Opt(inner_type) = field.ty.as_ref() {
-            return field_name
-                .append(str("?"))
-                .append(kwd(":"))
-                .append(pp_ty(env, inner_type, is_ref));
-        }
-    }
-
-    // Regular non-optional field
-    field_name
-        .append(kwd(":"))
-        .append(pp_ty(env, &field.ty, is_ref))
-}
-
-fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
-    let args_docs = func.args.iter().enumerate().map(|(i, ty)| {
-        str("arg")
-            .append(RcDoc::as_string(i))
-            .append(str(": "))
-            .append(pp_ty(env, ty, true))
-    });
-
-    // Handle the last argument specially to avoid trailing comma
-    let args = if func.args.is_empty() {
-        RcDoc::nil()
-    } else {
-        let args_vec: Vec<_> = args_docs.collect();
-        let mut result = RcDoc::nil();
-        for (i, arg) in args_vec.iter().enumerate() {
-            result = result.append(arg.clone());
-            if i < args_vec.len() - 1 {
-                result = result.append(str(", "));
-            }
-        }
-        result
-    };
-
-    let rets = match func.rets.len() {
-        0 => str("void"),
-        1 => pp_ty(env, &func.rets[0], true),
-        _ => enclose(
-            "[",
-            concat(func.rets.iter().map(|ty| pp_ty(env, ty, true)), ","),
-            "]",
-        ),
-    };
-
-    str("(")
-        .append(args)
-        .append(str("): Promise<"))
-        .append(rets)
-        .append(str(">"))
-}
-
-fn pp_service_interface<'a>(
-    env: &'a TypeEnv,
-    id: &'a str,
-    serv: &'a [(String, Type)],
-) -> RcDoc<'a> {
-    let doc = serv.iter().map(|(id, func)| {
-        let func_doc = match func.as_ref() {
-            TypeInner::Func(ref func) => {
-                // Use ident instead of quote_ident to avoid quotes
-                ident(id).append(pp_function(env, func))
-            }
-            _ => ident(id).append(kwd(":")).append(pp_ty(env, func, false)),
-        };
-        // Add 4 spaces indentation at the beginning of each line
-        RcDoc::space()
-            .append(RcDoc::space())
-            .append(RcDoc::space())
-            .append(RcDoc::space())
-            .append(func_doc)
-    });
-
-    // Join with comma and newline
-    let doc_with_commas = RcDoc::intersperse(doc, RcDoc::text(",").append(RcDoc::line()));
-
-    kwd("export interface")
-        .append(ident(id))
-        .append(" ")
-        .append(RcDoc::text("{"))
-        .append(RcDoc::line())
-        .append(doc_with_commas)
-        .append(RcDoc::line())
-        .append(RcDoc::text("}"))
-}
-
-fn pp_actor_var_wrapper<'a>(env: &'a TypeEnv, service_name: &'a str, id: &'a str) -> RcDoc<'a> {
-    let type_ref = env.find_type(id).unwrap();
-    // Determine the inner service details, which could be directly a service
-    // or could be a variable reference to a service
-    let serv = match type_ref.as_ref() {
-        TypeInner::Service(ref serv) => serv,
-        TypeInner::Var(var_id) => {
-            // If it's a variable, find what it refers to
-            let referred_type = env.rec_find_type(var_id).unwrap();
-            match referred_type.as_ref() {
-                TypeInner::Service(ref serv) => serv,
-                _ => unreachable!("Expected service type for {}", var_id),
-            }
-        }
-        _ => unreachable!("Expected service or reference to service type"),
-    };
-
-    kwd("export interface ")
-        .append(ident(service_name))
-        .append(" extends ")
-        .append(ident(id))
-        .append(" {}")
-        .append(RcDoc::line())
-        .append(RcDoc::line())
-        .append("export class ")
-        .append(ident(service_name))
-        .append(" implements ")
-        .append(ident(service_name))
-        .append(pp_wrapper(env, service_name, serv))
-}
-
-fn pp_actor_service_wrapper<'a>(
-    env: &'a TypeEnv,
-    service_name: &'a str,
-    serv: &'a Vec<(String, Type)>,
-) -> RcDoc<'a> {
-    pp_service_interface(env, service_name, serv)
-        .append(RcDoc::line())
-        .append(RcDoc::line())
-        .append("export class ")
-        .append(ident(service_name))
-        .append(" ")
-        .append(RcDoc::text("implements"))
-        .append(ident(service_name))
-        .append(pp_wrapper(env, service_name, serv))
-}
-
-fn pp_wrapper<'a>(
-    env: &'a TypeEnv,
-    service_name: &'a str,
-    serv: &'a Vec<(String, Type)>,
-) -> RcDoc<'a> {
-    let doc = serv.iter().map(|(method_id, func)| {
-        let func_doc = match func.as_ref() {
-            TypeInner::Func(ref func) => {
-                // Use ident instead of quote_ident to avoid quotes
-                ident(method_id)
-                    .append(pp_function(env, func))
-                    .append(" {")
-                    .append(RcDoc::line())
-                    // Use the generate_function_wrapper function to create the wrapper body
-                    .append(indent4())
-                    .append(indent4())
-                    .append(generate_function_wrapper(env, func, method_id))
-                    .append(RcDoc::line())
-                    .append(indent4())
-                    .append(str("}"))
-            }
-            _ => ident(method_id)
-                .append(kwd(":"))
-                .append(pp_ty(env, func, false)),
-        };
-        // Add 4 spaces indentation at the beginning of each line (class level)
-        RcDoc::nil().append(indent4()).append(func_doc)
-    });
-
-    let doc_with_lines = RcDoc::intersperse(doc, RcDoc::line());
-
-    kwd(" {") // Only one set of braces
-        .append(RcDoc::line())
-        .append(indent4())
-        .append("private _actor: ActorSubclass<_SERVICE>;")
-        .append(RcDoc::line())
-        .append(indent4())
-        .append(RcDoc::text("constructor() {"))
-        .append(RcDoc::line())
-        .append(indent4())
-        .append(indent4())
-        .append(RcDoc::text(format!("this._actor = _{};", service_name)))
-        .append(RcDoc::line())
-        .append(indent4())
-        .append(RcDoc::text("}"))
-        .append(RcDoc::line())
-        .append(doc_with_lines)
-        .append(RcDoc::line())
-        .append(RcDoc::line())
-        .append(RcDoc::space())
-        .append(RcDoc::line())
-        .append(str("}")) // Closing brace
-}
-
-// Function to generate definitions for types
-fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
-    lines(def_list.iter().map(|id| {
-        if let Ok(ty) = env.find_type(id) {
-            let export = match ty.as_ref() {
-                TypeInner::Record(_) if !is_tuple(ty) => kwd("export interface")
-                    .append(ident(id))
-                    .append(" ")
-                    .append(pp_ty(env, ty, false)),
-                TypeInner::Service(ref serv) => pp_service_interface(env, id, serv),
-                TypeInner::Func(ref func) => kwd("export type")
-                    .append(ident(id))
-                    .append(" = ")
-                    .append(pp_function_type(env, func))
-                    .append(";"),
-                _ => kwd("export type")
-                    .append(ident(id))
-                    .append(" = ")
-                    .append(pp_ty(env, ty, false))
-                    .append(";"),
-            };
-            export
-        } else {
-            // Handle case where type is not found
-            kwd("// Type not found: ").append(str(id))
-        }
+// Helper to create union array types like "Uint8Array | number[]"
+fn create_union_array_type(typed_array: &str, elem_type: &str) -> TsType {
+    TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(TsUnionType {
+        span: DUMMY_SP,
+        types: vec![
+            // TypedArray (e.g., Uint8Array)
+            Box::new(TsType::TsTypeRef(TsTypeRef {
+                span: DUMMY_SP,
+                type_name: TsEntityName::Ident(Ident::new(
+                    typed_array.into(),
+                    DUMMY_SP,
+                    SyntaxContext::empty(),
+                )),
+                type_params: None,
+            })),
+            // Regular array (e.g., number[])
+            Box::new(TsType::TsArrayType(TsArrayType {
+                span: DUMMY_SP,
+                elem_type: Box::new(TsType::TsKeywordType(TsKeywordType {
+                    span: DUMMY_SP,
+                    kind: match elem_type {
+                        "number" => TsKeywordTypeKind::TsNumberKeyword,
+                        "bigint" => TsKeywordTypeKind::TsBigIntKeyword,
+                        _ => TsKeywordTypeKind::TsAnyKeyword,
+                    },
+                })),
+            })),
+        ],
     }))
 }
 
-fn convert<'a>(env: &'a TypeEnv, i: usize, ty: &'a Type, arg: &'a str) -> RcDoc<'a> {
-    RcDoc::nil()
-}
-
-// Generate function wrapper with conversions
-pub fn generate_function_wrapper<'a>(
-    env: &'a TypeEnv,
-    func: &'a Function,
-    method_name: &'a str,
-) -> RcDoc<'a> {
-    // Generate parameter conversions (TypeScript -> Candid)
-    let param_conversions = func
-        .args
-        .iter()
-        .enumerate()
-        .map(|(i, ty)| convert(env, i, ty, ""));
-
-    // Join parameter conversions with newlines
-    let param_conversions_doc = RcDoc::intersperse(param_conversions, RcDoc::line());
-
-    // Generate the function call with converted arguments
-    let arg_names = (0..func.args.len()).map(|i| str("_arg").append(RcDoc::as_string(i)));
-    let args_list = RcDoc::intersperse(arg_names, str(", "));
-
-    // Generate result conversion (Candid -> TypeScript)
-    let return_conversion = match func.rets.len() {
-        0 => str("return;"),
-        1 => {
-            let conversion = convert(env, 0, &func.rets[0], "");
-            str("const _result0 = await this._actor.")
-                .append(str(method_name))
-                .append(str("("))
-                .append(args_list)
-                .append(str(");"))
-                .append(RcDoc::line())
-                .append(conversion)
-                .append(RcDoc::line())
-                .append(str("return result0;"))
+// Add actor implementation
+fn add_actor_implementation(
+    env: &TypeEnv,
+    module: &mut Module,
+    actor_type: &Type,
+    service_name: &str,
+) {
+    match actor_type.as_ref() {
+        TypeInner::Service(ref serv) => {
+            add_actor_service_implementation(env, module, serv, service_name)
         }
-        _ => {
-            // Handle multi-value returns
-            let result_decl = str("const [")
-                .append(RcDoc::intersperse(
-                    (0..func.rets.len()).map(|i| str("_result").append(RcDoc::as_string(i))),
-                    str(", "),
-                ))
-                .append(str("] = await this._actor."))
-                .append(str(method_name))
-                .append(str("("))
-                .append(args_list.clone())
-                .append(str(");"));
-
-            let result_conversions = func
-                .rets
-                .iter()
-                .enumerate()
-                .map(|(i, ty)| convert(env, i, ty, ""));
-
-            let return_statement = str("return [")
-                .append(RcDoc::intersperse(
-                    (0..func.rets.len()).map(|i| str("result").append(RcDoc::as_string(i))),
-                    str(", "),
-                ))
-                .append(str("];"));
-
-            result_decl
-                .append(RcDoc::line())
-                .append(RcDoc::intersperse(result_conversions, RcDoc::line()))
-                .append(RcDoc::line())
-                .append(return_statement)
-        }
-    };
-
-    // Combine all parts into the function wrapper
-    param_conversions_doc
-        .append(RcDoc::line())
-        .append(return_conversion)
-}
-
-fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type, service_name: &'a str) -> RcDoc<'a> {
-    match ty.as_ref() {
-        TypeInner::Service(ref serv) => pp_actor_service_wrapper(env, service_name, serv),
-        TypeInner::Var(id) => pp_actor_var_wrapper(env, service_name, id),
-        TypeInner::Class(_, t) => pp_actor(env, t, service_name),
-        _ => unreachable!(),
+        TypeInner::Var(id) => add_actor_var_implementation(env, module, id, service_name),
+        TypeInner::Class(_, t) => add_actor_implementation(env, module, t, service_name),
+        _ => {}
     }
 }
 
-fn helper_optional_ts_type<'a>(_env: &'a TypeEnv) -> RcDoc<'a> {
-    RcDoc::text("type Some<T> = {")
-        .append(RcDoc::line())
-        .append(RcDoc::text("    _tag: \"Some\","))
-        .append(RcDoc::line())
-        .append(RcDoc::text("    value: T"))
-        .append(RcDoc::line())
-        .append(RcDoc::text("}"))
-        .append(RcDoc::line())
-        .append(RcDoc::line())
-        .append(RcDoc::text("type None = {"))
-        .append(RcDoc::line())
-        .append(RcDoc::text("    _tag: \"None\""))
-        .append(RcDoc::line())
-        .append(RcDoc::text("}"))
-        .append(RcDoc::line())
-        .append(RcDoc::line())
-        .append(RcDoc::text("type Option<T> = Some<T> | None"))
+// Add actor implementation from service definition
+fn add_actor_service_implementation(
+    env: &TypeEnv,
+    module: &mut Module,
+    serv: &Vec<(String, Type)>,
+    service_name: &str,
+) {
+    // First add the service interface
+    let interface = create_interface_from_service(env, service_name, serv);
+    module
+        .body
+        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(Box::new(
+            interface,
+        )))));
+
+    // Then add the implementation class
+    let class_decl = create_actor_class(env, service_name, serv);
+    module
+        .body
+        .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
 }
 
-fn pp_imports_exports<'a>(service_name: &'a str, _original_name: &'a str) -> RcDoc<'a> {
-    let imports = format!(
-        r#"import {{ {original_name} as _{original_name} }} from './{dashed_name}';
-import type {{
-  ActorSubclass,
-}} from "@dfinity/agent";
-import {{ _SERVICE }} from './{dashed_name}/{dashed_name}.did';"#,
-        original_name = service_name,
-        dashed_name = service_name.replace('-', "_")
-    );
-
-    RcDoc::text(imports)
-        .append(RcDoc::line().append(RcDoc::line()))
-        .append(RcDoc::line().append(RcDoc::line()))
-}
-
-pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str) -> String {
-    let header = r#"import type { Principal } from '@dfinity/principal';
-"#;
-    let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
-    let defs = pp_defs(env, &def_list);
-    let actor = match actor {
-        None => RcDoc::nil(),
-        Some(actor) => pp_actor(env, actor, service_name),
+// Add actor implementation from a type reference
+fn add_actor_var_implementation(
+    env: &TypeEnv,
+    module: &mut Module,
+    type_id: &str,
+    service_name: &str,
+) {
+    // Find the service definition
+    let type_ref = env.find_type(type_id).unwrap();
+    let serv = match type_ref.as_ref() {
+        TypeInner::Service(ref serv) => serv,
+        TypeInner::Var(var_id) => {
+            let referred_type = env.rec_find_type(var_id).unwrap();
+            if let TypeInner::Service(ref serv) = referred_type.as_ref() {
+                serv
+            } else {
+                return;
+            }
+        }
+        _ => return,
     };
 
-    let helpers = helper_optional_ts_type(env);
+    // Add interface extending the referenced interface
+    let interface = TsInterfaceDecl {
+        span: DUMMY_SP,
+        declare: false,
+        id: create_ident(service_name),
+        type_params: None,
+        extends: vec![TsExprWithTypeArgs {
+            span: DUMMY_SP,
+            expr: Box::new(Expr::Ident(create_ident(type_id))),
+            type_args: None,
+        }],
+        body: TsInterfaceBody {
+            span: DUMMY_SP,
+            body: vec![],
+        },
+    };
+    module
+        .body
+        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(Box::new(
+            interface,
+        )))));
 
-    let imports_exports_doc = pp_imports_exports(service_name, service_name);
+    // Add the implementation class
+    let class_decl = create_actor_class(env, service_name, serv);
+    module
+        .body
+        .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
+}
 
-    let doc = RcDoc::text(header)
-        .append(RcDoc::line())
-        .append(RcDoc::line()) // Add an extra blank line
-        .append(imports_exports_doc)
-        .append(RcDoc::line())
-        .append(RcDoc::line())
-        .append(helpers)
-        .append(RcDoc::line())
-        .append(RcDoc::line())
-        .append(defs)
-        .append(actor);
-    doc.pretty(LINE_WIDTH).to_string()
+// Create actor class with methods
+fn create_actor_class(env: &TypeEnv, service_name: &str, serv: &Vec<(String, Type)>) -> ClassDecl {
+    // Create private actor field
+    let actor_field = ClassMember::PrivateProp(PrivateProp {
+        span: DUMMY_SP,
+        key: PrivateName {
+            span: DUMMY_SP,
+            name: "actor".into(),
+        },
+        value: None,
+        type_ann: Some(Box::new(TsTypeAnn {
+            span: DUMMY_SP,
+            type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                span: DUMMY_SP,
+                type_name: TsEntityName::Ident(Ident::new(
+                    "ActorSubclass".into(),
+                    DUMMY_SP,
+                    SyntaxContext::empty(),
+                )),
+                type_params: Some(Box::new(TsTypeParamInstantiation {
+                    span: DUMMY_SP,
+                    params: vec![Box::new(TsType::TsTypeRef(TsTypeRef {
+                        span: DUMMY_SP,
+                        type_name: TsEntityName::Ident(Ident::new(
+                            "_SERVICE".into(),
+                            DUMMY_SP,
+                            SyntaxContext::empty(),
+                        )),
+                        type_params: None,
+                    }))],
+                })),
+            })),
+        })),
+        accessibility: None,
+        is_static: false,
+        decorators: vec![],
+        ctxt: SyntaxContext::empty(),
+        is_optional: false,
+        is_override: false,
+        readonly: false,
+        definite: false,
+    });
+
+    // Create constructor
+    let constructor = ClassMember::Constructor(Constructor {
+        span: DUMMY_SP,
+        key: PropName::Ident(
+            Ident::new("constructor".into(), DUMMY_SP, SyntaxContext::empty()).into(),
+        ),
+        params: vec![],
+        body: Some(BlockStmt {
+            span: DUMMY_SP,
+            stmts: vec![Stmt::Expr(ExprStmt {
+                span: DUMMY_SP,
+                expr: Box::new(Expr::Assign(AssignExpr {
+                    span: DUMMY_SP,
+                    op: AssignOp::Assign,
+                    left: AssignTarget::Simple(SimpleAssignTarget::Member(MemberExpr {
+                        span: DUMMY_SP,
+                        obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
+                        prop: MemberProp::PrivateName(PrivateName {
+                            span: DUMMY_SP,
+                            name: "actor".into(),
+                        }),
+                    })),
+                    right: Box::new(Expr::Ident(Ident::new(
+                        format!("_{}", service_name).into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ))),
+                })),
+            })],
+            ctxt: SyntaxContext::empty(),
+        }),
+        accessibility: None,
+        is_optional: false,
+        ctxt: SyntaxContext::empty(),
+    });
+
+    // Create methods for each function in the service
+    let methods: Vec<ClassMember> = serv
+        .iter()
+        .filter_map(|(method_id, func_ty)| {
+            if let TypeInner::Func(ref func) = func_ty.as_ref() {
+                Some(create_actor_method(env, method_id, func))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // Combine all members
+    let mut members = vec![actor_field, constructor];
+    members.extend(methods);
+
+    ClassDecl {
+        ident: create_ident(service_name),
+        declare: false,
+        class: Box::new(Class {
+            span: DUMMY_SP,
+            body: members,
+            super_class: None,
+            type_params: None,
+            super_type_params: None,
+            implements: vec![TsExprWithTypeArgs {
+                span: DUMMY_SP,
+                expr: Box::new(Expr::Ident(create_ident(service_name).into())),
+                type_args: None,
+            }],
+            is_abstract: false,
+            decorators: vec![],
+            ctxt: SyntaxContext::empty(),
+        }),
+    }
+}
+
+// Create a class method for an actor function
+fn create_actor_method(
+    env: &TypeEnv,
+    method_id: &str,
+    func: &candid::types::Function,
+) -> ClassMember {
+    // Create parameters
+    let params = func
+        .args
+        .iter()
+        .enumerate()
+        .map(|(i, ty)| Param {
+            span: DUMMY_SP,
+            decorators: vec![],
+            pat: Pat::Ident(BindingIdent {
+                id: Ident::new(format!("arg{}", i).into(), DUMMY_SP, SyntaxContext::empty()),
+                type_ann: Some(Box::new(TsTypeAnn {
+                    span: DUMMY_SP,
+                    type_ann: Box::new(convert_type(env, ty, true)),
+                })),
+            }),
+        })
+        .collect();
+
+    // Create return type
+    let return_type = match func.rets.len() {
+        0 => TsType::TsKeywordType(TsKeywordType {
+            span: DUMMY_SP,
+            kind: TsKeywordTypeKind::TsVoidKeyword,
+        }),
+        1 => convert_type(env, &func.rets[0], true),
+        _ => {
+            // Create a tuple type for multiple return values
+            TsType::TsTupleType(TsTupleType {
+                span: DUMMY_SP,
+                elem_types: func
+                    .rets
+                    .iter()
+                    .map(|ty| TsTupleElement {
+                        span: DUMMY_SP,
+                        label: None,
+                        ty: Box::new(convert_type(env, ty, true)),
+                    })
+                    .collect(),
+            })
+        }
+    };
+
+    // Wrap return type in Promise
+    let promise_return_type = TsTypeRef {
+        span: DUMMY_SP,
+        type_name: TsEntityName::Ident(Ident::new(
+            "Promise".into(),
+            DUMMY_SP,
+            SyntaxContext::empty(),
+        )),
+        type_params: Some(Box::new(TsTypeParamInstantiation {
+            span: DUMMY_SP,
+            params: vec![Box::new(return_type)],
+        })),
+    };
+
+    // Generate method body
+    let func_call_args = (0..func.args.len())
+        .map(|i| {
+            Expr::Ident(Ident::new(
+                format!("arg{}", i).into(),
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            ))
+        })
+        .collect::<Vec<_>>();
+
+    let body_stmt = match func.rets.len() {
+        0 => {
+            // No return value
+            vec![Stmt::Return(ReturnStmt {
+                span: DUMMY_SP,
+                arg: Some(Box::new(Expr::Await(AwaitExpr {
+                    span: DUMMY_SP,
+                    arg: Box::new(Expr::Call(CallExpr {
+                        span: DUMMY_SP,
+                        callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
+                            span: DUMMY_SP,
+                            obj: Box::new(Expr::Member(MemberExpr {
+                                span: DUMMY_SP,
+                                obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
+                                prop: MemberProp::PrivateName(PrivateName {
+                                    span: DUMMY_SP,
+                                    name: "actor".into(),
+                                }),
+                            })),
+                            prop: MemberProp::Ident(create_ident(method_id).into()),
+                        }))),
+                        args: func_call_args
+                            .into_iter()
+                            .map(|arg| ExprOrSpread {
+                                spread: None,
+                                expr: Box::new(arg),
+                            })
+                            .collect(),
+                        type_args: None,
+                        ctxt: SyntaxContext::empty(),
+                    })),
+                }))),
+            })]
+        }
+        1 => {
+            // Single return value
+            vec![Stmt::Return(ReturnStmt {
+                span: DUMMY_SP,
+                arg: Some(Box::new(Expr::Await(AwaitExpr {
+                    span: DUMMY_SP,
+                    arg: Box::new(Expr::Call(CallExpr {
+                        span: DUMMY_SP,
+                        callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
+                            span: DUMMY_SP,
+                            obj: Box::new(Expr::Member(MemberExpr {
+                                span: DUMMY_SP,
+                                obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
+                                prop: MemberProp::PrivateName(PrivateName {
+                                    span: DUMMY_SP,
+                                    name: "actor".into(),
+                                }),
+                            })),
+                            prop: MemberProp::Ident(create_ident(method_id).into()),
+                        }))),
+                        args: func_call_args
+                            .into_iter()
+                            .map(|arg| ExprOrSpread {
+                                spread: None,
+                                expr: Box::new(arg),
+                            })
+                            .collect(),
+                        type_args: None,
+                        ctxt: SyntaxContext::empty(),
+                    })),
+                }))),
+            })]
+        }
+        _ => {
+            // Multiple return values
+            vec![Stmt::Return(ReturnStmt {
+                span: DUMMY_SP,
+                arg: Some(Box::new(Expr::Await(AwaitExpr {
+                    span: DUMMY_SP,
+                    arg: Box::new(Expr::Call(CallExpr {
+                        span: DUMMY_SP,
+                        callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
+                            span: DUMMY_SP,
+                            obj: Box::new(Expr::Member(MemberExpr {
+                                span: DUMMY_SP,
+                                obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
+                                prop: MemberProp::PrivateName(PrivateName {
+                                    span: DUMMY_SP,
+                                    name: "actor".into(),
+                                }),
+                            })),
+                            prop: MemberProp::Ident(create_ident(method_id).into()),
+                        }))),
+                        args: func_call_args
+                            .into_iter()
+                            .map(|arg| ExprOrSpread {
+                                spread: None,
+                                expr: Box::new(arg),
+                            })
+                            .collect(),
+                        type_args: None,
+                        ctxt: SyntaxContext::empty(),
+                    })),
+                }))),
+            })]
+        }
+    };
+
+    ClassMember::Method(ClassMethod {
+        span: DUMMY_SP,
+        key: PropName::Ident(create_ident(method_id).into()),
+        function: Box::new(swc_core::ecma::ast::Function {
+            params,
+            decorators: vec![],
+            span: DUMMY_SP,
+            body: Some(BlockStmt {
+                span: DUMMY_SP,
+                stmts: body_stmt,
+                ctxt: SyntaxContext::empty(),
+            }),
+            is_generator: false,
+            is_async: true,
+            type_params: None,
+            return_type: Some(Box::new(TsTypeAnn {
+                span: DUMMY_SP,
+                type_ann: Box::new(TsType::TsTypeRef(promise_return_type)),
+            })),
+            ctxt: SyntaxContext::empty(),
+        }),
+        kind: MethodKind::Method,
+        is_static: false,
+        accessibility: None,
+        is_abstract: false,
+        is_optional: false,
+        is_override: false,
+    })
 }

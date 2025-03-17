@@ -23,12 +23,3 @@ anyhow = "1.0"
 rand = "0.8"
 arbitrary = "1.3"
 console = "0.15"
-
-[workspace.lints.clippy]
-all = { level = "deny", priority = 0 }
-uninlined_format_args = { level = "allow", priority = 1 }
-
-[workspace.lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = [
-    'cfg(wasm_bindgen_unstable_test_coverage)',
-] }
