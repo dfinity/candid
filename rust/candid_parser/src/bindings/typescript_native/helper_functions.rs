@@ -2,7 +2,7 @@ use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 
 // Add Option helper types
-pub fn add_option_helpers(module: &mut Module) {
+pub fn add_option_helpers_interface(module: &mut Module) {
     let some_type = create_some_type();
     module
         .body
@@ -23,7 +23,8 @@ pub fn add_option_helpers(module: &mut Module) {
         .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(Box::new(
             option_type,
         )))));
-
+}
+pub fn add_option_helpers_wrapper(module: &mut Module) {
     let some_function = create_some_function();
     module
         .body

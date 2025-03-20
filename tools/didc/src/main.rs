@@ -31,7 +31,7 @@ enum Command {
     Bind {
         /// Specifies did file for code generation
         input: PathBuf,
-        #[clap(short, long, value_parser = ["js", "ts", "ts_native", "did", "mo", "rs", "rs-agent", "rs-stub"])]
+        #[clap(short, long, value_parser = ["js", "ts", "ts-native-interface", "ts-native-wrapper", "did", "mo", "rs", "rs-agent", "rs-stub"])]
         /// Specifies target language
         target: String,
         #[clap(short, long)]
@@ -232,7 +232,12 @@ fn main() -> Result<()> {
             let content = match target.as_str() {
                 "js" => candid_parser::bindings::javascript::compile(&env, &actor),
                 "ts" => candid_parser::bindings::typescript::compile(&env, &actor),
-                "ts_native" => {
+                "ts-native-interface" | "ts-native-wrapper" => {
+                    let target = match target.as_str() {
+                        "ts-native-interface" => "interface",
+                        "ts-native-wrapper" => "wrapper",
+                        _ => unreachable!(),
+                    };
                     let service_name = input
                         .file_stem()
                         .and_then(|stem| stem.to_str())
@@ -242,7 +247,8 @@ fn main() -> Result<()> {
                     candid_parser::bindings::typescript_native::compile::compile(
                         &env,
                         &actor,
-                        service_name.as_str(), // Now passing a string slice, not an Option<&str>
+                        service_name.as_str(),
+                        target,
                     )
                 }
                 "did" => candid_parser::pretty::candid::compile(&env, &actor),

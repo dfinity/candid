@@ -1,6 +1,6 @@
 use super::super::javascript::is_tuple;
 use super::generate_wrapper::{convert_multi_return_from_candid, TypeConverter};
-use super::helper_functions::add_option_helpers;
+use super::helper_functions::{add_option_helpers_interface, add_option_helpers_wrapper};
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use swc_core::common::comments::SingleThreadedComments;
 use swc_core::common::source_map::SourceMap;
@@ -142,33 +142,27 @@ static KEYWORDS: [&str; 125] = [
     "window",
 ];
 
-pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str) -> String {
-    // Create source map for location information
+pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: &str) -> String {
     let cm = Lrc::new(SourceMap::default());
     let comments = SingleThreadedComments::default();
 
-    // Create an empty module to hold all declarations
     let mut module = Module {
         span: DUMMY_SP,
         body: vec![],
         shebang: None,
     };
 
-    // Add imports
     add_imports(&mut module, service_name);
-
-    // Add Principal type import
     add_principal_import(&mut module);
+    add_option_helpers_interface(&mut module);
 
-    // Add helper types (Option<T>, Some<T>, None)
-    add_option_helpers(&mut module);
+    if target == "wrapper" {
+        add_option_helpers_wrapper(&mut module);
+    }
 
-    // Generate type definitions from the environment
     add_type_definitions(env, &mut module);
-
-    // Add actor implementation if provided
     if let Some(actor_type) = actor {
-        add_actor_implementation(env, &mut module, actor_type, service_name);
+        add_actor_implementation(env, &mut module, actor_type, service_name, target);
     }
 
     // Generate code from the AST
@@ -839,13 +833,14 @@ fn add_actor_implementation(
     module: &mut Module,
     actor_type: &Type,
     service_name: &str,
+    target: &str,
 ) {
     match actor_type.as_ref() {
         TypeInner::Service(ref serv) => {
-            add_actor_service_implementation(env, module, serv, service_name)
+            add_actor_service_implementation(env, module, serv, service_name, target)
         }
-        TypeInner::Var(id) => add_actor_var_implementation(env, module, id, service_name),
-        TypeInner::Class(_, t) => add_actor_implementation(env, module, t, service_name),
+        TypeInner::Var(id) => add_actor_var_implementation(env, module, id, service_name, target),
+        TypeInner::Class(_, t) => add_actor_implementation(env, module, t, service_name, target),
         _ => {}
     }
 }
@@ -856,8 +851,8 @@ fn add_actor_service_implementation(
     module: &mut Module,
     serv: &Vec<(String, Type)>,
     service_name: &str,
+    target: &str,
 ) {
-    // First add the service interface
     let interface = create_interface_from_service(env, service_name, serv);
     module
         .body
@@ -865,11 +860,12 @@ fn add_actor_service_implementation(
             interface,
         )))));
 
-    // Then add the implementation class
-    let class_decl = create_actor_class(env, service_name, serv);
-    module
-        .body
-        .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
+    if target == "wrapper" {
+        let class_decl = create_actor_class(env, service_name, serv);
+        module
+            .body
+            .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
+    }
 }
 
 // Add actor implementation from a type reference
@@ -878,6 +874,7 @@ fn add_actor_var_implementation(
     module: &mut Module,
     type_id: &str,
     service_name: &str,
+    target: &str,
 ) {
     // Find the service definition
     let type_ref = env.find_type(type_id).unwrap();
@@ -894,7 +891,7 @@ fn add_actor_var_implementation(
         _ => return,
     };
 
-    // Add interface extending the referenced interface
+    // First add the service interface
     let interface = TsInterfaceDecl {
         span: DUMMY_SP,
         declare: false,
@@ -916,11 +913,13 @@ fn add_actor_var_implementation(
             interface,
         )))));
 
-    // Add the implementation class
-    let class_decl = create_actor_class(env, service_name, serv);
-    module
-        .body
-        .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
+    if target == "wrapper" {
+        // Then add the implementation class
+        let class_decl = create_actor_class(env, service_name, serv);
+        module
+            .body
+            .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
+    }
 }
 
 // Create actor class with methods
