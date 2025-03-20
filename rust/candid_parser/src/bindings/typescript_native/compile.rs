@@ -152,7 +152,10 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
         shebang: None,
     };
 
-    add_imports(&mut module, service_name);
+    if target == "wrapper" {
+        add_imports(&mut module, service_name);
+    }
+
     add_principal_import(&mut module);
     add_option_helpers_interface(&mut module);
 

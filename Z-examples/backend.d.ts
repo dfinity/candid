@@ -1,6 +1,3 @@
-import { encrypted_notes_motoko as _encrypted_notes_motoko } from "./encrypted_notes_motoko";
-import { type ActorSubclass } from "@dfinity/agent";
-import { _SERVICE } from "./encrypted_notes_motoko/encrypted_notes_motoko.did";
 import type { Principal } from "@dfinity/principal";
 type Some<T> = {
     _tag: "Some";
@@ -63,6 +60,6 @@ interface _anon_class_23_1 {
     variant_in(arg0: Result): Promise<void>;
     variant_out(): Promise<Result>;
 }
-interface encrypted_notes_motoko extends _anon_class_23_1 {
+declare interface encrypted_notes_motoko extends _anon_class_23_1 {
 }
 
