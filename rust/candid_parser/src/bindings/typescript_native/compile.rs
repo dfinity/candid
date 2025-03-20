@@ -1,14 +1,13 @@
-use super::javascript::is_tuple;
+use super::super::javascript::is_tuple;
+use super::generate_wrapper::{convert_multi_return_from_candid, TypeConverter};
+use super::helper_functions::add_option_helpers;
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
-use std::io::Write;
 use swc_core::common::comments::SingleThreadedComments;
-use swc_core::common::errors::{ColorConfig, Handler};
 use swc_core::common::source_map::SourceMap;
 use swc_core::common::sync::Lrc;
-use swc_core::common::{FileName, Span, SyntaxContext, DUMMY_SP};
+use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 use swc_core::ecma::codegen::{text_writer::JsWriter, Config, Emitter};
-
 // Map of JavaScript/TypeScript keywords to escape
 static KEYWORDS: [&str; 125] = [
     // Original JavaScript keywords
@@ -297,193 +296,6 @@ fn add_principal_import(module: &mut Module) {
             with: None,
             phase: Default::default(),
         })));
-}
-
-// Add Option helper types
-fn add_option_helpers(module: &mut Module) {
-    // Some<T> type
-    let some_type = create_some_type();
-    module
-        .body
-        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(Box::new(
-            some_type,
-        )))));
-
-    // None type
-    let none_type = create_none_type();
-    module
-        .body
-        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(Box::new(
-            none_type,
-        )))));
-
-    // Option<T> type
-    let option_type = create_option_type();
-    module
-        .body
-        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(Box::new(
-            option_type,
-        )))));
-}
-
-fn create_some_type() -> TsTypeAliasDecl {
-    TsTypeAliasDecl {
-        span: DUMMY_SP,
-        declare: false,
-        id: Ident::new("Some".into(), DUMMY_SP, SyntaxContext::empty()),
-        type_params: Some(Box::new(TsTypeParamDecl {
-            span: DUMMY_SP,
-            params: vec![TsTypeParam {
-                span: DUMMY_SP,
-                name: Ident::new("T".into(), DUMMY_SP, SyntaxContext::empty()),
-                constraint: None,
-                default: None,
-                is_in: false,
-                is_out: false,
-                is_const: false,
-            }],
-        })),
-        type_ann: Box::new(TsType::TsTypeLit(TsTypeLit {
-            span: DUMMY_SP,
-            members: vec![
-                TsTypeElement::TsPropertySignature(TsPropertySignature {
-                    span: DUMMY_SP,
-                    readonly: false,
-                    key: Box::new(Expr::Ident(Ident::new(
-                        "_tag".into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    ))),
-                    computed: false,
-                    optional: false,
-                    type_ann: Some(Box::new(TsTypeAnn {
-                        span: DUMMY_SP,
-                        type_ann: Box::new(TsType::TsLitType(TsLitType {
-                            span: DUMMY_SP,
-                            lit: TsLit::Str(Str {
-                                span: DUMMY_SP,
-                                value: "Some".into(),
-                                raw: None,
-                            }),
-                        })),
-                    })),
-                }),
-                TsTypeElement::TsPropertySignature(TsPropertySignature {
-                    span: DUMMY_SP,
-                    readonly: false,
-                    key: Box::new(Expr::Ident(Ident::new(
-                        "value".into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    ))),
-                    computed: false,
-                    optional: false,
-                    type_ann: Some(Box::new(TsTypeAnn {
-                        span: DUMMY_SP,
-                        type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
-                            span: DUMMY_SP,
-                            type_name: TsEntityName::Ident(Ident::new(
-                                "T".into(),
-                                DUMMY_SP,
-                                SyntaxContext::empty(),
-                            )),
-                            type_params: None,
-                        })),
-                    })),
-                }),
-            ],
-        })),
-    }
-}
-
-fn create_none_type() -> TsTypeAliasDecl {
-    TsTypeAliasDecl {
-        span: DUMMY_SP,
-        declare: false,
-        id: Ident::new("None".into(), DUMMY_SP, SyntaxContext::empty()),
-        type_params: None,
-        type_ann: Box::new(TsType::TsTypeLit(TsTypeLit {
-            span: DUMMY_SP,
-            members: vec![TsTypeElement::TsPropertySignature(TsPropertySignature {
-                span: DUMMY_SP,
-                readonly: false,
-                key: Box::new(Expr::Ident(Ident::new(
-                    "_tag".into(),
-                    DUMMY_SP,
-                    SyntaxContext::empty(),
-                ))),
-                computed: false,
-                optional: false,
-                type_ann: Some(Box::new(TsTypeAnn {
-                    span: DUMMY_SP,
-                    type_ann: Box::new(TsType::TsLitType(TsLitType {
-                        span: DUMMY_SP,
-                        lit: TsLit::Str(Str {
-                            span: DUMMY_SP,
-                            value: "None".into(),
-                            raw: None,
-                        }),
-                    })),
-                })),
-            })],
-        })),
-    }
-}
-
-fn create_option_type() -> TsTypeAliasDecl {
-    TsTypeAliasDecl {
-        span: DUMMY_SP,
-        declare: false,
-        id: Ident::new("Option".into(), DUMMY_SP, SyntaxContext::empty()),
-        type_params: Some(Box::new(TsTypeParamDecl {
-            span: DUMMY_SP,
-            params: vec![TsTypeParam {
-                span: DUMMY_SP,
-                name: Ident::new("T".into(), DUMMY_SP, SyntaxContext::empty()),
-                constraint: None,
-                default: None,
-                is_in: false,
-                is_out: false,
-                is_const: false,
-            }],
-        })),
-        type_ann: Box::new(TsType::TsUnionOrIntersectionType(
-            TsUnionOrIntersectionType::TsUnionType(TsUnionType {
-                span: DUMMY_SP,
-                types: vec![
-                    Box::new(TsType::TsTypeRef(TsTypeRef {
-                        span: DUMMY_SP,
-                        type_name: TsEntityName::Ident(Ident::new(
-                            "Some".into(),
-                            DUMMY_SP,
-                            SyntaxContext::empty(),
-                        )),
-                        type_params: Some(Box::new(TsTypeParamInstantiation {
-                            span: DUMMY_SP,
-                            params: vec![Box::new(TsType::TsTypeRef(TsTypeRef {
-                                span: DUMMY_SP,
-                                type_name: TsEntityName::Ident(Ident::new(
-                                    "T".into(),
-                                    DUMMY_SP,
-                                    SyntaxContext::empty(),
-                                )),
-                                type_params: None,
-                            }))],
-                        })),
-                    })),
-                    Box::new(TsType::TsTypeRef(TsTypeRef {
-                        span: DUMMY_SP,
-                        type_name: TsEntityName::Ident(Ident::new(
-                            "None".into(),
-                            DUMMY_SP,
-                            SyntaxContext::empty(),
-                        )),
-                        type_params: None,
-                    })),
-                ],
-            }),
-        )),
-    }
 }
 
 // Add all type definitions from the environment
@@ -1228,11 +1040,10 @@ fn create_actor_class(env: &TypeEnv, service_name: &str, serv: &Vec<(String, Typ
 }
 
 // Create a class method for an actor function
-fn create_actor_method(
-    env: &TypeEnv,
-    method_id: &str,
-    func: &candid::types::Function,
-) -> ClassMember {
+pub fn create_actor_method(env: &TypeEnv, method_id: &str, func: &Function) -> ClassMember {
+    // Create type converter
+    let converter = TypeConverter::new(env);
+
     // Create parameters
     let params = func
         .args
@@ -1289,118 +1100,93 @@ fn create_actor_method(
         })),
     };
 
-    // Generate method body
-    let func_call_args = (0..func.args.len())
-        .map(|i| {
-            Expr::Ident(Ident::new(
-                format!("arg{}", i).into(),
-                DUMMY_SP,
-                SyntaxContext::empty(),
-            ))
+    // Generate converted arguments for the function call
+    let converted_args = func
+        .args
+        .iter()
+        .enumerate()
+        .map(|(i, ty)| {
+            let arg_ident =
+                Ident::new(format!("arg{}", i).into(), DUMMY_SP, SyntaxContext::empty());
+            let arg_expr = Expr::Ident(arg_ident);
+
+            // Apply type conversion
+            let converted_expr = converter.to_candid(&arg_expr, ty);
+
+            ExprOrSpread {
+                spread: None,
+                expr: Box::new(converted_expr),
+            }
         })
         .collect::<Vec<_>>();
 
-    let body_stmt = match func.rets.len() {
-        0 => {
-            // No return value
-            vec![Stmt::Return(ReturnStmt {
+    // Create the function call to the actor method
+    let actor_call = Expr::Call(CallExpr {
+        span: DUMMY_SP,
+        callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
+            span: DUMMY_SP,
+            obj: Box::new(Expr::Member(MemberExpr {
                 span: DUMMY_SP,
-                arg: Some(Box::new(Expr::Await(AwaitExpr {
+                obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
+                prop: MemberProp::PrivateName(PrivateName {
                     span: DUMMY_SP,
-                    arg: Box::new(Expr::Call(CallExpr {
-                        span: DUMMY_SP,
-                        callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
-                            span: DUMMY_SP,
-                            obj: Box::new(Expr::Member(MemberExpr {
-                                span: DUMMY_SP,
-                                obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
-                                prop: MemberProp::PrivateName(PrivateName {
-                                    span: DUMMY_SP,
-                                    name: "actor".into(),
-                                }),
-                            })),
-                            prop: MemberProp::Ident(create_ident(method_id).into()),
-                        }))),
-                        args: func_call_args
-                            .into_iter()
-                            .map(|arg| ExprOrSpread {
-                                spread: None,
-                                expr: Box::new(arg),
-                            })
-                            .collect(),
-                        type_args: None,
-                        ctxt: SyntaxContext::empty(),
-                    })),
-                }))),
-            })]
-        }
-        1 => {
-            // Single return value
-            vec![Stmt::Return(ReturnStmt {
-                span: DUMMY_SP,
-                arg: Some(Box::new(Expr::Await(AwaitExpr {
-                    span: DUMMY_SP,
-                    arg: Box::new(Expr::Call(CallExpr {
-                        span: DUMMY_SP,
-                        callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
-                            span: DUMMY_SP,
-                            obj: Box::new(Expr::Member(MemberExpr {
-                                span: DUMMY_SP,
-                                obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
-                                prop: MemberProp::PrivateName(PrivateName {
-                                    span: DUMMY_SP,
-                                    name: "actor".into(),
-                                }),
-                            })),
-                            prop: MemberProp::Ident(create_ident(method_id).into()),
-                        }))),
-                        args: func_call_args
-                            .into_iter()
-                            .map(|arg| ExprOrSpread {
-                                spread: None,
-                                expr: Box::new(arg),
-                            })
-                            .collect(),
-                        type_args: None,
-                        ctxt: SyntaxContext::empty(),
-                    })),
-                }))),
-            })]
-        }
-        _ => {
-            // Multiple return values
-            vec![Stmt::Return(ReturnStmt {
-                span: DUMMY_SP,
-                arg: Some(Box::new(Expr::Await(AwaitExpr {
-                    span: DUMMY_SP,
-                    arg: Box::new(Expr::Call(CallExpr {
-                        span: DUMMY_SP,
-                        callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
-                            span: DUMMY_SP,
-                            obj: Box::new(Expr::Member(MemberExpr {
-                                span: DUMMY_SP,
-                                obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
-                                prop: MemberProp::PrivateName(PrivateName {
-                                    span: DUMMY_SP,
-                                    name: "actor".into(),
-                                }),
-                            })),
-                            prop: MemberProp::Ident(create_ident(method_id).into()),
-                        }))),
-                        args: func_call_args
-                            .into_iter()
-                            .map(|arg| ExprOrSpread {
-                                spread: None,
-                                expr: Box::new(arg),
-                            })
-                            .collect(),
-                        type_args: None,
-                        ctxt: SyntaxContext::empty(),
-                    })),
-                }))),
-            })]
-        }
+                    name: "actor".into(),
+                }),
+            })),
+            prop: MemberProp::Ident(create_ident(method_id).into()),
+        }))),
+        args: converted_args,
+        type_args: None,
+        ctxt: SyntaxContext::empty(),
+    });
+
+    // Create await expression to call the actor
+    let await_expr = Expr::Await(AwaitExpr {
+        span: DUMMY_SP,
+        arg: Box::new(actor_call),
+    });
+
+    // Variable to hold the raw result
+    let result_var = Ident::new("result".into(), DUMMY_SP, SyntaxContext::empty());
+
+    // Create result variable declaration
+    let result_var_decl = VarDecl {
+        span: DUMMY_SP,
+        kind: VarDeclKind::Const,
+        declare: false,
+        decls: vec![VarDeclarator {
+            span: DUMMY_SP,
+            name: Pat::Ident(BindingIdent {
+                id: result_var.clone(),
+                type_ann: None,
+            }),
+            init: Some(Box::new(await_expr)),
+            definite: false,
+        }],
+        ctxt: SyntaxContext::empty(),
     };
+
+    // Convert the result based on return type(s)
+    let converted_result = if func.rets.is_empty() {
+        // No return value
+        Expr::Ident(result_var)
+    } else {
+        // Convert the result to the expected TypeScript type
+        let result_expr = Expr::Ident(result_var);
+        convert_multi_return_from_candid(&converter, &result_expr, &func.rets)
+    };
+
+    // Create return statement with converted result
+    let return_stmt = ReturnStmt {
+        span: DUMMY_SP,
+        arg: Some(Box::new(converted_result)),
+    };
+
+    // Method body with variable declaration and return statement
+    let body_stmts = vec![
+        Stmt::Decl(Decl::Var(Box::new(result_var_decl))),
+        Stmt::Return(return_stmt),
+    ];
 
     ClassMember::Method(ClassMethod {
         span: DUMMY_SP,
@@ -1411,7 +1197,7 @@ fn create_actor_method(
             span: DUMMY_SP,
             body: Some(BlockStmt {
                 span: DUMMY_SP,
-                stmts: body_stmt,
+                stmts: body_stmts,
                 ctxt: SyntaxContext::empty(),
             }),
             is_generator: false,

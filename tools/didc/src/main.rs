@@ -239,7 +239,7 @@ fn main() -> Result<()> {
                         .map(|s| s.to_string())
                         .unwrap_or_else(|| "service".to_string()); // Provide a fallback
 
-                    candid_parser::bindings::typescript_native::compile(
+                    candid_parser::bindings::typescript_native::compile::compile(
                         &env,
                         &actor,
                         service_name.as_str(), // Now passing a string slice, not an Option<&str>
