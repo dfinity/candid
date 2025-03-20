@@ -43,7 +43,7 @@ impl<'a> TypeConverter<'a> {
             TypeInner::Opt(ref inner) => self.convert_opt_to_candid(expr, inner),
             TypeInner::Vec(ref inner) => self.convert_vec_to_candid(expr, inner),
             TypeInner::Record(ref fields) => self.convert_record_to_candid(expr, fields),
-            TypeInner::Variant(ref fields) => expr.clone(), //self.convert_variant_to_candid(expr, fields),
+            TypeInner::Variant(ref _fields) => expr.clone(), //self.convert_variant_to_candid(expr, fields),
             TypeInner::Func(ref func) => self.convert_func_to_candid(expr, func),
             TypeInner::Service(_) => self.convert_service_to_candid(expr),
             TypeInner::Var(ref id) => self.convert_var_to_candid(expr, id),
@@ -80,7 +80,7 @@ impl<'a> TypeConverter<'a> {
             TypeInner::Opt(ref inner) => self.convert_opt_from_candid(expr, inner),
             TypeInner::Vec(ref inner) => self.convert_vec_from_candid(expr, inner),
             TypeInner::Record(ref fields) => self.convert_record_from_candid(expr, fields),
-            TypeInner::Variant(ref fields) => expr.clone(), //self.convert_variant_from_candid(expr, fields)
+            TypeInner::Variant(ref _fields) => expr.clone(), //self.convert_variant_from_candid(expr, fields)
             TypeInner::Func(ref func) => self.convert_func_from_candid(expr, func),
             TypeInner::Service(_) => self.convert_service_from_candid(expr),
             TypeInner::Var(ref id) => self.convert_var_from_candid(expr, id),
@@ -813,265 +813,265 @@ impl<'a> TypeConverter<'a> {
         })
     }
 
-    fn convert_variant_to_candid(&self, expr: &Expr, fields: &[Field]) -> Expr {
-        // Create an object with a single field for the variant
-        // First, we need to determine which variant it is
-        let variant_detection = Expr::Member(MemberExpr {
-            span: DUMMY_SP,
-            obj: Box::new(expr.clone()),
-            // Assuming the variant tag is in the property name
-            prop: MemberProp::Computed(ComputedPropName {
-                span: DUMMY_SP,
-                expr: Box::new(Expr::Call(CallExpr {
-                    span: DUMMY_SP,
-                    callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
-                        span: DUMMY_SP,
-                        obj: Box::new(Expr::Call(CallExpr {
-                            span: DUMMY_SP,
-                            callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
-                                span: DUMMY_SP,
-                                obj: Box::new(Expr::Ident(Ident::new(
-                                    "Object".into(),
-                                    DUMMY_SP,
-                                    SyntaxContext::empty(),
-                                ))),
-                                prop: MemberProp::Ident(
-                                    Ident::new("keys".into(), DUMMY_SP, SyntaxContext::empty())
-                                        .into(),
-                                ),
-                            }))),
-                            args: vec![ExprOrSpread {
-                                spread: None,
-                                expr: Box::new(expr.clone()),
-                            }],
-                            type_args: None,
-                            ctxt: SyntaxContext::empty(),
-                        })),
-                        prop: MemberProp::Ident(
-                            Ident::new("find".into(), DUMMY_SP, SyntaxContext::empty()).into(),
-                        ),
-                    }))),
-                    args: vec![ExprOrSpread {
-                        spread: None,
-                        expr: Box::new(Expr::Arrow(ArrowExpr {
-                            span: DUMMY_SP,
-                            params: vec![Pat::Ident(BindingIdent {
-                                id: Ident::new("k".into(), DUMMY_SP, SyntaxContext::empty()),
-                                type_ann: None,
-                            })],
-                            body: Box::new(BlockStmtOrExpr::Expr(Box::new(Expr::Bin(BinExpr {
-                                span: DUMMY_SP,
-                                op: BinaryOp::NotEqEq,
-                                left: Box::new(Expr::Ident(Ident::new(
-                                    "k".into(),
-                                    DUMMY_SP,
-                                    SyntaxContext::empty(),
-                                ))),
-                                right: Box::new(Expr::Lit(Lit::Str(Str {
-                                    span: DUMMY_SP,
-                                    value: "__proto__".into(),
-                                    raw: None,
-                                }))),
-                            })))),
-                            is_async: false,
-                            is_generator: false,
-                            type_params: None,
-                            return_type: None,
-                            ctxt: SyntaxContext::empty(),
-                        })),
-                    }],
-                    type_args: None,
-                    ctxt: SyntaxContext::empty(),
-                })),
-            }),
-        });
+    // fn convert_variant_to_candid(&self, expr: &Expr, fields: &[Field]) -> Expr {
+    //     // Create an object with a single field for the variant
+    //     // First, we need to determine which variant it is
+    //     let variant_detection = Expr::Member(MemberExpr {
+    //         span: DUMMY_SP,
+    //         obj: Box::new(expr.clone()),
+    //         // Assuming the variant tag is in the property name
+    //         prop: MemberProp::Computed(ComputedPropName {
+    //             span: DUMMY_SP,
+    //             expr: Box::new(Expr::Call(CallExpr {
+    //                 span: DUMMY_SP,
+    //                 callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
+    //                     span: DUMMY_SP,
+    //                     obj: Box::new(Expr::Call(CallExpr {
+    //                         span: DUMMY_SP,
+    //                         callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
+    //                             span: DUMMY_SP,
+    //                             obj: Box::new(Expr::Ident(Ident::new(
+    //                                 "Object".into(),
+    //                                 DUMMY_SP,
+    //                                 SyntaxContext::empty(),
+    //                             ))),
+    //                             prop: MemberProp::Ident(
+    //                                 Ident::new("keys".into(), DUMMY_SP, SyntaxContext::empty())
+    //                                     .into(),
+    //                             ),
+    //                         }))),
+    //                         args: vec![ExprOrSpread {
+    //                             spread: None,
+    //                             expr: Box::new(expr.clone()),
+    //                         }],
+    //                         type_args: None,
+    //                         ctxt: SyntaxContext::empty(),
+    //                     })),
+    //                     prop: MemberProp::Ident(
+    //                         Ident::new("find".into(), DUMMY_SP, SyntaxContext::empty()).into(),
+    //                     ),
+    //                 }))),
+    //                 args: vec![ExprOrSpread {
+    //                     spread: None,
+    //                     expr: Box::new(Expr::Arrow(ArrowExpr {
+    //                         span: DUMMY_SP,
+    //                         params: vec![Pat::Ident(BindingIdent {
+    //                             id: Ident::new("k".into(), DUMMY_SP, SyntaxContext::empty()),
+    //                             type_ann: None,
+    //                         })],
+    //                         body: Box::new(BlockStmtOrExpr::Expr(Box::new(Expr::Bin(BinExpr {
+    //                             span: DUMMY_SP,
+    //                             op: BinaryOp::NotEqEq,
+    //                             left: Box::new(Expr::Ident(Ident::new(
+    //                                 "k".into(),
+    //                                 DUMMY_SP,
+    //                                 SyntaxContext::empty(),
+    //                             ))),
+    //                             right: Box::new(Expr::Lit(Lit::Str(Str {
+    //                                 span: DUMMY_SP,
+    //                                 value: "__proto__".into(),
+    //                                 raw: None,
+    //                             }))),
+    //                         })))),
+    //                         is_async: false,
+    //                         is_generator: false,
+    //                         type_params: None,
+    //                         return_type: None,
+    //                         ctxt: SyntaxContext::empty(),
+    //                     })),
+    //                 }],
+    //                 type_args: None,
+    //                 ctxt: SyntaxContext::empty(),
+    //             })),
+    //         }),
+    //     });
 
-        // Now create a switch-like structure to handle each variant
-        fields
-            .iter()
-            .fold(None, |acc, field| {
-                let field_name = match &*field.id {
-                    Label::Named(name) => name.clone(),
-                    Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
-                };
+    //     // Now create a switch-like structure to handle each variant
+    //     fields
+    //         .iter()
+    //         .fold(None, |acc, field| {
+    //             let field_name = match &*field.id {
+    //                 Label::Named(name) => name.clone(),
+    //                 Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
+    //             };
 
-                let field_expr = Expr::Member(MemberExpr {
-                    span: DUMMY_SP,
-                    obj: Box::new(expr.clone()),
-                    prop: MemberProp::Ident(
-                        Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty())
-                            .into(),
-                    ),
-                });
+    //             let field_expr = Expr::Member(MemberExpr {
+    //                 span: DUMMY_SP,
+    //                 obj: Box::new(expr.clone()),
+    //                 prop: MemberProp::Ident(
+    //                     Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty())
+    //                         .into(),
+    //                 ),
+    //             });
 
-                let this_case = Expr::Object(ObjectLit {
-                    span: DUMMY_SP,
-                    props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                        key: PropName::Ident(
-                            Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty())
-                                .into(),
-                        ),
-                        value: Box::new(self._to_candid(&field_expr, &field.ty)),
-                    })))],
-                });
+    //             let this_case = Expr::Object(ObjectLit {
+    //                 span: DUMMY_SP,
+    //                 props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+    //                     key: PropName::Ident(
+    //                         Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty())
+    //                             .into(),
+    //                     ),
+    //                     value: Box::new(self._to_candid(&field_expr, &field.ty)),
+    //                 })))],
+    //             });
 
-                match acc {
-                    None => Some(this_case),
-                    Some(acc_expr) => Some(Expr::Cond(CondExpr {
-                        span: DUMMY_SP,
-                        test: Box::new(Expr::Bin(BinExpr {
-                            span: DUMMY_SP,
-                            op: BinaryOp::EqEqEq,
-                            left: Box::new(variant_detection.clone()),
-                            right: Box::new(Expr::Lit(Lit::Str(Str {
-                                span: DUMMY_SP,
-                                value: field_name.clone().into(),
-                                raw: None,
-                            }))),
-                        })),
-                        cons: Box::new(this_case),
-                        alt: Box::new(acc_expr),
-                    })),
-                }
-            })
-            .unwrap_or_else(|| {
-                // Default case if no variants match (should not happen)
-                Expr::Object(ObjectLit {
-                    span: DUMMY_SP,
-                    props: vec![],
-                })
-            })
-    }
+    //             match acc {
+    //                 None => Some(this_case),
+    //                 Some(acc_expr) => Some(Expr::Cond(CondExpr {
+    //                     span: DUMMY_SP,
+    //                     test: Box::new(Expr::Bin(BinExpr {
+    //                         span: DUMMY_SP,
+    //                         op: BinaryOp::EqEqEq,
+    //                         left: Box::new(variant_detection.clone()),
+    //                         right: Box::new(Expr::Lit(Lit::Str(Str {
+    //                             span: DUMMY_SP,
+    //                             value: field_name.clone().into(),
+    //                             raw: None,
+    //                         }))),
+    //                     })),
+    //                     cons: Box::new(this_case),
+    //                     alt: Box::new(acc_expr),
+    //                 })),
+    //             }
+    //         })
+    //         .unwrap_or_else(|| {
+    //             // Default case if no variants match (should not happen)
+    //             Expr::Object(ObjectLit {
+    //                 span: DUMMY_SP,
+    //                 props: vec![],
+    //             })
+    //         })
+    // }
 
-    fn convert_variant_from_candid(&self, expr: &Expr, fields: &[Field]) -> Expr {
-        // Create an object with a single field for the variant
-        // First, we need to determine which variant it is
-        let variant_detection = Expr::Member(MemberExpr {
-            span: DUMMY_SP,
-            obj: Box::new(expr.clone()),
-            // Assuming the variant tag is in the property name
-            prop: MemberProp::Computed(ComputedPropName {
-                span: DUMMY_SP,
-                expr: Box::new(Expr::Call(CallExpr {
-                    span: DUMMY_SP,
-                    callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
-                        span: DUMMY_SP,
-                        obj: Box::new(Expr::Call(CallExpr {
-                            span: DUMMY_SP,
-                            callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
-                                span: DUMMY_SP,
-                                obj: Box::new(Expr::Ident(Ident::new(
-                                    "Object".into(),
-                                    DUMMY_SP,
-                                    SyntaxContext::empty(),
-                                ))),
-                                prop: MemberProp::Ident(
-                                    Ident::new("keys".into(), DUMMY_SP, SyntaxContext::empty())
-                                        .into(),
-                                ),
-                            }))),
-                            args: vec![ExprOrSpread {
-                                spread: None,
-                                expr: Box::new(expr.clone()),
-                            }],
-                            type_args: None,
-                            ctxt: SyntaxContext::empty(),
-                        })),
-                        prop: MemberProp::Ident(
-                            Ident::new("find".into(), DUMMY_SP, SyntaxContext::empty()).into(),
-                        ),
-                    }))),
-                    args: vec![ExprOrSpread {
-                        spread: None,
-                        expr: Box::new(Expr::Arrow(ArrowExpr {
-                            span: DUMMY_SP,
-                            params: vec![Pat::Ident(BindingIdent {
-                                id: Ident::new("k".into(), DUMMY_SP, SyntaxContext::empty()),
-                                type_ann: None,
-                            })],
-                            body: Box::new(BlockStmtOrExpr::Expr(Box::new(Expr::Bin(BinExpr {
-                                span: DUMMY_SP,
-                                op: BinaryOp::NotEqEq,
-                                left: Box::new(Expr::Ident(Ident::new(
-                                    "k".into(),
-                                    DUMMY_SP,
-                                    SyntaxContext::empty(),
-                                ))),
-                                right: Box::new(Expr::Lit(Lit::Str(Str {
-                                    span: DUMMY_SP,
-                                    value: "__proto__".into(),
-                                    raw: None,
-                                }))),
-                            })))),
-                            is_async: false,
-                            is_generator: false,
-                            type_params: None,
-                            return_type: None,
-                            ctxt: SyntaxContext::empty(),
-                        })),
-                    }],
-                    type_args: None,
-                    ctxt: SyntaxContext::empty(),
-                })),
-            }),
-        });
+    // fn convert_variant_from_candid(&self, expr: &Expr, fields: &[Field]) -> Expr {
+    //     // Create an object with a single field for the variant
+    //     // First, we need to determine which variant it is
+    //     let variant_detection = Expr::Member(MemberExpr {
+    //         span: DUMMY_SP,
+    //         obj: Box::new(expr.clone()),
+    //         // Assuming the variant tag is in the property name
+    //         prop: MemberProp::Computed(ComputedPropName {
+    //             span: DUMMY_SP,
+    //             expr: Box::new(Expr::Call(CallExpr {
+    //                 span: DUMMY_SP,
+    //                 callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
+    //                     span: DUMMY_SP,
+    //                     obj: Box::new(Expr::Call(CallExpr {
+    //                         span: DUMMY_SP,
+    //                         callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
+    //                             span: DUMMY_SP,
+    //                             obj: Box::new(Expr::Ident(Ident::new(
+    //                                 "Object".into(),
+    //                                 DUMMY_SP,
+    //                                 SyntaxContext::empty(),
+    //                             ))),
+    //                             prop: MemberProp::Ident(
+    //                                 Ident::new("keys".into(), DUMMY_SP, SyntaxContext::empty())
+    //                                     .into(),
+    //                             ),
+    //                         }))),
+    //                         args: vec![ExprOrSpread {
+    //                             spread: None,
+    //                             expr: Box::new(expr.clone()),
+    //                         }],
+    //                         type_args: None,
+    //                         ctxt: SyntaxContext::empty(),
+    //                     })),
+    //                     prop: MemberProp::Ident(
+    //                         Ident::new("find".into(), DUMMY_SP, SyntaxContext::empty()).into(),
+    //                     ),
+    //                 }))),
+    //                 args: vec![ExprOrSpread {
+    //                     spread: None,
+    //                     expr: Box::new(Expr::Arrow(ArrowExpr {
+    //                         span: DUMMY_SP,
+    //                         params: vec![Pat::Ident(BindingIdent {
+    //                             id: Ident::new("k".into(), DUMMY_SP, SyntaxContext::empty()),
+    //                             type_ann: None,
+    //                         })],
+    //                         body: Box::new(BlockStmtOrExpr::Expr(Box::new(Expr::Bin(BinExpr {
+    //                             span: DUMMY_SP,
+    //                             op: BinaryOp::NotEqEq,
+    //                             left: Box::new(Expr::Ident(Ident::new(
+    //                                 "k".into(),
+    //                                 DUMMY_SP,
+    //                                 SyntaxContext::empty(),
+    //                             ))),
+    //                             right: Box::new(Expr::Lit(Lit::Str(Str {
+    //                                 span: DUMMY_SP,
+    //                                 value: "__proto__".into(),
+    //                                 raw: None,
+    //                             }))),
+    //                         })))),
+    //                         is_async: false,
+    //                         is_generator: false,
+    //                         type_params: None,
+    //                         return_type: None,
+    //                         ctxt: SyntaxContext::empty(),
+    //                     })),
+    //                 }],
+    //                 type_args: None,
+    //                 ctxt: SyntaxContext::empty(),
+    //             })),
+    //         }),
+    //     });
 
-        // Now create a switch-like structure to handle each variant
-        fields
-            .iter()
-            .fold(None, |acc, field| {
-                let field_name = match &*field.id {
-                    Label::Named(name) => name.clone(),
-                    Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
-                };
+    //     // Now create a switch-like structure to handle each variant
+    //     fields
+    //         .iter()
+    //         .fold(None, |acc, field| {
+    //             let field_name = match &*field.id {
+    //                 Label::Named(name) => name.clone(),
+    //                 Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
+    //             };
 
-                let field_expr = Expr::Member(MemberExpr {
-                    span: DUMMY_SP,
-                    obj: Box::new(expr.clone()),
-                    prop: MemberProp::Ident(
-                        Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty())
-                            .into(),
-                    ),
-                });
+    //             let field_expr = Expr::Member(MemberExpr {
+    //                 span: DUMMY_SP,
+    //                 obj: Box::new(expr.clone()),
+    //                 prop: MemberProp::Ident(
+    //                     Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty())
+    //                         .into(),
+    //                 ),
+    //             });
 
-                let this_case = Expr::Object(ObjectLit {
-                    span: DUMMY_SP,
-                    props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                        key: PropName::Ident(
-                            Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty())
-                                .into(),
-                        ),
-                        value: Box::new(self._from_candid(&field_expr, &field.ty)),
-                    })))],
-                });
+    //             let this_case = Expr::Object(ObjectLit {
+    //                 span: DUMMY_SP,
+    //                 props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+    //                     key: PropName::Ident(
+    //                         Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty())
+    //                             .into(),
+    //                     ),
+    //                     value: Box::new(self._from_candid(&field_expr, &field.ty)),
+    //                 })))],
+    //             });
 
-                match acc {
-                    None => Some(this_case),
-                    Some(acc_expr) => Some(Expr::Cond(CondExpr {
-                        span: DUMMY_SP,
-                        test: Box::new(Expr::Bin(BinExpr {
-                            span: DUMMY_SP,
-                            op: BinaryOp::EqEqEq,
-                            left: Box::new(variant_detection.clone()),
-                            right: Box::new(Expr::Lit(Lit::Str(Str {
-                                span: DUMMY_SP,
-                                value: field_name.clone().into(),
-                                raw: None,
-                            }))),
-                        })),
-                        cons: Box::new(this_case),
-                        alt: Box::new(acc_expr),
-                    })),
-                }
-            })
-            .unwrap_or_else(|| {
-                // Default case if no variants match (should not happen)
-                Expr::Object(ObjectLit {
-                    span: DUMMY_SP,
-                    props: vec![],
-                })
-            })
-    }
+    //             match acc {
+    //                 None => Some(this_case),
+    //                 Some(acc_expr) => Some(Expr::Cond(CondExpr {
+    //                     span: DUMMY_SP,
+    //                     test: Box::new(Expr::Bin(BinExpr {
+    //                         span: DUMMY_SP,
+    //                         op: BinaryOp::EqEqEq,
+    //                         left: Box::new(variant_detection.clone()),
+    //                         right: Box::new(Expr::Lit(Lit::Str(Str {
+    //                             span: DUMMY_SP,
+    //                             value: field_name.clone().into(),
+    //                             raw: None,
+    //                         }))),
+    //                     })),
+    //                     cons: Box::new(this_case),
+    //                     alt: Box::new(acc_expr),
+    //                 })),
+    //             }
+    //         })
+    //         .unwrap_or_else(|| {
+    //             // Default case if no variants match (should not happen)
+    //             Expr::Object(ObjectLit {
+    //                 span: DUMMY_SP,
+    //                 props: vec![],
+    //             })
+    //         })
+    // }
 
     fn convert_func_to_candid(&self, expr: &Expr, _func: &Function) -> Expr {
         // Functions are represented as Principals
