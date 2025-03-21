@@ -221,7 +221,7 @@ fn add_imports(module: &mut Module, service_name: &str) {
             })],
             src: Box::new(Str {
                 span: DUMMY_SP,
-                value: format!("../../declarations/{}", dashed_name).into(),
+                value: format!("declarations/{}", dashed_name).into(),
                 raw: None,
             }),
             type_only: false,
@@ -263,11 +263,7 @@ fn add_imports(module: &mut Module, service_name: &str) {
             })],
             src: Box::new(Str {
                 span: DUMMY_SP,
-                value: format!(
-                    "../../declarations/{}/{}.did.d.js",
-                    dashed_name, dashed_name
-                )
-                .into(),
+                value: format!("declarations/{}/{}.did.d.js", dashed_name, dashed_name).into(),
                 raw: None,
             }),
             type_only: false,
