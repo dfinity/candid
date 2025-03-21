@@ -450,7 +450,7 @@ impl<'a> TypeConverter<'a> {
             | TypeInner::Nat64
             | TypeInner::Int64 => {
                 // Handle conversion from regular array to TypedArray if needed
-                self.convert_number_array_to_typed_array(expr, inner)
+                return expr.clone();
             }
             _ => {
                 // Generate map to convert each element
@@ -663,7 +663,41 @@ impl<'a> TypeConverter<'a> {
                     });
 
                     // Convert the field value
-                    let value = self._to_candid(&field_expr, &field.ty);
+                    let value = match field.ty.as_ref() {
+                        TypeInner::Opt(inner) => {
+                            // For optional fields, use JavaScript truthiness check
+                            Expr::Cond(CondExpr {
+                                span: DUMMY_SP,
+                                test: Box::new(field_expr.clone()),
+                                cons: Box::new(Expr::Call(CallExpr {
+                                    span: DUMMY_SP,
+                                    callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
+                                        "candid_some".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    )))),
+                                    args: vec![ExprOrSpread {
+                                        spread: None,
+                                        expr: Box::new(self._to_candid(&field_expr, inner)),
+                                    }],
+                                    type_args: None,
+                                    ctxt: SyntaxContext::empty(),
+                                })),
+                                alt: Box::new(Expr::Call(CallExpr {
+                                    span: DUMMY_SP,
+                                    callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
+                                        "candid_none".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    )))),
+                                    args: vec![],
+                                    type_args: None,
+                                    ctxt: SyntaxContext::empty(),
+                                })),
+                            })
+                        }
+                        _ => self._to_candid(&field_expr, &field.ty),
+                    };
 
                     PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
                         key,

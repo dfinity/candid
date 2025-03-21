@@ -81,7 +81,18 @@ fn generate_record_opt_undefined() -> FnDecl {
                 decorators: vec![],
                 pat: Pat::Ident(BindingIdent {
                     id: Ident::new("arg".into(), DUMMY_SP, SyntaxContext::empty()),
-                    type_ann: None,
+                    type_ann: Some(Box::new(TsTypeAnn {
+                        span: DUMMY_SP,
+                        type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                            span: DUMMY_SP,
+                            type_name: TsEntityName::Ident(Ident::new(
+                                "T".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            )),
+                            type_params: None,
+                        })),
+                    })),
                 }),
             }],
             decorators: vec![],
@@ -168,7 +179,29 @@ fn generate_unwrap_function() -> FnDecl {
                 decorators: vec![],
                 pat: Pat::Ident(BindingIdent {
                     id: Ident::new("option".into(), DUMMY_SP, SyntaxContext::empty()),
-                    type_ann: None,
+                    type_ann: Some(Box::new(TsTypeAnn {
+                        span: DUMMY_SP,
+                        type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                            span: DUMMY_SP,
+                            type_name: TsEntityName::Ident(Ident::new(
+                                "Option".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            )),
+                            type_params: Some(Box::new(TsTypeParamInstantiation {
+                                span: DUMMY_SP,
+                                params: vec![Box::new(TsType::TsTypeRef(TsTypeRef {
+                                    span: DUMMY_SP,
+                                    type_name: TsEntityName::Ident(Ident::new(
+                                        "T".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    )),
+                                    type_params: None,
+                                }))],
+                            })),
+                        })),
+                    })),
                 }),
             }],
             decorators: vec![],
@@ -283,7 +316,18 @@ fn generate_candid_some_function() -> FnDecl {
                 decorators: vec![],
                 pat: Pat::Ident(BindingIdent {
                     id: Ident::new("value".into(), DUMMY_SP, SyntaxContext::empty()),
-                    type_ann: None,
+                    type_ann: Some(Box::new(TsTypeAnn {
+                        span: DUMMY_SP,
+                        type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                            span: DUMMY_SP,
+                            type_name: TsEntityName::Ident(Ident::new(
+                                "T".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            )),
+                            type_params: None,
+                        })),
+                    })),
                 }),
             }],
             decorators: vec![],
@@ -634,7 +678,18 @@ fn create_some_function() -> FnDecl {
                 decorators: vec![],
                 pat: Pat::Ident(BindingIdent {
                     id: Ident::new("value".into(), DUMMY_SP, SyntaxContext::empty()),
-                    type_ann: None,
+                    type_ann: Some(Box::new(TsTypeAnn {
+                        span: DUMMY_SP,
+                        type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                            span: DUMMY_SP,
+                            type_name: TsEntityName::Ident(Ident::new(
+                                "T".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            )),
+                            type_params: None,
+                        })),
+                    })),
                 }),
             }],
             decorators: vec![],
