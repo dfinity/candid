@@ -867,7 +867,10 @@ fn add_actor_service_implementation(
         let class_decl = create_actor_class(env, service_name, serv);
         module
             .body
-            .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
+            .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                span: DUMMY_SP,
+                decl: Decl::Class(class_decl),
+            })));
     }
 }
 
@@ -921,7 +924,10 @@ fn add_actor_var_implementation(
         let class_decl = create_actor_class(env, service_name, serv);
         module
             .body
-            .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
+            .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                span: DUMMY_SP,
+                decl: Decl::Class(class_decl),
+            })));
     }
 }
 
