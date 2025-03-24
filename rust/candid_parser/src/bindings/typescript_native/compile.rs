@@ -864,14 +864,57 @@ fn add_actor_service_implementation(
         )))));
 
     if target == "wrapper" {
-        let class_decl = create_actor_class(env, service_name, serv);
+        let capitalized_service_name = service_name
+            .chars()
+            .next()
+            .map_or(String::new(), |c| c.to_uppercase().collect::<String>())
+            + &service_name[1..];
+        let class_decl = create_actor_class(env, service_name, &capitalized_service_name, serv);
         module
             .body
-            .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-                span: DUMMY_SP,
-                decl: Decl::Class(class_decl),
-            })));
+            .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
+        // Export the instance of the class
+        module.body.push(create_actor_instance(
+            env,
+            service_name,
+            &capitalized_service_name,
+        ));
     }
+}
+
+fn create_actor_instance(
+    env: &TypeEnv,
+    service_name: &str,
+    capitalized_service_name: &str,
+) -> ModuleItem {
+    ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+        span: DUMMY_SP,
+        decl: Decl::Var(Box::new(VarDecl {
+            span: DUMMY_SP,
+            kind: VarDeclKind::Const,
+            declare: false,
+            decls: vec![VarDeclarator {
+                span: DUMMY_SP,
+                name: Pat::Ident(BindingIdent {
+                    id: Ident::new(service_name.into(), DUMMY_SP, SyntaxContext::empty()),
+                    type_ann: None,
+                }),
+                init: Some(Box::new(Expr::New(NewExpr {
+                    span: DUMMY_SP,
+                    callee: Box::new(Expr::Ident(Ident::new(
+                        capitalized_service_name.into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ))),
+                    args: Some(vec![]),
+                    type_args: None,
+                    ctxt: SyntaxContext::empty(),
+                }))),
+                definite: false,
+            }],
+            ctxt: SyntaxContext::empty(),
+        })),
+    }))
 }
 
 // Add actor implementation from a type reference
@@ -918,21 +961,32 @@ fn add_actor_var_implementation(
         .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(Box::new(
             interface,
         )))));
-
     if target == "wrapper" {
-        // Then add the implementation class
-        let class_decl = create_actor_class(env, service_name, serv);
+        let capitalized_service_name = service_name
+            .chars()
+            .next()
+            .map_or(String::new(), |c| c.to_uppercase().collect::<String>())
+            + &service_name[1..];
+        let class_decl = create_actor_class(env, service_name, &capitalized_service_name, serv);
         module
             .body
-            .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-                span: DUMMY_SP,
-                decl: Decl::Class(class_decl),
-            })));
+            .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
+        // Export the instance of the class
+        module.body.push(create_actor_instance(
+            env,
+            service_name,
+            &capitalized_service_name,
+        ));
     }
 }
 
 // Create actor class with methods
-fn create_actor_class(env: &TypeEnv, service_name: &str, serv: &Vec<(String, Type)>) -> ClassDecl {
+fn create_actor_class(
+    env: &TypeEnv,
+    service_name: &str,
+    capitalized_service_name: &str,
+    serv: &Vec<(String, Type)>,
+) -> ClassDecl {
     // Create private actor field
     let actor_field = ClassMember::PrivateProp(PrivateProp {
         span: DUMMY_SP,
@@ -1027,7 +1081,7 @@ fn create_actor_class(env: &TypeEnv, service_name: &str, serv: &Vec<(String, Typ
     members.extend(methods);
 
     ClassDecl {
-        ident: create_ident(service_name),
+        ident: create_ident(capitalized_service_name),
         declare: false,
         class: Box::new(Class {
             span: DUMMY_SP,
