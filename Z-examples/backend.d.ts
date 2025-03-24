@@ -60,6 +60,6 @@ interface _anon_class_23_1 {
     variant_in(arg0: Result): Promise<void>;
     variant_out(): Promise<Result>;
 }
-declare interface encrypted_notes_motoko extends _anon_class_23_1 {
+interface encrypted_notes_motoko extends _anon_class_23_1 {
 }
 
