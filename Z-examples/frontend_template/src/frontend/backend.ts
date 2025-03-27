@@ -41,7 +41,7 @@ function candid_some<T>(value: T): [T] {
 function candid_none<T>(): [] {
     return [];
 }
-function record_opt_to_undefined<T>(arg: T): T | undefined {
+function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
 type Result = {
@@ -60,21 +60,34 @@ interface TransferArgs {
 interface backend {
     transfer(arg0: TransferArgs): Promise<Result>;
 }
+import type { TransferArgs as _TransferArgs, Tokens as _Tokens } from "declarations/backend/backend.did.d.ts";
 class Backend implements backend {
     #actor: ActorSubclass<_SERVICE>;
     constructor(){
         this.#actor = _backend;
     }
     async transfer(arg0: TransferArgs): Promise<Result> {
-        const result = await this.#actor.transfer({
-            toPrincipal: arg0.toPrincipal,
-            amount: {
-                e8s: arg0.amount.e8s
-            },
-            toSubaccount: arg0.toSubaccount ? candid_some(arg0.toSubaccount) : candid_none()
-        });
+        const result = await this.#actor.transfer(to_candid_TransferArgs_n1(arg0));
         return result;
     }
 }
 export const backend = new Backend();
+function to_candid_TransferArgs_n1(value: TransferArgs): _TransferArgs {
+    return to_candid_record_n2(value);
+}
+function to_candid_record_n2(value: {
+    toPrincipal: Principal;
+    amount: Tokens;
+    toSubaccount?: Uint8Array | number[];
+}): {
+    toPrincipal: Principal;
+    amount: _Tokens;
+    toSubaccount: [] | [Uint8Array | number[]];
+} {
+    return {
+        toPrincipal: value.toPrincipal,
+        amount: value.amount,
+        toSubaccount: value.toSubaccount ? candid_some(value.toSubaccount) : candid_none()
+    };
+}
 

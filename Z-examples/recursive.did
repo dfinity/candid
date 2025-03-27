@@ -1,0 +1,56 @@
+type Token = record {
+    amount : float64;
+    category : text;
+    id : nat;
+    name : text;
+    purchaseDate : Time;
+    purchasePrice : float64;
+    symbol : text;
+};
+type Time = int;
+type Result_2 = variant {
+    err : Error;
+    ok : float64;
+};
+type Result_1 = variant {
+    err : Error;
+    ok : List;
+};
+type Result = variant {
+    err : Error;
+    ok;
+};
+type Portfolio = record {
+    id : nat;
+    name : text;
+    tokens : List_1;
+};
+type List_1 = opt record {
+    Token;
+    List_1;
+};
+type List = opt record {
+    record {
+        text;
+        float64;
+    };
+    List;
+};
+type Error = variant {
+    InvalidAmount;
+    PortfolioNotFound;
+    TokenNotFound;
+};
+service : {
+    addToken : (text, text, text, float64, float64) -> (nat);
+    addTokenToPortfolio : (nat, nat) -> (Result);
+    createPortfolio : (text) -> (nat);
+    getAllPortfolios : () -> (vec Portfolio) query;
+    getAllTokens : () -> (vec Token) query;
+    getPortfolio : (nat) -> (opt Portfolio) query;
+    getPortfolioValue : (nat) -> (Result_2) query;
+    getPortfolioWeightings : (nat) -> (Result_1) query;
+    setPortfolioWeightings : (Result_1) -> (nat) query;
+    getToken : (nat) -> (opt Token) query;
+    updateTokenAmount : (nat, float64) -> (Result);
+};
