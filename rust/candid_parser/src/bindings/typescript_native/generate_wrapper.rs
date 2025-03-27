@@ -71,7 +71,7 @@ impl<'a> TypeConverter<'a> {
             TypeInner::Empty => false,
 
             // Types that always need conversion
-            TypeInner::Opt(inner) => true,
+            TypeInner::Opt(_) => true,
             // Container types - need conversion only if their contents need conversion
             TypeInner::Vec(inner) => self.needs_conversion(inner),
             TypeInner::Record(fields) => {
@@ -1311,24 +1311,6 @@ impl<'a> TypeConverter<'a> {
 
         // Return a call to the function
         self.create_call(&function_name, vec![self.create_arg(expr.clone())])
-    }
-
-    /// Determine if we need to import a Candid type for this type
-    fn needs_candid_import(&self, ty: &Type) -> bool {
-        match ty.as_ref() {
-            TypeInner::Record(_) | TypeInner::Variant(_) => true,
-            TypeInner::Var(id) => {
-                if let Ok(actual_ty) = self.env.rec_find_type(id) {
-                    match actual_ty.as_ref() {
-                        TypeInner::Record(_) | TypeInner::Variant(_) => true,
-                        _ => false,
-                    }
-                } else {
-                    false
-                }
-            }
-            _ => false,
-        }
     }
 
     /// Add imports for Candid types
