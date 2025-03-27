@@ -83,15 +83,26 @@ fn generate_record_opt_undefined() -> FnDecl {
                     id: Ident::new("arg".into(), DUMMY_SP, SyntaxContext::empty()),
                     type_ann: Some(Box::new(TsTypeAnn {
                         span: DUMMY_SP,
-                        type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
-                            span: DUMMY_SP,
-                            type_name: TsEntityName::Ident(Ident::new(
-                                "T".into(),
-                                DUMMY_SP,
-                                SyntaxContext::empty(),
-                            )),
-                            type_params: None,
-                        })),
+                        type_ann: Box::new(TsType::TsUnionOrIntersectionType(
+                            TsUnionOrIntersectionType::TsUnionType(TsUnionType {
+                                span: DUMMY_SP,
+                                types: vec![
+                                    Box::new(TsType::TsTypeRef(TsTypeRef {
+                                        span: DUMMY_SP,
+                                        type_name: TsEntityName::Ident(Ident::new(
+                                            "T".into(),
+                                            DUMMY_SP,
+                                            SyntaxContext::empty(),
+                                        )),
+                                        type_params: None,
+                                    })),
+                                    Box::new(TsType::TsKeywordType(TsKeywordType {
+                                        span: DUMMY_SP,
+                                        kind: TsKeywordTypeKind::TsNullKeyword,
+                                    })),
+                                ],
+                            }),
+                        )),
                     })),
                 }),
             }],
