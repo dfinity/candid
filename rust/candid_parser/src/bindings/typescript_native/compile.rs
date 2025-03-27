@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use super::super::javascript::is_tuple;
 use super::generate_wrapper::{convert_multi_return_from_candid, TypeConverter};
 use super::helper_functions::{add_option_helpers_interface, add_option_helpers_wrapper};
@@ -11,7 +9,6 @@ use swc_core::common::sync::Lrc;
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 use swc_core::ecma::codegen::{text_writer::JsWriter, Config, Emitter};
-// Map of JavaScript/TypeScript keywords to escape
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: &str) -> String {
     let cm = Lrc::new(SourceMap::default());
@@ -768,18 +765,13 @@ fn add_actor_service_implementation(
 
         // Export the instance of the class
         module.body.push(create_actor_instance(
-            env,
             service_name,
             &capitalized_service_name,
         ));
     }
 }
 
-fn create_actor_instance(
-    env: &TypeEnv,
-    service_name: &str,
-    capitalized_service_name: &str,
-) -> ModuleItem {
+fn create_actor_instance(service_name: &str, capitalized_service_name: &str) -> ModuleItem {
     ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
         span: DUMMY_SP,
         decl: Decl::Var(Box::new(VarDecl {
@@ -874,7 +866,6 @@ fn add_actor_var_implementation(
             .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
         // Export the instance of the class
         module.body.push(create_actor_instance(
-            env,
             service_name,
             &capitalized_service_name,
         ));
