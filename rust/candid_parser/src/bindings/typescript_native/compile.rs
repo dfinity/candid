@@ -1,6 +1,9 @@
+use std::collections::HashSet;
+
 use super::super::javascript::is_tuple;
 use super::generate_wrapper::{convert_multi_return_from_candid, TypeConverter};
 use super::helper_functions::{add_option_helpers_interface, add_option_helpers_wrapper};
+use super::ident::{get_ident, get_ident_guarded};
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use swc_core::common::comments::SingleThreadedComments;
 use swc_core::common::source_map::SourceMap;
@@ -9,138 +12,6 @@ use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 use swc_core::ecma::codegen::{text_writer::JsWriter, Config, Emitter};
 // Map of JavaScript/TypeScript keywords to escape
-static KEYWORDS: [&str; 125] = [
-    // Original JavaScript keywords
-    "abstract",
-    "arguments",
-    "await",
-    "boolean",
-    "break",
-    "byte",
-    "case",
-    "catch",
-    "char",
-    "class",
-    "const",
-    "continue",
-    "debugger",
-    "default",
-    "delete",
-    "do",
-    "double",
-    "else",
-    "enum",
-    "eval",
-    "export",
-    "extends",
-    "false",
-    "final",
-    "finally",
-    "float",
-    "for",
-    "function",
-    "goto",
-    "if",
-    "implements",
-    "import",
-    "in",
-    "instanceof",
-    "int",
-    "interface",
-    "let",
-    "long",
-    "native",
-    "new",
-    "null",
-    "package",
-    "private",
-    "protected",
-    "public",
-    "return",
-    "short",
-    "static",
-    "super",
-    "switch",
-    "synchronized",
-    "this",
-    "throw",
-    "throws",
-    "transient",
-    "true",
-    "try",
-    "typeof",
-    "var",
-    "void",
-    "volatile",
-    "while",
-    "with",
-    "yield",
-    // TypeScript primitive types
-    "any",
-    "unknown",
-    "never",
-    "undefined",
-    "object",
-    "symbol",
-    "bigint",
-    "number",
-    "string",
-    // Utility types
-    "Partial",
-    "Required",
-    "Readonly",
-    "Record",
-    "Pick",
-    "Omit",
-    "Exclude",
-    "Extract",
-    "NonNullable",
-    "Parameters",
-    "ConstructorParameters",
-    "ReturnType",
-    "InstanceType",
-    "ThisParameterType",
-    "OmitThisParameter",
-    "ThisType",
-    "Uppercase",
-    "Lowercase",
-    "Capitalize",
-    "Uncapitalize",
-    // Common built-in types/interfaces
-    "Array",
-    "ReadonlyArray",
-    "Function",
-    "Date",
-    "Error",
-    "Promise",
-    "Map",
-    "Set",
-    "WeakMap",
-    "WeakSet",
-    "Iterator",
-    "IterableIterator",
-    "Generator",
-    "RegExp",
-    "ArrayBuffer",
-    "DataView",
-    "Float32Array",
-    "Float64Array",
-    "Int8Array",
-    "Int16Array",
-    "Int32Array",
-    "Uint8Array",
-    "Uint16Array",
-    "Uint32Array",
-    "Uint8ClampedArray",
-    "BigInt64Array",
-    "BigUint64Array",
-    // Common global objects
-    "Math",
-    "JSON",
-    "console",
-    "document",
-    "window",
-];
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: &str) -> String {
     let cm = Lrc::new(SourceMap::default());
@@ -165,7 +36,19 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
 
     add_type_definitions(env, &mut module);
     if let Some(actor_type) = actor {
-        add_actor_implementation(env, &mut module, actor_type, service_name, target);
+        let mut converter = TypeConverter::new(env);
+        add_actor_implementation(
+            env,
+            &mut module,
+            actor_type,
+            service_name,
+            target,
+            &mut converter,
+        );
+
+        for stmt in converter.get_generated_functions() {
+            module.body.push(ModuleItem::Stmt(stmt.clone()));
+        }
     }
 
     // Generate code from the AST
@@ -183,17 +66,6 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
     }
 
     String::from_utf8(buf).unwrap()
-}
-
-// Ensure identifier is not a reserved keyword
-fn create_ident(name: &str) -> Ident {
-    let ident_name = if KEYWORDS.contains(&name) {
-        format!("{}_", name)
-    } else {
-        name.to_string()
-    };
-
-    Ident::new(ident_name.into(), DUMMY_SP, SyntaxContext::empty())
 }
 
 // Add standard imports
@@ -355,7 +227,7 @@ fn create_interface_from_record(env: &TypeEnv, id: &str, ty: &Type) -> TsInterfa
     TsInterfaceDecl {
         span: DUMMY_SP,
         declare: false,
-        id: create_ident(id),
+        id: get_ident(id),
         type_params: None,
         extends: vec![],
         body: TsInterfaceBody {
@@ -382,7 +254,7 @@ fn create_interface_from_service(
     TsInterfaceDecl {
         span: DUMMY_SP,
         declare: false,
-        id: create_ident(id),
+        id: get_ident_guarded(id),
         type_params: None,
         extends: vec![],
         body: TsInterfaceBody {
@@ -397,7 +269,7 @@ fn create_type_alias_from_function(env: &TypeEnv, id: &str, func: &Function) -> 
     TsTypeAliasDecl {
         span: DUMMY_SP,
         declare: false,
-        id: create_ident(id),
+        id: get_ident_guarded(id),
         type_params: None,
         type_ann: Box::new(create_function_type(env, func)),
     }
@@ -408,7 +280,7 @@ fn create_type_alias(env: &TypeEnv, id: &str, ty: &Type) -> TsTypeAliasDecl {
     TsTypeAliasDecl {
         span: DUMMY_SP,
         declare: false,
-        id: create_ident(id),
+        id: get_ident_guarded(id),
         type_params: None,
         type_ann: Box::new(convert_type(env, ty, false)),
     }
@@ -417,7 +289,7 @@ fn create_type_alias(env: &TypeEnv, id: &str, ty: &Type) -> TsTypeAliasDecl {
 // Create TS property signature from Candid field
 fn create_property_signature(env: &TypeEnv, field: &Field) -> TsTypeElement {
     let field_name = match &*field.id {
-        Label::Named(str) => Box::new(Expr::Ident(create_ident(str))),
+        Label::Named(str) => Box::new(Expr::Ident(get_ident(str))),
         Label::Id(n) | Label::Unnamed(n) => Box::new(Expr::Ident(Ident::new(
             format!("_{}_", n).into(),
             DUMMY_SP,
@@ -450,7 +322,7 @@ fn create_property_signature_from_type(env: &TypeEnv, name: &str, ty: &Type) -> 
     TsTypeElement::TsPropertySignature(TsPropertySignature {
         span: DUMMY_SP,
         readonly: false,
-        key: Box::new(Expr::Ident(create_ident(name))),
+        key: Box::new(Expr::Ident(get_ident(name))),
         computed: false,
         optional: false,
         type_ann: Some(Box::new(TsTypeAnn {
@@ -518,7 +390,7 @@ fn create_method_signature(env: &TypeEnv, method_id: &str, func: &Function) -> T
 
     TsTypeElement::TsMethodSignature(TsMethodSignature {
         span: DUMMY_SP,
-        key: Box::new(Expr::Ident(create_ident(method_id))),
+        key: Box::new(Expr::Ident(get_ident_guarded(method_id))),
         computed: false,
         optional: false,
         params,
@@ -584,7 +456,7 @@ fn create_function_type(env: &TypeEnv, func: &Function) -> TsType {
 }
 
 // Convert Candid type to TypeScript type
-fn convert_type(env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
+pub fn convert_type(env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
     use TypeInner::*;
 
     match ty.as_ref() {
@@ -638,14 +510,14 @@ fn convert_type(env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
                 } else {
                     TsType::TsTypeRef(TsTypeRef {
                         span: DUMMY_SP,
-                        type_name: TsEntityName::Ident(create_ident(id)),
+                        type_name: TsEntityName::Ident(get_ident_guarded(id)),
                         type_params: None,
                     })
                 }
             } else {
                 TsType::TsTypeRef(TsTypeRef {
                     span: DUMMY_SP,
-                    type_name: TsEntityName::Ident(create_ident(id)),
+                    type_name: TsEntityName::Ident(get_ident_guarded(id)),
                     type_params: None,
                 })
             }
@@ -837,24 +709,32 @@ fn add_actor_implementation(
     actor_type: &Type,
     service_name: &str,
     target: &str,
+    converter: &mut TypeConverter,
 ) {
     match actor_type.as_ref() {
         TypeInner::Service(ref serv) => {
-            add_actor_service_implementation(env, module, serv, service_name, target)
+            add_actor_service_implementation(env, module, serv, service_name, target, converter)
         }
-        TypeInner::Var(id) => add_actor_var_implementation(env, module, id, service_name, target),
-        TypeInner::Class(_, t) => add_actor_implementation(env, module, t, service_name, target),
+        TypeInner::Var(id) => {
+            add_actor_var_implementation(env, module, id, service_name, target, converter)
+        }
+        TypeInner::Class(_, t) => {
+            add_actor_implementation(env, module, t, service_name, target, converter)
+        }
         _ => {}
     }
 }
 
 // Add actor implementation from service definition
+
+/// Add actor implementation from service definition
 fn add_actor_service_implementation(
     env: &TypeEnv,
     module: &mut Module,
     serv: &Vec<(String, Type)>,
     service_name: &str,
     target: &str,
+    converter: &mut TypeConverter,
 ) {
     let interface = create_interface_from_service(env, service_name, serv);
     module
@@ -864,15 +744,28 @@ fn add_actor_service_implementation(
         )))));
 
     if target == "wrapper" {
+        // Create a single TypeConverter instance
         let capitalized_service_name = service_name
             .chars()
             .next()
             .map_or(String::new(), |c| c.to_uppercase().collect::<String>())
             + &service_name[1..];
-        let class_decl = create_actor_class(env, service_name, &capitalized_service_name, serv);
+
+        // Pass the converter to create_actor_class
+        let class_decl = create_actor_class(
+            env,
+            service_name,
+            &capitalized_service_name,
+            serv,
+            converter,
+        );
+
+        converter.add_candid_type_imports(module, service_name);
+
         module
             .body
             .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
+
         // Export the instance of the class
         module.body.push(create_actor_instance(
             env,
@@ -924,6 +817,7 @@ fn add_actor_var_implementation(
     type_id: &str,
     service_name: &str,
     target: &str,
+    converter: &mut TypeConverter,
 ) {
     // Find the service definition
     let type_ref = env.find_type(type_id).unwrap();
@@ -944,11 +838,11 @@ fn add_actor_var_implementation(
     let interface = TsInterfaceDecl {
         span: DUMMY_SP,
         declare: false,
-        id: create_ident(service_name),
+        id: get_ident_guarded(service_name),
         type_params: None,
         extends: vec![TsExprWithTypeArgs {
             span: DUMMY_SP,
-            expr: Box::new(Expr::Ident(create_ident(type_id))),
+            expr: Box::new(Expr::Ident(get_ident_guarded(type_id))),
             type_args: None,
         }],
         body: TsInterfaceBody {
@@ -967,7 +861,14 @@ fn add_actor_var_implementation(
             .next()
             .map_or(String::new(), |c| c.to_uppercase().collect::<String>())
             + &service_name[1..];
-        let class_decl = create_actor_class(env, service_name, &capitalized_service_name, serv);
+        let class_decl = create_actor_class(
+            env,
+            service_name,
+            &capitalized_service_name,
+            serv,
+            converter,
+        );
+        converter.add_candid_type_imports(module, service_name);
         module
             .body
             .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
@@ -986,6 +887,7 @@ fn create_actor_class(
     service_name: &str,
     capitalized_service_name: &str,
     serv: &Vec<(String, Type)>,
+    converter: &mut TypeConverter,
 ) -> ClassDecl {
     // Create private actor field
     let actor_field = ClassMember::PrivateProp(PrivateProp {
@@ -1069,7 +971,7 @@ fn create_actor_class(
         .iter()
         .filter_map(|(method_id, func_ty)| {
             if let TypeInner::Func(ref func) = func_ty.as_ref() {
-                Some(create_actor_method(env, method_id, func))
+                Some(create_actor_method(env, method_id, func, converter))
             } else {
                 None
             }
@@ -1081,7 +983,7 @@ fn create_actor_class(
     members.extend(methods);
 
     ClassDecl {
-        ident: create_ident(capitalized_service_name),
+        ident: get_ident_guarded(capitalized_service_name),
         declare: false,
         class: Box::new(Class {
             span: DUMMY_SP,
@@ -1091,7 +993,7 @@ fn create_actor_class(
             super_type_params: None,
             implements: vec![TsExprWithTypeArgs {
                 span: DUMMY_SP,
-                expr: Box::new(Expr::Ident(create_ident(service_name).into())),
+                expr: Box::new(Expr::Ident(get_ident_guarded(service_name).into())),
                 type_args: None,
             }],
             is_abstract: false,
@@ -1102,10 +1004,12 @@ fn create_actor_class(
 }
 
 // Create a class method for an actor function
-pub fn create_actor_method(env: &TypeEnv, method_id: &str, func: &Function) -> ClassMember {
-    // Create type converter
-    let converter = TypeConverter::new(env);
-
+pub fn create_actor_method(
+    env: &TypeEnv,
+    method_id: &str,
+    func: &Function,
+    converter: &mut TypeConverter,
+) -> ClassMember {
     // Create parameters
     let params = func
         .args
@@ -1195,7 +1099,7 @@ pub fn create_actor_method(env: &TypeEnv, method_id: &str, func: &Function) -> C
                     name: "actor".into(),
                 }),
             })),
-            prop: MemberProp::Ident(create_ident(method_id).into()),
+            prop: MemberProp::Ident(get_ident_guarded(method_id).into()),
         }))),
         args: converted_args,
         type_args: None,
@@ -1235,7 +1139,7 @@ pub fn create_actor_method(env: &TypeEnv, method_id: &str, func: &Function) -> C
     } else {
         // Convert the result to the expected TypeScript type
         let result_expr = Expr::Ident(result_var);
-        convert_multi_return_from_candid(&converter, &result_expr, &func.rets)
+        convert_multi_return_from_candid(converter, &result_expr, &func.rets)
     };
 
     // Create return statement with converted result
@@ -1252,7 +1156,7 @@ pub fn create_actor_method(env: &TypeEnv, method_id: &str, func: &Function) -> C
 
     ClassMember::Method(ClassMethod {
         span: DUMMY_SP,
-        key: PropName::Ident(create_ident(method_id).into()),
+        key: PropName::Ident(get_ident_guarded(method_id).into()),
         function: Box::new(swc_core::ecma::ast::Function {
             params,
             decorators: vec![],

@@ -1,29 +1,240 @@
-use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
+use super::candid_types::CandidTypesConverter;
+use super::compile::convert_type;
+use candid::types::{Field, Label, Type, TypeEnv, TypeInner};
+use std::collections::{HashMap, HashSet};
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
-
 /// Provides functions to generate JavaScript expressions that convert
-/// between TypeScript and Candid representations.
+/// between TypeScript and Candid representations using a function-based approach.
 pub struct TypeConverter<'a> {
     env: &'a TypeEnv,
+    // Track function names by type
+    to_candid_functions: HashMap<Type, String>,
+    from_candid_functions: HashMap<Type, String>,
+    // Track which types have fully generated functions
+    to_candid_generated: HashSet<Type>,
+    from_candid_generated: HashSet<Type>,
+    // Store all generated function declarations
+    generated_functions: HashMap<String, Stmt>,
+    // Track types being processed to detect recursion
+    processing_to_candid: HashSet<Type>,
+    processing_from_candid: HashSet<Type>,
+    // Counter for unique function names
+    function_counter: usize,
+    candid_types_converter: CandidTypesConverter<'a>,
 }
 
 impl<'a> TypeConverter<'a> {
     /// Create a new TypeConverter with the given type environment
     pub fn new(env: &'a TypeEnv) -> Self {
-        TypeConverter { env }
+        TypeConverter {
+            env,
+            to_candid_functions: HashMap::new(),
+            from_candid_functions: HashMap::new(),
+            to_candid_generated: HashSet::new(),
+            from_candid_generated: HashSet::new(),
+            generated_functions: HashMap::new(),
+            processing_to_candid: HashSet::new(),
+            processing_from_candid: HashSet::new(),
+            function_counter: 0,
+            candid_types_converter: CandidTypesConverter::new(env),
+        }
     }
 
-    /// Generate an expression that converts from TypeScript to Candid representation
-    /// for the given Candid type and expression.
-    pub fn to_candid(&self, expr: &Expr, ty: &Type) -> Expr {
-        self._to_candid(expr, ty)
+    /// Get all generated function declarations
+    pub fn get_generated_functions(&self) -> Vec<Stmt> {
+        self.generated_functions.values().cloned().collect()
     }
 
-    fn _to_candid(&self, expr: &Expr, ty: &Type) -> Expr {
+    /// Check if a type requires conversion or can be passed through directly
+    fn needs_conversion(&self, ty: &Type) -> bool {
         match ty.as_ref() {
-            TypeInner::Null => self.convert_null(expr),
-            TypeInner::Bool => expr.clone(),
+            // Types that don't need conversion
+            TypeInner::Null => false,
+            TypeInner::Bool => false,
+            TypeInner::Text => false,
+            TypeInner::Nat8 => false,
+            TypeInner::Nat16 => false,
+            TypeInner::Nat32 => false,
+            TypeInner::Int8 => false,
+            TypeInner::Int16 => false,
+            TypeInner::Int32 => false,
+            TypeInner::Float32 => false,
+            TypeInner::Float64 => false,
+            TypeInner::Reserved => false,
+
+            TypeInner::Nat => false,
+            TypeInner::Int => false,
+            TypeInner::Nat64 => false,
+            TypeInner::Int64 => false,
+            TypeInner::Principal => false,
+            TypeInner::Empty => false,
+
+            // Types that always need conversion
+            TypeInner::Opt(inner) => true,
+            // Container types - need conversion only if their contents need conversion
+            TypeInner::Vec(inner) => self.needs_conversion(inner),
+            TypeInner::Record(fields) => {
+                // Only needs conversion if any field needs conversion
+                fields.iter().any(|field| self.needs_conversion(&field.ty))
+            }
+            TypeInner::Variant(fields) => {
+                // Only needs conversion if any variant case needs conversion
+                fields.iter().any(|field| self.needs_conversion(&field.ty))
+            }
+            TypeInner::Var(id) => {
+                // Check if the named type needs conversion
+                if let Ok(actual_ty) = self.env.rec_find_type(id) {
+                    self.needs_conversion(&actual_ty)
+                } else {
+                    true // Conservative default
+                }
+            }
+            _ => true, // Conservative default - convert if unsure
+        }
+    }
+
+    /// Get the function name for converting from TypeScript to Candid
+    fn get_to_candid_function_name(&mut self, ty: &Type) -> String {
+        if let Some(name) = self.to_candid_functions.get(ty) {
+            return name.clone();
+        }
+
+        // Generate a base name for the function
+        let base_name = match ty.as_ref() {
+            TypeInner::Var(id) => format!("to_candid_{}", id),
+            _ => {
+                // For anonymous types, use a descriptive prefix based on the type
+                let type_prefix = match ty.as_ref() {
+                    TypeInner::Null => "null",
+                    TypeInner::Bool => "bool",
+                    TypeInner::Nat => "nat",
+                    TypeInner::Int => "int",
+                    TypeInner::Nat8 => "nat8",
+                    TypeInner::Nat16 => "nat16",
+                    TypeInner::Nat32 => "nat32",
+                    TypeInner::Nat64 => "nat64",
+                    TypeInner::Int8 => "int8",
+                    TypeInner::Int16 => "int16",
+                    TypeInner::Int32 => "int32",
+                    TypeInner::Int64 => "int64",
+                    TypeInner::Float32 => "float32",
+                    TypeInner::Float64 => "float64",
+                    TypeInner::Text => "text",
+                    TypeInner::Reserved => "reserved",
+                    TypeInner::Empty => "empty",
+                    TypeInner::Principal => "principal",
+                    TypeInner::Opt(_) => "opt",
+                    TypeInner::Vec(_) => "vec",
+                    TypeInner::Record(fields) => {
+                        if self.is_tuple(fields) {
+                            "tuple"
+                        } else {
+                            "record"
+                        }
+                    }
+                    TypeInner::Variant(_) => "variant",
+                    TypeInner::Func(_) => "func",
+                    TypeInner::Service(_) => "service",
+                    _ => "anonymous",
+                };
+                format!("to_candid_{}", type_prefix)
+            }
+        };
+
+        // Generate a unique name with counter
+        self.function_counter += 1;
+        let name = format!("{}_n{}", base_name, self.function_counter);
+
+        self.to_candid_functions.insert(ty.clone(), name.clone());
+        name
+    }
+
+    /// Get the function name for converting from Candid to TypeScript
+    fn get_from_candid_function_name(&mut self, ty: &Type) -> String {
+        if let Some(name) = self.from_candid_functions.get(ty) {
+            return name.clone();
+        }
+
+        // Generate a base name for the function
+        let base_name = match ty.as_ref() {
+            TypeInner::Var(id) => format!("from_candid_{}", id),
+            _ => {
+                // For anonymous types, use a descriptive prefix based on the type
+                let type_prefix = match ty.as_ref() {
+                    TypeInner::Null => "null",
+                    TypeInner::Bool => "bool",
+                    TypeInner::Nat => "nat",
+                    TypeInner::Int => "int",
+                    TypeInner::Nat8 => "nat8",
+                    TypeInner::Nat16 => "nat16",
+                    TypeInner::Nat32 => "nat32",
+                    TypeInner::Nat64 => "nat64",
+                    TypeInner::Int8 => "int8",
+                    TypeInner::Int16 => "int16",
+                    TypeInner::Int32 => "int32",
+                    TypeInner::Int64 => "int64",
+                    TypeInner::Float32 => "float32",
+                    TypeInner::Float64 => "float64",
+                    TypeInner::Text => "text",
+                    TypeInner::Reserved => "reserved",
+                    TypeInner::Empty => "empty",
+                    TypeInner::Principal => "principal",
+                    TypeInner::Opt(_) => "opt",
+                    TypeInner::Vec(_) => "vec",
+                    TypeInner::Record(fields) => {
+                        if self.is_tuple(fields) {
+                            "tuple"
+                        } else {
+                            "record"
+                        }
+                    }
+                    TypeInner::Variant(_) => "variant",
+                    TypeInner::Func(_) => "func",
+                    TypeInner::Service(_) => "service",
+                    _ => "anonymous",
+                };
+                format!("from_candid_{}", type_prefix)
+            }
+        };
+
+        // Generate a unique name with counter
+        self.function_counter += 1;
+        let name = format!("{}_n{}", base_name, self.function_counter);
+
+        self.from_candid_functions.insert(ty.clone(), name.clone());
+        name
+    }
+
+    /// Create an identifier expression
+    fn create_ident(&self, name: &str) -> Expr {
+        Expr::Ident(Ident::new(name.into(), DUMMY_SP, SyntaxContext::empty()))
+    }
+
+    /// Create a function call expression
+    fn create_call(&self, callee: &str, args: Vec<ExprOrSpread>) -> Expr {
+        Expr::Call(CallExpr {
+            span: DUMMY_SP,
+            callee: Callee::Expr(Box::new(self.create_ident(callee))),
+            args,
+            type_args: None,
+            ctxt: SyntaxContext::empty(),
+        })
+    }
+
+    /// Create a function call argument
+    fn create_arg(&self, expr: Expr) -> ExprOrSpread {
+        ExprOrSpread {
+            spread: None,
+            expr: Box::new(expr),
+        }
+    }
+
+    /// Generate the body of a TypeScript -> Candid conversion function
+    fn generate_to_candid_body(&mut self, ty: &Type, param_name: &str) -> Expr {
+        match ty.as_ref() {
+            TypeInner::Null => self.create_ident(param_name),
+            TypeInner::Bool => self.create_ident(param_name),
             TypeInner::Nat
             | TypeInner::Int
             | TypeInner::Nat64
@@ -35,410 +246,131 @@ impl<'a> TypeConverter<'a> {
             | TypeInner::Int16
             | TypeInner::Int32
             | TypeInner::Float32
-            | TypeInner::Float64 => expr.clone(),
-            TypeInner::Text => expr.clone(),
-            TypeInner::Reserved => expr.clone(),
-            TypeInner::Empty => self.convert_empty(expr),
-            TypeInner::Principal => self.convert_principal_to_candid(expr),
-            TypeInner::Opt(ref inner) => self.convert_opt_to_candid(expr, inner),
-            TypeInner::Vec(ref inner) => self.convert_vec_to_candid(expr, inner),
-            TypeInner::Record(ref fields) => self.convert_record_to_candid(expr, fields),
-            TypeInner::Variant(ref _fields) => expr.clone(), //self.convert_variant_to_candid(expr, fields),
-            TypeInner::Func(ref func) => self.convert_func_to_candid(expr, func),
-            TypeInner::Service(_) => self.convert_service_to_candid(expr),
-            TypeInner::Var(ref id) => self.convert_var_to_candid(expr, id),
-            // For unsupported types, we pass through unchanged
-            _ => expr.clone(),
-        }
-    }
-
-    /// Generate an expression that converts from Candid to TypeScript representation
-    /// for the given Candid type and expression.
-    pub fn from_candid(&self, expr: &Expr, ty: &Type) -> Expr {
-        self._from_candid(expr, ty)
-    }
-
-    fn _from_candid(&self, expr: &Expr, ty: &Type) -> Expr {
-        match ty.as_ref() {
-            TypeInner::Null => self.convert_null(expr),
-            TypeInner::Bool => expr.clone(),
-            TypeInner::Nat | TypeInner::Int | TypeInner::Nat64 | TypeInner::Int64 => {
-                self.convert_from_bigint(expr)
+            | TypeInner::Float64 => self.create_ident(param_name),
+            TypeInner::Text => self.create_ident(param_name),
+            TypeInner::Reserved => self.create_ident(param_name),
+            TypeInner::Empty => {
+                // Empty type is represented as null in JavaScript
+                Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))
             }
-            TypeInner::Nat8
-            | TypeInner::Nat16
-            | TypeInner::Nat32
-            | TypeInner::Int8
-            | TypeInner::Int16
-            | TypeInner::Int32
-            | TypeInner::Float32
-            | TypeInner::Float64 => expr.clone(),
-            TypeInner::Text => expr.clone(),
-            TypeInner::Reserved => expr.clone(),
-            TypeInner::Empty => self.convert_empty(expr),
-            TypeInner::Principal => self.convert_principal_from_candid(expr),
-            TypeInner::Opt(ref inner) => self.convert_opt_from_candid(expr, inner),
-            TypeInner::Vec(ref inner) => self.convert_vec_from_candid(expr, inner),
-            TypeInner::Record(ref fields) => self.convert_record_from_candid(expr, fields),
-            TypeInner::Variant(ref _fields) => expr.clone(), //self.convert_variant_from_candid(expr, fields)
-            TypeInner::Func(ref func) => self.convert_func_from_candid(expr, func),
-            TypeInner::Service(_) => self.convert_service_from_candid(expr),
-            TypeInner::Var(ref id) => self.convert_var_from_candid(expr, id),
-            // For unsupported types, we pass through unchanged
-            _ => expr.clone(),
-        }
-    }
-
-    // --- Type-specific conversion methods ---
-
-    fn convert_null(&self, expr: &Expr) -> Expr {
-        expr.clone()
-    }
-
-    fn convert_empty(&self, _expr: &Expr) -> Expr {
-        // Empty type is represented as null in JavaScript
-        Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))
-    }
-
-    fn convert_from_bigint(&self, expr: &Expr) -> Expr {
-        // Convert from Candid bigint to JavaScript BigInt
-        expr.clone() // BigInt is already handled correctly in this direction
-    }
-
-    fn convert_principal_to_candid(&self, expr: &Expr) -> Expr {
-        // Convert from JavaScript Principal to Candid Principal
-        expr.clone() // Principal object is already compatible
-    }
-
-    fn convert_principal_from_candid(&self, expr: &Expr) -> Expr {
-        // Convert from Candid Principal to JavaScript Principal
-        expr.clone() // Principal object is already compatible
-    }
-
-    fn convert_opt_to_candid(&self, expr: &Expr, inner: &Type) -> Expr {
-        // Count the nesting depth
-        fn count_nesting_depth(ty: &Type) -> usize {
-            match ty.as_ref() {
-                TypeInner::Opt(inner) => 1 + count_nesting_depth(inner),
-                _ => 0,
+            TypeInner::Principal => self.convert_principal_to_candid_body(param_name),
+            TypeInner::Opt(ref inner) => self.convert_opt_to_candid_body(inner, param_name),
+            TypeInner::Vec(ref inner) => self.convert_vec_to_candid_body(inner, param_name),
+            TypeInner::Record(ref fields) => self.convert_record_to_candid_body(fields, param_name),
+            TypeInner::Variant(ref fields) => {
+                self.convert_variant_to_candid_body(fields, param_name)
             }
+            TypeInner::Func(ref func) => self.convert_func_to_candid_body(func, param_name),
+            TypeInner::Service(_) => self.create_ident(param_name), // Pass through as-is
+            TypeInner::Var(ref id) => {
+                // For named types, delegate to another conversion function
+                if let Ok(actual_ty) = self.env.rec_find_type(id) {
+                    // If the actual type doesn't need conversion, return the expression directly
+                    if !self.needs_conversion(&actual_ty) {
+                        return self.create_ident(param_name);
+                    }
+
+                    // Generate the function for the actual type if needed
+                    let inner_function_name = self.get_to_candid_function_name(&actual_ty);
+                    self.generate_to_candid_function(&actual_ty, &inner_function_name);
+
+                    // Return a call to that function
+                    self.create_call(
+                        &inner_function_name,
+                        vec![self.create_arg(self.create_ident(param_name))],
+                    )
+                } else {
+                    // If type not found, pass through unchanged
+                    self.create_ident(param_name)
+                }
+            }
+            // For unsupported types, we pass through unchanged
+            _ => self.create_ident(param_name),
+        }
+    }
+
+    // --- Type-specific conversion methods (TypeScript -> Candid) ---
+
+    fn convert_principal_to_candid_body(&mut self, param_name: &str) -> Expr {
+        // Principal objects are already compatible
+        self.create_ident(param_name)
+    }
+
+    fn convert_opt_to_candid_body(&mut self, inner: &Type, param_name: &str) -> Expr {
+        // For nested options, we need to handle them recursively
+        if let TypeInner::Opt(_) = inner.as_ref() {
+            // Generate a conversion function for the inner option type
+            let inner_function_name = self.get_to_candid_function_name(inner);
+            self.generate_to_candid_function(inner, &inner_function_name);
+
+            // Create expression: isNone(value) ? candid_none() : candid_some(inner_fn(unwrap(value)))
+            return Expr::Cond(CondExpr {
+                span: DUMMY_SP,
+                test: Box::new(Expr::Call(CallExpr {
+                    span: DUMMY_SP,
+                    callee: Callee::Expr(Box::new(self.create_ident("isNone"))),
+                    args: vec![self.create_arg(self.create_ident(param_name))],
+                    type_args: None,
+                    ctxt: SyntaxContext::empty(),
+                })),
+                cons: Box::new(self.create_call("candid_none", vec![])),
+                alt: Box::new(self.create_call(
+                    "candid_some",
+                    vec![self.create_arg(self.create_call(
+                        &inner_function_name,
+                        vec![self.create_arg(self.create_call(
+                            "unwrap",
+                            vec![self.create_arg(self.create_ident(param_name))],
+                        ))],
+                    ))],
+                )),
+            });
         }
 
-        let depth = count_nesting_depth(inner);
-
-        if depth == 0 {
-            // Base case (T | null)
+        // For inner types that don't need conversion, we can simplify
+        if !self.needs_conversion(inner) {
             return Expr::Cond(CondExpr {
                 span: DUMMY_SP,
                 test: Box::new(Expr::Bin(BinExpr {
                     span: DUMMY_SP,
                     op: BinaryOp::EqEqEq,
-                    left: Box::new(expr.clone()),
+                    left: Box::new(self.create_ident(param_name)),
                     right: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
                 })),
-                cons: Box::new(Expr::Call(CallExpr {
-                    span: DUMMY_SP,
-                    callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                        "candid_none".into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    )))),
-                    args: vec![],
-                    type_args: None,
-                    ctxt: SyntaxContext::empty(),
-                })),
-                alt: Box::new(Expr::Call(CallExpr {
-                    span: DUMMY_SP,
-                    callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                        "candid_some".into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    )))),
-                    args: vec![ExprOrSpread {
-                        spread: None,
-                        expr: Box::new(expr.clone()),
-                    }],
-                    type_args: None,
-                    ctxt: SyntaxContext::empty(),
-                })),
+                cons: Box::new(self.create_call("candid_none", vec![])),
+                alt: Box::new(self.create_call(
+                    "candid_some",
+                    vec![self.create_arg(self.create_ident(param_name))],
+                )),
             });
-        } else {
-            // Handle the outermost Option check
-            let is_none_check = Expr::Call(CallExpr {
-                span: DUMMY_SP,
-                callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                    "isNone".into(),
-                    DUMMY_SP,
-                    SyntaxContext::empty(),
-                )))),
-                args: vec![ExprOrSpread {
-                    spread: None,
-                    expr: Box::new(expr.clone()),
-                }],
-                type_args: None,
-                ctxt: SyntaxContext::empty(),
-            });
-
-            // Create the unwrap call
-            let unwrap_call = Expr::Call(CallExpr {
-                span: DUMMY_SP,
-                callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                    "unwrap".into(),
-                    DUMMY_SP,
-                    SyntaxContext::empty(),
-                )))),
-                args: vec![ExprOrSpread {
-                    spread: None,
-                    expr: Box::new(expr.clone()),
-                }],
-                type_args: None,
-                ctxt: SyntaxContext::empty(),
-            });
-
-            // For deeper nesting (depth >= 2), create nested conditional structure
-            let current_expr = unwrap_call;
-
-            // Create the innermost check first
-            let innermost_check = Expr::Cond(CondExpr {
-                span: DUMMY_SP,
-                test: Box::new(Expr::Bin(BinExpr {
-                    span: DUMMY_SP,
-                    op: BinaryOp::EqEqEq,
-                    left: Box::new(current_expr.clone()),
-                    right: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
-                })),
-                cons: Box::new(Expr::Call(CallExpr {
-                    span: DUMMY_SP,
-                    callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                        "candid_none".into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    )))),
-                    args: vec![],
-                    type_args: None,
-                    ctxt: SyntaxContext::empty(),
-                })),
-                alt: Box::new(Expr::Call(CallExpr {
-                    span: DUMMY_SP,
-                    callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                        "candid_some".into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    )))),
-                    args: vec![ExprOrSpread {
-                        spread: None,
-                        expr: Box::new(current_expr),
-                    }],
-                    type_args: None,
-                    ctxt: SyntaxContext::empty(),
-                })),
-            });
-
-            // Wrap with the outermost check
-            Expr::Cond(CondExpr {
-                span: DUMMY_SP,
-                test: Box::new(is_none_check),
-                cons: Box::new(Expr::Call(CallExpr {
-                    span: DUMMY_SP,
-                    callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                        "candid_none".into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    )))),
-                    args: vec![],
-                    type_args: None,
-                    ctxt: SyntaxContext::empty(),
-                })),
-                alt: Box::new(Expr::Call(CallExpr {
-                    span: DUMMY_SP,
-                    callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                        "candid_some".into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    )))),
-                    args: vec![ExprOrSpread {
-                        spread: None,
-                        expr: Box::new(innermost_check),
-                    }],
-                    type_args: None,
-                    ctxt: SyntaxContext::empty(),
-                })),
-            })
         }
-    }
 
-    // Helper method to count the nesting depth of optional types
-    fn count_opt_nesting_depth(&self, ty: &Type) -> usize {
-        match ty.as_ref() {
-            TypeInner::Opt(inner) => 1 + self.count_opt_nesting_depth(inner),
-            _ => 0,
-        }
-    }
+        // Only for non-option inner types that need conversion,
+        // generate a specific conversion function
+        let inner_function_name = self.get_to_candid_function_name(inner);
+        self.generate_to_candid_function(inner, &inner_function_name);
 
-    fn convert_opt_from_candid(&self, expr: &Expr, inner: &Type) -> Expr {
-        // Count the nesting depth of optionals
-        let depth = self.count_opt_nesting_depth(inner);
-
-        // If depth is 1, use the base case conversion (T | null)
-        if depth == 0 {
-            self.convert_base_optional(expr, inner)
-        } else if depth > 0 {
-            // For nested optionals, use the recursive conversion
-            self.convert_nested_optional(expr, inner, depth)
-        } else {
-            // Shouldn't happen
-            expr.clone()
-        }
-    }
-
-    // Base function: EXPR.length === 0 ? null : EXPR[0]
-    fn convert_base_optional(&self, expr: &Expr, inner: &Type) -> Expr {
-        // Get the inner non-optional type
-        let base_type = if let TypeInner::Opt(ref inner_ty) = inner.as_ref() {
-            inner_ty
-        } else {
-            inner // Shouldn't happen
-        };
-
-        // Create a length check: expr.length === 0
-        let length_check = Expr::Bin(BinExpr {
-            span: DUMMY_SP,
-            op: BinaryOp::EqEqEq,
-            left: Box::new(Expr::Member(MemberExpr {
-                span: DUMMY_SP,
-                obj: Box::new(expr.clone()),
-                prop: MemberProp::Ident(
-                    Ident::new("length".into(), DUMMY_SP, SyntaxContext::empty()).into(),
-                ),
-            })),
-            right: Box::new(Expr::Lit(Lit::Num(Number {
-                span: DUMMY_SP,
-                value: 0.0,
-                raw: None,
-            }))),
-        });
-
-        // Create a null literal for the "empty" case
-        let null_expr = Expr::Lit(Lit::Null(Null { span: DUMMY_SP }));
-
-        // Create an expression to access the first element: expr[0]
-        let first_element = Expr::Member(MemberExpr {
-            span: DUMMY_SP,
-            obj: Box::new(expr.clone()),
-            prop: MemberProp::Computed(ComputedPropName {
-                span: DUMMY_SP,
-                expr: Box::new(Expr::Lit(Lit::Num(Number {
-                    span: DUMMY_SP,
-                    value: 0.0,
-                    raw: None,
-                }))),
-            }),
-        });
-
-        // Convert the first element if needed
-        let converted_element = self._from_candid(&first_element, base_type);
-
-        // Create the conditional: expr.length === 0 ? null : expr[0]
+        // value === null ? candid_none() : candid_some(to_candid_inner(value))
         Expr::Cond(CondExpr {
             span: DUMMY_SP,
-            test: Box::new(length_check),
-            cons: Box::new(null_expr),
-            alt: Box::new(converted_element),
+            test: Box::new(Expr::Bin(BinExpr {
+                span: DUMMY_SP,
+                op: BinaryOp::EqEqEq,
+                left: Box::new(self.create_ident(param_name)),
+                right: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
+            })),
+            cons: Box::new(self.create_call("candid_none", vec![])),
+            alt: Box::new(self.create_call(
+                "candid_some",
+                vec![self.create_arg(self.create_call(
+                    &inner_function_name,
+                    vec![self.create_arg(self.create_ident(param_name))],
+                ))],
+            )),
         })
     }
 
-    // Recursive function: EXPR.length === 0 ? none() : some(INTERNAL_CALL_REC(EXPR[0]))
-    fn convert_nested_optional(&self, expr: &Expr, inner: &Type, depth: usize) -> Expr {
-        // Create a length check: expr.length === 0
-        let length_check = Expr::Bin(BinExpr {
-            span: DUMMY_SP,
-            op: BinaryOp::EqEqEq,
-            left: Box::new(Expr::Member(MemberExpr {
-                span: DUMMY_SP,
-                obj: Box::new(expr.clone()),
-                prop: MemberProp::Ident(
-                    Ident::new("length".into(), DUMMY_SP, SyntaxContext::empty()).into(),
-                ),
-            })),
-            right: Box::new(Expr::Lit(Lit::Num(Number {
-                span: DUMMY_SP,
-                value: 0.0,
-                raw: None,
-            }))),
-        });
-
-        // Create none() call for the "empty" case
-        let none_expr = Expr::Call(CallExpr {
-            span: DUMMY_SP,
-            callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                "none".into(),
-                DUMMY_SP,
-                SyntaxContext::empty(),
-            )))),
-            args: vec![],
-            type_args: None,
-            ctxt: SyntaxContext::empty(),
-        });
-
-        // Create an expression to access the first element: expr[0]
-        let first_element = Expr::Member(MemberExpr {
-            span: DUMMY_SP,
-            obj: Box::new(expr.clone()),
-            prop: MemberProp::Computed(ComputedPropName {
-                span: DUMMY_SP,
-                expr: Box::new(Expr::Lit(Lit::Num(Number {
-                    span: DUMMY_SP,
-                    value: 0.0,
-                    raw: None,
-                }))),
-            }),
-        });
-
-        // Get the inner type (unwrap one level of optional)
-        let next_inner = if let TypeInner::Opt(ref inner_ty) = inner.as_ref() {
-            inner_ty
-        } else {
-            inner // Shouldn't happen
-        };
-
-        // For the inner value, we need to either:
-        // - Recursively call this function (for depth > 1)
-        // - Use the base case (for depth == 1)
-        let inner_expr = if depth > 1 {
-            self.convert_nested_optional(&first_element, next_inner, depth - 1)
-        } else {
-            // At depth 2, the inner value is a base case (T | null)
-            self.convert_base_optional(&first_element, next_inner)
-        };
-
-        // Wrap the inner expression in some()
-        let some_expr = Expr::Call(CallExpr {
-            span: DUMMY_SP,
-            callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                "some".into(),
-                DUMMY_SP,
-                SyntaxContext::empty(),
-            )))),
-            args: vec![ExprOrSpread {
-                spread: None,
-                expr: Box::new(inner_expr),
-            }],
-            type_args: None,
-            ctxt: SyntaxContext::empty(),
-        });
-
-        // Create the conditional: expr.length === 0 ? none() : some(...)
-        Expr::Cond(CondExpr {
-            span: DUMMY_SP,
-            test: Box::new(length_check),
-            cons: Box::new(none_expr),
-            alt: Box::new(some_expr),
-        })
-    }
-
-    // *** Array conversion methods ***
-
-    fn convert_vec_to_candid(&self, expr: &Expr, inner: &Type) -> Expr {
+    fn convert_vec_to_candid_body(&mut self, inner: &Type, param_name: &str) -> Expr {
         // Check if it's a number array that should be converted to a typed array
         match inner.as_ref() {
             TypeInner::Nat8
@@ -449,16 +381,25 @@ impl<'a> TypeConverter<'a> {
             | TypeInner::Int32
             | TypeInner::Nat64
             | TypeInner::Int64 => {
-                // Handle conversion from regular array to TypedArray if needed
-                return expr.clone();
+                // For numeric types, we can just pass through or convert to typed array
+                self.create_ident(param_name)
             }
             _ => {
-                // Generate map to convert each element
+                // Optimization for inner types that don't need conversion
+                if !self.needs_conversion(inner) {
+                    return self.create_ident(param_name);
+                }
+
+                // Get conversion function for inner type
+                let inner_function_name = self.get_to_candid_function_name(inner);
+                self.generate_to_candid_function(inner, &inner_function_name);
+
+                // value.map(x => to_candid_inner(x))
                 Expr::Call(CallExpr {
                     span: DUMMY_SP,
                     callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
                         span: DUMMY_SP,
-                        obj: Box::new(expr.clone()),
+                        obj: Box::new(self.create_ident(param_name)),
                         prop: MemberProp::Ident(
                             Ident::new("map".into(), DUMMY_SP, SyntaxContext::empty()).into(),
                         ),
@@ -471,21 +412,10 @@ impl<'a> TypeConverter<'a> {
                                 id: Ident::new("x".into(), DUMMY_SP, SyntaxContext::empty()),
                                 type_ann: None,
                             })],
-                            body: Box::new(BlockStmtOrExpr::BlockStmt(BlockStmt {
-                                span: DUMMY_SP,
-                                stmts: vec![Stmt::Return(ReturnStmt {
-                                    span: DUMMY_SP,
-                                    arg: Some(Box::new(self._to_candid(
-                                        &Expr::Ident(Ident::new(
-                                            "x".into(),
-                                            DUMMY_SP,
-                                            SyntaxContext::empty(),
-                                        )),
-                                        inner,
-                                    ))),
-                                })],
-                                ctxt: SyntaxContext::empty(),
-                            })),
+                            body: Box::new(BlockStmtOrExpr::Expr(Box::new(self.create_call(
+                                &inner_function_name,
+                                vec![self.create_arg(self.create_ident("x"))],
+                            )))),
                             is_async: false,
                             is_generator: false,
                             type_params: None,
@@ -500,38 +430,535 @@ impl<'a> TypeConverter<'a> {
         }
     }
 
-    fn convert_number_array_to_typed_array(&self, expr: &Expr, inner: &Type) -> Expr {
-        // Get the appropriate TypedArray constructor based on the element type
-        let constructor = match inner.as_ref() {
-            TypeInner::Nat8 => "Uint8Array",
-            TypeInner::Int8 => "Int8Array",
-            TypeInner::Nat16 => "Uint16Array",
-            TypeInner::Int16 => "Int16Array",
-            TypeInner::Nat32 => "Uint32Array",
-            TypeInner::Int32 => "Int32Array",
-            TypeInner::Nat64 => "BigUint64Array",
-            TypeInner::Int64 => "BigInt64Array",
-            _ => return expr.clone(), // Should not happen given the caller's check
-        };
+    fn convert_record_to_candid_body(&mut self, fields: &[Field], param_name: &str) -> Expr {
+        // If the record is a tuple, handle differently
+        if self.is_tuple(fields) {
+            return self.convert_tuple_to_candid_body(fields, param_name);
+        }
 
-        // Create TypedArray from regular array
-        Expr::New(NewExpr {
+        // Create a new object with converted fields
+        Expr::Object(ObjectLit {
             span: DUMMY_SP,
-            callee: Box::new(Expr::Ident(Ident::new(
-                constructor.into(),
-                DUMMY_SP,
-                SyntaxContext::empty(),
-            ))),
-            args: Some(vec![ExprOrSpread {
-                spread: None,
-                expr: Box::new(expr.clone()),
-            }]),
-            type_args: None,
-            ctxt: SyntaxContext::empty(),
+            props: fields
+                .iter()
+                .map(|field| {
+                    let field_name = match &*field.id {
+                        Label::Named(name) => name.clone(),
+                        Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
+                    };
+
+                    // Get the field from the input object
+                    let field_access = Expr::Member(MemberExpr {
+                        span: DUMMY_SP,
+                        obj: Box::new(self.create_ident(param_name)),
+                        prop: MemberProp::Ident(
+                            Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty())
+                                .into(),
+                        ),
+                    });
+
+                    let prop_name = PropName::Ident(
+                        Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                    );
+
+                    // Convert the field value based on its type
+                    let value = match field.ty.as_ref() {
+                        TypeInner::Opt(inner) => {
+                            // For optional fields, handle undefined/null specially
+                            if !self.needs_conversion(inner) {
+                                Expr::Cond(CondExpr {
+                                    span: DUMMY_SP,
+                                    test: Box::new(field_access.clone()),
+                                    cons: Box::new(self.create_call(
+                                        "candid_some",
+                                        vec![self.create_arg(field_access.clone())],
+                                    )),
+                                    alt: Box::new(self.create_call("candid_none", vec![])),
+                                })
+                            } else {
+                                let inner_function_name = self.get_to_candid_function_name(inner);
+                                self.generate_to_candid_function(inner, &inner_function_name);
+
+                                Expr::Cond(CondExpr {
+                                    span: DUMMY_SP,
+                                    test: Box::new(field_access.clone()),
+                                    cons: Box::new(self.create_call(
+                                        "candid_some",
+                                        vec![self.create_arg(self.create_call(
+                                            &inner_function_name,
+                                            vec![self.create_arg(field_access.clone())],
+                                        ))],
+                                    )),
+                                    alt: Box::new(self.create_call("candid_none", vec![])),
+                                })
+                            }
+                        }
+                        _ => {
+                            // For normal fields, check if conversion is needed
+                            if !self.needs_conversion(&field.ty) {
+                                field_access
+                            } else {
+                                // Convert the value using appropriate function
+                                let function_name = self.get_to_candid_function_name(&field.ty);
+                                self.generate_to_candid_function(&field.ty, &function_name);
+                                self.create_call(
+                                    &function_name,
+                                    vec![self.create_arg(field_access)],
+                                )
+                            }
+                        }
+                    };
+
+                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                        key: prop_name,
+                        value: Box::new(value),
+                    })))
+                })
+                .collect(),
         })
     }
 
-    fn convert_vec_from_candid(&self, expr: &Expr, inner: &Type) -> Expr {
+    fn convert_tuple_to_candid_body(&mut self, fields: &[Field], param_name: &str) -> Expr {
+        // Create a new array with converted fields
+        Expr::Array(ArrayLit {
+            span: DUMMY_SP,
+            elems: fields
+                .iter()
+                .enumerate()
+                .map(|(i, field)| {
+                    // Access tuple element by index
+                    let elem_access = Expr::Member(MemberExpr {
+                        span: DUMMY_SP,
+                        obj: Box::new(self.create_ident(param_name)),
+                        prop: MemberProp::Computed(ComputedPropName {
+                            span: DUMMY_SP,
+                            expr: Box::new(Expr::Lit(Lit::Num(Number {
+                                span: DUMMY_SP,
+                                value: i as f64,
+                                raw: None,
+                            }))),
+                        }),
+                    });
+
+                    // Check if conversion is needed
+                    let value = if !self.needs_conversion(&field.ty) {
+                        elem_access
+                    } else {
+                        // Convert the tuple element
+                        let function_name = self.get_to_candid_function_name(&field.ty);
+                        self.generate_to_candid_function(&field.ty, &function_name);
+                        self.create_call(&function_name, vec![self.create_arg(elem_access)])
+                    };
+
+                    Some(ExprOrSpread {
+                        spread: None,
+                        expr: Box::new(value),
+                    })
+                })
+                .collect(),
+        })
+    }
+
+    fn convert_variant_to_candid_body(&mut self, fields: &[Field], param_name: &str) -> Expr {
+        // For variants, we need to determine which variant case we're dealing with
+        // and convert only the value for that case
+
+        let mut conditions = Vec::new();
+
+        for field in fields {
+            let field_name = match &*field.id {
+                Label::Named(name) => name.clone(),
+                Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
+            };
+
+            // Check if this field exists in the input object
+            let test = Expr::Bin(BinExpr {
+                span: DUMMY_SP,
+                op: BinaryOp::In,
+                left: Box::new(Expr::Lit(Lit::Str(Str {
+                    span: DUMMY_SP,
+                    value: field_name.clone().into(),
+                    raw: None,
+                }))),
+                right: Box::new(self.create_ident(param_name)),
+            });
+
+            // Get the field value
+            let field_access = Expr::Member(MemberExpr {
+                span: DUMMY_SP,
+                obj: Box::new(self.create_ident(param_name)),
+                prop: MemberProp::Ident(
+                    Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                ),
+            });
+
+            // Convert the field value if needed
+            let value = if !self.needs_conversion(&field.ty) {
+                field_access
+            } else {
+                let function_name = self.get_to_candid_function_name(&field.ty);
+                self.generate_to_candid_function(&field.ty, &function_name);
+                self.create_call(&function_name, vec![self.create_arg(field_access)])
+            };
+
+            // Create a new object with the converted value
+            let result = Expr::Object(ObjectLit {
+                span: DUMMY_SP,
+                props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                    key: PropName::Ident(
+                        Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                    ),
+                    value: Box::new(value),
+                })))],
+            });
+
+            conditions.push((test, result));
+        }
+
+        // Build a series of ternary expressions for each case
+        if conditions.is_empty() {
+            // Return the input unchanged if no fields
+            return self.create_ident(param_name);
+        }
+
+        // Start with the last condition
+        let (last_test, last_result) = conditions.pop().unwrap();
+
+        // Build the chain in reverse
+        let mut result_expr = Expr::Cond(CondExpr {
+            span: DUMMY_SP,
+            test: Box::new(last_test),
+            cons: Box::new(last_result),
+            alt: Box::new(self.create_ident(param_name)), // Fallback to original if nothing matches
+        });
+
+        // Add the rest of the conditions
+        for (test, result) in conditions.into_iter().rev() {
+            result_expr = Expr::Cond(CondExpr {
+                span: DUMMY_SP,
+                test: Box::new(test),
+                cons: Box::new(result),
+                alt: Box::new(result_expr),
+            });
+        }
+
+        result_expr
+    }
+    fn convert_func_to_candid_body(
+        &mut self,
+        _func: &candid::types::Function,
+        param_name: &str,
+    ) -> Expr {
+        // Functions are represented as Principals
+        self.create_ident(param_name)
+    }
+
+    // --- Type-specific conversion methods (Candid -> TypeScript) ---
+
+    /// Generate an expression that converts from Candid to TypeScript representation
+    /// for the given Candid type and expression.
+    pub fn from_candid(&mut self, expr: &Expr, ty: &Type) -> Expr {
+        // For simple types that don't need conversion, return the expression directly
+        if !self.needs_conversion(ty) {
+            return expr.clone();
+        }
+
+        let function_name = self.get_from_candid_function_name(ty);
+
+        // Generate the function if it doesn't exist
+        self.generate_from_candid_function(ty, &function_name);
+
+        // Return a call to the function
+        self.create_call(&function_name, vec![self.create_arg(expr.clone())])
+    }
+
+    /// Generate a function that converts from Candid to TypeScript
+    fn generate_from_candid_function(&mut self, ty: &Type, function_name: &str) {
+        // Skip if function already generated for this type
+        if self.from_candid_generated.contains(ty) {
+            return;
+        }
+
+        // Check for recursion
+        let is_recursive = self.processing_from_candid.contains(ty);
+
+        // Add to processing set to detect recursion
+        self.processing_from_candid.insert(ty.clone());
+
+        // Generate parameter type annotation (Candid type)
+        let param_name = "value";
+        let param_type_ann = self.candid_types_converter.get_candid_type(ty);
+
+        // Generate return type annotation (TypeScript type)
+        let return_type_ann = self.create_ts_type_annotation(ty);
+
+        // Generate function body
+        let body_expr = if is_recursive {
+            // For recursive types, return a placeholder initially
+            self.create_ident(param_name)
+        } else {
+            self.generate_from_candid_body(ty, param_name)
+        };
+
+        // Create function declaration with type annotations
+        let fn_decl = Stmt::Decl(Decl::Fn(FnDecl {
+            ident: Ident::new(function_name.into(), DUMMY_SP, SyntaxContext::empty()),
+            declare: false,
+            function: Box::new(swc_core::ecma::ast::Function {
+                params: vec![Param {
+                    span: DUMMY_SP,
+                    decorators: vec![],
+                    pat: Pat::Ident(BindingIdent {
+                        id: Ident::new(param_name.into(), DUMMY_SP, SyntaxContext::empty()),
+                        type_ann: Some(Box::new(TsTypeAnn {
+                            span: DUMMY_SP,
+                            type_ann: Box::new(param_type_ann),
+                        })),
+                    }),
+                }],
+                decorators: vec![],
+                span: DUMMY_SP,
+                body: Some(BlockStmt {
+                    span: DUMMY_SP,
+                    stmts: vec![Stmt::Return(ReturnStmt {
+                        span: DUMMY_SP,
+                        arg: Some(Box::new(body_expr)),
+                    })],
+                    ctxt: SyntaxContext::empty(),
+                }),
+                is_generator: false,
+                is_async: false,
+                type_params: None,
+                return_type: Some(Box::new(TsTypeAnn {
+                    span: DUMMY_SP,
+                    type_ann: Box::new(return_type_ann),
+                })),
+                ctxt: SyntaxContext::empty(),
+            }),
+        }));
+
+        // Add function to generated list
+        self.generated_functions
+            .insert(function_name.into(), fn_decl);
+
+        // Mark this type as fully generated
+        self.from_candid_generated.insert(ty.clone());
+
+        // If recursive, update the function body now that the function exists
+        if is_recursive {
+            let body_expr = self.generate_from_candid_body(ty, param_name);
+            if let Some(Stmt::Decl(Decl::Fn(fn_decl))) =
+                self.generated_functions.get_mut(function_name)
+            {
+                if let Some(BlockStmt { stmts, .. }) = &mut fn_decl.function.body {
+                    if let Some(Stmt::Return(ret)) = stmts.last_mut() {
+                        ret.arg = Some(Box::new(body_expr));
+                    }
+                }
+            }
+        }
+
+        // Remove from processing set
+        self.processing_from_candid.remove(ty);
+    }
+
+    /// Create a TypeScript type annotation for a given Candid type
+    fn create_ts_type_annotation(&self, ty: &Type) -> TsType {
+        convert_type(self.env, ty, true)
+    }
+
+    fn generate_from_candid_body(&mut self, ty: &Type, param_name: &str) -> Expr {
+        match ty.as_ref() {
+            TypeInner::Null => self.create_ident(param_name),
+            TypeInner::Bool => self.create_ident(param_name),
+            TypeInner::Nat | TypeInner::Int | TypeInner::Nat64 | TypeInner::Int64 => {
+                self.convert_from_bigint_body(param_name)
+            }
+            TypeInner::Nat8
+            | TypeInner::Nat16
+            | TypeInner::Nat32
+            | TypeInner::Int8
+            | TypeInner::Int16
+            | TypeInner::Int32
+            | TypeInner::Float32
+            | TypeInner::Float64 => self.create_ident(param_name),
+            TypeInner::Text => self.create_ident(param_name),
+            TypeInner::Reserved => self.create_ident(param_name),
+            TypeInner::Empty => {
+                // Empty type is represented as null in JavaScript
+                Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))
+            }
+            TypeInner::Principal => self.convert_principal_from_candid_body(param_name),
+            TypeInner::Opt(ref inner) => self.convert_opt_from_candid_body(inner, param_name),
+            TypeInner::Vec(ref inner) => self.convert_vec_from_candid_body(inner, param_name),
+            TypeInner::Record(ref fields) => {
+                self.convert_record_from_candid_body(fields, param_name)
+            }
+            TypeInner::Variant(ref fields) => {
+                self.convert_variant_from_candid_body(fields, param_name)
+            }
+            TypeInner::Func(ref func) => self.convert_func_from_candid_body(func, param_name),
+            TypeInner::Service(_) => self.create_ident(param_name), // Pass through as-is
+            TypeInner::Var(ref id) => {
+                // For named types, delegate to another conversion function
+                if let Ok(actual_ty) = self.env.rec_find_type(id) {
+                    // If the actual type doesn't need conversion, return directly
+                    if !self.needs_conversion(&actual_ty) {
+                        return self.create_ident(param_name);
+                    }
+
+                    // Generate the function for the actual type if needed
+                    let inner_function_name = self.get_from_candid_function_name(&actual_ty);
+                    self.generate_from_candid_function(&actual_ty, &inner_function_name);
+
+                    // Return a call to that function
+                    self.create_call(
+                        &inner_function_name,
+                        vec![self.create_arg(self.create_ident(param_name))],
+                    )
+                } else {
+                    // If type not found, pass through unchanged
+                    self.create_ident(param_name)
+                }
+            }
+            // For unsupported types, we pass through unchanged
+            _ => self.create_ident(param_name),
+        }
+    }
+
+    fn convert_from_bigint_body(&mut self, param_name: &str) -> Expr {
+        // For now, just pass through bigints
+        self.create_ident(param_name)
+    }
+
+    fn convert_principal_from_candid_body(&mut self, param_name: &str) -> Expr {
+        // Principal objects are already compatible
+        self.create_ident(param_name)
+    }
+
+    fn convert_opt_from_candid_body(&mut self, inner: &Type, param_name: &str) -> Expr {
+        // For inner types that don't need conversion, optimize
+        if !self.needs_conversion(inner) {
+            return Expr::Cond(CondExpr {
+                span: DUMMY_SP,
+                test: Box::new(Expr::Bin(BinExpr {
+                    span: DUMMY_SP,
+                    op: BinaryOp::EqEqEq,
+                    left: Box::new(Expr::Member(MemberExpr {
+                        span: DUMMY_SP,
+                        obj: Box::new(self.create_ident(param_name)),
+                        prop: MemberProp::Ident(
+                            Ident::new("length".into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                        ),
+                    })),
+                    right: Box::new(Expr::Lit(Lit::Num(Number {
+                        span: DUMMY_SP,
+                        value: 0.0,
+                        raw: None,
+                    }))),
+                })),
+                cons: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
+                alt: Box::new(Expr::Member(MemberExpr {
+                    span: DUMMY_SP,
+                    obj: Box::new(self.create_ident(param_name)),
+                    prop: MemberProp::Computed(ComputedPropName {
+                        span: DUMMY_SP,
+                        expr: Box::new(Expr::Lit(Lit::Num(Number {
+                            span: DUMMY_SP,
+                            value: 0.0,
+                            raw: None,
+                        }))),
+                    }),
+                })),
+            });
+        }
+
+        // Get conversion function for inner type
+        let inner_function_name = self.get_from_candid_function_name(inner);
+        self.generate_from_candid_function(inner, &inner_function_name);
+
+        match &inner.as_ref() {
+            // Types that don't need conversion
+            TypeInner::Opt(_) => Expr::Cond(CondExpr {
+                span: DUMMY_SP,
+                test: Box::new(Expr::Bin(BinExpr {
+                    span: DUMMY_SP,
+                    op: BinaryOp::EqEqEq,
+                    left: Box::new(Expr::Member(MemberExpr {
+                        span: DUMMY_SP,
+                        obj: Box::new(self.create_ident(param_name)),
+                        prop: MemberProp::Ident(
+                            Ident::new("length".into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                        ),
+                    })),
+                    right: Box::new(Expr::Lit(Lit::Num(Number {
+                        span: DUMMY_SP,
+                        value: 0.0,
+                        raw: None,
+                    }))),
+                })),
+                // Use null
+                cons: Box::new(self.create_call("none", vec![])),
+                // Wrap with some()
+                alt: Box::new(self.create_call(
+                    "some",
+                    vec![self.create_arg(self.create_call(
+                        &inner_function_name,
+                        vec![self.create_arg(Expr::Member(MemberExpr {
+                            span: DUMMY_SP,
+                            obj: Box::new(self.create_ident(param_name)),
+                            prop: MemberProp::Computed(ComputedPropName {
+                                span: DUMMY_SP,
+                                expr: Box::new(Expr::Lit(Lit::Num(Number {
+                                    span: DUMMY_SP,
+                                    value: 0.0,
+                                    raw: None,
+                                }))),
+                            }),
+                        }))],
+                    ))],
+                )),
+            }),
+            _ => Expr::Cond(CondExpr {
+                span: DUMMY_SP,
+                test: Box::new(Expr::Bin(BinExpr {
+                    span: DUMMY_SP,
+                    op: BinaryOp::EqEqEq,
+                    left: Box::new(Expr::Member(MemberExpr {
+                        span: DUMMY_SP,
+                        obj: Box::new(self.create_ident(param_name)),
+                        prop: MemberProp::Ident(
+                            Ident::new("length".into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                        ),
+                    })),
+                    right: Box::new(Expr::Lit(Lit::Num(Number {
+                        span: DUMMY_SP,
+                        value: 0.0,
+                        raw: None,
+                    }))),
+                })),
+                // Use null
+                cons: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
+                // Call conversion function
+                alt: Box::new(self.create_call(
+                    &inner_function_name,
+                    vec![self.create_arg(Expr::Member(MemberExpr {
+                        span: DUMMY_SP,
+                        obj: Box::new(self.create_ident(param_name)),
+                        prop: MemberProp::Computed(ComputedPropName {
+                            span: DUMMY_SP,
+                            expr: Box::new(Expr::Lit(Lit::Num(Number {
+                                span: DUMMY_SP,
+                                value: 0.0,
+                                raw: None,
+                            }))),
+                        }),
+                    }))],
+                )),
+            }),
+        }
+    }
+    fn convert_vec_from_candid_body(&mut self, inner: &Type, param_name: &str) -> Expr {
         // Check if it's a typed array that should be converted to a regular array
         match inner.as_ref() {
             TypeInner::Nat8
@@ -542,18 +969,28 @@ impl<'a> TypeConverter<'a> {
             | TypeInner::Int32
             | TypeInner::Nat64
             | TypeInner::Int64 => {
-                // Handle conversion from TypedArray to regular array if needed
-                self.convert_typed_array_to_array(expr, inner)
+                // For numeric types, convert from TypedArray to Array using Array.from
+                self.create_call(
+                    "Array.from",
+                    vec![self.create_arg(self.create_ident(param_name))],
+                )
             }
             _ => {
-                // Generate map to convert each element
-                // Generate map to convert each element
-                // Generate map to convert each element
+                // Optimization for inner types that don't need conversion
+                if !self.needs_conversion(inner) {
+                    return self.create_ident(param_name);
+                }
+
+                // Get conversion function for inner type
+                let inner_function_name = self.get_from_candid_function_name(inner);
+                self.generate_from_candid_function(inner, &inner_function_name);
+
+                // value.map(x => from_candid_inner(x))
                 Expr::Call(CallExpr {
                     span: DUMMY_SP,
                     callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
                         span: DUMMY_SP,
-                        obj: Box::new(expr.clone()),
+                        obj: Box::new(self.create_ident(param_name)),
                         prop: MemberProp::Ident(
                             Ident::new("map".into(), DUMMY_SP, SyntaxContext::empty()).into(),
                         ),
@@ -566,21 +1003,10 @@ impl<'a> TypeConverter<'a> {
                                 id: Ident::new("x".into(), DUMMY_SP, SyntaxContext::empty()),
                                 type_ann: None,
                             })],
-                            body: Box::new(BlockStmtOrExpr::BlockStmt(BlockStmt {
-                                span: DUMMY_SP,
-                                stmts: vec![Stmt::Return(ReturnStmt {
-                                    span: DUMMY_SP,
-                                    arg: Some(Box::new(self._from_candid(
-                                        &Expr::Ident(Ident::new(
-                                            "x".into(),
-                                            DUMMY_SP,
-                                            SyntaxContext::empty(),
-                                        )),
-                                        inner,
-                                    ))),
-                                })],
-                                ctxt: SyntaxContext::empty(),
-                            })),
+                            body: Box::new(BlockStmtOrExpr::Expr(Box::new(self.create_call(
+                                &inner_function_name,
+                                vec![self.create_arg(self.create_ident("x"))],
+                            )))),
                             is_async: false,
                             is_generator: false,
                             type_params: None,
@@ -595,34 +1021,10 @@ impl<'a> TypeConverter<'a> {
         }
     }
 
-    fn convert_typed_array_to_array(&self, expr: &Expr, _inner: &Type) -> Expr {
-        // Convert TypedArray to Array using Array.from
-        Expr::Call(CallExpr {
-            span: DUMMY_SP,
-            callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
-                span: DUMMY_SP,
-                obj: Box::new(Expr::Ident(Ident::new(
-                    "Array".into(),
-                    DUMMY_SP,
-                    SyntaxContext::empty(),
-                ))),
-                prop: MemberProp::Ident(
-                    Ident::new("from".into(), DUMMY_SP, SyntaxContext::empty()).into(),
-                ),
-            }))),
-            args: vec![ExprOrSpread {
-                spread: None,
-                expr: Box::new(expr.clone()),
-            }],
-            type_args: None,
-            ctxt: SyntaxContext::empty(),
-        })
-    }
-
-    fn convert_record_to_candid(&self, expr: &Expr, fields: &[Field]) -> Expr {
+    fn convert_record_from_candid_body(&mut self, fields: &[Field], param_name: &str) -> Expr {
         // If the record is a tuple, handle differently
         if self.is_tuple(fields) {
-            return self.convert_tuple_to_candid(expr, fields);
+            return self.convert_tuple_from_candid_body(fields, param_name);
         }
 
         // Create a new object with converted fields
@@ -631,181 +1033,62 @@ impl<'a> TypeConverter<'a> {
             props: fields
                 .iter()
                 .map(|field| {
-                    let key = match &*field.id {
-                        Label::Named(name) => PropName::Ident(
-                            Ident::new(name.clone().into(), DUMMY_SP, SyntaxContext::empty())
-                                .into(),
-                        ),
-                        Label::Id(n) | Label::Unnamed(n) => PropName::Ident(
-                            Ident::new(format!("_{}_", n).into(), DUMMY_SP, SyntaxContext::empty())
-                                .into(),
-                        ),
+                    let field_name = match &*field.id {
+                        Label::Named(name) => name.clone(),
+                        Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
                     };
 
                     // Get the field from the input object
-                    let field_expr = Expr::Member(MemberExpr {
+                    let field_access = Expr::Member(MemberExpr {
                         span: DUMMY_SP,
-                        obj: Box::new(expr.clone()),
-                        prop: match &*field.id {
-                            Label::Named(name) => MemberProp::Ident(
-                                Ident::new(name.clone().into(), DUMMY_SP, SyntaxContext::empty())
-                                    .into(),
-                            ),
-                            Label::Id(n) | Label::Unnamed(n) => MemberProp::Ident(
-                                Ident::new(
-                                    format!("_{}_", n).into(),
-                                    DUMMY_SP,
-                                    SyntaxContext::empty(),
-                                )
+                        obj: Box::new(self.create_ident(param_name)),
+                        prop: MemberProp::Ident(
+                            Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty())
                                 .into(),
-                            ),
-                        },
+                        ),
                     });
 
-                    // Convert the field value
+                    let prop_name = PropName::Ident(
+                        Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                    );
+
+                    // Convert the field value based on its type
                     let value = match field.ty.as_ref() {
-                        TypeInner::Opt(inner) => {
-                            // For optional fields, use JavaScript truthiness check
-                            Expr::Cond(CondExpr {
+                        TypeInner::Opt(_) => {
+                            // For optional fields, use a utility function
+                            Expr::Call(CallExpr {
                                 span: DUMMY_SP,
-                                test: Box::new(field_expr.clone()),
-                                cons: Box::new(Expr::Call(CallExpr {
-                                    span: DUMMY_SP,
-                                    callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                                        "candid_some".into(),
-                                        DUMMY_SP,
-                                        SyntaxContext::empty(),
-                                    )))),
-                                    args: vec![ExprOrSpread {
-                                        spread: None,
-                                        expr: Box::new(self._to_candid(&field_expr, inner)),
-                                    }],
-                                    type_args: None,
-                                    ctxt: SyntaxContext::empty(),
-                                })),
-                                alt: Box::new(Expr::Call(CallExpr {
-                                    span: DUMMY_SP,
-                                    callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                                        "candid_none".into(),
-                                        DUMMY_SP,
-                                        SyntaxContext::empty(),
-                                    )))),
-                                    args: vec![],
-                                    type_args: None,
-                                    ctxt: SyntaxContext::empty(),
-                                })),
+                                callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
+                                    "record_opt_to_undefined".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                )))),
+                                args: vec![ExprOrSpread {
+                                    spread: None,
+                                    expr: Box::new(self.from_candid(&field_access, &field.ty)),
+                                }],
+                                type_args: None,
+                                ctxt: SyntaxContext::empty(),
                             })
                         }
-                        _ => self._to_candid(&field_expr, &field.ty),
-                    };
-
-                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                        key,
-                        value: Box::new(value),
-                    })))
-                })
-                .collect(),
-        })
-    }
-
-    fn convert_tuple_to_candid(&self, expr: &Expr, fields: &[Field]) -> Expr {
-        // Create a new array with converted fields
-        Expr::Array(ArrayLit {
-            span: DUMMY_SP,
-            elems: fields
-                .iter()
-                .enumerate()
-                .map(|(i, field)| {
-                    // Access tuple element by index
-                    let elem_expr = Expr::Member(MemberExpr {
-                        span: DUMMY_SP,
-                        obj: Box::new(expr.clone()),
-                        prop: MemberProp::Computed(ComputedPropName {
-                            span: DUMMY_SP,
-                            expr: Box::new(Expr::Lit(Lit::Num(Number {
-                                span: DUMMY_SP,
-                                value: i as f64,
-                                raw: None,
-                            }))),
-                        }),
-                    });
-
-                    // Convert the tuple element
-                    let value = self._to_candid(&elem_expr, &field.ty);
-
-                    Some(ExprOrSpread {
-                        spread: None,
-                        expr: Box::new(value),
-                    })
-                })
-                .collect(),
-        })
-    }
-
-    fn convert_record_from_candid(&self, expr: &Expr, fields: &[Field]) -> Expr {
-        // If the record is a tuple, handle differently
-        if self.is_tuple(fields) {
-            return self.convert_tuple_from_candid(expr, fields);
-        }
-
-        // Create a new object with converted fields
-        Expr::Object(ObjectLit {
-            span: DUMMY_SP,
-            props: fields
-                .iter()
-                .map(|field| {
-                    let key = match &*field.id {
-                        Label::Named(name) => PropName::Ident(
-                            Ident::new(name.clone().into(), DUMMY_SP, SyntaxContext::empty())
-                                .into(),
-                        ),
-                        Label::Id(n) | Label::Unnamed(n) => PropName::Ident(
-                            Ident::new(format!("_{}_", n).into(), DUMMY_SP, SyntaxContext::empty())
-                                .into(),
-                        ),
-                    };
-
-                    // Get the field from the input object
-                    let field_expr = Expr::Member(MemberExpr {
-                        span: DUMMY_SP,
-                        obj: Box::new(expr.clone()),
-                        prop: match &*field.id {
-                            Label::Named(name) => MemberProp::Ident(
-                                Ident::new(name.clone().into(), DUMMY_SP, SyntaxContext::empty())
-                                    .into(),
-                            ),
-                            Label::Id(n) | Label::Unnamed(n) => MemberProp::Ident(
-                                Ident::new(
-                                    format!("_{}_", n).into(),
-                                    DUMMY_SP,
-                                    SyntaxContext::empty(),
+                        _ => {
+                            // For normal fields, check if conversion is needed
+                            if !self.needs_conversion(&field.ty) {
+                                field_access
+                            } else {
+                                // Convert the value using appropriate function
+                                let function_name = self.get_from_candid_function_name(&field.ty);
+                                self.generate_from_candid_function(&field.ty, &function_name);
+                                self.create_call(
+                                    &function_name,
+                                    vec![self.create_arg(field_access)],
                                 )
-                                .into(),
-                            ),
-                        },
-                    });
-
-                    // Convert the field value
-                    let value = match field.ty.as_ref() {
-                        TypeInner::Opt(_) => Expr::Call(CallExpr {
-                            span: DUMMY_SP,
-                            callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                                "record_opt_to_undefined".into(),
-                                DUMMY_SP,
-                                SyntaxContext::empty(),
-                            )))),
-                            args: vec![ExprOrSpread {
-                                spread: None,
-                                expr: Box::new(self._from_candid(&field_expr, &field.ty)),
-                            }],
-                            type_args: None,
-                            ctxt: SyntaxContext::empty(),
-                        }),
-                        _ => self._from_candid(&field_expr, &field.ty),
+                            }
+                        }
                     };
 
                     PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                        key,
+                        key: prop_name,
                         value: Box::new(value),
                     })))
                 })
@@ -813,7 +1096,7 @@ impl<'a> TypeConverter<'a> {
         })
     }
 
-    fn convert_tuple_from_candid(&self, expr: &Expr, fields: &[Field]) -> Expr {
+    fn convert_tuple_from_candid_body(&mut self, fields: &[Field], param_name: &str) -> Expr {
         // Create a new array with converted fields
         Expr::Array(ArrayLit {
             span: DUMMY_SP,
@@ -822,9 +1105,9 @@ impl<'a> TypeConverter<'a> {
                 .enumerate()
                 .map(|(i, field)| {
                     // Access tuple element by index
-                    let elem_expr = Expr::Member(MemberExpr {
+                    let elem_access = Expr::Member(MemberExpr {
                         span: DUMMY_SP,
-                        obj: Box::new(expr.clone()),
+                        obj: Box::new(self.create_ident(param_name)),
                         prop: MemberProp::Computed(ComputedPropName {
                             span: DUMMY_SP,
                             expr: Box::new(Expr::Lit(Lit::Num(Number {
@@ -835,8 +1118,15 @@ impl<'a> TypeConverter<'a> {
                         }),
                     });
 
-                    // Convert the tuple element
-                    let value = self._from_candid(&elem_expr, &field.ty);
+                    // Check if conversion is needed
+                    let value = if !self.needs_conversion(&field.ty) {
+                        elem_access
+                    } else {
+                        // Convert the tuple element
+                        let function_name = self.get_from_candid_function_name(&field.ty);
+                        self.generate_from_candid_function(&field.ty, &function_name);
+                        self.create_call(&function_name, vec![self.create_arg(elem_access)])
+                    };
 
                     Some(ExprOrSpread {
                         spread: None,
@@ -847,44 +1137,104 @@ impl<'a> TypeConverter<'a> {
         })
     }
 
-    fn convert_func_to_candid(&self, expr: &Expr, _func: &Function) -> Expr {
-        // Functions are represented as Principals
-        expr.clone() // Pass through as-is
-    }
+    fn convert_variant_from_candid_body(&mut self, fields: &[Field], param_name: &str) -> Expr {
+        // For variants from Candid, check which tag is present and convert accordingly
 
-    fn convert_func_from_candid(&self, expr: &Expr, _func: &Function) -> Expr {
-        // Functions are represented as Principals
-        expr.clone() // Pass through as-is
-    }
+        let mut conditions = Vec::new();
 
-    fn convert_service_to_candid(&self, expr: &Expr) -> Expr {
-        // Services are represented as Principals
-        expr.clone() // Pass through as-is
-    }
+        for field in fields {
+            let field_name = match &*field.id {
+                Label::Named(name) => name.clone(),
+                Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
+            };
 
-    fn convert_service_from_candid(&self, expr: &Expr) -> Expr {
-        // Services are represented as Principals
-        expr.clone() // Pass through as-is
-    }
+            // Check if this field exists in the input object
+            let test = Expr::Bin(BinExpr {
+                span: DUMMY_SP,
+                op: BinaryOp::In,
+                left: Box::new(Expr::Lit(Lit::Str(Str {
+                    span: DUMMY_SP,
+                    value: field_name.clone().into(),
+                    raw: None,
+                }))),
+                right: Box::new(self.create_ident(param_name)),
+            });
 
-    fn convert_var_to_candid(&self, expr: &Expr, id: &str) -> Expr {
-        // Look up the actual type and convert
-        if let Ok(ty) = self.env.rec_find_type(id) {
-            self._to_candid(expr, &ty)
-        } else {
-            // If type not found, pass through unchanged
-            expr.clone()
+            // Get the field value
+            let field_access = Expr::Member(MemberExpr {
+                span: DUMMY_SP,
+                obj: Box::new(self.create_ident(param_name)),
+                prop: MemberProp::Ident(
+                    Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                ),
+            });
+
+            // Convert the field value if needed
+            let value = if !self.needs_conversion(&field.ty) {
+                field_access
+            } else {
+                let function_name = self.get_from_candid_function_name(&field.ty);
+                self.generate_from_candid_function(&field.ty, &function_name);
+                self.create_call(&function_name, vec![self.create_arg(field_access)])
+            };
+
+            // Create a new object with the converted value
+            let result = Expr::Object(ObjectLit {
+                span: DUMMY_SP,
+                props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                    key: PropName::Ident(
+                        Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                    ),
+                    value: Box::new(value),
+                })))],
+            });
+
+            conditions.push((test, result));
         }
-    }
 
-    fn convert_var_from_candid(&self, expr: &Expr, id: &str) -> Expr {
-        // Look up the actual type and convert
-        if let Ok(ty) = self.env.rec_find_type(id) {
-            self._from_candid(expr, &ty)
-        } else {
-            // If type not found, pass through unchanged
-            expr.clone()
+        // Build the chain of conditionals
+        if conditions.is_empty() {
+            // Return the input unchanged if no fields (shouldn't happen for valid variants)
+            return self.create_ident(param_name);
         }
+
+        // Start with the last condition and build in reverse
+        let mut pairs = conditions.into_iter().rev();
+
+        // Get the last pair
+        let (last_test, last_result) = match pairs.next() {
+            Some(pair) => pair,
+            None => return self.create_ident(param_name), // Shouldn't happen due to the check above
+        };
+
+        // Build the chain
+        let mut expr = Expr::Cond(CondExpr {
+            span: DUMMY_SP,
+            test: Box::new(last_test),
+            cons: Box::new(last_result),
+            // If we get here, it's likely an error but return the input for robustness
+            alt: Box::new(self.create_ident(param_name)),
+        });
+
+        // Add the rest of the conditions
+        for (test, result) in pairs {
+            expr = Expr::Cond(CondExpr {
+                span: DUMMY_SP,
+                test: Box::new(test),
+                cons: Box::new(result),
+                alt: Box::new(expr),
+            });
+        }
+
+        expr
+    }
+    fn convert_func_from_candid_body(
+        &mut self,
+        _func: &candid::types::Function,
+        param_name: &str,
+    ) -> Expr {
+        // Functions are represented as Principals
+        self.create_ident(param_name)
     }
 
     // Helper to detect tuple types
@@ -893,15 +1243,196 @@ impl<'a> TypeConverter<'a> {
             .iter()
             .all(|f| matches!(&*f.id, Label::Id(_) | Label::Unnamed(_)))
     }
+
+    /// Generates imports for named Candid types
+    pub fn generate_imports(&mut self) -> Vec<ModuleItem> {
+        let mut imports = Vec::new();
+        let mut imported_types = HashSet::new();
+
+        // Collect all variable types that need to be imported
+        for (type_fingerprint, _) in &self.to_candid_functions {
+            if let TypeInner::Var(id) = type_fingerprint.as_ref() {
+                imported_types.insert(id.clone());
+            }
+        }
+
+        // Do the same for from_candid_functions
+        for (type_fingerprint, _) in &self.from_candid_functions {
+            if let TypeInner::Var(id) = type_fingerprint.as_ref() {
+                imported_types.insert(id.clone());
+            }
+        }
+
+        // Generate import statements
+        for type_name in imported_types {
+            // Create import statement: import { type_name as _type_name } from "declarations/type_name";
+            let import_stmt = ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+                span: DUMMY_SP,
+                specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
+                    span: DUMMY_SP,
+                    local: Ident::new(
+                        format!("_{}", type_name).into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ),
+                    imported: Some(ModuleExportName::Ident(Ident::new(
+                        type_name.clone().into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ))),
+                    is_type_only: false,
+                })],
+                src: Box::new(Str {
+                    span: DUMMY_SP,
+                    value: format!("declarations/{}", type_name).into(),
+                    raw: None,
+                }),
+                type_only: false,
+                with: None,
+                phase: Default::default(),
+            }));
+
+            imports.push(import_stmt);
+        }
+
+        imports
+    }
+
+    pub fn to_candid(&mut self, expr: &Expr, ty: &Type) -> Expr {
+        // For simple types that don't need conversion, return the expression directly
+        if !self.needs_conversion(ty) {
+            return expr.clone();
+        }
+
+        let function_name = self.get_to_candid_function_name(ty);
+
+        // Generate the function if it doesn't exist
+        self.generate_to_candid_function(ty, &function_name);
+
+        // Return a call to the function
+        self.create_call(&function_name, vec![self.create_arg(expr.clone())])
+    }
+
+    /// Determine if we need to import a Candid type for this type
+    fn needs_candid_import(&self, ty: &Type) -> bool {
+        match ty.as_ref() {
+            TypeInner::Record(_) | TypeInner::Variant(_) => true,
+            TypeInner::Var(id) => {
+                if let Ok(actual_ty) = self.env.rec_find_type(id) {
+                    match actual_ty.as_ref() {
+                        TypeInner::Record(_) | TypeInner::Variant(_) => true,
+                        _ => false,
+                    }
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    /// Add imports for Candid types
+    pub fn add_candid_type_imports(&mut self, module: &mut Module, service_name: &str) {
+        self.candid_types_converter
+            .add_candid_type_imports(module, service_name);
+    }
+
+    /// Generate a function that converts from TypeScript to Candid
+    fn generate_to_candid_function(&mut self, ty: &Type, function_name: &str) {
+        // Skip if function already generated for this type
+        if self.to_candid_generated.contains(ty) {
+            return;
+        }
+
+        // Check for recursion
+        let is_recursive = self.processing_to_candid.contains(ty);
+
+        // Add to processing set to detect recursion
+        self.processing_to_candid.insert(ty.clone());
+
+        // Generate parameter type annotation
+        let param_name = "value";
+        let param_type_ann = self.create_ts_type_annotation(ty);
+
+        // Generate return type annotation - use Candid type for complex types
+        let return_type_ann = self.candid_types_converter.get_candid_type(ty);
+
+        // Generate function body
+        let body_expr = if is_recursive {
+            // For recursive types, return a placeholder initially
+            self.create_ident(param_name)
+        } else {
+            self.generate_to_candid_body(ty, param_name)
+        };
+
+        // Create function declaration with type annotations
+        let fn_decl = Stmt::Decl(Decl::Fn(FnDecl {
+            ident: Ident::new(function_name.into(), DUMMY_SP, SyntaxContext::empty()),
+            declare: false,
+            function: Box::new(swc_core::ecma::ast::Function {
+                ctxt: SyntaxContext::empty(),
+                params: vec![Param {
+                    span: DUMMY_SP,
+                    decorators: vec![],
+                    pat: Pat::Ident(BindingIdent {
+                        id: Ident::new(param_name.into(), DUMMY_SP, SyntaxContext::empty()),
+                        type_ann: Some(Box::new(TsTypeAnn {
+                            span: DUMMY_SP,
+                            type_ann: Box::new(param_type_ann),
+                        })),
+                    }),
+                }],
+                decorators: vec![],
+                span: DUMMY_SP,
+                body: Some(BlockStmt {
+                    span: DUMMY_SP,
+                    stmts: vec![Stmt::Return(ReturnStmt {
+                        span: DUMMY_SP,
+                        arg: Some(Box::new(body_expr)),
+                    })],
+                    ctxt: SyntaxContext::empty(),
+                }),
+                is_generator: false,
+                is_async: false,
+                type_params: None,
+                return_type: Some(Box::new(TsTypeAnn {
+                    span: DUMMY_SP,
+                    type_ann: Box::new(return_type_ann),
+                })),
+            }),
+        }));
+
+        self.generated_functions
+            .insert(function_name.into(), fn_decl);
+
+        // Mark this type as fully generated
+        self.to_candid_generated.insert(ty.clone());
+
+        // If recursive, update the function body now that the function exists
+        if is_recursive {
+            let body_expr = self.generate_to_candid_body(ty, param_name);
+            if let Some(Stmt::Decl(Decl::Fn(fn_decl))) =
+                self.generated_functions.get_mut(function_name)
+            {
+                if let Some(BlockStmt { stmts, .. }) = &mut fn_decl.function.body {
+                    if let Some(Stmt::Return(ret)) = stmts.last_mut() {
+                        ret.arg = Some(Box::new(body_expr));
+                    }
+                }
+            }
+        }
+
+        // Remove from processing set
+        self.processing_to_candid.remove(ty);
+    }
 }
 
-/// Extends TypeConverter to support handling multiple result values
 pub fn convert_multi_return_from_candid(
-    converter: &TypeConverter,
+    converter: &mut TypeConverter,
     expr: &Expr,
     types: &[Type],
 ) -> Expr {
-    if types.len() == 0 {
+    if types.is_empty() {
         // No return value, return void
         return Expr::Lit(Lit::Null(Null { span: DUMMY_SP }));
     } else if types.len() == 1 {
@@ -929,8 +1460,28 @@ pub fn convert_multi_return_from_candid(
                         }),
                     });
 
-                    // Convert the return value
-                    let value = converter.from_candid(&elem_expr, ty);
+                    // If type doesn't need conversion, use it directly
+                    let value = if !converter.needs_conversion(ty) {
+                        elem_expr
+                    } else {
+                        // Convert the return value using the appropriate function
+                        let function_name = converter.get_from_candid_function_name(ty);
+                        converter.generate_from_candid_function(ty, &function_name);
+                        Expr::Call(CallExpr {
+                            span: DUMMY_SP,
+                            callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
+                                function_name.into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            )))),
+                            args: vec![ExprOrSpread {
+                                spread: None,
+                                expr: Box::new(elem_expr),
+                            }],
+                            type_args: None,
+                            ctxt: SyntaxContext::empty(),
+                        })
+                    };
 
                     Some(ExprOrSpread {
                         spread: None,
