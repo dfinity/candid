@@ -60,7 +60,7 @@ interface TransferArgs {
 interface backend {
     transfer(arg0: TransferArgs): Promise<Result>;
 }
-import type { TransferArgs as _TransferArgs, Tokens as _Tokens } from "declarations/backend/backend.did.d.ts";
+import type { Tokens as _Tokens, TransferArgs as _TransferArgs } from "declarations/backend/backend.did.d.ts";
 class Backend implements backend {
     #actor: ActorSubclass<_SERVICE>;
     constructor(){
@@ -72,9 +72,6 @@ class Backend implements backend {
     }
 }
 export const backend = new Backend();
-function to_candid_TransferArgs_n1(value: TransferArgs): _TransferArgs {
-    return to_candid_record_n2(value);
-}
 function to_candid_record_n2(value: {
     toPrincipal: Principal;
     amount: Tokens;
@@ -89,5 +86,8 @@ function to_candid_record_n2(value: {
         amount: value.amount,
         toSubaccount: value.toSubaccount ? candid_some(value.toSubaccount) : candid_none()
     };
+}
+function to_candid_TransferArgs_n1(value: TransferArgs): _TransferArgs {
+    return to_candid_record_n2(value);
 }
 

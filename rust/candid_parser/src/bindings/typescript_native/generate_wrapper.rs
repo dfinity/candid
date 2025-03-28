@@ -85,7 +85,7 @@ impl<'a> TypeConverter<'a> {
             TypeInner::Var(id) => {
                 // Check if the named type needs conversion
                 if let Ok(actual_ty) = self.env.rec_find_type(id) {
-                    self.needs_conversion(&actual_ty)
+                    self.needs_conversion(actual_ty)
                 } else {
                     true // Conservative default
                 }
@@ -266,13 +266,13 @@ impl<'a> TypeConverter<'a> {
                 // For named types, delegate to another conversion function
                 if let Ok(actual_ty) = self.env.rec_find_type(id) {
                     // If the actual type doesn't need conversion, return the expression directly
-                    if !self.needs_conversion(&actual_ty) {
+                    if !self.needs_conversion(actual_ty) {
                         return self.create_ident(param_name);
                     }
 
                     // Generate the function for the actual type if needed
-                    let inner_function_name = self.get_to_candid_function_name(&actual_ty);
-                    self.generate_to_candid_function(&actual_ty, &inner_function_name);
+                    let inner_function_name = self.get_to_candid_function_name(actual_ty);
+                    self.generate_to_candid_function(actual_ty, &inner_function_name);
 
                     // Return a call to that function
                     self.create_call(
@@ -657,7 +657,7 @@ impl<'a> TypeConverter<'a> {
 
     /// Generate an expression that converts from Candid to TypeScript representation
     /// for the given Candid type and expression.
-    pub fn from_candid(&mut self, expr: &Expr, ty: &Type) -> Expr {
+    pub fn convert_from_candid(&mut self, expr: &Expr, ty: &Type) -> Expr {
         // For simple types that don't need conversion, return the expression directly
         if !self.needs_conversion(ty) {
             return expr.clone();
@@ -803,13 +803,13 @@ impl<'a> TypeConverter<'a> {
                 // For named types, delegate to another conversion function
                 if let Ok(actual_ty) = self.env.rec_find_type(id) {
                     // If the actual type doesn't need conversion, return directly
-                    if !self.needs_conversion(&actual_ty) {
+                    if !self.needs_conversion(actual_ty) {
                         return self.create_ident(param_name);
                     }
 
                     // Generate the function for the actual type if needed
-                    let inner_function_name = self.get_from_candid_function_name(&actual_ty);
-                    self.generate_from_candid_function(&actual_ty, &inner_function_name);
+                    let inner_function_name = self.get_from_candid_function_name(actual_ty);
+                    self.generate_from_candid_function(actual_ty, &inner_function_name);
 
                     // Return a call to that function
                     self.create_call(
@@ -1065,7 +1065,9 @@ impl<'a> TypeConverter<'a> {
                                 )))),
                                 args: vec![ExprOrSpread {
                                     spread: None,
-                                    expr: Box::new(self.from_candid(&field_access, &field.ty)),
+                                    expr: Box::new(
+                                        self.convert_from_candid(&field_access, &field.ty),
+                                    ),
                                 }],
                                 type_args: None,
                                 ctxt: SyntaxContext::empty(),
@@ -1250,14 +1252,14 @@ impl<'a> TypeConverter<'a> {
         let mut imported_types = HashSet::new();
 
         // Collect all variable types that need to be imported
-        for (type_fingerprint, _) in &self.to_candid_functions {
+        for type_fingerprint in self.to_candid_functions.keys() {
             if let TypeInner::Var(id) = type_fingerprint.as_ref() {
                 imported_types.insert(id.clone());
             }
         }
 
         // Do the same for from_candid_functions
-        for (type_fingerprint, _) in &self.from_candid_functions {
+        for type_fingerprint in self.from_candid_functions.keys() {
             if let TypeInner::Var(id) = type_fingerprint.as_ref() {
                 imported_types.insert(id.clone());
             }
@@ -1298,7 +1300,7 @@ impl<'a> TypeConverter<'a> {
         imports
     }
 
-    pub fn to_candid(&mut self, expr: &Expr, ty: &Type) -> Expr {
+    pub fn convert_to_candid(&mut self, expr: &Expr, ty: &Type) -> Expr {
         // For simple types that don't need conversion, return the expression directly
         if !self.needs_conversion(ty) {
             return expr.clone();
@@ -1416,10 +1418,10 @@ pub fn convert_multi_return_from_candid(
 ) -> Expr {
     if types.is_empty() {
         // No return value, return void
-        return Expr::Lit(Lit::Null(Null { span: DUMMY_SP }));
+        Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))
     } else if types.len() == 1 {
         // Single return value
-        return converter.from_candid(expr, &types[0]);
+        converter.convert_from_candid(expr, &types[0])
     } else {
         // Multiple return values in a tuple
         Expr::Array(ArrayLit {
