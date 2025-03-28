@@ -19,6 +19,7 @@ pub struct TypeConverter<'a> {
     // Track types being processed to detect recursion
     processing_to_candid: HashSet<Type>,
     processing_from_candid: HashSet<Type>,
+    processing_conversion: HashSet<Type>,
     // Counter for unique function names
     function_counter: usize,
     candid_types_converter: CandidTypesConverter<'a>,
@@ -36,6 +37,7 @@ impl<'a> TypeConverter<'a> {
             generated_functions: HashMap::new(),
             processing_to_candid: HashSet::new(),
             processing_from_candid: HashSet::new(),
+            processing_conversion: HashSet::new(),
             function_counter: 0,
             candid_types_converter: CandidTypesConverter::new(env),
         }
@@ -47,8 +49,17 @@ impl<'a> TypeConverter<'a> {
     }
 
     /// Check if a type requires conversion or can be passed through directly
-    fn needs_conversion(&self, ty: &Type) -> bool {
-        match ty.as_ref() {
+    fn needs_conversion(&mut self, ty: &Type) -> bool {
+        // Check if we already computed this type
+        let is_recursive = self.processing_conversion.contains(ty);
+
+        self.processing_conversion.insert(ty.clone());
+
+        if is_recursive {
+            return true;
+        }
+
+        let result = match ty.as_ref() {
             // Types that don't need conversion
             TypeInner::Null => false,
             TypeInner::Bool => false,
@@ -91,7 +102,9 @@ impl<'a> TypeConverter<'a> {
                 }
             }
             _ => true, // Conservative default - convert if unsure
-        }
+        };
+        self.processing_conversion.remove(ty);
+        result
     }
 
     /// Get the function name for converting from TypeScript to Candid
