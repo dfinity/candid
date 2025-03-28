@@ -44,23 +44,6 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
-function to_candid_opt_recursive(value) {
-    if (value === null) return candid_none();
-    if (typeof value === "object" && "_tag" in value) {
-        if (isNone(value)) return candid_none();
-        else {
-            const unwrapped = unwrap(value);
-            return candid_some(to_candid_opt_recursive(unwrapped));
-        }
-    }
-    return candid_some(value);
-}
-function from_candid_opt_recursive(value) {
-    if (value.length === 0) return null;
-    const firstElem = value[0];
-    if (Array.isArray(firstElem)) return some(from_candid_opt_recursive(firstElem));
-    return some(firstElem);
-}
 type Error_ = {
     InvalidAmount: null;
 } | {
@@ -113,7 +96,7 @@ interface recursive {
     setPortfolioWeightings(arg0: Result_1): Promise<bigint>;
     updateTokenAmount(arg0: bigint, arg1: number): Promise<Result>;
 }
-import type { List_1 as _List_1, Result_1 as _Result_1, Portfolio as _Portfolio, Token as _Token, List as _List, Error as _Error } from "./recursive.did.d.ts";
+import type { Token as _Token, List as _List, Portfolio as _Portfolio, Result_1 as _Result_1, List_1 as _List_1, Error as _Error } from "./recursive.did.d.ts";
 class Recursive implements recursive {
     #actor: ActorSubclass<_SERVICE>;
     constructor(){
@@ -165,14 +148,8 @@ class Recursive implements recursive {
     }
 }
 export const recursive = new Recursive();
-function from_candid_List_n10(value: _List): List {
-    return from_candid_opt_n11(value);
-}
-function to_candid_tuple_n18(value: [[string, number], List]): [[string, number], _List] {
-    return [
-        value[0],
-        to_candid_List_n16(value[1])
-    ];
+function from_candid_vec_n1(value: Array<_Portfolio>): Array<Portfolio> {
+    return value.map((x)=>from_candid_Portfolio_n2(x));
 }
 function from_candid_tuple_n12(value: [[string, number], _List]): [[string, number], List] {
     return [
@@ -180,14 +157,14 @@ function from_candid_tuple_n12(value: [[string, number], _List]): [[string, numb
         from_candid_List_n10(value[1])
     ];
 }
-function to_candid_List_n16(value: List): _List {
-    return to_candid_opt_n17(value);
-}
-function from_candid_List_1_n4(value: _List_1): List_1 {
-    return from_candid_opt_n5(value);
-}
 function from_candid_Portfolio_n2(value: _Portfolio): Portfolio {
     return from_candid_record_n3(value);
+}
+function from_candid_opt_n13(value: [] | [_Token]): Token | null {
+    return value.length === 0 ? null : value[0];
+}
+function to_candid_List_n16(value: List): _List {
+    return to_candid_opt_n17(value);
 }
 function to_candid_variant_n15(value: {
     ok: List;
@@ -204,11 +181,23 @@ function to_candid_variant_n15(value: {
         err: value.err
     } : value;
 }
-function from_candid_opt_n11(value: [] | [[[string, number], _List]]): [[string, number], List] | null {
-    return value.length === 0 ? null : from_candid_tuple_n12(value[0]);
+function from_candid_List_n10(value: _List): List {
+    return from_candid_opt_n11(value);
 }
-function from_candid_opt_n13(value: [] | [_Token]): Token | null {
-    return value.length === 0 ? null : value[0];
+function from_candid_tuple_n6(value: [_Token, _List_1]): [Token, List_1] {
+    return [
+        value[0],
+        from_candid_List_1_n4(value[1])
+    ];
+}
+function to_candid_Result_1_n14(value: Result_1): _Result_1 {
+    return to_candid_variant_n15(value);
+}
+function from_candid_opt_n7(value: [] | [_Portfolio]): Portfolio | null {
+    return value.length === 0 ? null : from_candid_Portfolio_n2(value[0]);
+}
+function from_candid_Result_1_n8(value: _Result_1): Result_1 {
+    return from_candid_variant_n9(value);
 }
 function from_candid_record_n3(value: {
     id: bigint;
@@ -225,6 +214,9 @@ function from_candid_record_n3(value: {
         tokens: from_candid_List_1_n4(value.tokens)
     };
 }
+function from_candid_opt_n11(value: [] | [[[string, number], _List]]): [[string, number], List] | null {
+    return value.length === 0 ? null : from_candid_tuple_n12(value[0]);
+}
 function from_candid_variant_n9(value: {
     ok: _List;
 } | {
@@ -240,28 +232,19 @@ function from_candid_variant_n9(value: {
         err: value.err
     } : value;
 }
-function from_candid_tuple_n6(value: [_Token, _List_1]): [Token, List_1] {
-    return [
-        value[0],
-        from_candid_List_1_n4(value[1])
-    ];
-}
-function to_candid_Result_1_n14(value: Result_1): _Result_1 {
-    return to_candid_variant_n15(value);
-}
-function from_candid_Result_1_n8(value: _Result_1): Result_1 {
-    return from_candid_variant_n9(value);
-}
-function from_candid_vec_n1(value: Array<_Portfolio>): Array<Portfolio> {
-    return value.map((x)=>from_candid_Portfolio_n2(x));
-}
 function to_candid_opt_n17(value: [[string, number], List] | null): [] | [[[string, number], _List]] {
     return value === null ? candid_none() : candid_some(to_candid_tuple_n18(value));
+}
+function from_candid_List_1_n4(value: _List_1): List_1 {
+    return from_candid_opt_n5(value);
 }
 function from_candid_opt_n5(value: [] | [[_Token, _List_1]]): [Token, List_1] | null {
     return value.length === 0 ? null : from_candid_tuple_n6(value[0]);
 }
-function from_candid_opt_n7(value: [] | [_Portfolio]): Portfolio | null {
-    return value.length === 0 ? null : from_candid_Portfolio_n2(value[0]);
+function to_candid_tuple_n18(value: [[string, number], List]): [[string, number], _List] {
+    return [
+        value[0],
+        to_candid_List_n16(value[1])
+    ];
 }
 

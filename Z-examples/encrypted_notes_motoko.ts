@@ -1,6 +1,6 @@
-import { encrypted_notes_motoko as _encrypted_notes_motoko } from "declarations/encrypted_notes_motoko";
+import { encrypted_notes_motoko as _encrypted_notes_motoko } from "./encrypted_notes_motoko";
 import { type ActorSubclass } from "@dfinity/agent";
-import { _SERVICE } from "declarations/encrypted_notes_motoko/encrypted_notes_motoko.did.d.js";
+import { _SERVICE } from "./encrypted_notes_motoko/encrypted_notes_motoko.did.d.js";
 import type { Principal } from "@dfinity/principal";
 type Some<T> = {
     _tag: "Some";
@@ -43,23 +43,6 @@ function candid_none<T>(): [] {
 }
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
-}
-function to_candid_opt_recursive(value) {
-    if (value === null) return candid_none();
-    if (typeof value === "object" && "_tag" in value) {
-        if (isNone(value)) return candid_none();
-        else {
-            const unwrapped = unwrap(value);
-            return candid_some(to_candid_opt_recursive(unwrapped));
-        }
-    }
-    return candid_some(value);
-}
-function from_candid_opt_recursive(value) {
-    if (value.length === 0) return null;
-    const firstElem = value[0];
-    if (Array.isArray(firstElem)) return some(from_candid_opt_recursive(firstElem));
-    return some(firstElem);
 }
 type Ciphertext = string;
 type ComplexVariant = {
@@ -116,7 +99,7 @@ interface _anon_class_23_1 {
 }
 interface encrypted_notes_motoko extends _anon_class_23_1 {
 }
-import type { PublicKey as _PublicKey, EncryptedNote as _EncryptedNote, EncryptedText as _EncryptedText, GetCiphertextError as _GetCiphertextError } from "declarations/encrypted_notes_motoko/encrypted_notes_motoko.did.d.ts";
+import type { GetCiphertextError as _GetCiphertextError, EncryptedNote as _EncryptedNote, EncryptedText as _EncryptedText, PublicKey as _PublicKey } from "./encrypted_notes_motoko/encrypted_notes_motoko.did.d.ts";
 class Encrypted_notes_motoko implements encrypted_notes_motoko {
     #actor: ActorSubclass<_SERVICE>;
     constructor(){
@@ -224,8 +207,11 @@ class Encrypted_notes_motoko implements encrypted_notes_motoko {
     }
 }
 export const encrypted_notes_motoko = new Encrypted_notes_motoko();
-function to_candid_opt_n1(value: PublicKey | null): [] | [_PublicKey] {
-    return value === null ? candid_none() : candid_some(value);
+function to_candid_vec_n2(value: Array<EncryptedNote>): Array<_EncryptedNote> {
+    return value.map((x)=>to_candid_EncryptedNote_n3(x));
+}
+function from_candid_EncryptedNote_n8(value: _EncryptedNote): EncryptedNote {
+    return from_candid_record_n9(value);
 }
 function to_candid_record_n6(value: {
     sender?: string;
@@ -239,8 +225,17 @@ function to_candid_record_n6(value: {
         message: value.message
     };
 }
-function to_candid_EncryptedText_n5(value: EncryptedText): _EncryptedText {
-    return to_candid_record_n6(value);
+function from_candid_opt_n17(value: [] | [[] | [bigint]]): Option<bigint | null> {
+    return value.length === 0 ? none() : some(from_candid_opt_n18(value[0]));
+}
+function to_candid_opt_n14(value: Option<bigint | null>): [] | [[] | [bigint]] {
+    return isNone(value) ? candid_none() : candid_some(to_candid_opt_n15(unwrap(value)));
+}
+function to_candid_opt_n13(value: Option<Option<bigint | null>>): [] | [[] | [[] | [bigint]]] {
+    return isNone(value) ? candid_none() : candid_some(to_candid_opt_n14(unwrap(value)));
+}
+function from_candid_EncryptedText_n10(value: _EncryptedText): EncryptedText {
+    return from_candid_record_n11(value);
 }
 function to_candid_record_n4(value: {
     id: bigint;
@@ -254,14 +249,32 @@ function to_candid_record_n4(value: {
         encrypted_text: to_candid_EncryptedText_n5(value.encrypted_text)
     };
 }
-function to_candid_EncryptedNote_n3(value: EncryptedNote): _EncryptedNote {
-    return to_candid_record_n4(value);
+function from_candid_record_n9(value: {
+    id: bigint;
+    encrypted_text: _EncryptedText;
+}): {
+    id: bigint;
+    encrypted_text: EncryptedText;
+} {
+    return {
+        id: value.id,
+        encrypted_text: from_candid_EncryptedText_n10(value.encrypted_text)
+    };
 }
-function to_candid_vec_n2(value: Array<EncryptedNote>): Array<_EncryptedNote> {
-    return value.map((x)=>to_candid_EncryptedNote_n3(x));
+function from_candid_opt_n16(value: [] | [[] | [[] | [bigint]]]): Option<Option<bigint | null>> {
+    return value.length === 0 ? none() : some(from_candid_opt_n17(value[0]));
 }
-function from_candid_opt_n12(value: [] | [string]): string | null {
+function from_candid_opt_n18(value: [] | [bigint]): bigint | null {
     return value.length === 0 ? null : value[0];
+}
+function to_candid_opt_n19(value: EncryptedNote | null): [] | [_EncryptedNote] {
+    return value === null ? candid_none() : candid_some(to_candid_EncryptedNote_n3(value));
+}
+function to_candid_opt_n21(value: GetCiphertextError | null): [] | [_GetCiphertextError] {
+    return value === null ? candid_none() : candid_some(value);
+}
+function to_candid_opt_n1(value: PublicKey | null): [] | [_PublicKey] {
+    return value === null ? candid_none() : candid_some(value);
 }
 function from_candid_record_n11(value: {
     sender: [] | [string];
@@ -275,55 +288,25 @@ function from_candid_record_n11(value: {
         message: value.message
     };
 }
-function from_candid_EncryptedText_n10(value: _EncryptedText): EncryptedText {
-    return from_candid_record_n11(value);
-}
-function from_candid_record_n9(value: {
-    id: bigint;
-    encrypted_text: _EncryptedText;
-}): {
-    id: bigint;
-    encrypted_text: EncryptedText;
-} {
-    return {
-        id: value.id,
-        encrypted_text: from_candid_EncryptedText_n10(value.encrypted_text)
-    };
-}
-function from_candid_EncryptedNote_n8(value: _EncryptedNote): EncryptedNote {
-    return from_candid_record_n9(value);
-}
-function from_candid_vec_n7(value: Array<_EncryptedNote>): Array<EncryptedNote> {
-    return value.map((x)=>from_candid_EncryptedNote_n8(x));
-}
 function to_candid_opt_n15(value: bigint | null): [] | [bigint] {
-    return value === null ? candid_none() : candid_some(value);
-}
-function to_candid_opt_n14(value: Option<bigint | null>): [] | [[] | [bigint]] {
-    return isNone(value) ? candid_none() : candid_some(to_candid_opt_n15(unwrap(value)));
-}
-function to_candid_opt_n13(value: Option<Option<bigint | null>>): [] | [[] | [[] | [bigint]]] {
-    return isNone(value) ? candid_none() : candid_some(to_candid_opt_n14(unwrap(value)));
-}
-function from_candid_opt_n18(value: [] | [bigint]): bigint | null {
-    return value.length === 0 ? null : value[0];
-}
-function from_candid_opt_n17(value: [] | [[] | [bigint]]): Option<bigint | null> {
-    return value.length === 0 ? none() : some(from_candid_opt_n18(value[0]));
-}
-function from_candid_opt_n16(value: [] | [[] | [[] | [bigint]]]): Option<Option<bigint | null>> {
-    return value.length === 0 ? none() : some(from_candid_opt_n17(value[0]));
-}
-function to_candid_opt_n19(value: EncryptedNote | null): [] | [_EncryptedNote] {
-    return value === null ? candid_none() : candid_some(to_candid_EncryptedNote_n3(value));
-}
-function from_candid_opt_n20(value: [] | [_EncryptedNote]): EncryptedNote | null {
-    return value.length === 0 ? null : from_candid_EncryptedNote_n8(value[0]);
-}
-function to_candid_opt_n21(value: GetCiphertextError | null): [] | [_GetCiphertextError] {
     return value === null ? candid_none() : candid_some(value);
 }
 function from_candid_opt_n22(value: [] | [_GetCiphertextError]): GetCiphertextError | null {
     return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n20(value: [] | [_EncryptedNote]): EncryptedNote | null {
+    return value.length === 0 ? null : from_candid_EncryptedNote_n8(value[0]);
+}
+function from_candid_vec_n7(value: Array<_EncryptedNote>): Array<EncryptedNote> {
+    return value.map((x)=>from_candid_EncryptedNote_n8(x));
+}
+function to_candid_EncryptedText_n5(value: EncryptedText): _EncryptedText {
+    return to_candid_record_n6(value);
+}
+function from_candid_opt_n12(value: [] | [string]): string | null {
+    return value.length === 0 ? null : value[0];
+}
+function to_candid_EncryptedNote_n3(value: EncryptedNote): _EncryptedNote {
+    return to_candid_record_n4(value);
 }
 
