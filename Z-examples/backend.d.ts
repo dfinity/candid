@@ -7,33 +7,33 @@ type None = {
     _tag: "None";
 };
 type Option<T> = Some<T> | None;
-type Ciphertext = string;
-type ComplexVariant = {
+export type Ciphertext = string;
+export type ComplexVariant = {
     a: bigint;
 } | {
     b: boolean;
 };
-type DeviceAlias = string;
-interface EncryptedNote {
+export type DeviceAlias = string;
+export interface EncryptedNote {
     id: bigint;
     encrypted_text: EncryptedText;
 }
-interface EncryptedText {
+export interface EncryptedText {
     sender?: string;
     message: string;
 }
-type GetCiphertextError = {
+export type GetCiphertextError = {
     notSynced: null;
 } | {
     notFound: null;
 };
-type PublicKey = string;
-type Result = {
+export type PublicKey = string;
+export type Result = {
     ok: Ciphertext;
 } | {
     err: GetCiphertextError;
 };
-interface _anon_class_23_1 {
+export interface _anon_class_23_1 {
     anon_record_in(arg0: DeviceAlias, arg1: PublicKey | null): Promise<boolean>;
     anon_record_out(): Promise<Array<[DeviceAlias, PublicKey]>>;
     anon_vec_in(arg0: Array<PublicKey>): Promise<void>;
@@ -60,6 +60,14 @@ interface _anon_class_23_1 {
     variant_in(arg0: Result): Promise<void>;
     variant_out(): Promise<Result>;
 }
-declare interface encrypted_notes_motoko extends _anon_class_23_1 {
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+export declare interface CreateActorOptions {
+    agent?: Agent;
+    agentOptions?: HttpAgentOptions;
+    actorOptions?: ActorConfig;
+}
+export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => encrypted_notes_motoko;
+export declare const canisterId: string;
+export interface encrypted_notes_motoko extends _anon_class_23_1 {
 }
 
