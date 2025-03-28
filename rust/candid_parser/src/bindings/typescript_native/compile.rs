@@ -1,6 +1,10 @@
 use super::super::javascript::is_tuple;
 use super::generate_wrapper::{convert_multi_return_from_candid, TypeConverter};
-use super::helper_functions::{add_option_helpers_interface, add_option_helpers_wrapper};
+use super::helper_functions::{
+    add_create_actor_imports_and_interface, add_option_helpers_interface,
+    add_option_helpers_wrapper, create_canister_id_assignment, create_canister_id_declaration,
+    generate_create_actor_function, generate_create_actor_function_declaration,
+};
 use super::ident::{get_ident, get_ident_guarded};
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use swc_core::common::comments::SingleThreadedComments;
@@ -32,6 +36,35 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
     }
 
     add_type_definitions(env, &mut module);
+
+    add_create_actor_imports_and_interface(&mut module);
+
+    // createActor declaration / function
+    if target == "interface" {
+        let create_actor_fn = generate_create_actor_function_declaration(service_name);
+        module
+            .body
+            .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                span: DUMMY_SP,
+                decl: Decl::Var(Box::new(create_actor_fn)),
+            })));
+
+        let create_canister_id = create_canister_id_declaration();
+        module.body.push(create_canister_id);
+    }
+
+    if target == "wrapper" {
+        let create_actor_fn = generate_create_actor_function(service_name);
+        module
+            .body
+            .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                span: DUMMY_SP,
+                decl: Decl::Fn(create_actor_fn),
+            })));
+        let create_canister_id = create_canister_id_assignment();
+        module.body.push(create_canister_id);
+    }
+
     if let Some(actor_type) = actor {
         let mut converter = TypeConverter::new(env);
         add_actor_implementation(
@@ -74,20 +107,42 @@ fn add_imports(module: &mut Module, service_name: &str) {
         .body
         .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
             span: DUMMY_SP,
-            specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
-                span: DUMMY_SP,
-                local: Ident::new(
-                    format!("_{}", service_name).into(),
-                    DUMMY_SP,
-                    SyntaxContext::empty(),
-                ),
-                imported: Some(ModuleExportName::Ident(Ident::new(
-                    service_name.into(),
-                    DUMMY_SP,
-                    SyntaxContext::empty(),
-                ))),
-                is_type_only: false,
-            })],
+            specifiers: vec![
+                ImportSpecifier::Named(ImportNamedSpecifier {
+                    span: DUMMY_SP,
+                    local: Ident::new(
+                        format!("_{}", service_name).into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ),
+                    imported: Some(ModuleExportName::Ident(Ident::new(
+                        service_name.into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ))),
+                    is_type_only: false,
+                }),
+                ImportSpecifier::Named(ImportNamedSpecifier {
+                    span: DUMMY_SP,
+                    local: Ident::new("_createActor".into(), DUMMY_SP, SyntaxContext::empty()),
+                    imported: Some(ModuleExportName::Ident(Ident::new(
+                        "createActor".into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ))),
+                    is_type_only: false,
+                }),
+                ImportSpecifier::Named(ImportNamedSpecifier {
+                    span: DUMMY_SP,
+                    local: Ident::new("_canisterId".into(), DUMMY_SP, SyntaxContext::empty()),
+                    imported: Some(ModuleExportName::Ident(Ident::new(
+                        "canisterId".into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ))),
+                    is_type_only: false,
+                }),
+            ],
             src: Box::new(Str {
                 span: DUMMY_SP,
                 value: format!("declarations/{}", dashed_name).into(),
@@ -174,36 +229,40 @@ fn add_type_definitions(env: &TypeEnv, module: &mut Module) {
                     let interface = create_interface_from_record(env, id, ty);
                     module
                         .body
-                        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(Box::new(
-                            interface,
-                        )))));
+                        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                            span: DUMMY_SP,
+                            decl: Decl::TsInterface(Box::new(interface)),
+                        })));
                 }
                 TypeInner::Service(ref serv) => {
                     // Generate interface for service types
                     let interface = create_interface_from_service(env, id, serv);
                     module
                         .body
-                        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(Box::new(
-                            interface,
-                        )))));
+                        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                            span: DUMMY_SP,
+                            decl: Decl::TsInterface(Box::new(interface)),
+                        })));
                 }
                 TypeInner::Func(ref func) => {
                     // Generate type alias for function types
                     let type_alias = create_type_alias_from_function(env, id, func);
                     module
                         .body
-                        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(Box::new(
-                            type_alias,
-                        )))));
+                        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                            span: DUMMY_SP,
+                            decl: Decl::TsTypeAlias(Box::new(type_alias)),
+                        })));
                 }
                 _ => {
                     // Generate type alias for other types
                     let type_alias = create_type_alias(env, id, ty);
                     module
                         .body
-                        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(Box::new(
-                            type_alias,
-                        )))));
+                        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                            span: DUMMY_SP,
+                            decl: Decl::TsTypeAlias(Box::new(type_alias)),
+                        })));
                 }
             }
         }
@@ -736,9 +795,10 @@ fn add_actor_service_implementation(
     let interface = create_interface_from_service(env, service_name, serv);
     module
         .body
-        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(Box::new(
-            interface,
-        )))));
+        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+            span: DUMMY_SP,
+            decl: Decl::TsInterface(Box::new(interface)),
+        })));
 
     if target == "wrapper" {
         // Create a single TypeConverter instance
@@ -844,9 +904,10 @@ fn add_actor_var_implementation(
     };
     module
         .body
-        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(Box::new(
-            interface,
-        )))));
+        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+            span: DUMMY_SP,
+            decl: Decl::TsInterface(Box::new(interface)),
+        })));
     if target == "wrapper" {
         let capitalized_service_name = service_name
             .chars()
@@ -927,7 +988,41 @@ fn create_actor_class(
         key: PropName::Ident(
             Ident::new("constructor".into(), DUMMY_SP, SyntaxContext::empty()).into(),
         ),
-        params: vec![],
+        params: vec![ParamOrTsParamProp::Param(Param {
+            span: DUMMY_SP,
+            decorators: vec![],
+            pat: Pat::Ident(BindingIdent {
+                id: Ident {
+                    span: DUMMY_SP,
+                    sym: "actor".into(),
+                    optional: true,
+                    ctxt: SyntaxContext::empty(),
+                },
+                type_ann: Some(Box::new(TsTypeAnn {
+                    span: DUMMY_SP,
+                    type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                        span: DUMMY_SP,
+                        type_name: TsEntityName::Ident(Ident::new(
+                            "ActorSubclass".into(),
+                            DUMMY_SP,
+                            SyntaxContext::empty(),
+                        )),
+                        type_params: Some(Box::new(TsTypeParamInstantiation {
+                            span: DUMMY_SP,
+                            params: vec![Box::new(TsType::TsTypeRef(TsTypeRef {
+                                span: DUMMY_SP,
+                                type_name: TsEntityName::Ident(Ident::new(
+                                    "_SERVICE".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                )),
+                                type_params: None,
+                            }))],
+                        })),
+                    })),
+                })),
+            }),
+        })],
         body: Some(BlockStmt {
             span: DUMMY_SP,
             stmts: vec![Stmt::Expr(ExprStmt {
@@ -943,11 +1038,20 @@ fn create_actor_class(
                             name: "actor".into(),
                         }),
                     })),
-                    right: Box::new(Expr::Ident(Ident::new(
-                        format!("_{}", service_name).into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    ))),
+                    right: Box::new(Expr::Bin(BinExpr {
+                        span: DUMMY_SP,
+                        op: BinaryOp::NullishCoalescing,
+                        left: Box::new(Expr::Ident(Ident::new(
+                            "actor".into(),
+                            DUMMY_SP,
+                            SyntaxContext::empty(),
+                        ))),
+                        right: Box::new(Expr::Ident(Ident::new(
+                            format!("_{}", service_name).into(),
+                            DUMMY_SP,
+                            SyntaxContext::empty(),
+                        ))),
+                    })),
                 })),
             })],
             ctxt: SyntaxContext::empty(),

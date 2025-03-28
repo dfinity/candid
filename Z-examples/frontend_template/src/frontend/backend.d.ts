@@ -7,20 +7,28 @@ type None = {
     _tag: "None";
 };
 type Option<T> = Some<T> | None;
-type Result = {
+export type Result = {
     ok: bigint;
 } | {
     err: string;
 };
-interface Tokens {
+export interface Tokens {
     e8s: bigint;
 }
-interface TransferArgs {
+export interface TransferArgs {
     toPrincipal: Principal;
     amount: Tokens;
     toSubaccount?: Uint8Array | number[];
 }
-interface backend {
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+export declare interface CreateActorOptions {
+    agent?: Agent;
+    agentOptions?: HttpAgentOptions;
+    actorOptions?: ActorConfig;
+}
+export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => backend;
+export declare const canisterId: string;
+export interface backend {
     transfer(arg0: TransferArgs): Promise<Result>;
 }
 
