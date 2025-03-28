@@ -166,7 +166,7 @@ fn add_principal_import(module: &mut Module) {
 
 // Add all type definitions from the environment
 fn add_type_definitions(env: &TypeEnv, module: &mut Module) {
-    for (id, _) in &env.0 {
+    for id in env.0.keys() {
         if let Ok(ty) = env.find_type(id) {
             match ty.as_ref() {
                 TypeInner::Record(_) if !is_tuple(ty) => {
@@ -238,7 +238,7 @@ fn create_interface_from_record(env: &TypeEnv, id: &str, ty: &Type) -> TsInterfa
 fn create_interface_from_service(
     env: &TypeEnv,
     id: &str,
-    serv: &Vec<(String, Type)>,
+    serv: &[(String, Type)],
 ) -> TsInterfaceDecl {
     let members = serv
         .iter()
@@ -728,7 +728,7 @@ fn add_actor_implementation(
 fn add_actor_service_implementation(
     env: &TypeEnv,
     module: &mut Module,
-    serv: &Vec<(String, Type)>,
+    serv: &[(String, Type)],
     service_name: &str,
     target: &str,
     converter: &mut TypeConverter,
@@ -877,7 +877,7 @@ fn create_actor_class(
     env: &TypeEnv,
     service_name: &str,
     capitalized_service_name: &str,
-    serv: &Vec<(String, Type)>,
+    serv: &[(String, Type)],
     converter: &mut TypeConverter,
 ) -> ClassDecl {
     // Create private actor field
@@ -984,7 +984,7 @@ fn create_actor_class(
             super_type_params: None,
             implements: vec![TsExprWithTypeArgs {
                 span: DUMMY_SP,
-                expr: Box::new(Expr::Ident(get_ident_guarded(service_name).into())),
+                expr: Box::new(Expr::Ident(get_ident_guarded(service_name))),
                 type_args: None,
             }],
             is_abstract: false,
@@ -1068,7 +1068,7 @@ pub fn create_actor_method(
             let arg_expr = Expr::Ident(arg_ident);
 
             // Apply type conversion
-            let converted_expr = converter.to_candid(&arg_expr, ty);
+            let converted_expr = converter.convert_to_candid(&arg_expr, ty);
 
             ExprOrSpread {
                 spread: None,
