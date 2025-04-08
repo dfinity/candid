@@ -13,7 +13,12 @@ export const IDL = `
     B : text;
   };
 
-  service : {
+  type CustomInit = record {
+    field1 : text;
+    field2 : nat64;
+  };
+
+  service : (opt CustomInit) -> {
     store_number : (input : StoreNumberInput) -> ();
     get_number : () -> (nat64) query;
     set_complex_type : (input : CustomType) -> ();

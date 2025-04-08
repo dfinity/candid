@@ -7,7 +7,7 @@ describe("encode", () => {
       encode({
         idl: IDL,
         input: "(record { number=90; })",
-        serviceMethod: "store_number",
+        withType: { methodParams: "store_number" },
         targetFormat: "hex",
       })
     ).toBe("4449444c016c01c98dea8b0a7801005a00000000000000");
@@ -18,7 +18,7 @@ describe("encode", () => {
       encode({
         idl: IDL,
         input: "(record { number=90; })",
-        serviceMethod: "store_number",
+        withType: { methodParams: "store_number" },
         targetFormat: "blob",
       })
     ).toBe(
@@ -26,12 +26,75 @@ describe("encode", () => {
     );
   });
 
+  it("encoding works with arbitrary types", () => {
+    expect(
+      encode({
+        idl: IDL,
+        input: '(record { field1="test"; field2=90; })',
+        withType: { type: "CustomInit" },
+        targetFormat: "hex",
+      })
+    ).toBe(
+      "4449444c016c02b79cba840871b89cba840878010004746573745a00000000000000"
+    );
+  });
+
+  it("encoding works with service parameters (null)", () => {
+    expect(
+      encode({
+        idl: IDL,
+        input: "(null)",
+        withType: { serviceParams: null },
+        targetFormat: "hex",
+      })
+    ).toBe("4449444c026e016c02b79cba840871b89cba840878010000");
+  });
+
+  it("encoding works with service parameters (non-null)", () => {
+    expect(
+      encode({
+        idl: IDL,
+        input: '(opt record { field1="test"; field2=90; })',
+        withType: { serviceParams: null },
+        targetFormat: "hex",
+      })
+    ).toBe(
+      "4449444c026e016c02b79cba840871b89cba84087801000104746573745a00000000000000"
+    );
+  });
+
+  it("encoding throws an error for unknown types", () => {
+    const performEncoding = () =>
+      encode({
+        idl: IDL,
+        input: '(record { field1="test"; field2=90; })',
+        withType: { type: "UnknownType" },
+        targetFormat: "hex",
+      });
+
+    expect(performEncoding).toThrow(Error);
+    expect(performEncoding).toThrow("Type not found `UnknownType`.");
+  });
+
+  it("encoding throws an error for bad values", () => {
+    const performEncoding = () =>
+      encode({
+        idl: IDL,
+        input: '(record { field1="test"; unknown_field="bad"; })',
+        withType: { type: "CustomInit" },
+        targetFormat: "hex",
+      });
+
+    expect(performEncoding).toThrow(Error);
+    expect(performEncoding).toThrow(/field field2 not found/);
+  });
+
   it("encoding with an invalid service method throws", () => {
     const performEncoding = () =>
       encode({
         idl: IDL,
         input: "(record { number=90; })",
-        serviceMethod: "unknown_method",
+        withType: { methodParams: "unknown_method" },
       });
 
     expect(performEncoding).toThrow(Error);
@@ -45,7 +108,7 @@ describe("encode", () => {
       encode({
         idl: IDL,
         input: "record { number=90; }",
-        serviceMethod: "store_number",
+        withType: { methodParams: "store_number" },
       });
 
     expect(performEncoding).toThrow(Error);

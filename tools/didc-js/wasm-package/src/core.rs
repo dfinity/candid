@@ -1,5 +1,8 @@
-use crate::validation::Validate;
-use candid::IDLArgs;
+use crate::{types::EncodeType, validation::Validate};
+use candid::{
+    types::{Type, TypeInner},
+    IDLArgs,
+};
 
 use crate::{
     errors::LibraryError,
@@ -37,8 +40,8 @@ pub fn encode(args: EncodeArgs) -> Result<String, LibraryError> {
     let idl = parse_idl(&args.idl)?;
     let idl_args = parse_idl_args(&args.input)?;
 
-    let args_bytes = match (args.service_method, &idl.actor) {
-        (Some(method), Some(actor)) => {
+    let args_bytes = match (args.with_type, &idl.actor) {
+        (Some(EncodeType::MethodParams(method)), Some(actor)) => {
             let method = idl.env.get_method(actor, &method).map_err(|_| {
                 LibraryError::IdlMethodNotFound {
                     method: method.clone(),
@@ -51,7 +54,53 @@ pub fn encode(args: EncodeArgs) -> Result<String, LibraryError> {
                     reason: format!("Could not encode args to bytes {}", e),
                 })?
         }
-        (Some(method), None) => Err(LibraryError::IdlMethodNotFound { method })?,
+        (Some(EncodeType::Type(type_name)), Some(_)) => {
+            let type_def =
+                idl.env
+                    .find_type(&type_name)
+                    .map_err(|_| LibraryError::TypeNotFound {
+                        type_name: type_name.clone(),
+                    })?;
+
+            idl_args
+                .to_bytes_with_types(&idl.env, &[type_def.clone()])
+                .map_err(|e| LibraryError::IdlArgsToBytesFailed {
+                    reason: format!("Could not encode input to bytes {}", e),
+                })?
+        }
+        (Some(EncodeType::ServiceParams), Some(actor)) => match actor {
+            Type(inner) => match &**inner {
+                TypeInner::Service(_) => {
+                    if !idl_args.args.is_empty() {
+                        return Err(LibraryError::UnexpectedServiceParams);
+                    }
+
+                    idl_args.to_bytes_with_types(&idl.env, &[]).map_err(|e| {
+                        LibraryError::IdlArgsToBytesFailed {
+                            reason: format!("Could not encode input to bytes {}", e),
+                        }
+                    })?
+                }
+
+                TypeInner::Class(ctor_args, _) => {
+                    if ctor_args.is_empty() && !idl_args.args.is_empty() {
+                        return Err(LibraryError::UnexpectedServiceParams);
+                    }
+
+                    idl_args
+                        .to_bytes_with_types(&idl.env, &ctor_args)
+                        .map_err(|e| LibraryError::IdlArgsToBytesFailed {
+                            reason: format!("Could not encode input to bytes {}", e),
+                        })?
+                }
+                _ => {
+                    return Err(LibraryError::IdlArgsToBytesFailed {
+                        reason: "Service parameters are not supported for this type".to_string(),
+                    })
+                }
+            },
+        },
+        (Some(_), None) => Err(LibraryError::IdlNotFound)?,
         (None, _) => idl_args
             .to_bytes()
             .map_err(|e| LibraryError::IdlArgsToBytesFailed {
@@ -117,4 +166,161 @@ pub fn decode(args: DecodeArgs) -> Result<String, LibraryError> {
     };
 
     Ok(decoded_idl_args)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encode_service_params() {
+        let idl = r#"
+type  Payload = record {
+    field1: text;
+    field2: nat;
+};
+
+type Init = variant {
+    One : Payload;
+    Two;
+};
+
+service : (opt Init) -> {}
+"#;
+
+        encode(EncodeArgs {
+            idl: idl.to_owned(),
+            target_format: EncodeFormat::Hex,
+            input: r#"(opt variant { One = record { field1 = "Hello"; field_invalid = 1 } })"#
+                .to_owned(),
+            with_type: Some(EncodeType::ServiceParams),
+        })
+        .expect_err("Should fail to encode with bad args");
+
+        encode(EncodeArgs {
+            idl: idl.to_owned(),
+            target_format: EncodeFormat::Hex,
+            input: r#"(opt variant { One = record { field1 = "Hello"; field2 = 1 } })"#.to_owned(),
+            with_type: Some(EncodeType::ServiceParams),
+        })
+        .expect("Failed to encode");
+    }
+
+    #[test]
+    fn test_encode_service_without_params() {
+        encode(EncodeArgs {
+            idl: r#"service : {}"#.to_owned(),
+            target_format: EncodeFormat::Hex,
+            input: r#"()"#.to_owned(),
+            with_type: Some(EncodeType::ServiceParams),
+        })
+        .expect("Failed to encode");
+
+        encode(EncodeArgs {
+            idl: r#"service : {}"#.to_owned(),
+            target_format: EncodeFormat::Hex,
+            input: r#"(1)"#.to_owned(),
+            with_type: Some(EncodeType::ServiceParams),
+        })
+        .expect_err("Should fail to encode with args");
+
+        encode(EncodeArgs {
+            idl: r#"service : () -> {}"#.to_owned(),
+            target_format: EncodeFormat::Hex,
+            input: r#"(1)"#.to_owned(),
+            with_type: Some(EncodeType::ServiceParams),
+        })
+        .expect_err("Should fail to encode with args");
+
+        encode(EncodeArgs {
+            idl: r#"service : () -> {}"#.to_owned(),
+            target_format: EncodeFormat::Hex,
+            input: r#"()"#.to_owned(),
+            with_type: Some(EncodeType::ServiceParams),
+        })
+        .expect("Failed to encode");
+    }
+
+    #[test]
+    fn test_encode_value() {
+        let idl = r#"
+type  Payload = record {
+    field1: text;
+    field2: nat;
+};
+
+type Args = variant {
+    One : Payload;
+    Two;
+};
+
+service : {
+    test_method : (opt Args) -> () query;
+}
+"#;
+
+        encode(EncodeArgs {
+            idl: idl.to_owned(),
+            target_format: EncodeFormat::Hex,
+            input: r#"(variant { One = record { field1 = "Hello"; field_invalid = 1 } })"#
+                .to_owned(),
+            with_type: Some(EncodeType::Type("Args".to_string())),
+        })
+        .expect_err("Should fail to encode with bad args");
+
+        encode(EncodeArgs {
+            idl: idl.to_owned(),
+            target_format: EncodeFormat::Hex,
+            input: r#"(variant { One = record { field1 = "Hello"; field2 = 1 } })"#.to_owned(),
+            with_type: Some(EncodeType::Type("Args".to_string())),
+        })
+        .expect("Failed to encode");
+    }
+
+    #[test]
+    fn test_encode_method_args() {
+        let idl = r#"
+type  Payload = record {
+    field1: text;
+    field2: nat;
+};
+
+type Args = variant {
+    One : Payload;
+    Two;
+};
+
+service : {
+    test_method : (opt Args, nat) -> () query;
+}
+"#;
+
+        encode(EncodeArgs {
+            idl: idl.to_owned(),
+            target_format: EncodeFormat::Hex,
+
+            input: r#"(opt variant { One = record { field1 = "Hello"; field2 = 1 } })"#.to_owned(),
+            with_type: Some(EncodeType::MethodParams("test_method".to_string())),
+        })
+        .expect_err("Should fail to encode with missing second argument");
+
+        encode(EncodeArgs {
+            idl: idl.to_owned(),
+            target_format: EncodeFormat::Hex,
+
+            input: r#"(opt variant { One = record { field1 = "Hello"; field_invalid = 1 } }, 1)"#
+                .to_owned(),
+            with_type: Some(EncodeType::MethodParams("test_method".to_string())),
+        })
+        .expect_err("Should fail to encode with invalid argument");
+
+        encode(EncodeArgs {
+            idl: idl.to_owned(),
+            target_format: EncodeFormat::Hex,
+            input: r#"(opt variant { One = record { field1 = "Hello"; field2 = 1 } }, 1)"#
+                .to_owned(),
+            with_type: Some(EncodeType::MethodParams("test_method".to_string())),
+        })
+        .expect("Failed to encode");
+    }
 }

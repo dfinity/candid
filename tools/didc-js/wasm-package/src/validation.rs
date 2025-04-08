@@ -60,7 +60,7 @@ mod tests {
             idl: "test".to_string(),
             target_format: EncodeFormat::Hex,
             input: "test".to_string(),
-            service_method: None,
+            with_type: None,
         };
 
         assert!(args.validate().is_ok());
