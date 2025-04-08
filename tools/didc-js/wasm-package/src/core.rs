@@ -88,7 +88,7 @@ pub fn encode(args: EncodeArgs) -> Result<String, LibraryError> {
                     }
 
                     idl_args
-                        .to_bytes_with_types(&idl.env, &ctor_args)
+                        .to_bytes_with_types(&idl.env, ctor_args)
                         .map_err(|e| LibraryError::IdlArgsToBytesFailed {
                             reason: format!("Could not encode input to bytes {}", e),
                         })?
