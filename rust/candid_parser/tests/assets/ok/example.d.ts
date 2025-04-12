@@ -8,8 +8,16 @@ export type List = [] | [{ 'head' : bigint, 'tail' : List }];
 export type a = { 'a' : null } |
   { 'b' : b };
 export type b = [bigint, bigint];
-export interface broker { 'find' : ActorMethod<[string], Principal> }
-export type f = ActorMethod<[List, [Principal, string]], [[] | [List], res]>;
+export interface broker {
+  'find' : ActorMethod<
+    [string],
+    { 'current' : ActorMethod<[], number>, 'up' : ActorMethod<[], undefined> }
+  >,
+}
+export type f = ActorMethod<
+  [List, ActorMethod<[number], bigint>],
+  [[] | [List], res]
+>;
 export type list = [] | [node];
 export type my_type = Principal;
 export interface nested {
@@ -30,8 +38,10 @@ export interface node { 'head' : bigint, 'tail' : list }
 export type res = { 'Ok' : [bigint, bigint] } |
   { 'Err' : { 'error' : string } };
 export interface s { 'f' : t, 'g' : ActorMethod<[list], [B, tree, stream]> }
-export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
-export type t = ActorMethod<[Principal], undefined>;
+export type stream = [] | [
+  { 'head' : bigint, 'next' : ActorMethod<[], stream> }
+];
+export type t = ActorMethod<[s], undefined>;
 export type tree = {
     'branch' : { 'val' : bigint, 'left' : tree, 'right' : tree }
   } |
@@ -43,7 +53,7 @@ export interface _SERVICE {
   'g' : ActorMethod<[list], [B, tree, stream]>,
   'g1' : ActorMethod<
     [my_type, List, [] | [List], nested],
-    [bigint, Principal, nested_res]
+    [bigint, broker, nested_res]
   >,
   'h' : ActorMethod<
     [
