@@ -69,23 +69,59 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         Text => str("string"),
         Reserved => str("any"),
         Empty => str("never"),
-        Var(ref id) => {
-            let ty = env.rec_find_type(id).unwrap();
-            if matches!(ty.as_ref(), Func(_)) {
-                return pp_inline_func();
-            }
-            if is_ref && matches!(ty.as_ref(), Service(_)) {
-                return pp_inline_service();
-            }
-            ident(id)
-        }
+        Var(ref id) => ident(id),
         Principal => str("Principal"),
-        Opt(ref t) => pp_opt(env, t, None, is_ref),
-        Vec(ref t) => pp_vec(env, t, None, is_ref),
-        Record(ref fs) => pp_record(env, fs, None, is_ref),
-        Variant(ref fs) => pp_variant(env, fs, None, is_ref),
-        Func(_) => pp_inline_func(),
-        Service(_) => pp_inline_service(),
+        Opt(ref t) => str("[] | ").append(enclose("[", pp_ty(env, t, is_ref), "]")),
+        Vec(ref t) => {
+            let ty = match t.as_ref() {
+                Var(ref id) => {
+                    let ty = env.rec_find_type(id).unwrap();
+                    if matches!(
+                        ty.as_ref(),
+                        Nat8 | Nat16 | Nat32 | Nat64 | Int8 | Int16 | Int32 | Int64
+                    ) {
+                        ty
+                    } else {
+                        t
+                    }
+                }
+                _ => t,
+            };
+            match ty.as_ref() {
+                Nat8 => str("Uint8Array | number[]"),
+                Nat16 => str("Uint16Array | number[]"),
+                Nat32 => str("Uint32Array | number[]"),
+                Nat64 => str("BigUint64Array | bigint[]"),
+                Int8 => str("Int8Array | number[]"),
+                Int16 => str("Int16Array | number[]"),
+                Int32 => str("Int32Array | number[]"),
+                Int64 => str("BigInt64Array | bigint[]"),
+                _ => str("Array").append(enclose("<", pp_ty(env, t, is_ref), ">")),
+            }
+        }
+        Record(ref fs) => {
+            if is_tuple(ty) {
+                let tuple = concat(fs.iter().map(|f| pp_ty(env, &f.ty, is_ref)), ",");
+                enclose("[", tuple, "]")
+            } else {
+                let fields = concat(fs.iter().map(|f| pp_field(env, f, is_ref)), ",");
+                enclose_space("{", fields, "}")
+            }
+        }
+        Variant(ref fs) => {
+            if fs.is_empty() {
+                str("never")
+            } else {
+                strict_concat(
+                    fs.iter()
+                        .map(|f| enclose_space("{", pp_field(env, f, is_ref), "}")),
+                    " |",
+                )
+                .nest(INDENT_SPACE)
+            }
+        }
+        Func(ref func) => pp_function(env, func),
+        Service(ref serv) => pp_service(env, serv),
         Class(_, _) => unreachable!(),
         Knot(_) | Unknown | Future => unreachable!(),
     }
