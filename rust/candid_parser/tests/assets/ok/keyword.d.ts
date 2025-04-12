@@ -10,8 +10,10 @@ export type list = [] | [node];
 export interface node { 'head' : bigint, 'tail' : list }
 export type o = [] | [o];
 export interface return_ { 'f' : t, 'g' : ActorMethod<[list], [if_, stream]> }
-export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
-export type t = ActorMethod<[Principal], undefined>;
+export type stream = [] | [
+  { 'head' : bigint, 'next' : ActorMethod<[], stream> }
+];
+export type t = ActorMethod<[return_], undefined>;
 export interface _SERVICE {
   'Oneway' : ActorMethod<[], undefined>,
   'f_' : ActorMethod<[o], o>,

@@ -7,8 +7,10 @@ export type B = [] | [A];
 export type list = [] | [node];
 export interface node { 'head' : bigint, 'tail' : list }
 export interface s { 'f' : t, 'g' : ActorMethod<[list], [B, tree, stream]> }
-export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
-export type t = ActorMethod<[Principal], undefined>;
+export type stream = [] | [
+  { 'head' : bigint, 'next' : ActorMethod<[], stream> }
+];
+export type t = ActorMethod<[s], undefined>;
 export type tree = {
     'branch' : { 'val' : bigint, 'left' : tree, 'right' : tree }
   } |
