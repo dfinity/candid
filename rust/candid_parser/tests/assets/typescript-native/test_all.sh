@@ -17,12 +17,7 @@ echo "Running all valid tests from assets directory"
 
 # Get the path to the assets directory
 ASSETS_DIR="../"
-
-# Check if the assets directory exists
-if [ ! -d "$ASSETS_DIR" ]; then
-    echo "Error: Assets directory not found at $ASSETS_DIR"
-    cleanup 1
-fi
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Track test results
 PASSED=0
@@ -43,11 +38,8 @@ for did_file in "$ASSETS_DIR"/*.did; do
     
     echo "Running test for $filename"
     
-    # Copy the .did file to the current directory for testing
-    cp "$did_file" "$ORIGINAL_DIR/$filename.did"
-    
     # Run the test for this file
-    "$ORIGINAL_DIR/test.sh" "$filename"
+    "$SCRIPT_DIR/test.sh" "$ASSETS_DIR/$filename.did"
     
     if [ $? -eq 0 ]; then
         echo "✅ Test passed: $filename"
@@ -56,15 +48,6 @@ for did_file in "$ASSETS_DIR"/*.did; do
         echo "❌ Test failed: $filename"
         FAILED=$((FAILED + 1))
     fi
-    
-    # Clean up the copied .did file
-    rm -f "$ORIGINAL_DIR/$filename.did"
 done
 
 echo "Test summary: $PASSED passed, $FAILED failed, $SKIPPED skipped"
-
-if [ $FAILED -gt 0 ]; then
-    cleanup 1
-else
-    cleanup 0
-fi

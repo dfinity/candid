@@ -277,18 +277,10 @@ impl<'a> CandidTypesConverter<'a> {
                     ))
                 }
             }
-            // Function types
+            // Function types (TODO: check pending PR #604)
             TypeInner::Func(ref func) => self.create_function_type(func),
-            // Service types
-            TypeInner::Service(_) => TsType::TsTypeRef(TsTypeRef {
-                span: DUMMY_SP,
-                type_name: TsEntityName::Ident(Ident::new(
-                    "Principal".into(),
-                    DUMMY_SP,
-                    SyntaxContext::empty(),
-                )),
-                type_params: None,
-            }),
+            // Service types (TODO: check pending PR #604)
+            TypeInner::Service(ref serv) => self.create_service_type(serv),
             // Unsupported types
             TypeInner::Class(_, _)
             | TypeInner::Knot(_)
@@ -380,6 +372,33 @@ impl<'a> CandidTypesConverter<'a> {
                 type_ann: Box::new(return_type),
             }),
         }))
+    }
+
+    fn create_service_type(&mut self, serv: &[(String, Type)]) -> TsType {
+        TsType::TsTypeLit(TsTypeLit {
+            span: DUMMY_SP,
+            members: serv
+                .iter()
+                .map(|(id, func)| {
+                    let method_type = match func.as_ref() {
+                        TypeInner::Func(ref func) => self.create_function_type(func),
+                        _ => self.get_candid_type(func),
+                    };
+
+                    TsTypeElement::TsPropertySignature(TsPropertySignature {
+                        span: DUMMY_SP,
+                        readonly: false,
+                        key: Box::new(Expr::Ident(get_ident(id))),
+                        computed: false,
+                        optional: false,
+                        type_ann: Some(Box::new(TsTypeAnn {
+                            span: DUMMY_SP,
+                            type_ann: Box::new(method_type),
+                        })),
+                    })
+                })
+                .collect(),
+        })
     }
 
     fn create_property_signature(&mut self, field: &Field) -> TsTypeElement {
