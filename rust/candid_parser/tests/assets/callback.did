@@ -1,0 +1,6 @@
+type Fn = func(nat) -> (nat) query;
+
+type CallbacksAreFun = record {
+    callback : Fn;
+    inline_callback : func(nat) -> (nat);
+};

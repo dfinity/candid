@@ -1,0 +1,5 @@
+type CallbacksAreFun = record {
+  inline_callback : func(nat) -> (nat);
+  callback : Fn;
+};
+type Fn = func(nat) -> (nat);
