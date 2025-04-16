@@ -138,11 +138,28 @@ pub fn get_ident(name: &str) -> Ident {
     Ident::new(name.into(), DUMMY_SP, SyntaxContext::empty())
 }
 
-pub fn get_ident_guarded(name: &str) -> Ident {
+pub fn get_typescript_ident(name: &str) -> String {
     let ident_name = if KEYWORDS.contains(&name) {
         format!("{}_", name)
+    } else if name.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_') {
+        // If the name contains non-alphanumeric characters (except underscore),
+        // we need to quote it to make it a valid TypeScript property name
+        format!("\"{}\"", name)
     } else {
         name.to_string()
     };
+    // Handle empty names by returning a quoted empty string
+    if name.is_empty() {
+        return "\"\"".to_string();
+    }
+    ident_name
+}
+
+pub fn contains_unicode_characters(name: &str) -> bool {
+    name.chars().any(|c| !c.is_ascii_alphanumeric()) || name.is_empty()
+}
+
+pub fn get_ident_guarded(name: &str) -> Ident {
+    let ident_name = get_typescript_ident(name);
     get_ident(&ident_name)
 }

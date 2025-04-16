@@ -1,19 +1,21 @@
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 
+use super::ident::get_ident_guarded;
+
 // Add Option helper types
 pub fn add_option_helpers_interface(module: &mut Module) {
     let some_type = create_some_type();
     module
         .body
-        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(Box::new(
+        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(Box::new(
             some_type,
         )))));
 
     let none_type = create_none_type();
     module
         .body
-        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(Box::new(
+        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(Box::new(
             none_type,
         )))));
 
@@ -358,11 +360,7 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
                 span: DUMMY_SP,
                 type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
                     span: DUMMY_SP,
-                    type_name: TsEntityName::Ident(Ident::new(
-                        service_name.into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    )),
+                    type_name: TsEntityName::Ident(get_ident_guarded(service_name)),
                     type_params: None,
                 })),
             })),
@@ -500,11 +498,7 @@ pub fn generate_create_actor_function_declaration(service_name: &str) -> VarDecl
                                 span: DUMMY_SP,
                                 type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
                                     span: DUMMY_SP,
-                                    type_name: TsEntityName::Ident(Ident::new(
-                                        service_name.into(),
-                                        DUMMY_SP,
-                                        SyntaxContext::empty(),
-                                    )),
+                                    type_name: TsEntityName::Ident(get_ident_guarded(service_name)),
                                     type_params: None,
                                 })),
                             }),
@@ -1284,8 +1278,8 @@ fn create_none_function() -> FnDecl {
     }
 }
 
-fn create_some_type() -> TsTypeAliasDecl {
-    TsTypeAliasDecl {
+fn create_some_type() -> TsInterfaceDecl {
+    TsInterfaceDecl {
         span: DUMMY_SP,
         declare: false,
         id: Ident::new("Some".into(), DUMMY_SP, SyntaxContext::empty()),
@@ -1301,9 +1295,10 @@ fn create_some_type() -> TsTypeAliasDecl {
                 is_const: false,
             }],
         })),
-        type_ann: Box::new(TsType::TsTypeLit(TsTypeLit {
+        extends: vec![],
+        body: TsInterfaceBody {
             span: DUMMY_SP,
-            members: vec![
+            body: vec![
                 TsTypeElement::TsPropertySignature(TsPropertySignature {
                     span: DUMMY_SP,
                     readonly: false,
@@ -1350,19 +1345,20 @@ fn create_some_type() -> TsTypeAliasDecl {
                     })),
                 }),
             ],
-        })),
+        },
     }
 }
 
-fn create_none_type() -> TsTypeAliasDecl {
-    TsTypeAliasDecl {
+fn create_none_type() -> TsInterfaceDecl {
+    TsInterfaceDecl {
         span: DUMMY_SP,
         declare: false,
         id: Ident::new("None".into(), DUMMY_SP, SyntaxContext::empty()),
         type_params: None,
-        type_ann: Box::new(TsType::TsTypeLit(TsTypeLit {
+        extends: vec![],
+        body: TsInterfaceBody {
             span: DUMMY_SP,
-            members: vec![TsTypeElement::TsPropertySignature(TsPropertySignature {
+            body: vec![TsTypeElement::TsPropertySignature(TsPropertySignature {
                 span: DUMMY_SP,
                 readonly: false,
                 key: Box::new(Expr::Ident(Ident::new(
@@ -1384,7 +1380,7 @@ fn create_none_type() -> TsTypeAliasDecl {
                     })),
                 })),
             })],
-        })),
+        },
     }
 }
 

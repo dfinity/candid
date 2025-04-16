@@ -5,7 +5,7 @@ use super::helper_functions::{
     add_option_helpers_wrapper, create_canister_id_assignment, create_canister_id_declaration,
     generate_create_actor_function, generate_create_actor_function_declaration,
 };
-use super::ident::{get_ident, get_ident_guarded};
+use super::ident::{contains_unicode_characters, get_ident, get_ident_guarded};
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use swc_core::common::comments::SingleThreadedComments;
 use swc_core::common::source_map::SourceMap;
@@ -345,7 +345,7 @@ fn create_type_alias(env: &TypeEnv, id: &str, ty: &Type) -> TsTypeAliasDecl {
 // Create TS property signature from Candid field
 fn create_property_signature(env: &TypeEnv, field: &Field) -> TsTypeElement {
     let field_name = match &*field.id {
-        Label::Named(str) => Box::new(Expr::Ident(get_ident(str))),
+        Label::Named(str) => Box::new(Expr::Ident(get_ident_guarded(str))),
         Label::Id(n) | Label::Unnamed(n) => Box::new(Expr::Ident(Ident::new(
             format!("_{}_", n).into(),
             DUMMY_SP,
@@ -559,24 +559,26 @@ pub fn convert_type(env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
         }),
         // Reference types
         Var(ref id) => {
-            if is_ref {
-                let ty = env.rec_find_type(id).unwrap();
-                if matches!(ty.as_ref(), Service(_) | Func(_)) {
-                    convert_type(env, ty, false)
-                } else {
-                    TsType::TsTypeRef(TsTypeRef {
-                        span: DUMMY_SP,
-                        type_name: TsEntityName::Ident(get_ident_guarded(id)),
-                        type_params: None,
-                    })
-                }
-            } else {
-                TsType::TsTypeRef(TsTypeRef {
-                    span: DUMMY_SP,
-                    type_name: TsEntityName::Ident(get_ident_guarded(id)),
-                    type_params: None,
-                })
-            }
+            // (TODO: check pending PR #604)
+            //TODO check why this was the case
+            // if is_ref {
+            //     let ty = env.rec_find_type(id).unwrap();
+            //     if matches!(ty.as_ref(), Service(_) | Func(_)) {
+            //         convert_type(env, ty, false)
+            //     } else {
+            //         TsType::TsTypeRef(TsTypeRef {
+            //             span: DUMMY_SP,
+            //             type_name: TsEntityName::Ident(get_ident_guarded(id)),
+            //             type_params: None,
+            //         })
+            //     }
+            // } else {
+            TsType::TsTypeRef(TsTypeRef {
+                span: DUMMY_SP,
+                type_name: TsEntityName::Ident(get_ident_guarded(id)),
+                type_params: None,
+            })
+            // }
         }
         // Optional types
         Opt(ref t) => {
@@ -707,24 +709,45 @@ pub fn convert_type(env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
                 ))
             }
         }
-        // Function types
+        // Function types (TODO: check pending PR #604)
         Func(ref func) => create_function_type(env, func),
-        // Service types
-        Service(_) => TsType::TsTypeRef(TsTypeRef {
-            span: DUMMY_SP,
-            type_name: TsEntityName::Ident(Ident::new(
-                "Principal".into(),
-                DUMMY_SP,
-                SyntaxContext::empty(),
-            )),
-            type_params: None,
-        }),
+        // Service types (TODO: check pending PR #604)
+        Service(ref serv) => create_service_type(env, serv),
         // Unsupported types
         Class(_, _) | Knot(_) | Unknown | Future => TsType::TsKeywordType(TsKeywordType {
             span: DUMMY_SP,
             kind: TsKeywordTypeKind::TsAnyKeyword,
         }),
     }
+}
+
+fn create_service_type(env: &TypeEnv, serv: &[(String, Type)]) -> TsType {
+    // Create a TypeScript object type for the service
+    TsType::TsTypeLit(TsTypeLit {
+        span: DUMMY_SP,
+        members: serv
+            .iter()
+            .map(|(id, func)| {
+                // Create a property signature for each method in the service
+                let ts_type = match func.as_ref() {
+                    TypeInner::Func(ref func) => create_function_type(env, func),
+                    _ => convert_type(env, func, false),
+                };
+
+                TsTypeElement::TsPropertySignature(TsPropertySignature {
+                    span: DUMMY_SP,
+                    readonly: false,
+                    key: Box::new(Expr::Ident(get_ident_guarded(id).into())),
+                    computed: false,
+                    optional: false,
+                    type_ann: Some(Box::new(TsTypeAnn {
+                        span: DUMMY_SP,
+                        type_ann: Box::new(ts_type),
+                    })),
+                })
+            })
+            .collect(),
+    })
 }
 
 // Helper to create union array types like "Uint8Array | number[]"
@@ -1181,25 +1204,53 @@ pub fn create_actor_method(
         })
         .collect::<Vec<_>>();
 
-    // Create the function call to the actor method
-    let actor_call = Expr::Call(CallExpr {
-        span: DUMMY_SP,
-        callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
+    let actor_call = if contains_unicode_characters(&method_id) {
+        Expr::Call(CallExpr {
             span: DUMMY_SP,
-            obj: Box::new(Expr::Member(MemberExpr {
+            callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
                 span: DUMMY_SP,
-                obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
-                prop: MemberProp::PrivateName(PrivateName {
+                obj: Box::new(Expr::Member(MemberExpr {
                     span: DUMMY_SP,
-                    name: "actor".into(),
+                    obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
+                    prop: MemberProp::PrivateName(PrivateName {
+                        span: DUMMY_SP,
+                        name: "actor".into(),
+                    }),
+                })),
+                prop: MemberProp::Computed(ComputedPropName {
+                    span: DUMMY_SP,
+                    expr: Box::new(Expr::Lit(Lit::Str(Str {
+                        span: DUMMY_SP,
+                        value: method_id.into(),
+                        raw: None,
+                    }))),
                 }),
-            })),
-            prop: MemberProp::Ident(get_ident_guarded(method_id).into()),
-        }))),
-        args: converted_args,
-        type_args: None,
-        ctxt: SyntaxContext::empty(),
-    });
+            }))),
+            args: converted_args,
+            type_args: None,
+            ctxt: SyntaxContext::empty(),
+        })
+    } else {
+        // Create the function call to the actor method
+        Expr::Call(CallExpr {
+            span: DUMMY_SP,
+            callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
+                span: DUMMY_SP,
+                obj: Box::new(Expr::Member(MemberExpr {
+                    span: DUMMY_SP,
+                    obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
+                    prop: MemberProp::PrivateName(PrivateName {
+                        span: DUMMY_SP,
+                        name: "actor".into(),
+                    }),
+                })),
+                prop: MemberProp::Ident(get_ident_guarded(method_id).into()),
+            }))),
+            args: converted_args,
+            type_args: None,
+            ctxt: SyntaxContext::empty(),
+        })
+    };
 
     // Create await expression to call the actor
     let await_expr = Expr::Await(AwaitExpr {
