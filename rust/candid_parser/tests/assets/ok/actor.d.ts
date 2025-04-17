@@ -4,10 +4,10 @@ import type { IDL } from '@dfinity/candid';
 
 export type f = ActorMethod<[number], number>;
 export type g = f;
-export type h = ActorMethod<[f], f>;
+export type h = ActorMethod<[[Principal, string]], [Principal, string]>;
 export type o = [] | [o];
 export interface _SERVICE {
-  'f' : ActorMethod<[bigint], h>,
+  'f' : ActorMethod<[bigint], [Principal, string]>,
   'g' : f,
   'h' : g,
   'o' : ActorMethod<[o], o>,

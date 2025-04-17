@@ -116,15 +116,7 @@ export interface _SERVICE {
         'body' : [] | [Uint8Array | number[]],
         'transform' : [] | [
           {
-            'function' : ActorMethod<
-              [
-                {
-                  'context' : Uint8Array | number[],
-                  'response' : http_response,
-                },
-              ],
-              http_response
-            >,
+            'function' : [Principal, string],
             'context' : Uint8Array | number[],
           }
         ],
