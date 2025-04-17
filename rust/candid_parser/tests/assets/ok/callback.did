@@ -4,6 +4,7 @@ type RInline = record { x : nat; fn : func (nat) -> (nat) query };
 service : {
   add_two : (nat) -> (nat);
   fn : Fn;
+  high_order_fn : (nat, Fn) -> (nat);
   high_order_fn_inline : (nat, func (nat) -> (nat) query) -> (nat);
   high_order_fn_via_record : (R) -> (nat);
   high_order_fn_via_record_inline : (RInline) -> (nat);

@@ -8,6 +8,7 @@ export const idlFactory = ({ IDL }) => {
   return IDL.Service({
     'add_two' : IDL.Func([IDL.Nat], [IDL.Nat], []),
     'fn' : Fn,
+    'high_order_fn' : IDL.Func([IDL.Nat, Fn], [IDL.Nat], []),
     'high_order_fn_inline' : IDL.Func(
         [IDL.Nat, IDL.Func([IDL.Nat], [IDL.Nat], ['query'])],
         [IDL.Nat],

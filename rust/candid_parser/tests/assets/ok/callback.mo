@@ -8,6 +8,7 @@ module {
   public type Self = actor {
     add_two : shared Nat -> async Nat;
     fn : Fn;
+    high_order_fn : shared (Nat, Fn) -> async Nat;
     high_order_fn_inline : shared (
         Nat,
         shared query Nat -> async Nat,

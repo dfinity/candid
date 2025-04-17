@@ -22,6 +22,9 @@ impl Service {
   pub async fn r#fn(&self, arg0: &candid::Nat) -> Result<(candid::Nat,)> {
     ic_cdk::call(self.0, "fn", (arg0,)).await
   }
+  pub async fn high_order_fn(&self, arg0: &candid::Nat, arg1: &Fn) -> Result<(candid::Nat,)> {
+    ic_cdk::call(self.0, "high_order_fn", (arg0,arg1,)).await
+  }
   pub async fn high_order_fn_inline(&self, arg0: &candid::Nat, arg1: &HighOrderFnInlineArg1) -> Result<(candid::Nat,)> {
     ic_cdk::call(self.0, "high_order_fn_inline", (arg0,arg1,)).await
   }
