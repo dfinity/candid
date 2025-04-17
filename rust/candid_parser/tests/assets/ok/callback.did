@@ -1,5 +1,11 @@
-type CallbacksAreFun = record {
-  inline_callback : func(nat) -> (nat);
-  callback : Fn;
-};
-type Fn = func(nat) -> (nat);
+type Fn = func (nat) -> (nat) query;
+type R = record { x : nat; fn : Fn };
+type RInline = record { x : nat; fn : func (nat) -> (nat) query };
+service : {
+  add_two : (nat) -> (nat);
+  fn : Fn;
+  high_order_fn_inline : (nat, func (nat) -> (nat) query) -> (nat);
+  high_order_fn_via_record : (R) -> (nat);
+  high_order_fn_via_record_inline : (RInline) -> (nat);
+  inline_fn : (nat) -> (nat);
+}

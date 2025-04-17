@@ -4,14 +4,37 @@
 use candid::{self, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult as Result;
 
-#[derive(CandidType, Deserialize)]
-pub struct CallbacksAreFun {
-  pub inline_callback: Box<CallbacksAreFunInlineCallback>,
-  pub callback: Box<Fn>,
-}
-candid::define_function!(pub CallbacksAreFunInlineCallback : (candid::Nat) -> (
-    candid::Nat,
-  ));
 candid::define_function!(pub Fn : (candid::Nat) -> (candid::Nat) query);
+candid::define_function!(pub HighOrderFnInlineArg1 : (candid::Nat) -> (
+    candid::Nat,
+  ) query);
+#[derive(CandidType, Deserialize)]
+pub struct R { pub x: candid::Nat, pub r#fn: Fn }
+candid::define_function!(pub RInlineFn : (candid::Nat) -> (candid::Nat) query);
+#[derive(CandidType, Deserialize)]
+pub struct RInline { pub x: candid::Nat, pub r#fn: RInlineFn }
 
+pub struct Service(pub Principal);
+impl Service {
+  pub async fn add_two(&self, arg0: &candid::Nat) -> Result<(candid::Nat,)> {
+    ic_cdk::call(self.0, "add_two", (arg0,)).await
+  }
+  pub async fn r#fn(&self, arg0: &candid::Nat) -> Result<(candid::Nat,)> {
+    ic_cdk::call(self.0, "fn", (arg0,)).await
+  }
+  pub async fn high_order_fn_inline(&self, arg0: &candid::Nat, arg1: &HighOrderFnInlineArg1) -> Result<(candid::Nat,)> {
+    ic_cdk::call(self.0, "high_order_fn_inline", (arg0,arg1,)).await
+  }
+  pub async fn high_order_fn_via_record(&self, arg0: &R) -> Result<(candid::Nat,)> {
+    ic_cdk::call(self.0, "high_order_fn_via_record", (arg0,)).await
+  }
+  pub async fn high_order_fn_via_record_inline(&self, arg0: &RInline) -> Result<(candid::Nat,)> {
+    ic_cdk::call(self.0, "high_order_fn_via_record_inline", (arg0,)).await
+  }
+  pub async fn inline_fn(&self, arg0: &candid::Nat) -> Result<(candid::Nat,)> {
+    ic_cdk::call(self.0, "inline_fn", (arg0,)).await
+  }
+}
+pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
+pub const service : Service = Service(CANISTER_ID);
 
