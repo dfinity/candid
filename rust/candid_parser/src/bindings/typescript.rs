@@ -69,7 +69,18 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         Text => str("string"),
         Reserved => str("any"),
         Empty => str("never"),
-        Var(ref id) => ident(id),
+        Var(ref id) => {
+            if is_ref {
+                let ty = env.rec_find_type(id).unwrap();
+                if matches!(ty.as_ref(), Service(_) | Func(_)) {
+                    pp_ty(env, ty, false)
+                } else {
+                    ident(id)
+                }
+            } else {
+                ident(id)
+            }
+        }
         Principal => str("Principal"),
         Opt(ref t) => str("[] | ").append(enclose("[", pp_ty(env, t, is_ref), "]")),
         Vec(ref t) => {
@@ -120,8 +131,8 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
                 .nest(INDENT_SPACE)
             }
         }
-        Func(ref func) => pp_function(env, func),
-        Service(ref serv) => pp_service(env, serv),
+        Func(_) => str("[Principal, string]"),
+        Service(_) => str("Principal"),
         Class(_, _) => unreachable!(),
         Knot(_) | Unknown | Future => unreachable!(),
     }
