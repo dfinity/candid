@@ -21,7 +21,7 @@ export interface node {
     head: bigint;
     tail: list;
 }
-export type o = o | null;
+export type o = Some<o> | None;
 export interface return_ {
     f: [Principal, string];
     g(arg0: list): Promise<[if_, stream]>;

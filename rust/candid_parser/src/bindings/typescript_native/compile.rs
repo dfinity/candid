@@ -584,19 +584,90 @@ pub fn convert_type(env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
         Opt(ref t) => {
             match t.as_ref() {
                 Opt(_) => {
-                    // Use Option<T> for nested optionals
-                    TsType::TsTypeRef(TsTypeRef {
-                        span: DUMMY_SP,
-                        type_name: TsEntityName::Ident(Ident::new(
-                            "Option".into(),
-                            DUMMY_SP,
-                            SyntaxContext::empty(),
-                        )),
-                        type_params: Some(Box::new(TsTypeParamInstantiation {
+                    // Use Some<T> | None for nested optionals
+                    TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
+                        TsUnionType {
                             span: DUMMY_SP,
-                            params: vec![Box::new(convert_type(env, t, is_ref))],
-                        })),
-                    })
+                            types: vec![
+                                Box::new(TsType::TsTypeRef(TsTypeRef {
+                                    span: DUMMY_SP,
+                                    type_name: TsEntityName::Ident(Ident::new(
+                                        "Some".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    )),
+                                    type_params: Some(Box::new(TsTypeParamInstantiation {
+                                        span: DUMMY_SP,
+                                        params: vec![Box::new(convert_type(env, t, is_ref))],
+                                    })),
+                                })),
+                                Box::new(TsType::TsTypeRef(TsTypeRef {
+                                    span: DUMMY_SP,
+                                    type_name: TsEntityName::Ident(Ident::new(
+                                        "None".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    )),
+                                    type_params: None,
+                                })),
+                            ],
+                        },
+                    ))
+                }
+                Var(id) => {
+                    // Check for recursion
+                    let is_recursive = if let Ok(inner_type) = env.find_type(id) {
+                        let mut visited = std::collections::HashSet::new();
+                        is_recursive_optional(env, inner_type, &mut visited)
+                    } else {
+                        false
+                    };
+
+                    if is_recursive {
+                        // Use Some<T> | None for recursive optionals
+                        TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
+                            TsUnionType {
+                                span: DUMMY_SP,
+                                types: vec![
+                                    Box::new(TsType::TsTypeRef(TsTypeRef {
+                                        span: DUMMY_SP,
+                                        type_name: TsEntityName::Ident(Ident::new(
+                                            "Some".into(),
+                                            DUMMY_SP,
+                                            SyntaxContext::empty(),
+                                        )),
+                                        type_params: Some(Box::new(TsTypeParamInstantiation {
+                                            span: DUMMY_SP,
+                                            params: vec![Box::new(convert_type(env, t, is_ref))],
+                                        })),
+                                    })),
+                                    Box::new(TsType::TsTypeRef(TsTypeRef {
+                                        span: DUMMY_SP,
+                                        type_name: TsEntityName::Ident(Ident::new(
+                                            "None".into(),
+                                            DUMMY_SP,
+                                            SyntaxContext::empty(),
+                                        )),
+                                        type_params: None,
+                                    })),
+                                ],
+                            },
+                        ))
+                    } else {
+                        // Use T | null for non-recursive optionals with Var
+                        TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
+                            TsUnionType {
+                                span: DUMMY_SP,
+                                types: vec![
+                                    Box::new(convert_type(env, t, is_ref)),
+                                    Box::new(TsType::TsKeywordType(TsKeywordType {
+                                        span: DUMMY_SP,
+                                        kind: TsKeywordTypeKind::TsNullKeyword,
+                                    })),
+                                ],
+                            },
+                        ))
+                    }
                 }
                 _ => {
                     // Use T | null for simple optionals
@@ -1343,4 +1414,39 @@ pub fn create_actor_method(
         is_optional: false,
         is_override: false,
     })
+}
+
+// Helper function to determine if a type is recursively optional
+pub fn is_recursive_optional(
+    env: &TypeEnv,
+    ty: &Type,
+    visited: &mut std::collections::HashSet<String>,
+) -> bool {
+    use TypeInner::*;
+
+    match ty.as_ref() {
+        Var(id) => {
+            if !visited.insert(id.clone()) {
+                // We've seen this type before, it's recursive
+                return true;
+            }
+
+            if let Ok(inner_type) = env.find_type(id) {
+                is_recursive_optional(env, inner_type, visited)
+            } else {
+                false
+            }
+        }
+        Opt(inner) => {
+            // If we have an optional type, check its inner type
+            if let Var(id) = inner.as_ref() {
+                if visited.contains(id) {
+                    // Found recursive optional
+                    return true;
+                }
+            }
+            is_recursive_optional(env, inner, visited)
+        }
+        _ => false,
+    }
 }

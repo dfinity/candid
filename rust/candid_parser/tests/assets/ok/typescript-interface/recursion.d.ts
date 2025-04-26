@@ -8,7 +8,7 @@ interface None {
 }
 type Option<T> = Some<T> | None;
 export type A = B;
-export type B = A | null;
+export type B = Some<A> | None;
 export type list = node | null;
 export interface node {
     head: bigint;
