@@ -138,28 +138,52 @@ pub fn get_ident(name: &str) -> Ident {
     Ident::new(name.into(), DUMMY_SP, SyntaxContext::empty())
 }
 
-pub fn get_typescript_ident(name: &str) -> String {
-    let ident_name = if KEYWORDS.contains(&name) {
-        format!("{}_", name)
-    } else if name.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_') {
-        // If the name contains non-alphanumeric characters (except underscore),
-        // we need to quote it to make it a valid TypeScript property name
-        format!("\"{}\"", name)
-    } else {
-        name.to_string()
-    };
+fn escape_string_literal(s: &str) -> String {
+    s.replace("\\", "\\\\") // Must escape backslashes first!
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
+        .replace("\"", "\\\"")
+        .replace("'", "\\'")
+}
+
+pub fn get_typescript_ident(name: &str, filter_keywords: bool) -> String {
     // Handle empty names by returning a quoted empty string
     if name.is_empty() {
         return "\"\"".to_string();
     }
-    ident_name
+
+    if filter_keywords && KEYWORDS.contains(&name) {
+        return format!("{}_", name);
+    }
+
+    if name.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
+        || name.contains("\"")
+        || name.contains("'")
+        || name.contains("\n")
+        || name.contains("\r")
+        || name.contains("\t")
+        || name.contains("\\")
+    {
+        // If the name contains non-alphanumeric characters (except underscore),
+        // or contains quotes, we need to quote it to make it a valid TypeScript property name
+        let escaped_name = escape_string_literal(name);
+        return format!("\"{}\"", escaped_name);
+    } else {
+        return name.to_string();
+    }
 }
 
 pub fn contains_unicode_characters(name: &str) -> bool {
-    name.chars().any(|c| !c.is_ascii_alphanumeric()) || name.is_empty()
+    name != get_typescript_ident(name, false)
 }
 
 pub fn get_ident_guarded(name: &str) -> Ident {
-    let ident_name = get_typescript_ident(name);
+    let ident_name = get_typescript_ident(name, true);
+    get_ident(&ident_name)
+}
+
+pub fn get_ident_guarded_keyword_ok(name: &str) -> Ident {
+    let ident_name: String = get_typescript_ident(name, false);
     get_ident(&ident_name)
 }

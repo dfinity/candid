@@ -101,6 +101,8 @@ impl<'a> TypeConverter<'a> {
                     true // Conservative default
                 }
             }
+            TypeInner::Func(_) => false,
+            TypeInner::Service(_) => false,
             _ => true, // Conservative default - convert if unsure
         };
         self.processing_conversion.remove(ty);

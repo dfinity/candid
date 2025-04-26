@@ -5,7 +5,9 @@ use super::helper_functions::{
     add_option_helpers_wrapper, create_canister_id_assignment, create_canister_id_declaration,
     generate_create_actor_function, generate_create_actor_function_declaration,
 };
-use super::ident::{contains_unicode_characters, get_ident, get_ident_guarded};
+use super::ident::{
+    contains_unicode_characters, get_ident, get_ident_guarded, get_ident_guarded_keyword_ok,
+};
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use swc_core::common::comments::SingleThreadedComments;
 use swc_core::common::source_map::SourceMap;
@@ -53,7 +55,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
         module.body.push(create_canister_id);
     }
 
-    if target == "wrapper" {
+    if target == "wrapper" && actor.is_some() {
         let create_actor_fn = generate_create_actor_function(service_name);
         module
             .body
@@ -345,7 +347,7 @@ fn create_type_alias(env: &TypeEnv, id: &str, ty: &Type) -> TsTypeAliasDecl {
 // Create TS property signature from Candid field
 fn create_property_signature(env: &TypeEnv, field: &Field) -> TsTypeElement {
     let field_name = match &*field.id {
-        Label::Named(str) => Box::new(Expr::Ident(get_ident_guarded(str))),
+        Label::Named(str) => Box::new(Expr::Ident(get_ident_guarded_keyword_ok(str))),
         Label::Id(n) | Label::Unnamed(n) => Box::new(Expr::Ident(Ident::new(
             format!("_{}_", n).into(),
             DUMMY_SP,
@@ -559,26 +561,24 @@ pub fn convert_type(env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
         }),
         // Reference types
         Var(ref id) => {
-            // (TODO: check pending PR #604)
-            //TODO check why this was the case
-            // if is_ref {
-            //     let ty = env.rec_find_type(id).unwrap();
-            //     if matches!(ty.as_ref(), Service(_) | Func(_)) {
-            //         convert_type(env, ty, false)
-            //     } else {
-            //         TsType::TsTypeRef(TsTypeRef {
-            //             span: DUMMY_SP,
-            //             type_name: TsEntityName::Ident(get_ident_guarded(id)),
-            //             type_params: None,
-            //         })
-            //     }
-            // } else {
-            TsType::TsTypeRef(TsTypeRef {
-                span: DUMMY_SP,
-                type_name: TsEntityName::Ident(get_ident_guarded(id)),
-                type_params: None,
-            })
-            // }
+            if is_ref {
+                let ty = env.rec_find_type(id).unwrap();
+                if matches!(ty.as_ref(), Service(_) | Func(_)) {
+                    convert_type(env, ty, false)
+                } else {
+                    TsType::TsTypeRef(TsTypeRef {
+                        span: DUMMY_SP,
+                        type_name: TsEntityName::Ident(get_ident_guarded(id)),
+                        type_params: None,
+                    })
+                }
+            } else {
+                TsType::TsTypeRef(TsTypeRef {
+                    span: DUMMY_SP,
+                    type_name: TsEntityName::Ident(get_ident_guarded(id)),
+                    type_params: None,
+                })
+            }
         }
         // Optional types
         Opt(ref t) => {
@@ -709,45 +709,53 @@ pub fn convert_type(env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
                 ))
             }
         }
-        // Function types (TODO: check pending PR #604)
-        Func(ref func) => create_function_type(env, func),
-        // Service types (TODO: check pending PR #604)
-        Service(ref serv) => create_service_type(env, serv),
+        // Note: we map to a generic function, which is specified by Principal and function name
+        // see https://github.com/dfinity/candid/issues/606
+        Func(_) => {
+            // Function references are represented as [Principal, string]
+            TsType::TsTupleType(TsTupleType {
+                span: DUMMY_SP,
+                elem_types: vec![
+                    TsType::TsTypeRef(TsTypeRef {
+                        span: DUMMY_SP,
+                        type_name: TsEntityName::Ident(Ident::new(
+                            "Principal".into(),
+                            DUMMY_SP,
+                            SyntaxContext::empty(),
+                        )),
+                        type_params: None,
+                    }),
+                    TsType::TsKeywordType(TsKeywordType {
+                        span: DUMMY_SP,
+                        kind: TsKeywordTypeKind::TsStringKeyword,
+                    }),
+                ]
+                .into_iter()
+                .map(|t| TsTupleElement {
+                    span: DUMMY_SP,
+                    label: None,
+                    ty: Box::new(t),
+                })
+                .collect(),
+            })
+        }
+        // Note: we map to a generic principal type for now
+        // see https://github.com/dfinity/candid/issues/606
+        Service(_) => TsType::TsTypeRef(TsTypeRef {
+            span: DUMMY_SP,
+            type_name: TsEntityName::Ident(Ident::new(
+                "Principal".into(),
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            )),
+            type_params: None,
+        }),
         // Unsupported types
         Class(_, _) | Knot(_) | Unknown | Future => TsType::TsKeywordType(TsKeywordType {
             span: DUMMY_SP,
             kind: TsKeywordTypeKind::TsAnyKeyword,
         }),
     }
-}
-
-fn create_service_type(env: &TypeEnv, serv: &[(String, Type)]) -> TsType {
-    // Create a TypeScript object type for the service
-    TsType::TsTypeLit(TsTypeLit {
-        span: DUMMY_SP,
-        members: serv
-            .iter()
-            .map(|(id, func)| {
-                // Create a property signature for each method in the service
-                let ts_type = match func.as_ref() {
-                    TypeInner::Func(ref func) => create_function_type(env, func),
-                    _ => convert_type(env, func, false),
-                };
-
-                TsTypeElement::TsPropertySignature(TsPropertySignature {
-                    span: DUMMY_SP,
-                    readonly: false,
-                    key: Box::new(Expr::Ident(get_ident_guarded(id).into())),
-                    computed: false,
-                    optional: false,
-                    type_ann: Some(Box::new(TsTypeAnn {
-                        span: DUMMY_SP,
-                        type_ann: Box::new(ts_type),
-                    })),
-                })
-            })
-            .collect(),
-    })
 }
 
 // Helper to create union array types like "Uint8Array | number[]"
@@ -864,8 +872,15 @@ fn create_actor_instance(service_name: &str, capitalized_service_name: &str) -> 
             decls: vec![VarDeclarator {
                 span: DUMMY_SP,
                 name: Pat::Ident(BindingIdent {
-                    id: Ident::new(service_name.into(), DUMMY_SP, SyntaxContext::empty()),
-                    type_ann: None,
+                    id: get_ident_guarded(service_name),
+                    type_ann: Some(Box::new(TsTypeAnn {
+                        span: DUMMY_SP,
+                        type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                            span: DUMMY_SP,
+                            type_name: TsEntityName::Ident(get_ident_guarded(service_name)),
+                            type_params: None,
+                        })),
+                    })),
                 }),
                 init: Some(Box::new(Expr::New(NewExpr {
                     span: DUMMY_SP,
