@@ -277,10 +277,47 @@ impl<'a> CandidTypesConverter<'a> {
                     ))
                 }
             }
-            // Function types (TODO: check pending PR #604)
-            TypeInner::Func(ref func) => self.create_function_type(func),
-            // Service types (TODO: check pending PR #604)
-            TypeInner::Service(ref serv) => self.create_service_type(serv),
+            // Note: we map to a generic function, which is specified by Principal and function name
+            // see https://github.com/dfinity/candid/issues/606
+            TypeInner::Func(_) => {
+                // Function references are represented as [Principal, string]
+                TsType::TsTupleType(TsTupleType {
+                    span: DUMMY_SP,
+                    elem_types: vec![
+                        TsType::TsTypeRef(TsTypeRef {
+                            span: DUMMY_SP,
+                            type_name: TsEntityName::Ident(Ident::new(
+                                "Principal".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            )),
+                            type_params: None,
+                        }),
+                        TsType::TsKeywordType(TsKeywordType {
+                            span: DUMMY_SP,
+                            kind: TsKeywordTypeKind::TsStringKeyword,
+                        }),
+                    ]
+                    .into_iter()
+                    .map(|t| TsTupleElement {
+                        span: DUMMY_SP,
+                        label: None,
+                        ty: Box::new(t),
+                    })
+                    .collect(),
+                })
+            }
+            // Note: we map to a generic principal type for now
+            // see https://github.com/dfinity/candid/issues/606
+            TypeInner::Service(_) => TsType::TsTypeRef(TsTypeRef {
+                span: DUMMY_SP,
+                type_name: TsEntityName::Ident(Ident::new(
+                    "Principal".into(),
+                    DUMMY_SP,
+                    SyntaxContext::empty(),
+                )),
+                type_params: None,
+            }),
             // Unsupported types
             TypeInner::Class(_, _)
             | TypeInner::Knot(_)
@@ -320,85 +357,6 @@ impl<'a> CandidTypesConverter<'a> {
                 })),
             ],
         }))
-    }
-
-    fn create_function_type(&mut self, func: &candid::types::Function) -> TsType {
-        // Create parameters
-        let params = func
-            .args
-            .iter()
-            .enumerate()
-            .map(|(i, ty)| {
-                TsFnParam::Ident(BindingIdent {
-                    id: Ident::new(format!("arg{}", i).into(), DUMMY_SP, SyntaxContext::empty()),
-                    type_ann: Some(Box::new(TsTypeAnn {
-                        span: DUMMY_SP,
-                        type_ann: Box::new(self.get_candid_type(ty)),
-                    })),
-                })
-            })
-            .collect();
-
-        // Create return type
-        let return_type = match func.rets.len() {
-            0 => TsType::TsKeywordType(TsKeywordType {
-                span: DUMMY_SP,
-                kind: TsKeywordTypeKind::TsVoidKeyword,
-            }),
-            1 => self.get_candid_type(&func.rets[0]),
-            _ => {
-                // Create a tuple type for multiple return values
-                TsType::TsTupleType(TsTupleType {
-                    span: DUMMY_SP,
-                    elem_types: func
-                        .rets
-                        .iter()
-                        .map(|ty| TsTupleElement {
-                            span: DUMMY_SP,
-                            label: None,
-                            ty: Box::new(self.get_candid_type(ty)),
-                        })
-                        .collect(),
-                })
-            }
-        };
-
-        TsType::TsFnOrConstructorType(TsFnOrConstructorType::TsFnType(TsFnType {
-            span: DUMMY_SP,
-            params,
-            type_params: None,
-            type_ann: Box::new(TsTypeAnn {
-                span: DUMMY_SP,
-                type_ann: Box::new(return_type),
-            }),
-        }))
-    }
-
-    fn create_service_type(&mut self, serv: &[(String, Type)]) -> TsType {
-        TsType::TsTypeLit(TsTypeLit {
-            span: DUMMY_SP,
-            members: serv
-                .iter()
-                .map(|(id, func)| {
-                    let method_type = match func.as_ref() {
-                        TypeInner::Func(ref func) => self.create_function_type(func),
-                        _ => self.get_candid_type(func),
-                    };
-
-                    TsTypeElement::TsPropertySignature(TsPropertySignature {
-                        span: DUMMY_SP,
-                        readonly: false,
-                        key: Box::new(Expr::Ident(get_ident(id))),
-                        computed: false,
-                        optional: false,
-                        type_ann: Some(Box::new(TsTypeAnn {
-                            span: DUMMY_SP,
-                            type_ann: Box::new(method_type),
-                        })),
-                    })
-                })
-                .collect(),
-        })
     }
 
     fn create_property_signature(&mut self, field: &Field) -> TsTypeElement {
