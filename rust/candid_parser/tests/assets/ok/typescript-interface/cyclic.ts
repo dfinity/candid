@@ -44,8 +44,8 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
-export type A = B | null;
-export type B = C | null;
+export type A = Some<B> | None;
+export type B = Some<C> | None;
 export type C = A;
 export type X = Y;
 export type Y = Z;
@@ -64,7 +64,7 @@ export const canisterId = _canisterId;
 export interface cyclic {
     f(arg0: A, arg1: B, arg2: C, arg3: X, arg4: Y, arg5: Z): Promise<void>;
 }
-import type { A as _A, C as _C, B as _B, Y as _Y, X as _X, Z as _Z } from "declarations/cyclic/cyclic.did.d.ts";
+import type { Z as _Z, C as _C, Y as _Y, A as _A, B as _B, X as _X } from "declarations/cyclic/cyclic.did.d.ts";
 class Cyclic implements cyclic {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
@@ -76,28 +76,28 @@ class Cyclic implements cyclic {
     }
 }
 export const cyclic: cyclic = new Cyclic();
-function to_candid_B_n3(value: B): _B {
-    return to_candid_opt_n4(value);
+function to_candid_X_n6(value: X): _X {
+    return to_candid_opt_n2(value);
+}
+function to_candid_Z_n8(value: Z): _Z {
+    return to_candid_opt_n2(value);
 }
 function to_candid_A_n1(value: A): _A {
     return to_candid_opt_n2(value);
 }
-function to_candid_opt_n4(value: C | null): [] | [_C] {
-    return value === null ? candid_none() : candid_some(to_candid_C_n5(value));
+function to_candid_opt_n4(value: Some<C> | None): [] | [_C] {
+    return value._tag === "None" ? candid_none() : candid_some(value.value);
 }
-function to_candid_C_n5(value: C): _C {
-    return to_candid_opt_n2(value);
-}
-function to_candid_opt_n2(value: B | null): [] | [_B] {
-    return value === null ? candid_none() : candid_some(to_candid_B_n3(value));
-}
-function to_candid_X_n6(value: X): _X {
-    return to_candid_opt_n2(value);
+function to_candid_B_n3(value: B): _B {
+    return to_candid_opt_n4(value);
 }
 function to_candid_Y_n7(value: Y): _Y {
     return to_candid_opt_n2(value);
 }
-function to_candid_Z_n8(value: Z): _Z {
+function to_candid_opt_n2(value: Some<B> | None): [] | [_B] {
+    return value._tag === "None" ? candid_none() : candid_some(value.value);
+}
+function to_candid_C_n5(value: C): _C {
     return to_candid_opt_n2(value);
 }
 

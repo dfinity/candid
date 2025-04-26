@@ -45,7 +45,7 @@ function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
 export type A = B;
-export type B = A | null;
+export type B = Some<A> | None;
 export type list = node | null;
 export interface node {
     head: bigint;
@@ -82,7 +82,7 @@ export function createActor(canisterId: string | Principal, options?: CreateActo
 export const canisterId = _canisterId;
 export interface recursion extends s {
 }
-import type { list as _list, tree as _tree, node as _node, B as _B, A as _A, stream as _stream } from "declarations/recursion/recursion.did.d.ts";
+import type { node as _node, B as _B, A as _A, tree as _tree, list as _list, stream as _stream } from "declarations/recursion/recursion.did.d.ts";
 class Recursion implements recursion {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
@@ -98,12 +98,6 @@ class Recursion implements recursion {
     }
 }
 export const recursion: recursion = new Recursion();
-function from_candid_stream_n11(value: _stream): stream {
-    return from_candid_opt_n12(value);
-}
-function to_candid_list_n1(value: list): _list {
-    return to_candid_opt_n2(value);
-}
 function to_candid_record_n4(value: {
     head: bigint;
     tail: list;
@@ -115,9 +109,6 @@ function to_candid_record_n4(value: {
         head: value.head,
         tail: to_candid_list_n1(value.tail)
     };
-}
-function to_candid_node_n3(value: node): _node {
-    return to_candid_record_n4(value);
 }
 function from_candid_record_n10(value: {
     val: bigint;
@@ -157,6 +148,24 @@ function from_candid_variant_n9(value: {
         leaf: value.leaf
     } : value;
 }
+function to_candid_node_n3(value: node): _node {
+    return to_candid_record_n4(value);
+}
+function to_candid_list_n1(value: list): _list {
+    return to_candid_opt_n2(value);
+}
+function from_candid_A_n7(value: _A): A {
+    return from_candid_opt_n6(value);
+}
+function from_candid_tree_n8(value: _tree): tree {
+    return from_candid_variant_n9(value);
+}
+function from_candid_opt_n6(value: [] | [_A]): Some<A> | None {
+    return value.length === 0 ? none() : some(from_candid_A_n7(value[0]));
+}
+function from_candid_B_n5(value: _B): B {
+    return from_candid_opt_n6(value);
+}
 function from_candid_opt_n12(value: [] | [{
         head: bigint;
         next: [Principal, string];
@@ -166,19 +175,10 @@ function from_candid_opt_n12(value: [] | [{
 } | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_B_n5(value: _B): B {
-    return from_candid_opt_n6(value);
-}
-function from_candid_A_n7(value: _A): A {
-    return from_candid_opt_n6(value);
-}
-function from_candid_opt_n6(value: [] | [_A]): A | null {
-    return value.length === 0 ? null : from_candid_A_n7(value[0]);
-}
 function to_candid_opt_n2(value: node | null): [] | [_node] {
     return value === null ? candid_none() : candid_some(to_candid_node_n3(value));
 }
-function from_candid_tree_n8(value: _tree): tree {
-    return from_candid_variant_n9(value);
+function from_candid_stream_n11(value: _stream): stream {
+    return from_candid_opt_n12(value);
 }
 

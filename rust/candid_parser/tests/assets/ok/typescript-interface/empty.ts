@@ -97,13 +97,13 @@ class Empty implements empty {
     }
 }
 export const empty: empty = new Empty();
-function to_candid_T_n1(value: T): _T {
-    return to_candid_tuple_n2(value);
-}
 function to_candid_tuple_n2(value: [T]): [_T] {
     return [
         to_candid_T_n1(value[0])
     ];
+}
+function to_candid_T_n1(value: T): _T {
+    return to_candid_tuple_n2(value);
 }
 function from_candid_T_n4(value: _T): T {
     return from_candid_tuple_n5(value);
@@ -111,6 +111,21 @@ function from_candid_T_n4(value: _T): T {
 function from_candid_tuple_n5(value: [_T]): [T] {
     return [
         from_candid_T_n4(value[0])
+    ];
+}
+function from_candid_variant_n3(value: {
+    a: _T;
+}): {
+    a: T;
+} {
+    return "a" in value ? {
+        a: from_candid_T_n4(value.a)
+    } : value;
+}
+function to_candid_tuple_n6(value: [T, never]): [_T, never] {
+    return [
+        to_candid_T_n1(value[0]),
+        value[1]
     ];
 }
 function from_candid_variant_n7(value: {
@@ -128,20 +143,5 @@ function from_candid_variant_n7(value: {
     } : "b" in value ? {
         b: value.b
     } : value;
-}
-function from_candid_variant_n3(value: {
-    a: _T;
-}): {
-    a: T;
-} {
-    return "a" in value ? {
-        a: from_candid_T_n4(value.a)
-    } : value;
-}
-function to_candid_tuple_n6(value: [T, never]): [_T, never] {
-    return [
-        to_candid_T_n1(value[0]),
-        value[1]
-    ];
 }
 
