@@ -285,7 +285,7 @@ fn create_interface_from_record(env: &TypeEnv, id: &str, ty: &Type) -> TsInterfa
     TsInterfaceDecl {
         span: DUMMY_SP,
         declare: false,
-        id: get_ident(id),
+        id: get_ident_guarded(id),
         type_params: None,
         extends: vec![],
         body: TsInterfaceBody {
