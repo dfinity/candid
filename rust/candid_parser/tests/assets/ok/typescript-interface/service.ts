@@ -45,7 +45,7 @@ function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
 export type Func = () => Principal;
-export interface Service {
+export interface ServiceInterface {
     f: [Principal, string];
 }
 export type Service2 = Service;
@@ -55,12 +55,12 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): service {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions): serviceInterface {
     const actor = _createActor(canisterId, options);
     return new Service(actor);
 }
 export const canisterId = _canisterId;
-export interface service {
+export interface serviceInterface {
     asArray(): Promise<[Array<Principal>, Array<[Principal, string]>]>;
     asPrincipal(): Promise<[Principal, [Principal, string]]>;
     asRecord(): Promise<[Principal, Principal | null, [Principal, string]]>;
@@ -72,8 +72,8 @@ export interface service {
         };
     }>;
 }
-import type { Service2 as _Service2, Service as _Service, Func as _Func } from "declarations/service/service.did.d.ts";
-class Service implements service {
+import type { Service2 as _Service2, Func as _Func, Service as _Service } from "declarations/service/service.did.d.ts";
+class Service implements serviceInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
         this.#actor = actor ?? _service;
@@ -107,7 +107,29 @@ class Service implements service {
         return from_candid_variant_n3(result);
     }
 }
-export const service: service = new Service();
+export const service: serviceInterface = new Service();
+function from_candid_record_n4(value: {
+    f: [] | [_Func];
+}): {
+    f?: [Principal, string];
+} {
+    return {
+        f: record_opt_to_undefined(from_candid_opt_n5(value.f))
+    };
+}
+function from_candid_opt_n2(value: [] | [_Service]): Principal | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n5(value: [] | [_Func]): [Principal, string] | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_tuple_n1(value: [_Service2, [] | [_Service], _Func]): [Principal, Principal | null, [Principal, string]] {
+    return [
+        value[0],
+        from_candid_opt_n2(value[1]),
+        value[2]
+    ];
+}
 function from_candid_variant_n3(value: {
     a: _Service2;
 } | {
@@ -126,27 +148,5 @@ function from_candid_variant_n3(value: {
     } : "b" in value ? {
         b: from_candid_record_n4(value.b)
     } : value;
-}
-function from_candid_opt_n2(value: [] | [_Service]): Principal | null {
-    return value.length === 0 ? null : value[0];
-}
-function from_candid_record_n4(value: {
-    f: [] | [_Func];
-}): {
-    f?: [Principal, string];
-} {
-    return {
-        f: record_opt_to_undefined(from_candid_opt_n5(value.f))
-    };
-}
-function from_candid_tuple_n1(value: [_Service2, [] | [_Service], _Func]): [Principal, Principal | null, [Principal, string]] {
-    return [
-        value[0],
-        from_candid_opt_n2(value[1]),
-        value[2]
-    ];
-}
-function from_candid_opt_n5(value: [] | [_Func]): [Principal, string] | null {
-    return value.length === 0 ? null : value[0];
 }
 

@@ -14,7 +14,7 @@ export interface node {
     head: bigint;
     tail: list;
 }
-export interface s {
+export interface sInterface {
     f: [Principal, string];
     g(arg0: list): Promise<[B, tree, stream]>;
 }
@@ -40,6 +40,6 @@ export declare interface CreateActorOptions {
 }
 export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => recursion;
 export declare const canisterId: string;
-export interface recursion extends s {
+export interface recursionInterface extends sInterface {
 }
 

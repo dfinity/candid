@@ -20,7 +20,7 @@ export declare interface CreateActorOptions {
 }
 export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => fieldnat;
 export declare const canisterId: string;
-export interface fieldnat {
+export interface fieldnatInterface {
     bab(arg0: bigint, arg1: bigint): Promise<void>;
     bar(arg0: {
         2: bigint;

@@ -19,7 +19,7 @@ export declare interface CreateActorOptions {
 }
 export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => actor;
 export declare const canisterId: string;
-export interface actor {
+export interface actorInterface {
     f(arg0: bigint): Promise<[Principal, string]>;
     g: [Principal, string];
     h: [Principal, string];

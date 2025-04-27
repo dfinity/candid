@@ -55,12 +55,12 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): fieldnat {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions): fieldnatInterface {
     const actor = _createActor(canisterId, options);
     return new Fieldnat(actor);
 }
 export const canisterId = _canisterId;
-export interface fieldnat {
+export interface fieldnatInterface {
     bab(arg0: bigint, arg1: bigint): Promise<void>;
     bar(arg0: {
         2: bigint;
@@ -86,7 +86,7 @@ export interface fieldnat {
         _2: bigint;
     }>;
 }
-class Fieldnat implements fieldnat {
+class Fieldnat implements fieldnatInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
         this.#actor = actor ?? _fieldnat;
@@ -137,5 +137,5 @@ class Fieldnat implements fieldnat {
         return result;
     }
 }
-export const fieldnat: fieldnat = new Fieldnat();
+export const fieldnat: fieldnatInterface = new Fieldnat();
 

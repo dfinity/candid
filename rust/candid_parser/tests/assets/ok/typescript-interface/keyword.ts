@@ -59,7 +59,7 @@ export interface node {
     tail: list;
 }
 export type o = Some<o> | None;
-export interface return_ {
+export interface returnInterface {
     f: [Principal, string];
     g(arg0: list): Promise<[if_, stream]>;
 }
@@ -74,12 +74,12 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): keyword {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions): keywordInterface {
     const actor = _createActor(canisterId, options);
     return new Keyword(actor);
 }
 export const canisterId = _canisterId;
-export interface keyword {
+export interface keywordInterface {
     Oneway(): Promise<void>;
     f_(arg0: o): Promise<o>;
     field(arg0: {
@@ -108,7 +108,7 @@ export interface keyword {
     }): Promise<void>;
 }
 import type { o as _o } from "declarations/keyword/keyword.did.d.ts";
-class Keyword implements keyword {
+class Keyword implements keywordInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
         this.#actor = actor ?? _keyword;
@@ -169,15 +169,15 @@ class Keyword implements keyword {
         return result;
     }
 }
-export const keyword: keyword = new Keyword();
-function from_candid_o_n3(value: _o): o {
-    return from_candid_opt_n4(value);
-}
+export const keyword: keywordInterface = new Keyword();
 function from_candid_opt_n4(value: [] | [_o]): Some<o> | None {
     return value.length === 0 ? none() : some(from_candid_o_n3(value[0]));
 }
 function to_candid_opt_n2(value: Some<o> | None): [] | [_o] {
     return value._tag === "None" ? candid_none() : candid_some(value.value);
+}
+function from_candid_o_n3(value: _o): o {
+    return from_candid_opt_n4(value);
 }
 function to_candid_o_n1(value: o): _o {
     return to_candid_opt_n2(value);

@@ -44,7 +44,7 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
-export interface s {
+export interface sInterface {
     next(): Promise<Principal>;
 }
 import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
@@ -53,14 +53,14 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): recursive_class {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions): recursive_classInterface {
     const actor = _createActor(canisterId, options);
     return new Recursive_class(actor);
 }
 export const canisterId = _canisterId;
-export interface recursive_class extends s {
+export interface recursive_classInterface extends sInterface {
 }
-class Recursive_class implements recursive_class {
+class Recursive_class implements recursive_classInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
         this.#actor = actor ?? _recursive_class;
@@ -70,5 +70,5 @@ class Recursive_class implements recursive_class {
         return result;
     }
 }
-export const recursive_class: recursive_class = new Recursive_class();
+export const recursive_class: recursive_classInterface = new Recursive_class();
 

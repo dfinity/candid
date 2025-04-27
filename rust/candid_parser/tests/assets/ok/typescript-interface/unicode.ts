@@ -65,18 +65,18 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): unicode {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions): unicodeInterface {
     const actor = _createActor(canisterId, options);
     return new Unicode(actor);
 }
 export const canisterId = _canisterId;
-export interface unicode {
+export interface unicodeInterface {
     ""(arg0: bigint): Promise<bigint>;
     "✈️  🚗 ⛱️ "(): Promise<void>;
     "函数名"(arg0: A): Promise<B>;
     "👀"(arg0: bigint): Promise<bigint>;
 }
-class Unicode implements unicode {
+class Unicode implements unicodeInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
         this.#actor = actor ?? _unicode;
@@ -98,5 +98,5 @@ class Unicode implements unicode {
         return result;
     }
 }
-export const unicode: unicode = new Unicode();
+export const unicode: unicodeInterface = new Unicode();
 

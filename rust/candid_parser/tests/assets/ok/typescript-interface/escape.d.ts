@@ -21,7 +21,7 @@ export declare interface CreateActorOptions {
 }
 export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => escape;
 export declare const canisterId: string;
-export interface escape {
+export interface escapeInterface {
     "\n\'\"\'\'\"\"\r\t"(arg0: t): Promise<void>;
 }
 

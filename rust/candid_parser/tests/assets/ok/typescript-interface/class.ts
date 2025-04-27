@@ -55,17 +55,17 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): class_ {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions): classInterface {
     const actor = _createActor(canisterId, options);
     return new Class(actor);
 }
 export const canisterId = _canisterId;
-export interface class_ {
+export interface classInterface {
     get(): Promise<List>;
     set(arg0: List): Promise<List>;
 }
 import type { List as _List } from "declarations/class/class.did.d.ts";
-class Class implements class_ {
+class Class implements classInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
         this.#actor = actor ?? _class;
@@ -79,15 +79,9 @@ class Class implements class_ {
         return from_candid_List_n1(result);
     }
 }
-export const class_: class_ = new Class();
-function to_candid_List_n4(value: List): _List {
-    return to_candid_opt_n5(value);
-}
-function from_candid_opt_n2(value: [] | [[bigint, _List]]): [bigint, List] | null {
-    return value.length === 0 ? null : from_candid_tuple_n3(value[0]);
-}
-function from_candid_List_n1(value: _List): List {
-    return from_candid_opt_n2(value);
+export const class_: classInterface = new Class();
+function to_candid_opt_n5(value: [bigint, List] | null): [] | [[bigint, _List]] {
+    return value === null ? candid_none() : candid_some(to_candid_tuple_n6(value));
 }
 function from_candid_tuple_n3(value: [bigint, _List]): [bigint, List] {
     return [
@@ -95,8 +89,14 @@ function from_candid_tuple_n3(value: [bigint, _List]): [bigint, List] {
         from_candid_List_n1(value[1])
     ];
 }
-function to_candid_opt_n5(value: [bigint, List] | null): [] | [[bigint, _List]] {
-    return value === null ? candid_none() : candid_some(to_candid_tuple_n6(value));
+function to_candid_List_n4(value: List): _List {
+    return to_candid_opt_n5(value);
+}
+function from_candid_List_n1(value: _List): List {
+    return from_candid_opt_n2(value);
+}
+function from_candid_opt_n2(value: [] | [[bigint, _List]]): [bigint, List] | null {
+    return value.length === 0 ? null : from_candid_tuple_n3(value[0]);
 }
 function to_candid_tuple_n6(value: [bigint, List]): [bigint, _List] {
     return [

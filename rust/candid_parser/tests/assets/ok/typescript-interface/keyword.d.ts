@@ -22,7 +22,7 @@ export interface node {
     tail: list;
 }
 export type o = Some<o> | None;
-export interface return_ {
+export interface returnInterface {
     f: [Principal, string];
     g(arg0: list): Promise<[if_, stream]>;
 }
@@ -39,7 +39,7 @@ export declare interface CreateActorOptions {
 }
 export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => keyword;
 export declare const canisterId: string;
-export interface keyword {
+export interface keywordInterface {
     Oneway(): Promise<void>;
     f_(arg0: o): Promise<o>;
     field(arg0: {
