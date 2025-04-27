@@ -30,7 +30,7 @@ export declare interface CreateActorOptions {
 }
 export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => unicode;
 export declare const canisterId: string;
-export interface unicode {
+export interface unicodeInterface {
     ""(arg0: bigint): Promise<bigint>;
     "✈️  🚗 ⛱️ "(): Promise<void>;
     "函数名"(arg0: A): Promise<B>;

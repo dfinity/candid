@@ -312,7 +312,7 @@ fn create_interface_from_service(
     TsInterfaceDecl {
         span: DUMMY_SP,
         declare: false,
-        id: get_ident_guarded(id),
+        id: get_ident_guarded(&format!("{}Interface", id)),
         type_params: None,
         extends: vec![],
         body: TsInterfaceBody {
@@ -948,7 +948,10 @@ fn create_actor_instance(service_name: &str, capitalized_service_name: &str) -> 
                         span: DUMMY_SP,
                         type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
                             span: DUMMY_SP,
-                            type_name: TsEntityName::Ident(get_ident_guarded(service_name)),
+                            type_name: TsEntityName::Ident(get_ident_guarded(&format!(
+                                "{}Interface",
+                                service_name
+                            ))),
                             type_params: None,
                         })),
                     })),
@@ -999,11 +1002,14 @@ fn add_actor_var_implementation(
     let interface = TsInterfaceDecl {
         span: DUMMY_SP,
         declare: false,
-        id: get_ident_guarded(service_name),
+        id: get_ident_guarded(&format!("{}Interface", service_name)),
         type_params: None,
         extends: vec![TsExprWithTypeArgs {
             span: DUMMY_SP,
-            expr: Box::new(Expr::Ident(get_ident_guarded(type_id))),
+            expr: Box::new(Expr::Ident(get_ident_guarded(&format!(
+                "{}Interface",
+                type_id
+            )))),
             type_args: None,
         }],
         body: TsInterfaceBody {
@@ -1197,7 +1203,10 @@ fn create_actor_class(
             super_type_params: None,
             implements: vec![TsExprWithTypeArgs {
                 span: DUMMY_SP,
-                expr: Box::new(Expr::Ident(get_ident_guarded(service_name))),
+                expr: Box::new(Expr::Ident(get_ident_guarded(&format!(
+                    "{}Interface",
+                    service_name
+                )))),
                 type_args: None,
             }],
             is_abstract: false,

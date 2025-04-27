@@ -16,7 +16,7 @@ export declare interface CreateActorOptions {
 }
 export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => empty;
 export declare const canisterId: string;
-export interface empty {
+export interface emptyInterface {
     f(arg0: {
     }): Promise<never>;
     g(arg0: T): Promise<{

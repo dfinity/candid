@@ -56,15 +56,15 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): escape {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions): escapeInterface {
     const actor = _createActor(canisterId, options);
     return new Escape(actor);
 }
 export const canisterId = _canisterId;
-export interface escape {
+export interface escapeInterface {
     "\n\'\"\'\'\"\"\r\t"(arg0: t): Promise<void>;
 }
-class Escape implements escape {
+class Escape implements escapeInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
         this.#actor = actor ?? _escape;
@@ -74,5 +74,5 @@ class Escape implements escape {
         return result;
     }
 }
-export const escape: escape = new Escape();
+export const escape: escapeInterface = new Escape();
 

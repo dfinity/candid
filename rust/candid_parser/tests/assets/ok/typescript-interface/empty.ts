@@ -51,12 +51,12 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): empty {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions): emptyInterface {
     const actor = _createActor(canisterId, options);
     return new Empty(actor);
 }
 export const canisterId = _canisterId;
-export interface empty {
+export interface emptyInterface {
     f(arg0: {
     }): Promise<never>;
     g(arg0: T): Promise<{
@@ -70,7 +70,7 @@ export interface empty {
     }>;
 }
 import type { T as _T } from "declarations/empty/empty.did.d.ts";
-class Empty implements empty {
+class Empty implements emptyInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
         this.#actor = actor ?? _empty;
@@ -96,23 +96,7 @@ class Empty implements empty {
         return from_candid_variant_n7(result);
     }
 }
-export const empty: empty = new Empty();
-function to_candid_tuple_n2(value: [T]): [_T] {
-    return [
-        to_candid_T_n1(value[0])
-    ];
-}
-function to_candid_T_n1(value: T): _T {
-    return to_candid_tuple_n2(value);
-}
-function from_candid_T_n4(value: _T): T {
-    return from_candid_tuple_n5(value);
-}
-function from_candid_tuple_n5(value: [_T]): [T] {
-    return [
-        from_candid_T_n4(value[0])
-    ];
-}
+export const empty: emptyInterface = new Empty();
 function from_candid_variant_n3(value: {
     a: _T;
 }): {
@@ -143,5 +127,21 @@ function from_candid_variant_n7(value: {
     } : "b" in value ? {
         b: value.b
     } : value;
+}
+function from_candid_tuple_n5(value: [_T]): [T] {
+    return [
+        from_candid_T_n4(value[0])
+    ];
+}
+function to_candid_tuple_n2(value: [T]): [_T] {
+    return [
+        to_candid_T_n1(value[0])
+    ];
+}
+function to_candid_T_n1(value: T): _T {
+    return to_candid_tuple_n2(value);
+}
+function from_candid_T_n4(value: _T): T {
+    return from_candid_tuple_n5(value);
 }
 

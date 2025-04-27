@@ -19,7 +19,7 @@ export type a = {
     b: b;
 };
 export type b = [bigint, bigint];
-export interface broker {
+export interface brokerInterface {
     find(arg0: string): Promise<Principal>;
 }
 export type f = (arg0: List, arg1: [Principal, string]) => [List | null, res];
@@ -72,7 +72,7 @@ export type res = {
         error: string;
     };
 };
-export interface s {
+export interface sInterface {
     f: [Principal, string];
     g(arg0: list): Promise<[B, tree, stream]>;
 }
@@ -98,7 +98,7 @@ export declare interface CreateActorOptions {
 }
 export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => example;
 export declare const canisterId: string;
-export interface example {
+export interface exampleInterface {
     bbbbb(arg0: b): Promise<void>;
     f: [Principal, string];
     f1(arg0: list, arg1: Uint8Array | number[], arg2: boolean | null): Promise<void>;

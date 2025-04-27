@@ -20,7 +20,7 @@ export declare interface CreateActorOptions {
 }
 export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => class_;
 export declare const canisterId: string;
-export interface class_ {
+export interface classInterface {
     get(): Promise<List>;
     set(arg0: List): Promise<List>;
 }

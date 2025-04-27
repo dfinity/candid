@@ -8,7 +8,7 @@ interface None {
 }
 type Option<T> = Some<T> | None;
 export type Func = () => Principal;
-export interface Service {
+export interface ServiceInterface {
     f: [Principal, string];
 }
 export type Service2 = Service;
@@ -20,7 +20,7 @@ export declare interface CreateActorOptions {
 }
 export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => service;
 export declare const canisterId: string;
-export interface service {
+export interface serviceInterface {
     asArray(): Promise<[Array<Principal>, Array<[Principal, string]>]>;
     asPrincipal(): Promise<[Principal, [Principal, string]]>;
     asRecord(): Promise<[Principal, Principal | null, [Principal, string]]>;

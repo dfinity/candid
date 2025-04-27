@@ -21,7 +21,7 @@ export declare interface CreateActorOptions {
 }
 export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => cyclic;
 export declare const canisterId: string;
-export interface cyclic {
+export interface cyclicInterface {
     f(arg0: A, arg1: B, arg2: C, arg3: X, arg4: Y, arg5: Z): Promise<void>;
 }
 
