@@ -235,7 +235,7 @@ export interface managementInterface {
         settings: canister_settings;
     }): Promise<void>;
 }
-import type { utxo as _utxo, definite_canister_settings as _definite_canister_settings, ecdsa_curve as _ecdsa_curve, get_utxos_request as _get_utxos_request, canister_settings as _canister_settings, canister_id as _canister_id, get_balance_request as _get_balance_request, bitcoin_network as _bitcoin_network, bitcoin_address as _bitcoin_address, get_utxos_response as _get_utxos_response, http_header as _http_header, block_hash as _block_hash } from "declarations/management/management.did.d.ts";
+import type { block_hash as _block_hash, http_header as _http_header, canister_id as _canister_id, get_balance_request as _get_balance_request, utxo as _utxo, ecdsa_curve as _ecdsa_curve, bitcoin_network as _bitcoin_network, get_utxos_request as _get_utxos_request, definite_canister_settings as _definite_canister_settings, bitcoin_address as _bitcoin_address, canister_settings as _canister_settings, get_utxos_response as _get_utxos_response } from "declarations/management/management.did.d.ts";
 class Management implements managementInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
@@ -406,61 +406,43 @@ class Management implements managementInterface {
     }
 }
 export const management: managementInterface = new Management();
-function from_candid_get_utxos_response_n5(value: _get_utxos_response): get_utxos_response {
-    return from_candid_record_n6(value);
-}
-function from_candid_record_n6(value: {
-    next_page: [] | [Uint8Array | number[]];
-    tip_height: number;
-    tip_block_hash: _block_hash;
-    utxos: Array<_utxo>;
-}): {
-    next_page?: Uint8Array | number[];
-    tip_height: number;
-    tip_block_hash: block_hash;
-    utxos: Array<utxo>;
-} {
-    return {
-        next_page: record_opt_to_undefined(from_candid_opt_n7(value.next_page)),
-        tip_height: value.tip_height,
-        tip_block_hash: value.tip_block_hash,
-        utxos: value.utxos
-    };
-}
-function to_candid_get_utxos_request_n3(value: get_utxos_request): _get_utxos_request {
-    return to_candid_record_n4(value);
-}
 function from_candid_opt_n7(value: [] | [Uint8Array | number[]]): Uint8Array | number[] | null {
     return value.length === 0 ? null : value[0];
 }
-function to_candid_canister_settings_n10(value: canister_settings): _canister_settings {
-    return to_candid_record_n11(value);
-}
-function to_candid_record_n14(value: {
-    settings?: canister_settings;
-    specified_id?: canister_id;
-    amount?: bigint;
-}): {
-    settings: [] | [_canister_settings];
-    specified_id: [] | [_canister_id];
-    amount: [] | [bigint];
-} {
-    return {
-        settings: value.settings ? candid_some(to_candid_canister_settings_n10(value.settings)) : candid_none(),
-        specified_id: value.specified_id ? candid_some(value.specified_id) : candid_none(),
-        amount: value.amount ? candid_some(value.amount) : candid_none()
+function from_candid_record_n8(value: {
+    status: {
+        stopped: null;
+    } | {
+        stopping: null;
+    } | {
+        running: null;
     };
-}
-function to_candid_record_n15(value: {
-    canister_id: Principal;
-    settings: canister_settings;
+    memory_size: bigint;
+    cycles: bigint;
+    settings: _definite_canister_settings;
+    idle_cycles_burned_per_day: bigint;
+    module_hash: [] | [Uint8Array | number[]];
 }): {
-    canister_id: Principal;
-    settings: _canister_settings;
+    status: {
+        stopped: null;
+    } | {
+        stopping: null;
+    } | {
+        running: null;
+    };
+    memory_size: bigint;
+    cycles: bigint;
+    settings: definite_canister_settings;
+    idle_cycles_burned_per_day: bigint;
+    module_hash?: Uint8Array | number[];
 } {
     return {
-        canister_id: value.canister_id,
-        settings: to_candid_canister_settings_n10(value.settings)
+        status: value.status,
+        memory_size: value.memory_size,
+        cycles: value.cycles,
+        settings: value.settings,
+        idle_cycles_burned_per_day: value.idle_cycles_burned_per_day,
+        module_hash: record_opt_to_undefined(from_candid_opt_n7(value.module_hash))
     };
 }
 function to_candid_record_n13(value: {
@@ -505,107 +487,8 @@ function to_candid_record_n13(value: {
         headers: value.headers
     };
 }
-function from_candid_record_n8(value: {
-    status: {
-        stopped: null;
-    } | {
-        stopping: null;
-    } | {
-        running: null;
-    };
-    memory_size: bigint;
-    cycles: bigint;
-    settings: _definite_canister_settings;
-    idle_cycles_burned_per_day: bigint;
-    module_hash: [] | [Uint8Array | number[]];
-}): {
-    status: {
-        stopped: null;
-    } | {
-        stopping: null;
-    } | {
-        running: null;
-    };
-    memory_size: bigint;
-    cycles: bigint;
-    settings: definite_canister_settings;
-    idle_cycles_burned_per_day: bigint;
-    module_hash?: Uint8Array | number[];
-} {
-    return {
-        status: value.status,
-        memory_size: value.memory_size,
-        cycles: value.cycles,
-        settings: value.settings,
-        idle_cycles_burned_per_day: value.idle_cycles_burned_per_day,
-        module_hash: record_opt_to_undefined(from_candid_opt_n7(value.module_hash))
-    };
-}
-function to_candid_record_n11(value: {
-    freezing_threshold?: bigint;
-    controllers?: Array<Principal>;
-    memory_allocation?: bigint;
-    compute_allocation?: bigint;
-}): {
-    freezing_threshold: [] | [bigint];
-    controllers: [] | [Array<Principal>];
-    memory_allocation: [] | [bigint];
-    compute_allocation: [] | [bigint];
-} {
-    return {
-        freezing_threshold: value.freezing_threshold ? candid_some(value.freezing_threshold) : candid_none(),
-        controllers: value.controllers ? candid_some(value.controllers) : candid_none(),
-        memory_allocation: value.memory_allocation ? candid_some(value.memory_allocation) : candid_none(),
-        compute_allocation: value.compute_allocation ? candid_some(value.compute_allocation) : candid_none()
-    };
-}
-function to_candid_record_n2(value: {
-    network: bitcoin_network;
-    address: bitcoin_address;
-    min_confirmations?: number;
-}): {
-    network: _bitcoin_network;
-    address: _bitcoin_address;
-    min_confirmations: [] | [number];
-} {
-    return {
-        network: value.network,
-        address: value.address,
-        min_confirmations: value.min_confirmations ? candid_some(value.min_confirmations) : candid_none()
-    };
-}
-function to_candid_record_n12(value: {
-    key_id: {
-        name: string;
-        curve: ecdsa_curve;
-    };
-    canister_id?: canister_id;
-    derivation_path: Array<Uint8Array | number[]>;
-}): {
-    key_id: {
-        name: string;
-        curve: _ecdsa_curve;
-    };
-    canister_id: [] | [_canister_id];
-    derivation_path: Array<Uint8Array | number[]>;
-} {
-    return {
-        key_id: value.key_id,
-        canister_id: value.canister_id ? candid_some(value.canister_id) : candid_none(),
-        derivation_path: value.derivation_path
-    };
-}
 function to_candid_get_balance_request_n1(value: get_balance_request): _get_balance_request {
     return to_candid_record_n2(value);
-}
-function to_candid_record_n9(value: {
-    settings?: canister_settings;
-}): {
-    settings: [] | [_canister_settings];
-} {
-    return {
-        settings: value.settings ? candid_some(to_candid_canister_settings_n10(value.settings)) : candid_none()
-    };
 }
 function to_candid_record_n4(value: {
     network: bitcoin_network;
@@ -628,6 +511,123 @@ function to_candid_record_n4(value: {
         network: value.network,
         filter: value.filter ? candid_some(value.filter) : candid_none(),
         address: value.address
+    };
+}
+function to_candid_canister_settings_n10(value: canister_settings): _canister_settings {
+    return to_candid_record_n11(value);
+}
+function from_candid_get_utxos_response_n5(value: _get_utxos_response): get_utxos_response {
+    return from_candid_record_n6(value);
+}
+function to_candid_record_n14(value: {
+    settings?: canister_settings;
+    specified_id?: canister_id;
+    amount?: bigint;
+}): {
+    settings: [] | [_canister_settings];
+    specified_id: [] | [_canister_id];
+    amount: [] | [bigint];
+} {
+    return {
+        settings: value.settings ? candid_some(to_candid_canister_settings_n10(value.settings)) : candid_none(),
+        specified_id: value.specified_id ? candid_some(value.specified_id) : candid_none(),
+        amount: value.amount ? candid_some(value.amount) : candid_none()
+    };
+}
+function to_candid_record_n2(value: {
+    network: bitcoin_network;
+    address: bitcoin_address;
+    min_confirmations?: number;
+}): {
+    network: _bitcoin_network;
+    address: _bitcoin_address;
+    min_confirmations: [] | [number];
+} {
+    return {
+        network: value.network,
+        address: value.address,
+        min_confirmations: value.min_confirmations ? candid_some(value.min_confirmations) : candid_none()
+    };
+}
+function to_candid_record_n11(value: {
+    freezing_threshold?: bigint;
+    controllers?: Array<Principal>;
+    memory_allocation?: bigint;
+    compute_allocation?: bigint;
+}): {
+    freezing_threshold: [] | [bigint];
+    controllers: [] | [Array<Principal>];
+    memory_allocation: [] | [bigint];
+    compute_allocation: [] | [bigint];
+} {
+    return {
+        freezing_threshold: value.freezing_threshold ? candid_some(value.freezing_threshold) : candid_none(),
+        controllers: value.controllers ? candid_some(value.controllers) : candid_none(),
+        memory_allocation: value.memory_allocation ? candid_some(value.memory_allocation) : candid_none(),
+        compute_allocation: value.compute_allocation ? candid_some(value.compute_allocation) : candid_none()
+    };
+}
+function to_candid_record_n15(value: {
+    canister_id: Principal;
+    settings: canister_settings;
+}): {
+    canister_id: Principal;
+    settings: _canister_settings;
+} {
+    return {
+        canister_id: value.canister_id,
+        settings: to_candid_canister_settings_n10(value.settings)
+    };
+}
+function from_candid_record_n6(value: {
+    next_page: [] | [Uint8Array | number[]];
+    tip_height: number;
+    tip_block_hash: _block_hash;
+    utxos: Array<_utxo>;
+}): {
+    next_page?: Uint8Array | number[];
+    tip_height: number;
+    tip_block_hash: block_hash;
+    utxos: Array<utxo>;
+} {
+    return {
+        next_page: record_opt_to_undefined(from_candid_opt_n7(value.next_page)),
+        tip_height: value.tip_height,
+        tip_block_hash: value.tip_block_hash,
+        utxos: value.utxos
+    };
+}
+function to_candid_get_utxos_request_n3(value: get_utxos_request): _get_utxos_request {
+    return to_candid_record_n4(value);
+}
+function to_candid_record_n12(value: {
+    key_id: {
+        name: string;
+        curve: ecdsa_curve;
+    };
+    canister_id?: canister_id;
+    derivation_path: Array<Uint8Array | number[]>;
+}): {
+    key_id: {
+        name: string;
+        curve: _ecdsa_curve;
+    };
+    canister_id: [] | [_canister_id];
+    derivation_path: Array<Uint8Array | number[]>;
+} {
+    return {
+        key_id: value.key_id,
+        canister_id: value.canister_id ? candid_some(value.canister_id) : candid_none(),
+        derivation_path: value.derivation_path
+    };
+}
+function to_candid_record_n9(value: {
+    settings?: canister_settings;
+}): {
+    settings: [] | [_canister_settings];
+} {
+    return {
+        settings: value.settings ? candid_some(to_candid_canister_settings_n10(value.settings)) : candid_none()
     };
 }
 

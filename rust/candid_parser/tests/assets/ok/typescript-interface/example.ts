@@ -166,7 +166,7 @@ export interface exampleInterface {
             };
         }]>;
 }
-import type { tree as _tree, B as _B, node as _node, A as _A, a as _a, List as _List, list as _list, stream as _stream, b as _b } from "declarations/example/example.did.d.ts";
+import type { stream as _stream, B as _B, b as _b, list as _list, tree as _tree, a as _a, node as _node, List as _List, A as _A } from "declarations/example/example.did.d.ts";
 class Example implements exampleInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
@@ -228,98 +228,17 @@ class Example implements exampleInterface {
     }
 }
 export const example: exampleInterface = new Example();
+function from_candid_A_n8(value: _A): A {
+    return from_candid_opt_n7(value);
+}
 function from_candid_opt_n22(value: [] | [_b]): b | null {
     return value.length === 0 ? null : value[0];
 }
-function to_candid_variant_n20(value: {
-    A: bigint;
-} | {
-    B?: string;
-}): {
-    A: bigint;
-} | {
-    B: [] | [string];
-} {
-    return "A" in value ? {
-        A: value.A
-    } : "B" in value ? {
-        B: to_candid_opt_n19(value.B)
-    } : value;
-}
-function to_candid_vec_n18(value: Array<string | null>): Array<[] | [string]> {
-    return value.map((x)=>to_candid_opt_n19(x));
-}
-function from_candid_B_n6(value: _B): B {
-    return from_candid_opt_n7(value);
-}
-function from_candid_tree_n9(value: _tree): tree {
-    return from_candid_variant_n10(value);
-}
-function to_candid_opt_n5(value: boolean | null): [] | [boolean] {
-    return value === null ? candid_none() : candid_some(value);
-}
-function to_candid_record_n4(value: {
-    head: bigint;
-    tail: list;
-}): {
-    head: bigint;
-    tail: _list;
-} {
-    return {
-        head: value.head,
-        tail: to_candid_list_n1(value.tail)
-    };
-}
-function from_candid_opt_n13(value: [] | [{
-        head: bigint;
-        next: [Principal, string];
-    }]): {
-    head: bigint;
-    next: [Principal, string];
-} | null {
-    return value.length === 0 ? null : value[0];
-}
-function from_candid_opt_n7(value: [] | [_A]): Some<A> | None {
-    return value.length === 0 ? none() : some(from_candid_A_n8(value[0]));
-}
-function to_candid_node_n3(value: node): _node {
-    return to_candid_record_n4(value);
-}
-function to_candid_record_n16(value: {
-    head: bigint;
-    tail: List;
-}): {
-    head: bigint;
-    tail: _List;
-} {
-    return {
-        head: value.head,
-        tail: to_candid_List_n14(value.tail)
-    };
-}
-function to_candid_opt_n19(value: string | null): [] | [string] {
-    return value === null ? candid_none() : candid_some(value);
-}
-function from_candid_stream_n12(value: _stream): stream {
-    return from_candid_opt_n13(value);
+function to_candid_opt_n2(value: node | null): [] | [_node] {
+    return value === null ? candid_none() : candid_some(to_candid_node_n3(value));
 }
 function to_candid_list_n1(value: list): _list {
     return to_candid_opt_n2(value);
-}
-function to_candid_List_n14(value: List): _List {
-    return to_candid_opt_n15(value);
-}
-function to_candid_opt_n15(value: {
-    head: bigint;
-    tail: List;
-} | null): [] | [{
-        head: bigint;
-        tail: _List;
-    }] {
-    return value === null ? candid_none() : candid_some(to_candid_record_n16(value));
-}
-function from_candid_opt_n21(value: [] | [_a]): a | null {
-    return value.length === 0 ? null : value[0];
 }
 function from_candid_record_n11(value: {
     val: bigint;
@@ -335,12 +254,6 @@ function from_candid_record_n11(value: {
         left: from_candid_tree_n9(value.left),
         right: from_candid_tree_n9(value.right)
     };
-}
-function from_candid_A_n8(value: _A): A {
-    return from_candid_opt_n7(value);
-}
-function to_candid_opt_n2(value: node | null): [] | [_node] {
-    return value === null ? candid_none() : candid_some(to_candid_node_n3(value));
 }
 function from_candid_variant_n10(value: {
     branch: {
@@ -367,5 +280,92 @@ function from_candid_variant_n10(value: {
 }
 function to_candid_opt_n17(value: List | null): [] | [_List] {
     return value === null ? candid_none() : candid_some(to_candid_List_n14(value));
+}
+function to_candid_opt_n19(value: string | null): [] | [string] {
+    return value === null ? candid_none() : candid_some(value);
+}
+function from_candid_tree_n9(value: _tree): tree {
+    return from_candid_variant_n10(value);
+}
+function to_candid_variant_n20(value: {
+    A: bigint;
+} | {
+    B?: string;
+}): {
+    A: bigint;
+} | {
+    B: [] | [string];
+} {
+    return "A" in value ? {
+        A: value.A
+    } : "B" in value ? {
+        B: to_candid_opt_n19(value.B)
+    } : value;
+}
+function to_candid_record_n4(value: {
+    head: bigint;
+    tail: list;
+}): {
+    head: bigint;
+    tail: _list;
+} {
+    return {
+        head: value.head,
+        tail: to_candid_list_n1(value.tail)
+    };
+}
+function from_candid_stream_n12(value: _stream): stream {
+    return from_candid_opt_n13(value);
+}
+function to_candid_record_n16(value: {
+    head: bigint;
+    tail: List;
+}): {
+    head: bigint;
+    tail: _List;
+} {
+    return {
+        head: value.head,
+        tail: to_candid_List_n14(value.tail)
+    };
+}
+function to_candid_vec_n18(value: Array<string | null>): Array<[] | [string]> {
+    return value.map((x)=>to_candid_opt_n19(x));
+}
+function to_candid_opt_n5(value: boolean | null): [] | [boolean] {
+    return value === null ? candid_none() : candid_some(value);
+}
+function to_candid_opt_n15(value: {
+    head: bigint;
+    tail: List;
+} | null): [] | [{
+        head: bigint;
+        tail: _List;
+    }] {
+    return value === null ? candid_none() : candid_some(to_candid_record_n16(value));
+}
+function to_candid_node_n3(value: node): _node {
+    return to_candid_record_n4(value);
+}
+function from_candid_opt_n13(value: [] | [{
+        head: bigint;
+        next: [Principal, string];
+    }]): {
+    head: bigint;
+    next: [Principal, string];
+} | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_B_n6(value: _B): B {
+    return from_candid_opt_n7(value);
+}
+function to_candid_List_n14(value: List): _List {
+    return to_candid_opt_n15(value);
+}
+function from_candid_opt_n21(value: [] | [_a]): a | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n7(value: [] | [_A]): Some<A> | None {
+    return value.length === 0 ? none() : some(from_candid_A_n8(value[0]));
 }
 
