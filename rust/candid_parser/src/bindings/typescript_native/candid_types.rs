@@ -444,12 +444,30 @@ impl<'a> CandidTypesConverter<'a> {
             })
             .collect::<Vec<_>>();
 
+        // Sort specifiers by name
+        let mut sorted_specifiers = specifiers;
+        sorted_specifiers.sort_by(|a, b| {
+            let a_name = match a {
+                ImportSpecifier::Named(spec) => spec.local.sym.to_string(),
+                ImportSpecifier::Default(spec) => spec.local.sym.to_string(),
+                ImportSpecifier::Namespace(spec) => spec.local.sym.to_string(),
+            };
+
+            let b_name = match b {
+                ImportSpecifier::Named(spec) => spec.local.sym.to_string(),
+                ImportSpecifier::Default(spec) => spec.local.sym.to_string(),
+                ImportSpecifier::Namespace(spec) => spec.local.sym.to_string(),
+            };
+
+            a_name.cmp(&b_name)
+        });
+
         // Add import declaration
         module
             .body
             .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
                 span: DUMMY_SP,
-                specifiers,
+                specifiers: sorted_specifiers,
                 src: Box::new(Str {
                     span: DUMMY_SP,
                     value: format!("declarations/{}/{}.did.d.ts", dashed_name, dashed_name).into(),

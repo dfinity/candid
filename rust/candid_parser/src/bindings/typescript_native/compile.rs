@@ -78,7 +78,16 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
             &mut converter,
         );
 
-        for stmt in converter.get_generated_functions() {
+        let mut sorted_functions = converter.get_generated_functions();
+        sorted_functions.sort_by(|a, b| {
+            if let (Stmt::Decl(Decl::Fn(fn_a)), Stmt::Decl(Decl::Fn(fn_b))) = (a, b) {
+                fn_a.ident.sym.to_string().cmp(&fn_b.ident.sym.to_string())
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        });
+
+        for stmt in sorted_functions {
             module.body.push(ModuleItem::Stmt(stmt.clone()));
         }
     }

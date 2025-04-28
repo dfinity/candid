@@ -170,14 +170,17 @@ class Keyword implements keywordInterface {
     }
 }
 export const keyword: keywordInterface = new Keyword();
-function to_candid_opt_n2(value: Some<o> | None): [] | [_o] {
-    return value._tag === "None" ? candid_none() : candid_some(value.value);
+function from_candid_o_n3(value: _o): o {
+    return from_candid_opt_n4(value);
+}
+function from_candid_opt_n4(value: [] | [_o]): Some<o> | None {
+    return value.length === 0 ? none() : some(from_candid_o_n3(value[0]));
 }
 function to_candid_o_n1(value: o): _o {
     return to_candid_opt_n2(value);
 }
-function from_candid_o_n3(value: _o): o {
-    return from_candid_opt_n4(value);
+function to_candid_opt_n2(value: Some<o> | None): [] | [_o] {
+    return value._tag === "None" ? candid_none() : candid_some(value.value);
 }
 function to_candid_variant_n5(value: {
     A: null;
@@ -205,8 +208,5 @@ function to_candid_variant_n5(value: {
     } : "D" in value ? {
         D: value.D
     } : value;
-}
-function from_candid_opt_n4(value: [] | [_o]): Some<o> | None {
-    return value.length === 0 ? none() : some(from_candid_o_n3(value[0]));
 }
 
