@@ -96,13 +96,13 @@ function from_candid_B_n1(value: _B): B {
     return from_candid_variant_n2(value);
 }
 function from_candid_variant_n2(value: {
-    : null;
+    "": null;
 } | {
-    空的: null;
+    '空的': null;
 } | {
-      空的  : null;
+    '  空的  ': null;
 } | {
-    1⃣️2⃣️3⃣️: null;
+    '1⃣️2⃣️3⃣️': null;
 }): "" | "空的" | "  空的  " | "1⃣️2⃣️3⃣️" {
     return "" in value ? "" : "空的" in value ? "空的" : "  空的  " in value ? "  空的  " : "1⃣️2⃣️3⃣️" in value ? "1⃣️2⃣️3⃣️" : value;
 }

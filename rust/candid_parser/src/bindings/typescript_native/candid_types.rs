@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 
-use super::ident::get_ident;
+use super::ident::{get_ident, get_ident_guarded_keyword_ok};
 
 pub struct CandidTypesConverter<'a> {
     env: &'a TypeEnv,
@@ -361,7 +361,7 @@ impl<'a> CandidTypesConverter<'a> {
 
     fn create_property_signature(&mut self, field: &Field) -> TsTypeElement {
         let field_name = match &*field.id {
-            Label::Named(str) => Box::new(Expr::Ident(get_ident(str))),
+            Label::Named(str) => Box::new(Expr::Ident(get_ident_guarded_keyword_ok(str))),
             Label::Id(n) | Label::Unnamed(n) => Box::new(Expr::Ident(Ident::new(
                 format!("_{}_", n).into(),
                 DUMMY_SP,
