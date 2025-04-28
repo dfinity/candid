@@ -211,7 +211,7 @@ export interface managementInterface {
         settings: canister_settings;
     }): Promise<void>;
 }
-import type { canister_id as _canister_id, send_transaction_request as _send_transaction_request, get_balance_request as _get_balance_request, bitcoin_address as _bitcoin_address, get_utxos_response as _get_utxos_response, get_utxos_request as _get_utxos_request, get_current_fee_percentiles_request as _get_current_fee_percentiles_request, utxo as _utxo, bitcoin_network as _bitcoin_network, canister_settings as _canister_settings, wasm_module as _wasm_module, http_header as _http_header, block_hash as _block_hash, ecdsa_curve as _ecdsa_curve, definite_canister_settings as _definite_canister_settings } from "declarations/management/management.did.d.ts";
+import type { bitcoin_address as _bitcoin_address, bitcoin_network as _bitcoin_network, block_hash as _block_hash, canister_id as _canister_id, canister_settings as _canister_settings, definite_canister_settings as _definite_canister_settings, ecdsa_curve as _ecdsa_curve, get_balance_request as _get_balance_request, get_current_fee_percentiles_request as _get_current_fee_percentiles_request, get_utxos_request as _get_utxos_request, get_utxos_response as _get_utxos_response, http_header as _http_header, send_transaction_request as _send_transaction_request, utxo as _utxo, wasm_module as _wasm_module } from "declarations/management/management.did.d.ts";
 class Management implements managementInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
@@ -364,6 +364,126 @@ class Management implements managementInterface {
     }
 }
 export const management: managementInterface = new Management();
+function from_candid_get_utxos_response_n10(value: _get_utxos_response): get_utxos_response {
+    return from_candid_record_n11(value);
+}
+function from_candid_opt_n12(value: [] | [Uint8Array | number[]]): Uint8Array | number[] | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_record_n11(value: {
+    next_page: [] | [Uint8Array | number[]];
+    tip_height: number;
+    tip_block_hash: _block_hash;
+    utxos: Array<_utxo>;
+}): {
+    next_page?: Uint8Array | number[];
+    tip_height: number;
+    tip_block_hash: block_hash;
+    utxos: Array<utxo>;
+} {
+    return {
+        next_page: record_opt_to_undefined(from_candid_opt_n12(value.next_page)),
+        tip_height: value.tip_height,
+        tip_block_hash: value.tip_block_hash,
+        utxos: value.utxos
+    };
+}
+function from_candid_record_n15(value: {
+    status: {
+        stopped: null;
+    } | {
+        stopping: null;
+    } | {
+        running: null;
+    };
+    memory_size: bigint;
+    cycles: bigint;
+    settings: _definite_canister_settings;
+    idle_cycles_burned_per_day: bigint;
+    module_hash: [] | [Uint8Array | number[]];
+}): {
+    status: "stopped" | "stopping" | "running";
+    memory_size: bigint;
+    cycles: bigint;
+    settings: definite_canister_settings;
+    idle_cycles_burned_per_day: bigint;
+    module_hash?: Uint8Array | number[];
+} {
+    return {
+        status: from_candid_variant_n16(value.status),
+        memory_size: value.memory_size,
+        cycles: value.cycles,
+        settings: value.settings,
+        idle_cycles_burned_per_day: value.idle_cycles_burned_per_day,
+        module_hash: record_opt_to_undefined(from_candid_opt_n12(value.module_hash))
+    };
+}
+function from_candid_variant_n16(value: {
+    stopped: null;
+} | {
+    stopping: null;
+} | {
+    running: null;
+}): "stopped" | "stopping" | "running" {
+    return "stopped" in value ? "stopped" : "stopping" in value ? "stopping" : "running" in value ? "running" : value;
+}
+function to_candid_bitcoin_network_n3(value: bitcoin_network): _bitcoin_network {
+    return to_candid_variant_n4(value);
+}
+function to_candid_canister_settings_n18(value: canister_settings): _canister_settings {
+    return to_candid_record_n19(value);
+}
+function to_candid_ecdsa_curve_n22(value: ecdsa_curve): _ecdsa_curve {
+    return to_candid_variant_n23(value);
+}
+function to_candid_get_balance_request_n1(value: get_balance_request): _get_balance_request {
+    return to_candid_record_n2(value);
+}
+function to_candid_get_current_fee_percentiles_request_n5(value: get_current_fee_percentiles_request): _get_current_fee_percentiles_request {
+    return to_candid_record_n6(value);
+}
+function to_candid_get_utxos_request_n7(value: get_utxos_request): _get_utxos_request {
+    return to_candid_record_n8(value);
+}
+function to_candid_record_n14(value: {
+    transaction: Uint8Array | number[];
+    network: bitcoin_network;
+}): {
+    transaction: Uint8Array | number[];
+    network: _bitcoin_network;
+} {
+    return {
+        transaction: value.transaction,
+        network: to_candid_bitcoin_network_n3(value.network)
+    };
+}
+function to_candid_record_n17(value: {
+    settings?: canister_settings;
+}): {
+    settings: [] | [_canister_settings];
+} {
+    return {
+        settings: value.settings ? candid_some(to_candid_canister_settings_n18(value.settings)) : candid_none()
+    };
+}
+function to_candid_record_n19(value: {
+    freezing_threshold?: bigint;
+    controllers?: Array<Principal>;
+    memory_allocation?: bigint;
+    compute_allocation?: bigint;
+}): {
+    freezing_threshold: [] | [bigint];
+    controllers: [] | [Array<Principal>];
+    memory_allocation: [] | [bigint];
+    compute_allocation: [] | [bigint];
+} {
+    return {
+        freezing_threshold: value.freezing_threshold ? candid_some(value.freezing_threshold) : candid_none(),
+        controllers: value.controllers ? candid_some(value.controllers) : candid_none(),
+        memory_allocation: value.memory_allocation ? candid_some(value.memory_allocation) : candid_none(),
+        compute_allocation: value.compute_allocation ? candid_some(value.compute_allocation) : candid_none()
+    };
+}
 function to_candid_record_n2(value: {
     network: bitcoin_network;
     address: bitcoin_address;
@@ -379,23 +499,38 @@ function to_candid_record_n2(value: {
         min_confirmations: value.min_confirmations ? candid_some(value.min_confirmations) : candid_none()
     };
 }
-function to_candid_record_n14(value: {
-    transaction: Uint8Array | number[];
-    network: bitcoin_network;
+function to_candid_record_n20(value: {
+    key_id: {
+        name: string;
+        curve: ecdsa_curve;
+    };
+    canister_id?: canister_id;
+    derivation_path: Array<Uint8Array | number[]>;
 }): {
-    transaction: Uint8Array | number[];
-    network: _bitcoin_network;
+    key_id: {
+        name: string;
+        curve: _ecdsa_curve;
+    };
+    canister_id: [] | [_canister_id];
+    derivation_path: Array<Uint8Array | number[]>;
 } {
     return {
-        transaction: value.transaction,
-        network: to_candid_bitcoin_network_n3(value.network)
+        key_id: to_candid_record_n21(value.key_id),
+        canister_id: value.canister_id ? candid_some(value.canister_id) : candid_none(),
+        derivation_path: value.derivation_path
     };
 }
-function from_candid_get_utxos_response_n10(value: _get_utxos_response): get_utxos_response {
-    return from_candid_record_n11(value);
-}
-function to_candid_canister_settings_n18(value: canister_settings): _canister_settings {
-    return to_candid_record_n19(value);
+function to_candid_record_n21(value: {
+    name: string;
+    curve: ecdsa_curve;
+}): {
+    name: string;
+    curve: _ecdsa_curve;
+} {
+    return {
+        name: value.name,
+        curve: to_candid_ecdsa_curve_n22(value.curve)
+    };
 }
 function to_candid_record_n24(value: {
     url: string;
@@ -433,112 +568,6 @@ function to_candid_record_n24(value: {
         headers: value.headers
     };
 }
-function to_candid_get_current_fee_percentiles_request_n5(value: get_current_fee_percentiles_request): _get_current_fee_percentiles_request {
-    return to_candid_record_n6(value);
-}
-function from_candid_opt_n12(value: [] | [Uint8Array | number[]]): Uint8Array | number[] | null {
-    return value.length === 0 ? null : value[0];
-}
-function to_candid_send_transaction_request_n13(value: send_transaction_request): _send_transaction_request {
-    return to_candid_record_n14(value);
-}
-function to_candid_bitcoin_network_n3(value: bitcoin_network): _bitcoin_network {
-    return to_candid_variant_n4(value);
-}
-function to_candid_record_n29(value: {
-    key_id: {
-        name: string;
-        curve: ecdsa_curve;
-    };
-    derivation_path: Array<Uint8Array | number[]>;
-    message_hash: Uint8Array | number[];
-}): {
-    key_id: {
-        name: string;
-        curve: _ecdsa_curve;
-    };
-    derivation_path: Array<Uint8Array | number[]>;
-    message_hash: Uint8Array | number[];
-} {
-    return {
-        key_id: to_candid_record_n21(value.key_id),
-        derivation_path: value.derivation_path,
-        message_hash: value.message_hash
-    };
-}
-function from_candid_record_n11(value: {
-    next_page: [] | [Uint8Array | number[]];
-    tip_height: number;
-    tip_block_hash: _block_hash;
-    utxos: Array<_utxo>;
-}): {
-    next_page?: Uint8Array | number[];
-    tip_height: number;
-    tip_block_hash: block_hash;
-    utxos: Array<utxo>;
-} {
-    return {
-        next_page: record_opt_to_undefined(from_candid_opt_n12(value.next_page)),
-        tip_height: value.tip_height,
-        tip_block_hash: value.tip_block_hash,
-        utxos: value.utxos
-    };
-}
-function to_candid_variant_n23(value: "secp256k1"): {
-    secp256k1: null;
-} {
-    return value == "secp256k1" ? {
-        secp256k1: null
-    } : value;
-}
-function to_candid_ecdsa_curve_n22(value: ecdsa_curve): _ecdsa_curve {
-    return to_candid_variant_n23(value);
-}
-function to_candid_variant_n27(value: "reinstall" | "upgrade" | "install"): {
-    reinstall: null;
-} | {
-    upgrade: null;
-} | {
-    install: null;
-} {
-    return value == "reinstall" ? {
-        reinstall: null
-    } : value == "upgrade" ? {
-        upgrade: null
-    } : value == "install" ? {
-        install: null
-    } : value;
-}
-function to_candid_record_n28(value: {
-    settings?: canister_settings;
-    specified_id?: canister_id;
-    amount?: bigint;
-}): {
-    settings: [] | [_canister_settings];
-    specified_id: [] | [_canister_id];
-    amount: [] | [bigint];
-} {
-    return {
-        settings: value.settings ? candid_some(to_candid_canister_settings_n18(value.settings)) : candid_none(),
-        specified_id: value.specified_id ? candid_some(value.specified_id) : candid_none(),
-        amount: value.amount ? candid_some(value.amount) : candid_none()
-    };
-}
-function to_candid_record_n30(value: {
-    canister_id: Principal;
-    settings: canister_settings;
-}): {
-    canister_id: Principal;
-    settings: _canister_settings;
-} {
-    return {
-        canister_id: value.canister_id,
-        settings: to_candid_canister_settings_n18(value.settings)
-    };
-}
-function to_candid_get_utxos_request_n7(value: get_utxos_request): _get_utxos_request {
-    return to_candid_record_n8(value);
-}
 function to_candid_record_n26(value: {
     arg: Uint8Array | number[];
     wasm_module: wasm_module;
@@ -563,25 +592,52 @@ function to_candid_record_n26(value: {
         canister_id: value.canister_id
     };
 }
-function to_candid_record_n20(value: {
+function to_candid_record_n28(value: {
+    settings?: canister_settings;
+    specified_id?: canister_id;
+    amount?: bigint;
+}): {
+    settings: [] | [_canister_settings];
+    specified_id: [] | [_canister_id];
+    amount: [] | [bigint];
+} {
+    return {
+        settings: value.settings ? candid_some(to_candid_canister_settings_n18(value.settings)) : candid_none(),
+        specified_id: value.specified_id ? candid_some(value.specified_id) : candid_none(),
+        amount: value.amount ? candid_some(value.amount) : candid_none()
+    };
+}
+function to_candid_record_n29(value: {
     key_id: {
         name: string;
         curve: ecdsa_curve;
     };
-    canister_id?: canister_id;
     derivation_path: Array<Uint8Array | number[]>;
+    message_hash: Uint8Array | number[];
 }): {
     key_id: {
         name: string;
         curve: _ecdsa_curve;
     };
-    canister_id: [] | [_canister_id];
     derivation_path: Array<Uint8Array | number[]>;
+    message_hash: Uint8Array | number[];
 } {
     return {
         key_id: to_candid_record_n21(value.key_id),
-        canister_id: value.canister_id ? candid_some(value.canister_id) : candid_none(),
-        derivation_path: value.derivation_path
+        derivation_path: value.derivation_path,
+        message_hash: value.message_hash
+    };
+}
+function to_candid_record_n30(value: {
+    canister_id: Principal;
+    settings: canister_settings;
+}): {
+    canister_id: Principal;
+    settings: _canister_settings;
+} {
+    return {
+        canister_id: value.canister_id,
+        settings: to_candid_canister_settings_n18(value.settings)
     };
 }
 function to_candid_record_n6(value: {
@@ -592,117 +648,6 @@ function to_candid_record_n6(value: {
     return {
         network: to_candid_bitcoin_network_n3(value.network)
     };
-}
-function to_candid_get_balance_request_n1(value: get_balance_request): _get_balance_request {
-    return to_candid_record_n2(value);
-}
-function from_candid_record_n15(value: {
-    status: {
-        stopped: null;
-    } | {
-        stopping: null;
-    } | {
-        running: null;
-    };
-    memory_size: bigint;
-    cycles: bigint;
-    settings: _definite_canister_settings;
-    idle_cycles_burned_per_day: bigint;
-    module_hash: [] | [Uint8Array | number[]];
-}): {
-    status: "stopped" | "stopping" | "running";
-    memory_size: bigint;
-    cycles: bigint;
-    settings: definite_canister_settings;
-    idle_cycles_burned_per_day: bigint;
-    module_hash?: Uint8Array | number[];
-} {
-    return {
-        status: from_candid_variant_n16(value.status),
-        memory_size: value.memory_size,
-        cycles: value.cycles,
-        settings: value.settings,
-        idle_cycles_burned_per_day: value.idle_cycles_burned_per_day,
-        module_hash: record_opt_to_undefined(from_candid_opt_n12(value.module_hash))
-    };
-}
-function to_candid_record_n21(value: {
-    name: string;
-    curve: ecdsa_curve;
-}): {
-    name: string;
-    curve: _ecdsa_curve;
-} {
-    return {
-        name: value.name,
-        curve: to_candid_ecdsa_curve_n22(value.curve)
-    };
-}
-function to_candid_record_n19(value: {
-    freezing_threshold?: bigint;
-    controllers?: Array<Principal>;
-    memory_allocation?: bigint;
-    compute_allocation?: bigint;
-}): {
-    freezing_threshold: [] | [bigint];
-    controllers: [] | [Array<Principal>];
-    memory_allocation: [] | [bigint];
-    compute_allocation: [] | [bigint];
-} {
-    return {
-        freezing_threshold: value.freezing_threshold ? candid_some(value.freezing_threshold) : candid_none(),
-        controllers: value.controllers ? candid_some(value.controllers) : candid_none(),
-        memory_allocation: value.memory_allocation ? candid_some(value.memory_allocation) : candid_none(),
-        compute_allocation: value.compute_allocation ? candid_some(value.compute_allocation) : candid_none()
-    };
-}
-function to_candid_variant_n9(value: {
-    page: Uint8Array | number[];
-} | {
-    min_confirmations: number;
-}): {
-    page: Uint8Array | number[];
-} | {
-    min_confirmations: number;
-} {
-    return "page" in value ? {
-        page: value.page
-    } : "min_confirmations" in value ? {
-        min_confirmations: value.min_confirmations
-    } : value;
-}
-function from_candid_variant_n16(value: {
-    stopped: null;
-} | {
-    stopping: null;
-} | {
-    running: null;
-}): "stopped" | "stopping" | "running" {
-    return "stopped" in value ? "stopped" : "stopping" in value ? "stopping" : "running" in value ? "running" : value;
-}
-function to_candid_record_n17(value: {
-    settings?: canister_settings;
-}): {
-    settings: [] | [_canister_settings];
-} {
-    return {
-        settings: value.settings ? candid_some(to_candid_canister_settings_n18(value.settings)) : candid_none()
-    };
-}
-function to_candid_variant_n25(value: "get" | "head" | "post"): {
-    get: null;
-} | {
-    head: null;
-} | {
-    post: null;
-} {
-    return value == "get" ? {
-        get: null
-    } : value == "head" ? {
-        head: null
-    } : value == "post" ? {
-        post: null
-    } : value;
 }
 function to_candid_record_n8(value: {
     network: bitcoin_network;
@@ -727,6 +672,46 @@ function to_candid_record_n8(value: {
         address: value.address
     };
 }
+function to_candid_send_transaction_request_n13(value: send_transaction_request): _send_transaction_request {
+    return to_candid_record_n14(value);
+}
+function to_candid_variant_n23(value: "secp256k1"): {
+    secp256k1: null;
+} {
+    return value == "secp256k1" ? {
+        secp256k1: null
+    } : value;
+}
+function to_candid_variant_n25(value: "get" | "head" | "post"): {
+    get: null;
+} | {
+    head: null;
+} | {
+    post: null;
+} {
+    return value == "get" ? {
+        get: null
+    } : value == "head" ? {
+        head: null
+    } : value == "post" ? {
+        post: null
+    } : value;
+}
+function to_candid_variant_n27(value: "reinstall" | "upgrade" | "install"): {
+    reinstall: null;
+} | {
+    upgrade: null;
+} | {
+    install: null;
+} {
+    return value == "reinstall" ? {
+        reinstall: null
+    } : value == "upgrade" ? {
+        upgrade: null
+    } : value == "install" ? {
+        install: null
+    } : value;
+}
 function to_candid_variant_n4(value: "mainnet" | "testnet"): {
     mainnet: null;
 } | {
@@ -736,6 +721,21 @@ function to_candid_variant_n4(value: "mainnet" | "testnet"): {
         mainnet: null
     } : value == "testnet" ? {
         testnet: null
+    } : value;
+}
+function to_candid_variant_n9(value: {
+    page: Uint8Array | number[];
+} | {
+    min_confirmations: number;
+}): {
+    page: Uint8Array | number[];
+} | {
+    min_confirmations: number;
+} {
+    return "page" in value ? {
+        page: value.page
+    } : "min_confirmations" in value ? {
+        min_confirmations: value.min_confirmations
     } : value;
 }
 

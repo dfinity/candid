@@ -72,7 +72,7 @@ export interface serviceInterface {
         };
     }>;
 }
-import type { Service as _Service, Service2 as _Service2, Func as _Func } from "declarations/service/service.did.d.ts";
+import type { Func as _Func, Service as _Service, Service2 as _Service2 } from "declarations/service/service.did.d.ts";
 class Service implements serviceInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
@@ -108,15 +108,27 @@ class Service implements serviceInterface {
     }
 }
 export const service: serviceInterface = new Service();
+function from_candid_opt_n2(value: [] | [_Service]): Principal | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n5(value: [] | [_Func]): [Principal, string] | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_record_n4(value: {
+    f: [] | [_Func];
+}): {
+    f?: [Principal, string];
+} {
+    return {
+        f: record_opt_to_undefined(from_candid_opt_n5(value.f))
+    };
+}
 function from_candid_tuple_n1(value: [_Service2, [] | [_Service], _Func]): [Principal, Principal | null, [Principal, string]] {
     return [
         value[0],
         from_candid_opt_n2(value[1]),
         value[2]
     ];
-}
-function from_candid_opt_n2(value: [] | [_Service]): Principal | null {
-    return value.length === 0 ? null : value[0];
 }
 function from_candid_variant_n3(value: {
     a: _Service2;
@@ -136,17 +148,5 @@ function from_candid_variant_n3(value: {
     } : "b" in value ? {
         b: from_candid_record_n4(value.b)
     } : value;
-}
-function from_candid_record_n4(value: {
-    f: [] | [_Func];
-}): {
-    f?: [Principal, string];
-} {
-    return {
-        f: record_opt_to_undefined(from_candid_opt_n5(value.f))
-    };
-}
-function from_candid_opt_n5(value: [] | [_Func]): [Principal, string] | null {
-    return value.length === 0 ? null : value[0];
 }
 

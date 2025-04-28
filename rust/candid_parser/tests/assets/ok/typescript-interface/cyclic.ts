@@ -64,7 +64,7 @@ export const canisterId = _canisterId;
 export interface cyclicInterface {
     f(arg0: A, arg1: B, arg2: C, arg3: X, arg4: Y, arg5: Z): Promise<void>;
 }
-import type { C as _C, Z as _Z, X as _X, Y as _Y, A as _A, B as _B } from "declarations/cyclic/cyclic.did.d.ts";
+import type { A as _A, B as _B, C as _C, X as _X, Y as _Y, Z as _Z } from "declarations/cyclic/cyclic.did.d.ts";
 class Cyclic implements cyclicInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
@@ -76,20 +76,17 @@ class Cyclic implements cyclicInterface {
     }
 }
 export const cyclic: cyclicInterface = new Cyclic();
-function to_candid_X_n6(value: X): _X {
-    return to_candid_opt_n2(value);
-}
-function to_candid_opt_n2(value: Some<B> | None): [] | [_B] {
-    return value._tag === "None" ? candid_none() : candid_some(value.value);
-}
 function to_candid_A_n1(value: A): _A {
     return to_candid_opt_n2(value);
+}
+function to_candid_B_n3(value: B): _B {
+    return to_candid_opt_n4(value);
 }
 function to_candid_C_n5(value: C): _C {
     return to_candid_opt_n2(value);
 }
-function to_candid_opt_n4(value: Some<C> | None): [] | [_C] {
-    return value._tag === "None" ? candid_none() : candid_some(value.value);
+function to_candid_X_n6(value: X): _X {
+    return to_candid_opt_n2(value);
 }
 function to_candid_Y_n7(value: Y): _Y {
     return to_candid_opt_n2(value);
@@ -97,7 +94,10 @@ function to_candid_Y_n7(value: Y): _Y {
 function to_candid_Z_n8(value: Z): _Z {
     return to_candid_opt_n2(value);
 }
-function to_candid_B_n3(value: B): _B {
-    return to_candid_opt_n4(value);
+function to_candid_opt_n2(value: Some<B> | None): [] | [_B] {
+    return value._tag === "None" ? candid_none() : candid_some(value.value);
+}
+function to_candid_opt_n4(value: Some<C> | None): [] | [_C] {
+    return value._tag === "None" ? candid_none() : candid_some(value.value);
 }
 

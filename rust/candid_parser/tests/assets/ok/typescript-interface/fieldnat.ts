@@ -126,18 +126,18 @@ class Fieldnat implements fieldnatInterface {
     }
 }
 export const fieldnat: fieldnatInterface = new Fieldnat();
-function from_candid_variant_n2(value: {
-    _0_: bigint;
-}): "_0" {
-    return "_0_" in value ? {
-        _0_: value._0_
-    } : value;
-}
 function from_candid_variant_n1(value: {
     e20: null;
 } | {
     e30: null;
 }): "e20" | "e30" {
     return "e20" in value ? "e20" : "e30" in value ? "e30" : value;
+}
+function from_candid_variant_n2(value: {
+    _0_: bigint;
+}): "_0" {
+    return "_0_" in value ? {
+        _0_: value._0_
+    } : value;
 }
 
