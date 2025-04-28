@@ -45,20 +45,12 @@ function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
 export interface A {
-    "": bigint;
-    "📦🍦": bigint;
-    "字段名": bigint;
-    "字 段 名2": bigint;
+    '\u{e000}': bigint;
+    '📦🍦': bigint;
+    '字段名': bigint;
+    '字 段 名2': bigint;
 }
-export type B = {
-    "": null;
-} | {
-    "空的": null;
-} | {
-    "  空的  ": null;
-} | {
-    "1⃣️2⃣️3⃣️": null;
-};
+export type B = "" | "空的" | "  空的  " | "1⃣️2⃣️3⃣️";
 import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
@@ -72,10 +64,11 @@ export function createActor(canisterId: string | Principal, options?: CreateActo
 export const canisterId = _canisterId;
 export interface unicodeInterface {
     ""(arg0: bigint): Promise<bigint>;
-    "✈️  🚗 ⛱️ "(): Promise<void>;
-    "函数名"(arg0: A): Promise<B>;
-    "👀"(arg0: bigint): Promise<bigint>;
+    '✈️  🚗 ⛱️ '(): Promise<void>;
+    '函数名'(arg0: A): Promise<B>;
+    '👀'(arg0: bigint): Promise<bigint>;
 }
+import type { B as _B } from "declarations/unicode/unicode.did.d.ts";
 class Unicode implements unicodeInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
@@ -85,18 +78,32 @@ class Unicode implements unicodeInterface {
         const result = await this.#actor[""](arg0);
         return result;
     }
-    async "✈️  🚗 ⛱️ "(): Promise<void> {
+    async '✈️  🚗 ⛱️ '(): Promise<void> {
         const result = await this.#actor["✈️  🚗 ⛱️ "]();
         return result;
     }
-    async "函数名"(arg0: A): Promise<B> {
+    async '函数名'(arg0: A): Promise<B> {
         const result = await this.#actor["函数名"](arg0);
-        return result;
+        return from_candid_B_n1(result);
     }
-    async "👀"(arg0: bigint): Promise<bigint> {
+    async '👀'(arg0: bigint): Promise<bigint> {
         const result = await this.#actor["👀"](arg0);
         return result;
     }
 }
 export const unicode: unicodeInterface = new Unicode();
+function from_candid_B_n1(value: _B): B {
+    return from_candid_variant_n2(value);
+}
+function from_candid_variant_n2(value: {
+    : null;
+} | {
+    空的: null;
+} | {
+      空的  : null;
+} | {
+    1⃣️2⃣️3⃣️: null;
+}): "" | "空的" | "  空的  " | "1⃣️2⃣️3⃣️" {
+    return "" in value ? "" : "空的" in value ? "空的" : "  空的  " in value ? "  空的  " : "1⃣️2⃣️3⃣️" in value ? "1⃣️2⃣️3⃣️" : value;
+}
 

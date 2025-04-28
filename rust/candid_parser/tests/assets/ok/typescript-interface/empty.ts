@@ -59,9 +59,7 @@ export const canisterId = _canisterId;
 export interface emptyInterface {
     f(arg0: {
     }): Promise<never>;
-    g(arg0: T): Promise<{
-        a: T;
-    }>;
+    g(arg0: T): Promise<"a">;
     h(arg0: [T, never]): Promise<{
         a: T;
     } | {
@@ -78,13 +76,11 @@ class Empty implements emptyInterface {
     async f(arg0: {
     }): Promise<never> {
         const result = await this.#actor.f(arg0);
-        return result;
+        return from_candid_variant_n1(result);
     }
-    async g(arg0: T): Promise<{
-        a: T;
-    }> {
-        const result = await this.#actor.g(to_candid_T_n1(arg0));
-        return from_candid_variant_n3(result);
+    async g(arg0: T): Promise<"a"> {
+        const result = await this.#actor.g(to_candid_T_n2(arg0));
+        return from_candid_variant_n4(result);
     }
     async h(arg0: [T, never]): Promise<{
         a: T;
@@ -92,23 +88,12 @@ class Empty implements emptyInterface {
         b: {
         };
     }> {
-        const result = await this.#actor.h(to_candid_tuple_n6(arg0));
-        return from_candid_variant_n7(result);
+        const result = await this.#actor.h(to_candid_tuple_n7(arg0));
+        return from_candid_variant_n8(result);
     }
 }
 export const empty: emptyInterface = new Empty();
-function to_candid_tuple_n6(value: [T, never]): [_T, never] {
-    return [
-        to_candid_T_n1(value[0]),
-        value[1]
-    ];
-}
-function from_candid_tuple_n5(value: [_T]): [T] {
-    return [
-        from_candid_T_n4(value[0])
-    ];
-}
-function from_candid_variant_n7(value: {
+function from_candid_variant_n8(value: {
     a: _T;
 } | {
     b: [];
@@ -119,29 +104,41 @@ function from_candid_variant_n7(value: {
     };
 } {
     return "a" in value ? {
-        a: from_candid_T_n4(value.a)
+        a: from_candid_T_n5(value.a)
     } : "b" in value ? {
         b: value.b
     } : value;
 }
-function from_candid_T_n4(value: _T): T {
-    return from_candid_tuple_n5(value);
+function from_candid_variant_n1(value: never): never {
+    return value;
 }
-function to_candid_T_n1(value: T): _T {
-    return to_candid_tuple_n2(value);
-}
-function from_candid_variant_n3(value: {
-    a: _T;
-}): {
-    a: T;
-} {
-    return "a" in value ? {
-        a: from_candid_T_n4(value.a)
-    } : value;
-}
-function to_candid_tuple_n2(value: [T]): [_T] {
+function to_candid_tuple_n3(value: [T]): [_T] {
     return [
-        to_candid_T_n1(value[0])
+        to_candid_T_n2(value[0])
     ];
+}
+function from_candid_T_n5(value: _T): T {
+    return from_candid_tuple_n6(value);
+}
+function to_candid_T_n2(value: T): _T {
+    return to_candid_tuple_n3(value);
+}
+function to_candid_tuple_n7(value: [T, never]): [_T, never] {
+    return [
+        to_candid_T_n2(value[0]),
+        value[1]
+    ];
+}
+function from_candid_tuple_n6(value: [_T]): [T] {
+    return [
+        from_candid_T_n5(value[0])
+    ];
+}
+function from_candid_variant_n4(value: {
+    a: _T;
+}): "a" {
+    return "a" in value ? {
+        a: from_candid_T_n5(value.a)
+    } : value;
 }
 

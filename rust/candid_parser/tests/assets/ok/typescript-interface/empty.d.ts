@@ -19,9 +19,7 @@ export declare const canisterId: string;
 export interface emptyInterface {
     f(arg0: {
     }): Promise<never>;
-    g(arg0: T): Promise<{
-        a: T;
-    }>;
+    g(arg0: T): Promise<"a">;
     h(arg0: [T, never]): Promise<{
         a: T;
     } | {

@@ -89,10 +89,7 @@ impl<'a> TypeConverter<'a> {
                 // Only needs conversion if any field needs conversion
                 fields.iter().any(|field| self.needs_conversion(&field.ty))
             }
-            TypeInner::Variant(fields) => {
-                // Only needs conversion if any variant case needs conversion
-                fields.iter().any(|field| self.needs_conversion(&field.ty))
-            }
+            TypeInner::Variant(_) => true,
             TypeInner::Var(id) => {
                 // Check if the named type needs conversion
                 if let Ok(actual_ty) = self.env.rec_find_type(id) {
@@ -628,89 +625,122 @@ impl<'a> TypeConverter<'a> {
     }
 
     fn convert_variant_to_candid_body(&mut self, fields: &[Field], param_name: &str) -> Expr {
-        // For variants, we need to determine which variant case we're dealing with
-        // and convert only the value for that case
-
-        let mut conditions = Vec::new();
-
-        for field in fields {
-            let field_name = match &*field.id {
-                Label::Named(name) => name.clone(),
-                Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
-            };
-
-            // Check if this field exists in the input object
-            let test = Expr::Bin(BinExpr {
-                span: DUMMY_SP,
-                op: BinaryOp::In,
-                left: Box::new(Expr::Lit(Lit::Str(Str {
-                    span: DUMMY_SP,
-                    value: field_name.clone().into(),
-                    raw: None,
-                }))),
-                right: Box::new(self.create_ident(param_name)),
-            });
-
-            // Get the field value
-            let field_access = Expr::Member(MemberExpr {
-                span: DUMMY_SP,
-                obj: Box::new(self.create_ident(param_name)),
-                prop: MemberProp::Ident(
-                    Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty()).into(),
-                ),
-            });
-
-            // Convert the field value if needed
-            let value = if !self.needs_conversion(&field.ty) {
-                field_access
-            } else {
-                let function_name = self.get_to_candid_function_name(&field.ty);
-                self.generate_to_candid_function(&field.ty, &function_name);
-                self.create_call(&function_name, vec![self.create_arg(field_access)])
-            };
-
-            // Create a new object with the converted value
-            let result = Expr::Object(ObjectLit {
-                span: DUMMY_SP,
-                props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                    key: PropName::Ident(
-                        Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty()).into(),
-                    ),
-                    value: Box::new(value),
-                })))],
-            });
-
-            conditions.push((test, result));
-        }
-
-        // Build a series of ternary expressions for each case
-        if conditions.is_empty() {
-            // Return the input unchanged if no fields
+        // If there are no fields, return the input unchanged
+        if fields.is_empty() {
             return self.create_ident(param_name);
         }
 
-        // Start with the last condition
-        let (last_test, last_result) = conditions.pop().unwrap();
-
-        // Build the chain in reverse
-        let mut result_expr = Expr::Cond(CondExpr {
-            span: DUMMY_SP,
-            test: Box::new(last_test),
-            cons: Box::new(last_result),
-            alt: Box::new(self.create_ident(param_name)), // Fallback to original if nothing matches
+        // Check if all variants have the same type (especially null)
+        let all_same_type = fields.iter().skip(1).all(|f| {
+            let first_type = &fields[0].ty;
+            match (first_type.as_ref(), f.ty.as_ref()) {
+                (TypeInner::Null, TypeInner::Null) => true,
+                (a, b) => std::mem::discriminant(a) == std::mem::discriminant(b),
+            }
         });
 
-        // Add the rest of the conditions
-        for (test, result) in conditions.into_iter().rev() {
-            result_expr = Expr::Cond(CondExpr {
-                span: DUMMY_SP,
-                test: Box::new(test),
-                cons: Box::new(result),
-                alt: Box::new(result_expr),
-            });
-        }
+        if all_same_type {
+            // For variants with same type (like string literals), handle with simple string matching
+            let mut result = self.create_ident(param_name); // Default fallback
 
-        result_expr
+            // Process all fields in reverse order to build the chain
+            for field in fields.iter().rev() {
+                let field_name = match &*field.id {
+                    Label::Named(name) => name.clone(),
+                    Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
+                };
+
+                // Create condition: value === "field_name" or value == "field_name"
+                let condition = Expr::Bin(BinExpr {
+                    span: DUMMY_SP,
+                    op: BinaryOp::EqEq,
+                    left: Box::new(self.create_ident(param_name)),
+                    right: Box::new(Expr::Lit(Lit::Str(Str {
+                        span: DUMMY_SP,
+                        value: field_name.clone().into(),
+                        raw: None,
+                    }))),
+                });
+
+                // Create result: { field_name: null }
+                let field_result = Expr::Object(ObjectLit {
+                    span: DUMMY_SP,
+                    props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                        key: PropName::Ident(
+                            Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                        ),
+                        value: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
+                    })))],
+                });
+
+                // Create a new conditional with this field's condition and result,
+                // with the previous result as the alternate
+                result = Expr::Cond(CondExpr {
+                    span: DUMMY_SP,
+                    test: Box::new(condition),
+                    cons: Box::new(field_result),
+                    alt: Box::new(result),
+                });
+            }
+
+            return result;
+        } else {
+            // For variants with different types, check for _tag property
+            // This is for TypeScript unions of object types: { tag1: value1 } | { tag2: value2 }
+
+            // Build a series of conditions to check each tag
+            let mut result = self.create_ident(param_name); // Default fallback
+
+            for field in fields.iter().rev() {
+                let field_name = match &*field.id {
+                    Label::Named(name) => name.clone(),
+                    Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
+                };
+
+                // Check if this variant field exists on the object using: field in value
+                let condition = Expr::Bin(BinExpr {
+                    span: DUMMY_SP,
+                    op: BinaryOp::In,
+                    left: Box::new(Expr::Lit(Lit::Str(Str {
+                        span: DUMMY_SP,
+                        value: field_name.clone().into(),
+                        raw: None,
+                    }))),
+                    right: Box::new(self.create_ident(param_name)),
+                });
+
+                // Create result: { field_name: field_value }
+                // Use a clone of field_name to avoid the "use after move" error
+                let field_name_for_key = field_name.clone();
+                let field_result = Expr::Object(ObjectLit {
+                    span: DUMMY_SP,
+                    props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                        key: PropName::Ident(
+                            Ident::new(field_name_for_key.into(), DUMMY_SP, SyntaxContext::empty())
+                                .into(),
+                        ),
+                        value: Box::new(Expr::Member(MemberExpr {
+                            span: DUMMY_SP,
+                            obj: Box::new(self.create_ident(param_name)),
+                            prop: MemberProp::Ident(
+                                Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty())
+                                    .into(),
+                            ),
+                        })),
+                    })))],
+                });
+
+                // Create a new conditional with this field's condition and result
+                result = Expr::Cond(CondExpr {
+                    span: DUMMY_SP,
+                    test: Box::new(condition),
+                    cons: Box::new(field_result),
+                    alt: Box::new(result),
+                });
+            }
+
+            return result;
+        }
     }
     fn convert_func_to_candid_body(
         &mut self,
@@ -1270,8 +1300,89 @@ impl<'a> TypeConverter<'a> {
     }
 
     fn convert_variant_from_candid_body(&mut self, fields: &[Field], param_name: &str) -> Expr {
-        // For variants from Candid, check which tag is present and convert accordingly
+        // Check if all variants have the same type (especially null)
+        let all_same_type = fields.iter().skip(1).all(|f| {
+            let first_type = &fields[0].ty;
+            match (first_type.as_ref(), f.ty.as_ref()) {
+                (TypeInner::Null, TypeInner::Null) => true,
+                (a, b) => std::mem::discriminant(a) == std::mem::discriminant(b),
+            }
+        });
 
+        // For variants with all null or same simple type, return the tag as string
+        if all_same_type
+            && fields
+                .iter()
+                .all(|f| matches!(f.ty.as_ref(), TypeInner::Null))
+        {
+            let mut conditions = Vec::new();
+
+            for field in fields {
+                let field_name = match &*field.id {
+                    Label::Named(name) => name.clone(),
+                    Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
+                };
+
+                // Check if this field exists in the input object
+                let test = Expr::Bin(BinExpr {
+                    span: DUMMY_SP,
+                    op: BinaryOp::In,
+                    left: Box::new(Expr::Lit(Lit::Str(Str {
+                        span: DUMMY_SP,
+                        value: field_name.clone().into(),
+                        raw: None,
+                    }))),
+                    right: Box::new(self.create_ident(param_name)),
+                });
+
+                // Return the tag name as a string
+                let result = Expr::Lit(Lit::Str(Str {
+                    span: DUMMY_SP,
+                    value: field_name.into(),
+                    raw: None,
+                }));
+
+                conditions.push((test, result));
+            }
+
+            // Build the chain of conditionals
+            if conditions.is_empty() {
+                // Return the input unchanged if no fields (shouldn't happen for valid variants)
+                return self.create_ident(param_name);
+            }
+
+            // Start with the last condition and build in reverse
+            let mut pairs = conditions.into_iter().rev();
+
+            // Get the last pair
+            let (last_test, last_result) = match pairs.next() {
+                Some(pair) => pair,
+                None => return self.create_ident(param_name), // Shouldn't happen due to the check above
+            };
+
+            // Build the chain
+            let mut expr = Expr::Cond(CondExpr {
+                span: DUMMY_SP,
+                test: Box::new(last_test),
+                cons: Box::new(last_result),
+                // If we get here, it's an error
+                alt: Box::new(self.create_ident(param_name)),
+            });
+
+            // Add the rest of the conditions
+            for (test, result) in pairs {
+                expr = Expr::Cond(CondExpr {
+                    span: DUMMY_SP,
+                    test: Box::new(test),
+                    cons: Box::new(result),
+                    alt: Box::new(expr),
+                });
+            }
+
+            return expr;
+        }
+
+        // For variants with different types, create objects with each tag and value
         let mut conditions = Vec::new();
 
         for field in fields {

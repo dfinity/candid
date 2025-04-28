@@ -8,20 +8,12 @@ interface None {
 }
 type Option<T> = Some<T> | None;
 export interface A {
-    "": bigint;
-    "📦🍦": bigint;
-    "字段名": bigint;
-    "字 段 名2": bigint;
+    '\u{e000}': bigint;
+    '📦🍦': bigint;
+    '字段名': bigint;
+    '字 段 名2': bigint;
 }
-export type B = {
-    "": null;
-} | {
-    "空的": null;
-} | {
-    "  空的  ": null;
-} | {
-    "1⃣️2⃣️3⃣️": null;
-};
+export type B = "" | "空的" | "  空的  " | "1⃣️2⃣️3⃣️";
 import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
@@ -32,8 +24,8 @@ export declare const createActor: (canisterId: string | Principal, actor?: Creat
 export declare const canisterId: string;
 export interface unicodeInterface {
     ""(arg0: bigint): Promise<bigint>;
-    "✈️  🚗 ⛱️ "(): Promise<void>;
-    "函数名"(arg0: A): Promise<B>;
-    "👀"(arg0: bigint): Promise<bigint>;
+    '✈️  🚗 ⛱️ '(): Promise<void>;
+    '函数名'(arg0: A): Promise<B>;
+    '👀'(arg0: bigint): Promise<bigint>;
 }
 

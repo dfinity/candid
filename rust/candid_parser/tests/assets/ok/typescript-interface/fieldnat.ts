@@ -64,11 +64,7 @@ export interface fieldnatInterface {
     bab(arg0: bigint, arg1: bigint): Promise<void>;
     bar(arg0: {
         2: bigint;
-    }): Promise<{
-        e20: null;
-    } | {
-        e30: null;
-    }>;
+    }): Promise<"e20" | "e30">;
     bas(arg0: [bigint, bigint]): Promise<[string, bigint]>;
     baz(arg0: {
         _2_: bigint;
@@ -76,9 +72,7 @@ export interface fieldnatInterface {
     }): Promise<{
     }>;
     bba(arg0: tuple): Promise<non_tuple>;
-    bib(arg0: [bigint]): Promise<{
-        _0_: bigint;
-    }>;
+    bib(arg0: [bigint]): Promise<"_0">;
     foo(arg0: {
         _2_: bigint;
     }): Promise<{
@@ -97,13 +91,9 @@ class Fieldnat implements fieldnatInterface {
     }
     async bar(arg0: {
         2: bigint;
-    }): Promise<{
-        e20: null;
-    } | {
-        e30: null;
-    }> {
+    }): Promise<"e20" | "e30"> {
         const result = await this.#actor.bar(arg0);
-        return result;
+        return from_candid_variant_n1(result);
     }
     async bas(arg0: [bigint, bigint]): Promise<[string, bigint]> {
         const result = await this.#actor.bas(arg0);
@@ -121,11 +111,9 @@ class Fieldnat implements fieldnatInterface {
         const result = await this.#actor.bba(arg0);
         return result;
     }
-    async bib(arg0: [bigint]): Promise<{
-        _0_: bigint;
-    }> {
+    async bib(arg0: [bigint]): Promise<"_0"> {
         const result = await this.#actor.bib(arg0);
-        return result;
+        return from_candid_variant_n2(result);
     }
     async foo(arg0: {
         _2_: bigint;
@@ -138,4 +126,18 @@ class Fieldnat implements fieldnatInterface {
     }
 }
 export const fieldnat: fieldnatInterface = new Fieldnat();
+function from_candid_variant_n2(value: {
+    _0_: bigint;
+}): "_0" {
+    return "_0_" in value ? {
+        _0_: value._0_
+    } : value;
+}
+function from_candid_variant_n1(value: {
+    e20: null;
+} | {
+    e30: null;
+}): "e20" | "e30" {
+    return "e20" in value ? "e20" : "e30" in value ? "e30" : value;
+}
 

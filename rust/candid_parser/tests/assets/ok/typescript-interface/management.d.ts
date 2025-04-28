@@ -8,11 +8,7 @@ interface None {
 }
 type Option<T> = Some<T> | None;
 export type bitcoin_address = string;
-export type bitcoin_network = {
-    mainnet: null;
-} | {
-    testnet: null;
-};
+export type bitcoin_network = "mainnet" | "testnet";
 export type block_hash = Uint8Array | number[];
 export type canister_id = Principal;
 export interface canister_settings {
@@ -27,9 +23,7 @@ export interface definite_canister_settings {
     memory_allocation: bigint;
     compute_allocation: bigint;
 }
-export type ecdsa_curve = {
-    secp256k1: null;
-};
+export type ecdsa_curve = "secp256k1";
 export interface get_balance_request {
     network: bitcoin_network;
     address: bitcoin_address;
@@ -95,13 +89,7 @@ export interface managementInterface {
     canister_status(arg0: {
         canister_id: canister_id;
     }): Promise<{
-        status: {
-            stopped: null;
-        } | {
-            stopping: null;
-        } | {
-            running: null;
-        };
+        status: "stopped" | "stopping" | "running";
         memory_size: bigint;
         cycles: bigint;
         settings: definite_canister_settings;
@@ -132,13 +120,7 @@ export interface managementInterface {
     }>;
     http_request(arg0: {
         url: string;
-        method: {
-            get: null;
-        } | {
-            head: null;
-        } | {
-            post: null;
-        };
+        method: "get" | "head" | "post";
         max_response_bytes?: bigint;
         body?: Uint8Array | number[];
         transform?: {
@@ -150,13 +132,7 @@ export interface managementInterface {
     install_code(arg0: {
         arg: Uint8Array | number[];
         wasm_module: wasm_module;
-        mode: {
-            reinstall: null;
-        } | {
-            upgrade: null;
-        } | {
-            install: null;
-        };
+        mode: "reinstall" | "upgrade" | "install";
         canister_id: canister_id;
     }): Promise<void>;
     provisional_create_canister_with_cycles(arg0: {

@@ -72,43 +72,15 @@ export interface nested {
         _43_: number;
     };
     _40_: bigint;
-    _41_: {
-        _42_: null;
-    } | {
-        A: null;
-    } | {
-        B: null;
-    } | {
-        C: null;
-    };
+    _41_: "_42" | "A" | "B" | "C";
     _42_: bigint;
 }
-export type nested_res = {
-    Ok: {
-        Ok: null;
-    } | {
-        Err: null;
-    };
-} | {
-    Err: {
-        Ok: {
-            content: string;
-        };
-    } | {
-        Err: [bigint];
-    };
-};
+export type nested_res = "Ok" | "Err";
 export interface node {
     head: bigint;
     tail: list;
 }
-export type res = {
-    Ok: [bigint, bigint];
-} | {
-    Err: {
-        error: string;
-    };
-};
+export type res = "Ok" | "Err";
 export interface sInterface {
     f: [Principal, string];
     g(arg0: list): Promise<[B, tree, stream]>;
@@ -159,14 +131,10 @@ export interface exampleInterface {
                 result: string;
             };
         } | {
-            Err: {
-                a: null;
-            } | {
-                b: null;
-            };
+            Err: "a" | "b";
         }]>;
 }
-import type { stream as _stream, B as _B, b as _b, list as _list, tree as _tree, a as _a, node as _node, List as _List, A as _A } from "declarations/example/example.did.d.ts";
+import type { nested_res as _nested_res, tree as _tree, List as _List, A as _A, node as _node, a as _a, list as _list, stream as _stream, B as _B, nested as _nested, b as _b } from "declarations/example/example.did.d.ts";
 class Example implements exampleInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
@@ -189,11 +157,11 @@ class Example implements exampleInterface {
         ];
     }
     async g1(arg0: my_type, arg1: List, arg2: List | null, arg3: nested): Promise<[bigint, Principal, nested_res]> {
-        const result = await this.#actor.g1(arg0, to_candid_List_n14(arg1), to_candid_opt_n17(arg2), arg3);
+        const result = await this.#actor.g1(arg0, to_candid_List_n14(arg1), to_candid_opt_n17(arg2), to_candid_nested_n18(arg3));
         return [
             result[0],
             result[1],
-            result[2]
+            from_candid_nested_res_n21(result[2])
         ];
     }
     async h(arg0: Array<string | null>, arg1: {
@@ -205,7 +173,7 @@ class Example implements exampleInterface {
         };
         id: bigint;
     }> {
-        const result = await this.#actor.h(to_candid_vec_n18(arg0), to_candid_variant_n20(arg1), to_candid_opt_n17(arg2));
+        const result = await this.#actor.h(to_candid_vec_n25(arg0), to_candid_variant_n27(arg1), to_candid_opt_n17(arg2));
         return result;
     }
     async x(arg0: a, arg1: b): Promise<[a | null, b | null, {
@@ -213,47 +181,93 @@ class Example implements exampleInterface {
                 result: string;
             };
         } | {
-            Err: {
-                a: null;
-            } | {
-                b: null;
-            };
+            Err: "a" | "b";
         }]> {
-        const result = await this.#actor.x(arg0, arg1);
+        const result = await this.#actor.x(to_candid_a_n28(arg0), arg1);
         return [
-            from_candid_opt_n21(result[0]),
-            from_candid_opt_n22(result[1]),
-            result[2]
+            from_candid_opt_n30(result[0]),
+            from_candid_opt_n33(result[1]),
+            from_candid_variant_n34(result[2])
         ];
     }
 }
 export const example: exampleInterface = new Example();
-function from_candid_A_n8(value: _A): A {
-    return from_candid_opt_n7(value);
+function to_candid_List_n14(value: List): _List {
+    return to_candid_opt_n15(value);
 }
-function from_candid_opt_n22(value: [] | [_b]): b | null {
-    return value.length === 0 ? null : value[0];
+function from_candid_variant_n35(value: {
+    a: null;
+} | {
+    b: null;
+}): "a" | "b" {
+    return "a" in value ? "a" : "b" in value ? "b" : value;
 }
 function to_candid_opt_n2(value: node | null): [] | [_node] {
     return value === null ? candid_none() : candid_some(to_candid_node_n3(value));
 }
-function to_candid_list_n1(value: list): _list {
-    return to_candid_opt_n2(value);
+function to_candid_node_n3(value: node): _node {
+    return to_candid_record_n4(value);
 }
-function from_candid_record_n11(value: {
-    val: bigint;
-    left: _tree;
-    right: _tree;
-}): {
-    val: bigint;
-    left: tree;
-    right: tree;
+function to_candid_variant_n20(value: "_42" | "A" | "B" | "C"): {
+    _42_: null;
+} | {
+    A: null;
+} | {
+    B: null;
+} | {
+    C: null;
 } {
-    return {
-        val: value.val,
-        left: from_candid_tree_n9(value.left),
-        right: from_candid_tree_n9(value.right)
-    };
+    return value == "_42_" ? {
+        _42_: null
+    } : value == "A" ? {
+        A: null
+    } : value == "B" ? {
+        B: null
+    } : value == "C" ? {
+        C: null
+    } : value;
+}
+function from_candid_opt_n13(value: [] | [{
+        head: bigint;
+        next: [Principal, string];
+    }]): {
+    head: bigint;
+    next: [Principal, string];
+} | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_stream_n12(value: _stream): stream {
+    return from_candid_opt_n13(value);
+}
+function to_candid_variant_n27(value: {
+    A: bigint;
+} | {
+    B?: string;
+}): {
+    A: bigint;
+} | {
+    B: [] | [string];
+} {
+    return "A" in value ? {
+        A: value.A
+    } : "B" in value ? {
+        B: value.B
+    } : value;
+}
+function from_candid_B_n6(value: _B): B {
+    return from_candid_opt_n7(value);
+}
+function to_candid_opt_n5(value: boolean | null): [] | [boolean] {
+    return value === null ? candid_none() : candid_some(value);
+}
+function to_candid_opt_n15(value: {
+    head: bigint;
+    tail: List;
+} | null): [] | [{
+        head: bigint;
+        tail: _List;
+    }] {
+    return value === null ? candid_none() : candid_some(to_candid_record_n16(value));
 }
 function from_candid_variant_n10(value: {
     branch: {
@@ -278,28 +292,97 @@ function from_candid_variant_n10(value: {
         leaf: value.leaf
     } : value;
 }
-function to_candid_opt_n17(value: List | null): [] | [_List] {
-    return value === null ? candid_none() : candid_some(to_candid_List_n14(value));
-}
-function to_candid_opt_n19(value: string | null): [] | [string] {
-    return value === null ? candid_none() : candid_some(value);
-}
-function from_candid_tree_n9(value: _tree): tree {
-    return from_candid_variant_n10(value);
-}
-function to_candid_variant_n20(value: {
-    A: bigint;
+function from_candid_variant_n32(value: {
+    a: null;
 } | {
-    B?: string;
+    b: _b;
 }): {
-    A: bigint;
+    a: null;
 } | {
-    B: [] | [string];
+    b: b;
 } {
-    return "A" in value ? {
-        A: value.A
-    } : "B" in value ? {
-        B: to_candid_opt_n19(value.B)
+    return "a" in value ? {
+        a: value.a
+    } : "b" in value ? {
+        b: value.b
+    } : value;
+}
+function from_candid_nested_res_n21(value: _nested_res): nested_res {
+    return from_candid_variant_n22(value);
+}
+function from_candid_variant_n24(value: {
+    Ok: {
+        content: string;
+    };
+} | {
+    Err: [bigint];
+}): "Ok" | "Err" {
+    return "Ok" in value ? {
+        Ok: value.Ok
+    } : "Err" in value ? {
+        Err: value.Err
+    } : value;
+}
+function to_candid_nested_n18(value: nested): _nested {
+    return to_candid_tuple_n19(value);
+}
+function from_candid_record_n11(value: {
+    val: bigint;
+    left: _tree;
+    right: _tree;
+}): {
+    val: bigint;
+    left: tree;
+    right: tree;
+} {
+    return {
+        val: value.val,
+        left: from_candid_tree_n9(value.left),
+        right: from_candid_tree_n9(value.right)
+    };
+}
+function from_candid_opt_n30(value: [] | [_a]): a | null {
+    return value.length === 0 ? null : from_candid_a_n31(value[0]);
+}
+function from_candid_variant_n34(value: {
+    Ok: {
+        result: string;
+    };
+} | {
+    Err: {
+        a: null;
+    } | {
+        b: null;
+    };
+}): {
+    Ok: {
+        result: string;
+    };
+} | {
+    Err: "a" | "b";
+} {
+    return "Ok" in value ? {
+        Ok: value.Ok
+    } : "Err" in value ? {
+        Err: from_candid_variant_n35(value.Err)
+    } : value;
+}
+function to_candid_a_n28(value: a): _a {
+    return to_candid_variant_n29(value);
+}
+function to_candid_variant_n29(value: {
+    a: null;
+} | {
+    b: b;
+}): {
+    a: null;
+} | {
+    b: _b;
+} {
+    return "a" in value ? {
+        a: value.a
+    } : "b" in value ? {
+        b: value.b
     } : value;
 }
 function to_candid_record_n4(value: {
@@ -314,8 +397,46 @@ function to_candid_record_n4(value: {
         tail: to_candid_list_n1(value.tail)
     };
 }
-function from_candid_stream_n12(value: _stream): stream {
-    return from_candid_opt_n13(value);
+function to_candid_tuple_n19(value: {
+    _0_: bigint;
+    _1_: bigint;
+    _2_: [bigint, bigint];
+    _3_: {
+        _0_: bigint;
+        _42_: bigint;
+        _43_: number;
+    };
+    _40_: bigint;
+    _41_: "_42" | "A" | "B" | "C";
+    _42_: bigint;
+}): [bigint, bigint, [bigint, bigint], [bigint, bigint, number], bigint, {
+        _42_: null;
+    } | {
+        A: null;
+    } | {
+        B: null;
+    } | {
+        C: null;
+    }, bigint] {
+    return [
+        value[0],
+        value[1],
+        value[2],
+        value[3],
+        value[4],
+        to_candid_variant_n20(value[5]),
+        value[6]
+    ];
+}
+function from_candid_A_n8(value: _A): A {
+    return from_candid_opt_n7(value);
+}
+function from_candid_variant_n23(value: {
+    Ok: null;
+} | {
+    Err: null;
+}): "Ok" | "Err" {
+    return "Ok" in value ? "Ok" : "Err" in value ? "Err" : value;
 }
 function to_candid_record_n16(value: {
     head: bigint;
@@ -329,43 +450,49 @@ function to_candid_record_n16(value: {
         tail: to_candid_List_n14(value.tail)
     };
 }
-function to_candid_vec_n18(value: Array<string | null>): Array<[] | [string]> {
-    return value.map((x)=>to_candid_opt_n19(x));
+function to_candid_opt_n17(value: List | null): [] | [_List] {
+    return value === null ? candid_none() : candid_some(to_candid_List_n14(value));
 }
-function to_candid_opt_n5(value: boolean | null): [] | [boolean] {
+function from_candid_variant_n22(value: {
+    Ok: {
+        Ok: null;
+    } | {
+        Err: null;
+    };
+} | {
+    Err: {
+        Ok: {
+            content: string;
+        };
+    } | {
+        Err: [bigint];
+    };
+}): "Ok" | "Err" {
+    return "Ok" in value ? {
+        Ok: from_candid_variant_n23(value.Ok)
+    } : "Err" in value ? {
+        Err: from_candid_variant_n24(value.Err)
+    } : value;
+}
+function to_candid_opt_n26(value: string | null): [] | [string] {
     return value === null ? candid_none() : candid_some(value);
 }
-function to_candid_opt_n15(value: {
-    head: bigint;
-    tail: List;
-} | null): [] | [{
-        head: bigint;
-        tail: _List;
-    }] {
-    return value === null ? candid_none() : candid_some(to_candid_record_n16(value));
-}
-function to_candid_node_n3(value: node): _node {
-    return to_candid_record_n4(value);
-}
-function from_candid_opt_n13(value: [] | [{
-        head: bigint;
-        next: [Principal, string];
-    }]): {
-    head: bigint;
-    next: [Principal, string];
-} | null {
+function from_candid_opt_n33(value: [] | [_b]): b | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_B_n6(value: _B): B {
-    return from_candid_opt_n7(value);
+function to_candid_vec_n25(value: Array<string | null>): Array<[] | [string]> {
+    return value.map((x)=>to_candid_opt_n26(x));
 }
-function to_candid_List_n14(value: List): _List {
-    return to_candid_opt_n15(value);
+function to_candid_list_n1(value: list): _list {
+    return to_candid_opt_n2(value);
 }
-function from_candid_opt_n21(value: [] | [_a]): a | null {
-    return value.length === 0 ? null : value[0];
+function from_candid_a_n31(value: _a): a {
+    return from_candid_variant_n32(value);
 }
 function from_candid_opt_n7(value: [] | [_A]): Some<A> | None {
     return value.length === 0 ? none() : some(from_candid_A_n8(value[0]));
+}
+function from_candid_tree_n9(value: _tree): tree {
+    return from_candid_variant_n10(value);
 }
 

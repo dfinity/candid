@@ -35,43 +35,15 @@ export interface nested {
         _43_: number;
     };
     _40_: bigint;
-    _41_: {
-        _42_: null;
-    } | {
-        A: null;
-    } | {
-        B: null;
-    } | {
-        C: null;
-    };
+    _41_: "_42" | "A" | "B" | "C";
     _42_: bigint;
 }
-export type nested_res = {
-    Ok: {
-        Ok: null;
-    } | {
-        Err: null;
-    };
-} | {
-    Err: {
-        Ok: {
-            content: string;
-        };
-    } | {
-        Err: [bigint];
-    };
-};
+export type nested_res = "Ok" | "Err";
 export interface node {
     head: bigint;
     tail: list;
 }
-export type res = {
-    Ok: [bigint, bigint];
-} | {
-    Err: {
-        error: string;
-    };
-};
+export type res = "Ok" | "Err";
 export interface sInterface {
     f: [Principal, string];
     g(arg0: list): Promise<[B, tree, stream]>;
@@ -119,11 +91,7 @@ export interface exampleInterface {
                 result: string;
             };
         } | {
-            Err: {
-                a: null;
-            } | {
-                b: null;
-            };
+            Err: "a" | "b";
         }]>;
 }
 
