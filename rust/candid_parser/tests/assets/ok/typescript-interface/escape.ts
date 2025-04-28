@@ -45,10 +45,10 @@ function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
 export interface t {
-    "\"": bigint;
-    "\'": bigint;
-    "\"\'": bigint;
-    "\\\n\'\"": bigint;
+    '\"': bigint;
+    '\'': bigint;
+    '\"\'': bigint;
+    '\\\n\'\"': bigint;
 }
 import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
@@ -62,14 +62,14 @@ export function createActor(canisterId: string | Principal, options?: CreateActo
 }
 export const canisterId = _canisterId;
 export interface escapeInterface {
-    "\n\'\"\'\'\"\"\r\t"(arg0: t): Promise<void>;
+    '\n\'\"\'\'\"\"\r\t'(arg0: t): Promise<void>;
 }
 class Escape implements escapeInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
         this.#actor = actor ?? _escape;
     }
-    async "\n\'\"\'\'\"\"\r\t"(arg0: t): Promise<void> {
+    async '\n\'\"\'\'\"\"\r\t'(arg0: t): Promise<void> {
         const result = await this.#actor["\n'\"''\"\"\r	"](arg0);
         return result;
     }

@@ -256,6 +256,32 @@ fn add_type_definitions(env: &TypeEnv, module: &mut Module) {
                             decl: Decl::TsTypeAlias(Box::new(type_alias)),
                         })));
                 }
+                TypeInner::Variant(ref fs) => {
+                    // Check if all variants have the same type (especially null)
+                    let all_same_type = !fs.is_empty()
+                        && fs.iter().skip(1).all(|f| {
+                            let first_type = &fs[0].ty;
+                            match (first_type.as_ref(), f.ty.as_ref()) {
+                                (TypeInner::Null, TypeInner::Null) => true,
+                                (a, b) => std::mem::discriminant(a) == std::mem::discriminant(b),
+                            }
+                        });
+
+                    if all_same_type {
+                        // Generate string literal union for variant types with same type
+                        let type_union = create_string_literal_union(id, fs);
+                        module.body.push(type_union);
+                    } else {
+                        // Generate type alias for variant types with different types
+                        let type_alias = create_type_alias(env, id, ty);
+                        module
+                            .body
+                            .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                                span: DUMMY_SP,
+                                decl: Decl::TsTypeAlias(Box::new(type_alias)),
+                            })));
+                    }
+                }
                 _ => {
                     // Generate type alias for other types
                     let type_alias = create_type_alias(env, id, ty);
@@ -763,21 +789,67 @@ pub fn convert_type(env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
                     kind: TsKeywordTypeKind::TsNeverKeyword,
                 })
             } else {
-                // Create union of object types
-                TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
-                    TsUnionType {
-                        span: DUMMY_SP,
-                        types: fs
-                            .iter()
-                            .map(|f| {
-                                Box::new(TsType::TsTypeLit(TsTypeLit {
-                                    span: DUMMY_SP,
-                                    members: vec![create_property_signature(env, f)],
-                                }))
-                            })
-                            .collect(),
-                    },
-                ))
+                // Check if all variants have the same type (especially null)
+                let all_same_type = fs.iter().skip(1).all(|f| {
+                    let first_type = &fs[0].ty;
+                    match (first_type.as_ref(), f.ty.as_ref()) {
+                        (Null, Null) => true,
+                        (a, b) => std::mem::discriminant(a) == std::mem::discriminant(b),
+                    }
+                });
+
+                if all_same_type && is_ref {
+                    // For variants with the same type, create union of string literals
+                    if let TypeInner::Var(id) = ty.as_ref() {
+                        // For named type references
+                        TsType::TsTypeRef(TsTypeRef {
+                            span: DUMMY_SP,
+                            type_name: TsEntityName::Ident(get_ident_guarded(id)),
+                            type_params: None,
+                        })
+                    } else {
+                        // For inline variants, create union of string literals directly
+                        TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
+                            TsUnionType {
+                                span: DUMMY_SP,
+                                types: fs
+                                    .iter()
+                                    .map(|f| {
+                                        let variant_name = match &*f.id {
+                                            Label::Named(name) => name.clone(),
+                                            Label::Id(n) | Label::Unnamed(n) => format!("_{}", n),
+                                        };
+
+                                        Box::new(TsType::TsLitType(TsLitType {
+                                            span: DUMMY_SP,
+                                            lit: TsLit::Str(Str {
+                                                span: DUMMY_SP,
+                                                value: variant_name.into(),
+                                                raw: None,
+                                            }),
+                                        }))
+                                    })
+                                    .collect(),
+                            },
+                        ))
+                    }
+                } else {
+                    // Create union of object types (original behavior)
+                    TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
+                        TsUnionType {
+                            span: DUMMY_SP,
+                            types: fs
+                                .iter()
+                                .map(|f| {
+                                    Box::new(TsType::TsTypeLit(TsTypeLit {
+                                        span: DUMMY_SP,
+                                        members: vec![create_property_signature(env, f)],
+                                    }))
+                                })
+                                .collect(),
+                        },
+                    ))
+                }
             }
         }
         // Note: we map to a generic function, which is specified by Principal and function name
@@ -1458,4 +1530,58 @@ pub fn is_recursive_optional(
         }
         _ => false,
     }
+}
+
+// Create a string literal union type for variants with same type
+fn create_string_literal_union(id: &str, fs: &[Field]) -> ModuleItem {
+    // Create union of string literals
+    let union_type =
+        TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(TsUnionType {
+            span: DUMMY_SP,
+            types: fs
+                .iter()
+                .map(|f| {
+                    let variant_name = match &*f.id {
+                        Label::Named(name) => name.clone(),
+                        Label::Id(n) | Label::Unnamed(n) => format!("_{}", n),
+                    };
+
+                    Box::new(TsType::TsLitType(TsLitType {
+                        span: DUMMY_SP,
+                        lit: TsLit::Str(Str {
+                            span: DUMMY_SP,
+                            value: variant_name.into(),
+                            raw: None,
+                        }),
+                    }))
+                })
+                .collect(),
+        }));
+
+    // Create type alias using the union
+    ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+        span: DUMMY_SP,
+        decl: Decl::TsTypeAlias(Box::new(TsTypeAliasDecl {
+            span: DUMMY_SP,
+            declare: false,
+            id: get_ident_guarded(id),
+            type_params: None,
+            type_ann: Box::new(union_type),
+        })),
+    }))
+}
+
+// Helper function to detect if all variants have the same type
+fn all_variants_same_type(fs: &[Field]) -> bool {
+    if fs.is_empty() {
+        return false;
+    }
+
+    fs.iter().skip(1).all(|f| {
+        let first_type = &fs[0].ty;
+        match (first_type.as_ref(), f.ty.as_ref()) {
+            (TypeInner::Null, TypeInner::Null) => true,
+            (a, b) => std::mem::discriminant(a) == std::mem::discriminant(b),
+        }
+    })
 }

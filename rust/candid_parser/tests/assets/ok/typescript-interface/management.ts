@@ -45,11 +45,7 @@ function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
 export type bitcoin_address = string;
-export type bitcoin_network = {
-    mainnet: null;
-} | {
-    testnet: null;
-};
+export type bitcoin_network = "mainnet" | "testnet";
 export type block_hash = Uint8Array | number[];
 export type canister_id = Principal;
 export interface canister_settings {
@@ -64,9 +60,7 @@ export interface definite_canister_settings {
     memory_allocation: bigint;
     compute_allocation: bigint;
 }
-export type ecdsa_curve = {
-    secp256k1: null;
-};
+export type ecdsa_curve = "secp256k1";
 export interface get_balance_request {
     network: bitcoin_network;
     address: bitcoin_address;
@@ -135,13 +129,7 @@ export interface managementInterface {
     canister_status(arg0: {
         canister_id: canister_id;
     }): Promise<{
-        status: {
-            stopped: null;
-        } | {
-            stopping: null;
-        } | {
-            running: null;
-        };
+        status: "stopped" | "stopping" | "running";
         memory_size: bigint;
         cycles: bigint;
         settings: definite_canister_settings;
@@ -172,13 +160,7 @@ export interface managementInterface {
     }>;
     http_request(arg0: {
         url: string;
-        method: {
-            get: null;
-        } | {
-            head: null;
-        } | {
-            post: null;
-        };
+        method: "get" | "head" | "post";
         max_response_bytes?: bigint;
         body?: Uint8Array | number[];
         transform?: {
@@ -190,13 +172,7 @@ export interface managementInterface {
     install_code(arg0: {
         arg: Uint8Array | number[];
         wasm_module: wasm_module;
-        mode: {
-            reinstall: null;
-        } | {
-            upgrade: null;
-        } | {
-            install: null;
-        };
+        mode: "reinstall" | "upgrade" | "install";
         canister_id: canister_id;
     }): Promise<void>;
     provisional_create_canister_with_cycles(arg0: {
@@ -235,7 +211,7 @@ export interface managementInterface {
         settings: canister_settings;
     }): Promise<void>;
 }
-import type { block_hash as _block_hash, http_header as _http_header, canister_id as _canister_id, get_balance_request as _get_balance_request, utxo as _utxo, ecdsa_curve as _ecdsa_curve, bitcoin_network as _bitcoin_network, get_utxos_request as _get_utxos_request, definite_canister_settings as _definite_canister_settings, bitcoin_address as _bitcoin_address, canister_settings as _canister_settings, get_utxos_response as _get_utxos_response } from "declarations/management/management.did.d.ts";
+import type { canister_id as _canister_id, send_transaction_request as _send_transaction_request, get_balance_request as _get_balance_request, bitcoin_address as _bitcoin_address, get_utxos_response as _get_utxos_response, get_utxos_request as _get_utxos_request, get_current_fee_percentiles_request as _get_current_fee_percentiles_request, utxo as _utxo, bitcoin_network as _bitcoin_network, canister_settings as _canister_settings, wasm_module as _wasm_module, http_header as _http_header, block_hash as _block_hash, ecdsa_curve as _ecdsa_curve, definite_canister_settings as _definite_canister_settings } from "declarations/management/management.did.d.ts";
 class Management implements managementInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
@@ -246,27 +222,21 @@ class Management implements managementInterface {
         return result;
     }
     async bitcoin_get_current_fee_percentiles(arg0: get_current_fee_percentiles_request): Promise<BigUint64Array | bigint[]> {
-        const result = await this.#actor.bitcoin_get_current_fee_percentiles(arg0);
+        const result = await this.#actor.bitcoin_get_current_fee_percentiles(to_candid_get_current_fee_percentiles_request_n5(arg0));
         return result;
     }
     async bitcoin_get_utxos(arg0: get_utxos_request): Promise<get_utxos_response> {
-        const result = await this.#actor.bitcoin_get_utxos(to_candid_get_utxos_request_n3(arg0));
-        return from_candid_get_utxos_response_n5(result);
+        const result = await this.#actor.bitcoin_get_utxos(to_candid_get_utxos_request_n7(arg0));
+        return from_candid_get_utxos_response_n10(result);
     }
     async bitcoin_send_transaction(arg0: send_transaction_request): Promise<void> {
-        const result = await this.#actor.bitcoin_send_transaction(arg0);
+        const result = await this.#actor.bitcoin_send_transaction(to_candid_send_transaction_request_n13(arg0));
         return result;
     }
     async canister_status(arg0: {
         canister_id: canister_id;
     }): Promise<{
-        status: {
-            stopped: null;
-        } | {
-            stopping: null;
-        } | {
-            running: null;
-        };
+        status: "stopped" | "stopping" | "running";
         memory_size: bigint;
         cycles: bigint;
         settings: definite_canister_settings;
@@ -274,14 +244,14 @@ class Management implements managementInterface {
         module_hash?: Uint8Array | number[];
     }> {
         const result = await this.#actor.canister_status(arg0);
-        return from_candid_record_n8(result);
+        return from_candid_record_n15(result);
     }
     async create_canister(arg0: {
         settings?: canister_settings;
     }): Promise<{
         canister_id: canister_id;
     }> {
-        const result = await this.#actor.create_canister(to_candid_record_n9(arg0));
+        const result = await this.#actor.create_canister(to_candid_record_n17(arg0));
         return result;
     }
     async delete_canister(arg0: {
@@ -307,18 +277,12 @@ class Management implements managementInterface {
         public_key: Uint8Array | number[];
         chain_code: Uint8Array | number[];
     }> {
-        const result = await this.#actor.ecdsa_public_key(to_candid_record_n12(arg0));
+        const result = await this.#actor.ecdsa_public_key(to_candid_record_n20(arg0));
         return result;
     }
     async http_request(arg0: {
         url: string;
-        method: {
-            get: null;
-        } | {
-            head: null;
-        } | {
-            post: null;
-        };
+        method: "get" | "head" | "post";
         max_response_bytes?: bigint;
         body?: Uint8Array | number[];
         transform?: {
@@ -327,22 +291,16 @@ class Management implements managementInterface {
         };
         headers: Array<http_header>;
     }): Promise<http_response> {
-        const result = await this.#actor.http_request(to_candid_record_n13(arg0));
+        const result = await this.#actor.http_request(to_candid_record_n24(arg0));
         return result;
     }
     async install_code(arg0: {
         arg: Uint8Array | number[];
         wasm_module: wasm_module;
-        mode: {
-            reinstall: null;
-        } | {
-            upgrade: null;
-        } | {
-            install: null;
-        };
+        mode: "reinstall" | "upgrade" | "install";
         canister_id: canister_id;
     }): Promise<void> {
-        const result = await this.#actor.install_code(arg0);
+        const result = await this.#actor.install_code(to_candid_record_n26(arg0));
         return result;
     }
     async provisional_create_canister_with_cycles(arg0: {
@@ -352,7 +310,7 @@ class Management implements managementInterface {
     }): Promise<{
         canister_id: canister_id;
     }> {
-        const result = await this.#actor.provisional_create_canister_with_cycles(to_candid_record_n14(arg0));
+        const result = await this.#actor.provisional_create_canister_with_cycles(to_candid_record_n28(arg0));
         return result;
     }
     async provisional_top_up_canister(arg0: {
@@ -376,7 +334,7 @@ class Management implements managementInterface {
     }): Promise<{
         signature: Uint8Array | number[];
     }> {
-        const result = await this.#actor.sign_with_ecdsa(arg0);
+        const result = await this.#actor.sign_with_ecdsa(to_candid_record_n29(arg0));
         return result;
     }
     async start_canister(arg0: {
@@ -401,59 +359,47 @@ class Management implements managementInterface {
         canister_id: Principal;
         settings: canister_settings;
     }): Promise<void> {
-        const result = await this.#actor.update_settings(to_candid_record_n15(arg0));
+        const result = await this.#actor.update_settings(to_candid_record_n30(arg0));
         return result;
     }
 }
 export const management: managementInterface = new Management();
-function from_candid_opt_n7(value: [] | [Uint8Array | number[]]): Uint8Array | number[] | null {
-    return value.length === 0 ? null : value[0];
-}
-function from_candid_record_n8(value: {
-    status: {
-        stopped: null;
-    } | {
-        stopping: null;
-    } | {
-        running: null;
-    };
-    memory_size: bigint;
-    cycles: bigint;
-    settings: _definite_canister_settings;
-    idle_cycles_burned_per_day: bigint;
-    module_hash: [] | [Uint8Array | number[]];
+function to_candid_record_n2(value: {
+    network: bitcoin_network;
+    address: bitcoin_address;
+    min_confirmations?: number;
 }): {
-    status: {
-        stopped: null;
-    } | {
-        stopping: null;
-    } | {
-        running: null;
-    };
-    memory_size: bigint;
-    cycles: bigint;
-    settings: definite_canister_settings;
-    idle_cycles_burned_per_day: bigint;
-    module_hash?: Uint8Array | number[];
+    network: _bitcoin_network;
+    address: _bitcoin_address;
+    min_confirmations: [] | [number];
 } {
     return {
-        status: value.status,
-        memory_size: value.memory_size,
-        cycles: value.cycles,
-        settings: value.settings,
-        idle_cycles_burned_per_day: value.idle_cycles_burned_per_day,
-        module_hash: record_opt_to_undefined(from_candid_opt_n7(value.module_hash))
+        network: to_candid_bitcoin_network_n3(value.network),
+        address: value.address,
+        min_confirmations: value.min_confirmations ? candid_some(value.min_confirmations) : candid_none()
     };
 }
-function to_candid_record_n13(value: {
-    url: string;
-    method: {
-        get: null;
-    } | {
-        head: null;
-    } | {
-        post: null;
+function to_candid_record_n14(value: {
+    transaction: Uint8Array | number[];
+    network: bitcoin_network;
+}): {
+    transaction: Uint8Array | number[];
+    network: _bitcoin_network;
+} {
+    return {
+        transaction: value.transaction,
+        network: to_candid_bitcoin_network_n3(value.network)
     };
+}
+function from_candid_get_utxos_response_n10(value: _get_utxos_response): get_utxos_response {
+    return from_candid_record_n11(value);
+}
+function to_candid_canister_settings_n18(value: canister_settings): _canister_settings {
+    return to_candid_record_n19(value);
+}
+function to_candid_record_n24(value: {
+    url: string;
+    method: "get" | "head" | "post";
     max_response_bytes?: bigint;
     body?: Uint8Array | number[];
     transform?: {
@@ -480,46 +426,90 @@ function to_candid_record_n13(value: {
 } {
     return {
         url: value.url,
-        method: value.method,
+        method: to_candid_variant_n25(value.method),
         max_response_bytes: value.max_response_bytes ? candid_some(value.max_response_bytes) : candid_none(),
         body: value.body ? candid_some(value.body) : candid_none(),
         transform: value.transform ? candid_some(value.transform) : candid_none(),
         headers: value.headers
     };
 }
-function to_candid_get_balance_request_n1(value: get_balance_request): _get_balance_request {
-    return to_candid_record_n2(value);
+function to_candid_get_current_fee_percentiles_request_n5(value: get_current_fee_percentiles_request): _get_current_fee_percentiles_request {
+    return to_candid_record_n6(value);
 }
-function to_candid_record_n4(value: {
-    network: bitcoin_network;
-    filter?: {
-        page: Uint8Array | number[];
-    } | {
-        min_confirmations: number;
+function from_candid_opt_n12(value: [] | [Uint8Array | number[]]): Uint8Array | number[] | null {
+    return value.length === 0 ? null : value[0];
+}
+function to_candid_send_transaction_request_n13(value: send_transaction_request): _send_transaction_request {
+    return to_candid_record_n14(value);
+}
+function to_candid_bitcoin_network_n3(value: bitcoin_network): _bitcoin_network {
+    return to_candid_variant_n4(value);
+}
+function to_candid_record_n29(value: {
+    key_id: {
+        name: string;
+        curve: ecdsa_curve;
     };
-    address: bitcoin_address;
+    derivation_path: Array<Uint8Array | number[]>;
+    message_hash: Uint8Array | number[];
 }): {
-    network: _bitcoin_network;
-    filter: [] | [{
-            page: Uint8Array | number[];
-        } | {
-            min_confirmations: number;
-        }];
-    address: _bitcoin_address;
+    key_id: {
+        name: string;
+        curve: _ecdsa_curve;
+    };
+    derivation_path: Array<Uint8Array | number[]>;
+    message_hash: Uint8Array | number[];
 } {
     return {
-        network: value.network,
-        filter: value.filter ? candid_some(value.filter) : candid_none(),
-        address: value.address
+        key_id: to_candid_record_n21(value.key_id),
+        derivation_path: value.derivation_path,
+        message_hash: value.message_hash
     };
 }
-function to_candid_canister_settings_n10(value: canister_settings): _canister_settings {
-    return to_candid_record_n11(value);
+function from_candid_record_n11(value: {
+    next_page: [] | [Uint8Array | number[]];
+    tip_height: number;
+    tip_block_hash: _block_hash;
+    utxos: Array<_utxo>;
+}): {
+    next_page?: Uint8Array | number[];
+    tip_height: number;
+    tip_block_hash: block_hash;
+    utxos: Array<utxo>;
+} {
+    return {
+        next_page: record_opt_to_undefined(from_candid_opt_n12(value.next_page)),
+        tip_height: value.tip_height,
+        tip_block_hash: value.tip_block_hash,
+        utxos: value.utxos
+    };
 }
-function from_candid_get_utxos_response_n5(value: _get_utxos_response): get_utxos_response {
-    return from_candid_record_n6(value);
+function to_candid_variant_n23(value: "secp256k1"): {
+    secp256k1: null;
+} {
+    return value == "secp256k1" ? {
+        secp256k1: null
+    } : value;
 }
-function to_candid_record_n14(value: {
+function to_candid_ecdsa_curve_n22(value: ecdsa_curve): _ecdsa_curve {
+    return to_candid_variant_n23(value);
+}
+function to_candid_variant_n27(value: "reinstall" | "upgrade" | "install"): {
+    reinstall: null;
+} | {
+    upgrade: null;
+} | {
+    install: null;
+} {
+    return value == "reinstall" ? {
+        reinstall: null
+    } : value == "upgrade" ? {
+        upgrade: null
+    } : value == "install" ? {
+        install: null
+    } : value;
+}
+function to_candid_record_n28(value: {
     settings?: canister_settings;
     specified_id?: canister_id;
     amount?: bigint;
@@ -529,27 +519,126 @@ function to_candid_record_n14(value: {
     amount: [] | [bigint];
 } {
     return {
-        settings: value.settings ? candid_some(to_candid_canister_settings_n10(value.settings)) : candid_none(),
+        settings: value.settings ? candid_some(to_candid_canister_settings_n18(value.settings)) : candid_none(),
         specified_id: value.specified_id ? candid_some(value.specified_id) : candid_none(),
         amount: value.amount ? candid_some(value.amount) : candid_none()
     };
 }
-function to_candid_record_n2(value: {
-    network: bitcoin_network;
-    address: bitcoin_address;
-    min_confirmations?: number;
+function to_candid_record_n30(value: {
+    canister_id: Principal;
+    settings: canister_settings;
 }): {
-    network: _bitcoin_network;
-    address: _bitcoin_address;
-    min_confirmations: [] | [number];
+    canister_id: Principal;
+    settings: _canister_settings;
 } {
     return {
-        network: value.network,
-        address: value.address,
-        min_confirmations: value.min_confirmations ? candid_some(value.min_confirmations) : candid_none()
+        canister_id: value.canister_id,
+        settings: to_candid_canister_settings_n18(value.settings)
     };
 }
-function to_candid_record_n11(value: {
+function to_candid_get_utxos_request_n7(value: get_utxos_request): _get_utxos_request {
+    return to_candid_record_n8(value);
+}
+function to_candid_record_n26(value: {
+    arg: Uint8Array | number[];
+    wasm_module: wasm_module;
+    mode: "reinstall" | "upgrade" | "install";
+    canister_id: canister_id;
+}): {
+    arg: Uint8Array | number[];
+    wasm_module: _wasm_module;
+    mode: {
+        reinstall: null;
+    } | {
+        upgrade: null;
+    } | {
+        install: null;
+    };
+    canister_id: _canister_id;
+} {
+    return {
+        arg: value.arg,
+        wasm_module: value.wasm_module,
+        mode: to_candid_variant_n27(value.mode),
+        canister_id: value.canister_id
+    };
+}
+function to_candid_record_n20(value: {
+    key_id: {
+        name: string;
+        curve: ecdsa_curve;
+    };
+    canister_id?: canister_id;
+    derivation_path: Array<Uint8Array | number[]>;
+}): {
+    key_id: {
+        name: string;
+        curve: _ecdsa_curve;
+    };
+    canister_id: [] | [_canister_id];
+    derivation_path: Array<Uint8Array | number[]>;
+} {
+    return {
+        key_id: to_candid_record_n21(value.key_id),
+        canister_id: value.canister_id ? candid_some(value.canister_id) : candid_none(),
+        derivation_path: value.derivation_path
+    };
+}
+function to_candid_record_n6(value: {
+    network: bitcoin_network;
+}): {
+    network: _bitcoin_network;
+} {
+    return {
+        network: to_candid_bitcoin_network_n3(value.network)
+    };
+}
+function to_candid_get_balance_request_n1(value: get_balance_request): _get_balance_request {
+    return to_candid_record_n2(value);
+}
+function from_candid_record_n15(value: {
+    status: {
+        stopped: null;
+    } | {
+        stopping: null;
+    } | {
+        running: null;
+    };
+    memory_size: bigint;
+    cycles: bigint;
+    settings: _definite_canister_settings;
+    idle_cycles_burned_per_day: bigint;
+    module_hash: [] | [Uint8Array | number[]];
+}): {
+    status: "stopped" | "stopping" | "running";
+    memory_size: bigint;
+    cycles: bigint;
+    settings: definite_canister_settings;
+    idle_cycles_burned_per_day: bigint;
+    module_hash?: Uint8Array | number[];
+} {
+    return {
+        status: from_candid_variant_n16(value.status),
+        memory_size: value.memory_size,
+        cycles: value.cycles,
+        settings: value.settings,
+        idle_cycles_burned_per_day: value.idle_cycles_burned_per_day,
+        module_hash: record_opt_to_undefined(from_candid_opt_n12(value.module_hash))
+    };
+}
+function to_candid_record_n21(value: {
+    name: string;
+    curve: ecdsa_curve;
+}): {
+    name: string;
+    curve: _ecdsa_curve;
+} {
+    return {
+        name: value.name,
+        curve: to_candid_ecdsa_curve_n22(value.curve)
+    };
+}
+function to_candid_record_n19(value: {
     freezing_threshold?: bigint;
     controllers?: Array<Principal>;
     memory_allocation?: bigint;
@@ -567,67 +656,86 @@ function to_candid_record_n11(value: {
         compute_allocation: value.compute_allocation ? candid_some(value.compute_allocation) : candid_none()
     };
 }
-function to_candid_record_n15(value: {
-    canister_id: Principal;
-    settings: canister_settings;
+function to_candid_variant_n9(value: {
+    page: Uint8Array | number[];
+} | {
+    min_confirmations: number;
 }): {
-    canister_id: Principal;
-    settings: _canister_settings;
+    page: Uint8Array | number[];
+} | {
+    min_confirmations: number;
 } {
-    return {
-        canister_id: value.canister_id,
-        settings: to_candid_canister_settings_n10(value.settings)
-    };
+    return "page" in value ? {
+        page: value.page
+    } : "min_confirmations" in value ? {
+        min_confirmations: value.min_confirmations
+    } : value;
 }
-function from_candid_record_n6(value: {
-    next_page: [] | [Uint8Array | number[]];
-    tip_height: number;
-    tip_block_hash: _block_hash;
-    utxos: Array<_utxo>;
-}): {
-    next_page?: Uint8Array | number[];
-    tip_height: number;
-    tip_block_hash: block_hash;
-    utxos: Array<utxo>;
-} {
-    return {
-        next_page: record_opt_to_undefined(from_candid_opt_n7(value.next_page)),
-        tip_height: value.tip_height,
-        tip_block_hash: value.tip_block_hash,
-        utxos: value.utxos
-    };
+function from_candid_variant_n16(value: {
+    stopped: null;
+} | {
+    stopping: null;
+} | {
+    running: null;
+}): "stopped" | "stopping" | "running" {
+    return "stopped" in value ? "stopped" : "stopping" in value ? "stopping" : "running" in value ? "running" : value;
 }
-function to_candid_get_utxos_request_n3(value: get_utxos_request): _get_utxos_request {
-    return to_candid_record_n4(value);
-}
-function to_candid_record_n12(value: {
-    key_id: {
-        name: string;
-        curve: ecdsa_curve;
-    };
-    canister_id?: canister_id;
-    derivation_path: Array<Uint8Array | number[]>;
-}): {
-    key_id: {
-        name: string;
-        curve: _ecdsa_curve;
-    };
-    canister_id: [] | [_canister_id];
-    derivation_path: Array<Uint8Array | number[]>;
-} {
-    return {
-        key_id: value.key_id,
-        canister_id: value.canister_id ? candid_some(value.canister_id) : candid_none(),
-        derivation_path: value.derivation_path
-    };
-}
-function to_candid_record_n9(value: {
+function to_candid_record_n17(value: {
     settings?: canister_settings;
 }): {
     settings: [] | [_canister_settings];
 } {
     return {
-        settings: value.settings ? candid_some(to_candid_canister_settings_n10(value.settings)) : candid_none()
+        settings: value.settings ? candid_some(to_candid_canister_settings_n18(value.settings)) : candid_none()
     };
+}
+function to_candid_variant_n25(value: "get" | "head" | "post"): {
+    get: null;
+} | {
+    head: null;
+} | {
+    post: null;
+} {
+    return value == "get" ? {
+        get: null
+    } : value == "head" ? {
+        head: null
+    } : value == "post" ? {
+        post: null
+    } : value;
+}
+function to_candid_record_n8(value: {
+    network: bitcoin_network;
+    filter?: {
+        page: Uint8Array | number[];
+    } | {
+        min_confirmations: number;
+    };
+    address: bitcoin_address;
+}): {
+    network: _bitcoin_network;
+    filter: [] | [{
+            page: Uint8Array | number[];
+        } | {
+            min_confirmations: number;
+        }];
+    address: _bitcoin_address;
+} {
+    return {
+        network: to_candid_bitcoin_network_n3(value.network),
+        filter: value.filter ? candid_some(to_candid_variant_n9(value.filter)) : candid_none(),
+        address: value.address
+    };
+}
+function to_candid_variant_n4(value: "mainnet" | "testnet"): {
+    mainnet: null;
+} | {
+    testnet: null;
+} {
+    return value == "mainnet" ? {
+        mainnet: null
+    } : value == "testnet" ? {
+        testnet: null
+    } : value;
 }
 

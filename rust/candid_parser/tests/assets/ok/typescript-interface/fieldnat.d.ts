@@ -24,11 +24,7 @@ export interface fieldnatInterface {
     bab(arg0: bigint, arg1: bigint): Promise<void>;
     bar(arg0: {
         2: bigint;
-    }): Promise<{
-        e20: null;
-    } | {
-        e30: null;
-    }>;
+    }): Promise<"e20" | "e30">;
     bas(arg0: [bigint, bigint]): Promise<[string, bigint]>;
     baz(arg0: {
         _2_: bigint;
@@ -36,9 +32,7 @@ export interface fieldnatInterface {
     }): Promise<{
     }>;
     bba(arg0: tuple): Promise<non_tuple>;
-    bib(arg0: [bigint]): Promise<{
-        _0_: bigint;
-    }>;
+    bib(arg0: [bigint]): Promise<"_0">;
     foo(arg0: {
         _2_: bigint;
     }): Promise<{
