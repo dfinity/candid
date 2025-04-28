@@ -272,7 +272,7 @@ fn add_type_definitions(env: &TypeEnv, module: &mut Module) {
                             let first_type = &fs[0].ty;
                             match (first_type.as_ref(), f.ty.as_ref()) {
                                 (TypeInner::Null, TypeInner::Null) => true,
-                                (a, b) => std::mem::discriminant(a) == std::mem::discriminant(b),
+                                (a, b) => a == b,
                             }
                         });
 
@@ -803,7 +803,7 @@ pub fn convert_type(env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
                     let first_type = &fs[0].ty;
                     match (first_type.as_ref(), f.ty.as_ref()) {
                         (Null, Null) => true,
-                        (a, b) => std::mem::discriminant(a) == std::mem::discriminant(b),
+                        (a, b) => a == b,
                     }
                 });
 
@@ -1578,19 +1578,4 @@ fn create_string_literal_union(id: &str, fs: &[Field]) -> ModuleItem {
             type_ann: Box::new(union_type),
         })),
     }))
-}
-
-// Helper function to detect if all variants have the same type
-fn all_variants_same_type(fs: &[Field]) -> bool {
-    if fs.is_empty() {
-        return false;
-    }
-
-    fs.iter().skip(1).all(|f| {
-        let first_type = &fs[0].ty;
-        match (first_type.as_ref(), f.ty.as_ref()) {
-            (TypeInner::Null, TypeInner::Null) => true,
-            (a, b) => std::mem::discriminant(a) == std::mem::discriminant(b),
-        }
-    })
 }

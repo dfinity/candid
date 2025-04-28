@@ -75,12 +75,28 @@ export interface nested {
     _41_: "_42" | "A" | "B" | "C";
     _42_: bigint;
 }
-export type nested_res = "Ok" | "Err";
+export type nested_res = {
+    Ok: "Ok" | "Err";
+} | {
+    Err: {
+        Ok: {
+            content: string;
+        };
+    } | {
+        Err: [bigint];
+    };
+};
 export interface node {
     head: bigint;
     tail: list;
 }
-export type res = "Ok" | "Err";
+export type res = {
+    Ok: [bigint, bigint];
+} | {
+    Err: {
+        error: string;
+    };
+};
 export interface sInterface {
     f: [Principal, string];
     g(arg0: list): Promise<[B, tree, stream]>;
@@ -280,7 +296,17 @@ function from_candid_variant_n22(value: {
     } | {
         Err: [bigint];
     };
-}): "Ok" | "Err" {
+}): {
+    Ok: "Ok" | "Err";
+} | {
+    Err: {
+        Ok: {
+            content: string;
+        };
+    } | {
+        Err: [bigint];
+    };
+} {
     return "Ok" in value ? {
         Ok: from_candid_variant_n23(value.Ok)
     } : "Err" in value ? {
@@ -300,7 +326,13 @@ function from_candid_variant_n24(value: {
     };
 } | {
     Err: [bigint];
-}): "Ok" | "Err" {
+}): {
+    Ok: {
+        content: string;
+    };
+} | {
+    Err: [bigint];
+} {
     return "Ok" in value ? {
         Ok: value.Ok
     } : "Err" in value ? {
