@@ -170,8 +170,3 @@ pub fn get_ident_guarded_keyword_ok(name: &str) -> Ident {
     let ident_name: String = get_typescript_ident(name, false);
     get_ident(&ident_name)
 }
-
-pub fn get_ident_field(name: &str) -> Ident {
-    let ident_name: String = format!("'{}'", name.escape_debug());
-    get_ident(&ident_name)
-}
