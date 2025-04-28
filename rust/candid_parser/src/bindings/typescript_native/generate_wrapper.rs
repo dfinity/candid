@@ -635,7 +635,7 @@ impl<'a> TypeConverter<'a> {
             let first_type = &fields[0].ty;
             match (first_type.as_ref(), f.ty.as_ref()) {
                 (TypeInner::Null, TypeInner::Null) => true,
-                (a, b) => std::mem::discriminant(a) == std::mem::discriminant(b),
+                (a, b) => a == b,
             }
         });
 
@@ -1305,7 +1305,7 @@ impl<'a> TypeConverter<'a> {
             let first_type = &fields[0].ty;
             match (first_type.as_ref(), f.ty.as_ref()) {
                 (TypeInner::Null, TypeInner::Null) => true,
-                (a, b) => std::mem::discriminant(a) == std::mem::discriminant(b),
+                (a, b) => a == b,
             }
         });
 
