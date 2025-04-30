@@ -14,9 +14,16 @@ export interface EncodeArgs {
    */
   idl: string;
   /**
-   * A method to pick from the service. If not provided, the entire idl is used.
+   * Optional type specifier for encoding, as a discriminated union:
+   * - { kind: "methodParams", name: "method_name" } - Uses the parameters of specified method
+   * - { kind: "type", name: "type_name" } - Uses the specified type
+   * - { kind: "serviceParams" } - Uses the service parameters
+   * If omitted, the entire IDL is used.
    */
-  serviceMethod?: string;
+  withType?: 
+    | { kind: "type"; name: string } 
+    | { kind: "methodParams"; name: string } 
+    | { kind: "serviceParams" };
   /**
    * The format to encode the value in. Default is 'hex'.
    */
@@ -65,11 +72,18 @@ extern "C" {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub enum EncodeType {
+    MethodParams(String),
+    Type(String),
+    ServiceParams,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct EncodeArgs {
     pub idl: String,
     pub target_format: EncodeFormat,
     pub input: String,
-    pub service_method: Option<String>,
+    pub with_type: Option<EncodeType>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -151,11 +165,68 @@ impl TryFrom<JsEncodeArgs> for EncodeArgs {
                 reason: "Field 'input' should be a string".to_string(),
             })?;
 
-        let service_method = js_sys::Reflect::get(&obj, &JsValue::from_str("serviceMethod"))
-            .map_err(|_| LibraryError::MappingError {
-                reason: "Could not get 'serviceMethod' from JsValue".to_string(),
-            })?
-            .as_string();
+        let with_type_value =
+            js_sys::Reflect::get(&obj, &JsValue::from_str("withType")).map_err(|_| {
+                LibraryError::MappingError {
+                    reason: "Could not get 'withType' from JsValue".to_string(),
+                }
+            })?;
+
+        let with_type = if with_type_value.is_null() || with_type_value.is_undefined() {
+            None
+        } else if with_type_value.is_object() {
+            let with_type_obj = with_type_value.dyn_into::<js_sys::Object>().unwrap();
+
+            if js_sys::Reflect::has(&with_type_obj, &JsValue::from_str("kind")).unwrap_or(false) {
+                let kind = js_sys::Reflect::get(&with_type_obj, &JsValue::from_str("kind"))
+                    .map_err(|_| LibraryError::MappingError {
+                        reason: "Could not get 'kind' from withType object".to_string(),
+                    })?
+                    .as_string()
+                    .ok_or(LibraryError::MappingError {
+                        reason: "Field 'kind' should be a string".to_string(),
+                    })?;
+                let encode_type = match kind.as_str() {
+                    "type" => {
+                        let type_value =
+                            js_sys::Reflect::get(&with_type_obj, &JsValue::from_str("name"))
+                                .map_err(|_| LibraryError::MappingError {
+                                    reason: "Could not get 'name' from withType object".to_string(),
+                                })?
+                                .as_string()
+                                .ok_or(LibraryError::MappingError {
+                                    reason: "Field 'name' should be a string".to_string(),
+                                })?;
+                        EncodeType::Type(type_value)
+                    }
+                    "methodParams" => {
+                        let method_params =
+                            js_sys::Reflect::get(&with_type_obj, &JsValue::from_str("name"))
+                                .map_err(|_| LibraryError::MappingError {
+                                    reason: "Could not get 'name' from withType object".to_string(),
+                                })?
+                                .as_string()
+                                .ok_or(LibraryError::MappingError {
+                                    reason: "Field 'name' should be a string".to_string(),
+                                })?;
+                        EncodeType::MethodParams(method_params)
+                    }
+                    "serviceParams" => EncodeType::ServiceParams,
+                    _ => {
+                        return Err(LibraryError::ValidationError { reason: "Invalid kind in withType object. Expected 'type', 'methodParams', or 'serviceParams'.".to_string() });
+                    }
+                };
+                Some(encode_type)
+            } else {
+                return Err(LibraryError::ValidationError {
+                    reason: "Invalid withType object. Expected 'kind' property.".to_string(),
+                });
+            }
+        } else {
+            return Err(LibraryError::ValidationError {
+                reason: "Invalid withType value. Expected object.".to_string(),
+            });
+        };
 
         let target_form = js_sys::Reflect::get(&obj, &JsValue::from_str("targetFormat"))
             .map_err(|_| LibraryError::MappingError {
@@ -172,7 +243,7 @@ impl TryFrom<JsEncodeArgs> for EncodeArgs {
             idl,
             target_format,
             input,
-            service_method,
+            with_type,
         })
     }
 }

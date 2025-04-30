@@ -9,6 +9,15 @@ pub enum LibraryError {
     /// Service method not found.
     #[error(r#"Service method not found `{method}`."#)]
     IdlMethodNotFound { method: String },
+    /// IDL not specified.
+    #[error(r#"IDL not specified."#)]
+    IdlNotFound,
+    /// Type not found.
+    #[error(r#"Type not found `{type_name}`."#)]
+    TypeNotFound { type_name: String },
+    /// Unexpected service parameters.
+    #[error(r#"Unexpected service parameters."#)]
+    UnexpectedServiceParams,
     /// Failed to parse arguments.
     #[error(r#"Failed to parse arguments `{reason}`."#)]
     IdlArgsParsingFailed { reason: String },
