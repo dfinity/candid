@@ -7,7 +7,7 @@ describe("encode", () => {
       encode({
         idl: IDL,
         input: "(record { number=90; })",
-        withType: { methodParams: "store_number" },
+        withType: { kind: "methodParams", name: "store_number" },
         targetFormat: "hex",
       })
     ).toBe("4449444c016c01c98dea8b0a7801005a00000000000000");
@@ -18,7 +18,7 @@ describe("encode", () => {
       encode({
         idl: IDL,
         input: "(record { number=90; })",
-        withType: { methodParams: "store_number" },
+        withType: { kind: "methodParams", name: "store_number" },
         targetFormat: "blob",
       })
     ).toBe(
@@ -31,7 +31,7 @@ describe("encode", () => {
       encode({
         idl: IDL,
         input: '(record { field1="test"; field2=90; })',
-        withType: { type: "CustomInit" },
+        withType: { kind: "type", name: "CustomInit" },
         targetFormat: "hex",
       })
     ).toBe(
@@ -44,7 +44,7 @@ describe("encode", () => {
       encode({
         idl: IDL,
         input: "(null)",
-        withType: { serviceParams: null },
+        withType: { kind: "serviceParams" },
         targetFormat: "hex",
       })
     ).toBe("4449444c026e016c02b79cba840871b89cba840878010000");
@@ -55,7 +55,7 @@ describe("encode", () => {
       encode({
         idl: IDL,
         input: '(opt record { field1="test"; field2=90; })',
-        withType: { serviceParams: null },
+        withType: { kind: "serviceParams" },
         targetFormat: "hex",
       })
     ).toBe(
@@ -68,7 +68,7 @@ describe("encode", () => {
       encode({
         idl: IDL,
         input: '(record { field1="test"; field2=90; })',
-        withType: { type: "UnknownType" },
+        withType: { kind: "type", name: "UnknownType" },
         targetFormat: "hex",
       });
 
@@ -81,7 +81,7 @@ describe("encode", () => {
       encode({
         idl: IDL,
         input: '(record { field1="test"; unknown_field="bad"; })',
-        withType: { type: "CustomInit" },
+        withType: { kind: "type", name: "CustomInit" },
         targetFormat: "hex",
       });
 
@@ -94,7 +94,7 @@ describe("encode", () => {
       encode({
         idl: IDL,
         input: "(record { number=90; })",
-        withType: { methodParams: "unknown_method" },
+        withType: { kind: "methodParams", name: "unknown_method" },
       });
 
     expect(performEncoding).toThrow(Error);
@@ -108,7 +108,7 @@ describe("encode", () => {
       encode({
         idl: IDL,
         input: "record { number=90; }",
-        withType: { methodParams: "store_number" },
+        withType: { kind: "methodParams", name: "store_number" },
       });
 
     expect(performEncoding).toThrow(Error);

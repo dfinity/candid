@@ -42,7 +42,7 @@ const methods = getServiceMethods(IDL);
 const encoded = encode({
   idl: IDL,
   input: "(record { number=90; })",
-  withType: { methodParams: "store_number" },
+  withType: { kind: "methodParams", name: "store_number" },
   targetFormat: "hex",
 });
 
@@ -50,7 +50,7 @@ const encoded = encode({
 const encoded = encode({
   idl: IDL,
   input: '(record { field1="Hello"; field2=42 })',
-  withType: { type: "SomeType" },
+  withType: { kind: "type", name: "SomeType" },
   targetFormat: "hex",
 });
 
@@ -58,7 +58,7 @@ const encoded = encode({
 const encoded = encode({
   idl: IDL,
   input: '(record { name="MyCanister" })',
-  withType: { serviceParams: null },
+  withType: { kind: "serviceParams" },
   targetFormat: "hex",
 });
 
@@ -88,10 +88,10 @@ Parameters:
 
 - `idl`: The Candid IDL to encode against
 - `input`: The Candid text value to encode
-- `withType` (optional): Type specifier for encoding:
-  - `{ methodParams: "method_name" }`: Uses the parameters of the specified method
-  - `{ type: "type_name" }`: Uses the specified type
-  - `{ serviceParams: null }`: Uses the service constructor parameters
+- `withType` (optional): Type specifier for encoding (discriminated union):
+  - `{ kind: "methodParams", name: "method_name" }`: Uses the parameters of the specified method
+  - `{ kind: "type", name: "type_name" }`: Uses the specified type
+  - `{ kind: "serviceParams" }`: Uses the service constructor parameters
 - `targetFormat` (optional): Output format, either 'hex' (default) or 'blob'
 
 ### decode(args: DecodeArgs): string

@@ -14,13 +14,16 @@ export interface EncodeArgs {
    */
   idl: string;
   /**
-   * Optional type specifier for encoding:
-   * - { methodParams: "method_name" } - Uses the parameters of specified method
-   * - { type: "type_name" } - Uses the specified type
-   * - { serviceParams: null } - Uses the service parameters
+   * Optional type specifier for encoding, as a discriminated union:
+   * - { kind: "methodParams", name: "method_name" } - Uses the parameters of specified method
+   * - { kind: "type", name: "type_name" } - Uses the specified type
+   * - { kind: "serviceParams" } - Uses the service parameters
    * If omitted, the entire IDL is used.
    */
-  withType?: { methodParams: string } | { type: string } | { serviceParams: null };
+  withType?: 
+    | { kind: "type"; name: string } 
+    | { kind: "methodParams"; name: string } 
+    | { kind: "serviceParams" };
   /**
    * The format to encode the value in. Default is 'hex'.
    */
@@ -171,56 +174,57 @@ impl TryFrom<JsEncodeArgs> for EncodeArgs {
 
         let with_type = if with_type_value.is_null() || with_type_value.is_undefined() {
             None
-        // } else if with_type_value.is_string() {
-        //     let value = with_type_value.as_string().unwrap();
-        //     if value == "serviceParams" {
-        //         Some(EncodeType::ServiceParams)
-        //     } else {
-        //         return Err(LibraryError::ValidationError {
-        //             reason: format!("Invalid string value for withType: {}", value),
-        //         });
-        //     }
         } else if with_type_value.is_object() {
             let with_type_obj = with_type_value.dyn_into::<js_sys::Object>().unwrap();
 
-            if js_sys::Reflect::has(&with_type_obj, &JsValue::from_str("methodParams"))
-                .unwrap_or(false)
-            {
-                let method_params =
-                    js_sys::Reflect::get(&with_type_obj, &JsValue::from_str("methodParams"))
-                        .map_err(|_| LibraryError::MappingError {
-                            reason: "Could not get 'methodParams' from withType object".to_string(),
-                        })?
-                        .as_string()
-                        .ok_or(LibraryError::MappingError {
-                            reason: "Field 'methodParams' should be a string".to_string(),
-                        })?;
-                Some(EncodeType::MethodParams(method_params))
-            } else if js_sys::Reflect::has(&with_type_obj, &JsValue::from_str("type"))
-                .unwrap_or(false)
-            {
-                let type_value = js_sys::Reflect::get(&with_type_obj, &JsValue::from_str("type"))
+            if js_sys::Reflect::has(&with_type_obj, &JsValue::from_str("kind")).unwrap_or(false) {
+                let kind = js_sys::Reflect::get(&with_type_obj, &JsValue::from_str("kind"))
                     .map_err(|_| LibraryError::MappingError {
-                        reason: "Could not get 'type' from withType object".to_string(),
+                        reason: "Could not get 'kind' from withType object".to_string(),
                     })?
                     .as_string()
                     .ok_or(LibraryError::MappingError {
-                        reason: "Field 'type' should be a string".to_string(),
+                        reason: "Field 'kind' should be a string".to_string(),
                     })?;
-                Some(EncodeType::Type(type_value))
-            } else if js_sys::Reflect::has(&with_type_obj, &JsValue::from_str("serviceParams"))
-                .unwrap_or(false)
-            {
-                Some(EncodeType::ServiceParams)
+                let encode_type = match kind.as_str() {
+                    "type" => {
+                        let type_value =
+                            js_sys::Reflect::get(&with_type_obj, &JsValue::from_str("name"))
+                                .map_err(|_| LibraryError::MappingError {
+                                    reason: "Could not get 'name' from withType object".to_string(),
+                                })?
+                                .as_string()
+                                .ok_or(LibraryError::MappingError {
+                                    reason: "Field 'name' should be a string".to_string(),
+                                })?;
+                        EncodeType::Type(type_value)
+                    }
+                    "methodParams" => {
+                        let method_params =
+                            js_sys::Reflect::get(&with_type_obj, &JsValue::from_str("name"))
+                                .map_err(|_| LibraryError::MappingError {
+                                    reason: "Could not get 'name' from withType object".to_string(),
+                                })?
+                                .as_string()
+                                .ok_or(LibraryError::MappingError {
+                                    reason: "Field 'name' should be a string".to_string(),
+                                })?;
+                        EncodeType::MethodParams(method_params)
+                    }
+                    "serviceParams" => EncodeType::ServiceParams,
+                    _ => {
+                        return Err(LibraryError::ValidationError { reason: "Invalid kind in withType object. Expected 'type', 'methodParams', or 'serviceParams'.".to_string() });
+                    }
+                };
+                Some(encode_type)
             } else {
                 return Err(LibraryError::ValidationError {
-                    reason: "Invalid withType object. Expected 'methodParams' or 'type' property."
-                        .to_string(),
+                    reason: "Invalid withType object. Expected 'kind' property.".to_string(),
                 });
             }
         } else {
             return Err(LibraryError::ValidationError {
-                reason: "Invalid withType value. Expected string or object.".to_string(),
+                reason: "Invalid withType value. Expected object.".to_string(),
             });
         };
 
