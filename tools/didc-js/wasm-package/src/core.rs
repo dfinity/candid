@@ -54,7 +54,7 @@ pub fn encode(args: EncodeArgs) -> Result<String, LibraryError> {
                     reason: format!("Could not encode args to bytes {}", e),
                 })?
         }
-        (Some(EncodeType::Type(type_name)), Some(_)) => {
+        (Some(EncodeType::Type(type_name)), _) => {
             let type_def =
                 idl.env
                     .find_type(&type_name)
