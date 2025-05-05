@@ -1,7 +1,7 @@
 {
   "name": "@dfinity/didc",
   "description": "Utility tools for candid.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "author": "DFINITY Stiftung",
   "license": "Apache-2.0",
   "repository": "github:dfinity/candid",
