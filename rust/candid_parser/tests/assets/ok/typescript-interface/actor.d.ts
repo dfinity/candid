@@ -11,7 +11,7 @@ export type f = (arg0: number) => number;
 export type g = f;
 export type h = (arg0: [Principal, string]) => [Principal, string];
 export type o = Some<o> | None;
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

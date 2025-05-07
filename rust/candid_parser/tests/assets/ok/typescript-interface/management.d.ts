@@ -73,7 +73,7 @@ export interface utxo {
     outpoint: outpoint;
 }
 export type wasm_module = Uint8Array | number[];
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

@@ -44,12 +44,17 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
+function extractAgentErrorMessage(error: string): string {
+    const errorString = String(error);
+    const match = errorString.match(/with message: '([^']+)'/);
+    return match ? match[1] : errorString;
+}
 export type Func = () => Principal;
 export interface ServiceInterface {
     f: [Principal, string];
 }
 export type Service2 = Service;
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -79,22 +84,40 @@ class Service implements serviceInterface {
         this.#actor = actor ?? _service;
     }
     async asArray(): Promise<[Array<Principal>, Array<[Principal, string]>]> {
-        const result = await this.#actor.asArray();
-        return [
-            result[0],
-            result[1]
-        ];
+        try {
+            const result = await this.#actor.asArray();
+            return [
+                result[0],
+                result[1]
+            ];
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async asPrincipal(): Promise<[Principal, [Principal, string]]> {
-        const result = await this.#actor.asPrincipal();
-        return [
-            result[0],
-            result[1]
-        ];
+        try {
+            const result = await this.#actor.asPrincipal();
+            return [
+                result[0],
+                result[1]
+            ];
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async asRecord(): Promise<[Principal, Principal | null, [Principal, string]]> {
-        const result = await this.#actor.asRecord();
-        return from_candid_tuple_n1(result);
+        try {
+            const result = await this.#actor.asRecord();
+            return from_candid_tuple_n1(result);
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async asVariant(): Promise<{
         a: Principal;
@@ -103,8 +126,14 @@ class Service implements serviceInterface {
             f?: [Principal, string];
         };
     }> {
-        const result = await this.#actor.asVariant();
-        return from_candid_variant_n3(result);
+        try {
+            const result = await this.#actor.asVariant();
+            return from_candid_variant_n3(result);
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
 }
 export const service: serviceInterface = new Service();

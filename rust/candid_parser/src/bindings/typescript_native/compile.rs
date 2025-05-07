@@ -1420,7 +1420,7 @@ pub fn create_actor_method(
                         name: "actor".into(),
                     }),
                 })),
-                prop: MemberProp::Ident(get_ident_guarded(method_id).into()),
+                prop: MemberProp::Ident(get_ident_guarded_keyword_ok(method_id).into()),
             }))),
             args: converted_args,
             type_args: None,
@@ -1437,43 +1437,140 @@ pub fn create_actor_method(
     // Variable to hold the raw result
     let result_var = Ident::new("result".into(), DUMMY_SP, SyntaxContext::empty());
 
-    // Create result variable declaration
-    let result_var_decl = VarDecl {
-        span: DUMMY_SP,
-        kind: VarDeclKind::Const,
-        declare: false,
-        decls: vec![VarDeclarator {
-            span: DUMMY_SP,
-            name: Pat::Ident(BindingIdent {
-                id: result_var.clone(),
-                type_ann: None,
-            }),
-            init: Some(Box::new(await_expr)),
-            definite: false,
-        }],
-        ctxt: SyntaxContext::empty(),
-    };
-
-    // Convert the result based on return type(s)
-    let converted_result = if func.rets.is_empty() {
-        // No return value
-        Expr::Ident(result_var)
-    } else {
-        // Convert the result to the expected TypeScript type
-        let result_expr = Expr::Ident(result_var);
-        convert_multi_return_from_candid(converter, &result_expr, &func.rets)
-    };
-
-    // Create return statement with converted result
-    let return_stmt = ReturnStmt {
-        span: DUMMY_SP,
-        arg: Some(Box::new(converted_result)),
-    };
-
-    // Method body with variable declaration and return statement
+    // Method body with try-catch block, result declaration and return statement
     let body_stmts = vec![
-        Stmt::Decl(Decl::Var(Box::new(result_var_decl))),
-        Stmt::Return(return_stmt),
+        // try {
+        Stmt::Try(Box::new(TryStmt {
+            span: DUMMY_SP,
+            block: BlockStmt {
+                span: DUMMY_SP,
+                stmts: vec![
+                    // const result = await actor.method(args);
+                    Stmt::Decl(Decl::Var(Box::new(VarDecl {
+                        span: DUMMY_SP,
+                        kind: VarDeclKind::Const,
+                        declare: false,
+                        decls: vec![VarDeclarator {
+                            span: DUMMY_SP,
+                            name: Pat::Ident(BindingIdent {
+                                id: result_var.clone(),
+                                type_ann: None,
+                            }),
+                            init: Some(Box::new(await_expr)),
+                            definite: false,
+                        }],
+                        ctxt: SyntaxContext::empty(),
+                    }))),
+                    // Return converted result
+                    Stmt::Return(ReturnStmt {
+                        span: DUMMY_SP,
+                        arg: Some(Box::new(if func.rets.is_empty() {
+                            // No return value
+                            Expr::Ident(result_var.clone())
+                        } else {
+                            // Convert the result to the expected TypeScript type
+                            let result_expr = Expr::Ident(result_var.clone());
+                            convert_multi_return_from_candid(converter, &result_expr, &func.rets)
+                        })),
+                    }),
+                ],
+                ctxt: SyntaxContext::empty(),
+            },
+            handler: Some(CatchClause {
+                span: DUMMY_SP,
+                param: Some(Pat::Ident(BindingIdent {
+                    id: Ident::new("e".into(), DUMMY_SP, SyntaxContext::empty()),
+                    type_ann: None,
+                })),
+                body: BlockStmt {
+                    span: DUMMY_SP,
+                    stmts: vec![
+                        // if (e instanceof ActorCallError) {
+                        Stmt::If(IfStmt {
+                            span: DUMMY_SP,
+                            test: Box::new(Expr::Bin(BinExpr {
+                                span: DUMMY_SP,
+                                op: BinaryOp::InstanceOf,
+                                left: Box::new(Expr::Ident(Ident::new(
+                                    "e".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                ))),
+                                right: Box::new(Expr::Ident(Ident::new(
+                                    "ActorCallError".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                ))),
+                            })),
+                            cons: Box::new(Stmt::Block(BlockStmt {
+                                span: DUMMY_SP,
+                                stmts: vec![
+                                    // throw new Error(extractAgentErrorMessage(e));
+                                    Stmt::Throw(ThrowStmt {
+                                        span: DUMMY_SP,
+                                        arg: Box::new(Expr::New(NewExpr {
+                                            span: DUMMY_SP,
+                                            callee: Box::new(Expr::Ident(Ident::new(
+                                                "Error".into(),
+                                                DUMMY_SP,
+                                                SyntaxContext::empty(),
+                                            ))),
+                                            args: Some(vec![ExprOrSpread {
+                                                spread: None,
+                                                expr: Box::new(Expr::Call(CallExpr {
+                                                    span: DUMMY_SP,
+                                                    callee: Callee::Expr(Box::new(Expr::Ident(
+                                                        Ident::new(
+                                                            "extractAgentErrorMessage".into(),
+                                                            DUMMY_SP,
+                                                            SyntaxContext::empty(),
+                                                        ),
+                                                    ))),
+                                                    args: vec![ExprOrSpread {
+                                                        spread: None,
+                                                        expr: Box::new(Expr::Member(MemberExpr {
+                                                            span: DUMMY_SP,
+                                                            obj: Box::new(Expr::Ident(Ident::new(
+                                                                "e".into(),
+                                                                DUMMY_SP,
+                                                                SyntaxContext::empty(),
+                                                            ))),
+                                                            prop: MemberProp::Ident(
+                                                                Ident::new(
+                                                                    "message".into(),
+                                                                    DUMMY_SP,
+                                                                    SyntaxContext::empty(),
+                                                                )
+                                                                .into(),
+                                                            ),
+                                                        })),
+                                                    }],
+                                                    type_args: None,
+                                                    ctxt: SyntaxContext::empty(),
+                                                })),
+                                            }]),
+                                            type_args: None,
+                                            ctxt: SyntaxContext::empty(),
+                                        })),
+                                    }),
+                                ],
+                                ctxt: SyntaxContext::empty(),
+                            })),
+                            alt: Some(Box::new(Stmt::Throw(ThrowStmt {
+                                span: DUMMY_SP,
+                                arg: Box::new(Expr::Ident(Ident::new(
+                                    "e".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                ))),
+                            }))),
+                        }),
+                    ],
+                    ctxt: SyntaxContext::empty(),
+                },
+            }),
+            finalizer: None,
+        })),
     ];
 
     ClassMember::Method(ClassMethod {
