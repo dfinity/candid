@@ -12,7 +12,7 @@ export interface ServiceInterface {
     f: [Principal, string];
 }
 export type Service2 = Service;
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

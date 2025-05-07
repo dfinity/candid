@@ -44,6 +44,11 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
+function extractAgentErrorMessage(error: string): string {
+    const errorString = String(error);
+    const match = errorString.match(/with message: '([^']+)'/);
+    return match ? match[1] : errorString;
+}
 export interface A {
     '\u{e000}': bigint;
     '📦🍦': bigint;
@@ -51,7 +56,7 @@ export interface A {
     '字 段 名2': bigint;
 }
 export type B = "" | "空的" | "  空的  " | "1⃣️2⃣️3⃣️";
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -75,20 +80,44 @@ class Unicode implements unicodeInterface {
         this.#actor = actor ?? _unicode;
     }
     async ""(arg0: bigint): Promise<bigint> {
-        const result = await this.#actor[""](arg0);
-        return result;
+        try {
+            const result = await this.#actor[""](arg0);
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async '✈️  🚗 ⛱️ '(): Promise<void> {
-        const result = await this.#actor["✈️  🚗 ⛱️ "]();
-        return result;
+        try {
+            const result = await this.#actor["✈️  🚗 ⛱️ "]();
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async '函数名'(arg0: A): Promise<B> {
-        const result = await this.#actor["函数名"](arg0);
-        return from_candid_B_n1(result);
+        try {
+            const result = await this.#actor["函数名"](arg0);
+            return from_candid_B_n1(result);
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async '👀'(arg0: bigint): Promise<bigint> {
-        const result = await this.#actor["👀"](arg0);
-        return result;
+        try {
+            const result = await this.#actor["👀"](arg0);
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
 }
 export const unicode: unicodeInterface = new Unicode();

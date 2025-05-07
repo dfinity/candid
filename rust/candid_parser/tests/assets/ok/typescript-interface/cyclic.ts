@@ -44,13 +44,18 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
+function extractAgentErrorMessage(error: string): string {
+    const errorString = String(error);
+    const match = errorString.match(/with message: '([^']+)'/);
+    return match ? match[1] : errorString;
+}
 export type A = Some<B> | None;
 export type B = Some<C> | None;
 export type C = A;
 export type X = Y;
 export type Y = Z;
 export type Z = A;
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -71,8 +76,14 @@ class Cyclic implements cyclicInterface {
         this.#actor = actor ?? _cyclic;
     }
     async f(arg0: A, arg1: B, arg2: C, arg3: X, arg4: Y, arg5: Z): Promise<void> {
-        const result = await this.#actor.f(to_candid_A_n1(arg0), to_candid_B_n3(arg1), to_candid_C_n5(arg2), to_candid_X_n6(arg3), to_candid_Y_n7(arg4), to_candid_Z_n8(arg5));
-        return result;
+        try {
+            const result = await this.#actor.f(to_candid_A_n1(arg0), to_candid_B_n3(arg1), to_candid_C_n5(arg2), to_candid_X_n6(arg3), to_candid_Y_n7(arg4), to_candid_Z_n8(arg5));
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
 }
 export const cyclic: cyclicInterface = new Cyclic();

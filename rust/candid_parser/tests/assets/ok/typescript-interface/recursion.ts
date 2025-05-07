@@ -44,6 +44,11 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
+function extractAgentErrorMessage(error: string): string {
+    const errorString = String(error);
+    const match = errorString.match(/with message: '([^']+)'/);
+    return match ? match[1] : errorString;
+}
 export type A = B;
 export type B = Some<A> | None;
 export type list = node | null;
@@ -69,7 +74,7 @@ export type tree = {
 } | {
     leaf: bigint;
 };
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -89,12 +94,18 @@ class Recursion implements recursionInterface {
         this.#actor = actor ?? _recursion;
     }
     async g(arg0: list): Promise<[B, tree, stream]> {
-        const result = await this.#actor.g(to_candid_list_n1(arg0));
-        return [
-            from_candid_B_n5(result[0]),
-            from_candid_tree_n8(result[1]),
-            from_candid_stream_n11(result[2])
-        ];
+        try {
+            const result = await this.#actor.g(to_candid_list_n1(arg0));
+            return [
+                from_candid_B_n5(result[0]),
+                from_candid_tree_n8(result[1]),
+                from_candid_stream_n11(result[2])
+            ];
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
 }
 export const recursion: recursionInterface = new Recursion();

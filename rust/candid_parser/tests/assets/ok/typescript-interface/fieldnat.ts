@@ -44,12 +44,17 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
+function extractAgentErrorMessage(error: string): string {
+    const errorString = String(error);
+    const match = errorString.match(/with message: '([^']+)'/);
+    return match ? match[1] : errorString;
+}
 export interface non_tuple {
     _1_: string;
     _2_: string;
 }
 export type tuple = [string, string];
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -86,34 +91,70 @@ class Fieldnat implements fieldnatInterface {
         this.#actor = actor ?? _fieldnat;
     }
     async bab(arg0: bigint, arg1: bigint): Promise<void> {
-        const result = await this.#actor.bab(arg0, arg1);
-        return result;
+        try {
+            const result = await this.#actor.bab(arg0, arg1);
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async bar(arg0: {
         2: bigint;
     }): Promise<"e20" | "e30"> {
-        const result = await this.#actor.bar(arg0);
-        return from_candid_variant_n1(result);
+        try {
+            const result = await this.#actor.bar(arg0);
+            return from_candid_variant_n1(result);
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async bas(arg0: [bigint, bigint]): Promise<[string, bigint]> {
-        const result = await this.#actor.bas(arg0);
-        return result;
+        try {
+            const result = await this.#actor.bas(arg0);
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async baz(arg0: {
         _2_: bigint;
         2: bigint;
     }): Promise<{
     }> {
-        const result = await this.#actor.baz(arg0);
-        return result;
+        try {
+            const result = await this.#actor.baz(arg0);
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async bba(arg0: tuple): Promise<non_tuple> {
-        const result = await this.#actor.bba(arg0);
-        return result;
+        try {
+            const result = await this.#actor.bba(arg0);
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async bib(arg0: [bigint]): Promise<"_0"> {
-        const result = await this.#actor.bib(arg0);
-        return from_candid_variant_n2(result);
+        try {
+            const result = await this.#actor.bib(arg0);
+            return from_candid_variant_n2(result);
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async foo(arg0: {
         _2_: bigint;
@@ -121,8 +162,14 @@ class Fieldnat implements fieldnatInterface {
         _2_: bigint;
         _2: bigint;
     }> {
-        const result = await this.#actor.foo(arg0);
-        return result;
+        try {
+            const result = await this.#actor.foo(arg0);
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
 }
 export const fieldnat: fieldnatInterface = new Fieldnat();

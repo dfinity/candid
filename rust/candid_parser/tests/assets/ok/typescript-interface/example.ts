@@ -44,6 +44,11 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
+function extractAgentErrorMessage(error: string): string {
+    const errorString = String(error);
+    const match = errorString.match(/with message: '([^']+)'/);
+    return match ? match[1] : errorString;
+}
 export type A = B;
 export type B = Some<A> | None;
 export type List = {
@@ -115,7 +120,7 @@ export type tree = {
 } | {
     leaf: bigint;
 };
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -157,28 +162,52 @@ class Example implements exampleInterface {
         this.#actor = actor ?? _example;
     }
     async bbbbb(arg0: b): Promise<void> {
-        const result = await this.#actor.bbbbb(arg0);
-        return result;
+        try {
+            const result = await this.#actor.bbbbb(arg0);
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async f1(arg0: list, arg1: Uint8Array | number[], arg2: boolean | null): Promise<void> {
-        const result = await this.#actor.f1(to_candid_list_n1(arg0), arg1, to_candid_opt_n5(arg2));
-        return result;
+        try {
+            const result = await this.#actor.f1(to_candid_list_n1(arg0), arg1, to_candid_opt_n5(arg2));
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async g(arg0: list): Promise<[B, tree, stream]> {
-        const result = await this.#actor.g(to_candid_list_n1(arg0));
-        return [
-            from_candid_B_n6(result[0]),
-            from_candid_tree_n9(result[1]),
-            from_candid_stream_n12(result[2])
-        ];
+        try {
+            const result = await this.#actor.g(to_candid_list_n1(arg0));
+            return [
+                from_candid_B_n6(result[0]),
+                from_candid_tree_n9(result[1]),
+                from_candid_stream_n12(result[2])
+            ];
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async g1(arg0: my_type, arg1: List, arg2: List | null, arg3: nested): Promise<[bigint, Principal, nested_res]> {
-        const result = await this.#actor.g1(arg0, to_candid_List_n14(arg1), to_candid_opt_n17(arg2), to_candid_nested_n18(arg3));
-        return [
-            result[0],
-            result[1],
-            from_candid_nested_res_n21(result[2])
-        ];
+        try {
+            const result = await this.#actor.g1(arg0, to_candid_List_n14(arg1), to_candid_opt_n17(arg2), to_candid_nested_n18(arg3));
+            return [
+                result[0],
+                result[1],
+                from_candid_nested_res_n21(result[2])
+            ];
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async h(arg0: Array<string | null>, arg1: {
         A: bigint;
@@ -189,8 +218,14 @@ class Example implements exampleInterface {
         };
         id: bigint;
     }> {
-        const result = await this.#actor.h(to_candid_vec_n25(arg0), to_candid_variant_n27(arg1), to_candid_opt_n17(arg2));
-        return result;
+        try {
+            const result = await this.#actor.h(to_candid_vec_n25(arg0), to_candid_variant_n27(arg1), to_candid_opt_n17(arg2));
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async x(arg0: a, arg1: b): Promise<[a | null, b | null, {
             Ok: {
@@ -199,12 +234,18 @@ class Example implements exampleInterface {
         } | {
             Err: "a" | "b";
         }]> {
-        const result = await this.#actor.x(to_candid_a_n28(arg0), arg1);
-        return [
-            from_candid_opt_n30(result[0]),
-            from_candid_opt_n33(result[1]),
-            from_candid_variant_n34(result[2])
-        ];
+        try {
+            const result = await this.#actor.x(to_candid_a_n28(arg0), arg1);
+            return [
+                from_candid_opt_n30(result[0]),
+                from_candid_opt_n33(result[1]),
+                from_candid_variant_n34(result[2])
+            ];
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
 }
 export const example: exampleInterface = new Example();

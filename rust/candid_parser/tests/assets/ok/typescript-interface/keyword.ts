@@ -44,6 +44,11 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
+function extractAgentErrorMessage(error: string): string {
+    const errorString = String(error);
+    const match = errorString.match(/with message: '([^']+)'/);
+    return match ? match[1] : errorString;
+}
 export type if_ = {
     branch: {
         val: bigint;
@@ -68,7 +73,7 @@ export type stream = {
     next: [Principal, string];
 } | null;
 export type t = (arg0: Principal) => void;
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -114,47 +119,101 @@ class Keyword implements keywordInterface {
         this.#actor = actor ?? _keyword;
     }
     async Oneway(): Promise<void> {
-        const result = await this.#actor.Oneway();
-        return result;
+        try {
+            const result = await this.#actor.Oneway();
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async f_(arg0: o): Promise<o> {
-        const result = await this.#actor.f_(to_candid_o_n1(arg0));
-        return from_candid_o_n3(result);
+        try {
+            const result = await this.#actor.f_(to_candid_o_n1(arg0));
+            return from_candid_o_n3(result);
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async field(arg0: {
         test: number;
         _1291438163_: number;
     }): Promise<{
     }> {
-        const result = await this.#actor.field(arg0);
-        return result;
+        try {
+            const result = await this.#actor.field(arg0);
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async fieldnat(arg0: {
         _2_: bigint;
         2: bigint;
     }): Promise<[bigint]> {
-        const result = await this.#actor.fieldnat(arg0);
-        return result;
+        try {
+            const result = await this.#actor.fieldnat(arg0);
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async oneway(arg0: number): Promise<void> {
-        const result = await this.#actor.oneway(arg0);
-        return result;
+        try {
+            const result = await this.#actor.oneway(arg0);
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async oneway_(arg0: number): Promise<void> {
-        const result = await this.#actor.oneway_(arg0);
-        return result;
+        try {
+            const result = await this.#actor.oneway_(arg0);
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async query(arg0: Uint8Array | number[]): Promise<Uint8Array | number[]> {
-        const result = await this.#actor.query(arg0);
-        return result;
+        try {
+            const result = await this.#actor.query(arg0);
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async return_(arg0: o): Promise<o> {
-        const result = await this.#actor.return_(to_candid_o_n1(arg0));
-        return from_candid_o_n3(result);
+        try {
+            const result = await this.#actor.return(to_candid_o_n1(arg0));
+            return from_candid_o_n3(result);
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async tuple(arg0: [bigint, Uint8Array | number[], string]): Promise<[bigint, number]> {
-        const result = await this.#actor.tuple(arg0);
-        return result;
+        try {
+            const result = await this.#actor.tuple(arg0);
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async variant(arg0: {
         A: null;
@@ -165,8 +224,14 @@ class Keyword implements keywordInterface {
     } | {
         D: number;
     }): Promise<void> {
-        const result = await this.#actor.variant(to_candid_variant_n5(arg0));
-        return result;
+        try {
+            const result = await this.#actor.variant(to_candid_variant_n5(arg0));
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
 }
 export const keyword: keywordInterface = new Keyword();

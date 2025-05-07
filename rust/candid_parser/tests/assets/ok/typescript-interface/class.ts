@@ -44,12 +44,17 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
+function extractAgentErrorMessage(error: string): string {
+    const errorString = String(error);
+    const match = errorString.match(/with message: '([^']+)'/);
+    return match ? match[1] : errorString;
+}
 export type List = [bigint, List] | null;
 export interface Profile {
     age: number;
     name: string;
 }
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -71,12 +76,24 @@ class Class implements classInterface {
         this.#actor = actor ?? _class;
     }
     async get(): Promise<List> {
-        const result = await this.#actor.get();
-        return from_candid_List_n1(result);
+        try {
+            const result = await this.#actor.get();
+            return from_candid_List_n1(result);
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async set(arg0: List): Promise<List> {
-        const result = await this.#actor.set(to_candid_List_n4(arg0));
-        return from_candid_List_n1(result);
+        try {
+            const result = await this.#actor.set(to_candid_List_n4(arg0));
+            return from_candid_List_n1(result);
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
 }
 export const class_: classInterface = new Class();

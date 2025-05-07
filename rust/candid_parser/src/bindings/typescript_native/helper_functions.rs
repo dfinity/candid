@@ -66,6 +66,12 @@ pub fn add_option_helpers_wrapper(module: &mut Module) {
     module
         .body
         .push(ModuleItem::Stmt(Stmt::Decl(Decl::Fn(opt_struct_function))));
+
+    // Add error message parser
+    let extract_agent_error_message = generate_extract_agent_error_function();
+    module.body.push(ModuleItem::Stmt(Stmt::Decl(Decl::Fn(
+        extract_agent_error_message,
+    ))));
 }
 
 pub fn add_create_actor_imports_and_interface(module: &mut Module) {
@@ -182,6 +188,12 @@ fn generate_agent_imports() -> ImportDecl {
     ImportDecl {
         span: DUMMY_SP,
         specifiers: vec![
+            ImportSpecifier::Named(ImportNamedSpecifier {
+                span: DUMMY_SP,
+                local: Ident::new("ActorCallError".into(), DUMMY_SP, SyntaxContext::empty()),
+                imported: None,
+                is_type_only: false,
+            }),
             ImportSpecifier::Named(ImportNamedSpecifier {
                 span: DUMMY_SP,
                 local: Ident::new("HttpAgentOptions".into(), DUMMY_SP, SyntaxContext::empty()),
@@ -1440,5 +1452,166 @@ fn create_option_type() -> TsTypeAliasDecl {
                 ],
             }),
         )),
+    }
+}
+
+// Generate a function to extract the actual error message from IC agent errors
+fn generate_extract_agent_error_function() -> FnDecl {
+    FnDecl {
+        ident: Ident::new(
+            "extractAgentErrorMessage".into(),
+            DUMMY_SP,
+            SyntaxContext::empty(),
+        ),
+        declare: false,
+        function: Box::new(Function {
+            params: vec![Param {
+                span: DUMMY_SP,
+                decorators: vec![],
+                pat: Pat::Ident(BindingIdent {
+                    id: Ident::new("error".into(), DUMMY_SP, SyntaxContext::empty()),
+                    type_ann: Some(Box::new(TsTypeAnn {
+                        span: DUMMY_SP,
+                        type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
+                            span: DUMMY_SP,
+                            kind: TsKeywordTypeKind::TsStringKeyword,
+                        })),
+                    })),
+                }),
+            }],
+            decorators: vec![],
+            span: DUMMY_SP,
+            body: Some(BlockStmt {
+                span: DUMMY_SP,
+                stmts: vec![
+                    // const errorString = String(error);
+                    Stmt::Decl(Decl::Var(Box::new(VarDecl {
+                        span: DUMMY_SP,
+                        kind: VarDeclKind::Const,
+                        declare: false,
+                        decls: vec![VarDeclarator {
+                            span: DUMMY_SP,
+                            name: Pat::Ident(BindingIdent {
+                                id: Ident::new(
+                                    "errorString".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                ),
+                                type_ann: None,
+                            }),
+                            init: Some(Box::new(Expr::Call(CallExpr {
+                                span: DUMMY_SP,
+                                callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
+                                    "String".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                )))),
+                                args: vec![ExprOrSpread {
+                                    spread: None,
+                                    expr: Box::new(Expr::Ident(Ident::new(
+                                        "error".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    ))),
+                                }],
+                                type_args: None,
+                                ctxt: SyntaxContext::empty(),
+                            }))),
+                            definite: false,
+                        }],
+                        ctxt: SyntaxContext::empty(),
+                    }))),
+                    // const match = errorString.match(/with message: '([^']+)'/);
+                    Stmt::Decl(Decl::Var(Box::new(VarDecl {
+                        span: DUMMY_SP,
+                        kind: VarDeclKind::Const,
+                        declare: false,
+                        decls: vec![VarDeclarator {
+                            span: DUMMY_SP,
+                            name: Pat::Ident(BindingIdent {
+                                id: Ident::new("match".into(), DUMMY_SP, SyntaxContext::empty()),
+                                type_ann: None,
+                            }),
+                            init: Some(Box::new(Expr::Call(CallExpr {
+                                span: DUMMY_SP,
+                                callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
+                                    span: DUMMY_SP,
+                                    obj: Box::new(Expr::Ident(Ident::new(
+                                        "errorString".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    ))),
+                                    prop: MemberProp::Ident(
+                                        Ident::new(
+                                            "match".into(),
+                                            DUMMY_SP,
+                                            SyntaxContext::empty(),
+                                        )
+                                        .into(),
+                                    ),
+                                }))),
+                                args: vec![ExprOrSpread {
+                                    spread: None,
+                                    expr: Box::new(Expr::Lit(Lit::Regex(Regex {
+                                        span: DUMMY_SP,
+                                        exp: "with message: '([^']+)'".into(),
+                                        flags: "".into(),
+                                    }))),
+                                }],
+                                type_args: None,
+                                ctxt: SyntaxContext::empty(),
+                            }))),
+                            definite: false,
+                        }],
+                        ctxt: SyntaxContext::empty(),
+                    }))),
+                    // return match ? match[1] : errorString;
+                    Stmt::Return(ReturnStmt {
+                        span: DUMMY_SP,
+                        arg: Some(Box::new(Expr::Cond(CondExpr {
+                            span: DUMMY_SP,
+                            test: Box::new(Expr::Ident(Ident::new(
+                                "match".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            ))),
+                            cons: Box::new(Expr::Member(MemberExpr {
+                                span: DUMMY_SP,
+                                obj: Box::new(Expr::Ident(Ident::new(
+                                    "match".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                ))),
+                                prop: MemberProp::Computed(ComputedPropName {
+                                    span: DUMMY_SP,
+                                    expr: Box::new(Expr::Lit(Lit::Num(Number {
+                                        span: DUMMY_SP,
+                                        value: 1.0,
+                                        raw: None,
+                                    }))),
+                                }),
+                            })),
+                            alt: Box::new(Expr::Ident(Ident::new(
+                                "errorString".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            ))),
+                        }))),
+                    }),
+                ],
+                ctxt: SyntaxContext::empty(),
+            }),
+            is_generator: false,
+            is_async: false,
+            type_params: None,
+            return_type: Some(Box::new(TsTypeAnn {
+                span: DUMMY_SP,
+                type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
+                    span: DUMMY_SP,
+                    kind: TsKeywordTypeKind::TsStringKeyword,
+                })),
+            })),
+            ctxt: SyntaxContext::empty(),
+        }),
     }
 }

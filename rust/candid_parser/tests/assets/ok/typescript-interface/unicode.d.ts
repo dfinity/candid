@@ -14,7 +14,7 @@ export interface A {
     '字 段 名2': bigint;
 }
 export type B = "" | "空的" | "  空的  " | "1⃣️2⃣️3⃣️";
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

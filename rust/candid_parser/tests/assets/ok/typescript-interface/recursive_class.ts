@@ -44,10 +44,15 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
+function extractAgentErrorMessage(error: string): string {
+    const errorString = String(error);
+    const match = errorString.match(/with message: '([^']+)'/);
+    return match ? match[1] : errorString;
+}
 export interface sInterface {
     next(): Promise<Principal>;
 }
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -66,8 +71,14 @@ class Recursive_class implements recursive_classInterface {
         this.#actor = actor ?? _recursive_class;
     }
     async next(): Promise<Principal> {
-        const result = await this.#actor.next();
-        return result;
+        try {
+            const result = await this.#actor.next();
+            return result;
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
 }
 export const recursive_class: recursive_classInterface = new Recursive_class();

@@ -44,8 +44,13 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
+function extractAgentErrorMessage(error: string): string {
+    const errorString = String(error);
+    const match = errorString.match(/with message: '([^']+)'/);
+    return match ? match[1] : errorString;
+}
 export type T = [T];
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -75,12 +80,24 @@ class Empty implements emptyInterface {
     }
     async f(arg0: {
     }): Promise<never> {
-        const result = await this.#actor.f(arg0);
-        return from_candid_variant_n1(result);
+        try {
+            const result = await this.#actor.f(arg0);
+            return from_candid_variant_n1(result);
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async g(arg0: T): Promise<"a"> {
-        const result = await this.#actor.g(to_candid_T_n2(arg0));
-        return from_candid_variant_n4(result);
+        try {
+            const result = await this.#actor.g(to_candid_T_n2(arg0));
+            return from_candid_variant_n4(result);
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
     async h(arg0: [T, never]): Promise<{
         a: T;
@@ -88,8 +105,14 @@ class Empty implements emptyInterface {
         b: {
         };
     }> {
-        const result = await this.#actor.h(to_candid_tuple_n7(arg0));
-        return from_candid_variant_n8(result);
+        try {
+            const result = await this.#actor.h(to_candid_tuple_n7(arg0));
+            return from_candid_variant_n8(result);
+        } catch (e) {
+            if (e instanceof ActorCallError) {
+                throw new Error(extractAgentErrorMessage(e.message));
+            } else throw e;
+        }
     }
 }
 export const empty: emptyInterface = new Empty();
