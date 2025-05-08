@@ -142,6 +142,33 @@ where
     let cost = de.get_config().compute_cost(config);
     Ok((res, cost))
 }
+pub fn decode_args_with_decoding_quota<const N: usize, Tuple>(byte_vec: Vec<u8>) -> Tuple
+where
+    Tuple: for<'a> ArgumentDecoder<'a>,
+{
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(N);
+    decode_args_with_config(&byte_vec[..], &config).unwrap()
+}
+pub fn decode_args_with_skipping_quota<const M: usize, Tuple>(byte_vec: Vec<u8>) -> Tuple
+where
+    Tuple: for<'a> ArgumentDecoder<'a>,
+{
+    let mut config = DecoderConfig::new();
+    config.set_skipping_quota(M);
+    decode_args_with_config(&byte_vec[..], &config).unwrap()
+}
+pub fn decode_args_with_decoding_and_skipping_quota<const N: usize, const M: usize, Tuple>(
+    byte_vec: Vec<u8>,
+) -> Tuple
+where
+    Tuple: for<'a> ArgumentDecoder<'a>,
+{
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(N);
+    config.set_skipping_quota(M);
+    decode_args_with_config(&byte_vec[..], &config).unwrap()
+}
 
 /// Decode a single argument.
 ///
@@ -169,6 +196,33 @@ where
 {
     let (res,) = decode_args_with_config(bytes, config)?;
     Ok(res)
+}
+pub fn decode_one_with_decoding_quota<const N: usize, T>(byte_vec: Vec<u8>) -> T
+where
+    T: for<'a> Deserialize<'a> + CandidType,
+{
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(N);
+    decode_one_with_config(&byte_vec[..], &config).unwrap()
+}
+pub fn decode_one_with_skipping_quota<const M: usize, T>(byte_vec: Vec<u8>) -> T
+where
+    T: for<'a> Deserialize<'a> + CandidType,
+{
+    let mut config = DecoderConfig::new();
+    config.set_skipping_quota(M);
+    decode_one_with_config(&byte_vec[..], &config).unwrap()
+}
+pub fn decode_one_with_decoding_and_skipping_quota<const N: usize, const M: usize, T>(
+    byte_vec: Vec<u8>,
+) -> T
+where
+    T: for<'a> Deserialize<'a> + CandidType,
+{
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(N);
+    config.set_skipping_quota(M);
+    decode_one_with_config(&byte_vec[..], &config).unwrap()
 }
 
 /// Serialize an encoding of a tuple and write it to a `Write` buffer.
