@@ -171,14 +171,18 @@ import type { A as _A, B as _B, List as _List, a as _a, b as _b, list as _list, 
 class Example implements exampleInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
-        if (!actor) {
-            this.#actor = _createActor(canisterId, {
-                agentOptions: {
-                    host: process.env.BACKEND_HOST
-                }
-            });
-        } else {
+        if (actor) {
             this.#actor = actor;
+        } else {
+            if (process.env.BACKEND_HOST) {
+                this.#actor = _createActor(canisterId, {
+                    agentOptions: {
+                        host: process.env.BACKEND_HOST
+                    }
+                });
+            } else {
+                this.#actor = _createActor(canisterId);
+            }
         }
     }
     async bbbbb(arg0: b): Promise<void> {
