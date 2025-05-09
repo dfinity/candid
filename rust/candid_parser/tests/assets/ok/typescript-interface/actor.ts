@@ -86,14 +86,18 @@ import type { o as _o } from "declarations/actor/actor.did.d.ts";
 class Actor implements actorInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
-        if (!actor) {
-            this.#actor = _createActor(canisterId, {
-                agentOptions: {
-                    host: process.env.BACKEND_HOST
-                }
-            });
-        } else {
+        if (actor) {
             this.#actor = actor;
+        } else {
+            if (process.env.BACKEND_HOST) {
+                this.#actor = _createActor(canisterId, {
+                    agentOptions: {
+                        host: process.env.BACKEND_HOST
+                    }
+                });
+            } else {
+                this.#actor = _createActor(canisterId);
+            }
         }
     }
     async f(arg0: bigint): Promise<[Principal, string]> {

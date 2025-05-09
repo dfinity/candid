@@ -93,14 +93,18 @@ import type { Func as _Func, Service as _Service, Service2 as _Service2 } from "
 class Service implements serviceInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
-        if (!actor) {
-            this.#actor = _createActor(canisterId, {
-                agentOptions: {
-                    host: process.env.BACKEND_HOST
-                }
-            });
-        } else {
+        if (actor) {
             this.#actor = actor;
+        } else {
+            if (process.env.BACKEND_HOST) {
+                this.#actor = _createActor(canisterId, {
+                    agentOptions: {
+                        host: process.env.BACKEND_HOST
+                    }
+                });
+            } else {
+                this.#actor = _createActor(canisterId);
+            }
         }
     }
     async asArray(): Promise<[Array<Principal>, Array<[Principal, string]>]> {

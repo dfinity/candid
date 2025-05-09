@@ -85,14 +85,18 @@ import type { List as _List } from "declarations/class/class.did.d.ts";
 class Class implements classInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
-        if (!actor) {
-            this.#actor = _createActor(canisterId, {
-                agentOptions: {
-                    host: process.env.BACKEND_HOST
-                }
-            });
-        } else {
+        if (actor) {
             this.#actor = actor;
+        } else {
+            if (process.env.BACKEND_HOST) {
+                this.#actor = _createActor(canisterId, {
+                    agentOptions: {
+                        host: process.env.BACKEND_HOST
+                    }
+                });
+            } else {
+                this.#actor = _createActor(canisterId);
+            }
         }
     }
     async get(): Promise<List> {

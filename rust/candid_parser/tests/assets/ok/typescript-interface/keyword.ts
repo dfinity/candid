@@ -128,14 +128,18 @@ import type { o as _o } from "declarations/keyword/keyword.did.d.ts";
 class Keyword implements keywordInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
-        if (!actor) {
-            this.#actor = _createActor(canisterId, {
-                agentOptions: {
-                    host: process.env.BACKEND_HOST
-                }
-            });
-        } else {
+        if (actor) {
             this.#actor = actor;
+        } else {
+            if (process.env.BACKEND_HOST) {
+                this.#actor = _createActor(canisterId, {
+                    agentOptions: {
+                        host: process.env.BACKEND_HOST
+                    }
+                });
+            } else {
+                this.#actor = _createActor(canisterId);
+            }
         }
     }
     async Oneway(): Promise<void> {
