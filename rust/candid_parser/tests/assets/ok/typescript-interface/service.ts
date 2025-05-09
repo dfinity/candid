@@ -61,6 +61,18 @@ export declare interface CreateActorOptions {
     actorOptions?: ActorConfig;
 }
 export function createActor(canisterId: string | Principal, options?: CreateActorOptions): serviceInterface {
+    if (!options) {
+        options = {};
+    }
+    if (process.env.BACKEND_HOST) {
+        options = {
+            ...options,
+            agentOptions: {
+                ...options.agentOptions,
+                host: process.env.BACKEND_HOST
+            }
+        };
+    }
     const actor = _createActor(canisterId, options);
     return new Service(actor);
 }
@@ -81,7 +93,15 @@ import type { Func as _Func, Service as _Service, Service2 as _Service2 } from "
 class Service implements serviceInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
-        this.#actor = actor ?? _service;
+        if (!actor) {
+            this.#actor = _createActor(canisterId, {
+                agentOptions: {
+                    host: process.env.BACKEND_HOST
+                }
+            });
+        } else {
+            this.#actor = actor;
+        }
     }
     async asArray(): Promise<[Array<Principal>, Array<[Principal, string]>]> {
         try {

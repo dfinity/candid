@@ -57,6 +57,18 @@ export declare interface CreateActorOptions {
     actorOptions?: ActorConfig;
 }
 export function createActor(canisterId: string | Principal, options?: CreateActorOptions): emptyInterface {
+    if (!options) {
+        options = {};
+    }
+    if (process.env.BACKEND_HOST) {
+        options = {
+            ...options,
+            agentOptions: {
+                ...options.agentOptions,
+                host: process.env.BACKEND_HOST
+            }
+        };
+    }
     const actor = _createActor(canisterId, options);
     return new Empty(actor);
 }
@@ -76,7 +88,15 @@ import type { T as _T } from "declarations/empty/empty.did.d.ts";
 class Empty implements emptyInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
-        this.#actor = actor ?? _empty;
+        if (!actor) {
+            this.#actor = _createActor(canisterId, {
+                agentOptions: {
+                    host: process.env.BACKEND_HOST
+                }
+            });
+        } else {
+            this.#actor = actor;
+        }
     }
     async f(arg0: {
     }): Promise<never> {
