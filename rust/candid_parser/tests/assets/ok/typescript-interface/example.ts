@@ -127,6 +127,18 @@ export declare interface CreateActorOptions {
     actorOptions?: ActorConfig;
 }
 export function createActor(canisterId: string | Principal, options?: CreateActorOptions): exampleInterface {
+    if (!options) {
+        options = {};
+    }
+    if (process.env.BACKEND_HOST) {
+        options = {
+            ...options,
+            agentOptions: {
+                ...options.agentOptions,
+                host: process.env.BACKEND_HOST
+            }
+        };
+    }
     const actor = _createActor(canisterId, options);
     return new Example(actor);
 }
@@ -159,7 +171,15 @@ import type { A as _A, B as _B, List as _List, a as _a, b as _b, list as _list, 
 class Example implements exampleInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
-        this.#actor = actor ?? _example;
+        if (!actor) {
+            this.#actor = _createActor(canisterId, {
+                agentOptions: {
+                    host: process.env.BACKEND_HOST
+                }
+            });
+        } else {
+            this.#actor = actor;
+        }
     }
     async bbbbb(arg0: b): Promise<void> {
         try {

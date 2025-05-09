@@ -62,6 +62,18 @@ export declare interface CreateActorOptions {
     actorOptions?: ActorConfig;
 }
 export function createActor(canisterId: string | Principal, options?: CreateActorOptions): cyclicInterface {
+    if (!options) {
+        options = {};
+    }
+    if (process.env.BACKEND_HOST) {
+        options = {
+            ...options,
+            agentOptions: {
+                ...options.agentOptions,
+                host: process.env.BACKEND_HOST
+            }
+        };
+    }
     const actor = _createActor(canisterId, options);
     return new Cyclic(actor);
 }
@@ -73,7 +85,15 @@ import type { A as _A, B as _B, C as _C, X as _X, Y as _Y, Z as _Z } from "decla
 class Cyclic implements cyclicInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
-        this.#actor = actor ?? _cyclic;
+        if (!actor) {
+            this.#actor = _createActor(canisterId, {
+                agentOptions: {
+                    host: process.env.BACKEND_HOST
+                }
+            });
+        } else {
+            this.#actor = actor;
+        }
     }
     async f(arg0: A, arg1: B, arg2: C, arg3: X, arg4: Y, arg5: Z): Promise<void> {
         try {

@@ -1,5 +1,6 @@
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
+use swc_core::ecma::ast::{AssignTarget, SimpleAssignTarget};
 
 use super::ident::get_ident_guarded;
 
@@ -297,6 +298,169 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
             body: Some(BlockStmt {
                 span: DUMMY_SP,
                 stmts: vec![
+                    // if (!options) { options = {}; }
+                    Stmt::If(IfStmt {
+                        span: DUMMY_SP,
+                        test: Box::new(Expr::Unary(UnaryExpr {
+                            span: DUMMY_SP,
+                            op: UnaryOp::Bang,
+                            arg: Box::new(Expr::Ident(Ident::new(
+                                "options".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            ))),
+                        })),
+                        cons: Box::new(Stmt::Block(BlockStmt {
+                            span: DUMMY_SP,
+                            stmts: vec![Stmt::Expr(ExprStmt {
+                                span: DUMMY_SP,
+                                expr: Box::new(Expr::Assign(AssignExpr {
+                                    span: DUMMY_SP,
+                                    op: AssignOp::Assign,
+                                    left: AssignTarget::Simple(SimpleAssignTarget::Ident(Ident::new(
+                                        "options".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    ).into() )),
+                                    right: Box::new(Expr::Object(ObjectLit {
+                                        span: DUMMY_SP,
+                                        props: vec![],
+                                    })),
+                                })),
+                            })],
+                            ctxt: SyntaxContext::empty(),
+                        })),
+                        alt: None,
+                    }),
+                    // if (process.env.BACKEND_HOST) { ... }
+                    Stmt::If(IfStmt {
+                        span: DUMMY_SP,
+                        test: Box::new(Expr::Member(MemberExpr {
+                            span: DUMMY_SP,
+                            obj: Box::new(Expr::Member(MemberExpr {
+                                span: DUMMY_SP,
+                                obj: Box::new(Expr::Ident(Ident::new(
+                                    "process".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                ).into())),
+                                prop: MemberProp::Ident(Ident::new(
+                                    "env".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                ).into()),
+                            })),
+                            prop: MemberProp::Ident(Ident::new(
+                                "BACKEND_HOST".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            ).into()),
+                        })),
+                        cons: Box::new(Stmt::Block(BlockStmt {
+                            span: DUMMY_SP,
+                            stmts: vec![Stmt::Expr(ExprStmt {
+                                span: DUMMY_SP,
+                                expr: Box::new(Expr::Assign(AssignExpr {
+                                    span: DUMMY_SP,
+                                    op: AssignOp::Assign,
+                                    left: AssignTarget::Simple(SimpleAssignTarget::Ident(Ident::new(
+                                        "options".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    ).into() )),
+                                    right: Box::new(Expr::Object(ObjectLit {
+                                        span: DUMMY_SP,
+                                        props: vec![
+                                            PropOrSpread::Spread(SpreadElement {
+                                                dot3_token: DUMMY_SP,
+                                                expr: Box::new(Expr::Ident(Ident::new(
+                                                    "options".into(),
+                                                    DUMMY_SP,
+                                                    SyntaxContext::empty(),
+                                                ))),
+                                            }),
+                                            PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                                                key: PropName::Ident(Ident::new(
+                                                    "agentOptions".into(),
+                                                    DUMMY_SP,
+                                                    SyntaxContext::empty(),
+                                                ).into()),
+                                                value: Box::new(Expr::Object(ObjectLit {
+                                                    span: DUMMY_SP,
+                                                    props: vec![
+                                                        PropOrSpread::Spread(SpreadElement {
+                                                            dot3_token: DUMMY_SP,
+                                                            expr: Box::new(Expr::Member(MemberExpr {
+                                                                span: DUMMY_SP,
+                                                                obj: Box::new(Expr::Ident(
+                                                                    Ident::new(
+                                                                        "options".into(),
+                                                                        DUMMY_SP,
+                                                                        SyntaxContext::empty(),
+                                                                    ).into(),
+                                                                )),
+                                                                prop: MemberProp::Ident(Ident::new(
+                                                                    "agentOptions".into(),
+                                                                    DUMMY_SP,
+                                                                    SyntaxContext::empty(),
+                                                                ).into() ),
+                                                            })),
+                                                        }),
+                                                        PropOrSpread::Prop(Box::new(
+                                                            Prop::KeyValue(KeyValueProp {
+                                                                key: PropName::Ident(Ident::new(
+                                                                    "host".into(),
+                                                                    DUMMY_SP,
+                                                                    SyntaxContext::empty(),
+                                                                ).into()),
+                                                                value: Box::new(Expr::Member(
+                                                                    MemberExpr {
+                                                                        span: DUMMY_SP,
+                                                                        obj: Box::new(
+                                                                            Expr::Member(MemberExpr {
+                                                                                span: DUMMY_SP,
+                                                                                obj: Box::new(
+                                                                                    Expr::Ident(
+                                                                                        Ident::new(
+                                                                                            "process"
+                                                                                                .into(),
+                                                                                            DUMMY_SP,
+                                                                                            SyntaxContext::empty(),
+                                                                                        ),
+                                                                                    ),
+                                                                                ),
+                                                                                prop: MemberProp::Ident(
+                                                                                    Ident::new(
+                                                                                        "env".into(),
+                                                                                        DUMMY_SP,
+                                                                                        SyntaxContext::empty(),
+                                                                                    ).into(),
+                                                                                ),
+                                                                            }),
+                                                                        ),
+                                                                        prop: MemberProp::Ident(
+                                                                            Ident::new(
+                                                                                "BACKEND_HOST"
+                                                                                    .into(),
+                                                                                DUMMY_SP,
+                                                                                SyntaxContext::empty(),
+                                                                            ).into(),
+                                                                        ),
+                                                                    },
+                                                                )),
+                                                            }),
+                                                        )),
+                                                    ],
+                                                })),
+                                            }))),
+                                        ],
+                                    })),
+                                })),
+                            })],
+                            ctxt: SyntaxContext::empty(),
+                        })),
+                        alt: None,
+                    }),
                     // const actor = _createActor(canisterId, options);
                     Stmt::Decl(Decl::Var(Box::new(VarDecl {
                         ctxt: SyntaxContext::empty(),
