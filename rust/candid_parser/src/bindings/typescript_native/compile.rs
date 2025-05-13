@@ -1663,22 +1663,53 @@ pub fn create_actor_method(
                             span: DUMMY_SP,
                             test: Box::new(Expr::Bin(BinExpr {
                                 span: DUMMY_SP,
-                                op: BinaryOp::InstanceOf,
-                                left: Box::new(Expr::Ident(Ident::new(
-                                    "e".into(),
-                                    DUMMY_SP,
-                                    SyntaxContext::empty(),
-                                ))),
-                                right: Box::new(Expr::Ident(Ident::new(
-                                    "ActorCallError".into(),
-                                    DUMMY_SP,
-                                    SyntaxContext::empty(),
-                                ))),
+                                op: BinaryOp::LogicalAnd,
+                                left: Box::new(Expr::Bin(BinExpr {
+                                    span: DUMMY_SP,
+                                    op: BinaryOp::LogicalAnd,
+                                    left: Box::new(Expr::Ident(Ident::new(
+                                        "e".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    ))),
+                                    right: Box::new(Expr::Bin(BinExpr {
+                                        span: DUMMY_SP,
+                                        op: BinaryOp::EqEqEq,
+                                        left: Box::new(Expr::Unary(UnaryExpr {
+                                            span: DUMMY_SP,
+                                            op: UnaryOp::TypeOf,
+                                            arg: Box::new(Expr::Ident(Ident::new(
+                                                "e".into(),
+                                                DUMMY_SP,
+                                                SyntaxContext::empty(),
+                                            ))),
+                                        })),
+                                        right: Box::new(Expr::Lit(Lit::Str(Str {
+                                            span: DUMMY_SP,
+                                            value: "object".into(),
+                                            raw: None,
+                                        }))),
+                                    })),
+                                })),
+                                right: Box::new(Expr::Bin(BinExpr {
+                                    span: DUMMY_SP,
+                                    op: BinaryOp::In,
+                                    left: Box::new(Expr::Lit(Lit::Str(Str {
+                                        span: DUMMY_SP,
+                                        value: "message".into(),
+                                        raw: None,
+                                    }))),
+                                    right: Box::new(Expr::Ident(Ident::new(
+                                        "e".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    ))),
+                                })),
                             })),
                             cons: Box::new(Stmt::Block(BlockStmt {
                                 span: DUMMY_SP,
                                 stmts: vec![
-                                    // throw new Error(extractAgentErrorMessage(e));
+                                    // throw new Error(extractAgentErrorMessage(e["message"] as string));
                                     Stmt::Throw(ThrowStmt {
                                         span: DUMMY_SP,
                                         arg: Box::new(Expr::New(NewExpr {
@@ -1701,21 +1732,28 @@ pub fn create_actor_method(
                                                     ))),
                                                     args: vec![ExprOrSpread {
                                                         spread: None,
-                                                        expr: Box::new(Expr::Member(MemberExpr {
+                                                        expr: Box::new(Expr::TsAs(TsAsExpr {
                                                             span: DUMMY_SP,
-                                                            obj: Box::new(Expr::Ident(Ident::new(
-                                                                "e".into(),
-                                                                DUMMY_SP,
-                                                                SyntaxContext::empty(),
-                                                            ))),
-                                                            prop: MemberProp::Ident(
-                                                                Ident::new(
-                                                                    "message".into(),
+                                                            expr: Box::new(Expr::Member(MemberExpr {
+                                                                span: DUMMY_SP,
+                                                                obj: Box::new(Expr::Ident(Ident::new(
+                                                                    "e".into(),
                                                                     DUMMY_SP,
                                                                     SyntaxContext::empty(),
-                                                                )
-                                                                .into(),
-                                                            ),
+                                                                ))),
+                                                                prop: MemberProp::Computed(ComputedPropName {
+                                                                    span: DUMMY_SP,
+                                                                    expr: Box::new(Expr::Lit(Lit::Str(Str {
+                                                                        span: DUMMY_SP,
+                                                                        value: "message".into(),
+                                                                        raw: None,
+                                                                    }))),
+                                                                }),
+                                                            })),
+                                                            type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
+                                                                span: DUMMY_SP,
+                                                                kind: TsKeywordTypeKind::TsStringKeyword,
+                                                            })),
                                                         })),
                                                     }],
                                                     type_args: None,

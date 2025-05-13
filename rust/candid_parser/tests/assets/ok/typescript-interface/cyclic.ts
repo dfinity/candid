@@ -104,8 +104,8 @@ class Cyclic implements cyclicInterface {
             const result = await this.#actor.f(to_candid_A_n1(arg0), to_candid_B_n3(arg1), to_candid_C_n5(arg2), to_candid_X_n6(arg3), to_candid_Y_n7(arg4), to_candid_Z_n8(arg5));
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
