@@ -1718,8 +1718,8 @@ fn generate_extract_agent_error_function() -> FnDecl {
                                     spread: None,
                                     expr: Box::new(Expr::Lit(Lit::Regex(Regex {
                                         span: DUMMY_SP,
-                                        exp: "with message: '([^']+)'".into(),
-                                        flags: "".into(),
+                                        exp: "with message:\\s*'([^']+)'".into(),
+                                        flags: "s".into(),
                                     }))),
                                 }],
                                 type_args: None,
