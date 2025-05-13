@@ -126,8 +126,8 @@ class Recursion implements recursionInterface {
                 from_candid_stream_n11(result[2])
             ];
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }

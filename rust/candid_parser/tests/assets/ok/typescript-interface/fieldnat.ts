@@ -119,8 +119,8 @@ class Fieldnat implements fieldnatInterface {
             const result = await this.#actor.bab(arg0, arg1);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -131,8 +131,8 @@ class Fieldnat implements fieldnatInterface {
             const result = await this.#actor.bar(arg0);
             return from_candid_variant_n1(result);
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -141,8 +141,8 @@ class Fieldnat implements fieldnatInterface {
             const result = await this.#actor.bas(arg0);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -155,8 +155,8 @@ class Fieldnat implements fieldnatInterface {
             const result = await this.#actor.baz(arg0);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -165,8 +165,8 @@ class Fieldnat implements fieldnatInterface {
             const result = await this.#actor.bba(arg0);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -175,8 +175,8 @@ class Fieldnat implements fieldnatInterface {
             const result = await this.#actor.bib(arg0);
             return from_candid_variant_n2(result);
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -190,8 +190,8 @@ class Fieldnat implements fieldnatInterface {
             const result = await this.#actor.foo(arg0);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }

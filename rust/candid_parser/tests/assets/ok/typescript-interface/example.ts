@@ -190,8 +190,8 @@ class Example implements exampleInterface {
             const result = await this.#actor.bbbbb(arg0);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -200,8 +200,8 @@ class Example implements exampleInterface {
             const result = await this.#actor.f1(to_candid_list_n1(arg0), arg1, to_candid_opt_n5(arg2));
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -214,8 +214,8 @@ class Example implements exampleInterface {
                 from_candid_stream_n12(result[2])
             ];
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -228,8 +228,8 @@ class Example implements exampleInterface {
                 from_candid_nested_res_n21(result[2])
             ];
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -246,8 +246,8 @@ class Example implements exampleInterface {
             const result = await this.#actor.h(to_candid_vec_n25(arg0), to_candid_variant_n27(arg1), to_candid_opt_n17(arg2));
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -266,8 +266,8 @@ class Example implements exampleInterface {
                 from_candid_variant_n34(result[2])
             ];
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }

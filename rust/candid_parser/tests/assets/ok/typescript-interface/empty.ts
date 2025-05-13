@@ -108,8 +108,8 @@ class Empty implements emptyInterface {
             const result = await this.#actor.f(arg0);
             return from_candid_variant_n1(result);
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -118,8 +118,8 @@ class Empty implements emptyInterface {
             const result = await this.#actor.g(to_candid_T_n2(arg0));
             return from_candid_variant_n4(result);
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -133,8 +133,8 @@ class Empty implements emptyInterface {
             const result = await this.#actor.h(to_candid_tuple_n7(arg0));
             return from_candid_variant_n8(result);
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }

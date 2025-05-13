@@ -147,8 +147,8 @@ class Keyword implements keywordInterface {
             const result = await this.#actor.Oneway();
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -157,8 +157,8 @@ class Keyword implements keywordInterface {
             const result = await this.#actor.f_(to_candid_o_n1(arg0));
             return from_candid_o_n3(result);
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -171,8 +171,8 @@ class Keyword implements keywordInterface {
             const result = await this.#actor.field(arg0);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -184,8 +184,8 @@ class Keyword implements keywordInterface {
             const result = await this.#actor.fieldnat(arg0);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -194,8 +194,8 @@ class Keyword implements keywordInterface {
             const result = await this.#actor.oneway(arg0);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -204,8 +204,8 @@ class Keyword implements keywordInterface {
             const result = await this.#actor.oneway_(arg0);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -214,8 +214,8 @@ class Keyword implements keywordInterface {
             const result = await this.#actor.query(arg0);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -224,8 +224,8 @@ class Keyword implements keywordInterface {
             const result = await this.#actor.return(to_candid_o_n1(arg0));
             return from_candid_o_n3(result);
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -234,8 +234,8 @@ class Keyword implements keywordInterface {
             const result = await this.#actor.tuple(arg0);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -252,8 +252,8 @@ class Keyword implements keywordInterface {
             const result = await this.#actor.variant(to_candid_variant_n5(arg0));
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }

@@ -105,8 +105,8 @@ class Actor implements actorInterface {
             const result = await this.#actor.f(arg0);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -115,8 +115,8 @@ class Actor implements actorInterface {
             const result = await this.#actor.o(to_candid_o_n1(arg0));
             return from_candid_o_n3(result);
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }

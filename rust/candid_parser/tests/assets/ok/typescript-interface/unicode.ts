@@ -108,8 +108,8 @@ class Unicode implements unicodeInterface {
             const result = await this.#actor[""](arg0);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -118,8 +118,8 @@ class Unicode implements unicodeInterface {
             const result = await this.#actor["✈️  🚗 ⛱️ "]();
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -128,8 +128,8 @@ class Unicode implements unicodeInterface {
             const result = await this.#actor["函数名"](arg0);
             return from_candid_B_n1(result);
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
@@ -138,8 +138,8 @@ class Unicode implements unicodeInterface {
             const result = await this.#actor["👀"](arg0);
             return result;
         } catch (e) {
-            if (e instanceof ActorCallError) {
-                throw new Error(extractAgentErrorMessage(e.message));
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
             } else throw e;
         }
     }
