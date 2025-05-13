@@ -6,3 +6,4 @@ pub mod javascript;
 pub mod motoko;
 pub mod rust;
 pub mod typescript;
+pub mod typescript_native;

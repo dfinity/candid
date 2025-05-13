@@ -1,0 +1,43 @@
+import type { Principal } from "@dfinity/principal";
+interface Some<T> {
+    _tag: "Some";
+    value: T;
+}
+interface None {
+    _tag: "None";
+}
+type Option<T> = Some<T> | None;
+export interface non_tuple {
+    _1_: string;
+    _2_: string;
+}
+export type tuple = [string, string];
+import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+export declare interface CreateActorOptions {
+    agent?: Agent;
+    agentOptions?: HttpAgentOptions;
+    actorOptions?: ActorConfig;
+}
+export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => fieldnat;
+export declare const canisterId: string;
+export interface fieldnatInterface {
+    bab(arg0: bigint, arg1: bigint): Promise<void>;
+    bar(arg0: {
+        2: bigint;
+    }): Promise<"e20" | "e30">;
+    bas(arg0: [bigint, bigint]): Promise<[string, bigint]>;
+    baz(arg0: {
+        _2_: bigint;
+        2: bigint;
+    }): Promise<{
+    }>;
+    bba(arg0: tuple): Promise<non_tuple>;
+    bib(arg0: [bigint]): Promise<"_0">;
+    foo(arg0: {
+        _2_: bigint;
+    }): Promise<{
+        _2_: bigint;
+        _2: bigint;
+    }>;
+}
+

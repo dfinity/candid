@@ -41,6 +41,7 @@ num-traits = { workspace = true, optional = true }
 dialoguer = { version = "0.11", default-features = false, features = ["editor", "completion"], optional = true }
 ctrlc = { version = "3.4", optional = true }
 console = { workspace = true, optional = true }
+swc_core = { version = "16.6.0", features = ["common", "ecma_ast", "ecma_codegen"] }
 
 [dev-dependencies]
 goldenfile = "1.1.0"
