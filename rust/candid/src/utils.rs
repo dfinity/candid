@@ -146,7 +146,7 @@ where
 /// Decode a series of arguments, represented as a tuple, with const generic quotas.
 /// There is a maximum of 16 arguments supported.
 ///
-/// This function is particularly useful as a decoder in ic-cdk macros.
+/// This function is particularly useful as a decoder in ic-cdk macros (version 0.18 and up).
 ///
 /// Example:
 ///
@@ -214,7 +214,7 @@ where
 
 /// Decode a single argument with const generic quotas.
 ///
-/// This function is particularly useful as a decoder in ic-cdk macros.
+/// This function is particularly useful as a decoder in ic-cdk macros (version 0.18 and up).
 ///
 /// Example:
 ///
