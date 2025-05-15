@@ -142,6 +142,23 @@ where
     let cost = de.get_config().compute_cost(config);
     Ok((res, cost))
 }
+
+/// Decode a series of arguments, represented as a tuple, with const generic quotas.
+/// There is a maximum of 16 arguments supported.
+///
+/// This function is particularly useful as a decoder in ic-cdk macros.
+///
+/// Example:
+///
+/// ```
+/// # use ic_cdk::query;
+/// # use candid::utils::decode_args_with_decoding_quota;
+///
+/// #[query(decode_with = "decode_args_with_decoding_quota::<10000,_>")]
+/// fn count((arg1, arg2): (String, String)) -> u32 {
+///    arg1.len() as u32 + arg2.len() as u32
+/// }
+/// ```
 pub fn decode_args_with_decoding_quota<const N: usize, Tuple>(byte_vec: Vec<u8>) -> Tuple
 where
     Tuple: for<'a> ArgumentDecoder<'a>,
@@ -197,6 +214,22 @@ where
     let (res,) = decode_args_with_config(bytes, config)?;
     Ok(res)
 }
+
+/// Decode a single argument with const generic quotas.
+///
+/// This function is particularly useful as a decoder in ic-cdk macros.
+///
+/// Example:
+///
+/// ```
+/// # use ic_cdk::query;
+/// # use candid::utils::decode_one_with_decoding_quota;
+///
+/// #[query(decode_with = "decode_one_with_decoding_quota::<10000,_>")]
+/// fn count(arg: String) -> u32 {
+///    arg.len() as u32
+/// }
+/// ```
 pub fn decode_one_with_decoding_quota<const N: usize, T>(byte_vec: Vec<u8>) -> T
 where
     T: for<'a> Deserialize<'a> + CandidType,
