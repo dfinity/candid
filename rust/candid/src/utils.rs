@@ -150,9 +150,9 @@ where
 ///
 /// Example:
 ///
-/// ```
+/// ```ignore
 /// #[ic_cdk::query(decode_with = "decode_args_with_decoding_quota::<10000,_>")]
-/// fn count((arg1, arg2): (String, String)) -> u32 {
+/// fn count(arg1: String, arg2: String) -> u32 {
 ///    arg1.len() as u32 + arg2.len() as u32
 /// }
 /// ```
@@ -218,7 +218,7 @@ where
 ///
 /// Example:
 ///
-/// ```
+/// ```ignore
 /// #[ic_cdk::query(decode_with = "decode_one_with_decoding_quota::<10000,_>")]
 /// fn count(arg: String) -> u32 {
 ///    arg.len() as u32
