@@ -5,6 +5,8 @@ jobs:
   runBenchMark:
     name: run benchmark
     runs-on: ubuntu-latest
+    env:
+      RUSTC_VERSION: 1.82.0
     steps:
     - uses: actions/checkout@v4
     - name: Checkout base branch
