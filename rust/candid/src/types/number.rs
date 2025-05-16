@@ -317,12 +317,10 @@ macro_rules! define_eq {
     ($f: ty, $($t: ty)*) => ($(
         impl PartialEq<$t> for $f {
             #[inline]
-            #[must_use]
             fn eq(&self, v: &$t) -> bool { self.0.eq(&(*v).into()) }
         }
         impl PartialEq<$f> for $t {
             #[inline]
-            #[must_use]
             fn eq(&self, v: &$f) -> bool { v.0.eq(&(*self).into()) }
         }
     )*)

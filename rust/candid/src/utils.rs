@@ -143,6 +143,72 @@ where
     Ok((res, cost))
 }
 
+/// Decode a series of arguments, represented as a tuple, with a decoding_quota specified as a const generic number.
+///
+/// This function is particularly useful as a decoder in ic-cdk macros (version 0.18 and up).
+///
+/// Example:
+///
+/// ```ignore
+/// #[ic_cdk::query(decode_with = "decode_args_with_decoding_quota::<10000,_>")]
+/// fn count(arg1: String, arg2: String) -> u32 {
+///    arg1.len() as u32 + arg2.len() as u32
+/// }
+/// ```
+pub fn decode_args_with_decoding_quota<const N: usize, Tuple>(byte_vec: Vec<u8>) -> Tuple
+where
+    Tuple: for<'a> ArgumentDecoder<'a>,
+{
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(N);
+    decode_args_with_config(&byte_vec[..], &config).unwrap()
+}
+
+/// Decode a series of arguments, represented as a tuple, with a skipping_quota specified as a const generic number.
+///
+/// This function is particularly useful as a decoder in ic-cdk macros (version 0.18 and up).
+///
+/// Example:
+///
+/// ```ignore
+/// #[ic_cdk::query(decode_with = "decode_args_with_skipping_quota::<10000,_>")]
+/// fn count(arg1: String, arg2: String) -> u32 {
+///    arg1.len() as u32 + arg2.len() as u32
+/// }
+/// ```
+pub fn decode_args_with_skipping_quota<const M: usize, Tuple>(byte_vec: Vec<u8>) -> Tuple
+where
+    Tuple: for<'a> ArgumentDecoder<'a>,
+{
+    let mut config = DecoderConfig::new();
+    config.set_skipping_quota(M);
+    decode_args_with_config(&byte_vec[..], &config).unwrap()
+}
+
+/// Decode a series of arguments, represented as a tuple, with decoding_quota and skipping_quota specified as const generic numbers.
+///
+/// This function is particularly useful as a decoder in ic-cdk macros (version 0.18 and up).
+///
+/// Example:
+///
+/// ```ignore
+/// #[ic_cdk::query(decode_with = "decode_args_with_decoding_and_skipping_quota::<10000,10000,_>")]
+/// fn count(arg1: String, arg2: String) -> u32 {
+///    arg1.len() as u32 + arg2.len() as u32
+/// }
+/// ```
+pub fn decode_args_with_decoding_and_skipping_quota<const N: usize, const M: usize, Tuple>(
+    byte_vec: Vec<u8>,
+) -> Tuple
+where
+    Tuple: for<'a> ArgumentDecoder<'a>,
+{
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(N);
+    config.set_skipping_quota(M);
+    decode_args_with_config(&byte_vec[..], &config).unwrap()
+}
+
 /// Decode a single argument.
 ///
 /// Example:
@@ -169,6 +235,72 @@ where
 {
     let (res,) = decode_args_with_config(bytes, config)?;
     Ok(res)
+}
+
+/// Decode a single argument with a decoding_quota specified as a const generic number.
+///
+/// This function is particularly useful as a decoder in ic-cdk macros (version 0.18 and up).
+///
+/// Example:
+///
+/// ```ignore
+/// #[ic_cdk::query(decode_with = "decode_one_with_decoding_quota::<10000,_>")]
+/// fn count(arg: String) -> u32 {
+///    arg.len() as u32
+/// }
+/// ```
+pub fn decode_one_with_decoding_quota<const N: usize, T>(byte_vec: Vec<u8>) -> T
+where
+    T: for<'a> Deserialize<'a> + CandidType,
+{
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(N);
+    decode_one_with_config(&byte_vec[..], &config).unwrap()
+}
+
+/// Decode a single argument with a skipping_quota specified as a const generic number.
+///
+/// This function is particularly useful as a decoder in ic-cdk macros (version 0.18 and up).
+///
+/// Example:
+///
+/// ```ignore
+/// #[ic_cdk::query(decode_with = "decode_one_with_skipping_quota::<10000,_>")]
+/// fn count(arg: String) -> u32 {
+///    arg.len() as u32
+/// }
+/// ```
+pub fn decode_one_with_skipping_quota<const M: usize, T>(byte_vec: Vec<u8>) -> T
+where
+    T: for<'a> Deserialize<'a> + CandidType,
+{
+    let mut config = DecoderConfig::new();
+    config.set_skipping_quota(M);
+    decode_one_with_config(&byte_vec[..], &config).unwrap()
+}
+
+/// Decode a single argument with decoding_quota and skipping_quota specified as const generic numbers.
+///
+/// This function is particularly useful as a decoder in ic-cdk macros (version 0.18 and up).
+///
+/// Example:
+///
+/// ```ignore
+/// #[ic_cdk::query(decode_with = "decode_one_with_decoding_and_skipping_quota::<10000,10000,_>")]
+/// fn count(arg: String) -> u32 {
+///    arg.len() as u32
+/// }
+/// ```
+pub fn decode_one_with_decoding_and_skipping_quota<const N: usize, const M: usize, T>(
+    byte_vec: Vec<u8>,
+) -> T
+where
+    T: for<'a> Deserialize<'a> + CandidType,
+{
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(N);
+    config.set_skipping_quota(M);
+    decode_one_with_config(&byte_vec[..], &config).unwrap()
 }
 
 /// Serialize an encoding of a tuple and write it to a `Write` buffer.
