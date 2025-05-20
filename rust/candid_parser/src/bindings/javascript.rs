@@ -183,11 +183,47 @@ fn pp_modes(modes: &[candid::types::FuncMode]) -> RcDoc {
 
 fn pp_service(serv: &[(String, Type)]) -> RcDoc {
     let doc = concat(
-        serv.iter()
-            .map(|(id, func)| quote_ident(id).append(kwd(":")).append(pp_ty(func))),
+        serv.iter().map(|(id, _func)| {
+            quote_ident(id)
+                .append(kwd(":"))
+                .append("_ServiceTypes")
+                .append(enclose("[", quote_ident(id), "]"))
+        }),
         ",",
     );
     enclose_space("({", doc, "})")
+}
+
+fn pp_public_defs<'a>(
+    env: &'a TypeEnv,
+    def_list: &'a [&'a str],
+    recs: &'a BTreeSet<&'a str>,
+) -> RcDoc<'a> {
+    let recs_doc = lines(recs.iter().map(|id| {
+        kwd("export")
+            .append(kwd("const"))
+            .append(ident(id))
+            .append(RcDoc::space())
+            .append(kwd("="))
+            .append("IDL.Rec();")
+    }));
+    let defs = lines(def_list.iter().map(|id| {
+        let ty = env.find_type(id).unwrap();
+        if recs.contains(id) {
+            ident(id)
+                .append(".fill")
+                .append(enclose("(", pp_ty(ty), ");"))
+        } else {
+            kwd("export")
+                .append(kwd("const"))
+                .append(ident(id))
+                .append(RcDoc::space())
+                .append(kwd("="))
+                .append(pp_ty(ty))
+                .append(";")
+        }
+    }));
+    recs_doc.append(defs)
 }
 
 fn pp_defs<'a>(
@@ -216,6 +252,27 @@ fn pp_defs<'a>(
     recs_doc.append(defs)
 }
 
+fn pp_service_thing<'a>(ty: &'a Type) -> RcDoc<'a> {
+    match ty.as_ref() {
+        TypeInner::Service(serv) => pp_service_defs(serv),
+        TypeInner::Class(_, t) => pp_service_thing(t),
+        _ => RcDoc::nil(),
+    }
+}
+
+fn pp_service_defs(serv: &[(String, Type)]) -> RcDoc {
+    let entries = concat(
+        serv.iter()
+            .map(|(id, func)| quote_ident(id).append(kwd(":")).append(pp_ty(func))),
+        ",",
+    );
+
+    str("export const _ServiceTypes = ")
+        .append(enclose("{", entries, "}"))
+        .append(RcDoc::line())
+        .append(RcDoc::line())
+}
+
 fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
     match ty.as_ref() {
         TypeInner::Service(_) => pp_ty(ty),
@@ -232,26 +289,32 @@ fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
+    let header = r#"import { IDL } from '@dfinity/candid';"#;
+
     match actor {
         None => {
             let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
             let recs = infer_rec(env, &def_list).unwrap();
-            let doc = pp_defs(env, &def_list, &recs);
+            let defs = pp_public_defs(env, &def_list, &recs);
+
+            let doc = RcDoc::text(header).append(RcDoc::line()).append(defs);
             doc.pretty(LINE_WIDTH).to_string()
         }
         Some(actor) => {
             let def_list = chase_actor(env, actor).unwrap();
             let recs = infer_rec(env, &def_list).unwrap();
-            let defs = pp_defs(env, &def_list, &recs);
+            let defs = pp_public_defs(env, &def_list, &recs).append(RcDoc::line());
+            let defs = defs.append(pp_service_thing(actor));
+
             let init = if let TypeInner::Class(ref args, _) = actor.as_ref() {
                 args.as_slice()
             } else {
                 &[][..]
             };
             let actor = kwd("return").append(pp_actor(actor, &recs)).append(";");
-            let body = defs.append(actor);
-            let doc = str("export const idlFactory = ({ IDL }) => ")
-                .append(enclose_space("{", body, "};"));
+            let doc = defs
+                .append(str("export const idlFactory = ({ IDL }) => "))
+                .append(enclose_space("{", actor, "};"));
             // export init args
             let init_defs = chase_types(env, init).unwrap();
             let init_recs = infer_rec(env, &init_defs).unwrap();
@@ -261,7 +324,14 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let init_doc =
                 str("export const init = ({ IDL }) => ").append(enclose_space("{", init_doc, "};"));
             let init_doc = init_doc.pretty(LINE_WIDTH).to_string();
-            let doc = doc.append(RcDoc::hardline()).append(init_doc);
+
+            let doc = RcDoc::text(header)
+                .append(RcDoc::hardline())
+                .append(RcDoc::hardline())
+                .append(doc)
+                .append(RcDoc::hardline())
+                .append(RcDoc::hardline())
+                .append(init_doc);
             doc.pretty(LINE_WIDTH).to_string()
         }
     }
