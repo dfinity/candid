@@ -82,5 +82,4 @@ pub fn quote_ident(id: &str) -> RcDoc {
     str("'")
         .append(format!("{}", id.escape_debug()))
         .append("'")
-        .append(RcDoc::space())
 }
