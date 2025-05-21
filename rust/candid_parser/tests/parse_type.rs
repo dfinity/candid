@@ -1,6 +1,6 @@
 use candid::pretty::candid::compile;
 use candid::types::TypeEnv;
-use candid_parser::bindings::{javascript, motoko, rust, typescript};
+use candid_parser::bindings::{javascript, motoko, rust, typescript, typescript_native};
 use candid_parser::configs::Configs;
 use candid_parser::types::IDLProg;
 use candid_parser::typing::{check_file, check_prog};
@@ -101,6 +101,46 @@ fn compiler_test(resource: &str) {
                     .new_goldenfile(filename.with_extension("d.ts"))
                     .unwrap();
                 let content = typescript::compile(&env, &actor);
+                writeln!(output, "{content}").unwrap();
+            }
+        }
+        Err(e) => {
+            let mut fail_output = mint
+                .new_goldenfile(filename.with_extension("fail"))
+                .unwrap();
+            writeln!(fail_output, "{e}").unwrap();
+        }
+    }
+}
+
+#[test_generator::test_resources("rust/candid_parser/tests/assets/*.did")]
+fn compiler_test_typescript_native(resource: &str) {
+    let base_path = std::env::current_dir().unwrap().join("tests/assets");
+    let mut mint = Mint::new(base_path.join("ok/typescript-interface"));
+
+    let filename = Path::new(Path::new(resource).file_name().unwrap());
+    let candid_path = base_path.join(filename);
+    let service_name = resource
+        .split("/")
+        .last()
+        .unwrap_or_default()
+        .split(".")
+        .next()
+        .unwrap_or_default();
+    match check_file(&candid_path) {
+        Ok((env, actor)) => {
+            {
+                let mut output = mint.new_goldenfile(filename.with_extension("ts")).unwrap();
+                let content =
+                    typescript_native::compile::compile(&env, &actor, service_name, "wrapper");
+                writeln!(output, "{content}").unwrap();
+            }
+            {
+                let mut output = mint
+                    .new_goldenfile(filename.with_extension("d.ts"))
+                    .unwrap();
+                let content =
+                    typescript_native::compile::compile(&env, &actor, service_name, "interface");
                 writeln!(output, "{content}").unwrap();
             }
         }
