@@ -251,7 +251,7 @@ fn main() -> Result<()> {
                 "rs" => {
                     use candid_parser::bindings::rust::{compile, Config, ExternalConfig};
                     let external = configs
-                        .get_subtable(&["didc".to_string(), "rust".to_string()])
+                        .get_subtable(&["caffeine-stub".to_string(), "rust".to_string()])
                         .map(|x| x.clone().try_into().unwrap())
                         .unwrap_or(ExternalConfig::default());
                     let config = Config::new(configs);

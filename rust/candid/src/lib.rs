@@ -248,8 +248,8 @@
 //! ### Usage
 //!
 //! ```js
-//! const didc = import("pkg/didc");
-//! didc.then((mod) => {
+//! const caffeine-stub = import("pkg/caffeine-stub");
+//! caffeine-stub.then((mod) => {
 //!   const service = "service : {}";
 //!   const js = mod.did_to_js(service);
 //! });

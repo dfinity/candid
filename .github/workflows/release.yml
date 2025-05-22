@@ -14,16 +14,16 @@ jobs:
         include:
           - os: ubuntu-22.04
             name: linux64
-            artifact_name: target/x86_64-unknown-linux-musl/release/didc
-            asset_name: didc-linux64
-          - os: macos-13-large
+            artifact_name: target/x86_64-unknown-linux-musl/release/caffeine-stub
+            asset_name: caffeine-stub-linux64
+          - os: macos-12
             name: macos
-            artifact_name: target/release/didc
-            asset_name: didc-macos
-          - os: ubuntu-22.04
+            artifact_name: target/release/caffeine-stub
+            asset_name: caffeine-stub-macos
+          - os: ubuntu-latest
             name: arm
-            artifact_name: target/arm-unknown-linux-gnueabihf/release/didc
-            asset_name: didc-arm32
+            artifact_name: target/arm-unknown-linux-gnueabihf/release/caffeine-stub
+            asset_name: caffeine-stub-arm32
     steps:
       - uses: actions/checkout@v4
       - name: Install stable toolchain
@@ -76,11 +76,13 @@ jobs:
           - os: ubuntu-24.04
             asset_name: didc-linux64
           - os: ubuntu-22.04
-            asset_name: didc-linux64
-          - os: macos-14-large
-            asset_name: didc-macos
-          - os: macos-13-large
-            asset_name: didc-macos
+            asset_name: caffeine-stub-linux64
+          - os: ubuntu-20.04
+            asset_name: caffeine-stub-linux64
+          - os: macos-13
+            asset_name: caffeine-stub-macos
+          - os: macos-12
+            asset_name: caffeine-stub-macos
     steps:
       - name: Get executable
         id: download
@@ -89,8 +91,8 @@ jobs:
           name: ${{ matrix.asset_name }}
       - name: Executable runs
         run: |
-          chmod +x didc
-          ./didc --version
+          chmod +x caffeine-stub
+          ./caffeine-stub --version
   publish:
     needs: test
     name: Publish ${{ matrix.asset_name }}
@@ -98,9 +100,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - asset_name: didc-linux64
-          - asset_name: didc-arm32
-          - asset_name: didc-macos
+          - asset_name: caffeine-stub-linux64
+          - asset_name: caffeine-stub-arm32
+          - asset_name: caffeine-stub-macos
     runs-on: ubuntu-latest
     steps:
       - name: Get executable
@@ -111,6 +113,6 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: didc
+          file: caffeine-stub
           asset_name: ${{ matrix.asset_name }}
           tag: ${{ github.ref }}
