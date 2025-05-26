@@ -1,12 +1,12 @@
 import type { Principal } from "@dfinity/principal";
-interface Some<T> {
+export interface Some<T> {
     _tag: "Some";
     value: T;
 }
-interface None {
+export interface None {
     _tag: "None";
 }
-type Option<T> = Some<T> | None;
+export type Option<T> = Some<T> | None;
 export type A = Some<B> | None;
 export type B = Some<C> | None;
 export type C = A;

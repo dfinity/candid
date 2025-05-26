@@ -2,14 +2,14 @@ import { example as _example, createActor as _createActor, canisterId as _canist
 import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/example/example.did.d.js";
 import type { Principal } from "@dfinity/principal";
-interface Some<T> {
+export interface Some<T> {
     _tag: "Some";
     value: T;
 }
-interface None {
+export interface None {
     _tag: "None";
 }
-type Option<T> = Some<T> | None;
+export type Option<T> = Some<T> | None;
 function some<T>(value: T): Some<T> {
     return {
         _tag: "Some",

@@ -1,12 +1,12 @@
 import type { Principal } from "@dfinity/principal";
-interface Some<T> {
+export interface Some<T> {
     _tag: "Some";
     value: T;
 }
-interface None {
+export interface None {
     _tag: "None";
 }
-type Option<T> = Some<T> | None;
+export type Option<T> = Some<T> | None;
 export type bitcoin_address = string;
 export type bitcoin_network = "mainnet" | "testnet";
 export type block_hash = Uint8Array | number[];

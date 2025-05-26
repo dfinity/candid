@@ -9,23 +9,26 @@ pub fn add_option_helpers_interface(module: &mut Module) {
     let some_type = create_some_type();
     module
         .body
-        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(Box::new(
-            some_type,
-        )))));
+        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+            span: DUMMY_SP,
+            decl: Decl::TsInterface(Box::new(some_type)),
+        })));
 
     let none_type = create_none_type();
     module
         .body
-        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(Box::new(
-            none_type,
-        )))));
+        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+            span: DUMMY_SP,
+            decl: Decl::TsInterface(Box::new(none_type)),
+        })));
 
     let option_type = create_option_type();
     module
         .body
-        .push(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(Box::new(
-            option_type,
-        )))));
+        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+            span: DUMMY_SP,
+            decl: Decl::TsTypeAlias(Box::new(option_type)),
+        })));
 }
 pub fn add_option_helpers_wrapper(module: &mut Module) {
     let some_function = create_some_function();
