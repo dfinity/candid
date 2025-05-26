@@ -18,7 +18,7 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => fieldnat;
+export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => fieldnatInterface;
 export declare const canisterId: string;
 export interface fieldnatInterface {
     bab(arg0: bigint, arg1: bigint): Promise<void>;

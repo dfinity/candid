@@ -18,7 +18,7 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => class_;
+export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => classInterface;
 export declare const canisterId: string;
 export interface classInterface {
     get(): Promise<List>;

@@ -680,7 +680,10 @@ pub fn generate_create_actor_function_declaration(service_name: &str) -> VarDecl
                                 span: DUMMY_SP,
                                 type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
                                     span: DUMMY_SP,
-                                    type_name: TsEntityName::Ident(get_ident_guarded(service_name)),
+                                    type_name: TsEntityName::Ident(get_ident_guarded(&format!(
+                                        "{}Interface",
+                                        service_name
+                                    ))),
                                     type_params: None,
                                 })),
                             }),

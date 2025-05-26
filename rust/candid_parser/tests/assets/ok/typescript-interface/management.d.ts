@@ -79,7 +79,7 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => management;
+export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => managementInterface;
 export declare const canisterId: string;
 export interface managementInterface {
     bitcoin_get_balance(arg0: get_balance_request): Promise<satoshi>;
