@@ -80,16 +80,19 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
+import caffeineEnv from "./env.json" with {
+    type: "json"
+};
 export function createActor(canisterId: string | Principal, options?: CreateActorOptions): recursionInterface {
     if (!options) {
         options = {};
     }
-    if (process.env.BACKEND_HOST) {
+    if (caffeineEnv.backend_host !== "undefined") {
         options = {
             ...options,
             agentOptions: {
                 ...options.agentOptions,
-                host: process.env.BACKEND_HOST
+                host: caffeineEnv.backend_host
             }
         };
     }
@@ -106,10 +109,10 @@ class Recursion implements recursionInterface {
         if (actor) {
             this.#actor = actor;
         } else {
-            if (process.env.BACKEND_HOST) {
+            if (caffeineEnv.backend_host != "undefined") {
                 this.#actor = _createActor(canisterId, {
                     agentOptions: {
-                        host: process.env.BACKEND_HOST
+                        host: caffeineEnv.backend_host
                     }
                 });
             } else {

@@ -56,6 +56,33 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
     }
 
     if target == "wrapper" && actor.is_some() {
+        let import_decl = ImportDecl {
+            phase: Default::default(),
+            span: DUMMY_SP,
+            specifiers: vec![ImportSpecifier::Default(ImportDefaultSpecifier {
+                span: DUMMY_SP,
+                local: Ident::new("caffeineEnv".into(), DUMMY_SP, SyntaxContext::empty()),
+            })],
+            src: Box::new(Str {
+                span: DUMMY_SP,
+                value: "./env.json".into(),
+                raw: None,
+            }),
+            type_only: false,
+            with: Some(Box::new(ObjectLit {
+                span: DUMMY_SP,
+                props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                    key: PropName::Ident(IdentName::new("type".into(), DUMMY_SP)),
+                    value: Box::new(Expr::Lit(Lit::Str(Str {
+                        span: DUMMY_SP,
+                        value: "json".into(),
+                        raw: None,
+                    }))),
+                })))],
+            })),
+        };
+     module.body.push(ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl)));
+    
         let create_actor_fn = generate_create_actor_function(service_name);
         module
             .body
@@ -1260,28 +1287,29 @@ fn create_actor_class(
                         stmts: vec![
                             Stmt::If(IfStmt {
                                 span: DUMMY_SP,
-                                test: Box::new(Expr::Member(MemberExpr {
+                                test: Box::new(Expr::Bin(BinExpr {
                                     span: DUMMY_SP,
-                                    obj: Box::new(Expr::Member(MemberExpr {
+                                    op: BinaryOp::NotEq,
+                                    left: Box::new(Expr::Member(MemberExpr {
                                         span: DUMMY_SP,
                                         obj: Box::new(Expr::Ident(
                                             Ident::new(
-                                                "process".into(),
+                                                "caffeineEnv".into(),
                                                 DUMMY_SP,
                                                 SyntaxContext::empty(),
                                             ),
                                         )),
                                         prop: MemberProp::Ident(Ident::new(
-                                            "env".into(),
+                                            "backend_host".into(),
                                             DUMMY_SP,
                                             SyntaxContext::empty(),
                                         ).into()),
                                     })),
-                                    prop: MemberProp::Ident(Ident::new(
-                                        "BACKEND_HOST".into(),
-                                        DUMMY_SP,
-                                        SyntaxContext::empty(),
-                                    ).into()),
+                                    right: Box::new(Expr::Lit(Lit::Str(Str {
+                                        span: DUMMY_SP,
+                                        value: "undefined".into(),
+                                        raw: None,
+                                    }))),
                                 })),
                                 cons: Box::new(Stmt::Block(BlockStmt {
                                     span: DUMMY_SP,
@@ -1338,23 +1366,15 @@ fn create_actor_class(
                                                                                         ).into()),
                                                                                         value: Box::new(Expr::Member(MemberExpr {
                                                                                             span: DUMMY_SP,
-                                                                                            obj: Box::new(Expr::Member(MemberExpr {
-                                                                                                span: DUMMY_SP,
-                                                                                                obj: Box::new(Expr::Ident(
+                                                                                            obj: Box::new(Expr::Ident(
                                                                                                     Ident::new(
-                                                                                                        "process".into(),
+                                                                                                        "caffeineEnv".into(),
                                                                                                         DUMMY_SP,
                                                                                                         SyntaxContext::empty(),
                                                                                                     ),
                                                                                                 )),
-                                                                                                prop: MemberProp::Ident(Ident::new(
-                                                                                                    "env".into(),
-                                                                                                    DUMMY_SP,
-                                                                                                    SyntaxContext::empty(),
-                                                                                                ).into()),
-                                                                                            })),
                                                                                             prop: MemberProp::Ident(Ident::new(
-                                                                                                "BACKEND_HOST".into(),
+                                                                                                "backend_host".into(),
                                                                                                 DUMMY_SP,
                                                                                                 SyntaxContext::empty(),
                                                                                             ).into()),

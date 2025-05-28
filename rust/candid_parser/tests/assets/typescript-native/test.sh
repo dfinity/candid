@@ -62,6 +62,7 @@ awk -v export_str="$export_code" '// {gsub("{{canister_name}}", "'$CANDID_NAME'"
 
 cp ./templates/package.json ${TEMP_DIR}/package.json
 cp ./templates/tsconfig.json ${TEMP_DIR}/tsconfig.json
+cp ./templates/env.json ${TEMP_DIR}/env.json
 cd ${TEMP_DIR}
 npm install
 npm run build
