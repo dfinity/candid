@@ -230,8 +230,6 @@ fn generate_agent_imports() -> ImportDecl {
 }
 
 pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
-
-    
     let capitalized_service_name = service_name
         .chars()
         .next()
@@ -242,38 +240,7 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
         declare: false,
         function: Box::new(Function {
             params: vec![
-                // canisterId: string | Principal
-                Param {
-                    span: DUMMY_SP,
-                    decorators: vec![],
-                    pat: Pat::Ident(BindingIdent {
-                        id: Ident::new("canisterId".into(), DUMMY_SP, SyntaxContext::empty()),
-                        type_ann: Some(Box::new(TsTypeAnn {
-                            span: DUMMY_SP,
-                            type_ann: Box::new(TsType::TsUnionOrIntersectionType(
-                                TsUnionOrIntersectionType::TsUnionType(TsUnionType {
-                                    span: DUMMY_SP,
-                                    types: vec![
-                                        Box::new(TsType::TsKeywordType(TsKeywordType {
-                                            span: DUMMY_SP,
-                                            kind: TsKeywordTypeKind::TsStringKeyword,
-                                        })),
-                                        Box::new(TsType::TsTypeRef(TsTypeRef {
-                                            span: DUMMY_SP,
-                                            type_name: TsEntityName::Ident(Ident::new(
-                                                "Principal".into(),
-                                                DUMMY_SP,
-                                                SyntaxContext::empty(),
-                                            )),
-                                            type_params: None,
-                                        })),
-                                    ],
-                                }),
-                            )),
-                        })),
-                    }),
-                },
-                // options: CreateActorOptions
+                // options?: CreateActorOptions
                 Param {
                     span: DUMMY_SP,
                     decorators: vec![],
@@ -304,6 +271,35 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
             body: Some(BlockStmt {
                 span: DUMMY_SP,
                 stmts: vec![
+                    // const config = await loadConfig();
+                    Stmt::Decl(Decl::Var(Box::new(VarDecl {
+                        ctxt: SyntaxContext::empty(),
+                        span: DUMMY_SP,
+                        kind: VarDeclKind::Const,
+                        declare: false,
+                        decls: vec![VarDeclarator {
+                            span: DUMMY_SP,
+                            name: Pat::Ident(BindingIdent {
+                                id: Ident::new("config".into(), DUMMY_SP, SyntaxContext::empty()),
+                                type_ann: None,
+                            }),
+                            init: Some(Box::new(Expr::Await(AwaitExpr {
+                                span: DUMMY_SP,
+                                arg: Box::new(Expr::Call(CallExpr {
+                                    span: DUMMY_SP,
+                                    callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
+                                        "loadConfig".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    )))),
+                                    args: vec![],
+                                    type_args: None,
+                                    ctxt: SyntaxContext::empty(),
+                                })),
+                            }))),
+                            definite: false,
+                        }],
+                    }))),
                     // if (!options) { options = {}; }
                     Stmt::If(IfStmt {
                         span: DUMMY_SP,
@@ -338,7 +334,7 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
                         })),
                         alt: None,
                     }),
-                    // if (caffeineEnv.backend_host !== "undefined") { ... }
+                    // if (config.backend_host !== "undefined") { ... }
                     Stmt::If(IfStmt {
                         span: DUMMY_SP,
                         test: Box::new(Expr::Bin(BinExpr {
@@ -348,7 +344,7 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
                                 span: DUMMY_SP,
                                 obj: Box::new(Expr::Ident(
                                         Ident::new(
-                                            "caffeineEnv".into(),
+                                            "config".into(),
                                             DUMMY_SP,
                                             SyntaxContext::empty(),
                                         ),
@@ -426,7 +422,7 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
                                                                     span: DUMMY_SP,
                                                                     obj: Box::new(Expr::Ident(
                                                                             Ident::new(
-                                                                                "caffeineEnv".into(),
+                                                                                "config".into(),
                                                                                 DUMMY_SP,
                                                                                 SyntaxContext::empty(),
                                                                             ),
@@ -443,6 +439,86 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
                                                 })),
                                             }))),
                                         ],
+                                    })),
+                                })),
+                            })],
+                            ctxt: SyntaxContext::empty(),
+                        })),
+                        alt: None,
+                    }),
+                    // let canisterId = _canisterId;
+                    Stmt::Decl(Decl::Var(Box::new(VarDecl {
+                        ctxt: SyntaxContext::empty(),
+                        span: DUMMY_SP,
+                        kind: VarDeclKind::Let,
+                        declare: false,
+                        decls: vec![VarDeclarator {
+                            span: DUMMY_SP,
+                            name: Pat::Ident(BindingIdent {
+                                id: Ident::new("canisterId".into(), DUMMY_SP, SyntaxContext::empty()),
+                                type_ann: None,
+                            }),
+                            init: Some(Box::new(Expr::Ident(Ident::new(
+                                "_canisterId".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            )))),
+                            definite: false,
+                        }],
+                    }))),
+                    // if(config.backend_canister_id !== "undefined") { canisterId = config.backend_canister_id; }
+                    Stmt::If(IfStmt {
+                        span: DUMMY_SP,
+                        test: Box::new(Expr::Bin(BinExpr {
+                            span: DUMMY_SP,
+                            op: BinaryOp::NotEqEq,
+                            left: Box::new(Expr::Member(MemberExpr {
+                                span: DUMMY_SP,
+                                obj: Box::new(Expr::Ident(
+                                        Ident::new(
+                                            "config".into(),
+                                            DUMMY_SP,
+                                            SyntaxContext::empty(),
+                                        ),
+                                    )),
+                                prop: MemberProp::Ident(Ident::new(
+                                    "backend_canister_id".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                ).into()),
+                            })),
+                            right: Box::new(Expr::Lit(Lit::Str(Str {
+                                span: DUMMY_SP,
+                                value: "undefined".into(),
+                                raw: None,
+                            }))),
+                        })),
+                        cons: Box::new(Stmt::Block(BlockStmt {
+                            span: DUMMY_SP,
+                            stmts: vec![Stmt::Expr(ExprStmt {
+                                span: DUMMY_SP,
+                                expr: Box::new(Expr::Assign(AssignExpr {
+                                    span: DUMMY_SP,
+                                    op: AssignOp::Assign,
+                                    left: AssignTarget::Simple(SimpleAssignTarget::Ident(Ident::new(
+                                        "canisterId".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    ).into() )),
+                                    right: Box::new(Expr::Member(MemberExpr {
+                                        span: DUMMY_SP,
+                                        obj: Box::new(Expr::Ident(
+                                                Ident::new(
+                                                    "config".into(),
+                                                    DUMMY_SP,
+                                                    SyntaxContext::empty(),
+                                                ),
+                                            )),
+                                        prop: MemberProp::Ident(Ident::new(
+                                            "backend_canister_id".into(),
+                                            DUMMY_SP,
+                                            SyntaxContext::empty(),
+                                        ).into()),
                                     })),
                                 })),
                             })],
@@ -519,17 +595,28 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
                 ctxt: SyntaxContext::empty(),
             }),
             is_generator: false,
-            is_async: false,
+            is_async: true,
             type_params: None,
             return_type: Some(Box::new(TsTypeAnn {
                 span: DUMMY_SP,
                 type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
                     span: DUMMY_SP,
-                    type_name: TsEntityName::Ident(get_ident_guarded(&format!(
-                        "{}Interface",
-                        service_name
-                    ))),
-                    type_params: None,
+                    type_name: TsEntityName::Ident(Ident::new(
+                        "Promise".into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    )),
+                    type_params: Some(Box::new(TsTypeParamInstantiation {
+                        span: DUMMY_SP,
+                        params: vec![Box::new(TsType::TsTypeRef(TsTypeRef {
+                            span: DUMMY_SP,
+                            type_name: TsEntityName::Ident(get_ident_guarded(&format!(
+                                "{}Interface",
+                                service_name
+                            ))),
+                            type_params: None,
+                        }))],
+                    })),
                 })),
             })),
             ctxt: SyntaxContext::empty(),
@@ -605,45 +692,11 @@ pub fn generate_create_actor_function_declaration(service_name: &str) -> VarDecl
                         TsFnOrConstructorType::TsFnType(TsFnType {
                             span: DUMMY_SP,
                             params: vec![
-                                // First parameter: canisterId: string | Principal
-                                TsFnParam::Ident(BindingIdent {
-                                    id: Ident::new(
-                                        "canisterId".into(),
-                                        DUMMY_SP,
-                                        SyntaxContext::empty(),
-                                    ),
-                                    type_ann: Some(Box::new(TsTypeAnn {
-                                        span: DUMMY_SP,
-                                        type_ann: Box::new(TsType::TsUnionOrIntersectionType(
-                                            TsUnionOrIntersectionType::TsUnionType(TsUnionType {
-                                                span: DUMMY_SP,
-                                                types: vec![
-                                                    Box::new(TsType::TsKeywordType(
-                                                        TsKeywordType {
-                                                            span: DUMMY_SP,
-                                                            kind:
-                                                                TsKeywordTypeKind::TsStringKeyword,
-                                                        },
-                                                    )),
-                                                    Box::new(TsType::TsTypeRef(TsTypeRef {
-                                                        span: DUMMY_SP,
-                                                        type_name: TsEntityName::Ident(Ident::new(
-                                                            "Principal".into(),
-                                                            DUMMY_SP,
-                                                            SyntaxContext::empty(),
-                                                        )),
-                                                        type_params: None,
-                                                    })),
-                                                ],
-                                            }),
-                                        )),
-                                    })),
-                                }),
-                                // Second parameter: options?: CreateActorOptions
+                                // options?: CreateActorOptions
                                 TsFnParam::Ident(BindingIdent {
                                     id: Ident {
                                         span: DUMMY_SP,
-                                        sym: "actor".into(),
+                                        sym: "options".into(),
                                         optional: true,
                                         ctxt: SyntaxContext::empty(),
                                     },
@@ -666,11 +719,22 @@ pub fn generate_create_actor_function_declaration(service_name: &str) -> VarDecl
                                 span: DUMMY_SP,
                                 type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
                                     span: DUMMY_SP,
-                                    type_name: TsEntityName::Ident(get_ident_guarded(&format!(
-                                        "{}Interface",
-                                        service_name
-                                    ))),
-                                    type_params: None,
+                                    type_name: TsEntityName::Ident(Ident::new(
+                                        "Promise".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    )),
+                                    type_params: Some(Box::new(TsTypeParamInstantiation {
+                                        span: DUMMY_SP,
+                                        params: vec![Box::new(TsType::TsTypeRef(TsTypeRef {
+                                            span: DUMMY_SP,
+                                            type_name: TsEntityName::Ident(get_ident_guarded(&format!(
+                                                "{}Interface",
+                                                service_name
+                                            ))),
+                                            type_params: None,
+                                        }))],
+                                    })),
                                 })),
                             }),
                         }),
@@ -1645,6 +1709,7 @@ fn generate_extract_agent_error_function() -> FnDecl {
                         span: DUMMY_SP,
                         kind: VarDeclKind::Const,
                         declare: false,
+                        ctxt: SyntaxContext::empty(),
                         decls: vec![VarDeclarator {
                             span: DUMMY_SP,
                             name: Pat::Ident(BindingIdent {
@@ -1675,13 +1740,13 @@ fn generate_extract_agent_error_function() -> FnDecl {
                             }))),
                             definite: false,
                         }],
-                        ctxt: SyntaxContext::empty(),
                     }))),
                     // const match = errorString.match(/with message: '([^']+)'/);
                     Stmt::Decl(Decl::Var(Box::new(VarDecl {
                         span: DUMMY_SP,
                         kind: VarDeclKind::Const,
                         declare: false,
+                        ctxt: SyntaxContext::empty(),
                         decls: vec![VarDeclarator {
                             span: DUMMY_SP,
                             name: Pat::Ident(BindingIdent {
@@ -1719,7 +1784,6 @@ fn generate_extract_agent_error_function() -> FnDecl {
                             }))),
                             definite: false,
                         }],
-                        ctxt: SyntaxContext::empty(),
                     }))),
                     // return match ? match[1] : errorString;
                     Stmt::Return(ReturnStmt {
@@ -1765,6 +1829,241 @@ fn generate_extract_agent_error_function() -> FnDecl {
                 type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
                     span: DUMMY_SP,
                     kind: TsKeywordTypeKind::TsStringKeyword,
+                })),
+            })),
+            ctxt: SyntaxContext::empty(),
+        }),
+    }
+}
+
+// Generate loadConfig function that loads configuration from env.json with fallback
+pub fn generate_load_config_function() -> FnDecl {
+    FnDecl {
+        ident: Ident::new("loadConfig".into(), DUMMY_SP, SyntaxContext::empty()),
+        declare: false,
+        function: Box::new(Function {
+            params: vec![],
+            decorators: vec![],
+            span: DUMMY_SP,
+            body: Some(BlockStmt {
+                span: DUMMY_SP,
+                stmts: vec![
+                    // try {
+                    Stmt::Try(Box::new(TryStmt {
+                        span: DUMMY_SP,
+                        block: BlockStmt {
+                            span: DUMMY_SP,
+                            stmts: vec![
+                                // const response = await fetch("./env.json");
+                                Stmt::Decl(Decl::Var(Box::new(VarDecl {
+                                    span: DUMMY_SP,
+                                    kind: VarDeclKind::Const,
+                                    declare: false,
+                                    ctxt: SyntaxContext::empty(),
+                                    decls: vec![VarDeclarator {
+                                        span: DUMMY_SP,
+                                        name: Pat::Ident(BindingIdent {
+                                            id: Ident::new("response".into(), DUMMY_SP, SyntaxContext::empty()),
+                                            type_ann: None,
+                                        }),
+                                        init: Some(Box::new(Expr::Await(AwaitExpr {
+                                            span: DUMMY_SP,
+                                            arg: Box::new(Expr::Call(CallExpr {
+                                                span: DUMMY_SP,
+                                                callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
+                                                    "fetch".into(),
+                                                    DUMMY_SP,
+                                                    SyntaxContext::empty(),
+                                                )))),
+                                                args: vec![ExprOrSpread {
+                                                    spread: None,
+                                                    expr: Box::new(Expr::Lit(Lit::Str(Str {
+                                                        span: DUMMY_SP,
+                                                        value: "./env.json".into(),
+                                                        raw: None,
+                                                    }))),
+                                                }],
+                                                type_args: None,
+                                                ctxt: SyntaxContext::empty(),
+                                            })),
+                                        }))),
+                                        definite: false,
+                                    }],
+                                }))),
+                                // const config = await response.json();
+                                Stmt::Decl(Decl::Var(Box::new(VarDecl {
+                                    span: DUMMY_SP,
+                                    kind: VarDeclKind::Const,
+                                    declare: false,
+                                    ctxt: SyntaxContext::empty(),
+                                    decls: vec![VarDeclarator {
+                                        span: DUMMY_SP,
+                                        name: Pat::Ident(BindingIdent {
+                                            id: Ident::new("config".into(), DUMMY_SP, SyntaxContext::empty()),
+                                            type_ann: None,
+                                        }),
+                                        init: Some(Box::new(Expr::Await(AwaitExpr {
+                                            span: DUMMY_SP,
+                                            arg: Box::new(Expr::Call(CallExpr {
+                                                span: DUMMY_SP,
+                                                callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
+                                                    span: DUMMY_SP,
+                                                    obj: Box::new(Expr::Ident(Ident::new(
+                                                        "response".into(),
+                                                        DUMMY_SP,
+                                                        SyntaxContext::empty(),
+                                                    ))),
+                                                    prop: MemberProp::Ident(Ident::new(
+                                                        "json".into(),
+                                                        DUMMY_SP,
+                                                        SyntaxContext::empty(),
+                                                    ).into()),
+                                                }))),
+                                                args: vec![],
+                                                type_args: None,
+                                                ctxt: SyntaxContext::empty(),
+                                            })),
+                                        }))),
+                                        definite: false,
+                                    }],
+                                }))),
+                                // return config;
+                                Stmt::Return(ReturnStmt {
+                                    span: DUMMY_SP,
+                                    arg: Some(Box::new(Expr::Ident(Ident::new(
+                                        "config".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    )))),
+                                }),
+                            ],
+                            ctxt: SyntaxContext::empty(),
+                        },
+                        handler: Some(CatchClause {
+                            span: DUMMY_SP,
+                            param: None,
+                            body: BlockStmt {
+                                span: DUMMY_SP,
+                                stmts: vec![
+                                    // // Fallback values
+                                    // const fallbackConfig = { backend_host: "undefined", backend_canister_id: "undefined" };
+                                    Stmt::Decl(Decl::Var(Box::new(VarDecl {
+                                        span: DUMMY_SP,
+                                        kind: VarDeclKind::Const,
+                                        declare: false,
+                                        ctxt: SyntaxContext::empty(),
+                                        decls: vec![VarDeclarator {
+                                            span: DUMMY_SP,
+                                            name: Pat::Ident(BindingIdent {
+                                                id: Ident::new("fallbackConfig".into(), DUMMY_SP, SyntaxContext::empty()),
+                                                type_ann: None,
+                                            }),
+                                            init: Some(Box::new(Expr::Object(ObjectLit {
+                                                span: DUMMY_SP,
+                                                props: vec![
+                                                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                                                        key: PropName::Ident(Ident::new(
+                                                            "backend_host".into(),
+                                                            DUMMY_SP,
+                                                            SyntaxContext::empty(),
+                                                        ).into()),
+                                                        value: Box::new(Expr::Lit(Lit::Str(Str {
+                                                            span: DUMMY_SP,
+                                                            value: "undefined".into(),
+                                                            raw: None,
+                                                        }))),
+                                                    }))),
+                                                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                                                        key: PropName::Ident(Ident::new(
+                                                            "backend_canister_id".into(),
+                                                            DUMMY_SP,
+                                                            SyntaxContext::empty(),
+                                                        ).into()),
+                                                        value: Box::new(Expr::Lit(Lit::Str(Str {
+                                                            span: DUMMY_SP,
+                                                            value: "undefined".into(),
+                                                            raw: None,
+                                                        }))),
+                                                    }))),
+                                                ],
+                                            }))),
+                                            definite: false,
+                                        }],
+                                    }))),
+                                    // return fallbackConfig;
+                                    Stmt::Return(ReturnStmt {
+                                        span: DUMMY_SP,
+                                        arg: Some(Box::new(Expr::Ident(Ident::new(
+                                            "fallbackConfig".into(),
+                                            DUMMY_SP,
+                                            SyntaxContext::empty(),
+                                        )))),
+                                    }),
+                                ],
+                                ctxt: SyntaxContext::empty(),
+                            },
+                        }),
+                        finalizer: None,
+                    })),
+                ],
+                ctxt: SyntaxContext::empty(),
+            }),
+            is_generator: false,
+            is_async: true,
+            type_params: None,
+            return_type: Some(Box::new(TsTypeAnn {
+                span: DUMMY_SP,
+                type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                    span: DUMMY_SP,
+                    type_name: TsEntityName::Ident(Ident::new(
+                        "Promise".into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    )),
+                    type_params: Some(Box::new(TsTypeParamInstantiation {
+                        span: DUMMY_SP,
+                        params: vec![Box::new(TsType::TsTypeLit(TsTypeLit {
+                            span: DUMMY_SP,
+                            members: vec![
+                                TsTypeElement::TsPropertySignature(TsPropertySignature {
+                                    span: DUMMY_SP,
+                                    readonly: false,
+                                    key: Box::new(Expr::Ident(Ident::new(
+                                        "backend_host".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    ))),
+                                    computed: false,
+                                    optional: false,
+                                    type_ann: Some(Box::new(TsTypeAnn {
+                                        span: DUMMY_SP,
+                                        type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
+                                            span: DUMMY_SP,
+                                            kind: TsKeywordTypeKind::TsStringKeyword,
+                                        })),
+                                    })),
+                                }),
+                                TsTypeElement::TsPropertySignature(TsPropertySignature {
+                                    span: DUMMY_SP,
+                                    readonly: false,
+                                    key: Box::new(Expr::Ident(Ident::new(
+                                        "backend_canister_id".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    ))),
+                                    computed: false,
+                                    optional: false,
+                                    type_ann: Some(Box::new(TsTypeAnn {
+                                        span: DUMMY_SP,
+                                        type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
+                                            span: DUMMY_SP,
+                                            kind: TsKeywordTypeKind::TsStringKeyword,
+                                        })),
+                                    })),
+                                }),
+                            ],
+                        }))],
+                    })),
                 })),
             })),
             ctxt: SyntaxContext::empty(),

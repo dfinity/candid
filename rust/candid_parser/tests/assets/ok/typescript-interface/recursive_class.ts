@@ -58,21 +58,39 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-import caffeineEnv from "./env.json" with {
-    type: "json"
-};
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): recursive_classInterface {
+async function loadConfig(): Promise<{
+    backend_host: string;
+    backend_canister_id: string;
+}> {
+    try {
+        const response = await fetch("./env.json");
+        const config = await response.json();
+        return config;
+    } catch  {
+        const fallbackConfig = {
+            backend_host: "undefined",
+            backend_canister_id: "undefined"
+        };
+        return fallbackConfig;
+    }
+}
+export async function createActor(options?: CreateActorOptions): Promise<recursive_classInterface> {
+    const config = await loadConfig();
     if (!options) {
         options = {};
     }
-    if (caffeineEnv.backend_host !== "undefined") {
+    if (config.backend_host !== "undefined") {
         options = {
             ...options,
             agentOptions: {
                 ...options.agentOptions,
-                host: caffeineEnv.backend_host
+                host: config.backend_host
             }
         };
+    }
+    let canisterId = _canisterId;
+    if (config.backend_canister_id !== "undefined") {
+        canisterId = config.backend_canister_id;
     }
     const actor = _createActor(canisterId, options);
     return new Recursive_class(actor);
@@ -82,20 +100,8 @@ export interface recursive_classInterface extends sInterface {
 }
 class Recursive_class implements recursive_classInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor?: ActorSubclass<_SERVICE>){
-        if (actor) {
-            this.#actor = actor;
-        } else {
-            if (caffeineEnv.backend_host != "undefined") {
-                this.#actor = _createActor(canisterId, {
-                    agentOptions: {
-                        host: caffeineEnv.backend_host
-                    }
-                });
-            } else {
-                this.#actor = _createActor(canisterId);
-            }
-        }
+    constructor(actor: ActorSubclass<_SERVICE>){
+        this.#actor = actor;
     }
     async next(): Promise<Principal> {
         try {
@@ -108,5 +114,4 @@ class Recursive_class implements recursive_classInterface {
         }
     }
 }
-export const recursive_class: recursive_classInterface = new Recursive_class();
 

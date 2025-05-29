@@ -20,7 +20,7 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => unicodeInterface;
+export declare const createActor: (options?: CreateActorOptions) => Promise<unicodeInterface>;
 export declare const canisterId: string;
 export interface unicodeInterface {
     ""(arg0: bigint): Promise<bigint>;

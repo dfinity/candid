@@ -60,21 +60,39 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-import caffeineEnv from "./env.json" with {
-    type: "json"
-};
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): serviceInterface {
+async function loadConfig(): Promise<{
+    backend_host: string;
+    backend_canister_id: string;
+}> {
+    try {
+        const response = await fetch("./env.json");
+        const config = await response.json();
+        return config;
+    } catch  {
+        const fallbackConfig = {
+            backend_host: "undefined",
+            backend_canister_id: "undefined"
+        };
+        return fallbackConfig;
+    }
+}
+export async function createActor(options?: CreateActorOptions): Promise<serviceInterface> {
+    const config = await loadConfig();
     if (!options) {
         options = {};
     }
-    if (caffeineEnv.backend_host !== "undefined") {
+    if (config.backend_host !== "undefined") {
         options = {
             ...options,
             agentOptions: {
                 ...options.agentOptions,
-                host: caffeineEnv.backend_host
+                host: config.backend_host
             }
         };
+    }
+    let canisterId = _canisterId;
+    if (config.backend_canister_id !== "undefined") {
+        canisterId = config.backend_canister_id;
     }
     const actor = _createActor(canisterId, options);
     return new Service(actor);
@@ -95,20 +113,8 @@ export interface serviceInterface {
 import type { Func as _Func, Service as _Service, Service2 as _Service2 } from "declarations/service/service.did.d.ts";
 class Service implements serviceInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor?: ActorSubclass<_SERVICE>){
-        if (actor) {
-            this.#actor = actor;
-        } else {
-            if (caffeineEnv.backend_host != "undefined") {
-                this.#actor = _createActor(canisterId, {
-                    agentOptions: {
-                        host: caffeineEnv.backend_host
-                    }
-                });
-            } else {
-                this.#actor = _createActor(canisterId);
-            }
-        }
+    constructor(actor: ActorSubclass<_SERVICE>){
+        this.#actor = actor;
     }
     async asArray(): Promise<[Array<Principal>, Array<[Principal, string]>]> {
         try {
@@ -163,7 +169,6 @@ class Service implements serviceInterface {
         }
     }
 }
-export const service: serviceInterface = new Service();
 function from_candid_opt_n2(value: [] | [_Service]): Principal | null {
     return value.length === 0 ? null : value[0];
 }

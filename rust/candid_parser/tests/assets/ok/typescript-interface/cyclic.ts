@@ -61,21 +61,39 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-import caffeineEnv from "./env.json" with {
-    type: "json"
-};
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): cyclicInterface {
+async function loadConfig(): Promise<{
+    backend_host: string;
+    backend_canister_id: string;
+}> {
+    try {
+        const response = await fetch("./env.json");
+        const config = await response.json();
+        return config;
+    } catch  {
+        const fallbackConfig = {
+            backend_host: "undefined",
+            backend_canister_id: "undefined"
+        };
+        return fallbackConfig;
+    }
+}
+export async function createActor(options?: CreateActorOptions): Promise<cyclicInterface> {
+    const config = await loadConfig();
     if (!options) {
         options = {};
     }
-    if (caffeineEnv.backend_host !== "undefined") {
+    if (config.backend_host !== "undefined") {
         options = {
             ...options,
             agentOptions: {
                 ...options.agentOptions,
-                host: caffeineEnv.backend_host
+                host: config.backend_host
             }
         };
+    }
+    let canisterId = _canisterId;
+    if (config.backend_canister_id !== "undefined") {
+        canisterId = config.backend_canister_id;
     }
     const actor = _createActor(canisterId, options);
     return new Cyclic(actor);
@@ -87,20 +105,8 @@ export interface cyclicInterface {
 import type { A as _A, B as _B, C as _C, X as _X, Y as _Y, Z as _Z } from "declarations/cyclic/cyclic.did.d.ts";
 class Cyclic implements cyclicInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor?: ActorSubclass<_SERVICE>){
-        if (actor) {
-            this.#actor = actor;
-        } else {
-            if (caffeineEnv.backend_host != "undefined") {
-                this.#actor = _createActor(canisterId, {
-                    agentOptions: {
-                        host: caffeineEnv.backend_host
-                    }
-                });
-            } else {
-                this.#actor = _createActor(canisterId);
-            }
-        }
+    constructor(actor: ActorSubclass<_SERVICE>){
+        this.#actor = actor;
     }
     async f(arg0: A, arg1: B, arg2: C, arg3: X, arg4: Y, arg5: Z): Promise<void> {
         try {
@@ -113,7 +119,6 @@ class Cyclic implements cyclicInterface {
         }
     }
 }
-export const cyclic: cyclicInterface = new Cyclic();
 function to_candid_A_n1(value: A): _A {
     return to_candid_opt_n2(value);
 }

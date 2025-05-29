@@ -62,21 +62,39 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-import caffeineEnv from "./env.json" with {
-    type: "json"
-};
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): unicodeInterface {
+async function loadConfig(): Promise<{
+    backend_host: string;
+    backend_canister_id: string;
+}> {
+    try {
+        const response = await fetch("./env.json");
+        const config = await response.json();
+        return config;
+    } catch  {
+        const fallbackConfig = {
+            backend_host: "undefined",
+            backend_canister_id: "undefined"
+        };
+        return fallbackConfig;
+    }
+}
+export async function createActor(options?: CreateActorOptions): Promise<unicodeInterface> {
+    const config = await loadConfig();
     if (!options) {
         options = {};
     }
-    if (caffeineEnv.backend_host !== "undefined") {
+    if (config.backend_host !== "undefined") {
         options = {
             ...options,
             agentOptions: {
                 ...options.agentOptions,
-                host: caffeineEnv.backend_host
+                host: config.backend_host
             }
         };
+    }
+    let canisterId = _canisterId;
+    if (config.backend_canister_id !== "undefined") {
+        canisterId = config.backend_canister_id;
     }
     const actor = _createActor(canisterId, options);
     return new Unicode(actor);
@@ -91,20 +109,8 @@ export interface unicodeInterface {
 import type { B as _B } from "declarations/unicode/unicode.did.d.ts";
 class Unicode implements unicodeInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor?: ActorSubclass<_SERVICE>){
-        if (actor) {
-            this.#actor = actor;
-        } else {
-            if (caffeineEnv.backend_host != "undefined") {
-                this.#actor = _createActor(canisterId, {
-                    agentOptions: {
-                        host: caffeineEnv.backend_host
-                    }
-                });
-            } else {
-                this.#actor = _createActor(canisterId);
-            }
-        }
+    constructor(actor: ActorSubclass<_SERVICE>){
+        this.#actor = actor;
     }
     async ""(arg0: bigint): Promise<bigint> {
         try {
@@ -147,7 +153,6 @@ class Unicode implements unicodeInterface {
         }
     }
 }
-export const unicode: unicodeInterface = new Unicode();
 function from_candid_B_n1(value: _B): B {
     return from_candid_variant_n2(value);
 }
