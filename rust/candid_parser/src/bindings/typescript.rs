@@ -202,3 +202,25 @@ import type { IDL } from '@dfinity/candid';
         .append(actor);
     doc.pretty(LINE_WIDTH).to_string()
 }
+
+pub fn compile_ts_js(env: &TypeEnv, actor: &Option<Type>) -> String {
+    let header = r#"import { ActorMethod } from '@dfinity/agent';
+import { IDL } from '@dfinity/candid';
+import { Principal } from '@dfinity/principal';
+"#;
+    let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
+    let defs = pp_defs(env, &def_list);
+    let actor = match actor {
+        None => RcDoc::nil(),
+        Some(actor) => pp_actor(env, actor)
+            .append(RcDoc::line())
+            .append("export type idlFactory = IDL.InterfaceFactory;")
+            .append(RcDoc::line())
+            .append("export type init = (args: { IDL: typeof IDL }) => IDL.Type[];"),
+    };
+    let doc = RcDoc::text(header)
+        .append(RcDoc::line())
+        .append(defs)
+        .append(actor);
+    doc.pretty(LINE_WIDTH).to_string()
+}

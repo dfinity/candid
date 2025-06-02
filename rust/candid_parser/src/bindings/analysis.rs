@@ -135,6 +135,23 @@ pub fn chase_types<'a>(env: &'a TypeEnv, tys: &'a [Type]) -> Result<Vec<&'a str>
     Ok(res)
 }
 
+pub(crate) fn chase_types_with_seen<'a>(
+    env: &'a TypeEnv,
+    tys: &'a [Type],
+    seen: Option<&BTreeSet<&'a str>>,
+) -> Result<Vec<&'a str>> {
+    let mut seen = if let Some(seen) = seen {
+        BTreeSet::from_iter(seen.iter().cloned())
+    } else {
+        BTreeSet::new()
+    };
+    let mut res = Vec::new();
+    for t in tys.iter() {
+        chase_type(&mut seen, &mut res, env, t)?;
+    }
+    Ok(res)
+}
+
 /// Given a `def_list` produced by the `chase_actor` function, infer which types are recursive
 pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTreeSet<&'a str>> {
     let mut seen = BTreeSet::new();
