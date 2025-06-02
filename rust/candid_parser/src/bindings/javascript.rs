@@ -1,4 +1,4 @@
-use super::analysis::{chase_actor, chase_types_with_seen, infer_rec};
+use super::analysis::{chase_actor, chase_types, chase_types_with_seen, infer_rec};
 use candid::pretty::candid::pp_mode;
 use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
@@ -234,7 +234,43 @@ fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
     }
 }
 
-pub fn compile(env: &TypeEnv, actor: &Option<Type>, ts_js: bool) -> String {
+pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
+    match actor {
+        None => {
+            let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
+            let recs = infer_rec(env, &def_list).unwrap();
+            let doc = pp_defs(env, &def_list, &recs, false);
+            doc.pretty(LINE_WIDTH).to_string()
+        }
+        Some(actor) => {
+            let def_list = chase_actor(env, actor).unwrap();
+            let recs = infer_rec(env, &def_list).unwrap();
+            let defs = pp_defs(env, &def_list, &recs, false);
+            let init = if let TypeInner::Class(ref args, _) = actor.as_ref() {
+                args.as_slice()
+            } else {
+                &[][..]
+            };
+            let actor = kwd("return").append(pp_actor(actor, &recs)).append(";");
+            let body = defs.append(actor);
+            let doc = str("export const idlFactory = ({ IDL }) => ")
+                .append(enclose_space("{", body, "};"));
+            // export init args
+            let init_defs = chase_types(env, init).unwrap();
+            let init_recs = infer_rec(env, &init_defs).unwrap();
+            let init_defs_doc = pp_defs(env, &init_defs, &init_recs, false);
+            let init_doc = kwd("return").append(pp_args(init)).append(";");
+            let init_doc = init_defs_doc.append(init_doc);
+            let init_doc =
+                str("export const init = ({ IDL }) => ").append(enclose_space("{", init_doc, "};"));
+            let init_doc = init_doc.pretty(LINE_WIDTH).to_string();
+            let doc = doc.append(RcDoc::hardline()).append(init_doc);
+            doc.pretty(LINE_WIDTH).to_string()
+        }
+    }
+}
+
+pub fn compile_ts_js(env: &TypeEnv, actor: &Option<Type>) -> String {
     match actor {
         None => {
             let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
@@ -254,17 +290,13 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, ts_js: bool) -> String {
             };
             let actor = kwd("return").append(pp_actor(actor, &recs)).append(";");
             let body = defs_not_exported.append(actor);
-            let doc = if ts_js {
-                str("")
-            } else {
-                str("import { IDL } from '@dfinity/candid';").append(RcDoc::line())
-            }
-            .append(defs_exported)
-            .append(format!(
-                "export const idlFactory{} = ({{ IDL }}) => ",
-                if ts_js { ": idlFactory" } else { "" }
-            ))
-            .append(enclose_space("{", body, "};"));
+            let doc = str("")
+                .append(defs_exported)
+                .append(format!(
+                    "export const idlFactory{} = ({{ IDL }}) => ",
+                    ": idlFactory"
+                ))
+                .append(enclose_space("{", body, "};"));
             // export init args
             let init_defs = chase_types_with_seen(env, init, None).unwrap();
             let init_recs = infer_rec(env, &init_defs).unwrap();
@@ -280,7 +312,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, ts_js: bool) -> String {
             let init_doc = init_defs_exported_doc
                 .append(format!(
                     "export const init{} = ({}) => ",
-                    if ts_js { ": init" } else { "" },
+                    ": init",
                     if init_defs.len() != 0 { "{ IDL }" } else { "" }
                 ))
                 .append(enclose_space("{", init_doc, "};"));
@@ -429,7 +461,7 @@ import { Principal } from './principal';
             },
         )
         .unwrap();
-        res += &super::compile(&env, &None, false);
+        res += &super::compile(&env, &None);
         for (i, assert) in test.asserts.iter().enumerate() {
             let mut types = Vec::new();
             for ty in assert.typ.iter() {
