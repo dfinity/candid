@@ -204,9 +204,10 @@ import type { IDL } from '@dfinity/candid';
 }
 
 pub fn compile_ts_js(env: &TypeEnv, actor: &Option<Type>) -> String {
-    let actor_method_import = format!("import{}{{ ActorMethod }} from '@dfinity/agent';", " ");
-    let idl_import = format!("import{}{{ IDL }} from '@dfinity/candid';", " ");
-    let principal_import = format!("import{}{{ Principal }} from '@dfinity/principal';", " ");
+    let header = r#"import { ActorMethod } from '@dfinity/agent';
+import { IDL } from '@dfinity/candid';
+import { Principal } from '@dfinity/principal';
+"#;
     let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
     let defs = pp_defs(env, &def_list);
     let actor = match actor {
@@ -217,11 +218,7 @@ pub fn compile_ts_js(env: &TypeEnv, actor: &Option<Type>) -> String {
             .append(RcDoc::line())
             .append("export type init = (args: { IDL: typeof IDL }) => IDL.Type[];"),
     };
-    let doc = RcDoc::text(actor_method_import)
-        .append(RcDoc::line())
-        .append(idl_import)
-        .append(RcDoc::line())
-        .append(principal_import)
+    let doc = RcDoc::text(header)
         .append(RcDoc::line())
         .append(defs)
         .append(actor);
