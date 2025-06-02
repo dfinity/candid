@@ -181,45 +181,41 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
     }
 }
 
-pub fn compile(env: &TypeEnv, actor: &Option<Type>, ts_js: bool) -> String {
-    let actor_method_import = format!(
-        "import{}{{ ActorMethod }} from '@dfinity/agent';",
-        if ts_js { " " } else { " type " }
-    );
-
-    let idl_import = format!(
-        "import{}{{ IDL }} from '@dfinity/candid';",
-        if ts_js { " " } else { " type " }
-    );
-
-    let principal_import = format!(
-        "import{}{{ Principal }} from '@dfinity/principal';",
-        if ts_js { " " } else { " type " }
-    );
-
+pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
+    let header = r#"import type { Principal } from '@dfinity/principal';
+import type { ActorMethod } from '@dfinity/agent';
+import type { IDL } from '@dfinity/candid';
+"#;
     let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
     let defs = pp_defs(env, &def_list);
     let actor = match actor {
         None => RcDoc::nil(),
-        Some(actor) => {
-            let idl_factory_export = if ts_js {
-                "export type idlFactory = IDL.InterfaceFactory;"
-            } else {
-                "export declare const idlFactory: IDL.InterfaceFactory;"
-            };
+        Some(actor) => pp_actor(env, actor)
+            .append(RcDoc::line())
+            .append("export declare const idlFactory: IDL.InterfaceFactory;")
+            .append(RcDoc::line())
+            .append("export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];"),
+    };
+    let doc = RcDoc::text(header)
+        .append(RcDoc::line())
+        .append(defs)
+        .append(actor);
+    doc.pretty(LINE_WIDTH).to_string()
+}
 
-            let init_export = if ts_js {
-                "export type init = (args: { IDL: typeof IDL }) => IDL.Type[];"
-            } else {
-                "export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];"
-            };
-
-            pp_actor(env, actor)
-                .append(RcDoc::line())
-                .append(idl_factory_export)
-                .append(RcDoc::line())
-                .append(init_export)
-        }
+pub fn compile_ts_js(env: &TypeEnv, actor: &Option<Type>) -> String {
+    let actor_method_import = format!("import{}{{ ActorMethod }} from '@dfinity/agent';", " ");
+    let idl_import = format!("import{}{{ IDL }} from '@dfinity/candid';", " ");
+    let principal_import = format!("import{}{{ Principal }} from '@dfinity/principal';", " ");
+    let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
+    let defs = pp_defs(env, &def_list);
+    let actor = match actor {
+        None => RcDoc::nil(),
+        Some(actor) => pp_actor(env, actor)
+            .append(RcDoc::line())
+            .append("export type idlFactory = IDL.InterfaceFactory;")
+            .append(RcDoc::line())
+            .append("export type init = (args: { IDL: typeof IDL }) => IDL.Type[];"),
     };
     let doc = RcDoc::text(actor_method_import)
         .append(RcDoc::line())

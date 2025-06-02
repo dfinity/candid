@@ -231,7 +231,7 @@ fn main() -> Result<()> {
             }
             let content = match target.as_str() {
                 "js" => candid_parser::bindings::javascript::compile(&env, &actor),
-                "ts" => candid_parser::bindings::typescript::compile(&env, &actor, false),
+                "ts" => candid_parser::bindings::typescript::compile(&env, &actor),
                 "ts-js" => {
                     candid_parser::bindings::typescript_and_javascript::compile(&env, &actor)
                 }
