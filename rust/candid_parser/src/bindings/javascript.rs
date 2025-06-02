@@ -1,4 +1,4 @@
-use super::analysis::{chase_actor, chase_types, infer_rec};
+use super::analysis::{chase_actor, chase_types_with_seen, infer_rec};
 use candid::pretty::candid::pp_mode;
 use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
@@ -266,10 +266,11 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, ts_js: bool) -> String {
             ))
             .append(enclose_space("{", body, "};"));
             // export init args
-            let init_defs = chase_types(env, init, None).unwrap();
+            let init_defs = chase_types_with_seen(env, init, None).unwrap();
             let init_recs = infer_rec(env, &init_defs).unwrap();
             let init_defs_deduplicated =
-                chase_types(env, init, Some(&BTreeSet::from_iter(def_list.clone()))).unwrap();
+                chase_types_with_seen(env, init, Some(&BTreeSet::from_iter(def_list.clone())))
+                    .unwrap();
             let init_recs_deduplicated = infer_rec(env, &init_defs_deduplicated).unwrap();
             let init_defs_exported_doc =
                 pp_defs(env, &init_defs_deduplicated, &init_recs_deduplicated, true);
