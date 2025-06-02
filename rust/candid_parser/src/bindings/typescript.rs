@@ -206,8 +206,7 @@ import type { IDL } from '@dfinity/candid';
 pub fn compile_ts_js(env: &TypeEnv, actor: &Option<Type>) -> String {
     let header = r#"import { ActorMethod } from '@dfinity/agent';
 import { IDL } from '@dfinity/candid';
-import { Principal } from '@dfinity/principal';
-"#;
+import { Principal } from '@dfinity/principal';"#;
     let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
     let defs = pp_defs(env, &def_list);
     let actor = match actor {
