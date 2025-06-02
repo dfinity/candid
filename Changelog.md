@@ -1,6 +1,12 @@
 
 # Changelog
 
+## 2025-05-15
+
+### Candid 0.10.14
+
+* Add a series of decoder functions which provide convenience for ic-cdk macros usage.
+
 ## 2025-01-22
 
 ### Candid 0.10.13
