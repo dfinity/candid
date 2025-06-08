@@ -1,4 +1,4 @@
-use crate::types::internal::{Field, Function, Label, Type, TypeInner};
+use crate::types::internal::{ArgType, Field, Function, Label, Type, TypeInner};
 use crate::types::{FuncMode, TypeEnv};
 use anyhow::{anyhow, Context, Result};
 use binread::io::{Read, Seek};
@@ -201,7 +201,10 @@ impl ConsType {
                 let mut args = Vec::new();
                 let mut rets = Vec::new();
                 for arg in &f.args {
-                    args.push(arg.to_type(len)?);
+                    args.push(ArgType {
+                        name: None,
+                        typ: arg.to_type(len)?,
+                    });
                 }
                 for ret in &f.rets {
                     rets.push(ret.to_type(len)?);

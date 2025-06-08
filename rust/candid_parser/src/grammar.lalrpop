@@ -1,4 +1,4 @@
-use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs};
+use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLArgType};
 use super::test::{Assert, Input, Test};
 use super::token::{Token, error2, LexicalError, Span};
 use candid::{Principal, types::Label};
@@ -217,16 +217,18 @@ VariantFieldTyp: TypeField = {
     FieldId =>? Ok(TypeField { label: Label::Id(<>), typ: IDLType::PrimT(PrimType::Null) }),
 }
 
-TupTyp: Vec<IDLType> = "(" <SepBy<ArgTyp, ",">> ")" => <>;
+ArgTupTyp: Vec<IDLArgType> = "(" <SepBy<ArgTyp, ",">> ")" => <>;
+
+TupTyp: Vec<IDLType> = "(" <SepBy<Typ, ",">> ")" => <>;
 
 FuncTyp: FuncType = {
-    <args:TupTyp> "->" <rets:TupTyp> <modes:FuncMode*> =>
+    <args:ArgTupTyp> "->" <rets:TupTyp> <modes:FuncMode*> =>
         FuncType { modes, args, rets },
 }
 
-ArgTyp: IDLType = {
-    Typ => <>,
-    Name ":" <Typ> => <>,
+ArgTyp: IDLArgType = {
+    <t:Typ> => IDLArgType { typ: t, name: None },
+    <n:Name> ":" <t:Typ> => IDLArgType { typ: t, name: Some(n) },
 }
 
 FuncMode: FuncMode = {
@@ -263,7 +265,7 @@ Actor: IDLType = {
 
 MainActor: IDLType = {
     "service" "id"? ":" <t:Actor> ";"? => <>,
-    "service" "id"? ":" <args:TupTyp> "->" <t:Actor> ";"? => IDLType::ClassT(args, Box::new(t)),
+    "service" "id"? ":" <args:ArgTupTyp> "->" <t:Actor> ";"? => IDLType::ClassT(args, Box::new(t)),
 }
 
 pub IDLProg: IDLProg = {
@@ -271,7 +273,7 @@ pub IDLProg: IDLProg = {
 }
 
 pub IDLInitArgs: IDLInitArgs = {
-    <decs:SepBy<Def, ";">> <args:TupTyp> => IDLInitArgs { decs, args }
+    <decs:SepBy<Def, ";">> <args:ArgTupTyp> => IDLInitArgs { decs, args }
 }
 
 // Test file

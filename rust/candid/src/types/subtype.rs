@@ -129,8 +129,18 @@ fn subtype_(
             if f1.modes != f2.modes {
                 return Err(Error::msg("Function mode mismatch"));
             }
-            let args1 = to_tuple(&f1.args);
-            let args2 = to_tuple(&f2.args);
+            let f1_args = f1
+                .args
+                .iter()
+                .map(|arg| arg.typ.clone())
+                .collect::<std::vec::Vec<_>>();
+            let f2_args = f2
+                .args
+                .iter()
+                .map(|arg| arg.typ.clone())
+                .collect::<std::vec::Vec<_>>();
+            let args1 = to_tuple(&f1_args);
+            let args2 = to_tuple(&f2_args);
             let rets1 = to_tuple(&f1.rets);
             let rets2 = to_tuple(&f2.rets);
             subtype_(report, gamma, env, &args2, &args1)
@@ -212,8 +222,18 @@ pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<(
             if f1.modes != f2.modes {
                 return Err(Error::msg("Function mode mismatch"));
             }
-            let args1 = to_tuple(&f1.args);
-            let args2 = to_tuple(&f2.args);
+            let f1_args = f1
+                .args
+                .iter()
+                .map(|arg| arg.typ.clone())
+                .collect::<std::vec::Vec<_>>();
+            let f2_args = f2
+                .args
+                .iter()
+                .map(|arg| arg.typ.clone())
+                .collect::<std::vec::Vec<_>>();
+            let args1 = to_tuple(&f1_args);
+            let args2 = to_tuple(&f2_args);
             let rets1 = to_tuple(&f1.rets);
             let rets2 = to_tuple(&f2.rets);
             equal(gamma, env, &args1, &args2).context("Mismatch in function input type")?;
@@ -221,12 +241,20 @@ pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<(
             Ok(())
         }
         (Class(init1, ty1), Class(init2, ty2)) => {
-            let init_1 = to_tuple(init1);
-            let init_2 = to_tuple(init2);
+            let init1_typ = init1
+                .iter()
+                .map(|arg| arg.typ.clone())
+                .collect::<std::vec::Vec<_>>();
+            let init2_typ = init2
+                .iter()
+                .map(|arg| arg.typ.clone())
+                .collect::<std::vec::Vec<_>>();
+            let init_1 = to_tuple(&init1_typ);
+            let init_2 = to_tuple(&init2_typ);
             equal(gamma, env, &init_1, &init_2).context(format!(
                 "Mismatch in init args: {} and {}",
-                pp_args(init1),
-                pp_args(init2)
+                pp_args(&init1),
+                pp_args(&init2)
             ))?;
             equal(gamma, env, ty1, ty2)
         }
@@ -277,7 +305,7 @@ fn to_tuple(args: &[Type]) -> Type {
     .into()
 }
 #[cfg(not(feature = "printer"))]
-fn pp_args(args: &[crate::types::Type]) -> String {
+fn pp_args(args: &[crate::types::ArgType]) -> String {
     use std::fmt::Write;
     let mut s = String::new();
     write!(&mut s, "(").unwrap();
@@ -288,7 +316,7 @@ fn pp_args(args: &[crate::types::Type]) -> String {
     s
 }
 #[cfg(feature = "printer")]
-fn pp_args(args: &[crate::types::Type]) -> String {
+fn pp_args(args: &[crate::types::ArgType]) -> String {
     use crate::pretty::candid::pp_args;
     pp_args(args).pretty(80).to_string()
 }

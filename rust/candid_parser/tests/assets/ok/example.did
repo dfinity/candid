@@ -4,7 +4,7 @@ type List = opt record { head : int; tail : List };
 type a = variant { a; b : b };
 type b = record { int; nat };
 type broker = service {
-  find : (text) -> (service { current : () -> (nat32); up : () -> () });
+  find : (name : text) -> (service { current : () -> (nat32); up : () -> () });
 };
 type f = func (List, func (int32) -> (int64)) -> (opt List, res);
 type list = opt node;
@@ -26,7 +26,7 @@ type node = record { head : nat; tail : list };
 type res = variant { Ok : record { int; nat }; Err : record { error : text } };
 type s = service { f : t; g : (list) -> (B, tree, stream) };
 type stream = opt record { head : nat; next : func () -> (stream) query };
-type t = func (s) -> ();
+type t = func (server : s) -> ();
 type tree = variant {
   branch : record { val : int; left : tree; right : tree };
   leaf : int;
@@ -34,7 +34,7 @@ type tree = variant {
 service : {
   bbbbb : (b) -> ();
   f : t;
-  f1 : (list, blob, opt bool) -> () oneway;
+  f1 : (list, test : blob, opt bool) -> () oneway;
   g : (list) -> (B, tree, stream);
   g1 : (my_type, List, opt List, nested) -> (int, broker, nested_res) query;
   h : (vec opt text, variant { A : nat; B : opt text }, opt List) -> (

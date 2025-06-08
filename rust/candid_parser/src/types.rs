@@ -11,7 +11,7 @@ pub enum IDLType {
     RecordT(Vec<TypeField>),
     VariantT(Vec<TypeField>),
     ServT(Vec<Binding>),
-    ClassT(Vec<IDLType>, Box<IDLType>),
+    ClassT(Vec<IDLArgType>, Box<IDLType>),
     PrincipalT,
 }
 
@@ -63,8 +63,14 @@ pub enum PrimType {
 #[derive(Debug, Clone)]
 pub struct FuncType {
     pub modes: Vec<FuncMode>,
-    pub args: Vec<IDLType>,
+    pub args: Vec<IDLArgType>,
     pub rets: Vec<IDLType>,
+}
+
+#[derive(Debug, Clone)]
+pub struct IDLArgType {
+    pub typ: IDLType,
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -95,7 +101,7 @@ pub struct IDLProg {
 #[derive(Debug)]
 pub struct IDLInitArgs {
     pub decs: Vec<Dec>,
-    pub args: Vec<IDLType>,
+    pub args: Vec<IDLArgType>,
 }
 
 impl std::str::FromStr for IDLProg {

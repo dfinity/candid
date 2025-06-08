@@ -1,6 +1,6 @@
 use super::types::*;
 use crate::{pretty_parse, Error, Result};
-use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
+use candid::types::{ArgType, Field, Function, Type, TypeEnv, TypeInner};
 use candid::utils::check_unique;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -68,8 +68,8 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
         IDLType::PrincipalT => Ok(TypeInner::Principal.into()),
         IDLType::FuncT(func) => {
             let mut t1 = Vec::new();
-            for t in func.args.iter() {
-                t1.push(check_type(env, t)?);
+            for arg in func.args.iter() {
+                t1.push(check_arg(env, arg)?);
             }
             let mut t2 = Vec::new();
             for t in func.rets.iter() {
@@ -97,6 +97,13 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
         }
         IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
     }
+}
+
+fn check_arg(env: &Env, arg: &IDLArgType) -> Result<ArgType> {
+    Ok(ArgType {
+        name: arg.name.clone(),
+        typ: check_type(env, &arg.typ)?,
+    })
 }
 
 fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
@@ -188,7 +195,7 @@ fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
         Some(IDLType::ClassT(ts, t)) => {
             let mut args = Vec::new();
             for arg in ts.iter() {
-                args.push(check_type(env, arg)?);
+                args.push(check_arg(env, &arg)?);
             }
             let serv = check_type(env, t)?;
             env.te.as_service(&serv)?;
@@ -257,13 +264,13 @@ pub fn check_init_args(
     te: &mut TypeEnv,
     main_env: &TypeEnv,
     prog: &IDLInitArgs,
-) -> Result<Vec<Type>> {
+) -> Result<Vec<ArgType>> {
     let mut env = Env { te, pre: false };
     check_decs(&mut env, &prog.decs)?;
     env.te.merge(main_env)?;
     let mut args = Vec::new();
     for arg in prog.args.iter() {
-        args.push(check_type(&env, arg)?);
+        args.push(check_arg(&env, &arg)?);
     }
     Ok(args)
 }

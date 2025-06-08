@@ -56,7 +56,8 @@ pub fn chase_type<'a>(
             }
         }
         Func(f) => {
-            for ty in f.args.iter().chain(f.rets.iter()) {
+            let args = f.args.iter().map(|arg| &arg.typ);
+            for ty in args.clone().chain(f.rets.iter()) {
                 chase_type(seen, res, env, ty)?;
             }
         }
@@ -67,7 +68,7 @@ pub fn chase_type<'a>(
         }
         Class(args, t) => {
             for arg in args.iter() {
-                chase_type(seen, res, env, arg)?;
+                chase_type(seen, res, env, &arg.typ)?;
             }
             chase_type(seen, res, env, t)?;
         }
@@ -94,7 +95,7 @@ pub fn chase_def_use<'a>(
     if let TypeInner::Class(args, _) = actor.as_ref() {
         for (i, arg) in args.iter().enumerate() {
             let mut used = Vec::new();
-            chase_type(&mut BTreeSet::new(), &mut used, env, arg)?;
+            chase_type(&mut BTreeSet::new(), &mut used, env, &arg.typ)?;
             for var in used {
                 res.entry(var.to_string())
                     .or_insert_with(Vec::new)
@@ -106,7 +107,7 @@ pub fn chase_def_use<'a>(
         let func = env.as_func(ty)?;
         for (i, arg) in func.args.iter().enumerate() {
             let mut used = Vec::new();
-            chase_type(&mut BTreeSet::new(), &mut used, env, arg)?;
+            chase_type(&mut BTreeSet::new(), &mut used, env, &arg.typ)?;
             for var in used {
                 res.entry(var.to_string())
                     .or_insert_with(Vec::new)
@@ -159,7 +160,8 @@ pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTree
                 }
             }
             Func(f) => {
-                for ty in f.args.iter().chain(f.rets.iter()) {
+                let args = f.args.iter().map(|arg| &arg.typ);
+                for ty in args.clone().chain(f.rets.iter()) {
                     go(seen, res, _env, ty)?;
                 }
             }
@@ -170,7 +172,7 @@ pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTree
             }
             Class(args, t) => {
                 for arg in args.iter() {
-                    go(seen, res, _env, arg)?;
+                    go(seen, res, _env, &arg.typ)?;
                 }
                 go(seen, res, _env, t)?;
             }

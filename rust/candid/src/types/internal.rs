@@ -148,7 +148,14 @@ impl TypeContainer {
             }
             TypeInner::Func(func) => TypeInner::Func(Function {
                 modes: func.modes.clone(),
-                args: func.args.iter().map(|arg| self.go(arg)).collect(),
+                args: func
+                    .args
+                    .iter()
+                    .map(|arg| ArgType {
+                        name: arg.name.clone(),
+                        typ: self.go(&arg.typ),
+                    })
+                    .collect(),
                 rets: func.rets.iter().map(|arg| self.go(arg)).collect(),
             }),
             TypeInner::Service(serv) => TypeInner::Service(
@@ -156,9 +163,16 @@ impl TypeContainer {
                     .map(|(id, t)| (id.clone(), self.go(t)))
                     .collect(),
             ),
-            TypeInner::Class(inits, ref ty) => {
-                TypeInner::Class(inits.iter().map(|t| self.go(t)).collect(), self.go(ty))
-            }
+            TypeInner::Class(inits, ref ty) => TypeInner::Class(
+                inits
+                    .iter()
+                    .map(|t| ArgType {
+                        name: t.name.clone(),
+                        typ: self.go(&t.typ),
+                    })
+                    .collect(),
+                self.go(ty),
+            ),
             t => t.clone(),
         }
         .into()
@@ -196,7 +210,7 @@ pub enum TypeInner {
     Variant(Vec<Field>),
     Func(Function),
     Service(Vec<(String, Type)>),
-    Class(Vec<Type>, Type),
+    Class(Vec<ArgType>, Type),
     Principal,
     Future,
 }
@@ -278,7 +292,14 @@ impl Type {
                 let func = func.clone();
                 Func(Function {
                     modes: func.modes,
-                    args: func.args.into_iter().map(|t| t.subst(tau)).collect(),
+                    args: func
+                        .args
+                        .into_iter()
+                        .map(|t| ArgType {
+                            name: t.name,
+                            typ: t.typ.subst(tau),
+                        })
+                        .collect(),
                     rets: func.rets.into_iter().map(|t| t.subst(tau)).collect(),
                 })
             }
@@ -287,7 +308,15 @@ impl Type {
                     .map(|(meth, ty)| (meth.clone(), ty.subst(tau)))
                     .collect(),
             ),
-            Class(args, ty) => Class(args.iter().map(|t| t.subst(tau)).collect(), ty.subst(tau)),
+            Class(args, ty) => Class(
+                args.iter()
+                    .map(|t| ArgType {
+                        name: t.name.clone(),
+                        typ: t.typ.subst(tau),
+                    })
+                    .collect(),
+                ty.subst(tau),
+            ),
             _ => return self.clone(),
         }
         .into()
@@ -353,7 +382,8 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
             let mut cnt = mode + 6;
             let mut limit = limit - cnt;
             for t in &func.args {
-                cnt += text_size(t, limit)?;
+                let id_size = t.name.as_ref().map(|n| n.len() as i32).unwrap_or(0);
+                cnt += id_size + text_size(&t.typ, limit - id_size - 3)? + 3;
                 limit -= cnt;
             }
             for t in &func.rets {
@@ -510,9 +540,16 @@ pub enum FuncMode {
 #[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 pub struct Function {
     pub modes: Vec<FuncMode>,
-    pub args: Vec<Type>,
+    pub args: Vec<ArgType>,
     pub rets: Vec<Type>,
 }
+
+#[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
+pub struct ArgType {
+    pub name: Option<String>,
+    pub typ: Type,
+}
+
 #[cfg(feature = "printer")]
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -539,16 +576,16 @@ impl Function {
 /// `func!((u8, &str) -> (Nat) query)` expands to `Type(Rc::new(TypeInner::Func(...)))`
 macro_rules! func {
     ( ( $($arg:ty),* $(,)? ) -> ( $($ret:ty),* $(,)? ) ) => {
-        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![] }))
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*].into_iter().map(|arg| $crate::types::ArgType { name: None, typ: arg }).collect(), rets: vec![$(<$ret>::ty()),*], modes: vec![] }))
     };
     ( ( $($arg:ty),* $(,)? ) -> ( $($ret:ty),* $(,)? ) query ) => {
-        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::Query] }))
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*].into_iter().map(|arg| $crate::types::ArgType { name: None, typ: arg }).collect(), rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::Query] }))
     };
     ( ( $($arg:ty),* $(,)? ) -> ( $($ret:ty),* $(,)? ) composite_query ) => {
-        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::CompositeQuery] }))
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*].into_iter().map(|arg| $crate::types::ArgType { name: None, typ: arg }).collect(), rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::CompositeQuery] }))
     };
     ( ( $($arg:ty),* $(,)? ) -> ( $($ret:ty),* $(,)? ) oneway ) => {
-        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::Oneway] }))
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*].into_iter().map(|arg| $crate::types::ArgType { name: None, typ: arg }).collect(), rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::Oneway] }))
     };
 }
 #[macro_export]
