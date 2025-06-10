@@ -1,6 +1,25 @@
 
 # Changelog
 
+## Unreleased
+
+### Candid
+
+* Breaking changes:
+  + `pp_args` and `pp_init_args` noew require a `&[ArgType]` parameter. The `pp_rets` function has been added, with the signature of the old `pp_args`.
+
+### candid_parser
+
+* Breaking changes:
+  + The `args` field in both `FuncType` and `IDLInitArgs` now have type `Vec<IDLArgType>`.
+
+* Non-breaking changes:
+  + Supports parsing the arguments' names for `func` and `service` (init args).
+
+### candid_derive
+
+* Keeps argument names for Rust functions.
+
 ## 2025-05-15
 
 ### Candid 0.10.14
