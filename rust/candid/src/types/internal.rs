@@ -382,14 +382,11 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
             let mut cnt = mode + 6;
             let mut limit = limit - cnt;
             for t in &func.args {
-                match t.name.as_ref() {
-                    Some(name) => {
-                        let id_size = name.len() as i32;
-                        cnt += id_size + text_size(&t.typ, limit - id_size - 3)? + 3;
-                    }
-                    None => {
-                        cnt += text_size(&t.typ, limit)?;
-                    }
+                if let Some(name) = t.name.as_ref() {
+                    let id_size = name.len() as i32;
+                    cnt += id_size + text_size(&t.typ, limit - id_size - 3)? + 3;
+                } else {
+                    cnt += text_size(&t.typ, limit)?;
                 }
                 limit -= cnt;
             }

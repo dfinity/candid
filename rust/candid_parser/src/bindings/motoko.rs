@@ -202,19 +202,21 @@ fn pp_args(args: &[ArgType]) -> RcDoc {
             } else {
                 pp_ty(&ty.typ)
             };
-            match &ty.name {
-                Some(name) => enclose("(", escape(name, false).append(" : ").append(typ), ")"),
-                None => typ,
+            if let Some(name) = &ty.name {
+                enclose("(", escape(name, false).append(" : ").append(typ), ")")
+            } else {
+                typ
             }
         }
         _ => {
-            let doc = concat(
-                args.iter().map(|arg| match &arg.name {
-                    Some(name) => escape(name, false).append(" : ").append(pp_ty(&arg.typ)),
-                    None => pp_ty(&arg.typ),
-                }),
-                ",",
-            );
+            let args = args.iter().map(|arg| {
+                if let Some(name) = &arg.name {
+                    escape(name, false).append(" : ").append(pp_ty(&arg.typ))
+                } else {
+                    pp_ty(&arg.typ)
+                }
+            });
+            let doc = concat(args, ",");
             enclose("(", doc, ")")
         }
     }

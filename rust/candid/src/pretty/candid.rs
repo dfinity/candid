@@ -160,13 +160,14 @@ pub fn pp_function(func: &Function) -> RcDoc {
 }
 
 pub fn pp_args(args: &[ArgType]) -> RcDoc {
-    let doc = concat(
-        args.iter().map(|arg| match &arg.name {
-            Some(name) => pp_text(name).append(kwd(" :")).append(pp_ty(&arg.typ)),
-            None => pp_ty(&arg.typ),
-        }),
-        ",",
-    );
+    let args = args.iter().map(|arg| {
+        if let Some(name) = &arg.name {
+            pp_text(name).append(kwd(" :")).append(pp_ty(&arg.typ))
+        } else {
+            pp_ty(&arg.typ)
+        }
+    });
+    let doc = concat(args, ",");
     enclose("(", doc, ")")
 }
 

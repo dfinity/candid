@@ -175,19 +175,20 @@ fn get_args(sig: &Signature) -> Result<(Vec<(Option<String>, Type)>, Vec<Type>)>
                     return Err(Error::new_spanned(arg, "only works for borrowed self"));
                 }
             }
-            syn::FnArg::Typed(syn::PatType { ty, pat, .. }) => match pat.as_ref() {
-                syn::Pat::Ident(syn::PatIdent { ident, .. }) => {
+            syn::FnArg::Typed(syn::PatType { ty, pat, .. }) => {
+                if let syn::Pat::Ident(syn::PatIdent { ident, .. }) = pat.as_ref() {
                     let arg_name = ident.to_string();
                     if arg_name.starts_with("_") {
+                        // If the argument name starts with _, it usually means it's not used.
+                        // We don't need to include it in the IDL.
                         args.push((None, ty.as_ref().clone()));
                     } else {
                         args.push((Some(arg_name), ty.as_ref().clone()));
                     }
-                }
-                _ => {
+                } else {
                     args.push((None, ty.as_ref().clone()));
                 }
-            },
+            }
         }
     }
     let rets = match &sig.output {
