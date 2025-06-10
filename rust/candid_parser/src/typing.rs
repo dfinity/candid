@@ -195,7 +195,7 @@ fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
         Some(IDLType::ClassT(ts, t)) => {
             let mut args = Vec::new();
             for arg in ts.iter() {
-                args.push(check_arg(env, &arg)?);
+                args.push(check_arg(env, arg)?);
             }
             let serv = check_type(env, t)?;
             env.te.as_service(&serv)?;
@@ -270,7 +270,7 @@ pub fn check_init_args(
     env.te.merge(main_env)?;
     let mut args = Vec::new();
     for arg in prog.args.iter() {
-        args.push(check_arg(&env, &arg)?);
+        args.push(check_arg(&env, arg)?);
     }
     Ok(args)
 }

@@ -6,9 +6,14 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 use syn::{Error, ItemFn, Meta, Result, ReturnType, Signature, Type};
 
+type RawArgs = Vec<(Option<String>, String)>;
+type RawRets = Vec<String>;
+type ParsedArgs = Vec<(Option<String>, Type)>;
+type ParsedRets = Vec<Type>;
+
 struct Method {
-    args: Vec<(Option<String>, String)>,
-    rets: Vec<String>,
+    args: RawArgs,
+    rets: RawRets,
     modes: String,
 }
 
@@ -19,8 +24,7 @@ struct Method {
 lazy_static! {
     static ref METHODS: Mutex<Option<BTreeMap<String, Method>>> =
         Mutex::new(Some(BTreeMap::default()));
-    static ref INIT: Mutex<Option<Option<Vec<(Option<String>, String)>>>> =
-        Mutex::new(Some(Option::default()));
+    static ref INIT: Mutex<Option<Option<RawArgs>>> = Mutex::new(Some(Option::default()));
 }
 
 pub(crate) fn candid_method(attrs: Vec<Meta>, fun: ItemFn) -> Result<TokenStream> {
@@ -36,11 +40,11 @@ pub(crate) fn candid_method(attrs: Vec<Meta>, fun: ItemFn) -> Result<TokenStream
     let name = attrs.rename.as_ref().unwrap_or(&ident).clone();
     let modes = attrs.method_type.unwrap_or_else(|| "update".to_string());
     let (args, rets) = get_args(sig)?;
-    let args: Vec<(Option<String>, String)> = args
+    let args: RawArgs = args
         .iter()
         .map(|(name, t)| (name.clone(), format!("{}", t.to_token_stream())))
         .collect();
-    let rets: Vec<String> = rets
+    let rets: RawRets = rets
         .iter()
         .map(|t| format!("{}", t.to_token_stream()))
         .collect();
@@ -166,7 +170,7 @@ fn generate_ret(name: TokenStream, ty: &str) -> TokenStream {
     }
 }
 
-fn get_args(sig: &Signature) -> Result<(Vec<(Option<String>, Type)>, Vec<Type>)> {
+fn get_args(sig: &Signature) -> Result<(ParsedArgs, ParsedRets)> {
     let mut args = Vec::new();
     for arg in &sig.inputs {
         match arg {
