@@ -1,6 +1,6 @@
 use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLArgType};
 use super::test::{Assert, Input, Test};
-use super::token::{Token, error2, LexicalError, Span};
+use super::token::{Token, error, error2, LexicalError, Span};
 use candid::{Principal, types::Label};
 use candid::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
 use candid::types::{TypeEnv, FuncMode};
@@ -217,7 +217,13 @@ VariantFieldTyp: TypeField = {
     FieldId =>? Ok(TypeField { label: Label::Id(<>), typ: IDLType::PrimT(PrimType::Null) }),
 }
 
-ArgTupTyp: Vec<IDLArgType> = "(" <SepBy<ArgTyp, ",">> ")" => <>;
+ArgTupTyp: Vec<IDLArgType> = "(" <SepBy<ArgTyp, ",">> ")" =>? {
+    let args = <>;
+    let mut named_args: Vec<String> = args.iter().filter_map(|a| a.name.clone()).collect();
+    named_args.sort();
+    check_unique(named_args.iter()).map_err(|e| error(e))?;
+    Ok(args)
+};
 
 TupTyp: Vec<IDLType> = "(" <SepBy<Typ, ",">> ")" => <>;
 
