@@ -34,9 +34,9 @@ jobs:
           cargo build
       - name: Run tests
         run: |
-          cargo test --no-default-features
-          cargo test
-          cargo test --features all
+          cargo test --no-default-features -- --color always
+          cargo test -- --color always
+          cargo test --features all -- --color always
       - name: fmt
         run: cargo fmt -v -- --check
       - name: lint
