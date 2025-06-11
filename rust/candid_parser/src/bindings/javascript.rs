@@ -1,7 +1,7 @@
 use super::analysis::{chase_actor, chase_types, infer_rec};
 use candid::pretty::candid::pp_mode;
 use candid::pretty::utils::*;
-use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use candid::types::{ArgType, Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
 
@@ -159,14 +159,19 @@ fn pp_fields(fs: &[Field]) -> RcDoc {
 
 fn pp_function(func: &Function) -> RcDoc {
     let args = pp_args(&func.args);
-    let rets = pp_args(&func.rets);
+    let rets = pp_rets(&func.rets);
     let modes = pp_modes(&func.modes);
     let items = [args, rets, modes];
     let doc = concat(items.iter().cloned(), ",");
     enclose("(", doc, ")").nest(INDENT_SPACE)
 }
 
-fn pp_args(args: &[Type]) -> RcDoc {
+fn pp_args(args: &[ArgType]) -> RcDoc {
+    let doc = concat(args.iter().map(|arg| pp_ty(&arg.typ)), ",");
+    enclose("[", doc, "]")
+}
+
+fn pp_rets(args: &[Type]) -> RcDoc {
     let doc = concat(args.iter().map(pp_ty), ",");
     enclose("[", doc, "]")
 }
@@ -243,11 +248,12 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let def_list = chase_actor(env, actor).unwrap();
             let recs = infer_rec(env, &def_list).unwrap();
             let defs = pp_defs(env, &def_list, &recs);
-            let init = if let TypeInner::Class(ref args, _) = actor.as_ref() {
-                args.as_slice()
+            let types = if let TypeInner::Class(ref args, _) = actor.as_ref() {
+                args.iter().map(|arg| arg.typ.clone()).collect::<Vec<_>>()
             } else {
-                &[][..]
+                Vec::new()
             };
+            let init = types.as_slice();
             let actor = kwd("return").append(pp_actor(actor, &recs)).append(";");
             let body = defs.append(actor);
             let doc = str("export const idlFactory = ({ IDL }) => ")
@@ -256,7 +262,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let init_defs = chase_types(env, init).unwrap();
             let init_recs = infer_rec(env, &init_defs).unwrap();
             let init_defs_doc = pp_defs(env, &init_defs, &init_recs);
-            let init_doc = kwd("return").append(pp_args(init)).append(";");
+            let init_doc = kwd("return").append(pp_rets(init)).append(";");
             let init_doc = init_defs_doc.append(init_doc);
             let init_doc =
                 str("export const init = ({ IDL }) => ").append(enclose_space("{", init_doc, "};"));
@@ -374,7 +380,7 @@ pub mod test {
     }
     fn pp_encode<'a>(args: &'a candid::IDLArgs, tys: &'a [candid::types::Type]) -> RcDoc<'a> {
         let vals = value::pp_args(args);
-        let tys = super::pp_args(tys);
+        let tys = super::pp_rets(tys);
         let items = [tys, vals];
         let params = concat(items.iter().cloned(), ",");
         str("IDL.encode").append(enclose("(", params, ")"))
@@ -382,7 +388,7 @@ pub mod test {
 
     fn pp_decode<'a>(bytes: &'a [u8], tys: &'a [candid::types::Type]) -> RcDoc<'a> {
         let hex = pp_hex(bytes);
-        let tys = super::pp_args(tys);
+        let tys = super::pp_rets(tys);
         let items = [tys, hex];
         let params = concat(items.iter().cloned(), ",");
         str("IDL.decode").append(enclose("(", params, ")"))
@@ -417,7 +423,7 @@ import { Principal } from './principal';
                 use HostAssert::*;
                 let test_func = match cmd {
                     Encode(args, tys, _, _) | NotEncode(args, tys) => {
-                        let items = [super::pp_args(tys), pp_encode(args, tys)];
+                        let items = [super::pp_rets(tys), pp_encode(args, tys)];
                         let params = concat(items.iter().cloned(), ",");
                         str("IDL.decode").append(enclose("(", params, ")"))
                     }

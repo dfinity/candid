@@ -54,7 +54,10 @@ pub fn instantiate_candid(candid: CandidSource) -> Result<(Vec<Type>, (TypeEnv, 
     let serv = serv.ok_or_else(|| Error::msg("the Candid interface has no main service type"))?;
     let serv = env.trace_type(&serv)?;
     Ok(match serv.as_ref() {
-        TypeInner::Class(args, ty) => (args.clone(), (env, ty.clone())),
+        TypeInner::Class(args, ty) => (
+            args.iter().map(|arg| arg.typ.clone()).collect::<Vec<_>>(),
+            (env, ty.clone()),
+        ),
         TypeInner::Service(_) => (vec![], (env, serv)),
         _ => unreachable!(),
     })
@@ -110,6 +113,6 @@ pub fn check_rust_type<T: candid::CandidType>(candid_args: &str) -> Result<()> {
     let ty = rust_env.add::<T>();
     let ty = env.merge_type(rust_env.env, ty);
     let mut gamma = std::collections::HashSet::new();
-    equal(&mut gamma, &env, &args[0], &ty)?;
+    equal(&mut gamma, &env, &args[0].typ, &ty)?;
     Ok(())
 }
