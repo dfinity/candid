@@ -227,8 +227,8 @@ FuncTyp: FuncType = {
 }
 
 ArgTyp: IDLArgType = {
-    <t:Typ> => IDLArgType { typ: t, name: None },
-    <n:Name> ":" <t:Typ> => IDLArgType { typ: t, name: Some(n) },
+    <t:Typ> => IDLArgType::new(t),
+    <n:Name> ":" <t:Typ> => IDLArgType::new_with_name(t, n),
 }
 
 FuncMode: FuncMode = {

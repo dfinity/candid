@@ -73,6 +73,26 @@ pub struct IDLArgType {
     pub name: Option<String>,
 }
 
+impl IDLArgType {
+    pub fn new(typ: IDLType) -> Self {
+        Self { typ, name: None }
+    }
+
+    /// Create a new IDLArgType with a name.
+    /// If the name is an `u32` number, set it to None
+    /// as we don't want to use it as a field name
+    pub fn new_with_name(typ: IDLType, name: String) -> Self {
+        if name.parse::<u32>().is_ok() {
+            Self { typ, name: None }
+        } else {
+            Self {
+                typ,
+                name: Some(name),
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TypeField {
     pub label: Label,
