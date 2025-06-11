@@ -4,8 +4,17 @@ import type { IDL } from '@dfinity/candid';
 
 export type bitcoin_address = string;
 export type bitcoin_network = { 'mainnet' : null } |
-  { 'testnet' : null };
+  {
+    /**
+     * This is a variant comment
+     */
+    'testnet' : null
+  };
 export type block_hash = Uint8Array | number[];
+/**
+ * This is a comment
+ * with mutilple lines
+ */
 export type canister_id = Principal;
 export interface canister_settings {
   'freezing_threshold' : [] | [bigint],
@@ -13,9 +22,15 @@ export interface canister_settings {
   'memory_allocation' : [] | [bigint],
   'compute_allocation' : [] | [bigint],
 }
+/**
+ * This is a second comment
+ */
 export interface definite_canister_settings {
   'freezing_threshold' : bigint,
   'controllers' : Array<Principal>,
+  /**
+   * This is a field comment
+   */
   'memory_allocation' : bigint,
   'compute_allocation' : bigint,
 }
@@ -63,6 +78,9 @@ export interface utxo {
 }
 export type wasm_module = Uint8Array | number[];
 export interface _SERVICE {
+  /**
+   * bitcoin interface
+   */
   'bitcoin_get_balance' : ActorMethod<[get_balance_request], satoshi>,
   'bitcoin_get_current_fee_percentiles' : ActorMethod<
     [get_current_fee_percentiles_request],
@@ -92,6 +110,9 @@ export interface _SERVICE {
   >,
   'delete_canister' : ActorMethod<[{ 'canister_id' : canister_id }], undefined>,
   'deposit_cycles' : ActorMethod<[{ 'canister_id' : canister_id }], undefined>,
+  /**
+   * Threshold ECDSA signature
+   */
   'ecdsa_public_key' : ActorMethod<
     [
       {
@@ -138,6 +159,9 @@ export interface _SERVICE {
     ],
     undefined
   >,
+  /**
+   * provisional interfaces for the pre-ledger world
+   */
   'provisional_create_canister_with_cycles' : ActorMethod<
     [
       {

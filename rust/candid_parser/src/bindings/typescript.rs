@@ -103,7 +103,8 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
 }
 
 fn pp_field<'a>(env: &'a TypeEnv, field: &'a Field, is_ref: bool) -> RcDoc<'a> {
-    pp_label(&field.id)
+    pp_comment(field.ty.1.as_ref())
+        .append(pp_label(&field.id))
         .append(kwd(":"))
         .append(pp_ty(env, &field.ty, is_ref))
 }
@@ -130,11 +131,14 @@ fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
 fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
     let doc = concat(
         serv.iter().map(|(id, func)| {
-            let func = match func.as_ref() {
-                TypeInner::Func(ref func) => pp_function(env, func),
+            let f = match func.as_ref() {
+                TypeInner::Func(ref inner) => pp_function(env, inner),
                 _ => pp_ty(env, func, false),
             };
-            quote_ident(id).append(kwd(":")).append(func)
+            pp_comment(func.1.as_ref())
+                .append(quote_ident(id))
+                .append(kwd(":"))
+                .append(f)
         }),
         ",",
     );
@@ -144,7 +148,7 @@ fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
 fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
-        let export = match ty.as_ref() {
+        let doc = match ty.as_ref() {
             TypeInner::Record(_) if !ty.is_tuple() => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
@@ -156,7 +160,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
             TypeInner::Func(ref func) => kwd("export type")
                 .append(ident(id))
                 .append(" = ")
-                .append(pp_function(env, func))
+                .append(pp_function(env, func)) // the comment is already added at the end of this match block
                 .append(";"),
             _ => kwd("export type")
                 .append(ident(id))
@@ -164,7 +168,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
                 .append(pp_ty(env, ty, false))
                 .append(";"),
         };
-        export
+        pp_comment(ty.1.as_ref()).append(doc)
     }))
 }
 
@@ -179,6 +183,26 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
         TypeInner::Class(_, t) => pp_actor(env, t),
         _ => unreachable!(),
     }
+}
+
+fn pp_comment(comment: Option<&String>) -> RcDoc {
+    let mut comment_doc = RcDoc::nil();
+    let mut is_empty = true;
+    if let Some(comment) = comment {
+        for line in comment.lines().filter(|l| !l.is_empty()) {
+            is_empty = false;
+            comment_doc =
+                comment_doc.append(RcDoc::text(" * ").append(line).append(RcDoc::hardline()));
+        }
+    }
+    if !is_empty {
+        comment_doc = RcDoc::text("/**")
+            .append(RcDoc::hardline())
+            .append(comment_doc)
+            .append(RcDoc::text(" */"))
+            .append(RcDoc::hardline());
+    }
+    comment_doc
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
