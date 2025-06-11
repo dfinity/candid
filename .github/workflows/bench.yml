@@ -44,7 +44,7 @@ jobs:
           canbench --show-summary --persist
           popd
           cp main/rust/bench/canbench_results.yml rust/bench/
-      - name: Run perf for PR beanch
+      - name: Run perf for PR branch
         run: |
           pushd rust/bench
           canbench --less-verbose --show-summary --persist > /tmp/perf.txt
