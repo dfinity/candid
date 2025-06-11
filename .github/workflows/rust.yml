@@ -5,9 +5,6 @@ on:
       - master
   pull_request:
 
-env:
-  CARGO_TERM_COLOR: always # Force Cargo to use colors
-
 jobs:
   rust:
     runs-on: ubuntu-latest
@@ -30,7 +27,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Build
         run: |
-          cargo build
+          cargo build --color always
       - name: Run tests
         run: |
           cargo test --no-default-features --color always -- --color always
