@@ -5,6 +5,9 @@ on:
       - master
   pull_request:
 
+env:
+  CARGO_TERM_COLOR: always # Force Cargo to use colors
+
 jobs:
   rust:
     runs-on: ubuntu-latest
