@@ -1,6 +1,6 @@
-use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, Comment};
+use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLArgType, Comment};
 use super::test::{Assert, Input, Test};
-use super::token::{Token, error2, LexicalError, Span};
+use super::token::{Token, error, error2, LexicalError, Span};
 use candid::{Principal, types::Label};
 use candid::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
 use candid::types::{TypeEnv, FuncMode};
@@ -219,16 +219,24 @@ VariantFieldTyp: TypeField = {
     <comment:Comment?> <n:FieldId> =>? Ok(TypeField { label: Label::Id(n), typ: IDLType::PrimT(PrimType::Null), comment }),
 }
 
-TupTyp: Vec<IDLType> = "(" <SepBy<ArgTyp, ",">> ")" => <>;
+ArgTupTyp: Vec<IDLArgType> = "(" <SepBy<ArgTyp, ",">> ")" =>? {
+    let args = <>;
+    let mut named_args: Vec<String> = args.iter().filter_map(|a| a.name.clone()).collect();
+    named_args.sort();
+    check_unique(named_args.iter()).map_err(|e| error(e))?;
+    Ok(args)
+};
+
+TupTyp: Vec<IDLType> = "(" <SepBy<Typ, ",">> ")" => <>;
 
 FuncTyp: FuncType = {
-    <args:TupTyp> "->" <rets:TupTyp> <modes:FuncMode*> =>
+    <args:ArgTupTyp> "->" <rets:TupTyp> <modes:FuncMode*> =>
         FuncType { modes, args, rets },
 }
 
-ArgTyp: IDLType = {
-    Typ => <>,
-    Name ":" <Typ> => <>,
+ArgTyp: IDLArgType = {
+    <t:Typ> => IDLArgType::new(t),
+    <n:Name> ":" <t:Typ> => IDLArgType::new_with_name(t, n),
 }
 
 FuncMode: FuncMode = {
@@ -265,7 +273,7 @@ Actor: IDLType = {
 
 MainActor: IDLType = {
     "service" "id"? ":" <t:Actor> ";"? => <>,
-    "service" "id"? ":" <args:TupTyp> "->" <t:Actor> ";"? => IDLType::ClassT(args, Box::new(t)),
+    "service" "id"? ":" <args:ArgTupTyp> "->" <t:Actor> ";"? => IDLType::ClassT(args, Box::new(t)),
 }
 
 pub IDLProg: IDLProg = {
@@ -273,7 +281,7 @@ pub IDLProg: IDLProg = {
 }
 
 pub IDLInitArgs: IDLInitArgs = {
-    <decs:SepBy<Def, ";">> <args:TupTyp> => IDLInitArgs { decs, args }
+    <decs:SepBy<Def, ";">> <args:ArgTupTyp> => IDLInitArgs { decs, args }
 }
 
 // Test file

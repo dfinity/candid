@@ -6,9 +6,14 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 use syn::{Error, ItemFn, Meta, Result, ReturnType, Signature, Type};
 
+type RawArgs = Vec<(Option<String>, String)>;
+type RawRets = Vec<String>;
+type ParsedArgs = Vec<(Option<String>, Type)>;
+type ParsedRets = Vec<Type>;
+
 struct Method {
-    args: Vec<String>,
-    rets: Vec<String>,
+    args: RawArgs,
+    rets: RawRets,
     modes: String,
 }
 
@@ -19,7 +24,7 @@ struct Method {
 lazy_static! {
     static ref METHODS: Mutex<Option<BTreeMap<String, Method>>> =
         Mutex::new(Some(BTreeMap::default()));
-    static ref INIT: Mutex<Option<Option<Vec<String>>>> = Mutex::new(Some(Option::default()));
+    static ref INIT: Mutex<Option<Option<RawArgs>>> = Mutex::new(Some(Option::default()));
 }
 
 pub(crate) fn candid_method(attrs: Vec<Meta>, fun: ItemFn) -> Result<TokenStream> {
@@ -35,11 +40,11 @@ pub(crate) fn candid_method(attrs: Vec<Meta>, fun: ItemFn) -> Result<TokenStream
     let name = attrs.rename.as_ref().unwrap_or(&ident).clone();
     let modes = attrs.method_type.unwrap_or_else(|| "update".to_string());
     let (args, rets) = get_args(sig)?;
-    let args: Vec<String> = args
+    let args: RawArgs = args
         .iter()
-        .map(|t| format!("{}", t.to_token_stream()))
+        .map(|(name, t)| (name.clone(), format!("{}", t.to_token_stream())))
         .collect();
-    let rets: Vec<String> = rets
+    let rets: RawRets = rets
         .iter()
         .map(|t| format!("{}", t.to_token_stream()))
         .collect();
@@ -79,7 +84,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
                     .map(|t| generate_arg(quote! { init_args }, t))
                     .collect::<Vec<_>>();
                 quote! {
-                    let mut init_args = Vec::new();
+                    let mut init_args: Vec<ArgType> = Vec::new();
                     #(#args)*
                 }
             });
@@ -95,7 +100,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
                 .collect::<Vec<_>>();
             let rets = rets
                 .iter()
-                .map(|t| generate_arg(quote! { rets }, t))
+                .map(|t| generate_ret(quote! { rets }, t))
                 .collect::<Vec<_>>();
             let modes = match modes.as_ref() {
                 "query" => quote! { vec![#candid::types::FuncMode::Query] },
@@ -106,9 +111,9 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
             };
             quote! {
                 {
-                    let mut args = Vec::new();
+                    let mut args: Vec<ArgType> = Vec::new();
                     #(#args)*
-                    let mut rets = Vec::new();
+                    let mut rets: Vec<Type> = Vec::new();
                     #(#rets)*
                     let func = Function { args, rets, modes: #modes };
                     service.push((#name.to_string(), TypeInner::Func(func).into()));
@@ -116,7 +121,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
             }
         });
         let service = quote! {
-            use #candid::types::{CandidType, Function, Type, TypeInner};
+            use #candid::types::{CandidType, Function, Type, ArgType, TypeInner};
             let mut service = Vec::<(String, Type)>::new();
             let mut env = #candid::types::internal::TypeContainer::new();
             #(#gen_tys)*
@@ -147,14 +152,25 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
     }
 }
 
-fn generate_arg(name: TokenStream, ty: &str) -> TokenStream {
+fn generate_arg(name: TokenStream, (arg_name, ty): &(Option<String>, String)) -> TokenStream {
+    let arg_name = arg_name
+        .as_ref()
+        .map(|n| quote! { Some(#n.to_string()) })
+        .unwrap_or(quote! { None });
+    let ty = syn::parse_str::<Type>(ty.as_str()).unwrap();
+    quote! {
+        #name.push(ArgType { name: #arg_name, typ: env.add::<#ty>() });
+    }
+}
+
+fn generate_ret(name: TokenStream, ty: &str) -> TokenStream {
     let ty = syn::parse_str::<Type>(ty).unwrap();
     quote! {
         #name.push(env.add::<#ty>());
     }
 }
 
-fn get_args(sig: &Signature) -> Result<(Vec<Type>, Vec<Type>)> {
+fn get_args(sig: &Signature) -> Result<(ParsedArgs, ParsedRets)> {
     let mut args = Vec::new();
     for arg in &sig.inputs {
         match arg {
@@ -163,7 +179,20 @@ fn get_args(sig: &Signature) -> Result<(Vec<Type>, Vec<Type>)> {
                     return Err(Error::new_spanned(arg, "only works for borrowed self"));
                 }
             }
-            syn::FnArg::Typed(syn::PatType { ty, .. }) => args.push(ty.as_ref().clone()),
+            syn::FnArg::Typed(syn::PatType { ty, pat, .. }) => {
+                if let syn::Pat::Ident(syn::PatIdent { ident, .. }) = pat.as_ref() {
+                    let arg_name = ident.to_string();
+                    if arg_name.starts_with("_") {
+                        // If the argument name starts with _, it usually means it's not used.
+                        // We don't need to include it in the IDL.
+                        args.push((None, ty.as_ref().clone()));
+                    } else {
+                        args.push((Some(arg_name), ty.as_ref().clone()));
+                    }
+                } else {
+                    args.push((None, ty.as_ref().clone()));
+                }
+            }
         }
     }
     let rets = match &sig.output {

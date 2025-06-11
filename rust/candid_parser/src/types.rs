@@ -11,7 +11,7 @@ pub enum IDLType {
     RecordT(Vec<TypeField>),
     VariantT(Vec<TypeField>),
     ServT(Vec<Binding>),
-    ClassT(Vec<IDLType>, Box<IDLType>),
+    ClassT(Vec<IDLArgType>, Box<IDLType>),
     PrincipalT,
 }
 
@@ -63,8 +63,32 @@ pub enum PrimType {
 #[derive(Debug, Clone)]
 pub struct FuncType {
     pub modes: Vec<FuncMode>,
-    pub args: Vec<IDLType>,
+    pub args: Vec<IDLArgType>,
     pub rets: Vec<IDLType>,
+}
+
+#[derive(Debug, Clone)]
+pub struct IDLArgType {
+    pub typ: IDLType,
+    pub name: Option<String>,
+}
+
+impl IDLArgType {
+    pub fn new(typ: IDLType) -> Self {
+        Self { typ, name: None }
+    }
+
+    /// Create a new IDLArgType with a name.
+    /// If the name is an `u32` number, we set it to None
+    /// as we don't want to use it as a arg name.
+    pub fn new_with_name(typ: IDLType, name: String) -> Self {
+        let name = if name.parse::<u32>().is_ok() {
+            None
+        } else {
+            Some(name)
+        };
+        Self { typ, name }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -102,7 +126,7 @@ pub struct IDLProg {
 #[derive(Debug)]
 pub struct IDLInitArgs {
     pub decs: Vec<Dec>,
-    pub args: Vec<IDLType>,
+    pub args: Vec<IDLArgType>,
 }
 
 impl std::str::FromStr for IDLProg {

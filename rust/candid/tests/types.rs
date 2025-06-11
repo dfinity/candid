@@ -186,8 +186,8 @@ fn test_func() {
         pub struct Wrap(List<i8>);
         #[derive(CandidType)]
         pub struct NamedStruct {
-            a: u16,
-            b: i32,
+            pub a: u16,
+            pub b: i32,
         }
         #[derive(CandidType)]
         pub enum A {
@@ -220,6 +220,21 @@ fn test_func() {
         unreachable!()
     }
 
+    #[candid_method]
+    fn id_tuple_destructure((a, b): (u8, u8)) -> (u8, u8) {
+        (a, b)
+    }
+
+    #[candid_method]
+    fn id_struct_destructure(internal::NamedStruct { a, b }: internal::NamedStruct) -> (u16, i32) {
+        (a, b)
+    }
+
+    #[candid_method]
+    fn id_unused_arg(_a: u8) -> Result<List<u8>, candid::Empty> {
+        unreachable!()
+    }
+
     #[candid_method(init)]
     fn init(_: List<i128>) {}
 
@@ -244,13 +259,14 @@ type Wrap = record { head : int8; tail : opt Box };
 service : (List_2) -> {
   id_struct : (record { List }) -> (Result) query;
   id_struct_composite : (record { List }) -> (Result) composite_query;
+  id_struct_destructure : (NamedStruct) -> (nat16, int32);
+  id_tuple_destructure : (record { nat8; nat8 }) -> (nat8, nat8);
+  id_unused_arg : (nat8) -> (Result);
   id_variant : (vec A) -> (Result_1);
   "oneway" : (text) -> () oneway;
-  "🐂" : (text, int32) -> (text, int32) query;
+  "🐂" : (a : text, b : int32) -> (text, int32) query;
 }"#;
     assert_eq!(expected, __export_service());
-    //println!("{}", __export_service());
-    //assert!(false);
 }
 
 #[test]
@@ -270,8 +286,27 @@ fn test_counter() {
         fn read(&self) -> usize {
             self.counter
         }
+        #[candid_method]
+        fn set(&mut self, value: usize) {
+            self.counter = value;
+        }
     }
     candid::export_service!();
-    let expected = "service : { inc : () -> (); read : () -> (nat64) query }";
+    let expected = r#"service : {
+  inc : () -> ();
+  read : () -> (nat64) query;
+  set : (value : nat64) -> ();
+}"#;
+    assert_eq!(expected, __export_service());
+}
+
+#[test]
+fn test_init_named_args() {
+    #[candid_method(init)]
+    fn init(a: u8) {
+        let _ = a;
+    }
+    candid::export_service!();
+    let expected = r#"service : (a : nat8) -> {}"#;
     assert_eq!(expected, __export_service());
 }

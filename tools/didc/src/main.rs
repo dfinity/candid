@@ -146,10 +146,9 @@ impl TypeAnnotation {
                     .ok_or_else(|| Error::msg("Cannot use --method with a non-service did file"))?;
                 let func = env.get_method(&actor, meth)?;
                 let types = match mode {
-                    Mode::Encode => &func.args,
-                    Mode::Decode => &func.rets,
-                }
-                .clone();
+                    Mode::Encode => func.args.iter().map(|arg| arg.typ.clone()).collect(),
+                    Mode::Decode => func.rets.clone(),
+                };
                 Ok((env, types))
             }
             _ => unreachable!(),

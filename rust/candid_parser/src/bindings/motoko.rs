@@ -3,7 +3,7 @@
 
 use candid::pretty::candid::is_valid_as_id;
 use candid::pretty::utils::*;
-use candid::types::FuncMode;
+use candid::types::{ArgType, FuncMode};
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
@@ -174,7 +174,7 @@ fn pp_variant(field: &Field) -> RcDoc {
 
 fn pp_function(func: &Function) -> RcDoc {
     let args = pp_args(&func.args);
-    let rets = pp_args(&func.rets);
+    let rets = pp_rets(&func.rets);
     match func.modes.as_slice() {
         [FuncMode::Oneway] => kwd("shared").append(args).append(" -> ").append("()"),
         [FuncMode::Query] => kwd("shared query")
@@ -196,7 +196,35 @@ fn pp_function(func: &Function) -> RcDoc {
     }
     .nest(INDENT_SPACE)
 }
-fn pp_args(args: &[Type]) -> RcDoc {
+fn pp_args(args: &[ArgType]) -> RcDoc {
+    match args {
+        [ty] => {
+            let typ = if is_tuple(&ty.typ) {
+                enclose("(", pp_ty(&ty.typ), ")")
+            } else {
+                pp_ty(&ty.typ)
+            };
+            if let Some(name) = &ty.name {
+                enclose("(", escape(name, false).append(" : ").append(typ), ")")
+            } else {
+                typ
+            }
+        }
+        _ => {
+            let args = args.iter().map(|arg| {
+                if let Some(name) = &arg.name {
+                    escape(name, false).append(" : ").append(pp_ty(&arg.typ))
+                } else {
+                    pp_ty(&arg.typ)
+                }
+            });
+            let doc = concat(args, ",");
+            enclose("(", doc, ")")
+        }
+    }
+}
+
+fn pp_rets(args: &[Type]) -> RcDoc {
     match args {
         [ty] => {
             if is_tuple(ty) {

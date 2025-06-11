@@ -1,5 +1,7 @@
 use crate::pretty::utils::*;
-use crate::types::{Field, FuncMode, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use crate::types::{
+    ArgType, Field, FuncMode, Function, Label, SharedLabel, Type, TypeEnv, TypeInner,
+};
 use pretty::RcDoc;
 
 static KEYWORDS: [&str; 30] = [
@@ -151,7 +153,7 @@ fn pp_fields(fs: &[Field], is_variant: bool) -> RcDoc {
 
 pub fn pp_function(func: &Function) -> RcDoc {
     let args = pp_args(&func.args);
-    let rets = pp_args(&func.rets);
+    let rets = pp_rets(&func.rets);
     let modes = pp_modes(&func.modes);
     args.append(" ->")
         .append(RcDoc::space())
@@ -159,10 +161,23 @@ pub fn pp_function(func: &Function) -> RcDoc {
         .nest(INDENT_SPACE)
 }
 
-pub fn pp_args(args: &[Type]) -> RcDoc {
-    let doc = concat(args.iter().map(pp_ty), ",");
+pub fn pp_args(args: &[ArgType]) -> RcDoc {
+    let args = args.iter().map(|arg| {
+        if let Some(name) = &arg.name {
+            pp_text(name).append(kwd(" :")).append(pp_ty(&arg.typ))
+        } else {
+            pp_ty(&arg.typ)
+        }
+    });
+    let doc = concat(args, ",");
     enclose("(", doc, ")")
 }
+
+pub fn pp_rets(rets: &[Type]) -> RcDoc {
+    let doc = concat(rets.iter().map(pp_ty), ",");
+    enclose("(", doc, ")")
+}
+
 pub fn pp_mode(mode: &FuncMode) -> RcDoc {
     match mode {
         FuncMode::Oneway => RcDoc::text("oneway"),
@@ -221,7 +236,7 @@ fn pp_comment(comment: Option<&String>) -> RcDoc {
     comment_doc
 }
 
-pub fn pp_init_args<'a>(env: &'a TypeEnv, args: &'a [Type]) -> RcDoc<'a> {
+pub fn pp_init_args<'a>(env: &'a TypeEnv, args: &'a [ArgType]) -> RcDoc<'a> {
     pp_defs(env).append(pp_args(args))
 }
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {

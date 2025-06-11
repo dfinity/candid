@@ -3,8 +3,8 @@ use crate::{
     configs::{ConfigState, ConfigTree, Configs, Context, StateElem},
     Deserialize,
 };
-use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use candid::{pretty::utils::*, types::ArgType};
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
 use serde::Serialize;
@@ -152,7 +152,7 @@ fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
         None => RcDoc::text("pub "),
     }
 }
-fn pp_comment<'a>(comment: Option<&'a String>) -> RcDoc<'a> {
+fn pp_comment(comment: Option<&String>) -> RcDoc {
     let mut comment_doc = RcDoc::nil();
     if let Some(comment) = comment {
         for line in comment.lines() {
@@ -178,9 +178,15 @@ impl<'a> State<'a> {
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
         );
-        let src = candid::pretty::candid::pp_init_args(&env, &[src.clone()])
-            .pretty(80)
-            .to_string();
+        let src = candid::pretty::candid::pp_init_args(
+            &env,
+            &[ArgType {
+                name: None,
+                typ: src.clone(),
+            }],
+        )
+        .pretty(80)
+        .to_string();
         let match_path = self.state.config_source.get("use_type").unwrap().join(".");
         let test_name = use_type.replace(|c: char| !c.is_ascii_alphanumeric(), "_");
         let body = format!(
@@ -500,7 +506,22 @@ fn test_{test_name}() {{
         }
         lines(res.into_iter())
     }
-    fn pp_args<'b>(&mut self, args: &'b [Type], prefix: &'b str) -> RcDoc<'b> {
+    fn pp_args<'b>(&mut self, args: &'b [ArgType], prefix: &'b str) -> RcDoc<'b> {
+        let doc: Vec<_> = args
+            .iter()
+            .enumerate()
+            .map(|(i, t)| {
+                let lab = t.name.clone().unwrap_or_else(|| format!("{prefix}{i}"));
+                let old = self.state.push_state(&StateElem::Label(&lab));
+                let res = self.pp_ty(&t.typ, true);
+                self.state.pop_state(old, StateElem::Label(&lab));
+                res
+            })
+            .collect();
+        let doc = concat(doc.into_iter(), ",");
+        enclose("(", doc, ")")
+    }
+    fn pp_rets<'b>(&mut self, args: &'b [Type], prefix: &'b str) -> RcDoc<'b> {
         let doc: Vec<_> = args
             .iter()
             .enumerate()
@@ -519,7 +540,7 @@ fn test_{test_name}() {{
         let lab = StateElem::TypeStr("func");
         let old = self.state.push_state(&lab);
         let args = self.pp_args(&f.args, "arg");
-        let rets = self.pp_args(&f.rets, "ret");
+        let rets = self.pp_rets(&f.rets, "ret");
         let modes = candid::pretty::candid::pp_modes(&f.modes);
         let res = args
             .append(" ->")
@@ -565,8 +586,8 @@ fn test_{test_name}() {{
             .args
             .iter()
             .enumerate()
-            .map(|(i, ty)| {
-                let lab = format!("arg{i}");
+            .map(|(i, arg)| {
+                let lab = arg.name.clone().unwrap_or_else(|| format!("arg{i}"));
                 let old = self.state.push_state(&StateElem::Label(&lab));
                 let name = self
                     .state
@@ -575,7 +596,7 @@ fn test_{test_name}() {{
                     .clone()
                     .unwrap_or_else(|| lab.clone());
                 self.state.update_stats("name");
-                let res = self.pp_ty(ty, true);
+                let res = self.pp_ty(&arg.typ, true);
                 self.state.pop_state(old, StateElem::Label(&lab));
                 (name, res)
             })
@@ -628,8 +649,8 @@ fn test_{test_name}() {{
             let args: Vec<_> = args
                 .iter()
                 .enumerate()
-                .map(|(i, ty)| {
-                    let lab = format!("arg{i}");
+                .map(|(i, arg)| {
+                    let lab = arg.name.clone().unwrap_or_else(|| format!("arg{i}"));
                     let old = self.state.push_state(&StateElem::Label(&lab));
                     let name = self
                         .state
@@ -638,7 +659,7 @@ fn test_{test_name}() {{
                         .clone()
                         .unwrap_or_else(|| lab.clone());
                     self.state.update_stats("name");
-                    let res = self.pp_ty(ty, true);
+                    let res = self.pp_ty(&arg.typ, true);
                     self.state.pop_state(old, StateElem::Label(&lab));
                     (name, res.pretty(LINE_WIDTH).to_string())
                 })
@@ -917,8 +938,8 @@ impl NominalState<'_> {
                             .args
                             .into_iter()
                             .enumerate()
-                            .map(|(i, ty)| {
-                                let lab = format!("arg{i}");
+                            .map(|(i, arg)| {
+                                let lab = arg.name.clone().unwrap_or_else(|| format!("arg{i}"));
                                 let old = self.state.push_state(&StateElem::Label(&lab));
                                 let idx = if i == 0 {
                                     "".to_string()
@@ -926,10 +947,13 @@ impl NominalState<'_> {
                                     i.to_string()
                                 };
                                 path.push(TypePath::Func(format!("arg{idx}")));
-                                let ty = self.nominalize(env, path, &ty);
+                                let ty = self.nominalize(env, path, &arg.typ);
                                 path.pop();
                                 self.state.pop_state(old, StateElem::Label(&lab));
-                                ty
+                                ArgType {
+                                    name: arg.name.clone(),
+                                    typ: ty,
+                                }
                             })
                             .collect(),
                         rets: func
@@ -1003,14 +1027,17 @@ impl NominalState<'_> {
             },
             TypeInner::Class(args, ty) => TypeInner::Class(
                 args.iter()
-                    .map(|ty| {
+                    .map(|arg| {
                         let elem = StateElem::Label("init");
                         let old = self.state.push_state(&elem);
                         path.push(TypePath::Init);
-                        let ty = self.nominalize(env, path, ty);
+                        let ty = self.nominalize(env, path, &arg.typ);
                         path.pop();
                         self.state.pop_state(old, elem);
-                        ty
+                        ArgType {
+                            name: arg.name.clone(),
+                            typ: ty,
+                        }
                     })
                     .collect(),
                 self.nominalize(env, path, ty),
