@@ -107,11 +107,11 @@ impl Service {
   pub async fn bbbbb(&self, arg0: &B) -> Result<()> {
     ic_cdk::call(self.0, "bbbbb", (arg0,)).await
   }
-  pub async fn f(&self, arg0: &S) -> Result<()> {
-    ic_cdk::call(self.0, "f", (arg0,)).await
+  pub async fn f(&self, server: &S) -> Result<()> {
+    ic_cdk::call(self.0, "f", (server,)).await
   }
-  pub async fn f_1(&self, arg0: &List, arg1: &serde_bytes::ByteBuf, arg2: &Option<bool>) -> Result<()> {
-    ic_cdk::call(self.0, "f1", (arg0,arg1,arg2,)).await
+  pub async fn f_1(&self, arg0: &List, test: &serde_bytes::ByteBuf, arg2: &Option<bool>) -> Result<()> {
+    ic_cdk::call(self.0, "f1", (arg0,test,arg2,)).await
   }
   pub async fn g(&self, arg0: &List) -> Result<(B,Tree,Stream,)> {
     ic_cdk::call(self.0, "g", (arg0,)).await

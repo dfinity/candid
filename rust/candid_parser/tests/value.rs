@@ -37,7 +37,16 @@ service : {
     let method = env.get_method(&actor, "f").unwrap();
     {
         let args = parse_idl_args("(42,42,42,42)").unwrap();
-        let encoded = args.to_bytes_with_types(&env, &method.args).unwrap();
+        let encoded = args
+            .to_bytes_with_types(
+                &env,
+                &method
+                    .args
+                    .iter()
+                    .map(|arg| arg.typ.clone())
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap();
         let decoded = IDLArgs::from_bytes(&encoded).unwrap();
         assert_eq!(
             decoded.args,

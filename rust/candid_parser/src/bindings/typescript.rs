@@ -109,7 +109,7 @@ fn pp_field<'a>(env: &'a TypeEnv, field: &'a Field, is_ref: bool) -> RcDoc<'a> {
 }
 
 fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
-    let args = func.args.iter().map(|ty| pp_ty(env, ty, true));
+    let args = func.args.iter().map(|arg| pp_ty(env, &arg.typ, true));
     let args = enclose("[", concat(args, ","), "]");
     let rets = match func.rets.len() {
         0 => str("undefined"),

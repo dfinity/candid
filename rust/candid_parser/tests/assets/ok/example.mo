@@ -8,7 +8,7 @@ module {
   public type a = { #a; #b : b };
   public type b = (Int, Nat);
   public type broker = actor {
-    find : shared Text -> async actor {
+    find : shared (name : Text) -> async actor {
         current : shared () -> async Nat32;
         up : shared () -> async ();
       };
@@ -36,7 +36,7 @@ module {
   public type res = { #Ok : (Int, Nat); #Err : { error : Text } };
   public type s = actor { f : t; g : shared list -> async (B, tree, stream) };
   public type stream = ?{ head : Nat; next : shared query () -> async stream };
-  public type t = shared s -> async ();
+  public type t = shared (server : s) -> async ();
   public type tree = {
     #branch : { val : Int; left : tree; right : tree };
     #leaf : Int;
@@ -44,7 +44,7 @@ module {
   public type Self = actor {
     bbbbb : shared b -> async ();
     f : t;
-    f1 : shared (list, Blob, ?Bool) -> ();
+    f1 : shared (list, test : Blob, ?Bool) -> ();
     g : shared list -> async (B, tree, stream);
     g1 : shared query (my_type, List, ?List, nested) -> async (
         Int,

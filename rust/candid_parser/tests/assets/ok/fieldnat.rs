@@ -29,8 +29,8 @@ pub struct FooRet { pub _2_: candid::Int, pub _2: candid::Int }
 
 pub struct Service(pub Principal);
 impl Service {
-  pub async fn bab(&self, arg0: &candid::Int, arg1: &candid::Nat) -> Result<()> {
-    ic_cdk::call(self.0, "bab", (arg0,arg1,)).await
+  pub async fn bab(&self, two: &candid::Int, arg1: &candid::Nat) -> Result<()> {
+    ic_cdk::call(self.0, "bab", (two,arg1,)).await
   }
   pub async fn bar(&self, arg0: &BarArg) -> Result<(BarRet,)> {
     ic_cdk::call(self.0, "bar", (arg0,)).await
