@@ -8,6 +8,7 @@ type Result<T> = std::result::Result<T, ic_agent::AgentError>;
 pub enum BitcoinNetwork {
   #[serde(rename="mainnet")]
   Mainnet,
+  /// This is a variant comment
   #[serde(rename="testnet")]
   Testnet,
 }
@@ -52,6 +53,8 @@ pub struct SendTransactionRequest {
   pub transaction: serde_bytes::ByteBuf,
   pub network: BitcoinNetwork,
 }
+/// This is a comment
+/// with mutilple lines
 pub type CanisterId = Principal;
 #[derive(CandidType, Deserialize)]
 pub struct CanisterStatusArg { pub canister_id: CanisterId }
@@ -64,6 +67,7 @@ pub enum CanisterStatusRetStatus {
   #[serde(rename="running")]
   Running,
 }
+/// This is a second comment
 #[derive(CandidType, Deserialize)]
 pub struct DefiniteCanisterSettings {
   pub freezing_threshold: candid::Nat,
@@ -205,6 +209,7 @@ pub struct UpdateSettingsArg {
 
 pub struct Service<'a>(pub Principal, pub &'a ic_agent::Agent);
 impl<'a> Service<'a> {
+  /// bitcoin interface
   pub async fn bitcoin_get_balance(&self, arg0: &GetBalanceRequest) -> Result<Satoshi> {
     let args = Encode!(&arg0)?;
     let bytes = self.1.update(&self.0, "bitcoin_get_balance").with_arg(args).call_and_wait().await?;
@@ -245,6 +250,7 @@ impl<'a> Service<'a> {
     let bytes = self.1.update(&self.0, "deposit_cycles").with_arg(args).call_and_wait().await?;
     Ok(Decode!(&bytes)?)
   }
+  /// Threshold ECDSA signature
   pub async fn ecdsa_public_key(&self, arg0: &EcdsaPublicKeyArg) -> Result<EcdsaPublicKeyRet> {
     let args = Encode!(&arg0)?;
     let bytes = self.1.update(&self.0, "ecdsa_public_key").with_arg(args).call_and_wait().await?;
@@ -260,6 +266,7 @@ impl<'a> Service<'a> {
     let bytes = self.1.update(&self.0, "install_code").with_arg(args).call_and_wait().await?;
     Ok(Decode!(&bytes)?)
   }
+  /// provisional interfaces for the pre-ledger world
   pub async fn provisional_create_canister_with_cycles(&self, arg0: &ProvisionalCreateCanisterWithCyclesArg) -> Result<ProvisionalCreateCanisterWithCyclesRet> {
     let args = Encode!(&arg0)?;
     let bytes = self.1.update(&self.0, "provisional_create_canister_with_cycles").with_arg(args).call_and_wait().await?;

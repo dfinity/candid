@@ -1,6 +1,12 @@
 type bitcoin_address = text;
-type bitcoin_network = variant { mainnet; testnet };
+type bitcoin_network = variant {
+  mainnet;
+  // This is a variant comment
+  testnet;
+};
 type block_hash = blob;
+// This is a comment
+// with mutilple lines
 type canister_id = principal;
 type canister_settings = record {
   freezing_threshold : opt nat;
@@ -8,9 +14,11 @@ type canister_settings = record {
   memory_allocation : opt nat;
   compute_allocation : opt nat;
 };
+// This is a second comment
 type definite_canister_settings = record {
   freezing_threshold : nat;
   controllers : vec principal;
+  // This is a field comment
   memory_allocation : nat;
   compute_allocation : nat;
 };
@@ -49,6 +57,7 @@ type user_id = principal;
 type utxo = record { height : nat32; value : satoshi; outpoint : outpoint };
 type wasm_module = blob;
 service : {
+  // bitcoin interface
   bitcoin_get_balance : (get_balance_request) -> (satoshi);
   bitcoin_get_current_fee_percentiles : (
       get_current_fee_percentiles_request,
@@ -70,6 +79,7 @@ service : {
     );
   delete_canister : (record { canister_id : canister_id }) -> ();
   deposit_cycles : (record { canister_id : canister_id }) -> ();
+  // Threshold ECDSA signature
   ecdsa_public_key : (
       record {
         key_id : record { name : text; curve : ecdsa_curve };
@@ -100,6 +110,7 @@ service : {
         canister_id : canister_id;
       },
     ) -> ();
+  // provisional interfaces for the pre-ledger world
   provisional_create_canister_with_cycles : (
       record {
         settings : opt canister_settings;

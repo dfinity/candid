@@ -68,9 +68,15 @@ pub struct FuncType {
 }
 
 #[derive(Debug, Clone)]
+pub struct Comment {
+    pub text: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct TypeField {
     pub label: Label,
     pub typ: IDLType,
+    pub comment: Option<Comment>,
 }
 
 #[derive(Debug)]
@@ -84,6 +90,7 @@ pub enum Dec {
 pub struct Binding {
     pub id: String,
     pub typ: IDLType,
+    pub comment: Option<Comment>,
 }
 
 #[derive(Debug)]

@@ -1,2 +1,4 @@
+type a = variant { a; b : b };
+type b = record { int; nat };
 type id = nat8;
 

@@ -152,6 +152,16 @@ fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
         None => RcDoc::text("pub "),
     }
 }
+fn pp_comment<'a>(comment: Option<&'a String>) -> RcDoc<'a> {
+    let mut comment_doc = RcDoc::nil();
+    if let Some(comment) = comment {
+        for line in comment.lines() {
+            comment_doc =
+                comment_doc.append(RcDoc::text("/// ").append(line).append(RcDoc::line()));
+        }
+    }
+    comment_doc
+}
 
 impl<'a> State<'a> {
     fn generate_test(&mut self, src: &Type, use_type: &str) {
@@ -337,10 +347,11 @@ fn test_{test_name}() {{
     fn pp_record_field<'b>(&mut self, field: &'b Field, need_vis: bool, is_ref: bool) -> RcDoc<'b> {
         let lab = field.id.to_string();
         let old = self.state.push_state(&StateElem::Label(&lab));
-        let res = self
+        let f = self
             .pp_label(&field.id, false, need_vis)
             .append(kwd(":"))
             .append(self.pp_ty(&field.ty, is_ref));
+        let res = pp_comment(field.ty.1.as_ref()).append(f);
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
@@ -369,7 +380,7 @@ fn test_{test_name}() {{
     fn pp_variant_field<'b>(&mut self, field: &'b Field) -> RcDoc<'b> {
         let lab = field.id.to_string();
         let old = self.state.push_state(&StateElem::Label(&lab));
-        let res = match field.ty.as_ref() {
+        let f = match field.ty.as_ref() {
             TypeInner::Null => self.pp_label(&field.id, true, false),
             TypeInner::Record(fs) => self
                 .pp_label(&field.id, true, false)
@@ -380,6 +391,7 @@ fn test_{test_name}() {{
                 ")",
             )),
         };
+        let res = pp_comment(field.ty.1.as_ref()).append(f);
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
@@ -482,8 +494,9 @@ fn test_{test_name}() {{
                     }
                 }
             };
+            let line_with_comment = pp_comment(ty.1.as_ref()).append(line);
             self.state.pop_state(old, StateElem::Label(id));
-            res.push(line)
+            res.push(line_with_comment)
         }
         lines(res.into_iter())
     }
@@ -538,7 +551,7 @@ fn test_{test_name}() {{
         self.state.pop_state(old, lab);
         res
     }
-    fn pp_function(&mut self, id: &str, func: &Function) -> Method {
+    fn pp_function(&mut self, id: &str, func: &Function, comment: Option<&String>) -> Method {
         use candid::types::internal::FuncMode;
         let old = self.state.push_state(&StateElem::Label(id));
         let name = self
@@ -598,6 +611,12 @@ fn test_{test_name}() {{
                 .map(|x| x.pretty(LINE_WIDTH).to_string())
                 .collect(),
             mode,
+            comment: comment.map(|c| {
+                c.lines()
+                    .map(|l| format!("/// {l}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            }),
         };
         self.state.pop_state(old, StateElem::Label(id));
         res
@@ -632,8 +651,9 @@ fn test_{test_name}() {{
         let serv = self.state.env.as_service(&actor).unwrap();
         let mut res = Vec::new();
         for (id, func) in serv.iter() {
+            let comment = func.1.as_ref();
             let func = self.state.env.as_func(func).unwrap();
-            res.push(self.pp_function(id, func));
+            res.push(self.pp_function(id, func, comment));
         }
         (res, init)
     }
@@ -652,6 +672,7 @@ pub struct Method {
     pub args: Vec<(String, String)>,
     pub rets: Vec<String>,
     pub mode: String,
+    pub comment: Option<String>,
 }
 pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Output, Vec<String>) {
     let mut state = NominalState {

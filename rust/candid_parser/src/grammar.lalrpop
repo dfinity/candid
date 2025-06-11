@@ -1,4 +1,4 @@
-use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs};
+use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, Comment};
 use super::test::{Assert, Input, Test};
 use super::token::{Token, error2, LexicalError, Span};
 use candid::{Principal, types::Label};
@@ -46,6 +46,8 @@ extern {
         ";" => Token::Semi,
         ":" => Token::Colon,
         "->" => Token::Arrow,
+        "line_comment" => Token::LineComment(<String>),
+        "\n" => Token::Newline,
     }
 }
 
@@ -174,7 +176,7 @@ pub Typ: IDLType = {
               Label::Unnamed(_) => { id = id + 1; Label::Unnamed(id - 1) },
               ref l => { id = l.get_id() + 1; l.clone() },
           };
-          TypeField { label, typ: f.typ.clone() }
+          TypeField { label, typ: f.typ.clone(), comment: f.comment.clone() }
         }).collect();
         fs.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
         check_unique(fs.iter().map(|f| &f.label)).map_err(|e| error2(e, span))?;
@@ -202,19 +204,19 @@ PrimTyp: IDLType = {
 }
 
 FieldTyp: TypeField = {
-    <n:FieldId> ":" <t:Typ> =>? Ok(TypeField { label: Label::Id(n), typ: t }),
-    <n:Name> ":" <t:Typ> => TypeField { label: Label::Named(n), typ: t },
+    <comment:Comment?> <n:FieldId> ":" <t:Typ> =>? Ok(TypeField { label: Label::Id(n), typ: t, comment }),
+    <comment:Comment?> <n:Name> ":" <t:Typ> => TypeField { label: Label::Named(n), typ: t, comment },
 }
 
 RecordFieldTyp: TypeField = {
     FieldTyp => <>,
-    Typ => TypeField { label: Label::Unnamed(0), typ: <> },
+    Typ => TypeField { label: Label::Unnamed(0), typ: <>, comment: None },
 }
 
 VariantFieldTyp: TypeField = {
     FieldTyp => <>,
-    Name => TypeField { label: Label::Named(<>), typ: IDLType::PrimT(PrimType::Null) },
-    FieldId =>? Ok(TypeField { label: Label::Id(<>), typ: IDLType::PrimT(PrimType::Null) }),
+    <comment:Comment?> <n:Name> => TypeField { label: Label::Named(n), typ: IDLType::PrimT(PrimType::Null), comment },
+    <comment:Comment?> <n:FieldId> =>? Ok(TypeField { label: Label::Id(n), typ: IDLType::PrimT(PrimType::Null), comment }),
 }
 
 TupTyp: Vec<IDLType> = "(" <SepBy<ArgTyp, ",">> ")" => <>;
@@ -245,15 +247,15 @@ ActorTyp: Vec<Binding> = {
 }
 
 MethTyp: Binding = {
-    <n:Name> ":" <f:FuncTyp> => Binding { id: n, typ: IDLType::FuncT(f) },
-    <n:Name> ":" <id:"id"> => Binding { id: n, typ: IDLType::VarT(id) },
+    <comment:Comment?> <n:Name> ":" <f:FuncTyp> => Binding { id: n, typ: IDLType::FuncT(f), comment },
+    <comment:Comment?> <n:Name> ":" <id:"id"> => Binding { id: n, typ: IDLType::VarT(id), comment },
 }
 
 // Type declarations
 Def: Dec = {
-    "type" <id:"id"> "=" <t:Typ> => Dec::TypD(Binding { id: id, typ: t }),
-    "import" <Text> => Dec::ImportType(<>),
-    "import" "service" <Text> => Dec::ImportServ(<>),
+    <comment:Comment?> "type" <id:"id"> "=" <typ:Typ> => Dec::TypD(Binding { id, typ, comment }),
+    Comment? "import" <Text> => Dec::ImportType(<>),
+    Comment? "import" "service" <Text> => Dec::ImportServ(<>),
 }
 
 Actor: IDLType = {
@@ -281,7 +283,7 @@ Input: Input = {
     Bytes => Input::Blob(<>),
 }
 
-Assert: Assert = <id:Sp<"id">> <assert:Assertion> =>? {
+Assert: Assert = Comment? <id:Sp<"id">> <assert:Assertion> =>? {
     if id.0 != "assert" {
         Err(error2("not an assert", id.1))
     } else { Ok(assert) }
@@ -302,6 +304,10 @@ pub Test: Test = {
 Name: String = {
     "id" => <>,
     Text => <>,
+}
+
+Comment: Comment = {
+    "line_comment" => Comment { text: <> },
 }
 
 // Also allows trailing separator

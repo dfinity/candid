@@ -166,7 +166,7 @@ impl TypeContainer {
 }
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
-pub struct Type(pub std::rc::Rc<TypeInner>);
+pub struct Type(pub std::rc::Rc<TypeInner>, pub Option<String>);
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 pub enum TypeInner {
@@ -213,7 +213,12 @@ impl AsRef<TypeInner> for Type {
 }
 impl From<TypeInner> for Type {
     fn from(t: TypeInner) -> Self {
-        Type(t.into())
+        Type(t.into(), None)
+    }
+}
+impl From<(TypeInner, Option<&String>)> for Type {
+    fn from((t, comment): (TypeInner, Option<&String>)) -> Self {
+        Type(t.into(), comment.cloned())
     }
 }
 impl TypeInner {
@@ -302,7 +307,11 @@ impl fmt::Display for Type {
 #[cfg(feature = "printer")]
 impl fmt::Display for TypeInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", crate::pretty::candid::pp_ty_inner(self).pretty(80))
+        write!(
+            f,
+            "{}",
+            crate::pretty::candid::pp_ty_inner(self, None).pretty(80)
+        )
     }
 }
 #[cfg(not(feature = "printer"))]

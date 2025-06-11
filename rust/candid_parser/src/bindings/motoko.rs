@@ -162,7 +162,9 @@ fn pp_field(field: &Field) -> RcDoc {
     pp_label(&field.id).append(" : ").append(pp_ty(&field.ty))
 }
 fn pp_variant(field: &Field) -> RcDoc {
-    let doc = str("#").append(pp_label(&field.id));
+    let doc = pp_comment(field.ty.1.as_ref())
+        .append(str("#"))
+        .append(pp_label(&field.id));
     if *field.ty != TypeInner::Null {
         doc.append(" : ").append(pp_ty(&field.ty))
     } else {
@@ -212,8 +214,12 @@ fn pp_args(args: &[Type]) -> RcDoc {
 
 fn pp_service(serv: &[(String, Type)]) -> RcDoc {
     let doc = concat(
-        serv.iter()
-            .map(|(id, func)| escape(id, true).append(" : ").append(pp_ty(func))),
+        serv.iter().map(|(id, func)| {
+            pp_comment(func.1.as_ref())
+                .append(escape(id, true))
+                .append(" : ")
+                .append(pp_ty(func))
+        }),
         ";",
     );
     kwd("actor").append(enclose_space("{", doc, "}"))
@@ -221,7 +227,8 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 
 fn pp_defs(env: &TypeEnv) -> RcDoc {
     lines(env.0.iter().map(|(id, ty)| {
-        kwd("public type")
+        pp_comment(ty.1.as_ref())
+            .append(kwd("public type"))
             .append(escape(id, false))
             .append(" = ")
             .append(pp_ty(ty))
@@ -235,6 +242,17 @@ fn pp_actor(ty: &Type) -> RcDoc {
         TypeInner::Var(_) | TypeInner::Class(_, _) => pp_ty(ty),
         _ => unreachable!(),
     }
+}
+
+fn pp_comment(comment: Option<&String>) -> RcDoc {
+    let mut comment_doc = RcDoc::nil();
+    if let Some(comment) = comment {
+        for line in comment.lines() {
+            comment_doc =
+                comment_doc.append(RcDoc::text("/// ").append(line).append(RcDoc::line()));
+        }
+    }
+    comment_doc
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {

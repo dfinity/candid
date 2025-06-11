@@ -1,4 +1,10 @@
-// line comment
+// ignored comment above import
+import "import/a.did";
+// ignored line comment
+
+// another ignored line comment
+// that spans multiple lines
+
 /* gjkf
 jgfkg
 */

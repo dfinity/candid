@@ -2,11 +2,13 @@ use lalrpop_util::ParseError;
 use logos::{Lexer, Logos};
 
 #[derive(Logos, Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
-#[logos(skip r"[ \t\r\n]+")]
-#[logos(skip r"//[^\n]*")] // line comment
+#[logos(skip r"[ \t\r]+")]
+#[logos(skip r"(//[^\n]*\n)+\n")] // ignore line comments that are followed by an empty line
 pub enum Token {
     #[token("/*")]
     StartComment,
+    #[regex(r"(//[^\n]*\n)+", parse_line_comment)]
+    LineComment(String),
     #[token("=")]
     Equals,
     #[token("(")]
@@ -78,6 +80,8 @@ pub enum Token {
     Float(String),
     #[regex("true|false", |lex| lex.slice().parse().map_err(|_| ()))]
     Boolean(bool),
+    #[token("\n")]
+    Newline,
 }
 
 #[derive(Logos, Debug, Clone, PartialEq, Eq)]
@@ -116,6 +120,15 @@ fn parse_number(lex: &mut Lexer<Token>) -> String {
     } else {
         iter.collect()
     }
+}
+
+fn parse_line_comment(lex: &mut Lexer<Token>) -> String {
+    lex.slice()
+        .lines()
+        // remove the leading "//" and trim any space/newline
+        .map(|s| s[2..].trim())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 pub struct Tokenizer<'input> {
@@ -278,6 +291,7 @@ impl Iterator for Tokenizer<'_> {
                 self.lex = lex.morph::<Token>();
                 Some(Ok((span.start, Token::Text(result), self.lex.span().end)))
             }
+            Ok(Token::Newline) => self.next(),
             Ok(token) => Some(Ok((span.start, token, span.end))),
         }
     }
