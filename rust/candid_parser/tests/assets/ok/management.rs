@@ -54,7 +54,7 @@ pub struct SendTransactionRequest {
   pub network: BitcoinNetwork,
 }
 /// This is a comment
-/// with mutilple lines
+/// with multiple lines
 pub type CanisterId = Principal;
 #[derive(CandidType, Deserialize)]
 pub struct CanisterStatusArg { pub canister_id: CanisterId }

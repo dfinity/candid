@@ -6,7 +6,7 @@ type bitcoin_network = variant {
 };
 type block_hash = blob;
 // This is a comment
-// with mutilple lines
+// with multiple lines
 type canister_id = principal;
 type canister_settings = record {
   freezing_threshold : opt nat;

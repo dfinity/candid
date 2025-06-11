@@ -10,7 +10,7 @@ module {
   };
   public type block_hash = Blob;
   /// This is a comment
-  /// with mutilple lines
+  /// with multiple lines
   public type canister_id = Principal;
   public type canister_settings = {
     freezing_threshold : ?Nat;

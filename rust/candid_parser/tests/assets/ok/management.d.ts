@@ -13,7 +13,7 @@ export type bitcoin_network = { 'mainnet' : null } |
 export type block_hash = Uint8Array | number[];
 /**
  * This is a comment
- * with mutilple lines
+ * with multiple lines
  */
 export type canister_id = Principal;
 export interface canister_settings {

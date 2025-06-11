@@ -1,5 +1,5 @@
 // This is a comment
-// with mutilple lines
+// with multiple lines
 type canister_id = principal;
 type user_id = principal;
 type wasm_module = blob;
