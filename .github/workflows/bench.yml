@@ -8,6 +8,7 @@ jobs:
     env:
       RUSTC_VERSION: 1.82.0
       CARGO_TERM_COLOR: always # Force Cargo to use colors
+      TERM: xterm-256color
     steps:
       - uses: actions/checkout@v4
       - name: Checkout base branch

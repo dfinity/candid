@@ -7,6 +7,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always # Force Cargo to use colors
+  TERM: xterm-256color
 
 jobs:
   rust:
@@ -33,9 +34,9 @@ jobs:
           cargo build
       - name: Run tests
         run: |
-          cargo test --no-default-features --color always -- --color always
-          cargo test --color always -- --color always
-          cargo test --features all --color always -- --color always
+          cargo test --no-default-features
+          cargo test
+          cargo test --features all
       - name: fmt
         run: cargo fmt -v -- --check
       - name: lint
