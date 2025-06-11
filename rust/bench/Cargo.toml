@@ -11,7 +11,7 @@ path = "bench.rs"
 [dependencies]
 candid = { path = "../candid" }
 candid_parser = { path = "../candid_parser" }
-canbench-rs = "0.2"
+canbench-rs = "0.2.0"
 ic-cdk = "0.12"
 serde = "1.0"
 serde_bytes = "0.11"
