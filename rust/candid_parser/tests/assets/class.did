@@ -1,6 +1,8 @@
 type Profile = record { age: nat8; name: text };
 type List = opt record { int; List };
+// This is a service comment
 service : (int, l : List, Profile) -> {
+  // This is a method comment
   get : () -> (List);
   set : (List) -> (List);
 }

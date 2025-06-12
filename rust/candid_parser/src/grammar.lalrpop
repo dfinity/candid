@@ -272,7 +272,7 @@ Actor: IDLType = {
 }
 
 MainActor: ActorBinding = {
-    <comment:Comment?> "service" "id"? ":" <t:Actor> ";"? => ActorBinding { typ: t, comment },
+    <comment:Comment?> "service" "id"? ":" <typ:Actor> ";"? => ActorBinding { typ, comment },
     <comment:Comment?> "service" "id"? ":" <args:ArgTupTyp> "->" <t:Actor> ";"? => ActorBinding { typ: IDLType::ClassT(args, Box::new(t)), comment },
 }
 

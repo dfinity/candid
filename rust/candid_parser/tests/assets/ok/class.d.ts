@@ -4,7 +4,13 @@ import type { IDL } from '@dfinity/candid';
 
 export type List = [] | [[bigint, List]];
 export interface Profile { 'age' : number, 'name' : string }
+/**
+ * This is a service comment
+ */
 export interface _SERVICE {
+  /**
+   * This is a method comment
+   */
   'get' : ActorMethod<[], List>,
   'set' : ActorMethod<[List], List>,
 }
