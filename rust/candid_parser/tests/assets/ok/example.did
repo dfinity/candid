@@ -1,13 +1,19 @@
 type A = B;
 type B = opt A;
-type List = opt record { head : int; tail : List };
+type List = opt record {
+  head : int;
+  // This is a field comment
+  tail : List;
+};
 type a = variant { a; b : b };
 type b = record { int; nat };
+// This is another type comment
 type broker = service {
   find : (name : text) -> (service { current : () -> (nat32); up : () -> () });
 };
 type f = func (List, func (int32) -> (int64)) -> (opt List, res);
 type list = opt node;
+// This is a type comment
 type my_type = principal;
 type nested = record {
   0 : nat;
@@ -19,7 +25,10 @@ type nested = record {
   42 : nat;
 };
 type nested_res = variant {
+  // This is a variant comment
   Ok : variant { Ok; Err };
+  // This is another variant comment
+  // that spans multiple lines for variants
   Err : variant { Ok : record { content : text }; Err : record { int } };
 };
 type node = record { head : nat; tail : list };
@@ -31,16 +40,22 @@ type tree = variant {
   branch : record { val : int; left : tree; right : tree };
   leaf : int;
 };
+// This is a service comment
+// that spans multiple lines for services
 service : {
+  // This is a method comment on an imported service
   bbbbb : (b) -> ();
   f : t;
   f1 : (list, test : blob, opt bool) -> () oneway;
   g : (list) -> (B, tree, stream);
+  // This is a method comment
   g1 : (my_type, List, opt List, nested) -> (int, broker, nested_res) query;
   h : (vec opt text, variant { A : nat; B : opt text }, opt List) -> (
       record { 42 : record {}; id : nat },
     );
   i : f;
+  // This is another method comment
+  // that spans multiple lines for methods
   x : (a, b) -> (
       opt a,
       opt b,

@@ -7,6 +7,7 @@ module {
   public type List = ?{ head : Int; tail : List };
   public type a = { #a; #b : b };
   public type b = (Int, Nat);
+  /// This is another type comment
   public type broker = actor {
     find : shared (name : Text) -> async actor {
         current : shared () -> async Nat32;
@@ -18,6 +19,7 @@ module {
       res,
     );
   public type list = ?node;
+  /// This is a type comment
   public type my_type = Principal;
   public type nested = {
     _0_  : Nat;
@@ -29,7 +31,10 @@ module {
     _42_  : Nat;
   };
   public type nested_res = {
+    /// This is a variant comment
     #Ok : { #Ok; #Err };
+    /// This is another variant comment
+    /// that spans multiple lines for variants
     #Err : { #Ok : { content : Text }; #Err : { _0_  : Int } };
   };
   public type node = { head : Nat; tail : list };
@@ -41,11 +46,15 @@ module {
     #branch : { val : Int; left : tree; right : tree };
     #leaf : Int;
   };
+  /// This is a service comment
+  /// that spans multiple lines for services
   public type Self = actor {
+    /// This is a method comment on an imported service
     bbbbb : shared b -> async ();
     f : t;
     f1 : shared (list, test : Blob, ?Bool) -> ();
     g : shared list -> async (B, tree, stream);
+    /// This is a method comment
     g1 : shared query (my_type, List, ?List, nested) -> async (
         Int,
         broker,
@@ -56,6 +65,8 @@ module {
         id : Nat;
       };
     i : f;
+    /// This is another method comment
+    /// that spans multiple lines for methods
     x : shared composite query (a, b) -> async (
         ?a,
         ?b,

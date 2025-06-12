@@ -7,7 +7,7 @@ use logos::{Lexer, Logos};
 pub enum Token {
     #[token("/*")]
     StartComment,
-    #[regex(r"(//[^\n]*\n)+", parse_line_comment)]
+    #[regex(r"(( *)\/\/[^\n]*\n)+", parse_line_comment)]
     LineComment(String),
     #[token("=")]
     Equals,
@@ -125,8 +125,7 @@ fn parse_number(lex: &mut Lexer<Token>) -> String {
 fn parse_line_comment(lex: &mut Lexer<Token>) -> String {
     lex.slice()
         .lines()
-        // remove the leading "//" and trim any space/newline
-        .map(|s| s[2..].trim())
+        .map(|s| s.trim().trim_start_matches("//").trim())
         .collect::<Vec<_>>()
         .join("\n")
 }

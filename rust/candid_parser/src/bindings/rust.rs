@@ -161,19 +161,20 @@ fn pp_comment(comment: Option<&String>) -> RcDoc {
             comment_doc = comment_doc.append(
                 RcDoc::text(DOC_COMMENT_LINE_PREFIX)
                     .append(line)
-                    .append(RcDoc::line()),
+                    .append(RcDoc::hardline()),
             );
         }
     }
     comment_doc
 }
-fn map_comment(comment: Option<&String>) -> Option<String> {
-    comment.map(|c| {
-        c.lines()
-            .map(|l| format!("{DOC_COMMENT_LINE_PREFIX}{l}"))
-            .collect::<Vec<_>>()
-            .join("\n")
-    })
+fn map_comment(comment: Option<&String>) -> CommentLines {
+    comment
+        .map(|c| {
+            c.lines()
+                .map(|l| format!("{DOC_COMMENT_LINE_PREFIX}{l}"))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 impl<'a> State<'a> {
@@ -645,12 +646,12 @@ fn test_{test_name}() {{
                 .map(|x| x.pretty(LINE_WIDTH).to_string())
                 .collect(),
             mode,
-            comment: map_comment(comment),
+            comment_lines: map_comment(comment),
         };
         self.state.pop_state(old, StateElem::Label(id));
         res
     }
-    fn pp_actor(&mut self, actor: &Type) -> (Methods, InitArgs, Option<String>) {
+    fn pp_actor(&mut self, actor: &Type) -> (Methods, InitArgs, CommentLines) {
         let actor = self.state.env.trace_type(actor).unwrap();
         let init = if let TypeInner::Class(args, _) = actor.as_ref() {
             let old = self.state.push_state(&StateElem::Label("init"));
@@ -692,7 +693,7 @@ pub struct Output {
     pub type_defs: String,
     pub methods: Methods,
     pub init_args: InitArgs,
-    pub actor_comment: Option<String>,
+    pub actor_comment_lines: CommentLines,
     pub tests: String,
 }
 #[derive(Serialize, Debug)]
@@ -702,11 +703,12 @@ pub struct Method {
     pub args: Args,
     pub rets: Vec<String>,
     pub mode: String,
-    pub comment: Option<String>,
+    pub comment_lines: CommentLines,
 }
 type Methods = Vec<Method>;
 type Args = Vec<(String, String)>;
 type InitArgs = Option<Args>;
+type CommentLines = Vec<String>;
 
 pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Output, Vec<String>) {
     let mut state = NominalState {
@@ -727,10 +729,10 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
     };
     state.state.stats = old_stats;
     let defs = state.pp_defs(&def_list);
-    let (methods, init_args, actor_comment) = if let Some(actor) = &actor {
+    let (methods, init_args, actor_comment_lines) = if let Some(actor) = &actor {
         state.pp_actor(actor)
     } else {
-        (Vec::new(), None, None)
+        (Vec::new(), None, Vec::new())
     };
     let tests = state.tests.into_values().collect::<Vec<_>>().join("\n");
     let unused = state.state.report_unused();
@@ -739,7 +741,7 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
             type_defs: defs.pretty(LINE_WIDTH).to_string(),
             methods,
             init_args,
-            actor_comment,
+            actor_comment_lines,
             tests,
         },
         unused,
@@ -754,7 +756,7 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         type_defs: String,
         methods: Methods,
         init_args: InitArgs,
-        actor_comment: Option<String>,
+        actor_comment_lines: CommentLines,
         tests: String,
     }
     let data = HBOutput {
@@ -762,7 +764,7 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         methods: output.methods,
         external: config.0,
         init_args: output.init_args,
-        actor_comment: output.actor_comment,
+        actor_comment_lines: output.actor_comment_lines,
         tests: output.tests,
     };
     hbs.render_template(template, &data).unwrap()

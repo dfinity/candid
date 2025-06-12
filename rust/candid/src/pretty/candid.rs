@@ -230,7 +230,8 @@ fn pp_comment(comment: Option<&String>) -> RcDoc {
     let mut comment_doc = RcDoc::nil();
     if let Some(comment) = comment {
         for line in comment.lines() {
-            comment_doc = comment_doc.append(RcDoc::text("// ").append(line).append(RcDoc::line()));
+            comment_doc =
+                comment_doc.append(RcDoc::text("// ").append(line).append(RcDoc::hardline()));
         }
     }
     comment_doc

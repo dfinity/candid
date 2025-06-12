@@ -307,7 +307,7 @@ fn merge_actor(
                         check_unique(ms.iter().map(|m| &m.0)).map_err(|e| {
                             Error::msg(format!("Duplicate imported method name: {e}"))
                         })?;
-                        let res: Type = TypeInner::Service(ms).into();
+                        let res: Type = (TypeInner::Service(ms), t.comment()).into();
                         Ok(Some(res))
                     }
                 },

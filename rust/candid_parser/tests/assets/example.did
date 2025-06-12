@@ -1,22 +1,47 @@
+// This is an ignored import service comment
 import service "recursion.did";
+// This is an ignored import comment
 import "import/a.did";
+// This is another ignored import service comment
 import service "import/b/b.did";
+// This is a type comment
 type my_type = principal;
-type List = opt record { head: int; tail: List };
+
+// This is an ignored comment
+
+type List = opt record {
+  head: int;
+  // This is a field comment
+  tail: List;
+};
 type f = func (List, func (int32) -> (int64)) -> (opt List, res);
+// This is another type comment
 type broker = service {
   find : (name: text) ->
     (service {up:() -> (); current:() -> (nat32)});
 };
 type nested = record { nat; nat; record {nat;int;}; record { nat; 0x2a:nat; nat8; }; 42:nat; 40:nat; variant{ A; 0x2a; B; C }; };
 type res = variant { Ok: record{int;nat}; Err: record{ error: text } };
-type nested_res = variant { Ok: variant { Ok; Err }; Err: variant { Ok: record { content: text }; Err: record {int} } };
+type nested_res = variant {
+  // This is a variant comment
+  Ok : variant { Ok; Err };
+  // This is another variant comment
+  // that spans multiple lines for variants
+  Err : variant { Ok: record { content: text }; Err: record {int} };
+};
 
+// This is another ignored comment
+
+// This is a service comment
+// that spans multiple lines for services
 service server : {
   f1 : (list, test: blob, opt bool) -> () oneway;
+  // This is a method comment
   g1 : (my_type, List, opt List, nested) -> (int, broker, nested_res) query;
   h : (vec opt text, variant { A: nat; B: opt text }, opt List) -> (record { id: nat; 0x2a: record {} });
   i : f;
+  // This is another method comment
+  // that spans multiple lines for methods
   x : (a,b) -> (opt a, opt b, variant { Ok: record { result: text }; Err: variant {a;b} }) composite_query;
 }
 

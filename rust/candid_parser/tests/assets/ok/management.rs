@@ -6,9 +6,11 @@ type Result<T> = std::result::Result<T, ic_agent::AgentError>;
 
 #[derive(CandidType, Deserialize)]
 pub enum BitcoinNetwork {
+  /// This is a variant comment
   #[serde(rename="mainnet")]
   Mainnet,
-  /// This is a variant comment
+  /// This is another variant comment
+  /// that spans multiple lines for variants
   #[serde(rename="testnet")]
   Testnet,
 }

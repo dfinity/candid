@@ -33,12 +33,14 @@ candid::define_service!(pub(crate) S : {
   "g" : candid::func!((List) -> (B, Tree, Stream));
 });
 candid::define_function!(pub(crate) T : (S) -> ());
+/// This is a type comment
 type CanisterId = Principal;
 #derive[CandidType, Deserialize, Clone]
 pub(crate) struct ListInner {
   #[serde(skip_deserializing)]
   #[serde(rename="head")]
   HEAD: candid::Int,
+  /// This is a field comment
   #[serde(skip_deserializing)]
   tail: Arc<MyList>,
 }
@@ -73,6 +75,7 @@ candid::define_service!(pub BrokerReturn : {
   "current" : candid::func!(() -> (u32));
   "up" : candid::func!(() -> ());
 });
+/// This is another type comment
 candid::define_service!(pub(crate) Broker : {
   "find" : candid::func!((String) -> (BrokerReturn));
 });
@@ -102,8 +105,11 @@ pub(crate) struct XRet2Ok { pub(crate) result: String }
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) enum Error { #[serde(rename="a")] A, #[serde(rename="b")] B }
 
+/// This is a service comment
+/// that spans multiple lines for services
 pub struct Service(pub Principal);
 impl Service {
+  /// This is a method comment on an imported service
   pub async fn bbbbb(&self, arg0: &B) -> Result<()> {
     ic_cdk::call(self.0, "bbbbb", (arg0,)).await
   }
@@ -116,6 +122,7 @@ impl Service {
   pub async fn g(&self, arg0: &List) -> Result<(B,Tree,Stream,)> {
     ic_cdk::call(self.0, "g", (arg0,)).await
   }
+  /// This is a method comment
   pub async fn G11(&self, id: &CanisterId, list: &MyList, is_okay: &Option<MyList>, arg3: &Nested) -> Result<(i128,Broker,NestedRes,)> {
     ic_cdk::call(self.0, "g1", (id,list,is_okay,arg3,)).await
   }
@@ -125,18 +132,26 @@ impl Service {
   pub async fn i(&self, arg0: &MyList, arg1: &FArg1) -> Result<(Option<MyList>,Res,)> {
     ic_cdk::call(self.0, "i", (arg0,arg1,)).await
   }
+  /// This is another method comment
+  /// that spans multiple lines for methods
   pub async fn x(&self, arg0: &A, arg1: &B) -> Result<(Option<A>,Option<B>,std::result::Result<XRet2Ok, Error>,)> {
     ic_cdk::call(self.0, "x", (arg0,arg1,)).await
   }
 }
 /// Canister ID: `aaaaa-aa`
 pub const CANISTER_ID : Principal = Principal::from_slice(&[]);
+/// This is a service comment
+/// that spans multiple lines for services
 pub const service : Service = Service(CANISTER_ID);
 #[test]
 fn test_Arc_MyList_() {
   // Generated from ListInner.record.tail.use_type = "Arc<MyList>"
   let candid_src = r#"type List = opt ListInner;
-type ListInner = record { head : int; tail : List };
+type ListInner = record {
+  head : int;
+  // This is a field comment
+  tail : List;
+};
 (List)"#;
   candid_parser::utils::check_rust_type::<Arc<MyList>>(candid_src).unwrap();
 }

@@ -3,10 +3,16 @@ import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
 export type bitcoin_address = string;
-export type bitcoin_network = { 'mainnet' : null } |
-  {
+export type bitcoin_network = {
     /**
      * This is a variant comment
+     */
+    'mainnet' : null
+  } |
+  {
+    /**
+     * This is another variant comment
+     * that spans multiple lines for variants
      */
     'testnet' : null
   };

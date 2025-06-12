@@ -1,4 +1,6 @@
 type b = record { int;nat };
+// This service comment is always ignored because it's in an imported file
 service : {
+  // This is a method comment on an imported service
   bbbbb : (b) -> ();
 }

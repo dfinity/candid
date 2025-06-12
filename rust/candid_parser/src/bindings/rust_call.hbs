@@ -6,15 +6,15 @@ use ic_cdk::api::call::CallResult as Result;
 
 {{type_defs}}
 {{#if methods}}
-{{#if actor_comment}}
-{{actor_comment}}
-{{/if}}
+{{#each actor_comment_lines}}
+{{this}}
+{{/each}}
 pub struct {{PascalCase service_name}}(pub Principal);
 impl {{PascalCase service_name}} {
   {{#each methods}}
-  {{#if this.comment}}
-  {{this.comment}}
-  {{/if}}
+  {{#each this.comment_lines}}
+  {{this}}
+  {{/each}}
   pub async fn {{this.name}}(&self{{#each this.args}}, {{this.0}}: &{{this.1}}{{/each}}) -> Result<({{#each this.rets}}{{this}},{{/each}})> {
     ic_cdk::call(self.0, "{{escape_debug this.original_name}}", ({{#each this.args}}{{this.0}},{{/each}})).await
   }
@@ -23,9 +23,9 @@ impl {{PascalCase service_name}} {
 {{#if canister_id}}
 /// Canister ID: `{{canister_id}}`
 pub const CANISTER_ID : Principal = Principal::from_slice(&[{{principal_slice canister_id}}]);
-{{#if actor_comment}}
-{{actor_comment}}
-{{/if}}
+{{#each actor_comment_lines}}
+{{this}}
+{{/each}}
 pub const {{snake_case service_name}} : {{PascalCase service_name}} = {{PascalCase service_name}}(CANISTER_ID);
 {{/if}}
 {{/if}}

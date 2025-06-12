@@ -1,7 +1,9 @@
 type bitcoin_address = text;
 type bitcoin_network = variant {
-  mainnet;
   // This is a variant comment
+  mainnet;
+  // This is another variant comment
+  // that spans multiple lines for variants
   testnet;
 };
 type block_hash = blob;

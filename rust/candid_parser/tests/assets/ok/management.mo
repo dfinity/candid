@@ -4,8 +4,10 @@
 module {
   public type bitcoin_address = Text;
   public type bitcoin_network = {
-    #mainnet;
     /// This is a variant comment
+    #mainnet;
+    /// This is another variant comment
+    /// that spans multiple lines for variants
     #testnet;
   };
   public type block_hash = Blob;

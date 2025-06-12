@@ -35,8 +35,10 @@ type ecdsa_curve = variant { secp256k1; };
 type satoshi = nat64;
 
 type bitcoin_network = variant {
-  mainnet;
   // This is a variant comment
+  mainnet;
+  // This is another variant comment
+  // that spans multiple lines for variants
   testnet;
 };
 
