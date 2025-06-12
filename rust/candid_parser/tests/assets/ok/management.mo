@@ -24,6 +24,7 @@ module {
   public type definite_canister_settings = {
     freezing_threshold : Nat;
     controllers : [Principal];
+    /// This is a field comment
     memory_allocation : Nat;
     compute_allocation : Nat;
   };

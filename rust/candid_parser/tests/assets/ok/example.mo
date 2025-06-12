@@ -4,7 +4,11 @@
 module {
   public type A = B;
   public type B = ?A;
-  public type List = ?{ head : Int; tail : List };
+  public type List = ?{
+    head : Int;
+    /// This is a field comment
+    tail : List;
+  };
   public type a = { #a; #b : b };
   public type b = (Int, Nat);
   /// This is another type comment
