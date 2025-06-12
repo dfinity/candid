@@ -214,7 +214,8 @@ import type { IDL } from '@dfinity/candid';
     let defs = pp_defs(env, &def_list);
     let actor = match actor {
         None => RcDoc::nil(),
-        Some(actor) => pp_actor(env, actor)
+        Some(actor) => pp_comment(actor.comment())
+            .append(pp_actor(env, actor))
             .append(RcDoc::line())
             .append("export declare const idlFactory: IDL.InterfaceFactory;")
             .append(RcDoc::line())

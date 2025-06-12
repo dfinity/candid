@@ -208,6 +208,7 @@ pub struct UpdateSettingsArg {
   pub settings: CanisterSettings,
 }
 
+/// This is a service comment
 pub struct Service<'a>(pub Principal, pub &'a ic_agent::Agent);
 impl<'a> Service<'a> {
   /// bitcoin interface
@@ -309,5 +310,6 @@ impl<'a> Service<'a> {
     Ok(Decode!(&bytes)?)
   }
 }
-pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
+/// Canister ID: `aaaaa-aa`
+pub const CANISTER_ID : Principal = Principal::from_slice(&[]);
 

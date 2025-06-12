@@ -77,6 +77,9 @@ export interface utxo {
   'outpoint' : outpoint,
 }
 export type wasm_module = Uint8Array | number[];
+/**
+ * This is a service comment
+ */
 export interface _SERVICE {
   /**
    * bitcoin interface

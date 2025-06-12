@@ -291,7 +291,9 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
         None => pp_defs(env),
         Some(actor) => {
             let defs = pp_defs(env);
-            let actor = kwd("public type Self =").append(pp_actor(actor));
+            let actor = pp_comment(actor.comment())
+                .append(kwd("public type Self ="))
+                .append(pp_actor(actor));
             defs.append(actor)
         }
     };

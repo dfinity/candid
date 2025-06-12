@@ -129,7 +129,8 @@ impl Service {
     ic_cdk::call(self.0, "x", (arg0,arg1,)).await
   }
 }
-pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
+/// Canister ID: `aaaaa-aa`
+pub const CANISTER_ID : Principal = Principal::from_slice(&[]);
 pub const service : Service = Service(CANISTER_ID);
 #[test]
 fn test_Arc_MyList_() {

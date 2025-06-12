@@ -56,6 +56,7 @@ type send_transaction_request = record {
 type user_id = principal;
 type utxo = record { height : nat32; value : satoshi; outpoint : outpoint };
 type wasm_module = blob;
+// This is a service comment
 service : {
   // bitcoin interface
   bitcoin_get_balance : (get_balance_request) -> (satoshi);

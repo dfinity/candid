@@ -189,23 +189,29 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
-fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
-    match actor {
-        None => Ok(None),
-        Some(IDLType::ClassT(ts, t)) => {
-            let mut args = Vec::new();
-            for arg in ts.iter() {
-                args.push(check_arg(env, arg)?);
+fn check_actor(env: &Env, actor: &Option<ActorBinding>) -> Result<Option<Type>> {
+    if let Some(ActorBinding { typ, comment }) = actor {
+        let comment = comment.as_ref().map(|c| c.text.clone());
+        match typ {
+            IDLType::ClassT(ts, t) => {
+                let mut args = Vec::new();
+                for arg in ts.iter() {
+                    args.push(check_arg(env, arg)?);
+                }
+                let serv = check_type(env, t, None)?;
+                env.te.as_service(&serv)?;
+                Ok(Some(
+                    (TypeInner::Class(args, serv), comment.as_ref()).into(),
+                ))
             }
-            let serv = check_type(env, t, None)?;
-            env.te.as_service(&serv)?;
-            Ok(Some(TypeInner::Class(args, serv).into()))
+            _ => {
+                let t = check_type(env, typ, comment.as_ref())?;
+                env.te.as_service(&t)?;
+                Ok(Some(t))
+            }
         }
-        Some(typ) => {
-            let t = check_type(env, typ, None)?;
-            env.te.as_service(&t)?;
-            Ok(Some(t))
-        }
+    } else {
+        Ok(None)
     }
 }
 

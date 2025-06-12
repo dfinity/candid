@@ -6,6 +6,7 @@ module {
   public type g = f;
   public type h = shared f -> async f;
   public type o = ?o;
+  /// This is a service comment
   public type Self = actor {
     f : shared Nat -> async h;
     g : f;

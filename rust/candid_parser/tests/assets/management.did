@@ -88,6 +88,7 @@ type send_transaction_request = record {
 
 type millisatoshi_per_byte = nat64;
 
+// This is a service comment
 service ic : {
   create_canister : (record {
     settings : opt canister_settings

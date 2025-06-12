@@ -29,6 +29,7 @@ type nested = record { nat; nat; record { nat; 0x2a:nat; nat8; }; 42:nat; 40:nat
 
 // Ignored comment
 
+// This is a service comment
 service server : {
   f : (test: blob, opt bool) -> () oneway;
   g : (my_type, List, opt List) -> (int) query;

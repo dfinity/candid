@@ -61,6 +61,7 @@ module {
   public type user_id = Principal;
   public type utxo = { height : Nat32; value : satoshi; outpoint : outpoint };
   public type wasm_module = Blob;
+  /// This is a service comment
   public type Self = actor {
     /// bitcoin interface
     bitcoin_get_balance : shared get_balance_request -> async satoshi;

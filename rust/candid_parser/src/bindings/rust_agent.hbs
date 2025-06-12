@@ -6,6 +6,9 @@ type Result<T> = std::result::Result<T, ic_agent::AgentError>;
 
 {{type_defs}}
 {{#if methods}}
+{{#if actor_comment}}
+{{actor_comment}}
+{{/if}}
 pub struct {{PascalCase service_name}}<'a>(pub Principal, pub &'a ic_agent::Agent);
 impl<'a> {{PascalCase service_name}}<'a> {
   {{#each methods}}
@@ -20,7 +23,8 @@ impl<'a> {{PascalCase service_name}}<'a> {
   {{/each}}
 }
 {{#if canister_id}}
-pub const CANISTER_ID : Principal = Principal::from_slice(&[{{principal_slice canister_id}}]); // {{canister_id}}
+/// Canister ID: `{{canister_id}}`
+pub const CANISTER_ID : Principal = Principal::from_slice(&[{{principal_slice canister_id}}]);
 {{/if}}
 {{/if}}
 {{#if tests}}

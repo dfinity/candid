@@ -1,4 +1,4 @@
-use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLArgType, Comment};
+use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, ActorBinding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLArgType, Comment};
 use super::test::{Assert, Input, Test};
 use super::token::{Token, error, error2, LexicalError, Span};
 use candid::{Principal, types::Label};
@@ -271,9 +271,9 @@ Actor: IDLType = {
     "id" => IDLType::VarT(<>),
 }
 
-MainActor: IDLType = {
-    "service" "id"? ":" <t:Actor> ";"? => <>,
-    "service" "id"? ":" <args:ArgTupTyp> "->" <t:Actor> ";"? => IDLType::ClassT(args, Box::new(t)),
+MainActor: ActorBinding = {
+    <comment:Comment?> "service" "id"? ":" <t:Actor> ";"? => ActorBinding { typ: t, comment },
+    <comment:Comment?> "service" "id"? ":" <args:ArgTupTyp> "->" <t:Actor> ";"? => ActorBinding { typ: IDLType::ClassT(args, Box::new(t)), comment },
 }
 
 pub IDLProg: IDLProg = {

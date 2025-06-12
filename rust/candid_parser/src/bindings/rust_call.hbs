@@ -6,6 +6,9 @@ use ic_cdk::api::call::CallResult as Result;
 
 {{type_defs}}
 {{#if methods}}
+{{#if actor_comment}}
+{{actor_comment}}
+{{/if}}
 pub struct {{PascalCase service_name}}(pub Principal);
 impl {{PascalCase service_name}} {
   {{#each methods}}
@@ -18,7 +21,11 @@ impl {{PascalCase service_name}} {
   {{/each}}
 }
 {{#if canister_id}}
-pub const CANISTER_ID : Principal = Principal::from_slice(&[{{principal_slice canister_id}}]); // {{canister_id}}
+/// Canister ID: `{{canister_id}}`
+pub const CANISTER_ID : Principal = Principal::from_slice(&[{{principal_slice canister_id}}]);
+{{#if actor_comment}}
+{{actor_comment}}
+{{/if}}
 pub const {{snake_case service_name}} : {{PascalCase service_name}} = {{PascalCase service_name}}(CANISTER_ID);
 {{/if}}
 {{/if}}

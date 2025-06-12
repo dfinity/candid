@@ -117,10 +117,16 @@ pub struct Binding {
     pub comment: Option<Comment>,
 }
 
+#[derive(Debug, Clone)]
+pub struct ActorBinding {
+    pub typ: IDLType,
+    pub comment: Option<Comment>,
+}
+
 #[derive(Debug)]
 pub struct IDLProg {
     pub decs: Vec<Dec>,
-    pub actor: Option<IDLType>,
+    pub actor: Option<ActorBinding>,
 }
 
 #[derive(Debug)]

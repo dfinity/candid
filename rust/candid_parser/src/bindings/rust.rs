@@ -11,6 +11,8 @@ use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
+const COMMENT_PREFIX: &str = "/// ";
+
 #[derive(Default, Deserialize, Clone, Debug)]
 pub struct BindingConfig {
     name: Option<String>,
@@ -156,11 +158,22 @@ fn pp_comment(comment: Option<&String>) -> RcDoc {
     let mut comment_doc = RcDoc::nil();
     if let Some(comment) = comment {
         for line in comment.lines() {
-            comment_doc =
-                comment_doc.append(RcDoc::text("/// ").append(line).append(RcDoc::line()));
+            comment_doc = comment_doc.append(
+                RcDoc::text(COMMENT_PREFIX)
+                    .append(line)
+                    .append(RcDoc::line()),
+            );
         }
     }
     comment_doc
+}
+fn map_comment(comment: Option<&String>) -> Option<String> {
+    comment.map(|c| {
+        c.lines()
+            .map(|l| format!("{COMMENT_PREFIX}{l}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    })
 }
 
 impl<'a> State<'a> {
@@ -632,17 +645,12 @@ fn test_{test_name}() {{
                 .map(|x| x.pretty(LINE_WIDTH).to_string())
                 .collect(),
             mode,
-            comment: comment.map(|c| {
-                c.lines()
-                    .map(|l| format!("/// {l}"))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            }),
+            comment: map_comment(comment),
         };
         self.state.pop_state(old, StateElem::Label(id));
         res
     }
-    fn pp_actor(&mut self, actor: &Type) -> (Vec<Method>, Option<Vec<(String, String)>>) {
+    fn pp_actor(&mut self, actor: &Type) -> (Methods, InitArgs, Option<String>) {
         let actor = self.state.env.trace_type(actor).unwrap();
         let init = if let TypeInner::Class(args, _) = actor.as_ref() {
             let old = self.state.push_state(&StateElem::Label("init"));
@@ -676,25 +684,30 @@ fn test_{test_name}() {{
             let func = self.state.env.as_func(func).unwrap();
             res.push(self.pp_function(id, func, comment));
         }
-        (res, init)
+        (res, init, map_comment(actor.comment()))
     }
 }
 #[derive(Serialize, Debug)]
 pub struct Output {
     pub type_defs: String,
-    pub methods: Vec<Method>,
-    pub init_args: Option<Vec<(String, String)>>,
+    pub methods: Methods,
+    pub init_args: InitArgs,
+    pub actor_comment: Option<String>,
     pub tests: String,
 }
 #[derive(Serialize, Debug)]
 pub struct Method {
     pub name: String,
     pub original_name: String,
-    pub args: Vec<(String, String)>,
+    pub args: Args,
     pub rets: Vec<String>,
     pub mode: String,
     pub comment: Option<String>,
 }
+type Methods = Vec<Method>;
+type Args = Vec<(String, String)>;
+type InitArgs = Option<Args>;
+
 pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Output, Vec<String>) {
     let mut state = NominalState {
         state: crate::configs::State::new(&tree.0, env),
@@ -714,10 +727,10 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
     };
     state.state.stats = old_stats;
     let defs = state.pp_defs(&def_list);
-    let (methods, init_args) = if let Some(actor) = &actor {
+    let (methods, init_args, actor_comment) = if let Some(actor) = &actor {
         state.pp_actor(actor)
     } else {
-        (Vec::new(), None)
+        (Vec::new(), None, None)
     };
     let tests = state.tests.into_values().collect::<Vec<_>>().join("\n");
     let unused = state.state.report_unused();
@@ -726,6 +739,7 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
             type_defs: defs.pretty(LINE_WIDTH).to_string(),
             methods,
             init_args,
+            actor_comment,
             tests,
         },
         unused,
@@ -738,8 +752,9 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         #[serde(flatten)]
         external: BTreeMap<String, String>,
         type_defs: String,
-        methods: Vec<Method>,
-        init_args: Option<Vec<(String, String)>>,
+        methods: Methods,
+        init_args: InitArgs,
+        actor_comment: Option<String>,
         tests: String,
     }
     let data = HBOutput {
@@ -747,6 +762,7 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         methods: output.methods,
         external: config.0,
         init_args: output.init_args,
+        actor_comment: output.actor_comment,
         tests: output.tests,
     };
     hbs.render_template(template, &data).unwrap()
