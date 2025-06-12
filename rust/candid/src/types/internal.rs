@@ -96,19 +96,19 @@ impl TypeContainer {
         self.go(&t)
     }
     fn go(&mut self, t: &Type) -> Type {
-        match t.as_ref() {
+        let inner = match t.as_ref() {
             TypeInner::Opt(t) => TypeInner::Opt(self.go(t)),
             TypeInner::Vec(t) => TypeInner::Vec(self.go(t)),
             TypeInner::Record(fs) => {
-                let res: Type = TypeInner::Record(
+                let inner = TypeInner::Record(
                     fs.iter()
                         .map(|Field { id, ty }| Field {
                             id: id.clone(),
                             ty: self.go(ty),
                         })
                         .collect(),
-                )
-                .into();
+                );
+                let res = (inner, t.comment()).into();
                 if t.is_tuple() {
                     return res;
                 }
@@ -123,15 +123,15 @@ impl TypeContainer {
                 }
             }
             TypeInner::Variant(fs) => {
-                let res: Type = TypeInner::Variant(
+                let inner = TypeInner::Variant(
                     fs.iter()
                         .map(|Field { id, ty }| Field {
                             id: id.clone(),
                             ty: self.go(ty),
                         })
                         .collect(),
-                )
-                .into();
+                );
+                let res = (inner, t.comment()).into();
                 let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
                     self.env.0.insert(id.to_string(), res);
@@ -174,13 +174,13 @@ impl TypeContainer {
                 self.go(ty),
             ),
             t => t.clone(),
-        }
-        .into()
+        };
+        (inner, t.comment()).into()
     }
 }
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
-pub struct Type(pub std::rc::Rc<TypeInner>, pub Option<String>);
+pub struct Type(pub std::rc::Rc<TypeInner>, Option<String>);
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 pub enum TypeInner {
@@ -270,7 +270,7 @@ impl Type {
     }
     pub fn subst(&self, tau: &std::collections::BTreeMap<String, String>) -> Self {
         use TypeInner::*;
-        match self.as_ref() {
+        let inner = match self.as_ref() {
             Var(id) => match tau.get(id) {
                 None => Var(id.to_string()),
                 Some(new_id) => Var(new_id.to_string()),
@@ -323,8 +323,11 @@ impl Type {
                 ty.subst(tau),
             ),
             _ => return self.clone(),
-        }
-        .into()
+        };
+        (inner, self.comment()).into()
+    }
+    pub fn comment(&self) -> Option<&String> {
+        self.1.as_ref()
     }
 }
 #[cfg(feature = "printer")]
@@ -665,7 +668,7 @@ pub fn is_primitive(t: &Type) -> bool {
 
 pub fn unroll(t: &Type) -> Type {
     use self::TypeInner::*;
-    match t.as_ref() {
+    let inner = match t.as_ref() {
         Knot(ref id) => return find_type(id).unwrap(),
         Opt(ref t) => Opt(unroll(t)),
         Vec(ref t) => Vec(unroll(t)),
@@ -686,8 +689,8 @@ pub fn unroll(t: &Type) -> Type {
                 .collect(),
         ),
         t => t.clone(),
-    }
-    .into()
+    };
+    (inner, t.comment()).into()
 }
 
 thread_local! {

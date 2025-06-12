@@ -72,6 +72,7 @@ pub enum CanisterStatusRetStatus {
 pub struct DefiniteCanisterSettings {
   pub freezing_threshold: candid::Nat,
   pub controllers: Vec<Principal>,
+  /// This is a field comment
   pub memory_allocation: candid::Nat,
   pub compute_allocation: candid::Nat,
 }

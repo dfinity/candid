@@ -357,7 +357,7 @@ fn test_{test_name}() {{
             .pp_label(&field.id, false, need_vis)
             .append(kwd(":"))
             .append(self.pp_ty(&field.ty, is_ref));
-        let res = pp_comment(field.ty.1.as_ref()).append(f);
+        let res = pp_comment(field.ty.comment()).append(f);
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
@@ -397,7 +397,7 @@ fn test_{test_name}() {{
                 ")",
             )),
         };
-        let res = pp_comment(field.ty.1.as_ref()).append(f);
+        let res = pp_comment(field.ty.comment()).append(f);
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
@@ -500,7 +500,7 @@ fn test_{test_name}() {{
                     }
                 }
             };
-            let line_with_comment = pp_comment(ty.1.as_ref()).append(line);
+            let line_with_comment = pp_comment(ty.comment()).append(line);
             self.state.pop_state(old, StateElem::Label(id));
             res.push(line_with_comment)
         }
@@ -672,7 +672,7 @@ fn test_{test_name}() {{
         let serv = self.state.env.as_service(&actor).unwrap();
         let mut res = Vec::new();
         for (id, func) in serv.iter() {
-            let comment = func.1.as_ref();
+            let comment = func.comment();
             let func = self.state.env.as_func(func).unwrap();
             res.push(self.pp_function(id, func, comment));
         }
@@ -841,7 +841,7 @@ impl NominalState<'_> {
         } else {
             Some(self.state.push_state(&elem))
         };
-        let res = match t.as_ref() {
+        let inner = match t.as_ref() {
             TypeInner::Opt(ty) => {
                 path.push(TypePath::Opt);
                 let ty = self.nominalize(env, path, ty);
@@ -885,7 +885,7 @@ impl NominalState<'_> {
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
-                        &TypeInner::Record(fs.to_vec()).into(),
+                        &(TypeInner::Record(fs.to_vec()), None).into(),
                     );
                     env.0.insert(new_var.clone(), ty);
                     TypeInner::Var(new_var)
@@ -923,7 +923,7 @@ impl NominalState<'_> {
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
-                        &TypeInner::Variant(fs.to_vec()).into(),
+                        &(TypeInner::Variant(fs.to_vec()), None).into(),
                     );
                     env.0.insert(new_var.clone(), ty);
                     TypeInner::Var(new_var)
@@ -988,7 +988,7 @@ impl NominalState<'_> {
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
-                        &TypeInner::Func(func.clone()).into(),
+                        &(TypeInner::Func(func.clone()), None).into(),
                     );
                     env.0.insert(new_var.clone(), ty);
                     TypeInner::Var(new_var)
@@ -1019,7 +1019,7 @@ impl NominalState<'_> {
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
-                        &TypeInner::Service(serv.clone()).into(),
+                        &(TypeInner::Service(serv.clone()), None).into(),
                     );
                     env.0.insert(new_var.clone(), ty);
                     TypeInner::Var(new_var)
@@ -1043,8 +1043,8 @@ impl NominalState<'_> {
                 self.nominalize(env, path, ty),
             ),
             t => t.clone(),
-        }
-        .into();
+        };
+        let res = (inner, t.comment()).into();
         if let Some(old) = old {
             self.state.pop_state(old, elem);
         }

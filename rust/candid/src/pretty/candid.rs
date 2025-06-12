@@ -74,10 +74,10 @@ pub(crate) fn pp_text(id: &str) -> RcDoc {
 }
 
 pub fn pp_ty(ty: &Type) -> RcDoc {
-    pp_ty_inner(ty.as_ref(), ty.1.clone())
+    pp_ty_inner(ty.as_ref(), ty.comment())
 }
 
-pub fn pp_ty_inner(ty: &TypeInner, comment: Option<String>) -> RcDoc {
+pub fn pp_ty_inner<'a>(ty: &'a TypeInner, comment: Option<&'a String>) -> RcDoc<'a> {
     use TypeInner::*;
     match ty {
         Null => str("null"),
@@ -103,7 +103,7 @@ pub fn pp_ty_inner(ty: &TypeInner, comment: Option<String>) -> RcDoc {
         Vec(ref t) if matches!(t.as_ref(), Nat8) => str("blob"),
         Vec(ref t) => kwd("vec").append(pp_ty(t)),
         Record(ref fs) => {
-            let t = Type(ty.clone().into(), comment);
+            let t = Type::from((ty.clone(), comment));
             if t.is_tuple() {
                 let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ";");
                 kwd("record").append(enclose_space("{", tuple, "}"))
@@ -141,7 +141,7 @@ pub(crate) fn pp_field(field: &Field, is_variant: bool) -> RcDoc {
     } else {
         kwd(" :").append(pp_ty(&field.ty))
     };
-    pp_comment(field.ty.1.as_ref())
+    pp_comment(field.ty.comment())
         .append(pp_label(&field.id))
         .append(ty_doc)
 }
@@ -197,7 +197,7 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
                 TypeInner::Var(_) => pp_ty(func),
                 _ => unreachable!(),
             };
-            pp_comment(func.1.as_ref())
+            pp_comment(func.comment())
                 .append(pp_text(id))
                 .append(kwd(" :"))
                 .append(func_doc)
@@ -209,7 +209,7 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 
 fn pp_defs(env: &TypeEnv) -> RcDoc {
     lines(env.0.iter().map(|(id, ty)| {
-        pp_comment(ty.1.as_ref())
+        pp_comment(ty.comment())
             .append(kwd("type"))
             .append(ident(id))
             .append(kwd("="))

@@ -162,7 +162,7 @@ fn pp_field(field: &Field) -> RcDoc {
     pp_label(&field.id).append(" : ").append(pp_ty(&field.ty))
 }
 fn pp_variant(field: &Field) -> RcDoc {
-    let doc = pp_comment(field.ty.1.as_ref())
+    let doc = pp_comment(field.ty.comment())
         .append(str("#"))
         .append(pp_label(&field.id));
     if *field.ty != TypeInner::Null {
@@ -243,7 +243,7 @@ fn pp_rets(args: &[Type]) -> RcDoc {
 fn pp_service(serv: &[(String, Type)]) -> RcDoc {
     let doc = concat(
         serv.iter().map(|(id, func)| {
-            pp_comment(func.1.as_ref())
+            pp_comment(func.comment())
                 .append(escape(id, true))
                 .append(" : ")
                 .append(pp_ty(func))
@@ -255,7 +255,7 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 
 fn pp_defs(env: &TypeEnv) -> RcDoc {
     lines(env.0.iter().map(|(id, ty)| {
-        pp_comment(ty.1.as_ref())
+        pp_comment(ty.comment())
             .append(kwd("public type"))
             .append(escape(id, false))
             .append(" = ")

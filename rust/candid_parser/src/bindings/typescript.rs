@@ -103,7 +103,7 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
 }
 
 fn pp_field<'a>(env: &'a TypeEnv, field: &'a Field, is_ref: bool) -> RcDoc<'a> {
-    pp_comment(field.ty.1.as_ref())
+    pp_comment(field.ty.comment())
         .append(pp_label(&field.id))
         .append(kwd(":"))
         .append(pp_ty(env, &field.ty, is_ref))
@@ -135,7 +135,7 @@ fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
                 TypeInner::Func(ref inner) => pp_function(env, inner),
                 _ => pp_ty(env, func, false),
             };
-            pp_comment(func.1.as_ref())
+            pp_comment(func.comment())
                 .append(quote_ident(id))
                 .append(kwd(":"))
                 .append(f)
@@ -168,7 +168,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
                 .append(pp_ty(env, ty, false))
                 .append(";"),
         };
-        pp_comment(ty.1.as_ref()).append(doc)
+        pp_comment(ty.comment()).append(doc)
     }))
 }
 
