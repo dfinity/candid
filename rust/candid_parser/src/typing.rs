@@ -110,10 +110,11 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
     // field label duplication is checked in the parser
     let mut res = Vec::new();
     for f in fs.iter() {
-        let ty = check_type(env, &f.typ, f.comment.as_ref().map(|c| &c.text))?;
+        let ty = check_type(env, &f.typ, None)?;
         let field = Field {
             id: f.label.clone().into(),
             ty,
+            comment: f.comment.as_ref().map(|c| c.text.clone()),
         };
         res.push(field);
     }

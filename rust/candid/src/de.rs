@@ -923,8 +923,8 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                     (TypeInner::Record(ref e), TypeInner::Record(ref w)) => {
                         match (&e[..], &w[..]) {
                             (
-                                [Field { id: e_id0, ty: ek }, Field { id: e_id1, ty: ev }],
-                                [Field { id: w_id0, ty: wk }, Field { id: w_id1, ty: wv }],
+                                [Field { id: e_id0, ty: ek, .. }, Field { id: e_id1, ty: ev, .. }],
+                                [Field { id: w_id0, ty: wk, .. }, Field { id: w_id1, ty: wv, .. }],
                             ) if **e_id0 == Label::Id(0)
                                 && **e_id1 == Label::Id(1)
                                 && **w_id0 == Label::Id(0)

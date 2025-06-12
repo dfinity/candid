@@ -193,10 +193,12 @@ macro_rules! map_impl {
                     Field {
                         id: Label::Id(0).into(),
                         ty: K::ty(),
+                        comment: None,
                     },
                     Field {
                         id: Label::Id(1).into(),
                         ty: V::ty(),
+                        comment: None,
                     },
                 ]).into();
                 TypeInner::Vec(tuple).into()
@@ -276,10 +278,12 @@ where
             Field {
                 id: Label::Named("Ok".to_owned()).into(),
                 ty: T::ty(),
+                comment: None,
             },
             Field {
                 id: Label::Named("Err".to_owned()).into(),
                 ty: E::ty(),
+                comment: None,
             },
         ])
         .into()
@@ -470,7 +474,7 @@ macro_rules! tuple_impls {
             {
                 fn _ty() -> Type {
                     TypeInner::Record(vec![
-                        $(Field{ id: Label::Id($n).into(), ty: $name::ty() },)+
+                        $(Field{ id: Label::Id($n).into(), ty: $name::ty(), comment: None },)+
                     ]).into()
                 }
                 fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
@@ -512,10 +516,12 @@ impl CandidType for std::time::SystemTime {
             Field {
                 id: Label::Named("nanos_since_epoch".to_owned()).into(),
                 ty: u32::ty(),
+                comment: None,
             },
             Field {
                 id: Label::Named("secs_since_epoch".to_owned()).into(),
                 ty: u64::ty(),
+                comment: None,
             },
         ])
         .into()
@@ -547,10 +553,12 @@ impl CandidType for std::time::Duration {
             Field {
                 id: Label::Named("secs".to_owned()).into(),
                 ty: u64::ty(),
+                comment: None,
             },
             Field {
                 id: Label::Named("nanos".to_owned()).into(),
                 ty: u32::ty(),
+                comment: None,
             },
         ])
         .into()

@@ -94,15 +94,21 @@ pub(crate) fn is_tuple(fs: &[Field]) -> bool {
 }
 fn as_result(fs: &[Field]) -> Option<(&Type, &Type, bool)> {
     match fs {
-        [Field { id: ok, ty: t_ok }, Field { id: err, ty: t_err }]
-            if **ok == Label::Named("Ok".to_string())
-                && **err == Label::Named("Err".to_string()) =>
+        [Field {
+            id: ok, ty: t_ok, ..
+        }, Field {
+            id: err, ty: t_err, ..
+        }] if **ok == Label::Named("Ok".to_string())
+            && **err == Label::Named("Err".to_string()) =>
         {
             Some((t_ok, t_err, false))
         }
-        [Field { id: ok, ty: t_ok }, Field { id: err, ty: t_err }]
-            if **ok == Label::Named("ok".to_string())
-                && **err == Label::Named("err".to_string()) =>
+        [Field {
+            id: ok, ty: t_ok, ..
+        }, Field {
+            id: err, ty: t_err, ..
+        }] if **ok == Label::Named("ok".to_string())
+            && **err == Label::Named("err".to_string()) =>
         {
             Some((t_ok, t_err, true))
         }
@@ -371,7 +377,7 @@ fn test_{test_name}() {{
             .pp_label(&field.id, false, need_vis)
             .append(kwd(":"))
             .append(self.pp_ty(&field.ty, is_ref));
-        let res = pp_comment(field.ty.comment()).append(f);
+        let res = pp_comment(field.comment.as_ref()).append(f);
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
@@ -411,7 +417,7 @@ fn test_{test_name}() {{
                 ")",
             )),
         };
-        let res = pp_comment(field.ty.comment()).append(f);
+        let res = pp_comment(field.comment.as_ref()).append(f);
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
@@ -880,7 +886,7 @@ impl NominalState<'_> {
                 {
                     let fs: Vec<_> = fs
                         .iter()
-                        .map(|Field { id, ty }| {
+                        .map(|Field { id, ty, comment }| {
                             let lab = id.to_string();
                             let elem = StateElem::Label(&lab);
                             let old = self.state.push_state(&elem);
@@ -888,7 +894,11 @@ impl NominalState<'_> {
                             let ty = self.nominalize(env, path, ty);
                             path.pop();
                             self.state.pop_state(old, elem);
-                            Field { id: id.clone(), ty }
+                            Field {
+                                id: id.clone(),
+                                ty,
+                                comment: comment.clone(),
+                            }
                         })
                         .collect();
                     TypeInner::Record(fs)
@@ -914,7 +924,7 @@ impl NominalState<'_> {
                 if matches!(path.last(), None | Some(TypePath::Id(_))) || is_result {
                     let fs: Vec<_> = fs
                         .iter()
-                        .map(|Field { id, ty }| {
+                        .map(|Field { id, ty, comment }| {
                             let lab = id.to_string();
                             let old = self.state.push_state(&StateElem::Label(&lab));
                             if is_result {
@@ -926,7 +936,11 @@ impl NominalState<'_> {
                             let ty = self.nominalize(env, path, ty);
                             path.pop();
                             self.state.pop_state(old, StateElem::Label(&lab));
-                            Field { id: id.clone(), ty }
+                            Field {
+                                id: id.clone(),
+                                ty,
+                                comment: comment.clone(),
+                            }
                         })
                         .collect();
                     TypeInner::Variant(fs)

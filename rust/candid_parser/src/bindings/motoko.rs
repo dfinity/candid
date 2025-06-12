@@ -159,10 +159,13 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
 }
 
 fn pp_field(field: &Field) -> RcDoc {
-    pp_label(&field.id).append(" : ").append(pp_ty(&field.ty))
+    pp_comment(field.comment.as_ref())
+        .append(pp_label(&field.id))
+        .append(" : ")
+        .append(pp_ty(&field.ty))
 }
 fn pp_variant(field: &Field) -> RcDoc {
-    let doc = pp_comment(field.ty.comment())
+    let doc = pp_comment(field.comment.as_ref())
         .append(str("#"))
         .append(pp_label(&field.id));
     if *field.ty != TypeInner::Null {

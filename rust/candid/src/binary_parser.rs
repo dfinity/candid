@@ -188,6 +188,7 @@ impl ConsType {
                     let field = Field {
                         id: Label::Id(f.id).into(),
                         ty: f.index.to_type(len)?,
+                        comment: None,
                     };
                     res.push(field);
                 }

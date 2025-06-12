@@ -1,4 +1,4 @@
-use super::{candid_path, get_lit_str};
+use super::{candid_path, get_comment_from_lines, get_comment_lines, get_lit_str};
 use lazy_static::lazy_static;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
@@ -6,15 +6,20 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 use syn::{Error, ItemFn, Meta, Result, ReturnType, Signature, Type};
 
-type RawArgs = Vec<(Option<String>, String)>;
+type RawArg = (Option<String>, String);
+type RawArgs = Vec<RawArg>;
 type RawRets = Vec<String>;
-type ParsedArgs = Vec<(Option<String>, Type)>;
-type ParsedRets = Vec<Type>;
+type ParsedArg = (Option<String>, Type);
+type ParsedArgs = Vec<ParsedArg>;
+type ParsedRet = Type;
+type ParsedRets = Vec<ParsedRet>;
+type CommentLines = Vec<String>;
 
 struct Method {
     args: RawArgs,
     rets: RawRets,
     modes: String,
+    comment_lines: CommentLines,
 }
 
 // There is no official way to communicate information across proc macro invocations.
@@ -54,6 +59,7 @@ pub(crate) fn candid_method(attrs: Vec<Meta>, fun: ItemFn) -> Result<TokenStream
             "oneway function should have no return value",
         ));
     }
+    let comment_lines = get_comment_lines(&fun.attrs);
     if attrs.is_init {
         match (rets.len(), rets.first().map(|x| x.as_str())) {
             (0, None) | (1, Some("Self")) => {
@@ -69,7 +75,15 @@ pub(crate) fn candid_method(attrs: Vec<Meta>, fun: ItemFn) -> Result<TokenStream
             }
         }
     } else if let Some(map) = METHODS.lock().unwrap().as_mut() {
-        map.insert(name.clone(), Method { args, rets, modes });
+        map.insert(
+            name.clone(),
+            Method {
+                args,
+                rets,
+                modes,
+                comment_lines,
+            },
+        );
     }
     Ok(quote! { #fun })
 }
@@ -81,7 +95,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
             let res = opt_args.as_ref().map(|args| {
                 let args = args
                     .iter()
-                    .map(|t| generate_arg(quote! { init_args }, t))
+                    .map(|arg| generate_arg(quote! { init_args }, arg))
                     .collect::<Vec<_>>();
                 quote! {
                     let mut init_args: Vec<ArgType> = Vec::new();
@@ -93,33 +107,44 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
         } else {
             unreachable!();
         };
-        let gen_tys = meths.iter().map(|(name, Method { args, rets, modes })| {
-            let args = args
-                .iter()
-                .map(|t| generate_arg(quote! { args }, t))
-                .collect::<Vec<_>>();
-            let rets = rets
-                .iter()
-                .map(|t| generate_ret(quote! { rets }, t))
-                .collect::<Vec<_>>();
-            let modes = match modes.as_ref() {
-                "query" => quote! { vec![#candid::types::FuncMode::Query] },
-                "composite_query" => quote! { vec![#candid::types::FuncMode::CompositeQuery] },
-                "oneway" => quote! { vec![#candid::types::FuncMode::Oneway] },
-                "update" => quote! { vec![] },
-                _ => unreachable!(),
-            };
-            quote! {
-                {
-                    let mut args: Vec<ArgType> = Vec::new();
-                    #(#args)*
-                    let mut rets: Vec<Type> = Vec::new();
-                    #(#rets)*
-                    let func = Function { args, rets, modes: #modes };
-                    service.push((#name.to_string(), TypeInner::Func(func).into()));
+        let gen_tys = meths.iter().map(
+            |(
+                name,
+                Method {
+                    args,
+                    rets,
+                    modes,
+                    comment_lines,
+                },
+            )| {
+                let args = args
+                    .iter()
+                    .map(|arg| generate_arg(quote! { args }, arg))
+                    .collect::<Vec<_>>();
+                let rets = rets
+                    .iter()
+                    .map(|t| generate_ret(quote! { rets }, t))
+                    .collect::<Vec<_>>();
+                let modes = match modes.as_ref() {
+                    "query" => quote! { vec![#candid::types::FuncMode::Query] },
+                    "composite_query" => quote! { vec![#candid::types::FuncMode::CompositeQuery] },
+                    "oneway" => quote! { vec![#candid::types::FuncMode::Oneway] },
+                    "update" => quote! { vec![] },
+                    _ => unreachable!(),
+                };
+                let comment = get_comment_from_lines(comment_lines, true);
+                quote! {
+                    {
+                        let mut args: Vec<ArgType> = Vec::new();
+                        #(#args)*
+                        let mut rets: Vec<Type> = Vec::new();
+                        #(#rets)*
+                        let func = Function { args, rets, modes: #modes };
+                        service.push((#name.to_string(), (TypeInner::Func(func), #comment).into()));
+                    }
                 }
-            }
-        });
+            },
+        );
         let service = quote! {
             use #candid::types::{CandidType, Function, Type, ArgType, TypeInner};
             let mut service = Vec::<(String, Type)>::new();
@@ -152,7 +177,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
     }
 }
 
-fn generate_arg(name: TokenStream, (arg_name, ty): &(Option<String>, String)) -> TokenStream {
+fn generate_arg(name: TokenStream, (arg_name, ty): &RawArg) -> TokenStream {
     let arg_name = arg_name
         .as_ref()
         .map(|n| quote! { Some(#n.to_string()) })
