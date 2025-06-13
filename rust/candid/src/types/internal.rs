@@ -277,7 +277,7 @@ impl Type {
     }
     pub fn subst(&self, tau: &std::collections::BTreeMap<String, String>) -> Self {
         use TypeInner::*;
-        let inner = match self.as_ref() {
+        match self.as_ref() {
             Var(id) => match tau.get(id) {
                 None => Var(id.to_string()),
                 Some(new_id) => Var(new_id.to_string()),
@@ -286,19 +286,19 @@ impl Type {
             Vec(t) => Vec(t.subst(tau)),
             Record(fs) => Record(
                 fs.iter()
-                    .map(|Field { id, ty, comment }| Field {
+                    .map(|Field { id, ty, .. }| Field {
                         id: id.clone(),
                         ty: ty.subst(tau),
-                        comment: comment.clone(),
+                        comment: None,
                     })
                     .collect(),
             ),
             Variant(fs) => Variant(
                 fs.iter()
-                    .map(|Field { id, ty, comment }| Field {
+                    .map(|Field { id, ty, .. }| Field {
                         id: id.clone(),
                         ty: ty.subst(tau),
-                        comment: comment.clone(),
+                        comment: None,
                     })
                     .collect(),
             ),
@@ -332,8 +332,8 @@ impl Type {
                 ty.subst(tau),
             ),
             _ => return self.clone(),
-        };
-        (inner, self.comment()).into()
+        }
+        .into()
     }
     pub fn comment(&self) -> Option<&[String]> {
         self.1.as_ref().map(|rc| rc.as_slice())
@@ -684,31 +684,31 @@ pub fn is_primitive(t: &Type) -> bool {
 
 pub fn unroll(t: &Type) -> Type {
     use self::TypeInner::*;
-    let inner = match t.as_ref() {
+    match t.as_ref() {
         Knot(ref id) => return find_type(id).unwrap(),
         Opt(ref t) => Opt(unroll(t)),
         Vec(ref t) => Vec(unroll(t)),
         Record(fs) => Record(
             fs.iter()
-                .map(|Field { id, ty, comment }| Field {
+                .map(|Field { id, ty, .. }| Field {
                     id: id.clone(),
                     ty: unroll(ty),
-                    comment: comment.clone(),
+                    comment: None,
                 })
                 .collect(),
         ),
         Variant(fs) => Variant(
             fs.iter()
-                .map(|Field { id, ty, comment }| Field {
+                .map(|Field { id, ty, .. }| Field {
                     id: id.clone(),
                     ty: unroll(ty),
-                    comment: comment.clone(),
+                    comment: None,
                 })
                 .collect(),
         ),
         t => t.clone(),
-    };
-    (inner, t.comment()).into()
+    }
+    .into()
 }
 
 thread_local! {
