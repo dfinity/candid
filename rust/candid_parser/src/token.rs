@@ -7,7 +7,7 @@ use logos::{Lexer, Logos};
 pub enum Token {
     #[token("/*")]
     StartComment,
-    #[regex(r"(( *)\/\/[^\n]*\n)+", parse_comment_lines)]
+    #[regex(r"(( *)//[^\n]*\n)+", parse_comment_lines)]
     LineComment(Vec<String>),
     #[token("=")]
     Equals,
