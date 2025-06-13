@@ -95,10 +95,6 @@ impl TypeContainer {
         let t = T::ty();
         self.go(&t)
     }
-    pub fn add_with_comment<T: CandidType>(&mut self, comment: Option<&String>) -> Type {
-        let t = T::ty().with_comment(comment);
-        self.go(&t)
-    }
     fn go(&mut self, t: &Type) -> Type {
         let inner = match t.as_ref() {
             TypeInner::Opt(t) => TypeInner::Opt(self.go(t)),
@@ -336,9 +332,6 @@ impl Type {
     }
     pub fn comment(&self) -> Option<&String> {
         self.1.as_ref().map(|rc| rc.as_ref())
-    }
-    pub fn with_comment(&self, comment: Option<&String>) -> Self {
-        Self(self.0.clone(), comment.map(|s| std::rc::Rc::new(s.clone())))
     }
 }
 #[cfg(feature = "printer")]
