@@ -46,7 +46,7 @@ extern {
         ";" => Token::Semi,
         ":" => Token::Colon,
         "->" => Token::Arrow,
-        "line_comment" => Token::LineComment(<String>),
+        "line_comment" => Token::LineComment(<Vec<String>>),
         "\n" => Token::Newline,
     }
 }
@@ -315,7 +315,7 @@ Name: String = {
 }
 
 Comment: Comment = {
-    "line_comment" => Comment { text: <> },
+    "line_comment" => Comment { lines: <> },
 }
 
 // Also allows trailing separator

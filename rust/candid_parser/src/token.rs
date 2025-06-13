@@ -7,8 +7,8 @@ use logos::{Lexer, Logos};
 pub enum Token {
     #[token("/*")]
     StartComment,
-    #[regex(r"(( *)\/\/[^\n]*\n)+", parse_line_comment)]
-    LineComment(String),
+    #[regex(r"(( *)\/\/[^\n]*\n)+", parse_comment_lines)]
+    LineComment(Vec<String>),
     #[token("=")]
     Equals,
     #[token("(")]
@@ -122,12 +122,12 @@ fn parse_number(lex: &mut Lexer<Token>) -> String {
     }
 }
 
-fn parse_line_comment(lex: &mut Lexer<Token>) -> String {
+fn parse_comment_lines(lex: &mut Lexer<Token>) -> Vec<String> {
     lex.slice()
         .lines()
-        .map(|s| s.trim().trim_start_matches("//").trim())
-        .collect::<Vec<_>>()
-        .join("\n")
+        .map(|s| s.trim().trim_start_matches("//").trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect()
 }
 
 pub struct Tokenizer<'input> {

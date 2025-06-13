@@ -181,8 +181,10 @@ impl TypeContainer {
     }
 }
 
+type CommentLines = std::rc::Rc<Vec<String>>;
+
 #[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
-pub struct Type(pub std::rc::Rc<TypeInner>, Option<std::rc::Rc<String>>);
+pub struct Type(pub std::rc::Rc<TypeInner>, Option<CommentLines>);
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 pub enum TypeInner {
@@ -232,9 +234,12 @@ impl From<TypeInner> for Type {
         Type(t.into(), None)
     }
 }
-impl From<(TypeInner, Option<&String>)> for Type {
-    fn from((t, comment): (TypeInner, Option<&String>)) -> Self {
-        Type(t.into(), comment.map(|s| std::rc::Rc::new(s.clone())))
+impl From<(TypeInner, Option<&[String]>)> for Type {
+    fn from((t, comment_lines): (TypeInner, Option<&[String]>)) -> Self {
+        Type(
+            t.into(),
+            comment_lines.map(|s| std::rc::Rc::new(s.to_vec())),
+        )
     }
 }
 impl TypeInner {
@@ -330,8 +335,8 @@ impl Type {
         };
         (inner, self.comment()).into()
     }
-    pub fn comment(&self) -> Option<&String> {
-        self.1.as_ref().map(|rc| rc.as_ref())
+    pub fn comment(&self) -> Option<&[String]> {
+        self.1.as_ref().map(|rc| rc.as_slice())
     }
 }
 #[cfg(feature = "printer")]
@@ -492,7 +497,7 @@ pub type SharedLabel = std::rc::Rc<Label>;
 pub struct Field {
     pub id: SharedLabel,
     pub ty: Type,
-    pub comment: Option<std::rc::Rc<String>>,
+    pub comment: Option<CommentLines>,
 }
 #[cfg(feature = "printer")]
 impl fmt::Display for Field {
@@ -511,8 +516,8 @@ impl fmt::Display for Field {
     }
 }
 impl Field {
-    pub fn comment(&self) -> Option<&String> {
-        self.comment.as_ref().map(|rc| rc.as_ref())
+    pub fn comment(&self) -> Option<&[String]> {
+        self.comment.as_ref().map(|rc| rc.as_slice())
     }
 }
 

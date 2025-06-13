@@ -275,10 +275,10 @@ fn pp_actor(ty: &Type) -> RcDoc {
     }
 }
 
-fn pp_comment(comment: Option<&String>) -> RcDoc {
+fn pp_comment(comment_lines: Option<&[String]>) -> RcDoc {
     let mut comment_doc = RcDoc::nil();
-    if let Some(comment) = comment {
-        for line in comment.lines() {
+    if let Some(comment_lines) = comment_lines {
+        for line in comment_lines {
             comment_doc =
                 comment_doc.append(RcDoc::text("/// ").append(line).append(RcDoc::hardline()));
         }

@@ -41,7 +41,7 @@ fn check_prim(prim: &PrimType) -> TypeInner {
     }
 }
 
-pub fn check_type(env: &Env, t: &IDLType, comment: Option<&String>) -> Result<Type> {
+pub fn check_type(env: &Env, t: &IDLType, comment_lines: Option<&[String]>) -> Result<Type> {
     let inner = match t {
         IDLType::PrimT(prim) => Ok(check_prim(prim)),
         IDLType::VarT(id) => {
@@ -49,11 +49,11 @@ pub fn check_type(env: &Env, t: &IDLType, comment: Option<&String>) -> Result<Ty
             Ok(TypeInner::Var(id.to_string()))
         }
         IDLType::OptT(t) => {
-            let t = check_type(env, t, comment)?;
+            let t = check_type(env, t, comment_lines)?;
             Ok(TypeInner::Opt(t))
         }
         IDLType::VecT(t) => {
-            let t = check_type(env, t, comment)?;
+            let t = check_type(env, t, comment_lines)?;
             Ok(TypeInner::Vec(t))
         }
         IDLType::RecordT(fs) => {
@@ -72,7 +72,7 @@ pub fn check_type(env: &Env, t: &IDLType, comment: Option<&String>) -> Result<Ty
             }
             let mut t2 = Vec::new();
             for t in func.rets.iter() {
-                t2.push(check_type(env, t, comment)?);
+                t2.push(check_type(env, t, comment_lines)?);
             }
             if func.modes.len() > 1 {
                 return Err(Error::msg("cannot have more than one mode"));
@@ -96,7 +96,7 @@ pub fn check_type(env: &Env, t: &IDLType, comment: Option<&String>) -> Result<Ty
         }
         IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
     }?;
-    Ok((inner, comment).into())
+    Ok((inner, comment_lines).into())
 }
 
 fn check_arg(env: &Env, arg: &IDLArgType) -> Result<ArgType> {
@@ -114,7 +114,7 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
         let field = Field {
             id: f.label.clone().into(),
             ty,
-            comment: f.comment().map(std::rc::Rc::new),
+            comment: f.comment().map(|lines| std::rc::Rc::new(lines.to_vec())),
         };
         res.push(field);
     }
@@ -125,7 +125,7 @@ fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
     // binding duplication is checked in the parser
     let mut res = Vec::new();
     for meth in ms.iter() {
-        let t = check_type(env, &meth.typ, meth.comment.as_ref().map(|c| &c.text))?;
+        let t = check_type(env, &meth.typ, meth.comment.as_ref().map(|c| c.lines()))?;
         if !env.pre && env.te.as_func(&t).is_err() {
             return Err(Error::msg(format!(
                 "method {} is a non-function type",
@@ -141,7 +141,7 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         match dec {
             Dec::TypD(Binding { id, typ, comment }) => {
-                let t = check_type(env, typ, comment.as_ref().map(|c| &c.text))?;
+                let t = check_type(env, typ, comment.as_ref().map(|c| c.lines()))?;
                 env.te.0.insert(id.to_string(), t);
             }
             Dec::ImportType(_) | Dec::ImportServ(_) => (),
@@ -192,7 +192,7 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
 
 fn check_actor(env: &Env, actor: &Option<ActorBinding>) -> Result<Option<Type>> {
     if let Some(ActorBinding { typ, comment }) = actor {
-        let comment = comment.as_ref().map(|c| c.text.clone());
+        let comment = comment.as_ref().map(|c| c.lines());
         match typ {
             IDLType::ClassT(ts, t) => {
                 let mut args = Vec::new();
@@ -201,12 +201,10 @@ fn check_actor(env: &Env, actor: &Option<ActorBinding>) -> Result<Option<Type>> 
                 }
                 let serv = check_type(env, t, None)?;
                 env.te.as_service(&serv)?;
-                Ok(Some(
-                    (TypeInner::Class(args, serv), comment.as_ref()).into(),
-                ))
+                Ok(Some((TypeInner::Class(args, serv), comment).into()))
             }
             _ => {
-                let t = check_type(env, typ, comment.as_ref())?;
+                let t = check_type(env, typ, comment)?;
                 env.te.as_service(&t)?;
                 Ok(Some(t))
             }

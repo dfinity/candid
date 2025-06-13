@@ -79,16 +79,22 @@ pub(crate) fn get_comment_lines(attrs: &[syn::Attribute]) -> Vec<String> {
 
 pub(crate) fn get_comment_from_lines(
     comment_lines: &[String],
-    as_ref: bool,
+    as_slice: bool,
 ) -> proc_macro2::TokenStream {
     if comment_lines.is_empty() {
         quote::quote! { None }
     } else {
-        let comment = comment_lines.join("\n");
-        if as_ref {
-            quote::quote! { Some(#comment.to_string()).as_ref() }
+        let comment_strings: Vec<proc_macro2::TokenStream> = comment_lines
+            .iter()
+            .map(|s| quote::quote! { #s.to_string() })
+            .collect();
+
+        let comment_lines = quote::quote! { vec![#(#comment_strings),*] };
+
+        if as_slice {
+            quote::quote! { Some(#comment_lines.as_slice()) }
         } else {
-            quote::quote! { Some(std::rc::Rc::new(#comment.to_string())) }
+            quote::quote! { Some(std::rc::Rc::new(#comment_lines)) }
         }
     }
 }

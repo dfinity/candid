@@ -185,11 +185,11 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
     }
 }
 
-fn pp_comment(comment: Option<&String>) -> RcDoc {
+fn pp_comment(comment_lines: Option<&[String]>) -> RcDoc {
     let mut comment_doc = RcDoc::nil();
     let mut is_empty = true;
-    if let Some(comment) = comment {
-        for line in comment.lines().filter(|l| !l.is_empty()) {
+    if let Some(comment_lines) = comment_lines {
+        for line in comment_lines.iter().filter(|l| !l.is_empty()) {
             is_empty = false;
             comment_doc =
                 comment_doc.append(RcDoc::text(" * ").append(line).append(RcDoc::hardline()));

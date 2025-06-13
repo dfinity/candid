@@ -77,7 +77,7 @@ pub fn pp_ty(ty: &Type) -> RcDoc {
     pp_ty_inner(ty.as_ref(), ty.comment())
 }
 
-pub fn pp_ty_inner<'a>(ty: &'a TypeInner, comment: Option<&'a String>) -> RcDoc<'a> {
+pub fn pp_ty_inner<'a>(ty: &'a TypeInner, comment: Option<&[String]>) -> RcDoc<'a> {
     use TypeInner::*;
     match ty {
         Null => str("null"),
@@ -226,10 +226,10 @@ fn pp_actor(ty: &Type) -> RcDoc {
     }
 }
 
-fn pp_comment(comment: Option<&String>) -> RcDoc {
+fn pp_comment(comment_lines: Option<&[String]>) -> RcDoc {
     let mut comment_doc = RcDoc::nil();
-    if let Some(comment) = comment {
-        for line in comment.lines() {
+    if let Some(comment_lines) = comment_lines {
+        for line in comment_lines {
             comment_doc =
                 comment_doc.append(RcDoc::text("// ").append(line).append(RcDoc::hardline()));
         }

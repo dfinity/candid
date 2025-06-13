@@ -160,10 +160,10 @@ fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
         None => RcDoc::text("pub "),
     }
 }
-fn pp_comment(comment: Option<&String>) -> RcDoc {
+fn pp_comment(comment_lines: Option<&[String]>) -> RcDoc {
     let mut comment_doc = RcDoc::nil();
-    if let Some(comment) = comment {
-        for line in comment.lines() {
+    if let Some(comment_lines) = comment_lines {
+        for line in comment_lines {
             comment_doc = comment_doc.append(
                 RcDoc::text(DOC_COMMENT_LINE_PREFIX)
                     .append(line)
@@ -173,10 +173,11 @@ fn pp_comment(comment: Option<&String>) -> RcDoc {
     }
     comment_doc
 }
-fn map_comment(comment: Option<&String>) -> CommentLines {
-    comment
-        .map(|c| {
-            c.lines()
+fn map_comment_lines(comment_lines: Option<&[String]>) -> CommentLines {
+    comment_lines
+        .map(|lines| {
+            lines
+                .iter()
                 .map(|l| format!("{DOC_COMMENT_LINE_PREFIX}{l}"))
                 .collect()
         })
@@ -592,7 +593,12 @@ fn test_{test_name}() {{
         self.state.pop_state(old, lab);
         res
     }
-    fn pp_function(&mut self, id: &str, func: &Function, comment: Option<&String>) -> Method {
+    fn pp_function(
+        &mut self,
+        id: &str,
+        func: &Function,
+        comment_lines: Option<&[String]>,
+    ) -> Method {
         use candid::types::internal::FuncMode;
         let old = self.state.push_state(&StateElem::Label(id));
         let name = self
@@ -652,7 +658,7 @@ fn test_{test_name}() {{
                 .map(|x| x.pretty(LINE_WIDTH).to_string())
                 .collect(),
             mode,
-            comment_lines: map_comment(comment),
+            comment_lines: map_comment_lines(comment_lines),
         };
         self.state.pop_state(old, StateElem::Label(id));
         res
@@ -691,7 +697,7 @@ fn test_{test_name}() {{
             let func = self.state.env.as_func(func).unwrap();
             res.push(self.pp_function(id, func, comment));
         }
-        (res, init, map_comment(actor.comment()))
+        (res, init, map_comment_lines(actor.comment()))
     }
 }
 #[derive(Serialize, Debug)]
