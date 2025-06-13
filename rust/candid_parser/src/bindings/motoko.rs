@@ -7,6 +7,8 @@ use candid::types::{ArgType, FuncMode};
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
+const DOC_COMMENT_LINE_PREFIX: &str = "/// ";
+
 // The definition of tuple is language specific.
 fn is_tuple(t: &Type) -> bool {
     match t.as_ref() {
@@ -279,8 +281,11 @@ fn pp_comment(comment_lines: Option<&[String]>) -> RcDoc {
     let mut comment_doc = RcDoc::nil();
     if let Some(comment_lines) = comment_lines {
         for line in comment_lines {
-            comment_doc =
-                comment_doc.append(RcDoc::text("/// ").append(line).append(RcDoc::hardline()));
+            comment_doc = comment_doc.append(
+                RcDoc::text(DOC_COMMENT_LINE_PREFIX)
+                    .append(line)
+                    .append(RcDoc::hardline()),
+            );
         }
     }
     comment_doc

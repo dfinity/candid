@@ -3,6 +3,10 @@ use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
+const DOC_COMMENT_PREFIX: &str = "/**";
+const DOC_COMMENT_LINE_PREFIX: &str = " * ";
+const DOC_COMMENT_SUFFIX: &str = " */";
+
 fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
     use TypeInner::*;
     match ty.as_ref() {
@@ -189,17 +193,20 @@ fn pp_comment(comment_lines: Option<&[String]>) -> RcDoc {
     let mut comment_doc = RcDoc::nil();
     let mut is_empty = true;
     if let Some(comment_lines) = comment_lines {
+        is_empty = comment_lines.is_empty();
         for line in comment_lines {
-            is_empty = false;
-            comment_doc =
-                comment_doc.append(RcDoc::text(" * ").append(line).append(RcDoc::hardline()));
+            comment_doc = comment_doc.append(
+                RcDoc::text(DOC_COMMENT_LINE_PREFIX)
+                    .append(line)
+                    .append(RcDoc::hardline()),
+            );
         }
     }
     if !is_empty {
-        comment_doc = RcDoc::text("/**")
+        comment_doc = RcDoc::text(DOC_COMMENT_PREFIX)
             .append(RcDoc::hardline())
             .append(comment_doc)
-            .append(RcDoc::text(" */"))
+            .append(RcDoc::text(DOC_COMMENT_SUFFIX))
             .append(RcDoc::hardline());
     }
     comment_doc
