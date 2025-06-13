@@ -9,10 +9,8 @@ use syn::{Error, ItemFn, Meta, Result, ReturnType, Signature, Type};
 type RawArg = (Option<String>, String);
 type RawArgs = Vec<RawArg>;
 type RawRets = Vec<String>;
-type ParsedArg = (Option<String>, Type);
-type ParsedArgs = Vec<ParsedArg>;
-type ParsedRet = Type;
-type ParsedRets = Vec<ParsedRet>;
+type ParsedArgs = Vec<(Option<String>, Type)>;
+type ParsedRets = Vec<Type>;
 type CommentLines = Vec<String>;
 
 struct Method {
