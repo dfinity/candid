@@ -74,10 +74,10 @@ pub(crate) fn pp_text(id: &str) -> RcDoc {
 }
 
 pub fn pp_ty(ty: &Type) -> RcDoc {
-    pp_ty_inner(ty.as_ref())
+    pp_ty_inner(ty.as_ref(), ty.comment())
 }
 
-pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
+pub fn pp_ty_inner<'a>(ty: &'a TypeInner, comment: Option<&[String]>) -> RcDoc<'a> {
     use TypeInner::*;
     match ty {
         Null => str("null"),
@@ -103,7 +103,7 @@ pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
         Vec(ref t) if matches!(t.as_ref(), Nat8) => str("blob"),
         Vec(ref t) => kwd("vec").append(pp_ty(t)),
         Record(ref fs) => {
-            let t = Type(ty.clone().into());
+            let t = Type::from((ty.clone(), comment));
             if t.is_tuple() {
                 let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ";");
                 kwd("record").append(enclose_space("{", tuple, "}"))
@@ -141,7 +141,9 @@ pub(crate) fn pp_field(field: &Field, is_variant: bool) -> RcDoc {
     } else {
         kwd(" :").append(pp_ty(&field.ty))
     };
-    pp_label(&field.id).append(ty_doc)
+    pp_comment(field.comment())
+        .append(pp_label(&field.id))
+        .append(ty_doc)
 }
 
 fn pp_fields(fs: &[Field], is_variant: bool) -> RcDoc {
@@ -195,7 +197,10 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
                 TypeInner::Var(_) => pp_ty(func),
                 _ => unreachable!(),
             };
-            pp_text(id).append(kwd(" :")).append(func_doc)
+            pp_comment(func.comment())
+                .append(pp_text(id))
+                .append(kwd(" :"))
+                .append(func_doc)
         }),
         ";",
     );
@@ -204,7 +209,8 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 
 fn pp_defs(env: &TypeEnv) -> RcDoc {
     lines(env.0.iter().map(|(id, ty)| {
-        kwd("type")
+        pp_comment(ty.comment())
+            .append(kwd("type"))
             .append(ident(id))
             .append(kwd("="))
             .append(pp_ty(ty))
@@ -220,6 +226,17 @@ fn pp_actor(ty: &Type) -> RcDoc {
     }
 }
 
+fn pp_comment(comment_lines: Option<&[String]>) -> RcDoc {
+    let mut comment_doc = RcDoc::nil();
+    if let Some(comment_lines) = comment_lines {
+        for line in comment_lines {
+            comment_doc =
+                comment_doc.append(RcDoc::text("// ").append(line).append(RcDoc::hardline()));
+        }
+    }
+    comment_doc
+}
+
 pub fn pp_init_args<'a>(env: &'a TypeEnv, args: &'a [ArgType]) -> RcDoc<'a> {
     pp_defs(env).append(pp_args(args))
 }
@@ -228,7 +245,9 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
         None => pp_defs(env).pretty(LINE_WIDTH).to_string(),
         Some(actor) => {
             let defs = pp_defs(env);
-            let actor = kwd("service :").append(pp_actor(actor));
+            let actor = pp_comment(actor.comment())
+                .append(kwd("service :"))
+                .append(pp_actor(actor));
             let doc = defs.append(actor);
             doc.pretty(LINE_WIDTH).to_string()
         }

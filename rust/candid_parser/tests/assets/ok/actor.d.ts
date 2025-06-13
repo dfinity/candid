@@ -6,6 +6,9 @@ export type f = ActorMethod<[number], number>;
 export type g = f;
 export type h = ActorMethod<[[Principal, string]], [Principal, string]>;
 export type o = [] | [o];
+/**
+ * This is a service comment
+ */
 export interface _SERVICE {
   'f' : ActorMethod<[bigint], [Principal, string]>,
   'g' : f,

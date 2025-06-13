@@ -243,7 +243,7 @@ impl IDLValue {
                 let fields: HashMap<_, _> =
                     vec.iter().map(|IDLField { id, val }| (id, val)).collect();
                 let mut res = Vec::new();
-                for Field { id, ty } in fs.iter() {
+                for Field { id, ty, .. } in fs.iter() {
                     let val = fields
                         .get(id.as_ref())
                         .cloned()
@@ -341,6 +341,7 @@ impl IDLValue {
                     .map(|IDLField { id, val }| Field {
                         id: id.clone().into(),
                         ty: val.value_ty(),
+                        comment: None,
                     })
                     .collect();
                 TypeInner::Record(fs)
@@ -349,6 +350,7 @@ impl IDLValue {
                 let f = Field {
                     id: v.0.id.clone().into(),
                     ty: v.0.val.value_ty(),
+                    comment: None,
                 };
                 TypeInner::Variant(vec![f])
             }

@@ -4,13 +4,27 @@ import type { IDL } from '@dfinity/candid';
 
 export type A = B;
 export type B = [] | [A];
-export type List = [] | [{ 'head' : bigint, 'tail' : List }];
+export type List = [] | [
+  {
+    'head' : bigint,
+    /**
+     * This is a field comment
+     */
+    'tail' : List,
+  }
+];
 export type a = { 'a' : null } |
   { 'b' : b };
 export type b = [bigint, bigint];
+/**
+ * This is another type comment
+ */
 export interface broker { 'find' : ActorMethod<[string], Principal> }
 export type f = ActorMethod<[List, [Principal, string]], [[] | [List], res]>;
 export type list = [] | [node];
+/**
+ * This is a type comment
+ */
 export type my_type = Principal;
 export interface nested {
   _0_ : bigint,
@@ -24,8 +38,21 @@ export interface nested {
     { 'C' : null },
   _42_ : bigint,
 }
-export type nested_res = { 'Ok' : { 'Ok' : null } | { 'Err' : null } } |
-  { 'Err' : { 'Ok' : { 'content' : string } } | { 'Err' : [bigint] } };
+export type nested_res = {
+    /**
+     * This is a variant comment
+     */
+    'Ok' : { 'Ok' : null } |
+      { 'Err' : null }
+  } |
+  {
+    /**
+     * This is another variant comment
+     * that spans multiple lines for variants
+     */
+    'Err' : { 'Ok' : { 'content' : string } } |
+      { 'Err' : [bigint] }
+  };
 export interface node { 'head' : bigint, 'tail' : list }
 export type res = { 'Ok' : [bigint, bigint] } |
   { 'Err' : { 'error' : string } };
@@ -36,11 +63,21 @@ export type tree = {
     'branch' : { 'val' : bigint, 'left' : tree, 'right' : tree }
   } |
   { 'leaf' : bigint };
+/**
+ * This is a service comment
+ * that spans multiple lines for services
+ */
 export interface _SERVICE {
+  /**
+   * This is a method comment on an imported service
+   */
   'bbbbb' : ActorMethod<[b], undefined>,
   'f' : t,
   'f1' : ActorMethod<[list, Uint8Array | number[], [] | [boolean]], undefined>,
   'g' : ActorMethod<[list], [B, tree, stream]>,
+  /**
+   * This is a method comment
+   */
   'g1' : ActorMethod<
     [my_type, List, [] | [List], nested],
     [bigint, Principal, nested_res]
@@ -55,6 +92,10 @@ export interface _SERVICE {
     { _42_ : {}, 'id' : bigint }
   >,
   'i' : f,
+  /**
+   * This is another method comment
+   * that spans multiple lines for methods
+   */
   'x' : ActorMethod<
     [a, b],
     [

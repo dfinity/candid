@@ -1,5 +1,6 @@
 import "b/b.did";
 type a = variant {a;b:b};
 service : (a,b) -> {
+  // This comment is ignored because this method
   f : (b) -> (a);
 }

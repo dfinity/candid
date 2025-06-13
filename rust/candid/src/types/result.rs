@@ -34,10 +34,12 @@ where
             Field {
                 id: Label::Named("ok".to_owned()).into(),
                 ty: T::ty(),
+                comment: None,
             },
             Field {
                 id: Label::Named("err".to_owned()).into(),
                 ty: E::ty(),
+                comment: None,
             },
         ])
         .into()

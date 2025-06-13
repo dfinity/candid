@@ -3,8 +3,16 @@
 
 module {
   public type bitcoin_address = Text;
-  public type bitcoin_network = { #mainnet; #testnet };
+  public type bitcoin_network = {
+    /// This is a variant comment
+    #mainnet;
+    /// This is another variant comment
+    /// that spans multiple lines for variants
+    #testnet;
+  };
   public type block_hash = Blob;
+  /// This is a comment
+  /// with multiple lines
   public type canister_id = Principal;
   public type canister_settings = {
     freezing_threshold : ?Nat;
@@ -12,9 +20,11 @@ module {
     memory_allocation : ?Nat;
     compute_allocation : ?Nat;
   };
+  /// This is a second comment
   public type definite_canister_settings = {
     freezing_threshold : Nat;
     controllers : [Principal];
+    /// This is a field comment
     memory_allocation : Nat;
     compute_allocation : Nat;
   };
@@ -54,7 +64,9 @@ module {
   public type user_id = Principal;
   public type utxo = { height : Nat32; value : satoshi; outpoint : outpoint };
   public type wasm_module = Blob;
+  /// This is a service comment
   public type Self = actor {
+    /// bitcoin interface
     bitcoin_get_balance : shared get_balance_request -> async satoshi;
     bitcoin_get_current_fee_percentiles : shared get_current_fee_percentiles_request -> async [
         millisatoshi_per_byte
@@ -74,6 +86,7 @@ module {
       };
     delete_canister : shared { canister_id : canister_id } -> async ();
     deposit_cycles : shared { canister_id : canister_id } -> async ();
+    /// Threshold ECDSA signature
     ecdsa_public_key : shared {
         key_id : { name : Text; curve : ecdsa_curve };
         canister_id : ?canister_id;
@@ -99,6 +112,7 @@ module {
         mode : { #reinstall; #upgrade; #install };
         canister_id : canister_id;
       } -> async ();
+    /// provisional interfaces for the pre-ledger world
     provisional_create_canister_with_cycles : shared {
         settings : ?canister_settings;
         specified_id : ?canister_id;

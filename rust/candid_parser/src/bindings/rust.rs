@@ -11,6 +11,8 @@ use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
+const DOC_COMMENT_LINE_PREFIX: &str = "/// ";
+
 #[derive(Default, Deserialize, Clone, Debug)]
 pub struct BindingConfig {
     name: Option<String>,
@@ -92,15 +94,21 @@ pub(crate) fn is_tuple(fs: &[Field]) -> bool {
 }
 fn as_result(fs: &[Field]) -> Option<(&Type, &Type, bool)> {
     match fs {
-        [Field { id: ok, ty: t_ok }, Field { id: err, ty: t_err }]
-            if **ok == Label::Named("Ok".to_string())
-                && **err == Label::Named("Err".to_string()) =>
+        [Field {
+            id: ok, ty: t_ok, ..
+        }, Field {
+            id: err, ty: t_err, ..
+        }] if **ok == Label::Named("Ok".to_string())
+            && **err == Label::Named("Err".to_string()) =>
         {
             Some((t_ok, t_err, false))
         }
-        [Field { id: ok, ty: t_ok }, Field { id: err, ty: t_err }]
-            if **ok == Label::Named("ok".to_string())
-                && **err == Label::Named("err".to_string()) =>
+        [Field {
+            id: ok, ty: t_ok, ..
+        }, Field {
+            id: err, ty: t_err, ..
+        }] if **ok == Label::Named("ok".to_string())
+            && **err == Label::Named("err".to_string()) =>
         {
             Some((t_ok, t_err, true))
         }
@@ -151,6 +159,29 @@ fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
         Some(vis) => RcDoc::text(vis.clone()).append(" "),
         None => RcDoc::text("pub "),
     }
+}
+fn pp_comment(comment_lines: Option<&[String]>) -> RcDoc {
+    let mut comment_doc = RcDoc::nil();
+    if let Some(comment_lines) = comment_lines {
+        for line in comment_lines {
+            comment_doc = comment_doc.append(
+                RcDoc::text(DOC_COMMENT_LINE_PREFIX)
+                    .append(line)
+                    .append(RcDoc::hardline()),
+            );
+        }
+    }
+    comment_doc
+}
+fn map_comment_lines(comment_lines: Option<&[String]>) -> CommentLines {
+    comment_lines
+        .map(|lines| {
+            lines
+                .iter()
+                .map(|l| format!("{DOC_COMMENT_LINE_PREFIX}{l}"))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 impl<'a> State<'a> {
@@ -343,10 +374,11 @@ fn test_{test_name}() {{
     fn pp_record_field<'b>(&mut self, field: &'b Field, need_vis: bool, is_ref: bool) -> RcDoc<'b> {
         let lab = field.id.to_string();
         let old = self.state.push_state(&StateElem::Label(&lab));
-        let res = self
+        let f = self
             .pp_label(&field.id, false, need_vis)
             .append(kwd(":"))
             .append(self.pp_ty(&field.ty, is_ref));
+        let res = pp_comment(field.comment()).append(f);
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
@@ -375,7 +407,7 @@ fn test_{test_name}() {{
     fn pp_variant_field<'b>(&mut self, field: &'b Field) -> RcDoc<'b> {
         let lab = field.id.to_string();
         let old = self.state.push_state(&StateElem::Label(&lab));
-        let res = match field.ty.as_ref() {
+        let f = match field.ty.as_ref() {
             TypeInner::Null => self.pp_label(&field.id, true, false),
             TypeInner::Record(fs) => self
                 .pp_label(&field.id, true, false)
@@ -386,6 +418,7 @@ fn test_{test_name}() {{
                 ")",
             )),
         };
+        let res = pp_comment(field.comment()).append(f);
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
@@ -488,8 +521,9 @@ fn test_{test_name}() {{
                     }
                 }
             };
+            let line_with_comment = pp_comment(ty.comment()).append(line);
             self.state.pop_state(old, StateElem::Label(id));
-            res.push(line)
+            res.push(line_with_comment)
         }
         lines(res.into_iter())
     }
@@ -559,7 +593,12 @@ fn test_{test_name}() {{
         self.state.pop_state(old, lab);
         res
     }
-    fn pp_function(&mut self, id: &str, func: &Function) -> Method {
+    fn pp_function(
+        &mut self,
+        id: &str,
+        func: &Function,
+        comment_lines: Option<&[String]>,
+    ) -> Method {
         use candid::types::internal::FuncMode;
         let old = self.state.push_state(&StateElem::Label(id));
         let name = self
@@ -619,11 +658,12 @@ fn test_{test_name}() {{
                 .map(|x| x.pretty(LINE_WIDTH).to_string())
                 .collect(),
             mode,
+            comment_lines: map_comment_lines(comment_lines),
         };
         self.state.pop_state(old, StateElem::Label(id));
         res
     }
-    fn pp_actor(&mut self, actor: &Type) -> (Vec<Method>, Option<Vec<(String, String)>>) {
+    fn pp_actor(&mut self, actor: &Type) -> (Methods, InitArgs, CommentLines) {
         let actor = self.state.env.trace_type(actor).unwrap();
         let init = if let TypeInner::Class(args, _) = actor.as_ref() {
             let old = self.state.push_state(&StateElem::Label("init"));
@@ -653,27 +693,35 @@ fn test_{test_name}() {{
         let serv = self.state.env.as_service(&actor).unwrap();
         let mut res = Vec::new();
         for (id, func) in serv.iter() {
+            let comment = func.comment();
             let func = self.state.env.as_func(func).unwrap();
-            res.push(self.pp_function(id, func));
+            res.push(self.pp_function(id, func, comment));
         }
-        (res, init)
+        (res, init, map_comment_lines(actor.comment()))
     }
 }
 #[derive(Serialize, Debug)]
 pub struct Output {
     pub type_defs: String,
-    pub methods: Vec<Method>,
-    pub init_args: Option<Vec<(String, String)>>,
+    pub methods: Methods,
+    pub init_args: InitArgs,
+    pub actor_comment_lines: CommentLines,
     pub tests: String,
 }
 #[derive(Serialize, Debug)]
 pub struct Method {
     pub name: String,
     pub original_name: String,
-    pub args: Vec<(String, String)>,
+    pub args: Args,
     pub rets: Vec<String>,
     pub mode: String,
+    pub comment_lines: CommentLines,
 }
+type Methods = Vec<Method>;
+type Args = Vec<(String, String)>;
+type InitArgs = Option<Args>;
+type CommentLines = Vec<String>;
+
 pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Output, Vec<String>) {
     let mut state = NominalState {
         state: crate::configs::State::new(&tree.0, env),
@@ -693,10 +741,10 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
     };
     state.state.stats = old_stats;
     let defs = state.pp_defs(&def_list);
-    let (methods, init_args) = if let Some(actor) = &actor {
+    let (methods, init_args, actor_comment_lines) = if let Some(actor) = &actor {
         state.pp_actor(actor)
     } else {
-        (Vec::new(), None)
+        (Vec::new(), None, Vec::new())
     };
     let tests = state.tests.into_values().collect::<Vec<_>>().join("\n");
     let unused = state.state.report_unused();
@@ -705,6 +753,7 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
             type_defs: defs.pretty(LINE_WIDTH).to_string(),
             methods,
             init_args,
+            actor_comment_lines,
             tests,
         },
         unused,
@@ -717,8 +766,9 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         #[serde(flatten)]
         external: BTreeMap<String, String>,
         type_defs: String,
-        methods: Vec<Method>,
-        init_args: Option<Vec<(String, String)>>,
+        methods: Methods,
+        init_args: InitArgs,
+        actor_comment_lines: CommentLines,
         tests: String,
     }
     let data = HBOutput {
@@ -726,6 +776,7 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         methods: output.methods,
         external: config.0,
         init_args: output.init_args,
+        actor_comment_lines: output.actor_comment_lines,
         tests: output.tests,
     };
     hbs.render_template(template, &data).unwrap()
@@ -820,7 +871,7 @@ impl NominalState<'_> {
         } else {
             Some(self.state.push_state(&elem))
         };
-        let res = match t.as_ref() {
+        let inner = match t.as_ref() {
             TypeInner::Opt(ty) => {
                 path.push(TypePath::Opt);
                 let ty = self.nominalize(env, path, ty);
@@ -841,7 +892,7 @@ impl NominalState<'_> {
                 {
                     let fs: Vec<_> = fs
                         .iter()
-                        .map(|Field { id, ty }| {
+                        .map(|Field { id, ty, comment }| {
                             let lab = id.to_string();
                             let elem = StateElem::Label(&lab);
                             let old = self.state.push_state(&elem);
@@ -849,7 +900,11 @@ impl NominalState<'_> {
                             let ty = self.nominalize(env, path, ty);
                             path.pop();
                             self.state.pop_state(old, elem);
-                            Field { id: id.clone(), ty }
+                            Field {
+                                id: id.clone(),
+                                ty,
+                                comment: comment.clone(),
+                            }
                         })
                         .collect();
                     TypeInner::Record(fs)
@@ -864,7 +919,7 @@ impl NominalState<'_> {
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
-                        &TypeInner::Record(fs.to_vec()).into(),
+                        &(TypeInner::Record(fs.to_vec()), None).into(),
                     );
                     env.0.insert(new_var.clone(), ty);
                     TypeInner::Var(new_var)
@@ -875,7 +930,7 @@ impl NominalState<'_> {
                 if matches!(path.last(), None | Some(TypePath::Id(_))) || is_result {
                     let fs: Vec<_> = fs
                         .iter()
-                        .map(|Field { id, ty }| {
+                        .map(|Field { id, ty, comment }| {
                             let lab = id.to_string();
                             let old = self.state.push_state(&StateElem::Label(&lab));
                             if is_result {
@@ -887,7 +942,11 @@ impl NominalState<'_> {
                             let ty = self.nominalize(env, path, ty);
                             path.pop();
                             self.state.pop_state(old, StateElem::Label(&lab));
-                            Field { id: id.clone(), ty }
+                            Field {
+                                id: id.clone(),
+                                ty,
+                                comment: comment.clone(),
+                            }
                         })
                         .collect();
                     TypeInner::Variant(fs)
@@ -902,7 +961,7 @@ impl NominalState<'_> {
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
-                        &TypeInner::Variant(fs.to_vec()).into(),
+                        &(TypeInner::Variant(fs.to_vec()), None).into(),
                     );
                     env.0.insert(new_var.clone(), ty);
                     TypeInner::Var(new_var)
@@ -967,7 +1026,7 @@ impl NominalState<'_> {
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
-                        &TypeInner::Func(func.clone()).into(),
+                        &(TypeInner::Func(func.clone()), None).into(),
                     );
                     env.0.insert(new_var.clone(), ty);
                     TypeInner::Var(new_var)
@@ -998,7 +1057,7 @@ impl NominalState<'_> {
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
-                        &TypeInner::Service(serv.clone()).into(),
+                        &(TypeInner::Service(serv.clone()), None).into(),
                     );
                     env.0.insert(new_var.clone(), ty);
                     TypeInner::Var(new_var)
@@ -1022,8 +1081,8 @@ impl NominalState<'_> {
                 self.nominalize(env, path, ty),
             ),
             t => t.clone(),
-        }
-        .into();
+        };
+        let res = (inner, t.comment()).into();
         if let Some(old) = old {
             self.state.pop_state(old, elem);
         }

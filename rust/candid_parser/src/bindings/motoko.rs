@@ -7,6 +7,8 @@ use candid::types::{ArgType, FuncMode};
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
+const DOC_COMMENT_LINE_PREFIX: &str = "/// ";
+
 // The definition of tuple is language specific.
 fn is_tuple(t: &Type) -> bool {
     match t.as_ref() {
@@ -159,10 +161,15 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
 }
 
 fn pp_field(field: &Field) -> RcDoc {
-    pp_label(&field.id).append(" : ").append(pp_ty(&field.ty))
+    pp_comment(field.comment())
+        .append(pp_label(&field.id))
+        .append(" : ")
+        .append(pp_ty(&field.ty))
 }
 fn pp_variant(field: &Field) -> RcDoc {
-    let doc = str("#").append(pp_label(&field.id));
+    let doc = pp_comment(field.comment())
+        .append(str("#"))
+        .append(pp_label(&field.id));
     if *field.ty != TypeInner::Null {
         doc.append(" : ").append(pp_ty(&field.ty))
     } else {
@@ -240,8 +247,12 @@ fn pp_rets(args: &[Type]) -> RcDoc {
 
 fn pp_service(serv: &[(String, Type)]) -> RcDoc {
     let doc = concat(
-        serv.iter()
-            .map(|(id, func)| escape(id, true).append(" : ").append(pp_ty(func))),
+        serv.iter().map(|(id, func)| {
+            pp_comment(func.comment())
+                .append(escape(id, true))
+                .append(" : ")
+                .append(pp_ty(func))
+        }),
         ";",
     );
     kwd("actor").append(enclose_space("{", doc, "}"))
@@ -249,7 +260,8 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
 
 fn pp_defs(env: &TypeEnv) -> RcDoc {
     lines(env.0.iter().map(|(id, ty)| {
-        kwd("public type")
+        pp_comment(ty.comment())
+            .append(kwd("public type"))
             .append(escape(id, false))
             .append(" = ")
             .append(pp_ty(ty))
@@ -265,6 +277,20 @@ fn pp_actor(ty: &Type) -> RcDoc {
     }
 }
 
+fn pp_comment(comment_lines: Option<&[String]>) -> RcDoc {
+    let mut comment_doc = RcDoc::nil();
+    if let Some(comment_lines) = comment_lines {
+        for line in comment_lines {
+            comment_doc = comment_doc.append(
+                RcDoc::text(DOC_COMMENT_LINE_PREFIX)
+                    .append(line)
+                    .append(RcDoc::hardline()),
+            );
+        }
+    }
+    comment_doc
+}
+
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     let header = r#"// This is a generated Motoko binding.
 // Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
@@ -273,7 +299,9 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
         None => pp_defs(env),
         Some(actor) => {
             let defs = pp_defs(env);
-            let actor = kwd("public type Self =").append(pp_actor(actor));
+            let actor = pp_comment(actor.comment())
+                .append(kwd("public type Self ="))
+                .append(pp_actor(actor));
             defs.append(actor)
         }
     };

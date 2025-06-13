@@ -54,9 +54,8 @@ pub fn concat<'a, D>(docs: D, sep: &'a str) -> RcDoc<'a>
 where
     D: Iterator<Item = RcDoc<'a>> + Clone,
 {
-    RcDoc::intersperse(docs.clone().map(|d| d.append(sep)), RcDoc::line()).flat_alt(
-        RcDoc::intersperse(docs, RcDoc::text(sep).append(RcDoc::line())),
-    )
+    RcDoc::intersperse(docs.clone().map(|d| d.append(sep)), RcDoc::line())
+        .flat_alt(strict_concat(docs, sep))
 }
 
 pub fn lines<'a, D>(docs: D) -> RcDoc<'a>

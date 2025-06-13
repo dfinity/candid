@@ -4,6 +4,10 @@
 use candid::{self, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult as Result;
 
+#[derive(CandidType, Deserialize)]
+pub enum A { #[serde(rename="a")] A, #[serde(rename="b")] B(Box<B>) }
+#[derive(CandidType, Deserialize)]
+pub struct B (pub candid::Int,pub candid::Nat,);
 pub type Id = u8;
 
 
