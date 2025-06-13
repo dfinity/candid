@@ -377,7 +377,7 @@ fn test_{test_name}() {{
             .pp_label(&field.id, false, need_vis)
             .append(kwd(":"))
             .append(self.pp_ty(&field.ty, is_ref));
-        let res = pp_comment(field.comment.as_ref()).append(f);
+        let res = pp_comment(field.comment()).append(f);
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
@@ -417,7 +417,7 @@ fn test_{test_name}() {{
                 ")",
             )),
         };
-        let res = pp_comment(field.comment.as_ref()).append(f);
+        let res = pp_comment(field.comment()).append(f);
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }

@@ -186,7 +186,7 @@ impl TypeContainer {
 }
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
-pub struct Type(pub std::rc::Rc<TypeInner>, Option<String>);
+pub struct Type(pub std::rc::Rc<TypeInner>, Option<std::rc::Rc<String>>);
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 pub enum TypeInner {
@@ -238,7 +238,7 @@ impl From<TypeInner> for Type {
 }
 impl From<(TypeInner, Option<&String>)> for Type {
     fn from((t, comment): (TypeInner, Option<&String>)) -> Self {
-        Type(t.into(), comment.cloned())
+        Type(t.into(), comment.map(|s| std::rc::Rc::new(s.clone())))
     }
 }
 impl TypeInner {
@@ -335,10 +335,10 @@ impl Type {
         (inner, self.comment()).into()
     }
     pub fn comment(&self) -> Option<&String> {
-        self.1.as_ref()
+        self.1.as_ref().map(|rc| rc.as_ref())
     }
     pub fn with_comment(&self, comment: Option<&String>) -> Self {
-        Self(self.0.clone(), comment.cloned())
+        Self(self.0.clone(), comment.map(|s| std::rc::Rc::new(s.clone())))
     }
 }
 #[cfg(feature = "printer")]
@@ -499,7 +499,7 @@ pub type SharedLabel = std::rc::Rc<Label>;
 pub struct Field {
     pub id: SharedLabel,
     pub ty: Type,
-    pub comment: Option<String>,
+    pub comment: Option<std::rc::Rc<String>>,
 }
 #[cfg(feature = "printer")]
 impl fmt::Display for Field {
@@ -515,6 +515,11 @@ impl fmt::Display for Field {
 impl fmt::Display for Field {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+impl Field {
+    pub fn comment(&self) -> Option<&String> {
+        self.comment.as_ref().map(|rc| rc.as_ref())
     }
 }
 

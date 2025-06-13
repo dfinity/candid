@@ -103,6 +103,12 @@ pub struct TypeField {
     pub comment: Option<Comment>,
 }
 
+impl TypeField {
+    pub fn comment(&self) -> Option<String> {
+        self.comment.as_ref().map(|c| c.text.clone())
+    }
+}
+
 #[derive(Debug)]
 pub enum Dec {
     TypD(Binding),

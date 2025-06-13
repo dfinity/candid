@@ -88,7 +88,7 @@ pub(crate) fn get_comment_from_lines(
         if as_ref {
             quote::quote! { Some(#comment.to_string()).as_ref() }
         } else {
-            quote::quote! { Some(#comment.to_string()) }
+            quote::quote! { Some(std::rc::Rc::new(#comment.to_string())) }
         }
     }
 }

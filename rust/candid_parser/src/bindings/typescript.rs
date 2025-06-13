@@ -103,7 +103,7 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
 }
 
 fn pp_field<'a>(env: &'a TypeEnv, field: &'a Field, is_ref: bool) -> RcDoc<'a> {
-    pp_comment(field.comment.as_ref())
+    pp_comment(field.comment())
         .append(pp_label(&field.id))
         .append(kwd(":"))
         .append(pp_ty(env, &field.ty, is_ref))

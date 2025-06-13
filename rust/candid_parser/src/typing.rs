@@ -114,7 +114,7 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
         let field = Field {
             id: f.label.clone().into(),
             ty,
-            comment: f.comment.as_ref().map(|c| c.text.clone()),
+            comment: f.comment().map(std::rc::Rc::new),
         };
         res.push(field);
     }

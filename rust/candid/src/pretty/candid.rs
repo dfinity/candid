@@ -141,7 +141,7 @@ pub(crate) fn pp_field(field: &Field, is_variant: bool) -> RcDoc {
     } else {
         kwd(" :").append(pp_ty(&field.ty))
     };
-    pp_comment(field.comment.as_ref())
+    pp_comment(field.comment())
         .append(pp_label(&field.id))
         .append(ty_doc)
 }
