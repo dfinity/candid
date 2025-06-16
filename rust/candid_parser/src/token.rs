@@ -7,7 +7,8 @@ use logos::{Lexer, Logos};
 pub enum Token {
     #[token("/*")]
     StartComment,
-    #[regex(r"(( *)//[^\n]*\n)+", parse_comment_lines)]
+    // catch line comments at any nesting level, thanks to the `[ \t]*` prefix
+    #[regex(r"([ \t]*//[^\n]*\n)+", parse_comment_lines)]
     LineComment(Vec<String>),
     #[token("=")]
     Equals,
@@ -214,6 +215,31 @@ impl Iterator for Tokenizer<'_> {
                 }
                 self.lex = lex.morph::<Token>();
                 self.next()
+            }
+            Ok(Token::LineComment(mut lines)) => {
+                let span = self.lex.span();
+                let source = self.lex.source();
+
+                // Check the char before the span: if it's NOT a newline, it means that
+                // the line comment is at the end of a line and therefore it must be ignored
+                if span.start > 0 {
+                    let is_end_of_line_comment = source
+                        .chars()
+                        // subtraction is safe because we checked that span.start > 0
+                        .nth(span.start - 1)
+                        .map(|c| c != '\n')
+                        .unwrap_or(false);
+
+                    if is_end_of_line_comment {
+                        lines.remove(0);
+                    }
+                }
+
+                // Ignore the comment if it's empty
+                if lines.is_empty() {
+                    return self.next();
+                }
+                Some(Ok((span.start, Token::LineComment(lines), span.end)))
             }
             Ok(Token::StartString) => {
                 let mut result = String::new();

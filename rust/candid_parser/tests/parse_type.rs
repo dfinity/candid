@@ -18,12 +18,12 @@ type List = opt record {
   head: int;
   // This is a field comment
   tail: List;
-};
-type f = func (List, func (int32) -> (int64)) -> (opt List);
-type broker = service {
+}; // This comment is ignored
+type f = func (List, func (int32) -> (int64)) -> (opt List); // This comment is ignored
+type broker = service { // This comment is ignored
   // This is a method comment
   find : (name: text) ->
-    (service {up:() -> (); current:() -> (nat32)});
+    (service {up:() -> (); current:() -> (nat32)});     // This comment is ignored
 };
 type nested = record { nat; nat; record { nat; 0x2a:nat; nat8; }; 42:nat; 40:nat; variant{ A; 0x2a; B; C }; };
 
@@ -32,7 +32,7 @@ type nested = record { nat; nat; record { nat; 0x2a:nat; nat8; }; 42:nat; 40:nat
 // This is a service comment
 service server : {
   f : (test: blob, opt bool) -> () oneway;
-  g : (my_type, List, opt List) -> (int) query;
+  g : (my_type, List, opt List) -> (int) query; // This comment is ignored
   h : (vec opt text, variant { A: nat; B: opt text }, opt List) -> (record { id: nat; 0x2a: record {} });
   i : f;
 };

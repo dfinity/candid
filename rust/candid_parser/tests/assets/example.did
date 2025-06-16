@@ -13,21 +13,21 @@ type List = opt record {
   head: int;
   // This is a field comment
   tail: List;
-};
-type f = func (List, func (int32) -> (int64)) -> (opt List, res);
+}; // This comment is ignored
+type f = func (List, func (int32) -> (int64)) -> (opt List, res); // This comment is ignored
 // This is another type comment
 type broker = service {
   find : (name: text) ->
-    (service {up:() -> (); current:() -> (nat32)});
+    (service {up:() -> (); current:() -> (nat32)}); // This comment is ignored
 };
 type nested = record { nat; nat; record {nat;int;}; record { nat; 0x2a:nat; nat8; }; 42:nat; 40:nat; variant{ A; 0x2a; B; C }; };
-type res = variant { Ok: record{int;nat}; Err: record{ error: text } };
-type nested_res = variant {
+type res = variant { Ok: record{int;nat}; Err: record{ error: text } }; // This comment is ignored
+type nested_res = variant { // This comment is ignored
   // This is a variant comment
-  Ok : variant { Ok; Err };
+  Ok : variant { Ok; Err };      // This comment is ignored
   // This is another variant comment
   // that spans multiple lines for variants
-  Err : variant { Ok: record { content: text }; Err: record {int} };
+  Err : variant { Ok: record { content: text }; Err: record {int} }; // This comment is ignored
 };
 
 // This is another ignored comment
@@ -37,9 +37,9 @@ type nested_res = variant {
 service server : {
   f1 : (list, test: blob, opt bool) -> () oneway;
   // This is a method comment
-  g1 : (my_type, List, opt List, nested) -> (int, broker, nested_res) query;
-  h : (vec opt text, variant { A: nat; B: opt text }, opt List) -> (record { id: nat; 0x2a: record {} });
-  i : f;
+  g1 : (my_type, List, opt List, nested) -> (int, broker, nested_res) query; // This comment is ignored
+  h : (vec opt text, variant { A: nat; B: opt text }, opt List) -> (record { id: nat; 0x2a: record {} }); // This comment is ignored
+  i : f;// This comment is ignored
   // This is another method comment
   // that spans multiple lines for methods
   x : (a,b) -> (opt a, opt b, variant { Ok: record { result: text }; Err: variant {a;b} }) composite_query;
