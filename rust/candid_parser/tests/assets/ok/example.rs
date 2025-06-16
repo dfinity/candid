@@ -4,6 +4,7 @@
 use candid::{self, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult as Result;
 
+/// This is a type comment
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct B (pub(crate) candid::Int,pub(crate) u128,);
 #[derive(CandidType, Deserialize, Debug)]

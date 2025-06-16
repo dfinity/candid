@@ -10,6 +10,7 @@ module {
     tail : List;
   };
   public type a = { #a; #b : b };
+  /// This is a type comment
   public type b = (Int, Nat);
   /// This is another type comment
   public type broker = actor {

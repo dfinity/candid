@@ -6,6 +6,7 @@ type List = opt record {
   tail : List;
 };
 type a = variant { a; b : b };
+// This is a type comment
 type b = record { int; nat };
 // This is another type comment
 type broker = service {

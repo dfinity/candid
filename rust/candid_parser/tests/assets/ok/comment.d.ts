@@ -4,6 +4,9 @@ import type { IDL } from '@dfinity/candid';
 
 export type a = { 'a' : null } |
   { 'b' : b };
+/**
+ * This is a type comment
+ */
 export type b = [bigint, bigint];
 export type id = number;
 

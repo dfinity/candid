@@ -219,14 +219,15 @@ impl Iterator for Tokenizer<'_> {
             Ok(Token::LineComment(mut lines)) => {
                 let span = self.lex.span();
                 let source = self.lex.source();
+                let prev_char_index = span.start.saturating_sub(1);
 
                 // Check the char before the span: if it's NOT a newline, it means that
-                // the line comment is at the end of a line and therefore it must be ignored
-                if span.start > 0 {
+                // the comment is at the end of a line and therefore it must be ignored.
+                // If it's at the start of the file (prev_char_index == 0), we don't have to check anything.
+                if prev_char_index > 0 {
                     let is_end_of_line_comment = source
                         .chars()
-                        // subtraction is safe because we checked that span.start > 0
-                        .nth(span.start - 1)
+                        .nth(prev_char_index)
                         .map(|c| c != '\n')
                         .unwrap_or(false);
 

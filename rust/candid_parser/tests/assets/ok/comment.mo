@@ -3,6 +3,7 @@
 
 module {
   public type a = { #a; #b : b };
+  /// This is a type comment
   public type b = (Int, Nat);
   public type id = Nat8;
 

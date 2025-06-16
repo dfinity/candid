@@ -15,6 +15,9 @@ export type List = [] | [
 ];
 export type a = { 'a' : null } |
   { 'b' : b };
+/**
+ * This is a type comment
+ */
 export type b = [bigint, bigint];
 /**
  * This is another type comment

@@ -1,4 +1,5 @@
 type a = variant { a; b : b };
+// This is a type comment
 type b = record { int; nat };
 type id = nat8;
 
