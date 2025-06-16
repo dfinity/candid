@@ -38,6 +38,7 @@ candid::define_function!(pub(crate) T : (S) -> ());
 type CanisterId = Principal;
 #derive[CandidType, Deserialize, Clone]
 pub(crate) struct ListInner {
+  /// This is a field block comment
   #[serde(skip_deserializing)]
   #[serde(rename="head")]
   HEAD: candid::Int,
@@ -45,6 +46,7 @@ pub(crate) struct ListInner {
   #[serde(skip_deserializing)]
   tail: Arc<MyList>,
 }
+/// This is a type block comment
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct MyList(pub(crate) Option<ListInner>);
 #[derive(CandidType, Deserialize, Debug)]
@@ -127,9 +129,13 @@ impl Service {
   pub async fn G11(&self, id: &CanisterId, list: &MyList, is_okay: &Option<MyList>, arg3: &Nested) -> Result<(i128,Broker,NestedRes,)> {
     ic_cdk::call(self.0, "g1", (id,list,is_okay,arg3,)).await
   }
+  /// This is a block comment for a method
   pub async fn h(&self, arg0: &Vec<Option<String>>, arg1: &HArg1, arg2: &Option<MyList>) -> Result<(HRet,)> {
     ic_cdk::call(self.0, "h", (arg0,arg1,arg2,)).await
   }
+  /// This is a block comment for a method
+  /// that spans multiple lines,
+  /// even with wrong indentation
   pub async fn i(&self, arg0: &MyList, arg1: &FArg1) -> Result<(Option<MyList>,Res,)> {
     ic_cdk::call(self.0, "i", (arg0,arg1,)).await
   }
@@ -147,8 +153,10 @@ pub const service : Service = Service(CANISTER_ID);
 #[test]
 fn test_Arc_MyList_() {
   // Generated from ListInner.record.tail.use_type = "Arc<MyList>"
-  let candid_src = r#"type List = opt ListInner;
+  let candid_src = r#"// This is a type block comment
+type List = opt ListInner;
 type ListInner = record {
+  // This is a field block comment
   head : int;
   // This is a field comment
   tail : List;

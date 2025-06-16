@@ -10,7 +10,7 @@ pub type G = F;
 #[derive(CandidType, Deserialize)]
 pub struct O(pub Option<Box<O>>);
 
-/// This is a service comment
+/// This is a service block comment
 pub struct Service(pub Principal);
 impl Service {
   pub async fn f(&self, arg0: &candid::Nat) -> Result<(H,)> {
@@ -28,6 +28,6 @@ impl Service {
 }
 /// Canister ID: `aaaaa-aa`
 pub const CANISTER_ID : Principal = Principal::from_slice(&[]);
-/// This is a service comment
+/// This is a service block comment
 pub const service : Service = Service(CANISTER_ID);
 

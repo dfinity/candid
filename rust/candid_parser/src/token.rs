@@ -4,12 +4,16 @@ use logos::{Lexer, Logos};
 #[derive(Logos, Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 #[logos(skip r"[ \t\r]+")]
 #[logos(skip r"([ \t]*//[^\n]*\n)+\n")] // ignore line comments that are followed by an empty line
+#[logos(skip r"[ \t]*/\*([^(\*/)]*)\*/\n\n")] // ignore block comments that are followed by an empty line
 pub enum Token {
     #[token("/*")]
     StartComment,
     // catch line comments at any indentation level, thanks to the `[ \t]*` prefix
     #[regex(r"([ \t]*//[^\n]*\n)+", parse_comment_lines)]
     LineComment(Vec<String>),
+    // catch block comments at any indentation level, thanks to the `[ \t]*` prefix
+    #[regex(r"[ \t]*/\*([^(\*/)]*)\*/\n", parse_block_comment_lines)]
+    BlockComment(Vec<String>),
     #[token("=")]
     Equals,
     #[token("(")]
@@ -131,6 +135,20 @@ fn parse_comment_lines(lex: &mut Lexer<Token>) -> Vec<String> {
         .collect()
 }
 
+fn parse_block_comment_lines(lex: &mut Lexer<Token>) -> Vec<String> {
+    lex.slice()
+        .lines()
+        .map(|s| {
+            s.trim()
+                .trim_start_matches("/*")
+                .trim_end_matches("*/")
+                .trim()
+                .to_string()
+        })
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
 pub struct Tokenizer<'input> {
     lex: Lexer<'input, Token>,
 }
@@ -217,30 +235,20 @@ impl Iterator for Tokenizer<'_> {
                 self.next()
             }
             Ok(Token::LineComment(mut lines)) => {
-                let span = self.lex.span();
-                let source = self.lex.source();
-
-                // Check the char before the span: if it's NOT a newline, it means that
-                // the comment is at the end of a line and therefore it must be ignored.
-                // If it's at the start of the source (prev_char_index == 0), we don't have to check anything.
-                let prev_char_index = span.start.saturating_sub(1);
-                if prev_char_index > 0 {
-                    let is_end_of_line_comment = source
-                        .chars()
-                        .nth(prev_char_index)
-                        .map(|c| c != '\n')
-                        .unwrap_or(false);
-
-                    if is_end_of_line_comment {
-                        lines.remove(0);
-                    }
-                }
-
+                let span = skip_isolated_comments(&self.lex, &mut lines);
                 // Ignore the comment if it's empty
                 if lines.is_empty() {
                     return self.next();
                 }
                 Some(Ok((span.start, Token::LineComment(lines), span.end)))
+            }
+            Ok(Token::BlockComment(mut lines)) => {
+                let span = skip_isolated_comments(&self.lex, &mut lines);
+                // Ignore the comment if it's empty
+                if lines.is_empty() {
+                    return self.next();
+                }
+                Some(Ok((span.start, Token::BlockComment(lines), span.end)))
             }
             Ok(Token::StartString) => {
                 let mut result = String::new();
@@ -321,4 +329,27 @@ impl Iterator for Tokenizer<'_> {
             Ok(token) => Some(Ok((span.start, token, span.end))),
         }
     }
+}
+
+fn skip_isolated_comments(lex: &Lexer<Token>, comment_lines: &mut Vec<String>) -> Span {
+    let span = lex.span();
+    let source = lex.source();
+
+    // Check the char before the span: if it's NOT a newline or space, it means that
+    // the comment is at the end of a line and therefore it must be ignored.
+    // If it's at the start of the source (prev_char_index == 0), we don't have to check anything.
+    let prev_char_index = span.start.saturating_sub(1);
+    if prev_char_index > 0 {
+        let is_end_of_line_comment = source
+            .chars()
+            .nth(prev_char_index)
+            .map(|c| c != '\n' && c != ' ')
+            .unwrap_or(false);
+
+        if is_end_of_line_comment {
+            comment_lines.remove(0);
+        }
+    }
+
+    span
 }

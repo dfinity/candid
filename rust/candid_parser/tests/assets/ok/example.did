@@ -1,6 +1,8 @@
 type A = B;
 type B = opt A;
+// This is a type block comment
 type List = opt record {
+  // This is a field block comment
   head : int;
   // This is a field comment
   tail : List;
@@ -10,6 +12,7 @@ type a = variant { a; b : b };
 type b = record { int; nat };
 // This is another type comment
 type broker = service {
+  // This is a service method block comment
   find : (name : text) -> (service { current : () -> (nat32); up : () -> () });
 };
 type f = func (List, func (int32) -> (int64)) -> (opt List, res);
@@ -33,7 +36,12 @@ type nested_res = variant {
   Err : variant { Ok : record { content : text }; Err : record { int } };
 };
 type node = record { head : nat; tail : list };
-type res = variant { Ok : record { int; nat }; Err : record { error : text } };
+type res = variant {
+  // This is a block comment for variant Ok
+  Ok : record { int; nat };
+  // This comment is a block comment for variant Err
+  Err : record { error : text };
+};
 type s = service { f : t; g : (list) -> (B, tree, stream) };
 type stream = opt record { head : nat; next : func () -> (stream) query };
 type t = func (server : s) -> ();
@@ -51,9 +59,13 @@ service : {
   g : (list) -> (B, tree, stream);
   // This is a method comment
   g1 : (my_type, List, opt List, nested) -> (int, broker, nested_res) query;
+  // This is a block comment for a method
   h : (vec opt text, variant { A : nat; B : opt text }, opt List) -> (
       record { 42 : record {}; id : nat },
     );
+  // This is a block comment for a method
+  // that spans multiple lines,
+  // even with wrong indentation
   i : f;
   // This is another method comment
   // that spans multiple lines for methods

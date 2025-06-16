@@ -4,7 +4,9 @@
 module {
   public type A = B;
   public type B = ?A;
+  /// This is a type block comment
   public type List = ?{
+    /// This is a field block comment
     head : Int;
     /// This is a field comment
     tail : List;
@@ -14,6 +16,7 @@ module {
   public type b = (Int, Nat);
   /// This is another type comment
   public type broker = actor {
+    /// This is a service method block comment
     find : shared (name : Text) -> async actor {
         current : shared () -> async Nat32;
         up : shared () -> async ();
@@ -43,7 +46,12 @@ module {
     #Err : { #Ok : { content : Text }; #Err : { _0_  : Int } };
   };
   public type node = { head : Nat; tail : list };
-  public type res = { #Ok : (Int, Nat); #Err : { error : Text } };
+  public type res = {
+    /// This is a block comment for variant Ok
+    #Ok : (Int, Nat);
+    /// This comment is a block comment for variant Err
+    #Err : { error : Text };
+  };
   public type s = actor { f : t; g : shared list -> async (B, tree, stream) };
   public type stream = ?{ head : Nat; next : shared query () -> async stream };
   public type t = shared (server : s) -> async ();
@@ -65,10 +73,14 @@ module {
         broker,
         nested_res,
       );
+    /// This is a block comment for a method
     h : shared ([?Text], { #A : Nat; #B : ?Text }, ?List) -> async {
         _42_  : {};
         id : Nat;
       };
+    /// This is a block comment for a method
+    /// that spans multiple lines,
+    /// even with wrong indentation
     i : f;
     /// This is another method comment
     /// that spans multiple lines for methods

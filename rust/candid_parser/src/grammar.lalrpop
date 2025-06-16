@@ -47,6 +47,7 @@ extern {
         ":" => Token::Colon,
         "->" => Token::Arrow,
         "line_comment" => Token::LineComment(<Vec<String>>),
+        "block_comment" => Token::BlockComment(<Vec<String>>),
         "\n" => Token::Newline,
     }
 }
@@ -314,8 +315,11 @@ Name: String = {
     Text => <>,
 }
 
+
+// Prioritize the last comment
 Comment: Comment = {
-    "line_comment" => Comment { lines: <> },
+    <lc:"line_comment"> <bc:"block_comment"?> => Comment { lines: bc.unwrap_or(lc) },
+    <bc:"block_comment"> <lc:"line_comment"?> => Comment { lines: lc.unwrap_or(bc) },
 }
 
 // Also allows trailing separator
