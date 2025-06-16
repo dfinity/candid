@@ -3,11 +3,11 @@ use logos::{Lexer, Logos};
 
 #[derive(Logos, Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 #[logos(skip r"[ \t\r]+")]
-#[logos(skip r"(//[^\n]*\n)+\n")] // ignore line comments that are followed by an empty line
+#[logos(skip r"([ \t]*//[^\n]*\n)+\n")] // ignore line comments that are followed by an empty line
 pub enum Token {
     #[token("/*")]
     StartComment,
-    // catch line comments at any nesting level, thanks to the `[ \t]*` prefix
+    // catch line comments at any indentation level, thanks to the `[ \t]*` prefix
     #[regex(r"([ \t]*//[^\n]*\n)+", parse_comment_lines)]
     LineComment(Vec<String>),
     #[token("=")]
@@ -219,11 +219,11 @@ impl Iterator for Tokenizer<'_> {
             Ok(Token::LineComment(mut lines)) => {
                 let span = self.lex.span();
                 let source = self.lex.source();
-                let prev_char_index = span.start.saturating_sub(1);
 
                 // Check the char before the span: if it's NOT a newline, it means that
                 // the comment is at the end of a line and therefore it must be ignored.
-                // If it's at the start of the file (prev_char_index == 0), we don't have to check anything.
+                // If it's at the start of the source (prev_char_index == 0), we don't have to check anything.
+                let prev_char_index = span.start.saturating_sub(1);
                 if prev_char_index > 0 {
                     let is_end_of_line_comment = source
                         .chars()

@@ -36,6 +36,9 @@ type nested_res = variant { // This comment is ignored
 // that spans multiple lines for services
 service server : {
   f1 : (list, test: blob, opt bool) -> () oneway;
+  // This comment is ignored
+  // even indented
+
   // This is a method comment
   g1 : (my_type, List, opt List, nested) -> (int, broker, nested_res) query; // This comment is ignored
   h : (vec opt text, variant { A: nat; B: opt text }, opt List) -> (record { id: nat; 0x2a: record {} }); // This comment is ignored

@@ -4,6 +4,7 @@ import "import/a.did";
 
 // another ignored line comment
 // that spans multiple lines
+  // even indented
 
 /* gjkf
 jgfkg
