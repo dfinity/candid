@@ -1,3 +1,5 @@
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
 use crate::Result;
 use candid::types::{FuncMode, Label};
 
@@ -98,7 +100,13 @@ pub struct TypeField {
 }
 
 #[derive(Debug)]
-pub enum Dec {
+pub struct Dec {
+    pub doc_comment: Option<Vec<String>>,
+    pub inner: DecInner,
+}
+
+#[derive(Debug)]
+pub enum DecInner {
     TypD(Binding),
     ImportType(String),
     ImportServ(String),
@@ -125,15 +133,18 @@ pub struct IDLInitArgs {
 impl std::str::FromStr for IDLProg {
     type Err = crate::Error;
     fn from_str(str: &str) -> Result<Self> {
-        let lexer = super::token::Tokenizer::new(str);
-        Ok(super::grammar::IDLProgParser::new().parse(lexer)?)
+        let trivia: super::token::TriviaMap = Rc::new(RefCell::new(HashMap::new()));
+        let lexer = super::token::Tokenizer::new_with_trivia(str, trivia.clone());
+        let res = super::grammar::IDLProgParser::new().parse(Some(&trivia.clone()), lexer)?;
+        println!("{res:?}");
+        Ok(res)
     }
 }
 impl std::str::FromStr for IDLInitArgs {
     type Err = crate::Error;
     fn from_str(str: &str) -> Result<Self> {
         let lexer = super::token::Tokenizer::new(str);
-        Ok(super::grammar::IDLInitArgsParser::new().parse(lexer)?)
+        Ok(super::grammar::IDLInitArgsParser::new().parse(None, lexer)?)
     }
 }
 
@@ -141,7 +152,7 @@ impl std::str::FromStr for IDLType {
     type Err = crate::Error;
     fn from_str(str: &str) -> Result<Self> {
         let lexer = super::token::Tokenizer::new(str);
-        Ok(super::grammar::TypParser::new().parse(lexer)?)
+        Ok(super::grammar::TypParser::new().parse(None, lexer)?)
     }
 }
 
@@ -149,6 +160,6 @@ impl std::str::FromStr for IDLTypes {
     type Err = crate::Error;
     fn from_str(str: &str) -> Result<Self> {
         let lexer = super::token::Tokenizer::new(str);
-        Ok(super::grammar::TypsParser::new().parse(lexer)?)
+        Ok(super::grammar::TypsParser::new().parse(None, lexer)?)
     }
 }

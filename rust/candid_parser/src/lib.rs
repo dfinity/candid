@@ -144,10 +144,10 @@ pub mod test;
 
 pub fn parse_idl_args(s: &str) -> crate::Result<candid::IDLArgs> {
     let lexer = token::Tokenizer::new(s);
-    Ok(grammar::ArgsParser::new().parse(lexer)?)
+    Ok(grammar::ArgsParser::new().parse(None, lexer)?)
 }
 
 pub fn parse_idl_value(s: &str) -> crate::Result<candid::IDLValue> {
     let lexer = token::Tokenizer::new(s);
-    Ok(grammar::ArgParser::new().parse(lexer)?)
+    Ok(grammar::ArgParser::new().parse(None, lexer)?)
 }
