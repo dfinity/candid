@@ -183,7 +183,7 @@ impl TypeContainer {
 
 type CommentLines = std::rc::Rc<Vec<String>>;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Type(pub std::rc::Rc<TypeInner>, Option<CommentLines>);
 
 impl PartialEq for Type {
@@ -202,13 +202,19 @@ impl std::hash::Hash for Type {
 
 impl PartialOrd for Type {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0.partial_cmp(&other.0)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Type {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.0.cmp(&other.0)
+    }
+}
+
+impl std::fmt::Debug for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
