@@ -370,6 +370,7 @@ pub mod test {
     use super::value;
     use crate::test::{HostAssert, HostTest, Test};
     use candid::pretty::utils::*;
+    use candid::types::parser::IDLProg;
     use candid::TypeEnv;
     use pretty::RcDoc;
 
@@ -405,7 +406,7 @@ import { Principal } from './principal';
         let mut env = TypeEnv::new();
         crate::check_prog(
             &mut env,
-            &crate::IDLProg {
+            &IDLProg {
                 decs: test.defs,
                 actor: None,
             },

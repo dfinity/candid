@@ -1,10 +1,11 @@
 //! When serializing or deserializing Candid goes wrong.
 
+use candid::types::parser::{IDLProg, IDLTypes};
 use codespan_reporting::diagnostic::Label;
 use std::io;
 use thiserror::Error;
 
-use crate::token;
+use crate::{parse_idl_prog, parse_idl_types, token};
 use codespan_reporting::{
     diagnostic::Diagnostic,
     files::{Error as ReportError, SimpleFile},
@@ -110,6 +111,20 @@ where
     T: std::str::FromStr<Err = Error>,
 {
     str.parse::<T>().or_else(|e| {
+        pretty_diagnose(name, str, &e)?;
+        Err(e)
+    })
+}
+
+pub fn pretty_parse_idl_prog(name: &str, str: &str) -> Result<IDLProg> {
+    parse_idl_prog(str).or_else(|e| {
+        pretty_diagnose(name, str, &e)?;
+        Err(e)
+    })
+}
+
+pub fn pretty_parse_idl_types(name: &str, str: &str) -> Result<IDLTypes> {
+    parse_idl_types(str).or_else(|e| {
         pretty_diagnose(name, str, &e)?;
         Err(e)
     })

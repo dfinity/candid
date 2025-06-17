@@ -8,6 +8,8 @@ use serde::ser::Error;
 
 mod impls;
 pub mod internal;
+#[cfg(feature = "parser")]
+pub mod parser;
 pub mod subtype;
 pub mod type_env;
 #[cfg_attr(docsrs, doc(cfg(feature = "value")))]

@@ -3,8 +3,8 @@
 
 use candid::pretty::candid::is_valid_as_id;
 use candid::pretty::utils::*;
-use candid::types::{ArgType, FuncMode};
-use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use candid::types::{ArgType, Field, FuncMode, Function, Label, SharedLabel, Type, TypeInner};
+use candid::TypeEnv;
 use pretty::RcDoc;
 
 // The definition of tuple is language specific.

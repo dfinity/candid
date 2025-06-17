@@ -1,6 +1,8 @@
-use super::types::*;
-use crate::{pretty_parse, Error, Result};
-use candid::types::{ArgType, Field, Function, Type, TypeEnv, TypeInner};
+use crate::{parse_idl_prog, pretty_parse_idl_prog, Error, Result};
+use candid::types::{
+    parser::{Binding, Dec, IDLArgType, IDLInitArgs, IDLProg, IDLType, PrimType, TypeField},
+    ArgType, Field, Function, Type, TypeEnv, TypeInner,
+};
 use candid::utils::check_unique;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -11,7 +13,7 @@ pub struct Env<'a> {
 }
 
 /// Convert candid AST to internal Type
-pub fn ast_to_type(env: &TypeEnv, ast: &super::types::IDLType) -> Result<Type> {
+pub fn ast_to_type(env: &TypeEnv, ast: &IDLType) -> Result<Type> {
     let env = Env {
         te: &mut env.clone(),
         pre: false,
@@ -237,9 +239,9 @@ fn load_imports(
                     let code = std::fs::read_to_string(&path)
                         .map_err(|_| Error::msg(format!("Cannot import {file:?}")))?;
                     let code = if is_pretty {
-                        pretty_parse::<IDLProg>(path.to_str().unwrap(), &code)?
+                        pretty_parse_idl_prog(path.to_str().unwrap(), &code)?
                     } else {
-                        code.parse::<IDLProg>()?
+                        parse_idl_prog(&code)?
                     };
                     let base = path.parent().unwrap();
                     load_imports(is_pretty, base, visited, &code, list)?;
@@ -324,9 +326,9 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
     let prog =
         std::fs::read_to_string(file).map_err(|_| Error::msg(format!("Cannot open {file:?}")))?;
     let prog = if is_pretty {
-        pretty_parse::<IDLProg>(file.to_str().unwrap(), &prog)?
+        pretty_parse_idl_prog(file.to_str().unwrap(), &prog)?
     } else {
-        prog.parse::<IDLProg>()?
+        parse_idl_prog(&prog)?
     };
     let mut visited = BTreeMap::new();
     let mut imports = Vec::new();
@@ -346,7 +348,7 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
     let mut actor: Option<Type> = None;
     for (include_serv, path, name) in imports.iter() {
         let code = std::fs::read_to_string(path)?;
-        let code = code.parse::<IDLProg>()?;
+        let code = parse_idl_prog(&code)?;
         check_decs(&mut env, &code.decs)?;
         if *include_serv {
             let t = check_actor(&env, &code.actor)?;
