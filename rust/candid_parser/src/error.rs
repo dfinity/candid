@@ -106,6 +106,7 @@ impl From<toml::de::Error> for Error {
     }
 }
 
+/// Does not work for parsing [IDLProg] and [IDLTypes], use [pretty_parse_idl_prog] and [pretty_parse_idl_types] instead.
 pub fn pretty_parse<T>(name: &str, str: &str) -> Result<T>
 where
     T: std::str::FromStr<Err = Error>,
