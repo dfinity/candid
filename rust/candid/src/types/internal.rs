@@ -181,10 +181,13 @@ impl TypeContainer {
     }
 }
 
-type CommentLines = std::rc::Rc<Vec<String>>;
+type CommentLines = Vec<String>;
 
 #[derive(Clone)]
-pub struct Type(pub std::rc::Rc<TypeInner>, Option<CommentLines>);
+pub struct Type(
+    pub std::rc::Rc<TypeInner>,
+    Option<std::rc::Rc<CommentLines>>,
+);
 
 impl PartialEq for Type {
     fn eq(&self, other: &Self) -> bool {
@@ -529,7 +532,7 @@ pub type SharedLabel = std::rc::Rc<Label>;
 pub struct Field {
     pub id: SharedLabel,
     pub ty: Type,
-    pub comment: Option<CommentLines>,
+    pub comment: Option<std::rc::Rc<CommentLines>>,
 }
 #[cfg(feature = "printer")]
 impl fmt::Display for Field {
