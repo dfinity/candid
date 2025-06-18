@@ -4,7 +4,7 @@
 use candid::pretty::candid::is_valid_as_id;
 use candid::pretty::utils::*;
 use candid::types::{
-    syntax::{Binding, Dec, FuncType, IDLArgType, IDLProg, IDLType, PrimType, TypeField},
+    syntax::{Binding, FuncType, IDLArgType, IDLEnv, IDLType, PrimType, TypeField},
     FuncMode, Label,
 };
 use pretty::RcDoc;
@@ -257,16 +257,13 @@ fn pp_service(serv: &[Binding]) -> RcDoc {
     kwd("actor").append(enclose_space("{", doc, "}"))
 }
 
-fn pp_defs(decs: &[Dec]) -> RcDoc {
-    lines(decs.iter().map(|dec| {
-        match dec {
-            Dec::TypD(binding) => kwd("public type")
-                .append(escape(&binding.id, false))
-                .append(" = ")
-                .append(pp_ty(&binding.typ))
-                .append(";"),
-            _ => unreachable!(),
-        }
+fn pp_defs(bindings: &[Binding]) -> RcDoc {
+    lines(bindings.iter().map(|binding| {
+        kwd("public type")
+            .append(escape(&binding.id, false))
+            .append(" = ")
+            .append(pp_ty(&binding.typ))
+            .append(";")
     }))
 }
 
@@ -278,14 +275,14 @@ fn pp_actor(ty: &IDLType) -> RcDoc {
     }
 }
 
-pub fn compile(prog: &IDLProg) -> String {
+pub fn compile(env: &IDLEnv) -> String {
     let header = r#"// This is a generated Motoko binding.
 // Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 "#;
-    let doc = match &prog.actor {
-        None => pp_defs(&prog.decs),
+    let doc = match &env.actor {
+        None => pp_defs(&env.types_bindings),
         Some(actor) => {
-            let defs = pp_defs(&prog.decs);
+            let defs = pp_defs(&env.types_bindings);
             let actor = kwd("public type Self =").append(pp_actor(actor));
             defs.append(actor)
         }

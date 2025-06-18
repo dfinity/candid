@@ -4,21 +4,29 @@
 module {
   public type A = B;
   public type B = ?A;
-  public type List = ?{ head : Int; tail : List };
-  public type a = { #a; #b : b };
+  public type node = { head : Nat; tail : list };
+  public type list = ?node;
+  public type tree = {
+    #branch : { val : Int; left : tree; right : tree };
+    #leaf : Int;
+  };
+  public type s = actor { f : t; g : shared list -> async (B, tree, stream) };
+  public type t = shared (server : s) -> async ();
+  public type stream = ?{ head : Nat; next : shared query () -> async stream };
   public type b = (Int, Nat);
+  public type a = { #a; #b : b };
+  public type my_type = Principal;
+  public type List = ?{ head : Int; tail : List };
+  public type f = shared (List, shared Int32 -> async Int64) -> async (
+      ?List,
+      res,
+    );
   public type broker = actor {
     find : shared (name : Text) -> async actor {
         current : shared () -> async Nat32;
         up : shared () -> async ();
       };
   };
-  public type f = shared (List, shared Int32 -> async Int64) -> async (
-      ?List,
-      res,
-    );
-  public type list = ?node;
-  public type my_type = Principal;
   public type nested = {
     _0_  : Nat;
     _1_  : Nat;
@@ -28,24 +36,16 @@ module {
     _41_  : { #_42_ ; #A; #B; #C };
     _42_  : Nat;
   };
+  public type res = { #Ok : (Int, Nat); #Err : { error : Text } };
   public type nested_res = {
     #Ok : { #Ok; #Err };
     #Err : { #Ok : { content : Text }; #Err : { _0_  : Int } };
   };
-  public type node = { head : Nat; tail : list };
-  public type res = { #Ok : (Int, Nat); #Err : { error : Text } };
-  public type s = actor { f : t; g : shared list -> async (B, tree, stream) };
-  public type stream = ?{ head : Nat; next : shared query () -> async stream };
-  public type t = shared (server : s) -> async ();
-  public type tree = {
-    #branch : { val : Int; left : tree; right : tree };
-    #leaf : Int;
-  };
   public type Self = actor {
     bbbbb : shared b -> async ();
     f : t;
-    f1 : shared (list, test : Blob, ?Bool) -> ();
     g : shared list -> async (B, tree, stream);
+    f1 : shared (list, test : Blob, ?Bool) -> ();
     g1 : shared query (my_type, List, ?List, nested) -> async (
         Int,
         broker,

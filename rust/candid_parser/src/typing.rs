@@ -1,6 +1,8 @@
 use crate::{parse_idl_prog, pretty_parse_idl_prog, Error, Result};
 use candid::types::{
-    syntax::{Binding, Dec, IDLArgType, IDLInitArgs, IDLProg, IDLType, PrimType, TypeField},
+    syntax::{
+        Binding, Dec, IDLArgType, IDLEnv, IDLInitArgs, IDLProg, IDLType, PrimType, TypeField,
+    },
     ArgType, Field, Function, Type, TypeEnv, TypeInner,
 };
 use candid::utils::check_unique;
@@ -9,13 +11,27 @@ use std::path::{Path, PathBuf};
 
 pub struct Env<'a> {
     pub te: &'a mut TypeEnv,
+    pub idl_env: &'a mut IDLEnv,
     pub pre: bool,
+}
+
+impl Env<'_> {
+    fn insert(&mut self, id: String, t: Type) -> bool {
+        let duplicate = self.te.0.insert(id, t);
+        duplicate.is_some()
+    }
+
+    fn insert_binding(&mut self, binding: Binding, t: Type) {
+        self.insert(binding.id.to_string(), t);
+        self.idl_env.insert_binding(binding);
+    }
 }
 
 /// Convert candid AST to internal Type
 pub fn ast_to_type(env: &TypeEnv, ast: &IDLType) -> Result<Type> {
     let env = Env {
         te: &mut env.clone(),
+        idl_env: &mut IDLEnv::new(),
         pre: false,
     };
     check_type(&env, ast)
@@ -141,9 +157,9 @@ fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
 fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         match dec {
-            Dec::TypD(Binding { id, typ }) => {
-                let t = check_type(env, typ)?;
-                env.te.0.insert(id.to_string(), t);
+            Dec::TypD(binding) => {
+                let t = check_type(env, &binding.typ)?;
+                env.insert_binding(binding.clone(), t);
             }
             Dec::ImportType(_) | Dec::ImportServ(_) => (),
         }
@@ -177,8 +193,8 @@ fn check_cycle(env: &TypeEnv) -> Result<()> {
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         if let Dec::TypD(Binding { id, typ: _ }) = dec {
-            let duplicate = env.te.0.insert(id.to_string(), TypeInner::Unknown.into());
-            if duplicate.is_some() {
+            let is_duplicate = env.insert(id.to_string(), TypeInner::Unknown.into());
+            if is_duplicate {
                 return Err(Error::msg(format!("duplicate binding for {id}")));
             }
         }
@@ -191,22 +207,24 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
-fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
+fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<(Type, IDLType)>> {
     match actor {
         None => Ok(None),
-        Some(IDLType::ClassT(ts, t)) => {
-            let mut args = Vec::new();
-            for arg in ts.iter() {
-                args.push(check_arg(env, arg)?);
-            }
-            let serv = check_type(env, t)?;
-            env.te.as_service(&serv)?;
-            Ok(Some(TypeInner::Class(args, serv).into()))
-        }
         Some(typ) => {
-            let t = check_type(env, typ)?;
-            env.te.as_service(&t)?;
-            Ok(Some(t))
+            let serv = if let IDLType::ClassT(ts, t) = typ {
+                let mut args = Vec::new();
+                for arg in ts.iter() {
+                    args.push(check_arg(env, arg)?);
+                }
+                let t = check_type(env, t)?;
+                env.te.as_service(&t)?;
+                TypeInner::Class(args, t).into()
+            } else {
+                let serv = check_type(env, typ)?;
+                env.te.as_service(&serv)?;
+                serv
+            };
+            Ok(Some((serv, typ.clone())))
         }
     }
 }
@@ -256,18 +274,27 @@ fn load_imports(
 /// Type check IDLProg and adds bindings to type environment. Returns
 /// the main actor if present. This function ignores the imports.
 pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<Option<Type>> {
-    let mut env = Env { te, pre: false };
+    let mut env = Env {
+        te,
+        idl_env: &mut IDLEnv::new(),
+        pre: false,
+    };
     check_decs(&mut env, &prog.decs)?;
-    check_actor(&env, &prog.actor)
+    check_actor(&env, &prog.actor).map(|t| t.map(|t| t.0))
 }
 /// Type check init args extracted from canister metadata candid:args.
 /// Need to provide `main_env`, because init args may refer to variables from the main did file.
 pub fn check_init_args(
     te: &mut TypeEnv,
     main_env: &TypeEnv,
+    idl_env: &mut IDLEnv,
     prog: &IDLInitArgs,
 ) -> Result<Vec<ArgType>> {
-    let mut env = Env { te, pre: false };
+    let mut env = Env {
+        te,
+        idl_env,
+        pre: false,
+    };
     check_decs(&mut env, &prog.decs)?;
     env.te.merge(main_env)?;
     let mut args = Vec::new();
@@ -279,32 +306,36 @@ pub fn check_init_args(
 
 fn merge_actor(
     env: &Env,
-    actor: &Option<Type>,
-    imported: &Option<Type>,
+    actor: &Option<(Type, IDLType)>,
+    imported: &Option<(Type, IDLType)>,
     file: &str,
-) -> Result<Option<Type>> {
+) -> Result<Option<(Type, IDLType)>> {
     match imported {
         None => Err(Error::msg(format!(
             "Imported service file {file:?} has no main service"
         ))),
-        Some(t) => {
+        Some((t, idl_type)) => {
             let t = env.te.trace_type(t)?;
+            let idl_meths = env.idl_env.as_service(idl_type).map_err(Error::msg)?;
             match t.as_ref() {
                 TypeInner::Class(_, _) => Err(Error::msg(format!(
                     "Imported service file {file:?} has a service constructor"
                 ))),
                 TypeInner::Service(meths) => match actor {
-                    None => Ok(Some(t)),
-                    Some(t) => {
+                    None => Ok(Some((t, idl_type.clone()))),
+                    Some((t, idl_type)) => {
                         let t = env.te.trace_type(t)?;
                         let serv = env.te.as_service(&t)?;
+                        let idl_serv = env.idl_env.as_service(idl_type).map_err(Error::msg)?;
                         let mut ms: Vec<_> = serv.iter().chain(meths.iter()).cloned().collect();
                         ms.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
                         check_unique(ms.iter().map(|m| &m.0)).map_err(|e| {
                             Error::msg(format!("Duplicate imported method name: {e}"))
                         })?;
                         let res: Type = TypeInner::Service(ms).into();
-                        Ok(Some(res))
+                        let res_idl_meths =
+                            idl_meths.iter().chain(idl_serv.iter()).cloned().collect();
+                        Ok(Some((res, IDLType::ServT(res_idl_meths))))
                     }
                 },
                 _ => unreachable!(),
@@ -313,7 +344,7 @@ fn merge_actor(
     }
 }
 
-fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, IDLProg, Option<Type>)> {
+fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, IDLEnv, Option<Type>)> {
     let base = if file.is_absolute() {
         file.parent().unwrap().to_path_buf()
     } else {
@@ -323,13 +354,17 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, IDLProg, Option
             .unwrap()
             .to_path_buf()
     };
-    let prog =
-        std::fs::read_to_string(file).map_err(|_| Error::msg(format!("Cannot open {file:?}")))?;
-    let prog = if is_pretty {
-        pretty_parse_idl_prog(file.to_str().unwrap(), &prog)?
-    } else {
-        parse_idl_prog(&prog)?
+
+    let prog = {
+        let prog = std::fs::read_to_string(file)
+            .map_err(|_| Error::msg(format!("Cannot open {file:?}")))?;
+        if is_pretty {
+            pretty_parse_idl_prog(file.to_str().unwrap(), &prog)?
+        } else {
+            parse_idl_prog(&prog)?
+        }
     };
+
     let mut visited = BTreeMap::new();
     let mut imports = Vec::new();
     load_imports(is_pretty, &base, &mut visited, &prog, &mut imports)?;
@@ -340,12 +375,16 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, IDLProg, Option
             None => unreachable!(),
         })
         .collect();
+
     let mut te = TypeEnv::new();
+    let mut idl_env = IDLEnv::new();
     let mut env = Env {
         te: &mut te,
+        idl_env: &mut idl_env,
         pre: false,
     };
-    let mut actor: Option<Type> = None;
+
+    let mut actor: Option<(Type, IDLType)> = None;
     for (include_serv, path, name) in imports.iter() {
         let code = std::fs::read_to_string(path)?;
         let code = parse_idl_prog(&code)?;
@@ -355,18 +394,22 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, IDLProg, Option
             actor = merge_actor(&env, &actor, &t, name)?;
         }
     }
+
     check_decs(&mut env, &prog.decs)?;
+
     let mut res = check_actor(&env, &prog.actor)?;
     if actor.is_some() {
         res = merge_actor(&env, &res, &actor, "")?;
     }
-    Ok((te, prog, res))
+    idl_env.set_actor(res.clone().map(|t| t.1));
+
+    Ok((te, idl_env, res.map(|t| t.0)))
 }
 
 /// Type check did file including the imports.
-pub fn check_file(file: &Path) -> Result<(TypeEnv, IDLProg, Option<Type>)> {
+pub fn check_file(file: &Path) -> Result<(TypeEnv, IDLEnv, Option<Type>)> {
     check_file_(file, false)
 }
-pub fn pretty_check_file(file: &Path) -> Result<(TypeEnv, IDLProg, Option<Type>)> {
+pub fn pretty_check_file(file: &Path) -> Result<(TypeEnv, IDLEnv, Option<Type>)> {
     check_file_(file, true)
 }

@@ -2,16 +2,16 @@
 // Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 
 module {
+  public type o = ?o;
+  public type node = { head : Nat; tail : list };
+  public type list = ?node;
   public type if_ = {
     #branch : { val : Int; left : if_; right : if_ };
     #leaf : Int;
   };
-  public type list = ?node;
-  public type node = { head : Nat; tail : list };
-  public type o = ?o;
   public type return_ = actor { f : t; g : shared list -> async (if_, stream) };
-  public type stream = ?{ head : Nat; next : shared query () -> async stream };
   public type t = shared (server : return_) -> async ();
+  public type stream = ?{ head : Nat; next : shared query () -> async stream };
   public type Self = actor {
     Oneway : shared () -> ();
     f__ : shared o -> async o;

@@ -1,6 +1,6 @@
 use crate::{check_prog, pretty_check_file, pretty_parse_idl_prog, Error, Result};
 use candid::{
-    types::{syntax::IDLProg, Type, TypeInner},
+    types::{syntax::IDLEnv, Type, TypeInner},
     TypeEnv,
 };
 use std::path::Path;
@@ -11,14 +11,15 @@ pub enum CandidSource<'a> {
 }
 
 impl CandidSource<'_> {
-    pub fn load(&self) -> Result<(TypeEnv, IDLProg, Option<Type>)> {
+    pub fn load(&self) -> Result<(TypeEnv, IDLEnv, Option<Type>)> {
         Ok(match self {
             CandidSource::File(path) => pretty_check_file(path)?,
             CandidSource::Text(str) => {
                 let ast = pretty_parse_idl_prog("", str)?;
                 let mut env = TypeEnv::new();
+                let idl_env = IDLEnv::from(&ast);
                 let actor = check_prog(&mut env, &ast)?;
-                (env, ast, actor)
+                (env, idl_env, actor)
             }
         })
     }
@@ -88,7 +89,7 @@ pub fn merge_init_args(candid: &str, init: &str) -> Result<(TypeEnv, Type)> {
     use crate::{parse_idl_init_args, typing::check_init_args};
     use candid::types::TypeInner;
     let candid = CandidSource::Text(candid);
-    let (env, _, serv) = candid.load()?;
+    let (env, mut idl_env, serv) = candid.load()?;
     let serv = serv.ok_or_else(|| Error::msg("the Candid interface has no main service type"))?;
     let serv = env.trace_type(&serv)?;
     match serv.as_ref() {
@@ -96,7 +97,7 @@ pub fn merge_init_args(candid: &str, init: &str) -> Result<(TypeEnv, Type)> {
         TypeInner::Service(_) => {
             let prog = parse_idl_init_args(init)?;
             let mut env2 = TypeEnv::new();
-            let args = check_init_args(&mut env2, &env, &prog)?;
+            let args = check_init_args(&mut env2, &env, &mut idl_env, &prog)?;
             Ok((env2, TypeInner::Class(args, serv).into()))
         }
         _ => unreachable!(),
@@ -110,7 +111,8 @@ pub fn check_rust_type<T: candid::CandidType>(candid_args: &str) -> Result<()> {
     use candid::types::{internal::TypeContainer, subtype::equal, TypeEnv};
     let parsed = parse_idl_init_args(candid_args)?;
     let mut env = TypeEnv::new();
-    let args = check_init_args(&mut env, &TypeEnv::new(), &parsed)?;
+    let mut idl_env = IDLEnv::new();
+    let args = check_init_args(&mut env, &TypeEnv::new(), &mut idl_env, &parsed)?;
     let mut rust_env = TypeContainer::new();
     let ty = rust_env.add::<T>();
     let ty = env.merge_type(rust_env.env, ty);

@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use candid_parser::candid::types::{
     subtype,
-    syntax::{IDLProg, IDLType, IDLTypes},
+    syntax::{IDLType, IDLTypes},
     Type,
 };
 use candid_parser::{
@@ -131,10 +131,11 @@ impl TypeAnnotation {
         self.tys.is_none() && self.method.is_none()
     }
     fn get_types(&self, mode: Mode) -> candid_parser::Result<(TypeEnv, Vec<Type>)> {
-        let (env, _, actor) = if let Some(ref file) = self.defs {
-            pretty_check_file(file)?
+        let (env, actor) = if let Some(ref file) = self.defs {
+            let (env, _, actor) = pretty_check_file(file)?;
+            (env, actor)
         } else {
-            (TypeEnv::new(), IDLProg::default(), None)
+            (TypeEnv::new(), None)
         };
         match (&self.tys, &self.method) {
             (None, None) => Err(Error::msg("no type annotations")),
@@ -210,10 +211,10 @@ fn main() -> Result<()> {
             }
         }
         Command::Subtype { defs, ty1, ty2 } => {
-            let (env, _, _) = if let Some(file) = defs {
-                pretty_check_file(&file)?
+            let env = if let Some(file) = defs {
+                pretty_check_file(&file)?.0
             } else {
-                (TypeEnv::new(), IDLProg::default(), None)
+                TypeEnv::new()
             };
             let ty1 = ast_to_type(&env, &ty1)?;
             let ty2 = ast_to_type(&env, &ty2)?;

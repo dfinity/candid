@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use crate::types::{FuncMode, Label};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -109,7 +111,7 @@ pub struct Binding {
     pub typ: IDLType,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct IDLProg {
     pub decs: Vec<Dec>,
     pub actor: Option<IDLType>,
@@ -119,4 +121,69 @@ pub struct IDLProg {
 pub struct IDLInitArgs {
     pub decs: Vec<Dec>,
     pub args: Vec<IDLArgType>,
+}
+
+#[derive(Debug, Default)]
+pub struct IDLEnv {
+    pub types_bindings: Vec<Binding>,
+    types_bindings_ids: BTreeSet<String>,
+    pub actor: Option<IDLType>,
+}
+
+impl From<&IDLProg> for IDLEnv {
+    fn from(prog: &IDLProg) -> Self {
+        let mut types_bindings_ids = BTreeSet::new();
+        let mut types_bindings = Vec::new();
+
+        for dec in prog.decs.iter() {
+            if let Dec::TypD(binding) = dec {
+                let is_duplicate = types_bindings_ids.insert(binding.id.clone());
+                if !is_duplicate {
+                    types_bindings.push(binding.clone());
+                }
+            }
+        }
+
+        let mut env = Self {
+            types_bindings,
+            types_bindings_ids,
+            actor: None,
+        };
+        env.set_actor(prog.actor.clone());
+        env
+    }
+}
+
+impl IDLEnv {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn insert_binding(&mut self, binding: Binding) {
+        let is_duplicate = self.types_bindings_ids.insert(binding.id.clone());
+        if !is_duplicate {
+            self.types_bindings.push(binding);
+        }
+    }
+
+    pub fn set_actor(&mut self, actor: Option<IDLType>) {
+        self.actor = actor;
+    }
+
+    pub fn find_type(&self, id: &str) -> Result<&IDLType, String> {
+        self.types_bindings
+            .iter()
+            .find(|b| b.id == id)
+            .map(|b| &b.typ)
+            .ok_or(format!("Unbound type identifier: {id}"))
+    }
+
+    pub fn as_service<'a>(&'a self, t: &'a IDLType) -> Result<&'a Vec<Binding>, String> {
+        match t {
+            IDLType::ServT(methods) => Ok(methods),
+            IDLType::VarT(id) => self.as_service(self.find_type(id)?),
+            IDLType::ClassT(_, t) => self.as_service(t),
+            _ => Err(format!("not a service type: {:?}", t)),
+        }
+    }
 }
