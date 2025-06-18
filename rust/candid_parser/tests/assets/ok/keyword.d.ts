@@ -6,11 +6,14 @@ export type if_ = {
     'branch' : { 'val' : bigint, 'left' : if_, 'right' : if_ }
   } |
   { 'leaf' : bigint };
-export type list = [] | [node];
+export type list = node | undefined;
 export interface node { 'head' : bigint, 'tail' : list }
-export type o = [] | [o];
+export type o = Array<o>;
 export interface return_ { 'f' : t, 'g' : ActorMethod<[list], [if_, stream]> }
-export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
+export type stream = {
+  'head' : bigint,
+  'next' : [Principal, string],
+} | undefined;
 export type t = ActorMethod<[Principal], undefined>;
 export interface _SERVICE {
   'Oneway' : ActorMethod<[], undefined>,

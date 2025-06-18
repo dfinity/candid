@@ -4,6 +4,10 @@ use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInne
 use pretty::RcDoc;
 
 fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
+    pp_ty_with_context(env, ty, is_ref, None)
+}
+
+fn pp_ty_with_context<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool, current_type_id: Option<&'a str>) -> RcDoc<'a> {
     use TypeInner::*;
     match ty.as_ref() {
         Null => str("null"),
@@ -23,11 +27,10 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         Text => str("string"),
         Reserved => str("any"),
         Empty => str("never"),
-        Var(ref id) => {
-            if is_ref {
+        Var(ref id) => {                if is_ref {
                 let ty = env.rec_find_type(id).unwrap();
                 if matches!(ty.as_ref(), Service(_) | Func(_)) {
-                    pp_ty(env, ty, false)
+                    pp_ty_with_context(env, ty, false, current_type_id)
                 } else {
                     ident(id)
                 }
@@ -36,7 +39,30 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
             }
         }
         Principal => str("Principal"),
-        Opt(ref t) => pp_ty(env, t, is_ref).append(str(" | undefined")),
+        Opt(ref t) => {
+            
+            // if the inner type is an option, we treat it as a nested option
+            
+            if t.as_ref().is_opt() {
+                println!("pp_ty: {ty:?}");
+                println!("t: {t:?}");
+                
+                str("[] | ").append(enclose("[", pp_ty_with_context(env, t, is_ref, current_type_id), "]"))
+            }
+            // for self referential check, check if the id is the same as the type that is inside the optional
+            else if let (Some(current_id), TypeInner::Var(ref var_id)) = (current_type_id, t.as_ref()) {
+                if current_id == var_id {
+                    // Self-referential optional type like "type o = opt o"
+                    // In TypeScript, this becomes a recursive array type
+                    str("Array<").append(ident(current_id)).append(">")
+                } else {
+                    pp_ty_with_context(env, t, is_ref, current_type_id).append(str(" | undefined"))
+                }
+            }
+            else {
+                pp_ty_with_context(env, t, is_ref, current_type_id).append(str(" | undefined"))
+            }
+        }
         Vec(ref t) => {
             let ty = match t.as_ref() {
                 Var(ref id) => {
@@ -61,15 +87,15 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
                 Int16 => str("Int16Array | number[]"),
                 Int32 => str("Int32Array | number[]"),
                 Int64 => str("BigInt64Array | bigint[]"),
-                _ => str("Array").append(enclose("<", pp_ty(env, t, is_ref), ">")),
+                _ => str("Array").append(enclose("<", pp_ty_with_context(env, t, is_ref, current_type_id), ">")),
             }
         }
         Record(ref fs) => {
             if is_tuple(ty) {
-                let tuple = concat(fs.iter().map(|f| pp_ty(env, &f.ty, is_ref)), ",");
+                let tuple = concat(fs.iter().map(|f| pp_ty_with_context(env, &f.ty, is_ref, current_type_id)), ",");
                 enclose("[", tuple, "]")
             } else {
-                let fields = concat(fs.iter().map(|f| pp_field(env, f, is_ref)), ",");
+                let fields = concat(fs.iter().map(|f| pp_field_with_context(env, f, is_ref, current_type_id)), ",");
                 enclose_space("{", fields, "}")
             }
         }
@@ -79,7 +105,7 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
             } else {
                 strict_concat(
                     fs.iter()
-                        .map(|f| enclose_space("{", pp_field(env, f, is_ref), "}")),
+                        .map(|f| enclose_space("{", pp_field_with_context(env, f, is_ref, current_type_id), "}")),
                     " |",
                 )
                 .nest(INDENT_SPACE)
@@ -103,9 +129,13 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
 }
 
 fn pp_field<'a>(env: &'a TypeEnv, field: &'a Field, is_ref: bool) -> RcDoc<'a> {
+    pp_field_with_context(env, field, is_ref, None)
+}
+
+fn pp_field_with_context<'a>(env: &'a TypeEnv, field: &'a Field, is_ref: bool, current_type_id: Option<&'a str>) -> RcDoc<'a> {
     pp_label(&field.id)
         .append(kwd(":"))
-        .append(pp_ty(env, &field.ty, is_ref))
+        .append(pp_ty_with_context(env, &field.ty, is_ref, current_type_id))
 }
 
 fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
@@ -148,7 +178,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
             TypeInner::Record(_) if !ty.is_tuple() => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
-                .append(pp_ty(env, ty, false)),
+                .append(pp_ty_with_context(env, ty, false, Some(id))),
             TypeInner::Service(ref serv) => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
@@ -161,7 +191,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
             _ => kwd("export type")
                 .append(ident(id))
                 .append(" = ")
-                .append(pp_ty(env, ty, false))
+                .append(pp_ty_with_context(env, ty, false, Some(id)))
                 .append(";"),
         };
         export

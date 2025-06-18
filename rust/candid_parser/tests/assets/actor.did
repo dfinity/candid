@@ -2,10 +2,12 @@ type f = func (int8) -> (int8);
 type g = f;
 type h = func (f) -> (f);
 type o = opt o;
+type foo = opt opt text;
 service :
 {
   f : (nat) -> (h);
   g : f;
   h : g;
   o : (o) -> (o);
+  foo: () -> (foo);
 }

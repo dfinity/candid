@@ -10,12 +10,12 @@ export interface _SERVICE {
   'asPrincipal' : ActorMethod<[], [Principal, [Principal, string]]>,
   'asRecord' : ActorMethod<
     [],
-    [Principal, [] | [Principal], [Principal, string]]
+    [Principal, Principal | undefined, [Principal, string]]
   >,
   'asVariant' : ActorMethod<
     [],
     { 'a' : Principal } |
-      { 'b' : { 'f' : [] | [[Principal, string]] } }
+      { 'b' : { 'f' : [Principal, string] | undefined } }
   >,
 }
 export declare const idlFactory: IDL.InterfaceFactory;

@@ -30,14 +30,12 @@ export interface get_current_fee_percentiles_request {
 }
 export interface get_utxos_request {
   'network' : bitcoin_network,
-  'filter' : (
-    { 'page' : Uint8Array | number[] } |
-      { 'min_confirmations' : number }
-  ) | undefined,
+  'filter' : { 'page' : Uint8Array | number[] } |
+    { 'min_confirmations' : number } | undefined,
   'address' : bitcoin_address,
 }
 export interface get_utxos_response {
-  'next_page' : (Uint8Array | number[]) | undefined,
+  'next_page' : Uint8Array | number[] | undefined,
   'tip_height' : number,
   'tip_block_hash' : block_hash,
   'utxos' : Array<utxo>,
@@ -83,7 +81,7 @@ export interface _SERVICE {
       'cycles' : bigint,
       'settings' : definite_canister_settings,
       'idle_cycles_burned_per_day' : bigint,
-      'module_hash' : (Uint8Array | number[]) | undefined,
+      'module_hash' : Uint8Array | number[] | undefined,
     }
   >,
   'create_canister' : ActorMethod<
@@ -112,14 +110,12 @@ export interface _SERVICE {
         'method' : { 'get' : null } |
           { 'head' : null } |
           { 'post' : null },
-        'max_response_bytes' : [] | [bigint],
-        'body' : [] | [Uint8Array | number[]],
-        'transform' : [] | [
-          {
-            'function' : [Principal, string],
-            'context' : Uint8Array | number[],
-          }
-        ],
+        'max_response_bytes' : bigint | undefined,
+        'body' : Uint8Array | number[] | undefined,
+        'transform' : {
+          'function' : [Principal, string],
+          'context' : Uint8Array | number[],
+        } | undefined,
         'headers' : Array<http_header>,
       },
     ],
@@ -141,9 +137,9 @@ export interface _SERVICE {
   'provisional_create_canister_with_cycles' : ActorMethod<
     [
       {
-        'settings' : [] | [canister_settings],
-        'specified_id' : [] | [canister_id],
-        'amount' : [] | [bigint],
+        'settings' : canister_settings | undefined,
+        'specified_id' : canister_id | undefined,
+        'amount' : bigint | undefined,
       },
     ],
     { 'canister_id' : canister_id }

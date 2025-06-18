@@ -2,8 +2,8 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
-export type A = [] | [B];
-export type B = [] | [C];
+export type A = B | undefined;
+export type B = C | undefined;
 export type C = A;
 export type X = Y;
 export type Y = Z;
