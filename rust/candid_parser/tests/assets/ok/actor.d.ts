@@ -7,7 +7,7 @@ export type g = f;
 export type h = ActorMethod<[[Principal, string]], [Principal, string]>;
 export type o = [] | [o];
 /**
- * This is a service comment
+ * This is a service block comment
  */
 export interface _SERVICE {
   'f' : ActorMethod<[bigint], [Principal, string]>,

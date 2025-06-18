@@ -4,8 +4,14 @@ import type { IDL } from '@dfinity/candid';
 
 export type A = B;
 export type B = [] | [A];
+/**
+ * This is a type block comment
+ */
 export type List = [] | [
   {
+    /**
+     * This is a field block comment
+     */
     'head' : bigint,
     /**
      * This is a field comment
@@ -22,7 +28,12 @@ export type b = [bigint, bigint];
 /**
  * This is another type comment
  */
-export interface broker { 'find' : ActorMethod<[string], Principal> }
+export interface broker {
+  /**
+   * This is a service method block comment
+   */
+  'find' : ActorMethod<[string], Principal>,
+}
 export type f = ActorMethod<[List, [Principal, string]], [[] | [List], res]>;
 export type list = [] | [node];
 /**
@@ -57,8 +68,18 @@ export type nested_res = {
       { 'Err' : [bigint] }
   };
 export interface node { 'head' : bigint, 'tail' : list }
-export type res = { 'Ok' : [bigint, bigint] } |
-  { 'Err' : { 'error' : string } };
+export type res = {
+    /**
+     * This is a block comment for variant Ok
+     */
+    'Ok' : [bigint, bigint]
+  } |
+  {
+    /**
+     * This comment is a block comment for variant Err
+     */
+    'Err' : { 'error' : string }
+  };
 export interface s { 'f' : t, 'g' : ActorMethod<[list], [B, tree, stream]> }
 export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
 export type t = ActorMethod<[Principal], undefined>;
@@ -85,6 +106,9 @@ export interface _SERVICE {
     [my_type, List, [] | [List], nested],
     [bigint, Principal, nested_res]
   >,
+  /**
+   * This is a block comment for a method
+   */
   'h' : ActorMethod<
     [
       Array<[] | [string]>,
@@ -94,6 +118,11 @@ export interface _SERVICE {
     ],
     { _42_ : {}, 'id' : bigint }
   >,
+  /**
+   * This is a block comment for a method
+   * that spans multiple lines,
+   * even with wrong indentation
+   */
   'i' : f,
   /**
    * This is another method comment

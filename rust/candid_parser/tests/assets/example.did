@@ -9,7 +9,13 @@ type my_type = principal;
 
 // This is an ignored comment
 
+/*
+This is a type block comment
+*/
 type List = opt record {
+  /*
+  This is a field block comment
+  */
   head: int;
   // This is a field comment
   tail: List;
@@ -17,11 +23,19 @@ type List = opt record {
 type f = func (List, func (int32) -> (int64)) -> (opt List, res); // This comment is ignored
 // This is another type comment
 type broker = service {
+  /* This is a service method block comment */
   find : (name: text) ->
     (service {up:() -> (); current:() -> (nat32)}); // This comment is ignored
 };
 type nested = record { nat; nat; record {nat;int;}; record { nat; 0x2a:nat; nat8; }; 42:nat; 40:nat; variant{ A; 0x2a; B; C }; };
-type res = variant { Ok: record{int;nat}; Err: record{ error: text } }; // This comment is ignored
+type res = variant {
+  /*
+  This is a block comment for variant Ok
+  */
+  Ok: record{int;nat}; /* This comment is ignored */
+  /* This comment is a block comment for variant Err */
+  Err: record{ error: text }; /* This comment is ignored */
+}; // This comment is ignored
 type nested_res = variant { // This comment is ignored
   // This is a variant comment
   Ok : variant { Ok; Err };      // This comment is ignored
@@ -32,6 +46,17 @@ type nested_res = variant { // This comment is ignored
 
 // This is another ignored comment
 
+/*
+  This is an ignored block comment
+*/
+
+/* This is another ignored block comment */
+
+/*
+This is a block comment
+that spans multiple lines
+*/
+
 // This is a service comment
 // that spans multiple lines for services
 service server : {
@@ -41,7 +66,15 @@ service server : {
 
   // This is a method comment
   g1 : (my_type, List, opt List, nested) -> (int, broker, nested_res) query; // This comment is ignored
+  /*
+  This is a block comment for a method
+  */
   h : (vec opt text, variant { A: nat; B: opt text }, opt List) -> (record { id: nat; 0x2a: record {} }); // This comment is ignored
+  /*
+    This is a block comment for a method
+    that spans multiple lines,
+even with wrong indentation
+  */
   i : f;// This comment is ignored
   // This is another method comment
   // that spans multiple lines for methods

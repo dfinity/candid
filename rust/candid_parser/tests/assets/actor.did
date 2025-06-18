@@ -2,7 +2,9 @@ type f = func (int8) -> (int8);
 type g = f;
 type h = func (f) -> (f);
 type o = opt o;
-// This is a service comment
+/*
+This is a service block comment
+*/
 service :
 {
   f : (nat) -> (h);

@@ -5,6 +5,8 @@ module {
   public type a = { #a; #b : b };
   /// This is a type comment
   public type b = (Int, Nat);
+  /// gjkf
+  /// jgfkg
   public type id = Nat8;
 
 }

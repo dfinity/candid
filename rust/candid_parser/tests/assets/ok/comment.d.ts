@@ -8,5 +8,9 @@ export type a = { 'a' : null } |
  * This is a type comment
  */
 export type b = [bigint, bigint];
+/**
+ * gjkf
+ * jgfkg
+ */
 export type id = number;
 
