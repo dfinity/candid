@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use candid_parser::candid::types::{
     subtype,
-    syntax::{IDLType, IDLTypes},
+    syntax::{IDLProg, IDLType, IDLTypes},
     Type,
 };
 use candid_parser::{
@@ -131,10 +131,10 @@ impl TypeAnnotation {
         self.tys.is_none() && self.method.is_none()
     }
     fn get_types(&self, mode: Mode) -> candid_parser::Result<(TypeEnv, Vec<Type>)> {
-        let (env, actor) = if let Some(ref file) = self.defs {
+        let (env, _, actor) = if let Some(ref file) = self.defs {
             pretty_check_file(file)?
         } else {
-            (TypeEnv::new(), None)
+            (TypeEnv::new(), IDLProg::default(), None)
         };
         match (&self.tys, &self.method) {
             (None, None) => Err(Error::msg("no type annotations")),
@@ -190,9 +190,9 @@ fn main() -> Result<()> {
             previous,
             strict,
         } => {
-            let (mut env, opt_t1) = pretty_check_file(&input)?;
+            let (mut env, _, opt_t1) = pretty_check_file(&input)?;
             if let Some(previous) = previous {
-                let (env2, opt_t2) = pretty_check_file(&previous)?;
+                let (env2, _, opt_t2) = pretty_check_file(&previous)?;
                 match (opt_t1, opt_t2) {
                     (Some(t1), Some(t2)) => {
                         let mut gamma = HashSet::new();
@@ -210,10 +210,10 @@ fn main() -> Result<()> {
             }
         }
         Command::Subtype { defs, ty1, ty2 } => {
-            let (env, _) = if let Some(file) = defs {
+            let (env, _, _) = if let Some(file) = defs {
                 pretty_check_file(&file)?
             } else {
-                (TypeEnv::new(), None)
+                (TypeEnv::new(), IDLProg::default(), None)
             };
             let ty1 = ast_to_type(&env, &ty1)?;
             let ty2 = ast_to_type(&env, &ty2)?;
@@ -226,7 +226,7 @@ fn main() -> Result<()> {
             methods,
         } => {
             let configs = load_config(&config)?;
-            let (env, mut actor) = pretty_check_file(&input)?;
+            let (env, prog, mut actor) = pretty_check_file(&input)?;
             if !methods.is_empty() {
                 actor = Some(candid_parser::bindings::analysis::project_methods(
                     &env, &actor, methods,
@@ -236,7 +236,7 @@ fn main() -> Result<()> {
                 "js" => candid_parser::bindings::javascript::compile(&env, &actor),
                 "ts" => candid_parser::bindings::typescript::compile(&env, &actor),
                 "did" => candid_parser::pretty::candid::compile(&env, &actor),
-                "mo" => candid_parser::bindings::motoko::compile(&env, &actor),
+                "mo" => candid_parser::bindings::motoko::compile(&prog),
                 "rs" => {
                     use candid_parser::bindings::rust::{compile, Config, ExternalConfig};
                     let external = configs

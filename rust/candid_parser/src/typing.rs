@@ -313,7 +313,7 @@ fn merge_actor(
     }
 }
 
-fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> {
+fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, IDLProg, Option<Type>)> {
     let base = if file.is_absolute() {
         file.parent().unwrap().to_path_buf()
     } else {
@@ -360,13 +360,13 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
     if actor.is_some() {
         res = merge_actor(&env, &res, &actor, "")?;
     }
-    Ok((te, res))
+    Ok((te, prog, res))
 }
 
 /// Type check did file including the imports.
-pub fn check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
+pub fn check_file(file: &Path) -> Result<(TypeEnv, IDLProg, Option<Type>)> {
     check_file_(file, false)
 }
-pub fn pretty_check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
+pub fn pretty_check_file(file: &Path) -> Result<(TypeEnv, IDLProg, Option<Type>)> {
     check_file_(file, true)
 }

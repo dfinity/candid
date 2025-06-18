@@ -3,19 +3,21 @@
 
 use candid::pretty::candid::is_valid_as_id;
 use candid::pretty::utils::*;
-use candid::types::{ArgType, Field, FuncMode, Function, Label, SharedLabel, Type, TypeInner};
-use candid::TypeEnv;
+use candid::types::{
+    syntax::{Binding, Dec, FuncType, IDLArgType, IDLProg, IDLType, PrimType, TypeField},
+    FuncMode, Label,
+};
 use pretty::RcDoc;
 
 // The definition of tuple is language specific.
-fn is_tuple(t: &Type) -> bool {
-    match t.as_ref() {
-        TypeInner::Record(ref fs) => {
+fn is_tuple(t: &IDLType) -> bool {
+    match t {
+        IDLType::RecordT(ref fs) => {
             if fs.len() <= 1 {
                 return false;
             }
             for (i, field) in fs.iter().enumerate() {
-                if field.id.get_id() != (i as u32) {
+                if field.label.get_id() != (i as u32) {
                     return false;
                 }
             }
@@ -92,9 +94,9 @@ fn escape(id: &str, is_method: bool) -> RcDoc {
     }
 }
 
-fn pp_ty(ty: &Type) -> RcDoc {
-    use TypeInner::*;
-    match ty.as_ref() {
+fn pp_prim_ty(prim: &PrimType) -> RcDoc {
+    use PrimType::*;
+    match prim {
         Null => str("Null"),
         Bool => str("Bool"),
         Nat => str("Nat"),
@@ -112,21 +114,28 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("Text"),
         Reserved => str("Any"),
         Empty => str("None"),
-        Var(ref s) => escape(s, false),
-        Principal => str("Principal"),
-        Opt(ref t) => str("?").append(pp_ty(t)),
-        Vec(ref t) if matches!(t.as_ref(), Nat8) => str("Blob"),
-        Vec(ref t) => enclose("[", pp_ty(t), "]"),
-        Record(ref fs) => {
+    }
+}
+
+fn pp_ty(ty: &IDLType) -> RcDoc {
+    use IDLType::*;
+    match ty {
+        PrimT(prim) => pp_prim_ty(prim),
+        VarT(ref s) => escape(s, false),
+        PrincipalT => str("Principal"),
+        OptT(ref t) => str("?").append(pp_ty(t)),
+        VecT(ref t) if matches!(t.as_ref(), PrimT(PrimType::Nat8)) => str("Blob"),
+        VecT(ref t) => enclose("[", pp_ty(t), "]"),
+        RecordT(ref fs) => {
             if is_tuple(ty) {
-                let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
+                let tuple = concat(fs.iter().map(|f| pp_ty(&f.typ)), ",");
                 enclose("(", tuple, ")")
             } else {
                 let fields = concat(fs.iter().map(pp_field), ";");
                 enclose_space("{", fields, "}")
             }
         }
-        Variant(ref fs) => {
+        VariantT(ref fs) => {
             if fs.is_empty() {
                 str("{#}")
             } else {
@@ -134,22 +143,21 @@ fn pp_ty(ty: &Type) -> RcDoc {
                 enclose_space("{", fields, "}")
             }
         }
-        Func(ref func) => pp_function(func),
-        Service(ref serv) => pp_service(serv),
-        Class(ref args, ref t) => {
+        FuncT(ref func) => pp_function(func),
+        ServT(ref serv) => pp_service(serv),
+        ClassT(ref args, ref t) => {
             let doc = pp_args(args).append(" -> async ");
             match t.as_ref() {
-                Service(ref serv) => doc.append(pp_service(serv)),
-                Var(ref s) => doc.append(s),
+                IDLType::ServT(ref serv) => doc.append(pp_service(serv)),
+                IDLType::VarT(ref s) => doc.append(s),
                 _ => unreachable!(),
             }
         }
-        Knot(_) | Unknown | Future => unreachable!(),
     }
 }
 
-fn pp_label(id: &SharedLabel) -> RcDoc {
-    match &**id {
+fn pp_label(id: &Label) -> RcDoc {
+    match id {
         Label::Named(str) => escape(str, false),
         Label::Id(n) | Label::Unnamed(n) => str("_")
             .append(RcDoc::as_string(n))
@@ -158,19 +166,21 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
     }
 }
 
-fn pp_field(field: &Field) -> RcDoc {
-    pp_label(&field.id).append(" : ").append(pp_ty(&field.ty))
+fn pp_field(field: &TypeField) -> RcDoc {
+    pp_label(&field.label)
+        .append(" : ")
+        .append(pp_ty(&field.typ))
 }
-fn pp_variant(field: &Field) -> RcDoc {
-    let doc = str("#").append(pp_label(&field.id));
-    if *field.ty != TypeInner::Null {
-        doc.append(" : ").append(pp_ty(&field.ty))
+fn pp_variant(field: &TypeField) -> RcDoc {
+    let doc = str("#").append(pp_label(&field.label));
+    if field.typ != IDLType::PrimT(PrimType::Null) {
+        doc.append(" : ").append(pp_ty(&field.typ))
     } else {
         doc
     }
 }
 
-fn pp_function(func: &Function) -> RcDoc {
+fn pp_function(func: &FuncType) -> RcDoc {
     let args = pp_args(&func.args);
     let rets = pp_rets(&func.rets);
     match func.modes.as_slice() {
@@ -194,7 +204,7 @@ fn pp_function(func: &Function) -> RcDoc {
     }
     .nest(INDENT_SPACE)
 }
-fn pp_args(args: &[ArgType]) -> RcDoc {
+fn pp_args(args: &[IDLArgType]) -> RcDoc {
     match args {
         [ty] => {
             let typ = if is_tuple(&ty.typ) {
@@ -222,7 +232,7 @@ fn pp_args(args: &[ArgType]) -> RcDoc {
     }
 }
 
-fn pp_rets(args: &[Type]) -> RcDoc {
+fn pp_rets(args: &[IDLType]) -> RcDoc {
     match args {
         [ty] => {
             if is_tuple(ty) {
@@ -238,41 +248,44 @@ fn pp_rets(args: &[Type]) -> RcDoc {
     }
 }
 
-fn pp_service(serv: &[(String, Type)]) -> RcDoc {
+fn pp_service(serv: &[Binding]) -> RcDoc {
     let doc = concat(
         serv.iter()
-            .map(|(id, func)| escape(id, true).append(" : ").append(pp_ty(func))),
+            .map(|b| escape(&b.id, true).append(" : ").append(pp_ty(&b.typ))),
         ";",
     );
     kwd("actor").append(enclose_space("{", doc, "}"))
 }
 
-fn pp_defs(env: &TypeEnv) -> RcDoc {
-    lines(env.0.iter().map(|(id, ty)| {
-        kwd("public type")
-            .append(escape(id, false))
-            .append(" = ")
-            .append(pp_ty(ty))
-            .append(";")
+fn pp_defs(decs: &[Dec]) -> RcDoc {
+    lines(decs.iter().map(|dec| {
+        match dec {
+            Dec::TypD(binding) => kwd("public type")
+                .append(escape(&binding.id, false))
+                .append(" = ")
+                .append(pp_ty(&binding.typ))
+                .append(";"),
+            _ => unreachable!(),
+        }
     }))
 }
 
-fn pp_actor(ty: &Type) -> RcDoc {
-    match ty.as_ref() {
-        TypeInner::Service(ref serv) => pp_service(serv),
-        TypeInner::Var(_) | TypeInner::Class(_, _) => pp_ty(ty),
+fn pp_actor(ty: &IDLType) -> RcDoc {
+    match ty {
+        IDLType::ServT(ref serv) => pp_service(serv),
+        IDLType::VarT(_) | IDLType::ClassT(_, _) => pp_ty(ty),
         _ => unreachable!(),
     }
 }
 
-pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
+pub fn compile(prog: &IDLProg) -> String {
     let header = r#"// This is a generated Motoko binding.
 // Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 "#;
-    let doc = match actor {
-        None => pp_defs(env),
+    let doc = match &prog.actor {
+        None => pp_defs(&prog.decs),
         Some(actor) => {
-            let defs = pp_defs(env);
+            let defs = pp_defs(&prog.decs);
             let actor = kwd("public type Self =").append(pp_actor(actor));
             defs.append(actor)
         }
