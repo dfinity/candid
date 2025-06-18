@@ -8,10 +8,10 @@ export type bitcoin_network = { 'mainnet' : null } |
 export type block_hash = Uint8Array | number[];
 export type canister_id = Principal;
 export interface canister_settings {
-  'freezing_threshold' : [] | [bigint],
-  'controllers' : [] | [Array<Principal>],
-  'memory_allocation' : [] | [bigint],
-  'compute_allocation' : [] | [bigint],
+  'freezing_threshold' : bigint | undefined,
+  'controllers' : Array<Principal> | undefined,
+  'memory_allocation' : bigint | undefined,
+  'compute_allocation' : bigint | undefined,
 }
 export interface definite_canister_settings {
   'freezing_threshold' : bigint,
@@ -23,21 +23,21 @@ export type ecdsa_curve = { 'secp256k1' : null };
 export interface get_balance_request {
   'network' : bitcoin_network,
   'address' : bitcoin_address,
-  'min_confirmations' : [] | [number],
+  'min_confirmations' : number | undefined,
 }
 export interface get_current_fee_percentiles_request {
   'network' : bitcoin_network,
 }
 export interface get_utxos_request {
   'network' : bitcoin_network,
-  'filter' : [] | [
+  'filter' : (
     { 'page' : Uint8Array | number[] } |
       { 'min_confirmations' : number }
-  ],
+  ) | undefined,
   'address' : bitcoin_address,
 }
 export interface get_utxos_response {
-  'next_page' : [] | [Uint8Array | number[]],
+  'next_page' : (Uint8Array | number[]) | undefined,
   'tip_height' : number,
   'tip_block_hash' : block_hash,
   'utxos' : Array<utxo>,
@@ -83,11 +83,11 @@ export interface _SERVICE {
       'cycles' : bigint,
       'settings' : definite_canister_settings,
       'idle_cycles_burned_per_day' : bigint,
-      'module_hash' : [] | [Uint8Array | number[]],
+      'module_hash' : (Uint8Array | number[]) | undefined,
     }
   >,
   'create_canister' : ActorMethod<
-    [{ 'settings' : [] | [canister_settings] }],
+    [{ 'settings' : canister_settings | undefined }],
     { 'canister_id' : canister_id }
   >,
   'delete_canister' : ActorMethod<[{ 'canister_id' : canister_id }], undefined>,
@@ -96,7 +96,7 @@ export interface _SERVICE {
     [
       {
         'key_id' : { 'name' : string, 'curve' : ecdsa_curve },
-        'canister_id' : [] | [canister_id],
+        'canister_id' : canister_id | undefined,
         'derivation_path' : Array<Uint8Array | number[]>,
       },
     ],

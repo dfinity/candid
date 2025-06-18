@@ -3,14 +3,14 @@ import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
 export type A = B;
-export type B = [] | [A];
-export type List = [] | [{ 'head' : bigint, 'tail' : List }];
+export type B = A | undefined;
+export type List = { 'head' : bigint, 'tail' : List } | undefined;
 export type a = { 'a' : null } |
   { 'b' : b };
 export type b = [bigint, bigint];
 export interface broker { 'find' : ActorMethod<[string], Principal> }
-export type f = ActorMethod<[List, [Principal, string]], [[] | [List], res]>;
-export type list = [] | [node];
+export type f = ActorMethod<[List, [Principal, string]], [List | undefined, res]>;
+export type list = node | undefined;
 export type my_type = Principal;
 export interface nested {
   _0_ : bigint,
@@ -30,7 +30,7 @@ export interface node { 'head' : bigint, 'tail' : list }
 export type res = { 'Ok' : [bigint, bigint] } |
   { 'Err' : { 'error' : string } };
 export interface s { 'f' : t, 'g' : ActorMethod<[list], [B, tree, stream]> }
-export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
+export type stream = { 'head' : bigint, 'next' : [Principal, string] } | undefined;
 export type t = ActorMethod<[Principal], undefined>;
 export type tree = {
     'branch' : { 'val' : bigint, 'left' : tree, 'right' : tree }
@@ -39,18 +39,18 @@ export type tree = {
 export interface _SERVICE {
   'bbbbb' : ActorMethod<[b], undefined>,
   'f' : t,
-  'f1' : ActorMethod<[list, Uint8Array | number[], [] | [boolean]], undefined>,
+  'f1' : ActorMethod<[list, Uint8Array | number[], boolean | undefined], undefined>,
   'g' : ActorMethod<[list], [B, tree, stream]>,
   'g1' : ActorMethod<
-    [my_type, List, [] | [List], nested],
+    [my_type, List, List | undefined, nested],
     [bigint, Principal, nested_res]
   >,
   'h' : ActorMethod<
     [
-      Array<[] | [string]>,
+      Array<string | undefined>,
       { 'A' : bigint } |
-        { 'B' : [] | [string] },
-      [] | [List],
+        { 'B' : string | undefined },
+      List | undefined,
     ],
     { _42_ : {}, 'id' : bigint }
   >,
@@ -58,8 +58,8 @@ export interface _SERVICE {
   'x' : ActorMethod<
     [a, b],
     [
-      [] | [a],
-      [] | [b],
+      a | undefined,
+      b | undefined,
       { 'Ok' : { 'result' : string } } |
         { 'Err' : { 'a' : null } | { 'b' : null } },
     ]
