@@ -1,6 +1,6 @@
 //! When serializing or deserializing Candid goes wrong.
 
-use candid::types::parser::{IDLProg, IDLTypes};
+use candid::types::syntax::{IDLProg, IDLTypes};
 use codespan_reporting::diagnostic::Label;
 use std::io;
 use thiserror::Error;

@@ -8,9 +8,9 @@ use serde::ser::Error;
 
 mod impls;
 pub mod internal;
-#[cfg(feature = "parser")]
-pub mod parser;
 pub mod subtype;
+#[cfg(feature = "syntax")]
+pub mod syntax;
 pub mod type_env;
 #[cfg_attr(docsrs, doc(cfg(feature = "value")))]
 #[cfg(feature = "value")]

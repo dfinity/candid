@@ -142,22 +142,22 @@ pub mod configs;
 pub mod random;
 pub mod test;
 
-pub fn parse_idl_prog(str: &str) -> Result<candid::types::parser::IDLProg> {
+pub fn parse_idl_prog(str: &str) -> Result<candid::types::syntax::IDLProg> {
     let lexer = token::Tokenizer::new(str);
     Ok(grammar::IDLProgParser::new().parse(lexer)?)
 }
 
-pub fn parse_idl_init_args(str: &str) -> Result<candid::types::parser::IDLInitArgs> {
+pub fn parse_idl_init_args(str: &str) -> Result<candid::types::syntax::IDLInitArgs> {
     let lexer = token::Tokenizer::new(str);
     Ok(grammar::IDLInitArgsParser::new().parse(lexer)?)
 }
 
-pub fn parse_idl_type(str: &str) -> Result<candid::types::parser::IDLType> {
+pub fn parse_idl_type(str: &str) -> Result<candid::types::syntax::IDLType> {
     let lexer = token::Tokenizer::new(str);
     Ok(grammar::TypParser::new().parse(lexer)?)
 }
 
-pub fn parse_idl_types(str: &str) -> Result<candid::types::parser::IDLTypes> {
+pub fn parse_idl_types(str: &str) -> Result<candid::types::syntax::IDLTypes> {
     let lexer = token::Tokenizer::new(str);
     Ok(grammar::TypsParser::new().parse(lexer)?)
 }

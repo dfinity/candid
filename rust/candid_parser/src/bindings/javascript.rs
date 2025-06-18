@@ -370,7 +370,7 @@ pub mod test {
     use super::value;
     use crate::test::{HostAssert, HostTest, Test};
     use candid::pretty::utils::*;
-    use candid::types::parser::IDLProg;
+    use candid::types::syntax::IDLProg;
     use candid::TypeEnv;
     use pretty::RcDoc;
 

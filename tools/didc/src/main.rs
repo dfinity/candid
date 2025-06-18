@@ -1,7 +1,8 @@
 use anyhow::{bail, Result};
 use candid_parser::candid::types::{
-    parser::{IDLType, IDLTypes},
-    subtype, Type,
+    subtype,
+    syntax::{IDLType, IDLTypes},
+    Type,
 };
 use candid_parser::{
     configs::Configs, parse_idl_args, parse_idl_type, parse_idl_value, pretty_check_file,

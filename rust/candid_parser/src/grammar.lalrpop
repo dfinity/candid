@@ -1,7 +1,7 @@
 use super::test::{Assert, Input, Test};
 use super::token::{Token, error, error2, LexicalError, Span};
 use candid::{Principal, types::Label};
-use candid::types::parser::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLArgType};
+use candid::types::syntax::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLArgType};
 use candid::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
 use candid::types::{TypeEnv, FuncMode};
 use candid::utils::check_unique;

@@ -1,6 +1,6 @@
 use crate::{parse_idl_prog, pretty_parse_idl_prog, Error, Result};
 use candid::types::{
-    parser::{Binding, Dec, IDLArgType, IDLInitArgs, IDLProg, IDLType, PrimType, TypeField},
+    syntax::{Binding, Dec, IDLArgType, IDLInitArgs, IDLProg, IDLType, PrimType, TypeField},
     ArgType, Field, Function, Type, TypeEnv, TypeInner,
 };
 use candid::utils::check_unique;
