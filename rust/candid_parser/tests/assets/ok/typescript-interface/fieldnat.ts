@@ -123,9 +123,9 @@ class Fieldnat implements fieldnatInterface {
     constructor(actor: ActorSubclass<_SERVICE>){
         this.#actor = actor;
     }
-    async bab(arg0: bigint, arg1: bigint): Promise<void> {
+    async bab(two: bigint, arg1: bigint): Promise<void> {
         try {
-            const result = await this.#actor.bab(arg0, arg1);
+            const result = await this.#actor.bab(two, arg1);
             return result;
         } catch (e) {
             if (e && typeof e === "object" && "message" in e) {

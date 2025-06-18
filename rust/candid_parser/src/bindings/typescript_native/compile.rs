@@ -440,7 +440,7 @@ fn create_method_signature(env: &TypeEnv, method_id: &str, func: &Function) -> T
                 id: Ident::new(format!("arg{}", i).into(), DUMMY_SP, SyntaxContext::empty()),
                 type_ann: Some(Box::new(TsTypeAnn {
                     span: DUMMY_SP,
-                    type_ann: Box::new(convert_type(env, ty, true)),
+                    type_ann: Box::new(convert_type(env, &ty.typ, true)),
                 })),
             })
         })
@@ -510,7 +510,7 @@ fn create_function_type(env: &TypeEnv, func: &Function) -> TsType {
                 id: Ident::new(format!("arg{}", i).into(), DUMMY_SP, SyntaxContext::empty()),
                 type_ann: Some(Box::new(TsTypeAnn {
                     span: DUMMY_SP,
-                    type_ann: Box::new(convert_type(env, ty, true)),
+                    type_ann: Box::new(convert_type(env, &ty.typ, true)),
                 })),
             })
         })
@@ -1297,17 +1297,20 @@ pub fn create_actor_method(
         .args
         .iter()
         .enumerate()
-        .map(|(i, ty)| Param {
+        .map(|(i, arg_ty)|{ 
+            let var_name = arg_ty.name.clone().unwrap_or_else(||  format!("arg{}", i));
+            Param {
             span: DUMMY_SP,
             decorators: vec![],
             pat: Pat::Ident(BindingIdent {
-                id: Ident::new(format!("arg{}", i).into(), DUMMY_SP, SyntaxContext::empty()),
+                id: Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty()),
                 type_ann: Some(Box::new(TsTypeAnn {
                     span: DUMMY_SP,
-                    type_ann: Box::new(convert_type(env, ty, true)),
+                    type_ann: Box::new(convert_type(env, &arg_ty.typ, true)),
                 })),
             }),
-        })
+        } }
+    )
         .collect();
 
     // Create return type
@@ -1353,13 +1356,14 @@ pub fn create_actor_method(
         .args
         .iter()
         .enumerate()
-        .map(|(i, ty)| {
-            let arg_ident =
-                Ident::new(format!("arg{}", i).into(), DUMMY_SP, SyntaxContext::empty());
+        .map(|(i, arg_ty)| {
+            let var_name = arg_ty.name.clone().unwrap_or_else(||  format!("arg{}", i));
+
+            let arg_ident = Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty());
             let arg_expr = Expr::Ident(arg_ident);
 
             // Apply type conversion
-            let converted_expr = converter.convert_to_candid(&arg_expr, ty);
+            let converted_expr = converter.convert_to_candid(&arg_expr, &arg_ty.typ);
 
             ExprOrSpread {
                 spread: None,

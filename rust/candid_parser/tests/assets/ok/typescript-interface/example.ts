@@ -204,9 +204,9 @@ class Example implements exampleInterface {
             } else throw e;
         }
     }
-    async f1(arg0: list, arg1: Uint8Array | number[], arg2: boolean | null): Promise<void> {
+    async f1(arg0: list, test: Uint8Array | number[], arg2: boolean | null): Promise<void> {
         try {
-            const result = await this.#actor.f1(to_candid_list_n1(arg0), arg1, to_candid_opt_n5(arg2));
+            const result = await this.#actor.f1(to_candid_list_n1(arg0), test, to_candid_opt_n5(arg2));
             return result;
         } catch (e) {
             if (e && typeof e === "object" && "message" in e) {
