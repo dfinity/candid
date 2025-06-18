@@ -36,7 +36,7 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
             }
         }
         Principal => str("Principal"),
-        Opt(ref t) => str("[] | ").append(enclose("[", pp_ty(env, t, is_ref), "]")),
+        Opt(ref t) => pp_ty(env, t, is_ref).append(str(" | undefined")),
         Vec(ref t) => {
             let ty = match t.as_ref() {
                 Var(ref id) => {
