@@ -22,7 +22,7 @@ export type stream = {
     head: bigint;
     next: [Principal, string];
 } | null;
-export type t = (arg0: Principal) => void;
+export type t = (server: Principal) => void;
 export type tree = {
     branch: {
         val: bigint;

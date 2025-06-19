@@ -435,12 +435,13 @@ fn create_method_signature(env: &TypeEnv, method_id: &str, func: &Function) -> T
         .args
         .iter()
         .enumerate()
-        .map(|(i, ty)| {
+        .map(|(i, arg_ty)| {
+            let var_name = arg_ty.name.clone().unwrap_or_else(||  format!("arg{}", i));
             TsFnParam::Ident(BindingIdent {
-                id: Ident::new(format!("arg{}", i).into(), DUMMY_SP, SyntaxContext::empty()),
+                id: Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty()),
                 type_ann: Some(Box::new(TsTypeAnn {
                     span: DUMMY_SP,
-                    type_ann: Box::new(convert_type(env, &ty.typ, true)),
+                    type_ann: Box::new(convert_type(env, &arg_ty.typ, true)),
                 })),
             })
         })
@@ -505,12 +506,13 @@ fn create_function_type(env: &TypeEnv, func: &Function) -> TsType {
         .args
         .iter()
         .enumerate()
-        .map(|(i, ty)| {
+        .map(|(i, arg_ty)| {
+            let var_name = arg_ty.name.clone().unwrap_or_else(||  format!("arg{}", i));
             TsFnParam::Ident(BindingIdent {
-                id: Ident::new(format!("arg{}", i).into(), DUMMY_SP, SyntaxContext::empty()),
+                id: Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty()),
                 type_ann: Some(Box::new(TsTypeAnn {
                     span: DUMMY_SP,
-                    type_ann: Box::new(convert_type(env, &ty.typ, true)),
+                    type_ann: Box::new(convert_type(env, &arg_ty.typ, true)),
                 })),
             })
         })
@@ -1298,7 +1300,7 @@ pub fn create_actor_method(
         .iter()
         .enumerate()
         .map(|(i, arg_ty)|{ 
-            let var_name = arg_ty.name.clone().unwrap_or_else(||  format!("arg{}", i));
+            let var_name =  format!("arg{}", i);
             Param {
             span: DUMMY_SP,
             decorators: vec![],
@@ -1357,7 +1359,7 @@ pub fn create_actor_method(
         .iter()
         .enumerate()
         .map(|(i, arg_ty)| {
-            let var_name = arg_ty.name.clone().unwrap_or_else(||  format!("arg{}", i));
+            let var_name =  format!("arg{}", i);
 
             let arg_ident = Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty());
             let arg_expr = Expr::Ident(arg_ident);

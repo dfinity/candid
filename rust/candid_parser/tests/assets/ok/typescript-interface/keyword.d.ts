@@ -30,7 +30,7 @@ export type stream = {
     head: bigint;
     next: [Principal, string];
 } | null;
-export type t = (arg0: Principal) => void;
+export type t = (server: Principal) => void;
 import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;

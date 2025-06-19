@@ -62,7 +62,7 @@ export type a = {
 };
 export type b = [bigint, bigint];
 export interface brokerInterface {
-    find(arg0: string): Promise<Principal>;
+    find(name: string): Promise<Principal>;
 }
 export type f = (arg0: List, arg1: [Principal, string]) => [List | null, res];
 export type list = node | null;
@@ -110,7 +110,7 @@ export type stream = {
     head: bigint;
     next: [Principal, string];
 } | null;
-export type t = (arg0: Principal) => void;
+export type t = (server: Principal) => void;
 export type tree = {
     branch: {
         val: bigint;
@@ -167,7 +167,7 @@ export const canisterId = _canisterId;
 export interface exampleInterface {
     bbbbb(arg0: b): Promise<void>;
     f: [Principal, string];
-    f1(arg0: list, arg1: Uint8Array | number[], arg2: boolean | null): Promise<void>;
+    f1(arg0: list, test: Uint8Array | number[], arg2: boolean | null): Promise<void>;
     g(arg0: list): Promise<[B, tree, stream]>;
     g1(arg0: my_type, arg1: List, arg2: List | null, arg3: nested): Promise<[bigint, Principal, nested_res]>;
     h(arg0: Array<string | null>, arg1: {
@@ -204,9 +204,9 @@ class Example implements exampleInterface {
             } else throw e;
         }
     }
-    async f1(arg0: list, test: Uint8Array | number[], arg2: boolean | null): Promise<void> {
+    async f1(arg0: list, arg1: Uint8Array | number[], arg2: boolean | null): Promise<void> {
         try {
-            const result = await this.#actor.f1(to_candid_list_n1(arg0), test, to_candid_opt_n5(arg2));
+            const result = await this.#actor.f1(to_candid_list_n1(arg0), arg1, to_candid_opt_n5(arg2));
             return result;
         } catch (e) {
             if (e && typeof e === "object" && "message" in e) {

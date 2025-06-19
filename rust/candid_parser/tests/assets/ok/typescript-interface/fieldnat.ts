@@ -99,7 +99,7 @@ export async function createActor(options?: CreateActorOptions): Promise<fieldna
 }
 export const canisterId = _canisterId;
 export interface fieldnatInterface {
-    bab(arg0: bigint, arg1: bigint): Promise<void>;
+    bab(two: bigint, arg1: bigint): Promise<void>;
     bar(arg0: {
         2: bigint;
     }): Promise<"e20" | "e30">;
@@ -123,9 +123,9 @@ class Fieldnat implements fieldnatInterface {
     constructor(actor: ActorSubclass<_SERVICE>){
         this.#actor = actor;
     }
-    async bab(two: bigint, arg1: bigint): Promise<void> {
+    async bab(arg0: bigint, arg1: bigint): Promise<void> {
         try {
-            const result = await this.#actor.bab(two, arg1);
+            const result = await this.#actor.bab(arg0, arg1);
             return result;
         } catch (e) {
             if (e && typeof e === "object" && "message" in e) {
