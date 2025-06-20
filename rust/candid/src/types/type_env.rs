@@ -1,6 +1,6 @@
 use crate::types::{Function, Type, TypeInner};
 use crate::{Error, Result};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, Default)]
 pub struct TypeEnv(pub BTreeMap<String, Type>);
@@ -130,7 +130,32 @@ impl TypeEnv {
         }
         Ok(())
     }
+
+    fn has_cycle<'a>(&'a self, seen: &mut BTreeSet<&'a str>, t: &'a Type) -> Result<bool> {
+        match t.as_ref() {
+            TypeInner::Var(id) => {
+                if seen.insert(id) {
+                    let ty = self.find_type(id)?;
+                    self.has_cycle(seen, ty)
+                } else {
+                    Ok(true)
+                }
+            }
+            _ => Ok(false),
+        }
+    }
+
+    pub fn check_cycle(&self) -> Result<()> {
+        for (id, ty) in self.0.iter() {
+            let mut seen = BTreeSet::new();
+            if self.has_cycle(&mut seen, ty)? {
+                return Err(Error::msg(format!("{id} has cyclic type definition")));
+            }
+        }
+        Ok(())
+    }
 }
+
 impl std::fmt::Display for TypeEnv {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (k, v) in &self.0 {

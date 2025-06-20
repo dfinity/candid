@@ -4,14 +4,14 @@
 module {
   public type A = B;
   public type B = ?A;
-  public type list = ?node;
   public type node = { head : Nat; tail : list };
-  public type s = actor { f : t; g : shared list -> async (B, tree, stream) };
-  public type stream = ?{ head : Nat; next : shared query () -> async stream };
-  public type t = shared (server : s) -> async ();
+  public type list = ?node;
   public type tree = {
     #branch : { val : Int; left : tree; right : tree };
     #leaf : Int;
   };
+  public type s = actor { f : t; g : shared list -> async (B, tree, stream) };
+  public type t = shared (server : s) -> async ();
+  public type stream = ?{ head : Nat; next : shared query () -> async stream };
   public type Self = s
 }

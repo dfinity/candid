@@ -4,14 +4,22 @@ import type { IDL } from '@dfinity/candid';
 
 export type A = B;
 export type B = [] | [A];
-export type List = [] | [{ 'head' : bigint, 'tail' : List }];
+export interface node { 'head' : bigint, 'tail' : list }
+export type list = [] | [node];
+export type tree = {
+    'branch' : { 'val' : bigint, 'left' : tree, 'right' : tree }
+  } |
+  { 'leaf' : bigint };
+export interface s { 'f' : t, 'g' : ActorMethod<[list], [B, tree, stream]> }
+export type t = ActorMethod<[Principal], undefined>;
+export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
+export type b = [bigint, bigint];
 export type a = { 'a' : null } |
   { 'b' : b };
-export type b = [bigint, bigint];
-export interface broker { 'find' : ActorMethod<[string], Principal> }
-export type f = ActorMethod<[List, [Principal, string]], [[] | [List], res]>;
-export type list = [] | [node];
 export type my_type = Principal;
+export type List = [] | [{ 'head' : bigint, 'tail' : List }];
+export type f = ActorMethod<[List, [Principal, string]], [[] | [List], res]>;
+export interface broker { 'find' : ActorMethod<[string], Principal> }
 export interface nested {
   _0_ : bigint,
   _1_ : bigint,
@@ -24,18 +32,10 @@ export interface nested {
     { 'C' : null },
   _42_ : bigint,
 }
-export type nested_res = { 'Ok' : { 'Ok' : null } | { 'Err' : null } } |
-  { 'Err' : { 'Ok' : { 'content' : string } } | { 'Err' : [bigint] } };
-export interface node { 'head' : bigint, 'tail' : list }
 export type res = { 'Ok' : [bigint, bigint] } |
   { 'Err' : { 'error' : string } };
-export interface s { 'f' : t, 'g' : ActorMethod<[list], [B, tree, stream]> }
-export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
-export type t = ActorMethod<[Principal], undefined>;
-export type tree = {
-    'branch' : { 'val' : bigint, 'left' : tree, 'right' : tree }
-  } |
-  { 'leaf' : bigint };
+export type nested_res = { 'Ok' : { 'Ok' : null } | { 'Err' : null } } |
+  { 'Err' : { 'Ok' : { 'content' : string } } | { 'Err' : [bigint] } };
 export interface _SERVICE {
   'bbbbb' : ActorMethod<[b], undefined>,
   'f' : t,

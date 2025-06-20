@@ -2,16 +2,16 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
+export type o = [] | [o];
+export interface node { 'head' : bigint, 'tail' : list }
+export type list = [] | [node];
 export type if_ = {
     'branch' : { 'val' : bigint, 'left' : if_, 'right' : if_ }
   } |
   { 'leaf' : bigint };
-export type list = [] | [node];
-export interface node { 'head' : bigint, 'tail' : list }
-export type o = [] | [o];
 export interface return_ { 'f' : t, 'g' : ActorMethod<[list], [if_, stream]> }
-export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
 export type t = ActorMethod<[Principal], undefined>;
+export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
 export interface _SERVICE {
   'Oneway' : ActorMethod<[], undefined>,
   'f_' : ActorMethod<[o], o>,

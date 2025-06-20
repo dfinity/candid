@@ -2,14 +2,14 @@ use candid::pretty::candid::compile;
 use candid::types::TypeEnv;
 use candid_parser::bindings::{javascript, motoko, rust, typescript};
 use candid_parser::configs::Configs;
-use candid_parser::types::IDLProg;
+use candid_parser::parse_idl_prog;
 use candid_parser::typing::{check_file, check_prog};
 use goldenfile::Mint;
 use std::io::Write;
 use std::path::Path;
 
 #[test]
-fn parse_idl_prog() {
+fn test_parse_idl_prog() {
     let prog = r#"
 import "test.did";
 type my_type = principal;
@@ -28,7 +28,7 @@ service server : {
   i : f;
 }
     "#;
-    prog.parse::<IDLProg>().unwrap();
+    parse_idl_prog(prog).unwrap();
 }
 
 #[test_generator::test_resources("rust/candid_parser/tests/assets/*.did")]
@@ -40,24 +40,24 @@ fn compiler_test(resource: &str) {
     let candid_path = base_path.join(filename);
 
     match check_file(&candid_path) {
-        Ok((env, actor)) => {
+        Ok((_, idl_env, _)) => {
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
-                let content = compile(&env, &actor);
+                let content = compile(&idl_env);
                 // Type check output
-                let ast = content.parse::<IDLProg>().unwrap();
+                let ast = parse_idl_prog(&content).unwrap();
                 check_prog(&mut TypeEnv::new(), &ast).unwrap();
                 writeln!(output, "{content}").unwrap();
             }
             {
                 match filename.file_name().unwrap().to_str().unwrap() {
                     "unicode.did" | "escape.did" => {
-                        check_error(|| motoko::compile(&env, &actor), "not a valid Motoko id")
+                        check_error(|| motoko::compile(&idl_env), "not a valid Motoko id")
                     }
                     _ => {
                         let mut output =
                             mint.new_goldenfile(filename.with_extension("mo")).unwrap();
-                        let content = motoko::compile(&env, &actor);
+                        let content = motoko::compile(&idl_env);
                         writeln!(output, "{content}").unwrap();
                     }
                 }
@@ -87,20 +87,20 @@ fn compiler_test(resource: &str) {
                     _ => (),
                 }
                 let mut output = mint.new_goldenfile(filename.with_extension("rs")).unwrap();
-                let (content, unused) = rust::compile(&config, &env, &actor, external);
+                let (content, unused) = rust::compile(&config, &idl_env, external);
                 assert!(unused.is_empty());
                 writeln!(output, "{content}").unwrap();
             }
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
-                let content = javascript::compile(&env, &actor);
+                let content = javascript::compile(&idl_env);
                 writeln!(output, "{content}").unwrap();
             }
             {
                 let mut output = mint
                     .new_goldenfile(filename.with_extension("d.ts"))
                     .unwrap();
-                let content = typescript::compile(&env, &actor);
+                let content = typescript::compile(&idl_env);
                 writeln!(output, "{content}").unwrap();
             }
         }

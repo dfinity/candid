@@ -1,14 +1,22 @@
 type A = B;
 type B = opt A;
-type List = opt record { head : int; tail : List };
-type a = variant { a; b : b };
+type node = record { head : nat; tail : list };
+type list = opt node;
+type tree = variant {
+  branch : record { val : int; left : tree; right : tree };
+  leaf : int;
+};
+type s = service { f : t; g : (list) -> (B, tree, stream) };
+type t = func (server : s) -> ();
+type stream = opt record { head : nat; next : func () -> (stream) query };
 type b = record { int; nat };
+type a = variant { a; b : b };
+type my_type = principal;
+type List = opt record { head : int; tail : List };
+type f = func (List, func (int32) -> (int64)) -> (opt List, res);
 type broker = service {
   find : (name : text) -> (service { current : () -> (nat32); up : () -> () });
 };
-type f = func (List, func (int32) -> (int64)) -> (opt List, res);
-type list = opt node;
-type my_type = principal;
 type nested = record {
   0 : nat;
   1 : nat;
@@ -18,18 +26,10 @@ type nested = record {
   41 : variant { 42; A; B; C };
   42 : nat;
 };
+type res = variant { Ok : record { int; nat }; Err : record { error : text } };
 type nested_res = variant {
   Ok : variant { Ok; Err };
   Err : variant { Ok : record { content : text }; Err : record { int } };
-};
-type node = record { head : nat; tail : list };
-type res = variant { Ok : record { int; nat }; Err : record { error : text } };
-type s = service { f : t; g : (list) -> (B, tree, stream) };
-type stream = opt record { head : nat; next : func () -> (stream) query };
-type t = func (server : s) -> ();
-type tree = variant {
-  branch : record { val : int; left : tree; right : tree };
-  leaf : int;
 };
 service : {
   bbbbb : (b) -> ();
