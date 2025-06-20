@@ -18,6 +18,7 @@ impl Service {
     ic_cdk::call(self.0, "f", (arg0,arg1,arg2,arg3,arg4,arg5,)).await
   }
 }
-pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
+/// Canister ID: `aaaaa-aa`
+pub const CANISTER_ID : Principal = Principal::from_slice(&[]);
 pub const service : Service = Service(CANISTER_ID);
 

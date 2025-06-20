@@ -92,9 +92,27 @@ impl IDLArgType {
 }
 
 #[derive(Debug, Clone)]
+pub struct Comment {
+    pub lines: Vec<String>,
+}
+
+impl Comment {
+    pub fn lines(&self) -> &[String] {
+        &self.lines
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct TypeField {
     pub label: Label,
     pub typ: IDLType,
+    pub comment: Option<Comment>,
+}
+
+impl TypeField {
+    pub fn comment(&self) -> Option<&[String]> {
+        self.comment.as_ref().map(|c| c.lines())
+    }
 }
 
 #[derive(Debug)]
@@ -108,12 +126,19 @@ pub enum Dec {
 pub struct Binding {
     pub id: String,
     pub typ: IDLType,
+    pub comment: Option<Comment>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ActorBinding {
+    pub typ: IDLType,
+    pub comment: Option<Comment>,
 }
 
 #[derive(Debug)]
 pub struct IDLProg {
     pub decs: Vec<Dec>,
-    pub actor: Option<IDLType>,
+    pub actor: Option<ActorBinding>,
 }
 
 #[derive(Debug)]

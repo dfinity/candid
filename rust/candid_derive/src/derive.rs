@@ -1,4 +1,4 @@
-use super::{candid_path, get_lit_str, idl_hash};
+use super::{candid_path, get_comment_from_lines, get_comment_lines, get_lit_str, idl_hash};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::BTreeSet;
@@ -12,12 +12,16 @@ pub(crate) fn derive_idl_type(
 ) -> TokenStream {
     let candid = candid_path(custom_candid_path);
     let name = input.ident;
+    let comment_lines = get_comment_lines(&input.attrs);
     let generics = add_trait_bounds(input.generics, custom_candid_path);
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     let (ty_body, ser_body) = match input.data {
-        Data::Enum(ref data) => enum_from_ast(&name, &data.variants, custom_candid_path),
+        Data::Enum(ref data) => {
+            enum_from_ast(&name, &data.variants, custom_candid_path, &comment_lines)
+        }
         Data::Struct(ref data) => {
-            let (ty, idents, is_bytes, _) = struct_from_ast(&data.fields, custom_candid_path);
+            let (ty, idents, is_bytes, _) =
+                struct_from_ast(&data.fields, custom_candid_path, &comment_lines);
             (ty, serialize_struct(&idents, &is_bytes, custom_candid_path))
         }
         Data::Union(_) => unimplemented!("doesn't derive union type"),
@@ -49,6 +53,7 @@ struct Variant {
     members: Vec<Ident>,
     with_bytes: bool,
     style: Style,
+    comment_lines: Vec<String>,
 }
 enum Style {
     Struct,
@@ -93,12 +98,14 @@ fn enum_from_ast(
     name: &syn::Ident,
     variants: &Punctuated<syn::Variant, Token![,]>,
     custom_candid_path: &Option<TokenStream>,
+    comment_lines: &[String],
 ) -> (TokenStream, TokenStream) {
     let mut fs: Vec<_> = variants
         .iter()
         .map(|variant| {
             let id = variant.ident.clone();
             let attrs = get_attrs(&variant.attrs);
+            let variant_comment_lines = get_comment_lines(&variant.attrs);
             let (renamed_ident, hash) = match attrs.rename {
                 Some(ref rename) => (rename.clone(), idl_hash(rename)),
                 None => {
@@ -107,7 +114,7 @@ fn enum_from_ast(
                     (id, hash)
                 }
             };
-            let (ty, idents, _, style) = struct_from_ast(&variant.fields, custom_candid_path);
+            let (ty, idents, _, style) = struct_from_ast(&variant.fields, custom_candid_path, &[]);
             Variant {
                 real_ident: id,
                 renamed_ident,
@@ -116,6 +123,7 @@ fn enum_from_ast(
                 members: idents,
                 with_bytes: attrs.with_bytes,
                 style,
+                comment_lines: variant_comment_lines,
             }
         })
         .collect();
@@ -126,15 +134,20 @@ fn enum_from_ast(
     let id = fs.iter().map(|Variant { renamed_ident, .. }| renamed_ident);
     let ty = fs.iter().map(|Variant { ty, .. }| ty);
     let candid = candid_path(custom_candid_path);
+    let variant_comment = fs
+        .iter()
+        .map(|Variant { comment_lines, .. }| get_comment_from_lines(comment_lines, false));
+    let comment = get_comment_from_lines(comment_lines, true);
     let ty_gen = quote! {
-        #candid::types::TypeInner::Variant(
+        (#candid::types::TypeInner::Variant(
             vec![
                 #(#candid::types::Field {
                     id: #candid::types::Label::Named(#id.to_owned()).into(),
-                    ty: #ty }
+                    ty: #ty,
+                    comment: #variant_comment }
                 ),*
             ]
-        ).into()
+        ), #comment).into()
     };
 
     let id = fs.iter().map(|Variant { real_ident, .. }| {
@@ -195,13 +208,15 @@ fn serialize_struct(
 fn struct_from_ast(
     fields: &syn::Fields,
     custom_candid_path: &Option<TokenStream>,
+    comment_lines: &[String],
 ) -> (TokenStream, Vec<Ident>, Vec<bool>, Style) {
     let candid = candid_path(custom_candid_path);
+    let comment = get_comment_from_lines(comment_lines, true);
     match *fields {
         syn::Fields::Named(ref fields) => {
             let (fs, idents, is_bytes) = fields_from_ast(&fields.named, custom_candid_path);
             (
-                quote! { #candid::types::TypeInner::Record(#fs).into() },
+                quote! { (#candid::types::TypeInner::Record(#fs), #comment).into() },
                 idents,
                 is_bytes,
                 Style::Struct,
@@ -214,7 +229,7 @@ fn struct_from_ast(
                 (quote! { #newtype }, idents, is_bytes, Style::Tuple)
             } else {
                 (
-                    quote! { #candid::types::TypeInner::Record(#fs).into() },
+                    quote! { (#candid::types::TypeInner::Record(#fs), #comment).into() },
                     idents,
                     is_bytes,
                     Style::Tuple,
@@ -222,7 +237,7 @@ fn struct_from_ast(
             }
         }
         syn::Fields::Unit => (
-            quote! { #candid::types::TypeInner::Null.into() },
+            quote! { (#candid::types::TypeInner::Null, #comment).into() },
             Vec::new(),
             Vec::new(),
             Style::Unit,
@@ -262,6 +277,7 @@ struct Field {
     hash: u32,
     ty: TokenStream,
     with_bytes: bool,
+    comment_lines: Vec<String>,
 }
 
 fn get_serde_meta_items(attr: &syn::Attribute) -> Result<Vec<syn::Meta>, ()> {
@@ -334,6 +350,7 @@ fn fields_from_ast(
         .enumerate()
         .map(|(i, field)| {
             let attrs = get_attrs(&field.attrs);
+            let field_comment_lines = get_comment_lines(&field.attrs);
             let (real_ident, renamed_ident, hash) = match field.ident {
                 Some(ref ident) => {
                     let real_ident = Ident::Named(ident.clone());
@@ -357,6 +374,7 @@ fn fields_from_ast(
                 hash,
                 ty: derive_type(&field.ty, custom_candid_path),
                 with_bytes: attrs.with_bytes,
+                comment_lines: field_comment_lines,
             }
         })
         .collect();
@@ -377,11 +395,15 @@ fn fields_from_ast(
             Ident::Unnamed(ref i) => quote! { #candid::types::Label::Id(#i).into() },
         });
     let ty = fs.iter().map(|Field { ty, .. }| ty);
+    let comment = fs
+        .iter()
+        .map(|Field { comment_lines, .. }| get_comment_from_lines(comment_lines, false));
     let ty_gen = quote! {
         vec![
             #(#candid::types::Field {
                 id: #id,
-                ty: #ty }
+                ty: #ty,
+                comment: #comment }
             ),*
         ]
     };

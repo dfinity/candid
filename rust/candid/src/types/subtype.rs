@@ -78,8 +78,8 @@ fn subtype_(
             Ok(())
         }
         (Record(fs1), Record(fs2)) => {
-            let fields: HashMap<_, _> = fs1.iter().map(|Field { id, ty }| (id, ty)).collect();
-            for Field { id, ty: ty2 } in fs2 {
+            let fields: HashMap<_, _> = fs1.iter().map(|Field { id, ty, .. }| (id, ty)).collect();
+            for Field { id, ty: ty2, .. } in fs2 {
                 match fields.get(id) {
                     Some(ty1) => subtype_(report, gamma, env, ty1, ty2).with_context(|| {
                         format!("Record field {id}: {ty1} is not a subtype of {ty2}")
@@ -94,8 +94,8 @@ fn subtype_(
             Ok(())
         }
         (Variant(fs1), Variant(fs2)) => {
-            let fields: HashMap<_, _> = fs2.iter().map(|Field { id, ty }| (id, ty)).collect();
-            for Field { id, ty: ty1 } in fs1 {
+            let fields: HashMap<_, _> = fs2.iter().map(|Field { id, ty, .. }| (id, ty)).collect();
+            for Field { id, ty: ty1, .. } in fs1 {
                 match fields.get(id) {
                     Some(ty2) => subtype_(report, gamma, env, ty1, ty2).with_context(|| {
                         format!("Variant field {id}: {ty1} is not a subtype_ of {ty2}")
@@ -299,6 +299,7 @@ fn to_tuple(args: &[Type]) -> Type {
             .map(|(i, ty)| Field {
                 id: Label::Id(i as u32).into(),
                 ty: ty.clone(),
+                comment: None,
             })
             .collect(),
     )

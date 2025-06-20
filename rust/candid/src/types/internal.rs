@@ -96,19 +96,20 @@ impl TypeContainer {
         self.go(&t)
     }
     fn go(&mut self, t: &Type) -> Type {
-        match t.as_ref() {
+        let inner = match t.as_ref() {
             TypeInner::Opt(t) => TypeInner::Opt(self.go(t)),
             TypeInner::Vec(t) => TypeInner::Vec(self.go(t)),
             TypeInner::Record(fs) => {
-                let res: Type = TypeInner::Record(
+                let record_inner = TypeInner::Record(
                     fs.iter()
-                        .map(|Field { id, ty }| Field {
+                        .map(|Field { id, ty, comment }| Field {
                             id: id.clone(),
                             ty: self.go(ty),
+                            comment: comment.clone(),
                         })
                         .collect(),
-                )
-                .into();
+                );
+                let res = (record_inner, t.comment()).into();
                 if t.is_tuple() {
                     return res;
                 }
@@ -123,15 +124,16 @@ impl TypeContainer {
                 }
             }
             TypeInner::Variant(fs) => {
-                let res: Type = TypeInner::Variant(
+                let variant_inner = TypeInner::Variant(
                     fs.iter()
-                        .map(|Field { id, ty }| Field {
+                        .map(|Field { id, ty, comment }| Field {
                             id: id.clone(),
                             ty: self.go(ty),
+                            comment: comment.clone(),
                         })
                         .collect(),
-                )
-                .into();
+                );
+                let res = (variant_inner, t.comment()).into();
                 let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
                     self.env.0.insert(id.to_string(), res);
@@ -174,13 +176,50 @@ impl TypeContainer {
                 self.go(ty),
             ),
             t => t.clone(),
-        }
-        .into()
+        };
+        (inner, t.comment()).into()
     }
 }
 
-#[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
-pub struct Type(pub std::rc::Rc<TypeInner>);
+type CommentLines = Vec<String>;
+
+#[derive(Clone)]
+pub struct Type(
+    pub std::rc::Rc<TypeInner>,
+    Option<std::rc::Rc<CommentLines>>,
+);
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for Type {}
+
+impl std::hash::Hash for Type {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+impl PartialOrd for Type {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Type {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl std::fmt::Debug for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 pub enum TypeInner {
@@ -227,7 +266,15 @@ impl AsRef<TypeInner> for Type {
 }
 impl From<TypeInner> for Type {
     fn from(t: TypeInner) -> Self {
-        Type(t.into())
+        Type(t.into(), None)
+    }
+}
+impl From<(TypeInner, Option<&[String]>)> for Type {
+    fn from((t, comment_lines): (TypeInner, Option<&[String]>)) -> Self {
+        Type(
+            t.into(),
+            comment_lines.map(|s| std::rc::Rc::new(s.to_vec())),
+        )
     }
 }
 impl TypeInner {
@@ -274,17 +321,19 @@ impl Type {
             Vec(t) => Vec(t.subst(tau)),
             Record(fs) => Record(
                 fs.iter()
-                    .map(|Field { id, ty }| Field {
+                    .map(|Field { id, ty, .. }| Field {
                         id: id.clone(),
                         ty: ty.subst(tau),
+                        comment: None,
                     })
                     .collect(),
             ),
             Variant(fs) => Variant(
                 fs.iter()
-                    .map(|Field { id, ty }| Field {
+                    .map(|Field { id, ty, .. }| Field {
                         id: id.clone(),
                         ty: ty.subst(tau),
+                        comment: None,
                     })
                     .collect(),
             ),
@@ -321,6 +370,9 @@ impl Type {
         }
         .into()
     }
+    pub fn comment(&self) -> Option<&[String]> {
+        self.1.as_ref().map(|rc| rc.as_slice())
+    }
 }
 #[cfg(feature = "printer")]
 impl fmt::Display for Type {
@@ -331,7 +383,11 @@ impl fmt::Display for Type {
 #[cfg(feature = "printer")]
 impl fmt::Display for TypeInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", crate::pretty::candid::pp_ty_inner(self).pretty(80))
+        write!(
+            f,
+            "{}",
+            crate::pretty::candid::pp_ty_inner(self, None).pretty(80)
+        )
     }
 }
 #[cfg(not(feature = "printer"))]
@@ -476,6 +532,7 @@ pub type SharedLabel = std::rc::Rc<Label>;
 pub struct Field {
     pub id: SharedLabel,
     pub ty: Type,
+    pub comment: Option<std::rc::Rc<CommentLines>>,
 }
 #[cfg(feature = "printer")]
 impl fmt::Display for Field {
@@ -493,6 +550,11 @@ impl fmt::Display for Field {
         write!(f, "{:?}", self)
     }
 }
+impl Field {
+    pub fn comment(&self) -> Option<&[String]> {
+        self.comment.as_ref().map(|rc| rc.as_slice())
+    }
+}
 
 #[macro_export]
 /// Construct a field type, which can be used in `TypeInner::Record` and `TypeInner::Variant`.
@@ -506,7 +568,8 @@ macro_rules! field {
                 Ok(id) => $crate::types::Label::Id(id),
                 Err(_) => $crate::types::Label::Named(stringify!($id).to_string()),
             }.into(),
-            ty: $ty
+            ty: $ty,
+            comment: None,
         }
     }}
 }
@@ -662,17 +725,19 @@ pub fn unroll(t: &Type) -> Type {
         Vec(ref t) => Vec(unroll(t)),
         Record(fs) => Record(
             fs.iter()
-                .map(|Field { id, ty }| Field {
+                .map(|Field { id, ty, .. }| Field {
                     id: id.clone(),
                     ty: unroll(ty),
+                    comment: None,
                 })
                 .collect(),
         ),
         Variant(fs) => Variant(
             fs.iter()
-                .map(|Field { id, ty }| Field {
+                .map(|Field { id, ty, .. }| Field {
                     id: id.clone(),
                     ty: unroll(ty),
+                    comment: None,
                 })
                 .collect(),
         ),

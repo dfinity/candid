@@ -61,6 +61,44 @@ pub(crate) fn get_lit_str(expr: &syn::Expr) -> std::result::Result<syn::LitStr, 
     Err(())
 }
 
+pub(crate) fn get_comment_lines(attrs: &[syn::Attribute]) -> Vec<String> {
+    attrs
+        .iter()
+        .filter_map(|attr| match &attr.meta {
+            syn::Meta::NameValue(m) if m.path.is_ident("doc") => {
+                if let Ok(lit) = get_lit_str(&m.value) {
+                    Some(lit.value().trim().to_string())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+pub(crate) fn get_comment_from_lines(
+    comment_lines: &[String],
+    as_slice: bool,
+) -> proc_macro2::TokenStream {
+    if comment_lines.is_empty() {
+        quote::quote! { None }
+    } else {
+        let comment_strings: Vec<proc_macro2::TokenStream> = comment_lines
+            .iter()
+            .map(|s| quote::quote! { #s.to_string() })
+            .collect();
+
+        let comment_lines = quote::quote! { vec![#(#comment_strings),*] };
+
+        if as_slice {
+            quote::quote! { Some(#comment_lines.as_slice()) }
+        } else {
+            quote::quote! { Some(std::rc::Rc::new(#comment_lines)) }
+        }
+    }
+}
+
 fn get_custom_candid_path(input: &syn::DeriveInput) -> Result<Option<proc_macro2::TokenStream>> {
     let candid_path_helper_attribute_option = input
         .attrs

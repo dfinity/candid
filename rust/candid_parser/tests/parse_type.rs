@@ -12,21 +12,30 @@ use std::path::Path;
 fn parse_idl_prog() {
     let prog = r#"
 import "test.did";
+// This is a comment
 type my_type = principal;
-type List = opt record { head: int; tail: List };
-type f = func (List, func (int32) -> (int64)) -> (opt List);
-type broker = service {
+type List = opt record {
+  head: int;
+  // This is a field comment
+  tail: List;
+}; // This comment is ignored
+type f = func (List, func (int32) -> (int64)) -> (opt List); // This comment is ignored
+type broker = service { // This comment is ignored
+  // This is a method comment
   find : (name: text) ->
-    (service {up:() -> (); current:() -> (nat32)});
+    (service {up:() -> (); current:() -> (nat32)});     // This comment is ignored
 };
 type nested = record { nat; nat; record { nat; 0x2a:nat; nat8; }; 42:nat; 40:nat; variant{ A; 0x2a; B; C }; };
 
+// Ignored comment
+
+// This is a service comment
 service server : {
   f : (test: blob, opt bool) -> () oneway;
-  g : (my_type, List, opt List) -> (int) query;
+  g : (my_type, List, opt List) -> (int) query; // This comment is ignored
   h : (vec opt text, variant { A: nat; B: opt text }, opt List) -> (record { id: nat; 0x2a: record {} });
   i : f;
-}
+};
     "#;
     prog.parse::<IDLProg>().unwrap();
 }

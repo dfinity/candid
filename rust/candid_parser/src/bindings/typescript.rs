@@ -3,6 +3,10 @@ use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
+const DOC_COMMENT_PREFIX: &str = "/**";
+const DOC_COMMENT_LINE_PREFIX: &str = " * ";
+const DOC_COMMENT_SUFFIX: &str = " */";
+
 fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
     use TypeInner::*;
     match ty.as_ref() {
@@ -103,7 +107,8 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
 }
 
 fn pp_field<'a>(env: &'a TypeEnv, field: &'a Field, is_ref: bool) -> RcDoc<'a> {
-    pp_label(&field.id)
+    pp_comment(field.comment())
+        .append(pp_label(&field.id))
         .append(kwd(":"))
         .append(pp_ty(env, &field.ty, is_ref))
 }
@@ -130,11 +135,14 @@ fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
 fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
     let doc = concat(
         serv.iter().map(|(id, func)| {
-            let func = match func.as_ref() {
-                TypeInner::Func(ref func) => pp_function(env, func),
+            let f = match func.as_ref() {
+                TypeInner::Func(ref inner) => pp_function(env, inner),
                 _ => pp_ty(env, func, false),
             };
-            quote_ident(id).append(kwd(":")).append(func)
+            pp_comment(func.comment())
+                .append(quote_ident(id))
+                .append(kwd(":"))
+                .append(f)
         }),
         ",",
     );
@@ -144,7 +152,7 @@ fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
 fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
-        let export = match ty.as_ref() {
+        let doc = match ty.as_ref() {
             TypeInner::Record(_) if !ty.is_tuple() => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
@@ -156,7 +164,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
             TypeInner::Func(ref func) => kwd("export type")
                 .append(ident(id))
                 .append(" = ")
-                .append(pp_function(env, func))
+                .append(pp_function(env, func)) // the comment is already added at the end of this match block
                 .append(";"),
             _ => kwd("export type")
                 .append(ident(id))
@@ -164,7 +172,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
                 .append(pp_ty(env, ty, false))
                 .append(";"),
         };
-        export
+        pp_comment(ty.comment()).append(doc)
     }))
 }
 
@@ -181,6 +189,29 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
     }
 }
 
+fn pp_comment(comment_lines: Option<&[String]>) -> RcDoc {
+    let mut comment_doc = RcDoc::nil();
+    let mut is_empty = true;
+    if let Some(comment_lines) = comment_lines {
+        is_empty = comment_lines.is_empty();
+        for line in comment_lines {
+            comment_doc = comment_doc.append(
+                RcDoc::text(DOC_COMMENT_LINE_PREFIX)
+                    .append(line)
+                    .append(RcDoc::hardline()),
+            );
+        }
+    }
+    if !is_empty {
+        comment_doc = RcDoc::text(DOC_COMMENT_PREFIX)
+            .append(RcDoc::hardline())
+            .append(comment_doc)
+            .append(RcDoc::text(DOC_COMMENT_SUFFIX))
+            .append(RcDoc::hardline());
+    }
+    comment_doc
+}
+
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
     let header = r#"import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
@@ -190,7 +221,8 @@ import type { IDL } from '@dfinity/candid';
     let defs = pp_defs(env, &def_list);
     let actor = match actor {
         None => RcDoc::nil(),
-        Some(actor) => pp_actor(env, actor)
+        Some(actor) => pp_comment(actor.comment())
+            .append(pp_actor(env, actor))
             .append(RcDoc::line())
             .append("export declare const idlFactory: IDL.InterfaceFactory;")
             .append(RcDoc::line())

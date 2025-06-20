@@ -215,7 +215,7 @@ impl RandState<'_> {
             }
             TypeInner::Record(fs) => {
                 let mut res = Vec::new();
-                for Field { id, ty } in fs.iter() {
+                for Field { id, ty, .. } in fs.iter() {
                     let lab_str = id.to_string();
                     let elem = StateElem::Label(&lab_str);
                     let old_config = self.0.push_state(&elem);
@@ -243,7 +243,7 @@ impl RandState<'_> {
                     choices.collect()
                 };
                 let idx = arbitrary_variant(u, &sizes)?;
-                let Field { id, ty } = &fs[idx];
+                let Field { id, ty, .. } = &fs[idx];
                 let lab_str = id.to_string();
                 let elem = StateElem::Label(&lab_str);
                 let old_config = self.0.push_state(&elem);

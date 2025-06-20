@@ -12,6 +12,7 @@ pub struct Profile { pub age: u8, pub name: String }
 fn init(arg0: candid::Int, l: List, arg2: Profile) {
   unimplemented!()
 }
+/// This is a method comment
 #[ic_cdk::update]
 fn get() -> List {
   unimplemented!()
@@ -21,6 +22,10 @@ fn set(arg0: List) -> List {
   unimplemented!()
 }
 #[link_section = "icp:public candid:service"]
-pub static __SERVICE: [u8; 94] = *br#"type List = opt record { int; List };
-service : { get : () -> (List); set : (List) -> (List) }"#;
+pub static __SERVICE: [u8; 129] = *br#"type List = opt record { int; List };
+service : {
+  // This is a method comment
+  get : () -> (List);
+  set : (List) -> (List);
+}"#;
 

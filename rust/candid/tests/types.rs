@@ -184,21 +184,34 @@ fn test_func() {
         }
         #[derive(CandidType)]
         pub struct Wrap(List<i8>);
+        /// Comment for NamedStruct
+        /// on multiple lines
         #[derive(CandidType)]
         pub struct NamedStruct {
+            /// Comment for NamedStruct.a
             pub a: u16,
+            /// Comment for NamedStruct.b
+            /// on multiple lines
             pub b: i32,
         }
+        /// Comment for A enum
         #[derive(CandidType)]
         pub enum A {
             A1(super::List<i8>, Box<List<i8>>, Wrap),
             A2(String, candid::Principal),
             A3(candid::Int),
-            // This struct happens to have the same candid type as NamedStruct
-            A4 { a: u16, b: i32 },
+            /// This struct happens to have the same candid type as NamedStruct
+            A4 {
+                a: u16,
+                b: i32,
+            },
+            /// This comment is for A5
             A5(NamedStruct),
             A6(Box<NamedStruct>),
-            A7 { b: i32, c: u16 },
+            A7 {
+                b: i32,
+                c: u16,
+            },
         }
     }
     use internal::A;
@@ -211,6 +224,8 @@ fn test_func() {
         unreachable!()
     }
 
+    /// Doc comment for id_struct
+    /// on multiple lines
     #[candid_method(query)]
     fn id_struct(_: (List<u8>,)) -> Result<List<u8>, candid::Empty> {
         unreachable!()
@@ -239,11 +254,14 @@ fn test_func() {
     fn init(_: List<i128>) {}
 
     candid::export_service!();
-    let expected = r#"type A = variant {
+    let expected = r#"// Comment for A enum
+type A = variant {
   A1 : record { List_1; Wrap; Wrap };
   A2 : record { text; principal };
   A3 : int;
-  A4 : NamedStruct;
+  // This struct happens to have the same candid type as NamedStruct
+  A4 : record { a : nat16; b : int32 };
+  // This comment is for A5
   A5 : NamedStruct;
   A6 : NamedStruct;
   A7 : record { b : int32; c : nat16 };
@@ -252,11 +270,21 @@ type Box = record { head : int8; tail : opt Box };
 type List = record { head : nat8; tail : opt List };
 type List_1 = record { head : int8; tail : opt List_1 };
 type List_2 = record { head : int; tail : opt List_2 };
-type NamedStruct = record { a : nat16; b : int32 };
+// Comment for NamedStruct
+// on multiple lines
+type NamedStruct = record {
+  // Comment for NamedStruct.a
+  a : nat16;
+  // Comment for NamedStruct.b
+  // on multiple lines
+  b : int32;
+};
 type Result = variant { Ok : List; Err : empty };
 type Result_1 = variant { Ok : record { record { A }; A }; Err : text };
 type Wrap = record { head : int8; tail : opt Box };
 service : (List_2) -> {
+  // Doc comment for id_struct
+  // on multiple lines
   id_struct : (record { List }) -> (Result) query;
   id_struct_composite : (record { List }) -> (Result) composite_query;
   id_struct_destructure : (NamedStruct) -> (nat16, int32);
@@ -279,6 +307,7 @@ fn test_counter() {
             Service { counter: 0 }
         }
         #[candid_method]
+        /// Doc comment for inc
         fn inc(&mut self) {
             self.counter += 1;
         }
@@ -293,6 +322,7 @@ fn test_counter() {
     }
     candid::export_service!();
     let expected = r#"service : {
+  // Doc comment for inc
   inc : () -> ();
   read : () -> (nat64) query;
   set : (value : nat64) -> ();
