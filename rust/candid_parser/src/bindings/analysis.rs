@@ -11,9 +11,7 @@ pub fn project_methods(
     actor: &Option<Type>,
     mut methods: Vec<String>,
 ) -> Result<Type> {
-    let actor = actor
-        .as_ref()
-        .ok_or_else(|| Error::Custom(anyhow::anyhow!("no actor")))?;
+    let actor = actor.as_ref().ok_or_else(|| Error::msg("no actor"))?;
     let service = env.as_service(actor)?;
     let filtered = service
         .iter()
@@ -28,10 +26,7 @@ pub fn project_methods(
         .cloned()
         .collect();
     if !methods.is_empty() {
-        return Err(Error::Custom(anyhow::anyhow!(
-            "methods not found: {:?}",
-            methods
-        )));
+        return Err(Error::msg(format!("methods not found: {:?}", methods)));
     }
     Ok(TypeInner::Service(filtered).into())
 }
@@ -47,9 +42,7 @@ pub fn chase_type<'a>(
     match t {
         VarT(id) => {
             if seen.insert(id) {
-                let t = env
-                    .find_type(id)
-                    .map_err(|e| Error::Custom(anyhow::anyhow!(e)))?;
+                let t = env.find_type(id).map_err(Error::msg)?;
                 chase_type(seen, res, env, t)?;
                 res.push(id);
             }
@@ -87,23 +80,15 @@ pub fn chase_type<'a>(
 pub fn chase_actor<'a>(env: &'a IDLEnv) -> Result<Vec<&'a str>> {
     let mut seen = BTreeSet::new();
     let mut res = Vec::new();
-    let actor = env
-        .actor
-        .as_ref()
-        .ok_or_else(|| Error::Custom(anyhow::anyhow!("no actor")))?;
+    let actor = env.actor.as_ref().ok_or_else(|| Error::msg("no actor"))?;
     chase_type(&mut seen, &mut res, env, actor)?;
     Ok(res)
 }
 /// Given an actor, return a map from variable names to the (methods, arg) that use them.
 pub fn chase_def_use<'a>(env: &'a IDLEnv) -> Result<BTreeMap<String, Vec<String>>> {
     let mut res = BTreeMap::new();
-    let actor = env
-        .actor
-        .as_ref()
-        .ok_or_else(|| Error::Custom(anyhow::anyhow!("no actor")))?;
-    let actor = env
-        .trace_type(&actor)
-        .map_err(|e| Error::Custom(anyhow::anyhow!(e)))?;
+    let actor = env.actor.as_ref().ok_or_else(|| Error::msg("no actor"))?;
+    let actor = env.trace_type(&actor).map_err(Error::msg)?;
     if let IDLType::ClassT(args, _) = &actor {
         for (i, arg) in args.iter().enumerate() {
             let mut used = Vec::new();
@@ -115,13 +100,8 @@ pub fn chase_def_use<'a>(env: &'a IDLEnv) -> Result<BTreeMap<String, Vec<String>
             }
         }
     }
-    for binding in env
-        .as_service(&actor)
-        .map_err(|e| Error::Custom(anyhow::anyhow!(e)))?
-    {
-        let func = env
-            .as_func(&binding.typ)
-            .map_err(|e| Error::Custom(anyhow::anyhow!(e)))?;
+    for binding in env.as_service(&actor).map_err(Error::msg)? {
+        let func = env.as_func(&binding.typ).map_err(Error::msg)?;
         for (i, arg) in func.args.iter().enumerate() {
             let mut used = Vec::new();
             chase_type(&mut BTreeSet::new(), &mut used, env, &arg.typ)?;
