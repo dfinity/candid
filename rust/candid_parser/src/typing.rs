@@ -1,9 +1,10 @@
 use crate::{parse_idl_prog, pretty_parse_idl_prog, Error, Result};
 use candid::types::{
     syntax::{
-        Binding, Dec, FuncType, IDLArgType, IDLEnv, IDLInitArgs, IDLProg, IDLType, TypeField,
+        Binding, Dec, FuncType, IDLArgType, IDLEnv, IDLInitArgs, IDLProg, IDLType, PrimType,
+        TypeField,
     },
-    ArgType, Type, TypeEnv, TypeInner,
+    ArgType, Field, Function, Type, TypeEnv, TypeInner,
 };
 use candid::utils::check_unique;
 use std::collections::BTreeMap;
@@ -15,15 +16,132 @@ pub struct Env<'a> {
     pre: bool,
 }
 
-impl Env<'_> {
-    fn insert_binding(&mut self, binding: Binding) {
-        self.idl_env.insert_binding(binding);
+/// Convert candid AST to internal Type
+pub fn ast_to_type(env: &TypeEnv, ast: &IDLType) -> Result<Type> {
+    let env = Env {
+        te: &mut env.clone(),
+        idl_env: &mut IDLEnv::new(),
+        pre: false,
+    };
+    map_type(&env, ast)
+}
+
+fn map_prim(prim: &PrimType) -> Type {
+    match prim {
+        PrimType::Nat => TypeInner::Nat,
+        PrimType::Nat8 => TypeInner::Nat8,
+        PrimType::Nat16 => TypeInner::Nat16,
+        PrimType::Nat32 => TypeInner::Nat32,
+        PrimType::Nat64 => TypeInner::Nat64,
+        PrimType::Int => TypeInner::Int,
+        PrimType::Int8 => TypeInner::Int8,
+        PrimType::Int16 => TypeInner::Int16,
+        PrimType::Int32 => TypeInner::Int32,
+        PrimType::Int64 => TypeInner::Int64,
+        PrimType::Float32 => TypeInner::Float32,
+        PrimType::Float64 => TypeInner::Float64,
+        PrimType::Bool => TypeInner::Bool,
+        PrimType::Text => TypeInner::Text,
+        PrimType::Null => TypeInner::Null,
+        PrimType::Reserved => TypeInner::Reserved,
+        PrimType::Empty => TypeInner::Empty,
+    }
+    .into()
+}
+
+pub fn map_type(env: &Env, t: &IDLType) -> Result<Type> {
+    match t {
+        IDLType::PrimT(prim) => Ok(map_prim(prim)),
+        IDLType::VarT(id) => {
+            env.te.find_type(id)?;
+            Ok(TypeInner::Var(id.to_string()).into())
+        }
+        IDLType::OptT(t) => {
+            let t = map_type(env, t)?;
+            Ok(TypeInner::Opt(t).into())
+        }
+        IDLType::VecT(t) => {
+            let t = map_type(env, t)?;
+            Ok(TypeInner::Vec(t).into())
+        }
+        IDLType::RecordT(fs) => {
+            let fs = map_fields(env, fs)?;
+            Ok(TypeInner::Record(fs).into())
+        }
+        IDLType::VariantT(fs) => {
+            let fs = map_fields(env, fs)?;
+            Ok(TypeInner::Variant(fs).into())
+        }
+        IDLType::PrincipalT => Ok(TypeInner::Principal.into()),
+        IDLType::FuncT(func) => {
+            let mut t1 = Vec::new();
+            for arg in func.args.iter() {
+                t1.push(map_arg(env, arg)?);
+            }
+            let mut t2 = Vec::new();
+            for t in func.rets.iter() {
+                t2.push(map_type(env, t)?);
+            }
+            if func.modes.len() > 1 {
+                return Err(Error::msg("cannot have more than one mode"));
+            }
+            if func.modes.len() == 1
+                && func.modes[0] == candid::types::FuncMode::Oneway
+                && !t2.is_empty()
+            {
+                return Err(Error::msg("oneway function has non-unit return type"));
+            }
+            let f = Function {
+                modes: func.modes.clone(),
+                args: t1,
+                rets: t2,
+            };
+            Ok(TypeInner::Func(f).into())
+        }
+        IDLType::ServT(ms) => {
+            let ms = map_meths(env, ms)?;
+            Ok(TypeInner::Service(ms).into())
+        }
+        IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
+        IDLType::UnknownT => Err(Error::msg("unknown type")),
     }
 }
 
-/// Convert candid AST to internal Type
-pub fn ast_to_type(env: &TypeEnv, ast: &IDLType) -> Result<Type> {
-    env.map_type(ast).map_err(Error::msg)
+fn map_arg(env: &Env, arg: &IDLArgType) -> Result<ArgType> {
+    Ok(ArgType {
+        name: arg.name.clone(),
+        typ: map_type(env, &arg.typ)?,
+    })
+}
+
+fn map_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
+    // field label duplication is checked in the parser
+    let mut res = Vec::new();
+    for f in fs.iter() {
+        let ty = map_type(env, &f.typ)?;
+        let field = Field {
+            id: f.label.clone().into(),
+            ty,
+        };
+        res.push(field);
+    }
+    Ok(res)
+}
+
+fn map_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
+    // binding duplication is checked in the parser
+    let mut res = Vec::new();
+    for meth in ms.iter() {
+        let t = map_type(env, &meth.typ)?;
+        if !env.pre && env.te.as_func(&t).is_err() {
+            return Err(Error::msg(format!(
+                "method {} is a non-function type",
+                meth.id
+            )));
+        }
+        res.push((meth.id.to_owned(), t));
+    }
+    Ok(res)
 }
 
 pub fn check_type(env: &Env, t: &IDLType) -> Result<IDLType> {
@@ -128,11 +246,11 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         match dec {
             Dec::TypD(binding) => {
-                let t = check_type(env, &binding.typ)?;
-                env.insert_binding(Binding {
-                    id: binding.id.to_owned(),
-                    typ: t,
-                });
+                let idl_type = check_type(env, &binding.typ)?;
+                let t = map_type(env, &idl_type)?;
+                let id = binding.id.to_string();
+                env.te.0.insert(id.clone(), t);
+                env.idl_env.insert_binding(Binding { id, typ: idl_type });
             }
             Dec::ImportType(_) | Dec::ImportServ(_) => (),
         }
