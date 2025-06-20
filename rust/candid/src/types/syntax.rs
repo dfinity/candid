@@ -257,7 +257,6 @@ impl IDLEnv {
     pub fn trace_type(&self, t: &IDLType) -> Result<IDLType, String> {
         match t {
             IDLType::VarT(id) => self.trace_type(self.find_type(id)?),
-            IDLType::ClassT(_, t) => self.trace_type(t),
             _ => Ok(t.clone()),
         }
     }
