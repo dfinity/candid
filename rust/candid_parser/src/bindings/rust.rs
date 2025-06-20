@@ -170,7 +170,7 @@ impl<'a> State<'a> {
         if self.tests.contains_key(use_type) {
             return;
         }
-        let def_list = chase_actor(self.state.env).unwrap();
+        let def_list = chase_actor(self.state.env, src).unwrap();
         let env = IDLEnv::from(
             self.state
                 .env
@@ -706,8 +706,8 @@ pub fn emit_bindgen(tree: &Config, env: &IDLEnv) -> (Output, Vec<String>) {
     };
     let env = state.nominalize_all();
     let old_stats = state.state.stats.clone();
-    let def_list = if env.actor.is_some() {
-        chase_actor(&env).unwrap()
+    let def_list = if let Some(actor) = &env.actor {
+        chase_actor(&env, actor).unwrap()
     } else {
         env.types_ids()
     };

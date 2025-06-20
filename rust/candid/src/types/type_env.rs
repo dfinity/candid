@@ -1,4 +1,5 @@
-use crate::types::{Function, Type, TypeInner};
+use crate::types::syntax::{Binding, IDLArgType, IDLType, PrimType, TypeField};
+use crate::types::{ArgType, Field, FuncMode, Function, Type, TypeInner};
 use crate::{Error, Result};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -154,7 +155,100 @@ impl TypeEnv {
         }
         Ok(())
     }
+
+    fn map_arg(&self, arg: &IDLArgType) -> Result<ArgType> {
+        Ok(ArgType {
+            name: arg.name.clone(),
+            typ: self.map_type(&arg.typ)?,
+        })
+    }
+
+    fn map_fields(&self, fs: &[TypeField]) -> Result<Vec<Field>> {
+        // field label duplication is checked in the parser
+        let mut res = Vec::new();
+        for f in fs.iter() {
+            let ty = self.map_type(&f.typ)?;
+            let field = Field {
+                id: f.label.clone().into(),
+                ty,
+            };
+            res.push(field);
+        }
+        Ok(res)
+    }
+
+    fn map_meths(&self, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
+        // binding duplication is checked in the parser
+        let mut res = Vec::new();
+        for meth in ms.iter() {
+            let t = self.map_type(&meth.typ)?;
+            if self.as_func(&t).is_err() {
+                return Err(Error::msg(format!(
+                    "method {} is a non-function type",
+                    meth.id
+                )));
+            }
+            res.push((meth.id.to_owned(), t));
+        }
+        Ok(res)
+    }
+
+    pub fn map_type(&self, t: &IDLType) -> Result<Type> {
+        match t {
+            IDLType::PrimT(prim) => Ok(map_prim(prim)),
+            IDLType::VarT(id) => {
+                self.find_type(id)?;
+                Ok(TypeInner::Var(id.to_string()).into())
+            }
+            IDLType::OptT(t) => {
+                let t = self.map_type(t)?;
+                Ok(TypeInner::Opt(t).into())
+            }
+            IDLType::VecT(t) => {
+                let t = self.map_type(t)?;
+                Ok(TypeInner::Vec(t).into())
+            }
+            IDLType::RecordT(fs) => {
+                let fs = self.map_fields(fs)?;
+                Ok(TypeInner::Record(fs).into())
+            }
+            IDLType::VariantT(fs) => {
+                let fs = self.map_fields(fs)?;
+                Ok(TypeInner::Variant(fs).into())
+            }
+            IDLType::PrincipalT => Ok(TypeInner::Principal.into()),
+            IDLType::FuncT(func) => {
+                let mut t1 = Vec::new();
+                for arg in func.args.iter() {
+                    t1.push(self.map_arg(arg)?);
+                }
+                let mut t2 = Vec::new();
+                for t in func.rets.iter() {
+                    t2.push(self.map_type(t)?);
+                }
+                if func.modes.len() > 1 {
+                    return Err(Error::msg("cannot have more than one mode"));
+                }
+                if func.modes.len() == 1 && func.modes[0] == FuncMode::Oneway && !t2.is_empty() {
+                    return Err(Error::msg("oneway function has non-unit return type"));
+                }
+                let f = Function {
+                    modes: func.modes.clone(),
+                    args: t1,
+                    rets: t2,
+                };
+                Ok(TypeInner::Func(f).into())
+            }
+            IDLType::ServT(ms) => {
+                let ms = self.map_meths(ms)?;
+                Ok(TypeInner::Service(ms).into())
+            }
+            IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
+            IDLType::UnknownT => Err(Error::msg("unknown type")),
+        }
+    }
 }
+
 impl std::fmt::Display for TypeEnv {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (k, v) in &self.0 {
@@ -162,4 +256,27 @@ impl std::fmt::Display for TypeEnv {
         }
         Ok(())
     }
+}
+
+fn map_prim(prim: &PrimType) -> Type {
+    match prim {
+        PrimType::Nat => TypeInner::Nat,
+        PrimType::Nat8 => TypeInner::Nat8,
+        PrimType::Nat16 => TypeInner::Nat16,
+        PrimType::Nat32 => TypeInner::Nat32,
+        PrimType::Nat64 => TypeInner::Nat64,
+        PrimType::Int => TypeInner::Int,
+        PrimType::Int8 => TypeInner::Int8,
+        PrimType::Int16 => TypeInner::Int16,
+        PrimType::Int32 => TypeInner::Int32,
+        PrimType::Int64 => TypeInner::Int64,
+        PrimType::Float32 => TypeInner::Float32,
+        PrimType::Float64 => TypeInner::Float64,
+        PrimType::Bool => TypeInner::Bool,
+        PrimType::Text => TypeInner::Text,
+        PrimType::Null => TypeInner::Null,
+        PrimType::Reserved => TypeInner::Reserved,
+        PrimType::Empty => TypeInner::Empty,
+    }
+    .into()
 }

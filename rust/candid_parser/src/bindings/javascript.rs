@@ -245,7 +245,7 @@ pub fn compile(env: &IDLEnv) -> String {
             doc.pretty(LINE_WIDTH).to_string()
         }
         Some(actor) => {
-            let def_list = chase_actor(env).unwrap();
+            let def_list = chase_actor(env, actor).unwrap();
             let recs = infer_rec(env, &def_list).unwrap();
             let defs = pp_defs(env, &def_list, &recs);
             let init = if let IDLType::ClassT(ref args, _) = actor {

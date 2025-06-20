@@ -81,7 +81,14 @@ pub fn instantiate_candid(candid: CandidSource) -> Result<(Vec<Type>, (TypeEnv, 
     })
 }
 pub fn get_metadata(env: &IDLEnv) -> Option<String> {
-    let def_list = crate::bindings::analysis::chase_actor(env).ok()?;
+    let serv = env.actor.clone()?;
+    let serv = env.trace_type(&serv).ok()?;
+    let serv = match &serv {
+        IDLType::ClassT(_, ty) => ty.as_ref(),
+        IDLType::ServT(_) => &serv,
+        _ => unreachable!(),
+    };
+    let def_list = crate::bindings::analysis::chase_actor(env, &serv).ok()?;
     let mut filtered = IDLEnv::new();
     for d in def_list {
         if let Ok((id, typ)) = env.find_binding(d) {
@@ -91,6 +98,7 @@ pub fn get_metadata(env: &IDLEnv) -> Option<String> {
             });
         }
     }
+    filtered.set_actor(Some(serv.clone()));
     Some(candid::pretty::candid::compile(&filtered))
 }
 

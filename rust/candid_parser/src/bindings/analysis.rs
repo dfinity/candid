@@ -77,10 +77,9 @@ pub fn chase_type<'a>(
 
 /// Gather type definitions mentioned in actor, return the non-recursive type names in topological order.
 /// Recursive types can appear in any order.
-pub fn chase_actor<'a>(env: &'a IDLEnv) -> Result<Vec<&'a str>> {
+pub fn chase_actor<'a>(env: &'a IDLEnv, actor: &'a IDLType) -> Result<Vec<&'a str>> {
     let mut seen = BTreeSet::new();
     let mut res = Vec::new();
-    let actor = env.actor.as_ref().ok_or_else(|| Error::msg("no actor"))?;
     chase_type(&mut seen, &mut res, env, actor)?;
     Ok(res)
 }
