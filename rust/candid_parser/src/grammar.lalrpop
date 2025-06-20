@@ -1,5 +1,4 @@
 use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLArgType};
-use super::test::{Assert, Input, Test};
 use super::token::{Token, error, error2, LexicalError, Span};
 use candid::{Principal, types::Label};
 use candid::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
@@ -280,30 +279,6 @@ pub IDLProg: IDLProg = {
 
 pub IDLInitArgs: IDLInitArgs = {
     <decs:SepBy<Def, ";">> <args:ArgTupTyp> => IDLInitArgs { decs, args }
-}
-
-// Test file
-
-Input: Input = {
-    Text => Input::Text(<>),
-    Bytes => Input::Blob(<>),
-}
-
-Assert: Assert = <id:Sp<"id">> <assert:Assertion> =>? {
-    if id.0 != "assert" {
-        Err(error2("not an assert", id.1))
-    } else { Ok(assert) }
-};
-
-Assertion: Assert = {
-    <left:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: None, typ, pass: true, desc },
-    <left:Input> "!:" <typ:TupTyp> <desc:Text?> => Assert { left, right: None, typ, pass: false, desc },
-    <left:Input> "==" <right:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: Some(right), typ, pass: true, desc },
-    <left:Input> "!=" <right:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: Some(right), typ, pass: false, desc },
-}
-
-pub Test: Test = {
-    <defs:SepBy<Def, ";">> <asserts:SepBy<Assert, ";">> => Test { defs, asserts },
 }
 
 // Common util

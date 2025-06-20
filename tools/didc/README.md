@@ -3,18 +3,20 @@
 A multi-purpose tool for Candid.
 
 ```
-didc 0.1.0
+didc 0.4.0
 
 USAGE:
     didc <SUBCOMMAND>
 
 SUBCOMMANDS:
-    check     Type check Candid file
-    bind      Binding for different languages
-    test      Generate test suites for different languages
-    encode    Encode Candid value
-    decode    Decode Candid binary data
-    random    Generate random Candid values
+    check    Type check Candid file
+    bind     Generate binding for different languages
+    hash     Compute the hash of a field name
+    encode   Encode Candid value
+    decode   Decode Candid binary data
+    assist   Generate textual Candid values based on a terminal dialog
+    random   Generate random Candid values
+    subtype  Check for subtyping
 ```
 
 ## TOML config
