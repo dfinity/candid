@@ -1,5 +1,5 @@
 use anyhow::Result;
-use candid::types::{Type, TypeEnv, TypeInner};
+use candid::types::syntax::{IDLEnv, IDLType, PrimType};
 use serde::de::DeserializeOwned;
 use std::collections::{BTreeMap, BTreeSet};
 use toml::{Table, Value};
@@ -12,7 +12,7 @@ pub struct State<'a, T: ConfigState> {
     pub stats: BTreeMap<Vec<String>, u32>,
     pub config: T,
     pub config_source: BTreeMap<String, Vec<String>>,
-    pub env: &'a TypeEnv,
+    pub env: &'a IDLEnv,
 }
 pub struct ConfigBackup<T> {
     config: T,
@@ -20,7 +20,7 @@ pub struct ConfigBackup<T> {
 }
 #[derive(Debug)]
 pub enum StateElem<'a> {
-    Type(&'a Type),
+    Type(&'a IDLType),
     TypeStr(&'a str),
     Label(&'a str),
 }
@@ -36,7 +36,7 @@ pub enum ScopePos {
 }
 
 impl<'a, T: ConfigState> State<'a, T> {
-    pub fn new(tree: &'a ConfigTree<T>, env: &'a TypeEnv) -> Self {
+    pub fn new(tree: &'a ConfigTree<T>, env: &'a IDLEnv) -> Self {
         let mut config = T::default();
         let mut config_source = BTreeMap::new();
         if let Some(state) = &tree.state {
@@ -374,38 +374,40 @@ fn generate_state_tree<T: ConfigState>(v: Value) -> Result<ConfigTree<T>> {
         Err(anyhow::anyhow!("Expected a table"))
     }
 }
-fn path_name(t: &Type) -> String {
-    match t.as_ref() {
-        TypeInner::Null => "null",
-        TypeInner::Bool => "bool",
-        TypeInner::Nat => "nat",
-        TypeInner::Int => "int",
-        TypeInner::Nat8 => "nat8",
-        TypeInner::Nat16 => "nat16",
-        TypeInner::Nat32 => "nat32",
-        TypeInner::Nat64 => "nat64",
-        TypeInner::Int8 => "int8",
-        TypeInner::Int16 => "int16",
-        TypeInner::Int32 => "int32",
-        TypeInner::Int64 => "int64",
-        TypeInner::Float32 => "float32",
-        TypeInner::Float64 => "float64",
-        TypeInner::Text => "text",
-        TypeInner::Reserved => "reserved",
-        TypeInner::Empty => "empty",
-        TypeInner::Var(id) => id,
-        TypeInner::Knot(id) => id.name,
-        TypeInner::Principal => "principal",
-        TypeInner::Opt(_) => "opt",
-        TypeInner::Vec(t) if matches!(t.as_ref(), TypeInner::Nat8) => "blob",
-        TypeInner::Vec(_) => "vec",
-        TypeInner::Record(_) => "record",
-        TypeInner::Variant(_) => "variant",
-        TypeInner::Func(_) => "func",
-        TypeInner::Service(_) => "service",
-        TypeInner::Future => "future",
-        TypeInner::Class(..) => "func:init",
-        TypeInner::Unknown => unreachable!(),
+fn prim_path_name(t: &PrimType) -> &str {
+    match t {
+        PrimType::Null => "null",
+        PrimType::Bool => "bool",
+        PrimType::Nat => "nat",
+        PrimType::Int => "int",
+        PrimType::Nat8 => "nat8",
+        PrimType::Nat16 => "nat16",
+        PrimType::Nat32 => "nat32",
+        PrimType::Nat64 => "nat64",
+        PrimType::Int8 => "int8",
+        PrimType::Int16 => "int16",
+        PrimType::Int32 => "int32",
+        PrimType::Int64 => "int64",
+        PrimType::Float32 => "float32",
+        PrimType::Float64 => "float64",
+        PrimType::Text => "text",
+        PrimType::Reserved => "reserved",
+        PrimType::Empty => "empty",
+    }
+}
+fn path_name(t: &IDLType) -> String {
+    match t {
+        IDLType::PrimT(t) => prim_path_name(t),
+        IDLType::VarT(id) => id,
+        IDLType::PrincipalT => "principal",
+        IDLType::OptT(_) => "opt",
+        IDLType::VecT(t) if matches!(t.as_ref(), IDLType::PrimT(PrimType::Nat8)) => "blob",
+        IDLType::VecT(_) => "vec",
+        IDLType::RecordT(_) => "record",
+        IDLType::VariantT(_) => "variant",
+        IDLType::FuncT(_) => "func",
+        IDLType::ServT(_) => "service",
+        IDLType::ClassT(..) => "func:init",
     }
     .to_string()
 }
@@ -520,7 +522,7 @@ Vec = { width = 2, size = 10 }
         t.clone(),
     );
     assert_eq!(tree.max_depth, 4);
-    let env = TypeEnv::default();
+    let env = IDLEnv::new();
     let mut state = State::new(&tree, &env);
     state.with_scope(
         &Some(Scope {

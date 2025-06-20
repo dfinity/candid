@@ -1,5 +1,8 @@
 use crate::{Error, Result};
-use candid::types::{Type, TypeEnv, TypeInner};
+use candid::types::{
+    syntax::{IDLEnv, IDLType},
+    Type, TypeEnv, TypeInner,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Select a subset of methods from an actor.
@@ -37,36 +40,38 @@ pub fn project_methods(
 pub fn chase_type<'a>(
     seen: &mut BTreeSet<&'a str>,
     res: &mut Vec<&'a str>,
-    env: &'a TypeEnv,
-    t: &'a Type,
+    env: &'a IDLEnv,
+    t: &'a IDLType,
 ) -> Result<()> {
-    use TypeInner::*;
-    match t.as_ref() {
-        Var(id) => {
+    use IDLType::*;
+    match t {
+        VarT(id) => {
             if seen.insert(id) {
-                let t = env.find_type(id)?;
+                let t = env
+                    .find_type(id)
+                    .map_err(|e| Error::Custom(anyhow::anyhow!(e)))?;
                 chase_type(seen, res, env, t)?;
                 res.push(id);
             }
         }
-        Opt(ty) | Vec(ty) => chase_type(seen, res, env, ty)?,
-        Record(fs) | Variant(fs) => {
+        OptT(ty) | VecT(ty) => chase_type(seen, res, env, ty)?,
+        RecordT(fs) | VariantT(fs) => {
             for f in fs.iter() {
-                chase_type(seen, res, env, &f.ty)?;
+                chase_type(seen, res, env, &f.typ)?;
             }
         }
-        Func(f) => {
+        FuncT(f) => {
             let args = f.args.iter().map(|arg| &arg.typ);
             for ty in args.clone().chain(f.rets.iter()) {
                 chase_type(seen, res, env, ty)?;
             }
         }
-        Service(ms) => {
-            for (_, ty) in ms.iter() {
-                chase_type(seen, res, env, ty)?;
+        ServT(bindings) => {
+            for binding in bindings.iter() {
+                chase_type(seen, res, env, &binding.typ)?;
             }
         }
-        Class(args, t) => {
+        ClassT(args, t) => {
             for arg in args.iter() {
                 chase_type(seen, res, env, &arg.typ)?;
             }
@@ -79,20 +84,27 @@ pub fn chase_type<'a>(
 
 /// Gather type definitions mentioned in actor, return the non-recursive type names in topological order.
 /// Recursive types can appear in any order.
-pub fn chase_actor<'a>(env: &'a TypeEnv, actor: &'a Type) -> Result<Vec<&'a str>> {
+pub fn chase_actor<'a>(env: &'a IDLEnv) -> Result<Vec<&'a str>> {
     let mut seen = BTreeSet::new();
     let mut res = Vec::new();
+    let actor = env
+        .actor
+        .as_ref()
+        .ok_or_else(|| Error::Custom(anyhow::anyhow!("no actor")))?;
     chase_type(&mut seen, &mut res, env, actor)?;
     Ok(res)
 }
 /// Given an actor, return a map from variable names to the (methods, arg) that use them.
-pub fn chase_def_use<'a>(
-    env: &'a TypeEnv,
-    actor: &'a Type,
-) -> Result<BTreeMap<String, Vec<String>>> {
+pub fn chase_def_use<'a>(env: &'a IDLEnv) -> Result<BTreeMap<String, Vec<String>>> {
     let mut res = BTreeMap::new();
-    let actor = env.trace_type(actor)?;
-    if let TypeInner::Class(args, _) = actor.as_ref() {
+    let actor = env
+        .actor
+        .as_ref()
+        .ok_or_else(|| Error::Custom(anyhow::anyhow!("no actor")))?;
+    let actor = env
+        .trace_type(&actor)
+        .map_err(|e| Error::Custom(anyhow::anyhow!(e)))?;
+    if let IDLType::ClassT(args, _) = &actor {
         for (i, arg) in args.iter().enumerate() {
             let mut used = Vec::new();
             chase_type(&mut BTreeSet::new(), &mut used, env, &arg.typ)?;
@@ -103,15 +115,20 @@ pub fn chase_def_use<'a>(
             }
         }
     }
-    for (id, ty) in env.as_service(&actor)? {
-        let func = env.as_func(ty)?;
+    for binding in env
+        .as_service(&actor)
+        .map_err(|e| Error::Custom(anyhow::anyhow!(e)))?
+    {
+        let func = env
+            .as_func(&binding.typ)
+            .map_err(|e| Error::Custom(anyhow::anyhow!(e)))?;
         for (i, arg) in func.args.iter().enumerate() {
             let mut used = Vec::new();
             chase_type(&mut BTreeSet::new(), &mut used, env, &arg.typ)?;
             for var in used {
                 res.entry(var.to_string())
                     .or_insert_with(Vec::new)
-                    .push(format!("{}.arg{}", id, i));
+                    .push(format!("{}.arg{}", binding.id, i));
             }
         }
         for (i, arg) in func.rets.iter().enumerate() {
@@ -120,14 +137,14 @@ pub fn chase_def_use<'a>(
             for var in used {
                 res.entry(var.to_string())
                     .or_insert_with(Vec::new)
-                    .push(format!("{}.ret{}", id, i));
+                    .push(format!("{}.ret{}", binding.id, i));
             }
         }
     }
     Ok(res)
 }
 
-pub fn chase_types<'a>(env: &'a TypeEnv, tys: &'a [Type]) -> Result<Vec<&'a str>> {
+pub fn chase_types<'a>(env: &'a IDLEnv, tys: &'a [IDLType]) -> Result<Vec<&'a str>> {
     let mut seen = BTreeSet::new();
     let mut res = Vec::new();
     for t in tys.iter() {
@@ -137,40 +154,40 @@ pub fn chase_types<'a>(env: &'a TypeEnv, tys: &'a [Type]) -> Result<Vec<&'a str>
 }
 
 /// Given a `def_list` produced by the `chase_actor` function, infer which types are recursive
-pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTreeSet<&'a str>> {
+pub fn infer_rec<'a>(_env: &'a IDLEnv, def_list: &'a [&'a str]) -> Result<BTreeSet<&'a str>> {
     let mut seen = BTreeSet::new();
     let mut res = BTreeSet::new();
     fn go<'a>(
         seen: &mut BTreeSet<&'a str>,
         res: &mut BTreeSet<&'a str>,
-        _env: &'a TypeEnv,
-        t: &'a Type,
+        _env: &'a IDLEnv,
+        t: &'a IDLType,
     ) -> Result<()> {
-        use TypeInner::*;
-        match t.as_ref() {
-            Var(id) => {
+        use IDLType::*;
+        match t {
+            VarT(id) => {
                 if seen.insert(id) {
                     res.insert(id);
                 }
             }
-            Opt(ty) | Vec(ty) => go(seen, res, _env, ty)?,
-            Record(fs) | Variant(fs) => {
+            OptT(ty) | VecT(ty) => go(seen, res, _env, ty)?,
+            RecordT(fs) | VariantT(fs) => {
                 for f in fs.iter() {
-                    go(seen, res, _env, &f.ty)?;
+                    go(seen, res, _env, &f.typ)?;
                 }
             }
-            Func(f) => {
+            FuncT(f) => {
                 let args = f.args.iter().map(|arg| &arg.typ);
                 for ty in args.clone().chain(f.rets.iter()) {
                     go(seen, res, _env, ty)?;
                 }
             }
-            Service(ms) => {
-                for (_, ty) in ms.iter() {
-                    go(seen, res, _env, ty)?;
+            ServT(ms) => {
+                for binding in ms.iter() {
+                    go(seen, res, _env, &binding.typ)?;
                 }
             }
-            Class(args, t) => {
+            ClassT(args, t) => {
                 for arg in args.iter() {
                     go(seen, res, _env, &arg.typ)?;
                 }
@@ -181,7 +198,7 @@ pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTree
         Ok(())
     }
     for var in def_list.iter() {
-        let t = _env.0.get(*var).unwrap();
+        let t = _env.find_type(var).unwrap();
         go(&mut seen, &mut res, _env, t)?;
         seen.insert(var);
     }

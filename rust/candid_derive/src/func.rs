@@ -140,7 +140,8 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
             fn __export_service() -> String {
                 #service
                 #actor
-                let result = #candid::pretty::candid::compile(&env.env, &actor);
+                // let result = #candid::pretty::candid::compile(&env.env, &actor);
+                let result = "TODO";
                 format!("{}", result)
             }
         };

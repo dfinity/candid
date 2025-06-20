@@ -1,6 +1,7 @@
 use crate::pretty::utils::*;
 use crate::types::{
-    ArgType, Field, FuncMode, Function, Label, SharedLabel, Type, TypeEnv, TypeInner,
+    syntax::{Binding, FuncType, IDLArgType, IDLEnv, IDLType, PrimType, TypeField},
+    FuncMode, Label,
 };
 use pretty::RcDoc;
 
@@ -73,12 +74,8 @@ pub(crate) fn pp_text(id: &str) -> RcDoc {
     RcDoc::text(ident_string(id))
 }
 
-pub fn pp_ty(ty: &Type) -> RcDoc {
-    pp_ty_inner(ty.as_ref())
-}
-
-pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
-    use TypeInner::*;
+fn pp_prim_ty(ty: &PrimType) -> RcDoc {
+    use PrimType::*;
     match ty {
         Null => str("null"),
         Bool => str("bool"),
@@ -97,59 +94,62 @@ pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
         Text => str("text"),
         Reserved => str("reserved"),
         Empty => str("empty"),
-        Var(ref s) => str(s),
-        Principal => str("principal"),
-        Opt(ref t) => kwd("opt").append(pp_ty(t)),
-        Vec(ref t) if matches!(t.as_ref(), Nat8) => str("blob"),
-        Vec(ref t) => kwd("vec").append(pp_ty(t)),
-        Record(ref fs) => {
-            let t = Type(ty.clone().into());
-            if t.is_tuple() {
-                let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ";");
+    }
+}
+
+pub fn pp_ty(ty: &IDLType) -> RcDoc {
+    use IDLType::*;
+    match ty {
+        PrimT(ty) => pp_prim_ty(ty),
+        VarT(ref s) => str(s),
+        PrincipalT => str("principal"),
+        OptT(ref t) => kwd("opt").append(pp_ty(t)),
+        VecT(ref t) if matches!(t.as_ref(), PrimT(PrimType::Nat8)) => str("blob"),
+        VecT(ref t) => kwd("vec").append(pp_ty(t)),
+        RecordT(ref fs) => {
+            if ty.is_tuple() {
+                let tuple = concat(fs.iter().map(|f| pp_ty(&f.typ)), ";");
                 kwd("record").append(enclose_space("{", tuple, "}"))
             } else {
                 kwd("record").append(pp_fields(fs, false))
             }
         }
-        Variant(ref fs) => kwd("variant").append(pp_fields(fs, true)),
-        Func(ref func) => kwd("func").append(pp_function(func)),
-        Service(ref serv) => kwd("service").append(pp_service(serv)),
-        Class(ref args, ref t) => {
+        VariantT(ref fs) => kwd("variant").append(pp_fields(fs, true)),
+        FuncT(ref func) => kwd("func").append(pp_function(func)),
+        ServT(ref serv) => kwd("service").append(pp_service(serv)),
+        ClassT(ref args, ref t) => {
             let doc = pp_args(args).append(" ->").append(RcDoc::space());
             match t.as_ref() {
-                Service(ref serv) => doc.append(pp_service(serv)),
-                Var(ref s) => doc.append(s),
+                IDLType::ServT(ref serv) => doc.append(pp_service(serv)),
+                IDLType::VarT(ref s) => doc.append(s),
                 _ => unreachable!(),
             }
         }
-        Knot(ref id) => RcDoc::text(format!("{id}")),
-        Unknown => str("unknown"),
-        Future => str("future"),
     }
 }
 
-pub fn pp_label(id: &SharedLabel) -> RcDoc {
-    match &**id {
+pub fn pp_label(id: &Label) -> RcDoc {
+    match id {
         Label::Named(id) => pp_text(id),
         Label::Id(_) | Label::Unnamed(_) => RcDoc::as_string(id),
     }
 }
 
-pub(crate) fn pp_field(field: &Field, is_variant: bool) -> RcDoc {
-    let ty_doc = if is_variant && *field.ty == TypeInner::Null {
+pub(crate) fn pp_field(field: &TypeField, is_variant: bool) -> RcDoc {
+    let ty_doc = if is_variant && field.typ == IDLType::PrimT(PrimType::Null) {
         RcDoc::nil()
     } else {
-        kwd(" :").append(pp_ty(&field.ty))
+        kwd(" :").append(pp_ty(&field.typ))
     };
-    pp_label(&field.id).append(ty_doc)
+    pp_label(&field.label).append(ty_doc)
 }
 
-fn pp_fields(fs: &[Field], is_variant: bool) -> RcDoc {
+fn pp_fields(fs: &[TypeField], is_variant: bool) -> RcDoc {
     let fields = concat(fs.iter().map(|f| pp_field(f, is_variant)), ";");
     enclose_space("{", fields, "}")
 }
 
-pub fn pp_function(func: &Function) -> RcDoc {
+pub fn pp_function(func: &FuncType) -> RcDoc {
     let args = pp_args(&func.args);
     let rets = pp_rets(&func.rets);
     let modes = pp_modes(&func.modes);
@@ -159,7 +159,7 @@ pub fn pp_function(func: &Function) -> RcDoc {
         .nest(INDENT_SPACE)
 }
 
-pub fn pp_args(args: &[ArgType]) -> RcDoc {
+pub fn pp_args(args: &[IDLArgType]) -> RcDoc {
     let args = args.iter().map(|arg| {
         if let Some(name) = &arg.name {
             pp_text(name).append(kwd(" :")).append(pp_ty(&arg.typ))
@@ -171,7 +171,7 @@ pub fn pp_args(args: &[ArgType]) -> RcDoc {
     enclose("(", doc, ")")
 }
 
-pub fn pp_rets(rets: &[Type]) -> RcDoc {
+pub fn pp_rets(rets: &[IDLType]) -> RcDoc {
     let doc = concat(rets.iter().map(pp_ty), ",");
     enclose("(", doc, ")")
 }
@@ -187,12 +187,12 @@ pub fn pp_modes(modes: &[FuncMode]) -> RcDoc {
     RcDoc::concat(modes.iter().map(|m| RcDoc::space().append(pp_mode(m))))
 }
 
-fn pp_service(serv: &[(String, Type)]) -> RcDoc {
+fn pp_service(serv: &[Binding]) -> RcDoc {
     let doc = concat(
-        serv.iter().map(|(id, func)| {
-            let func_doc = match func.as_ref() {
-                TypeInner::Func(ref f) => pp_function(f),
-                TypeInner::Var(_) => pp_ty(func),
+        serv.iter().map(|Binding { id, typ }| {
+            let func_doc = match typ {
+                IDLType::FuncT(ref f) => pp_function(f),
+                IDLType::VarT(_) => pp_ty(typ),
                 _ => unreachable!(),
             };
             pp_text(id).append(kwd(" :")).append(func_doc)
@@ -202,29 +202,29 @@ fn pp_service(serv: &[(String, Type)]) -> RcDoc {
     enclose_space("{", doc, "}")
 }
 
-fn pp_defs(env: &TypeEnv) -> RcDoc {
-    lines(env.0.iter().map(|(id, ty)| {
+fn pp_defs(env: &IDLEnv) -> RcDoc {
+    lines(env.types_bindings.iter().map(|Binding { id, typ }| {
         kwd("type")
             .append(ident(id))
             .append(kwd("="))
-            .append(pp_ty(ty))
+            .append(pp_ty(typ))
             .append(";")
     }))
 }
 
-fn pp_actor(ty: &Type) -> RcDoc {
-    match ty.as_ref() {
-        TypeInner::Service(ref serv) => pp_service(serv),
-        TypeInner::Var(_) | TypeInner::Class(_, _) => pp_ty(ty),
+fn pp_actor(ty: &IDLType) -> RcDoc {
+    match ty {
+        IDLType::ServT(ref serv) => pp_service(serv),
+        IDLType::VarT(_) | IDLType::ClassT(_, _) => pp_ty(ty),
         _ => unreachable!(),
     }
 }
 
-pub fn pp_init_args<'a>(env: &'a TypeEnv, args: &'a [ArgType]) -> RcDoc<'a> {
+pub fn pp_init_args<'a>(env: &'a IDLEnv, args: &'a [IDLArgType]) -> RcDoc<'a> {
     pp_defs(env).append(pp_args(args))
 }
-pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
-    match actor {
+pub fn compile(env: &IDLEnv) -> String {
+    match &env.actor {
         None => pp_defs(env).pretty(LINE_WIDTH).to_string(),
         Some(actor) => {
             let defs = pp_defs(env);

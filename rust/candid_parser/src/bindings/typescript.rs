@@ -1,11 +1,14 @@
 use super::javascript::{ident, is_tuple};
 use candid::pretty::utils::*;
-use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use candid::types::{
+    syntax::{Binding, FuncType, IDLEnv, IDLType, PrimType, TypeField},
+    Label,
+};
 use pretty::RcDoc;
 
-fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
-    use TypeInner::*;
-    match ty.as_ref() {
+fn pp_prim_ty(ty: &PrimType) -> RcDoc {
+    use PrimType::*;
+    match ty {
         Null => str("null"),
         Bool => str("boolean"),
         Nat => str("bigint"),
@@ -23,10 +26,17 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         Text => str("string"),
         Reserved => str("any"),
         Empty => str("never"),
-        Var(ref id) => {
+    }
+}
+
+fn pp_ty<'a>(env: &'a IDLEnv, ty: &'a IDLType, is_ref: bool) -> RcDoc<'a> {
+    use IDLType::*;
+    match ty {
+        PrimT(ref ty) => pp_prim_ty(ty),
+        VarT(ref id) => {
             if is_ref {
                 let ty = env.rec_find_type(id).unwrap();
-                if matches!(ty.as_ref(), Service(_) | Func(_)) {
+                if matches!(ty, ServT(_) | FuncT(_)) {
                     pp_ty(env, ty, false)
                 } else {
                     ident(id)
@@ -35,15 +45,22 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
                 ident(id)
             }
         }
-        Principal => str("Principal"),
-        Opt(ref t) => str("[] | ").append(enclose("[", pp_ty(env, t, is_ref), "]")),
-        Vec(ref t) => {
+        PrincipalT => str("Principal"),
+        OptT(ref t) => str("[] | ").append(enclose("[", pp_ty(env, t, is_ref), "]")),
+        VecT(ref t) => {
             let ty = match t.as_ref() {
-                Var(ref id) => {
+                VarT(ref id) => {
                     let ty = env.rec_find_type(id).unwrap();
                     if matches!(
-                        ty.as_ref(),
-                        Nat8 | Nat16 | Nat32 | Nat64 | Int8 | Int16 | Int32 | Int64
+                        ty,
+                        PrimT(PrimType::Nat8)
+                            | PrimT(PrimType::Nat16)
+                            | PrimT(PrimType::Nat32)
+                            | PrimT(PrimType::Nat64)
+                            | PrimT(PrimType::Int8)
+                            | PrimT(PrimType::Int16)
+                            | PrimT(PrimType::Int32)
+                            | PrimT(PrimType::Int64)
                     ) {
                         ty
                     } else {
@@ -52,28 +69,28 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
                 }
                 _ => t,
             };
-            match ty.as_ref() {
-                Nat8 => str("Uint8Array | number[]"),
-                Nat16 => str("Uint16Array | number[]"),
-                Nat32 => str("Uint32Array | number[]"),
-                Nat64 => str("BigUint64Array | bigint[]"),
-                Int8 => str("Int8Array | number[]"),
-                Int16 => str("Int16Array | number[]"),
-                Int32 => str("Int32Array | number[]"),
-                Int64 => str("BigInt64Array | bigint[]"),
+            match ty {
+                PrimT(PrimType::Nat8) => str("Uint8Array | number[]"),
+                PrimT(PrimType::Nat16) => str("Uint16Array | number[]"),
+                PrimT(PrimType::Nat32) => str("Uint32Array | number[]"),
+                PrimT(PrimType::Nat64) => str("BigUint64Array | bigint[]"),
+                PrimT(PrimType::Int8) => str("Int8Array | number[]"),
+                PrimT(PrimType::Int16) => str("Int16Array | number[]"),
+                PrimT(PrimType::Int32) => str("Int32Array | number[]"),
+                PrimT(PrimType::Int64) => str("BigInt64Array | bigint[]"),
                 _ => str("Array").append(enclose("<", pp_ty(env, t, is_ref), ">")),
             }
         }
-        Record(ref fs) => {
+        RecordT(ref fs) => {
             if is_tuple(ty) {
-                let tuple = concat(fs.iter().map(|f| pp_ty(env, &f.ty, is_ref)), ",");
+                let tuple = concat(fs.iter().map(|f| pp_ty(env, &f.typ, is_ref)), ",");
                 enclose("[", tuple, "]")
             } else {
                 let fields = concat(fs.iter().map(|f| pp_field(env, f, is_ref)), ",");
                 enclose_space("{", fields, "}")
             }
         }
-        Variant(ref fs) => {
+        VariantT(ref fs) => {
             if fs.is_empty() {
                 str("never")
             } else {
@@ -85,15 +102,14 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
                 .nest(INDENT_SPACE)
             }
         }
-        Func(_) => str("[Principal, string]"),
-        Service(_) => str("Principal"),
-        Class(_, _) => unreachable!(),
-        Knot(_) | Unknown | Future => unreachable!(),
+        FuncT(_) => str("[Principal, string]"),
+        ServT(_) => str("Principal"),
+        ClassT(_, _) => unreachable!(),
     }
 }
 
-fn pp_label(id: &SharedLabel) -> RcDoc {
-    match &**id {
+fn pp_label(id: &Label) -> RcDoc {
+    match id {
         Label::Named(str) => quote_ident(str),
         Label::Id(n) | Label::Unnamed(n) => str("_")
             .append(RcDoc::as_string(n))
@@ -102,13 +118,13 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
     }
 }
 
-fn pp_field<'a>(env: &'a TypeEnv, field: &'a Field, is_ref: bool) -> RcDoc<'a> {
-    pp_label(&field.id)
+fn pp_field<'a>(env: &'a IDLEnv, field: &'a TypeField, is_ref: bool) -> RcDoc<'a> {
+    pp_label(&field.label)
         .append(kwd(":"))
-        .append(pp_ty(env, &field.ty, is_ref))
+        .append(pp_ty(env, &field.typ, is_ref))
 }
 
-fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
+fn pp_function<'a>(env: &'a IDLEnv, func: &'a FuncType) -> RcDoc<'a> {
     let args = func.args.iter().map(|arg| pp_ty(env, &arg.typ, true));
     let args = enclose("[", concat(args, ","), "]");
     let rets = match func.rets.len() {
@@ -127,12 +143,12 @@ fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
     )
 }
 
-fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
+fn pp_service<'a>(env: &'a IDLEnv, serv: &'a [Binding]) -> RcDoc<'a> {
     let doc = concat(
-        serv.iter().map(|(id, func)| {
-            let func = match func.as_ref() {
-                TypeInner::Func(ref func) => pp_function(env, func),
-                _ => pp_ty(env, func, false),
+        serv.iter().map(|Binding { id, typ }| {
+            let func = match typ {
+                IDLType::FuncT(ref func) => pp_function(env, func),
+                _ => pp_ty(env, typ, false),
             };
             quote_ident(id).append(kwd(":")).append(func)
         }),
@@ -141,19 +157,19 @@ fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
     enclose_space("{", doc, "}")
 }
 
-fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
+fn pp_defs<'a>(env: &'a IDLEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
-        let export = match ty.as_ref() {
-            TypeInner::Record(_) if !ty.is_tuple() => kwd("export interface")
+        let export = match ty {
+            IDLType::RecordT(_) if !ty.is_tuple() => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
                 .append(pp_ty(env, ty, false)),
-            TypeInner::Service(ref serv) => kwd("export interface")
+            IDLType::ServT(ref serv) => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
                 .append(pp_service(env, serv)),
-            TypeInner::Func(ref func) => kwd("export type")
+            IDLType::FuncT(ref func) => kwd("export type")
                 .append(ident(id))
                 .append(" = ")
                 .append(pp_function(env, func))
@@ -168,27 +184,29 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
     }))
 }
 
-fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type) -> RcDoc<'a> {
-    match ty.as_ref() {
-        TypeInner::Service(ref serv) => {
-            kwd("export interface _SERVICE").append(pp_service(env, serv))
-        }
-        TypeInner::Var(id) => kwd("export interface _SERVICE extends")
+fn pp_actor<'a>(env: &'a IDLEnv, ty: &'a IDLType) -> RcDoc<'a> {
+    match ty {
+        IDLType::ServT(ref serv) => kwd("export interface _SERVICE").append(pp_service(env, serv)),
+        IDLType::VarT(id) => kwd("export interface _SERVICE extends")
             .append(str(id))
             .append(str(" {}")),
-        TypeInner::Class(_, t) => pp_actor(env, t),
+        IDLType::ClassT(_, t) => pp_actor(env, t),
         _ => unreachable!(),
     }
 }
 
-pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
+pub fn compile(env: &IDLEnv) -> String {
     let header = r#"import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 "#;
-    let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
+    let def_list: Vec<_> = env
+        .types_bindings
+        .iter()
+        .map(|Binding { id, typ: _ }| id.as_ref())
+        .collect();
     let defs = pp_defs(env, &def_list);
-    let actor = match actor {
+    let actor = match &env.actor {
         None => RcDoc::nil(),
         Some(actor) => pp_actor(env, actor)
             .append(RcDoc::line())

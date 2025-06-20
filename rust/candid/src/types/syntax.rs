@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, fmt};
 
 use crate::types::{FuncMode, Label};
 
@@ -14,6 +14,28 @@ pub enum IDLType {
     ServT(Vec<Binding>),
     ClassT(Vec<IDLArgType>, Box<IDLType>),
     PrincipalT,
+}
+
+impl IDLType {
+    pub fn is_tuple(&self) -> bool {
+        match self {
+            IDLType::RecordT(fields) => {
+                for (i, field) in fields.iter().enumerate() {
+                    if field.label.get_id() != (i as u32) {
+                        return false;
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for IDLType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", crate::pretty::candid::pp_ty(self).pretty(80))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -154,28 +176,64 @@ impl From<&IDLProg> for IDLEnv {
     }
 }
 
+impl From<Vec<&Binding>> for IDLEnv {
+    fn from(bindings: Vec<&Binding>) -> Self {
+        let mut env = Self::default();
+        for binding in bindings {
+            env.insert_binding(binding.clone());
+        }
+        env
+    }
+}
+
 impl IDLEnv {
     pub fn new() -> Self {
         Self::default()
     }
 
     pub fn insert_binding(&mut self, binding: Binding) {
-        let is_duplicate = self.types_bindings_ids.insert(binding.id.clone());
-        if !is_duplicate {
+        let is_new = self.types_bindings_ids.insert(binding.id.clone());
+        if is_new {
             self.types_bindings.push(binding);
         }
+    }
+
+    pub fn bindings_ids(&self) -> Vec<&str> {
+        self.types_bindings_ids
+            .iter()
+            .map(|id| id.as_str())
+            .collect()
     }
 
     pub fn set_actor(&mut self, actor: Option<IDLType>) {
         self.actor = actor;
     }
 
-    pub fn find_type(&self, id: &str) -> Result<&IDLType, String> {
+    pub fn find_binding(&self, id: &str) -> Result<&Binding, String> {
         self.types_bindings
             .iter()
             .find(|b| b.id == id)
-            .map(|b| &b.typ)
             .ok_or(format!("Unbound type identifier: {id}"))
+    }
+
+    pub fn find_type(&self, id: &str) -> Result<&IDLType, String> {
+        self.find_binding(id).map(|b| &b.typ)
+    }
+
+    pub fn rec_find_type(&self, name: &str) -> Result<&IDLType, String> {
+        let t = self.find_type(name)?;
+        match t {
+            IDLType::VarT(id) => self.rec_find_type(id),
+            _ => Ok(t),
+        }
+    }
+
+    pub fn trace_type(&self, t: &IDLType) -> Result<IDLType, String> {
+        match t {
+            IDLType::VarT(id) => self.trace_type(self.find_type(id)?),
+            IDLType::ClassT(_, t) => self.trace_type(t),
+            _ => Ok(t.clone()),
+        }
     }
 
     pub fn as_service<'a>(&'a self, t: &'a IDLType) -> Result<&'a Vec<Binding>, String> {
@@ -183,7 +241,24 @@ impl IDLEnv {
             IDLType::ServT(methods) => Ok(methods),
             IDLType::VarT(id) => self.as_service(self.find_type(id)?),
             IDLType::ClassT(_, t) => self.as_service(t),
-            _ => Err(format!("not a service type: {:?}", t)),
+            _ => Err(format!("not a service type: {t}")),
         }
+    }
+
+    pub fn as_func<'a>(&'a self, t: &'a IDLType) -> Result<&'a FuncType, String> {
+        match t {
+            IDLType::FuncT(f) => Ok(f),
+            IDLType::VarT(id) => self.as_func(self.find_type(id)?),
+            _ => Err(format!("not a function type: {:?}", t)),
+        }
+    }
+
+    pub fn get_method<'a>(&'a self, t: &'a IDLType, id: &'a str) -> Result<&'a FuncType, String> {
+        for binding in self.as_service(t)? {
+            if binding.id == id {
+                return self.as_func(&binding.typ);
+            }
+        }
+        Err(format!("cannot find method {id}"))
     }
 }

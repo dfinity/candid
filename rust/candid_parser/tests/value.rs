@@ -1,6 +1,7 @@
 use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
 use candid::types::{Label, TypeEnv};
 use candid::{decode_args, decode_one, Decode};
+use candid_parser::typing::ast_to_type;
 use candid_parser::{parse_idl_args, parse_idl_prog, typing::check_prog};
 
 #[test]
@@ -34,6 +35,7 @@ service : {
     let ast = parse_idl_prog(candid).unwrap();
     let mut env = TypeEnv::new();
     let actor = check_prog(&mut env, &ast).unwrap().unwrap();
+    let actor = ast_to_type(&env, &actor).unwrap();
     let method = env.get_method(&actor, "f").unwrap();
     {
         let args = parse_idl_args("(42,42,42,42)").unwrap();

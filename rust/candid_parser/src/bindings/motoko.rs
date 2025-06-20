@@ -9,19 +9,13 @@ use candid::types::{
 };
 use pretty::RcDoc;
 
-// The definition of tuple is language specific.
 fn is_tuple(t: &IDLType) -> bool {
     match t {
         IDLType::RecordT(ref fs) => {
             if fs.len() <= 1 {
                 return false;
             }
-            for (i, field) in fs.iter().enumerate() {
-                if field.label.get_id() != (i as u32) {
-                    return false;
-                }
-            }
-            true
+            t.is_tuple()
         }
         _ => false,
     }

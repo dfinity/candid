@@ -3,8 +3,11 @@ use crate::{
     configs::{ConfigState, ConfigTree, Configs, Context, StateElem},
     Deserialize,
 };
-use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
-use candid::{pretty::utils::*, types::ArgType};
+use candid::pretty::utils::*;
+use candid::types::{
+    syntax::{Binding, FuncType, IDLArgType, IDLEnv, IDLType, PrimType, TypeField},
+    Label,
+};
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
 use serde::Serialize;
@@ -82,26 +85,35 @@ struct State<'a> {
 
 type RecPoints<'a> = BTreeSet<&'a str>;
 // The definition of tuple is language specific.
-pub(crate) fn is_tuple(fs: &[Field]) -> bool {
-    if fs.is_empty() {
-        return false;
+pub(crate) fn is_tuple(t: &IDLType) -> bool {
+    match t {
+        IDLType::RecordT(ref fs) => {
+            if fs.is_empty() {
+                return false;
+            }
+            t.is_tuple()
+        }
+        _ => false,
     }
-    !fs.iter()
-        .enumerate()
-        .any(|(i, field)| field.id.get_id() != (i as u32))
 }
-fn as_result(fs: &[Field]) -> Option<(&Type, &Type, bool)> {
+fn as_result(fs: &[TypeField]) -> Option<(&IDLType, &IDLType, bool)> {
     match fs {
-        [Field { id: ok, ty: t_ok }, Field { id: err, ty: t_err }]
-            if **ok == Label::Named("Ok".to_string())
-                && **err == Label::Named("Err".to_string()) =>
-        {
+        [TypeField {
+            label: ok,
+            typ: t_ok,
+        }, TypeField {
+            label: err,
+            typ: t_err,
+        }] if *ok == Label::Named("Ok".to_string()) && *err == Label::Named("Err".to_string()) => {
             Some((t_ok, t_err, false))
         }
-        [Field { id: ok, ty: t_ok }, Field { id: err, ty: t_err }]
-            if **ok == Label::Named("ok".to_string())
-                && **err == Label::Named("err".to_string()) =>
-        {
+        [TypeField {
+            label: ok,
+            typ: t_ok,
+        }, TypeField {
+            label: err,
+            typ: t_err,
+        }] if *ok == Label::Named("ok".to_string()) && *err == Label::Named("err".to_string()) => {
             Some((t_ok, t_err, true))
         }
         _ => None,
@@ -154,23 +166,22 @@ fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
 }
 
 impl<'a> State<'a> {
-    fn generate_test(&mut self, src: &Type, use_type: &str) {
+    fn generate_test(&mut self, src: &IDLType, use_type: &str) {
         if self.tests.contains_key(use_type) {
             return;
         }
-        let def_list = chase_actor(self.state.env, src).unwrap();
-        let env = TypeEnv(
+        let def_list = chase_actor(self.state.env).unwrap();
+        let env = IDLEnv::from(
             self.state
                 .env
-                .0
+                .types_bindings
                 .iter()
-                .filter(|(k, _)| def_list.contains(&k.as_str()))
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect(),
+                .filter(|Binding { id, typ: _ }| def_list.contains(&id.as_str()))
+                .collect::<Vec<_>>(),
         );
         let src = candid::pretty::candid::pp_init_args(
             &env,
-            &[ArgType {
+            &[IDLArgType {
                 name: None,
                 typ: src.clone(),
             }],
@@ -189,8 +200,8 @@ fn test_{test_name}() {{
         );
         self.tests.insert(use_type.to_string(), body);
     }
-    fn pp_ty<'b>(&mut self, ty: &'b Type, is_ref: bool) -> RcDoc<'b> {
-        use TypeInner::*;
+    fn pp_ty<'b>(&mut self, ty: &'b IDLType, is_ref: bool) -> RcDoc<'b> {
+        use IDLType::*;
         let elem = StateElem::Type(ty);
         let old = self.state.push_state(&elem);
         let res = if let Some(t) = &self.state.config.use_type {
@@ -202,25 +213,25 @@ fn test_{test_name}() {{
             self.state.update_stats("use_type");
             res
         } else {
-            match ty.as_ref() {
-                Null => str("()"),
-                Bool => str("bool"),
-                Nat => str("candid::Nat"),
-                Int => str("candid::Int"),
-                Nat8 => str("u8"),
-                Nat16 => str("u16"),
-                Nat32 => str("u32"),
-                Nat64 => str("u64"),
-                Int8 => str("i8"),
-                Int16 => str("i16"),
-                Int32 => str("i32"),
-                Int64 => str("i64"),
-                Float32 => str("f32"),
-                Float64 => str("f64"),
-                Text => str("String"),
-                Reserved => str("candid::Reserved"),
-                Empty => str("candid::Empty"),
-                Var(ref id) => {
+            match ty {
+                PrimT(PrimType::Null) => str("()"),
+                PrimT(PrimType::Bool) => str("bool"),
+                PrimT(PrimType::Nat) => str("candid::Nat"),
+                PrimT(PrimType::Int) => str("candid::Int"),
+                PrimT(PrimType::Nat8) => str("u8"),
+                PrimT(PrimType::Nat16) => str("u16"),
+                PrimT(PrimType::Nat32) => str("u32"),
+                PrimT(PrimType::Nat64) => str("u64"),
+                PrimT(PrimType::Int8) => str("i8"),
+                PrimT(PrimType::Int16) => str("i16"),
+                PrimT(PrimType::Int32) => str("i32"),
+                PrimT(PrimType::Int64) => str("i64"),
+                PrimT(PrimType::Float32) => str("f32"),
+                PrimT(PrimType::Float64) => str("f64"),
+                PrimT(PrimType::Text) => str("String"),
+                PrimT(PrimType::Reserved) => str("candid::Reserved"),
+                PrimT(PrimType::Empty) => str("candid::Empty"),
+                VarT(ref id) => {
                     let name = if let Some(name) = &self.state.config.name {
                         let res = RcDoc::text(name.clone());
                         self.state.update_stats("name");
@@ -234,13 +245,15 @@ fn test_{test_name}() {{
                         name
                     }
                 }
-                Principal => str("Principal"),
-                Opt(ref t) => str("Option").append(enclose("<", self.pp_ty(t, is_ref), ">")),
+                PrincipalT => str("Principal"),
+                OptT(ref t) => str("Option").append(enclose("<", self.pp_ty(t, is_ref), ">")),
                 // It's a bit tricky to use `deserialize_with = "serde_bytes"`. It's not working for `type t = blob`
-                Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
-                Vec(ref t) => str("Vec").append(enclose("<", self.pp_ty(t, is_ref), ">")),
-                Record(ref fs) => self.pp_record_fields(fs, false, is_ref),
-                Variant(ref fs) => {
+                VecT(ref t) if matches!(t.as_ref(), PrimT(PrimType::Nat8)) => {
+                    str("serde_bytes::ByteBuf")
+                }
+                VecT(ref t) => str("Vec").append(enclose("<", self.pp_ty(t, is_ref), ">")),
+                RecordT(ref fs) => self.pp_record_fields(fs, false, is_ref),
+                VariantT(ref fs) => {
                     // only possible for result variant
                     let (ok, err, is_motoko) = as_result(fs).unwrap();
                     // This is a hacky way to redirect Result type
@@ -268,16 +281,15 @@ fn test_{test_name}() {{
                     let body = ok.append(", ").append(err);
                     RcDoc::text(result).append(enclose("<", body, ">"))
                 }
-                Func(_) => unreachable!(), // not possible after rewriting
-                Service(_) => unreachable!(), // not possible after rewriting
-                Class(_, _) => unreachable!(),
-                Knot(_) | Unknown | Future => unreachable!(),
+                FuncT(_) => unreachable!(), // not possible after rewriting
+                ServT(_) => unreachable!(), // not possible after rewriting
+                ClassT(_, _) => unreachable!(),
             }
         };
         self.state.pop_state(old, elem);
         res
     }
-    fn pp_label<'b>(&mut self, id: &'b SharedLabel, is_variant: bool, need_vis: bool) -> RcDoc<'b> {
+    fn pp_label<'b>(&mut self, id: &'b Label, is_variant: bool, need_vis: bool) -> RcDoc<'b> {
         let vis = if need_vis {
             self.state.update_stats("visibility");
             pp_vis(&self.state.config.visibility)
@@ -292,7 +304,7 @@ fn test_{test_name}() {{
             .map(|s| RcDoc::text(s).append(RcDoc::line()))
             .unwrap_or(RcDoc::nil());
         self.state.update_stats("attributes");
-        match &**id {
+        match id {
             Label::Named(id) => {
                 let (doc, is_rename) = if let Some(name) = &self.state.config.name {
                     let res = (RcDoc::text(name.clone()), true);
@@ -324,7 +336,7 @@ fn test_{test_name}() {{
             }
         }
     }
-    fn pp_tuple<'b>(&mut self, fs: &'b [Field], need_vis: bool, is_ref: bool) -> RcDoc<'b> {
+    fn pp_tuple<'b>(&mut self, fs: &'b [TypeField], need_vis: bool, is_ref: bool) -> RcDoc<'b> {
         let tuple = fs.iter().enumerate().map(|(i, f)| {
             let lab = i.to_string();
             let old = self.state.push_state(&StateElem::Label(&lab));
@@ -334,30 +346,40 @@ fn test_{test_name}() {{
             } else {
                 RcDoc::nil()
             };
-            let res = vis.append(self.pp_ty(&f.ty, is_ref)).append(",");
+            let res = vis.append(self.pp_ty(&f.typ, is_ref)).append(",");
             self.state.pop_state(old, StateElem::Label(&lab));
             res
         });
         enclose("(", RcDoc::concat(tuple), ")")
     }
-    fn pp_record_field<'b>(&mut self, field: &'b Field, need_vis: bool, is_ref: bool) -> RcDoc<'b> {
-        let lab = field.id.to_string();
+    fn pp_record_field<'b>(
+        &mut self,
+        field: &'b TypeField,
+        need_vis: bool,
+        is_ref: bool,
+    ) -> RcDoc<'b> {
+        let lab = field.label.to_string();
         let old = self.state.push_state(&StateElem::Label(&lab));
         let res = self
-            .pp_label(&field.id, false, need_vis)
+            .pp_label(&field.label, false, need_vis)
             .append(kwd(":"))
-            .append(self.pp_ty(&field.ty, is_ref));
+            .append(self.pp_ty(&field.typ, is_ref));
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
-    fn pp_record_fields<'b>(&mut self, fs: &'b [Field], need_vis: bool, is_ref: bool) -> RcDoc<'b> {
+    fn pp_record_fields<'b>(
+        &mut self,
+        fs: &'b [TypeField],
+        need_vis: bool,
+        is_ref: bool,
+    ) -> RcDoc<'b> {
         let old = if self.state.path.last() == Some(&"record".to_string()) {
             // don't push record again when coming from pp_ty
             None
         } else {
             Some(self.state.push_state(&StateElem::TypeStr("record")))
         };
-        let res = if is_tuple(fs) {
+        let res = if is_tuple(&IDLType::RecordT(fs.to_vec())) {
             self.pp_tuple(fs, need_vis, is_ref)
         } else {
             let fields: Vec<_> = fs
@@ -372,24 +394,24 @@ fn test_{test_name}() {{
         }
         res
     }
-    fn pp_variant_field<'b>(&mut self, field: &'b Field) -> RcDoc<'b> {
-        let lab = field.id.to_string();
+    fn pp_variant_field<'b>(&mut self, field: &'b TypeField) -> RcDoc<'b> {
+        let lab = field.label.to_string();
         let old = self.state.push_state(&StateElem::Label(&lab));
-        let res = match field.ty.as_ref() {
-            TypeInner::Null => self.pp_label(&field.id, true, false),
-            TypeInner::Record(fs) => self
-                .pp_label(&field.id, true, false)
+        let res = match &field.typ {
+            IDLType::PrimT(PrimType::Null) => self.pp_label(&field.label, true, false),
+            IDLType::RecordT(fs) => self
+                .pp_label(&field.label, true, false)
                 .append(self.pp_record_fields(fs, false, false)),
-            _ => self.pp_label(&field.id, true, false).append(enclose(
+            _ => self.pp_label(&field.label, true, false).append(enclose(
                 "(",
-                self.pp_ty(&field.ty, false),
+                self.pp_ty(&field.typ, false),
                 ")",
             )),
         };
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
-    fn pp_variant_fields<'b>(&mut self, fs: &'b [Field]) -> RcDoc<'b> {
+    fn pp_variant_fields<'b>(&mut self, fs: &'b [TypeField]) -> RcDoc<'b> {
         let old = self.state.push_state(&StateElem::TypeStr("variant"));
         let fields: Vec<_> = fs.iter().map(|f| self.pp_variant_field(f)).collect();
         let fields = concat(fields.into_iter(), ",");
@@ -424,9 +446,9 @@ fn test_{test_name}() {{
                 .clone()
                 .map(RcDoc::text)
                 .unwrap_or(RcDoc::text("#[derive(CandidType, Deserialize)]"));
-            let line = match ty.as_ref() {
-                TypeInner::Record(fs) => {
-                    let separator = if is_tuple(fs) {
+            let line = match ty {
+                IDLType::RecordT(fs) => {
+                    let separator = if is_tuple(ty) {
                         RcDoc::text(";")
                     } else {
                         RcDoc::nil()
@@ -440,7 +462,7 @@ fn test_{test_name}() {{
                         .append(self.pp_record_fields(fs, true, false))
                         .append(separator)
                 }
-                TypeInner::Variant(fs) => {
+                IDLType::VariantT(fs) => {
                     if as_result(fs).is_some() {
                         vis.append(kwd("type"))
                             .append(name)
@@ -457,13 +479,13 @@ fn test_{test_name}() {{
                             .append(self.pp_variant_fields(fs))
                     }
                 }
-                TypeInner::Func(func) => str("candid::define_function!(")
+                IDLType::FuncT(func) => str("candid::define_function!(")
                     .append(vis)
                     .append(name)
                     .append(" : ")
                     .append(self.pp_ty_func(func))
                     .append(");"),
-                TypeInner::Service(serv) => str("candid::define_service!(")
+                IDLType::ServT(serv) => str("candid::define_service!(")
                     .append(vis)
                     .append(name)
                     .append(" : ")
@@ -493,7 +515,7 @@ fn test_{test_name}() {{
         }
         lines(res.into_iter())
     }
-    fn pp_args<'b>(&mut self, args: &'b [ArgType], prefix: &'b str) -> RcDoc<'b> {
+    fn pp_args<'b>(&mut self, args: &'b [IDLArgType], prefix: &'b str) -> RcDoc<'b> {
         let doc: Vec<_> = args
             .iter()
             .enumerate()
@@ -508,7 +530,7 @@ fn test_{test_name}() {{
         let doc = concat(doc.into_iter(), ",");
         enclose("(", doc, ")")
     }
-    fn pp_rets<'b>(&mut self, args: &'b [Type], prefix: &'b str) -> RcDoc<'b> {
+    fn pp_rets<'b>(&mut self, args: &'b [IDLType], prefix: &'b str) -> RcDoc<'b> {
         let doc: Vec<_> = args
             .iter()
             .enumerate()
@@ -523,7 +545,7 @@ fn test_{test_name}() {{
         let doc = concat(doc.into_iter(), ",");
         enclose("(", doc, ")")
     }
-    fn pp_ty_func<'b>(&mut self, f: &'b Function) -> RcDoc<'b> {
+    fn pp_ty_func<'b>(&mut self, f: &'b FuncType) -> RcDoc<'b> {
         let lab = StateElem::TypeStr("func");
         let old = self.state.push_state(&lab);
         let args = self.pp_args(&f.args, "arg");
@@ -537,19 +559,19 @@ fn test_{test_name}() {{
         self.state.pop_state(old, lab);
         res
     }
-    fn pp_ty_service<'b>(&mut self, serv: &'b [(String, Type)]) -> RcDoc<'b> {
+    fn pp_ty_service<'b>(&mut self, serv: &'b [Binding]) -> RcDoc<'b> {
         let lab = StateElem::TypeStr("service");
         let old = self.state.push_state(&lab);
         let mut list = Vec::new();
-        for (id, func) in serv.iter() {
-            let func_doc = match func.as_ref() {
-                TypeInner::Func(ref f) => enclose("candid::func!(", self.pp_ty_func(f), ")"),
-                TypeInner::Var(_) => self.pp_ty(func, true).append("::ty()"),
+        for binding in serv.iter() {
+            let func_doc = match &binding.typ {
+                IDLType::FuncT(ref f) => enclose("candid::func!(", self.pp_ty_func(f), ")"),
+                IDLType::VarT(_) => self.pp_ty(&binding.typ, true).append("::ty()"),
                 _ => unreachable!(),
             };
             list.push(
                 RcDoc::text("\"")
-                    .append(id)
+                    .append(&binding.id)
                     .append(kwd("\" :"))
                     .append(func_doc),
             );
@@ -559,7 +581,7 @@ fn test_{test_name}() {{
         self.state.pop_state(old, lab);
         res
     }
-    fn pp_function(&mut self, id: &str, func: &Function) -> Method {
+    fn pp_function(&mut self, id: &str, func: &FuncType) -> Method {
         use candid::types::internal::FuncMode;
         let old = self.state.push_state(&StateElem::Label(id));
         let name = self
@@ -623,9 +645,9 @@ fn test_{test_name}() {{
         self.state.pop_state(old, StateElem::Label(id));
         res
     }
-    fn pp_actor(&mut self, actor: &Type) -> (Vec<Method>, Option<Vec<(String, String)>>) {
+    fn pp_actor(&mut self, actor: &IDLType) -> (Vec<Method>, Option<Vec<(String, String)>>) {
         let actor = self.state.env.trace_type(actor).unwrap();
-        let init = if let TypeInner::Class(args, _) = actor.as_ref() {
+        let init = if let IDLType::ClassT(args, _) = &actor {
             let old = self.state.push_state(&StateElem::Label("init"));
             let args: Vec<_> = args
                 .iter()
@@ -652,9 +674,9 @@ fn test_{test_name}() {{
         };
         let serv = self.state.env.as_service(&actor).unwrap();
         let mut res = Vec::new();
-        for (id, func) in serv.iter() {
-            let func = self.state.env.as_func(func).unwrap();
-            res.push(self.pp_function(id, func));
+        for binding in serv.iter() {
+            let func = self.state.env.as_func(&binding.typ).unwrap();
+            res.push(self.pp_function(&binding.id, func));
         }
         (res, init)
     }
@@ -674,16 +696,16 @@ pub struct Method {
     pub rets: Vec<String>,
     pub mode: String,
 }
-pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Output, Vec<String>) {
+pub fn emit_bindgen(tree: &Config, env: &IDLEnv) -> (Output, Vec<String>) {
     let mut state = NominalState {
         state: crate::configs::State::new(&tree.0, env),
     };
-    let (env, actor) = state.nominalize_all(actor);
+    let env = state.nominalize_all();
     let old_stats = state.state.stats.clone();
-    let def_list = if let Some(actor) = &actor {
-        chase_actor(&env, actor).unwrap()
+    let def_list = if env.actor.is_some() {
+        chase_actor(&env).unwrap()
     } else {
-        env.0.iter().map(|pair| pair.0.as_ref()).collect::<Vec<_>>()
+        env.bindings_ids()
     };
     let recs = infer_rec(&env, &def_list).unwrap();
     let mut state = State {
@@ -693,7 +715,7 @@ pub fn emit_bindgen(tree: &Config, env: &TypeEnv, actor: &Option<Type>) -> (Outp
     };
     state.state.stats = old_stats;
     let defs = state.pp_defs(&def_list);
-    let (methods, init_args) = if let Some(actor) = &actor {
+    let (methods, init_args) = if let Some(actor) = &env.actor {
         state.pp_actor(actor)
     } else {
         (Vec::new(), None)
@@ -752,17 +774,12 @@ impl Default for ExternalConfig {
         )
     }
 }
-pub fn compile(
-    tree: &Config,
-    env: &TypeEnv,
-    actor: &Option<Type>,
-    mut external: ExternalConfig,
-) -> (String, Vec<String>) {
+pub fn compile(tree: &Config, env: &IDLEnv, mut external: ExternalConfig) -> (String, Vec<String>) {
     let source = match external.0.get("target").map(|s| s.as_str()) {
         Some("canister_call") | None => Cow::Borrowed(include_str!("rust_call.hbs")),
         Some("agent") => Cow::Borrowed(include_str!("rust_agent.hbs")),
         Some("stub") => {
-            let metadata = crate::utils::get_metadata(env, actor);
+            let metadata = crate::utils::get_metadata(env);
             if let Some(metadata) = metadata {
                 external.0.insert("metadata".to_string(), metadata);
             }
@@ -777,7 +794,7 @@ pub fn compile(
         }
         _ => unimplemented!(),
     };
-    let (output, unused) = emit_bindgen(tree, env, actor);
+    let (output, unused) = emit_bindgen(tree, env);
     (output_handlebar(output, external, &source), unused)
 }
 
@@ -812,47 +829,50 @@ struct NominalState<'a> {
 }
 impl NominalState<'_> {
     // Convert structural typing to nominal typing to fit Rust's type system
-    fn nominalize(&mut self, env: &mut TypeEnv, path: &mut Vec<TypePath>, t: &Type) -> Type {
+    fn nominalize(&mut self, env: &mut IDLEnv, path: &mut Vec<TypePath>, t: &IDLType) -> IDLType {
         let elem = StateElem::Type(t);
-        let old = if matches!(t.as_ref(), TypeInner::Func(_)) {
+        let old = if matches!(t, IDLType::FuncT(_)) {
             // strictly speaking, we want to avoid func label from the main service. But this is probably good enough.
             None
         } else {
             Some(self.state.push_state(&elem))
         };
-        let res = match t.as_ref() {
-            TypeInner::Opt(ty) => {
+        let res = match t {
+            IDLType::OptT(ty) => {
                 path.push(TypePath::Opt);
                 let ty = self.nominalize(env, path, ty);
                 path.pop();
-                TypeInner::Opt(ty)
+                IDLType::OptT(Box::new(ty))
             }
-            TypeInner::Vec(ty) => {
+            IDLType::VecT(ty) => {
                 path.push(TypePath::Vec);
                 let ty = self.nominalize(env, path, ty);
                 path.pop();
-                TypeInner::Vec(ty)
+                IDLType::VecT(Box::new(ty))
             }
-            TypeInner::Record(fs) => {
+            IDLType::RecordT(fs) => {
                 if matches!(
                     path.last(),
                     None | Some(TypePath::VariantField(_)) | Some(TypePath::Id(_))
-                ) || is_tuple(fs)
+                ) || is_tuple(t)
                 {
                     let fs: Vec<_> = fs
                         .iter()
-                        .map(|Field { id, ty }| {
-                            let lab = id.to_string();
+                        .map(|TypeField { label, typ }| {
+                            let lab = label.to_string();
                             let elem = StateElem::Label(&lab);
                             let old = self.state.push_state(&elem);
-                            path.push(TypePath::RecordField(id.to_string()));
-                            let ty = self.nominalize(env, path, ty);
+                            path.push(TypePath::RecordField(lab.clone()));
+                            let ty = self.nominalize(env, path, typ);
                             path.pop();
                             self.state.pop_state(old, elem);
-                            Field { id: id.clone(), ty }
+                            TypeField {
+                                label: label.clone(),
+                                typ: ty,
+                            }
                         })
                         .collect();
-                    TypeInner::Record(fs)
+                    IDLType::RecordT(fs)
                 } else {
                     let new_var = if let Some(name) = &self.state.config.name {
                         let res = name.to_string();
@@ -864,33 +884,39 @@ impl NominalState<'_> {
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
-                        &TypeInner::Record(fs.to_vec()).into(),
+                        &IDLType::RecordT(fs.to_vec()),
                     );
-                    env.0.insert(new_var.clone(), ty);
-                    TypeInner::Var(new_var)
+                    env.insert_binding(Binding {
+                        id: new_var.clone(),
+                        typ: ty,
+                    });
+                    IDLType::VarT(new_var)
                 }
             }
-            TypeInner::Variant(fs) => {
+            IDLType::VariantT(fs) => {
                 let is_result = as_result(fs).is_some();
                 if matches!(path.last(), None | Some(TypePath::Id(_))) || is_result {
                     let fs: Vec<_> = fs
                         .iter()
-                        .map(|Field { id, ty }| {
-                            let lab = id.to_string();
+                        .map(|TypeField { label, typ }| {
+                            let lab = label.to_string();
                             let old = self.state.push_state(&StateElem::Label(&lab));
                             if is_result {
                                 // so that inner record gets a new name
-                                path.push(TypePath::ResultField(id.to_string()));
+                                path.push(TypePath::ResultField(lab.clone()));
                             } else {
-                                path.push(TypePath::VariantField(id.to_string()));
+                                path.push(TypePath::VariantField(lab.clone()));
                             }
-                            let ty = self.nominalize(env, path, ty);
+                            let ty = self.nominalize(env, path, typ);
                             path.pop();
                             self.state.pop_state(old, StateElem::Label(&lab));
-                            Field { id: id.clone(), ty }
+                            TypeField {
+                                label: label.clone(),
+                                typ: ty,
+                            }
                         })
                         .collect();
-                    TypeInner::Variant(fs)
+                    IDLType::VariantT(fs)
                 } else {
                     let new_var = if let Some(name) = &self.state.config.name {
                         let res = name.to_string();
@@ -902,16 +928,19 @@ impl NominalState<'_> {
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
-                        &TypeInner::Variant(fs.to_vec()).into(),
+                        &IDLType::VariantT(fs.to_vec()),
                     );
-                    env.0.insert(new_var.clone(), ty);
-                    TypeInner::Var(new_var)
+                    env.insert_binding(Binding {
+                        id: new_var.clone(),
+                        typ: ty,
+                    });
+                    IDLType::VarT(new_var)
                 }
             }
-            TypeInner::Func(func) => match path.last() {
+            IDLType::FuncT(func) => match path.last() {
                 None | Some(TypePath::Id(_)) => {
                     let func = func.clone();
-                    TypeInner::Func(Function {
+                    IDLType::FuncT(FuncType {
                         modes: func.modes,
                         args: func
                             .args
@@ -929,7 +958,7 @@ impl NominalState<'_> {
                                 let ty = self.nominalize(env, path, &arg.typ);
                                 path.pop();
                                 self.state.pop_state(old, StateElem::Label(&lab));
-                                ArgType {
+                                IDLArgType {
                                     name: arg.name.clone(),
                                     typ: ty,
                                 }
@@ -967,23 +996,26 @@ impl NominalState<'_> {
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
-                        &TypeInner::Func(func.clone()).into(),
+                        &IDLType::FuncT(func.clone()),
                     );
-                    env.0.insert(new_var.clone(), ty);
-                    TypeInner::Var(new_var)
+                    env.insert_binding(Binding {
+                        id: new_var.clone(),
+                        typ: ty,
+                    });
+                    IDLType::VarT(new_var)
                 }
             },
-            TypeInner::Service(serv) => match path.last() {
-                None | Some(TypePath::Id(_)) => TypeInner::Service(
+            IDLType::ServT(serv) => match path.last() {
+                None | Some(TypePath::Id(_)) => IDLType::ServT(
                     serv.iter()
-                        .map(|(meth, ty)| {
-                            let lab = meth.to_string();
+                        .map(|Binding { id, typ }| {
+                            let lab = id.to_string();
                             let old = self.state.push_state(&StateElem::Label(&lab));
-                            path.push(TypePath::Id(meth.to_string()));
-                            let ty = self.nominalize(env, path, ty);
+                            path.push(TypePath::Id(lab.clone()));
+                            let ty = self.nominalize(env, path, &typ);
                             path.pop();
                             self.state.pop_state(old, StateElem::Label(&lab));
-                            (meth.clone(), ty)
+                            Binding { id: lab, typ: ty }
                         })
                         .collect(),
                 ),
@@ -998,13 +1030,16 @@ impl NominalState<'_> {
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
-                        &TypeInner::Service(serv.clone()).into(),
+                        &IDLType::ServT(serv.clone()),
                     );
-                    env.0.insert(new_var.clone(), ty);
-                    TypeInner::Var(new_var)
+                    env.insert_binding(Binding {
+                        id: new_var.clone(),
+                        typ: ty,
+                    });
+                    IDLType::VarT(new_var)
                 }
             },
-            TypeInner::Class(args, ty) => TypeInner::Class(
+            IDLType::ClassT(args, ty) => IDLType::ClassT(
                 args.iter()
                     .map(|arg| {
                         let elem = StateElem::Label("init");
@@ -1013,36 +1048,46 @@ impl NominalState<'_> {
                         let ty = self.nominalize(env, path, &arg.typ);
                         path.pop();
                         self.state.pop_state(old, elem);
-                        ArgType {
+                        IDLArgType {
                             name: arg.name.clone(),
                             typ: ty,
                         }
                     })
                     .collect(),
-                self.nominalize(env, path, ty),
+                Box::new(self.nominalize(env, path, ty)),
             ),
             t => t.clone(),
-        }
-        .into();
+        };
         if let Some(old) = old {
             self.state.pop_state(old, elem);
         }
         res
     }
 
-    fn nominalize_all(&mut self, actor: &Option<Type>) -> (TypeEnv, Option<Type>) {
-        let mut res = TypeEnv(Default::default());
-        for (id, ty) in self.state.env.0.iter() {
-            let elem = StateElem::Label(id);
+    fn nominalize_all(&mut self) -> IDLEnv {
+        let mut res = IDLEnv::new();
+        for binding in self.state.env.types_bindings.iter() {
+            let elem = StateElem::Label(binding.id.as_str());
             let old = self.state.push_state(&elem);
-            let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.clone())], ty);
-            res.0.insert(id.to_string(), ty);
+            let ty = self.nominalize(
+                &mut res,
+                &mut vec![TypePath::Id(binding.id.clone())],
+                &binding.typ,
+            );
+            res.insert_binding(Binding {
+                id: binding.id.clone(),
+                typ: ty,
+            });
             self.state.pop_state(old, elem);
         }
-        let actor = actor
+        let actor = self
+            .state
+            .env
+            .actor
             .as_ref()
             .map(|ty| self.nominalize(&mut res, &mut vec![], ty));
-        (res, actor)
+        res.set_actor(actor);
+        res
     }
 }
 fn get_hbs() -> handlebars::Handlebars<'static> {

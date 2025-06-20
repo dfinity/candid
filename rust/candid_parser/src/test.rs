@@ -34,10 +34,10 @@ pub struct HostTest {
 }
 pub enum HostAssert {
     // The encoded bytes is not unique
-    Encode(IDLArgs, Vec<Type>, bool, Vec<u8>),
-    NotEncode(IDLArgs, Vec<Type>),
-    Decode(Vec<u8>, Vec<Type>, bool, IDLArgs),
-    NotDecode(Vec<u8>, Vec<Type>),
+    Encode(IDLArgs, Vec<(IDLType, Type)>, bool, Vec<u8>),
+    NotEncode(IDLArgs, Vec<(IDLType, Type)>),
+    Decode(Vec<u8>, Vec<(IDLType, Type)>, bool, IDLArgs),
+    NotDecode(Vec<u8>, Vec<(IDLType, Type)>),
 }
 
 impl Assert {
@@ -83,7 +83,7 @@ impl std::str::FromStr for Test {
 }
 
 impl HostTest {
-    pub fn from_assert(assert: &Assert, env: &TypeEnv, types: &[Type]) -> Self {
+    pub fn from_assert(assert: &Assert, env: &TypeEnv, types: &[(IDLType, Type)]) -> Self {
         use HostAssert::*;
         let types = types.to_vec();
         let mut asserts = Vec::new();
@@ -100,10 +100,10 @@ impl HostTest {
                 if !assert.pass && assert.right.is_none() {
                     asserts.push(NotEncode(parsed, types));
                 } else {
-                    let bytes = parsed.to_bytes_with_types(env, &types).unwrap();
+                    let bytes = parsed.to_bytes_with_types(env, &to_types(&types)).unwrap();
                     asserts.push(Encode(parsed.clone(), types.clone(), true, bytes.clone()));
                     // round tripping
-                    let vals = parsed.annotate_types(true, env, &types).unwrap();
+                    let vals = parsed.annotate_types(true, env, &to_types(&types)).unwrap();
                     asserts.push(Decode(bytes, types, true, vals));
                 }
                 let desc = format!("(encode?) {}", assert.desc());
@@ -116,14 +116,18 @@ impl HostTest {
                 } else {
                     let mut config = DecoderConfig::new();
                     config.set_decoding_quota(DECODING_COST);
-                    let args =
-                        IDLArgs::from_bytes_with_types_with_config(&bytes, env, &types, &config)
-                            .unwrap();
+                    let args = IDLArgs::from_bytes_with_types_with_config(
+                        &bytes,
+                        env,
+                        &to_types(&types),
+                        &config,
+                    )
+                    .unwrap();
                     asserts.push(Decode(bytes.clone(), types.clone(), true, args));
                     // round tripping
                     // asserts.push(Encode(args, types.clone(), true, bytes.clone()));
                     if let Some(right) = &assert.right {
-                        let expected = right.parse(env, &types).unwrap();
+                        let expected = right.parse(env, &to_types(&types)).unwrap();
                         if let Input::Blob(blob) = right {
                             asserts.push(Decode(
                                 blob.to_vec(),
@@ -197,4 +201,12 @@ pub fn check(test: Test) -> Result<()> {
             test.asserts.len()
         )))
     }
+}
+
+pub fn to_idl_types(types: &[(IDLType, Type)]) -> Vec<IDLType> {
+    types.iter().map(|(idl_typ, _)| idl_typ.clone()).collect()
+}
+
+fn to_types(types: &[(IDLType, Type)]) -> Vec<Type> {
+    types.iter().map(|(_, ty)| ty.clone()).collect()
 }

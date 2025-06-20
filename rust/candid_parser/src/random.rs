@@ -1,9 +1,9 @@
 use super::configs::{ConfigState, Configs, Context, Scope, State, StateElem};
 use crate::{Error, Result};
 use arbitrary::{unstructured::Int, Arbitrary, Unstructured};
+use candid::types::syntax::{IDLEnv, IDLType, PrimType, TypeField};
 use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
-use candid::types::{Field, Type, TypeEnv, TypeInner};
-use candid::Deserialize;
+use candid::{Deserialize, TypeEnv};
 use std::collections::HashSet;
 use std::convert::TryFrom;
 
@@ -63,7 +63,7 @@ impl ConfigState for GenConfig {
     }
     fn update_state(&mut self, elem: &StateElem) {
         if let StateElem::Type(t) = elem {
-            if !matches!(t.as_ref(), TypeInner::Var(_)) {
+            if !matches!(t, IDLType::VarT(_)) {
                 self.depth = self.depth.map(|d| d - 1);
                 self.size = self.size.map(|s| s - 1);
             }
@@ -71,7 +71,7 @@ impl ConfigState for GenConfig {
     }
     fn restore_state(&mut self, elem: &StateElem) {
         if let StateElem::Type(t) = elem {
-            if !matches!(t.as_ref(), TypeInner::Var(_)) {
+            if !matches!(t, IDLType::VarT(_)) {
                 self.depth = self.depth.map(|d| d + 1);
             }
         }
@@ -112,67 +112,69 @@ impl ConfigState for GenConfig {
 
 pub struct RandState<'a>(State<'a, GenConfig>);
 impl RandState<'_> {
-    pub fn any(&mut self, u: &mut Unstructured, ty: &Type) -> Result<IDLValue> {
+    pub fn any(&mut self, u: &mut Unstructured, ty: &IDLType) -> Result<IDLValue> {
         let old_config = self.0.push_state(&StateElem::Type(ty));
         if let Some(vec) = &self.0.config.value {
             let v = u.choose(vec)?;
             let v: IDLValue = super::parse_idl_value(v)?;
-            let v = v.annotate_type(true, self.0.env, ty)?;
+            let env = TypeEnv::new();
+            let t = crate::typing::ast_to_type(&env, ty).unwrap();
+            let v = v.annotate_type(true, &env, &t)?;
             self.0.pop_state(old_config, StateElem::Type(ty));
             self.0.update_stats("value");
             return Ok(v);
         }
-        let res = Ok(match ty.as_ref() {
-            TypeInner::Var(id) => {
-                let ty = self.0.env.rec_find_type(id)?;
+        let res = Ok(match ty {
+            IDLType::VarT(id) => {
+                let ty = self.0.env.rec_find_type(id).map_err(|e| Error::msg(e))?;
                 self.any(u, ty)?
             }
-            TypeInner::Null => IDLValue::Null,
-            TypeInner::Reserved => IDLValue::Reserved,
-            TypeInner::Bool => IDLValue::Bool(u.arbitrary()?),
-            TypeInner::Int => {
+            IDLType::PrimT(PrimType::Null) => IDLValue::Null,
+            IDLType::PrimT(PrimType::Reserved) => IDLValue::Reserved,
+            IDLType::PrimT(PrimType::Bool) => IDLValue::Bool(u.arbitrary()?),
+            IDLType::PrimT(PrimType::Int) => {
                 self.0.update_stats("range");
                 IDLValue::Int(arbitrary_num::<i128>(u, self.0.config.range)?.into())
             }
-            TypeInner::Nat => {
+            IDLType::PrimT(PrimType::Nat) => {
                 self.0.update_stats("range");
                 IDLValue::Nat(arbitrary_num::<u128>(u, self.0.config.range)?.into())
             }
-            TypeInner::Nat8 => {
+            IDLType::PrimT(PrimType::Nat8) => {
                 self.0.update_stats("range");
                 IDLValue::Nat8(arbitrary_num(u, self.0.config.range)?)
             }
-            TypeInner::Nat16 => {
+            IDLType::PrimT(PrimType::Nat16) => {
                 self.0.update_stats("range");
                 IDLValue::Nat16(arbitrary_num(u, self.0.config.range)?)
             }
-            TypeInner::Nat32 => {
+            IDLType::PrimT(PrimType::Nat32) => {
                 self.0.update_stats("range");
                 IDLValue::Nat32(arbitrary_num(u, self.0.config.range)?)
             }
-            TypeInner::Nat64 => {
+            IDLType::PrimT(PrimType::Nat64) => {
                 self.0.update_stats("range");
                 IDLValue::Nat64(arbitrary_num(u, self.0.config.range)?)
             }
-            TypeInner::Int8 => {
+            IDLType::PrimT(PrimType::Int8) => {
                 self.0.update_stats("range");
                 IDLValue::Int8(arbitrary_num(u, self.0.config.range)?)
             }
-            TypeInner::Int16 => {
+            IDLType::PrimT(PrimType::Int16) => {
                 self.0.update_stats("range");
                 IDLValue::Int16(arbitrary_num(u, self.0.config.range)?)
             }
-            TypeInner::Int32 => {
+            IDLType::PrimT(PrimType::Int32) => {
                 self.0.update_stats("range");
                 IDLValue::Int32(arbitrary_num(u, self.0.config.range)?)
             }
-            TypeInner::Int64 => {
+            IDLType::PrimT(PrimType::Int64) => {
                 self.0.update_stats("range");
                 IDLValue::Int64(arbitrary_num(u, self.0.config.range)?)
             }
-            TypeInner::Float32 => IDLValue::Float32(u.arbitrary()?),
-            TypeInner::Float64 => IDLValue::Float64(u.arbitrary()?),
-            TypeInner::Text => {
+            IDLType::PrimT(PrimType::Float32) => IDLValue::Float32(u.arbitrary()?),
+            IDLType::PrimT(PrimType::Float64) => IDLValue::Float64(u.arbitrary()?),
+            IDLType::PrimT(PrimType::Text) => {
                 self.0.update_stats("text");
                 self.0.update_stats("width");
                 IDLValue::Text(arbitrary_text(
@@ -181,7 +183,7 @@ impl RandState<'_> {
                     &self.0.config.width,
                 )?)
             }
-            TypeInner::Opt(t) => {
+            IDLType::OptT(t) => {
                 self.0.update_stats("depth");
                 self.0.update_stats("size");
                 let depths = if self.0.config.depth.is_some_and(|d| d <= 0)
@@ -198,7 +200,7 @@ impl RandState<'_> {
                     IDLValue::Opt(Box::new(self.any(u, t)?))
                 }
             }
-            TypeInner::Vec(t) => {
+            IDLType::VecT(t) => {
                 self.0.update_stats("width");
                 let width = self.0.config.width.or_else(|| {
                     let elem_size = size(self.0.env, t).unwrap_or(MAX_DEPTH);
@@ -213,25 +215,25 @@ impl RandState<'_> {
                 }
                 IDLValue::Vec(vec)
             }
-            TypeInner::Record(fs) => {
+            IDLType::RecordT(fs) => {
                 let mut res = Vec::new();
-                for Field { id, ty } in fs.iter() {
-                    let lab_str = id.to_string();
+                for TypeField { label, typ } in fs.iter() {
+                    let lab_str = label.to_string();
                     let elem = StateElem::Label(&lab_str);
                     let old_config = self.0.push_state(&elem);
-                    let val = self.any(u, ty)?;
+                    let val = self.any(u, typ)?;
                     self.0.pop_state(old_config, elem);
                     res.push(IDLField {
-                        id: id.as_ref().clone(),
+                        id: label.clone(),
                         val,
                     });
                 }
                 IDLValue::Record(res)
             }
-            TypeInner::Variant(fs) => {
+            IDLType::VariantT(fs) => {
                 let choices = fs
                     .iter()
-                    .map(|Field { ty, .. }| size(self.0.env, ty).unwrap_or(MAX_DEPTH));
+                    .map(|TypeField { typ, .. }| size(self.0.env, typ).unwrap_or(MAX_DEPTH));
                 self.0.update_stats("size");
                 self.0.update_stats("depth");
                 let sizes: Vec<_> = if self.0.config.depth.is_some_and(|d| d <= 0)
@@ -243,20 +245,20 @@ impl RandState<'_> {
                     choices.collect()
                 };
                 let idx = arbitrary_variant(u, &sizes)?;
-                let Field { id, ty } = &fs[idx];
-                let lab_str = id.to_string();
+                let TypeField { label, typ } = &fs[idx];
+                let lab_str = label.to_string();
                 let elem = StateElem::Label(&lab_str);
                 let old_config = self.0.push_state(&elem);
-                let val = self.any(u, ty)?;
+                let val = self.any(u, typ)?;
                 self.0.pop_state(old_config, elem);
                 let field = IDLField {
-                    id: id.as_ref().clone(),
+                    id: label.clone(),
                     val,
                 };
                 IDLValue::Variant(VariantValue(Box::new(field), idx as u64))
             }
-            TypeInner::Principal => IDLValue::Principal(crate::Principal::arbitrary(u)?),
-            TypeInner::Func(_) => {
+            IDLType::PrincipalT => IDLValue::Principal(crate::Principal::arbitrary(u)?),
+            IDLType::FuncT(_) => {
                 self.0.update_stats("text");
                 self.0.update_stats("width");
                 IDLValue::Func(
@@ -264,7 +266,7 @@ impl RandState<'_> {
                     arbitrary_text(u, &self.0.config.text, &self.0.config.width)?,
                 )
             }
-            TypeInner::Service(_) => IDLValue::Service(crate::Principal::arbitrary(u)?),
+            IDLType::ServT(_) => IDLValue::Service(crate::Principal::arbitrary(u)?),
             _ => unimplemented!(),
         });
         self.0.pop_state(old_config, StateElem::Type(ty));
@@ -275,8 +277,8 @@ impl RandState<'_> {
 pub fn any(
     seed: &[u8],
     configs: Configs,
-    env: &TypeEnv,
-    types: &[Type],
+    env: &IDLEnv,
+    types: &[IDLType],
     scope: &Option<Scope>,
 ) -> Result<IDLArgs> {
     let mut u = arbitrary::Unstructured::new(seed);
@@ -293,10 +295,10 @@ pub fn any(
     Ok(IDLArgs { args })
 }
 
-fn size_helper(env: &TypeEnv, seen: &mut HashSet<String>, t: &Type) -> Option<usize> {
-    use TypeInner::*;
-    Some(match t.as_ref() {
-        Var(id) => {
+fn size_helper(env: &IDLEnv, seen: &mut HashSet<String>, t: &IDLType) -> Option<usize> {
+    use IDLType::*;
+    Some(match t {
+        VarT(id) => {
             if seen.insert(id.to_string()) {
                 let ty = env.rec_find_type(id).unwrap();
                 let res = size_helper(env, seen, ty)?;
@@ -306,20 +308,20 @@ fn size_helper(env: &TypeEnv, seen: &mut HashSet<String>, t: &Type) -> Option<us
                 return None;
             }
         }
-        Empty => 0,
-        Opt(t) => 1 + size_helper(env, seen, t)?,
-        Vec(t) => 1 + size_helper(env, seen, t)? * 2,
-        Record(fs) => {
+        PrimT(PrimType::Empty) => 0,
+        OptT(t) => 1 + size_helper(env, seen, t)?,
+        VecT(t) => 1 + size_helper(env, seen, t)? * 2,
+        RecordT(fs) => {
             let mut sum = 0;
-            for Field { ty, .. } in fs.iter() {
-                sum += size_helper(env, seen, ty)?;
+            for TypeField { typ, .. } in fs.iter() {
+                sum += size_helper(env, seen, typ)?;
             }
             1 + sum
         }
-        Variant(fs) => {
+        VariantT(fs) => {
             let mut max = 0;
-            for Field { ty, .. } in fs.iter() {
-                let s = size_helper(env, seen, ty)?;
+            for TypeField { typ, .. } in fs.iter() {
+                let s = size_helper(env, seen, typ)?;
                 if s > max {
                     max = s;
                 };
@@ -330,7 +332,7 @@ fn size_helper(env: &TypeEnv, seen: &mut HashSet<String>, t: &Type) -> Option<us
     })
 }
 
-fn size(env: &TypeEnv, t: &Type) -> Option<usize> {
+fn size(env: &IDLEnv, t: &IDLType) -> Option<usize> {
     let mut seen = HashSet::new();
     size_helper(env, &mut seen, t)
 }

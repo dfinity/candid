@@ -1,7 +1,8 @@
 use crate::{parse_idl_prog, pretty_parse_idl_prog, Error, Result};
 use candid::types::{
     syntax::{
-        Binding, Dec, IDLArgType, IDLEnv, IDLInitArgs, IDLProg, IDLType, PrimType, TypeField,
+        Binding, Dec, FuncType, IDLArgType, IDLEnv, IDLInitArgs, IDLProg, IDLType, PrimType,
+        TypeField,
     },
     ArgType, Field, Function, Type, TypeEnv, TypeInner,
 };
@@ -16,13 +17,7 @@ pub struct Env<'a> {
 }
 
 impl Env<'_> {
-    fn insert(&mut self, id: String, t: Type) -> bool {
-        let duplicate = self.te.0.insert(id, t);
-        duplicate.is_some()
-    }
-
-    fn insert_binding(&mut self, binding: Binding, t: Type) {
-        self.insert(binding.id.to_string(), t);
+    fn insert_binding(&mut self, binding: Binding) {
         self.idl_env.insert_binding(binding);
     }
 }
@@ -34,10 +29,10 @@ pub fn ast_to_type(env: &TypeEnv, ast: &IDLType) -> Result<Type> {
         idl_env: &mut IDLEnv::new(),
         pre: false,
     };
-    check_type(&env, ast)
+    map_type(&env, ast)
 }
 
-fn check_prim(prim: &PrimType) -> Type {
+fn map_prim(prim: &PrimType) -> Type {
     match prim {
         PrimType::Nat => TypeInner::Nat,
         PrimType::Nat8 => TypeInner::Nat8,
@@ -60,38 +55,38 @@ fn check_prim(prim: &PrimType) -> Type {
     .into()
 }
 
-pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
+pub fn map_type(env: &Env, t: &IDLType) -> Result<Type> {
     match t {
-        IDLType::PrimT(prim) => Ok(check_prim(prim)),
+        IDLType::PrimT(prim) => Ok(map_prim(prim)),
         IDLType::VarT(id) => {
             env.te.find_type(id)?;
             Ok(TypeInner::Var(id.to_string()).into())
         }
         IDLType::OptT(t) => {
-            let t = check_type(env, t)?;
+            let t = map_type(env, t)?;
             Ok(TypeInner::Opt(t).into())
         }
         IDLType::VecT(t) => {
-            let t = check_type(env, t)?;
+            let t = map_type(env, t)?;
             Ok(TypeInner::Vec(t).into())
         }
         IDLType::RecordT(fs) => {
-            let fs = check_fields(env, fs)?;
+            let fs = map_fields(env, fs)?;
             Ok(TypeInner::Record(fs).into())
         }
         IDLType::VariantT(fs) => {
-            let fs = check_fields(env, fs)?;
+            let fs = map_fields(env, fs)?;
             Ok(TypeInner::Variant(fs).into())
         }
         IDLType::PrincipalT => Ok(TypeInner::Principal.into()),
         IDLType::FuncT(func) => {
             let mut t1 = Vec::new();
             for arg in func.args.iter() {
-                t1.push(check_arg(env, arg)?);
+                t1.push(map_arg(env, arg)?);
             }
             let mut t2 = Vec::new();
             for t in func.rets.iter() {
-                t2.push(check_type(env, t)?);
+                t2.push(map_type(env, t)?);
             }
             if func.modes.len() > 1 {
                 return Err(Error::msg("cannot have more than one mode"));
@@ -110,25 +105,25 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
             Ok(TypeInner::Func(f).into())
         }
         IDLType::ServT(ms) => {
-            let ms = check_meths(env, ms)?;
+            let ms = map_meths(env, ms)?;
             Ok(TypeInner::Service(ms).into())
         }
         IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
     }
 }
 
-fn check_arg(env: &Env, arg: &IDLArgType) -> Result<ArgType> {
+fn map_arg(env: &Env, arg: &IDLArgType) -> Result<ArgType> {
     Ok(ArgType {
         name: arg.name.clone(),
-        typ: check_type(env, &arg.typ)?,
+        typ: map_type(env, &arg.typ)?,
     })
 }
 
-fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
+fn map_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
     // field label duplication is checked in the parser
     let mut res = Vec::new();
     for f in fs.iter() {
-        let ty = check_type(env, &f.typ)?;
+        let ty = map_type(env, &f.typ)?;
         let field = Field {
             id: f.label.clone().into(),
             ty,
@@ -138,11 +133,11 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
     Ok(res)
 }
 
-fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
+fn map_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
     // binding duplication is checked in the parser
     let mut res = Vec::new();
     for meth in ms.iter() {
-        let t = check_type(env, &meth.typ)?;
+        let t = map_type(env, &meth.typ)?;
         if !env.pre && env.te.as_func(&t).is_err() {
             return Err(Error::msg(format!(
                 "method {} is a non-function type",
@@ -154,12 +149,112 @@ fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
     Ok(res)
 }
 
+pub fn check_type(env: &Env, t: &IDLType) -> Result<IDLType> {
+    match t {
+        IDLType::PrimT(prim) => Ok(IDLType::PrimT(prim.clone())),
+        IDLType::VarT(id) => {
+            env.idl_env.find_type(id).map_err(Error::msg)?;
+            Ok(IDLType::VarT(id.to_string()))
+        }
+        IDLType::OptT(t) => {
+            let t = check_type(env, t)?;
+            Ok(IDLType::OptT(Box::new(t)))
+        }
+        IDLType::VecT(t) => {
+            let t = check_type(env, t)?;
+            Ok(IDLType::VecT(Box::new(t)))
+        }
+        IDLType::RecordT(fs) => {
+            let fs = check_fields(env, fs)?;
+            Ok(IDLType::RecordT(fs))
+        }
+        IDLType::VariantT(fs) => {
+            let fs = check_fields(env, fs)?;
+            Ok(IDLType::VariantT(fs))
+        }
+        IDLType::PrincipalT => Ok(IDLType::PrincipalT),
+        IDLType::FuncT(func) => {
+            let mut t1 = Vec::new();
+            for arg in func.args.iter() {
+                t1.push(check_arg(env, arg)?);
+            }
+            let mut t2 = Vec::new();
+            for t in func.rets.iter() {
+                t2.push(check_type(env, t)?);
+            }
+            if func.modes.len() > 1 {
+                return Err(Error::msg("cannot have more than one mode"));
+            }
+            if func.modes.len() == 1
+                && func.modes[0] == candid::types::FuncMode::Oneway
+                && !t2.is_empty()
+            {
+                return Err(Error::msg("oneway function has non-unit return type"));
+            }
+            let f = FuncType {
+                modes: func.modes.clone(),
+                args: t1,
+                rets: t2,
+            };
+            Ok(IDLType::FuncT(f))
+        }
+        IDLType::ServT(ms) => {
+            let ms = check_meths(env, ms)?;
+            Ok(IDLType::ServT(ms))
+        }
+        IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
+    }
+}
+
+fn check_arg(env: &Env, arg: &IDLArgType) -> Result<IDLArgType> {
+    Ok(IDLArgType {
+        name: arg.name.clone(),
+        typ: check_type(env, &arg.typ).map_err(Error::msg)?,
+    })
+}
+
+fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<TypeField>> {
+    // field label duplication is checked in the parser
+    let mut res = Vec::new();
+    for f in fs.iter() {
+        let typ = check_type(env, &f.typ).map_err(Error::msg)?;
+        let field = TypeField {
+            label: f.label.clone().into(),
+            typ: typ,
+        };
+        res.push(field);
+    }
+    Ok(res)
+}
+
+fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<Binding>> {
+    // binding duplication is checked in the parser
+    let mut res = Vec::new();
+    for meth in ms.iter() {
+        let t = check_type(env, &meth.typ)?;
+        if !env.pre && env.idl_env.as_func(&t).is_err() {
+            return Err(Error::msg(format!(
+                "method {} is a non-function type",
+                meth.id
+            )));
+        }
+        res.push(Binding {
+            id: meth.id.to_owned(),
+            typ: t,
+        });
+    }
+    Ok(res)
+}
+
 fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         match dec {
             Dec::TypD(binding) => {
                 let t = check_type(env, &binding.typ)?;
-                env.insert_binding(binding.clone(), t);
+                env.insert_binding(Binding {
+                    id: binding.id.to_owned(),
+                    typ: t,
+                });
             }
             Dec::ImportType(_) | Dec::ImportServ(_) => (),
         }
@@ -193,8 +288,8 @@ fn check_cycle(env: &TypeEnv) -> Result<()> {
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         if let Dec::TypD(Binding { id, typ: _ }) = dec {
-            let is_duplicate = env.insert(id.to_string(), TypeInner::Unknown.into());
-            if is_duplicate {
+            let duplicate = env.te.0.insert(id.to_string(), TypeInner::Unknown.into());
+            if duplicate.is_some() {
                 return Err(Error::msg(format!("duplicate binding for {id}")));
             }
         }
@@ -207,7 +302,7 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
-fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<(Type, IDLType)>> {
+fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<IDLType>> {
     match actor {
         None => Ok(None),
         Some(typ) => {
@@ -217,14 +312,14 @@ fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<(Type, IDLTy
                     args.push(check_arg(env, arg)?);
                 }
                 let t = check_type(env, t)?;
-                env.te.as_service(&t)?;
-                TypeInner::Class(args, t).into()
+                env.idl_env.as_service(&t).map_err(Error::msg)?;
+                IDLType::ClassT(args, Box::new(t))
             } else {
                 let serv = check_type(env, typ)?;
-                env.te.as_service(&serv)?;
+                env.idl_env.as_service(&serv).map_err(Error::msg)?;
                 serv
             };
-            Ok(Some((serv, typ.clone())))
+            Ok(Some(serv))
         }
     }
 }
@@ -273,14 +368,14 @@ fn load_imports(
 
 /// Type check IDLProg and adds bindings to type environment. Returns
 /// the main actor if present. This function ignores the imports.
-pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<Option<Type>> {
+pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<Option<IDLType>> {
     let mut env = Env {
         te,
         idl_env: &mut IDLEnv::new(),
         pre: false,
     };
     check_decs(&mut env, &prog.decs)?;
-    check_actor(&env, &prog.actor).map(|t| t.map(|t| t.0))
+    check_actor(&env, &prog.actor)
 }
 /// Type check init args extracted from canister metadata candid:args.
 /// Need to provide `main_env`, because init args may refer to variables from the main did file.
@@ -299,43 +394,46 @@ pub fn check_init_args(
     env.te.merge(main_env)?;
     let mut args = Vec::new();
     for arg in prog.args.iter() {
-        args.push(check_arg(&env, arg)?);
+        args.push(check_arg(&env, arg).and_then(|t| {
+            Ok(ArgType {
+                name: t.name,
+                typ: ast_to_type(&env.te, &t.typ)?,
+            })
+        })?);
     }
     Ok(args)
 }
 
 fn merge_actor(
     env: &Env,
-    actor: &Option<(Type, IDLType)>,
-    imported: &Option<(Type, IDLType)>,
+    actor: &Option<IDLType>,
+    imported: &Option<IDLType>,
     file: &str,
-) -> Result<Option<(Type, IDLType)>> {
+) -> Result<Option<IDLType>> {
     match imported {
         None => Err(Error::msg(format!(
             "Imported service file {file:?} has no main service"
         ))),
-        Some((t, idl_type)) => {
-            let t = env.te.trace_type(t)?;
+        Some(idl_type) => {
+            let t = env.idl_env.trace_type(idl_type).map_err(Error::msg)?;
             let idl_meths = env.idl_env.as_service(idl_type).map_err(Error::msg)?;
-            match t.as_ref() {
-                TypeInner::Class(_, _) => Err(Error::msg(format!(
+            match &t {
+                IDLType::ClassT(_, _) => Err(Error::msg(format!(
                     "Imported service file {file:?} has a service constructor"
                 ))),
-                TypeInner::Service(meths) => match actor {
-                    None => Ok(Some((t, idl_type.clone()))),
-                    Some((t, idl_type)) => {
-                        let t = env.te.trace_type(t)?;
-                        let serv = env.te.as_service(&t)?;
-                        let idl_serv = env.idl_env.as_service(idl_type).map_err(Error::msg)?;
+                IDLType::ServT(meths) => match &actor {
+                    None => Ok(Some(t.clone())),
+                    Some(idl_type) => {
+                        let t = env.idl_env.trace_type(idl_type).map_err(Error::msg)?;
+                        let serv = env.idl_env.as_service(&t).map_err(Error::msg)?;
                         let mut ms: Vec<_> = serv.iter().chain(meths.iter()).cloned().collect();
-                        ms.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-                        check_unique(ms.iter().map(|m| &m.0)).map_err(|e| {
+                        ms.sort_unstable_by(|a, b| a.id.partial_cmp(&b.id).unwrap());
+                        check_unique(ms.iter().map(|m| &m.id)).map_err(|e| {
                             Error::msg(format!("Duplicate imported method name: {e}"))
                         })?;
-                        let res: Type = TypeInner::Service(ms).into();
-                        let res_idl_meths =
-                            idl_meths.iter().chain(idl_serv.iter()).cloned().collect();
-                        Ok(Some((res, IDLType::ServT(res_idl_meths))))
+                        let res =
+                            IDLType::ServT(idl_meths.iter().chain(meths.iter()).cloned().collect());
+                        Ok(Some(res))
                     }
                 },
                 _ => unreachable!(),
@@ -344,7 +442,7 @@ fn merge_actor(
     }
 }
 
-fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, IDLEnv, Option<Type>)> {
+fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, IDLEnv, Option<IDLType>)> {
     let base = if file.is_absolute() {
         file.parent().unwrap().to_path_buf()
     } else {
@@ -384,7 +482,7 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, IDLEnv, Option<
         pre: false,
     };
 
-    let mut actor: Option<(Type, IDLType)> = None;
+    let mut actor: Option<IDLType> = None;
     for (include_serv, path, name) in imports.iter() {
         let code = std::fs::read_to_string(path)?;
         let code = parse_idl_prog(&code)?;
@@ -401,15 +499,15 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, IDLEnv, Option<
     if actor.is_some() {
         res = merge_actor(&env, &res, &actor, "")?;
     }
-    idl_env.set_actor(res.clone().map(|t| t.1));
+    idl_env.set_actor(res.clone());
 
-    Ok((te, idl_env, res.map(|t| t.0)))
+    Ok((te, idl_env, res))
 }
 
 /// Type check did file including the imports.
-pub fn check_file(file: &Path) -> Result<(TypeEnv, IDLEnv, Option<Type>)> {
+pub fn check_file(file: &Path) -> Result<(TypeEnv, IDLEnv, Option<IDLType>)> {
     check_file_(file, false)
 }
-pub fn pretty_check_file(file: &Path) -> Result<(TypeEnv, IDLEnv, Option<Type>)> {
+pub fn pretty_check_file(file: &Path) -> Result<(TypeEnv, IDLEnv, Option<IDLType>)> {
     check_file_(file, true)
 }
