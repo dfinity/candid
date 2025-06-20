@@ -9,7 +9,7 @@
   + `pp_args` and `pp_init_args` now require a `&[ArgType]` parameter. The `pp_rets` function has been added, with the signature of the old `pp_args`.
 
 * Non-breaking changes:
-  + The following structs have been moved from the `candid_parser` crate to the `candid::types::parser` module, under the `parser` feature flag:
+  + The following structs have been moved from the `candid_parser` crate to the `candid::types::syntax` module:
     - `IDLType`
     - `IDLTypes`
     - `PrimType`
