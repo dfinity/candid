@@ -1,7 +1,6 @@
-type bitcoin_address = text;
-type bitcoin_network = variant { mainnet; testnet };
-type block_hash = blob;
 type canister_id = principal;
+type user_id = principal;
+type wasm_module = blob;
 type canister_settings = record {
   freezing_threshold : opt nat;
   controllers : opt vec principal;
@@ -14,40 +13,41 @@ type definite_canister_settings = record {
   memory_allocation : nat;
   compute_allocation : nat;
 };
-type ecdsa_curve = variant { secp256k1 };
-type get_balance_request = record {
-  network : bitcoin_network;
-  address : bitcoin_address;
-  min_confirmations : opt nat32;
-};
-type get_current_fee_percentiles_request = record { network : bitcoin_network };
-type get_utxos_request = record {
-  network : bitcoin_network;
-  filter : opt variant { page : blob; min_confirmations : nat32 };
-  address : bitcoin_address;
-};
-type get_utxos_response = record {
-  next_page : opt blob;
-  tip_height : nat32;
-  tip_block_hash : block_hash;
-  utxos : vec utxo;
-};
 type http_header = record { value : text; name : text };
 type http_response = record {
   status : nat;
   body : blob;
   headers : vec http_header;
 };
-type millisatoshi_per_byte = nat64;
-type outpoint = record { txid : blob; vout : nat32 };
+type ecdsa_curve = variant { secp256k1 };
 type satoshi = nat64;
+type bitcoin_network = variant { mainnet; testnet };
+type bitcoin_address = text;
+type block_hash = blob;
+type outpoint = record { txid : blob; vout : nat32 };
+type utxo = record { height : nat32; value : satoshi; outpoint : outpoint };
+type get_utxos_request = record {
+  network : bitcoin_network;
+  filter : opt variant { page : blob; min_confirmations : nat32 };
+  address : bitcoin_address;
+};
+type get_current_fee_percentiles_request = record { network : bitcoin_network };
+type get_utxos_response = record {
+  next_page : opt blob;
+  tip_height : nat32;
+  tip_block_hash : block_hash;
+  utxos : vec utxo;
+};
+type get_balance_request = record {
+  network : bitcoin_network;
+  address : bitcoin_address;
+  min_confirmations : opt nat32;
+};
 type send_transaction_request = record {
   transaction : blob;
   network : bitcoin_network;
 };
-type user_id = principal;
-type utxo = record { height : nat32; value : satoshi; outpoint : outpoint };
-type wasm_module = blob;
+type millisatoshi_per_byte = nat64;
 service : {
   bitcoin_get_balance : (get_balance_request) -> (satoshi);
   bitcoin_get_current_fee_percentiles : (

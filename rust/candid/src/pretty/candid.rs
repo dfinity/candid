@@ -125,6 +125,7 @@ pub fn pp_ty(ty: &IDLType) -> RcDoc {
                 _ => unreachable!(),
             }
         }
+        UnknownT => unreachable!(),
     }
 }
 
@@ -203,7 +204,7 @@ fn pp_service(serv: &[Binding]) -> RcDoc {
 }
 
 fn pp_defs(env: &IDLEnv) -> RcDoc {
-    lines(env.types_bindings.iter().map(|Binding { id, typ }| {
+    lines(env.get_bindings().iter().map(|(id, typ)| {
         kwd("type")
             .append(ident(id))
             .append(kwd("="))

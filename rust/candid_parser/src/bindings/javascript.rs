@@ -136,7 +136,7 @@ fn pp_ty(ty: &IDLType) -> RcDoc {
         VariantT(ref fs) => str("IDL.Variant").append(pp_fields(fs)),
         FuncT(ref func) => str("IDL.Func").append(pp_function(func)),
         ServT(ref serv) => str("IDL.Service").append(pp_service(serv)),
-        ClassT(_, _) => unreachable!(),
+        ClassT(_, _) | UnknownT => unreachable!(),
     }
 }
 
@@ -239,7 +239,7 @@ fn pp_actor<'a>(ty: &'a IDLType, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
 pub fn compile(env: &IDLEnv) -> String {
     match &env.actor {
         None => {
-            let def_list: Vec<_> = env.bindings_ids();
+            let def_list: Vec<_> = env.types_ids();
             let recs = infer_rec(env, &def_list).unwrap();
             let doc = pp_defs(env, &def_list, &recs);
             doc.pretty(LINE_WIDTH).to_string()

@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, fmt};
+use std::{collections::BTreeMap, fmt};
 
 use crate::types::{FuncMode, Label};
 
@@ -14,6 +14,7 @@ pub enum IDLType {
     ServT(Vec<Binding>),
     ClassT(Vec<IDLArgType>, Box<IDLType>),
     PrincipalT,
+    UnknownT,
 }
 
 impl IDLType {
@@ -147,37 +148,28 @@ pub struct IDLInitArgs {
 
 #[derive(Debug, Default)]
 pub struct IDLEnv {
-    pub types_bindings: Vec<Binding>,
-    types_bindings_ids: BTreeSet<String>,
+    types: BTreeMap<String, Option<IDLType>>,
+    types_bindings_ids: Vec<String>,
     pub actor: Option<IDLType>,
 }
 
 impl From<&IDLProg> for IDLEnv {
     fn from(prog: &IDLProg) -> Self {
-        let mut types_bindings_ids = BTreeSet::new();
-        let mut types_bindings = Vec::new();
+        let mut env = Self::new();
 
         for dec in prog.decs.iter() {
             if let Dec::TypD(binding) = dec {
-                let is_duplicate = types_bindings_ids.insert(binding.id.clone());
-                if !is_duplicate {
-                    types_bindings.push(binding.clone());
-                }
+                env.insert_binding(binding.clone());
             }
         }
 
-        let mut env = Self {
-            types_bindings,
-            types_bindings_ids,
-            actor: None,
-        };
         env.set_actor(prog.actor.clone());
         env
     }
 }
 
-impl From<Vec<&Binding>> for IDLEnv {
-    fn from(bindings: Vec<&Binding>) -> Self {
+impl From<Vec<Binding>> for IDLEnv {
+    fn from(bindings: Vec<Binding>) -> Self {
         let mut env = Self::default();
         for binding in bindings {
             env.insert_binding(binding.clone());
@@ -192,13 +184,22 @@ impl IDLEnv {
     }
 
     pub fn insert_binding(&mut self, binding: Binding) {
-        let is_new = self.types_bindings_ids.insert(binding.id.clone());
-        if is_new {
-            self.types_bindings.push(binding);
+        let duplicate = self
+            .types
+            .insert(binding.id.clone(), Some(binding.typ.clone()));
+        if duplicate.is_none() {
+            self.types_bindings_ids.push(binding.id.clone());
         }
     }
 
-    pub fn bindings_ids(&self) -> Vec<&str> {
+    pub fn insert_unknown(&mut self, id: &str) {
+        let duplicate = self.types.insert(id.to_string(), None);
+        if duplicate.is_none() {
+            self.types_bindings_ids.push(id.to_string());
+        }
+    }
+
+    pub fn types_ids(&self) -> Vec<&str> {
         self.types_bindings_ids
             .iter()
             .map(|id| id.as_str())
@@ -209,15 +210,40 @@ impl IDLEnv {
         self.actor = actor;
     }
 
-    pub fn find_binding(&self, id: &str) -> Result<&Binding, String> {
-        self.types_bindings
-            .iter()
-            .find(|b| b.id == id)
-            .ok_or(format!("Unbound type identifier: {id}"))
+    pub fn find_binding<'a>(&'a self, id: &'a str) -> Result<(&'a str, &'a IDLType), String> {
+        self.find_type(id).map(|t| (id, t))
     }
 
     pub fn find_type(&self, id: &str) -> Result<&IDLType, String> {
-        self.find_binding(id).map(|b| &b.typ)
+        self.types
+            .get(id)
+            .ok_or(format!("Type identifier not found: {id}"))
+            .and_then(|t| {
+                t.as_ref()
+                    .ok_or(format!("Type identifier is unknown: {id}"))
+            })
+    }
+
+    pub fn assert_has_type(&self, id: &str) -> Result<(), String> {
+        if self.types.contains_key(id) {
+            Ok(())
+        } else {
+            Err(format!("Type identifier not found: {id}"))
+        }
+    }
+
+    pub fn get_types(&self) -> Vec<&IDLType> {
+        self.types_bindings_ids
+            .iter()
+            .map(|id| self.find_type(id).unwrap())
+            .collect()
+    }
+
+    pub fn get_bindings(&self) -> Vec<(&str, &IDLType)> {
+        self.types_bindings_ids
+            .iter()
+            .map(|id| self.find_binding(id).unwrap())
+            .collect()
     }
 
     pub fn rec_find_type(&self, name: &str) -> Result<&IDLType, String> {

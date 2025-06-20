@@ -104,7 +104,7 @@ fn pp_ty<'a>(env: &'a IDLEnv, ty: &'a IDLType, is_ref: bool) -> RcDoc<'a> {
         }
         FuncT(_) => str("[Principal, string]"),
         ServT(_) => str("Principal"),
-        ClassT(_, _) => unreachable!(),
+        ClassT(_, _) | UnknownT => unreachable!(),
     }
 }
 
@@ -200,11 +200,7 @@ pub fn compile(env: &IDLEnv) -> String {
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 "#;
-    let def_list: Vec<_> = env
-        .types_bindings
-        .iter()
-        .map(|Binding { id, typ: _ }| id.as_ref())
-        .collect();
+    let def_list = env.types_ids();
     let defs = pp_defs(env, &def_list);
     let actor = match &env.actor {
         None => RcDoc::nil(),

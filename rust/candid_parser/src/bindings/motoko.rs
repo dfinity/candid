@@ -147,6 +147,7 @@ fn pp_ty(ty: &IDLType) -> RcDoc {
                 _ => unreachable!(),
             }
         }
+        UnknownT => unreachable!(),
     }
 }
 
@@ -251,12 +252,12 @@ fn pp_service(serv: &[Binding]) -> RcDoc {
     kwd("actor").append(enclose_space("{", doc, "}"))
 }
 
-fn pp_defs(bindings: &[Binding]) -> RcDoc {
-    lines(bindings.iter().map(|binding| {
+fn pp_defs<'a>(bindings: &[(&'a str, &'a IDLType)]) -> RcDoc<'a> {
+    lines(bindings.iter().map(|(id, typ)| {
         kwd("public type")
-            .append(escape(&binding.id, false))
+            .append(escape(&id, false))
             .append(" = ")
-            .append(pp_ty(&binding.typ))
+            .append(pp_ty(&typ))
             .append(";")
     }))
 }
@@ -273,10 +274,11 @@ pub fn compile(env: &IDLEnv) -> String {
     let header = r#"// This is a generated Motoko binding.
 // Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 "#;
+    let bindings = env.get_bindings();
     let doc = match &env.actor {
-        None => pp_defs(&env.types_bindings),
+        None => pp_defs(&bindings),
         Some(actor) => {
-            let defs = pp_defs(&env.types_bindings);
+            let defs = pp_defs(&bindings);
             let actor = kwd("public type Self =").append(pp_actor(actor));
             defs.append(actor)
         }

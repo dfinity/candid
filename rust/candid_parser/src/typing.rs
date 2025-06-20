@@ -7,7 +7,7 @@ use candid::types::{
     ArgType, Field, Function, Type, TypeEnv, TypeInner,
 };
 use candid::utils::check_unique;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 pub struct Env<'a> {
@@ -109,6 +109,7 @@ pub fn map_type(env: &Env, t: &IDLType) -> Result<Type> {
             Ok(TypeInner::Service(ms).into())
         }
         IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
+        IDLType::UnknownT => Err(Error::msg("unknown type")),
     }
 }
 
@@ -153,7 +154,7 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<IDLType> {
     match t {
         IDLType::PrimT(prim) => Ok(IDLType::PrimT(prim.clone())),
         IDLType::VarT(id) => {
-            env.idl_env.find_type(id).map_err(Error::msg)?;
+            env.idl_env.assert_has_type(id).map_err(Error::msg)?;
             Ok(IDLType::VarT(id.to_string()))
         }
         IDLType::OptT(t) => {
@@ -203,6 +204,7 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<IDLType> {
             Ok(IDLType::ServT(ms))
         }
         IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
+        IDLType::UnknownT => Err(Error::msg("unknown type")),
     }
 }
 
@@ -262,29 +264,6 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
-fn check_cycle(env: &TypeEnv) -> Result<()> {
-    fn has_cycle<'a>(seen: &mut BTreeSet<&'a str>, env: &'a TypeEnv, t: &'a Type) -> Result<bool> {
-        match t.as_ref() {
-            TypeInner::Var(id) => {
-                if seen.insert(id) {
-                    let ty = env.find_type(id)?;
-                    has_cycle(seen, env, ty)
-                } else {
-                    Ok(true)
-                }
-            }
-            _ => Ok(false),
-        }
-    }
-    for (id, ty) in env.0.iter() {
-        let mut seen = BTreeSet::new();
-        if has_cycle(&mut seen, env, ty)? {
-            return Err(Error::msg(format!("{id} has cyclic type definition")));
-        }
-    }
-    Ok(())
-}
-
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         if let Dec::TypD(Binding { id, typ: _ }) = dec {
@@ -292,11 +271,12 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
             if duplicate.is_some() {
                 return Err(Error::msg(format!("duplicate binding for {id}")));
             }
+            env.idl_env.insert_unknown(id);
         }
     }
     env.pre = true;
     check_defs(env, decs)?;
-    check_cycle(env.te)?;
+    env.te.check_cycle()?;
     env.pre = false;
     check_defs(env, decs)?;
     Ok(())

@@ -3,7 +3,7 @@ use crate::{
 };
 use candid::{
     types::{
-        syntax::{IDLEnv, IDLType},
+        syntax::{Binding, IDLEnv, IDLType},
         Type, TypeInner,
     },
     TypeEnv,
@@ -84,8 +84,11 @@ pub fn get_metadata(env: &IDLEnv) -> Option<String> {
     let def_list = crate::bindings::analysis::chase_actor(env).ok()?;
     let mut filtered = IDLEnv::new();
     for d in def_list {
-        if let Ok(b) = env.find_binding(d) {
-            filtered.insert_binding(b.clone());
+        if let Ok((id, typ)) = env.find_binding(d) {
+            filtered.insert_binding(Binding {
+                id: id.to_string(),
+                typ: typ.clone(),
+            });
         }
     }
     Some(candid::pretty::candid::compile(&filtered))

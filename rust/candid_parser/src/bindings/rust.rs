@@ -174,9 +174,13 @@ impl<'a> State<'a> {
         let env = IDLEnv::from(
             self.state
                 .env
-                .types_bindings
-                .iter()
-                .filter(|Binding { id, typ: _ }| def_list.contains(&id.as_str()))
+                .get_bindings()
+                .into_iter()
+                .filter(|(id, _)| def_list.contains(id))
+                .map(|(id, typ)| Binding {
+                    id: id.to_string(),
+                    typ: typ.clone(),
+                })
                 .collect::<Vec<_>>(),
         );
         let src = candid::pretty::candid::pp_init_args(
@@ -283,7 +287,7 @@ fn test_{test_name}() {{
                 }
                 FuncT(_) => unreachable!(), // not possible after rewriting
                 ServT(_) => unreachable!(), // not possible after rewriting
-                ClassT(_, _) => unreachable!(),
+                ClassT(_, _) | UnknownT => unreachable!(),
             }
         };
         self.state.pop_state(old, elem);
@@ -705,7 +709,7 @@ pub fn emit_bindgen(tree: &Config, env: &IDLEnv) -> (Output, Vec<String>) {
     let def_list = if env.actor.is_some() {
         chase_actor(&env).unwrap()
     } else {
-        env.bindings_ids()
+        env.types_ids()
     };
     let recs = infer_rec(&env, &def_list).unwrap();
     let mut state = State {
@@ -1066,16 +1070,12 @@ impl NominalState<'_> {
 
     fn nominalize_all(&mut self) -> IDLEnv {
         let mut res = IDLEnv::new();
-        for binding in self.state.env.types_bindings.iter() {
-            let elem = StateElem::Label(binding.id.as_str());
+        for (id, typ) in self.state.env.get_bindings() {
+            let elem = StateElem::Label(id);
             let old = self.state.push_state(&elem);
-            let ty = self.nominalize(
-                &mut res,
-                &mut vec![TypePath::Id(binding.id.clone())],
-                &binding.typ,
-            );
+            let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.to_string())], typ);
             res.insert_binding(Binding {
-                id: binding.id.clone(),
+                id: id.to_string(),
                 typ: ty,
             });
             self.state.pop_state(old, elem);
