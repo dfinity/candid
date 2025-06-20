@@ -41,61 +41,61 @@ fn compiler_test(resource: &str) {
 
     match check_file(&candid_path) {
         Ok((env, actor)) => {
-            // {
-            //     let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
-            //     let content = compile(&env, &actor);
-            //     // Type check output
-            //     let ast = content.parse::<IDLProg>().unwrap();
-            //     check_prog(&mut TypeEnv::new(), &ast).unwrap();
-            //     writeln!(output, "{content}").unwrap();
-            // }
-            // {
-            //     match filename.file_name().unwrap().to_str().unwrap() {
-            //         "unicode.did" | "escape.did" => {
-            //             check_error(|| motoko::compile(&env, &actor), "not a valid Motoko id")
-            //         }
-            //         _ => {
-            //             let mut output =
-            //                 mint.new_goldenfile(filename.with_extension("mo")).unwrap();
-            //             let content = motoko::compile(&env, &actor);
-            //             writeln!(output, "{content}").unwrap();
-            //         }
-            //     }
-            // }
-            // {
-            //     use rust::{Config, ExternalConfig};
-            //     use std::str::FromStr;
-            //     let mut config = Config::new(Configs::from_str("").unwrap());
-            //     let mut external = ExternalConfig::default();
-            //     external
-            //         .0
-            //         .insert("canister_id".to_string(), "aaaaa-aa".to_string());
-            //     match filename.file_name().unwrap().to_str().unwrap() {
-            //         "management.did" => {
-            //             drop(external.0.insert("target".to_string(), "agent".to_string()))
-            //         }
-            //         "class.did" => {
-            //             drop(external.0.insert("target".to_string(), "stub".to_string()))
-            //         }
-            //         "example.did" => {
-            //             let configs = std::fs::read_to_string(base_path.join("example.toml"))
-            //                 .unwrap()
-            //                 .parse::<Configs>()
-            //                 .unwrap();
-            //             config = Config::new(configs);
-            //         }
-            //         _ => (),
-            //     }
-            //     let mut output = mint.new_goldenfile(filename.with_extension("rs")).unwrap();
-            //     let (content, unused) = rust::compile(&config, &env, &actor, external);
-            //     assert!(unused.is_empty());
-            //     writeln!(output, "{content}").unwrap();
-            // }
-            // {
-            //     let mut output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
-            //     let content = javascript::compile(&env, &actor);
-            //     writeln!(output, "{content}").unwrap();
-            // }
+            {
+                let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
+                let content = compile(&env, &actor);
+                // Type check output
+                let ast = content.parse::<IDLProg>().unwrap();
+                check_prog(&mut TypeEnv::new(), &ast).unwrap();
+                writeln!(output, "{content}").unwrap();
+            }
+            {
+                match filename.file_name().unwrap().to_str().unwrap() {
+                    "unicode.did" | "escape.did" => {
+                        check_error(|| motoko::compile(&env, &actor), "not a valid Motoko id")
+                    }
+                    _ => {
+                        let mut output =
+                            mint.new_goldenfile(filename.with_extension("mo")).unwrap();
+                        let content = motoko::compile(&env, &actor);
+                        writeln!(output, "{content}").unwrap();
+                    }
+                }
+            }
+            {
+                use rust::{Config, ExternalConfig};
+                use std::str::FromStr;
+                let mut config = Config::new(Configs::from_str("").unwrap());
+                let mut external = ExternalConfig::default();
+                external
+                    .0
+                    .insert("canister_id".to_string(), "aaaaa-aa".to_string());
+                match filename.file_name().unwrap().to_str().unwrap() {
+                    "management.did" => {
+                        drop(external.0.insert("target".to_string(), "agent".to_string()))
+                    }
+                    "class.did" => {
+                        drop(external.0.insert("target".to_string(), "stub".to_string()))
+                    }
+                    "example.did" => {
+                        let configs = std::fs::read_to_string(base_path.join("example.toml"))
+                            .unwrap()
+                            .parse::<Configs>()
+                            .unwrap();
+                        config = Config::new(configs);
+                    }
+                    _ => (),
+                }
+                let mut output = mint.new_goldenfile(filename.with_extension("rs")).unwrap();
+                let (content, unused) = rust::compile(&config, &env, &actor, external);
+                assert!(unused.is_empty());
+                writeln!(output, "{content}").unwrap();
+            }
+            {
+                let mut output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
+                let content = javascript::compile(&env, &actor);
+                writeln!(output, "{content}").unwrap();
+            }
             {
                 let mut output = mint
                     .new_goldenfile(filename.with_extension("d.ts"))
