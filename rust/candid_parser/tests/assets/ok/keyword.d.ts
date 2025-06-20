@@ -8,7 +8,7 @@ export type if_ = {
   { 'leaf' : bigint };
 export type list = node | undefined;
 export interface node { 'head' : bigint, 'tail' : list }
-export type o = Array<o>;
+export type o = [] | [o];
 export interface return_ { 'f' : t, 'g' : ActorMethod<[list], [if_, stream]> }
 export type stream = {
   'head' : bigint,
