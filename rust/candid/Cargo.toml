@@ -45,9 +45,8 @@ candid_parser = { path = "../candid_parser" }
 bignum = ["dep:num-bigint", "dep:num-traits"]
 printer = ["dep:pretty"]
 value = ["bignum", "printer"]
-syntax = []
 default = ["serde_bytes", "printer", "bignum"]
-all = ["default", "value", "ic_principal/arbitrary", "syntax"]
+all = ["default", "value", "ic_principal/arbitrary"]
 
 [[test]]
 name = "types"
