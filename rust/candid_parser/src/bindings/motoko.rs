@@ -255,9 +255,9 @@ fn pp_service(serv: &[Binding]) -> RcDoc {
 fn pp_defs<'a>(bindings: &[(&'a str, &'a IDLType)]) -> RcDoc<'a> {
     lines(bindings.iter().map(|(id, typ)| {
         kwd("public type")
-            .append(escape(&id, false))
+            .append(escape(id, false))
             .append(" = ")
-            .append(pp_ty(&typ))
+            .append(pp_ty(typ))
             .append(";")
     }))
 }

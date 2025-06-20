@@ -318,5 +318,12 @@ fn pp_args(args: &[crate::types::ArgType]) -> String {
 #[cfg(feature = "printer")]
 fn pp_args(args: &[crate::types::ArgType]) -> String {
     use crate::pretty::candid::pp_args;
-    "TODO".to_string() // pp_args(args).pretty(80).to_string()
+    pp_args(
+        args.iter()
+            .map(|arg| arg.clone().into())
+            .collect::<Vec<_>>()
+            .as_slice(),
+    )
+    .pretty(80)
+    .to_string()
 }

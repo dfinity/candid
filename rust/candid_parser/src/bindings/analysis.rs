@@ -84,10 +84,10 @@ pub fn chase_actor<'a>(env: &'a IDLEnv, actor: &'a IDLType) -> Result<Vec<&'a st
     Ok(res)
 }
 /// Given an actor, return a map from variable names to the (methods, arg) that use them.
-pub fn chase_def_use<'a>(env: &'a IDLEnv) -> Result<BTreeMap<String, Vec<String>>> {
+pub fn chase_def_use(env: &IDLEnv) -> Result<BTreeMap<String, Vec<String>>> {
     let mut res = BTreeMap::new();
     let actor = env.actor.as_ref().ok_or_else(|| Error::msg("no actor"))?;
-    let actor = env.trace_type(&actor).map_err(Error::msg)?;
+    let actor = env.trace_type(actor).map_err(Error::msg)?;
     if let IDLType::ClassT(args, _) = &actor {
         for (i, arg) in args.iter().enumerate() {
             let mut used = Vec::new();

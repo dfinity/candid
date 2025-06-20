@@ -215,8 +215,8 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<TypeField>> {
     for f in fs.iter() {
         let typ = check_type(env, &f.typ).map_err(Error::msg)?;
         let field = TypeField {
-            label: f.label.clone().into(),
-            typ: typ,
+            label: f.label.clone(),
+            typ,
         };
         res.push(field);
     }
@@ -371,7 +371,7 @@ pub fn check_init_args(
         args.push(check_arg(&env, arg).and_then(|t| {
             Ok(ArgType {
                 name: t.name,
-                typ: ast_to_type(&env.te, &t.typ)?,
+                typ: ast_to_type(env.te, &t.typ)?,
             })
         })?);
     }

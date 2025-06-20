@@ -84,7 +84,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
                     .map(|t| generate_arg(quote! { init_args }, t))
                     .collect::<Vec<_>>();
                 quote! {
-                    let mut init_args: Vec<ArgType> = Vec::new();
+                    let mut init_args: Vec<IDLArgType> = Vec::new();
                     #(#args)*
                 }
             });
@@ -111,27 +111,30 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
             };
             quote! {
                 {
-                    let mut args: Vec<ArgType> = Vec::new();
+                    let mut args: Vec<IDLArgType> = Vec::new();
                     #(#args)*
-                    let mut rets: Vec<Type> = Vec::new();
+                    let mut rets: Vec<IDLType> = Vec::new();
                     #(#rets)*
-                    let func = Function { args, rets, modes: #modes };
-                    service.push((#name.to_string(), TypeInner::Func(func).into()));
+                    let func = FuncType { args, rets, modes: #modes };
+                    service.push(Binding {
+                        id: #name.to_string(),
+                        typ: IDLType::FuncT(func),
+                    });
                 }
             }
         });
         let service = quote! {
-            use #candid::types::{CandidType, Function, Type, ArgType, TypeInner};
-            let mut service = Vec::<(String, Type)>::new();
+            use #candid::types::{CandidType, syntax::{IDLEnv, IDLArgType, FuncType, IDLType, Binding}};
+            let mut service = Vec::<Binding>::new();
             let mut env = #candid::types::internal::TypeContainer::new();
             #(#gen_tys)*
-            service.sort_unstable_by_key(|(name, _)| name.clone());
-            let ty = TypeInner::Service(service).into();
+            service.sort_unstable_by_key(|b| b.id.clone());
+            let ty = IDLType::ServT(service);
         };
         let actor = if let Some(init) = init {
             quote! {
                 #init
-                let actor = Some(TypeInner::Class(init_args, ty).into());
+                let actor = Some(IDLType::ClassT(init_args, Box::new(ty)));
             }
         } else {
             quote! { let actor = Some(ty); }
@@ -140,8 +143,8 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
             fn __export_service() -> String {
                 #service
                 #actor
-                // let result = #candid::pretty::candid::compile(&env.env, &actor);
-                let result = "TODO";
+                env.idl_env.set_actor(actor);
+                let result = #candid::pretty::candid::compile(&env.idl_env);
                 format!("{}", result)
             }
         };
@@ -160,7 +163,7 @@ fn generate_arg(name: TokenStream, (arg_name, ty): &(Option<String>, String)) ->
         .unwrap_or(quote! { None });
     let ty = syn::parse_str::<Type>(ty.as_str()).unwrap();
     quote! {
-        #name.push(ArgType { name: #arg_name, typ: env.add::<#ty>() });
+        #name.push(IDLArgType { name: #arg_name, typ: env.add::<#ty>() });
     }
 }
 

@@ -1016,7 +1016,7 @@ impl NominalState<'_> {
                             let lab = id.to_string();
                             let old = self.state.push_state(&StateElem::Label(&lab));
                             path.push(TypePath::Id(lab.clone()));
-                            let ty = self.nominalize(env, path, &typ);
+                            let ty = self.nominalize(env, path, typ);
                             path.pop();
                             self.state.pop_state(old, StateElem::Label(&lab));
                             Binding { id: lab, typ: ty }

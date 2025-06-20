@@ -175,7 +175,7 @@ fn pp_args(args: &[IDLArgType]) -> RcDoc {
     enclose("[", doc, "]")
 }
 
-fn pp_rets<'a>(args: &'a [IDLType]) -> RcDoc<'a> {
+fn pp_rets(args: &[IDLType]) -> RcDoc {
     let doc = concat(args.iter().map(pp_ty), ",");
     enclose("[", doc, "]")
 }
@@ -422,13 +422,13 @@ import { Principal } from './principal';
                 use HostAssert::*;
                 let test_func = match cmd {
                     Encode(args, tys, _, _) | NotEncode(args, tys) => {
-                        let idl_tys = to_idl_types(&tys);
+                        let idl_tys = to_idl_types(tys);
                         let items = [super::pp_rets(&[]), pp_encode(args, &[])];
                         let params = concat(items.iter().cloned(), ",");
                         str("IDL.decode").append(enclose("(", params, ")"))
                     }
                     Decode(bytes, tys, _, _) | NotDecode(bytes, tys) => {
-                        let idl_tys = to_idl_types(&tys);
+                        let idl_tys = to_idl_types(tys);
                         pp_decode(bytes, &[])
                     }
                 };
@@ -443,7 +443,7 @@ import { Principal } from './principal';
                 };
                 let expected = match cmd {
                     Encode(_, tys, _, bytes) => {
-                        let idl_tys = to_idl_types(&tys);
+                        let idl_tys = to_idl_types(tys);
                         pp_decode(bytes, &[])
                     }
                     Decode(_, _, _, vals) => value::pp_args(vals),

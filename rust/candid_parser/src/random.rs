@@ -126,7 +126,7 @@ impl RandState<'_> {
         }
         let res = Ok(match ty {
             IDLType::VarT(id) => {
-                let ty = self.0.env.rec_find_type(id).map_err(|e| Error::msg(e))?;
+                let ty = self.0.env.rec_find_type(id).map_err(Error::msg)?;
                 self.any(u, ty)?
             }
             IDLType::PrimT(PrimType::Null) => IDLValue::Null,

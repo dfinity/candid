@@ -1,6 +1,9 @@
 use std::{collections::BTreeMap, fmt};
 
-use crate::types::{FuncMode, Label};
+use crate::{
+    types::{ArgType, Field, FuncMode, Function, Label, Type, TypeInner},
+    TypeEnv,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IDLType {
@@ -36,6 +39,100 @@ impl IDLType {
 impl fmt::Display for IDLType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", crate::pretty::candid::pp_ty(self).pretty(80))
+    }
+}
+
+impl From<IDLType> for Type {
+    fn from(t: IDLType) -> Self {
+        match t {
+            IDLType::PrimT(PrimType::Null) => TypeInner::Null,
+            IDLType::PrimT(PrimType::Bool) => TypeInner::Bool,
+            IDLType::PrimT(PrimType::Nat) => TypeInner::Nat,
+            IDLType::PrimT(PrimType::Int) => TypeInner::Int,
+            IDLType::PrimT(PrimType::Nat8) => TypeInner::Nat8,
+            IDLType::PrimT(PrimType::Nat16) => TypeInner::Nat16,
+            IDLType::PrimT(PrimType::Nat32) => TypeInner::Nat32,
+            IDLType::PrimT(PrimType::Nat64) => TypeInner::Nat64,
+            IDLType::PrimT(PrimType::Int8) => TypeInner::Int8,
+            IDLType::PrimT(PrimType::Int16) => TypeInner::Int16,
+            IDLType::PrimT(PrimType::Int32) => TypeInner::Int32,
+            IDLType::PrimT(PrimType::Int64) => TypeInner::Int64,
+            IDLType::PrimT(PrimType::Float32) => TypeInner::Float32,
+            IDLType::PrimT(PrimType::Float64) => TypeInner::Float64,
+            IDLType::PrimT(PrimType::Text) => TypeInner::Text,
+            IDLType::PrimT(PrimType::Reserved) => TypeInner::Reserved,
+            IDLType::PrimT(PrimType::Empty) => TypeInner::Empty,
+            IDLType::VarT(id) => TypeInner::Var(id),
+            IDLType::FuncT(func) => TypeInner::Func(func.into()),
+            IDLType::OptT(t) => TypeInner::Opt((*t).into()),
+            IDLType::VecT(t) => TypeInner::Vec((*t).into()),
+            IDLType::RecordT(fields) => {
+                TypeInner::Record(fields.into_iter().map(|t| t.into()).collect())
+            }
+            IDLType::VariantT(fields) => {
+                TypeInner::Variant(fields.into_iter().map(|t| t.into()).collect())
+            }
+            IDLType::ServT(methods) => {
+                TypeInner::Service(methods.into_iter().map(|t| (t.id, t.typ.into())).collect())
+            }
+            IDLType::ClassT(args, t) => {
+                TypeInner::Class(args.into_iter().map(|t| t.into()).collect(), (*t).into())
+            }
+            IDLType::PrincipalT => TypeInner::Principal,
+            IDLType::UnknownT => TypeInner::Unknown,
+        }
+        .into()
+    }
+}
+
+impl From<Type> for IDLType {
+    fn from(t: Type) -> Self {
+        match t.as_ref() {
+            TypeInner::Null => IDLType::PrimT(PrimType::Null),
+            TypeInner::Bool => IDLType::PrimT(PrimType::Bool),
+            TypeInner::Nat => IDLType::PrimT(PrimType::Nat),
+            TypeInner::Int => IDLType::PrimT(PrimType::Int),
+            TypeInner::Nat8 => IDLType::PrimT(PrimType::Nat8),
+            TypeInner::Nat16 => IDLType::PrimT(PrimType::Nat16),
+            TypeInner::Nat32 => IDLType::PrimT(PrimType::Nat32),
+            TypeInner::Nat64 => IDLType::PrimT(PrimType::Nat64),
+            TypeInner::Int8 => IDLType::PrimT(PrimType::Int8),
+            TypeInner::Int16 => IDLType::PrimT(PrimType::Int16),
+            TypeInner::Int32 => IDLType::PrimT(PrimType::Int32),
+            TypeInner::Int64 => IDLType::PrimT(PrimType::Int64),
+            TypeInner::Float32 => IDLType::PrimT(PrimType::Float32),
+            TypeInner::Float64 => IDLType::PrimT(PrimType::Float64),
+            TypeInner::Text => IDLType::PrimT(PrimType::Text),
+            TypeInner::Reserved => IDLType::PrimT(PrimType::Reserved),
+            TypeInner::Empty => IDLType::PrimT(PrimType::Empty),
+            TypeInner::Var(id) => IDLType::VarT(id.to_string()),
+            TypeInner::Opt(t) => IDLType::OptT(Box::new(t.clone().into())),
+            TypeInner::Vec(t) => IDLType::VecT(Box::new(t.clone().into())),
+            TypeInner::Record(fields) => {
+                IDLType::RecordT(fields.iter().map(|t| t.clone().into()).collect())
+            }
+            TypeInner::Variant(fields) => {
+                IDLType::VariantT(fields.iter().map(|t| t.clone().into()).collect())
+            }
+            TypeInner::Func(func) => IDLType::FuncT(func.clone().into()),
+            TypeInner::Service(methods) => IDLType::ServT(
+                methods
+                    .iter()
+                    .map(|t| Binding {
+                        id: t.0.clone(),
+                        typ: t.1.clone().into(),
+                    })
+                    .collect(),
+            ),
+            TypeInner::Class(args, t) => IDLType::ClassT(
+                args.iter().map(|t| t.clone().into()).collect(),
+                Box::new(t.clone().into()),
+            ),
+            TypeInner::Principal => IDLType::PrincipalT,
+            TypeInner::Unknown => IDLType::UnknownT,
+            TypeInner::Knot(_) => IDLType::UnknownT,
+            TypeInner::Future => IDLType::UnknownT,
+        }
     }
 }
 
@@ -91,10 +188,47 @@ pub struct FuncType {
     pub rets: Vec<IDLType>,
 }
 
+impl From<FuncType> for Function {
+    fn from(t: FuncType) -> Self {
+        Function {
+            modes: t.modes,
+            args: t.args.into_iter().map(|t| t.into()).collect(),
+            rets: t.rets.into_iter().map(|t| t.into()).collect(),
+        }
+    }
+}
+
+impl From<Function> for FuncType {
+    fn from(t: Function) -> Self {
+        FuncType {
+            modes: t.modes,
+            args: t.args.into_iter().map(|t| t.into()).collect(),
+            rets: t.rets.into_iter().map(|t| t.into()).collect(),
+        }
+    }
+}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IDLArgType {
     pub typ: IDLType,
     pub name: Option<String>,
+}
+
+impl From<IDLArgType> for ArgType {
+    fn from(t: IDLArgType) -> Self {
+        ArgType {
+            typ: t.typ.into(),
+            name: t.name,
+        }
+    }
+}
+
+impl From<ArgType> for IDLArgType {
+    fn from(t: ArgType) -> Self {
+        IDLArgType {
+            typ: t.typ.into(),
+            name: t.name,
+        }
+    }
 }
 
 impl IDLArgType {
@@ -119,6 +253,24 @@ impl IDLArgType {
 pub struct TypeField {
     pub label: Label,
     pub typ: IDLType,
+}
+
+impl From<TypeField> for Field {
+    fn from(t: TypeField) -> Self {
+        Field {
+            id: t.label.into(),
+            ty: t.typ.into(),
+        }
+    }
+}
+
+impl From<Field> for TypeField {
+    fn from(t: Field) -> Self {
+        TypeField {
+            label: (*t.id).clone(),
+            typ: t.ty.into(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -175,6 +327,16 @@ impl From<Vec<Binding>> for IDLEnv {
             env.insert_binding(binding.clone());
         }
         env
+    }
+}
+
+impl From<TypeEnv> for IDLEnv {
+    fn from(env: TypeEnv) -> Self {
+        let mut idl_env = Self::default();
+        for (id, t) in env.0 {
+            idl_env.insert_binding(Binding { id, typ: t.into() });
+        }
+        idl_env
     }
 }
 
