@@ -1,6 +1,8 @@
-use crate::{check_prog, pretty_check_file, pretty_parse, Error, Result};
-use candid::types::TypeInner;
-use candid::{types::Type, TypeEnv};
+use crate::{check_prog, pretty_check_file, pretty_parse_idl_prog, Error, Result};
+use candid::{
+    types::{Type, TypeInner},
+    TypeEnv,
+};
 use std::path::Path;
 
 pub enum CandidSource<'a> {
@@ -13,7 +15,7 @@ impl CandidSource<'_> {
         Ok(match self {
             CandidSource::File(path) => pretty_check_file(path)?,
             CandidSource::Text(str) => {
-                let ast = pretty_parse("", str)?;
+                let ast = pretty_parse_idl_prog("", str)?;
                 let mut env = TypeEnv::new();
                 let actor = check_prog(&mut env, &ast)?;
                 (env, actor)
@@ -83,7 +85,7 @@ pub fn get_metadata(env: &TypeEnv, serv: &Option<Type>) -> Option<String> {
 /// Merge canister metadata candid:args and candid:service into a service constructor.
 /// If candid:service already contains init args, returns the original did file.
 pub fn merge_init_args(candid: &str, init: &str) -> Result<(TypeEnv, Type)> {
-    use crate::{types::IDLInitArgs, typing::check_init_args};
+    use crate::{parse_idl_init_args, typing::check_init_args};
     use candid::types::TypeInner;
     let candid = CandidSource::Text(candid);
     let (env, serv) = candid.load()?;
@@ -92,7 +94,7 @@ pub fn merge_init_args(candid: &str, init: &str) -> Result<(TypeEnv, Type)> {
     match serv.as_ref() {
         TypeInner::Class(_, _) => Ok((env, serv)),
         TypeInner::Service(_) => {
-            let prog = init.parse::<IDLInitArgs>()?;
+            let prog = parse_idl_init_args(init)?;
             let mut env2 = TypeEnv::new();
             let args = check_init_args(&mut env2, &env, &prog)?;
             Ok((env2, TypeInner::Class(args, serv).into()))
@@ -104,9 +106,9 @@ pub fn merge_init_args(candid: &str, init: &str) -> Result<(TypeEnv, Type)> {
 /// Note that this only checks structural equality, not equivalence. For recursive types, it may reject
 /// an unrolled type.
 pub fn check_rust_type<T: candid::CandidType>(candid_args: &str) -> Result<()> {
-    use crate::{types::IDLInitArgs, typing::check_init_args};
+    use crate::{parse_idl_init_args, typing::check_init_args};
     use candid::types::{internal::TypeContainer, subtype::equal, TypeEnv};
-    let parsed = candid_args.parse::<IDLInitArgs>()?;
+    let parsed = parse_idl_init_args(candid_args)?;
     let mut env = TypeEnv::new();
     let args = check_init_args(&mut env, &TypeEnv::new(), &parsed)?;
     let mut rust_env = TypeContainer::new();

@@ -47,7 +47,7 @@
 //! ```
 //! # fn f() -> anyhow::Result<()> {
 //! use candid::{TypeEnv, types::{Type, TypeInner}};
-//! use candid_parser::{IDLProg, check_prog};
+//! use candid_parser::{check_prog, parse_idl_prog};
 //! let did_file = r#"
 //!     type List = opt record { head: int; tail: List };
 //!     type byte = nat8;
@@ -58,7 +58,7 @@
 //! "#;
 //!
 //! // Parse did file into an AST
-//! let ast: IDLProg = did_file.parse()?;
+//! let ast = parse_idl_prog(did_file)?;
 //!
 //! // Type checking a given .did file
 //! // let (env, opt_actor) = check_file("a.did")?;
@@ -86,7 +86,7 @@
 //! use candid::{IDLArgs, types::value::IDLValue};
 //! use candid_parser::parse_idl_args;
 //! # use candid::TypeEnv;
-//! # use candid_parser::{IDLProg, check_prog};
+//! # use candid_parser::{check_prog, parse_idl_prog};
 //! # let did_file = r#"
 //! #    type List = opt record { head: int; tail: List };
 //! #    type byte = nat8;
@@ -95,7 +95,7 @@
 //! #      g : (List) -> (int) query;
 //! #    }
 //! # "#;
-//! # let ast = did_file.parse::<IDLProg>()?;
+//! # let ast = parse_idl_prog(did_file)?;
 //! # let mut env = TypeEnv::new();
 //! # let actor = check_prog(&mut env, &ast)?.unwrap();
 //! // Get method type f : (byte, int, nat, int8) -> (List)
@@ -119,15 +119,15 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod error;
-pub use error::{pretty_parse, pretty_wrap, Error, Result};
+pub use error::{
+    pretty_parse, pretty_parse_idl_prog, pretty_parse_idl_types, pretty_wrap, Error, Result,
+};
 
 pub mod bindings;
 pub mod grammar;
 pub mod token;
-pub mod types;
-pub mod utils;
-pub use types::IDLProg;
 pub mod typing;
+pub mod utils;
 pub use typing::{check_file, check_prog, pretty_check_file};
 
 pub use candid;
@@ -141,6 +141,26 @@ pub mod configs;
 #[cfg(feature = "random")]
 pub mod random;
 pub mod test;
+
+pub fn parse_idl_prog(str: &str) -> Result<candid::types::syntax::IDLProg> {
+    let lexer = token::Tokenizer::new(str);
+    Ok(grammar::IDLProgParser::new().parse(lexer)?)
+}
+
+pub fn parse_idl_init_args(str: &str) -> Result<candid::types::syntax::IDLInitArgs> {
+    let lexer = token::Tokenizer::new(str);
+    Ok(grammar::IDLInitArgsParser::new().parse(lexer)?)
+}
+
+pub fn parse_idl_type(str: &str) -> Result<candid::types::syntax::IDLType> {
+    let lexer = token::Tokenizer::new(str);
+    Ok(grammar::TypParser::new().parse(lexer)?)
+}
+
+pub fn parse_idl_types(str: &str) -> Result<candid::types::syntax::IDLTypes> {
+    let lexer = token::Tokenizer::new(str);
+    Ok(grammar::TypsParser::new().parse(lexer)?)
+}
 
 pub fn parse_idl_args(s: &str) -> crate::Result<candid::IDLArgs> {
     let lexer = token::Tokenizer::new(s);
