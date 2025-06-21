@@ -1,12 +1,12 @@
-use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLArgType};
+use super::types::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, DecInner, IDLProg, IDLTypes, IDLInitArgs, IDLArgType};
 use super::test::{Assert, Input, Test};
-use super::token::{Token, error, error2, LexicalError, Span};
+use super::token::{Token, error, error2, LexicalError, Span, TriviaMap};
 use candid::{Principal, types::Label};
 use candid::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
 use candid::types::{TypeEnv, FuncMode};
 use candid::utils::check_unique;
 
-grammar;
+grammar(trivia: Option<&TriviaMap>);
 
 extern {
     type Location = usize;
@@ -257,11 +257,17 @@ MethTyp: Binding = {
     <n:Name> ":" <id:"id"> => Binding { id: n, typ: IDLType::VarT(id) },
 }
 
-// Type declarations
 Def: Dec = {
-    "type" <id:"id"> "=" <t:Typ> => Dec::TypD(Binding { id: id, typ: t }),
-    "import" <Text> => Dec::ImportType(<>),
-    "import" "service" <Text> => Dec::ImportServ(<>),
+  <doc_comment: DocComment> <inner: DefInner> => {
+    Dec { doc_comment, inner }
+  }
+}
+
+// Type declarations
+DefInner: DecInner = {
+    "type" <id:"id"> "=" <t:Typ> => DecInner::TypD(Binding { id: id, typ: t }),
+    "import" <Text> => DecInner::ImportType(<>),
+    "import" "service" <Text> => DecInner::ImportServ(<>),
 }
 
 Actor: IDLType = {
@@ -327,3 +333,13 @@ SepBy<T, S>: Vec<T> = {
 #[inline]
 Sp<T>: (T, Span) =
     <l: @L> <t: T> <r: @R> => (t, l..r);
+
+#[inline]
+DocComment: Option<Vec<String>> =
+    <l: @L> => {
+      let mut comment = None;
+      if let Some(trivia) = &trivia {
+        comment = trivia.borrow().get(&l).cloned();
+      }
+      comment
+    };
