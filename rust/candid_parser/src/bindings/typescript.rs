@@ -101,8 +101,7 @@ fn pp_ty<'a>(
                 enclose("[", tuple, "]")
             } else {
                 let fields = concat(
-                    fs.iter()
-                        .map(|f| pp_field_with_context(env, f, is_ref, current_type_id)),
+                    fs.iter().map(|f| pp_field(env, f, is_ref, current_type_id)),
                     ",",
                 );
                 enclose_space("{", fields, "}")
@@ -114,11 +113,7 @@ fn pp_ty<'a>(
             } else {
                 strict_concat(
                     fs.iter().map(|f| {
-                        enclose_space(
-                            "{",
-                            pp_field_with_context(env, f, is_ref, current_type_id),
-                            "}",
-                        )
+                        enclose_space("{", pp_field(env, f, is_ref, current_type_id), "}")
                     }),
                     " |",
                 )
@@ -142,11 +137,7 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
     }
 }
 
-fn pp_field<'a>(env: &'a TypeEnv, field: &'a Field, is_ref: bool) -> RcDoc<'a> {
-    pp_field_with_context(env, field, is_ref, None)
-}
-
-fn pp_field_with_context<'a>(
+fn pp_field<'a>(
     env: &'a TypeEnv,
     field: &'a Field,
     is_ref: bool,
