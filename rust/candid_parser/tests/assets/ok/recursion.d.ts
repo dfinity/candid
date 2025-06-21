@@ -3,11 +3,14 @@ import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
 export type A = B;
-export type B = [] | [A];
-export type list = [] | [node];
+export type B = A | undefined;
+export type list = node | undefined;
 export interface node { 'head' : bigint, 'tail' : list }
 export interface s { 'f' : t, 'g' : ActorMethod<[list], [B, tree, stream]> }
-export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
+export type stream = {
+  'head' : bigint,
+  'next' : [Principal, string],
+} | undefined;
 export type t = ActorMethod<[Principal], undefined>;
 export type tree = {
     'branch' : { 'val' : bigint, 'left' : tree, 'right' : tree }

@@ -2,7 +2,7 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
-export type List = [] | [[bigint, List]];
+export type List = [bigint, List] | undefined;
 export interface Profile { 'age' : number, 'name' : string }
 export interface _SERVICE {
   'get' : ActorMethod<[], List>,

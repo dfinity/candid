@@ -255,6 +255,9 @@ impl TypeInner {
             _ => false,
         }
     }
+    pub fn is_opt(&self) -> bool {
+        matches!(self, TypeInner::Opt(_))
+    }
 }
 impl Type {
     pub fn is_tuple(&self) -> bool {
