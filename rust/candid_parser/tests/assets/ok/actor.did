@@ -1,8 +1,16 @@
+type doubleNestedOpt = opt opt opt text;
 type f = func (int8) -> (int8);
 type g = f;
 type h = func (f) -> (f);
-type recursiveOpt = opt recursiveOpt;
-type normalOpt = opt text;
 type nestedOpt = opt opt text;
-type doubleNese = opt opt text;
-service : { f : (nat) -> (h); g : f; h : g; o : (o) -> (o) }
+type normalOpt = opt text;
+type recursiveOpt = opt recursiveOpt;
+service : {
+  doubleNestedOpt : (doubleNestedOpt) -> (doubleNestedOpt);
+  f : (nat) -> (h);
+  g : f;
+  h : g;
+  nestedOpt : (nestedOpt) -> (nestedOpt);
+  normalOpt : (normalOpt) -> (normalOpt);
+  recursiveOpt : (recursiveOpt) -> (recursiveOpt);
+}
