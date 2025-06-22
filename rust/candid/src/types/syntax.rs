@@ -370,10 +370,10 @@ impl IDLEnv {
         }
     }
 
-    pub fn insert_unknown(&mut self, id: &str) {
-        let duplicate = self.types.insert(id.to_string(), None);
+    pub fn insert_unknown(&mut self, id: String) {
+        let duplicate = self.types.insert(id.clone(), None);
         if duplicate.is_none() {
-            self.types_bindings_ids.push(id.to_string());
+            self.types_bindings_ids.push(id);
         }
     }
 

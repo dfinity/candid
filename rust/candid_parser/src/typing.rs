@@ -16,6 +16,22 @@ pub struct Env<'a> {
     pre: bool,
 }
 
+impl Env<'_> {
+    fn insert_type(&mut self, id: String, t: Type, binding: IDLType) {
+        self.te.0.insert(id.clone(), t);
+        self.idl_env.insert_binding(Binding { id, typ: binding });
+    }
+
+    fn visit_id(&mut self, id: String) -> Result<()> {
+        let duplicate = self.te.0.insert(id.clone(), TypeInner::Unknown.into());
+        if duplicate.is_some() {
+            return Err(Error::msg(format!("duplicate binding for {id}")));
+        }
+        self.idl_env.insert_unknown(id);
+        Ok(())
+    }
+}
+
 /// Convert candid AST to internal Type
 pub fn ast_to_type(env: &TypeEnv, ast: &IDLType) -> Result<Type> {
     let env = Env {
@@ -245,12 +261,10 @@ fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<Binding>> {
 fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         match dec {
-            Dec::TypD(binding) => {
-                let idl_type = check_type(env, &binding.typ)?;
+            Dec::TypD(Binding { id, typ }) => {
+                let idl_type = check_type(env, typ)?;
                 let t = map_type(env, &idl_type)?;
-                let id = binding.id.to_string();
-                env.te.0.insert(id.clone(), t);
-                env.idl_env.insert_binding(Binding { id, typ: idl_type });
+                env.insert_type(id.to_string(), t, idl_type);
             }
             Dec::ImportType(_) | Dec::ImportServ(_) => (),
         }
@@ -261,11 +275,7 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         if let Dec::TypD(Binding { id, typ: _ }) = dec {
-            let duplicate = env.te.0.insert(id.to_string(), TypeInner::Unknown.into());
-            if duplicate.is_some() {
-                return Err(Error::msg(format!("duplicate binding for {id}")));
-            }
-            env.idl_env.insert_unknown(id);
+            env.visit_id(id.to_string())?;
         }
     }
     env.pre = true;
