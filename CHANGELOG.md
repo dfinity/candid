@@ -20,6 +20,9 @@
     - `Binding`
     - `IDLProg`
     - `IDLInitArgs`
+  + `IDLType::KnotT` is now a valid type.
+  + The `IDLEnv` struct has been added to support the parsing and bindings generation, to avoid using the `TypeEnv`.
+  + The IDL types can now be converted to `Type` and vice versa, using the `From` trait.
 
 ### candid_parser
 
@@ -43,6 +46,12 @@
     You must now use the `parse_idl_prog`, `parse_idl_init_args`, `parse_idl_type` and `parse_idl_types` functions to parse these types, respectively.
   + `pretty_parse` doesn't work anymore with the `IDLProg` and `IDLTypes` types. Use `pretty_parse_idl_prog` and `pretty_parse_idl_types` instead.
   + The `args` field in both `FuncType` and `IDLInitArgs` now have type `Vec<IDLArgType>`.
+  + The bindings generators now use the IDL env and types.
+  + `check_file` and `pretty_check_file` now return a `(TypeEnv, IDLEnv, Option<IDLType>)` tuple, instead of `(TypeEnv, Option<Type>)`. Same for the `CandidSource.load` method.
+  + `check_prog` now returns a `Result<Option<IDLType>>` instead of `Result<Option<Type>>`.
+  + `typing::check_init_args` now accepts the additional `&mut IDLEnv` parameter.
+  + `utils::get_metadata` now accepts only an `&IDLEnv` parameter.
+  + The `chase_type`, `chase_actor`, `chase_def_use`, `chase_types` and `infer_rec` functions of the `bindings::analysis` module now accept an IDL env and types as parameters.
 
 * Non-breaking changes:
   + Supports parsing the arguments' names for `func` and `service` (init args).
