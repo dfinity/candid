@@ -119,7 +119,14 @@ pub fn map_type(env: &Env, t: &IDLType) -> Result<Type> {
             Ok(TypeInner::Service(ms).into())
         }
         IDLType::KnotT(id) => Ok(TypeInner::Knot(id.clone()).into()),
-        IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
+        IDLType::ClassT(args, serv) => {
+            let serv = map_type(env, serv)?;
+            let args = args
+                .iter()
+                .map(|arg| map_arg(env, arg))
+                .collect::<Result<Vec<_>>>()?;
+            Ok(TypeInner::Class(args, serv).into())
+        }
     }
 }
 

@@ -1,5 +1,6 @@
 use canbench_rs::{bench, bench_fn, bench_scope, BenchResult};
 use candid::{CandidType, Decode, DecoderConfig, Deserialize, Encode, Int, Nat};
+use candid_parser::typing::ast_to_type;
 use std::collections::BTreeMap;
 
 #[allow(clippy::all)]
@@ -212,9 +213,9 @@ fn nns() -> BenchResult {
 "#;
     bench_fn(|| {
         let _p = bench_scope("0. Parsing");
-        let (env, serv) = nns_did.load().unwrap();
+        let (env, _, serv) = nns_did.load().unwrap();
         let args = candid_parser::parse_idl_args(motion_proposal).unwrap();
-        let serv = serv.unwrap();
+        let serv = ast_to_type(&env, &serv.unwrap()).unwrap();
         let method = &env.get_method(&serv, "manage_neuron").unwrap();
         let arg_tys = method
             .args
