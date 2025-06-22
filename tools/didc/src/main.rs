@@ -148,9 +148,7 @@ impl TypeAnnotation {
             (None, Some(meth)) => {
                 let actor = actor
                     .ok_or_else(|| Error::msg("Cannot use --method with a non-service did file"))?;
-                let func = idl_env
-                    .get_method(&actor, meth)
-                    .map_err(|e| Error::msg(e))?;
+                let func = idl_env.get_method(&actor, meth).map_err(Error::msg)?;
                 match mode {
                     Mode::Encode => func.args.iter().map(|arg| arg.typ.clone()).collect(),
                     Mode::Decode => func.rets.clone(),

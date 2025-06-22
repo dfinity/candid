@@ -145,6 +145,15 @@ impl TypeContainer {
                     res
                 }
             }
+            IDLType::KnotT(id) => {
+                let name = id.to_string();
+                let ty = ENV.with(|e| e.borrow().get(id).unwrap().clone());
+                self.idl_env.insert_binding(Binding {
+                    id: name.clone(),
+                    typ: ty.into(),
+                });
+                IDLType::VarT(name)
+            }
             IDLType::FuncT(func) => IDLType::FuncT(FuncType {
                 modes: func.modes.clone(),
                 args: func
@@ -707,7 +716,7 @@ pub fn find_type(id: &TypeId) -> Option<Type> {
 
 // only for debugging
 #[allow(dead_code)]
-pub(crate) fn show_env() {
+pub fn show_env() {
     ENV.with(|e| println!("{:?}", e.borrow()));
 }
 

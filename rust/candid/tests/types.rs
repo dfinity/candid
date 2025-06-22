@@ -5,8 +5,12 @@ use std::fmt::Debug;
 use candid::{
     candid_method, record,
     ser::IDLBuilder,
-    types::value::{IDLValue, IDLValueVisitor},
-    types::{get_type, Serializer, Type, TypeInner},
+    types::{
+        get_type,
+        syntax::{IDLType, PrimType, TypeField},
+        value::{IDLValue, IDLValueVisitor},
+        Label, Serializer, Type, TypeInner,
+    },
     variant, CandidType, Decode, Deserialize, Encode, Int,
 };
 use serde::de::DeserializeOwned;
@@ -84,22 +88,40 @@ fn any_val() {
 
 #[test]
 fn test_primitive() {
-    assert_eq!(get_type(&true), TypeInner::Bool.into());
-    assert_eq!(get_type(&Box::new(42)), TypeInner::Int32.into());
-    assert_eq!(get_type(&Box::new(Int::from(42))), TypeInner::Int.into());
+    let bool_prim = get_type(&true);
+    assert_eq!(bool_prim, TypeInner::Bool.into());
+    assert_eq!(IDLType::from(bool_prim), IDLType::PrimT(PrimType::Bool));
+
+    let null_prim = get_type(&());
+    assert_eq!(null_prim, TypeInner::Null.into());
+    assert_eq!(IDLType::from(null_prim), IDLType::PrimT(PrimType::Null));
+
+    let int_prim = get_type(&Box::new(42));
+    assert_eq!(int_prim, TypeInner::Int32.into());
+    assert_eq!(IDLType::from(int_prim), IDLType::PrimT(PrimType::Int32));
+
+    let int_prim = get_type(&Box::new(Int::from(42)));
+    assert_eq!(int_prim, TypeInner::Int.into());
+    assert_eq!(IDLType::from(int_prim), IDLType::PrimT(PrimType::Int));
+
     let opt: Option<&str> = None;
+    let opt_prim = get_type(&opt);
+    assert_eq!(opt_prim, TypeInner::Opt(TypeInner::Text.into()).into());
     assert_eq!(
-        get_type(&opt),
-        TypeInner::Opt(TypeInner::Text.into()).into()
+        IDLType::from(opt_prim),
+        IDLType::OptT(Box::new(IDLType::PrimT(PrimType::Text)))
     );
+
+    let vec_prim = get_type(&[0, 1, 2, 3]);
+    assert_eq!(vec_prim, TypeInner::Vec(TypeInner::Int32.into()).into());
     assert_eq!(
-        get_type(&[0, 1, 2, 3]),
-        TypeInner::Vec(TypeInner::Int32.into()).into()
+        IDLType::from(vec_prim),
+        IDLType::VecT(Box::new(IDLType::PrimT(PrimType::Int32)))
     );
-    assert_eq!(
-        get_type(&std::marker::PhantomData::<u32>),
-        TypeInner::Nat32.into()
-    );
+
+    let nat_prim = get_type(&std::marker::PhantomData::<u32>);
+    assert_eq!(nat_prim, TypeInner::Nat32.into());
+    assert_eq!(IDLType::from(nat_prim), IDLType::PrimT(PrimType::Nat32));
 }
 
 #[test]
@@ -107,6 +129,8 @@ fn test_struct() {
     #[derive(Debug, CandidType)]
     struct Newtype(Int);
     assert_eq!(Newtype::ty(), TypeInner::Int.into());
+    assert_eq!(IDLType::from(Newtype::ty()), IDLType::PrimT(PrimType::Int));
+
     #[derive(Debug, CandidType)]
     struct A {
         foo: Int,
@@ -115,6 +139,19 @@ fn test_struct() {
     assert_eq!(
         A::ty(),
         record! { foo: TypeInner::Int.into(); bar: TypeInner::Bool.into() }
+    );
+    assert_eq!(
+        IDLType::from(A::ty()),
+        IDLType::RecordT(vec![
+            TypeField {
+                label: Label::Named("bar".to_string()),
+                typ: IDLType::PrimT(PrimType::Bool),
+            },
+            TypeField {
+                label: Label::Named("foo".to_string()),
+                typ: IDLType::PrimT(PrimType::Int),
+            },
+        ])
     );
 
     #[derive(Debug, CandidType)]
@@ -127,6 +164,19 @@ fn test_struct() {
         get_type(&res),
         record! { g1: TypeInner::Int32.into(); g2: TypeInner::Bool.into() }
     );
+    assert_eq!(
+        IDLType::from(get_type(&res)),
+        IDLType::RecordT(vec![
+            TypeField {
+                label: Label::Named("g1".to_string()),
+                typ: IDLType::PrimT(PrimType::Int32),
+            },
+            TypeField {
+                label: Label::Named("g2".to_string()),
+                typ: IDLType::PrimT(PrimType::Bool),
+            },
+        ])
+    );
 
     #[derive(Debug, CandidType)]
     struct List {
@@ -136,6 +186,68 @@ fn test_struct() {
     assert_eq!(
         List::ty(),
         record! { head: TypeInner::Int32.into(); tail: TypeInner::Opt(TypeInner::Knot(candid::types::TypeId::of::<List>()).into()).into() }
+    );
+    assert_eq!(
+        IDLType::from(List::ty()),
+        IDLType::RecordT(vec![
+            TypeField {
+                label: Label::Named("head".to_string()),
+                typ: IDLType::PrimT(PrimType::Int32),
+            },
+            TypeField {
+                label: Label::Named("tail".to_string()),
+                typ: IDLType::OptT(Box::new(
+                    IDLType::KnotT(candid::types::TypeId::of::<List>())
+                )),
+            },
+        ])
+    );
+
+    #[derive(Debug, CandidType)]
+    struct GenericList<T> {
+        head: T,
+        tail: Option<Box<GenericList<T>>>,
+    }
+    assert_eq!(
+        GenericList::<i32>::ty(),
+        record! { head: TypeInner::Int32.into(); tail: TypeInner::Opt(TypeInner::Knot(candid::types::TypeId::of::<GenericList<i32>>()).into()).into() }
+    );
+    assert_eq!(
+        IDLType::from(GenericList::<i32>::ty()),
+        IDLType::RecordT(vec![
+            TypeField {
+                label: Label::Named("head".to_string()),
+                typ: IDLType::PrimT(PrimType::Int32),
+            },
+            TypeField {
+                label: Label::Named("tail".to_string()),
+                typ: IDLType::OptT(Box::new(IDLType::KnotT(candid::types::TypeId::of::<
+                    GenericList<i32>,
+                >()))),
+            },
+        ])
+    );
+
+    #[derive(Debug, CandidType)]
+    struct Wrap(GenericList<i32>);
+    assert_eq!(
+        Wrap::ty(),
+        record! { head: TypeInner::Int32.into(); tail: TypeInner::Opt(TypeInner::Knot(candid::types::TypeId::of::<GenericList<i32>>()).into()).into() }
+    );
+    assert_eq!(
+        IDLType::from(Wrap::ty()),
+        IDLType::RecordT(vec![
+            TypeField {
+                label: Label::Named("head".to_string()),
+                typ: IDLType::PrimT(PrimType::Int32),
+            },
+            TypeField {
+                label: Label::Named("tail".to_string()),
+                typ: IDLType::OptT(Box::new(IDLType::KnotT(candid::types::TypeId::of::<
+                    GenericList<i32>,
+                >()))),
+            },
+        ])
     );
 }
 
@@ -159,6 +271,45 @@ fn test_variant() {
             Bar: record!{ 0: TypeInner::Bool.into(); 1: TypeInner::Int32.into() };
             Newtype: TypeInner::Bool.into();
         }
+    );
+    assert_eq!(
+        IDLType::from(get_type(&v)),
+        IDLType::VariantT(vec![
+            TypeField {
+                label: Label::Named("Bar".to_string()),
+                typ: IDLType::RecordT(vec![
+                    TypeField {
+                        label: Label::Id(0),
+                        typ: IDLType::PrimT(PrimType::Bool),
+                    },
+                    TypeField {
+                        label: Label::Id(1),
+                        typ: IDLType::PrimT(PrimType::Int32),
+                    },
+                ]),
+            },
+            TypeField {
+                label: Label::Named("Baz".to_string()),
+                typ: IDLType::RecordT(vec![
+                    TypeField {
+                        label: Label::Named("a".to_string()),
+                        typ: IDLType::PrimT(PrimType::Int32),
+                    },
+                    TypeField {
+                        label: Label::Named("b".to_string()),
+                        typ: IDLType::PrimT(PrimType::Nat32),
+                    },
+                ]),
+            },
+            TypeField {
+                label: Label::Named("Foo".to_string()),
+                typ: IDLType::PrimT(PrimType::Null),
+            },
+            TypeField {
+                label: Label::Named("Newtype".to_string()),
+                typ: IDLType::PrimT(PrimType::Bool),
+            },
+        ])
     );
 }
 
@@ -243,6 +394,7 @@ fn test_func() {
 type Result = variant { Ok : List; Err : empty };
 type NamedStruct = record { a : nat16; b : int32 };
 type List_1 = record { head : int8; tail : opt List_1 };
+type Box = record { head : int8; tail : opt Box };
 type Wrap = record { head : int8; tail : opt Box };
 type A = variant {
   A1 : record { List_1; Wrap; Wrap };

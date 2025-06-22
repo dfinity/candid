@@ -435,6 +435,10 @@ impl IDLEnv {
     pub fn trace_type(&self, t: &IDLType) -> Result<IDLType, String> {
         match t {
             IDLType::VarT(id) => self.trace_type(self.find_type(id)?),
+            IDLType::KnotT(id) => {
+                let t = crate::types::internal::find_type(id).unwrap();
+                self.trace_type(&t.into())
+            }
             _ => Ok(t.clone()),
         }
     }
