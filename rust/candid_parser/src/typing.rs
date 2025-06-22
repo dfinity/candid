@@ -17,12 +17,12 @@ pub struct Env<'a> {
 }
 
 impl Env<'_> {
-    fn insert_type(&mut self, id: String, t: Type, binding: IDLType) {
+    fn insert_type(&mut self, id: String, t: Type, idl_type: IDLType) {
         self.te.0.insert(id.clone(), t);
-        self.idl_env.insert_binding(Binding { id, typ: binding });
+        self.idl_env.insert_binding(Binding { id, typ: idl_type });
     }
 
-    fn visit_id(&mut self, id: String) -> Result<()> {
+    fn insert_id(&mut self, id: String) -> Result<()> {
         let duplicate = self.te.0.insert(id.clone(), TypeInner::Unknown.into());
         if duplicate.is_some() {
             return Err(Error::msg(format!("duplicate binding for {id}")));
@@ -275,7 +275,7 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         if let Dec::TypD(Binding { id, typ: _ }) = dec {
-            env.visit_id(id.to_string())?;
+            env.insert_id(id.to_string())?;
         }
     }
     env.pre = true;
