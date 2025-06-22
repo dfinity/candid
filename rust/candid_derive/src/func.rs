@@ -124,7 +124,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
             }
         });
         let service = quote! {
-            use #candid::types::{CandidType, syntax::{IDLEnv, IDLArgType, FuncType, IDLType, Binding}};
+            use #candid::types::syntax::{IDLArgType, FuncType, IDLType, Binding};
             let mut service = Vec::<Binding>::new();
             let mut env = #candid::types::internal::TypeContainer::new();
             #(#gen_tys)*

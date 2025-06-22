@@ -102,8 +102,8 @@ pub fn map_type(env: &Env, t: &IDLType) -> Result<Type> {
             let ms = map_meths(env, ms)?;
             Ok(TypeInner::Service(ms).into())
         }
+        IDLType::KnotT(id) => Ok(TypeInner::Knot(id.clone()).into()),
         IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
-        IDLType::UnknownT => Err(Error::msg("unknown type")),
     }
 }
 
@@ -198,7 +198,7 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<IDLType> {
             Ok(IDLType::ServT(ms))
         }
         IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
-        IDLType::UnknownT => Err(Error::msg("unknown type")),
+        IDLType::KnotT(_) => Err(Error::msg("knot type not supported")),
     }
 }
 

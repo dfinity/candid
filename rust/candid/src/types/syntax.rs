@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt};
 
 use crate::{
-    types::{ArgType, Field, FuncMode, Function, Label, Type, TypeInner},
+    types::{ArgType, Field, FuncMode, Function, Label, Type, TypeId, TypeInner},
     TypeEnv,
 };
 
@@ -17,7 +17,8 @@ pub enum IDLType {
     ServT(Vec<Binding>),
     ClassT(Vec<IDLArgType>, Box<IDLType>),
     PrincipalT,
-    UnknownT,
+    /// Used for Rust recursive types.
+    KnotT(TypeId),
 }
 
 impl IDLType {
@@ -79,7 +80,7 @@ impl From<IDLType> for Type {
                 TypeInner::Class(args.into_iter().map(|t| t.into()).collect(), (*t).into())
             }
             IDLType::PrincipalT => TypeInner::Principal,
-            IDLType::UnknownT => TypeInner::Unknown,
+            IDLType::KnotT(id) => TypeInner::Knot(id),
         }
         .into()
     }
@@ -129,9 +130,10 @@ impl From<Type> for IDLType {
                 Box::new(t.clone().into()),
             ),
             TypeInner::Principal => IDLType::PrincipalT,
-            TypeInner::Unknown => IDLType::UnknownT,
-            TypeInner::Knot(_) => IDLType::UnknownT,
-            TypeInner::Future => IDLType::UnknownT,
+            TypeInner::Knot(id) => IDLType::KnotT(id.clone()),
+            TypeInner::Unknown | TypeInner::Future => {
+                panic!("Unknown type: {:?}", t)
+            }
         }
     }
 }
@@ -337,6 +339,20 @@ impl From<TypeEnv> for IDLEnv {
             idl_env.insert_binding(Binding { id, typ: t.into() });
         }
         idl_env
+    }
+}
+
+impl From<IDLEnv> for TypeEnv {
+    fn from(env: IDLEnv) -> Self {
+        let mut type_env = Self::default();
+        for (id, t) in env
+            .types
+            .iter()
+            .filter_map(|(id, t)| t.as_ref().map(|t| (id, t)))
+        {
+            type_env.0.insert(id.to_string(), t.clone().into());
+        }
+        type_env
     }
 }
 

@@ -136,7 +136,7 @@ pub fn check_rust_type<T: candid::CandidType>(candid_args: &str) -> Result<()> {
     let args = check_init_args(&mut env, &TypeEnv::new(), &mut idl_env, &parsed)?;
     let mut rust_env = TypeContainer::new();
     let ty = rust_env.add::<T>();
-    let ty = env.merge_type(env.clone(), ty.into());
+    let ty = env.merge_type(rust_env.idl_env.into(), ty.into());
     let mut gamma = std::collections::HashSet::new();
     equal(&mut gamma, &env, &args[0].typ, &ty)?;
     Ok(())

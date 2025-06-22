@@ -239,7 +239,12 @@ fn test_func() {
     fn init(_: List<i128>) {}
 
     candid::export_service!();
-    let expected = r#"type A = variant {
+    let expected = r#"type List = record { head : nat8; tail : opt List };
+type Result = variant { Ok : List; Err : empty };
+type NamedStruct = record { a : nat16; b : int32 };
+type List_1 = record { head : int8; tail : opt List_1 };
+type Wrap = record { head : int8; tail : opt Box };
+type A = variant {
   A1 : record { List_1; Wrap; Wrap };
   A2 : record { text; principal };
   A3 : int;
@@ -248,14 +253,8 @@ fn test_func() {
   A6 : NamedStruct;
   A7 : record { b : int32; c : nat16 };
 };
-type Box = record { head : int8; tail : opt Box };
-type List = record { head : nat8; tail : opt List };
-type List_1 = record { head : int8; tail : opt List_1 };
-type List_2 = record { head : int; tail : opt List_2 };
-type NamedStruct = record { a : nat16; b : int32 };
-type Result = variant { Ok : List; Err : empty };
 type Result_1 = variant { Ok : record { record { A }; A }; Err : text };
-type Wrap = record { head : int8; tail : opt Box };
+type List_2 = record { head : int; tail : opt List_2 };
 service : (List_2) -> {
   id_struct : (record { List }) -> (Result) query;
   id_struct_composite : (record { List }) -> (Result) composite_query;

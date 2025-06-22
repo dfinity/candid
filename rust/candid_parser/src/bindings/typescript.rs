@@ -104,7 +104,7 @@ fn pp_ty<'a>(env: &'a IDLEnv, ty: &'a IDLType, is_ref: bool) -> RcDoc<'a> {
         }
         FuncT(_) => str("[Principal, string]"),
         ServT(_) => str("Principal"),
-        ClassT(_, _) | UnknownT => unreachable!(),
+        ClassT(_, _) | KnotT(_) => unreachable!(),
     }
 }
 

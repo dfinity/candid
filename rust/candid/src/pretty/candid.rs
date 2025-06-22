@@ -125,7 +125,7 @@ pub fn pp_ty(ty: &IDLType) -> RcDoc {
                 _ => unreachable!(),
             }
         }
-        UnknownT => unreachable!(),
+        KnotT(ref id) => RcDoc::text(format!("{id}")),
     }
 }
 
