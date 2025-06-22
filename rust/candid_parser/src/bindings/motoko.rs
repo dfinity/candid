@@ -168,7 +168,7 @@ fn pp_field(field: &TypeField) -> RcDoc {
 }
 fn pp_variant(field: &TypeField) -> RcDoc {
     let doc = str("#").append(pp_label(&field.label));
-    if field.typ != IDLType::PrimT(PrimType::Null) {
+    if !field.typ.is_null() {
         doc.append(" : ").append(pp_ty(&field.typ))
     } else {
         doc

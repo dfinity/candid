@@ -137,7 +137,7 @@ pub fn pp_label(id: &Label) -> RcDoc {
 }
 
 pub(crate) fn pp_field(field: &TypeField, is_variant: bool) -> RcDoc {
-    let ty_doc = if is_variant && field.typ == IDLType::PrimT(PrimType::Null) {
+    let ty_doc = if is_variant && field.typ.is_null() {
         RcDoc::nil()
     } else {
         kwd(" :").append(pp_ty(&field.typ))

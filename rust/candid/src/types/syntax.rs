@@ -35,6 +35,10 @@ impl IDLType {
             _ => false,
         }
     }
+
+    pub fn is_null(&self) -> bool {
+        matches!(self, IDLType::PrimT(PrimType::Null))
+    }
 }
 
 impl fmt::Display for IDLType {
