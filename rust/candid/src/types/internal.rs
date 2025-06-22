@@ -716,7 +716,7 @@ pub fn find_type(id: &TypeId) -> Option<Type> {
 
 // only for debugging
 #[allow(dead_code)]
-pub fn show_env() {
+pub(crate) fn show_env() {
     ENV.with(|e| println!("{:?}", e.borrow()));
 }
 
