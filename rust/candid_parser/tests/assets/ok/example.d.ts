@@ -23,7 +23,7 @@ export type a = { 'a' : null } |
   { 'b' : b };
 export type b = [bigint, bigint];
 export interface broker { 'find' : ActorMethod<[string], Principal> }
-export type f = ActorMethod<[List, [Principal, string]], [[] | [List], res]>;
+export type f = [Principal, string];
 export type list = [] | [node];
 /**
  * Doc comment for prim type
@@ -111,33 +111,14 @@ export type nested_res = { 'Ok' : { 'Ok' : null } | { 'Err' : null } } |
       }
   };
 export interface node { 'head' : bigint, 'tail' : list }
-/**
- * Doc comment for res type
- */
-export type res = {
-    /**
-     * Doc comment for Ok variant
-     */
-    'Ok' : [bigint, bigint]
-  } |
-  {
-    /**
-     * Doc comment for Err variant
-     */
-    'Err' : {
-      /**
-       * Doc comment for error field in Err variant,
-       * on multiple lines
-       */
-      'error' : string,
-    }
-  };
-/**
- * Doc comment for service id
- */
-export interface s { 'f' : t, 'g' : ActorMethod<[list], [B, tree, stream]> }
+export type res = { 'Ok' : [bigint, bigint] } |
+  { 'Err' : { 'error' : string } };
+export interface s {
+  'f' : ActorMethod<[Principal], undefined>,
+  'g' : ActorMethod<[list], [B, tree, stream]>,
+}
 export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
-export type t = ActorMethod<[Principal], undefined>;
+export type t = [Principal, string];
 export type tree = {
     'branch' : { 'val' : bigint, 'left' : tree, 'right' : tree }
   } |
@@ -146,9 +127,8 @@ export type tree = {
  * Doc comment for service
  */
 export interface _SERVICE {
-  /**
-   * Doc comment for f1 method of service
-   */
+  'bbbbb' : ActorMethod<[b], undefined>,
+  'f' : ActorMethod<[Principal], undefined>,
   'f1' : ActorMethod<[list, Uint8Array | number[], [] | [boolean]], undefined>,
   'g1' : ActorMethod<
     [my_type, List, [] | [List], nested],
@@ -163,10 +143,7 @@ export interface _SERVICE {
     ],
     { _42_ : {}, 'id' : bigint }
   >,
-  /**
-   * Doc comment for i method of service
-   */
-  'i' : f,
+  'i' : ActorMethod<[List, [Principal, string]], [[] | [List], res]>,
   'x' : ActorMethod<
     [a, b],
     [
