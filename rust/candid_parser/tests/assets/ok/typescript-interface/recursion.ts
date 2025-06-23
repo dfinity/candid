@@ -57,14 +57,14 @@ export interface node {
     tail: list;
 }
 export interface sInterface {
-    f: [Principal, string];
+    f: t;
     g(arg0: list): Promise<[B, tree, stream]>;
 }
 export type stream = {
     head: bigint;
     next: [Principal, string];
 } | null;
-export type t = (server: Principal) => void;
+export type t = (server: Principal) => Promise<void>;
 export type tree = {
     branch: {
         val: bigint;
@@ -125,6 +125,16 @@ class Recursion implements recursionInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor: ActorSubclass<_SERVICE>){
         this.#actor = actor;
+    }
+    async f(arg0: Principal): Promise<void> {
+        try {
+            const result = await this.#actor.f(arg0);
+            return result;
+        } catch (e) {
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
+            } else throw e;
+        }
     }
     async g(arg0: list): Promise<[B, tree, stream]> {
         try {

@@ -20,6 +20,9 @@ impl<'a> CandidTypesConverter<'a> {
 
     /// Determines if a record structure is a tuple (all fields are numbered or unnamed).
     fn is_tuple(&mut self, fields: &[Field]) -> bool {
+        if fields.is_empty() {
+            return false;
+        }
         fields
             .iter()
             .all(|f| matches!(&*f.id, Label::Id(_) | Label::Unnamed(_)))
@@ -34,6 +37,27 @@ impl<'a> CandidTypesConverter<'a> {
         self.required_candid_imports.insert(type_id.to_string());
     }
 
+    fn create_candid_var_type( &mut self, id: &str) -> TsType {
+        let ty = self.env.rec_find_type(id).unwrap();
+        if matches!(ty.as_ref(),  TypeInner::Func(_)) {
+            return self.create_inline_actor_method();
+        }
+        if matches!(ty.as_ref(), TypeInner:: Service(_)) {
+            return self.create_inline_service();
+        }
+        // For named types, use the imported Candid type
+        self.add_required_import(id);
+        TsType::TsTypeRef(TsTypeRef {
+            span: DUMMY_SP,
+            type_name: TsEntityName::Ident(Ident::new(
+                format!("_{}", id).into(),
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            )),
+            type_params: None,
+        })
+    }
+
     /// Converts a Candid type to a TypeScript type for return values.
     /// This function generates TypeScript types that match the output of `pp_ty` in the
     /// candid-ts printer module.
@@ -41,19 +65,7 @@ impl<'a> CandidTypesConverter<'a> {
     /// The key difference from parameter types is the representation of optionals and tuples.
     fn create_candid_type(&mut self, ty: &Type) -> TsType {
         match ty.as_ref() {
-            TypeInner::Var(id) => {
-                // For named types, use the imported Candid type
-                self.add_required_import(id);
-                TsType::TsTypeRef(TsTypeRef {
-                    span: DUMMY_SP,
-                    type_name: TsEntityName::Ident(Ident::new(
-                        format!("_{}", id).into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    )),
-                    type_params: None,
-                })
-            }
+            TypeInner::Var(id) => self.create_candid_var_type(id),
             TypeInner::Opt(inner) => {
                 // For Option types, return "[] | [T]" to match pp_ty output
                 TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
@@ -277,47 +289,9 @@ impl<'a> CandidTypesConverter<'a> {
                     ))
                 }
             }
-            // Note: we map to a generic function, which is specified by Principal and function name
-            // see https://github.com/dfinity/candid/issues/606
-            TypeInner::Func(_) => {
-                // Function references are represented as [Principal, string]
-                TsType::TsTupleType(TsTupleType {
-                    span: DUMMY_SP,
-                    elem_types: vec![
-                        TsType::TsTypeRef(TsTypeRef {
-                            span: DUMMY_SP,
-                            type_name: TsEntityName::Ident(Ident::new(
-                                "Principal".into(),
-                                DUMMY_SP,
-                                SyntaxContext::empty(),
-                            )),
-                            type_params: None,
-                        }),
-                        TsType::TsKeywordType(TsKeywordType {
-                            span: DUMMY_SP,
-                            kind: TsKeywordTypeKind::TsStringKeyword,
-                        }),
-                    ]
-                    .into_iter()
-                    .map(|t| TsTupleElement {
-                        span: DUMMY_SP,
-                        label: None,
-                        ty: Box::new(t),
-                    })
-                    .collect(),
-                })
-            }
-            // Note: we map to a generic principal type for now
-            // see https://github.com/dfinity/candid/issues/606
-            TypeInner::Service(_) => TsType::TsTypeRef(TsTypeRef {
-                span: DUMMY_SP,
-                type_name: TsEntityName::Ident(Ident::new(
-                    "Principal".into(),
-                    DUMMY_SP,
-                    SyntaxContext::empty(),
-                )),
-                type_params: None,
-            }),
+
+            TypeInner::Func(_) => self.create_inline_actor_method(),
+            TypeInner::Service(_) => self.create_inline_service(),
             // Unsupported types
             TypeInner::Class(_, _)
             | TypeInner::Knot(_)
@@ -327,6 +301,47 @@ impl<'a> CandidTypesConverter<'a> {
                 kind: TsKeywordTypeKind::TsAnyKeyword,
             }),
         }
+    }
+
+    fn create_inline_service(&mut self) -> TsType {
+        TsType::TsTypeRef(TsTypeRef {
+            span: DUMMY_SP,
+            type_name: TsEntityName::Ident(Ident::new(
+                "Principal".into(),
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            )),
+            type_params: None,
+        })
+    }
+
+    fn create_inline_actor_method(&mut self) -> TsType {
+        // Function references are represented as [Principal, string]
+        TsType::TsTupleType(TsTupleType {
+            span: DUMMY_SP,
+            elem_types: vec![
+                TsType::TsTypeRef(TsTypeRef {
+                    span: DUMMY_SP,
+                    type_name: TsEntityName::Ident(Ident::new(
+                        "Principal".into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    )),
+                    type_params: None,
+                }),
+                TsType::TsKeywordType(TsKeywordType {
+                    span: DUMMY_SP,
+                    kind: TsKeywordTypeKind::TsStringKeyword,
+                }),
+            ]
+            .into_iter()
+            .map(|t| TsTupleElement {
+                span: DUMMY_SP,
+                label: None,
+                ty: Box::new(t),
+            })
+            .collect(),
+        })
     }
 
     fn create_union_array_type(&mut self, typed_array: &str, elem_type: &str) -> TsType {
@@ -387,20 +402,7 @@ impl<'a> CandidTypesConverter<'a> {
     /// For other types, it defers to create_candid_type.
     fn create_candid_type_ref(&mut self, ty: &Type) -> TsType {
         match ty.as_ref() {
-            TypeInner::Var(id) => {
-                // Generate TypeScript reference to the named type
-                // Prefix with underscore to match the naming convention in pp_ty
-                self.add_required_import(id);
-                TsType::TsTypeRef(TsTypeRef {
-                    span: DUMMY_SP,
-                    type_name: TsEntityName::Ident(Ident::new(
-                        format!("_{}", id).into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    )),
-                    type_params: None,
-                })
-            }
+            TypeInner::Var(id) => self.create_candid_var_type(id),
             _ => {
                 // For anonymous types, use a detailed structure
                 self.create_candid_type(ty)

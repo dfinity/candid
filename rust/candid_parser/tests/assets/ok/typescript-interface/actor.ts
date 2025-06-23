@@ -49,9 +49,9 @@ function extractAgentErrorMessage(error: string): string {
     const match = errorString.match(/with message:\s*'([^']+)'/s);
     return match ? match[1] : errorString;
 }
-export type f = (arg0: number) => number;
+export type f = (arg0: number) => Promise<number>;
 export type g = f;
-export type h = (arg0: [Principal, string]) => [Principal, string];
+export type h = (arg0: [Principal, string]) => Promise<[Principal, string]>;
 export type o = Some<o> | None;
 import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
@@ -99,9 +99,9 @@ export async function createActor(options?: CreateActorOptions): Promise<actorIn
 export const canisterId = _canisterId;
 export interface actorInterface {
     f(arg0: bigint): Promise<[Principal, string]>;
-    g: [Principal, string];
-    h: [Principal, string];
-    h2: [Principal, string];
+    g: f;
+    h: g;
+    h2: h;
     o(arg0: o): Promise<o>;
 }
 import type { o as _o } from "declarations/actor/actor.did.d.ts";
@@ -113,6 +113,36 @@ class Actor implements actorInterface {
     async f(arg0: bigint): Promise<[Principal, string]> {
         try {
             const result = await this.#actor.f(arg0);
+            return result;
+        } catch (e) {
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
+            } else throw e;
+        }
+    }
+    async g(arg0: number): Promise<number> {
+        try {
+            const result = await this.#actor.g(arg0);
+            return result;
+        } catch (e) {
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
+            } else throw e;
+        }
+    }
+    async h(arg0: number): Promise<number> {
+        try {
+            const result = await this.#actor.h(arg0);
+            return result;
+        } catch (e) {
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
+            } else throw e;
+        }
+    }
+    async h2(arg0: [Principal, string]): Promise<[Principal, string]> {
+        try {
+            const result = await this.#actor.h2(arg0);
             return result;
         } catch (e) {
             if (e && typeof e === "object" && "message" in e) {

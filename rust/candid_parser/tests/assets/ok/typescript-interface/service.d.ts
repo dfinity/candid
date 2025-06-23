@@ -7,11 +7,11 @@ export interface None {
     _tag: "None";
 }
 export type Option<T> = Some<T> | None;
-export type Func = () => Principal;
+export type Func = () => Promise<Principal>;
 export interface ServiceInterface {
-    f: [Principal, string];
+    f: Func;
 }
-export type Service2 = Service;
+export type Service2 = ServiceInterface;
 import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;

@@ -7,9 +7,9 @@ export interface None {
     _tag: "None";
 }
 export type Option<T> = Some<T> | None;
-export type f = (arg0: number) => number;
+export type f = (arg0: number) => Promise<number>;
 export type g = f;
-export type h = (arg0: [Principal, string]) => [Principal, string];
+export type h = (arg0: [Principal, string]) => Promise<[Principal, string]>;
 export type o = Some<o> | None;
 import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
@@ -21,9 +21,9 @@ export declare const createActor: (options?: CreateActorOptions) => Promise<acto
 export declare const canisterId: string;
 export interface actorInterface {
     f(arg0: bigint): Promise<[Principal, string]>;
-    g: [Principal, string];
-    h: [Principal, string];
-    h2: [Principal, string];
+    g: f;
+    h: g;
+    h2: h;
     o(arg0: o): Promise<o>;
 }
 

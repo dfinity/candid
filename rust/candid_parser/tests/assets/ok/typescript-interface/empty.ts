@@ -169,7 +169,8 @@ function from_candid_variant_n4(value: {
 function from_candid_variant_n8(value: {
     a: _T;
 } | {
-    b: [];
+    b: {
+    };
 }): {
     a: T;
 } | {

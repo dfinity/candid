@@ -6,7 +6,7 @@ use super::helper_functions::{
     generate_create_actor_function, generate_create_actor_function_declaration, generate_load_config_function
 };
 use super::ident::{
-    contains_unicode_characters, get_ident, get_ident_guarded, get_ident_guarded_keyword_ok,
+    contains_unicode_characters, get_ident_guarded, get_ident_guarded_keyword_ok,
 };
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use swc_core::common::comments::SingleThreadedComments;
@@ -294,6 +294,30 @@ fn add_type_definitions(env: &TypeEnv, module: &mut Module) {
                             })));
                     }
                 }
+                TypeInner::Var(ref inner_id) => {
+                    let inner_type = env.rec_find_type(inner_id).unwrap();
+                    let inner_name = match inner_type.as_ref() {
+                        TypeInner::Service(_) => format!("{}Interface", inner_id),
+                        _ => inner_id.clone(),
+                    };
+                    let type_alias = TsTypeAliasDecl {
+                        span: DUMMY_SP,
+                        declare: false,
+                        id: get_ident_guarded(id),
+                        type_params: None,
+                        type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                            span: DUMMY_SP,
+                            type_name: TsEntityName::Ident(get_ident_guarded(&inner_name)),
+                            type_params: None,
+                        })),
+                    };
+                    module
+                        .body
+                        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                            span: DUMMY_SP,
+                            decl: Decl::TsTypeAlias(Box::new(type_alias)),
+                        })));
+                }
                 _ => {
                     // Generate type alias for other types
                     let type_alias = create_type_alias(env, id, ty);
@@ -343,7 +367,23 @@ fn create_interface_from_service(
         .iter()
         .map(|(method_id, method_ty)| match method_ty.as_ref() {
             TypeInner::Func(ref func) => create_method_signature(env, method_id, func),
-            _ => create_property_signature_from_type(env, method_id, method_ty),
+            TypeInner::Var(ref id) => TsTypeElement::TsPropertySignature(TsPropertySignature {
+                span: DUMMY_SP,
+                key: Box::new(Expr::Ident(get_ident_guarded(method_id))),
+                computed: false,
+                optional: false,
+                readonly: false,
+                type_ann: Some(Box::new(TsTypeAnn {
+
+                    span: DUMMY_SP,
+                    type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                        span: DUMMY_SP,
+                        type_name: TsEntityName::Ident(get_ident_guarded(id)),
+                        type_params: None,
+                    })),
+                })),
+            }),
+            _ => unreachable!()
         })
         .collect();
 
@@ -409,21 +449,6 @@ fn create_property_signature(env: &TypeEnv, field: &Field) -> TsTypeElement {
         type_ann: Some(Box::new(TsTypeAnn {
             span: DUMMY_SP,
             type_ann: Box::new(type_ann),
-        })),
-    })
-}
-
-// Create TS property signature from Candid type
-fn create_property_signature_from_type(env: &TypeEnv, name: &str, ty: &Type) -> TsTypeElement {
-    TsTypeElement::TsPropertySignature(TsPropertySignature {
-        span: DUMMY_SP,
-        readonly: false,
-        key: Box::new(Expr::Ident(get_ident(name))),
-        computed: false,
-        optional: false,
-        type_ann: Some(Box::new(TsTypeAnn {
-            span: DUMMY_SP,
-            type_ann: Box::new(convert_type(env, ty, true)),
         })),
     })
 }
@@ -542,13 +567,26 @@ fn create_function_type(env: &TypeEnv, func: &Function) -> TsType {
         }
     };
 
+    let promise_return_type = TsType::TsTypeRef(TsTypeRef {
+        span: DUMMY_SP,
+        type_name: TsEntityName::Ident(Ident::new(
+            "Promise".into(),
+            DUMMY_SP,
+            SyntaxContext::empty(),
+        )),
+        type_params: Some(Box::new(TsTypeParamInstantiation {
+            span: DUMMY_SP,
+            params: vec![Box::new(return_type)],
+        })),
+    });
+
     TsType::TsFnOrConstructorType(TsFnOrConstructorType::TsFnType(TsFnType {
         span: DUMMY_SP,
         params,
         type_params: None,
         type_ann: Box::new(TsTypeAnn {
             span: DUMMY_SP,
-            type_ann: Box::new(return_type),
+            type_ann: Box::new(promise_return_type),
         }),
     }))
 }
@@ -1253,6 +1291,12 @@ fn create_actor_class(
         .filter_map(|(method_id, func_ty)| {
             if let TypeInner::Func(ref func) = func_ty.as_ref() {
                 Some(create_actor_method(env, method_id, func, converter))
+            } else if let TypeInner::Var(ref inner_id) = func_ty.as_ref() {
+                let inner_id = env.rec_find_type(inner_id).unwrap();
+                match inner_id.as_ref() {
+                    TypeInner::Func(ref func) => Some(create_actor_method(env, method_id, func, converter)),
+                    _ => None
+                }
             } else {
                 None
             }

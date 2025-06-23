@@ -49,7 +49,7 @@ function extractAgentErrorMessage(error: string): string {
     const match = errorString.match(/with message:\s*'([^']+)'/s);
     return match ? match[1] : errorString;
 }
-export type Fn = (arg0: bigint) => bigint;
+export type Fn = (arg0: bigint) => Promise<bigint>;
 export type Gn = Fn;
 export interface R {
     x: bigint;
@@ -109,7 +109,7 @@ export async function createActor(options?: CreateActorOptions): Promise<inline_
 export const canisterId = _canisterId;
 export interface inline_methodsInterface {
     add_two(arg0: bigint): Promise<bigint>;
-    fn: [Principal, string];
+    fn: Fn;
     high_order_fn(arg0: bigint, arg1: [Principal, string]): Promise<bigint>;
     high_order_fn_inline(arg0: bigint, arg1: [Principal, string]): Promise<bigint>;
     high_order_fn_via_id(arg0: bigint, arg1: [Principal, string]): Promise<[Principal, string]>;
@@ -124,6 +124,16 @@ class Inline_methods implements inline_methodsInterface {
     async add_two(arg0: bigint): Promise<bigint> {
         try {
             const result = await this.#actor.add_two(arg0);
+            return result;
+        } catch (e) {
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
+            } else throw e;
+        }
+    }
+    async fn(arg0: bigint): Promise<bigint> {
+        try {
+            const result = await this.#actor.fn(arg0);
             return result;
         } catch (e) {
             if (e && typeof e === "object" && "message" in e) {

@@ -7,7 +7,7 @@ export interface None {
     _tag: "None";
 }
 export type Option<T> = Some<T> | None;
-export type Fn = (arg0: bigint) => bigint;
+export type Fn = (arg0: bigint) => Promise<bigint>;
 export type Gn = Fn;
 export interface R {
     x: bigint;
@@ -31,7 +31,7 @@ export declare const createActor: (options?: CreateActorOptions) => Promise<inli
 export declare const canisterId: string;
 export interface inline_methodsInterface {
     add_two(arg0: bigint): Promise<bigint>;
-    fn: [Principal, string];
+    fn: Fn;
     high_order_fn(arg0: bigint, arg1: [Principal, string]): Promise<bigint>;
     high_order_fn_inline(arg0: bigint, arg1: [Principal, string]): Promise<bigint>;
     high_order_fn_via_id(arg0: bigint, arg1: [Principal, string]): Promise<[Principal, string]>;

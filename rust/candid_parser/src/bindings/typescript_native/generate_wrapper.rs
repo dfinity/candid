@@ -1482,6 +1482,9 @@ impl<'a> TypeConverter<'a> {
 
     // Helper to detect tuple types
     fn is_tuple(&self, fields: &[Field]) -> bool {
+        if fields.is_empty() {
+            return false;
+        }
         fields
             .iter()
             .all(|f| matches!(&*f.id, Label::Id(_) | Label::Unnamed(_)))

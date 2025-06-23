@@ -22,7 +22,7 @@ export type b = [bigint, bigint];
 export interface brokerInterface {
     find(name: string): Promise<Principal>;
 }
-export type f = (arg0: List, arg1: [Principal, string]) => [List | null, res];
+export type f = (arg0: List, arg1: [Principal, string]) => Promise<[List | null, res]>;
 export type list = node | null;
 export type my_type = Principal;
 export interface nested {
@@ -61,14 +61,14 @@ export type res = {
     };
 };
 export interface sInterface {
-    f: [Principal, string];
+    f: t;
     g(arg0: list): Promise<[B, tree, stream]>;
 }
 export type stream = {
     head: bigint;
     next: [Principal, string];
 } | null;
-export type t = (server: Principal) => void;
+export type t = (server: Principal) => Promise<void>;
 export type tree = {
     branch: {
         val: bigint;
@@ -88,7 +88,7 @@ export declare const createActor: (options?: CreateActorOptions) => Promise<exam
 export declare const canisterId: string;
 export interface exampleInterface {
     bbbbb(arg0: b): Promise<void>;
-    f: [Principal, string];
+    f: t;
     f1(arg0: list, test: Uint8Array | number[], arg2: boolean | null): Promise<void>;
     g(arg0: list): Promise<[B, tree, stream]>;
     g1(arg0: my_type, arg1: List, arg2: List | null, arg3: nested): Promise<[bigint, Principal, nested_res]>;
@@ -101,7 +101,7 @@ export interface exampleInterface {
         };
         id: bigint;
     }>;
-    i: [Principal, string];
+    i: f;
     x(arg0: a, arg1: b): Promise<[a | null, b | null, {
             Ok: {
                 result: string;

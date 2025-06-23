@@ -49,11 +49,11 @@ function extractAgentErrorMessage(error: string): string {
     const match = errorString.match(/with message:\s*'([^']+)'/s);
     return match ? match[1] : errorString;
 }
-export type Func = () => Principal;
+export type Func = () => Promise<Principal>;
 export interface ServiceInterface {
-    f: [Principal, string];
+    f: Func;
 }
-export type Service2 = Service;
+export type Service2 = ServiceInterface;
 import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
@@ -110,7 +110,6 @@ export interface serviceInterface {
         };
     }>;
 }
-import type { Func as _Func, Service as _Service, Service2 as _Service2 } from "declarations/service/service.did.d.ts";
 class Service implements serviceInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor: ActorSubclass<_SERVICE>){
@@ -169,14 +168,14 @@ class Service implements serviceInterface {
         }
     }
 }
-function from_candid_opt_n2(value: [] | [_Service]): Principal | null {
+function from_candid_opt_n2(value: [] | [Principal]): Principal | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n5(value: [] | [_Func]): [Principal, string] | null {
+function from_candid_opt_n5(value: [] | [[Principal, string]]): [Principal, string] | null {
     return value.length === 0 ? null : value[0];
 }
 function from_candid_record_n4(value: {
-    f: [] | [_Func];
+    f: [] | [[Principal, string]];
 }): {
     f?: [Principal, string];
 } {
@@ -184,7 +183,7 @@ function from_candid_record_n4(value: {
         f: record_opt_to_undefined(from_candid_opt_n5(value.f))
     };
 }
-function from_candid_tuple_n1(value: [_Service2, [] | [_Service], _Func]): [Principal, Principal | null, [Principal, string]] {
+function from_candid_tuple_n1(value: [Principal, [] | [Principal], [Principal, string]]): [Principal, Principal | null, [Principal, string]] {
     return [
         value[0],
         from_candid_opt_n2(value[1]),
@@ -192,10 +191,10 @@ function from_candid_tuple_n1(value: [_Service2, [] | [_Service], _Func]): [Prin
     ];
 }
 function from_candid_variant_n3(value: {
-    a: _Service2;
+    a: Principal;
 } | {
     b: {
-        f: [] | [_Func];
+        f: [] | [[Principal, string]];
     };
 }): {
     a: Principal;

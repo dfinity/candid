@@ -64,7 +64,7 @@ export type b = [bigint, bigint];
 export interface brokerInterface {
     find(name: string): Promise<Principal>;
 }
-export type f = (arg0: List, arg1: [Principal, string]) => [List | null, res];
+export type f = (arg0: List, arg1: [Principal, string]) => Promise<[List | null, res]>;
 export type list = node | null;
 export type my_type = Principal;
 export interface nested {
@@ -103,14 +103,14 @@ export type res = {
     };
 };
 export interface sInterface {
-    f: [Principal, string];
+    f: t;
     g(arg0: list): Promise<[B, tree, stream]>;
 }
 export type stream = {
     head: bigint;
     next: [Principal, string];
 } | null;
-export type t = (server: Principal) => void;
+export type t = (server: Principal) => Promise<void>;
 export type tree = {
     branch: {
         val: bigint;
@@ -166,7 +166,7 @@ export async function createActor(options?: CreateActorOptions): Promise<example
 export const canisterId = _canisterId;
 export interface exampleInterface {
     bbbbb(arg0: b): Promise<void>;
-    f: [Principal, string];
+    f: t;
     f1(arg0: list, test: Uint8Array | number[], arg2: boolean | null): Promise<void>;
     g(arg0: list): Promise<[B, tree, stream]>;
     g1(arg0: my_type, arg1: List, arg2: List | null, arg3: nested): Promise<[bigint, Principal, nested_res]>;
@@ -179,7 +179,7 @@ export interface exampleInterface {
         };
         id: bigint;
     }>;
-    i: [Principal, string];
+    i: f;
     x(arg0: a, arg1: b): Promise<[a | null, b | null, {
             Ok: {
                 result: string;
@@ -188,7 +188,7 @@ export interface exampleInterface {
             Err: "a" | "b";
         }]>;
 }
-import type { A as _A, B as _B, List as _List, a as _a, b as _b, list as _list, nested as _nested, nested_res as _nested_res, node as _node, stream as _stream, tree as _tree } from "declarations/example/example.did.d.ts";
+import type { A as _A, B as _B, List as _List, a as _a, b as _b, list as _list, nested as _nested, nested_res as _nested_res, node as _node, res as _res, stream as _stream, tree as _tree } from "declarations/example/example.did.d.ts";
 class Example implements exampleInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor: ActorSubclass<_SERVICE>){
@@ -197,6 +197,16 @@ class Example implements exampleInterface {
     async bbbbb(arg0: b): Promise<void> {
         try {
             const result = await this.#actor.bbbbb(arg0);
+            return result;
+        } catch (e) {
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
+            } else throw e;
+        }
+    }
+    async f(arg0: Principal): Promise<void> {
+        try {
+            const result = await this.#actor.f(arg0);
             return result;
         } catch (e) {
             if (e && typeof e === "object" && "message" in e) {
@@ -260,6 +270,19 @@ class Example implements exampleInterface {
             } else throw e;
         }
     }
+    async i(arg0: List, arg1: [Principal, string]): Promise<[List | null, res]> {
+        try {
+            const result = await this.#actor.i(to_candid_List_n14(arg0), arg1);
+            return [
+                from_candid_opt_n28(result[0]),
+                from_candid_res_n32(result[1])
+            ];
+        } catch (e) {
+            if (e && typeof e === "object" && "message" in e) {
+                throw new Error(extractAgentErrorMessage(e["message"] as string));
+            } else throw e;
+        }
+    }
     async x(arg0: a, arg1: b): Promise<[a | null, b | null, {
             Ok: {
                 result: string;
@@ -268,11 +291,11 @@ class Example implements exampleInterface {
             Err: "a" | "b";
         }]> {
         try {
-            const result = await this.#actor.x(to_candid_a_n28(arg0), arg1);
+            const result = await this.#actor.x(to_candid_a_n34(arg0), arg1);
             return [
-                from_candid_opt_n30(result[0]),
-                from_candid_opt_n33(result[1]),
-                from_candid_variant_n34(result[2])
+                from_candid_opt_n36(result[0]),
+                from_candid_opt_n39(result[1]),
+                from_candid_variant_n40(result[2])
             ];
         } catch (e) {
             if (e && typeof e === "object" && "message" in e) {
@@ -287,8 +310,11 @@ function from_candid_A_n8(value: _A): A {
 function from_candid_B_n6(value: _B): B {
     return from_candid_opt_n7(value);
 }
-function from_candid_a_n31(value: _a): a {
-    return from_candid_variant_n32(value);
+function from_candid_List_n29(value: _List): List {
+    return from_candid_opt_n30(value);
+}
+function from_candid_a_n37(value: _a): a {
+    return from_candid_variant_n38(value);
 }
 function from_candid_nested_res_n21(value: _nested_res): nested_res {
     return from_candid_variant_n22(value);
@@ -302,10 +328,22 @@ function from_candid_opt_n13(value: [] | [{
 } | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n30(value: [] | [_a]): a | null {
-    return value.length === 0 ? null : from_candid_a_n31(value[0]);
+function from_candid_opt_n28(value: [] | [_List]): List | null {
+    return value.length === 0 ? null : from_candid_List_n29(value[0]);
 }
-function from_candid_opt_n33(value: [] | [_b]): b | null {
+function from_candid_opt_n30(value: [] | [{
+        head: bigint;
+        tail: _List;
+    }]): {
+    head: bigint;
+    tail: List;
+} | null {
+    return value.length === 0 ? null : from_candid_record_n31(value[0]);
+}
+function from_candid_opt_n36(value: [] | [_a]): a | null {
+    return value.length === 0 ? null : from_candid_a_n37(value[0]);
+}
+function from_candid_opt_n39(value: [] | [_b]): b | null {
     return value.length === 0 ? null : value[0];
 }
 function from_candid_opt_n7(value: [] | [_A]): Some<A> | None {
@@ -325,6 +363,21 @@ function from_candid_record_n11(value: {
         left: from_candid_tree_n9(value.left),
         right: from_candid_tree_n9(value.right)
     };
+}
+function from_candid_record_n31(value: {
+    head: bigint;
+    tail: _List;
+}): {
+    head: bigint;
+    tail: List;
+} {
+    return {
+        head: value.head,
+        tail: from_candid_List_n29(value.tail)
+    };
+}
+function from_candid_res_n32(value: _res): res {
+    return from_candid_variant_n33(value);
 }
 function from_candid_stream_n12(value: _stream): stream {
     return from_candid_opt_n13(value);
@@ -412,7 +465,26 @@ function from_candid_variant_n24(value: {
         Err: value.Err
     } : value;
 }
-function from_candid_variant_n32(value: {
+function from_candid_variant_n33(value: {
+    Ok: [bigint, bigint];
+} | {
+    Err: {
+        error: string;
+    };
+}): {
+    Ok: [bigint, bigint];
+} | {
+    Err: {
+        error: string;
+    };
+} {
+    return "Ok" in value ? {
+        Ok: value.Ok
+    } : "Err" in value ? {
+        Err: value.Err
+    } : value;
+}
+function from_candid_variant_n38(value: {
     a: null;
 } | {
     b: _b;
@@ -427,7 +499,7 @@ function from_candid_variant_n32(value: {
         b: value.b
     } : value;
 }
-function from_candid_variant_n34(value: {
+function from_candid_variant_n40(value: {
     Ok: {
         result: string;
     };
@@ -447,10 +519,10 @@ function from_candid_variant_n34(value: {
     return "Ok" in value ? {
         Ok: value.Ok
     } : "Err" in value ? {
-        Err: from_candid_variant_n35(value.Err)
+        Err: from_candid_variant_n41(value.Err)
     } : value;
 }
-function from_candid_variant_n35(value: {
+function from_candid_variant_n41(value: {
     a: null;
 } | {
     b: null;
@@ -460,8 +532,8 @@ function from_candid_variant_n35(value: {
 function to_candid_List_n14(value: List): _List {
     return to_candid_opt_n15(value);
 }
-function to_candid_a_n28(value: a): _a {
-    return to_candid_variant_n29(value);
+function to_candid_a_n34(value: a): _a {
+    return to_candid_variant_n35(value);
 }
 function to_candid_list_n1(value: list): _list {
     return to_candid_opt_n2(value);
@@ -582,7 +654,7 @@ function to_candid_variant_n27(value: {
         B: value.B
     } : value;
 }
-function to_candid_variant_n29(value: {
+function to_candid_variant_n35(value: {
     a: null;
 } | {
     b: b;

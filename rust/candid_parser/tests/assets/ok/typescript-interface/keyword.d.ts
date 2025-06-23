@@ -23,14 +23,14 @@ export interface node {
 }
 export type o = Some<o> | None;
 export interface returnInterface {
-    f: [Principal, string];
+    f: t;
     g(arg0: list): Promise<[if_, stream]>;
 }
 export type stream = {
     head: bigint;
     next: [Principal, string];
 } | null;
-export type t = (server: Principal) => void;
+export type t = (server: Principal) => Promise<void>;
 import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
@@ -55,7 +55,7 @@ export interface keywordInterface {
     oneway_(arg0: number): Promise<void>;
     query(arg0: Uint8Array | number[]): Promise<Uint8Array | number[]>;
     return_(arg0: o): Promise<o>;
-    service: [Principal, string];
+    service: t;
     tuple(arg0: [bigint, Uint8Array | number[], string]): Promise<[bigint, number]>;
     variant(arg0: {
         A: null;
