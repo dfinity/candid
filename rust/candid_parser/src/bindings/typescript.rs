@@ -26,7 +26,7 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         Var(ref id) => {
             let ty = env.rec_find_type(id).unwrap();
             if matches!(ty.as_ref(), Func(_)) {
-                return pp_inline_actor_method();
+                return pp_inline_func();
             }
             if is_ref && matches!(ty.as_ref(), Service(_)) {
                 return pp_inline_service();
@@ -83,14 +83,14 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
                 .nest(INDENT_SPACE)
             }
         }
-        Func(_) => pp_inline_actor_method(),
+        Func(_) => pp_inline_func(),
         Service(_) => pp_inline_service(),
         Class(_, _) => unreachable!(),
         Knot(_) | Unknown | Future => unreachable!(),
     }
 }
 
-fn pp_inline_actor_method<'a>() -> RcDoc<'a> {
+fn pp_inline_func<'a>() -> RcDoc<'a> {
     str("[Principal, string]")
 }
 
