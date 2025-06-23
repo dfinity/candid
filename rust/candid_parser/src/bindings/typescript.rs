@@ -279,15 +279,8 @@ fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
         serv.iter().map(|(id, func)| {
             let func = match func.as_ref() {
                 TypeInner::Func(ref func) => pp_function(env, func),
-                TypeInner::Var(ref id) => {
-                    let ty = env.rec_find_type(id).unwrap();
-                    if matches!(ty.as_ref(), TypeInner::Func(_)) {
-                        ident(id)
-                    } else {
-                        pp_ty(env, ty, false)
-                    }
-                }
-                _ => pp_ty(env, func, false),
+                TypeInner::Var(ref id) => ident(id),
+                _ => unreachable!(),
             };
             quote_ident(id).append(kwd(":")).append(func)
         }),
