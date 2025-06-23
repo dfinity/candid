@@ -1,6 +1,5 @@
 use super::CandidType;
 use crate::idl_hash;
-use crate::types::syntax::{Binding, FuncType, IDLArgType, IDLType, TypeField};
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -71,9 +70,9 @@ impl TypeName {
     }
 }
 
-/// Used for `candid_derive::export_service` to generate `IDLEnv` from `IDLType`.
+/// Used for `candid_derive::export_service` to generate `TypeEnv` from `Type`.
 ///
-/// It performs a global rewriting of `IDLType` to resolve:
+/// It performs a global rewriting of `Type` to resolve:
 /// * Duplicate type names in different modules/namespaces.
 /// * Give different names to instantiated polymorphic types.
 /// * Find the type name of a recursive node `Knot(TypeId)` and convert to `Var` node.
@@ -84,108 +83,99 @@ impl TypeName {
 /// * Unless we do equivalence checking, recursive types can be unrolled and assigned to multiple names.
 #[derive(Default)]
 pub struct TypeContainer {
-    pub idl_env: crate::types::syntax::IDLEnv,
+    pub env: crate::TypeEnv,
 }
 impl TypeContainer {
     pub fn new() -> Self {
         TypeContainer {
-            idl_env: crate::types::syntax::IDLEnv::new(),
+            env: crate::TypeEnv::new(),
         }
     }
-    pub fn add<T: CandidType>(&mut self) -> IDLType {
+    pub fn add<T: CandidType>(&mut self) -> Type {
         let t = T::ty();
-        self.go(&t.into())
+        self.go(&t)
     }
-    fn go(&mut self, t: &IDLType) -> IDLType {
-        match t {
-            IDLType::OptT(t) => IDLType::OptT(Box::new(self.go(t))),
-            IDLType::VecT(t) => IDLType::VecT(Box::new(self.go(t))),
-            IDLType::RecordT(fs) => {
-                let res = IDLType::RecordT(
+    fn go(&mut self, t: &Type) -> Type {
+        match t.as_ref() {
+            TypeInner::Opt(t) => TypeInner::Opt(self.go(t)),
+            TypeInner::Vec(t) => TypeInner::Vec(self.go(t)),
+            TypeInner::Record(fs) => {
+                let res: Type = TypeInner::Record(
                     fs.iter()
-                        .map(|TypeField { label, typ }| TypeField {
-                            label: label.clone(),
-                            typ: self.go(typ),
+                        .map(|Field { id, ty }| Field {
+                            id: id.clone(),
+                            ty: self.go(ty),
                         })
                         .collect(),
-                );
+                )
+                .into();
                 if t.is_tuple() {
                     return res;
                 }
-                let id = ID.with(|n| n.borrow().get(&t.clone().into()).cloned());
+                let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
-                    self.idl_env.insert_binding(Binding {
-                        id: id.to_string(),
-                        typ: res,
-                    });
-                    IDLType::VarT(id.to_string())
+                    self.env.0.insert(id.to_string(), res);
+                    TypeInner::Var(id.to_string())
                 } else {
                     // if the type is part of an enum, the id won't be recorded.
                     // we want to inline the type in this case.
-                    res
+                    return res;
                 }
             }
-            IDLType::VariantT(fs) => {
-                let res = IDLType::VariantT(
+            TypeInner::Variant(fs) => {
+                let res: Type = TypeInner::Variant(
                     fs.iter()
-                        .map(|TypeField { label, typ }| TypeField {
-                            label: label.clone(),
-                            typ: self.go(typ),
+                        .map(|Field { id, ty }| Field {
+                            id: id.clone(),
+                            ty: self.go(ty),
                         })
                         .collect(),
-                );
-                let id = ID.with(|n| n.borrow().get(&t.clone().into()).cloned());
+                )
+                .into();
+                let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
-                    self.idl_env.insert_binding(Binding {
-                        id: id.to_string(),
-                        typ: res,
-                    });
-                    IDLType::VarT(id.to_string())
+                    self.env.0.insert(id.to_string(), res);
+                    TypeInner::Var(id.to_string())
                 } else {
-                    res
+                    return res;
                 }
             }
-            IDLType::KnotT(id) => {
+            TypeInner::Knot(id) => {
                 let name = id.to_string();
                 let ty = ENV.with(|e| e.borrow().get(id).unwrap().clone());
-                self.idl_env.insert_binding(Binding {
-                    id: name.clone(),
-                    typ: ty.into(),
-                });
-                IDLType::VarT(name)
+                self.env.0.insert(id.to_string(), ty);
+                TypeInner::Var(name)
             }
-            IDLType::FuncT(func) => IDLType::FuncT(FuncType {
+            TypeInner::Func(func) => TypeInner::Func(Function {
                 modes: func.modes.clone(),
                 args: func
                     .args
                     .iter()
-                    .map(|arg| IDLArgType {
+                    .map(|arg| ArgType {
                         name: arg.name.clone(),
                         typ: self.go(&arg.typ),
                     })
                     .collect(),
                 rets: func.rets.iter().map(|arg| self.go(arg)).collect(),
             }),
-            IDLType::ServT(serv) => IDLType::ServT(
+            TypeInner::Service(serv) => TypeInner::Service(
                 serv.iter()
-                    .map(|binding| Binding {
-                        id: binding.id.clone(),
-                        typ: self.go(&binding.typ),
-                    })
+                    .map(|(id, t)| (id.clone(), self.go(t)))
                     .collect(),
             ),
-            IDLType::ClassT(inits, ref ty) => IDLType::ClassT(
+            TypeInner::Class(inits, ref ty) => TypeInner::Class(
                 inits
                     .iter()
-                    .map(|t| IDLArgType {
+                    .map(|t| ArgType {
                         name: t.name.clone(),
                         typ: self.go(&t.typ),
                     })
                     .collect(),
-                Box::new(self.go(ty)),
+                self.go(ty),
             ),
             t => t.clone(),
         }
+        .into()
     }
 }
 

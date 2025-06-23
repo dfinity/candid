@@ -3,11 +3,11 @@ use crate::{
     configs::{ConfigState, ConfigTree, Configs, Context, StateElem},
     Deserialize,
 };
-use candid::pretty::utils::*;
 use candid::types::{
-    syntax::{Binding, FuncType, IDLArgType, IDLEnv, IDLType, PrimType, TypeField},
+    syntax::{Binding, FuncType, IDLArgType, IDLType, PrimType, TypeField},
     Label,
 };
+use candid::{pretty::utils::*, types::syntax::IDLMergedProg};
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
 use serde::Serialize;
@@ -170,21 +170,17 @@ impl<'a> State<'a> {
         if self.tests.contains_key(use_type) {
             return;
         }
-        let def_list = chase_actor(self.state.env, src).unwrap();
-        let env = IDLEnv::from(
-            self.state
-                .env
-                .get_bindings()
-                .into_iter()
-                .filter(|(id, _)| def_list.contains(id))
-                .map(|(id, typ)| Binding {
-                    id: id.to_string(),
-                    typ: typ.clone(),
-                })
-                .collect::<Vec<_>>(),
-        );
+        let def_list = chase_actor(self.state.prog, src).unwrap();
+        let filtered_bindings = self
+            .state
+            .prog
+            .get_bindings()
+            .into_iter()
+            .filter(|b| def_list.contains(&b.id.as_str()))
+            .collect::<Vec<_>>();
+        let prog = IDLMergedProg::from(filtered_bindings);
         let src = candid::pretty::candid::pp_init_args(
-            &env,
+            &prog,
             &[IDLArgType {
                 name: None,
                 typ: src.clone(),
@@ -287,7 +283,7 @@ fn test_{test_name}() {{
                 }
                 FuncT(_) => unreachable!(), // not possible after rewriting
                 ServT(_) => unreachable!(), // not possible after rewriting
-                ClassT(_, _) | KnotT(_) => unreachable!(),
+                ClassT(_, _) => unreachable!(),
             }
         };
         self.state.pop_state(old, elem);
@@ -431,7 +427,7 @@ fn test_{test_name}() {{
                 self.state.pop_state(old, StateElem::Label(id));
                 continue;
             }
-            let ty = self.state.env.find_type(id).unwrap();
+            let ty = self.state.prog.find_type(id).unwrap();
             let name = self
                 .state
                 .config
@@ -650,7 +646,7 @@ fn test_{test_name}() {{
         res
     }
     fn pp_actor(&mut self, actor: &IDLType) -> (Vec<Method>, Option<Vec<(String, String)>>) {
-        let actor = self.state.env.trace_type(actor).unwrap();
+        let actor = self.state.prog.trace_type(actor).unwrap();
         let init = if let IDLType::ClassT(args, _) = &actor {
             let old = self.state.push_state(&StateElem::Label("init"));
             let args: Vec<_> = args
@@ -676,10 +672,10 @@ fn test_{test_name}() {{
         } else {
             None
         };
-        let serv = self.state.env.as_service(&actor).unwrap();
+        let serv = self.state.prog.service_methods(&actor).unwrap();
         let mut res = Vec::new();
         for binding in serv.iter() {
-            let func = self.state.env.as_func(&binding.typ).unwrap();
+            let func = self.state.prog.as_func(&binding.typ).unwrap();
             res.push(self.pp_function(&binding.id, func));
         }
         (res, init)
@@ -700,9 +696,9 @@ pub struct Method {
     pub rets: Vec<String>,
     pub mode: String,
 }
-pub fn emit_bindgen(tree: &Config, env: &IDLEnv) -> (Output, Vec<String>) {
+pub fn emit_bindgen(tree: &Config, prog: &IDLMergedProg) -> (Output, Vec<String>) {
     let mut state = NominalState {
-        state: crate::configs::State::new(&tree.0, env),
+        state: crate::configs::State::new(&tree.0, prog),
     };
     let env = state.nominalize_all();
     let old_stats = state.state.stats.clone();
@@ -778,12 +774,16 @@ impl Default for ExternalConfig {
         )
     }
 }
-pub fn compile(tree: &Config, env: &IDLEnv, mut external: ExternalConfig) -> (String, Vec<String>) {
+pub fn compile(
+    tree: &Config,
+    prog: &IDLMergedProg,
+    mut external: ExternalConfig,
+) -> (String, Vec<String>) {
     let source = match external.0.get("target").map(|s| s.as_str()) {
         Some("canister_call") | None => Cow::Borrowed(include_str!("rust_call.hbs")),
         Some("agent") => Cow::Borrowed(include_str!("rust_agent.hbs")),
         Some("stub") => {
-            let metadata = crate::utils::get_metadata(env);
+            let metadata = crate::utils::get_metadata(prog);
             if let Some(metadata) = metadata {
                 external.0.insert("metadata".to_string(), metadata);
             }
@@ -798,7 +798,7 @@ pub fn compile(tree: &Config, env: &IDLEnv, mut external: ExternalConfig) -> (St
         }
         _ => unimplemented!(),
     };
-    let (output, unused) = emit_bindgen(tree, env);
+    let (output, unused) = emit_bindgen(tree, prog);
     (output_handlebar(output, external, &source), unused)
 }
 
@@ -833,7 +833,12 @@ struct NominalState<'a> {
 }
 impl NominalState<'_> {
     // Convert structural typing to nominal typing to fit Rust's type system
-    fn nominalize(&mut self, env: &mut IDLEnv, path: &mut Vec<TypePath>, t: &IDLType) -> IDLType {
+    fn nominalize(
+        &mut self,
+        env: &mut IDLMergedProg,
+        path: &mut Vec<TypePath>,
+        t: &IDLType,
+    ) -> IDLType {
         let elem = StateElem::Type(t);
         let old = if matches!(t, IDLType::FuncT(_)) {
             // strictly speaking, we want to avoid func label from the main service. But this is probably good enough.
@@ -1068,9 +1073,9 @@ impl NominalState<'_> {
         res
     }
 
-    fn nominalize_all(&mut self) -> IDLEnv {
-        let mut res = IDLEnv::new();
-        for (id, typ) in self.state.env.get_bindings() {
+    fn nominalize_all(&mut self) -> IDLMergedProg {
+        let mut res = IDLMergedProg::new();
+        for (id, typ) in self.state.prog.get_types() {
             let elem = StateElem::Label(id);
             let old = self.state.push_state(&elem);
             let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.to_string())], typ);
@@ -1082,7 +1087,7 @@ impl NominalState<'_> {
         }
         let actor = self
             .state
-            .env
+            .prog
             .actor
             .as_ref()
             .map(|ty| self.nominalize(&mut res, &mut vec![], ty));

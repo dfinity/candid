@@ -1,6 +1,6 @@
 use crate::pretty::utils::*;
 use crate::types::{
-    syntax::{Binding, FuncType, IDLArgType, IDLEnv, IDLType, PrimType, TypeField},
+    syntax::{Binding, FuncType, IDLArgType, IDLMergedProg, IDLType, PrimType, TypeField},
     FuncMode, Label,
 };
 use pretty::RcDoc;
@@ -125,7 +125,6 @@ pub fn pp_ty(ty: &IDLType) -> RcDoc {
                 _ => unreachable!(),
             }
         }
-        KnotT(ref id) => RcDoc::text(format!("{id}")),
     }
 }
 
@@ -203,8 +202,8 @@ fn pp_service(serv: &[Binding]) -> RcDoc {
     enclose_space("{", doc, "}")
 }
 
-fn pp_defs(env: &IDLEnv) -> RcDoc {
-    lines(env.get_bindings().iter().map(|(id, typ)| {
+fn pp_defs(env: &IDLMergedProg) -> RcDoc {
+    lines(env.get_types().iter().map(|(id, typ)| {
         kwd("type")
             .append(ident(id))
             .append(kwd("="))
@@ -221,10 +220,10 @@ fn pp_actor(ty: &IDLType) -> RcDoc {
     }
 }
 
-pub fn pp_init_args<'a>(env: &'a IDLEnv, args: &'a [IDLArgType]) -> RcDoc<'a> {
+pub fn pp_init_args<'a>(env: &'a IDLMergedProg, args: &'a [IDLArgType]) -> RcDoc<'a> {
     pp_defs(env).append(pp_args(args))
 }
-pub fn compile(env: &IDLEnv) -> String {
+pub fn compile(env: &IDLMergedProg) -> String {
     match &env.actor {
         None => pp_defs(env).pretty(LINE_WIDTH).to_string(),
         Some(actor) => {

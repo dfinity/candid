@@ -1,7 +1,7 @@
 use super::javascript::{ident, is_tuple};
 use candid::pretty::utils::*;
 use candid::types::{
-    syntax::{Binding, FuncType, IDLEnv, IDLType, PrimType, TypeField},
+    syntax::{Binding, FuncType, IDLMergedProg, IDLType, PrimType, TypeField},
     Label,
 };
 use pretty::RcDoc;
@@ -29,15 +29,15 @@ fn pp_prim_ty(ty: &PrimType) -> RcDoc {
     }
 }
 
-fn pp_ty<'a>(env: &'a IDLEnv, ty: &'a IDLType, is_ref: bool) -> RcDoc<'a> {
+fn pp_ty<'a>(prog: &'a IDLMergedProg, ty: &'a IDLType, is_ref: bool) -> RcDoc<'a> {
     use IDLType::*;
     match ty {
         PrimT(ref ty) => pp_prim_ty(ty),
         VarT(ref id) => {
             if is_ref {
-                let ty = env.rec_find_type(id).unwrap();
+                let ty = prog.rec_find_type(id).unwrap();
                 if matches!(ty, ServT(_) | FuncT(_)) {
-                    pp_ty(env, ty, false)
+                    pp_ty(prog, ty, false)
                 } else {
                     ident(id)
                 }
@@ -46,11 +46,11 @@ fn pp_ty<'a>(env: &'a IDLEnv, ty: &'a IDLType, is_ref: bool) -> RcDoc<'a> {
             }
         }
         PrincipalT => str("Principal"),
-        OptT(ref t) => str("[] | ").append(enclose("[", pp_ty(env, t, is_ref), "]")),
+        OptT(ref t) => str("[] | ").append(enclose("[", pp_ty(prog, t, is_ref), "]")),
         VecT(ref t) => {
             let ty = match t.as_ref() {
                 VarT(ref id) => {
-                    let ty = env.rec_find_type(id).unwrap();
+                    let ty = prog.rec_find_type(id).unwrap();
                     if matches!(
                         ty,
                         PrimT(PrimType::Nat8)
@@ -78,15 +78,15 @@ fn pp_ty<'a>(env: &'a IDLEnv, ty: &'a IDLType, is_ref: bool) -> RcDoc<'a> {
                 PrimT(PrimType::Int16) => str("Int16Array | number[]"),
                 PrimT(PrimType::Int32) => str("Int32Array | number[]"),
                 PrimT(PrimType::Int64) => str("BigInt64Array | bigint[]"),
-                _ => str("Array").append(enclose("<", pp_ty(env, t, is_ref), ">")),
+                _ => str("Array").append(enclose("<", pp_ty(prog, t, is_ref), ">")),
             }
         }
         RecordT(ref fs) => {
             if is_tuple(ty) {
-                let tuple = concat(fs.iter().map(|f| pp_ty(env, &f.typ, is_ref)), ",");
+                let tuple = concat(fs.iter().map(|f| pp_ty(prog, &f.typ, is_ref)), ",");
                 enclose("[", tuple, "]")
             } else {
-                let fields = concat(fs.iter().map(|f| pp_field(env, f, is_ref)), ",");
+                let fields = concat(fs.iter().map(|f| pp_field(prog, f, is_ref)), ",");
                 enclose_space("{", fields, "}")
             }
         }
@@ -96,7 +96,7 @@ fn pp_ty<'a>(env: &'a IDLEnv, ty: &'a IDLType, is_ref: bool) -> RcDoc<'a> {
             } else {
                 strict_concat(
                     fs.iter()
-                        .map(|f| enclose_space("{", pp_field(env, f, is_ref), "}")),
+                        .map(|f| enclose_space("{", pp_field(prog, f, is_ref), "}")),
                     " |",
                 )
                 .nest(INDENT_SPACE)
@@ -104,7 +104,7 @@ fn pp_ty<'a>(env: &'a IDLEnv, ty: &'a IDLType, is_ref: bool) -> RcDoc<'a> {
         }
         FuncT(_) => str("[Principal, string]"),
         ServT(_) => str("Principal"),
-        ClassT(_, _) | KnotT(_) => unreachable!(),
+        ClassT(_, _) => unreachable!(),
     }
 }
 
@@ -118,21 +118,21 @@ fn pp_label(id: &Label) -> RcDoc {
     }
 }
 
-fn pp_field<'a>(env: &'a IDLEnv, field: &'a TypeField, is_ref: bool) -> RcDoc<'a> {
+fn pp_field<'a>(prog: &'a IDLMergedProg, field: &'a TypeField, is_ref: bool) -> RcDoc<'a> {
     pp_label(&field.label)
         .append(kwd(":"))
-        .append(pp_ty(env, &field.typ, is_ref))
+        .append(pp_ty(prog, &field.typ, is_ref))
 }
 
-fn pp_function<'a>(env: &'a IDLEnv, func: &'a FuncType) -> RcDoc<'a> {
-    let args = func.args.iter().map(|arg| pp_ty(env, &arg.typ, true));
+fn pp_function<'a>(prog: &'a IDLMergedProg, func: &'a FuncType) -> RcDoc<'a> {
+    let args = func.args.iter().map(|arg| pp_ty(prog, &arg.typ, true));
     let args = enclose("[", concat(args, ","), "]");
     let rets = match func.rets.len() {
         0 => str("undefined"),
-        1 => pp_ty(env, &func.rets[0], true),
+        1 => pp_ty(prog, &func.rets[0], true),
         _ => enclose(
             "[",
-            concat(func.rets.iter().map(|ty| pp_ty(env, ty, true)), ","),
+            concat(func.rets.iter().map(|ty| pp_ty(prog, ty, true)), ","),
             "]",
         ),
     };
@@ -143,12 +143,12 @@ fn pp_function<'a>(env: &'a IDLEnv, func: &'a FuncType) -> RcDoc<'a> {
     )
 }
 
-fn pp_service<'a>(env: &'a IDLEnv, serv: &'a [Binding]) -> RcDoc<'a> {
+fn pp_service<'a>(prog: &'a IDLMergedProg, serv: &'a [Binding]) -> RcDoc<'a> {
     let doc = concat(
         serv.iter().map(|Binding { id, typ }| {
             let func = match typ {
-                IDLType::FuncT(ref func) => pp_function(env, func),
-                _ => pp_ty(env, typ, false),
+                IDLType::FuncT(ref func) => pp_function(prog, func),
+                _ => pp_ty(prog, typ, false),
             };
             quote_ident(id).append(kwd(":")).append(func)
         }),
@@ -157,54 +157,54 @@ fn pp_service<'a>(env: &'a IDLEnv, serv: &'a [Binding]) -> RcDoc<'a> {
     enclose_space("{", doc, "}")
 }
 
-fn pp_defs<'a>(env: &'a IDLEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
+fn pp_defs<'a>(prog: &'a IDLMergedProg, def_list: &'a [&'a str]) -> RcDoc<'a> {
     lines(def_list.iter().map(|id| {
-        let ty = env.find_type(id).unwrap();
+        let ty = prog.find_type(id).unwrap();
         let export = match ty {
             IDLType::RecordT(_) if !ty.is_tuple() => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
-                .append(pp_ty(env, ty, false)),
+                .append(pp_ty(prog, ty, false)),
             IDLType::ServT(ref serv) => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
-                .append(pp_service(env, serv)),
+                .append(pp_service(prog, serv)),
             IDLType::FuncT(ref func) => kwd("export type")
                 .append(ident(id))
                 .append(" = ")
-                .append(pp_function(env, func))
+                .append(pp_function(prog, func))
                 .append(";"),
             _ => kwd("export type")
                 .append(ident(id))
                 .append(" = ")
-                .append(pp_ty(env, ty, false))
+                .append(pp_ty(prog, ty, false))
                 .append(";"),
         };
         export
     }))
 }
 
-fn pp_actor<'a>(env: &'a IDLEnv, ty: &'a IDLType) -> RcDoc<'a> {
+fn pp_actor<'a>(prog: &'a IDLMergedProg, ty: &'a IDLType) -> RcDoc<'a> {
     match ty {
-        IDLType::ServT(ref serv) => kwd("export interface _SERVICE").append(pp_service(env, serv)),
+        IDLType::ServT(ref serv) => kwd("export interface _SERVICE").append(pp_service(prog, serv)),
         IDLType::VarT(id) => kwd("export interface _SERVICE extends")
             .append(str(id))
             .append(str(" {}")),
-        IDLType::ClassT(_, t) => pp_actor(env, t),
+        IDLType::ClassT(_, t) => pp_actor(prog, t),
         _ => unreachable!(),
     }
 }
 
-pub fn compile(env: &IDLEnv) -> String {
+pub fn compile(prog: &IDLMergedProg) -> String {
     let header = r#"import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 "#;
-    let def_list = env.types_ids();
-    let defs = pp_defs(env, &def_list);
-    let actor = match &env.actor {
+    let def_list = prog.types_ids();
+    let defs = pp_defs(prog, &def_list);
+    let actor = match &prog.actor {
         None => RcDoc::nil(),
-        Some(actor) => pp_actor(env, actor)
+        Some(actor) => pp_actor(prog, actor)
             .append(RcDoc::line())
             .append("export declare const idlFactory: IDL.InterfaceFactory;")
             .append(RcDoc::line())

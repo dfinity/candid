@@ -3,8 +3,9 @@
 
 use candid::pretty::candid::is_valid_as_id;
 use candid::pretty::utils::*;
+use candid::types::syntax::IDLMergedProg;
 use candid::types::{
-    syntax::{Binding, FuncType, IDLArgType, IDLEnv, IDLType, PrimType, TypeField},
+    syntax::{Binding, FuncType, IDLArgType, IDLType, PrimType, TypeField},
     FuncMode, Label,
 };
 use pretty::RcDoc;
@@ -147,7 +148,6 @@ fn pp_ty(ty: &IDLType) -> RcDoc {
                 _ => unreachable!(),
             }
         }
-        KnotT(_) => unreachable!(),
     }
 }
 
@@ -270,12 +270,12 @@ fn pp_actor(ty: &IDLType) -> RcDoc {
     }
 }
 
-pub fn compile(env: &IDLEnv) -> String {
+pub fn compile(prog: &IDLMergedProg) -> String {
     let header = r#"// This is a generated Motoko binding.
 // Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 "#;
-    let bindings = env.get_bindings();
-    let doc = match &env.actor {
+    let bindings = prog.get_types();
+    let doc = match &prog.actor {
         None => pp_defs(&bindings),
         Some(actor) => {
             let defs = pp_defs(&bindings);

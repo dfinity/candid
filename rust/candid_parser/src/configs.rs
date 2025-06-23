@@ -1,5 +1,5 @@
 use anyhow::Result;
-use candid::types::syntax::{IDLEnv, IDLType, PrimType};
+use candid::types::syntax::{IDLMergedProg, IDLType, PrimType};
 use serde::de::DeserializeOwned;
 use std::collections::{BTreeMap, BTreeSet};
 use toml::{Table, Value};
@@ -12,7 +12,7 @@ pub struct State<'a, T: ConfigState> {
     pub stats: BTreeMap<Vec<String>, u32>,
     pub config: T,
     pub config_source: BTreeMap<String, Vec<String>>,
-    pub env: &'a IDLEnv,
+    pub prog: &'a IDLMergedProg,
 }
 pub struct ConfigBackup<T> {
     config: T,
@@ -36,7 +36,7 @@ pub enum ScopePos {
 }
 
 impl<'a, T: ConfigState> State<'a, T> {
-    pub fn new(tree: &'a ConfigTree<T>, env: &'a IDLEnv) -> Self {
+    pub fn new(tree: &'a ConfigTree<T>, prog: &'a IDLMergedProg) -> Self {
         let mut config = T::default();
         let mut config_source = BTreeMap::new();
         if let Some(state) = &tree.state {
@@ -53,7 +53,7 @@ impl<'a, T: ConfigState> State<'a, T> {
             stats: BTreeMap::new(),
             config,
             config_source,
-            env,
+            prog,
         }
     }
     /// Match paths in the scope first. If `scope` is None, clear the scope.
@@ -408,7 +408,6 @@ fn path_name(t: &IDLType) -> String {
         IDLType::FuncT(_) => "func",
         IDLType::ServT(_) => "service",
         IDLType::ClassT(..) => "func:init",
-        IDLType::KnotT(id) => id.name,
     }
     .to_string()
 }
@@ -523,8 +522,8 @@ Vec = { width = 2, size = 10 }
         t.clone(),
     );
     assert_eq!(tree.max_depth, 4);
-    let env = IDLEnv::new();
-    let mut state = State::new(&tree, &env);
+    let prog = IDLMergedProg::new();
+    let mut state = State::new(&tree, &prog);
     state.with_scope(
         &Some(Scope {
             method: "f",

@@ -1,9 +1,6 @@
-use std::{collections::BTreeMap, fmt};
+use std::fmt;
 
-use crate::{
-    types::{ArgType, Field, FuncMode, Function, Label, Type, TypeId, TypeInner},
-    TypeEnv,
-};
+use crate::types::{ArgType, Field, FuncMode, Function, Label, Type, TypeInner};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IDLType {
@@ -17,8 +14,6 @@ pub enum IDLType {
     ServT(Vec<Binding>),
     ClassT(Vec<IDLArgType>, Box<IDLType>),
     PrincipalT,
-    /// Used for Rust recursive types.
-    KnotT(TypeId),
 }
 
 impl IDLType {
@@ -84,7 +79,6 @@ impl From<IDLType> for Type {
                 TypeInner::Class(args.into_iter().map(|t| t.into()).collect(), (*t).into())
             }
             IDLType::PrincipalT => TypeInner::Principal,
-            IDLType::KnotT(id) => TypeInner::Knot(id),
         }
         .into()
     }
@@ -134,8 +128,7 @@ impl From<Type> for IDLType {
                 Box::new(t.clone().into()),
             ),
             TypeInner::Principal => IDLType::PrincipalT,
-            TypeInner::Knot(id) => IDLType::KnotT(id.clone()),
-            TypeInner::Unknown | TypeInner::Future => {
+            TypeInner::Knot(_) | TypeInner::Unknown | TypeInner::Future => {
                 panic!("Unknown type: {:?}", t)
             }
         }
@@ -279,7 +272,7 @@ impl From<Field> for TypeField {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Dec {
     TypD(Binding),
     ImportType(String),
@@ -292,7 +285,7 @@ pub struct Binding {
     pub typ: IDLType,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IDLProg {
     pub decs: Vec<Dec>,
     pub actor: Option<IDLType>,
@@ -304,128 +297,56 @@ pub struct IDLInitArgs {
     pub args: Vec<IDLArgType>,
 }
 
+/// Generated from concatenating different `IDLProg`s.
 #[derive(Debug, Default)]
-pub struct IDLEnv {
-    types: BTreeMap<String, Option<IDLType>>,
-    types_bindings_ids: Vec<String>,
+pub struct IDLMergedProg {
+    types: Vec<Binding>,
     pub actor: Option<IDLType>,
 }
 
-impl From<&IDLProg> for IDLEnv {
-    fn from(prog: &IDLProg) -> Self {
-        let mut env = Self::new();
-
-        for dec in prog.decs.iter() {
-            if let Dec::TypD(binding) = dec {
-                env.insert_binding(binding.clone());
-            }
-        }
-
-        env.set_actor(prog.actor.clone());
-        env
+impl From<IDLProg> for IDLMergedProg {
+    fn from(other_prog: IDLProg) -> Self {
+        let mut merged_prog = Self::default();
+        merged_prog.add_decs(&other_prog.decs);
+        merged_prog.set_actor(other_prog.actor);
+        merged_prog
     }
 }
 
-impl From<Vec<Binding>> for IDLEnv {
+impl From<Vec<Binding>> for IDLMergedProg {
     fn from(bindings: Vec<Binding>) -> Self {
-        let mut env = Self::default();
-        for binding in bindings {
-            env.insert_binding(binding.clone());
+        Self {
+            types: bindings,
+            actor: None,
         }
-        env
     }
 }
 
-impl From<TypeEnv> for IDLEnv {
-    fn from(env: TypeEnv) -> Self {
-        let mut idl_env = Self::default();
-        for (id, t) in env.0 {
-            idl_env.insert_binding(Binding { id, typ: t.into() });
-        }
-        idl_env
-    }
-}
-
-impl From<IDLEnv> for TypeEnv {
-    fn from(env: IDLEnv) -> Self {
-        let mut type_env = Self::default();
-        for (id, t) in env
-            .types
-            .iter()
-            .filter_map(|(id, t)| t.as_ref().map(|t| (id, t)))
-        {
-            type_env.0.insert(id.to_string(), t.clone().into());
-        }
-        type_env
-    }
-}
-
-impl IDLEnv {
+impl IDLMergedProg {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn insert_binding(&mut self, binding: Binding) {
-        let duplicate = self
-            .types
-            .insert(binding.id.clone(), Some(binding.typ.clone()));
-        if duplicate.is_none() {
-            self.types_bindings_ids.push(binding.id.clone());
-        }
-    }
-
-    pub fn insert_unknown(&mut self, id: String) {
-        let duplicate = self.types.insert(id.clone(), None);
-        if duplicate.is_none() {
-            self.types_bindings_ids.push(id);
-        }
-    }
-
-    pub fn types_ids(&self) -> Vec<&str> {
-        self.types_bindings_ids
+    pub fn add_decs(&mut self, decs: &[Dec]) {
+        let types: Vec<Binding> = decs
             .iter()
-            .map(|id| id.as_str())
-            .collect()
+            .filter_map(|dec| match dec {
+                Dec::TypD(binding) => Some(binding.clone()),
+                Dec::ImportType(_) | Dec::ImportServ(_) => None,
+            })
+            .collect();
+        self.types.extend(types);
     }
 
-    pub fn set_actor(&mut self, actor: Option<IDLType>) {
-        self.actor = actor;
-    }
-
-    pub fn find_binding<'a>(&'a self, id: &'a str) -> Result<(&'a str, &'a IDLType), String> {
-        self.find_type(id).map(|t| (id, t))
+    pub fn set_actor(&mut self, other: Option<IDLType>) {
+        self.actor = other;
     }
 
     pub fn find_type(&self, id: &str) -> Result<&IDLType, String> {
         self.types
-            .get(id)
+            .iter()
+            .find_map(|t| if t.id == id { Some(&t.typ) } else { None })
             .ok_or(format!("Type identifier not found: {id}"))
-            .and_then(|t| {
-                t.as_ref()
-                    .ok_or(format!("Type identifier is unknown: {id}"))
-            })
-    }
-
-    pub fn assert_has_type(&self, id: &str) -> Result<(), String> {
-        if self.types.contains_key(id) {
-            Ok(())
-        } else {
-            Err(format!("Type identifier not found: {id}"))
-        }
-    }
-
-    pub fn get_types(&self) -> Vec<&IDLType> {
-        self.types_bindings_ids
-            .iter()
-            .map(|id| self.find_type(id).unwrap())
-            .collect()
-    }
-
-    pub fn get_bindings(&self) -> Vec<(&str, &IDLType)> {
-        self.types_bindings_ids
-            .iter()
-            .map(|id| self.find_binding(id).unwrap())
-            .collect()
     }
 
     pub fn rec_find_type(&self, name: &str) -> Result<&IDLType, String> {
@@ -436,22 +357,34 @@ impl IDLEnv {
         }
     }
 
+    pub fn get_types(&self) -> Vec<(&str, &IDLType)> {
+        self.types.iter().map(|t| (t.id.as_str(), &t.typ)).collect()
+    }
+
+    pub fn get_bindings(&self) -> Vec<Binding> {
+        self.types.clone()
+    }
+
+    pub fn insert_binding(&mut self, binding: Binding) {
+        self.types.push(binding);
+    }
+
+    pub fn types_ids(&self) -> Vec<&str> {
+        self.types.iter().map(|t| t.id.as_str()).collect()
+    }
+
     pub fn trace_type(&self, t: &IDLType) -> Result<IDLType, String> {
         match t {
             IDLType::VarT(id) => self.trace_type(self.find_type(id)?),
-            IDLType::KnotT(id) => {
-                let t = crate::types::internal::find_type(id).unwrap();
-                self.trace_type(&t.into())
-            }
             _ => Ok(t.clone()),
         }
     }
 
-    pub fn as_service<'a>(&'a self, t: &'a IDLType) -> Result<&'a Vec<Binding>, String> {
+    pub fn service_methods<'a>(&'a self, t: &'a IDLType) -> Result<&'a Vec<Binding>, String> {
         match t {
             IDLType::ServT(methods) => Ok(methods),
-            IDLType::VarT(id) => self.as_service(self.find_type(id)?),
-            IDLType::ClassT(_, t) => self.as_service(t),
+            IDLType::VarT(id) => self.service_methods(self.find_type(id)?),
+            IDLType::ClassT(_, t) => self.service_methods(t),
             _ => Err(format!("not a service type: {t}")),
         }
     }
@@ -462,14 +395,5 @@ impl IDLEnv {
             IDLType::VarT(id) => self.as_func(self.find_type(id)?),
             _ => Err(format!("not a function type: {:?}", t)),
         }
-    }
-
-    pub fn get_method<'a>(&'a self, t: &'a IDLType, id: &'a str) -> Result<&'a FuncType, String> {
-        for binding in self.as_service(t)? {
-            if binding.id == id {
-                return self.as_func(&binding.typ);
-            }
-        }
-        Err(format!("cannot find method {id}"))
     }
 }

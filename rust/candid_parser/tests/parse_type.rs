@@ -40,10 +40,10 @@ fn compiler_test(resource: &str) {
     let candid_path = base_path.join(filename);
 
     match check_file(&candid_path) {
-        Ok((_, idl_env, _)) => {
+        Ok((_, _, idl_merged_prog)) => {
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
-                let content = compile(&idl_env);
+                let content = compile(&idl_merged_prog);
                 // Type check output
                 let ast = parse_idl_prog(&content).unwrap();
                 check_prog(&mut TypeEnv::new(), &ast).unwrap();
@@ -51,13 +51,14 @@ fn compiler_test(resource: &str) {
             }
             {
                 match filename.file_name().unwrap().to_str().unwrap() {
-                    "unicode.did" | "escape.did" => {
-                        check_error(|| motoko::compile(&idl_env), "not a valid Motoko id")
-                    }
+                    "unicode.did" | "escape.did" => check_error(
+                        || motoko::compile(&idl_merged_prog),
+                        "not a valid Motoko id",
+                    ),
                     _ => {
                         let mut output =
                             mint.new_goldenfile(filename.with_extension("mo")).unwrap();
-                        let content = motoko::compile(&idl_env);
+                        let content = motoko::compile(&idl_merged_prog);
                         writeln!(output, "{content}").unwrap();
                     }
                 }
@@ -87,20 +88,20 @@ fn compiler_test(resource: &str) {
                     _ => (),
                 }
                 let mut output = mint.new_goldenfile(filename.with_extension("rs")).unwrap();
-                let (content, unused) = rust::compile(&config, &idl_env, external);
+                let (content, unused) = rust::compile(&config, &idl_merged_prog, external);
                 assert!(unused.is_empty());
                 writeln!(output, "{content}").unwrap();
             }
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("js")).unwrap();
-                let content = javascript::compile(&idl_env);
+                let content = javascript::compile(&idl_merged_prog);
                 writeln!(output, "{content}").unwrap();
             }
             {
                 let mut output = mint
                     .new_goldenfile(filename.with_extension("d.ts"))
                     .unwrap();
-                let content = typescript::compile(&idl_env);
+                let content = typescript::compile(&idl_merged_prog);
                 writeln!(output, "{content}").unwrap();
             }
         }

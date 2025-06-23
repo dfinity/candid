@@ -1,7 +1,7 @@
 use super::configs::{ConfigState, Configs, Context, Scope, State, StateElem};
 use crate::{Error, Result};
 use arbitrary::{unstructured::Int, Arbitrary, Unstructured};
-use candid::types::syntax::{IDLEnv, IDLType, PrimType, TypeField};
+use candid::types::syntax::{IDLMergedProg, IDLType, PrimType, TypeField};
 use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
 use candid::{Deserialize, TypeEnv};
 use std::collections::HashSet;
@@ -126,7 +126,7 @@ impl RandState<'_> {
         }
         let res = Ok(match ty {
             IDLType::VarT(id) => {
-                let ty = self.0.env.rec_find_type(id).map_err(Error::msg)?;
+                let ty = self.0.prog.rec_find_type(id).map_err(Error::msg)?;
                 self.any(u, ty)?
             }
             IDLType::PrimT(PrimType::Null) => IDLValue::Null,
@@ -191,7 +191,7 @@ impl RandState<'_> {
                 {
                     [1, 0]
                 } else {
-                    [1, size(self.0.env, t).unwrap_or(MAX_DEPTH)]
+                    [1, size(self.0.prog, t).unwrap_or(MAX_DEPTH)]
                 };
                 let idx = arbitrary_variant(u, &depths)?;
                 if idx == 0 {
@@ -203,7 +203,7 @@ impl RandState<'_> {
             IDLType::VecT(t) => {
                 self.0.update_stats("width");
                 let width = self.0.config.width.or_else(|| {
-                    let elem_size = size(self.0.env, t).unwrap_or(MAX_DEPTH);
+                    let elem_size = size(self.0.prog, t).unwrap_or(MAX_DEPTH);
                     self.0.update_stats("size");
                     Some(std::cmp::max(0, self.0.config.size.unwrap_or(0)) as usize / elem_size)
                 });
@@ -233,7 +233,7 @@ impl RandState<'_> {
             IDLType::VariantT(fs) => {
                 let choices = fs
                     .iter()
-                    .map(|TypeField { typ, .. }| size(self.0.env, typ).unwrap_or(MAX_DEPTH));
+                    .map(|TypeField { typ, .. }| size(self.0.prog, typ).unwrap_or(MAX_DEPTH));
                 self.0.update_stats("size");
                 self.0.update_stats("depth");
                 let sizes: Vec<_> = if self.0.config.depth.is_some_and(|d| d <= 0)
@@ -277,7 +277,7 @@ impl RandState<'_> {
 pub fn any(
     seed: &[u8],
     configs: Configs,
-    env: &IDLEnv,
+    prog: &IDLMergedProg,
     types: &[IDLType],
     scope: &Option<Scope>,
 ) -> Result<IDLArgs> {
@@ -285,7 +285,7 @@ pub fn any(
     let tree = super::configs::ConfigTree::from_configs("random", configs)?;
     let mut args = Vec::new();
     for (i, t) in types.iter().enumerate() {
-        let mut state = State::new(&tree, env);
+        let mut state = State::new(&tree, prog);
         state.with_scope(scope, i);
         let mut state = RandState(state);
         state.0.push_state(&StateElem::Label(&i.to_string()));
@@ -295,13 +295,13 @@ pub fn any(
     Ok(IDLArgs { args })
 }
 
-fn size_helper(env: &IDLEnv, seen: &mut HashSet<String>, t: &IDLType) -> Option<usize> {
+fn size_helper(prog: &IDLMergedProg, seen: &mut HashSet<String>, t: &IDLType) -> Option<usize> {
     use IDLType::*;
     Some(match t {
         VarT(id) => {
             if seen.insert(id.to_string()) {
-                let ty = env.rec_find_type(id).unwrap();
-                let res = size_helper(env, seen, ty)?;
+                let ty = prog.rec_find_type(id).unwrap();
+                let res = size_helper(prog, seen, ty)?;
                 seen.remove(id);
                 res
             } else {
@@ -309,19 +309,19 @@ fn size_helper(env: &IDLEnv, seen: &mut HashSet<String>, t: &IDLType) -> Option<
             }
         }
         PrimT(PrimType::Empty) => 0,
-        OptT(t) => 1 + size_helper(env, seen, t)?,
-        VecT(t) => 1 + size_helper(env, seen, t)? * 2,
+        OptT(t) => 1 + size_helper(prog, seen, t)?,
+        VecT(t) => 1 + size_helper(prog, seen, t)? * 2,
         RecordT(fs) => {
             let mut sum = 0;
             for TypeField { typ, .. } in fs.iter() {
-                sum += size_helper(env, seen, typ)?;
+                sum += size_helper(prog, seen, typ)?;
             }
             1 + sum
         }
         VariantT(fs) => {
             let mut max = 0;
             for TypeField { typ, .. } in fs.iter() {
-                let s = size_helper(env, seen, typ)?;
+                let s = size_helper(prog, seen, typ)?;
                 if s > max {
                     max = s;
                 };
@@ -332,9 +332,9 @@ fn size_helper(env: &IDLEnv, seen: &mut HashSet<String>, t: &IDLType) -> Option<
     })
 }
 
-fn size(env: &IDLEnv, t: &IDLType) -> Option<usize> {
+fn size(prog: &IDLMergedProg, t: &IDLType) -> Option<usize> {
     let mut seen = HashSet::new();
-    size_helper(env, &mut seen, t)
+    size_helper(prog, &mut seen, t)
 }
 
 fn choose_range<T: Int>(u: &mut Unstructured, ranges: &[std::ops::RangeInclusive<T>]) -> Result<T> {

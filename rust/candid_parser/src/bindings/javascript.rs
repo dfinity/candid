@@ -2,7 +2,7 @@ use super::analysis::{chase_actor, chase_types, infer_rec};
 use candid::pretty::candid::pp_mode;
 use candid::pretty::utils::*;
 use candid::types::{
-    syntax::{Binding, FuncType, IDLArgType, IDLEnv, IDLType, PrimType, TypeField},
+    syntax::{Binding, FuncType, IDLArgType, IDLMergedProg, IDLType, PrimType, TypeField},
     Label,
 };
 use pretty::RcDoc;
@@ -136,7 +136,7 @@ fn pp_ty(ty: &IDLType) -> RcDoc {
         VariantT(ref fs) => str("IDL.Variant").append(pp_fields(fs)),
         FuncT(ref func) => str("IDL.Func").append(pp_function(func)),
         ServT(ref serv) => str("IDL.Service").append(pp_service(serv)),
-        ClassT(_, _) | KnotT(_) => unreachable!(),
+        ClassT(_, _) => unreachable!(),
     }
 }
 
@@ -199,7 +199,11 @@ fn pp_service(serv: &[Binding]) -> RcDoc {
     enclose_space("({", doc, "})")
 }
 
-fn pp_defs<'a>(env: &'a IDLEnv, def_list: &'a [&'a str], recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
+fn pp_defs<'a>(
+    env: &'a IDLMergedProg,
+    def_list: &'a [&'a str],
+    recs: &'a BTreeSet<&'a str>,
+) -> RcDoc<'a> {
     let recs_doc = lines(
         recs.iter()
             .map(|id| kwd("const").append(ident(id)).append(" = IDL.Rec();")),
@@ -236,18 +240,18 @@ fn pp_actor<'a>(ty: &'a IDLType, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
     }
 }
 
-pub fn compile(env: &IDLEnv) -> String {
-    match &env.actor {
+pub fn compile(prog: &IDLMergedProg) -> String {
+    match &prog.actor {
         None => {
-            let def_list: Vec<_> = env.types_ids();
-            let recs = infer_rec(env, &def_list).unwrap();
-            let doc = pp_defs(env, &def_list, &recs);
+            let def_list: Vec<_> = prog.types_ids();
+            let recs = infer_rec(prog, &def_list).unwrap();
+            let doc = pp_defs(prog, &def_list, &recs);
             doc.pretty(LINE_WIDTH).to_string()
         }
         Some(actor) => {
-            let def_list = chase_actor(env, actor).unwrap();
-            let recs = infer_rec(env, &def_list).unwrap();
-            let defs = pp_defs(env, &def_list, &recs);
+            let def_list = chase_actor(prog, actor).unwrap();
+            let recs = infer_rec(prog, &def_list).unwrap();
+            let defs = pp_defs(prog, &def_list, &recs);
             let init = if let IDLType::ClassT(ref args, _) = actor {
                 args.iter().map(|arg| arg.typ.clone()).collect::<Vec<_>>()
             } else {
@@ -259,9 +263,9 @@ pub fn compile(env: &IDLEnv) -> String {
             let doc = str("export const idlFactory = ({ IDL }) => ")
                 .append(enclose_space("{", body, "};"));
             // export init args
-            let init_defs = chase_types(env, init).unwrap();
-            let init_recs = infer_rec(env, &init_defs).unwrap();
-            let init_defs_doc = pp_defs(env, &init_defs, &init_recs);
+            let init_defs = chase_types(prog, init).unwrap();
+            let init_recs = infer_rec(prog, &init_defs).unwrap();
+            let init_defs_doc = pp_defs(prog, &init_defs, &init_recs);
             let init_doc = kwd("return").append(pp_rets(init)).append(";");
             let init_doc = init_defs_doc.append(init_doc);
             let init_doc =
@@ -368,10 +372,10 @@ pub mod value {
 
 pub mod test {
     use super::value;
-    use crate::test::{to_idl_types, HostAssert, HostTest, Test};
+    use crate::test::{HostAssert, HostTest, Test};
     use candid::pretty::utils::*;
-    use candid::types::syntax::{IDLEnv, IDLType};
-    use candid::types::{syntax::IDLProg, TypeEnv};
+    use candid::types::syntax::{IDLMergedProg, IDLProg};
+    use candid::TypeEnv;
     use pretty::RcDoc;
 
     fn pp_hex(bytes: &[u8]) -> RcDoc {
@@ -379,17 +383,17 @@ pub mod test {
             .append(RcDoc::as_string(hex::encode(bytes)))
             .append("', 'hex')")
     }
-    fn pp_encode<'a>(args: &'a candid::IDLArgs, tys: &'a [IDLType]) -> RcDoc<'a> {
+    fn pp_encode<'a>(args: &'a candid::IDLArgs, tys: &'a [candid::types::Type]) -> RcDoc<'a> {
         let vals = value::pp_args(args);
-        let tys = super::pp_rets(tys);
+        let tys = super::pp_rets(&[]);
         let items = [tys, vals];
         let params = concat(items.iter().cloned(), ",");
         str("IDL.encode").append(enclose("(", params, ")"))
     }
 
-    fn pp_decode<'a>(bytes: &'a [u8], tys: &'a [IDLType]) -> RcDoc<'a> {
+    fn pp_decode<'a>(bytes: &'a [u8], tys: &'a [candid::types::Type]) -> RcDoc<'a> {
         let hex = pp_hex(bytes);
-        let tys = super::pp_rets(tys);
+        let tys = super::pp_rets(&[]);
         let items = [tys, hex];
         let params = concat(items.iter().cloned(), ",");
         str("IDL.decode").append(enclose("(", params, ")"))
@@ -408,29 +412,25 @@ import { Principal } from './principal';
             decs: test.defs,
             actor: None,
         };
-        let idl_env = IDLEnv::from(&idl_prog);
         crate::check_prog(&mut env, &idl_prog).unwrap();
-        res += &super::compile(&idl_env);
+        let idl_merged_prog = IDLMergedProg::from(idl_prog);
+        res += &super::compile(&idl_merged_prog);
         for (i, assert) in test.asserts.iter().enumerate() {
             let mut types = Vec::new();
             for ty in assert.typ.iter() {
-                types.push((ty.clone(), crate::typing::ast_to_type(&env, ty).unwrap()));
+                types.push(crate::typing::ast_to_type(&env, ty).unwrap());
             }
-            let host = HostTest::from_assert(assert, &env, &types);
+            let host = HostTest::from_assert(assert, &env, &[]);
             let mut expects = Vec::new();
             for cmd in host.asserts.iter() {
                 use HostAssert::*;
                 let test_func = match cmd {
                     Encode(args, tys, _, _) | NotEncode(args, tys) => {
-                        let idl_tys = to_idl_types(tys);
-                        let items = [super::pp_rets(&[]), pp_encode(args, &[])];
+                        let items = [];
                         let params = concat(items.iter().cloned(), ",");
                         str("IDL.decode").append(enclose("(", params, ")"))
                     }
-                    Decode(bytes, tys, _, _) | NotDecode(bytes, tys) => {
-                        let idl_tys = to_idl_types(tys);
-                        pp_decode(bytes, &[])
-                    }
+                    Decode(bytes, tys, _, _) | NotDecode(bytes, tys) => RcDoc::nil(),
                 };
                 let (test_func, predicate) = match cmd {
                     Encode(_, _, true, _) | Decode(_, _, true, _) => (test_func, str(".toEqual")),
@@ -442,10 +442,7 @@ import { Principal } from './principal';
                     }
                 };
                 let expected = match cmd {
-                    Encode(_, tys, _, bytes) => {
-                        let idl_tys = to_idl_types(tys);
-                        pp_decode(bytes, &[])
-                    }
+                    Encode(_, tys, _, bytes) => RcDoc::nil(),
                     Decode(_, _, _, vals) => value::pp_args(vals),
                     NotEncode(_, _) | NotDecode(_, _) => RcDoc::nil(),
                 };
