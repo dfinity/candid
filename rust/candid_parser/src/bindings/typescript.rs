@@ -70,8 +70,11 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         Reserved => str("any"),
         Empty => str("never"),
         Var(ref id) => {
+            let ty = env.rec_find_type(id).unwrap();
+            if matches!(ty.as_ref(), Func(_)) {
+                return pp_ty(env, ty, false);
+            }
             if is_ref {
-                let ty = env.rec_find_type(id).unwrap();
                 if matches!(ty.as_ref(), Service(_)) {
                     pp_ty(env, ty, false)
                 } else {
@@ -278,8 +281,8 @@ fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
                 TypeInner::Func(ref func) => pp_function(env, func),
                 TypeInner::Var(ref id) => {
                     let ty = env.rec_find_type(id).unwrap();
-                    if let TypeInner::Func(ref func) = ty.as_ref() {
-                        pp_function(env, func)
+                    if matches!(ty.as_ref(), TypeInner::Func(_)) {
+                        ident(id)
                     } else {
                         pp_ty(env, ty, false)
                     }
@@ -326,6 +329,16 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], prog: &'a IDLMergedPro
                 .append(ident(id))
                 .append(" ")
                 .append(pp_service(env, serv)),
+            TypeInner::Func(ref func) => kwd("export type")
+                .append(ident(id))
+                .append(" = ")
+                .append(pp_function(env, func))
+                .append(";"),
+            TypeInner::Var(ref inner_id) => kwd("export type")
+                .append(ident(id))
+                .append(" = ")
+                .append(ident(inner_id))
+                .append(";"),
             _ => kwd("export type")
                 .append(ident(id))
                 .append(" = ")
