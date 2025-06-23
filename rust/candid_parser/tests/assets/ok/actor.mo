@@ -5,11 +5,5 @@ module {
   public type f = shared Int8 -> async Int8;
   public type g = f;
   public type h = shared f -> async f;
-  public type o = ?o;
-  public type Self = actor {
-    f : shared Nat -> async h;
-    g : f;
-    h : g;
-    o : shared o -> async o;
-  }
+  public type Self = actor { f : shared Nat -> async h; g : f; h : g }
 }
