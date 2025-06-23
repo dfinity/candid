@@ -1,0 +1,10 @@
+type doubleNested_opt = opt opt opt text;
+type nested_opt = opt opt text;
+type normal_opt = opt text;
+type recursive_opt = opt recursive_opt;
+service : {
+  doubleNested_opt : (doubleNested_opt) -> (doubleNested_opt);
+  nested_opt : (nested_opt) -> (nested_opt);
+  normal_opt : (normal_opt) -> (normal_opt);
+  recursive_opt : (recursive_opt) -> (recursive_opt);
+}
