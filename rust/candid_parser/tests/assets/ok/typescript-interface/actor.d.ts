@@ -23,6 +23,7 @@ export interface actorInterface {
     f(arg0: bigint): Promise<[Principal, string]>;
     g: [Principal, string];
     h: [Principal, string];
+    h2: [Principal, string];
     o(arg0: o): Promise<o>;
 }
 
