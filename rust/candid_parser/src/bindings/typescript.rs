@@ -44,24 +44,21 @@ fn pp_ty<'a>(
         Opt(ref t) => {
             // if the inner type is an option, we treat it as a nested option
             if t.as_ref().is_opt() {
-                println!("pp_ty: {ty:?}");
-                println!("t: {t:?}");
-
-                str("[] | ").append(enclose("[", pp_ty(env, t, is_ref, current_type_id), "]"))
+                return str("[] | ").append(enclose(
+                    "[",
+                    pp_ty(env, t, is_ref, current_type_id),
+                    "]",
+                ));
             }
+
             // for self referential check, check if the id is the same as the type that is inside the optional
-            else if let (Some(current_id), TypeInner::Var(ref var_id)) =
-                (current_type_id, t.as_ref())
-            {
-                if current_id == var_id {
+            match (current_type_id, t.as_ref()) {
+                (Some(current_id), TypeInner::Var(var_id)) if current_id == var_id => {
                     // Self-referential optional type like "type o = opt o"
                     // In TypeScript, this becomes a recursive array type
                     str("[] | [").append(ident(current_id)).append("]")
-                } else {
-                    pp_ty(env, t, is_ref, current_type_id).append(str(" | undefined"))
                 }
-            } else {
-                pp_ty(env, t, is_ref, current_type_id).append(str(" | undefined"))
+                _ => pp_ty(env, t, is_ref, current_type_id).append(str(" | undefined")),
             }
         }
         Vec(ref t) => {
