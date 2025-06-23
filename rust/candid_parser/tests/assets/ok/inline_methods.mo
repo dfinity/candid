@@ -3,7 +3,8 @@
 
 module {
   public type Fn = shared query Nat -> async Nat;
-  public type R = { x : Nat; fn : Fn };
+  public type Gn = Fn;
+  public type R = { x : Nat; fn : Fn; gn : Gn; nested : { fn : Gn } };
   public type RInline = { x : Nat; fn : shared query Nat -> async Nat };
   public type Self = actor {
     add_two : shared Nat -> async Nat;
@@ -13,8 +14,8 @@ module {
         Nat,
         shared query Nat -> async Nat,
       ) -> async Nat;
+    high_order_fn_via_id : shared (Nat, Gn) -> async Fn;
     high_order_fn_via_record : shared R -> async Nat;
     high_order_fn_via_record_inline : shared RInline -> async Nat;
-    inline_fn : shared Nat -> async Nat;
   }
 }
