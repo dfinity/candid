@@ -352,6 +352,10 @@ impl<'a> TypeConverter<'a> {
 
                 if is_recursive {
                     // For recursive patterns using Some/None, check for _tag property
+                    // Generate conversion function for the inner type
+                    let inner_function_name = self.get_to_candid_function_name(inner);
+                    self.generate_to_candid_function(inner, &inner_function_name);
+                    
                     return Expr::Cond(CondExpr {
                         span: DUMMY_SP,
                         test: Box::new(Expr::Bin(BinExpr {
@@ -374,7 +378,9 @@ impl<'a> TypeConverter<'a> {
                         cons: Box::new(self.create_call("candid_none", vec![])),
                         alt: Box::new(self.create_call(
                             "candid_some",
-                            vec![self.create_arg(Expr::Member(MemberExpr {
+                            vec![self.create_arg(self.create_call(
+                                &inner_function_name,
+                                vec![self.create_arg(Expr::Member(MemberExpr {
                                     span: DUMMY_SP,
                                     obj: Box::new(self.create_ident(param_name)),
                                     prop: MemberProp::Ident(
@@ -386,6 +392,7 @@ impl<'a> TypeConverter<'a> {
                                         .into(),
                                     ),
                                 }))],
+                            ))],
                         )),
                     });
                 }

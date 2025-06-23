@@ -138,9 +138,9 @@ function to_candid_Z_n8(value: Z): _Z {
     return to_candid_opt_n2(value);
 }
 function to_candid_opt_n2(value: Some<B> | None): [] | [_B] {
-    return value._tag === "None" ? candid_none() : candid_some(value.value);
+    return value._tag === "None" ? candid_none() : candid_some(to_candid_B_n3(value.value));
 }
 function to_candid_opt_n4(value: Some<C> | None): [] | [_C] {
-    return value._tag === "None" ? candid_none() : candid_some(value.value);
+    return value._tag === "None" ? candid_none() : candid_some(to_candid_C_n5(value.value));
 }
 

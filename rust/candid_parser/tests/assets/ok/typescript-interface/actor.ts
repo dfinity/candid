@@ -171,6 +171,6 @@ function to_candid_o_n1(value: o): _o {
     return to_candid_opt_n2(value);
 }
 function to_candid_opt_n2(value: Some<o> | None): [] | [_o] {
-    return value._tag === "None" ? candid_none() : candid_some(value.value);
+    return value._tag === "None" ? candid_none() : candid_some(to_candid_o_n1(value.value));
 }
 
