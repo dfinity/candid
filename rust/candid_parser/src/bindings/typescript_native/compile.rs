@@ -842,15 +842,11 @@ pub fn convert_type(env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
                 })
             } else {
                 // Check if all variants have the same type (especially null)
-                let all_same_type = fs.iter().skip(1).all(|f| {
-                    let first_type = &fs[0].ty;
-                    match (first_type.as_ref(), f.ty.as_ref()) {
-                        (Null, Null) => true,
-                        (a, b) => a == b,
-                    }
+                let all_null = fs.iter().all(|f| {
+                    matches!(f.ty.as_ref(), TypeInner::Null)
                 });
 
-                if all_same_type && is_ref {
+                if all_null && is_ref {
                     // For variants with the same type, create union of string literals
                     if let TypeInner::Var(id) = ty.as_ref() {
                         // For named type references

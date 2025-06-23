@@ -97,7 +97,9 @@ export const canisterId = _canisterId;
 export interface emptyInterface {
     f(arg0: {
     }): Promise<never>;
-    g(arg0: T): Promise<"a">;
+    g(arg0: T): Promise<{
+        a: T;
+    }>;
     h(arg0: [T, never]): Promise<{
         a: T;
     } | {
@@ -122,7 +124,9 @@ class Empty implements emptyInterface {
             } else throw e;
         }
     }
-    async g(arg0: T): Promise<"a"> {
+    async g(arg0: T): Promise<{
+        a: T;
+    }> {
         try {
             const result = await this.#actor.g(to_candid_T_n2(arg0));
             return from_candid_variant_n4(result);
@@ -161,7 +165,9 @@ function from_candid_variant_n1(value: never): never {
 }
 function from_candid_variant_n4(value: {
     a: _T;
-}): "a" {
+}): {
+    a: T;
+} {
     return "a" in value ? {
         a: from_candid_T_n5(value.a)
     } : value;
