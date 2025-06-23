@@ -70,7 +70,7 @@ pub fn instantiate_candid(candid: CandidSource) -> Result<(Vec<Type>, (TypeEnv, 
 }
 pub fn get_metadata(env: &IDLMergedProg) -> Option<String> {
     let serv = env.actor.as_ref()?;
-    let serv = env.trace_type(&serv).ok()?;
+    let serv = env.trace_type(serv).ok()?;
     let serv = match &serv {
         IDLType::ClassT(_, ty) => ty.as_ref(),
         IDLType::ServT(_) => &serv,
