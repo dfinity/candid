@@ -7,7 +7,7 @@ fn pp_ty<'a>(
     env: &'a TypeEnv,
     ty: &'a Type,
     is_ref: bool,
-    current_type_id: Option<&'a str>,
+    parent_type_id: Option<&'a str>,
 ) -> RcDoc<'a> {
     use TypeInner::*;
     match ty.as_ref() {
@@ -32,7 +32,7 @@ fn pp_ty<'a>(
             if is_ref {
                 let ty = env.rec_find_type(id).unwrap();
                 if matches!(ty.as_ref(), Service(_) | Func(_)) {
-                    pp_ty(env, ty, false, current_type_id)
+                    pp_ty(env, ty, false, parent_type_id)
                 } else {
                     ident(id)
                 }
@@ -46,19 +46,19 @@ fn pp_ty<'a>(
             if t.as_ref().is_opt() {
                 return str("[] | ").append(enclose(
                     "[",
-                    pp_ty(env, t, is_ref, current_type_id),
+                    pp_ty(env, t, is_ref, parent_type_id),
                     "]",
                 ));
             }
 
             // for self referential check, check if the id is the same as the type that is inside the optional
-            match (current_type_id, t.as_ref()) {
+            match (parent_type_id, t.as_ref()) {
                 (Some(current_id), TypeInner::Var(var_id)) if current_id == var_id => {
                     // Self-referential optional type like "type o = opt o"
                     // In TypeScript, this becomes a recursive array type
                     str("[] | [").append(ident(current_id)).append("]")
                 }
-                _ => pp_ty(env, t, is_ref, current_type_id).append(str(" | undefined")),
+                _ => pp_ty(env, t, is_ref, parent_type_id).append(str(" | undefined")),
             }
         }
         Vec(ref t) => {
@@ -85,20 +85,19 @@ fn pp_ty<'a>(
                 Int16 => str("Int16Array | number[]"),
                 Int32 => str("Int32Array | number[]"),
                 Int64 => str("BigInt64Array | bigint[]"),
-                _ => str("Array").append(enclose("<", pp_ty(env, t, is_ref, current_type_id), ">")),
+                _ => str("Array").append(enclose("<", pp_ty(env, t, is_ref, parent_type_id), ">")),
             }
         }
         Record(ref fs) => {
             if is_tuple(ty) {
                 let tuple = concat(
-                    fs.iter()
-                        .map(|f| pp_ty(env, &f.ty, is_ref, current_type_id)),
+                    fs.iter().map(|f| pp_ty(env, &f.ty, is_ref, parent_type_id)),
                     ",",
                 );
                 enclose("[", tuple, "]")
             } else {
                 let fields = concat(
-                    fs.iter().map(|f| pp_field(env, f, is_ref, current_type_id)),
+                    fs.iter().map(|f| pp_field(env, f, is_ref, parent_type_id)),
                     ",",
                 );
                 enclose_space("{", fields, "}")
@@ -109,9 +108,8 @@ fn pp_ty<'a>(
                 str("never")
             } else {
                 strict_concat(
-                    fs.iter().map(|f| {
-                        enclose_space("{", pp_field(env, f, is_ref, current_type_id), "}")
-                    }),
+                    fs.iter()
+                        .map(|f| enclose_space("{", pp_field(env, f, is_ref, parent_type_id), "}")),
                     " |",
                 )
                 .nest(INDENT_SPACE)
@@ -138,11 +136,11 @@ fn pp_field<'a>(
     env: &'a TypeEnv,
     field: &'a Field,
     is_ref: bool,
-    current_type_id: Option<&'a str>,
+    parent_type_id: Option<&'a str>,
 ) -> RcDoc<'a> {
     pp_label(&field.id)
         .append(kwd(":"))
-        .append(pp_ty(env, &field.ty, is_ref, current_type_id))
+        .append(pp_ty(env, &field.ty, is_ref, parent_type_id))
 }
 
 fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
