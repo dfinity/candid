@@ -9,9 +9,12 @@ export type if_ = {
 export type list = [] | [node];
 export interface node { 'head' : bigint, 'tail' : list }
 export type o = [] | [o];
-export interface return_ { 'f' : t, 'g' : ActorMethod<[list], [if_, stream]> }
+export interface return_ {
+  'f' : ActorMethod<[Principal], undefined>,
+  'g' : ActorMethod<[list], [if_, stream]>,
+}
 export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
-export type t = ActorMethod<[Principal], undefined>;
+export type t = [Principal, string];
 export interface _SERVICE {
   'Oneway' : ActorMethod<[], undefined>,
   'f_' : ActorMethod<[o], o>,
@@ -21,7 +24,7 @@ export interface _SERVICE {
   'oneway_' : ActorMethod<[number], undefined>,
   'query' : ActorMethod<[Uint8Array | number[]], Uint8Array | number[]>,
   'return' : ActorMethod<[o], o>,
-  'service' : t,
+  'service' : ActorMethod<[Principal], undefined>,
   'tuple' : ActorMethod<
     [[bigint, Uint8Array | number[], string]],
     [bigint, number]

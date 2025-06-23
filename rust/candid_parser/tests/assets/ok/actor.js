@@ -8,6 +8,7 @@ export const idlFactory = ({ IDL }) => {
     'f' : IDL.Func([IDL.Nat], [h], []),
     'g' : f,
     'h' : g,
+    'h2' : h,
     'o' : IDL.Func([o], [o], []),
   });
 };
