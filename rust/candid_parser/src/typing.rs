@@ -374,7 +374,7 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>, I
         res = merge_actor(&env, &res, &actor, "")?;
     }
 
-    idl_merged_prog.set_actor(res.clone().map(Into::into));
+    idl_merged_prog.set_actor(res.clone().map(|t| te.as_idl_type(&t)));
 
     Ok((te, res, idl_merged_prog))
 }

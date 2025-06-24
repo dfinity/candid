@@ -1,4 +1,5 @@
-use crate::types::{Function, Type, TypeInner};
+use crate::types::syntax::{Binding, FuncType, IDLArgType, IDLType, PrimType, TypeField};
+use crate::types::{ArgType, Field, Function, Type, TypeInner};
 use crate::{Error, Result};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -9,6 +10,7 @@ impl TypeEnv {
     pub fn new() -> Self {
         TypeEnv(BTreeMap::new())
     }
+
     pub fn merge<'a>(&'a mut self, env: &TypeEnv) -> Result<&'a mut Self> {
         for (k, v) in &env.0 {
             let entry = self.0.entry(k.to_string()).or_insert_with(|| v.clone());
@@ -18,6 +20,7 @@ impl TypeEnv {
         }
         Ok(self)
     }
+
     pub fn merge_type(&mut self, env: TypeEnv, ty: Type) -> Type {
         let tau: BTreeMap<String, String> = env
             .0
@@ -35,12 +38,14 @@ impl TypeEnv {
         }
         ty.subst(&tau)
     }
+
     pub fn find_type(&self, name: &str) -> Result<&Type> {
         match self.0.get(name) {
             None => Err(Error::msg(format!("Unbound type identifier {name}"))),
             Some(t) => Ok(t),
         }
     }
+
     pub fn rec_find_type(&self, name: &str) -> Result<&Type> {
         let t = self.find_type(name)?;
         match t.as_ref() {
@@ -48,6 +53,7 @@ impl TypeEnv {
             _ => Ok(t),
         }
     }
+
     pub fn trace_type<'a>(&'a self, t: &'a Type) -> Result<Type> {
         match t.as_ref() {
             TypeInner::Var(id) => self.trace_type(self.find_type(id)?),
@@ -57,6 +63,7 @@ impl TypeEnv {
             _ => Ok(t.clone()),
         }
     }
+
     pub fn as_func<'a>(&'a self, t: &'a Type) -> Result<&'a Function> {
         match t.as_ref() {
             TypeInner::Func(f) => Ok(f),
@@ -64,6 +71,7 @@ impl TypeEnv {
             _ => Err(Error::msg(format!("not a function type: {t}"))),
         }
     }
+
     pub fn as_service<'a>(&'a self, t: &'a Type) -> Result<&'a [(String, Type)]> {
         match t.as_ref() {
             TypeInner::Service(s) => Ok(s),
@@ -72,6 +80,7 @@ impl TypeEnv {
             _ => Err(Error::msg(format!("not a service type: {t}"))),
         }
     }
+
     pub fn get_method<'a>(&'a self, t: &'a Type, id: &'a str) -> Result<&'a Function> {
         for (meth, ty) in self.as_service(t)? {
             if meth == id {
@@ -80,6 +89,7 @@ impl TypeEnv {
         }
         Err(Error::msg(format!("cannot find method {id}")))
     }
+
     fn is_empty<'a>(
         &'a self,
         res: &mut BTreeMap<&'a str, Option<bool>>,
@@ -115,6 +125,7 @@ impl TypeEnv {
             Some(Some(b)) => Ok(*b),
         }
     }
+
     pub fn replace_empty(&mut self) -> Result<()> {
         let mut res = BTreeMap::new();
         for name in self.0.keys() {
@@ -153,6 +164,95 @@ impl TypeEnv {
             }
         }
         Ok(())
+    }
+
+    pub fn inner_as_idl_type(&self, ty: &TypeInner) -> IDLType {
+        match ty {
+            TypeInner::Null => IDLType::PrimT(PrimType::Null),
+            TypeInner::Bool => IDLType::PrimT(PrimType::Bool),
+            TypeInner::Nat => IDLType::PrimT(PrimType::Nat),
+            TypeInner::Int => IDLType::PrimT(PrimType::Int),
+            TypeInner::Nat8 => IDLType::PrimT(PrimType::Nat8),
+            TypeInner::Nat16 => IDLType::PrimT(PrimType::Nat16),
+            TypeInner::Nat32 => IDLType::PrimT(PrimType::Nat32),
+            TypeInner::Nat64 => IDLType::PrimT(PrimType::Nat64),
+            TypeInner::Int8 => IDLType::PrimT(PrimType::Int8),
+            TypeInner::Int16 => IDLType::PrimT(PrimType::Int16),
+            TypeInner::Int32 => IDLType::PrimT(PrimType::Int32),
+            TypeInner::Int64 => IDLType::PrimT(PrimType::Int64),
+            TypeInner::Float32 => IDLType::PrimT(PrimType::Float32),
+            TypeInner::Float64 => IDLType::PrimT(PrimType::Float64),
+            TypeInner::Text => IDLType::PrimT(PrimType::Text),
+            TypeInner::Reserved => IDLType::PrimT(PrimType::Reserved),
+            TypeInner::Empty => IDLType::PrimT(PrimType::Empty),
+            TypeInner::Var(id) => IDLType::VarT(id.to_string()),
+            TypeInner::Opt(t) => IDLType::OptT(Box::new(self.as_idl_type(t))),
+            TypeInner::Vec(t) => IDLType::VecT(Box::new(self.as_idl_type(t))),
+            TypeInner::Record(fields) => IDLType::RecordT(self.fields_to_idl_fields(fields)),
+            TypeInner::Variant(fields) => IDLType::VariantT(self.fields_to_idl_fields(fields)),
+            TypeInner::Func(func) => IDLType::FuncT(self.func_to_idl_func(func)),
+            TypeInner::Service(methods) => IDLType::ServT(self.methods_to_idl_methods(methods)),
+            TypeInner::Class(args, t) => IDLType::ClassT(
+                self.arg_types_to_idl_arg_types(args),
+                Box::new(self.as_idl_type(t)),
+            ),
+            TypeInner::Principal => IDLType::PrincipalT,
+            TypeInner::Knot(id) => {
+                let name = id.to_string();
+                self.0
+                    .get(&name)
+                    .unwrap_or_else(|| panic!("Knot type should already be in the env: {:?}", id));
+                IDLType::VarT(name)
+            }
+            TypeInner::Unknown | TypeInner::Future => {
+                panic!("Unknown type: {:?}", ty)
+            }
+        }
+    }
+
+    pub fn as_idl_type(&self, ty: &Type) -> IDLType {
+        self.inner_as_idl_type(ty.as_ref())
+    }
+
+    pub fn arg_types_to_idl_arg_types(&self, args: &[ArgType]) -> Vec<IDLArgType> {
+        args.iter()
+            .map(|arg| IDLArgType {
+                typ: self.as_idl_type(&arg.typ),
+                name: arg.name.clone(),
+            })
+            .collect()
+    }
+
+    pub fn func_to_idl_func(&self, func: &Function) -> FuncType {
+        FuncType {
+            modes: func.modes.clone(),
+            args: self.arg_types_to_idl_arg_types(&func.args),
+            rets: func.rets.iter().map(|arg| self.as_idl_type(arg)).collect(),
+        }
+    }
+
+    pub fn field_to_idl_field(&self, field: &Field) -> TypeField {
+        TypeField {
+            label: field.id.as_ref().clone(),
+            typ: self.as_idl_type(&field.ty),
+        }
+    }
+
+    fn fields_to_idl_fields(&self, fields: &[Field]) -> Vec<TypeField> {
+        fields
+            .iter()
+            .map(|field| self.field_to_idl_field(field))
+            .collect()
+    }
+
+    fn methods_to_idl_methods(&self, methods: &[(String, Type)]) -> Vec<Binding> {
+        methods
+            .iter()
+            .map(|(id, t)| Binding {
+                id: id.clone(),
+                typ: self.as_idl_type(t),
+            })
+            .collect()
     }
 }
 

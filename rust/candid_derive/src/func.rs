@@ -122,6 +122,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
         });
         let service = quote! {
             use #candid::types::{CandidType, Function, Type, ArgType, TypeInner};
+            use #candid::types::syntax::{Binding, IDLMergedProg};
             let mut service = Vec::<(String, Type)>::new();
             let mut env = #candid::types::internal::TypeContainer::new();
             #(#gen_tys)*
@@ -131,16 +132,24 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
         let actor = if let Some(init) = init {
             quote! {
                 #init
-                let actor = Some(TypeInner::Class(init_args, ty).into());
+                let actor = TypeInner::Class(init_args, ty).into();
             }
         } else {
-            quote! { let actor = Some(ty); }
+            quote! { let actor = ty; }
         };
         let res = quote! {
             fn __export_service() -> String {
                 #service
                 #actor
-                let result = #candid::pretty::candid::compile(&env.env, &actor);
+
+                let bindings = env.env.0.iter().map(|(id, t)| Binding {
+                    id: id.clone(),
+                    typ: env.as_idl_type(t),
+                }).collect::<Vec<_>>();
+                let mut idl_merged_prog = IDLMergedProg::from(bindings);
+                idl_merged_prog.set_actor(Some(env.as_idl_type(&actor)));
+
+                let result = #candid::pretty::candid::compile(&idl_merged_prog);
                 format!("{}", result)
             }
         };

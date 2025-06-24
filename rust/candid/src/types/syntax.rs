@@ -84,57 +84,6 @@ impl From<IDLType> for Type {
     }
 }
 
-impl From<Type> for IDLType {
-    fn from(t: Type) -> Self {
-        match t.as_ref() {
-            TypeInner::Null => IDLType::PrimT(PrimType::Null),
-            TypeInner::Bool => IDLType::PrimT(PrimType::Bool),
-            TypeInner::Nat => IDLType::PrimT(PrimType::Nat),
-            TypeInner::Int => IDLType::PrimT(PrimType::Int),
-            TypeInner::Nat8 => IDLType::PrimT(PrimType::Nat8),
-            TypeInner::Nat16 => IDLType::PrimT(PrimType::Nat16),
-            TypeInner::Nat32 => IDLType::PrimT(PrimType::Nat32),
-            TypeInner::Nat64 => IDLType::PrimT(PrimType::Nat64),
-            TypeInner::Int8 => IDLType::PrimT(PrimType::Int8),
-            TypeInner::Int16 => IDLType::PrimT(PrimType::Int16),
-            TypeInner::Int32 => IDLType::PrimT(PrimType::Int32),
-            TypeInner::Int64 => IDLType::PrimT(PrimType::Int64),
-            TypeInner::Float32 => IDLType::PrimT(PrimType::Float32),
-            TypeInner::Float64 => IDLType::PrimT(PrimType::Float64),
-            TypeInner::Text => IDLType::PrimT(PrimType::Text),
-            TypeInner::Reserved => IDLType::PrimT(PrimType::Reserved),
-            TypeInner::Empty => IDLType::PrimT(PrimType::Empty),
-            TypeInner::Var(id) => IDLType::VarT(id.to_string()),
-            TypeInner::Opt(t) => IDLType::OptT(Box::new(t.clone().into())),
-            TypeInner::Vec(t) => IDLType::VecT(Box::new(t.clone().into())),
-            TypeInner::Record(fields) => {
-                IDLType::RecordT(fields.iter().map(|t| t.clone().into()).collect())
-            }
-            TypeInner::Variant(fields) => {
-                IDLType::VariantT(fields.iter().map(|t| t.clone().into()).collect())
-            }
-            TypeInner::Func(func) => IDLType::FuncT(func.clone().into()),
-            TypeInner::Service(methods) => IDLType::ServT(
-                methods
-                    .iter()
-                    .map(|t| Binding {
-                        id: t.0.clone(),
-                        typ: t.1.clone().into(),
-                    })
-                    .collect(),
-            ),
-            TypeInner::Class(args, t) => IDLType::ClassT(
-                args.iter().map(|t| t.clone().into()).collect(),
-                Box::new(t.clone().into()),
-            ),
-            TypeInner::Principal => IDLType::PrincipalT,
-            TypeInner::Knot(_) | TypeInner::Unknown | TypeInner::Future => {
-                panic!("Unknown type: {:?}", t)
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct IDLTypes {
     pub args: Vec<IDLType>,
@@ -197,15 +146,6 @@ impl From<FuncType> for Function {
     }
 }
 
-impl From<Function> for FuncType {
-    fn from(t: Function) -> Self {
-        FuncType {
-            modes: t.modes,
-            args: t.args.into_iter().map(|t| t.into()).collect(),
-            rets: t.rets.into_iter().map(|t| t.into()).collect(),
-        }
-    }
-}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IDLArgType {
     pub typ: IDLType,
@@ -215,15 +155,6 @@ pub struct IDLArgType {
 impl From<IDLArgType> for ArgType {
     fn from(t: IDLArgType) -> Self {
         ArgType {
-            typ: t.typ.into(),
-            name: t.name,
-        }
-    }
-}
-
-impl From<ArgType> for IDLArgType {
-    fn from(t: ArgType) -> Self {
-        IDLArgType {
             typ: t.typ.into(),
             name: t.name,
         }
@@ -263,15 +194,6 @@ impl From<TypeField> for Field {
     }
 }
 
-impl From<Field> for TypeField {
-    fn from(t: Field) -> Self {
-        TypeField {
-            label: (*t.id).clone(),
-            typ: t.ty.into(),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum Dec {
     TypD(Binding),
@@ -285,10 +207,24 @@ pub struct Binding {
     pub typ: IDLType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct IDLProg {
     pub decs: Vec<Dec>,
     pub actor: Option<IDLType>,
+}
+
+impl IDLProg {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add_binding(&mut self, binding: Binding) {
+        self.decs.push(Dec::TypD(binding));
+    }
+
+    pub fn set_actor(&mut self, actor: Option<IDLType>) {
+        self.actor = actor;
+    }
 }
 
 #[derive(Debug)]
@@ -395,5 +331,14 @@ impl IDLMergedProg {
             IDLType::VarT(id) => self.as_func(self.find_type(id)?),
             _ => Err(format!("not a function type: {:?}", t)),
         }
+    }
+
+    pub fn get_method<'a>(&'a self, t: &'a IDLType, id: &'a str) -> Result<&'a FuncType, String> {
+        for binding in self.service_methods(t)? {
+            if binding.id == id {
+                return self.as_func(&binding.typ);
+            }
+        }
+        Err(format!("cannot find method {id}"))
     }
 }

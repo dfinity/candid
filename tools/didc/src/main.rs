@@ -5,7 +5,7 @@ use candid_parser::{
         syntax::{IDLType, IDLTypes},
         Type,
     },
-    types::syntax::IDLEnv,
+    types::syntax::IDLMergedProg,
 };
 use candid_parser::{
     configs::Configs, parse_idl_args, parse_idl_type, parse_idl_value, pretty_check_file,
@@ -136,19 +136,21 @@ impl TypeAnnotation {
     fn get_types(
         &self,
         mode: Mode,
-    ) -> candid_parser::Result<(TypeEnv, IDLEnv, Vec<Type>, Vec<IDLType>)> {
-        let (env, idl_env, actor) = if let Some(ref file) = self.defs {
+    ) -> candid_parser::Result<(TypeEnv, Vec<Type>, IDLMergedProg, Vec<IDLType>)> {
+        let (env, _, idl_prog) = if let Some(ref file) = self.defs {
             pretty_check_file(file)?
         } else {
-            (TypeEnv::new(), IDLEnv::new(), None)
+            (TypeEnv::new(), None, IDLMergedProg::new())
         };
         let idl_types = match (&self.tys, &self.method) {
             (None, None) => return Err(Error::msg("no type annotations")),
             (Some(tys), None) => tys.args.clone(),
             (None, Some(meth)) => {
-                let actor = actor
+                let actor = idl_prog
+                    .actor
+                    .as_ref()
                     .ok_or_else(|| Error::msg("Cannot use --method with a non-service did file"))?;
-                let func = idl_env.get_method(&actor, meth).map_err(Error::msg)?;
+                let func = idl_prog.get_method(actor, meth).map_err(Error::msg)?;
                 match mode {
                     Mode::Encode => func.args.iter().map(|arg| arg.typ.clone()).collect(),
                     Mode::Decode => func.rets.clone(),
@@ -160,7 +162,7 @@ impl TypeAnnotation {
         for ty in idl_types.iter() {
             types.push(ast_to_type(&env, ty)?);
         }
-        Ok((env, idl_env, types, idl_types))
+        Ok((env, types, idl_prog, idl_types))
     }
 }
 
@@ -194,13 +196,11 @@ fn main() -> Result<()> {
             previous,
             strict,
         } => {
-            let (mut env, _, opt_t1) = pretty_check_file(&input)?;
+            let (mut env, opt_t1, _) = pretty_check_file(&input)?;
             if let Some(previous) = previous {
-                let (env2, _, opt_t2) = pretty_check_file(&previous)?;
+                let (env2, opt_t2, _) = pretty_check_file(&previous)?;
                 match (opt_t1, opt_t2) {
-                    (Some(idl_t1), Some(idl_t2)) => {
-                        let t1 = ast_to_type(&env, &idl_t1)?;
-                        let t2 = ast_to_type(&env2, &idl_t2)?;
+                    (Some(t1), Some(t2)) => {
                         let mut gamma = HashSet::new();
                         let t2 = env.merge_type(env2, t2);
                         if strict {
@@ -232,7 +232,7 @@ fn main() -> Result<()> {
             methods: _,
         } => {
             let configs = load_config(&config)?;
-            let (_, idl_env, _) = pretty_check_file(&input)?;
+            let (_, _, idl_env) = pretty_check_file(&input)?;
             let content = match target.as_str() {
                 "js" => candid_parser::bindings::javascript::compile(&idl_env),
                 "ts" => candid_parser::bindings::typescript::compile(&idl_env),
@@ -286,7 +286,7 @@ fn main() -> Result<()> {
         }
         Command::Assist { annotate } => {
             use candid_parser::assist::{input_args, Context};
-            let (env, _, types, _) = annotate.get_types(Mode::Encode)?;
+            let (env, types, _, _) = annotate.get_types(Mode::Encode)?;
             let ctx = Context::new(env.clone());
             let args = input_args(&ctx, &types)?;
             println!("{args}");
@@ -308,7 +308,7 @@ fn main() -> Result<()> {
             let bytes = if annotate.is_empty() {
                 args.to_bytes()?
             } else {
-                let (env, _, types, _) = annotate.get_types(Mode::Encode)?;
+                let (env, types, _, _) = annotate.get_types(Mode::Encode)?;
                 args.to_bytes_with_types(&env, &types)?
             };
             let hex = match format.as_str() {
@@ -349,7 +349,7 @@ fn main() -> Result<()> {
             let value = if annotate.is_empty() {
                 IDLArgs::from_bytes(&bytes)?
             } else {
-                let (env, _, types, _) = annotate.get_types(Mode::Decode)?;
+                let (env, types, _, _) = annotate.get_types(Mode::Decode)?;
                 IDLArgs::from_bytes_with_types(&bytes, &env, &types)?
             };
             println!("{value}");
@@ -362,7 +362,7 @@ fn main() -> Result<()> {
         } => {
             use candid_parser::configs::{Scope, ScopePos};
             use rand::Rng;
-            let (_, idl_env, _, idl_types) = if args.is_some() {
+            let (_, _, idl_prog, idl_types) = if args.is_some() {
                 annotate.get_types(Mode::Decode)?
             } else {
                 annotate.get_types(Mode::Encode)?
@@ -370,7 +370,7 @@ fn main() -> Result<()> {
             let config = load_config(&config)?;
             // TODO figure out how many bytes of entropy we need
             let seed: Vec<u8> = if let Some(ref args) = args {
-                let (env, _, types, _) = annotate.get_types(Mode::Encode)?;
+                let (env, types, _, _) = annotate.get_types(Mode::Encode)?;
                 let bytes = args.to_bytes_with_types(&env, &types)?;
                 bytes.into_iter().rev().cycle().take(2048).collect()
             } else {
@@ -385,7 +385,7 @@ fn main() -> Result<()> {
                 });
                 Scope { position, method }
             });
-            let args = candid_parser::random::any(&seed, config, &idl_env, &idl_types, &scope)?;
+            let args = candid_parser::random::any(&seed, config, &idl_prog, &idl_types, &scope)?;
             match lang.as_str() {
                 "did" => println!("{args}"),
                 "js" => println!(

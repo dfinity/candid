@@ -253,8 +253,8 @@ pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<(
             let init_2 = to_tuple(&init2_typ);
             equal(gamma, env, &init_1, &init_2).context(format!(
                 "Mismatch in init args: {} and {}",
-                pp_args(init1),
-                pp_args(init2)
+                pp_args(env, init1),
+                pp_args(env, init2)
             ))?;
             equal(gamma, env, ty1, ty2)
         }
@@ -316,14 +316,9 @@ fn pp_args(args: &[crate::types::ArgType]) -> String {
     s
 }
 #[cfg(feature = "printer")]
-fn pp_args(args: &[crate::types::ArgType]) -> String {
+fn pp_args(env: &TypeEnv, args: &[crate::types::ArgType]) -> String {
     use crate::pretty::candid::pp_args;
-    pp_args(
-        args.iter()
-            .map(|arg| arg.clone().into())
-            .collect::<Vec<_>>()
-            .as_slice(),
-    )
-    .pretty(80)
-    .to_string()
+    pp_args(&env.arg_types_to_idl_arg_types(args))
+        .pretty(80)
+        .to_string()
 }

@@ -1,5 +1,6 @@
 use super::CandidType;
 use crate::idl_hash;
+use crate::types::syntax::IDLType;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -177,6 +178,12 @@ impl TypeContainer {
         }
         .into()
     }
+
+    pub fn as_idl_type(&self, ty: &Type) -> IDLType {
+        // The knot type has already been converted to a var type when adding the type to the env,
+        // see `self.add` and `self.go`
+        self.env.as_idl_type(ty)
+    }
 }
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
@@ -325,20 +332,22 @@ impl Type {
 #[cfg(feature = "printer")]
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let env = crate::TypeEnv::new();
         write!(
             f,
             "{}",
-            crate::pretty::candid::pp_ty(&self.clone().into()).pretty(80),
+            crate::pretty::candid::pp_ty(&env.as_idl_type(self)).pretty(80),
         )
     }
 }
 #[cfg(feature = "printer")]
 impl fmt::Display for TypeInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let env = crate::TypeEnv::new();
         write!(
             f,
             "{}",
-            crate::pretty::candid::pp_ty(&Type::from(self.clone()).into()).pretty(80),
+            crate::pretty::candid::pp_ty(&env.inner_as_idl_type(self)).pretty(80),
         )
     }
 }
@@ -488,10 +497,11 @@ pub struct Field {
 #[cfg(feature = "printer")]
 impl fmt::Display for Field {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let env = crate::TypeEnv::new();
         write!(
             f,
             "{}",
-            crate::pretty::candid::pp_field(&self.clone().into(), false).pretty(80)
+            crate::pretty::candid::pp_field(&env.field_to_idl_field(self), false).pretty(80)
         )
     }
 }
@@ -565,10 +575,11 @@ pub struct ArgType {
 #[cfg(feature = "printer")]
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let env = crate::TypeEnv::new();
         write!(
             f,
             "{}",
-            crate::pretty::candid::pp_function(&self.clone().into()).pretty(80),
+            crate::pretty::candid::pp_function(&env.func_to_idl_func(self)).pretty(80),
         )
     }
 }
@@ -733,6 +744,10 @@ pub(crate) fn env_id(id: TypeId, t: Type) {
             }
         }
     });
+}
+
+pub fn get_id(t: &Type) -> TypeId {
+    ID.with(|n| n.borrow().get(t).cloned().unwrap())
 }
 
 pub fn get_type<T>(_v: &T) -> Type
