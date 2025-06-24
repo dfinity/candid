@@ -8,4 +8,5 @@ service :
   g : f;
   h : g;
   o : (o) -> (o);
+  h2 : h;
 }

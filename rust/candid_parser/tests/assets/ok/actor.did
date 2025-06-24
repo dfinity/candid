@@ -2,4 +2,4 @@ type f = func (int8) -> (int8);
 type g = f;
 type h = func (f) -> (f);
 type o = opt o;
-service : { f : (nat) -> (h); g : f; h : g; o : (o) -> (o) }
+service : { f : (nat) -> (h); g : f; h : g; h2 : h; o : (o) -> (o) }

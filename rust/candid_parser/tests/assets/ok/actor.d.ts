@@ -10,6 +10,7 @@ export interface _SERVICE {
   'f' : ActorMethod<[bigint], [Principal, string]>,
   'g' : f,
   'h' : g,
+  'h2' : h,
   'o' : ActorMethod<[o], o>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
