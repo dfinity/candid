@@ -269,30 +269,20 @@ fn add_type_definitions(env: &TypeEnv, module: &mut Module) {
                         })));
                 }
                 TypeInner::Variant(ref fs) => {
-                    // Check if all variants have the same type (especially null)
-                    let all_same_type = !fs.is_empty()
-                        && fs.iter().skip(1).all(|f| {
-                            let first_type = &fs[0].ty;
-                            match (first_type.as_ref(), f.ty.as_ref()) {
-                                (TypeInner::Null, TypeInner::Null) => true,
-                                (a, b) => a == b,
-                            }
-                        });
-
-                    if all_same_type {
-                        // Generate string literal union for variant types with same type
-                        let type_union = create_string_literal_union(id, fs);
-                        module.body.push(type_union);
-                    } else {
-                        // Generate type alias for variant types with different types
-                        let type_alias = create_type_alias(env, id, ty);
-                        module
-                            .body
-                            .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-                                span: DUMMY_SP,
-                                decl: Decl::TsTypeAlias(Box::new(type_alias)),
-                            })));
-                    }
+                    let variant_type = create_variant_type(env, ty, fs);
+                    let type_alias = TsTypeAliasDecl {
+                        span: DUMMY_SP,
+                        declare: false,
+                        id: get_ident_guarded(id),
+                        type_params: None,
+                        type_ann: Box::new(variant_type),
+                    };
+                    module
+                        .body
+                        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                            span: DUMMY_SP,
+                            decl: Decl::TsTypeAlias(Box::new(type_alias)),
+                        })));
                 }
                 TypeInner::Var(ref inner_id) => {
                     let inner_type = env.rec_find_type(inner_id).unwrap();
@@ -834,72 +824,7 @@ pub fn convert_type(env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
             }
         }
         // Variant types
-        Variant(ref fs) => {
-            if fs.is_empty() {
-                TsType::TsKeywordType(TsKeywordType {
-                    span: DUMMY_SP,
-                    kind: TsKeywordTypeKind::TsNeverKeyword,
-                })
-            } else {
-                // Check if all variants have the same type (especially null)
-                let all_null = fs.iter().all(|f| {
-                    matches!(f.ty.as_ref(), TypeInner::Null)
-                });
-
-                if all_null && is_ref {
-                    // For variants with the same type, create union of string literals
-                    if let TypeInner::Var(id) = ty.as_ref() {
-                        // For named type references
-                        TsType::TsTypeRef(TsTypeRef {
-                            span: DUMMY_SP,
-                            type_name: TsEntityName::Ident(get_ident_guarded(id)),
-                            type_params: None,
-                        })
-                    } else {
-                        // For inline variants, create union of string literals directly
-                        TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
-                            TsUnionType {
-                                span: DUMMY_SP,
-                                types: fs
-                                    .iter()
-                                    .map(|f| {
-                                        let variant_name = match &*f.id {
-                                            Label::Named(name) => name.clone(),
-                                            Label::Id(n) | Label::Unnamed(n) => format!("_{}", n),
-                                        };
-
-                                        Box::new(TsType::TsLitType(TsLitType {
-                                            span: DUMMY_SP,
-                                            lit: TsLit::Str(Str {
-                                                span: DUMMY_SP,
-                                                value: variant_name.into(),
-                                                raw: None,
-                                            }),
-                                        }))
-                                    })
-                                    .collect(),
-                            },
-                        ))
-                    }
-                } else {
-                    // Create union of object types (original behavior)
-                    TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
-                        TsUnionType {
-                            span: DUMMY_SP,
-                            types: fs
-                                .iter()
-                                .map(|f| {
-                                    Box::new(TsType::TsTypeLit(TsTypeLit {
-                                        span: DUMMY_SP,
-                                        members: vec![create_property_signature(env, f)],
-                                    }))
-                                })
-                                .collect(),
-                        },
-                    ))
-                }
-            }
-        }
+        Variant(ref fs) => create_variant_type(env, ty, fs),
         // Note: we map to a generic function, which is specified by Principal and function name
         // see https://github.com/dfinity/candid/issues/606
         Func(_) => {
@@ -946,6 +871,74 @@ pub fn convert_type(env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
             span: DUMMY_SP,
             kind: TsKeywordTypeKind::TsAnyKeyword,
         }),
+    }
+}
+
+fn create_variant_type(env: &TypeEnv, ty: &Type, fs: &[Field]) -> TsType {
+    if fs.is_empty() {
+        TsType::TsKeywordType(TsKeywordType {
+            span: DUMMY_SP,
+            kind: TsKeywordTypeKind::TsNeverKeyword,
+        })
+    } else {
+        // Check if all variants have the same type (especially null)
+        let all_null = fs.iter().all(|f| {
+            matches!(f.ty.as_ref(), TypeInner::Null)
+
+        });
+
+        if all_null {
+            // For variant all null, create union of string literals
+            if let TypeInner::Var(id) = ty.as_ref() {
+                // For named type references
+                TsType::TsTypeRef(TsTypeRef {
+                    span: DUMMY_SP,
+                    type_name: TsEntityName::Ident(get_ident_guarded(id)),
+                    type_params: None,
+                })
+            } else {
+                // For inline variants, create union of string literals directly
+                TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
+                    TsUnionType {
+                        span: DUMMY_SP,
+                        types: fs
+                            .iter()
+                            .map(|f| {
+                                let variant_name = match &*f.id {
+                                    Label::Named(name) => name.clone(),
+                                    Label::Id(n) | Label::Unnamed(n) => format!("_{}", n),
+                                };
+
+                                Box::new(TsType::TsLitType(TsLitType {
+                                    span: DUMMY_SP,
+                                    lit: TsLit::Str(Str {
+                                        span: DUMMY_SP,
+                                        value: variant_name.into(),
+                                        raw: None,
+                                    }),
+                                }))
+                            })
+                            .collect(),
+                    },
+                ))
+            }
+        } else {
+            // Create union of object types (original behavior)
+            TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
+                TsUnionType {
+                    span: DUMMY_SP,
+                    types: fs
+                        .iter()
+                        .map(|f| {
+                            Box::new(TsType::TsTypeLit(TsTypeLit {
+                                span: DUMMY_SP,
+                                members: vec![create_property_signature(env, f)],
+                            }))
+                        })
+                        .collect(),
+                },
+            ))
+        }
     }
 }
 
@@ -1708,43 +1701,4 @@ pub fn is_recursive_optional(
         }
         _ => false,
     }
-}
-
-// Create a string literal union type for variants with same type
-fn create_string_literal_union(id: &str, fs: &[Field]) -> ModuleItem {
-    // Create union of string literals
-    let union_type =
-        TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(TsUnionType {
-            span: DUMMY_SP,
-            types: fs
-                .iter()
-                .map(|f| {
-                    let variant_name = match &*f.id {
-                        Label::Named(name) => name.clone(),
-                        Label::Id(n) | Label::Unnamed(n) => format!("_{}", n),
-                    };
-
-                    Box::new(TsType::TsLitType(TsLitType {
-                        span: DUMMY_SP,
-                        lit: TsLit::Str(Str {
-                            span: DUMMY_SP,
-                            value: variant_name.into(),
-                            raw: None,
-                        }),
-                    }))
-                })
-                .collect(),
-        }));
-
-    // Create type alias using the union
-    ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-        span: DUMMY_SP,
-        decl: Decl::TsTypeAlias(Box::new(TsTypeAliasDecl {
-            span: DUMMY_SP,
-            declare: false,
-            id: get_ident_guarded(id),
-            type_params: None,
-            type_ann: Box::new(union_type),
-        })),
-    }))
 }
