@@ -213,20 +213,6 @@ pub struct IDLProg {
     pub actor: Option<IDLType>,
 }
 
-impl IDLProg {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn add_binding(&mut self, binding: Binding) {
-        self.decs.push(Dec::TypD(binding));
-    }
-
-    pub fn set_actor(&mut self, actor: Option<IDLType>) {
-        self.actor = actor;
-    }
-}
-
 #[derive(Debug)]
 pub struct IDLInitArgs {
     pub decs: Vec<Dec>,
