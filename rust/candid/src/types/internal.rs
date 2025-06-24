@@ -746,10 +746,6 @@ pub(crate) fn env_id(id: TypeId, t: Type) {
     });
 }
 
-pub fn get_id(t: &Type) -> TypeId {
-    ID.with(|n| n.borrow().get(t).cloned().unwrap())
-}
-
 pub fn get_type<T>(_v: &T) -> Type
 where
     T: CandidType,
