@@ -1,0 +1,31 @@
+type HeaderField = record { text; text };
+type HttpRequest = record {
+  url : text;
+  method : text;
+  body : blob;
+  headers : vec HeaderField;
+};
+type HttpResponse = record {
+  body : blob;
+  headers : vec HeaderField;
+  streaming_strategy : opt StreamingStrategy;
+  status_code : nat16;
+};
+type StreamingCallback = func (StreamingToken) -> (
+    StreamingCallbackHttpResponse,
+  ) query;
+type StreamingCallbackHttpResponse = record {
+  token : opt StreamingToken;
+  body : blob;
+};
+type StreamingStrategy = variant {
+  Callback : record { token : StreamingToken; callback : StreamingCallback };
+};
+type StreamingToken = record { resource : text; index : nat };
+service : {
+  httpStreamingCallback : (token : StreamingToken) -> (
+      StreamingCallbackHttpResponse,
+    ) query;
+  http_request : (request : HttpRequest) -> (HttpResponse) query;
+  upload : (path : text, mimeType : text, chunk : blob, complete : bool) -> ();
+}
