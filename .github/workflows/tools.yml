@@ -22,9 +22,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: "Setup PNPM"
-        uses: dfinity/ci-tools/actions/setup-pnpm@f241586372f71ae0875545bf5ce2aade82ebc0b5
+        uses: dfinity/ci-tools/actions/setup-pnpm@0a7684a5086dff1eade8b259b5fa1f3c301d7fad
         with:
-          working-directory: ${{ env.WORKING_DIR }}
+          working_directory: ${{ env.WORKING_DIR }}
 
       - name: Build didc-js
         run: pnpm build
