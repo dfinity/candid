@@ -6,7 +6,7 @@ jobs:
     name: run benchmark
     runs-on: ubuntu-latest
     env:
-      RUSTC_VERSION: 1.82.0
+      RUSTUP_TOOLCHAIN: 1.82.0
       CARGO_TERM_COLOR: always # Force Cargo to use colors
       TERM: xterm-256color
     steps:
@@ -16,13 +16,6 @@ jobs:
         with:
           ref: ${{ github.base_ref }}
           path: main/
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.RUSTC_VERSION }}
-          override: true
-          target: wasm32-unknown-unknown
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
@@ -43,6 +36,7 @@ jobs:
       - name: Run perf for base branch
         run: |
           pushd main/rust/bench
+          rustup target add wasm32-unknown-unknown # TODO: remove once #628 is merged
           canbench --show-summary --persist
           popd
           cp main/rust/bench/canbench_results.yml rust/bench/
