@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: "Setup PNPM"
-        uses: dfinity/ci-tools/actions/setup-pnpm@0a7684a5086dff1eade8b259b5fa1f3c301d7fad
+        uses: dfinity/ci-tools/actions/setup-pnpm@dfe8a41559fa517dfcb4c329aff8effd889c8796
         with:
           working_directory: ${{ env.WORKING_DIR }}
 
