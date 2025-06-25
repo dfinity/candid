@@ -1,3 +1,6 @@
 packages:
   - "wasm-package"
   - "wasm-tests"
+
+onlyBuiltDependencies:
+  - "wasm-pack"

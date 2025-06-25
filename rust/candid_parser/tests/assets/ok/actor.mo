@@ -10,6 +10,7 @@ module {
     f : shared Nat -> async h;
     g : f;
     h : g;
+    h2 : h;
     o : shared o -> async o;
   }
 }

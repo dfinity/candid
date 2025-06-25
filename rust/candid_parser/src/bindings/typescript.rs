@@ -24,16 +24,14 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         Reserved => str("any"),
         Empty => str("never"),
         Var(ref id) => {
-            if is_ref {
-                let ty = env.rec_find_type(id).unwrap();
-                if matches!(ty.as_ref(), Service(_) | Func(_)) {
-                    pp_ty(env, ty, false)
-                } else {
-                    ident(id)
-                }
-            } else {
-                ident(id)
+            let ty = env.rec_find_type(id).unwrap();
+            if matches!(ty.as_ref(), Func(_)) {
+                return pp_inline_func();
             }
+            if is_ref && matches!(ty.as_ref(), Service(_)) {
+                return pp_inline_service();
+            }
+            ident(id)
         }
         Principal => str("Principal"),
         Opt(ref t) => str("[] | ").append(enclose("[", pp_ty(env, t, is_ref), "]")),
@@ -85,11 +83,19 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
                 .nest(INDENT_SPACE)
             }
         }
-        Func(_) => str("[Principal, string]"),
-        Service(_) => str("Principal"),
+        Func(_) => pp_inline_func(),
+        Service(_) => pp_inline_service(),
         Class(_, _) => unreachable!(),
         Knot(_) | Unknown | Future => unreachable!(),
     }
+}
+
+fn pp_inline_func<'a>() -> RcDoc<'a> {
+    str("[Principal, string]")
+}
+
+fn pp_inline_service<'a>() -> RcDoc<'a> {
+    str("Principal")
 }
 
 fn pp_label(id: &SharedLabel) -> RcDoc {
@@ -132,7 +138,8 @@ fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)]) -> RcDoc<'a> {
         serv.iter().map(|(id, func)| {
             let func = match func.as_ref() {
                 TypeInner::Func(ref func) => pp_function(env, func),
-                _ => pp_ty(env, func, false),
+                TypeInner::Var(ref id) => ident(id),
+                _ => unreachable!(),
             };
             quote_ident(id).append(kwd(":")).append(func)
         }),
@@ -157,6 +164,11 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str]) -> RcDoc<'a> {
                 .append(ident(id))
                 .append(" = ")
                 .append(pp_function(env, func))
+                .append(";"),
+            TypeInner::Var(ref inner_id) => kwd("export type")
+                .append(ident(id))
+                .append(" = ")
+                .append(ident(inner_id))
                 .append(";"),
             _ => kwd("export type")
                 .append(ident(id))

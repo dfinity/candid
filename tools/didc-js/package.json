@@ -2,10 +2,10 @@
   "name": "didc-js",
   "description": "Workspace for the didc-js project.",
   "private": true,
-  "packageManager": "pnpm@9.12.2",
+  "packageManager": "pnpm@10.10.0",
   "engines": {
     "node": "^20",
-    "pnpm": "^9",
+    "pnpm": "^10",
     "npm": "please use pnpm",
     "yarn": "please use pnpm"
   },

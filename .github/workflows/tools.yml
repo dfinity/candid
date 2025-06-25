@@ -1,0 +1,53 @@
+name: Tools
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always # Force Cargo to use colors
+  TERM: xterm-256color
+  WORKING_DIR: tools/didc-js
+
+jobs:
+  build-didc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build didc
+        run: cargo build -p didc --release
+
+  build-and-test-didc-js:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # TODO: use dfinity/ci-tools/actions/setup-pnpm once the repo has a standard structure with a package.json file in the root
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          package_json_file: ${{ env.WORKING_DIR }}/package.json
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ env.WORKING_DIR }}/.node-version
+          registry-url: "https://registry.npmjs.org"
+          cache: pnpm
+          cache-dependency-path: ${{ env.WORKING_DIR }}/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm i --frozen-lockfile
+      # end of TODO
+
+      - name: Build didc-js
+        run: pnpm build
+
+      - name: Test didc-js
+        run: pnpm test
