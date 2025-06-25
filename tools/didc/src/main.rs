@@ -6,8 +6,7 @@ use candid_parser::candid::types::{
 };
 use candid_parser::{
     configs::Configs, parse_idl_args, parse_idl_type, parse_idl_value, pretty_check_file,
-    pretty_parse, pretty_parse_idl_types, pretty_wrap, typing::ast_to_type, Error, IDLArgs,
-    IDLValue, TypeEnv,
+    pretty_parse_idl_types, pretty_wrap, typing::ast_to_type, Error, IDLArgs, IDLValue, TypeEnv,
 };
 use clap::Parser;
 use console::style;
