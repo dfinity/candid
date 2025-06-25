@@ -20,10 +20,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: "Setup PNPM"
-        uses: dfinity/ci-tools/actions/setup-pnpm@4a9ed3a6c8fb04ec11b9af8e013a10411236860c
+      # TODO: use dfinity/ci-tools/actions/setup-pnpm once the repo has a standard structure with a package.json file in the root
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
         with:
-          working_directory: ${{ env.WORKING_DIR }}
+          package_json_file: ${{ env.WORKING_DIR }}/package.json
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ env.WORKING_DIR }}/.node-version
+          registry-url: "https://registry.npmjs.org"
+          cache: pnpm
+          cache-dependency-path: ${{ env.WORKING_DIR }}/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm i --frozen-lockfile
+      # end of TODO
 
       - name: Build didc-js
         run: pnpm build
