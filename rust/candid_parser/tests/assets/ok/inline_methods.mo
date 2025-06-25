@@ -4,8 +4,8 @@
 module {
   public type Fn = shared query Nat -> async Nat;
   public type Gn = Fn;
-  public type R = { x : Nat; fn : Fn; gn : Gn; nested : { fn : Gn } };
   public type RInline = { x : Nat; fn : shared query Nat -> async Nat };
+  public type R = { x : Nat; fn : Fn; gn : Gn; nested : { fn : Gn } };
   public type Self = actor {
     add_two : shared Nat -> async Nat;
     fn : Fn;

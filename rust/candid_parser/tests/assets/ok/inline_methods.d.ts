@@ -4,13 +4,13 @@ import type { IDL } from '@dfinity/candid';
 
 export type Fn = ActorMethod<[bigint], bigint>;
 export type Gn = Fn;
+export interface RInline { 'x' : bigint, 'fn' : [Principal, string] }
 export interface R {
   'x' : bigint,
   'fn' : [Principal, string],
   'gn' : [Principal, string],
   'nested' : { 'fn' : [Principal, string] },
 }
-export interface RInline { 'x' : bigint, 'fn' : [Principal, string] }
 export interface _SERVICE {
   'add_two' : ActorMethod<[bigint], bigint>,
   'fn' : Fn,
