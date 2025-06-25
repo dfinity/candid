@@ -156,10 +156,12 @@ fn test_struct() {
             TypeField {
                 label: Label::Named("bar".to_string()),
                 typ: IDLType::PrimT(PrimType::Bool),
+                doc_comment: None,
             },
             TypeField {
                 label: Label::Named("foo".to_string()),
                 typ: IDLType::PrimT(PrimType::Int),
+                doc_comment: None,
             },
         ])
     );
@@ -181,10 +183,12 @@ fn test_struct() {
             TypeField {
                 label: Label::Named("g1".to_string()),
                 typ: IDLType::PrimT(PrimType::Int32),
+                doc_comment: None,
             },
             TypeField {
                 label: Label::Named("g2".to_string()),
                 typ: IDLType::PrimT(PrimType::Bool),
+                doc_comment: None,
             },
         ])
     );
@@ -205,10 +209,12 @@ fn test_struct() {
             TypeField {
                 label: Label::Named("head".to_string()),
                 typ: IDLType::PrimT(PrimType::Int32),
+                doc_comment: None,
             },
             TypeField {
                 label: Label::Named("tail".to_string()),
                 typ: IDLType::OptT(Box::new(IDLType::VarT("List".to_string()))),
+                doc_comment: None,
             },
         ])
     );
@@ -229,10 +235,12 @@ fn test_struct() {
             TypeField {
                 label: Label::Named("head".to_string()),
                 typ: IDLType::PrimT(PrimType::Int32),
+                doc_comment: None,
             },
             TypeField {
                 label: Label::Named("tail".to_string()),
                 typ: IDLType::OptT(Box::new(IDLType::VarT("GenericList".to_string()))),
+                doc_comment: None,
             },
         ])
     );
@@ -250,10 +258,12 @@ fn test_struct() {
             TypeField {
                 label: Label::Named("head".to_string()),
                 typ: IDLType::PrimT(PrimType::Int32),
+                doc_comment: None,
             },
             TypeField {
                 label: Label::Named("tail".to_string()),
                 typ: IDLType::OptT(Box::new(IDLType::VarT("GenericList".to_string()))),
+                doc_comment: None,
             },
         ])
     );
@@ -292,12 +302,15 @@ fn test_variant() {
                     TypeField {
                         label: Label::Id(0),
                         typ: IDLType::PrimT(PrimType::Bool),
+                        doc_comment: None,
                     },
                     TypeField {
                         label: Label::Id(1),
                         typ: IDLType::PrimT(PrimType::Int32),
+                        doc_comment: None,
                     },
                 ]),
+                doc_comment: None,
             },
             TypeField {
                 label: Label::Named("Baz".to_string()),
@@ -305,20 +318,25 @@ fn test_variant() {
                     TypeField {
                         label: Label::Named("a".to_string()),
                         typ: IDLType::PrimT(PrimType::Int32),
+                        doc_comment: None,
                     },
                     TypeField {
                         label: Label::Named("b".to_string()),
                         typ: IDLType::PrimT(PrimType::Nat32),
+                        doc_comment: None,
                     },
                 ]),
+                doc_comment: None,
             },
             TypeField {
                 label: Label::Named("Foo".to_string()),
                 typ: IDLType::PrimT(PrimType::Null),
+                doc_comment: None,
             },
             TypeField {
                 label: Label::Named("Newtype".to_string()),
                 typ: IDLType::PrimT(PrimType::Bool),
+                doc_comment: None,
             },
         ])
     );
