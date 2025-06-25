@@ -36,7 +36,6 @@ jobs:
       - name: Run perf for base branch
         run: |
           pushd main/rust/bench
-          rustup target add wasm32-unknown-unknown # TODO: remove once #628 is merged
           canbench --show-summary --persist
           popd
           cp main/rust/bench/canbench_results.yml rust/bench/
