@@ -151,14 +151,20 @@ fn pp_function<'a>(prog: &'a IDLMergedProg, func: &'a FuncType) -> RcDoc<'a> {
 
 fn pp_service<'a>(prog: &'a IDLMergedProg, serv: &'a [Binding]) -> RcDoc<'a> {
     let doc = concat(
-        serv.iter().map(|Binding { id, typ }| {
-            let func = match typ {
-                IDLType::FuncT(ref func) => pp_function(prog, func),
-                IDLType::VarT(ref id) => ident(id),
-                _ => unreachable!(),
-            };
-            quote_ident(id).append(kwd(":")).append(func)
-        }),
+        serv.iter().map(
+            |Binding {
+                 id,
+                 typ,
+                 doc_comment: _,
+             }| {
+                let func = match typ {
+                    IDLType::FuncT(ref func) => pp_function(prog, func),
+                    IDLType::VarT(ref id) => ident(id),
+                    _ => unreachable!(),
+                };
+                quote_ident(id).append(kwd(":")).append(func)
+            },
+        ),
         ",",
     );
     enclose_space("{", doc, "}")

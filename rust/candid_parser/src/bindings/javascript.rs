@@ -192,8 +192,13 @@ fn pp_modes(modes: &[candid::types::FuncMode]) -> RcDoc {
 
 fn pp_service(serv: &[Binding]) -> RcDoc {
     let doc = concat(
-        serv.iter()
-            .map(|Binding { id, typ }| quote_ident(id).append(kwd(":")).append(pp_ty(typ))),
+        serv.iter().map(
+            |Binding {
+                 id,
+                 typ,
+                 doc_comment: _,
+             }| quote_ident(id).append(kwd(":")).append(pp_ty(typ)),
+        ),
         ",",
     );
     enclose_space("({", doc, "})")

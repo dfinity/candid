@@ -83,6 +83,7 @@ pub fn get_metadata(env: &IDLMergedProg) -> Option<String> {
             filtered.insert_binding(Binding {
                 id: d.to_string(),
                 typ: typ.clone(),
+                doc_comment: None,
             });
         }
     }

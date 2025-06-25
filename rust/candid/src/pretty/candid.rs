@@ -191,21 +191,27 @@ pub fn pp_modes(modes: &[FuncMode]) -> RcDoc {
 
 fn pp_service(serv: &[Binding]) -> RcDoc {
     let doc = concat(
-        serv.iter().map(|Binding { id, typ }| {
-            let func_doc = match typ {
-                IDLType::FuncT(ref f) => pp_function(f),
-                IDLType::VarT(_) => pp_ty(typ),
-                _ => unreachable!(),
-            };
-            pp_text(id).append(kwd(" :")).append(func_doc)
-        }),
+        serv.iter().map(
+            |Binding {
+                 id,
+                 typ,
+                 doc_comment: _,
+             }| {
+                let func_doc = match typ {
+                    IDLType::FuncT(ref f) => pp_function(f),
+                    IDLType::VarT(_) => pp_ty(typ),
+                    _ => unreachable!(),
+                };
+                pp_text(id).append(kwd(" :")).append(func_doc)
+            },
+        ),
         ";",
     );
     enclose_space("{", doc, "}")
 }
 
 fn pp_defs(env: &IDLMergedProg) -> RcDoc {
-    lines(env.get_types().iter().map(|(id, typ)| {
+    lines(env.get_types().iter().map(|(id, typ, _)| {
         kwd("type")
             .append(ident(id))
             .append(kwd("="))

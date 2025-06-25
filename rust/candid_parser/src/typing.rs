@@ -145,7 +145,11 @@ fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
 fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         match dec {
-            Dec::TypD(Binding { id, typ }) => {
+            Dec::TypD(Binding {
+                id,
+                typ,
+                doc_comment: _,
+            }) => {
                 let t = check_type(env, typ)?;
                 env.te.0.insert(id.to_string(), t);
             }
@@ -180,7 +184,12 @@ fn check_cycle(env: &TypeEnv) -> Result<()> {
 
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
-        if let Dec::TypD(Binding { id, typ: _ }) = dec {
+        if let Dec::TypD(Binding {
+            id,
+            typ: _,
+            doc_comment: _,
+        }) = dec
+        {
             let duplicate = env.te.0.insert(id.to_string(), TypeInner::Unknown.into());
             if duplicate.is_some() {
                 return Err(Error::msg(format!("duplicate binding for {id}")));

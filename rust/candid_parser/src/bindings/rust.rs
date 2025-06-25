@@ -101,18 +101,22 @@ fn as_result(fs: &[TypeField]) -> Option<(&IDLType, &IDLType, bool)> {
         [TypeField {
             label: ok,
             typ: t_ok,
+            doc_comment: _,
         }, TypeField {
             label: err,
             typ: t_err,
+            doc_comment: _,
         }] if *ok == Label::Named("Ok".to_string()) && *err == Label::Named("Err".to_string()) => {
             Some((t_ok, t_err, false))
         }
         [TypeField {
             label: ok,
             typ: t_ok,
+            doc_comment: _,
         }, TypeField {
             label: err,
             typ: t_err,
+            doc_comment: _,
         }] if *ok == Label::Named("ok".to_string()) && *err == Label::Named("err".to_string()) => {
             Some((t_ok, t_err, true))
         }
@@ -869,19 +873,26 @@ impl NominalState<'_> {
                 {
                     let fs: Vec<_> = fs
                         .iter()
-                        .map(|TypeField { label, typ }| {
-                            let lab = label.to_string();
-                            let elem = StateElem::Label(&lab);
-                            let old = self.state.push_state(&elem);
-                            path.push(TypePath::RecordField(lab.clone()));
-                            let ty = self.nominalize(env, path, typ);
-                            path.pop();
-                            self.state.pop_state(old, elem);
-                            TypeField {
-                                label: label.clone(),
-                                typ: ty,
-                            }
-                        })
+                        .map(
+                            |TypeField {
+                                 label,
+                                 typ,
+                                 doc_comment,
+                             }| {
+                                let lab = label.to_string();
+                                let elem = StateElem::Label(&lab);
+                                let old = self.state.push_state(&elem);
+                                path.push(TypePath::RecordField(lab.clone()));
+                                let ty = self.nominalize(env, path, typ);
+                                path.pop();
+                                self.state.pop_state(old, elem);
+                                TypeField {
+                                    label: label.clone(),
+                                    typ: ty,
+                                    doc_comment: doc_comment.clone(),
+                                }
+                            },
+                        )
                         .collect();
                     IDLType::RecordT(fs)
                 } else {
@@ -900,6 +911,7 @@ impl NominalState<'_> {
                     env.insert_binding(Binding {
                         id: new_var.clone(),
                         typ: ty,
+                        doc_comment: None,
                     });
                     IDLType::VarT(new_var)
                 }
@@ -909,23 +921,30 @@ impl NominalState<'_> {
                 if matches!(path.last(), None | Some(TypePath::Id(_))) || is_result {
                     let fs: Vec<_> = fs
                         .iter()
-                        .map(|TypeField { label, typ }| {
-                            let lab = label.to_string();
-                            let old = self.state.push_state(&StateElem::Label(&lab));
-                            if is_result {
-                                // so that inner record gets a new name
-                                path.push(TypePath::ResultField(lab.clone()));
-                            } else {
-                                path.push(TypePath::VariantField(lab.clone()));
-                            }
-                            let ty = self.nominalize(env, path, typ);
-                            path.pop();
-                            self.state.pop_state(old, StateElem::Label(&lab));
-                            TypeField {
-                                label: label.clone(),
-                                typ: ty,
-                            }
-                        })
+                        .map(
+                            |TypeField {
+                                 label,
+                                 typ,
+                                 doc_comment,
+                             }| {
+                                let lab = label.to_string();
+                                let old = self.state.push_state(&StateElem::Label(&lab));
+                                if is_result {
+                                    // so that inner record gets a new name
+                                    path.push(TypePath::ResultField(lab.clone()));
+                                } else {
+                                    path.push(TypePath::VariantField(lab.clone()));
+                                }
+                                let ty = self.nominalize(env, path, typ);
+                                path.pop();
+                                self.state.pop_state(old, StateElem::Label(&lab));
+                                TypeField {
+                                    label: label.clone(),
+                                    typ: ty,
+                                    doc_comment: doc_comment.clone(),
+                                }
+                            },
+                        )
                         .collect();
                     IDLType::VariantT(fs)
                 } else {
@@ -944,6 +963,7 @@ impl NominalState<'_> {
                     env.insert_binding(Binding {
                         id: new_var.clone(),
                         typ: ty,
+                        doc_comment: None,
                     });
                     IDLType::VarT(new_var)
                 }
@@ -1012,6 +1032,7 @@ impl NominalState<'_> {
                     env.insert_binding(Binding {
                         id: new_var.clone(),
                         typ: ty,
+                        doc_comment: None,
                     });
                     IDLType::VarT(new_var)
                 }
@@ -1019,15 +1040,25 @@ impl NominalState<'_> {
             IDLType::ServT(serv) => match path.last() {
                 None | Some(TypePath::Id(_)) => IDLType::ServT(
                     serv.iter()
-                        .map(|Binding { id, typ }| {
-                            let lab = id.to_string();
-                            let old = self.state.push_state(&StateElem::Label(&lab));
-                            path.push(TypePath::Id(lab.clone()));
-                            let ty = self.nominalize(env, path, typ);
-                            path.pop();
-                            self.state.pop_state(old, StateElem::Label(&lab));
-                            Binding { id: lab, typ: ty }
-                        })
+                        .map(
+                            |Binding {
+                                 id,
+                                 typ,
+                                 doc_comment,
+                             }| {
+                                let lab = id.to_string();
+                                let old = self.state.push_state(&StateElem::Label(&lab));
+                                path.push(TypePath::Id(lab.clone()));
+                                let ty = self.nominalize(env, path, typ);
+                                path.pop();
+                                self.state.pop_state(old, StateElem::Label(&lab));
+                                Binding {
+                                    id: lab,
+                                    typ: ty,
+                                    doc_comment: doc_comment.clone(),
+                                }
+                            },
+                        )
                         .collect(),
                 ),
                 Some(_) => {
@@ -1046,6 +1077,7 @@ impl NominalState<'_> {
                     env.insert_binding(Binding {
                         id: new_var.clone(),
                         typ: ty,
+                        doc_comment: None,
                     });
                     IDLType::VarT(new_var)
                 }
@@ -1077,13 +1109,14 @@ impl NominalState<'_> {
 
     fn nominalize_all(&mut self) -> IDLMergedProg {
         let mut res = IDLMergedProg::new();
-        for (id, typ) in self.state.prog.get_types() {
+        for (id, typ, doc_comment) in self.state.prog.get_types() {
             let elem = StateElem::Label(id);
             let old = self.state.push_state(&elem);
             let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.to_string())], typ);
             res.insert_binding(Binding {
                 id: id.to_string(),
                 typ: ty,
+                doc_comment: doc_comment.cloned(),
             });
             self.state.pop_state(old, elem);
         }

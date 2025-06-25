@@ -189,6 +189,7 @@ impl IDLArgType {
 pub struct TypeField {
     pub label: Label,
     pub typ: IDLType,
+    pub doc_comment: Option<Vec<String>>,
 }
 
 impl From<TypeField> for Field {
@@ -211,6 +212,7 @@ pub enum Dec {
 pub struct Binding {
     pub id: String,
     pub typ: IDLType,
+    pub doc_comment: Option<Vec<String>>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -285,8 +287,11 @@ impl IDLMergedProg {
         }
     }
 
-    pub fn get_types(&self) -> Vec<(&str, &IDLType)> {
-        self.types.iter().map(|t| (t.id.as_str(), &t.typ)).collect()
+    pub fn get_types(&self) -> Vec<(&str, &IDLType, Option<&Vec<String>>)> {
+        self.types
+            .iter()
+            .map(|t| (t.id.as_str(), &t.typ, t.doc_comment.as_ref()))
+            .collect()
     }
 
     pub fn get_bindings(&self) -> Vec<Binding> {

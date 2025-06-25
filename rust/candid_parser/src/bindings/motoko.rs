@@ -253,8 +253,8 @@ fn pp_service(serv: &[Binding]) -> RcDoc {
     kwd("actor").append(enclose_space("{", doc, "}"))
 }
 
-fn pp_defs<'a>(bindings: &[(&'a str, &'a IDLType)]) -> RcDoc<'a> {
-    lines(bindings.iter().map(|(id, typ)| {
+fn pp_defs<'a>(bindings: &[(&'a str, &'a IDLType, Option<&'a Vec<String>>)]) -> RcDoc<'a> {
+    lines(bindings.iter().map(|(id, typ, _)| {
         kwd("public type")
             .append(escape(id, false))
             .append(" = ")

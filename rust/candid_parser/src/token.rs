@@ -1,3 +1,5 @@
+use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
+
 use lalrpop_util::ParseError;
 use logos::{Lexer, Logos};
 
@@ -5,6 +7,8 @@ use logos::{Lexer, Logos};
 #[logos(skip r"[ \t\r\n]+")]
 #[logos(skip r"//[^\n]*")] // line comment
 pub enum Token {
+    #[regex(r"///[^\n]*")]
+    DocComment,
     #[token("/*")]
     StartComment,
     #[token("=")]
@@ -118,22 +122,36 @@ fn parse_number(lex: &mut Lexer<Token>) -> String {
     }
 }
 
+pub type TriviaMap = Rc<RefCell<HashMap<usize, Vec<String>>>>;
+
 pub struct Tokenizer<'input> {
     lex: Lexer<'input, Token>,
+    comment_buffer: Vec<String>,
+    trivia: Option<TriviaMap>,
 }
+
 impl<'input> Tokenizer<'input> {
     pub fn new(input: &'input str) -> Self {
         let lex = Token::lexer(input);
-        Tokenizer { lex }
+        Tokenizer {
+            lex,
+            comment_buffer: vec![],
+            trivia: None,
+        }
+    }
+
+    pub fn new_with_trivia(input: &'input str, trivia: TriviaMap) -> Self {
+        let lex = Token::lexer(input);
+        Tokenizer {
+            lex,
+            comment_buffer: vec![],
+            trivia: Some(trivia),
+        }
     }
 }
 
 pub type Span = std::ops::Range<usize>;
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Spanned<T> {
-    pub span: Span,
-    pub value: T,
-}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LexicalError {
     pub err: String,
@@ -178,6 +196,13 @@ impl Iterator for Tokenizer<'_> {
             Err(_) => {
                 let err = format!("Unknown token {}", self.lex.slice());
                 Some(Err(LexicalError::new(err, span)))
+            }
+            Ok(Token::DocComment) => {
+                let content = self.lex.slice();
+                if self.trivia.is_some() {
+                    self.comment_buffer.push(content.to_string());
+                }
+                self.next()
             }
             Ok(Token::StartComment) => {
                 let mut lex = self.lex.to_owned().morph::<Comment>();
@@ -278,7 +303,15 @@ impl Iterator for Tokenizer<'_> {
                 self.lex = lex.morph::<Token>();
                 Some(Ok((span.start, Token::Text(result), self.lex.span().end)))
             }
-            Ok(token) => Some(Ok((span.start, token, span.end))),
+            Ok(token) => {
+                if let Some(trivia) = &mut self.trivia {
+                    if !self.comment_buffer.is_empty() {
+                        let content: Vec<String> = mem::take(&mut self.comment_buffer);
+                        trivia.borrow_mut().insert(span.start, content);
+                    }
+                }
+                Some(Ok((span.start, token, span.end)))
+            }
         }
     }
 }
