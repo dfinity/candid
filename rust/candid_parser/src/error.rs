@@ -1,10 +1,11 @@
 //! When serializing or deserializing Candid goes wrong.
 
+use candid::types::syntax::{IDLProg, IDLTypes};
 use codespan_reporting::diagnostic::Label;
 use std::io;
 use thiserror::Error;
 
-use crate::token;
+use crate::{parse_idl_prog, parse_idl_types, token};
 use codespan_reporting::{
     diagnostic::Diagnostic,
     files::{Error as ReportError, SimpleFile},
@@ -105,14 +106,20 @@ impl From<toml::de::Error> for Error {
     }
 }
 
+/// Does not work for parsing [IDLProg] and [IDLTypes], use [pretty_parse_idl_prog] and [pretty_parse_idl_types] instead.
 pub fn pretty_parse<T>(name: &str, str: &str) -> Result<T>
 where
     T: std::str::FromStr<Err = Error>,
 {
-    str.parse::<T>().or_else(|e| {
-        pretty_diagnose(name, str, &e)?;
-        Err(e)
-    })
+    str.parse::<T>().or_else(|e| pretty_print_err(name, str, e))
+}
+
+pub fn pretty_parse_idl_prog(name: &str, str: &str) -> Result<IDLProg> {
+    parse_idl_prog(str).or_else(|e| pretty_print_err(name, str, e))
+}
+
+pub fn pretty_parse_idl_types(name: &str, str: &str) -> Result<IDLTypes> {
+    parse_idl_types(str).or_else(|e| pretty_print_err(name, str, e))
 }
 
 /// Wrap the parser error and pretty print the error message.
@@ -122,10 +129,12 @@ where
 /// # Ok::<(), candid_parser::Error>(())
 /// ```
 pub fn pretty_wrap<T>(name: &str, str: &str, f: impl FnOnce(&str) -> Result<T>) -> Result<T> {
-    f(str).or_else(|e| {
-        pretty_diagnose(name, str, &e)?;
-        Err(e)
-    })
+    f(str).or_else(|e| pretty_print_err(name, str, e))
+}
+
+fn pretty_print_err<T>(name: &str, source: &str, e: Error) -> Result<T> {
+    pretty_diagnose(name, source, &e)?;
+    Err(e)
 }
 
 pub fn pretty_diagnose(file_name: &str, source: &str, e: &Error) -> Result<()> {

@@ -6,11 +6,42 @@
 ### Candid
 
 * Breaking changes:
-  + `pp_args` and `pp_init_args` noew require a `&[ArgType]` parameter. The `pp_rets` function has been added, with the signature of the old `pp_args`.
+  + `pp_args` and `pp_init_args` now require a `&[ArgType]` parameter. The `pp_rets` function has been added, with the signature of the old `pp_args`.
+
+* Non-breaking changes:
+  + The following structs have been moved from the `candid_parser` crate to the `candid::types::syntax` module:
+    - `IDLType`
+    - `IDLTypes`
+    - `PrimType`
+    - `FuncType`
+    - `IDLArgType`
+    - `TypeField`
+    - `Dec`
+    - `Binding`
+    - `IDLProg`
+    - `IDLInitArgs`
 
 ### candid_parser
 
 * Breaking changes:
+  + The following structs have been moved to the `candid` crate:
+    - `IDLType`
+    - `IDLTypes`
+    - `PrimType`
+    - `FuncType`
+    - `IDLArgType`
+    - `TypeField`
+    - `Dec`
+    - `Binding`
+    - `IDLProg`
+    - `IDLInitArgs`
+    As a consequence, the `FromStr` trait is no longer implemented for the following types:
+      - `IDLProg`
+      - `IDLInitArgs`
+      - `IDLType`
+      - `IDLTypes`
+    You must now use the `parse_idl_prog`, `parse_idl_init_args`, `parse_idl_type` and `parse_idl_types` functions to parse these types, respectively.
+  + `pretty_parse` doesn't work anymore with the `IDLProg` and `IDLTypes` types. Use `pretty_parse_idl_prog` and `pretty_parse_idl_types` instead.
   + The `args` field in both `FuncType` and `IDLInitArgs` now have type `Vec<IDLArgType>`.
 
 * Non-breaking changes:

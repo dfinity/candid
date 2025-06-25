@@ -1,11 +1,12 @@
 use anyhow::{bail, Result};
-use candid_parser::candid::types::{subtype, Type};
+use candid_parser::candid::types::{
+    subtype,
+    syntax::{IDLType, IDLTypes},
+    Type,
+};
 use candid_parser::{
-    configs::Configs,
-    parse_idl_args, parse_idl_value, pretty_check_file, pretty_parse, pretty_wrap,
-    types::{IDLType, IDLTypes},
-    typing::ast_to_type,
-    Error, IDLArgs, IDLValue, TypeEnv,
+    configs::Configs, parse_idl_args, parse_idl_type, parse_idl_value, pretty_check_file,
+    pretty_parse_idl_types, pretty_wrap, typing::ast_to_type, Error, IDLArgs, IDLValue, TypeEnv,
 };
 use clap::Parser;
 use console::style;
@@ -90,7 +91,9 @@ enum Command {
     Subtype {
         #[clap(short, long)]
         defs: Option<PathBuf>,
+        #[clap(value_parser = parse_idl_type)]
         ty1: IDLType,
+        #[clap(value_parser = parse_idl_type)]
         ty2: IDLType,
     },
 }
@@ -152,7 +155,7 @@ fn parse_args(str: &str) -> Result<IDLArgs, Error> {
     pretty_wrap("candid arguments", str, parse_idl_args)
 }
 fn parse_types(str: &str) -> Result<IDLTypes, Error> {
-    pretty_parse("type annotations", str)
+    pretty_parse_idl_types("type annotations", str)
 }
 fn load_config(input: &Option<String>) -> Result<Configs, Error> {
     match input {

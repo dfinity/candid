@@ -1,7 +1,6 @@
-use crate::Result;
-use candid::types::{FuncMode, Label};
+use crate::types::{FuncMode, Label};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IDLType {
     PrimT(PrimType),
     VarT(String),
@@ -60,14 +59,14 @@ pub enum PrimType {
     Empty,
 }}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FuncType {
     pub modes: Vec<FuncMode>,
     pub args: Vec<IDLArgType>,
     pub rets: Vec<IDLType>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IDLArgType {
     pub typ: IDLType,
     pub name: Option<String>,
@@ -91,7 +90,7 @@ impl IDLArgType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypeField {
     pub label: Label,
     pub typ: IDLType,
@@ -104,13 +103,13 @@ pub enum Dec {
     ImportServ(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Binding {
     pub id: String,
     pub typ: IDLType,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct IDLProg {
     pub decs: Vec<Dec>,
     pub actor: Option<IDLType>,
@@ -120,35 +119,4 @@ pub struct IDLProg {
 pub struct IDLInitArgs {
     pub decs: Vec<Dec>,
     pub args: Vec<IDLArgType>,
-}
-
-impl std::str::FromStr for IDLProg {
-    type Err = crate::Error;
-    fn from_str(str: &str) -> Result<Self> {
-        let lexer = super::token::Tokenizer::new(str);
-        Ok(super::grammar::IDLProgParser::new().parse(lexer)?)
-    }
-}
-impl std::str::FromStr for IDLInitArgs {
-    type Err = crate::Error;
-    fn from_str(str: &str) -> Result<Self> {
-        let lexer = super::token::Tokenizer::new(str);
-        Ok(super::grammar::IDLInitArgsParser::new().parse(lexer)?)
-    }
-}
-
-impl std::str::FromStr for IDLType {
-    type Err = crate::Error;
-    fn from_str(str: &str) -> Result<Self> {
-        let lexer = super::token::Tokenizer::new(str);
-        Ok(super::grammar::TypParser::new().parse(lexer)?)
-    }
-}
-
-impl std::str::FromStr for IDLTypes {
-    type Err = crate::Error;
-    fn from_str(str: &str) -> Result<Self> {
-        let lexer = super::token::Tokenizer::new(str);
-        Ok(super::grammar::TypsParser::new().parse(lexer)?)
-    }
 }

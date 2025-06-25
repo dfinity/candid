@@ -2,14 +2,14 @@ use candid::pretty::candid::compile;
 use candid::types::TypeEnv;
 use candid_parser::bindings::{javascript, motoko, rust, typescript};
 use candid_parser::configs::Configs;
-use candid_parser::types::IDLProg;
+use candid_parser::parse_idl_prog;
 use candid_parser::typing::{check_file, check_prog};
 use goldenfile::Mint;
 use std::io::Write;
 use std::path::Path;
 
 #[test]
-fn parse_idl_prog() {
+fn test_parse_idl_prog() {
     let prog = r#"
 import "test.did";
 type my_type = principal;
@@ -28,7 +28,7 @@ service server : {
   i : f;
 }
     "#;
-    prog.parse::<IDLProg>().unwrap();
+    parse_idl_prog(prog).unwrap();
 }
 
 #[test_generator::test_resources("rust/candid_parser/tests/assets/*.did")]
@@ -45,7 +45,7 @@ fn compiler_test(resource: &str) {
                 let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
                 let content = compile(&env, &actor);
                 // Type check output
-                let ast = content.parse::<IDLProg>().unwrap();
+                let ast = parse_idl_prog(&content).unwrap();
                 check_prog(&mut TypeEnv::new(), &ast).unwrap();
                 writeln!(output, "{content}").unwrap();
             }
