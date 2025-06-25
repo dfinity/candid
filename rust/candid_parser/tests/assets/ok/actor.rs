@@ -21,6 +21,9 @@ impl Service {
   pub async fn h(&self, arg0: &i8) -> Result<(i8,)> {
     ic_cdk::call(self.0, "h", (arg0,)).await
   }
+  pub async fn h_2(&self, arg0: &F) -> Result<(F,)> {
+    ic_cdk::call(self.0, "h2", (arg0,)).await
+  }
   pub async fn o(&self, arg0: &O) -> Result<(O,)> {
     ic_cdk::call(self.0, "o", (arg0,)).await
   }

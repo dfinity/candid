@@ -282,7 +282,7 @@ pub IDLInitArgs: IDLInitArgs = {
     <decs:SepBy<Def, ";">> <args:ArgTupTyp> => IDLInitArgs { decs, args }
 }
 
-// Test file
+// Test file. Follows the "specification" in test/README.md
 
 Input: Input = {
     Text => Input::Text(<>),

@@ -34,16 +34,14 @@ fn pp_ty<'a>(prog: &'a IDLMergedProg, ty: &'a IDLType, is_ref: bool) -> RcDoc<'a
     match ty {
         PrimT(ref ty) => pp_prim_ty(ty),
         VarT(ref id) => {
-            if is_ref {
-                let ty = prog.rec_find_type(id).unwrap();
-                if matches!(ty, ServT(_) | FuncT(_)) {
-                    pp_ty(prog, ty, false)
-                } else {
-                    ident(id)
-                }
-            } else {
-                ident(id)
+            let ty = prog.rec_find_type(id).unwrap();
+            if matches!(ty, FuncT(_)) {
+                return pp_inline_func();
             }
+            if is_ref && matches!(ty, ServT(_)) {
+                return pp_inline_service();
+            }
+            ident(id)
         }
         PrincipalT => str("Principal"),
         OptT(ref t) => str("[] | ").append(enclose("[", pp_ty(prog, t, is_ref), "]")),
@@ -102,10 +100,18 @@ fn pp_ty<'a>(prog: &'a IDLMergedProg, ty: &'a IDLType, is_ref: bool) -> RcDoc<'a
                 .nest(INDENT_SPACE)
             }
         }
-        FuncT(_) => str("[Principal, string]"),
-        ServT(_) => str("Principal"),
+        FuncT(_) => pp_inline_func(),
+        ServT(_) => pp_inline_service(),
         ClassT(_, _) => unreachable!(),
     }
+}
+
+fn pp_inline_func<'a>() -> RcDoc<'a> {
+    str("[Principal, string]")
+}
+
+fn pp_inline_service<'a>() -> RcDoc<'a> {
+    str("Principal")
 }
 
 fn pp_label(id: &Label) -> RcDoc {
@@ -148,7 +154,8 @@ fn pp_service<'a>(prog: &'a IDLMergedProg, serv: &'a [Binding]) -> RcDoc<'a> {
         serv.iter().map(|Binding { id, typ }| {
             let func = match typ {
                 IDLType::FuncT(ref func) => pp_function(prog, func),
-                _ => pp_ty(prog, typ, false),
+                IDLType::VarT(ref id) => ident(id),
+                _ => unreachable!(),
             };
             quote_ident(id).append(kwd(":")).append(func)
         }),
@@ -173,6 +180,11 @@ fn pp_defs<'a>(prog: &'a IDLMergedProg, def_list: &'a [&'a str]) -> RcDoc<'a> {
                 .append(ident(id))
                 .append(" = ")
                 .append(pp_function(prog, func))
+                .append(";"),
+            IDLType::VarT(ref inner_id) => kwd("export type")
+                .append(ident(id))
+                .append(" = ")
+                .append(ident(inner_id))
                 .append(";"),
             _ => kwd("export type")
                 .append(ident(id))

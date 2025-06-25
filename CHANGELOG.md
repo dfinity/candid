@@ -58,6 +58,11 @@
 
 * Keeps argument names for Rust functions.
 
+### didc
+
+* Breaking changes:
+  + The `didc test` subcommand has been removed.
+
 ## 2025-05-15
 
 ### Candid 0.10.14

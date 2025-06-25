@@ -9,8 +9,7 @@ use candid_parser::{
 };
 use candid_parser::{
     configs::Configs, parse_idl_args, parse_idl_type, parse_idl_value, pretty_check_file,
-    pretty_parse, pretty_parse_idl_types, pretty_wrap, typing::ast_to_type, Error, IDLArgs,
-    IDLValue, TypeEnv,
+    pretty_parse_idl_types, pretty_wrap, typing::ast_to_type, Error, IDLArgs, IDLValue, TypeEnv,
 };
 use clap::Parser;
 use console::style;
@@ -45,14 +44,6 @@ enum Command {
         #[clap(short, long, num_args = 1.., value_delimiter = ',')]
         /// Specifies a subset of methods to generate bindings. Allowed format: "-m foo,bar", "-m foo bar", "-m foo -m bar"
         methods: Vec<String>,
-    },
-    /// Generate test suites for different languages
-    Test {
-        /// Specifies .test.did file for test suites generation
-        input: PathBuf,
-        #[clap(short, long, value_parser = ["js", "did"], default_value = "js")]
-        /// Specifies target language
-        target: String,
     },
     /// Compute the hash of a field name
     Hash { input: String },
@@ -262,20 +253,6 @@ fn main() -> Result<()> {
                     let (res, unused) = compile(&config, &idl_env, external);
                     warn_unused(&unused);
                     res
-                }
-                _ => unreachable!(),
-            };
-            println!("{content}");
-        }
-        Command::Test { input, target } => {
-            let test = std::fs::read_to_string(&input)
-                .map_err(|_| Error::msg(format!("could not read file {}", input.display())))?;
-            let ast = pretty_parse::<candid_parser::test::Test>(input.to_str().unwrap(), &test)?;
-            let content = match target.as_str() {
-                "js" => candid_parser::bindings::javascript::test::test_generate(ast),
-                "did" => {
-                    candid_parser::test::check(ast)?;
-                    "".to_string()
                 }
                 _ => unreachable!(),
             };

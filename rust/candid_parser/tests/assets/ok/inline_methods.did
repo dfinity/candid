@@ -1,0 +1,13 @@
+type Fn = func (nat) -> (nat) query;
+type Gn = Fn;
+type R = record { x : nat; fn : Fn; gn : Gn; nested : record { fn : Gn } };
+type RInline = record { x : nat; fn : func (nat) -> (nat) query };
+service : {
+  add_two : (nat) -> (nat);
+  fn : Fn;
+  high_order_fn : (nat, Fn) -> (nat);
+  high_order_fn_inline : (nat, func (nat) -> (nat) query) -> (nat);
+  high_order_fn_via_id : (nat, Gn) -> (Fn);
+  high_order_fn_via_record : (R) -> (nat);
+  high_order_fn_via_record_inline : (RInline) -> (nat);
+}
