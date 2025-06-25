@@ -12,7 +12,15 @@ env:
   WORKING_DIR: tools/didc-js
 
 jobs:
-  build-and-test:
+  build-didc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build didc
+        run: cargo build -p didc --release
+
+  build-and-test-didc-js:
     runs-on: ubuntu-latest
     defaults:
       run:
