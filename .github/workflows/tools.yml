@@ -1,4 +1,5 @@
 name: Tools
+
 on:
   push:
     branches:
@@ -8,6 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: always # Force Cargo to use colors
   TERM: xterm-256color
+  WORKING_DIR: tools/didc-js
 
 jobs:
   build-and-test:
@@ -15,12 +17,14 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: tools/didc-js
+        working-directory: ${{ env.WORKING_DIR }}
     steps:
       - uses: actions/checkout@v4
 
       - name: "Setup PNPM"
-        uses: dfinity/ci-tools/actions/setup-pnpm@main
+        uses: dfinity/ci-tools/actions/setup-pnpm@4b6df5046ffab822abcfef2af5aec2c33e419d02
+        with:
+          working-directory: ${{ env.WORKING_DIR }}
 
       - name: Build didc-js
         run: pnpm build
