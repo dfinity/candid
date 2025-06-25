@@ -47,7 +47,7 @@
 //! ```
 //! # fn f() -> anyhow::Result<()> {
 //! use candid::{TypeEnv, types::{Type, TypeInner}};
-//! use candid_parser::{check_prog, parse_idl_prog, typing::ast_to_type};
+//! use candid_parser::{check_prog, parse_idl_prog};
 //! let did_file = r#"
 //!     type List = opt record { head: int; tail: List };
 //!     type byte = nat8;
@@ -66,7 +66,6 @@
 //! // Note that file import is ignored by check_prog.
 //! let mut env = TypeEnv::new();
 //! let actor = check_prog(&mut env, &ast)?.unwrap();
-//! let actor = ast_to_type(&env, &actor)?;
 //!
 //! let method = env.get_method(&actor, "g").unwrap();
 //! assert_eq!(method.is_query(), true);
@@ -87,7 +86,7 @@
 //! use candid::{IDLArgs, types::value::IDLValue};
 //! use candid_parser::parse_idl_args;
 //! # use candid::TypeEnv;
-//! # use candid_parser::{check_prog, parse_idl_prog, typing::ast_to_type};
+//! # use candid_parser::{check_prog, parse_idl_prog};
 //! # let did_file = r#"
 //! #    type List = opt record { head: int; tail: List };
 //! #    type byte = nat8;
@@ -99,7 +98,6 @@
 //! # let ast = parse_idl_prog(did_file)?;
 //! # let mut env = TypeEnv::new();
 //! # let actor = check_prog(&mut env, &ast)?.unwrap();
-//! # let actor = ast_to_type(&env, &actor)?;
 //! // Get method type f : (byte, int, nat, int8) -> (List)
 //! let method = env.get_method(&actor, "f").unwrap();
 //! let args = parse_idl_args("(42, 42, 42, 42)")?;

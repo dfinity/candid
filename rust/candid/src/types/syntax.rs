@@ -14,6 +14,10 @@ pub enum IDLType {
     ServT(Vec<Binding>),
     ClassT(Vec<IDLArgType>, Box<IDLType>),
     PrincipalT,
+    /// Used in test files.
+    FutureT,
+    /// Used in test files.
+    UnknownT,
 }
 
 impl IDLType {
@@ -79,6 +83,8 @@ impl From<IDLType> for Type {
                 TypeInner::Class(args.into_iter().map(|t| t.into()).collect(), (*t).into())
             }
             IDLType::PrincipalT => TypeInner::Principal,
+            IDLType::FutureT => TypeInner::Future,
+            IDLType::UnknownT => TypeInner::Unknown,
         }
         .into()
     }

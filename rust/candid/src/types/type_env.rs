@@ -204,9 +204,8 @@ impl TypeEnv {
                     .unwrap_or_else(|| panic!("Knot type should already be in the env: {:?}", id));
                 IDLType::VarT(name)
             }
-            TypeInner::Unknown | TypeInner::Future => {
-                panic!("Unknown type: {:?}", ty)
-            }
+            TypeInner::Future => IDLType::FutureT,
+            TypeInner::Unknown => IDLType::UnknownT,
         }
     }
 

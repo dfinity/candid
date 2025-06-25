@@ -27,19 +27,6 @@ pub enum Input {
     Blob(Vec<u8>),
 }
 
-/// Generate assertions for host value
-pub struct HostTest {
-    pub desc: String,
-    pub asserts: Vec<HostAssert>,
-}
-pub enum HostAssert {
-    // The encoded bytes is not unique
-    Encode(IDLArgs, Vec<(IDLType, Type)>, bool, Vec<u8>),
-    NotEncode(IDLArgs, Vec<(IDLType, Type)>),
-    Decode(Vec<u8>, Vec<(IDLType, Type)>, bool, IDLArgs),
-    NotDecode(Vec<u8>, Vec<(IDLType, Type)>),
-}
-
 impl Assert {
     pub fn desc(&self) -> String {
         match &self.desc {
@@ -79,74 +66,6 @@ impl std::str::FromStr for Test {
     fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
         let lexer = super::token::Tokenizer::new(str);
         Ok(super::grammar::TestParser::new().parse(lexer)?)
-    }
-}
-
-impl HostTest {
-    pub fn from_assert(assert: &Assert, env: &TypeEnv, types: &[(IDLType, Type)]) -> Self {
-        use HostAssert::*;
-        let types = types.to_vec();
-        let mut asserts = Vec::new();
-        match &assert.left {
-            Input::Text(s) => {
-                // Without type annotation, numbers are all of type int.
-                // Assertion may not pass.
-                let parsed = crate::parse_idl_args(s);
-                if parsed.is_err() {
-                    let desc = format!("(skip) {}", assert.desc());
-                    return HostTest { desc, asserts };
-                }
-                let parsed = parsed.unwrap();
-                if !assert.pass && assert.right.is_none() {
-                    asserts.push(NotEncode(parsed, types));
-                } else {
-                    let bytes = parsed.to_bytes_with_types(env, &to_types(&types)).unwrap();
-                    asserts.push(Encode(parsed.clone(), types.clone(), true, bytes.clone()));
-                    // round tripping
-                    let vals = parsed.annotate_types(true, env, &to_types(&types)).unwrap();
-                    asserts.push(Decode(bytes, types, true, vals));
-                }
-                let desc = format!("(encode?) {}", assert.desc());
-                HostTest { desc, asserts }
-            }
-            Input::Blob(bytes) => {
-                let bytes = bytes.to_vec();
-                if !assert.pass && assert.right.is_none() {
-                    asserts.push(NotDecode(bytes, types));
-                } else {
-                    let mut config = DecoderConfig::new();
-                    config.set_decoding_quota(DECODING_COST);
-                    let args = IDLArgs::from_bytes_with_types_with_config(
-                        &bytes,
-                        env,
-                        &to_types(&types),
-                        &config,
-                    )
-                    .unwrap();
-                    asserts.push(Decode(bytes.clone(), types.clone(), true, args));
-                    // round tripping
-                    // asserts.push(Encode(args, types.clone(), true, bytes.clone()));
-                    if let Some(right) = &assert.right {
-                        let expected = right.parse(env, &to_types(&types)).unwrap();
-                        if let Input::Blob(blob) = right {
-                            asserts.push(Decode(
-                                blob.to_vec(),
-                                types.clone(),
-                                true,
-                                expected.clone(),
-                            ));
-                        }
-                        if !assert.pass {
-                            asserts.push(Decode(bytes, types, assert.pass, expected));
-                        }
-                    }
-                }
-                HostTest {
-                    desc: assert.desc(),
-                    asserts,
-                }
-            }
-        }
     }
 }
 
@@ -201,12 +120,4 @@ pub fn check(test: Test) -> Result<()> {
             test.asserts.len()
         )))
     }
-}
-
-pub fn to_idl_types(types: &[(IDLType, Type)]) -> Vec<IDLType> {
-    types.iter().map(|(idl_typ, _)| idl_typ.clone()).collect()
-}
-
-fn to_types(types: &[(IDLType, Type)]) -> Vec<Type> {
-    types.iter().map(|(_, ty)| ty.clone()).collect()
 }

@@ -281,9 +281,11 @@ fn test_{test_name}() {{
                     let body = ok.append(", ").append(err);
                     RcDoc::text(result).append(enclose("<", body, ">"))
                 }
-                FuncT(_) => unreachable!(), // not possible after rewriting
-                ServT(_) => unreachable!(), // not possible after rewriting
-                ClassT(_, _) => unreachable!(),
+                FuncT(_) // not possible after rewriting
+                | ServT(_) // not possible after rewriting
+                | ClassT(_, _)
+                | FutureT
+                | UnknownT => unreachable!(),
             }
         };
         self.state.pop_state(old, elem);
