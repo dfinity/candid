@@ -38,8 +38,6 @@ jobs:
         run: cargo doc
   fuzzing:
     runs-on: ubuntu-latest
-    env:
-      RUSTUP_TOOLCHAIN: nightly
     steps:
       - uses: actions/checkout@v4
       - name: Install cargo-fuzz
