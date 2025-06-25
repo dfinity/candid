@@ -1,0 +1,212 @@
+/*
+Encoding tests for construct types
+
+Corresponding to spec version version 0.1.6
+*/
+
+// Type definitions
+type Opt = opt Opt;
+type Vec = vec Vec;
+type EmptyRecord = record { EmptyRecord };
+type OptRec = opt record { OptRec };
+
+type List = opt record { head : int; tail : List };
+type List1 = opt List2;
+type List2 = record { head : int; tail : List1 };
+type EmptyVariant = variant { 0: EmptyVariant };
+type VariantList = variant { nil; cons: record { head : int; tail : VariantList } };
+
+type A1 = record { foo : int32; bar : bool };
+type A2 = record { foo : int32; bar : bool; bat: VariantList; baz: A1; bbb: List; bib: variant { foo; bar }; bab: A1 };
+
+// Type table
+assert blob "DIDL\00\00"               : () "empty table";
+assert blob "DIDL\01\6e\6f\00"         : () "unused type";
+assert blob "DIDL\02\6e\6f\6e\6f\00"   : () "repeated types";
+assert blob "DIDL\01\6e\00\00"         : () "recursive type";
+assert blob "DIDL\01\6e\00"           !: () "type too short";
+assert blob "DIDL\01\00\00"           !: () "vacuous type";
+assert blob "DIDL\02\6e\01\00\00"     !: () "vacuous type";
+assert blob "DIDL\01\6e\01\00"        !: () "table entry out of range";
+assert blob "DIDL\00\01\00"           !: () "arg entry out of range";
+assert blob "DIDL\00\03\7f\7f"        !: () "arg too short";
+assert blob "DIDL\00\02\7f\7f\7f"     !: () "arg too long";
+assert blob "DIDL\00\01\6e\7f\00"     !: () "non-primitive in arg list";
+assert blob "DIDL\01\7f\00"           !: () "primitive type in the table";
+assert blob "DIDL\01\68\00"           !: () "principal in the table";
+assert blob "DIDL\02\6d\7f\00\00"     !: () "table entry in the table";
+assert blob "DIDL\01\00\00"           !: () "table entry in the table (self-reference)";
+assert blob "DIDL\01\6e\6f\6e\6f\00"  !: () "table too long";
+
+// option
+assert blob "DIDL\01\6e\7c\01\00\00" == "(null)"                     : (opt int) "opt: null";
+assert blob "DIDL\01\6e\02\01\00\00"                                !: (opt int) "opt: type out of range";
+assert blob "DIDL\01\6e\7c\01\00\01\2a" == "(opt 42)"                : (opt int) "opt: 42";
+assert blob "DIDL\01\6e\7c\01\00\02\2a"                             !: (opt int) "opt: out of range";
+assert blob "DIDL\01\6e\7c\01\00\ff"                                !: (opt int) "opt: out of range";
+assert blob "DIDL\01\6e\7c\01\00\01"                                !: (opt int) "opt: too short";
+assert blob "DIDL\01\6e\7c\01\00\00\2a"                             !: (opt int) "opt: too long";
+assert blob "DIDL\02\6e\01\6e\7c\01\00\01\01\2a" == "(opt opt 42)"   : (opt opt int) "opt: nested";
+assert blob "DIDL\01\6e\00\01\00\01\01\00" == "(opt opt null)"       : (Opt) "opt: recursion";
+assert blob "DIDL\01\6e\00\01\00\01\01\00" == "(opt opt null)"       : (opt opt opt empty) "opt: non-recursive type";
+assert blob "DIDL\02\6e\01\6e\00\01\00\01\01\00" == "(opt opt null)" : (Opt) "opt: mutual recursion";
+assert blob "DIDL\00\00" == "(null)"                                 : (Opt) "opt: extra arg";
+
+// vector
+assert blob "DIDL\01\6d\7c\01\00\00" == "(vec {})"                          : (vec int) "vec: empty";
+assert blob "DIDL\01\6d\7c\01\00\00"                                        : (vec int8) "vec: non subtype empty";
+assert blob "DIDL\01\6d\7c\01\00\02\01\02" == "(vec { 1; 2 })"              : (vec int) "vec";
+assert blob "DIDL\01\6d\7b\01\00\02\01\02" == "(blob \"\\01\\02\")"         : (vec nat8) "vec: blob";
+assert blob "DIDL\01\6d\00\01\00\00" == "(vec {})"                          : (Vec) "vec: recursive vector";
+assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (Vec) "vec: tree";
+assert blob "DIDL\01\6d\00\01\00\02\00\00" == "(vec { vec {}; vec {} })"    : (vec vec opt empty) "vec: non-recursive tree";
+assert blob "DIDL\01\6d\7f\01\00\e8\07"                                     : (vec null) "vec null";
+assert blob "DIDL\01\6d\7f\01\00\e8\07"                                     : (vec opt nat) "vec null <: vec opt nat";
+assert "(vec { 1; -1 })"                                                   !: (vec nat) "vec: type mismatch";
+assert blob "DIDL\01\6d\7c\01\00"                                          !: (vec int) "vec: too short";
+assert blob "DIDL\01\6d\7c\01\00\02\01"                                    !: (vec int) "vec: too short";
+assert blob "DIDL\01\6d\7c\01\00\01\01\02"                                 !: (vec int) "vec: too long";
+assert blob "DIDL\02\6d\01\6c\00\01\00\05"                                  : (vec record {}) "vec of records";
+
+// record
+assert blob "DIDL\01\6c\00\01\00" == "(record {})"                                : (record {}) "record: empty";
+assert blob "DIDL\01\6c\00\03\00\00\00" == "(record {}, record {}, record {})"    : (record {}, record {}, record {}) "record: multiple records";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 1 = 42 })"               : (record {1:int}) "record";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 1 = opt 42 })"           : (record {1:opt int}) "record: opt";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 1 = null })"             : (record {1:reserved}) "record: reserved";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record {})"                       : (record {}) "record: ignore fields";
+assert "(record { whatever = 0 })"  == "(record {})"                              : (record {}) "record: ignore fields (textual)";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a"                                       !: (record {2:int}) "record: missing field";
+assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 2 = null })"             : (record {2:opt int}) "record: missing opt field";
+assert blob "DIDL\01\6c\00\01\00" == "(record { 2 = null })"                      : (record {2:null}) "record: missing null field";
+assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01" == "(record {42; true})"      : (record {int; bool}) "record: tuple";
+assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01" == "(record {1 = true})"      : (record {1:bool}) "record: ignore fields";
+assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01"                              !: (record {bool; int}) "record: type mismatch";
+assert blob "DIDL\01\6c\02\00\7c\00\7e\01\00\2a\01"                              !: (record {int; bool}) "record: duplicate fields";
+assert blob "DIDL\01\6c\02\01\7c\00\7e\01\00\2a\01"                              !: (record {1:int; 0:bool}) "record: unsorted";
+assert blob "DIDL\01\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\7c\01\00\01\2a"
+    == "(record { foo = 42; bar = true})"                                         : (record {foo:int; bar:bool}) "record: named fields";
+assert blob "DIDL\01\6c\01\cd\84\b0\05\7f\01\00" == "(record { \"☃\" = null })"   : (record { "☃":null }) "record: unicode field";
+assert blob "DIDL\01\6c\01\80\e4\97\d0\12\7c\01\00\2a"                         !: (record {}) "record: field hash larger than u32";
+assert blob "DIDL\04\6c\01\00\01\6c\01\00\02\6c\01\00\03\6c\00\01\00"
+    == "(record { record { record { record {} } } })"                           : (record{record{record{record{}}}}) "record: nested";
+assert blob "DIDL\01\6c\01\00\00\01\00"                                        !: (EmptyRecord) "record: empty recursion";
+assert blob "DIDL\02\6d\01\6c\01\00\01\01\00\01"                               !: (vec EmptyRecord) "vec of empty records";
+assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a"                               !: (record {int}) "record: value too short";
+assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01\00"                         !: (record {int}) "record: value too long";
+assert blob "DIDL\01\6c\02\00\7c\01\01\00\2a\01"                               !: (record {}) "record: type too short";
+assert blob "DIDL\01\6c\02\00\7c\01\00\2a\01"                                  !: (record {}) "record: type too short";
+assert blob "DIDL\01\6c\02\00\7c\01\7e\02\7e\01\00\2a\01\00"                   !: (record {}) "record: type too long";
+assert blob "DIDL\01\6c\02\00\01\01\7e\01\00\00\00"                            !: (record {}) "record: type out of range";
+assert blob "DIDL\01\6c\02\00\01\01\7e\01\7c\2a"                               !: (reserved) "record: type out of range";
+
+// opt
+assert blob "DIDL\00\01\7f" == "(null)"                                         : (opt empty) "opt: parsing null : null";
+assert blob "DIDL\01\6e\6f\01\00\00" == "(null)"                                : (opt empty) "opt: parsing null : opt empty";
+assert blob "DIDL\01\6e\7e\01\00\00" == "(null)"                                : (opt bool) "opt: parsing null : opt bool ";
+assert blob "DIDL\01\6e\7e\01\00\01\00" == "(opt false)"                        : (opt bool) "opt: parsing opt false : opt bool";
+assert blob "DIDL\01\6e\7e\01\00\01\01" == "(opt true)"                         : (opt bool) "opt: parsing opt true : opt bool";
+assert blob "DIDL\01\6e\7e\01\00\01\02"                                        !: (opt bool) "opt: parsing invalid bool at opt bool";
+assert blob "DIDL\00\00" == "(null)"                                            : (opt bool) "opt: extra value";
+
+// nested opt
+assert blob "DIDL\02\6e\01\6e\7e\01\00\00" == "(null)"                          : (opt opt bool) "opt: parsing null : opt opt bool";
+assert blob "DIDL\02\6e\01\6e\7e\01\00\01\00" == "(opt null)"                   : (opt opt bool) "opt: parsing opt null : opt opt bool";
+assert blob "DIDL\02\6e\01\6e\7e\01\00\01\01\00" == "(opt opt false)"           : (opt opt bool) "opt: parsing opt opt false : opt opt bool";
+
+// opt subtype to constituent
+assert blob "DIDL\00\01\7e\00" == "(opt false)"   : (opt bool) "opt: parsing false : opt bool";
+assert blob "DIDL\00\01\7e\01" == "(opt true)"    : (opt bool) "opt: parsing true : opt bool";
+assert blob "DIDL\00\01\7e\02"                   !: (opt bool) "opt: parsing invalid bool at opt bool";
+assert blob "DIDL\01\6e\7f\01\00\00" == "(null)"  : (opt opt null) "opt: parsing (null : opt null) at opt opt null gives null, not opt null";
+assert blob "DIDL\00\01\7e\01" == "(null)"        : (opt opt bool) "opt: parsing true : opt opt bool gives null";
+assert blob "DIDL\00\01\7e\01" == "(null)"        : (Opt) "opt: parsing (true : bool) at \"fix opt\" gives null";
+assert blob "DIDL\01\6c\01\00\00\01\00"          !: (OptRec) "opt: parsing \"fix record\" at \"fix record opt\" fails";
+
+// special opt subtyping
+assert blob "DIDL\00\01\70" == "(null)"  : (opt nat) "reserved <: opt nat";
+assert blob "DIDL\01\6e\7e\01\00\00"    == "(null)"  : (opt nat) "null : opt bool <: opt nat";
+assert blob "DIDL\01\6e\7e\01\00\01\01" == "(null)"  : (opt nat) "opt true : opt bool <: opt nat";
+assert blob "DIDL\01\6e\7e\01\00\01\02"             !: (opt nat) "opt bool <: opt nat with invalid boolean value";
+assert blob "DIDL\02\6e\01\6e\7e\01\00\01\01\01" == "(null)"  : (opt nat) "opt opt true : opt opt bool <: opt nat";
+assert blob "DIDL\02\6e\01\6e\7e\01\00\01\01\01" == "(opt null)"  : (opt opt nat) "opt opt true : opt opt bool <: opt opt nat";
+assert blob "DIDL\02\6e\01\6b\01\00\7e\01\00\01\00\01" == "(null)"  : (opt variant { 0 : int }) "opt: recovered coercion error under variant";
+
+// special record field rules
+assert blob "DIDL\01\6c\00\01\00" == "(record { foo = null })" : (record { foo : opt bool }) "missing optional field";
+assert blob "DIDL\01\6c\00\01\00" == "(record { foo = \"☃\" })" : (record { foo : reserved }) "missing reserved field";
+
+// variant
+assert "(variant {})"                                                          !: (variant {}) "variant: no empty value";
+assert blob "DIDL\01\6b\00\01\00"                                              !: (variant {}) "variant: no empty value";
+assert blob "DIDL\01\6b\01\00\7f\01\00\00" == "(variant {0})"                   : (variant {0}) "variant: numbered field";
+assert blob "DIDL\01\6b\01\00\7f\01\00\00\2a"                                  !: (variant {0:int}) "variant: type mismatch";
+assert blob "DIDL\01\6b\02\00\7f\01\7c\01\00\01\2a"                             : (variant {0:int; 1:int}) "variant: type mismatch in unused tag";
+assert blob "DIDL\01\6b\01\00\7f\01\00\00" == "(variant {0})"                   : (variant {0;1}) "variant: ignore field";
+assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\00"                                : (variant {0}) "variant {0;1} <: variant {0}";
+assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\00" == "(opt variant {0})"         : (opt variant {0}) "variant {0;1} <: opt variant {0}";
+assert blob "DIDL\01\6b\02\00\7f\01\7f\01\00\01" == "(variant {1})"             : (variant {0;1;2}) "variant: change index";
+assert blob "DIDL\01\6b\01\00\7f\01\00\00"                                     !: (variant {1}) "variant: missing field";
+assert blob "DIDL\01\6b\01\00\7f\01\00\01"                                     !: (variant {0}) "variant: index out of range";
+assert blob "DIDL\01\6b\02\00\7f\00\7f\01\00\00"                               !: (variant {0}) "variant: duplicate fields";
+assert blob "DIDL\01\6b\03\00\7f\01\7f\01\7f\01\00\00"                         !: (variant {0}) "variant: duplicate fields";
+assert blob "DIDL\01\6b\02\01\7f\00\7f\01\00\00"                               !: (variant {0;1}) "variant: unsorted";
+assert blob "DIDL\01\6b\03\00\7f\01\7f\ff\ff\ff\ff\0f\7f\01\00\00"              : (variant {0;1;4294967295}) "variant: ok with maxInt";
+assert blob "DIDL\01\6b\03\00\7f\ff\ff\ff\ff\0f\7f\01\7f\01\00\00"             !: (variant {0;1;4294967295}) "variant: unsorted with maxInt";
+assert blob "DIDL\01\6b\02\b3\d3\c9\01\7f\e6\fd\d5\01\7f\01\00\00" == "(variant { Bar })" : (variant { Foo; Bar; }) "variant: enum";
+assert blob "DIDL\01\6b\01\cd\84\b0\05\7f\01\00\00" == "(variant { \"☃\" })"    : (variant { "☃" }) "variant: unicode field";
+assert blob "DIDL\01\6b\02\bc\8a\01\71\c5\fe\d2\01\71\01\00\00\04\67\6f\6f\64"
+    == "(variant { Ok = \"good\" })" : (variant { Ok: text; Err: text }) "variant: result";
+assert blob "DIDL\01\6b\02\9c\c2\01\71\e5\8e\b4\02\6f\01\00\00\04\67\6f\6f\64"
+    == "(variant { ok = \"good\" })" : (variant { ok: text; err: empty }) "variant: with empty";
+assert blob "DIDL\02\6b\02\9c\c2\01\71\e5\8e\b4\02\01\6c\01\00\01\01\00\00\04\67\6f\6f\64"
+    == "(variant { ok = \"good\" })" : (variant { ok: text; err: EmptyRecord }) "variant: with EmptyRecord";    
+assert blob "DIDL\03\6b\03\b3\d3\c9\01\01\bb\d3\c9\01\02\e6\fd\d5\01\7f\6c\02\00\7e\01\7c\6c\02\61\7c\62\7d\01\00\00\01\2a"
+    == "(variant { Bar = record { true; 42 } })" : (variant { Foo; Bar: record { bool; int }; Baz: record { a: int; b: nat } }) "variant";
+assert blob "DIDL\01\6b\01\00\00\01\00\00\00\00\00\00\00\00\00\00\00\00\00" !: (EmptyVariant) "variant: empty recursion";
+assert blob "DIDL\01\6b\01\80\e4\97\d0\12\7c\01\00\00\2a"                   !: (reserved) "variant: field hash larger than u32";
+assert blob "DIDL\01\6b\02\00\7f\01\7c\01\00\01\2a"               : (variant {0; 1:int}) "variant";    
+assert blob "DIDL\01\6b\02\00\7f\01\7c\01\00\01"                 !: (variant {0; 1:int}) "variant: value too short";
+assert blob "DIDL\01\6b\02\00\7f\01\7c\01\00\01\2a\00"           !: (variant {0; 1:int}) "variant: value too long";
+assert blob "DIDL\01\6b\02\00\01\01\7c\01\00\01\2a"              !: (variant {0:reserved; 1:int}) "variant: type out of range";
+assert blob "DIDL\01\6b\02\00\7f\01\00\00"                       !: (variant {0; 1}) "variant: type too short";
+assert blob "DIDL\01\6b\03\00\7f\01\7f\01\00\00"                 !: (variant {0; 1}) "variant: type too long";
+
+// list
+assert blob "DIDL\02\6e\01\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\00\01\00\00" == "(null)" : (List) "record: empty list";
+assert blob "DIDL\02\6e\01\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\00\01\00\01\01\01\02\01\03\01\04\00"
+    == "(opt record { head = 1; tail = opt record { head = 2; tail = opt record { head = 3; tail = opt record { head = 4; tail = null }}}})" : (List) "record: list";
+
+assert blob "DIDL\02\6e\01\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\00\01\00\01\01\01\02\00"
+    == blob "DIDL\02\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\01\6e\00\01\01\01\01\01\02\00" : (List) "record: reorder type table";
+
+assert blob "DIDL\02\6e\01\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\00\01\00\01\01\01\02\00"
+    == "(opt record { head = 1; tail = opt record { head = 2; tail = null } })" : (List1) "record: mutual recursive list";
+
+assert blob "DIDL\02\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\01\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\00\01\00\00"
+    == "(variant {nil})" : (VariantList) "variant: empty list";
+
+assert blob "DIDL\02\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\01\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\00\01\00\01\01\01\02\00"
+    == "(variant { cons = record { head = 1; tail = variant { cons = record { head = 2; tail = variant { nil } } } } })" : (VariantList) "variant: list";
+
+assert blob "DIDL\02\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\01\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\00\01\00\00"
+    == "(variant {nil}, null, null, null, null)" : (VariantList, opt VariantList, null, reserved, opt int) "variant: extra args";
+
+assert blob "DIDL\02\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\01\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\00\01\00\00" !: (VariantList, opt int, vec int) "non-null extra args";
+
+// skip fields
+assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa\02\01\a2\e5\aa\02\04\bb\f1\aa\02\06\86\8e\b7\02\75\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\75\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\03\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\02\6e\05\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\04\6b\02\d3\e3\aa\02\7f\86\8e\b7\02\7f\01\00\01\0b\00\00\00\01\00\00\0a\00\00\00\01\14\00\00\2a\00\00\00" == "(record { foo = 42; bar = true; bat = variant { nil }; baz = record { foo = 10; bar = false }; bbb = opt record { head = 20; tail = null }; bib = variant { bar }; bab = record { foo = 11; bar = true}})" : (A2);
+
+assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa\02\01\a2\e5\aa\02\04\bb\f1\aa\02\06\86\8e\b7\02\75\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\75\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\03\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\02\6e\05\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\04\6b\02\d3\e3\aa\02\7f\86\8e\b7\02\7f\01\00\01\0b\00\00\00\01\00\00\0a\00\00\00\01\14\00\00\2a\00\00\00" == "(record { foo = 42; bar = true })" : (A1) "skip fields";
+
+assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa\02\01\a2\e5\aa\02\04\bb\f1\aa\02\06\86\8e\b7\02\75\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\75\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\03\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\02\6e\05\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\04\6b\02\d3\e3\aa\02\7f\86\8e\b7\02\7f\01\00\01\0b\00\00\00\01\00\00\0a\00\00\00\01\14\00\00\2a\00\00\00" == "(record { bar = true; baz = record { bar = false }; bbb = opt record { head = 20 }})" : (record { bar: bool; baz: record { bar: bool }; bbb: opt record { head : int} }) "skip fields";
+
+assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa\02\01\a2\e5\aa\02\04\bb\f1\aa\02\06\86\8e\b7\02\75\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\75\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\03\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\02\6e\05\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\04\6b\02\d3\e3\aa\02\7f\86\8e\b7\02\7f\01\00\01\0b\00\00\00\01\00\00\0a\00\00\00\01\14\00\00\2a\00\00\00" == "(record { bat = variant { nil } })" : (record { bat: variant { nil; cons: record { head : int; tail : VariantList }; new_field: empty } }) "new variant field";
+
+assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa\02\01\a2\e5\aa\02\04\bb\f1\aa\02\06\86\8e\b7\02\75\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\75\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\03\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\02\6e\05\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\04\6b\02\d3\e3\aa\02\7f\86\8e\b7\02\7f\01\00\01\0b\00\00\00\01\00\00\0a\00\00\00\01\14\00\00\2a\00\00\00" !: (record { foo: int; new_field: bool }) "new record field";
+
+// Future types
+// This uses 0x67 for the “future type”; bump (well, decrement) once that
+// becomes a concrete future type
+assert blob "DIDL\01\67\00\02\00\7e\00\00\01" == "(null, true)" : (opt empty,bool) "skipping minimal future type";
+assert blob "DIDL\01\67\03ABC\02\00\7e\05\00hello\01" == "(null,true)" : (opt empty,bool) "skipping future type with data";

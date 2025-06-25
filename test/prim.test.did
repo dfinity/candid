@@ -1,0 +1,200 @@
+/*
+Encoding tests for primitive types
+
+Corresponding to spec version version 0.1.6
+*/
+
+// fundamentally wrong
+assert blob ""              !: () "empty";
+assert blob "\00\00"        !: () "no magic bytes";
+assert blob "DADL"          !: () "wrong magic bytes";
+assert blob "DADL\00\00"    !: () "wrong magic bytes";
+assert blob "DIDL\80\00\00"  : () "overlong typ table length";
+assert blob "DIDL\00\80\00"  : () "overlong arg length";
+
+// nullary input
+assert blob "DIDL\00\00"     : ();
+assert blob "DIDL\00\00\00" !: () "nullary: too long";
+assert blob "DIDL\00\01\7f"  : () "Additional parameters are ignored";
+assert blob "DIDL\00\01\6e" !: () "Not a primitive type";
+assert blob "DIDL\00\01\5e" !: () "Out of range type";
+
+// Missing arguments
+assert blob "DIDL\00\00"                        !: (nat)       "missing argument: nat   fails";
+assert blob "DIDL\00\00"                        !: (empty)     "missing argument: empty fails";
+assert blob "DIDL\00\00" == "(null)"             : (null)      "missing argument: null";
+assert blob "DIDL\00\00" == "(null)"             : (opt empty) "missing argument: opt empty";
+assert blob "DIDL\00\00" == "(null)"             : (opt null)  "missing argument: opt null";
+assert blob "DIDL\00\00" == "(null)"             : (opt nat)   "missing argument: opt nat";
+assert blob "DIDL\00\00" == blob "DIDL\00\01\70" : (reserved)  "missing argument: reserved";
+
+// primitive types
+assert blob "DIDL\00\01\7f"     : (null);
+assert blob "DIDL\00\01\7e"    !: (null) "wrong type";
+assert blob "DIDL\00\01\7f\00" !: (null) "null: too long";
+
+assert blob "DIDL\00\01\7e\00" == "(false)" : (bool) "bool: false";
+assert blob "DIDL\00\01\7e\01" == "(true)"  : (bool) "bool: true";
+assert blob "DIDL\00\01\7e"                !: (bool) "bool: missing";
+assert blob "DIDL\00\01\7e\02"             !: (bool) "bool: out of range";
+assert blob "DIDL\00\01\7e\ff"             !: (bool) "bool: out of range";
+
+assert blob "DIDL\00\01\7d\00" == "(0)"         : (nat) "nat: 0";
+assert blob "DIDL\00\01\7d\01" == "(1)"         : (nat) "nat: 1";
+assert blob "DIDL\00\01\7d\7f" == "(127)"       : (nat) "nat: 0x7f";
+assert blob "DIDL\00\01\7d\80\01"  == "(128)"   : (nat) "nat: leb (two bytes)";
+assert blob "DIDL\00\01\7d\ff\7f"  == "(16383)" : (nat) "nat: leb (two bytes, all bits)";
+assert blob "DIDL\00\01\7d\80"                 !: (nat) "nat: leb too short";
+assert blob "DIDL\00\01\7d\80\00" == "(0)"      : (nat) "nat: leb overlong";
+assert blob "DIDL\00\01\7d\ff\00" == "(127)"    : (nat) "nat: leb overlong";
+assert blob "DIDL\00\01\7d\80\80\98\f4\e9\b5\ca\6a" == "(60000000000000000)" : (nat) "nat: big number";
+
+assert blob "DIDL\00\01\7c\00" == "(0)"         : (int) "int: 0";
+assert blob "DIDL\00\01\7c\01" == "(1)"         : (int) "int: 1";
+assert blob "DIDL\00\01\7c\7f" == "(-1)"        : (int) "int: -1";
+assert blob "DIDL\00\01\7c\40" == "(-64)"       : (int) "int: -64";
+assert blob "DIDL\00\01\7c\80\01"  == "(128)"   : (int) "int: leb (two bytes)";
+assert blob "DIDL\00\01\7c\80"                 !: (int) "int: leb too short";
+assert blob "DIDL\00\01\7c\80\00" == "(0)"      : (int) "int: leb overlong (0s)";
+assert blob "DIDL\00\01\7c\ff\7f" == "(-1)"     : (int) "int: leb overlong (1s)";
+assert blob "DIDL\00\01\7c\ff\00" == "(127)"    : (int) "int: leb not overlong when signed";
+assert blob "DIDL\00\01\7c\80\7f" == "(-128)"   : (int) "int: leb not overlong when signed";
+assert blob "DIDL\00\01\7c\80\80\98\f4\e9\b5\ca\ea\00" == "(60000000000000000)"  : (int) "int: big number";
+assert blob "DIDL\00\01\7c\80\80\e8\8b\96\ca\b5\95\7f" == "(-60000000000000000)" : (int) "int: negative big number";
+
+assert blob "DIDL\00\01\7d\00" == "(0)"         : (int) "nat <: int: 0";
+assert blob "DIDL\00\01\7d\01" == "(1)"         : (int) "nat <: int: 1";
+assert blob "DIDL\00\01\7d\7f" == "(127)"       : (int) "nat <: int: leb (two bytes)";
+assert blob "DIDL\00\01\7d\80\01"  == "(128)"   : (int) "nat <: int: leb (two bytes)";
+assert blob "DIDL\00\01\7d\ff\7f"  == "(16383)" : (int) "nat <: int: leb (two bytes, all bits)";
+
+assert blob "DIDL\00\01\7b\00" == "(0)"         : (nat8) "nat8: 0";
+assert blob "DIDL\00\01\7b\01" == "(1)"         : (nat8) "nat8: 1";
+assert blob "DIDL\00\01\7b\ff" == "(255)"       : (nat8) "nat8: 255";
+assert blob "DIDL\00\01\7b"                    !: (nat8) "nat8: too short";
+assert blob "DIDL\00\01\7b\00\00"              !: (nat8) "nat8: too long";
+
+assert blob "DIDL\00\01\7a\00\00" == "(0)"         : (nat16) "nat16: 0";
+assert blob "DIDL\00\01\7a\01\00" == "(1)"         : (nat16) "nat16: 1";
+assert blob "DIDL\00\01\7a\ff\00" == "(255)"       : (nat16) "nat16: 255";
+assert blob "DIDL\00\01\7a\00\01" == "(256)"       : (nat16) "nat16: 256";
+assert blob "DIDL\00\01\7a\ff\ff" == "(65535)"     : (nat16) "nat16: 65535";
+assert blob "DIDL\00\01\7a"                       !: (nat16) "nat16: too short";
+assert blob "DIDL\00\01\7a\00"                    !: (nat16) "nat16: too short";
+assert blob "DIDL\00\01\7a\00\00\00"              !: (nat16) "nat16: too long";
+
+assert blob "DIDL\00\01\79\00\00\00\00" == "(0)"          : (nat32) "nat32: 0";
+assert blob "DIDL\00\01\79\01\00\00\00" == "(1)"          : (nat32) "nat32: 1";
+assert blob "DIDL\00\01\79\ff\00\00\00" == "(255)"        : (nat32) "nat32: 255";
+assert blob "DIDL\00\01\79\00\01\00\00" == "(256)"        : (nat32) "nat32: 256";
+assert blob "DIDL\00\01\79\ff\ff\00\00" == "(65535)"      : (nat32) "nat32: 65535";
+assert blob "DIDL\00\01\79\ff\ff\ff\ff" == "(4294967295)" : (nat32) "nat32: 4294967295";
+assert blob "DIDL\00\01\79"                              !: (nat32) "nat32: too short";
+assert blob "DIDL\00\01\79\00"                           !: (nat32) "nat32: too short";
+assert blob "DIDL\00\01\79\00\00"                        !: (nat32) "nat32: too short";
+assert blob "DIDL\00\01\79\00\00\00"                     !: (nat32) "nat32: too short";
+assert blob "DIDL\00\01\79\00\00\00\00\00"               !: (nat32) "nat32: too long";
+
+assert blob "DIDL\00\01\78\00\00\00\00\00\00\00\00" == "(0)"          : (nat64) "nat64: 0";
+assert blob "DIDL\00\01\78\01\00\00\00\00\00\00\00" == "(1)"          : (nat64) "nat64: 1";
+assert blob "DIDL\00\01\78\ff\00\00\00\00\00\00\00" == "(255)"        : (nat64) "nat64: 255";
+assert blob "DIDL\00\01\78\00\01\00\00\00\00\00\00" == "(256)"        : (nat64) "nat64: 256";
+assert blob "DIDL\00\01\78\ff\ff\00\00\00\00\00\00" == "(65535)"      : (nat64) "nat64: 65535";
+assert blob "DIDL\00\01\78\ff\ff\ff\ff\00\00\00\00" == "(4294967295)" : (nat64) "nat64: 4294967295";
+assert blob "DIDL\00\01\78\ff\ff\ff\ff\ff\ff\ff\ff" == "(18446744073709551615)" : (nat64) "nat64: 18446744073709551615";
+assert blob "DIDL\00\01\78"                              !: (nat64) "nat64: too short";
+assert blob "DIDL\00\01\78\00"                           !: (nat64) "nat64: too short";
+assert blob "DIDL\00\01\78\00\00"                        !: (nat64) "nat64: too short";
+assert blob "DIDL\00\01\78\00\00\00"                     !: (nat64) "nat64: too short";
+assert blob "DIDL\00\01\78\00\00\00\00"                  !: (nat64) "nat64: too short";
+assert blob "DIDL\00\01\78\00\00\00\00\00"               !: (nat64) "nat64: too short";
+assert blob "DIDL\00\01\78\00\00\00\00\00\00"            !: (nat64) "nat64: too short";
+assert blob "DIDL\00\01\78\00\00\00\00\00\00\00"         !: (nat64) "nat64: too short";
+assert blob "DIDL\00\01\78\00\00\00\00\00\00\00\00\00"   !: (nat64) "nat64: too long";
+
+assert blob "DIDL\00\01\77\00" == "(0)"         : (int8) "int8: 0";
+assert blob "DIDL\00\01\77\01" == "(1)"         : (int8) "int8: 1";
+assert blob "DIDL\00\01\77\ff" == "(-1)"        : (int8) "int8: -1";
+assert blob "DIDL\00\01\77"                    !: (int8) "int8: too short";
+assert blob "DIDL\00\01\77\00\00"              !: (int8) "int8: too long";
+
+assert blob "DIDL\00\01\76\00\00" == "(0)"         : (int16) "int16: 0";
+assert blob "DIDL\00\01\76\01\00" == "(1)"         : (int16) "int16: 1";
+assert blob "DIDL\00\01\76\ff\00" == "(255)"       : (int16) "int16: 255";
+assert blob "DIDL\00\01\76\00\01" == "(256)"       : (int16) "int16: 256";
+assert blob "DIDL\00\01\76\ff\ff" == "(-1)"        : (int16) "int16: -1";
+assert blob "DIDL\00\01\76"                       !: (int16) "int16: too short";
+assert blob "DIDL\00\01\76\00"                    !: (int16) "int16: too short";
+assert blob "DIDL\00\01\76\00\00\00"              !: (int16) "int16: too long";
+
+assert blob "DIDL\00\01\75\00\00\00\00" == "(0)"          : (int32) "int32: 0";
+assert blob "DIDL\00\01\75\01\00\00\00" == "(1)"          : (int32) "int32: 1";
+assert blob "DIDL\00\01\75\ff\00\00\00" == "(255)"        : (int32) "int32: 255";
+assert blob "DIDL\00\01\75\00\01\00\00" == "(256)"        : (int32) "int32: 256";
+assert blob "DIDL\00\01\75\ff\ff\00\00" == "(65535)"      : (int32) "int32: 65535";
+assert blob "DIDL\00\01\75\ff\ff\ff\ff" == "(-1)"         : (int32) "int32: -1";
+assert blob "DIDL\00\01\75"                              !: (int32) "int32: too short";
+assert blob "DIDL\00\01\75\00"                           !: (int32) "int32: too short";
+assert blob "DIDL\00\01\75\00\00"                        !: (int32) "int32: too short";
+assert blob "DIDL\00\01\75\00\00\00"                     !: (int32) "int32: too short";
+assert blob "DIDL\00\01\75\00\00\00\00\00"               !: (int32) "int32: too long";
+
+assert blob "DIDL\00\01\74\00\00\00\00\00\00\00\00" == "(0)"          : (int64) "int64: 0";
+assert blob "DIDL\00\01\74\01\00\00\00\00\00\00\00" == "(1)"          : (int64) "int64: 1";
+assert blob "DIDL\00\01\74\ff\00\00\00\00\00\00\00" == "(255)"        : (int64) "int64: 255";
+assert blob "DIDL\00\01\74\00\01\00\00\00\00\00\00" == "(256)"        : (int64) "int64: 256";
+assert blob "DIDL\00\01\74\ff\ff\00\00\00\00\00\00" == "(65535)"      : (int64) "int64: 65535";
+assert blob "DIDL\00\01\74\ff\ff\ff\ff\00\00\00\00" == "(4294967295)" : (int64) "int64: 4294967295";
+assert blob "DIDL\00\01\74\ff\ff\ff\ff\ff\ff\ff\ff" == "(-1)"         : (int64) "int64: -1";
+assert blob "DIDL\00\01\74"                              !: (int64) "int64: too short";
+assert blob "DIDL\00\01\74\00"                           !: (int64) "int64: too short";
+assert blob "DIDL\00\01\74\00\00"                        !: (int64) "int64: too short";
+assert blob "DIDL\00\01\74\00\00\00"                     !: (int64) "int64: too short";
+assert blob "DIDL\00\01\74\00\00\00\00"                  !: (int64) "int64: too short";
+assert blob "DIDL\00\01\74\00\00\00\00\00"               !: (int64) "int64: too short";
+assert blob "DIDL\00\01\74\00\00\00\00\00\00"            !: (int64) "int64: too short";
+assert blob "DIDL\00\01\74\00\00\00\00\00\00\00"         !: (int64) "int64: too short";
+assert blob "DIDL\00\01\74\00\00\00\00\00\00\00\00\00"   !: (int64) "int64: too long";
+
+assert blob "DIDL\00\01\73\00\00\00\00" == "(0.)"          : (float32) "float32: 0";
+assert blob "DIDL\00\01\73\00\00\40\40" == "(3.)"          : (float32) "float32: 3";
+assert blob "DIDL\00\01\73\00\00\00\3f" == "(0.5)"         : (float32) "float32: 0.5";
+assert blob "DIDL\00\01\73\00\00\00\bf" == "(-0.5)"        : (float32) "float32: -0.5";
+assert blob "DIDL\00\01\73\00\00"                         !: (float32) "float32: too short";
+assert blob "DIDL\00\01\73\00\00\00\00\00"                !: (float32) "float32: too long";
+
+assert blob "DIDL\00\01\72\00\00\00\00\00\00\00\00" == "(0.)"     : (float64) "float64: 0";
+assert blob "DIDL\00\01\72\00\00\00\00\00\00\08\40" == "(3.)"     : (float64) "float64: 3";
+assert blob "DIDL\00\01\72\00\00\00\00\00\00\e0\3f" == "(0.5)"    : (float64) "float64: 0.5";
+assert blob "DIDL\00\01\72\00\00\00\00\00\00\e0\bf" == "(-0.5)"   : (float64) "float64: -0.5";
+assert blob "DIDL\00\01\72\01\00\00\00\00\00\f0\7f"               : (float64) "float64: NaN";
+assert blob "DIDL\00\01\72\ff\ff\ff\ff\ff\ff\ef\7f"               : (float64) "float64: max value";
+assert blob "DIDL\00\01\72\00\00\00\00"                          !: (float64) "float64: too short";
+assert blob "DIDL\00\01\72\00\00\00\00\00\00\00\00\00"           !: (float64) "float64: too long";
+
+assert blob "DIDL\00\01\71\00" == "(\"\")"             : (text) "text: empty string";
+assert blob "DIDL\00\01\71\06Motoko" == "(\"Motoko\")" : (text) "text: Motoko";
+assert blob "DIDL\00\01\71\05Motoko"                  !: (text) "text: too long";
+assert blob "DIDL\00\01\71\07Motoko"                  !: (text) "text: too short";
+assert blob "DIDL\00\01\71\86\00Motoko"                : (text) "text: overlong length leb";
+assert blob "DIDL\00\01\71\03\e2\98\83" == "(\"☃\")"   : (text) "text: Unicode";
+assert "(\"\\u{2603}\")" == "(\"☃\")"                  : (text) "text: Unicode escape";
+assert "(\"\\u{26_03}\")" == "(\"☃\")"                 : (text) "text: Unicode escape with underscore";
+assert "(\"\\u{2603\")"                               !: (text) "text: Unicode escape (unclosed)";
+assert blob "DIDL\00\01\71\03\e2\28\a1"               !: (text) "text: Invalid utf8";
+assert blob "DIDL\00\01\71\02\e2\98\83"               !: (text) "text: Unicode overshoots";
+assert blob "DIDL\00\01\71\06\09\0A\0D\22\27\5C" == "(\"\\t\\n\\r\\\"\\\'\\\\\")"  : (text) "text: Escape sequences";
+
+assert blob "DIDL\00\01\70" == blob "DIDL\00\01\7f"          : (reserved) "reserved from null";
+assert blob "DIDL\00\01\70" == blob "DIDL\00\01\7e\01"       : (reserved) "reserved from bool";
+assert blob "DIDL\00\01\70" == blob "DIDL\00\01\7d\80\01"    : (reserved) "reserved from nat";
+assert blob "DIDL\00\01\70" == blob "DIDL\00\01\71\06Motoko" : (reserved) "reserved from text";
+assert blob "DIDL\00\00"                                     : (reserved) "reserved extra value";
+assert blob "DIDL\00\01\71\05Motoko"    !: (reserved) "reserved from too short text";
+assert blob "DIDL\00\01\71\03\e2\28\a1" !: (reserved) "reserved from invalid utf8 text";
+
+assert blob "DIDL\00\01\6f"                      !: (empty) "cannot decode empty type";
+assert blob "DIDL\01\6e\6f\01\00\00" == "(null)"  : (opt empty) "okay to decode non-empty value";
+
+assert blob "DIDL\00\0a\7f\7e\7d\7c\7f\70\7f\7b\7a\79\01\2a\2a\2a\2a\00\2a\00\00\00"
+    == "(null, true, 42, 42, null, null, null, 42, 42, 42)" : (null, bool, nat, int, null, reserved, null, nat8, nat16, nat32) "multiple arguments";

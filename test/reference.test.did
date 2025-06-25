@@ -1,0 +1,69 @@
+/*
+Encoding tests for reference types
+
+Corresponding to spec version version 0.1.6
+*/
+
+// principal
+assert blob "DIDL\00\01\68\01\00" == "(principal \"aaaaa-aa\")" : (principal) "principal: ic0";
+assert blob "DIDL\00\01\68\01\03\ca\ff\ee" == "(principal \"w7x7r-cok77-xa\")" : (principal) "principal";
+assert blob "DIDL\00\01\68\01\09\ef\cd\ab\00\00\00\00\00\01"
+  == "(principal \"2chl6-4hpzw-vqaaa-aaaaa-c\")"                               : (principal) "principal";
+assert blob "DIDL\00\01\68\01\02\ca\ff" != "(principal \"w7x7r-cok77-xa\")"    : (principal) "principal";
+assert blob "DIDL\00\01\68\03\ca\ff\ee"                                       !: (principal) "principal: no tag";
+assert blob "DIDL\00\01\68\01\03\ca\ff"                                       !: (principal) "principal: too short";
+assert blob "DIDL\00\01\68\01\03\ca\ff\ee\ee"                                 !: (principal) "principal: too long";
+assert blob "DIDL\01\68\01\00\01\03\ca\ff\ee"                                 !: (principal) "principal: not construct";
+
+// service
+assert blob "DIDL\00\01\68\01\03\ca\ff\ee" !: (service {}) "service: not principal";
+assert blob "DIDL\00\01\69\01\03\ca\ff\ee" !: (service {}) "service: not primitive type";
+assert "(principal \"w7x7r-cok77-xa\")"    !: (service {}) "service: not principal";
+assert blob "DIDL\01\69\00\01\00\01\03\ca\ff\ee" == "(service \"w7x7r-cok77-xa\")" : (service {}) "service";
+assert blob "DIDL\01\69\00\01\00\01\03\ca\ff\ee" == "(service \"w7x7r-cok77-xa\")" : (service {}) "service";
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\01\01\01\03\ca\ff\ee"
+  == "(service \"w7x7r-cok77-xa\")" : (service { foo : (text) -> (nat) }) "service";
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\02\03foo\00\04foo\32\00\01\01\01\03\ca\ff\ee"
+  == "(service \"w7x7r-cok77-xa\")" : (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service";
+
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\03\03foo\00\04foo\32\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service: too long";
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\04foo\32\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service: too short";
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\02\04foo\32\00\03foo\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service: unsorted";
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\02\09foobarbaz\00\06foobar\00\01\01\01\03\ca\ff\ee" !: (service { foobar : (text) -> (nat); foobarbaz : (text) -> (nat) }) "service: unsorted (but sorted by hash)";
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03\e2\28\a1\00\01\01\01\03\ca\ff\ee" !: (reserved) "service: invalid unicode";
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\02\03foo\00\03foo\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat) }) "service: duplicate";
+
+assert blob "DIDL\05i\02\03foo\01\04\f0\9f\90\82\02j\00\00\01\02j\01\03\01\04\01\01n|l\00\01\00\01\00"
+  == "(service \"aaaaa-aa\")" : (service {"🐂":(opt int)->(record{}) query; foo:()->() oneway}) "service: unicode";
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\68\01\01\01\03\ca\ff\ee" !: (service { foo: () -> () }) "service { foo: principal }";
+assert blob "DIDL\02\6e\7e\69\01\03foo\00\01\01\01\03\ca\ff\ee" !: (service { foo: () -> () }) "service { foo: opt bool }";
+assert blob "DIDL\02\69\01\03foo\01\6e\7e\01\01\01\03\ca\ff\ee" !: (service { foo: () -> () }) "service { foo: opt bool }";
+
+// function
+assert blob "DIDL\01\6a\00\00\00\01\00\01\01\03\ca\ff\ee\01\61"
+  == "(func \"w7x7r-cok77-xa\".\"a\")"          : (func () -> ()) "func: quote name";
+assert blob "DIDL\01\6a\00\00\00\01\00\01\01\03\ca\ff\ee\01\61"
+  == "(func \"w7x7r-cok77-xa\".a)"              : (func () -> ()) "func: non-quote name";
+assert blob "DIDL\01\6a\00\00\00\01\00\01\00\03\ca\ff\ee\01\61" !: (func () -> ()) "func: wrong tag";
+assert blob "DIDL\02j\02|}\01\01\01\01i\00\01\00\01\01\00\04\f0\9f\90\82"
+  == "(func \"aaaaa-aa\".\"🐂\")"               : (func (int,nat) -> (service {}) query) "func: unicode";
+assert blob "DIDL\01\6a\01\68\01\7d\00\01\00\01\01\03\ca\ff\ee\03foo"
+  == "(func \"w7x7r-cok77-xa\".foo)"            : (func (principal) -> (nat)) "func";
+assert blob "DIDL\01\6a\01\71\01\7d\01\01\01\00\01\01\03\ca\ff\ee\03foo"
+  == "(func \"w7x7r-cok77-xa\".foo)"            : (func (text) -> (nat) query) "func: query";
+assert blob "DIDL\01\6a\01\71\01\7d\01\03\01\00\01\01\03\ca\ff\ee\03foo"
+  == "(func \"w7x7r-cok77-xa\".foo)"            : (func (text) -> (nat) composite_query) "func: composite query";  
+assert blob "DIDL\01\6a\01\71\01\7d\01\80\01\01\00\01\01\03\ca\ff\ee\03foo" !: (func (text) -> (nat) query) "func: unknown annotation";
+assert blob "DIDL\00\01\6a\01\01\03\ca\ff\ee\01\61" !: (func () -> ()) "func: not primitive";
+assert blob "DIDL\00\01\6a\01\03\ca\ff\ee\01\61"    !: (func () -> ()) "func: no tag";
+assert blob "DIDL\01\6a\01\69\01\7d\00\01\00\01\01\03\ca\ff\ee\03foo" !: (func (service {}) -> (nat)) "func: service not in type table";
+assert blob "DIDL\01\6a\01\71\01\7d\01\03\01\00\01\01\03\ca\ff\ee\03foo" !: (func (text) -> (nat)) "func: invalid annotation";
+
+// subtype
+assert blob "DIDL\01\69\00\01\00\01\03\ca\ff\ee"    !: (service { foo : (text) -> (nat) }) "service {} !<: service { foo : (text) -> (nat) }";
+assert blob "DIDL\02\6a\01\71\01\7d\01\01\69\01\03foo\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat) }) "service { foo : (text) -> (nat) query } !<: service { foo : (text) -> (nat) }";
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat) query }) "service { foo : (text) -> (nat) } !<: service { foo : (text) -> (nat) query }";
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\01\01\01\03\ca\ff\ee" == "(service \"w7x7r-cok77-xa\")" : (service {}) "service { foo : (text) -> (nat) } decodes at service {}";
+
+assert blob "DIDL\01\6a\00\00\00\01\00\01\01\03\ca\ff\ee\03foo" !: (func (text) -> (nat)) "func () -> () !<: func (text) -> (nat) }";
+assert blob "DIDL\01\6a\01\71\01\7d\00\01\00\01\01\03\ca\ff\ee\03foo" == "(func \"w7x7r-cok77-xa\".foo)" : (func (text, opt text) -> ()) "func (text) -> (nat) decodes at func (text, opt text) -> () }";

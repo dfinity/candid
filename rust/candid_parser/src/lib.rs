@@ -140,6 +140,7 @@ pub mod configs;
 #[cfg_attr(docsrs, doc(cfg(feature = "random")))]
 #[cfg(feature = "random")]
 pub mod random;
+pub mod test;
 
 pub fn parse_idl_args(s: &str) -> crate::Result<candid::IDLArgs> {
     let lexer = token::Tokenizer::new(s);

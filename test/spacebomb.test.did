@@ -1,0 +1,37 @@
+
+// Space bomb tests
+
+// Messages in this test all take a lot of time, memory and stack space to decode.
+// With infinite resources, these are all valid Candid messages.
+// When using Candid in a resource limited environment, for example one consensus round in a blockchain,
+// an implementation with self-metering should reject these messages relatively early
+// without going through the whole deserialisation process.
+
+// \80\94\eb\dc\03  is 1000_000_000
+// \80\ad\e2\04     is   10_000_000
+// \ff\ff\3f        is    1_048_575
+// \80\b5\18        is      400_000
+
+
+// Plain decoding (unused arguments) 
+assert blob "DIDL\01\6d\7f\01\00\80\94\eb\dc\03"                           !: () "vec null (extra argument)";
+assert blob "DIDL\01\6d\70\01\00\80\94\eb\dc\03"                           !: () "vec reserved (extra argument)";
+assert blob "DIDL\04\6c\03\00\7f\01\01\02\02\6c\01\00\70\6c\00\6d\00\01\03\80\94\eb\dc\03" !: () "zero-sized record (extra argument)";
+assert blob "DIDL\02\6d\01\6d\7f\01\00\05\ff\ff\3f\ff\ff\3f\ff\ff\3f\ff\ff\3f\ff\ff\3f"    !: () "vec vec null (extra argument)";
+assert blob "DIDL\02\6d\01\6c\00\01\00\80\ad\e2\04"                                        !: () "vec record {} (extra argument)";
+assert blob "DIDL\17\6c\02\01\7f\02\7f\6c\02\01\00\02\00\6c\02\00\01\01\01\6c\02\00\02\01\02\6c\02\00\03\01\03\6c\02\00\04\01\04\6c\02\00\05\01\05\6c\02\00\06\01\06\6c\02\00\07\01\07\6c\02\00\08\01\08\6c\02\00\09\01\09\6c\02\00\0a\01\0a\6c\02\00\0b\01\0b\6c\02\00\0c\01\0c\6c\02\00\0d\02\0d\6c\02\00\0e\01\0e\6c\02\00\0f\01\0f\6c\02\00\10\01\10\6c\02\00\11\01\11\6c\02\00\12\01\12\6c\02\00\13\01\13\6e\14\6d\15\01\16\02\01\01" !: () "vec opt record with 2^20 null (extra argument)";
+
+// Decoding to actual type
+assert blob "DIDL\01\6d\7f\01\00\80\94\eb\dc\03"                           !: (vec opt nat) "vec null (not ignored)";
+assert blob "DIDL\01\6d\70\01\00\80\94\eb\dc\03"                           !: (vec reserved) "vec reserved (not ignored)";
+assert blob "DIDL\04\6c\03\00\7f\01\01\02\02\6c\01\00\70\6c\00\6d\00\01\03\80\94\eb\dc\03" !: (vec record {null;record{reserved};record{}}) "zero-sized record (not ignored)";
+assert blob "DIDL\02\6d\01\6d\7f\01\00\05\ff\ff\3f\ff\ff\3f\ff\ff\3f\ff\ff\3f\ff\ff\3f"    !: (vec vec null) "vec vec null (not ignored)";
+assert blob "DIDL\02\6d\01\6c\00\01\00\80\ad\e2\04"                                        !: (vec record {}) "vec record {} (not ignored)";
+
+// Decoding under opt
+assert blob "DIDL\01\6d\7f\01\00\80\94\eb\dc\03"                           !: (opt nat) "vec null (subtyping)";
+assert blob "DIDL\01\6d\70\01\00\80\94\eb\dc\03"                           !: (opt nat) "vec reserved (subtyping)";
+assert blob "DIDL\04\6c\03\00\7f\01\01\02\02\6c\01\00\70\6c\00\6d\00\01\03\80\94\eb\dc\03" !: (opt nat) "zero-sized record (subtyping)";
+assert blob "DIDL\02\6d\01\6d\7f\01\00\05\ff\ff\3f\ff\ff\3f\ff\ff\3f\ff\ff\3f\ff\ff\3f"    !: (vec opt nat) "vec vec null (subtyping)";
+assert blob "DIDL\02\6d\01\6c\00\01\00\80\ad\e2\04"                                        !: (opt nat) "vec record {} (subtyping)";
+assert blob "DIDL\17\6c\02\01\7f\02\7f\6c\02\01\00\02\00\6c\02\00\01\01\01\6c\02\00\02\01\02\6c\02\00\03\01\03\6c\02\00\04\01\04\6c\02\00\05\01\05\6c\02\00\06\01\06\6c\02\00\07\01\07\6c\02\00\08\01\08\6c\02\00\09\01\09\6c\02\00\0a\01\0a\6c\02\00\0b\01\0b\6c\02\00\0c\01\0c\6c\02\00\0d\02\0d\6c\02\00\0e\01\0e\6c\02\00\0f\01\0f\6c\02\00\10\01\10\6c\02\00\11\01\11\6c\02\00\12\01\12\6c\02\00\13\01\13\6e\14\6d\15\01\16\05\01\01\01\01\01" !: (vec opt record {}) "vec opt record with 2^20 null (subtyping)";

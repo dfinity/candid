@@ -1,0 +1,32 @@
+/*
+Corresponding to spec version version 0.1.6
+
+The tests in this file involve large leb-encoded values that indicate sizes (of
+tables, arrays, blobs, etc.). In all cases, a decode should be able to catch
+that eary by noticing that the overall input is too short to potentially
+contain that number of elements.
+
+The number is always one billion (leb "\80\94\eb\dc\03"). A test suite could run
+these tests with a memory limit, of, say 100MB and should still never run into
+out of memory conditions, if these eager plausability checks are performed.
+*/
+
+
+assert blob "DIDL\80\94\eb\dc\03\00" !: () "type table length";
+assert blob "DIDL\00\80\94\eb\dc\03" !: () "argument sequence length";
+assert blob "DIDL\00\01\71\80\94\eb\dc\03Motoko" !: (text) "text length";
+assert blob "DIDL\00\01\68\01\80\94\eb\dc\03Motoko" !: (principal) "principal length";
+
+assert blob "DIDL\01\6c\80\94\eb\dc\03\00\7f\00\7f" !: () "record field number";
+assert blob "DIDL\01\6b\80\94\eb\dc\03\00\7f\00\7f" !: () "variant field number";
+
+
+// the next one is an interesting one: it would not work with (vec null) or
+// (vec reserved) or similar, as values of these types have size 0.
+// Some implementations may detect the overshoot eagerly, others not.
+assert blob "DIDL\01\6d\7e\01\00\80\94\eb\dc\03\00\00\00" !: (vec bool) "vector length";
+
+assert blob "DIDL\01\6a\68\68\68\68\68\00\00\00\00\00\00\00\00\00\00\00\00\00\00\68\68\68\68\68\68\00\68\68\7a\68\68\68\68\68\68\68\68\68\68\68\68\68\68\68\79\79\79\79\79\79\79\79\79\79\79\79\79\79\79\7a\79\79\79\79\79\79\79\79\79\7b\79\79\79\79\79\7f\00\79\79\79\79\79\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\04\00\00\00\00\01\01\68\68\1d\00\00\00\00\00\00\00\68\1f\00\00\00\00\00\00\00\00\68\00\44\44\44\44\44\44\49\44\4c\00\f7\01\7c\80\80\80\80\80\80\80\80\ff\ff\ff\ff\80\80\80\80\80\80\80\80\ff\ff\ff\ff\80\80\80\80\80\80\80\80\80\80\80\80\49\44\4c\01\6c\01\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\01" !: () "func arg length";
+
+assert blob "DIDL\01\67\80\94\eb\dc\03\00\00" !: () "future type length";
+assert blob "DIDL\01\67\00\01\00\80\94\eb\dc\03\00\00" !: () "future value length";
