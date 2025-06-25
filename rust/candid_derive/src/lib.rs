@@ -77,15 +77,6 @@ pub(crate) fn get_doc_comment_lines(attrs: &[syn::Attribute]) -> Vec<String> {
         .collect()
 }
 
-pub(crate) fn get_doc_comment_from_lines(comment_lines: &[String]) -> proc_macro2::TokenStream {
-    let comment_strings: Vec<proc_macro2::TokenStream> = comment_lines
-        .iter()
-        .map(|s| quote::quote! { #s.to_string() })
-        .collect();
-
-    quote::quote! { vec![#(#comment_strings),*] }
-}
-
 fn get_custom_candid_path(input: &syn::DeriveInput) -> Result<Option<proc_macro2::TokenStream>> {
     let candid_path_helper_attribute_option = input
         .attrs

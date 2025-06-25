@@ -1,4 +1,4 @@
-use crate::{get_doc_comment_from_lines, get_doc_comment_lines};
+use crate::get_doc_comment_lines;
 
 use super::{candid_path, get_lit_str};
 use lazy_static::lazy_static;
@@ -131,7 +131,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
                     "update" => quote! { vec![] },
                     _ => unreachable!(),
                 };
-                let doc_comment = get_doc_comment_from_lines(doc_comment.as_slice());
+                let doc_comment = generate_doc_comment(doc_comment.as_slice());
                 quote! {
                     {
                         let mut args: Vec<ArgType> = Vec::new();
@@ -203,6 +203,15 @@ fn generate_ret(name: TokenStream, ty: &str) -> TokenStream {
     quote! {
         #name.push(env.add::<#ty>());
     }
+}
+
+fn generate_doc_comment(comment_lines: &[String]) -> TokenStream {
+    let comment_strings: Vec<TokenStream> = comment_lines
+        .iter()
+        .map(|s| quote::quote! { #s.to_string() })
+        .collect();
+
+    quote::quote! { vec![#(#comment_strings),*] }
 }
 
 fn get_args(sig: &Signature) -> Result<(ParsedArgs, ParsedRets)> {
