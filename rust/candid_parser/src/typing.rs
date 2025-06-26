@@ -6,7 +6,7 @@ use candid::types::{
     ArgType, Field, Function, Type, TypeEnv, TypeInner,
 };
 use candid::utils::check_unique;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 pub struct Env<'a> {
@@ -155,29 +155,6 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
-fn check_cycle(env: &TypeEnv) -> Result<()> {
-    fn has_cycle<'a>(seen: &mut BTreeSet<&'a str>, env: &'a TypeEnv, t: &'a Type) -> Result<bool> {
-        match t.as_ref() {
-            TypeInner::Var(id) => {
-                if seen.insert(id) {
-                    let ty = env.find_type(id)?;
-                    has_cycle(seen, env, ty)
-                } else {
-                    Ok(true)
-                }
-            }
-            _ => Ok(false),
-        }
-    }
-    for (id, ty) in env.0.iter() {
-        let mut seen = BTreeSet::new();
-        if has_cycle(&mut seen, env, ty)? {
-            return Err(Error::msg(format!("{id} has cyclic type definition")));
-        }
-    }
-    Ok(())
-}
-
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         if let Dec::TypD(Binding { id, typ: _ }) = dec {
@@ -189,7 +166,7 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     }
     env.pre = true;
     check_defs(env, decs)?;
-    check_cycle(env.te)?;
+    env.te.check_cycle()?;
     env.pre = false;
     check_defs(env, decs)?;
     Ok(())
@@ -376,7 +353,7 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>, I
         res = merge_actor(&env, &res, &actor, "")?;
     }
 
-    idl_merged_prog.set_actor(res.clone().map(|t| te.as_idl_type(&t)));
+    idl_merged_prog.set_actor(res.clone().map(|t| env.te.as_idl_type(&t)));
 
     Ok((te, res, idl_merged_prog))
 }
