@@ -6,21 +6,44 @@ use candid::types::{
     ArgType, Field, Function, Type, TypeEnv, TypeInner,
 };
 use candid::utils::check_unique;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
 pub struct Env<'a> {
     pub te: &'a mut TypeEnv,
+    doc_comments_in_actor: HashMap<String, Vec<String>>,
+    can_insert_doc_comments: bool,
     pub pre: bool,
+}
+
+impl<'a> Env<'a> {
+    fn new_with_te(te: &'a mut TypeEnv) -> Self {
+        Self {
+            te,
+            doc_comments_in_actor: HashMap::new(),
+            can_insert_doc_comments: false,
+            pre: false,
+        }
+    }
+
+    /// Insert doc comments if [Env::can_insert_doc_comments] is true and there is a doc comment.
+    fn insert_comments_if_allowed(&mut self, id: &str, doc_comment: Option<&Vec<String>>) {
+        if !self.can_insert_doc_comments {
+            return;
+        }
+
+        if let Some(doc_comment) = doc_comment {
+            self.doc_comments_in_actor
+                .insert(id.to_string(), doc_comment.to_vec());
+        }
+    }
 }
 
 /// Convert candid AST to internal Type
 pub fn ast_to_type(env: &TypeEnv, ast: &IDLType) -> Result<Type> {
-    let env = Env {
-        te: &mut env.clone(),
-        pre: false,
-    };
-    check_type(&env, ast)
+    let mut te = env.clone();
+    let mut env = Env::new_with_te(&mut te);
+    check_type(&mut env, ast)
 }
 
 fn check_prim(prim: &PrimType) -> Type {
@@ -46,7 +69,7 @@ fn check_prim(prim: &PrimType) -> Type {
     .into()
 }
 
-pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
+pub fn check_type(env: &mut Env, t: &IDLType) -> Result<Type> {
     match t {
         IDLType::PrimT(prim) => Ok(check_prim(prim)),
         IDLType::VarT(id) => {
@@ -105,14 +128,14 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
     }
 }
 
-fn check_arg(env: &Env, arg: &IDLArgType) -> Result<ArgType> {
+fn check_arg(env: &mut Env, arg: &IDLArgType) -> Result<ArgType> {
     Ok(ArgType {
         name: arg.name.clone(),
         typ: check_type(env, &arg.typ)?,
     })
 }
 
-fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
+fn check_fields(env: &mut Env, fs: &[TypeField]) -> Result<Vec<Field>> {
     // field label duplication is checked in the parser
     let mut res = Vec::new();
     for f in fs.iter() {
@@ -122,11 +145,12 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
             ty,
         };
         res.push(field);
+        env.insert_comments_if_allowed(&f.label.to_string(), f.doc_comment.as_ref());
     }
     Ok(res)
 }
 
-fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
+fn check_meths(env: &mut Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
     // binding duplication is checked in the parser
     let mut res = Vec::new();
     for meth in ms.iter() {
@@ -138,6 +162,7 @@ fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
             )));
         }
         res.push((meth.id.to_owned(), t));
+        env.insert_comments_if_allowed(&meth.id, meth.doc_comment.as_ref());
     }
     Ok(res)
 }
@@ -181,8 +206,9 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
-fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
-    match actor {
+fn check_actor(env: &mut Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
+    env.can_insert_doc_comments = true;
+    let res = match actor {
         None => Ok(None),
         Some(IDLType::ClassT(ts, t)) => {
             let mut args = Vec::new();
@@ -198,7 +224,9 @@ fn check_actor(env: &Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
             env.te.as_service(&t)?;
             Ok(Some(t))
         }
-    }
+    };
+    env.can_insert_doc_comments = false;
+    res
 }
 
 fn resolve_path(base: &Path, file: &str) -> PathBuf {
@@ -246,9 +274,9 @@ fn load_imports(
 /// Type check IDLProg and adds bindings to type environment. Returns
 /// the main actor if present. This function ignores the imports.
 pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<Option<Type>> {
-    let mut env = Env { te, pre: false };
+    let mut env = Env::new_with_te(te);
     check_decs(&mut env, &prog.decs)?;
-    check_actor(&env, &prog.actor)
+    check_actor(&mut env, &prog.actor)
 }
 /// Type check init args extracted from canister metadata candid:args.
 /// Need to provide `main_env`, because init args may refer to variables from the main did file.
@@ -257,12 +285,12 @@ pub fn check_init_args(
     main_env: &TypeEnv,
     prog: &IDLInitArgs,
 ) -> Result<Vec<ArgType>> {
-    let mut env = Env { te, pre: false };
+    let mut env = Env::new_with_te(te);
     check_decs(&mut env, &prog.decs)?;
     env.te.merge(main_env)?;
     let mut args = Vec::new();
     for arg in prog.args.iter() {
-        args.push(check_arg(&env, arg)?);
+        args.push(check_arg(&mut env, arg)?);
     }
     Ok(args)
 }
@@ -336,10 +364,7 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>, I
         .collect();
 
     let mut te = TypeEnv::new();
-    let mut env = Env {
-        te: &mut te,
-        pre: false,
-    };
+    let mut env = Env::new_with_te(&mut te);
     let mut idl_merged_prog = IDLMergedProg::new();
 
     let mut actor: Option<Type> = None;
@@ -349,7 +374,7 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>, I
         check_decs(&mut env, &code.decs)?;
         idl_merged_prog.add_decs(&code.decs);
         if *include_serv {
-            let t = check_actor(&env, &code.actor)?;
+            let t = check_actor(&mut env, &code.actor)?;
             actor = merge_actor(&env, &actor, &t, name)?;
         }
     }
@@ -357,12 +382,13 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>, I
     check_decs(&mut env, &prog.decs)?;
     idl_merged_prog.add_decs(&prog.decs);
 
-    let mut res = check_actor(&env, &prog.actor)?;
+    let mut res = check_actor(&mut env, &prog.actor)?;
     if actor.is_some() {
         res = merge_actor(&env, &res, &actor, "")?;
     }
 
     idl_merged_prog.set_actor(res.clone().map(|t| env.te.as_idl_type(&t)));
+    idl_merged_prog.set_comments_in_actor(&env.doc_comments_in_actor);
 
     Ok((te, res, idl_merged_prog))
 }

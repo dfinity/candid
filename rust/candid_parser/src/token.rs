@@ -122,6 +122,10 @@ fn parse_number(lex: &mut Lexer<Token>) -> String {
     }
 }
 
+fn parse_doc_comment(lex: &Lexer<Token>) -> String {
+    lex.slice().trim_start_matches("///").trim().to_string()
+}
+
 pub type TriviaMap = Rc<RefCell<HashMap<usize, Vec<String>>>>;
 
 pub struct Tokenizer<'input> {
@@ -198,7 +202,7 @@ impl Iterator for Tokenizer<'_> {
                 Some(Err(LexicalError::new(err, span)))
             }
             Ok(Token::DocComment) => {
-                let content = self.lex.slice();
+                let content = parse_doc_comment(&self.lex);
                 if self.trivia.is_some() {
                     self.comment_buffer.push(content.to_string());
                 }
