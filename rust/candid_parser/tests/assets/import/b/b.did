@@ -1,4 +1,8 @@
+/// Doc comment for b in imported file
 type b = record { int;nat };
+/// Doc comment for service in imported file,
+/// ignored if the service in the importing file has a doc comment
 service : {
+  /// Doc comment for bbbbb method in imported service
   bbbbb : (b) -> ();
 }

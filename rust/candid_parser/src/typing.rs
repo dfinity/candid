@@ -1,7 +1,8 @@
 use crate::{parse_idl_prog, pretty_parse_idl_prog, Error, Result};
 use candid::types::{
     syntax::{
-        Binding, Dec, IDLArgType, IDLInitArgs, IDLMergedProg, IDLProg, IDLType, PrimType, TypeField,
+        Binding, Dec, IDLActorType, IDLArgType, IDLInitArgs, IDLMergedProg, IDLProg, IDLType,
+        PrimType, TypeField,
     },
     ArgType, Field, Function, Type, TypeEnv, TypeInner,
 };
@@ -11,7 +12,8 @@ use std::path::{Path, PathBuf};
 
 pub struct Env<'a> {
     pub te: &'a mut TypeEnv,
-    doc_comments_in_actor: HashMap<String, Vec<String>>,
+    doc_comments_in_actor_types: HashMap<String, Vec<String>>,
+    actor_doc_comment: Option<Vec<String>>,
     can_insert_doc_comments: bool,
     pub pre: bool,
 }
@@ -20,7 +22,8 @@ impl<'a> Env<'a> {
     fn new_with_te(te: &'a mut TypeEnv) -> Self {
         Self {
             te,
-            doc_comments_in_actor: HashMap::new(),
+            doc_comments_in_actor_types: HashMap::new(),
+            actor_doc_comment: None,
             can_insert_doc_comments: false,
             pre: false,
         }
@@ -33,7 +36,7 @@ impl<'a> Env<'a> {
         }
 
         if let Some(doc_comment) = doc_comment {
-            self.doc_comments_in_actor
+            self.doc_comments_in_actor_types
                 .insert(id.to_string(), doc_comment.to_vec());
         }
     }
@@ -206,9 +209,11 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
-fn check_actor(env: &mut Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
+fn check_actor(env: &mut Env, actor: &Option<IDLActorType>) -> Result<Option<Type>> {
     env.can_insert_doc_comments = true;
-    let res = match actor {
+    env.actor_doc_comment = actor.as_ref().and_then(|a| a.doc_comment.clone());
+
+    let res = match actor.as_ref().map(|a| &a.typ) {
         None => Ok(None),
         Some(IDLType::ClassT(ts, t)) => {
             let mut args = Vec::new();
@@ -225,7 +230,9 @@ fn check_actor(env: &mut Env, actor: &Option<IDLType>) -> Result<Option<Type>> {
             Ok(Some(t))
         }
     };
+
     env.can_insert_doc_comments = false;
+
     res
 }
 
@@ -387,8 +394,11 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>, I
         res = merge_actor(&env, &res, &actor, "")?;
     }
 
-    idl_merged_prog.set_actor(res.clone().map(|t| env.te.as_idl_type(&t)));
-    idl_merged_prog.set_comments_in_actor(&env.doc_comments_in_actor);
+    idl_merged_prog.set_actor(res.clone().map(|t| IDLActorType {
+        typ: env.te.as_idl_type(&t),
+        doc_comment: env.actor_doc_comment.clone(),
+    }));
+    idl_merged_prog.set_comments_in_actor(&env.doc_comments_in_actor_types);
 
     Ok((te, res, idl_merged_prog))
 }

@@ -4,7 +4,7 @@ use crate::{
     Deserialize,
 };
 use candid::types::{
-    syntax::{Binding, FuncType, IDLArgType, IDLType, PrimType, TypeField},
+    syntax::{Binding, FuncType, IDLActorType, IDLArgType, IDLType, PrimType, TypeField},
     Label,
 };
 use candid::{pretty::utils::*, types::syntax::IDLMergedProg};
@@ -13,6 +13,8 @@ use pretty::RcDoc;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
+
+const DOC_COMMENT_LINE_PREFIX: &str = "/// ";
 
 #[derive(Default, Deserialize, Clone, Debug)]
 pub struct BindingConfig {
@@ -169,6 +171,20 @@ fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
     }
 }
 
+fn pp_doc_comment(comment_lines: Option<&Vec<String>>) -> RcDoc {
+    let mut doc_comment = RcDoc::nil();
+    if let Some(comment_lines) = comment_lines {
+        for line in comment_lines {
+            doc_comment = doc_comment.append(
+                RcDoc::text(DOC_COMMENT_LINE_PREFIX)
+                    .append(line)
+                    .append(RcDoc::hardline()),
+            );
+        }
+    }
+    doc_comment
+}
+
 impl<'a> State<'a> {
     fn generate_test(&mut self, src: &IDLType, use_type: &str) {
         if self.tests.contains_key(use_type) {
@@ -259,7 +275,7 @@ fn test_{test_name}() {{
                 RecordT(ref fs) => self.pp_record_fields(fs, false, is_ref),
                 VariantT(ref fs) => {
                     // only possible for result variant
-                    let (ok, err, is_motoko) = as_result(fs).unwrap();
+                    let (ok_typ, err_typ, is_motoko) = as_result(fs).unwrap();
                     // This is a hacky way to redirect Result type
                     let old = self
                         .state
@@ -277,10 +293,10 @@ fn test_{test_name}() {{
                     self.state
                         .pop_state(old, StateElem::TypeStr("std::result::Result"));
                     let old = self.state.push_state(&StateElem::Label("Ok"));
-                    let ok = self.pp_ty(ok, is_ref);
+                    let ok = self.pp_ty(ok_typ, is_ref);
                     self.state.pop_state(old, StateElem::Label("Ok"));
                     let old = self.state.push_state(&StateElem::Label("Err"));
-                    let err = self.pp_ty(err, is_ref);
+                    let err = self.pp_ty(err_typ, is_ref);
                     self.state.pop_state(old, StateElem::Label("Err"));
                     let body = ok.append(", ").append(err);
                     RcDoc::text(result).append(enclose("<", body, ">"))
@@ -366,10 +382,11 @@ fn test_{test_name}() {{
     ) -> RcDoc<'b> {
         let lab = field.label.to_string();
         let old = self.state.push_state(&StateElem::Label(&lab));
-        let res = self
+        let f = self
             .pp_label(&field.label, false, need_vis)
             .append(kwd(":"))
             .append(self.pp_ty(&field.typ, is_ref));
+        let res = pp_doc_comment(field.doc_comment.as_ref()).append(f);
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
@@ -403,7 +420,7 @@ fn test_{test_name}() {{
     fn pp_variant_field<'b>(&mut self, field: &'b TypeField) -> RcDoc<'b> {
         let lab = field.label.to_string();
         let old = self.state.push_state(&StateElem::Label(&lab));
-        let res = match &field.typ {
+        let f = match &field.typ {
             IDLType::PrimT(PrimType::Null) => self.pp_label(&field.label, true, false),
             IDLType::RecordT(fs) => self
                 .pp_label(&field.label, true, false)
@@ -414,6 +431,7 @@ fn test_{test_name}() {{
                 ")",
             )),
         };
+        let res = pp_doc_comment(field.doc_comment.as_ref()).append(f);
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
@@ -433,7 +451,7 @@ fn test_{test_name}() {{
                 self.state.pop_state(old, StateElem::Label(id));
                 continue;
             }
-            let ty = self.state.prog.find_type(id).unwrap();
+            let binding = self.state.prog.find_binding(id).unwrap();
             let name = self
                 .state
                 .config
@@ -452,9 +470,9 @@ fn test_{test_name}() {{
                 .clone()
                 .map(RcDoc::text)
                 .unwrap_or(RcDoc::text("#[derive(CandidType, Deserialize)]"));
-            let line = match ty {
+            let line = match &binding.typ {
                 IDLType::RecordT(fs) => {
-                    let separator = if is_tuple(ty) {
+                    let separator = if is_tuple(&binding.typ) {
                         RcDoc::text(";")
                     } else {
                         RcDoc::nil()
@@ -473,7 +491,7 @@ fn test_{test_name}() {{
                         vis.append(kwd("type"))
                             .append(name)
                             .append(" = ")
-                            .append(self.pp_ty(ty, false))
+                            .append(self.pp_ty(&binding.typ, false))
                             .append(";")
                     } else {
                         derive
@@ -505,19 +523,23 @@ fn test_{test_name}() {{
                             .append("struct ")
                             .append(name)
                             // TODO: Unfortunately, the visibility of the inner newtype is also controlled by var.visibility
-                            .append(enclose("(", vis.append(self.pp_ty(ty, false)), ")"))
+                            .append(enclose(
+                                "(",
+                                vis.append(self.pp_ty(&binding.typ, false)),
+                                ")",
+                            ))
                             .append(";")
                     } else {
                         vis.append(kwd("type"))
                             .append(name)
                             .append(" = ")
-                            .append(self.pp_ty(ty, false))
+                            .append(self.pp_ty(&binding.typ, false))
                             .append(";")
                     }
                 }
             };
             self.state.pop_state(old, StateElem::Label(id));
-            res.push(line)
+            res.push(pp_doc_comment(binding.doc_comment.as_ref()).append(line));
         }
         lines(res.into_iter())
     }
@@ -587,8 +609,9 @@ fn test_{test_name}() {{
         self.state.pop_state(old, lab);
         res
     }
-    fn pp_function(&mut self, id: &str, func: &FuncType) -> Method {
+    fn pp_function(&mut self, binding: &Binding, func: &FuncType) -> Method {
         use candid::types::internal::FuncMode;
+        let id = &binding.id;
         let old = self.state.push_state(&StateElem::Label(id));
         let name = self
             .state
@@ -647,13 +670,21 @@ fn test_{test_name}() {{
                 .map(|x| x.pretty(LINE_WIDTH).to_string())
                 .collect(),
             mode,
+            doc_comment_lines: binding.doc_comment.clone().unwrap_or_default(),
         };
         self.state.pop_state(old, StateElem::Label(id));
         res
     }
-    fn pp_actor(&mut self, actor: &IDLType) -> (Vec<Method>, Option<Vec<(String, String)>>) {
-        let actor = self.state.prog.trace_type(actor).unwrap();
-        let init = if let IDLType::ClassT(args, _) = &actor {
+    fn pp_actor(
+        &mut self,
+        actor: &IDLActorType,
+    ) -> (
+        Vec<Method>,
+        Option<Vec<(String, String)>>,
+        Option<Vec<String>>,
+    ) {
+        let actor_typ = self.state.prog.trace_type(&actor.typ).unwrap();
+        let init = if let IDLType::ClassT(args, _) = &actor_typ {
             let old = self.state.push_state(&StateElem::Label("init"));
             let args: Vec<_> = args
                 .iter()
@@ -678,13 +709,13 @@ fn test_{test_name}() {{
         } else {
             None
         };
-        let serv = self.state.prog.service_methods(&actor).unwrap();
+        let serv = self.state.prog.service_methods(&actor_typ).unwrap();
         let mut res = Vec::new();
         for binding in serv.iter() {
             let func = self.state.prog.as_func(&binding.typ).unwrap();
-            res.push(self.pp_function(&binding.id, func));
+            res.push(self.pp_function(&binding, func));
         }
-        (res, init)
+        (res, init, actor.doc_comment.clone())
     }
 }
 #[derive(Serialize, Debug)]
@@ -692,6 +723,7 @@ pub struct Output {
     pub type_defs: String,
     pub methods: Vec<Method>,
     pub init_args: Option<Vec<(String, String)>>,
+    pub actor_comment_lines: Vec<String>,
     pub tests: String,
 }
 #[derive(Serialize, Debug)]
@@ -701,6 +733,7 @@ pub struct Method {
     pub args: Vec<(String, String)>,
     pub rets: Vec<String>,
     pub mode: String,
+    pub doc_comment_lines: Vec<String>,
 }
 pub fn emit_bindgen(tree: &Config, prog: &IDLMergedProg) -> (Output, Vec<String>) {
     let mut state = NominalState {
@@ -709,7 +742,7 @@ pub fn emit_bindgen(tree: &Config, prog: &IDLMergedProg) -> (Output, Vec<String>
     let env = state.nominalize_all();
     let old_stats = state.state.stats.clone();
     let def_list = if let Some(actor) = &env.actor {
-        chase_actor(&env, actor).unwrap()
+        chase_actor(&env, &actor.typ).unwrap()
     } else {
         env.types_ids()
     };
@@ -721,10 +754,10 @@ pub fn emit_bindgen(tree: &Config, prog: &IDLMergedProg) -> (Output, Vec<String>
     };
     state.state.stats = old_stats;
     let defs = state.pp_defs(&def_list);
-    let (methods, init_args) = if let Some(actor) = &env.actor {
+    let (methods, init_args, actor_doc_comment) = if let Some(actor) = &env.actor {
         state.pp_actor(actor)
     } else {
-        (Vec::new(), None)
+        (Vec::new(), None, None)
     };
     let tests = state.tests.into_values().collect::<Vec<_>>().join("\n");
     let unused = state.state.report_unused();
@@ -733,6 +766,7 @@ pub fn emit_bindgen(tree: &Config, prog: &IDLMergedProg) -> (Output, Vec<String>
             type_defs: defs.pretty(LINE_WIDTH).to_string(),
             methods,
             init_args,
+            actor_comment_lines: actor_doc_comment.unwrap_or_default(),
             tests,
         },
         unused,
@@ -747,6 +781,7 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         type_defs: String,
         methods: Vec<Method>,
         init_args: Option<Vec<(String, String)>>,
+        actor_comment_lines: Vec<String>,
         tests: String,
     }
     let data = HBOutput {
@@ -754,6 +789,7 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         methods: output.methods,
         external: config.0,
         init_args: output.init_args,
+        actor_comment_lines: output.actor_comment_lines,
         tests: output.tests,
     };
     hbs.render_template(template, &data).unwrap()
@@ -1120,12 +1156,10 @@ impl NominalState<'_> {
             });
             self.state.pop_state(old, elem);
         }
-        let actor = self
-            .state
-            .prog
-            .actor
-            .as_ref()
-            .map(|ty| self.nominalize(&mut res, &mut vec![], ty));
+        let actor = self.state.prog.actor.as_ref().map(|a| IDLActorType {
+            typ: self.nominalize(&mut res, &mut vec![], &a.typ),
+            doc_comment: a.doc_comment.clone(),
+        });
         res.set_actor(actor);
         res
     }

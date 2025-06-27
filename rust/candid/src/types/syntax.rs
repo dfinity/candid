@@ -215,10 +215,16 @@ pub struct Binding {
     pub doc_comment: Option<Vec<String>>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
+pub struct IDLActorType {
+    pub typ: IDLType,
+    pub doc_comment: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone)]
 pub struct IDLProg {
     pub decs: Vec<Dec>,
-    pub actor: Option<IDLType>,
+    pub actor: Option<IDLActorType>,
 }
 
 #[derive(Debug)]
@@ -231,7 +237,7 @@ pub struct IDLInitArgs {
 #[derive(Debug, Default)]
 pub struct IDLMergedProg {
     types: Vec<Binding>,
-    pub actor: Option<IDLType>,
+    pub actor: Option<IDLActorType>,
 }
 
 impl From<IDLProg> for IDLMergedProg {
@@ -240,6 +246,15 @@ impl From<IDLProg> for IDLMergedProg {
         merged_prog.add_decs(&other_prog.decs);
         merged_prog.set_actor(other_prog.actor);
         merged_prog
+    }
+}
+
+impl From<IDLActorType> for IDLMergedProg {
+    fn from(other_actor: IDLActorType) -> Self {
+        Self {
+            types: vec![],
+            actor: Some(other_actor),
+        }
     }
 }
 
@@ -268,7 +283,7 @@ impl IDLMergedProg {
         self.types.extend(types);
     }
 
-    pub fn set_actor(&mut self, other: Option<IDLType>) {
+    pub fn set_actor(&mut self, other: Option<IDLActorType>) {
         self.actor = other;
     }
 
@@ -348,10 +363,10 @@ impl IDLMergedProg {
     }
 
     pub fn set_comments_in_actor(&mut self, doc_comments: &HashMap<String, Vec<String>>) {
-        self.actor = self
-            .actor
-            .as_ref()
-            .map(|t| self.set_comments_in_type(&t, doc_comments));
+        self.actor = self.actor.as_ref().map(|t| IDLActorType {
+            typ: self.set_comments_in_type(&t.typ, doc_comments),
+            doc_comment: t.doc_comment.clone(),
+        });
     }
 
     pub fn find_type(&self, id: &str) -> Result<&IDLType, String> {

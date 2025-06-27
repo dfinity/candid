@@ -1,7 +1,7 @@
 use crate::{check_prog, pretty_check_file, pretty_parse_idl_prog, Error, Result};
 use candid::{
     types::{
-        syntax::{Binding, IDLMergedProg, IDLType},
+        syntax::{Binding, IDLActorType, IDLMergedProg, IDLType},
         Type, TypeInner,
     },
     TypeEnv,
@@ -68,18 +68,21 @@ pub fn instantiate_candid(candid: CandidSource) -> Result<(Vec<Type>, (TypeEnv, 
         _ => unreachable!(),
     })
 }
-pub fn get_metadata(env: &IDLMergedProg) -> Option<String> {
-    let serv = env.actor.as_ref()?;
-    let serv = env.trace_type(serv).ok()?;
+pub fn get_metadata(prog: &IDLMergedProg) -> Option<String> {
+    let serv = prog.actor.as_ref().map(|a| &a.typ)?;
+    let serv = prog.trace_type(serv).ok()?;
     let serv = match &serv {
         IDLType::ClassT(_, ty) => ty.as_ref(),
         IDLType::ServT(_) => &serv,
         _ => unreachable!(),
     };
-    let def_list = crate::bindings::analysis::chase_actor(env, serv).ok()?;
-    let mut filtered = IDLMergedProg::new();
+    let def_list = crate::bindings::analysis::chase_actor(prog, serv).ok()?;
+    let mut filtered = IDLMergedProg::from(IDLActorType {
+        typ: serv.clone(),
+        doc_comment: prog.actor.as_ref().and_then(|a| a.doc_comment.clone()),
+    });
     for d in def_list {
-        if let Ok(typ) = env.find_type(d) {
+        if let Ok(typ) = prog.find_type(d) {
             filtered.insert_binding(Binding {
                 id: d.to_string(),
                 typ: typ.clone(),
@@ -87,7 +90,6 @@ pub fn get_metadata(env: &IDLMergedProg) -> Option<String> {
             });
         }
     }
-    filtered.set_actor(Some(serv.clone()));
     Some(candid::pretty::candid::compile(&filtered))
 }
 

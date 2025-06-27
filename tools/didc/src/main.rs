@@ -142,7 +142,7 @@ impl TypeAnnotation {
                     .actor
                     .as_ref()
                     .ok_or_else(|| Error::msg("Cannot use --method with a non-service did file"))?;
-                let func = idl_prog.get_method(actor, meth).map_err(Error::msg)?;
+                let func = idl_prog.get_method(&actor.typ, meth).map_err(Error::msg)?;
                 match mode {
                     Mode::Encode => func.args.iter().map(|arg| arg.typ.clone()).collect(),
                     Mode::Decode => func.rets.clone(),

@@ -5,6 +5,8 @@ use crate::types::{
 };
 use pretty::RcDoc;
 
+const DOC_COMMENT_LINE_PREFIX: &str = "/// ";
+
 static KEYWORDS: [&str; 30] = [
     "import",
     "service",
@@ -143,7 +145,9 @@ pub(crate) fn pp_field(field: &TypeField, is_variant: bool) -> RcDoc {
     } else {
         kwd(" :").append(pp_ty(&field.typ))
     };
-    pp_label(&field.label).append(ty_doc)
+    pp_doc_comment(field.doc_comment.as_ref())
+        .append(pp_label(&field.label))
+        .append(ty_doc)
 }
 
 fn pp_fields(fs: &[TypeField], is_variant: bool) -> RcDoc {
@@ -195,14 +199,17 @@ fn pp_service(serv: &[Binding]) -> RcDoc {
             |Binding {
                  id,
                  typ,
-                 doc_comment: _,
+                 doc_comment,
              }| {
                 let func_doc = match typ {
                     IDLType::FuncT(ref f) => pp_function(f),
                     IDLType::VarT(_) => pp_ty(typ),
                     _ => unreachable!(),
                 };
-                pp_text(id).append(kwd(" :")).append(func_doc)
+                pp_doc_comment(doc_comment.as_ref())
+                    .append(pp_text(id))
+                    .append(kwd(" :"))
+                    .append(func_doc)
             },
         ),
         ";",
@@ -211,8 +218,9 @@ fn pp_service(serv: &[Binding]) -> RcDoc {
 }
 
 fn pp_defs(env: &IDLMergedProg) -> RcDoc {
-    lines(env.get_types().iter().map(|(id, typ, _)| {
-        kwd("type")
+    lines(env.get_types().iter().map(|(id, typ, doc_comment)| {
+        pp_doc_comment(*doc_comment)
+            .append(kwd("type"))
             .append(ident(id))
             .append(kwd("="))
             .append(pp_ty(typ))
@@ -228,6 +236,20 @@ fn pp_actor(ty: &IDLType) -> RcDoc {
     }
 }
 
+fn pp_doc_comment(comment_lines: Option<&Vec<String>>) -> RcDoc {
+    let mut doc_comment = RcDoc::nil();
+    if let Some(comment_lines) = comment_lines {
+        for line in comment_lines {
+            doc_comment = doc_comment.append(
+                RcDoc::text(DOC_COMMENT_LINE_PREFIX)
+                    .append(line)
+                    .append(RcDoc::hardline()),
+            );
+        }
+    }
+    doc_comment
+}
+
 pub fn pp_init_args<'a>(env: &'a IDLMergedProg, args: &'a [IDLArgType]) -> RcDoc<'a> {
     pp_defs(env).append(pp_args(args))
 }
@@ -236,7 +258,9 @@ pub fn compile(env: &IDLMergedProg) -> String {
         None => pp_defs(env).pretty(LINE_WIDTH).to_string(),
         Some(actor) => {
             let defs = pp_defs(env);
-            let actor = kwd("service :").append(pp_actor(actor));
+            let actor = pp_doc_comment(actor.doc_comment.as_ref())
+                .append(kwd("service :"))
+                .append(pp_actor(&actor.typ));
             let doc = defs.append(actor);
             doc.pretty(LINE_WIDTH).to_string()
         }

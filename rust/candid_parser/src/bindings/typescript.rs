@@ -6,6 +6,10 @@ use candid::types::{
 };
 use pretty::RcDoc;
 
+const DOC_COMMENT_PREFIX: &str = "/**";
+const DOC_COMMENT_LINE_PREFIX: &str = " * ";
+const DOC_COMMENT_SUFFIX: &str = " */";
+
 fn pp_prim_ty(ty: &PrimType) -> RcDoc {
     use PrimType::*;
     match ty {
@@ -125,7 +129,8 @@ fn pp_label(id: &Label) -> RcDoc {
 }
 
 fn pp_field<'a>(prog: &'a IDLMergedProg, field: &'a TypeField, is_ref: bool) -> RcDoc<'a> {
-    pp_label(&field.label)
+    pp_doc_comment(field.doc_comment.as_ref())
+        .append(pp_label(&field.label))
         .append(kwd(":"))
         .append(pp_ty(prog, &field.typ, is_ref))
 }
@@ -155,14 +160,17 @@ fn pp_service<'a>(prog: &'a IDLMergedProg, serv: &'a [Binding]) -> RcDoc<'a> {
             |Binding {
                  id,
                  typ,
-                 doc_comment: _,
+                 doc_comment,
              }| {
                 let func = match typ {
                     IDLType::FuncT(ref func) => pp_function(prog, func),
                     IDLType::VarT(ref id) => ident(id),
                     _ => unreachable!(),
                 };
-                quote_ident(id).append(kwd(":")).append(func)
+                pp_doc_comment(doc_comment.as_ref())
+                    .append(quote_ident(id))
+                    .append(kwd(":"))
+                    .append(func)
             },
         ),
         ",",
@@ -172,8 +180,9 @@ fn pp_service<'a>(prog: &'a IDLMergedProg, serv: &'a [Binding]) -> RcDoc<'a> {
 
 fn pp_defs<'a>(prog: &'a IDLMergedProg, def_list: &'a [&'a str]) -> RcDoc<'a> {
     lines(def_list.iter().map(|id| {
-        let ty = prog.find_type(id).unwrap();
-        let export = match ty {
+        let binding = prog.find_binding(id).unwrap();
+        let ty = &binding.typ;
+        let doc = match ty {
             IDLType::RecordT(_) if !ty.is_tuple() => kwd("export interface")
                 .append(ident(id))
                 .append(" ")
@@ -198,7 +207,7 @@ fn pp_defs<'a>(prog: &'a IDLMergedProg, def_list: &'a [&'a str]) -> RcDoc<'a> {
                 .append(pp_ty(prog, ty, false))
                 .append(";"),
         };
-        export
+        pp_doc_comment(binding.doc_comment.as_ref()).append(doc)
     }))
 }
 
@@ -213,6 +222,29 @@ fn pp_actor<'a>(prog: &'a IDLMergedProg, ty: &'a IDLType) -> RcDoc<'a> {
     }
 }
 
+fn pp_doc_comment(comment_lines: Option<&Vec<String>>) -> RcDoc {
+    let mut doc_comment = RcDoc::nil();
+    let mut is_empty = true;
+    if let Some(comment_lines) = comment_lines {
+        is_empty = comment_lines.is_empty();
+        for line in comment_lines {
+            doc_comment = doc_comment.append(
+                RcDoc::text(DOC_COMMENT_LINE_PREFIX)
+                    .append(line)
+                    .append(RcDoc::hardline()),
+            );
+        }
+    }
+    if !is_empty {
+        doc_comment = RcDoc::text(DOC_COMMENT_PREFIX)
+            .append(RcDoc::hardline())
+            .append(doc_comment)
+            .append(RcDoc::text(DOC_COMMENT_SUFFIX))
+            .append(RcDoc::hardline());
+    }
+    doc_comment
+}
+
 pub fn compile(prog: &IDLMergedProg) -> String {
     let header = r#"import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
@@ -222,7 +254,8 @@ import type { IDL } from '@dfinity/candid';
     let defs = pp_defs(prog, &def_list);
     let actor = match &prog.actor {
         None => RcDoc::nil(),
-        Some(actor) => pp_actor(prog, actor)
+        Some(actor) => pp_doc_comment(actor.doc_comment.as_ref())
+            .append(pp_actor(prog, &actor.typ))
             .append(RcDoc::line())
             .append("export declare const idlFactory: IDL.InterfaceFactory;")
             .append(RcDoc::line())

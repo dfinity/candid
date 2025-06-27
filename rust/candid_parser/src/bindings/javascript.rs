@@ -254,16 +254,18 @@ pub fn compile(prog: &IDLMergedProg) -> String {
             doc.pretty(LINE_WIDTH).to_string()
         }
         Some(actor) => {
-            let def_list = chase_actor(prog, actor).unwrap();
+            let def_list = chase_actor(prog, &actor.typ).unwrap();
             let recs = infer_rec(prog, &def_list).unwrap();
             let defs = pp_defs(prog, &def_list, &recs);
-            let init = if let IDLType::ClassT(ref args, _) = actor {
+            let init = if let IDLType::ClassT(ref args, _) = actor.typ {
                 args.iter().map(|arg| arg.typ.clone()).collect::<Vec<_>>()
             } else {
                 Vec::new()
             };
             let init = init.as_slice();
-            let actor = kwd("return").append(pp_actor(actor, &recs)).append(";");
+            let actor = kwd("return")
+                .append(pp_actor(&actor.typ, &recs))
+                .append(";");
             let body = defs.append(actor);
             let doc = str("export const idlFactory = ({ IDL }) => ")
                 .append(enclose_space("{", body, "};"));

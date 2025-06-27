@@ -9,37 +9,67 @@ type tree = variant {
 type s = service { f : t; g : (list) -> (B, tree, stream) };
 type t = func (server : s) -> ();
 type stream = opt record { head : nat; next : func () -> (stream) query };
+/// Doc comment for b in imported file
 type b = record { int; nat };
+/// Doc comment for a in imported file
 type a = variant { a; b : b };
+/// Doc comment for prim type
 type my_type = principal;
+/// Doc comment for List
 type List = opt record { head : int; tail : List };
 type f = func (List, func (int32) -> (int64)) -> (opt List, res);
+/// Doc comment for broker service
 type broker = service {
   find : (name : text) -> (service { current : () -> (nat32); up : () -> () });
 };
+/// Doc comment for nested type
 type nested = record {
   0 : nat;
   1 : nat;
+  /// Doc comment for nested record
   2 : record { nat; int };
   3 : record { 0 : nat; 42 : nat; 43 : nat8 };
   40 : nat;
   41 : variant { 42; A; B; C };
   42 : nat;
 };
-type res = variant { Ok : record { int; nat }; Err : record { error : text } };
+type res = variant {
+  /// Doc comment for Ok variant
+  Ok : record { int; nat };
+  /// Doc comment for Err variant
+  Err : record {
+    /// Doc comment for error field in Err variant,
+    /// on multiple lines
+    error : text;
+  };
+};
 type nested_res = variant {
   Ok : variant { Ok; Err };
-  Err : variant { Ok : record { content : text }; Err : record { int } };
+  Err : variant {
+    /// Doc comment for Ok in nested variant
+    Ok : record { content : text };
+    /// Doc comment for Err in nested variant
+    Err : record { int };
+  };
 };
+/// Doc comment for service
 service : {
+  /// Doc comment for bbbbb method in imported service
   bbbbb : (b) -> ();
   f : t;
+  /// Doc comment for f1 method of service
   f1 : (list, test : blob, opt bool) -> () oneway;
   g : (list) -> (B, tree, stream);
   g1 : (my_type, List, opt List, nested) -> (int, broker, nested_res) query;
   h : (vec opt text, variant { A : nat; B : opt text }, opt List) -> (
-      record { 42 : record {}; id : nat },
+      record {
+        /// Doc comment for 0x2a field in h method return
+        42 : record {};
+        /// Doc comment for id field in h method return
+        id : nat;
+      },
     );
+  /// Doc comment for i method of service
   i : f;
   x : (a, b) -> (
       opt a,

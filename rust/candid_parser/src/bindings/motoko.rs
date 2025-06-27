@@ -10,6 +10,8 @@ use candid::types::{
 };
 use pretty::RcDoc;
 
+const DOC_COMMENT_LINE_PREFIX: &str = "/// ";
+
 fn is_tuple(t: &IDLType) -> bool {
     match t {
         IDLType::RecordT(ref fs) => {
@@ -163,17 +165,20 @@ fn pp_label(id: &Label) -> RcDoc {
 }
 
 fn pp_field(field: &TypeField) -> RcDoc {
-    pp_label(&field.label)
+    pp_doc_comment(field.doc_comment.as_ref())
+        .append(pp_label(&field.label))
         .append(" : ")
         .append(pp_ty(&field.typ))
 }
+
 fn pp_variant(field: &TypeField) -> RcDoc {
-    let doc = str("#").append(pp_label(&field.label));
-    if !field.typ.is_null() {
-        doc.append(" : ").append(pp_ty(&field.typ))
+    let label = str("#").append(pp_label(&field.label));
+    let doc = if !field.typ.is_null() {
+        label.append(" : ").append(pp_ty(&field.typ))
     } else {
-        doc
-    }
+        label
+    };
+    pp_doc_comment(field.doc_comment.as_ref()).append(doc)
 }
 
 fn pp_function(func: &FuncType) -> RcDoc {
@@ -200,6 +205,7 @@ fn pp_function(func: &FuncType) -> RcDoc {
     }
     .nest(INDENT_SPACE)
 }
+
 fn pp_args(args: &[IDLArgType]) -> RcDoc {
     match args {
         [ty] => {
@@ -246,16 +252,21 @@ fn pp_rets(args: &[IDLType]) -> RcDoc {
 
 fn pp_service(serv: &[Binding]) -> RcDoc {
     let doc = concat(
-        serv.iter()
-            .map(|b| escape(&b.id, true).append(" : ").append(pp_ty(&b.typ))),
+        serv.iter().map(|b| {
+            pp_doc_comment(b.doc_comment.as_ref())
+                .append(escape(&b.id, true))
+                .append(" : ")
+                .append(pp_ty(&b.typ))
+        }),
         ";",
     );
     kwd("actor").append(enclose_space("{", doc, "}"))
 }
 
 fn pp_defs<'a>(bindings: &[(&'a str, &'a IDLType, Option<&'a Vec<String>>)]) -> RcDoc<'a> {
-    lines(bindings.iter().map(|(id, typ, _)| {
-        kwd("public type")
+    lines(bindings.iter().map(|(id, typ, doc_comment)| {
+        pp_doc_comment(*doc_comment)
+            .append(kwd("public type"))
             .append(escape(id, false))
             .append(" = ")
             .append(pp_ty(typ))
@@ -271,6 +282,20 @@ fn pp_actor(ty: &IDLType) -> RcDoc {
     }
 }
 
+fn pp_doc_comment(comment_lines: Option<&Vec<String>>) -> RcDoc {
+    let mut doc_comment = RcDoc::nil();
+    if let Some(comment_lines) = comment_lines {
+        for line in comment_lines {
+            doc_comment = doc_comment.append(
+                RcDoc::text(DOC_COMMENT_LINE_PREFIX)
+                    .append(line)
+                    .append(RcDoc::hardline()),
+            );
+        }
+    }
+    doc_comment
+}
+
 pub fn compile(prog: &IDLMergedProg) -> String {
     let header = r#"// This is a generated Motoko binding.
 // Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
@@ -280,7 +305,9 @@ pub fn compile(prog: &IDLMergedProg) -> String {
         None => pp_defs(&bindings),
         Some(actor) => {
             let defs = pp_defs(&bindings);
-            let actor = kwd("public type Self =").append(pp_actor(actor));
+            let actor = pp_doc_comment(actor.doc_comment.as_ref())
+                .append(kwd("public type Self ="))
+                .append(pp_actor(&actor.typ));
             defs.append(actor)
         }
     };
