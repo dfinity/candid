@@ -4,7 +4,12 @@ import service "import/b/b.did";
 /// Doc comment for prim type
 type my_type = principal;
 /// Doc comment for List
-type List = opt record { head: int; tail: List };
+type List = opt record {
+  /// Doc comment for List head
+  head: int;
+  /// Doc comment for List tail
+  tail: List
+};
 type f = func (List, func (int32) -> (int64)) -> (opt List, res);
 /// Doc comment for broker service
 type broker = service {
@@ -38,6 +43,26 @@ type nested_res = variant { Ok: variant { Ok; Err }; Err: variant {
   /// Doc comment for Err in nested variant
   Err: record { int }
 } };
+/// Doc comment for nested_records
+type nested_records = record {
+  /// Doc comment for nested_records field nested
+  nested: opt record {
+    /// Doc comment for nested_records field nested_field
+    nested_field: text
+  }
+};
+type my_variant = variant {
+  /// Doc comment for my_variant field a
+  a: record {
+    /// Doc comment for my_variant field a field b
+    b: text;
+  };
+  /// Doc comment for my_variant field c
+  c: opt record {
+    /// Doc comment for my_variant field c field d
+    d: text;
+  }
+}
 
 /// Doc comment for service
 service server : {
@@ -55,5 +80,6 @@ service server : {
   /// Doc comment for i method of service
   i : f;
   x : (a,b) -> (opt a, opt b, variant { Ok: record { result: text }; Err: variant {a;b} }) composite_query;
+  y : (nested_records) -> (record { nested_records; my_variant }) query;
 }
 

@@ -20,7 +20,12 @@ module {
   /// Doc comment for prim type
   public type my_type = Principal;
   /// Doc comment for List
-  public type List = ?{ head : Int; tail : List };
+  public type List = ?{
+    /// Doc comment for List head
+    head : Int;
+    /// Doc comment for List tail
+    tail : List;
+  };
   public type f = shared (List, shared Int32 -> async Int64) -> async (
       ?List,
       res,
@@ -62,6 +67,26 @@ module {
       #Err : { _0_  : Int };
     };
   };
+  /// Doc comment for nested_records
+  public type nested_records = {
+    /// Doc comment for nested_records field nested
+    nested : ?{
+      /// Doc comment for nested_records field nested_field
+      nested_field : Text;
+    };
+  };
+  public type my_variant = {
+    /// Doc comment for my_variant field a
+    #a : {
+      /// Doc comment for my_variant field a field b
+      b : Text;
+    };
+    /// Doc comment for my_variant field c
+    #c : ?{
+      /// Doc comment for my_variant field c field d
+      d : Text;
+    };
+  };
   /// Doc comment for service
   public type Self = actor {
     /// Doc comment for bbbbb method in imported service
@@ -88,5 +113,6 @@ module {
         ?b,
         { #Ok : { result : Text }; #Err : { #a; #b } },
       );
+    y : shared query nested_records -> async ((nested_records, my_variant));
   }
 }

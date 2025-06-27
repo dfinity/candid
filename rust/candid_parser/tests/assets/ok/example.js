@@ -74,6 +74,13 @@ export const idlFactory = ({ IDL }) => {
       [],
     );
   const a = IDL.Variant({ 'a' : IDL.Null, 'b' : b });
+  const nested_records = IDL.Record({
+    'nested' : IDL.Opt(IDL.Record({ 'nested_field' : IDL.Text })),
+  });
+  const my_variant = IDL.Variant({
+    'a' : IDL.Record({ 'b' : IDL.Text }),
+    'c' : IDL.Opt(IDL.Record({ 'd' : IDL.Text })),
+  });
   return IDL.Service({
     'bbbbb' : IDL.Func([b], [], []),
     'f' : t,
@@ -109,6 +116,11 @@ export const idlFactory = ({ IDL }) => {
           }),
         ],
         ['composite_query'],
+      ),
+    'y' : IDL.Func(
+        [nested_records],
+        [IDL.Tuple(nested_records, my_variant)],
+        ['query'],
       ),
   });
 };

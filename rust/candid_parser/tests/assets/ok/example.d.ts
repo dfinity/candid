@@ -29,7 +29,18 @@ export type my_type = Principal;
 /**
  * Doc comment for List
  */
-export type List = [] | [{ 'head' : bigint, 'tail' : List }];
+export type List = [] | [
+  {
+    /**
+     * Doc comment for List head
+     */
+    'head' : bigint,
+    /**
+     * Doc comment for List tail
+     */
+    'tail' : List,
+  }
+];
 export type f = ActorMethod<[List, [Principal, string]], [[] | [List], res]>;
 /**
  * Doc comment for broker service
@@ -87,6 +98,46 @@ export type nested_res = { 'Ok' : { 'Ok' : null } | { 'Err' : null } } |
       }
   };
 /**
+ * Doc comment for nested_records
+ */
+export interface nested_records {
+  /**
+   * Doc comment for nested_records field nested
+   */
+  'nested' : [] | [
+    {
+      /**
+       * Doc comment for nested_records field nested_field
+       */
+      'nested_field' : string,
+    }
+  ],
+}
+export type my_variant = {
+    /**
+     * Doc comment for my_variant field a
+     */
+    'a' : {
+      /**
+       * Doc comment for my_variant field a field b
+       */
+      'b' : string,
+    }
+  } |
+  {
+    /**
+     * Doc comment for my_variant field c
+     */
+    'c' : [] | [
+      {
+        /**
+         * Doc comment for my_variant field c field d
+         */
+        'd' : string,
+      }
+    ]
+  };
+/**
  * Doc comment for service
  */
 export interface _SERVICE {
@@ -135,6 +186,7 @@ export interface _SERVICE {
         { 'Err' : { 'a' : null } | { 'b' : null } },
     ]
   >,
+  'y' : ActorMethod<[nested_records], [nested_records, my_variant]>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];
