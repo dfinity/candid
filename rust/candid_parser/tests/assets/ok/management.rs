@@ -301,5 +301,6 @@ impl<'a> Service<'a> {
     Ok(Decode!(&bytes)?)
   }
 }
-pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
+/// Canister ID: `aaaaa-aa`
+pub const CANISTER_ID : Principal = Principal::from_slice(&[]);
 

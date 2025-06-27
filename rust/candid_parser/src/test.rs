@@ -65,7 +65,7 @@ impl std::str::FromStr for Test {
     type Err = Error;
     fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
         let lexer = super::token::Tokenizer::new(str);
-        Ok(super::grammar::TestParser::new().parse(lexer)?)
+        Ok(super::grammar::TestParser::new().parse(None, lexer)?)
     }
 }
 

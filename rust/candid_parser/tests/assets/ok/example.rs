@@ -4,6 +4,7 @@
 use candid::{self, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult as Result;
 
+/// Doc comment for b in imported file
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct B (pub(crate) candid::Int,pub(crate) u128,);
 #[derive(CandidType, Deserialize, Debug)]
@@ -33,15 +34,19 @@ candid::define_service!(pub(crate) S : {
   "g" : candid::func!((List) -> (B, Tree, Stream));
 });
 candid::define_function!(pub(crate) T : (S) -> ());
+/// Doc comment for prim type
 type CanisterId = Principal;
 #derive[CandidType, Deserialize, Clone]
 pub(crate) struct ListInner {
+  /// Doc comment for List head
   #[serde(skip_deserializing)]
   #[serde(rename="head")]
   HEAD: candid::Int,
+  /// Doc comment for List tail
   #[serde(skip_deserializing)]
   tail: Arc<MyList>,
 }
+/// Doc comment for List
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct MyList(pub(crate) Option<ListInner>);
 #[derive(CandidType, Deserialize, Debug)]
@@ -59,10 +64,12 @@ pub(crate) enum Nested41 {
   B,
   C,
 }
+/// Doc comment for nested type
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct Nested {
   pub(crate) _0_: u128,
   pub(crate) _1_: u128,
+  /// Doc comment for nested record
   pub(crate) _2_: (u128,candid::Int,),
   pub(crate) _3_: Nested3,
   pub(crate) _40_: u128,
@@ -73,9 +80,11 @@ candid::define_service!(pub BrokerReturn : {
   "current" : candid::func!(() -> (u32));
   "up" : candid::func!(() -> ());
 });
+/// Doc comment for broker service
 candid::define_service!(pub(crate) Broker : {
   "find" : candid::func!((String) -> (BrokerReturn));
 });
+/// Doc comment for Ok in nested variant
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct NestedResErrOk { pub(crate) content: String }
 pub(crate) type NestedRes = std::result::Result<
@@ -86,30 +95,72 @@ pub(crate) enum HArg1 { A(u128), B(Option<String>) }
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct HRet42 {}
 #[derive(CandidType, Deserialize, Debug)]
-pub(crate) struct HRet { pub(crate) _42_: HRet42, pub(crate) id: u128 }
+pub(crate) struct HRet {
+  /// Doc comment for 0x2a field in h method return
+  pub(crate) _42_: HRet42,
+  /// Doc comment for id field in h method return
+  pub(crate) id: u128,
+}
 candid::define_function!(pub(crate) FArg1 : (i32) -> (i64));
+/// Doc comment for Err variant
 #[derive(CandidType, Deserialize, Debug)]
-pub(crate) struct ResErr { pub(crate) error: String }
+pub(crate) struct ResErr {
+  /// Doc comment for error field in Err variant,
+  /// on multiple lines
+  pub(crate) error: String,
+}
 pub(crate) type Res = std::result::Result<(candid::Int,u128,), ResErr>;
 candid::define_function!(pub(crate) F : (MyList, FArg1) -> (
     Option<MyList>,
     Res,
   ));
+/// Doc comment for a in imported file
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) enum A { #[serde(rename="a")] A, #[serde(rename="b")] B(B) }
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct XRet2Ok { pub(crate) result: String }
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) enum Error { #[serde(rename="a")] A, #[serde(rename="b")] B }
+#[derive(CandidType, Deserialize, Debug)]
+pub(crate) struct NestedRecordsNestedInner {
+  /// Doc comment for nested_records field nested_field
+  pub(crate) nested_field: String,
+}
+/// Doc comment for nested_records
+#[derive(CandidType, Deserialize, Debug)]
+pub(crate) struct NestedRecords {
+  /// Doc comment for nested_records field nested
+  pub(crate) nested: Option<NestedRecordsNestedInner>,
+}
+#[derive(CandidType, Deserialize, Debug)]
+pub(crate) struct MyVariantCInner {
+  /// Doc comment for my_variant field c field d
+  pub(crate) d: String,
+}
+#[derive(CandidType, Deserialize, Debug)]
+pub(crate) enum MyVariant {
+  /// Doc comment for my_variant field a
+  #[serde(rename="a")]
+  A{
+    /// Doc comment for my_variant field a field b
+    b: String,
+  },
+  /// Doc comment for my_variant field c
+  #[serde(rename="c")]
+  C(Option<MyVariantCInner>),
+}
 
+/// Doc comment for service
 pub struct Service(pub Principal);
 impl Service {
+  /// Doc comment for bbbbb method in imported service
   pub async fn bbbbb(&self, arg0: &B) -> Result<()> {
     ic_cdk::call(self.0, "bbbbb", (arg0,)).await
   }
   pub async fn f(&self, server: &S) -> Result<()> {
     ic_cdk::call(self.0, "f", (server,)).await
   }
+  /// Doc comment for f1 method of service
   pub async fn f_1(&self, arg0: &List, test: &serde_bytes::ByteBuf, arg2: &Option<bool>) -> Result<()> {
     ic_cdk::call(self.0, "f1", (arg0,test,arg2,)).await
   }
@@ -122,19 +173,31 @@ impl Service {
   pub async fn h(&self, arg0: &Vec<Option<String>>, arg1: &HArg1, arg2: &Option<MyList>) -> Result<(HRet,)> {
     ic_cdk::call(self.0, "h", (arg0,arg1,arg2,)).await
   }
+  /// Doc comment for i method of service
   pub async fn i(&self, arg0: &MyList, arg1: &FArg1) -> Result<(Option<MyList>,Res,)> {
     ic_cdk::call(self.0, "i", (arg0,arg1,)).await
   }
   pub async fn x(&self, arg0: &A, arg1: &B) -> Result<(Option<A>,Option<B>,std::result::Result<XRet2Ok, Error>,)> {
     ic_cdk::call(self.0, "x", (arg0,arg1,)).await
   }
+  pub async fn y(&self, arg0: &NestedRecords) -> Result<((NestedRecords,MyVariant,),)> {
+    ic_cdk::call(self.0, "y", (arg0,)).await
+  }
 }
-pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
+/// Canister ID: `aaaaa-aa`
+pub const CANISTER_ID : Principal = Principal::from_slice(&[]);
+/// Doc comment for service
 pub const service : Service = Service(CANISTER_ID);
 #[test]
 fn test_Arc_MyList_() {
   // Generated from ListInner.record.tail.use_type = "Arc<MyList>"
-  let candid_src = r#"type ListInner = record { head : int; tail : List };
+  let candid_src = r#"type ListInner = record {
+  /// Doc comment for List head
+  head : int;
+  /// Doc comment for List tail
+  tail : List;
+};
+/// Doc comment for List
 type List = opt ListInner;
 (List)"#;
   candid_parser::utils::check_rust_type::<Arc<MyList>>(candid_src).unwrap();

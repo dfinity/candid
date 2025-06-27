@@ -1,5 +1,9 @@
 import "b/b.did";
+/// Doc comment for a in imported file
 type a = variant {a;b:b};
+/// Doc comment for service in imported file,
+/// ignored if the service in the importing file has a doc comment
 service : (a,b) -> {
+  /// Doc comment for f in imported service
   f : (b) -> (a);
 }

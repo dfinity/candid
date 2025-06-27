@@ -217,7 +217,12 @@ impl RandState<'_> {
             }
             IDLType::RecordT(fs) => {
                 let mut res = Vec::new();
-                for TypeField { label, typ } in fs.iter() {
+                for TypeField {
+                    label,
+                    typ,
+                    doc_comment: _,
+                } in fs.iter()
+                {
                     let lab_str = label.to_string();
                     let elem = StateElem::Label(&lab_str);
                     let old_config = self.0.push_state(&elem);
@@ -245,7 +250,11 @@ impl RandState<'_> {
                     choices.collect()
                 };
                 let idx = arbitrary_variant(u, &sizes)?;
-                let TypeField { label, typ } = &fs[idx];
+                let TypeField {
+                    label,
+                    typ,
+                    doc_comment: _,
+                } = &fs[idx];
                 let lab_str = label.to_string();
                 let elem = StateElem::Label(&lab_str);
                 let old_config = self.0.push_state(&elem);

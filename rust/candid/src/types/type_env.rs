@@ -234,6 +234,7 @@ impl TypeEnv {
         TypeField {
             label: field.id.as_ref().clone(),
             typ: self.as_idl_type(&field.ty),
+            doc_comment: None,
         }
     }
 
@@ -250,6 +251,7 @@ impl TypeEnv {
             .map(|(id, t)| Binding {
                 id: id.clone(),
                 typ: self.as_idl_type(t),
+                doc_comment: None,
             })
             .collect()
     }

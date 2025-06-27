@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use crate::types::{ArgType, Field, FuncMode, Function, Label, Type, TypeInner};
 
@@ -189,6 +189,7 @@ impl IDLArgType {
 pub struct TypeField {
     pub label: Label,
     pub typ: IDLType,
+    pub doc_comment: Option<Vec<String>>,
 }
 
 impl From<TypeField> for Field {
@@ -211,12 +212,19 @@ pub enum Dec {
 pub struct Binding {
     pub id: String,
     pub typ: IDLType,
+    pub doc_comment: Option<Vec<String>>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
+pub struct IDLActorType {
+    pub typ: IDLType,
+    pub doc_comment: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone)]
 pub struct IDLProg {
     pub decs: Vec<Dec>,
-    pub actor: Option<IDLType>,
+    pub actor: Option<IDLActorType>,
 }
 
 #[derive(Debug)]
@@ -229,7 +237,7 @@ pub struct IDLInitArgs {
 #[derive(Debug, Default)]
 pub struct IDLMergedProg {
     types: Vec<Binding>,
-    pub actor: Option<IDLType>,
+    pub actor: Option<IDLActorType>,
 }
 
 impl From<IDLProg> for IDLMergedProg {
@@ -238,6 +246,15 @@ impl From<IDLProg> for IDLMergedProg {
         merged_prog.add_decs(&other_prog.decs);
         merged_prog.set_actor(other_prog.actor);
         merged_prog
+    }
+}
+
+impl From<IDLActorType> for IDLMergedProg {
+    fn from(other_actor: IDLActorType) -> Self {
+        Self {
+            types: vec![],
+            actor: Some(other_actor),
+        }
     }
 }
 
@@ -266,14 +283,25 @@ impl IDLMergedProg {
         self.types.extend(types);
     }
 
-    pub fn set_actor(&mut self, other: Option<IDLType>) {
+    pub fn set_actor(&mut self, other: Option<IDLActorType>) {
         self.actor = other;
     }
 
+    pub fn set_comments_in_actor(&mut self, doc_comments: &HashMap<String, Vec<String>>) {
+        self.actor = self.actor.as_ref().map(|t| IDLActorType {
+            typ: set_comments_in_type(&t.typ, doc_comments),
+            doc_comment: t.doc_comment.clone(),
+        });
+    }
+
     pub fn find_type(&self, id: &str) -> Result<&IDLType, String> {
+        self.find_binding(id).map(|b| &b.typ)
+    }
+
+    pub fn find_binding(&self, id: &str) -> Result<&Binding, String> {
         self.types
             .iter()
-            .find_map(|t| if t.id == id { Some(&t.typ) } else { None })
+            .find(|t| t.id == id)
             .ok_or(format!("Type identifier not found: {id}"))
     }
 
@@ -285,8 +313,11 @@ impl IDLMergedProg {
         }
     }
 
-    pub fn get_types(&self) -> Vec<(&str, &IDLType)> {
-        self.types.iter().map(|t| (t.id.as_str(), &t.typ)).collect()
+    pub fn get_types(&self) -> Vec<(&str, &IDLType, Option<&Vec<String>>)> {
+        self.types
+            .iter()
+            .map(|t| (t.id.as_str(), &t.typ, t.doc_comment.as_ref()))
+            .collect()
     }
 
     pub fn get_bindings(&self) -> Vec<Binding> {
@@ -332,5 +363,76 @@ impl IDLMergedProg {
             }
         }
         Err(format!("cannot find method {id}"))
+    }
+}
+
+fn set_comments_in_type(t: &IDLType, doc_comments: &HashMap<String, Vec<String>>) -> IDLType {
+    match t {
+        IDLType::PrimT(prim) => IDLType::PrimT(prim.clone()),
+        IDLType::VarT(id) => IDLType::VarT(id.clone()),
+        IDLType::FuncT(func) => IDLType::FuncT(FuncType {
+            modes: func.modes.clone(),
+            args: func
+                .args
+                .iter()
+                .map(|a| IDLArgType {
+                    typ: set_comments_in_type(&a.typ, doc_comments),
+                    name: a.name.clone(),
+                })
+                .collect(),
+            rets: func
+                .rets
+                .iter()
+                .map(|r| set_comments_in_type(r, doc_comments))
+                .collect(),
+        }),
+        IDLType::OptT(t) => IDLType::OptT(Box::new(set_comments_in_type(t, doc_comments))),
+        IDLType::VecT(t) => IDLType::VecT(Box::new(set_comments_in_type(t, doc_comments))),
+        IDLType::RecordT(fields) => {
+            let fields = fields
+                .iter()
+                .map(|f| TypeField {
+                    label: f.label.clone(),
+                    typ: set_comments_in_type(&f.typ, doc_comments),
+                    doc_comment: doc_comments.get(&f.label.to_string()).cloned(),
+                })
+                .collect();
+            IDLType::RecordT(fields)
+        }
+        IDLType::ServT(methods) => {
+            let methods = methods
+                .iter()
+                .map(|m| Binding {
+                    id: m.id.clone(),
+                    typ: set_comments_in_type(&m.typ, doc_comments),
+                    doc_comment: doc_comments.get(&m.id).cloned(),
+                })
+                .collect();
+            IDLType::ServT(methods)
+        }
+        IDLType::VariantT(fields) => {
+            let fields = fields
+                .iter()
+                .map(|f| TypeField {
+                    label: f.label.clone(),
+                    typ: set_comments_in_type(&f.typ, doc_comments),
+                    doc_comment: doc_comments.get(&f.label.to_string()).cloned(),
+                })
+                .collect();
+            IDLType::VariantT(fields)
+        }
+        IDLType::ClassT(args, t) => {
+            let args = args
+                .iter()
+                .map(|a| IDLArgType {
+                    typ: set_comments_in_type(&a.typ, doc_comments),
+                    name: a.name.clone(),
+                })
+                .collect();
+            IDLType::ClassT(args, Box::new(set_comments_in_type(t, doc_comments)))
+        }
+        IDLType::PrincipalT => IDLType::PrincipalT,
+        IDLType::FutureT => IDLType::FutureT,
+        IDLType::UnknownT => IDLType::UnknownT,
     }
 }

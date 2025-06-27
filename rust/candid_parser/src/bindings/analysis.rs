@@ -87,7 +87,7 @@ pub fn chase_actor<'a>(prog: &'a IDLMergedProg, actor: &'a IDLType) -> Result<Ve
 pub fn chase_def_use(prog: &IDLMergedProg) -> Result<BTreeMap<String, Vec<String>>> {
     let mut res = BTreeMap::new();
     let actor = prog.actor.as_ref().ok_or_else(|| Error::msg("no actor"))?;
-    let actor = prog.trace_type(actor).map_err(Error::msg)?;
+    let actor = prog.trace_type(&actor.typ).map_err(Error::msg)?;
     if let IDLType::ClassT(args, _) = &actor {
         for (i, arg) in args.iter().enumerate() {
             let mut used = Vec::new();
