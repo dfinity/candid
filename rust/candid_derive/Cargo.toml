@@ -24,3 +24,6 @@ quote = "1.0.7"
 syn = { version = "2.0", features = ["visit", "full"] }
 proc-macro2 = "1.0.19"
 lazy_static = "1.4.0"
+
+[lints]
+workspace = true
