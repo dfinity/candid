@@ -134,8 +134,8 @@ pub const service : Service = Service(CANISTER_ID);
 #[test]
 fn test_Arc_MyList_() {
   // Generated from ListInner.record.tail.use_type = "Arc<MyList>"
-  let candid_src = r#"type List = opt ListInner;
-type ListInner = record { head : int; tail : List };
+  let candid_src = r#"type ListInner = record { head : int; tail : List };
+type List = opt ListInner;
 (List)"#;
   candid_parser::utils::check_rust_type::<Arc<MyList>>(candid_src).unwrap();
 }

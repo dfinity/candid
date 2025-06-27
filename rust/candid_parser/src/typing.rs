@@ -1,10 +1,12 @@
 use crate::{parse_idl_prog, pretty_parse_idl_prog, Error, Result};
 use candid::types::{
-    syntax::{Binding, Dec, IDLArgType, IDLInitArgs, IDLProg, IDLType, PrimType, TypeField},
+    syntax::{
+        Binding, Dec, IDLArgType, IDLInitArgs, IDLMergedProg, IDLProg, IDLType, PrimType, TypeField,
+    },
     ArgType, Field, Function, Type, TypeEnv, TypeInner,
 };
 use candid::utils::check_unique;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 pub struct Env<'a> {
@@ -98,6 +100,8 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
             Ok(TypeInner::Service(ms).into())
         }
         IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
+        IDLType::FutureT => Err(Error::msg("future not supported")),
+        IDLType::UnknownT => Err(Error::msg("unknown type not supported")),
     }
 }
 
@@ -151,29 +155,6 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
-fn check_cycle(env: &TypeEnv) -> Result<()> {
-    fn has_cycle<'a>(seen: &mut BTreeSet<&'a str>, env: &'a TypeEnv, t: &'a Type) -> Result<bool> {
-        match t.as_ref() {
-            TypeInner::Var(id) => {
-                if seen.insert(id) {
-                    let ty = env.find_type(id)?;
-                    has_cycle(seen, env, ty)
-                } else {
-                    Ok(true)
-                }
-            }
-            _ => Ok(false),
-        }
-    }
-    for (id, ty) in env.0.iter() {
-        let mut seen = BTreeSet::new();
-        if has_cycle(&mut seen, env, ty)? {
-            return Err(Error::msg(format!("{id} has cyclic type definition")));
-        }
-    }
-    Ok(())
-}
-
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         if let Dec::TypD(Binding { id, typ: _ }) = dec {
@@ -185,7 +166,7 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     }
     env.pre = true;
     check_defs(env, decs)?;
-    check_cycle(env.te)?;
+    env.te.check_cycle()?;
     env.pre = false;
     check_defs(env, decs)?;
     Ok(())
@@ -313,7 +294,7 @@ fn merge_actor(
     }
 }
 
-fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> {
+fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>, IDLMergedProg)> {
     let base = if file.is_absolute() {
         file.parent().unwrap().to_path_buf()
     } else {
@@ -323,13 +304,17 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
             .unwrap()
             .to_path_buf()
     };
-    let prog =
-        std::fs::read_to_string(file).map_err(|_| Error::msg(format!("Cannot open {file:?}")))?;
-    let prog = if is_pretty {
-        pretty_parse_idl_prog(file.to_str().unwrap(), &prog)?
-    } else {
-        parse_idl_prog(&prog)?
+
+    let prog = {
+        let prog = std::fs::read_to_string(file)
+            .map_err(|_| Error::msg(format!("Cannot open {file:?}")))?;
+        if is_pretty {
+            pretty_parse_idl_prog(file.to_str().unwrap(), &prog)?
+        } else {
+            parse_idl_prog(&prog)?
+        }
     };
+
     let mut visited = BTreeMap::new();
     let mut imports = Vec::new();
     load_imports(is_pretty, &base, &mut visited, &prog, &mut imports)?;
@@ -340,33 +325,43 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
             None => unreachable!(),
         })
         .collect();
+
     let mut te = TypeEnv::new();
     let mut env = Env {
         te: &mut te,
         pre: false,
     };
+    let mut idl_merged_prog = IDLMergedProg::new();
+
     let mut actor: Option<Type> = None;
     for (include_serv, path, name) in imports.iter() {
         let code = std::fs::read_to_string(path)?;
         let code = parse_idl_prog(&code)?;
         check_decs(&mut env, &code.decs)?;
+        idl_merged_prog.add_decs(&code.decs);
         if *include_serv {
             let t = check_actor(&env, &code.actor)?;
             actor = merge_actor(&env, &actor, &t, name)?;
         }
     }
+
     check_decs(&mut env, &prog.decs)?;
+    idl_merged_prog.add_decs(&prog.decs);
+
     let mut res = check_actor(&env, &prog.actor)?;
     if actor.is_some() {
         res = merge_actor(&env, &res, &actor, "")?;
     }
-    Ok((te, res))
+
+    idl_merged_prog.set_actor(res.clone().map(|t| env.te.as_idl_type(&t)));
+
+    Ok((te, res, idl_merged_prog))
 }
 
 /// Type check did file including the imports.
-pub fn check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
+pub fn check_file(file: &Path) -> Result<(TypeEnv, Option<Type>, IDLMergedProg)> {
     check_file_(file, false)
 }
-pub fn pretty_check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
+pub fn pretty_check_file(file: &Path) -> Result<(TypeEnv, Option<Type>, IDLMergedProg)> {
     check_file_(file, true)
 }

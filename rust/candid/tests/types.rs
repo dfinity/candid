@@ -5,9 +5,14 @@ use std::fmt::Debug;
 use candid::{
     candid_method, record,
     ser::IDLBuilder,
-    types::value::{IDLValue, IDLValueVisitor},
-    types::{get_type, Serializer, Type, TypeInner},
-    variant, CandidType, Decode, Deserialize, Encode, Int,
+    types::{
+        get_type,
+        internal::TypeContainer,
+        syntax::{IDLType, PrimType, TypeField},
+        value::{IDLValue, IDLValueVisitor},
+        Label, Serializer, Type, TypeInner,
+    },
+    variant, CandidType, Decode, Deserialize, Encode, Int, TypeEnv,
 };
 use serde::de::DeserializeOwned;
 
@@ -84,29 +89,57 @@ fn any_val() {
 
 #[test]
 fn test_primitive() {
-    assert_eq!(get_type(&true), TypeInner::Bool.into());
-    assert_eq!(get_type(&Box::new(42)), TypeInner::Int32.into());
-    assert_eq!(get_type(&Box::new(Int::from(42))), TypeInner::Int.into());
+    let env = TypeEnv::new();
+
+    let bool_prim = get_type(&true);
+    assert_eq!(bool_prim, TypeInner::Bool.into());
+    assert_eq!(env.as_idl_type(&bool_prim), IDLType::PrimT(PrimType::Bool));
+
+    let null_prim = get_type(&());
+    assert_eq!(null_prim, TypeInner::Null.into());
+    assert_eq!(env.as_idl_type(&null_prim), IDLType::PrimT(PrimType::Null));
+
+    let int_prim = get_type(&Box::new(42));
+    assert_eq!(int_prim, TypeInner::Int32.into());
+    assert_eq!(env.as_idl_type(&int_prim), IDLType::PrimT(PrimType::Int32));
+
+    let int_prim = get_type(&Box::new(Int::from(42)));
+    assert_eq!(int_prim, TypeInner::Int.into());
+    assert_eq!(env.as_idl_type(&int_prim), IDLType::PrimT(PrimType::Int));
+
     let opt: Option<&str> = None;
+    let opt_prim = get_type(&opt);
+    assert_eq!(opt_prim, TypeInner::Opt(TypeInner::Text.into()).into());
     assert_eq!(
-        get_type(&opt),
-        TypeInner::Opt(TypeInner::Text.into()).into()
+        env.as_idl_type(&opt_prim),
+        IDLType::OptT(Box::new(IDLType::PrimT(PrimType::Text)))
     );
+
+    let vec_prim = get_type(&[0, 1, 2, 3]);
+    assert_eq!(vec_prim, TypeInner::Vec(TypeInner::Int32.into()).into());
     assert_eq!(
-        get_type(&[0, 1, 2, 3]),
-        TypeInner::Vec(TypeInner::Int32.into()).into()
+        env.as_idl_type(&vec_prim),
+        IDLType::VecT(Box::new(IDLType::PrimT(PrimType::Int32)))
     );
-    assert_eq!(
-        get_type(&std::marker::PhantomData::<u32>),
-        TypeInner::Nat32.into()
-    );
+
+    let nat_prim = get_type(&std::marker::PhantomData::<u32>);
+    assert_eq!(nat_prim, TypeInner::Nat32.into());
+    assert_eq!(env.as_idl_type(&nat_prim), IDLType::PrimT(PrimType::Nat32));
 }
 
 #[test]
 fn test_struct() {
+    let mut type_container = TypeContainer::new();
+
     #[derive(Debug, CandidType)]
     struct Newtype(Int);
     assert_eq!(Newtype::ty(), TypeInner::Int.into());
+    type_container.add::<Newtype>();
+    assert_eq!(
+        type_container.as_idl_type(&Newtype::ty()),
+        IDLType::PrimT(PrimType::Int)
+    );
+
     #[derive(Debug, CandidType)]
     struct A {
         foo: Int,
@@ -115,6 +148,20 @@ fn test_struct() {
     assert_eq!(
         A::ty(),
         record! { foo: TypeInner::Int.into(); bar: TypeInner::Bool.into() }
+    );
+    type_container.add::<A>();
+    assert_eq!(
+        type_container.as_idl_type(&A::ty()),
+        IDLType::RecordT(vec![
+            TypeField {
+                label: Label::Named("bar".to_string()),
+                typ: IDLType::PrimT(PrimType::Bool),
+            },
+            TypeField {
+                label: Label::Named("foo".to_string()),
+                typ: IDLType::PrimT(PrimType::Int),
+            },
+        ])
     );
 
     #[derive(Debug, CandidType)]
@@ -127,6 +174,20 @@ fn test_struct() {
         get_type(&res),
         record! { g1: TypeInner::Int32.into(); g2: TypeInner::Bool.into() }
     );
+    type_container.add::<G<i32, bool>>();
+    assert_eq!(
+        type_container.as_idl_type(&get_type(&res)),
+        IDLType::RecordT(vec![
+            TypeField {
+                label: Label::Named("g1".to_string()),
+                typ: IDLType::PrimT(PrimType::Int32),
+            },
+            TypeField {
+                label: Label::Named("g2".to_string()),
+                typ: IDLType::PrimT(PrimType::Bool),
+            },
+        ])
+    );
 
     #[derive(Debug, CandidType)]
     struct List {
@@ -137,10 +198,71 @@ fn test_struct() {
         List::ty(),
         record! { head: TypeInner::Int32.into(); tail: TypeInner::Opt(TypeInner::Knot(candid::types::TypeId::of::<List>()).into()).into() }
     );
+    type_container.add::<List>();
+    assert_eq!(
+        type_container.as_idl_type(&List::ty()),
+        IDLType::RecordT(vec![
+            TypeField {
+                label: Label::Named("head".to_string()),
+                typ: IDLType::PrimT(PrimType::Int32),
+            },
+            TypeField {
+                label: Label::Named("tail".to_string()),
+                typ: IDLType::OptT(Box::new(IDLType::VarT("List".to_string()))),
+            },
+        ])
+    );
+
+    #[derive(Debug, CandidType)]
+    struct GenericList<T> {
+        head: T,
+        tail: Option<Box<GenericList<T>>>,
+    }
+    assert_eq!(
+        GenericList::<i32>::ty(),
+        record! { head: TypeInner::Int32.into(); tail: TypeInner::Opt(TypeInner::Knot(candid::types::TypeId::of::<GenericList<i32>>()).into()).into() }
+    );
+    type_container.add::<GenericList<i32>>();
+    assert_eq!(
+        type_container.as_idl_type(&GenericList::<i32>::ty()),
+        IDLType::RecordT(vec![
+            TypeField {
+                label: Label::Named("head".to_string()),
+                typ: IDLType::PrimT(PrimType::Int32),
+            },
+            TypeField {
+                label: Label::Named("tail".to_string()),
+                typ: IDLType::OptT(Box::new(IDLType::VarT("GenericList".to_string()))),
+            },
+        ])
+    );
+
+    #[derive(Debug, CandidType)]
+    struct Wrap(GenericList<i32>);
+    assert_eq!(
+        Wrap::ty(),
+        record! { head: TypeInner::Int32.into(); tail: TypeInner::Opt(TypeInner::Knot(candid::types::TypeId::of::<GenericList<i32>>()).into()).into() }
+    );
+    type_container.add::<Wrap>();
+    assert_eq!(
+        type_container.as_idl_type(&Wrap::ty()),
+        IDLType::RecordT(vec![
+            TypeField {
+                label: Label::Named("head".to_string()),
+                typ: IDLType::PrimT(PrimType::Int32),
+            },
+            TypeField {
+                label: Label::Named("tail".to_string()),
+                typ: IDLType::OptT(Box::new(IDLType::VarT("GenericList".to_string()))),
+            },
+        ])
+    );
 }
 
 #[test]
 fn test_variant() {
+    let mut type_container = TypeContainer::new();
+
     #[allow(dead_code)]
     #[derive(Debug, CandidType)]
     enum E {
@@ -159,6 +281,46 @@ fn test_variant() {
             Bar: record!{ 0: TypeInner::Bool.into(); 1: TypeInner::Int32.into() };
             Newtype: TypeInner::Bool.into();
         }
+    );
+    type_container.add::<E>();
+    assert_eq!(
+        type_container.as_idl_type(&get_type(&v)),
+        IDLType::VariantT(vec![
+            TypeField {
+                label: Label::Named("Bar".to_string()),
+                typ: IDLType::RecordT(vec![
+                    TypeField {
+                        label: Label::Id(0),
+                        typ: IDLType::PrimT(PrimType::Bool),
+                    },
+                    TypeField {
+                        label: Label::Id(1),
+                        typ: IDLType::PrimT(PrimType::Int32),
+                    },
+                ]),
+            },
+            TypeField {
+                label: Label::Named("Baz".to_string()),
+                typ: IDLType::RecordT(vec![
+                    TypeField {
+                        label: Label::Named("a".to_string()),
+                        typ: IDLType::PrimT(PrimType::Int32),
+                    },
+                    TypeField {
+                        label: Label::Named("b".to_string()),
+                        typ: IDLType::PrimT(PrimType::Nat32),
+                    },
+                ]),
+            },
+            TypeField {
+                label: Label::Named("Foo".to_string()),
+                typ: IDLType::PrimT(PrimType::Null),
+            },
+            TypeField {
+                label: Label::Named("Newtype".to_string()),
+                typ: IDLType::PrimT(PrimType::Bool),
+            },
+        ])
     );
 }
 

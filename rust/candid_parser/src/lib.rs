@@ -65,7 +65,7 @@
 //! // Or alternatively, use check_prog to check in-memory did file
 //! // Note that file import is ignored by check_prog.
 //! let mut env = TypeEnv::new();
-//! let actor: Type = check_prog(&mut env, &ast)?.unwrap();
+//! let actor = check_prog(&mut env, &ast)?.unwrap();
 //!
 //! let method = env.get_method(&actor, "g").unwrap();
 //! assert_eq!(method.is_query(), true);

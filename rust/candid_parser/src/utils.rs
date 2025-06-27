@@ -1,6 +1,9 @@
 use crate::{check_prog, pretty_check_file, pretty_parse_idl_prog, Error, Result};
 use candid::{
-    types::{Type, TypeInner},
+    types::{
+        syntax::{Binding, IDLMergedProg, IDLType},
+        Type, TypeInner,
+    },
     TypeEnv,
 };
 use std::path::Path;
@@ -11,14 +14,15 @@ pub enum CandidSource<'a> {
 }
 
 impl CandidSource<'_> {
-    pub fn load(&self) -> Result<(TypeEnv, Option<Type>)> {
+    pub fn load(&self) -> Result<(TypeEnv, Option<Type>, IDLMergedProg)> {
         Ok(match self {
             CandidSource::File(path) => pretty_check_file(path)?,
             CandidSource::Text(str) => {
                 let ast = pretty_parse_idl_prog("", str)?;
                 let mut env = TypeEnv::new();
                 let actor = check_prog(&mut env, &ast)?;
-                (env, actor)
+                let idl_merged_prog = IDLMergedProg::from(ast);
+                (env, actor, idl_merged_prog)
             }
         })
     }
@@ -26,9 +30,9 @@ impl CandidSource<'_> {
 
 /// Check compatibility of two service types
 pub fn service_compatible(new: CandidSource, old: CandidSource) -> Result<()> {
-    let (mut env, t1) = new.load()?;
+    let (mut env, t1, _) = new.load()?;
     let t1 = t1.ok_or_else(|| Error::msg("new interface has no main service type"))?;
-    let (env2, t2) = old.load()?;
+    let (env2, t2, _) = old.load()?;
     let t2 = t2.ok_or_else(|| Error::msg("old interface has no main service type"))?;
     let mut gamma = std::collections::HashSet::new();
     let t2 = env.merge_type(env2, t2);
@@ -38,9 +42,9 @@ pub fn service_compatible(new: CandidSource, old: CandidSource) -> Result<()> {
 
 /// Check structural equality of two service types
 pub fn service_equal(left: CandidSource, right: CandidSource) -> Result<()> {
-    let (mut env, t1) = left.load()?;
+    let (mut env, t1, _) = left.load()?;
     let t1 = t1.ok_or_else(|| Error::msg("left interface has no main service type"))?;
-    let (env2, t2) = right.load()?;
+    let (env2, t2, _) = right.load()?;
     let t2 = t2.ok_or_else(|| Error::msg("right interface has no main service type"))?;
     let mut gamma = std::collections::HashSet::new();
     let t2 = env.merge_type(env2, t2);
@@ -52,7 +56,7 @@ pub fn service_equal(left: CandidSource, right: CandidSource) -> Result<()> {
 /// If the original did file contains imports, the output flattens the type definitions.
 /// For now, the comments from the original did file is omitted.
 pub fn instantiate_candid(candid: CandidSource) -> Result<(Vec<Type>, (TypeEnv, Type))> {
-    let (env, serv) = candid.load()?;
+    let (env, serv, _) = candid.load()?;
     let serv = serv.ok_or_else(|| Error::msg("the Candid interface has no main service type"))?;
     let serv = env.trace_type(&serv)?;
     Ok(match serv.as_ref() {
@@ -64,22 +68,26 @@ pub fn instantiate_candid(candid: CandidSource) -> Result<(Vec<Type>, (TypeEnv, 
         _ => unreachable!(),
     })
 }
-pub fn get_metadata(env: &TypeEnv, serv: &Option<Type>) -> Option<String> {
-    let serv = serv.clone()?;
-    let serv = env.trace_type(&serv).ok()?;
-    let serv = match serv.as_ref() {
-        TypeInner::Class(_, ty) => ty.clone(),
-        TypeInner::Service(_) => serv,
+pub fn get_metadata(env: &IDLMergedProg) -> Option<String> {
+    let serv = env.actor.as_ref()?;
+    let serv = env.trace_type(serv).ok()?;
+    let serv = match &serv {
+        IDLType::ClassT(_, ty) => ty.as_ref(),
+        IDLType::ServT(_) => &serv,
         _ => unreachable!(),
     };
-    let def_list = crate::bindings::analysis::chase_actor(env, &serv).ok()?;
-    let mut filtered = TypeEnv::new();
+    let def_list = crate::bindings::analysis::chase_actor(env, serv).ok()?;
+    let mut filtered = IDLMergedProg::new();
     for d in def_list {
-        if let Some(t) = env.0.get(d) {
-            filtered.0.insert(d.to_string(), t.clone());
+        if let Ok(typ) = env.find_type(d) {
+            filtered.insert_binding(Binding {
+                id: d.to_string(),
+                typ: typ.clone(),
+            });
         }
     }
-    Some(candid::pretty::candid::compile(&filtered, &Some(serv)))
+    filtered.set_actor(Some(serv.clone()));
+    Some(candid::pretty::candid::compile(&filtered))
 }
 
 /// Merge canister metadata candid:args and candid:service into a service constructor.
@@ -88,7 +96,7 @@ pub fn merge_init_args(candid: &str, init: &str) -> Result<(TypeEnv, Type)> {
     use crate::{parse_idl_init_args, typing::check_init_args};
     use candid::types::TypeInner;
     let candid = CandidSource::Text(candid);
-    let (env, serv) = candid.load()?;
+    let (env, serv, _) = candid.load()?;
     let serv = serv.ok_or_else(|| Error::msg("the Candid interface has no main service type"))?;
     let serv = env.trace_type(&serv)?;
     match serv.as_ref() {

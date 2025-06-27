@@ -3,8 +3,8 @@
 
 module {
   public type A = ?B;
-  public type B = ?C;
   public type C = A;
+  public type B = ?C;
   public type X = Y;
   public type Y = Z;
   public type Z = A;

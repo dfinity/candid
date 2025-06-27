@@ -212,7 +212,7 @@ fn nns() -> BenchResult {
 "#;
     bench_fn(|| {
         let _p = bench_scope("0. Parsing");
-        let (env, serv) = nns_did.load().unwrap();
+        let (env, serv, _) = nns_did.load().unwrap();
         let args = candid_parser::parse_idl_args(motion_proposal).unwrap();
         let serv = serv.unwrap();
         let method = &env.get_method(&serv, "manage_neuron").unwrap();

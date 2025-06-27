@@ -1,23 +1,21 @@
 use super::analysis::{chase_actor, chase_types, infer_rec};
 use candid::pretty::candid::pp_mode;
 use candid::pretty::utils::*;
-use candid::types::{ArgType, Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use candid::types::{
+    syntax::{Binding, FuncType, IDLArgType, IDLMergedProg, IDLType, PrimType, TypeField},
+    Label,
+};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
 
 // The definition of tuple is language specific.
-pub(crate) fn is_tuple(t: &Type) -> bool {
-    match t.as_ref() {
-        TypeInner::Record(ref fs) => {
+pub(super) fn is_tuple(t: &IDLType) -> bool {
+    match t {
+        IDLType::RecordT(ref fs) => {
             if fs.is_empty() {
                 return false;
             }
-            for (i, field) in fs.iter().enumerate() {
-                if field.id.get_id() != (i as u32) {
-                    return false;
-                }
-            }
-            true
+            t.is_tuple()
         }
         _ => false,
     }
@@ -96,9 +94,9 @@ pub(crate) fn ident(id: &str) -> RcDoc {
     }
 }
 
-fn pp_ty(ty: &Type) -> RcDoc {
-    use TypeInner::*;
-    match ty.as_ref() {
+fn pp_prim_ty(ty: &PrimType) -> RcDoc {
+    use PrimType::*;
+    match ty {
         Null => str("IDL.Null"),
         Bool => str("IDL.Bool"),
         Nat => str("IDL.Nat"),
@@ -116,28 +114,34 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("IDL.Text"),
         Reserved => str("IDL.Reserved"),
         Empty => str("IDL.Empty"),
-        Var(ref s) => ident(s),
-        Principal => str("IDL.Principal"),
-        Opt(ref t) => str("IDL.Opt").append(enclose("(", pp_ty(t), ")")),
-        Vec(ref t) => str("IDL.Vec").append(enclose("(", pp_ty(t), ")")),
-        Record(ref fs) => {
+    }
+}
+
+fn pp_ty(ty: &IDLType) -> RcDoc {
+    use IDLType::*;
+    match ty {
+        PrimT(ty) => pp_prim_ty(ty),
+        VarT(ref s) => ident(s),
+        PrincipalT => str("IDL.Principal"),
+        OptT(ref t) => str("IDL.Opt").append(enclose("(", pp_ty(t), ")")),
+        VecT(ref t) => str("IDL.Vec").append(enclose("(", pp_ty(t), ")")),
+        RecordT(ref fs) => {
             if is_tuple(ty) {
-                let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
+                let tuple = concat(fs.iter().map(|f| pp_ty(&f.typ)), ",");
                 str("IDL.Tuple").append(enclose("(", tuple, ")"))
             } else {
                 str("IDL.Record").append(pp_fields(fs))
             }
         }
-        Variant(ref fs) => str("IDL.Variant").append(pp_fields(fs)),
-        Func(ref func) => str("IDL.Func").append(pp_function(func)),
-        Service(ref serv) => str("IDL.Service").append(pp_service(serv)),
-        Class(_, _) => unreachable!(),
-        Knot(_) | Unknown | Future => unreachable!(),
+        VariantT(ref fs) => str("IDL.Variant").append(pp_fields(fs)),
+        FuncT(ref func) => str("IDL.Func").append(pp_function(func)),
+        ServT(ref serv) => str("IDL.Service").append(pp_service(serv)),
+        ClassT(_, _) | FutureT | UnknownT => unreachable!(),
     }
 }
 
-fn pp_label(id: &SharedLabel) -> RcDoc {
-    match &**id {
+fn pp_label(id: &Label) -> RcDoc {
+    match id {
         Label::Named(str) => quote_ident(str),
         Label::Id(n) | Label::Unnamed(n) => str("_")
             .append(RcDoc::as_string(n))
@@ -146,18 +150,18 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
     }
 }
 
-fn pp_field(field: &Field) -> RcDoc {
-    pp_label(&field.id)
+fn pp_field(field: &TypeField) -> RcDoc {
+    pp_label(&field.label)
         .append(kwd(":"))
-        .append(pp_ty(&field.ty))
+        .append(pp_ty(&field.typ))
 }
 
-fn pp_fields(fs: &[Field]) -> RcDoc {
+fn pp_fields(fs: &[TypeField]) -> RcDoc {
     let fields = concat(fs.iter().map(pp_field), ",");
     enclose_space("({", fields, "})")
 }
 
-fn pp_function(func: &Function) -> RcDoc {
+fn pp_function(func: &FuncType) -> RcDoc {
     let args = pp_args(&func.args);
     let rets = pp_rets(&func.rets);
     let modes = pp_modes(&func.modes);
@@ -166,12 +170,12 @@ fn pp_function(func: &Function) -> RcDoc {
     enclose("(", doc, ")").nest(INDENT_SPACE)
 }
 
-fn pp_args(args: &[ArgType]) -> RcDoc {
+fn pp_args(args: &[IDLArgType]) -> RcDoc {
     let doc = concat(args.iter().map(|arg| pp_ty(&arg.typ)), ",");
     enclose("[", doc, "]")
 }
 
-fn pp_rets(args: &[Type]) -> RcDoc {
+fn pp_rets(args: &[IDLType]) -> RcDoc {
     let doc = concat(args.iter().map(pp_ty), ",");
     enclose("[", doc, "]")
 }
@@ -186,17 +190,17 @@ fn pp_modes(modes: &[candid::types::FuncMode]) -> RcDoc {
     enclose("[", doc, "]")
 }
 
-fn pp_service(serv: &[(String, Type)]) -> RcDoc {
+fn pp_service(serv: &[Binding]) -> RcDoc {
     let doc = concat(
         serv.iter()
-            .map(|(id, func)| quote_ident(id).append(kwd(":")).append(pp_ty(func))),
+            .map(|Binding { id, typ }| quote_ident(id).append(kwd(":")).append(pp_ty(typ))),
         ",",
     );
     enclose_space("({", doc, "})")
 }
 
 fn pp_defs<'a>(
-    env: &'a TypeEnv,
+    env: &'a IDLMergedProg,
     def_list: &'a [&'a str],
     recs: &'a BTreeSet<&'a str>,
 ) -> RcDoc<'a> {
@@ -221,47 +225,47 @@ fn pp_defs<'a>(
     recs_doc.append(defs)
 }
 
-fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
-    match ty.as_ref() {
-        TypeInner::Service(_) => pp_ty(ty),
-        TypeInner::Var(id) => {
+fn pp_actor<'a>(ty: &'a IDLType, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
+    match ty {
+        IDLType::ServT(_) => pp_ty(ty),
+        IDLType::VarT(id) => {
             if recs.contains(&*id.clone()) {
                 str(id).append(".getType()")
             } else {
                 str(id)
             }
         }
-        TypeInner::Class(_, t) => pp_actor(t, recs),
+        IDLType::ClassT(_, t) => pp_actor(t, recs),
         _ => unreachable!(),
     }
 }
 
-pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
-    match actor {
+pub fn compile(prog: &IDLMergedProg) -> String {
+    match &prog.actor {
         None => {
-            let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
-            let recs = infer_rec(env, &def_list).unwrap();
-            let doc = pp_defs(env, &def_list, &recs);
+            let def_list: Vec<_> = prog.types_ids();
+            let recs = infer_rec(prog, &def_list).unwrap();
+            let doc = pp_defs(prog, &def_list, &recs);
             doc.pretty(LINE_WIDTH).to_string()
         }
         Some(actor) => {
-            let def_list = chase_actor(env, actor).unwrap();
-            let recs = infer_rec(env, &def_list).unwrap();
-            let defs = pp_defs(env, &def_list, &recs);
-            let types = if let TypeInner::Class(ref args, _) = actor.as_ref() {
+            let def_list = chase_actor(prog, actor).unwrap();
+            let recs = infer_rec(prog, &def_list).unwrap();
+            let defs = pp_defs(prog, &def_list, &recs);
+            let init = if let IDLType::ClassT(ref args, _) = actor {
                 args.iter().map(|arg| arg.typ.clone()).collect::<Vec<_>>()
             } else {
                 Vec::new()
             };
-            let init = types.as_slice();
+            let init = init.as_slice();
             let actor = kwd("return").append(pp_actor(actor, &recs)).append(";");
             let body = defs.append(actor);
             let doc = str("export const idlFactory = ({ IDL }) => ")
                 .append(enclose_space("{", body, "};"));
             // export init args
-            let init_defs = chase_types(env, init).unwrap();
-            let init_recs = infer_rec(env, &init_defs).unwrap();
-            let init_defs_doc = pp_defs(env, &init_defs, &init_recs);
+            let init_defs = chase_types(prog, init).unwrap();
+            let init_recs = infer_rec(prog, &init_defs).unwrap();
+            let init_defs_doc = pp_defs(prog, &init_defs, &init_recs);
             let init_doc = kwd("return").append(pp_rets(init)).append(";");
             let init_doc = init_defs_doc.append(init_doc);
             let init_doc =
