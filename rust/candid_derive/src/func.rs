@@ -139,20 +139,24 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
                         let mut rets: Vec<Type> = Vec::new();
                         #(#rets)*
                         let func = Function { args, rets, modes: #modes };
-                        service.insert(#name.to_string(), (TypeInner::Func(func).into(), #doc_comment));
+                        service.push((#name.to_string(), TypeInner::Func(func).into()));
+                        #doc_comment
+                        if !doc_comment.is_empty() {
+                            doc_comments.insert(#name.to_string(), doc_comment);
+                        }
                     }
                 }
             },
         );
         let service = quote! {
             use #candid::types::{CandidType, Function, Type, ArgType, TypeInner};
-            use #candid::types::syntax::{Binding, IDLMergedProg};
-            let mut service: std::collections::HashMap<String, (Type, Vec<String>)> = std::collections::HashMap::new();
+            use #candid::types::syntax::{Binding, IDLMergedProg, IDLActorType};
+            let mut service = Vec::<(String, Type)>::new();
+            let mut doc_comments: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
             let mut env = #candid::types::internal::TypeContainer::new();
             #(#gen_tys)*
-            let mut service_methods = service.iter().map(|(id, (typ, _))| (id.clone(), typ.clone())).collect::<Vec<_>>();
-            service_methods.sort_unstable_by_key(|(name, _)| name.clone());
-            let ty = TypeInner::Service(service_methods).into();
+            service.sort_unstable_by_key(|(name, _)| name.clone());
+            let ty = TypeInner::Service(service).into();
         };
         let actor = if let Some(init) = init {
             quote! {
@@ -170,10 +174,14 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
                 let bindings = env.env.0.iter().map(|(id, t)| Binding {
                     id: id.clone(),
                     typ: env.as_idl_type(t),
-                    doc_comment: service.get(id).map(|(_, c)| c).cloned(),
+                    doc_comment: doc_comments.get(id).cloned(),
                 }).collect::<Vec<_>>();
                 let mut idl_merged_prog = IDLMergedProg::from(bindings);
-                idl_merged_prog.set_actor(Some(env.as_idl_type(&actor)));
+                idl_merged_prog.set_actor(Some(IDLActorType {
+                    typ: env.as_idl_type(&actor),
+                    doc_comment: None,
+                }));
+                idl_merged_prog.set_comments_in_actor(&doc_comments);
 
                 let result = #candid::pretty::candid::compile(&idl_merged_prog);
                 format!("{}", result)

@@ -350,6 +350,7 @@ pub struct List<T> {
 
 #[test]
 fn test_func() {
+    /// Doc comment for 🐂 method
     #[candid_method(query, rename = "🐂")]
     fn test(a: String, b: i32) -> (String, i32) {
         (a, b)
@@ -382,24 +383,29 @@ fn test_func() {
         }
     }
     use internal::A;
+    /// Doc comment for id_variant method
     #[candid::candid_method]
     fn id_variant(_: &[internal::A]) -> Result<((A,), A), String> {
         unreachable!()
     }
+    /// Doc comment for oneway method
     #[candid_method(oneway)]
     fn oneway(_: &str) {
         unreachable!()
     }
 
+    /// Doc comment for id_struct query method
     #[candid_method(query)]
     fn id_struct(_: (List<u8>,)) -> Result<List<u8>, candid::Empty> {
         unreachable!()
     }
+    /// Doc comment for id_struct_composite composite_query method
     #[candid_method(composite_query)]
     fn id_struct_composite(_: (List<u8>,)) -> Result<List<u8>, candid::Empty> {
         unreachable!()
     }
 
+    /// Doc comment for id_tuple_destructure method
     #[candid_method]
     fn id_tuple_destructure((a, b): (u8, u8)) -> (u8, u8) {
         (a, b)
@@ -437,13 +443,19 @@ type Result = variant { Ok : List; Err : empty };
 type Result_1 = variant { Ok : record { record { A }; A }; Err : text };
 type Wrap = record { head : int8; tail : opt Box };
 service : (List_2) -> {
+  /// Doc comment for id_struct query method
   id_struct : (record { List }) -> (Result) query;
+  /// Doc comment for id_struct_composite composite_query method
   id_struct_composite : (record { List }) -> (Result) composite_query;
   id_struct_destructure : (NamedStruct) -> (nat16, int32);
+  /// Doc comment for id_tuple_destructure method
   id_tuple_destructure : (record { nat8; nat8 }) -> (nat8, nat8);
   id_unused_arg : (nat8) -> (Result);
+  /// Doc comment for id_variant method
   id_variant : (vec A) -> (Result_1);
+  /// Doc comment for oneway method
   "oneway" : (text) -> () oneway;
+  /// Doc comment for 🐂 method
   "🐂" : (a : text, b : int32) -> (text, int32) query;
 }"#;
     assert_eq!(expected, __export_service());
