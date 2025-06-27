@@ -21,9 +21,6 @@ features = ["all"]
 [workspace]
 members = ["."]
 
-[lints]
-workspace = true
-
 [[bin]]
 name = "parser"
 path = "fuzz_targets/parser.rs"

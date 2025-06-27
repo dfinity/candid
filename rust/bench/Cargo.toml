@@ -21,6 +21,3 @@ hex = "0.4.3"
 candid = { path = "../candid" }
 candid_derive = { path = "../candid_derive" }
 ic_principal = { path = "../ic_principal" }
-
-[lints]
-workspace = true
