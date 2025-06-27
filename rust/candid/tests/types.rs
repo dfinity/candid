@@ -470,14 +470,17 @@ fn test_counter() {
         fn init() -> Self {
             Service { counter: 0 }
         }
+        /// Doc comment for inc method
         #[candid_method]
         fn inc(&mut self) {
             self.counter += 1;
         }
+        /// Doc comment for read method
         #[candid_method(query)]
         fn read(&self) -> usize {
             self.counter
         }
+        /// Doc comment for set method
         #[candid_method]
         fn set(&mut self, value: usize) {
             self.counter = value;
@@ -485,8 +488,11 @@ fn test_counter() {
     }
     candid::export_service!();
     let expected = r#"service : {
+  /// Doc comment for inc method
   inc : () -> ();
+  /// Doc comment for read method
   read : () -> (nat64) query;
+  /// Doc comment for set method
   set : (value : nat64) -> ();
 }"#;
     assert_eq!(expected, __export_service());
