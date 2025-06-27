@@ -287,84 +287,9 @@ impl IDLMergedProg {
         self.actor = other;
     }
 
-    pub fn set_comments_in_type(
-        &self,
-        t: &IDLType,
-        doc_comments: &HashMap<String, Vec<String>>,
-    ) -> IDLType {
-        match t {
-            IDLType::PrimT(prim) => IDLType::PrimT(prim.clone()),
-            IDLType::VarT(id) => IDLType::VarT(id.clone()),
-            IDLType::FuncT(func) => IDLType::FuncT(FuncType {
-                modes: func.modes.clone(),
-                args: func
-                    .args
-                    .iter()
-                    .map(|a| IDLArgType {
-                        typ: self.set_comments_in_type(&a.typ, doc_comments),
-                        name: a.name.clone(),
-                    })
-                    .collect(),
-                rets: func
-                    .rets
-                    .iter()
-                    .map(|r| self.set_comments_in_type(r, doc_comments))
-                    .collect(),
-            }),
-            IDLType::OptT(t) => IDLType::OptT(Box::new(self.set_comments_in_type(t, doc_comments))),
-            IDLType::VecT(t) => IDLType::VecT(Box::new(self.set_comments_in_type(t, doc_comments))),
-            IDLType::RecordT(fields) => {
-                let fields = fields
-                    .iter()
-                    .map(|f| TypeField {
-                        label: f.label.clone(),
-                        typ: self.set_comments_in_type(&f.typ, doc_comments),
-                        doc_comment: doc_comments.get(&f.label.to_string()).cloned(),
-                    })
-                    .collect();
-                IDLType::RecordT(fields)
-            }
-            IDLType::ServT(methods) => {
-                let methods = methods
-                    .iter()
-                    .map(|m| Binding {
-                        id: m.id.clone(),
-                        typ: self.set_comments_in_type(&m.typ, doc_comments),
-                        doc_comment: doc_comments.get(&m.id).cloned(),
-                    })
-                    .collect();
-                IDLType::ServT(methods)
-            }
-            IDLType::VariantT(fields) => {
-                let fields = fields
-                    .iter()
-                    .map(|f| TypeField {
-                        label: f.label.clone(),
-                        typ: self.set_comments_in_type(&f.typ, doc_comments),
-                        doc_comment: doc_comments.get(&f.label.to_string()).cloned(),
-                    })
-                    .collect();
-                IDLType::VariantT(fields)
-            }
-            IDLType::ClassT(args, t) => {
-                let args = args
-                    .iter()
-                    .map(|a| IDLArgType {
-                        typ: self.set_comments_in_type(&a.typ, doc_comments),
-                        name: a.name.clone(),
-                    })
-                    .collect();
-                IDLType::ClassT(args, Box::new(self.set_comments_in_type(t, doc_comments)))
-            }
-            IDLType::PrincipalT => IDLType::PrincipalT,
-            IDLType::FutureT => IDLType::FutureT,
-            IDLType::UnknownT => IDLType::UnknownT,
-        }
-    }
-
     pub fn set_comments_in_actor(&mut self, doc_comments: &HashMap<String, Vec<String>>) {
         self.actor = self.actor.as_ref().map(|t| IDLActorType {
-            typ: self.set_comments_in_type(&t.typ, doc_comments),
+            typ: set_comments_in_type(&t.typ, doc_comments),
             doc_comment: t.doc_comment.clone(),
         });
     }
@@ -438,5 +363,76 @@ impl IDLMergedProg {
             }
         }
         Err(format!("cannot find method {id}"))
+    }
+}
+
+fn set_comments_in_type(t: &IDLType, doc_comments: &HashMap<String, Vec<String>>) -> IDLType {
+    match t {
+        IDLType::PrimT(prim) => IDLType::PrimT(prim.clone()),
+        IDLType::VarT(id) => IDLType::VarT(id.clone()),
+        IDLType::FuncT(func) => IDLType::FuncT(FuncType {
+            modes: func.modes.clone(),
+            args: func
+                .args
+                .iter()
+                .map(|a| IDLArgType {
+                    typ: set_comments_in_type(&a.typ, doc_comments),
+                    name: a.name.clone(),
+                })
+                .collect(),
+            rets: func
+                .rets
+                .iter()
+                .map(|r| set_comments_in_type(r, doc_comments))
+                .collect(),
+        }),
+        IDLType::OptT(t) => IDLType::OptT(Box::new(set_comments_in_type(t, doc_comments))),
+        IDLType::VecT(t) => IDLType::VecT(Box::new(set_comments_in_type(t, doc_comments))),
+        IDLType::RecordT(fields) => {
+            let fields = fields
+                .iter()
+                .map(|f| TypeField {
+                    label: f.label.clone(),
+                    typ: set_comments_in_type(&f.typ, doc_comments),
+                    doc_comment: doc_comments.get(&f.label.to_string()).cloned(),
+                })
+                .collect();
+            IDLType::RecordT(fields)
+        }
+        IDLType::ServT(methods) => {
+            let methods = methods
+                .iter()
+                .map(|m| Binding {
+                    id: m.id.clone(),
+                    typ: set_comments_in_type(&m.typ, doc_comments),
+                    doc_comment: doc_comments.get(&m.id).cloned(),
+                })
+                .collect();
+            IDLType::ServT(methods)
+        }
+        IDLType::VariantT(fields) => {
+            let fields = fields
+                .iter()
+                .map(|f| TypeField {
+                    label: f.label.clone(),
+                    typ: set_comments_in_type(&f.typ, doc_comments),
+                    doc_comment: doc_comments.get(&f.label.to_string()).cloned(),
+                })
+                .collect();
+            IDLType::VariantT(fields)
+        }
+        IDLType::ClassT(args, t) => {
+            let args = args
+                .iter()
+                .map(|a| IDLArgType {
+                    typ: set_comments_in_type(&a.typ, doc_comments),
+                    name: a.name.clone(),
+                })
+                .collect();
+            IDLType::ClassT(args, Box::new(set_comments_in_type(t, doc_comments)))
+        }
+        IDLType::PrincipalT => IDLType::PrincipalT,
+        IDLType::FutureT => IDLType::FutureT,
+        IDLType::UnknownT => IDLType::UnknownT,
     }
 }

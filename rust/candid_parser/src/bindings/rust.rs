@@ -185,6 +185,13 @@ fn pp_doc_comment(comment_lines: Option<&Vec<String>>) -> RcDoc {
     doc_comment
 }
 
+/// (actor methods, init args, actor comment lines)
+type PpActorRet = (
+    Vec<Method>,
+    Option<Vec<(String, String)>>,
+    Option<Vec<String>>,
+);
+
 impl<'a> State<'a> {
     fn generate_test(&mut self, src: &IDLType, use_type: &str) {
         if self.tests.contains_key(use_type) {
@@ -675,14 +682,7 @@ fn test_{test_name}() {{
         self.state.pop_state(old, StateElem::Label(id));
         res
     }
-    fn pp_actor(
-        &mut self,
-        actor: &IDLActorType,
-    ) -> (
-        Vec<Method>,
-        Option<Vec<(String, String)>>,
-        Option<Vec<String>>,
-    ) {
+    fn pp_actor(&mut self, actor: &IDLActorType) -> PpActorRet {
         let actor_typ = self.state.prog.trace_type(&actor.typ).unwrap();
         let init = if let IDLType::ClassT(args, _) = &actor_typ {
             let old = self.state.push_state(&StateElem::Label("init"));
@@ -713,7 +713,7 @@ fn test_{test_name}() {{
         let mut res = Vec::new();
         for binding in serv.iter() {
             let func = self.state.prog.as_func(&binding.typ).unwrap();
-            res.push(self.pp_function(&binding, func));
+            res.push(self.pp_function(binding, func));
         }
         (res, init, actor.doc_comment.clone())
     }

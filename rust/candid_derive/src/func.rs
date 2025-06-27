@@ -140,9 +140,9 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
                         #(#rets)*
                         let func = Function { args, rets, modes: #modes };
                         service.push((#name.to_string(), TypeInner::Func(func).into()));
-                        #doc_comment
-                        if !doc_comment.is_empty() {
-                            doc_comments.insert(#name.to_string(), doc_comment);
+                        let function_doc_comment = #doc_comment;
+                        if !function_doc_comment.is_empty() {
+                            doc_comments.insert(#name.to_string(), function_doc_comment);
                         }
                     }
                 }
