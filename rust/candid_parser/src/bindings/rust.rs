@@ -310,9 +310,7 @@ fn test_{test_name}() {{
                 }
                 FuncT(_) // not possible after rewriting
                 | ServT(_) // not possible after rewriting
-                | ClassT(_, _)
-                | FutureT
-                | UnknownT => unreachable!(),
+                | ClassT(_, _) => unreachable!(),
             }
         };
         self.state.pop_state(old, elem);

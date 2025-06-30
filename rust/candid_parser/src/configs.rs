@@ -408,7 +408,6 @@ fn path_name(t: &IDLType) -> String {
         IDLType::FuncT(_) => "func",
         IDLType::ServT(_) => "service",
         IDLType::ClassT(..) => "func:init",
-        IDLType::FutureT | IDLType::UnknownT => unreachable!(),
     }
     .to_string()
 }

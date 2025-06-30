@@ -106,7 +106,7 @@ fn pp_ty<'a>(prog: &'a IDLMergedProg, ty: &'a IDLType, is_ref: bool) -> RcDoc<'a
         }
         FuncT(_) => pp_inline_func(),
         ServT(_) => pp_inline_service(),
-        ClassT(_, _) | FutureT | UnknownT => unreachable!(),
+        ClassT(_, _) => unreachable!(),
     }
 }
 

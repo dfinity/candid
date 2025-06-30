@@ -166,6 +166,13 @@ impl TypeEnv {
         Ok(())
     }
 
+    /// # Panics
+    ///
+    /// Panics if the type is [TypeInner::Future] or [TypeInner::Unknown].
+    /// You must handle those cases before calling this function.
+    ///
+    /// Panics if the id referenced by the [TypeInner::Knot] was not inserted
+    /// into the env before calling this function.
     pub fn inner_as_idl_type(&self, ty: &TypeInner) -> IDLType {
         match ty {
             TypeInner::Null => IDLType::PrimT(PrimType::Null),
@@ -204,8 +211,7 @@ impl TypeEnv {
                     .unwrap_or_else(|| panic!("Knot type should already be in the env: {:?}", id));
                 IDLType::VarT(name)
             }
-            TypeInner::Future => IDLType::FutureT,
-            TypeInner::Unknown => IDLType::UnknownT,
+            TypeInner::Future | TypeInner::Unknown => unreachable!(),
         }
     }
 
