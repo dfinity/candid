@@ -61,22 +61,6 @@ pub(crate) fn get_lit_str(expr: &syn::Expr) -> std::result::Result<syn::LitStr, 
     Err(())
 }
 
-pub(crate) fn get_doc_comment_lines(attrs: &[syn::Attribute]) -> Vec<String> {
-    attrs
-        .iter()
-        .filter_map(|attr| match &attr.meta {
-            syn::Meta::NameValue(m) if m.path.is_ident("doc") => {
-                if let Ok(lit) = get_lit_str(&m.value) {
-                    Some(lit.value().trim().to_string())
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        })
-        .collect()
-}
-
 fn get_custom_candid_path(input: &syn::DeriveInput) -> Result<Option<proc_macro2::TokenStream>> {
     let candid_path_helper_attribute_option = input
         .attrs
