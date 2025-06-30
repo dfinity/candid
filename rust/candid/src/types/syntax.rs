@@ -426,7 +426,5 @@ fn set_comments_in_type(t: &IDLType, doc_comments: &HashMap<String, Vec<String>>
             IDLType::ClassT(args, Box::new(set_comments_in_type(t, doc_comments)))
         }
         IDLType::PrincipalT => IDLType::PrincipalT,
-        IDLType::FutureT => IDLType::FutureT,
-        IDLType::UnknownT => IDLType::UnknownT,
     }
 }
