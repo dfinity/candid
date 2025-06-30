@@ -150,7 +150,6 @@ fn pp_ty(ty: &IDLType) -> RcDoc {
                 _ => unreachable!(),
             }
         }
-        FutureT | UnknownT => unreachable!(),
     }
 }
 

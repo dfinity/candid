@@ -127,8 +127,6 @@ pub fn pp_ty(ty: &IDLType) -> RcDoc {
                 _ => unreachable!(),
             }
         }
-        FutureT => str("future"),
-        UnknownT => str("unknown"),
     }
 }
 

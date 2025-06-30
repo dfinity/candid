@@ -126,8 +126,6 @@ pub fn check_type(env: &mut Env, t: &IDLType) -> Result<Type> {
             Ok(TypeInner::Service(ms).into())
         }
         IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
-        IDLType::FutureT => Err(Error::msg("future not supported")),
-        IDLType::UnknownT => Err(Error::msg("unknown type not supported")),
     }
 }
 

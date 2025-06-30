@@ -332,23 +332,24 @@ impl Type {
 #[cfg(feature = "printer")]
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let env = crate::TypeEnv::new();
-        write!(
-            f,
-            "{}",
-            crate::pretty::candid::pp_ty(&env.as_idl_type(self)).pretty(80),
-        )
+        write!(f, "{}", self.as_ref())
     }
 }
 #[cfg(feature = "printer")]
 impl fmt::Display for TypeInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let env = crate::TypeEnv::new();
-        write!(
-            f,
-            "{}",
-            crate::pretty::candid::pp_ty(&env.inner_as_idl_type(self)).pretty(80),
-        )
+        match self {
+            TypeInner::Future => write!(f, "future"),
+            TypeInner::Unknown => write!(f, "unknown"),
+            _ => {
+                let env = crate::TypeEnv::new();
+                write!(
+                    f,
+                    "{}",
+                    crate::pretty::candid::pp_ty(&env.inner_as_idl_type(self)).pretty(80),
+                )
+            }
+        }
     }
 }
 #[cfg(not(feature = "printer"))]
