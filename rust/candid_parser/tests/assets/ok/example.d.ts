@@ -37,10 +37,7 @@ export type tree = {
   } |
   { 'leaf' : bigint };
 export interface _SERVICE {
-  'bbbbb' : ActorMethod<[b], undefined>,
-  'f' : t,
   'f1' : ActorMethod<[list, Uint8Array | number[], [] | [boolean]], undefined>,
-  'g' : ActorMethod<[list], [B, tree, stream]>,
   'g1' : ActorMethod<
     [my_type, List, [] | [List], nested],
     [bigint, Principal, nested_res]
@@ -64,6 +61,9 @@ export interface _SERVICE {
         { 'Err' : { 'a' : null } | { 'b' : null } },
     ]
   >,
+  'f' : t,
+  'g' : ActorMethod<[list], [B, tree, stream]>,
+  'bbbbb' : ActorMethod<[b], undefined>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

@@ -42,10 +42,7 @@ module {
     #leaf : Int;
   };
   public type Self = actor {
-    bbbbb : shared b -> async ();
-    f : t;
     f1 : shared (list, test : Blob, ?Bool) -> ();
-    g : shared list -> async (B, tree, stream);
     g1 : shared query (my_type, List, ?List, nested) -> async (
         Int,
         broker,
@@ -61,5 +58,8 @@ module {
         ?b,
         { #Ok : { result : Text }; #Err : { #a; #b } },
       );
+    f : t;
+    g : shared list -> async (B, tree, stream);
+    bbbbb : shared b -> async ();
   }
 }

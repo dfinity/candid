@@ -32,10 +32,7 @@ type tree = variant {
   leaf : int;
 };
 service : {
-  bbbbb : (b) -> ();
-  f : t;
   f1 : (list, test : blob, opt bool) -> () oneway;
-  g : (list) -> (B, tree, stream);
   g1 : (my_type, List, opt List, nested) -> (int, broker, nested_res) query;
   h : (vec opt text, variant { A : nat; B : opt text }, opt List) -> (
       record { 42 : record {}; id : nat },
@@ -46,4 +43,7 @@ service : {
       opt b,
       variant { Ok : record { result : text }; Err : variant { a; b } },
     ) composite_query;
+  f : t;
+  g : (list) -> (B, tree, stream);
+  bbbbb : (b) -> ();
 }
