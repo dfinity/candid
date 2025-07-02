@@ -162,11 +162,15 @@ impl IDLMergedProg {
         }
     }
 
-    pub fn merge(&mut self, is_service_import: bool, name: String, prog: IDLProg) {
+    pub fn merge(&mut self, is_service_import: bool, name: String, prog: IDLProg) -> Result<()> {
         self.typ_decs.extend(IDLProg::typ_decs(prog.decs));
         if is_service_import {
-            self.service_imports.push((name, prog.actor.expect("TODO")))
+            let actor = prog
+                .actor
+                .with_context(|| format!("Imported service file \"{name}\" has no main service"))?;
+            self.service_imports.push((name, actor));
         }
+        Ok(())
     }
 
     pub fn lookup(&self, id: &str) -> Option<&Binding> {
