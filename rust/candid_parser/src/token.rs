@@ -8,7 +8,7 @@ const DOC_COMMENT_PREFIX: &str = "//";
 #[derive(Logos, Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 #[logos(skip r"[ \t\r\n]+")]
 pub enum Token {
-    #[regex(r"//[^\n]*")]
+    #[regex(r"//[^\n]*")] // must start with `DOC_COMMENT_PREFIX`
     DocComment,
     #[token("/*")]
     StartComment,
