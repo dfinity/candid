@@ -219,7 +219,7 @@ fn main() -> Result<()> {
             methods,
         } => {
             let configs = load_config(&config)?;
-            let (env, mut actor, _) = pretty_check_file(&input)?;
+            let (env, mut actor, prog) = pretty_check_file(&input)?;
             if !methods.is_empty() {
                 actor = Some(candid_parser::bindings::analysis::project_methods(
                     &env, &actor, methods,
@@ -229,7 +229,7 @@ fn main() -> Result<()> {
                 "js" => candid_parser::bindings::javascript::compile(&env, &actor),
                 "ts" => candid_parser::bindings::typescript::compile(&env, &actor),
                 "did" => candid_parser::pretty::candid::compile(&env, &actor),
-                "mo" => candid_parser::bindings::motoko::compile(&env, &actor),
+                "mo" => candid_parser::bindings::motoko::compile(&env, &actor, &prog),
                 "rs" => {
                     use candid_parser::bindings::rust::{compile, Config, ExternalConfig};
                     let external = configs

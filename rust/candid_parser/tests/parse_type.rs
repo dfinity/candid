@@ -120,7 +120,7 @@ fn compiler_test(resource: &str) {
     let candid_path = base_path.join(filename);
 
     match check_file(&candid_path) {
-        Ok((env, actor, _prog)) => {
+        Ok((env, actor, prog)) => {
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
                 let content = compile(&env, &actor);
@@ -131,13 +131,14 @@ fn compiler_test(resource: &str) {
             }
             {
                 match filename.file_name().unwrap().to_str().unwrap() {
-                    "unicode.did" | "escape.did" => {
-                        check_error(|| motoko::compile(&env, &actor), "not a valid Motoko id")
-                    }
+                    "unicode.did" | "escape.did" => check_error(
+                        || motoko::compile(&env, &actor, &prog),
+                        "not a valid Motoko id",
+                    ),
                     _ => {
                         let mut output =
                             mint.new_goldenfile(filename.with_extension("mo")).unwrap();
-                        let content = motoko::compile(&env, &actor);
+                        let content = motoko::compile(&env, &actor, &prog);
                         writeln!(output, "{content}").unwrap();
                     }
                 }

@@ -3,6 +3,7 @@
 
 use candid::pretty::candid::is_valid_as_id;
 use candid::pretty::utils::*;
+use candid::types::syntax::{self, IDLMergedProg, IDLType};
 use candid::types::{ArgType, Field, FuncMode, Function, Label, SharedLabel, Type, TypeInner};
 use candid::TypeEnv;
 use pretty::RcDoc;
@@ -92,6 +93,15 @@ fn escape(id: &str, is_method: bool) -> RcDoc {
     }
 }
 
+fn pp_ty_rich<'a>(ty: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
+    match (ty.as_ref(), syntax) {
+        (TypeInner::Service(ref meths), Some(IDLType::ServT(methods))) => {
+            pp_service(meths, Some(methods))
+        }
+        (_, _) => pp_ty(ty),
+    }
+}
+
 fn pp_ty(ty: &Type) -> RcDoc {
     use TypeInner::*;
     match ty.as_ref() {
@@ -135,11 +145,11 @@ fn pp_ty(ty: &Type) -> RcDoc {
             }
         }
         Func(ref func) => pp_function(func),
-        Service(ref serv) => pp_service(serv),
+        Service(ref serv) => pp_service(serv, None),
         Class(ref args, ref t) => {
             let doc = pp_args(args).append(" -> async ");
             match t.as_ref() {
-                Service(ref serv) => doc.append(pp_service(serv)),
+                Service(ref serv) => doc.append(pp_service(serv, None)),
                 Var(ref s) => doc.append(s),
                 _ => unreachable!(),
             }
@@ -238,41 +248,56 @@ fn pp_rets(args: &[Type]) -> RcDoc {
     }
 }
 
-fn pp_service(serv: &[(String, Type)]) -> RcDoc {
+fn pp_service<'a>(serv: &'a [(String, Type)], syntax: Option<&'a [syntax::Binding]>) -> RcDoc<'a> {
     let doc = concat(
-        serv.iter()
-            .map(|(id, func)| escape(id, true).append(" : ").append(pp_ty(func))),
+        serv.iter().map(|(id, func)| {
+            syntax
+                .and_then(|bs| bs.iter().find(|b| &b.id == id))
+                .map(|b| pp_docs(&b.docs))
+                .unwrap_or(RcDoc::nil())
+                .append(escape(id, true))
+                .append(" : ")
+                .append(pp_ty(func))
+        }),
         ";",
     );
     kwd("actor").append(enclose_space("{", doc, "}"))
 }
 
-fn pp_defs(env: &TypeEnv) -> RcDoc {
+fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
+    lines(docs.iter().map(|line| RcDoc::text("/// ").append(line)))
+}
+
+fn pp_defs<'a>(env: &'a TypeEnv, prog: &'a IDLMergedProg) -> RcDoc<'a> {
     lines(env.0.iter().map(|(id, ty)| {
-        kwd("public type")
+        let syntax = prog.lookup(id);
+        let docs = syntax
+            .map(|b| pp_docs(b.docs.as_ref()))
+            .unwrap_or(RcDoc::nil());
+        docs.append(kwd("public type"))
             .append(escape(id, false))
             .append(" = ")
-            .append(pp_ty(ty))
+            .append(pp_ty_rich(ty, syntax.map(|b| &b.typ)))
             .append(";")
     }))
 }
 
 fn pp_actor(ty: &Type) -> RcDoc {
     match ty.as_ref() {
-        TypeInner::Service(ref serv) => pp_service(serv),
+        TypeInner::Service(ref serv) => pp_service(serv, None),
         TypeInner::Var(_) | TypeInner::Class(_, _) => pp_ty(ty),
         _ => unreachable!(),
     }
 }
 
-pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
+pub fn compile(env: &TypeEnv, actor: &Option<Type>, prog: &IDLMergedProg) -> String {
     let header = r#"// This is a generated Motoko binding.
 // Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 "#;
     let doc = match actor {
-        None => pp_defs(env),
+        None => pp_defs(env, prog),
         Some(actor) => {
-            let defs = pp_defs(env);
+            let defs = pp_defs(env, prog);
             let actor = kwd("public type Self =").append(pp_actor(actor));
             defs.append(actor)
         }
