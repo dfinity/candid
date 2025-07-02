@@ -1,12 +1,12 @@
 use super::test::{Assert, Input, Test};
-use super::token::{Token, error, error2, LexicalError, Span};
+use super::token::{Token, error, error2, LexicalError, Span, TriviaMap};
 use candid::{Principal, types::Label};
-use candid::types::syntax::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLArgType};
+use candid::types::syntax::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLArgType, IDLActorType};
 use candid::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
 use candid::types::{TypeEnv, FuncMode};
 use candid::utils::check_unique;
 
-grammar;
+grammar(trivia: Option<&TriviaMap>);
 
 extern {
     type Location = usize;
@@ -174,7 +174,7 @@ pub Typ: IDLType = {
               Label::Unnamed(_) => { id = id + 1; Label::Unnamed(id - 1) },
               ref l => { id = l.get_id() + 1; l.clone() },
           };
-          TypeField { label, typ: f.typ.clone() }
+          TypeField { label, typ: f.typ.clone(), docs: f.docs.clone() }
         }).collect();
         fs.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
         check_unique(fs.iter().map(|f| &f.label)).map_err(|e| error2(e, span))?;
@@ -202,19 +202,19 @@ PrimTyp: IDLType = {
 }
 
 FieldTyp: TypeField = {
-    <n:FieldId> ":" <t:Typ> =>? Ok(TypeField { label: Label::Id(n), typ: t }),
-    <n:Name> ":" <t:Typ> => TypeField { label: Label::Named(n), typ: t },
+    <doc_comment:DocComment> <id:FieldId> ":" <typ:Typ> =>? Ok(TypeField { label: Label::Id(id), typ, docs: doc_comment.unwrap_or_default() }),
+    <doc_comment:DocComment> <n:Name> ":" <typ:Typ> => TypeField { label: Label::Named(n), typ, docs: doc_comment.unwrap_or_default() },
 }
 
 RecordFieldTyp: TypeField = {
     FieldTyp => <>,
-    Typ => TypeField { label: Label::Unnamed(0), typ: <> },
+    <doc_comment:DocComment> <typ:Typ> => TypeField { label: Label::Unnamed(0), typ, docs: doc_comment.unwrap_or_default() },
 }
 
 VariantFieldTyp: TypeField = {
     FieldTyp => <>,
-    Name => TypeField { label: Label::Named(<>), typ: IDLType::PrimT(PrimType::Null) },
-    FieldId =>? Ok(TypeField { label: Label::Id(<>), typ: IDLType::PrimT(PrimType::Null) }),
+    <doc_comment:DocComment> <n:Name> => TypeField { label: Label::Named(n), typ: IDLType::PrimT(PrimType::Null), docs: doc_comment.unwrap_or_default() },
+    <doc_comment:DocComment> <id:FieldId> =>? Ok(TypeField { label: Label::Id(id), typ: IDLType::PrimT(PrimType::Null), docs: doc_comment.unwrap_or_default() }),
 }
 
 ArgTupTyp: Vec<IDLArgType> = "(" <SepBy<ArgTyp, ",">> ")" =>? {
@@ -253,13 +253,13 @@ ActorTyp: Vec<Binding> = {
 }
 
 MethTyp: Binding = {
-    <n:Name> ":" <f:FuncTyp> => Binding { id: n, typ: IDLType::FuncT(f) },
-    <n:Name> ":" <id:"id"> => Binding { id: n, typ: IDLType::VarT(id) },
+    <doc_comment: DocComment> <n:Name> ":" <f:FuncTyp> => Binding { id: n, typ: IDLType::FuncT(f), docs: doc_comment.unwrap_or_default() },
+    <doc_comment: DocComment> <n:Name> ":" <id:"id"> => Binding { id: n, typ: IDLType::VarT(id), docs: doc_comment.unwrap_or_default() },
 }
 
 // Type declarations
 Def: Dec = {
-    "type" <id:"id"> "=" <t:Typ> => Dec::TypD(Binding { id: id, typ: t }),
+    <doc_comment: DocComment> "type" <id:"id"> "=" <t:Typ> => Dec::TypD(Binding { id: id, typ: t, docs: doc_comment.unwrap_or_default() }),
     "import" <Text> => Dec::ImportType(<>),
     "import" "service" <Text> => Dec::ImportServ(<>),
 }
@@ -269,9 +269,9 @@ Actor: IDLType = {
     "id" => IDLType::VarT(<>),
 }
 
-MainActor: IDLType = {
-    "service" "id"? ":" <t:Actor> ";"? => <>,
-    "service" "id"? ":" <args:ArgTupTyp> "->" <t:Actor> ";"? => IDLType::ClassT(args, Box::new(t)),
+MainActor: IDLActorType = {
+    <doc_comment: DocComment> "service" "id"? ":" <t:Actor> ";"? => IDLActorType { typ: t, docs: doc_comment.unwrap_or_default() },
+    <doc_comment: DocComment> "service" "id"? ":" <args:ArgTupTyp> "->" <t:Actor> ";"? => IDLActorType { typ: IDLType::ClassT(args, Box::new(t)), docs: doc_comment.unwrap_or_default() },
 }
 
 pub IDLProg: IDLProg = {
@@ -327,3 +327,9 @@ SepBy<T, S>: Vec<T> = {
 #[inline]
 Sp<T>: (T, Span) =
     <l: @L> <t: T> <r: @R> => (t, l..r);
+
+#[inline]
+DocComment: Option<Vec<String>> =
+    <l: @L> => {
+      trivia.and_then(|t| t.borrow().get(&l).cloned())
+    };

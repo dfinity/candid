@@ -1,4 +1,5 @@
 use candid::pretty::candid::compile;
+use candid::types::syntax::{Dec, IDLType};
 use candid::types::TypeEnv;
 use candid_parser::bindings::{javascript, motoko, rust, typescript};
 use candid_parser::configs::Configs;
@@ -12,8 +13,13 @@ use std::path::Path;
 fn test_parse_idl_prog() {
     let prog = r#"
 import "test.did";
+// Doc comment for my_type
 type my_type = principal;
-type List = opt record { head: int; tail: List };
+type List = opt record {
+  // Doc comment for List.head
+  head: int;
+  tail: List
+};
 type f = func (List, func (int32) -> (int64)) -> (opt List);
 type broker = service {
   find : (name: text) ->
@@ -21,14 +27,88 @@ type broker = service {
 };
 type nested = record { nat; nat; record { nat; 0x2a:nat; nat8; }; 42:nat; 40:nat; variant{ A; 0x2a; B; C }; };
 
+// Doc comment for service
 service server : {
+  // Doc comment for f
   f : (test: blob, opt bool) -> () oneway;
   g : (my_type, List, opt List) -> (int) query;
   h : (vec opt text, variant { A: nat; B: opt text }, opt List) -> (record { id: nat; 0x2a: record {} });
   i : f;
 }
     "#;
-    parse_idl_prog(prog).unwrap();
+    let ast = parse_idl_prog(prog).unwrap();
+
+    // Assert doc comments
+    let actor = ast.actor.unwrap();
+    assert_eq!(actor.docs, vec!["Doc comment for service"]);
+
+    let IDLType::ServT(methods) = &actor.typ else {
+        panic!("actor is not a service");
+    };
+    assert_eq!(methods[0].docs, vec!["Doc comment for f"]);
+    assert!(methods[1].docs.is_empty());
+    assert!(methods[2].docs.is_empty());
+    assert!(methods[3].docs.is_empty());
+
+    let my_type = ast
+        .decs
+        .iter()
+        .find_map(|dec| {
+            if let Dec::TypD(binding) = dec {
+                if binding.id == "my_type" {
+                    Some(binding)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap();
+    assert_eq!(my_type.docs, vec!["Doc comment for my_type"]);
+
+    let list = ast
+        .decs
+        .iter()
+        .find_map(|dec| {
+            if let Dec::TypD(binding) = dec {
+                if binding.id == "List" {
+                    Some(binding)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap();
+    match &list.typ {
+        IDLType::OptT(list_inner) => {
+            let IDLType::RecordT(fields) = list_inner.as_ref() else {
+                panic!("inner is not a record");
+            };
+            assert_eq!(fields[0].docs, vec!["Doc comment for List.head"]);
+            assert!(fields[1].docs.is_empty());
+        }
+        _ => panic!("list is not an opt"),
+    }
+
+    let nested = ast
+        .decs
+        .iter()
+        .find_map(|dec| {
+            if let Dec::TypD(binding) = dec {
+                if binding.id == "nested" {
+                    Some(binding)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap();
+    assert!(nested.docs.is_empty());
 }
 
 #[test_generator::test_resources("rust/candid_parser/tests/assets/*.did")]
