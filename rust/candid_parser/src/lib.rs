@@ -143,31 +143,33 @@ pub mod random;
 pub mod test;
 
 pub fn parse_idl_prog(str: &str) -> Result<candid::types::syntax::IDLProg> {
-    let lexer = token::Tokenizer::new(str);
-    Ok(grammar::IDLProgParser::new().parse(lexer)?)
+    let trivia = token::TriviaMap::default();
+    let lexer = token::Tokenizer::new_with_trivia(str, trivia.clone());
+    let res = grammar::IDLProgParser::new().parse(Some(&trivia.clone()), lexer)?;
+    Ok(res)
 }
 
 pub fn parse_idl_init_args(str: &str) -> Result<candid::types::syntax::IDLInitArgs> {
     let lexer = token::Tokenizer::new(str);
-    Ok(grammar::IDLInitArgsParser::new().parse(lexer)?)
+    Ok(grammar::IDLInitArgsParser::new().parse(None, lexer)?)
 }
 
 pub fn parse_idl_type(str: &str) -> Result<candid::types::syntax::IDLType> {
     let lexer = token::Tokenizer::new(str);
-    Ok(grammar::TypParser::new().parse(lexer)?)
+    Ok(grammar::TypParser::new().parse(None, lexer)?)
 }
 
 pub fn parse_idl_types(str: &str) -> Result<candid::types::syntax::IDLTypes> {
     let lexer = token::Tokenizer::new(str);
-    Ok(grammar::TypsParser::new().parse(lexer)?)
+    Ok(grammar::TypsParser::new().parse(None, lexer)?)
 }
 
 pub fn parse_idl_args(s: &str) -> crate::Result<candid::IDLArgs> {
     let lexer = token::Tokenizer::new(s);
-    Ok(grammar::ArgsParser::new().parse(lexer)?)
+    Ok(grammar::ArgsParser::new().parse(None, lexer)?)
 }
 
 pub fn parse_idl_value(s: &str) -> crate::Result<candid::IDLValue> {
     let lexer = token::Tokenizer::new(s);
-    Ok(grammar::ArgParser::new().parse(lexer)?)
+    Ok(grammar::ArgParser::new().parse(None, lexer)?)
 }

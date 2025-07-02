@@ -94,6 +94,7 @@ impl IDLArgType {
 pub struct TypeField {
     pub label: Label,
     pub typ: IDLType,
+    pub doc_comment_lines: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -107,12 +108,19 @@ pub enum Dec {
 pub struct Binding {
     pub id: String,
     pub typ: IDLType,
+    pub doc_comment_lines: Vec<String>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
+pub struct IDLActorType {
+    pub typ: IDLType,
+    pub doc_comment_lines: Vec<String>,
+}
+
+#[derive(Debug)]
 pub struct IDLProg {
     pub decs: Vec<Dec>,
-    pub actor: Option<IDLType>,
+    pub actor: Option<IDLActorType>,
 }
 
 #[derive(Debug)]
