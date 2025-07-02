@@ -3,6 +3,8 @@ use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
 use lalrpop_util::ParseError;
 use logos::{Lexer, Logos};
 
+const DOC_COMMENT_PREFIX: &str = "//";
+
 #[derive(Logos, Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 #[logos(skip r"[ \t\r\n]+")]
 pub enum Token {
@@ -122,7 +124,10 @@ fn parse_number(lex: &mut Lexer<Token>) -> String {
 }
 
 fn parse_doc_comment(lex: &Lexer<Token>) -> String {
-    lex.slice().trim_start_matches("///").trim().to_string()
+    lex.slice()
+        .trim_start_matches(DOC_COMMENT_PREFIX)
+        .trim()
+        .to_string()
 }
 
 pub type TriviaMap = Rc<RefCell<HashMap<usize, Vec<String>>>>;
