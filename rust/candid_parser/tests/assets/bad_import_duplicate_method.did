@@ -1,0 +1,5 @@
+import service "actor.did";
+
+service : {
+  f : () -> ();
+}

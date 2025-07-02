@@ -1,5 +1,9 @@
-use crate::types::{FuncMode, Label};
-use anyhow::{anyhow, Context, Result};
+use crate::{
+    idl_hash,
+    types::{FuncMode, Label},
+};
+use anyhow::{anyhow, bail, Context, Result};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IDLType {
@@ -202,7 +206,14 @@ impl IDLMergedProg {
             methods.extend(self.chase_service(typ.typ.clone(), Some(name))?);
         }
 
-        // TODO: Check for duplicates in methods
+        let mut hashes: HashMap<u32, &str> = HashMap::new();
+        for method in &methods {
+            let name = &method.id;
+            if let Some(previous) = hashes.insert(idl_hash(name), name) {
+                bail!("Duplicate imported method name: label '{name}' hash collision with '{previous}'")
+            }
+        }
+
         let typ = if let Some(args) = init_args {
             IDLType::ClassT(args, Box::new(IDLType::ServT(methods)))
         } else {
@@ -218,14 +229,17 @@ impl IDLMergedProg {
     fn chase_service(&self, ty: IDLType, import_name: Option<&str>) -> Result<Vec<Binding>> {
         match ty {
             IDLType::VarT(v) => {
-                let resolved = self.typ_decs.iter().find(|b| b.id == v).with_context(|| format!("Unbound type identifier {v}"))?;
+                let resolved = self
+                    .typ_decs
+                    .iter()
+                    .find(|b| b.id == v)
+                    .with_context(|| format!("Unbound type identifier {v}"))?;
                 self.chase_service(resolved.typ.clone(), import_name)
             }
             IDLType::ServT(bindings) => Ok(bindings),
             ty => Err(import_name
                 .map(|name| anyhow!("Imported service file \"{name}\" has a service constructor"))
-                .unwrap_or(anyhow!("not a service type: {:?}", ty))
-            )
+                .unwrap_or(anyhow!("not a service type: {:?}", ty))),
         }
     }
 }
