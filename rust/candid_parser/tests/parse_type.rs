@@ -120,7 +120,7 @@ fn compiler_test(resource: &str) {
     let candid_path = base_path.join(filename);
 
     match check_file(&candid_path) {
-        Ok((env, actor)) => {
+        Ok((env, actor, _prog)) => {
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
                 let content = compile(&env, &actor);

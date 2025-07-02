@@ -13,7 +13,10 @@ pub enum CandidSource<'a> {
 impl CandidSource<'_> {
     pub fn load(&self) -> Result<(TypeEnv, Option<Type>)> {
         Ok(match self {
-            CandidSource::File(path) => pretty_check_file(path)?,
+            CandidSource::File(path) => {
+                let (env, actor, _) = pretty_check_file(path)?;
+                (env, actor)
+            }
             CandidSource::Text(str) => {
                 let ast = pretty_parse_idl_prog("", str)?;
                 let mut env = TypeEnv::new();
