@@ -40,15 +40,15 @@ service server : {
 
     // Assert doc comments
     let actor = ast.actor.unwrap();
-    assert_eq!(actor.doc_comment_lines, vec!["Doc comment for service"]);
+    assert_eq!(actor.docs, vec!["Doc comment for service"]);
 
     let IDLType::ServT(methods) = &actor.typ else {
         panic!("actor is not a service");
     };
-    assert_eq!(methods[0].doc_comment_lines, vec!["Doc comment for f"]);
-    assert!(methods[1].doc_comment_lines.is_empty());
-    assert!(methods[2].doc_comment_lines.is_empty());
-    assert!(methods[3].doc_comment_lines.is_empty());
+    assert_eq!(methods[0].docs, vec!["Doc comment for f"]);
+    assert!(methods[1].docs.is_empty());
+    assert!(methods[2].docs.is_empty());
+    assert!(methods[3].docs.is_empty());
 
     let my_type = ast
         .decs
@@ -65,7 +65,7 @@ service server : {
             }
         })
         .unwrap();
-    assert_eq!(my_type.doc_comment_lines, vec!["Doc comment for my_type"]);
+    assert_eq!(my_type.docs, vec!["Doc comment for my_type"]);
 
     let list = ast
         .decs
@@ -87,11 +87,8 @@ service server : {
             let IDLType::RecordT(fields) = list_inner.as_ref() else {
                 panic!("inner is not a record");
             };
-            assert_eq!(
-                fields[0].doc_comment_lines,
-                vec!["Doc comment for List.head"]
-            );
-            assert!(fields[1].doc_comment_lines.is_empty());
+            assert_eq!(fields[0].docs, vec!["Doc comment for List.head"]);
+            assert!(fields[1].docs.is_empty());
         }
         _ => panic!("list is not an opt"),
     }
@@ -111,7 +108,7 @@ service server : {
             }
         })
         .unwrap();
-    assert!(nested.doc_comment_lines.is_empty());
+    assert!(nested.docs.is_empty());
 }
 
 #[test_generator::test_resources("rust/candid_parser/tests/assets/*.did")]

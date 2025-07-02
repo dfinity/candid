@@ -3,13 +3,13 @@ use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
 use lalrpop_util::ParseError;
 use logos::{Lexer, Logos};
 
-const DOC_COMMENT_PREFIX: &str = "//";
+const LINE_COMMENT_PREFIX: &str = "//";
 
 #[derive(Logos, Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 #[logos(skip r"[ \t\r\n]+")]
 pub enum Token {
-    #[regex(r"//[^\n]*")] // must start with `DOC_COMMENT_PREFIX`
-    DocComment,
+    #[regex(r"//[^\n]*")] // must start with `LINE_COMMENT_PREFIX`
+    LineComment,
     #[token("/*")]
     StartComment,
     #[token("=")]
@@ -125,7 +125,7 @@ fn parse_number(lex: &mut Lexer<Token>) -> String {
 
 fn parse_doc_comment(lex: &Lexer<Token>) -> String {
     lex.slice()
-        .trim_start_matches(DOC_COMMENT_PREFIX)
+        .trim_start_matches(LINE_COMMENT_PREFIX)
         .trim()
         .to_string()
 }
@@ -205,7 +205,7 @@ impl Iterator for Tokenizer<'_> {
                 let err = format!("Unknown token {}", self.lex.slice());
                 Some(Err(LexicalError::new(err, span)))
             }
-            Ok(Token::DocComment) => {
+            Ok(Token::LineComment) => {
                 let content = parse_doc_comment(&self.lex);
                 if self.trivia.is_some() {
                     self.comment_buffer.push(content.to_string());

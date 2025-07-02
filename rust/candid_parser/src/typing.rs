@@ -143,11 +143,7 @@ fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
 fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         match dec {
-            Dec::TypD(Binding {
-                id,
-                typ,
-                doc_comment_lines: _,
-            }) => {
+            Dec::TypD(Binding { id, typ, docs: _ }) => {
                 let t = check_type(env, typ)?;
                 env.te.0.insert(id.to_string(), t);
             }

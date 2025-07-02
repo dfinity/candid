@@ -174,7 +174,7 @@ pub Typ: IDLType = {
               Label::Unnamed(_) => { id = id + 1; Label::Unnamed(id - 1) },
               ref l => { id = l.get_id() + 1; l.clone() },
           };
-          TypeField { label, typ: f.typ.clone(), doc_comment_lines: f.doc_comment_lines.clone() }
+          TypeField { label, typ: f.typ.clone(), docs: f.docs.clone() }
         }).collect();
         fs.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
         check_unique(fs.iter().map(|f| &f.label)).map_err(|e| error2(e, span))?;
@@ -202,19 +202,19 @@ PrimTyp: IDLType = {
 }
 
 FieldTyp: TypeField = {
-    <doc_comment: DocComment> <id:FieldId> ":" <typ:Typ> =>? Ok(TypeField { label: Label::Id(id), typ, doc_comment_lines: doc_comment.unwrap_or_default() }),
-    <doc_comment: DocComment> <n:Name> ":" <typ:Typ> => TypeField { label: Label::Named(n), typ, doc_comment_lines: doc_comment.unwrap_or_default() },
+    <doc_comment:DocComment> <id:FieldId> ":" <typ:Typ> =>? Ok(TypeField { label: Label::Id(id), typ, docs: doc_comment.unwrap_or_default() }),
+    <doc_comment:DocComment> <n:Name> ":" <typ:Typ> => TypeField { label: Label::Named(n), typ, docs: doc_comment.unwrap_or_default() },
 }
 
 RecordFieldTyp: TypeField = {
     FieldTyp => <>,
-    <doc_comment: DocComment> <typ:Typ> => TypeField { label: Label::Unnamed(0), typ, doc_comment_lines: doc_comment.unwrap_or_default() },
+    <doc_comment:DocComment> <typ:Typ> => TypeField { label: Label::Unnamed(0), typ, docs: doc_comment.unwrap_or_default() },
 }
 
 VariantFieldTyp: TypeField = {
     FieldTyp => <>,
-    <doc_comment: DocComment> <n:Name> => TypeField { label: Label::Named(n), typ: IDLType::PrimT(PrimType::Null), doc_comment_lines: doc_comment.unwrap_or_default() },
-    <doc_comment: DocComment> <id:FieldId> =>? Ok(TypeField { label: Label::Id(id), typ: IDLType::PrimT(PrimType::Null), doc_comment_lines: doc_comment.unwrap_or_default() }),
+    <doc_comment:DocComment> <n:Name> => TypeField { label: Label::Named(n), typ: IDLType::PrimT(PrimType::Null), docs: doc_comment.unwrap_or_default() },
+    <doc_comment:DocComment> <id:FieldId> =>? Ok(TypeField { label: Label::Id(id), typ: IDLType::PrimT(PrimType::Null), docs: doc_comment.unwrap_or_default() }),
 }
 
 ArgTupTyp: Vec<IDLArgType> = "(" <SepBy<ArgTyp, ",">> ")" =>? {
@@ -253,13 +253,13 @@ ActorTyp: Vec<Binding> = {
 }
 
 MethTyp: Binding = {
-    <doc_comment: DocComment> <n:Name> ":" <f:FuncTyp> => Binding { id: n, typ: IDLType::FuncT(f), doc_comment_lines: doc_comment.unwrap_or_default() },
-    <doc_comment: DocComment> <n:Name> ":" <id:"id"> => Binding { id: n, typ: IDLType::VarT(id), doc_comment_lines: doc_comment.unwrap_or_default() },
+    <doc_comment: DocComment> <n:Name> ":" <f:FuncTyp> => Binding { id: n, typ: IDLType::FuncT(f), docs: doc_comment.unwrap_or_default() },
+    <doc_comment: DocComment> <n:Name> ":" <id:"id"> => Binding { id: n, typ: IDLType::VarT(id), docs: doc_comment.unwrap_or_default() },
 }
 
 // Type declarations
 Def: Dec = {
-    <doc_comment: DocComment> "type" <id:"id"> "=" <t:Typ> => Dec::TypD(Binding { id: id, typ: t, doc_comment_lines: doc_comment.unwrap_or_default() }),
+    <doc_comment: DocComment> "type" <id:"id"> "=" <t:Typ> => Dec::TypD(Binding { id: id, typ: t, docs: doc_comment.unwrap_or_default() }),
     "import" <Text> => Dec::ImportType(<>),
     "import" "service" <Text> => Dec::ImportServ(<>),
 }
@@ -270,8 +270,8 @@ Actor: IDLType = {
 }
 
 MainActor: IDLActorType = {
-    <doc_comment: DocComment> "service" "id"? ":" <t:Actor> ";"? => IDLActorType { typ: t, doc_comment_lines: doc_comment.unwrap_or_default() },
-    <doc_comment: DocComment> "service" "id"? ":" <args:ArgTupTyp> "->" <t:Actor> ";"? => IDLActorType { typ: IDLType::ClassT(args, Box::new(t)), doc_comment_lines: doc_comment.unwrap_or_default() },
+    <doc_comment: DocComment> "service" "id"? ":" <t:Actor> ";"? => IDLActorType { typ: t, docs: doc_comment.unwrap_or_default() },
+    <doc_comment: DocComment> "service" "id"? ":" <args:ArgTupTyp> "->" <t:Actor> ";"? => IDLActorType { typ: IDLType::ClassT(args, Box::new(t)), docs: doc_comment.unwrap_or_default() },
 }
 
 pub IDLProg: IDLProg = {
