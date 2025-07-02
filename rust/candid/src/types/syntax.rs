@@ -1,5 +1,5 @@
 use crate::types::{FuncMode, Label};
-use anyhow::{bail, Result};
+use anyhow::{anyhow, Context, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IDLType {
@@ -146,7 +146,7 @@ pub struct IDLInitArgs {
 pub struct IDLMergedProg {
     typ_decs: Vec<Binding>,
     main_actor: Option<IDLActorType>,
-    service_imports: Vec<IDLActorType>,
+    service_imports: Vec<(String, IDLActorType)>,
 }
 
 impl IDLMergedProg {
@@ -158,10 +158,10 @@ impl IDLMergedProg {
         }
     }
 
-    pub fn merge(&mut self, is_service_import: bool, prog: IDLProg) {
+    pub fn merge(&mut self, is_service_import: bool, name: String, prog: IDLProg) {
         self.typ_decs.extend(IDLProg::typ_decs(prog.decs));
         if is_service_import {
-            self.service_imports.push(prog.actor.expect("TODO"))
+            self.service_imports.push((name, prog.actor.expect("TODO")))
         }
     }
 
@@ -189,13 +189,17 @@ impl IDLMergedProg {
             }) => (
                 Some(args.clone()),
                 docs.clone(),
-                self.chase_service(*inner.clone())?,
+                self.chase_service(*inner.clone(), None)?,
             ),
-            Some(ty) => (None, ty.docs.clone(), self.chase_service(ty.typ.clone())?),
+            Some(ty) => (
+                None,
+                ty.docs.clone(),
+                self.chase_service(ty.typ.clone(), None)?,
+            ),
         };
 
-        for import in &self.service_imports {
-            methods.extend(self.chase_service(import.typ.clone())?)
+        for (name, typ) in &self.service_imports {
+            methods.extend(self.chase_service(typ.typ.clone(), Some(name))?);
         }
 
         // TODO: Check for duplicates in methods
@@ -210,15 +214,18 @@ impl IDLMergedProg {
         }))
     }
 
-    // TODO: visited set
-    fn chase_service(&self, ty: IDLType) -> Result<Vec<Binding>> {
+    // NOTE: We don't worry about cyclic type definitions, as we rule those out earlier when checking the type decs
+    fn chase_service(&self, ty: IDLType, import_name: Option<&str>) -> Result<Vec<Binding>> {
         match ty {
             IDLType::VarT(v) => {
-                let resolved = self.typ_decs.iter().find(|b| b.id == v).expect("TODO");
-                self.chase_service(resolved.typ.clone())
+                let resolved = self.typ_decs.iter().find(|b| b.id == v).with_context(|| format!("Unbound type identifier {v}"))?;
+                self.chase_service(resolved.typ.clone(), import_name)
             }
             IDLType::ServT(bindings) => Ok(bindings),
-            _ => bail!("Tried to import a non-service type"),
+            ty => Err(import_name
+                .map(|name| anyhow!("Imported service file \"{name}\" has a service constructor"))
+                .unwrap_or(anyhow!("not a service type: {:?}", ty))
+            )
         }
     }
 }

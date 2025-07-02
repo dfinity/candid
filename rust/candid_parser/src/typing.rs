@@ -307,10 +307,10 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>, I
         })
         .collect();
     let mut merged_prog: IDLMergedProg = IDLMergedProg::new(prog);
-    for (include_serv, path, _name) in imports.iter() {
+    for (include_serv, path, name) in imports.iter() {
         let code = std::fs::read_to_string(path)?;
         let code = parse_idl_prog(&code)?;
-        merged_prog.merge(*include_serv, code);
+        merged_prog.merge(*include_serv, name.clone(), code);
     }
 
     let mut te = TypeEnv::new();
