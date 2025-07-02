@@ -46,6 +46,46 @@
 
 * Non-breaking changes:
   + Supports parsing the arguments' names for `func` and `service` (init args).
+  + Supports collecting line comments as doc comments in the following cases:
+    - above services:
+      ```
+      // This is a valid doc comment for the service
+      service : {
+        greet : (text) -> (text);
+      }
+      ```
+    - above actor methods:
+      ```
+      service : {
+        // This is a valid doc comment for greet
+        greet : (text) -> (text);
+      }
+      ```
+    - above type declarations:
+      ```
+      // This is a valid doc comment for type A
+      type A = record {
+        my_field : text;
+      };
+      ```
+    - above record and variant fields:
+      ```
+      type A = record {
+        // This is a valid doc comment for my_field
+        my_field : text;
+      };
+
+      type B = record {
+        // This is a valid doc comment for nat element
+        nat;
+        text;
+      }
+
+      type C = variant {
+        // This is a valid doc comment for my_variant_field
+        my_variant_field : nat;
+      };
+      ```
 
 ### candid_derive
 
