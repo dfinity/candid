@@ -78,6 +78,21 @@ pub(crate) enum A { #[serde(rename="a")] A, #[serde(rename="b")] B(B) }
 pub(crate) struct XRet2Ok { pub(crate) result: String }
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) enum Error { #[serde(rename="a")] A, #[serde(rename="b")] B }
+#[derive(CandidType, Deserialize, Debug)]
+pub(crate) struct NestedRecordsNestedInner { pub(crate) nested_field: String }
+#[derive(CandidType, Deserialize, Debug)]
+pub(crate) struct NestedRecords {
+  pub(crate) nested: Option<NestedRecordsNestedInner>,
+}
+#[derive(CandidType, Deserialize, Debug)]
+pub(crate) struct MyVariantCInner { pub(crate) d: String }
+#[derive(CandidType, Deserialize, Debug)]
+pub(crate) enum MyVariant {
+  #[serde(rename="a")]
+  A{ b: String },
+  #[serde(rename="c")]
+  C(Option<MyVariantCInner>),
+}
 pub(crate) type A = Box<B>;
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct B(pub(crate) Option<A>);
@@ -118,6 +133,9 @@ impl Service {
   }
   pub async fn x(&self, arg0: &A, arg1: &B) -> Result<(Option<A>,Option<B>,std::result::Result<XRet2Ok, Error>,)> {
     ic_cdk::call(self.0, "x", (arg0,arg1,)).await
+  }
+  pub async fn y(&self, arg0: &NestedRecords) -> Result<((NestedRecords,MyVariant,),)> {
+    ic_cdk::call(self.0, "y", (arg0,)).await
   }
   pub async fn f(&self, server: &S) -> Result<()> {
     ic_cdk::call(self.0, "f", (server,)).await

@@ -8,6 +8,8 @@ use candid::types::{ArgType, Field, FuncMode, Function, Label, SharedLabel, Type
 use candid::TypeEnv;
 use pretty::RcDoc;
 
+const DOC_COMMENT_PREFIX: &str = "/// ";
+
 // The definition of tuple is language specific.
 fn is_tuple(t: &Type) -> bool {
     match t.as_ref() {
@@ -93,68 +95,68 @@ fn escape(id: &str, is_method: bool) -> RcDoc {
     }
 }
 
-fn pp_ty_rich<'a>(ty: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
+fn pp_ty<'a>(ty: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
     match (ty.as_ref(), syntax) {
-        (TypeInner::Service(ref meths), Some(IDLType::ServT(methods))) => {
-            pp_service(meths, Some(methods))
+        (TypeInner::Null, _) => str("Null"),
+        (TypeInner::Bool, _) => str("Bool"),
+        (TypeInner::Nat, _) => str("Nat"),
+        (TypeInner::Int, _) => str("Int"),
+        (TypeInner::Nat8, _) => str("Nat8"),
+        (TypeInner::Nat16, _) => str("Nat16"),
+        (TypeInner::Nat32, _) => str("Nat32"),
+        (TypeInner::Nat64, _) => str("Nat64"),
+        (TypeInner::Int8, _) => str("Int8"),
+        (TypeInner::Int16, _) => str("Int16"),
+        (TypeInner::Int32, _) => str("Int32"),
+        (TypeInner::Int64, _) => str("Int64"),
+        (TypeInner::Float32, _) => panic!("float32 not supported in Motoko"),
+        (TypeInner::Float64, _) => str("Float"),
+        (TypeInner::Text, _) => str("Text"),
+        (TypeInner::Reserved, _) => str("Any"),
+        (TypeInner::Empty, _) => str("None"),
+        (TypeInner::Var(ref s), _) => escape(s, false),
+        (TypeInner::Principal, _) => str("Principal"),
+        (TypeInner::Opt(ref t), maybe_syntax_opt) => {
+            str("?").append(pp_ty(t, maybe_syntax_opt.map(|o| o.opt_inner())))
         }
-        (_, _) => pp_ty(ty),
-    }
-}
-
-fn pp_ty(ty: &Type) -> RcDoc {
-    use TypeInner::*;
-    match ty.as_ref() {
-        Null => str("Null"),
-        Bool => str("Bool"),
-        Nat => str("Nat"),
-        Int => str("Int"),
-        Nat8 => str("Nat8"),
-        Nat16 => str("Nat16"),
-        Nat32 => str("Nat32"),
-        Nat64 => str("Nat64"),
-        Int8 => str("Int8"),
-        Int16 => str("Int16"),
-        Int32 => str("Int32"),
-        Int64 => str("Int64"),
-        Float32 => panic!("float32 not supported in Motoko"),
-        Float64 => str("Float"),
-        Text => str("Text"),
-        Reserved => str("Any"),
-        Empty => str("None"),
-        Var(ref s) => escape(s, false),
-        Principal => str("Principal"),
-        Opt(ref t) => str("?").append(pp_ty(t)),
-        Vec(ref t) if matches!(t.as_ref(), Nat8) => str("Blob"),
-        Vec(ref t) => enclose("[", pp_ty(t), "]"),
-        Record(ref fs) => {
-            if is_tuple(ty) {
-                let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
-                enclose("(", tuple, ")")
+        (TypeInner::Vec(ref t), maybe_syntax_vec) => {
+            if matches!(t.as_ref(), TypeInner::Nat8) {
+                str("Blob")
             } else {
-                let fields = concat(fs.iter().map(pp_field), ";");
-                enclose_space("{", fields, "}")
+                enclose("[", pp_ty(t, maybe_syntax_vec.map(|v| v.vec_inner())), "]")
             }
         }
-        Variant(ref fs) => {
-            if fs.is_empty() {
-                str("{#}")
-            } else {
-                let fields = concat(fs.iter().map(pp_variant), ";");
-                enclose_space("{", fields, "}")
-            }
+        (TypeInner::Record(ref fs), maybe_syntax_record) => pp_record(
+            fs,
+            maybe_syntax_record.map(|s| s.record_fields()),
+            is_tuple(ty),
+        ),
+        (TypeInner::Variant(ref fs), maybe_syntax_variant) => {
+            pp_variant(fs, maybe_syntax_variant.map(|v| v.variant_fields()))
         }
-        Func(ref func) => pp_function(func),
-        Service(ref serv) => pp_service(serv, None),
-        Class(ref args, ref t) => {
+        (TypeInner::Func(ref func), _) => pp_function(func),
+        (TypeInner::Service(ref meths), maybe_syntax_service) => {
+            pp_service(meths, maybe_syntax_service.map(|s| s.service_methods()))
+        }
+        (TypeInner::Class(ref args, ref t), maybe_syntax_class) => {
             let doc = pp_args(args).append(" -> async ");
-            match t.as_ref() {
-                Service(ref serv) => doc.append(pp_service(serv, None)),
-                Var(ref s) => doc.append(s),
+            let maybe_syntax_serv = maybe_syntax_class.map(|c| {
+                if let IDLType::ClassT(_, s) = c {
+                    s.as_ref()
+                } else {
+                    unreachable!()
+                }
+            });
+            let service_doc = match t.as_ref() {
+                TypeInner::Service(_) => pp_ty(t, maybe_syntax_serv.map(|s| s.as_service())),
+                TypeInner::Var(_) => pp_ty(t, maybe_syntax_serv.map(|v| v.as_var())),
                 _ => unreachable!(),
-            }
+            };
+            doc.append(service_doc)
         }
-        Knot(_) | Unknown | Future => unreachable!(),
+        (TypeInner::Knot(_), _) | (TypeInner::Unknown, _) | (TypeInner::Future, _) => {
+            unreachable!()
+        }
     }
 }
 
@@ -168,13 +170,55 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
     }
 }
 
-fn pp_field(field: &Field) -> RcDoc {
-    pp_label(&field.id).append(" : ").append(pp_ty(&field.ty))
+fn pp_field<'a>(field: &'a Field, syntax: Option<&'a syntax::TypeField>) -> RcDoc<'a> {
+    pp_label(&field.id)
+        .append(" : ")
+        .append(pp_ty(&field.ty, syntax.map(|s| &s.typ)))
 }
-fn pp_variant(field: &Field) -> RcDoc {
+
+fn pp_record<'a>(
+    fields: &'a [Field],
+    syntax: Option<&'a [syntax::TypeField]>,
+    is_tuple: bool,
+) -> RcDoc<'a> {
+    if is_tuple {
+        let tuple = concat(fields.iter().map(|f| pp_ty(&f.ty, None)), ",");
+        enclose("(", tuple, ")")
+    } else {
+        let fields = concat(
+            fields.iter().map(|f| {
+                let syntax_field =
+                    syntax.and_then(|tfs| tfs.iter().find(|tf| &tf.label == f.id.as_ref()));
+                pp_docs(syntax_field.map(|tf| tf.docs.as_slice())).append(pp_field(f, syntax_field))
+            }),
+            ";",
+        );
+        enclose_space("{", fields, "}")
+    }
+}
+
+fn pp_variant<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) -> RcDoc<'a> {
+    if fields.is_empty() {
+        str("{#}")
+    } else {
+        let fields = concat(
+            fields.iter().map(|f| {
+                let syntax_field =
+                    syntax.and_then(|tfs| tfs.iter().find(|tf| &tf.label == f.id.as_ref()));
+                pp_docs(syntax_field.map(|tf| tf.docs.as_slice()))
+                    .append(pp_variant_field(f, syntax_field))
+            }),
+            ";",
+        );
+        enclose_space("{", fields, "}")
+    }
+}
+
+fn pp_variant_field<'a>(field: &'a Field, syntax: Option<&'a syntax::TypeField>) -> RcDoc<'a> {
     let doc = str("#").append(pp_label(&field.id));
     if *field.ty != TypeInner::Null {
-        doc.append(" : ").append(pp_ty(&field.ty))
+        doc.append(" : ")
+            .append(pp_ty(&field.ty, syntax.map(|s| &s.typ)))
     } else {
         doc
     }
@@ -208,9 +252,9 @@ fn pp_args(args: &[ArgType]) -> RcDoc {
     match args {
         [ty] => {
             let typ = if is_tuple(&ty.typ) {
-                enclose("(", pp_ty(&ty.typ), ")")
+                enclose("(", pp_ty(&ty.typ, None), ")")
             } else {
-                pp_ty(&ty.typ)
+                pp_ty(&ty.typ, None)
             };
             if let Some(name) = &ty.name {
                 enclose("(", escape(name, false).append(" : ").append(typ), ")")
@@ -221,9 +265,11 @@ fn pp_args(args: &[ArgType]) -> RcDoc {
         _ => {
             let args = args.iter().map(|arg| {
                 if let Some(name) = &arg.name {
-                    escape(name, false).append(" : ").append(pp_ty(&arg.typ))
+                    escape(name, false)
+                        .append(" : ")
+                        .append(pp_ty(&arg.typ, None))
                 } else {
-                    pp_ty(&arg.typ)
+                    pp_ty(&arg.typ, None)
                 }
             });
             let doc = concat(args, ",");
@@ -236,13 +282,13 @@ fn pp_rets(args: &[Type]) -> RcDoc {
     match args {
         [ty] => {
             if is_tuple(ty) {
-                enclose("(", pp_ty(ty), ")")
+                enclose("(", pp_ty(ty, None), ")")
             } else {
-                pp_ty(ty)
+                pp_ty(ty, None)
             }
         }
         _ => {
-            let doc = concat(args.iter().map(pp_ty), ",");
+            let doc = concat(args.iter().map(|arg| pp_ty(arg, None)), ",");
             enclose("(", doc, ")")
         }
     }
@@ -251,41 +297,45 @@ fn pp_rets(args: &[Type]) -> RcDoc {
 fn pp_service<'a>(serv: &'a [(String, Type)], syntax: Option<&'a [syntax::Binding]>) -> RcDoc<'a> {
     let doc = concat(
         serv.iter().map(|(id, func)| {
-            syntax
-                .and_then(|bs| bs.iter().find(|b| &b.id == id))
-                .map(|b| pp_docs(&b.docs))
-                .unwrap_or(RcDoc::nil())
-                .append(escape(id, true))
-                .append(" : ")
-                .append(pp_ty(func))
+            pp_docs(
+                syntax
+                    .and_then(|bs| bs.iter().find(|b| &b.id == id))
+                    .map(|b| b.docs.as_slice()),
+            )
+            .append(escape(id, true))
+            .append(" : ")
+            .append(pp_ty(func, None))
         }),
         ";",
     );
     kwd("actor").append(enclose_space("{", doc, "}"))
 }
 
-fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
-    lines(docs.iter().map(|line| RcDoc::text("/// ").append(line)))
+fn pp_docs<'a>(docs: Option<&'a [String]>) -> RcDoc<'a> {
+    docs.map(|docs| {
+        lines(
+            docs.iter()
+                .map(|line| RcDoc::text(DOC_COMMENT_PREFIX).append(line)),
+        )
+    })
+    .unwrap_or(RcDoc::nil())
 }
 
 fn pp_defs<'a>(env: &'a TypeEnv, prog: &'a IDLMergedProg) -> RcDoc<'a> {
     lines(env.0.iter().map(|(id, ty)| {
         let syntax = prog.lookup(id);
-        let docs = syntax
-            .map(|b| pp_docs(b.docs.as_ref()))
-            .unwrap_or(RcDoc::nil());
+        let docs = pp_docs(syntax.map(|b| b.docs.as_slice()));
         docs.append(kwd("public type"))
             .append(escape(id, false))
             .append(" = ")
-            .append(pp_ty_rich(ty, syntax.map(|b| &b.typ)))
+            .append(pp_ty(ty, syntax.map(|b| &b.typ)))
             .append(";")
     }))
 }
 
-fn pp_actor(ty: &Type) -> RcDoc {
+fn pp_actor<'a>(ty: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
     match ty.as_ref() {
-        TypeInner::Service(ref serv) => pp_service(serv, None),
-        TypeInner::Var(_) | TypeInner::Class(_, _) => pp_ty(ty),
+        TypeInner::Service(_) | TypeInner::Var(_) | TypeInner::Class(_, _) => pp_ty(ty, syntax),
         _ => unreachable!(),
     }
 }
@@ -297,9 +347,10 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, prog: &IDLMergedProg) -> Str
     let doc = match actor {
         None => pp_defs(env, prog),
         Some(actor) => {
+            let syntax = prog.actor();
             let defs = pp_defs(env, prog);
-            let actor = kwd("public type Self =").append(pp_actor(actor));
-            defs.append(actor)
+            let actor = kwd("public type Self =").append(pp_actor(actor, syntax.map(|a| &a.typ)));
+            defs.append(pp_docs(syntax.map(|a| a.docs.as_slice())).append(actor))
         }
     };
     RcDoc::text(header)

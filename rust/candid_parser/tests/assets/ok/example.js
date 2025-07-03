@@ -53,6 +53,13 @@ export const idlFactory = ({ IDL }) => {
     );
   const b = IDL.Tuple(IDL.Int, IDL.Nat);
   const a = IDL.Variant({ 'a' : IDL.Null, 'b' : b });
+  const nested_records = IDL.Record({
+    'nested' : IDL.Opt(IDL.Record({ 'nested_field' : IDL.Text })),
+  });
+  const my_variant = IDL.Variant({
+    'a' : IDL.Record({ 'b' : IDL.Text }),
+    'c' : IDL.Opt(IDL.Record({ 'd' : IDL.Text })),
+  });
   const A = B;
   B.fill(IDL.Opt(A));
   tree.fill(
@@ -106,6 +113,11 @@ export const idlFactory = ({ IDL }) => {
           }),
         ],
         ['composite_query'],
+      ),
+    'y' : IDL.Func(
+        [nested_records],
+        [IDL.Tuple(nested_records, my_variant)],
+        ['query'],
       ),
     'f' : t,
     'g' : IDL.Func([list], [B, tree, stream], []),

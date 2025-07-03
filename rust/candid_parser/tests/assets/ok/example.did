@@ -9,6 +9,10 @@ type broker = service {
 type f = func (List, func (int32) -> (int64)) -> (opt List, res);
 type list = opt node;
 type my_type = principal;
+type my_variant = variant {
+  a : record { b : text };
+  c : opt record { d : text };
+};
 type nested = record {
   0 : nat;
   1 : nat;
@@ -18,6 +22,7 @@ type nested = record {
   41 : variant { 42; A; B; C };
   42 : nat;
 };
+type nested_records = record { nested : opt record { nested_field : text } };
 type nested_res = variant {
   Ok : variant { Ok; Err };
   Err : variant { Ok : record { content : text }; Err : record { int } };
@@ -43,6 +48,7 @@ service : {
       opt b,
       variant { Ok : record { result : text }; Err : variant { a; b } },
     ) composite_query;
+  y : (nested_records) -> (record { nested_records; my_variant }) query;
   f : t;
   g : (list) -> (B, tree, stream);
   bbbbb : (b) -> ();

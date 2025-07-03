@@ -19,6 +19,77 @@ pub enum IDLType {
     PrincipalT,
 }
 
+impl IDLType {
+    /// # Panics
+    /// If the type is not a [IDLType::OptT].
+    pub fn opt_inner(&self) -> &IDLType {
+        if let IDLType::OptT(ty) = self {
+            ty.as_ref()
+        } else {
+            panic!("not an opt type: {:?}", self)
+        }
+    }
+
+    /// If the type is not a [IDLType::VecT].
+    pub fn vec_inner(&self) -> &IDLType {
+        if let IDLType::VecT(ty) = self {
+            ty.as_ref()
+        } else {
+            panic!("not a record type: {:?}", self)
+        }
+    }
+
+    /// # Panics
+    /// If the type is not a [IDLType::RecordT].
+    pub fn record_fields(&self) -> &[TypeField] {
+        if let IDLType::RecordT(fields) = self {
+            fields.as_slice()
+        } else {
+            panic!("not a record type: {:?}", self)
+        }
+    }
+
+    /// # Panics
+    /// If the type is not a [IDLType::VariantT].
+    pub fn variant_fields(&self) -> &[TypeField] {
+        if let IDLType::VariantT(fields) = self {
+            fields.as_slice()
+        } else {
+            panic!("not a variant type: {:?}", self)
+        }
+    }
+
+    /// # Panics
+    /// If the type is not a [IDLType::ServT].
+    pub fn service_methods(&self) -> &[Binding] {
+        if let IDLType::ServT(methods) = self {
+            methods.as_slice()
+        } else {
+            panic!("not a service type: {:?}", self)
+        }
+    }
+
+    /// # Panics
+    /// If the type is not a [IDLType::ServT].
+    pub fn as_service(&self) -> &IDLType {
+        if let IDLType::ServT(_) = self {
+            self
+        } else {
+            panic!("not a service type: {:?}", self)
+        }
+    }
+
+    /// # Panics
+    /// If the type is not a [IDLType::VarT].
+    pub fn as_var(&self) -> &IDLType {
+        if let IDLType::VarT(_) = self {
+            self
+        } else {
+            panic!("not a var type: {:?}", self)
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct IDLTypes {
     pub args: Vec<IDLType>,
@@ -179,6 +250,10 @@ impl IDLMergedProg {
 
     pub fn decs(&self) -> Vec<Dec> {
         self.typ_decs.iter().map(|b| Dec::TypD(b.clone())).collect()
+    }
+
+    pub fn actor(&self) -> Option<&IDLActorType> {
+        self.main_actor.as_ref()
     }
 
     pub fn resolve_actor(&self) -> Result<Option<IDLActorType>> {
