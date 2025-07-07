@@ -181,10 +181,6 @@ impl IDLMergedProg {
         self.typ_decs.iter().map(|b| Dec::TypD(b.clone())).collect()
     }
 
-    pub fn actor(&self) -> Option<&IDLActorType> {
-        self.main_actor.as_ref()
-    }
-
     pub fn resolve_actor(&self) -> Result<Option<IDLActorType>> {
         let (init_args, top_level_docs, mut methods) = match &self.main_actor {
             None => {
