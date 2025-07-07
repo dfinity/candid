@@ -4,7 +4,9 @@
 module {
   public type List = ?(Int, List);
   public type Profile = { age : Nat8; name : Text };
+  /// Doc comment for class service
   public type Self = (Int, l : List, Profile) -> async actor {
+    /// Doc comment for get method in class service
     get : shared () -> async List;
     set : shared List -> async List;
   }

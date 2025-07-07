@@ -71,9 +71,9 @@ service server : {
   g1 : (my_type, List, opt List, nested) -> (int, broker, nested_res) query;
   h : (vec opt text, variant { A: nat; B: opt text }, opt List) -> (
     record {
-      // Doc comment for id field in h method return
+      // Doc comment for id field in h method return, currently ignored
       id: nat;
-      // Doc comment for 0x2a field in h method return
+      // Doc comment for 0x2a field in h method return, currently ignored
       0x2a: record {};
     }
   );

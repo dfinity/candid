@@ -101,6 +101,9 @@ fn pp_ty_rich<'a>(ty: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
         (TypeInner::Service(ref meths), Some(IDLType::ServT(methods))) => {
             pp_service(meths, Some(methods))
         }
+        (TypeInner::Class(ref args, t), Some(IDLType::ClassT(_, syntax_t))) => {
+            pp_class((args, t), Some(syntax_t))
+        }
         (TypeInner::Record(ref fields), Some(IDLType::RecordT(syntax_fields))) => {
             pp_record(fields, Some(syntax_fields))
         }
@@ -143,14 +146,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Variant(ref fs) => pp_variant(fs, None),
         Func(ref func) => pp_function(func),
         Service(ref serv) => pp_service(serv, None),
-        Class(ref args, ref t) => {
-            let doc = pp_args(args).append(" -> async ");
-            match t.as_ref() {
-                Service(ref serv) => doc.append(pp_service(serv, None)),
-                Var(ref s) => doc.append(s),
-                _ => unreachable!(),
-            }
-        }
+        Class(ref args, ref t) => pp_class((args, t), None),
         Knot(_) | Unknown | Future => unreachable!(),
     }
 }
@@ -309,6 +305,15 @@ fn pp_variant<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) 
     enclose_space("{", doc, "}")
 }
 
+fn pp_class<'a>((args, ty): (&'a [ArgType], &'a Type), syntax: Option<&'a IDLType>) -> RcDoc<'a> {
+    let doc = pp_args(args).append(" -> async ");
+    match ty.as_ref() {
+        TypeInner::Service(_) => doc.append(pp_ty_rich(ty, syntax)),
+        TypeInner::Var(_) => doc.append(pp_ty(ty)),
+        _ => unreachable!(),
+    }
+}
+
 fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
     lines(docs.iter().map(|line| RcDoc::text("/// ").append(line)))
 }
@@ -328,6 +333,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, prog: &'a IDLMergedProg) -> RcDoc<'a> {
 }
 
 fn pp_actor<'a>(ty: &'a Type, syntax: Option<&'a IDLActorType>) -> RcDoc<'a> {
+    let self_doc = kwd("public type Self =");
     match ty.as_ref() {
         TypeInner::Service(ref serv) => match syntax {
             Some(IDLActorType {
@@ -335,12 +341,22 @@ fn pp_actor<'a>(ty: &'a Type, syntax: Option<&'a IDLActorType>) -> RcDoc<'a> {
                 docs,
             }) => {
                 let docs = pp_docs(docs);
-                docs.append(kwd("public type Self ="))
-                    .append(pp_service(serv, Some(fields)))
+                docs.append(self_doc).append(pp_service(serv, Some(fields)))
             }
             _ => pp_service(serv, None),
         },
-        TypeInner::Var(_) | TypeInner::Class(_, _) => kwd("public type Self =").append(pp_ty(ty)),
+        TypeInner::Class(ref args, ref t) => match syntax {
+            Some(IDLActorType {
+                typ: IDLType::ClassT(_, syntax_t),
+                docs,
+            }) => {
+                let docs = pp_docs(docs);
+                docs.append(self_doc)
+                    .append(pp_class((args, t), Some(syntax_t)))
+            }
+            _ => self_doc.append(pp_class((args, t), None)),
+        },
+        TypeInner::Var(_) => self_doc.append(pp_ty(ty)),
         _ => unreachable!(),
     }
 }

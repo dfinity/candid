@@ -78,6 +78,7 @@ module {
       error : Text;
     };
   };
+  /// Doc comment for service id
   public type s = actor { f : t; g : shared list -> async (B, tree, stream) };
   public type stream = ?{ head : Nat; next : shared query () -> async stream };
   public type t = shared (server : s) -> async ();
