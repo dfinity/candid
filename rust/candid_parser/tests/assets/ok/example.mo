@@ -108,6 +108,7 @@ module {
     y : shared query nested_records -> async ((nested_records, my_variant));
     f : t;
     g : shared list -> async (B, tree, stream);
+    /// Doc comment for imported bbbbb service method
     bbbbb : shared b -> async ();
   }
 }
