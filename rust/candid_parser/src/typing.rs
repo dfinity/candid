@@ -299,18 +299,13 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>, I
     let mut visited = BTreeMap::new();
     let mut imports = Vec::new();
     load_imports(is_pretty, &base, &mut visited, &prog, &mut imports)?;
-    let imports: Vec<_> = imports
-        .into_iter()
-        .map(|file| match visited.get(&file.0) {
-            Some(x) => (*x, file.0, file.1),
-            None => unreachable!(),
-        })
-        .collect();
+
     let mut merged_prog: IDLMergedProg = IDLMergedProg::new(prog);
-    for (include_serv, path, name) in imports.iter() {
+    for (path, name) in imports {
+        let include_service = visited.get(&path).unwrap();
         let code = std::fs::read_to_string(path)?;
-        let code = parse_idl_prog(&code)?;
-        merged_prog.merge(*include_serv, name.clone(), code)?;
+        let prog = parse_idl_prog(&code)?;
+        merged_prog.merge(*include_service, name, prog)?;
     }
 
     let mut te = TypeEnv::new();
