@@ -1,4 +1,5 @@
 type b = record { int;nat };
 service : {
+  // Doc comment for imported bbbbb service method
   bbbbb : (b) -> ();
 }

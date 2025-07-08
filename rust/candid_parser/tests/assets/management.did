@@ -121,7 +121,6 @@ service ic : {
     };
   }) -> (http_response);
 
-  // Threshold ECDSA signature
   ecdsa_public_key : (record {
     canister_id : opt canister_id;
     derivation_path : vec blob;
@@ -133,13 +132,11 @@ service ic : {
     key_id : record { curve: ecdsa_curve; name: text };
   }) -> (record { signature : blob });
 
-  // bitcoin interface
   bitcoin_get_balance: (get_balance_request) -> (satoshi);
   bitcoin_get_utxos: (get_utxos_request) -> (get_utxos_response);
   bitcoin_send_transaction: (send_transaction_request) -> ();
   bitcoin_get_current_fee_percentiles: (get_current_fee_percentiles_request) -> (vec millisatoshi_per_byte);
 
-  // provisional interfaces for the pre-ledger world
   provisional_create_canister_with_cycles : (record {
     amount: opt nat;
     settings : opt canister_settings;

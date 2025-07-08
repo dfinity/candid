@@ -1,11 +1,11 @@
 use crate::{parse_idl_prog, pretty_parse_idl_prog, Error, Result};
 use candid::types::{
     syntax::{
-        Binding, Dec, IDLActorType, IDLArgType, IDLInitArgs, IDLProg, IDLType, PrimType, TypeField,
+        Binding, Dec, IDLActorType, IDLArgType, IDLInitArgs, IDLMergedProg, IDLProg, IDLType,
+        PrimType, TypeField,
     },
     ArgType, Field, Function, Type, TypeEnv, TypeInner,
 };
-use candid::utils::check_unique;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -279,43 +279,7 @@ pub fn check_init_args(
     Ok(args)
 }
 
-fn merge_actor(
-    env: &Env,
-    actor: &Option<Type>,
-    imported: &Option<Type>,
-    file: &str,
-) -> Result<Option<Type>> {
-    match imported {
-        None => Err(Error::msg(format!(
-            "Imported service file {file:?} has no main service"
-        ))),
-        Some(t) => {
-            let t = env.te.trace_type(t)?;
-            match t.as_ref() {
-                TypeInner::Class(_, _) => Err(Error::msg(format!(
-                    "Imported service file {file:?} has a service constructor"
-                ))),
-                TypeInner::Service(meths) => match actor {
-                    None => Ok(Some(t)),
-                    Some(t) => {
-                        let t = env.te.trace_type(t)?;
-                        let serv = env.te.as_service(&t)?;
-                        let mut ms: Vec<_> = serv.iter().chain(meths.iter()).cloned().collect();
-                        ms.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-                        check_unique(ms.iter().map(|m| &m.0)).map_err(|e| {
-                            Error::msg(format!("Duplicate imported method name: {e}"))
-                        })?;
-                        let res: Type = TypeInner::Service(ms).into();
-                        Ok(Some(res))
-                    }
-                },
-                _ => unreachable!(),
-            }
-        }
-    }
-}
-
-fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> {
+fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>, IDLMergedProg)> {
     let base = if file.is_absolute() {
         file.parent().unwrap().to_path_buf()
     } else {
@@ -335,40 +299,29 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>)> 
     let mut visited = BTreeMap::new();
     let mut imports = Vec::new();
     load_imports(is_pretty, &base, &mut visited, &prog, &mut imports)?;
-    let imports: Vec<_> = imports
-        .iter()
-        .map(|file| match visited.get(&file.0) {
-            Some(x) => (*x, &file.0, &file.1),
-            None => unreachable!(),
-        })
-        .collect();
+
+    let mut merged_prog: IDLMergedProg = IDLMergedProg::new(prog);
+    for (path, name) in imports {
+        let include_service = visited.get(&path).unwrap();
+        let code = std::fs::read_to_string(path)?;
+        let prog = parse_idl_prog(&code)?;
+        merged_prog.merge(*include_service, name, prog)?;
+    }
+
     let mut te = TypeEnv::new();
     let mut env = Env {
         te: &mut te,
         pre: false,
     };
-    let mut actor: Option<Type> = None;
-    for (include_serv, path, name) in imports.iter() {
-        let code = std::fs::read_to_string(path)?;
-        let code = parse_idl_prog(&code)?;
-        check_decs(&mut env, &code.decs)?;
-        if *include_serv {
-            let t = check_actor(&env, &code.actor)?;
-            actor = merge_actor(&env, &actor, &t, name)?;
-        }
-    }
-    check_decs(&mut env, &prog.decs)?;
-    let mut res = check_actor(&env, &prog.actor)?;
-    if actor.is_some() {
-        res = merge_actor(&env, &res, &actor, "")?;
-    }
-    Ok((te, res))
+    check_decs(&mut env, &merged_prog.decs())?;
+    let res = check_actor(&env, &merged_prog.resolve_actor()?)?;
+    Ok((te, res, merged_prog))
 }
 
 /// Type check did file including the imports.
-pub fn check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
+pub fn check_file(file: &Path) -> Result<(TypeEnv, Option<Type>, IDLMergedProg)> {
     check_file_(file, false)
 }
-pub fn pretty_check_file(file: &Path) -> Result<(TypeEnv, Option<Type>)> {
+pub fn pretty_check_file(file: &Path) -> Result<(TypeEnv, Option<Type>, IDLMergedProg)> {
     check_file_(file, true)
 }

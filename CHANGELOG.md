@@ -86,6 +86,8 @@
         my_variant_field : nat;
       };
       ```
+  + Adds the `IDLMergedProg` struct, used to collect the syntax types when parsing Candid declarations.
+  + Supports reflecting doc comments from Candid declarations to the Motoko generated bindings. The `candid_parser::bindings::motoko::compile` function now takes a `&IDLMergedProg` parameter.
 
 ### candid_derive
 

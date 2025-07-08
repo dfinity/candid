@@ -12,6 +12,8 @@ export interface broker { 'find' : ActorMethod<[string], Principal> }
 export type f = ActorMethod<[List, [Principal, string]], [[] | [List], res]>;
 export type list = [] | [node];
 export type my_type = Principal;
+export type my_variant = { 'a' : { 'b' : string } } |
+  { 'c' : [] | [{ 'd' : string }] };
 export interface nested {
   _0_ : bigint,
   _1_ : bigint,
@@ -23,6 +25,9 @@ export interface nested {
     { 'B' : null } |
     { 'C' : null },
   _42_ : bigint,
+}
+export interface nested_records {
+  'nested' : [] | [{ 'nested_field' : string }],
 }
 export type nested_res = { 'Ok' : { 'Ok' : null } | { 'Err' : null } } |
   { 'Err' : { 'Ok' : { 'content' : string } } | { 'Err' : [bigint] } };
@@ -37,10 +42,7 @@ export type tree = {
   } |
   { 'leaf' : bigint };
 export interface _SERVICE {
-  'bbbbb' : ActorMethod<[b], undefined>,
-  'f' : t,
   'f1' : ActorMethod<[list, Uint8Array | number[], [] | [boolean]], undefined>,
-  'g' : ActorMethod<[list], [B, tree, stream]>,
   'g1' : ActorMethod<
     [my_type, List, [] | [List], nested],
     [bigint, Principal, nested_res]
@@ -64,6 +66,10 @@ export interface _SERVICE {
         { 'Err' : { 'a' : null } | { 'b' : null } },
     ]
   >,
+  'y' : ActorMethod<[nested_records], [nested_records, my_variant]>,
+  'f' : t,
+  'g' : ActorMethod<[list], [B, tree, stream]>,
+  'bbbbb' : ActorMethod<[b], undefined>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

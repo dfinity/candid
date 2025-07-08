@@ -3,6 +3,7 @@
 
 use candid::pretty::candid::is_valid_as_id;
 use candid::pretty::utils::*;
+use candid::types::syntax::{self, IDLActorType, IDLMergedProg, IDLType};
 use candid::types::{ArgType, Field, FuncMode, Function, Label, SharedLabel, Type, TypeInner};
 use candid::TypeEnv;
 use pretty::RcDoc;
@@ -10,20 +11,23 @@ use pretty::RcDoc;
 // The definition of tuple is language specific.
 fn is_tuple(t: &Type) -> bool {
     match t.as_ref() {
-        TypeInner::Record(ref fs) => {
-            if fs.len() <= 1 {
-                return false;
-            }
-            for (i, field) in fs.iter().enumerate() {
-                if field.id.get_id() != (i as u32) {
-                    return false;
-                }
-            }
-            true
-        }
+        TypeInner::Record(ref fs) => is_tuple_fields(fs),
         _ => false,
     }
 }
+
+fn is_tuple_fields(fs: &[Field]) -> bool {
+    if fs.len() <= 1 {
+        return false;
+    }
+    for (i, field) in fs.iter().enumerate() {
+        if field.id.get_id() != (i as u32) {
+            return false;
+        }
+    }
+    true
+}
+
 static KEYWORDS: [&str; 48] = [
     "actor",
     "and",
@@ -92,6 +96,27 @@ fn escape(id: &str, is_method: bool) -> RcDoc {
     }
 }
 
+fn pp_ty_rich<'a>(ty: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
+    match (ty.as_ref(), syntax) {
+        (TypeInner::Service(ref meths), Some(IDLType::ServT(methods))) => {
+            pp_service(meths, Some(methods))
+        }
+        (TypeInner::Class(ref args, t), Some(IDLType::ClassT(_, syntax_t))) => {
+            pp_class((args, t), Some(syntax_t))
+        }
+        (TypeInner::Record(ref fields), Some(IDLType::RecordT(syntax_fields))) => {
+            pp_record(fields, Some(syntax_fields))
+        }
+        (TypeInner::Variant(ref fields), Some(IDLType::VariantT(syntax_fields))) => {
+            pp_variant(fields, Some(syntax_fields))
+        }
+        (TypeInner::Opt(ref inner), Some(IDLType::OptT(syntax))) => {
+            str("?").append(pp_ty_rich(inner, Some(syntax)))
+        }
+        (_, _) => pp_ty(ty),
+    }
+}
+
 fn pp_ty(ty: &Type) -> RcDoc {
     use TypeInner::*;
     match ty.as_ref() {
@@ -117,33 +142,11 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Opt(ref t) => str("?").append(pp_ty(t)),
         Vec(ref t) if matches!(t.as_ref(), Nat8) => str("Blob"),
         Vec(ref t) => enclose("[", pp_ty(t), "]"),
-        Record(ref fs) => {
-            if is_tuple(ty) {
-                let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
-                enclose("(", tuple, ")")
-            } else {
-                let fields = concat(fs.iter().map(pp_field), ";");
-                enclose_space("{", fields, "}")
-            }
-        }
-        Variant(ref fs) => {
-            if fs.is_empty() {
-                str("{#}")
-            } else {
-                let fields = concat(fs.iter().map(pp_variant), ";");
-                enclose_space("{", fields, "}")
-            }
-        }
+        Record(ref fs) => pp_record(fs, None),
+        Variant(ref fs) => pp_variant(fs, None),
         Func(ref func) => pp_function(func),
-        Service(ref serv) => pp_service(serv),
-        Class(ref args, ref t) => {
-            let doc = pp_args(args).append(" -> async ");
-            match t.as_ref() {
-                Service(ref serv) => doc.append(pp_service(serv)),
-                Var(ref s) => doc.append(s),
-                _ => unreachable!(),
-            }
-        }
+        Service(ref serv) => pp_service(serv, None),
+        Class(ref args, ref t) => pp_class((args, t), None),
         Knot(_) | Unknown | Future => unreachable!(),
     }
 }
@@ -155,18 +158,6 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
             .append(RcDoc::as_string(n))
             .append("_")
             .append(RcDoc::space()),
-    }
-}
-
-fn pp_field(field: &Field) -> RcDoc {
-    pp_label(&field.id).append(" : ").append(pp_ty(&field.ty))
-}
-fn pp_variant(field: &Field) -> RcDoc {
-    let doc = str("#").append(pp_label(&field.id));
-    if *field.ty != TypeInner::Null {
-        doc.append(" : ").append(pp_ty(&field.ty))
-    } else {
-        doc
     }
 }
 
@@ -238,49 +229,156 @@ fn pp_rets(args: &[Type]) -> RcDoc {
     }
 }
 
-fn pp_service(serv: &[(String, Type)]) -> RcDoc {
+fn pp_service<'a>(serv: &'a [(String, Type)], syntax: Option<&'a [syntax::Binding]>) -> RcDoc<'a> {
     let doc = concat(
-        serv.iter()
-            .map(|(id, func)| escape(id, true).append(" : ").append(pp_ty(func))),
+        serv.iter().map(|(id, func)| {
+            let mut docs = RcDoc::nil();
+            let mut syntax_field_ty = None;
+            if let Some(bs) = syntax {
+                if let Some(b) = bs.iter().find(|b| &b.id == id) {
+                    docs = pp_docs(&b.docs);
+                    syntax_field_ty = Some(&b.typ)
+                }
+            }
+            docs.append(escape(id, true))
+                .append(" : ")
+                .append(pp_ty_rich(func, syntax_field_ty))
+        }),
         ";",
     );
     kwd("actor").append(enclose_space("{", doc, "}"))
 }
 
-fn pp_defs(env: &TypeEnv) -> RcDoc {
-    lines(env.0.iter().map(|(id, ty)| {
-        kwd("public type")
-            .append(escape(id, false))
-            .append(" = ")
-            .append(pp_ty(ty))
-            .append(";")
-    }))
+fn pp_tuple<'a>(fields: &'a [Field]) -> RcDoc<'a> {
+    let tuple = concat(fields.iter().map(|f| pp_ty(&f.ty)), ",");
+    enclose("(", tuple, ")")
 }
 
-fn pp_actor(ty: &Type) -> RcDoc {
+fn find_field<'a>(
+    fields: Option<&'a [syntax::TypeField]>,
+    label: &'a Label,
+) -> (RcDoc<'a>, Option<&'a syntax::IDLType>) {
+    let mut docs = RcDoc::nil();
+    let mut syntax_field_ty = None;
+    if let Some(bs) = fields {
+        if let Some(field) = bs.iter().find(|b| b.label == *label) {
+            docs = pp_docs(&field.docs);
+            syntax_field_ty = Some(&field.typ);
+        }
+    };
+    (docs, syntax_field_ty)
+}
+
+fn pp_record<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) -> RcDoc<'a> {
+    if is_tuple_fields(fields) {
+        return pp_tuple(fields);
+    }
+    let doc = concat(
+        fields.iter().map(|field| {
+            let (docs, syntax_field) = find_field(syntax, &field.id);
+            docs.append(pp_label(&field.id))
+                .append(" : ")
+                .append(pp_ty_rich(&field.ty, syntax_field))
+        }),
+        ";",
+    );
+    enclose_space("{", doc, "}")
+}
+
+fn pp_variant<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) -> RcDoc<'a> {
+    if fields.is_empty() {
+        return str("{#}");
+    }
+    let doc = concat(
+        fields.iter().map(|field| {
+            let (docs, syntax_field) = find_field(syntax, &field.id);
+            let doc = docs.append(str("#")).append(pp_label(&field.id));
+            if *field.ty != TypeInner::Null {
+                doc.append(" : ")
+                    .append(pp_ty_rich(&field.ty, syntax_field))
+            } else {
+                doc
+            }
+        }),
+        ";",
+    );
+    enclose_space("{", doc, "}")
+}
+
+fn pp_class<'a>((args, ty): (&'a [ArgType], &'a Type), syntax: Option<&'a IDLType>) -> RcDoc<'a> {
+    let doc = pp_args(args).append(" -> async ");
     match ty.as_ref() {
-        TypeInner::Service(ref serv) => pp_service(serv),
-        TypeInner::Var(_) | TypeInner::Class(_, _) => pp_ty(ty),
+        TypeInner::Service(_) => doc.append(pp_ty_rich(ty, syntax)),
+        TypeInner::Var(_) => doc.append(pp_ty(ty)),
         _ => unreachable!(),
     }
 }
 
-pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
+fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
+    lines(docs.iter().map(|line| RcDoc::text("/// ").append(line)))
+}
+
+fn pp_defs<'a>(env: &'a TypeEnv, prog: &'a IDLMergedProg) -> RcDoc<'a> {
+    lines(env.0.iter().map(|(id, ty)| {
+        let syntax = prog.lookup(id);
+        let docs = syntax
+            .map(|b| pp_docs(b.docs.as_ref()))
+            .unwrap_or(RcDoc::nil());
+        docs.append(kwd("public type"))
+            .append(escape(id, false))
+            .append(" = ")
+            .append(pp_ty_rich(ty, syntax.map(|b| &b.typ)))
+            .append(";")
+    }))
+}
+
+fn pp_actor<'a>(ty: &'a Type, syntax: Option<&'a IDLActorType>) -> RcDoc<'a> {
+    let self_doc = kwd("public type Self =");
+    match ty.as_ref() {
+        TypeInner::Service(ref serv) => match syntax {
+            Some(IDLActorType {
+                typ: IDLType::ServT(ref fields),
+                docs,
+            }) => {
+                let docs = pp_docs(docs);
+                docs.append(self_doc).append(pp_service(serv, Some(fields)))
+            }
+            _ => pp_service(serv, None),
+        },
+        TypeInner::Class(ref args, ref t) => match syntax {
+            Some(IDLActorType {
+                typ: IDLType::ClassT(_, syntax_t),
+                docs,
+            }) => {
+                let docs = pp_docs(docs);
+                docs.append(self_doc)
+                    .append(pp_class((args, t), Some(syntax_t)))
+            }
+            _ => self_doc.append(pp_class((args, t), None)),
+        },
+        TypeInner::Var(_) => self_doc.append(pp_ty(ty)),
+        _ => unreachable!(),
+    }
+}
+
+pub fn compile(env: &TypeEnv, actor: &Option<Type>, prog: &IDLMergedProg) -> String {
     let header = r#"// This is a generated Motoko binding.
 // Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 "#;
+    let syntax_actor = prog.resolve_actor().ok().flatten();
     let doc = match actor {
-        None => pp_defs(env),
+        None => pp_defs(env, prog),
         Some(actor) => {
-            let defs = pp_defs(env);
-            let actor = kwd("public type Self =").append(pp_actor(actor));
+            let defs = pp_defs(env, prog);
+            let actor = pp_actor(actor, syntax_actor.as_ref());
             defs.append(actor)
         }
     };
-    RcDoc::text(header)
+    let doc = RcDoc::text(header)
         .append(RcDoc::line())
         .append("module ")
         .append(enclose_space("{", doc, "}"))
         .pretty(LINE_WIDTH)
-        .to_string()
+        .to_string();
+    doc
 }

@@ -123,7 +123,8 @@ impl TypeAnnotation {
     }
     fn get_types(&self, mode: Mode) -> candid_parser::Result<(TypeEnv, Vec<Type>)> {
         let (env, actor) = if let Some(ref file) = self.defs {
-            pretty_check_file(file)?
+            let (env, actor, _) = pretty_check_file(file)?;
+            (env, actor)
         } else {
             (TypeEnv::new(), None)
         };
@@ -181,9 +182,9 @@ fn main() -> Result<()> {
             previous,
             strict,
         } => {
-            let (mut env, opt_t1) = pretty_check_file(&input)?;
+            let (mut env, opt_t1, _) = pretty_check_file(&input)?;
             if let Some(previous) = previous {
-                let (env2, opt_t2) = pretty_check_file(&previous)?;
+                let (env2, opt_t2, _) = pretty_check_file(&previous)?;
                 match (opt_t1, opt_t2) {
                     (Some(t1), Some(t2)) => {
                         let mut gamma = HashSet::new();
@@ -202,7 +203,8 @@ fn main() -> Result<()> {
         }
         Command::Subtype { defs, ty1, ty2 } => {
             let (env, _) = if let Some(file) = defs {
-                pretty_check_file(&file)?
+                let (env, actor, _) = pretty_check_file(&file)?;
+                (env, actor)
             } else {
                 (TypeEnv::new(), None)
             };
@@ -217,7 +219,7 @@ fn main() -> Result<()> {
             methods,
         } => {
             let configs = load_config(&config)?;
-            let (env, mut actor) = pretty_check_file(&input)?;
+            let (env, mut actor, prog) = pretty_check_file(&input)?;
             if !methods.is_empty() {
                 actor = Some(candid_parser::bindings::analysis::project_methods(
                     &env, &actor, methods,
@@ -227,7 +229,7 @@ fn main() -> Result<()> {
                 "js" => candid_parser::bindings::javascript::compile(&env, &actor),
                 "ts" => candid_parser::bindings::typescript::compile(&env, &actor),
                 "did" => candid_parser::pretty::candid::compile(&env, &actor),
-                "mo" => candid_parser::bindings::motoko::compile(&env, &actor),
+                "mo" => candid_parser::bindings::motoko::compile(&env, &actor, &prog),
                 "rs" => {
                     use candid_parser::bindings::rust::{compile, Config, ExternalConfig};
                     let external = configs

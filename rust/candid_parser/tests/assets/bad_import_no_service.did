@@ -1,0 +1,5 @@
+import service "import/no_service.did";
+
+service : {
+  f : () -> ();
+}
