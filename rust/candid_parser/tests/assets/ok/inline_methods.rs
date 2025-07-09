@@ -46,6 +46,7 @@ impl Service {
     ic_cdk::call(self.0, "high_order_fn_via_record_inline", (arg0,)).await
   }
 }
-pub const CANISTER_ID : Principal = Principal::from_slice(&[]); // aaaaa-aa
+/// Canister ID: `aaaaa-aa`
+pub const CANISTER_ID : Principal = Principal::from_slice(&[]);
 pub const service : Service = Service(CANISTER_ID);
 
