@@ -244,9 +244,6 @@ fn test_{test_name}() {{
             use_type_doc
         } else {
             match (ty.as_ref(), syntax) {
-                (TypeInner::Record(ref fields), Some(IDLType::RecordT(syntax_fields))) => {
-                    self.pp_record_fields(fields, Some(syntax_fields), false, is_ref)
-                }
                 (TypeInner::Variant(ref fields), Some(IDLType::VariantT(syntax_fields))) => {
                     self.pp_variant(fields, Some(syntax_fields), is_ref)
                 }
