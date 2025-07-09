@@ -16,6 +16,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const DOC_COMMENT_PREFIX: &str = "/// ";
 
+/// Maps the names generated during nominalization to the original syntactic types.
+type GeneratedTypes<'a> = BTreeMap<String, &'a IDLType>;
+
 #[derive(Default, Deserialize, Clone, Debug)]
 pub struct BindingConfig {
     name: Option<String>,
@@ -82,6 +85,7 @@ impl ConfigState for BindingConfig {
 struct State<'a> {
     state: crate::configs::State<'a, BindingConfig>,
     prog: &'a IDLMergedProg,
+    generated_types: GeneratedTypes<'a>,
     recs: RecPoints<'a>,
     tests: BTreeMap<String, String>,
 }
@@ -182,23 +186,19 @@ fn find_field<'a>(
 }
 
 fn record_syntax_fields(syntax: Option<&IDLType>) -> Option<&[syntax::TypeField]> {
-    syntax.and_then(|t| {
-        if let IDLType::RecordT(syntax_fields) = &t {
-            Some(syntax_fields.as_slice())
-        } else {
-            None
-        }
-    })
+    if let Some(IDLType::RecordT(syntax_fields)) = syntax {
+        Some(syntax_fields.as_slice())
+    } else {
+        None
+    }
 }
 
 fn variant_syntax_fields(syntax: Option<&IDLType>) -> Option<&[syntax::TypeField]> {
-    syntax.and_then(|t| {
-        if let IDLType::VariantT(syntax_fields) = &t {
-            Some(syntax_fields.as_slice())
-        } else {
-            None
-        }
-    })
+    if let Some(IDLType::VariantT(syntax_fields)) = syntax {
+        Some(syntax_fields.as_slice())
+    } else {
+        None
+    }
 }
 
 fn actor_methods(actor: Option<&IDLActorType>) -> Vec<syntax::Binding> {
@@ -525,7 +525,9 @@ fn test_{test_name}() {{
                 .map(RcDoc::text)
                 .unwrap_or_else(|| ident(id, Some(Case::Pascal)));
             let syntax = self.prog.lookup(id);
-            let syntax_ty = syntax.map(|b| &b.typ);
+            let syntax_ty = syntax
+                .map(|b| &b.typ)
+                .or_else(|| self.generated_types.get(*id).map(|t| &**t));
             let docs = syntax
                 .map(|b| pp_docs(b.docs.as_ref()))
                 .unwrap_or(RcDoc::nil());
@@ -812,13 +814,13 @@ pub fn emit_bindgen(
     tree: &Config,
     env: &TypeEnv,
     actor: &Option<Type>,
-    prog: &mut IDLMergedProg,
+    prog: &IDLMergedProg,
 ) -> (Output, Vec<String>) {
     let mut state = NominalState {
         state: crate::configs::State::new(&tree.0, env),
-        prog,
+        generated_types: BTreeMap::new(),
     };
-    let (env, actor) = state.nominalize_all(actor);
+    let (env, actor) = state.nominalize_all(actor, prog);
     let old_stats = state.state.stats.clone();
     let def_list = if let Some(actor) = &actor {
         chase_actor(&env, actor).unwrap()
@@ -829,6 +831,7 @@ pub fn emit_bindgen(
     let mut state = State {
         state: crate::configs::State::new(&tree.0, &env),
         prog,
+        generated_types: state.generated_types,
         recs,
         tests: BTreeMap::new(),
     };
@@ -906,7 +909,6 @@ pub fn compile(
     prog: &IDLMergedProg,
     mut external: ExternalConfig,
 ) -> (String, Vec<String>) {
-    let mut prog = prog.clone();
     let source = match external.0.get("target").map(|s| s.as_str()) {
         Some("canister_call") | None => Cow::Borrowed(include_str!("rust_call.hbs")),
         Some("agent") => Cow::Borrowed(include_str!("rust_agent.hbs")),
@@ -926,7 +928,7 @@ pub fn compile(
         }
         _ => unimplemented!(),
     };
-    let (output, unused) = emit_bindgen(tree, env, actor, &mut prog);
+    let (output, unused) = emit_bindgen(tree, env, actor, prog);
     (output_handlebar(output, external, &source), unused)
 }
 
@@ -956,18 +958,20 @@ fn path_to_var(path: &[TypePath]) -> String {
         .collect();
     name.join("_").to_case(Case::Pascal)
 }
-struct NominalState<'a> {
+
+struct NominalState<'a, 'b> {
     state: crate::configs::State<'a, BindingConfig>,
-    prog: &'a mut IDLMergedProg,
+    generated_types: GeneratedTypes<'b>,
 }
-impl NominalState<'_> {
+
+impl<'b> NominalState<'_, 'b> {
     // Convert structural typing to nominal typing to fit Rust's type system
     fn nominalize(
         &mut self,
         env: &mut TypeEnv,
         path: &mut Vec<TypePath>,
         t: &Type,
-        syntax: Option<&IDLType>,
+        syntax: Option<&'b IDLType>,
     ) -> Type {
         let elem = StateElem::Type(t);
         let old = if matches!(t.as_ref(), TypeInner::Func(_)) {
@@ -979,26 +983,22 @@ impl NominalState<'_> {
         let res = match t.as_ref() {
             TypeInner::Opt(ty) => {
                 path.push(TypePath::Opt);
-                let syntax_ty = syntax.and_then(|s| {
-                    if let IDLType::OptT(inner) = s {
-                        Some(inner.as_ref())
-                    } else {
-                        None
-                    }
-                });
+                let syntax_ty = if let Some(IDLType::OptT(inner)) = syntax {
+                    Some(inner.as_ref())
+                } else {
+                    None
+                };
                 let ty = self.nominalize(env, path, ty, syntax_ty);
                 path.pop();
                 TypeInner::Opt(ty)
             }
             TypeInner::Vec(ty) => {
                 path.push(TypePath::Vec);
-                let syntax_ty = syntax.and_then(|s| {
-                    if let IDLType::VecT(inner) = s {
-                        Some(inner.as_ref())
-                    } else {
-                        None
-                    }
-                });
+                let syntax_ty = if let Some(IDLType::VecT(inner)) = syntax {
+                    Some(inner.as_ref())
+                } else {
+                    None
+                };
                 let ty = self.nominalize(env, path, ty, syntax_ty);
                 path.pop();
                 TypeInner::Vec(ty)
@@ -1017,10 +1017,9 @@ impl NominalState<'_> {
                             let elem = StateElem::Label(&lab);
                             let old = self.state.push_state(&elem);
                             path.push(TypePath::RecordField(id.to_string()));
-                            let syntax_field = syntax_fields.and_then(|s| {
-                                s.iter().find(|f| f.label == **id).map(|f| f.typ.clone())
-                            });
-                            let ty = self.nominalize(env, path, ty, syntax_field.as_ref());
+                            let syntax_field = syntax_fields
+                                .and_then(|s| s.iter().find(|f| f.label == **id).map(|f| &f.typ));
+                            let ty = self.nominalize(env, path, ty, syntax_field);
                             path.pop();
                             self.state.pop_state(old, elem);
                             Field { id: id.clone(), ty }
@@ -1035,17 +1034,16 @@ impl NominalState<'_> {
                     } else {
                         path_to_var(path)
                     };
-                    let new_syntax =
-                        IDLType::RecordT(syntax_fields.map(|s| s.to_vec()).unwrap_or_default());
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
                         &TypeInner::Record(fs.to_vec()).into(),
-                        Some(&new_syntax),
+                        syntax,
                     );
                     env.0.insert(new_var.clone(), ty);
-                    self.prog
-                        .insert_binding(new_var.clone(), new_syntax, vec![]);
+                    if let Some(syntax) = syntax {
+                        self.generated_types.insert(new_var.clone(), syntax);
+                    }
                     TypeInner::Var(new_var)
                 }
             }
@@ -1064,10 +1062,9 @@ impl NominalState<'_> {
                             } else {
                                 path.push(TypePath::VariantField(id.to_string()));
                             }
-                            let syntax_field = syntax_fields.and_then(|s| {
-                                s.iter().find(|f| f.label == **id).map(|f| f.typ.clone())
-                            });
-                            let ty = self.nominalize(env, path, ty, syntax_field.as_ref());
+                            let syntax_field = syntax_fields
+                                .and_then(|s| s.iter().find(|f| f.label == **id).map(|f| &f.typ));
+                            let ty = self.nominalize(env, path, ty, syntax_field);
                             path.pop();
                             self.state.pop_state(old, StateElem::Label(&lab));
                             Field { id: id.clone(), ty }
@@ -1082,17 +1079,16 @@ impl NominalState<'_> {
                     } else {
                         path_to_var(path)
                     };
-                    let new_syntax =
-                        IDLType::VariantT(syntax_fields.map(|s| s.to_vec()).unwrap_or_default());
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
                         &TypeInner::Variant(fs.to_vec()).into(),
-                        Some(&new_syntax),
+                        syntax,
                     );
                     env.0.insert(new_var.clone(), ty);
-                    self.prog
-                        .insert_binding(new_var.clone(), new_syntax, vec![]);
+                    if let Some(syntax) = syntax {
+                        self.generated_types.insert(new_var.clone(), syntax);
+                    }
                     TypeInner::Var(new_var)
                 }
             }
@@ -1195,13 +1191,11 @@ impl NominalState<'_> {
                 }
             },
             TypeInner::Class(args, ty) => {
-                let syntax_ty = syntax.and_then(|s| {
-                    if let IDLType::ClassT(_, syntax_ty) = s {
-                        Some(syntax_ty.as_ref())
-                    } else {
-                        None
-                    }
-                });
+                let syntax_ty = if let Some(IDLType::ClassT(_, syntax_ty)) = syntax {
+                    Some(syntax_ty.as_ref())
+                } else {
+                    None
+                };
                 TypeInner::Class(
                     args.iter()
                         .map(|arg| {
@@ -1229,18 +1223,17 @@ impl NominalState<'_> {
         res
     }
 
-    fn nominalize_all(&mut self, actor: &Option<Type>) -> (TypeEnv, Option<Type>) {
+    fn nominalize_all(
+        &mut self,
+        actor: &Option<Type>,
+        prog: &'b IDLMergedProg,
+    ) -> (TypeEnv, Option<Type>) {
         let mut res = TypeEnv(Default::default());
         for (id, ty) in self.state.env.0.iter() {
             let elem = StateElem::Label(id);
             let old = self.state.push_state(&elem);
-            let syntax = self.prog.lookup(id).map(|t| t.typ.clone());
-            let ty = self.nominalize(
-                &mut res,
-                &mut vec![TypePath::Id(id.clone())],
-                ty,
-                syntax.as_ref(),
-            );
+            let syntax = prog.lookup(id).map(|t| &t.typ);
+            let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.clone())], ty, syntax);
             res.0.insert(id.to_string(), ty);
             self.state.pop_state(old, elem);
         }
@@ -1250,6 +1243,7 @@ impl NominalState<'_> {
         (res, actor)
     }
 }
+
 fn get_hbs() -> handlebars::Handlebars<'static> {
     use handlebars::*;
     let mut hbs = Handlebars::new();
