@@ -146,7 +146,7 @@ pub struct IDLInitArgs {
     pub args: Vec<IDLArgType>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct IDLMergedProg {
     typ_decs: Vec<Binding>,
     main_actor: Option<IDLActorType>,
@@ -179,10 +179,6 @@ impl IDLMergedProg {
 
     pub fn decs(&self) -> Vec<Dec> {
         self.typ_decs.iter().map(|b| Dec::TypD(b.clone())).collect()
-    }
-
-    pub fn insert_binding(&mut self, id: String, typ: IDLType, docs: Vec<String>) {
-        self.typ_decs.push(Binding { id, typ, docs });
     }
 
     pub fn resolve_actor(&self) -> Result<Option<IDLActorType>> {

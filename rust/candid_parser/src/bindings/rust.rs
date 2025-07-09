@@ -201,22 +201,22 @@ fn variant_syntax_fields(syntax: Option<&IDLType>) -> Option<&[syntax::TypeField
     }
 }
 
-fn actor_methods(actor: Option<&IDLActorType>) -> Vec<syntax::Binding> {
+fn actor_methods(actor: Option<&IDLActorType>) -> &[syntax::Binding] {
     let typ = match actor {
         Some(IDLActorType { typ, .. }) => typ,
-        None => return vec![],
+        None => return &[],
     };
 
     match typ {
-        IDLType::ServT(methods) => methods.to_vec(),
+        IDLType::ServT(methods) => methods,
         IDLType::ClassT(_, inner) => {
             if let IDLType::ServT(methods) = inner.as_ref() {
-                methods.to_vec()
+                methods
             } else {
-                vec![]
+                &[]
             }
         }
-        _ => vec![],
+        _ => &[],
     }
 }
 
