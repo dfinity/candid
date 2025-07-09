@@ -181,6 +181,26 @@ fn find_field<'a>(
     (docs, syntax_field_ty)
 }
 
+fn record_syntax_fields(syntax: Option<&IDLType>) -> Option<&[syntax::TypeField]> {
+    syntax.and_then(|t| {
+        if let IDLType::RecordT(syntax_fields) = &t {
+            Some(syntax_fields.as_slice())
+        } else {
+            None
+        }
+    })
+}
+
+fn variant_syntax_fields(syntax: Option<&IDLType>) -> Option<&[syntax::TypeField]> {
+    syntax.and_then(|t| {
+        if let IDLType::VariantT(syntax_fields) = &t {
+            Some(syntax_fields.as_slice())
+        } else {
+            None
+        }
+    })
+}
+
 impl<'a> State<'a> {
     fn generate_test(&mut self, src: &Type, use_type: &str) {
         if self.tests.contains_key(use_type) {
@@ -478,13 +498,7 @@ fn test_{test_name}() {{
         let res = match field.ty.as_ref() {
             TypeInner::Null => label,
             TypeInner::Record(fs) => {
-                let syntax_fields = syntax.and_then(|t| {
-                    if let IDLType::RecordT(syntax_fields) = &t {
-                        Some(syntax_fields.as_slice())
-                    } else {
-                        None
-                    }
-                });
+                let syntax_fields = record_syntax_fields(syntax);
                 label.append(self.pp_record_fields(fs, syntax_fields, false, false))
             }
             _ => label.append(enclose("(", self.pp_ty_rich(&field.ty, syntax, false), ")")),
@@ -552,13 +566,7 @@ fn test_{test_name}() {{
                     } else {
                         RcDoc::nil()
                     };
-                    let syntax_fields = syntax_ty.and_then(|t| {
-                        if let IDLType::RecordT(syntax_fields) = &t {
-                            Some(syntax_fields.as_slice())
-                        } else {
-                            None
-                        }
-                    });
+                    let syntax_fields = record_syntax_fields(syntax_ty);
                     derive
                         .append(vis)
                         .append("struct ")
@@ -575,13 +583,7 @@ fn test_{test_name}() {{
                             .append(self.pp_ty_rich(ty, syntax_ty, false))
                             .append(";")
                     } else {
-                        let syntax_fields = syntax_ty.and_then(|t| {
-                            if let IDLType::VariantT(syntax_fields) = &t {
-                                Some(syntax_fields.as_slice())
-                            } else {
-                                None
-                            }
-                        });
+                        let syntax_fields = variant_syntax_fields(syntax_ty);
                         derive
                             .append(vis)
                             .append("enum ")
@@ -1024,13 +1026,7 @@ impl NominalState<'_> {
                 TypeInner::Vec(ty)
             }
             TypeInner::Record(fs) => {
-                let syntax_fields = syntax.and_then(|s| {
-                    if let IDLType::RecordT(syntax_fields) = s {
-                        Some(syntax_fields)
-                    } else {
-                        None
-                    }
-                });
+                let syntax_fields = record_syntax_fields(syntax);
                 if matches!(
                     path.last(),
                     None | Some(TypePath::VariantField(_)) | Some(TypePath::Id(_))
@@ -1061,7 +1057,8 @@ impl NominalState<'_> {
                     } else {
                         path_to_var(path)
                     };
-                    let new_syntax = IDLType::RecordT(syntax_fields.cloned().unwrap_or_default());
+                    let new_syntax =
+                        IDLType::RecordT(syntax_fields.map(|s| s.to_vec()).unwrap_or_default());
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
@@ -1075,13 +1072,7 @@ impl NominalState<'_> {
                 }
             }
             TypeInner::Variant(fs) => {
-                let syntax_fields = syntax.and_then(|s| {
-                    if let IDLType::VariantT(syntax_fields) = s {
-                        Some(syntax_fields)
-                    } else {
-                        None
-                    }
-                });
+                let syntax_fields = variant_syntax_fields(syntax);
                 let is_result = as_result(fs).is_some();
                 if matches!(path.last(), None | Some(TypePath::Id(_))) || is_result {
                     let fs: Vec<_> = fs
@@ -1113,7 +1104,8 @@ impl NominalState<'_> {
                     } else {
                         path_to_var(path)
                     };
-                    let new_syntax = IDLType::VariantT(syntax_fields.cloned().unwrap_or_default());
+                    let new_syntax =
+                        IDLType::VariantT(syntax_fields.map(|s| s.to_vec()).unwrap_or_default());
                     let ty = self.nominalize(
                         env,
                         &mut vec![TypePath::Id(new_var.clone())],
