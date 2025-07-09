@@ -474,16 +474,20 @@ fn test_{test_name}() {{
     fn pp_variant_field<'b>(&mut self, field: &'b Field, syntax: Option<&'b IDLType>) -> RcDoc<'b> {
         let lab = field.id.to_string();
         let old = self.state.push_state(&StateElem::Label(&lab));
+        let label = self.pp_label(&field.id, true, false);
         let res = match field.ty.as_ref() {
-            TypeInner::Null => self.pp_label(&field.id, true, false),
-            TypeInner::Record(fs) => self
-                .pp_label(&field.id, true, false)
-                .append(self.pp_record_fields(fs, None, false, false)),
-            _ => self.pp_label(&field.id, true, false).append(enclose(
-                "(",
-                self.pp_ty_rich(&field.ty, syntax, false),
-                ")",
-            )),
+            TypeInner::Null => label,
+            TypeInner::Record(fs) => {
+                let syntax_fields = syntax.and_then(|t| {
+                    if let IDLType::RecordT(syntax_fields) = &t {
+                        Some(syntax_fields.as_slice())
+                    } else {
+                        None
+                    }
+                });
+                label.append(self.pp_record_fields(fs, syntax_fields, false, false))
+            }
+            _ => label.append(enclose("(", self.pp_ty_rich(&field.ty, syntax, false), ")")),
         };
         self.state.pop_state(old, StateElem::Label(&lab));
         res

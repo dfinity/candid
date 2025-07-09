@@ -107,7 +107,10 @@ pub(crate) struct MyVariantCInner {
 pub(crate) enum MyVariant {
   /// Doc comment for my_variant field a
   #[serde(rename="a")]
-  A{ b: String },
+  A{
+    /// Doc comment for my_variant field a field b
+    b: String,
+  },
   /// Doc comment for my_variant field c
   #[serde(rename="c")]
   C(Option<MyVariantCInner>),
