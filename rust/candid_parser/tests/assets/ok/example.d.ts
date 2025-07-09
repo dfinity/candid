@@ -106,6 +106,9 @@ export type nested_res = { 'Ok' : { 'Ok' : null } | { 'Err' : null } } |
       }
   };
 export interface node { 'head' : bigint, 'tail' : list }
+/**
+ * Doc comment for res type
+ */
 export type res = {
     /**
      * Doc comment for Ok variant
