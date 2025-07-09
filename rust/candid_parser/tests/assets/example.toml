@@ -3,7 +3,7 @@ attributes = "#[derive(CandidType, Deserialize, Debug)]"
 visibility = "pub(crate)"
 List.name = "MyList"
 Nested41.variant.A = { name = "AAA", attributes = "#[serde(skip_deserializing)]" }
-ListInner.attributes = "#derive[CandidType, Deserialize, Clone]"
+ListInner.attributes = "#[derive(CandidType, Deserialize, Clone)]"
 ListInner.record = { visibility = "", head.name = "HEAD", attributes = "#[serde(skip_deserializing)]", tail.use_type = "Arc<MyList>" }
 my_type = { visibility = "", name = "CanisterId" }
 nat.use_type = "u128 (no test)"

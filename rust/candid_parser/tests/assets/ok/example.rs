@@ -9,7 +9,7 @@ pub(crate) struct Node { pub(crate) head: u128, pub(crate) tail: Box<List> }
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct List(pub(crate) Option<Node>);
 type CanisterId = Principal;
-#derive[CandidType, Deserialize, Clone]
+#[derive(CandidType, Deserialize, Clone)]
 pub(crate) struct ListInner {
   #[serde(skip_deserializing)]
   #[serde(rename="head")]
