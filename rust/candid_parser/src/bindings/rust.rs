@@ -542,7 +542,7 @@ fn test_{test_name}() {{
                 .clone()
                 .map(RcDoc::text)
                 .unwrap_or(RcDoc::text("#[derive(CandidType, Deserialize)]"));
-            let derive = docs.append(derive).append(RcDoc::line());
+            let docs_with_derive = docs.clone().append(derive).append(RcDoc::line());
             let line = match ty.as_ref() {
                 TypeInner::Record(fs) => {
                     let separator = if is_tuple(fs) {
@@ -551,7 +551,7 @@ fn test_{test_name}() {{
                         RcDoc::nil()
                     };
                     let syntax_fields = record_syntax_fields(syntax_ty);
-                    derive
+                    docs_with_derive
                         .append(vis)
                         .append("struct ")
                         .append(name)
@@ -561,14 +561,15 @@ fn test_{test_name}() {{
                 }
                 TypeInner::Variant(fs) => {
                     if as_result(fs).is_some() {
-                        vis.append(kwd("type"))
+                        docs.append(vis)
+                            .append(kwd("type"))
                             .append(name)
                             .append(" = ")
                             .append(self.pp_ty(ty, false))
                             .append(";")
                     } else {
                         let syntax_fields = variant_syntax_fields(syntax_ty);
-                        derive
+                        docs_with_derive
                             .append(vis)
                             .append("enum ")
                             .append(name)
@@ -590,7 +591,7 @@ fn test_{test_name}() {{
                     .append(");"),
                 _ => {
                     if self.recs.contains(id) {
-                        derive
+                        docs_with_derive
                             .append(vis.clone())
                             .append("struct ")
                             .append(name)
@@ -598,7 +599,8 @@ fn test_{test_name}() {{
                             .append(enclose("(", vis.append(self.pp_ty(ty, false)), ")"))
                             .append(";")
                     } else {
-                        vis.append(kwd("type"))
+                        docs.append(vis)
+                            .append(kwd("type"))
                             .append(name)
                             .append(" = ")
                             .append(self.pp_ty(ty, false))

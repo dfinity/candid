@@ -68,6 +68,7 @@ module {
     };
   };
   public type node = { head : Nat; tail : list };
+  /// Doc comment for res type
   public type res = {
     /// Doc comment for Ok variant
     #Ok : (Int, Nat);

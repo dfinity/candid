@@ -8,6 +8,7 @@ use ic_cdk::api::call::CallResult as Result;
 pub(crate) struct Node { pub(crate) head: u128, pub(crate) tail: Box<List> }
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct List(pub(crate) Option<Node>);
+/// Doc comment for prim type
 type CanisterId = Principal;
 #[derive(CandidType, Deserialize, Clone)]
 pub(crate) struct ListInner {
@@ -74,6 +75,7 @@ pub(crate) struct ResErr {
   /// on multiple lines
   pub(crate) error: String,
 }
+/// Doc comment for res type
 pub(crate) type Res = std::result::Result<(candid::Int,u128,), ResErr>;
 candid::define_function!(pub(crate) F : (MyList, FArg1) -> (
     Option<MyList>,
