@@ -181,7 +181,7 @@ fn compiler_test(resource: &str) {
                 let mut output = mint
                     .new_goldenfile(filename.with_extension("d.ts"))
                     .unwrap();
-                let content = typescript::compile(&env, &actor);
+                let content = typescript::compile(&env, &actor, &prog);
                 writeln!(output, "{content}").unwrap();
             }
         }
