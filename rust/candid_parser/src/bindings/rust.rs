@@ -238,48 +238,18 @@ fn test_{test_name}() {{
         self.tests.insert(use_type.to_string(), body);
     }
 
-    fn use_type_doc<'b>(&mut self, ty: &'b Type) -> Option<RcDoc<'b>> {
-        if let Some(t) = &self.state.config.use_type {
+    fn pp_ty<'b>(&mut self, ty: &'b Type, syntax: Option<&'b IDLType>, is_ref: bool) -> RcDoc<'b> {
+        use TypeInner::*;
+        let elem = StateElem::Type(ty);
+        let old = self.state.push_state(&elem);
+        let res = if let Some(t) = &self.state.config.use_type {
             let (t, need_test) = parse_use_type(t);
             if need_test {
                 self.generate_test(ty, &t);
             }
             let res = RcDoc::text(t);
             self.state.update_stats("use_type");
-            Some(res)
-        } else {
-            None
-        }
-    }
-
-    fn pp_ty_rich<'b>(
-        &mut self,
-        ty: &'b Type,
-        syntax: Option<&'b IDLType>,
-        is_ref: bool,
-    ) -> RcDoc<'b> {
-        let elem = StateElem::Type(ty);
-        let old = self.state.push_state(&elem);
-        let res = if let Some(use_type_doc) = self.use_type_doc(ty) {
-            use_type_doc
-        } else {
-            match (ty.as_ref(), syntax) {
-                (TypeInner::Variant(ref fields), Some(IDLType::VariantT(syntax_fields))) => {
-                    self.pp_variant(fields, Some(syntax_fields), is_ref)
-                }
-                (_, _) => self.pp_ty(ty, is_ref),
-            }
-        };
-        self.state.pop_state(old, elem);
-        res
-    }
-
-    fn pp_ty<'b>(&mut self, ty: &'b Type, is_ref: bool) -> RcDoc<'b> {
-        use TypeInner::*;
-        let elem = StateElem::Type(ty);
-        let old = self.state.push_state(&elem);
-        let res = if let Some(use_type_doc) = self.use_type_doc(ty) {
-            use_type_doc
+            res
         } else {
             match ty.as_ref() {
                 Null => str("()"),
@@ -306,7 +276,10 @@ fn test_{test_name}() {{
                 Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
                 Vec(ref t) => self.pp_vec(t, is_ref),
                 Record(ref fs) => self.pp_record_fields(fs, None, false, is_ref),
-                Variant(ref fs) => self.pp_variant(fs, None, is_ref),
+                Variant(ref fs) => {
+                    let syntax_fields = variant_syntax_fields(syntax);
+                    self.pp_variant(fs, syntax_fields, is_ref)
+                }
                 Func(_) => unreachable!(), // not possible after rewriting
                 Service(_) => unreachable!(), // not possible after rewriting
                 Class(_, _) => unreachable!(),
@@ -381,11 +354,11 @@ fn test_{test_name}() {{
     }
 
     fn pp_vec<'b>(&mut self, ty: &'b Type, is_ref: bool) -> RcDoc<'b> {
-        str("Vec").append(enclose("<", self.pp_ty(ty, is_ref), ">"))
+        str("Vec").append(enclose("<", self.pp_ty(ty, None, is_ref), ">"))
     }
 
     fn pp_opt<'b>(&mut self, ty: &'b Type, is_ref: bool) -> RcDoc<'b> {
-        str("Option").append(enclose("<", self.pp_ty(ty, is_ref), ">"))
+        str("Option").append(enclose("<", self.pp_ty(ty, None, is_ref), ">"))
     }
 
     fn pp_tuple<'b>(&mut self, fs: &'b [Field], need_vis: bool, is_ref: bool) -> RcDoc<'b> {
@@ -398,7 +371,7 @@ fn test_{test_name}() {{
             } else {
                 RcDoc::nil()
             };
-            let res = vis.append(self.pp_ty(&f.ty, is_ref)).append(",");
+            let res = vis.append(self.pp_ty(&f.ty, None, is_ref)).append(",");
             self.state.pop_state(old, StateElem::Label(&lab));
             res
         });
@@ -417,7 +390,7 @@ fn test_{test_name}() {{
         let res = self
             .pp_label(&field.id, false, need_vis)
             .append(kwd(":"))
-            .append(self.pp_ty_rich(&field.ty, syntax, is_ref));
+            .append(self.pp_ty(&field.ty, syntax, is_ref));
         self.state.pop_state(old, StateElem::Label(&lab));
         res
     }
@@ -479,10 +452,10 @@ fn test_{test_name}() {{
             self.state
                 .pop_state(old, StateElem::TypeStr("std::result::Result"));
             let old = self.state.push_state(&StateElem::Label("Ok"));
-            let ok = self.pp_ty(ok, is_ref);
+            let ok = self.pp_ty(ok, None, is_ref);
             self.state.pop_state(old, StateElem::Label("Ok"));
             let old = self.state.push_state(&StateElem::Label("Err"));
-            let err = self.pp_ty(err, is_ref);
+            let err = self.pp_ty(err, None, is_ref);
             self.state.pop_state(old, StateElem::Label("Err"));
             let body = ok.append(", ").append(err);
             RcDoc::text(result).append(enclose("<", body, ">"))
@@ -501,7 +474,7 @@ fn test_{test_name}() {{
                 let syntax_fields = record_syntax_fields(syntax);
                 label.append(self.pp_record_fields(fs, syntax_fields, false, false))
             }
-            _ => label.append(enclose("(", self.pp_ty_rich(&field.ty, syntax, false), ")")),
+            _ => label.append(enclose("(", self.pp_ty(&field.ty, syntax, false), ")")),
         };
         self.state.pop_state(old, StateElem::Label(&lab));
         res
@@ -580,7 +553,7 @@ fn test_{test_name}() {{
                         vis.append(kwd("type"))
                             .append(name)
                             .append(" = ")
-                            .append(self.pp_ty_rich(ty, syntax_ty, false))
+                            .append(self.pp_ty(ty, syntax_ty, false))
                             .append(";")
                     } else {
                         let syntax_fields = variant_syntax_fields(syntax_ty);
@@ -613,7 +586,7 @@ fn test_{test_name}() {{
                             // TODO: Unfortunately, the visibility of the inner newtype is also controlled by var.visibility
                             .append(enclose(
                                 "(",
-                                vis.append(self.pp_ty_rich(ty, syntax_ty, false)),
+                                vis.append(self.pp_ty(ty, syntax_ty, false)),
                                 ")",
                             ))
                             .append(";")
@@ -621,7 +594,7 @@ fn test_{test_name}() {{
                         vis.append(kwd("type"))
                             .append(name)
                             .append(" = ")
-                            .append(self.pp_ty_rich(ty, syntax_ty, false))
+                            .append(self.pp_ty(ty, syntax_ty, false))
                             .append(";")
                     }
                 }
@@ -638,7 +611,7 @@ fn test_{test_name}() {{
             .map(|(i, t)| {
                 let lab = t.name.clone().unwrap_or_else(|| format!("{prefix}{i}"));
                 let old = self.state.push_state(&StateElem::Label(&lab));
-                let res = self.pp_ty(&t.typ, true);
+                let res = self.pp_ty(&t.typ, None, true);
                 self.state.pop_state(old, StateElem::Label(&lab));
                 res
             })
@@ -653,7 +626,7 @@ fn test_{test_name}() {{
             .map(|(i, t)| {
                 let lab = format!("{prefix}{i}");
                 let old = self.state.push_state(&StateElem::Label(&lab));
-                let res = self.pp_ty(t, true);
+                let res = self.pp_ty(t, None, true);
                 self.state.pop_state(old, StateElem::Label(&lab));
                 res
             })
@@ -683,7 +656,7 @@ fn test_{test_name}() {{
         for (id, func) in serv.iter() {
             let func_doc = match func.as_ref() {
                 TypeInner::Func(ref f) => enclose("candid::func!(", self.pp_ty_func(f), ")"),
-                TypeInner::Var(_) => self.pp_ty(func, true).append("::ty()"),
+                TypeInner::Var(_) => self.pp_ty(func, None, true).append("::ty()"),
                 _ => unreachable!(),
             };
             list.push(
@@ -728,7 +701,7 @@ fn test_{test_name}() {{
                     .clone()
                     .unwrap_or_else(|| lab.clone());
                 self.state.update_stats("name");
-                let res = self.pp_ty(&arg.typ, true);
+                let res = self.pp_ty(&arg.typ, None, true);
                 self.state.pop_state(old, StateElem::Label(&lab));
                 (name, res)
             })
@@ -740,7 +713,7 @@ fn test_{test_name}() {{
             .map(|(i, ty)| {
                 let lab = format!("ret{i}");
                 let old = self.state.push_state(&StateElem::Label(&lab));
-                let res = self.pp_ty(ty, true);
+                let res = self.pp_ty(ty, None, true);
                 self.state.pop_state(old, StateElem::Label(&lab));
                 res
             })
@@ -787,7 +760,7 @@ fn test_{test_name}() {{
                         .clone()
                         .unwrap_or_else(|| lab.clone());
                     self.state.update_stats("name");
-                    let res = self.pp_ty(&arg.typ, true);
+                    let res = self.pp_ty(&arg.typ, None, true);
                     self.state.pop_state(old, StateElem::Label(&lab));
                     (name, res.pretty(LINE_WIDTH).to_string())
                 })
