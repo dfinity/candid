@@ -250,9 +250,6 @@ fn test_{test_name}() {{
                 (TypeInner::Variant(ref fields), Some(IDLType::VariantT(syntax_fields))) => {
                     self.pp_variant(fields, Some(syntax_fields), is_ref)
                 }
-                (TypeInner::Opt(ref inner), Some(IDLType::OptT(syntax))) => {
-                    self.pp_opt(inner, Some(syntax), is_ref)
-                }
                 (_, _) => self.pp_ty(ty, is_ref),
             }
         };
@@ -287,7 +284,7 @@ fn test_{test_name}() {{
                 Empty => str("candid::Empty"),
                 Var(ref id) => self.pp_var(id, is_ref),
                 Principal => str("Principal"),
-                Opt(ref t) => self.pp_opt(t, None, is_ref),
+                Opt(ref t) => self.pp_opt(t, is_ref),
                 // It's a bit tricky to use `deserialize_with = "serde_bytes"`. It's not working for `type t = blob`
                 Vec(ref t) if matches!(t.as_ref(), Nat8) => str("serde_bytes::ByteBuf"),
                 Vec(ref t) => self.pp_vec(t, is_ref),
@@ -370,8 +367,8 @@ fn test_{test_name}() {{
         str("Vec").append(enclose("<", self.pp_ty(ty, is_ref), ">"))
     }
 
-    fn pp_opt<'b>(&mut self, ty: &'b Type, syntax: Option<&'b IDLType>, is_ref: bool) -> RcDoc<'b> {
-        str("Option").append(enclose("<", self.pp_ty_rich(ty, syntax, is_ref), ">"))
+    fn pp_opt<'b>(&mut self, ty: &'b Type, is_ref: bool) -> RcDoc<'b> {
+        str("Option").append(enclose("<", self.pp_ty(ty, is_ref), ">"))
     }
 
     fn pp_tuple<'b>(&mut self, fs: &'b [Field], need_vis: bool, is_ref: bool) -> RcDoc<'b> {
