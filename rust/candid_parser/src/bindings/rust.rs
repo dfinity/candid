@@ -4,7 +4,7 @@ use crate::{
     Deserialize,
 };
 use candid::types::{
-    syntax::{self, IDLMergedProg, IDLType},
+    syntax::{self, IDLActorType, IDLMergedProg, IDLType},
     Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner,
 };
 use candid::{pretty::utils::*, types::ArgType};
@@ -200,6 +200,31 @@ fn variant_syntax_fields(syntax: Option<&IDLType>) -> Option<&[syntax::TypeField
         }
     })
 }
+
+fn actor_methods(actor: Option<&IDLActorType>) -> Vec<syntax::Binding> {
+    let typ = match actor {
+        Some(IDLActorType { typ, .. }) => typ,
+        None => return vec![],
+    };
+
+    match typ {
+        IDLType::ServT(methods) => methods.to_vec(),
+        IDLType::ClassT(_, inner) => {
+            if let IDLType::ServT(methods) = inner.as_ref() {
+                methods.to_vec()
+            } else {
+                vec![]
+            }
+        }
+        _ => vec![],
+    }
+}
+
+type PpActorRet = (
+    Vec<Method>,
+    Option<Vec<(String, String)>>,
+    Option<IDLActorType>,
+);
 
 impl<'a> State<'a> {
     fn generate_test(&mut self, src: &Type, use_type: &str) {
@@ -743,7 +768,7 @@ fn test_{test_name}() {{
         res
     }
 
-    fn pp_actor(&mut self, actor: &Type) -> (Vec<Method>, Option<Vec<(String, String)>>) {
+    fn pp_actor(&mut self, actor: &Type) -> PpActorRet {
         let actor = self.state.env.trace_type(actor).unwrap();
         let init = if let TypeInner::Class(args, _) = actor.as_ref() {
             let old = self.state.push_state(&StateElem::Label("init"));
@@ -773,13 +798,14 @@ fn test_{test_name}() {{
 
         let mut res = Vec::new();
         let serv = self.state.env.as_service(&actor).unwrap();
-        let syntax_methods = self.prog.resolve_actor_methods().unwrap();
+        let syntax_actor = self.prog.resolve_actor().ok().flatten();
+        let syntax_methods = actor_methods(syntax_actor.as_ref());
         for (id, func) in serv.iter() {
             let func = self.state.env.as_func(func).unwrap();
             let syntax = syntax_methods.iter().find(|b| b.id == *id);
             res.push(self.pp_function(id, func, syntax));
         }
-        (res, init)
+        (res, init, syntax_actor)
     }
 }
 
@@ -829,8 +855,7 @@ pub fn emit_bindgen(
     state.state.stats = old_stats;
     let defs = state.pp_defs(&def_list);
     let (methods, init_args, actor_docs) = if let Some(actor) = &actor {
-        let (meths, args) = state.pp_actor(actor);
-        let syntax_actor = prog.resolve_actor().ok().flatten();
+        let (meths, args, syntax_actor) = state.pp_actor(actor);
         let docs = syntax_actor.map(|a| a.docs.clone()).unwrap_or_default();
         (meths, args, docs)
     } else {

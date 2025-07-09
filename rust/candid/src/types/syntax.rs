@@ -233,25 +233,6 @@ impl IDLMergedProg {
         }))
     }
 
-    pub fn resolve_actor_methods(&self) -> Result<Vec<Binding>> {
-        let typ = match self.resolve_actor()? {
-            Some(IDLActorType { typ, .. }) => typ,
-            None => return Ok(vec![]),
-        };
-
-        if let IDLType::ServT(methods) = typ {
-            Ok(methods)
-        } else if let IDLType::ClassT(_, inner) = typ {
-            if let IDLType::ServT(methods) = inner.as_ref() {
-                Ok(methods.to_vec())
-            } else {
-                Ok(vec![])
-            }
-        } else {
-            Ok(vec![])
-        }
-    }
-
     // NOTE: We don't worry about cyclic type definitions, as we rule those out earlier when checking the type decs
     fn chase_service(&self, ty: IDLType, import_name: Option<&str>) -> Result<Vec<Binding>> {
         match ty {
