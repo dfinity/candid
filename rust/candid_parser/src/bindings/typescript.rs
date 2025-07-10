@@ -173,18 +173,15 @@ fn pp_variant<'a>(
     if fields.is_empty() {
         str("never")
     } else {
-        strict_concat(
-            fields.iter().map(|f| {
-                let (docs, syntax_field) = find_field(syntax, &f.id);
-                enclose_space(
-                    "{",
-                    docs.append(pp_field(env, f, syntax_field, is_ref)),
-                    "}",
-                )
-            }),
-            " |",
-        )
-        .nest(INDENT_SPACE)
+        let fields = fields.iter().map(|f| {
+            let (docs, syntax_field) = find_field(syntax, &f.id);
+            enclose_space(
+                "{",
+                docs.append(pp_field(env, f, syntax_field, is_ref)),
+                "}",
+            )
+        });
+        strict_concat(fields, " |").nest(INDENT_SPACE)
     }
 }
 
@@ -211,7 +208,7 @@ fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
     };
     enclose(
         "ActorMethod<",
-        strict_concat([args, rets].iter().cloned(), ","),
+        strict_concat([args, rets].into_iter(), ","),
         ">",
     )
 }
@@ -221,24 +218,21 @@ fn pp_service<'a>(
     serv: &'a [(String, Type)],
     syntax: Option<&'a [syntax::Binding]>,
 ) -> RcDoc<'a> {
-    let doc = concat(
-        serv.iter().map(|(id, func)| {
-            let mut docs = RcDoc::nil();
-            if let Some(bs) = syntax {
-                if let Some(b) = bs.iter().find(|b| &b.id == id) {
-                    docs = pp_docs(&b.docs);
-                }
+    let methods = serv.iter().map(|(id, func)| {
+        let mut docs = RcDoc::nil();
+        if let Some(bs) = syntax {
+            if let Some(b) = bs.iter().find(|b| &b.id == id) {
+                docs = pp_docs(&b.docs);
             }
-            let func = match func.as_ref() {
-                TypeInner::Func(ref func) => pp_function(env, func),
-                TypeInner::Var(ref id) => ident(id),
-                _ => unreachable!(),
-            };
-            docs.append(quote_ident(id)).append(kwd(":")).append(func)
-        }),
-        ",",
-    );
-    enclose_space("{", doc, "}")
+        }
+        let func = match func.as_ref() {
+            TypeInner::Func(ref func) => pp_function(env, func),
+            TypeInner::Var(ref id) => ident(id),
+            _ => unreachable!(),
+        };
+        docs.append(quote_ident(id)).append(kwd(":")).append(func)
+    });
+    enclose_space("{", concat(methods, ","), "}")
 }
 
 fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {

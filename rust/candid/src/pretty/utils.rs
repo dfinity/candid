@@ -7,7 +7,8 @@ fn is_empty(doc: &RcDoc) -> bool {
     use pretty::Doc::*;
     match &**doc {
         Nil => true,
-        FlatAlt(t1, t2) | Union(t1, t2) => is_empty(t1) && is_empty(t2),
+        FlatAlt(t1, t2) => is_empty(t2) || is_empty(t1),
+        Union(t1, t2) => is_empty(t1) && is_empty(t2),
         Group(t) | Nest(_, t) | Annotated((), t) => is_empty(t),
         _ => false,
     }
@@ -52,11 +53,11 @@ where
 /// Append the separator to each item in `docs`. If it is displayed in a single line, omit the last separator.
 pub fn concat<'a, D>(docs: D, sep: &'a str) -> RcDoc<'a>
 where
-    D: Iterator<Item = RcDoc<'a>> + Clone,
+    D: Iterator<Item = RcDoc<'a>>,
 {
-    RcDoc::intersperse(docs.clone().map(|d| d.append(sep)), RcDoc::line()).flat_alt(
-        RcDoc::intersperse(docs, RcDoc::text(sep).append(RcDoc::line())),
-    )
+    let singleline = RcDoc::intersperse(docs, RcDoc::text(sep).append(RcDoc::line()));
+    let multiline = singleline.clone().append(sep);
+    multiline.flat_alt(singleline)
 }
 
 pub fn lines<'a, D>(docs: D) -> RcDoc<'a>
