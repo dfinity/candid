@@ -495,15 +495,11 @@ fn test_{test_name}() {{
         syntax: Option<&'b [syntax::TypeField]>,
     ) -> RcDoc<'b> {
         let old = self.state.push_state(&StateElem::TypeStr("variant"));
-        let fields: Vec<_> = fs
-            .iter()
-            .map(|f| {
-                let (docs, syntax_field) = find_field(syntax, &f.id);
-                docs.append(self.pp_variant_field(f, syntax_field))
-            })
-            .collect();
-        let fields = concat(fields.into_iter(), ",");
-        let res = enclose_space("{", fields, "}");
+        let fields = fs.iter().map(|f| {
+            let (docs, syntax_field) = find_field(syntax, &f.id);
+            docs.append(self.pp_variant_field(f, syntax_field))
+        });
+        let res = enclose_space("{", concat(fields, ","), "}");
         self.state.pop_state(old, StateElem::TypeStr("variant"));
         res
     }
@@ -614,34 +610,24 @@ fn test_{test_name}() {{
         lines(res.into_iter())
     }
     fn pp_args<'b>(&mut self, args: &'b [ArgType], prefix: &'b str) -> RcDoc<'b> {
-        let doc: Vec<_> = args
-            .iter()
-            .enumerate()
-            .map(|(i, t)| {
-                let lab = t.name.clone().unwrap_or_else(|| format!("{prefix}{i}"));
-                let old = self.state.push_state(&StateElem::Label(&lab));
-                let res = self.pp_ty(&t.typ, true);
-                self.state.pop_state(old, StateElem::Label(&lab));
-                res
-            })
-            .collect();
-        let doc = concat(doc.into_iter(), ",");
-        enclose("(", doc, ")")
+        let doc = args.iter().enumerate().map(|(i, t)| {
+            let lab = t.name.clone().unwrap_or_else(|| format!("{prefix}{i}"));
+            let old = self.state.push_state(&StateElem::Label(&lab));
+            let res = self.pp_ty(&t.typ, true);
+            self.state.pop_state(old, StateElem::Label(&lab));
+            res
+        });
+        enclose("(", concat(doc, ","), ")")
     }
-    fn pp_rets<'b>(&mut self, args: &'b [Type], prefix: &'b str) -> RcDoc<'b> {
-        let doc: Vec<_> = args
-            .iter()
-            .enumerate()
-            .map(|(i, t)| {
-                let lab = format!("{prefix}{i}");
-                let old = self.state.push_state(&StateElem::Label(&lab));
-                let res = self.pp_ty(t, true);
-                self.state.pop_state(old, StateElem::Label(&lab));
-                res
-            })
-            .collect();
-        let doc = concat(doc.into_iter(), ",");
-        enclose("(", doc, ")")
+    fn pp_rets<'b>(&mut self, rets: &'b [Type], prefix: &'b str) -> RcDoc<'b> {
+        let tys = rets.iter().enumerate().map(|(i, t)| {
+            let lab = format!("{prefix}{i}");
+            let old = self.state.push_state(&StateElem::Label(&lab));
+            let res = self.pp_ty(t, true);
+            self.state.pop_state(old, StateElem::Label(&lab));
+            res
+        });
+        enclose("(", concat(tys.into_iter(), ","), ")")
     }
     fn pp_ty_func<'b>(&mut self, f: &'b Function) -> RcDoc<'b> {
         let lab = StateElem::TypeStr("func");
@@ -661,22 +647,18 @@ fn test_{test_name}() {{
     fn pp_ty_service<'b>(&mut self, serv: &'b [(String, Type)]) -> RcDoc<'b> {
         let lab = StateElem::TypeStr("service");
         let old = self.state.push_state(&lab);
-        let mut list = Vec::new();
-        for (id, func) in serv.iter() {
+        let methods = serv.iter().map(|(id, func)| {
             let func_doc = match func.as_ref() {
                 TypeInner::Func(ref f) => enclose("candid::func!(", self.pp_ty_func(f), ")"),
                 TypeInner::Var(_) => self.pp_ty(func, true).append("::ty()"),
                 _ => unreachable!(),
             };
-            list.push(
-                RcDoc::text("\"")
-                    .append(id)
-                    .append(kwd("\" :"))
-                    .append(func_doc),
-            );
-        }
-        let doc = concat(list.into_iter(), ";");
-        let res = enclose_space("{", doc, "}");
+            RcDoc::text("\"")
+                .append(id)
+                .append(kwd("\" :"))
+                .append(func_doc)
+        });
+        let res = enclose_space("{", concat(methods, ";"), "}");
         self.state.pop_state(old, lab);
         res
     }

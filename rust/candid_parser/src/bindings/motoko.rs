@@ -207,8 +207,7 @@ fn pp_args(args: &[ArgType]) -> RcDoc {
                     pp_ty(&arg.typ)
                 }
             });
-            let doc = concat(args, ",");
-            enclose("(", doc, ")")
+            enclose("(", concat(args, ","), ")")
         }
     }
 }
@@ -222,31 +221,25 @@ fn pp_rets(args: &[Type]) -> RcDoc {
                 pp_ty(ty)
             }
         }
-        _ => {
-            let doc = concat(args.iter().map(pp_ty), ",");
-            enclose("(", doc, ")")
-        }
+        _ => enclose("(", concat(args.iter().map(pp_ty), ","), ")"),
     }
 }
 
 fn pp_service<'a>(serv: &'a [(String, Type)], syntax: Option<&'a [syntax::Binding]>) -> RcDoc<'a> {
-    let doc = concat(
-        serv.iter().map(|(id, func)| {
-            let mut docs = RcDoc::nil();
-            let mut syntax_field_ty = None;
-            if let Some(bs) = syntax {
-                if let Some(b) = bs.iter().find(|b| &b.id == id) {
-                    docs = pp_docs(&b.docs);
-                    syntax_field_ty = Some(&b.typ)
-                }
+    let methods = serv.iter().map(|(id, func)| {
+        let mut docs = RcDoc::nil();
+        let mut syntax_field_ty = None;
+        if let Some(bs) = syntax {
+            if let Some(b) = bs.iter().find(|b| &b.id == id) {
+                docs = pp_docs(&b.docs);
+                syntax_field_ty = Some(&b.typ)
             }
-            docs.append(escape(id, true))
-                .append(" : ")
-                .append(pp_ty_rich(func, syntax_field_ty))
-        }),
-        ";",
-    );
-    kwd("actor").append(enclose_space("{", doc, "}"))
+        }
+        docs.append(escape(id, true))
+            .append(" : ")
+            .append(pp_ty_rich(func, syntax_field_ty))
+    });
+    kwd("actor").append(enclose_space("{", concat(methods, ";"), "}"))
 }
 
 fn pp_tuple<'a>(fields: &'a [Field]) -> RcDoc<'a> {
@@ -273,36 +266,30 @@ fn pp_record<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) -
     if is_tuple_fields(fields) {
         return pp_tuple(fields);
     }
-    let doc = concat(
-        fields.iter().map(|field| {
-            let (docs, syntax_field) = find_field(syntax, &field.id);
-            docs.append(pp_label(&field.id))
-                .append(" : ")
-                .append(pp_ty_rich(&field.ty, syntax_field))
-        }),
-        ";",
-    );
-    enclose_space("{", doc, "}")
+    let fields = fields.iter().map(|field| {
+        let (docs, syntax_field) = find_field(syntax, &field.id);
+        docs.append(pp_label(&field.id))
+            .append(" : ")
+            .append(pp_ty_rich(&field.ty, syntax_field))
+    });
+    enclose_space("{", concat(fields, ";"), "}")
 }
 
 fn pp_variant<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) -> RcDoc<'a> {
     if fields.is_empty() {
         return str("{#}");
     }
-    let doc = concat(
-        fields.iter().map(|field| {
-            let (docs, syntax_field) = find_field(syntax, &field.id);
-            let doc = docs.append(str("#")).append(pp_label(&field.id));
-            if *field.ty != TypeInner::Null {
-                doc.append(" : ")
-                    .append(pp_ty_rich(&field.ty, syntax_field))
-            } else {
-                doc
-            }
-        }),
-        ";",
-    );
-    enclose_space("{", doc, "}")
+    let fields = fields.iter().map(|field| {
+        let (docs, syntax_field) = find_field(syntax, &field.id);
+        let doc = docs.append(str("#")).append(pp_label(&field.id));
+        if *field.ty != TypeInner::Null {
+            doc.append(" : ")
+                .append(pp_ty_rich(&field.ty, syntax_field))
+        } else {
+            doc
+        }
+    });
+    enclose_space("{", concat(fields, ";"), "}")
 }
 
 fn pp_class<'a>((args, ty): (&'a [ArgType], &'a Type), syntax: Option<&'a IDLType>) -> RcDoc<'a> {
