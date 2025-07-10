@@ -12,6 +12,7 @@ pub struct Profile { pub age: u8, pub name: String }
 fn init(arg0: candid::Int, l: List, arg2: Profile) {
   unimplemented!()
 }
+/// Doc comment for get method in class service
 #[ic_cdk::update]
 fn get() -> List {
   unimplemented!()

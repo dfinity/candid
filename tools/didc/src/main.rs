@@ -237,7 +237,7 @@ fn main() -> Result<()> {
                         .map(|x| x.clone().try_into().unwrap())
                         .unwrap_or(ExternalConfig::default());
                     let config = Config::new(configs);
-                    let (res, unused) = compile(&config, &env, &actor, external);
+                    let (res, unused) = compile(&config, &env, &actor, &prog, external);
                     warn_unused(&unused);
                     res
                 }
@@ -251,7 +251,7 @@ fn main() -> Result<()> {
                         _ => unreachable!(),
                     };
                     external.0.insert("target".to_string(), target.to_string());
-                    let (res, unused) = compile(&config, &env, &actor, external);
+                    let (res, unused) = compile(&config, &env, &actor, &prog, external);
                     warn_unused(&unused);
                     res
                 }
