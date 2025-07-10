@@ -1,2 +1,4 @@
+// line comment
+// 
 type id = nat8;
 
