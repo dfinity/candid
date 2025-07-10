@@ -228,7 +228,7 @@ fn main() -> Result<()> {
             let content = match target.as_str() {
                 "js" => candid_parser::bindings::javascript::compile(&env, &actor),
                 "ts" => candid_parser::bindings::typescript::compile(&env, &actor, &prog),
-                "did" => candid_parser::pretty::candid::compile(&env, &actor),
+                "did" => candid_parser::candid::pretty::syntax::pretty_print(&prog),
                 "mo" => candid_parser::bindings::motoko::compile(&env, &actor, &prog),
                 "rs" => {
                     use candid_parser::bindings::rust::{compile, Config, ExternalConfig};
