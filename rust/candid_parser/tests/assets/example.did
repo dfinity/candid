@@ -62,6 +62,10 @@ type my_variant = variant {
   c: opt record {
     // Doc comment for my_variant field c field d
     d: text;
+    e: vec record {
+      // Doc comment for my_variant field c field e inner vec element
+      f: nat;
+    };
   }
 }
 

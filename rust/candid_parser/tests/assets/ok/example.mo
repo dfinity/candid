@@ -37,6 +37,12 @@ module {
     #c : ?{
       /// Doc comment for my_variant field c field d
       d : Text;
+      e : [
+        {
+          /// Doc comment for my_variant field c field e inner vec element
+          f : Nat;
+        }
+      ];
     };
   };
   /// Doc comment for nested type

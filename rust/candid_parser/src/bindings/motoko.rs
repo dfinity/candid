@@ -113,6 +113,7 @@ fn pp_ty_rich<'a>(ty: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
         (TypeInner::Opt(ref inner), Some(IDLType::OptT(syntax))) => {
             str("?").append(pp_ty_rich(inner, Some(syntax)))
         }
+        (TypeInner::Vec(ref inner), Some(IDLType::VecT(syntax))) => pp_vec(inner, Some(syntax)),
         (_, _) => pp_ty(ty),
     }
 }
@@ -140,8 +141,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Var(ref s) => escape(s, false),
         Principal => str("Principal"),
         Opt(ref t) => str("?").append(pp_ty(t)),
-        Vec(ref t) if matches!(t.as_ref(), Nat8) => str("Blob"),
-        Vec(ref t) => enclose("[", pp_ty(t), "]"),
+        Vec(ref t) => pp_vec(t, None),
         Record(ref fs) => pp_record(fs, None),
         Variant(ref fs) => pp_variant(fs, None),
         Func(ref func) => pp_function(func),
@@ -245,6 +245,14 @@ fn pp_service<'a>(serv: &'a [(String, Type)], syntax: Option<&'a [syntax::Bindin
 fn pp_tuple<'a>(fields: &'a [Field]) -> RcDoc<'a> {
     let tuple = concat(fields.iter().map(|f| pp_ty(&f.ty)), ",");
     enclose("(", tuple, ")")
+}
+
+fn pp_vec<'a>(inner: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
+    if matches!(inner.as_ref(), TypeInner::Nat8) {
+        str("Blob")
+    } else {
+        enclose("[", pp_ty_rich(inner, syntax), "]")
+    }
 }
 
 fn find_field<'a>(

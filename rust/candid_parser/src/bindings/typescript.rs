@@ -42,6 +42,9 @@ fn pp_ty_rich<'a>(
         (TypeInner::Opt(ref t), Some(IDLType::OptT(syntax_inner))) => {
             pp_opt(env, t, Some(syntax_inner), is_ref)
         }
+        (TypeInner::Vec(ref t), Some(IDLType::VecT(syntax_inner))) => {
+            pp_vec(env, t, Some(syntax_inner), is_ref)
+        }
         (_, _) => pp_ty(env, ty, is_ref),
     }
 }
@@ -78,33 +81,7 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
         }
         Principal => str("Principal"),
         Opt(ref t) => pp_opt(env, t, None, is_ref),
-        Vec(ref t) => {
-            let ty = match t.as_ref() {
-                Var(ref id) => {
-                    let ty = env.rec_find_type(id).unwrap();
-                    if matches!(
-                        ty.as_ref(),
-                        Nat8 | Nat16 | Nat32 | Nat64 | Int8 | Int16 | Int32 | Int64
-                    ) {
-                        ty
-                    } else {
-                        t
-                    }
-                }
-                _ => t,
-            };
-            match ty.as_ref() {
-                Nat8 => str("Uint8Array | number[]"),
-                Nat16 => str("Uint16Array | number[]"),
-                Nat32 => str("Uint32Array | number[]"),
-                Nat64 => str("BigUint64Array | bigint[]"),
-                Int8 => str("Int8Array | number[]"),
-                Int16 => str("Int16Array | number[]"),
-                Int32 => str("Int32Array | number[]"),
-                Int64 => str("BigInt64Array | bigint[]"),
-                _ => str("Array").append(enclose("<", pp_ty(env, t, is_ref), ">")),
-            }
-        }
+        Vec(ref t) => pp_vec(env, t, None, is_ref),
         Record(ref fs) => pp_record(env, fs, None, is_ref),
         Variant(ref fs) => pp_variant(env, fs, None, is_ref),
         Func(_) => pp_inline_func(),
@@ -129,6 +106,40 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
             .append(RcDoc::as_string(n))
             .append("_")
             .append(RcDoc::space()),
+    }
+}
+
+fn pp_vec<'a>(
+    env: &'a TypeEnv,
+    inner: &'a Type,
+    syntax: Option<&'a IDLType>,
+    is_ref: bool,
+) -> RcDoc<'a> {
+    use TypeInner::*;
+    let ty = match inner.as_ref() {
+        Var(ref id) => {
+            let ty = env.rec_find_type(id).unwrap();
+            if matches!(
+                ty.as_ref(),
+                Nat8 | Nat16 | Nat32 | Nat64 | Int8 | Int16 | Int32 | Int64
+            ) {
+                ty
+            } else {
+                inner
+            }
+        }
+        _ => inner,
+    };
+    match ty.as_ref() {
+        Nat8 => str("Uint8Array | number[]"),
+        Nat16 => str("Uint16Array | number[]"),
+        Nat32 => str("Uint32Array | number[]"),
+        Nat64 => str("BigUint64Array | bigint[]"),
+        Int8 => str("Int8Array | number[]"),
+        Int16 => str("Int16Array | number[]"),
+        Int32 => str("Int32Array | number[]"),
+        Int64 => str("BigInt64Array | bigint[]"),
+        _ => str("Array").append(enclose("<", pp_ty_rich(env, inner, syntax, is_ref), ">")),
     }
 }
 

@@ -58,7 +58,12 @@ export const idlFactory = ({ IDL }) => {
   });
   const my_variant = IDL.Variant({
     'a' : IDL.Record({ 'b' : IDL.Text }),
-    'c' : IDL.Opt(IDL.Record({ 'd' : IDL.Text })),
+    'c' : IDL.Opt(
+      IDL.Record({
+        'd' : IDL.Text,
+        'e' : IDL.Vec(IDL.Record({ 'f' : IDL.Nat })),
+      })
+    ),
   });
   const A = B;
   B.fill(IDL.Opt(A));
