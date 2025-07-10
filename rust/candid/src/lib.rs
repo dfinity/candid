@@ -10,6 +10,7 @@
 //! Candid provides efficient, flexible and safe ways of converting data between each of these representations.
 //!
 //! ## Operating on native Rust values
+//!
 //! We are using a builder pattern to encode/decode Candid messages, see [`candid::ser::IDLBuilder`](ser/struct.IDLBuilder.html) for serialization and [`candid::de::IDLDeserialize`](de/struct.IDLDeserialize.html) for deserialization.
 //!
 //! ```
@@ -70,6 +71,7 @@
 //! we can decode a Candid `text` type into either `String` or `&str` in Rust.
 //!
 //! ## Operating on user defined struct/enum
+//!
 //! We use trait [`CandidType`](types/trait.CandidType.html) for serialization. Deserialization requires both [`CandidType`](types/trait.CandidType.html) and Serde's [`Deserialize`](trait.Deserialize.html) trait.
 //! Any type that implements these two traits can be used for serialization and deserialization.
 //! This includes built-in Rust standard library types like `Vec<T>` and `Result<T, E>`, as well as any structs
@@ -78,6 +80,7 @@
 //! We do not use Serde's `Serialize` trait because Candid requires serializing types along with the values.
 //! This is difficult to achieve in `Serialize`, especially for enum types. Besides serialization, [`CandidType`](types/trait.CandidType.html)
 //! trait also converts Rust type to Candid type defined as [`candid::types::Type`](types/internal/enum.Type.html).
+//!
 //! ```
 //! #[cfg(feature = "serde_bytes")]
 //! # fn f() -> Result<(), candid::Error> {
@@ -99,18 +102,32 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! Note that if you are deriving `Deserialize` trait from Candid, you need to import `serde` as a dependency in
+//! your project, as the derived implementation will refer to the `serde` crate.
+//!
+//! ## Supported `serde` Attributes
+//!
+//! Due to fundamental differences between Candid's type system and the general `serde` data model,
+//! we cannot support all `serde` attributes. The following attributes are officially supported
+//! when working with `CandidType` and guaranteed to function correctly:
+//!
+//! ### 1. `rename`
+//!
 //! We support serde's rename attributes for each field, namely `#[serde(rename = "foo")]`
 //! and `#[serde(rename(serialize = "foo", deserialize = "foo"))]`.
 //! This is useful when interoperating between Rust and Motoko canisters involving variant types, because
 //! they use different naming conventions for field names.
 //!
+//! Please note that `rename_all` and `rename_all_fields` are not supported.
+//!
+//! ### 2. `serde_bytes`
+//!
 //! We support `#[serde(with = "serde_bytes")]` for efficient handling of `&[u8]` and `Vec<u8>`. You can
 //! also use the wrapper type `serde_bytes::ByteBuf` and `serde_bytes::Bytes`.
 //!
-//! Note that if you are deriving `Deserialize` trait from Candid, you need to import `serde` as a dependency in
-//! your project, as the derived implementation will refer to the `serde` crate.
-//!
 //! ## Operating on big integers
+//!
 //! To support big integer types [`Candid::Int`](types/number/struct.Int.html) and [`Candid::Nat`](types/number/struct.Nat.html),
 //! we use the `num_bigint` crate. We provide interface to convert `i64`, `u64`, `&str` and `&[u8]` to big integers.
 //! You can also use `i128` and `u128` to represent Candid `int` and `nat` types respectively (decoding will fail if
@@ -130,6 +147,7 @@
 //! ```
 //!
 //! ## Operating on reference types
+//!
 //! The type of function and service references cannot be derived automatically. We provide
 //! two macros [`define_function!`](macro.define_function.html) and [`define_service!`](macro.define_service.html) to help defining the reference types. To specify reference types in the macro, you need to use the corresponding Rust types,
 //! instead of the Candid types.
@@ -155,6 +173,7 @@
 //! ```
 //!
 //! ## Operating on untyped Candid values
+//!
 //! Any valid Candid value can be manipulated in an recursive enum representation [`candid::parser::value::IDLValue`](parser/value/enum.IDLValue.html).
 //! We use `ser.value_arg(v)` and `de.get_value::<IDLValue>()` for encoding and decoding the value.
 //! The use of Rust value and `IDLValue` can be intermixed.
@@ -183,10 +202,12 @@
 //! ```
 //!
 //! ## Building the library as a JS/Wasm package
+//!
 //! With the help of `wasm-bindgen` and `wasm-pack`, we can build the library as a Wasm binary and run in the browser.
 //! This is useful for client-side UIs and parsing did files in JavaScript.
 //!
 //! Create a new project with the following `Cargo.toml`.
+//!
 //! ```toml
 //! [lib]
 //! crate-type = ["cdylib"]
@@ -200,7 +221,9 @@
 //! lto = true
 //! opt-level = 'z'
 //! ```
+//!
 //! Expose the methods in `lib.rs`
+//!
 //! ```ignore
 //! use candid::TypeEnv;
 //! use candid_parser::{check_prog, IDLProg};
@@ -213,13 +236,17 @@
 //!   Some(candid_parser::bindings::javascript::compile(&env, &actor))
 //! }
 //! ```
+//!
 //! ### Building
+//!
 //! ```shell
 //! cargo install wasm-pack
 //! wasm-pack build --target bundler
 //! wasm-opt --strip-debug -Oz pkg/didc_bg.wasm -o pkg/didc_bg.wasm
 //! ```
+//!
 //! ### Usage
+//!
 //! ```js
 //! const didc = import("pkg/didc");
 //! didc.then((mod) => {
@@ -227,8 +254,6 @@
 //!   const js = mod.did_to_js(service);
 //! });
 //! ```
-//!
-//!
 
 // only enables the `doc_cfg` feature when
 // the `docsrs` configuration attribute is defined
