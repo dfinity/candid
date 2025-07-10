@@ -7,7 +7,7 @@ fn is_empty(doc: &RcDoc) -> bool {
     use pretty::Doc::*;
     match &**doc {
         Nil => true,
-        FlatAlt(t1, t2) => is_empty(t1) || is_empty(t2),
+        FlatAlt(t1, t2) => is_empty(t2) || is_empty(t1),
         Union(t1, t2) => is_empty(t1) && is_empty(t2),
         Group(t) | Nest(_, t) | Annotated((), t) => is_empty(t),
         _ => false,
