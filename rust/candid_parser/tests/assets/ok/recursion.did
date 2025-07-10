@@ -2,6 +2,7 @@ type A = B;
 type B = opt A;
 type list = opt node;
 type node = record { head : nat; tail : list };
+// Doc comment for service id
 type s = service { f : t; g : (list) -> (B, tree, stream) };
 type stream = opt record { head : nat; next : func () -> (stream) query };
 type t = func (server : s) -> ();
