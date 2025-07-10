@@ -1,4 +1,3 @@
-
 # Changelog
 
 ## Unreleased
@@ -98,6 +97,10 @@
 
 * Breaking changes:
   + The `didc test` subcommand has been removed.
+
+### candiff
+
+The source code of this tool has been removed, as it was deprecated in [PR#405](https://github.com/dfinity/candid/pull/405).
 
 ## 2025-05-15
 
