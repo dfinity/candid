@@ -27,6 +27,7 @@ type nested = record {
   40:nat;
   variant{ A; 0x2a; B; C };
 };
+// Doc comment for res type
 type res = variant {
   // Doc comment for Ok variant
   Ok: record{int;nat};

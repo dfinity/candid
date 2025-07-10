@@ -168,8 +168,11 @@ fn compiler_test(resource: &str) {
                     _ => (),
                 }
                 let mut output = mint.new_goldenfile(filename.with_extension("rs")).unwrap();
-                let (content, unused) = rust::compile(&config, &env, &actor, external);
-                assert!(unused.is_empty());
+                let (content, unused) = rust::compile(&config, &env, &actor, &prog, external);
+                assert!(
+                    unused.is_empty(),
+                    "Expected no unused fields, got {unused:?}"
+                );
                 writeln!(output, "{content}").unwrap();
             }
             {
