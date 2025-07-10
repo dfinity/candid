@@ -1,6 +1,6 @@
-type Func = func () -> (Service);
 type Service = service { f : Func };
 type Service2 = Service;
+type Func = func () -> (Service);
 service : {
   asArray : () -> (vec Service2, vec Func) query;
   asPrincipal : () -> (Service2, Func);

@@ -69,7 +69,7 @@ pub(crate) fn ident_string(id: &str) -> String {
     }
 }
 
-pub fn pp_text(id: &str) -> RcDoc {
+pub(crate) fn pp_text(id: &str) -> RcDoc {
     RcDoc::text(ident_string(id))
 }
 

@@ -1,6 +1,7 @@
+use candid::pretty::syntax::pretty_print;
 use candid::types::syntax::{Dec, IDLType};
 use candid::types::TypeEnv;
-use candid_parser::bindings::{candid::compile, javascript, motoko, rust, typescript};
+use candid_parser::bindings::{javascript, motoko, rust, typescript};
 use candid_parser::configs::Configs;
 use candid_parser::parse_idl_prog;
 use candid_parser::typing::{check_file, check_prog};
@@ -122,7 +123,7 @@ fn compiler_test(resource: &str) {
         Ok((env, actor, prog)) => {
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
-                let content = compile(&env, &actor, &prog);
+                let content = pretty_print(&prog);
                 // Type check output
                 let ast = parse_idl_prog(&content)
                     .unwrap_or_else(|_| panic!("failed to parse candid. Content: {content}"));

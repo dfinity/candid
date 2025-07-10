@@ -19,6 +19,22 @@ pub enum IDLType {
     PrincipalT,
 }
 
+impl IDLType {
+    pub fn is_tuple(&self) -> bool {
+        match self {
+            IDLType::RecordT(ref fs) => {
+                for (i, field) in fs.iter().enumerate() {
+                    if field.label.get_id() != (i as u32) {
+                        return false;
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct IDLTypes {
     pub args: Vec<IDLType>,
@@ -179,6 +195,10 @@ impl IDLMergedProg {
 
     pub fn decs(&self) -> Vec<Dec> {
         self.typ_decs.iter().map(|b| Dec::TypD(b.clone())).collect()
+    }
+
+    pub fn bindings(&self) -> impl Iterator<Item = &Binding> {
+        self.typ_decs.iter()
     }
 
     pub fn resolve_actor(&self) -> Result<Option<IDLActorType>> {

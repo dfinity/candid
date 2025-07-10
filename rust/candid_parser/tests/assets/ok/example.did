@@ -1,25 +1,16 @@
-type A = B;
-type B = opt A;
+// Doc comment for prim type
+type my_type = principal;
 // Doc comment for List
 type List = opt record {
   // Doc comment for List head
   head : int;
   // Doc comment for List tail
-  tail : List
+  tail : List;
 };
-type a = variant { a; b : b };
-type b = record { int; nat };
+type f = func (List, func (int32) -> (int64)) -> (opt List, res);
 // Doc comment for broker service
 type broker = service {
-  find : (name : text) -> (service { current : () -> (nat32); up : () -> () })
-};
-type f = func(List, func(int32) -> (int64)) -> (opt List, res);
-type list = opt node;
-// Doc comment for prim type
-type my_type = principal;
-type my_variant = variant {
-  a : record { b : text };
-  c : opt record { d : text; e : vec record { f : nat } }
+  find : (name : text) -> (service { current : () -> (nat32); up : () -> () });
 };
 // Doc comment for nested type
 type nested = record {
@@ -30,26 +21,8 @@ type nested = record {
   3 : record { 0 : nat; 42 : nat; 43 : nat8 };
   40 : nat;
   41 : variant { 42; A; B; C };
-  42 : nat
+  42 : nat;
 };
-// Doc comment for nested_records
-type nested_records = record {
-  // Doc comment for nested_records field nested
-  nested : opt record {
-    // Doc comment for nested_records field nested_field
-    nested_field : text
-  }
-};
-type nested_res = variant {
-  Ok : variant { Ok; Err };
-  Err : variant {
-    // Doc comment for Ok in nested variant
-    Ok : record { content : text };
-    // Doc comment for Err in nested variant
-    Err : record { int }
-  }
-};
-type node = record { head : nat; tail : list };
 // Doc comment for res type
 type res = variant {
   // Doc comment for Ok variant
@@ -58,35 +31,79 @@ type res = variant {
   Err : record {
     // Doc comment for error field in Err variant,
     // on multiple lines
-    error : text
-  }
+    error : text;
+  };
+};
+type nested_res = variant {
+  Ok : variant { Ok; Err };
+  Err : variant {
+    // Doc comment for Ok in nested variant
+    Ok : record { content : text };
+    // Doc comment for Err in nested variant
+    Err : record { int };
+  };
+};
+// Doc comment for nested_records
+type nested_records = record {
+  // Doc comment for nested_records field nested
+  nested : opt record {
+    // Doc comment for nested_records field nested_field
+    nested_field : text;
+  };
+};
+type my_variant = variant {
+  // Doc comment for my_variant field a
+  a : record {
+    // Doc comment for my_variant field a field b
+    b : text;
+  };
+  // Doc comment for my_variant field c
+  c : opt record {
+    // Doc comment for my_variant field c field d
+    d : text;
+    e : vec record {
+      // Doc comment for my_variant field c field e inner vec element
+      f : nat;
+    };
+  };
+};
+type A = B;
+type B = opt A;
+type node = record { head : nat; tail : list };
+type list = opt node;
+type tree = variant {
+  branch : record { val : int; left : tree; right : tree };
+  leaf : int;
 };
 // Doc comment for service id
 type s = service { f : t; g : (list) -> (B, tree, stream) };
-type stream = opt record { head : nat; next : func() -> (stream) query };
-type t = func(server : s) -> ();
-type tree = variant {
-  branch : record { val : int; left : tree; right : tree };
-  leaf : int
-};
+type t = func (server : s) -> ();
+type stream = opt record { head : nat; next : func () -> (stream) query };
+type b = record { int; nat };
+type a = variant { a; b : b };
 // Doc comment for service
 service : {
   // Doc comment for f1 method of service
   f1 : (list, test : blob, opt bool) -> () oneway;
   g1 : (my_type, List, opt List, nested) -> (int, broker, nested_res) query;
   h : (vec opt text, variant { A : nat; B : opt text }, opt List) -> (
-    record { 42 : record {}; id : nat }
-  );
+      record {
+        // Doc comment for 0x2a field in h method return, currently ignored
+        42 : record {};
+        // Doc comment for id field in h method return, currently ignored
+        id : nat;
+      },
+    );
   // Doc comment for i method of service
   i : f;
   x : (a, b) -> (
-    opt a,
-    opt b,
-    variant { Ok : record { result : text }; Err : variant { a; b } }
-  ) composite_query;
+      opt a,
+      opt b,
+      variant { Ok : record { result : text }; Err : variant { a; b } },
+    ) composite_query;
   y : (nested_records) -> (record { nested_records; my_variant }) query;
   f : t;
   g : (list) -> (B, tree, stream);
   // Doc comment for imported bbbbb service method
-  bbbbb : (b) -> ()
+  bbbbb : (b) -> ();
 }
