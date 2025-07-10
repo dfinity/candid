@@ -51,7 +51,7 @@ We provide a [test suite](test/) to check Candid implementations for compliance.
 
 To make a release in this repo:
 
-* Update `Changelog.md` and merge the PR into master.
+* Update `CHANGELOG.md` and merge the PR into master.
 * `git tag 2020-04-01 -m "2020-04-01"`
 * `git push origin 2020-04-01`
 
