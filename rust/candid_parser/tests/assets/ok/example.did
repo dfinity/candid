@@ -11,7 +11,7 @@ type list = opt node;
 type my_type = principal;
 type my_variant = variant {
   a : record { b : text };
-  c : opt record { d : text };
+  c : opt record { d : text; e : vec record { f : nat } };
 };
 type nested = record {
   0 : nat;

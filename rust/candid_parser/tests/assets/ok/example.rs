@@ -101,9 +101,15 @@ pub(crate) struct NestedRecords {
   pub(crate) nested: Option<NestedRecordsNestedInner>,
 }
 #[derive(CandidType, Deserialize, Debug)]
+pub(crate) struct MyVariantCInnerEItem {
+  /// Doc comment for my_variant field c field e inner vec element
+  pub(crate) f: u128,
+}
+#[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct MyVariantCInner {
   /// Doc comment for my_variant field c field d
   pub(crate) d: String,
+  pub(crate) e: Vec<MyVariantCInnerEItem>,
 }
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) enum MyVariant {

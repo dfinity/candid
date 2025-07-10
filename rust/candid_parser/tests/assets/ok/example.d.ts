@@ -53,6 +53,14 @@ export type my_variant = {
          * Doc comment for my_variant field c field d
          */
         'd' : string,
+        'e' : Array<
+          {
+            /**
+             * Doc comment for my_variant field c field e inner vec element
+             */
+            'f' : bigint,
+          }
+        >,
       }
     ]
   };
