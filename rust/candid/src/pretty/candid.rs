@@ -145,8 +145,8 @@ pub(crate) fn pp_field(field: &Field, is_variant: bool) -> RcDoc {
 }
 
 fn pp_fields(fs: &[Field], is_variant: bool) -> RcDoc {
-    let fields = concat(fs.iter().map(|f| pp_field(f, is_variant)), ";");
-    enclose_space("{", fields, "}")
+    let fields = fs.iter().map(|f| pp_field(f, is_variant));
+    enclose_space("{", concat(fields, ";"), "}")
 }
 
 pub fn pp_function(func: &Function) -> RcDoc {
@@ -484,14 +484,14 @@ pub mod value {
                 if matches!(vs.first(), Some(Nat8(_))) || vs.len() > MAX_ELEMENTS_FOR_PRETTY_PRINT {
                     RcDoc::as_string(format!("{v:?}"))
                 } else {
-                    let body = concat(vs.iter().map(|v| pp_value(depth - 1, v)), ";");
-                    kwd("vec").append(enclose_space("{", body, "}"))
+                    let values = vs.iter().map(|v| pp_value(depth - 1, v));
+                    kwd("vec").append(enclose_space("{", concat(values, ";"), "}"))
                 }
             }
             Record(fields) => {
                 if is_tuple(v) {
-                    let tuple = concat(fields.iter().map(|f| pp_value(depth - 1, &f.val)), ";");
-                    kwd("record").append(enclose_space("{", tuple, "}"))
+                    let fields = fields.iter().map(|f| pp_value(depth - 1, &f.val));
+                    kwd("record").append(enclose_space("{", concat(fields, ";"), "}"))
                 } else {
                     kwd("record").append(pp_fields(depth, fields))
                 }
@@ -504,12 +504,10 @@ pub mod value {
     }
 
     pub fn pp_args(args: &IDLArgs) -> RcDoc {
-        let body = concat(
-            args.args
-                .iter()
-                .map(|v| pp_value(MAX_ELEMENTS_FOR_PRETTY_PRINT, v)),
-            ",",
-        );
-        enclose("(", body, ")")
+        let args = args
+            .args
+            .iter()
+            .map(|v| pp_value(MAX_ELEMENTS_FOR_PRETTY_PRINT, v));
+        enclose("(", concat(args, ","), ")")
     }
 }
