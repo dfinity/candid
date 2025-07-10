@@ -1,7 +1,5 @@
 use crate::pretty::utils::*;
-use crate::types::{
-    ArgType, Field, FuncMode, Function, Label, SharedLabel, Type, TypeEnv, TypeInner,
-};
+use crate::types::{ArgType, Field, FuncMode, Function, Label, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
 static KEYWORDS: [&str; 30] = [
@@ -128,8 +126,8 @@ pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
     }
 }
 
-pub fn pp_label(id: &SharedLabel) -> RcDoc {
-    match &**id {
+pub fn pp_label(id: &Label) -> RcDoc {
+    match id {
         Label::Named(id) => pp_text(id),
         Label::Id(_) | Label::Unnamed(_) => RcDoc::as_string(id),
     }
@@ -238,7 +236,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 #[cfg_attr(docsrs, doc(cfg(feature = "value")))]
 #[cfg(feature = "value")]
 pub mod value {
-    use super::{ident_string, pp_text};
+    use super::{ident_string, pp_label};
     use crate::pretty::utils::*;
     use crate::types::value::{IDLArgs, IDLField, IDLValue};
     use crate::types::Label;
@@ -437,13 +435,6 @@ pub mod value {
                 true
             }
             _ => false,
-        }
-    }
-
-    fn pp_label(id: &Label) -> RcDoc {
-        match id {
-            Label::Named(id) => pp_text(id),
-            Label::Id(_) | Label::Unnamed(_) => RcDoc::as_string(id),
         }
     }
 

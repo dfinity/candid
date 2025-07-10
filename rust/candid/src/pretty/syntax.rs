@@ -2,15 +2,11 @@ use pretty::RcDoc;
 
 use crate::{
     pretty::{
-        candid::{pp_modes, pp_text},
+        candid::{pp_label, pp_modes, pp_text},
         utils::{concat, enclose, enclose_space, ident, kwd, lines, str, INDENT_SPACE, LINE_WIDTH},
     },
-    types::{
-        syntax::{
-            Binding, FuncType, IDLActorType, IDLArgType, IDLMergedProg, IDLType, PrimType,
-            TypeField,
-        },
-        Label,
+    types::syntax::{
+        Binding, FuncType, IDLActorType, IDLArgType, IDLMergedProg, IDLType, PrimType, TypeField,
     },
 };
 
@@ -57,13 +53,6 @@ fn pp_ty(ty: &IDLType) -> RcDoc {
                 _ => unreachable!(),
             }
         }
-    }
-}
-
-fn pp_label(id: &Label) -> RcDoc {
-    match id {
-        Label::Named(id) => pp_text(id),
-        Label::Id(_) | Label::Unnamed(_) => RcDoc::as_string(id),
     }
 }
 
