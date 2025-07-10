@@ -6,6 +6,9 @@ export type A = B;
 export type B = [] | [A];
 export type list = [] | [node];
 export interface node { 'head' : bigint, 'tail' : list }
+/**
+ * Doc comment for service id
+ */
 export interface s { 'f' : t, 'g' : ActorMethod<[list], [B, tree, stream]> }
 export type stream = [] | [{ 'head' : bigint, 'next' : [Principal, string] }];
 export type t = ActorMethod<[Principal], undefined>;

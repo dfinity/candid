@@ -6,22 +6,25 @@ use pretty::RcDoc;
 use std::collections::BTreeSet;
 
 // The definition of tuple is language specific.
-pub(crate) fn is_tuple(t: &Type) -> bool {
+fn is_tuple(t: &Type) -> bool {
     match t.as_ref() {
-        TypeInner::Record(ref fs) => {
-            if fs.is_empty() {
-                return false;
-            }
-            for (i, field) in fs.iter().enumerate() {
-                if field.id.get_id() != (i as u32) {
-                    return false;
-                }
-            }
-            true
-        }
+        TypeInner::Record(ref fs) => is_tuple_fields(fs),
         _ => false,
     }
 }
+
+pub(crate) fn is_tuple_fields(fs: &[Field]) -> bool {
+    if fs.is_empty() {
+        return false;
+    }
+    for (i, field) in fs.iter().enumerate() {
+        if field.id.get_id() != (i as u32) {
+            return false;
+        }
+    }
+    true
+}
+
 static KEYWORDS: [&str; 64] = [
     "abstract",
     "arguments",
