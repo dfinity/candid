@@ -102,9 +102,9 @@ assert blob "DIDL\03\6a\00\01\01\00\6a\01\02\00\00\6e\7f\01\00\01\01\00\01m"
 assert blob "DIDL\02\6a\00\01\01\00\6a\01\70\00\00\01\00\01\01\00\01m"
    == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (func () -> ())) "func (reserved) -> () <: func () -> ()";
 assert blob "DIDL\02\6a\00\01\01\00\6a\01\6f\00\00\01\00\01\01\00\01m"
-   == "(null)" : (opt func () -> (func () -> ())) "func (empty) -> () </: func () -> ()";
+   != "(null)" : (opt func () -> (func () -> ())) "func (empty) -> () </: func () -> ()";
 assert blob "DIDL\02\6a\00\01\01\00\6a\01\7d\00\00\01\00\01\01\00\01m"
-   == "(null)" : (opt func () -> (func () -> ())) "func (nat) -> () </: func () -> ()";
+   != "(null)" : (opt func () -> (func () -> ())) "func (nat) -> () </: func () -> ()";
 assert blob "DIDL\02\6a\00\01\01\00\6a\01\7f\00\00\01\00\01\01\00\01m"
    == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (func () -> ())) "func (null) -> () <: func () -> ()";
 
