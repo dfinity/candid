@@ -143,7 +143,7 @@ fn subtype_(
             let args2 = to_tuple(&f2_args);
             let rets1 = to_tuple(&f1.rets);
             let rets2 = to_tuple(&f2.rets);
-            subtype_(report, gamma, env, &args2, &args1)
+            subtype_(report, gamma, env, &args1, &args2)
                 .context("Subtype fails at function input type")?;
             subtype_(report, gamma, env, &rets1, &rets2)
                 .context("Subtype fails at function return type")?;
