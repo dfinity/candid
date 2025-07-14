@@ -69,7 +69,7 @@ fn subtype_(
             Ok(())
         }
         (_, Opt(_)) => {
-            let msg = format!("WARNING: {t1} <: {t2} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/master/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.");
+            let msg = format!("WARNING: {t1} <: {t2} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/c7659ca/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.");
             match report {
                 OptReport::Silence => (),
                 OptReport::Warning => eprintln!("{msg}"),
