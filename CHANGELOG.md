@@ -88,6 +88,27 @@
       ```
   + Adds the `IDLMergedProg` struct, used to collect the syntax types when parsing Candid declarations.
   + Supports reflecting doc comments from Candid declarations to the Motoko generated bindings. The `candid_parser::bindings::motoko::compile` function now takes a `&IDLMergedProg` parameter.
+  + Supports reflecting doc comments from Rust canister methods to the Candid generated bindings. Example:
+    ```rust
+    /// Doc comment for greet,
+    /// even on multiple lines
+    #[candid_method(query)]
+    fn greet(name: &str) -> String {
+      format!("Hello, {name}!")
+    }
+    ```
+    The generated Candid bindings will then look like this:
+    ```candid
+    service : {
+      // Doc comment for greet,
+      // even on multiple lines
+      greet : (text) -> (text);
+    }
+    ```
+
+    To support this feature, hhe following have been added:
+    - `candid::pretty::candid::DocComments` struct, which is used to collect doc comments from Rust canister methods, in the `candid_derive::export_service` macro.
+    - `candid::pretty::candid::compile_with_docs` function, which takes a `&DocComments` parameter.
 
 ### candid_derive
 

@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+
+use crate::pretty::syntax::pp_docs;
 use crate::pretty::utils::*;
 use crate::types::{ArgType, Field, FuncMode, Function, Label, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
@@ -111,15 +114,8 @@ pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
         }
         Variant(ref fs) => kwd("variant").append(pp_fields(fs, true)),
         Func(ref func) => kwd("func").append(pp_function(func)),
-        Service(ref serv) => kwd("service").append(pp_service(serv)),
-        Class(ref args, ref t) => {
-            let doc = pp_args(args).append(" ->").append(RcDoc::space());
-            match t.as_ref() {
-                Service(ref serv) => doc.append(pp_service(serv)),
-                Var(ref s) => doc.append(s),
-                _ => unreachable!(),
-            }
-        }
+        Service(ref serv) => kwd("service").append(pp_service(serv, None)),
+        Class(ref args, ref t) => pp_class(args, t, None),
         Knot(ref id) => RcDoc::text(format!("{id}")),
         Unknown => str("unknown"),
         Future => str("future"),
@@ -185,15 +181,19 @@ pub fn pp_modes(modes: &[FuncMode]) -> RcDoc {
     RcDoc::concat(modes.iter().map(|m| RcDoc::space().append(pp_mode(m))))
 }
 
-fn pp_service(serv: &[(String, Type)]) -> RcDoc {
+fn pp_service<'a>(serv: &'a [(String, Type)], docs: Option<&'a DocComments>) -> RcDoc<'a> {
     let doc = concat(
         serv.iter().map(|(id, func)| {
+            let doc = docs
+                .and_then(|docs| docs.lookup_service_method(id))
+                .map(|docs| pp_docs(docs))
+                .unwrap_or(RcDoc::nil());
             let func_doc = match func.as_ref() {
                 TypeInner::Func(ref f) => pp_function(f),
                 TypeInner::Var(_) => pp_ty(func),
                 _ => unreachable!(),
             };
-            pp_text(id).append(kwd(" :")).append(func_doc)
+            doc.append(pp_text(id)).append(kwd(" :")).append(func_doc)
         }),
         ";",
     );
@@ -210,10 +210,20 @@ fn pp_defs(env: &TypeEnv) -> RcDoc {
     }))
 }
 
-fn pp_actor(ty: &Type) -> RcDoc {
+fn pp_class<'a>(args: &'a [ArgType], t: &'a Type, docs: Option<&'a DocComments>) -> RcDoc<'a> {
+    let doc = pp_args(args).append(" ->").append(RcDoc::space());
+    match t.as_ref() {
+        TypeInner::Service(ref serv) => doc.append(pp_service(serv, docs)),
+        TypeInner::Var(ref s) => doc.append(s),
+        _ => unreachable!(),
+    }
+}
+
+fn pp_actor<'a>(ty: &'a Type, docs: &'a DocComments) -> RcDoc<'a> {
     match ty.as_ref() {
-        TypeInner::Service(ref serv) => pp_service(serv),
-        TypeInner::Var(_) | TypeInner::Class(_, _) => pp_ty(ty),
+        TypeInner::Service(ref serv) => pp_service(serv, Some(docs)),
+        TypeInner::Class(ref args, ref t) => pp_class(args, t, Some(docs)),
+        TypeInner::Var(_) => pp_ty(ty),
         _ => unreachable!(),
     }
 }
@@ -221,12 +231,48 @@ fn pp_actor(ty: &Type) -> RcDoc {
 pub fn pp_init_args<'a>(env: &'a TypeEnv, args: &'a [ArgType]) -> RcDoc<'a> {
     pp_defs(env).append(pp_args(args))
 }
+
+/// Collects doc comments that can be passed to the [compile_with_docs] function.
+#[derive(Default, Debug)]
+pub struct DocComments {
+    service_methods: HashMap<String, Vec<String>>,
+}
+
+impl DocComments {
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    pub fn add_service_method(&mut self, method: String, doc: Vec<String>) {
+        self.service_methods.insert(method, doc);
+    }
+
+    pub fn lookup_service_method(&self, method: &str) -> Option<&Vec<String>> {
+        self.service_methods.get(method)
+    }
+}
+
 pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
+    compile_with_docs(env, actor, &DocComments::empty())
+}
+
+/// Same as [compile], but also accepts doc comments that are printed in the generated Candid bindings.
+///
+/// This is useful when generating Candid bindings for Rust canister methods.
+///
+/// # Example
+///
+/// ```ignore
+/// let mut doc_comments = DocComments::empty();
+/// doc_comments.add_service_method("method_name".to_string(), vec!["Doc comment line 1".to_string(), "Doc comment line 2".to_string()]);
+/// let candid = compile_with_docs(&env, &actor, &doc_comments);
+/// ```
+pub fn compile_with_docs(env: &TypeEnv, actor: &Option<Type>, docs: &DocComments) -> String {
     match actor {
         None => pp_defs(env).pretty(LINE_WIDTH).to_string(),
         Some(actor) => {
             let defs = pp_defs(env);
-            let actor = kwd("service :").append(pp_actor(actor));
+            let actor = kwd("service :").append(pp_actor(actor, docs));
             let doc = defs.append(actor);
             doc.pretty(LINE_WIDTH).to_string()
         }
