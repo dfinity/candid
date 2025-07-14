@@ -10,7 +10,7 @@
 
 * Non-breaking changes:
   + The following structs have been moved from the `candid_parser` crate to the `candid::types::syntax` module. See the `candid_parser`'s changelog for more details.
-  + Changes the warning message for the special opt subtyping rule to be more explicit in `candid::types::subtype::subtype` and `candid::types::subtype::subtype_with_config` functions.
+  + Makes the warning message for the special opt subtyping rule more explicit in the `candid::types::subtype::subtype` and `candid::types::subtype::subtype_with_config` functions.
 
 ### candid_parser
 
