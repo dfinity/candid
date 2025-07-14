@@ -20,6 +20,7 @@
     - `Binding`
     - `IDLProg`
     - `IDLInitArgs`
+  + Changes the warning message for the special opt subtyping rule to be more explicit in `candid::types::subtype::subtype` and `candid::types::subtype::subtype_with_config` functions.
 
 ### candid_parser
 
