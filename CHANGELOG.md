@@ -83,6 +83,27 @@
     - The `candid_parser::bindings::rust::compile` function now takes an additional `&IDLMergedProg` parameter.
     - The `candid_parser::bindings::typescript::compile` function now takes an additional `&IDLMergedProg` parameter.
     - The `candid::pretty::syntax` module has been added. It exposes the `pretty_print` function, which is used to pretty print the `IDLMergedProg` struct. The behavior is similar to the already existing `candid::pretty::candid::compile` function, but uses the syntax types instead of the candid types.
+  + Supports reflecting doc comments from Rust canister methods to the Candid generated bindings. Example:
+    ```rust
+    /// Doc comment for greet,
+    /// even on multiple lines
+    #[candid_method(query)]
+    fn greet(name: &str) -> String {
+      format!("Hello, {name}!")
+    }
+    ```
+    The generated Candid bindings will then look like this:
+    ```candid
+    service : {
+      // Doc comment for greet,
+      // even on multiple lines
+      greet : (text) -> (text);
+    }
+    ```
+
+    To support this feature, hhe following have been added:
+    - `candid::pretty::candid::DocComments` struct, which is used to collect doc comments from Rust canister methods, in the `candid_derive::export_service` macro.
+    - `candid::pretty::candid::compile_with_docs` function, which takes a `&DocComments` parameter.
 
 ### candid_derive
 

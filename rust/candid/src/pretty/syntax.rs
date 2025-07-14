@@ -153,7 +153,7 @@ fn pp_defs(prog: &IDLMergedProg) -> RcDoc {
     }))
 }
 
-fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
+pub(crate) fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
     lines(docs.iter().map(|line| RcDoc::text("// ").append(line)))
 }
 
