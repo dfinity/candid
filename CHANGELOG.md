@@ -9,17 +9,7 @@
   + `pretty::candid::pp_label` now takes a `&Label` parameter, instead of a `&SharedLabel`.
 
 * Non-breaking changes:
-  + The following structs have been moved from the `candid_parser` crate to the `candid::types::syntax` module:
-    - `IDLType`
-    - `IDLTypes`
-    - `PrimType`
-    - `FuncType`
-    - `IDLArgType`
-    - `TypeField`
-    - `Dec`
-    - `Binding`
-    - `IDLProg`
-    - `IDLInitArgs`
+  + The following structs have been moved from the `candid_parser` crate to the `candid::types::syntax` module. See the `candid_parser`'s changelog for more details.
 
 ### candid_parser
 
@@ -87,7 +77,11 @@
       };
       ```
   + Adds the `IDLMergedProg` struct, used to collect the syntax types when parsing Candid declarations.
-  + Supports reflecting doc comments from Candid declarations to the Motoko generated bindings. The `candid_parser::bindings::motoko::compile` function now takes a `&IDLMergedProg` parameter.
+  + Supports reflecting doc comments from Candid declarations to the generated bindings. To enable this feature, we had to change the following:
+    - The `candid_parser::bindings::motoko::compile` function now takes an additional `&IDLMergedProg` parameter.
+    - The `candid_parser::bindings::rust::compile` function now takes an additional `&IDLMergedProg` parameter.
+    - The `candid_parser::bindings::typescript::compile` function now takes an additional `&IDLMergedProg` parameter.
+    - The `candid::pretty::syntax` module has been added. It exposes the `pretty_print` function, which is used to pretty print the `IDLMergedProg` struct. The behavior is similar to the already existing `candid::pretty::candid::compile` function, but uses the syntax types instead of the candid types.
 
 ### candid_derive
 
