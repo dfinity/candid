@@ -1,10 +1,10 @@
-use candid::pretty::syntax::pretty_print;
-use candid::types::syntax::{Dec, IDLType};
 use candid::types::TypeEnv;
-use candid_parser::bindings::{javascript, motoko, rust, typescript};
-use candid_parser::configs::Configs;
-use candid_parser::parse_idl_prog;
-use candid_parser::typing::{check_file, check_prog};
+use candid_parser::{
+    bindings::{javascript, motoko, rust, typescript},
+    configs::Configs,
+    syntax::{pretty_print, Dec, IDLProg, IDLType},
+    typing::{check_file, check_prog},
+};
 use goldenfile::Mint;
 use std::io::Write;
 use std::path::Path;
@@ -36,7 +36,7 @@ service server : {
   i : f;
 }
     "#;
-    let ast = parse_idl_prog(prog).unwrap();
+    let ast = prog.parse::<IDLProg>().unwrap();
 
     // Assert doc comments
     let actor = ast.actor.unwrap();
@@ -125,7 +125,8 @@ fn compiler_test(resource: &str) {
                 let mut output = mint.new_goldenfile(filename.with_extension("did")).unwrap();
                 let content = pretty_print(&prog);
                 // Type check output
-                let ast = parse_idl_prog(&content)
+                let ast = content
+                    .parse::<IDLProg>()
                     .unwrap_or_else(|_| panic!("failed to parse candid. Content: {content}"));
                 check_prog(&mut TypeEnv::new(), &ast).unwrap();
                 writeln!(output, "{content}").unwrap();

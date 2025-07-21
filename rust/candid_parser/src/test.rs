@@ -1,6 +1,6 @@
 use super::typing::check_prog;
+use crate::syntax::{Dec, IDLProg, IDLType};
 use crate::{Error, Result};
-use candid::types::syntax::{Dec, IDLProg, IDLType};
 use candid::types::value::IDLArgs;
 use candid::types::{Type, TypeEnv};
 use candid::DecoderConfig;

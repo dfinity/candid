@@ -1,16 +1,14 @@
 //! When serializing or deserializing Candid goes wrong.
 
-use candid::types::syntax::{IDLProg, IDLTypes};
+use crate::token;
 use codespan_reporting::diagnostic::Label;
-use std::io;
-use thiserror::Error;
-
-use crate::{parse_idl_prog, parse_idl_types, token};
 use codespan_reporting::{
     diagnostic::Diagnostic,
     files::{Error as ReportError, SimpleFile},
     term::{self, termcolor::StandardStream},
 };
+use std::io;
+use thiserror::Error;
 
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
@@ -106,20 +104,11 @@ impl From<toml::de::Error> for Error {
     }
 }
 
-/// Does not work for parsing [IDLProg] and [IDLTypes], use [pretty_parse_idl_prog] and [pretty_parse_idl_types] instead.
 pub fn pretty_parse<T>(name: &str, str: &str) -> Result<T>
 where
     T: std::str::FromStr<Err = Error>,
 {
     str.parse::<T>().or_else(|e| pretty_print_err(name, str, e))
-}
-
-pub fn pretty_parse_idl_prog(name: &str, str: &str) -> Result<IDLProg> {
-    parse_idl_prog(str).or_else(|e| pretty_print_err(name, str, e))
-}
-
-pub fn pretty_parse_idl_types(name: &str, str: &str) -> Result<IDLTypes> {
-    parse_idl_types(str).or_else(|e| pretty_print_err(name, str, e))
 }
 
 /// Wrap the parser error and pretty print the error message.

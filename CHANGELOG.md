@@ -9,30 +9,12 @@
   + `pretty::candid::pp_label` now takes a `&Label` parameter, instead of a `&SharedLabel`.
 
 * Non-breaking changes:
-  + The following structs have been moved from the `candid_parser` crate to the `candid::types::syntax` module. See the `candid_parser`'s changelog for more details.
   + Makes the warning message for the special opt subtyping rule more explicit in the `candid::types::subtype::subtype` and `candid::types::subtype::subtype_with_config` functions.
 
 ### candid_parser
 
 * Breaking changes:
-  + The following structs have been moved to the `candid` crate:
-    - `IDLType`
-    - `IDLTypes`
-    - `PrimType`
-    - `FuncType`
-    - `IDLArgType`
-    - `TypeField`
-    - `Dec`
-    - `Binding`
-    - `IDLProg`
-    - `IDLInitArgs`
-    As a consequence, the `FromStr` trait is no longer implemented for the following types:
-      - `IDLProg`
-      - `IDLInitArgs`
-      - `IDLType`
-      - `IDLTypes`
-    You must now use the `parse_idl_prog`, `parse_idl_init_args`, `parse_idl_type` and `parse_idl_types` functions to parse these types, respectively.
-  + `pretty_parse` doesn't work anymore with the `IDLProg` and `IDLTypes` types. Use `pretty_parse_idl_prog` and `pretty_parse_idl_types` instead.
+  + The `candid_parser::types` module has been renamed to `candid_parser::syntax`.
   + The `args` field in both `FuncType` and `IDLInitArgs` now have type `Vec<IDLArgType>`.
 
 * Non-breaking changes:

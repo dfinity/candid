@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::pretty::syntax::pp_docs;
 use crate::pretty::utils::*;
 use crate::types::{ArgType, Field, FuncMode, Function, Label, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
@@ -62,7 +61,7 @@ fn needs_quote(id: &str) -> bool {
     !is_valid_as_id(id) || is_keyword(id)
 }
 
-pub(crate) fn ident_string(id: &str) -> String {
+fn ident_string(id: &str) -> String {
     if needs_quote(id) {
         format!("\"{}\"", id.escape_debug())
     } else {
@@ -70,7 +69,7 @@ pub(crate) fn ident_string(id: &str) -> String {
     }
 }
 
-pub(crate) fn pp_text(id: &str) -> RcDoc {
+pub fn pp_text(id: &str) -> RcDoc {
     RcDoc::text(ident_string(id))
 }
 
@@ -120,6 +119,10 @@ pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
         Unknown => str("unknown"),
         Future => str("future"),
     }
+}
+
+pub fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
+    lines(docs.iter().map(|line| RcDoc::text("// ").append(line)))
 }
 
 pub fn pp_label(id: &Label) -> RcDoc {

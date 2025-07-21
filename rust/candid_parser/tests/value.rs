@@ -1,7 +1,12 @@
-use candid::types::value::{IDLArgs, IDLField, IDLValue, VariantValue};
-use candid::types::{Label, TypeEnv};
-use candid::{decode_args, decode_one, Decode};
-use candid_parser::{parse_idl_args, parse_idl_prog, typing::check_prog};
+use candid::{
+    decode_args, decode_one,
+    types::{
+        value::{IDLArgs, IDLField, IDLValue, VariantValue},
+        Label, TypeEnv,
+    },
+    Decode,
+};
+use candid_parser::{parse_idl_args, syntax::IDLProg, typing::check_prog};
 
 #[test]
 fn test_parser() {
@@ -31,7 +36,7 @@ service : {
   f : f;
 }
 "#;
-    let ast = parse_idl_prog(candid).unwrap();
+    let ast = candid.parse::<IDLProg>().unwrap();
     let mut env = TypeEnv::new();
     let actor = check_prog(&mut env, &ast).unwrap().unwrap();
     let method = env.get_method(&actor, "f").unwrap();
