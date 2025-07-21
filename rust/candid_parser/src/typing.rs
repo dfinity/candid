@@ -1,11 +1,12 @@
-use crate::{parse_idl_prog, pretty_parse_idl_prog, Error, Result};
-use candid::types::{
+use crate::{
+    pretty_parse,
     syntax::{
         Binding, Dec, IDLActorType, IDLArgType, IDLInitArgs, IDLMergedProg, IDLProg, IDLType,
         PrimType, TypeField,
     },
-    ArgType, Field, Function, Type, TypeEnv, TypeInner,
+    Error, Result,
 };
+use candid::types::{ArgType, Field, Function, Type, TypeEnv, TypeInner};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -228,7 +229,7 @@ fn load_imports(
     base: &Path,
     visited: &mut BTreeMap<PathBuf, bool>,
     prog: &IDLProg,
-    list: &mut Vec<(PathBuf, String)>,
+    list: &mut Vec<(PathBuf, String, IDLProg)>,
 ) -> Result<()> {
     for dec in prog.decs.iter() {
         let include_serv = matches!(dec, Dec::ImportServ(_));
@@ -240,14 +241,14 @@ fn load_imports(
                     visited.insert(path.clone(), include_serv);
                     let code = std::fs::read_to_string(&path)
                         .map_err(|_| Error::msg(format!("Cannot import {file:?}")))?;
-                    let code = if is_pretty {
-                        pretty_parse_idl_prog(path.to_str().unwrap(), &code)?
+                    let prog = if is_pretty {
+                        pretty_parse::<IDLProg>(path.to_str().unwrap(), &code)?
                     } else {
-                        parse_idl_prog(&code)?
+                        code.parse::<IDLProg>()?
                     };
                     let base = path.parent().unwrap();
-                    load_imports(is_pretty, base, visited, &code, list)?;
-                    list.push((path, file.to_string()));
+                    load_imports(is_pretty, base, visited, &prog, list)?;
+                    list.push((path, file.to_string(), prog));
                 }
             }
         }
@@ -292,19 +293,17 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>, I
     let prog =
         std::fs::read_to_string(file).map_err(|_| Error::msg(format!("Cannot open {file:?}")))?;
     let prog = if is_pretty {
-        pretty_parse_idl_prog(file.to_str().unwrap(), &prog)?
+        pretty_parse::<IDLProg>(file.to_str().unwrap(), &prog)?
     } else {
-        parse_idl_prog(&prog)?
+        prog.parse::<IDLProg>()?
     };
     let mut visited = BTreeMap::new();
     let mut imports = Vec::new();
     load_imports(is_pretty, &base, &mut visited, &prog, &mut imports)?;
 
     let mut merged_prog: IDLMergedProg = IDLMergedProg::new(prog);
-    for (path, name) in imports {
+    for (path, name, prog) in imports {
         let include_service = visited.get(&path).unwrap();
-        let code = std::fs::read_to_string(path)?;
-        let prog = parse_idl_prog(&code)?;
         merged_prog.merge(*include_service, name, prog)?;
     }
 

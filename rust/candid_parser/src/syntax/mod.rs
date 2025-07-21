@@ -1,8 +1,13 @@
-use crate::{
+mod pretty;
+
+pub use pretty::pretty_print;
+
+use crate::error;
+use anyhow::{anyhow, bail, Context, Result};
+use candid::{
     idl_hash,
     types::{FuncMode, Label},
 };
-use anyhow::{anyhow, bail, Context, Result};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,9 +40,27 @@ impl IDLType {
     }
 }
 
+impl std::str::FromStr for IDLType {
+    type Err = error::Error;
+    fn from_str(str: &str) -> error::Result<Self> {
+        let trivia = super::token::TriviaMap::default();
+        let lexer = super::token::Tokenizer::new_with_trivia(str, trivia.clone());
+        Ok(super::grammar::TypParser::new().parse(Some(&trivia), lexer)?)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct IDLTypes {
     pub args: Vec<IDLType>,
+}
+
+impl std::str::FromStr for IDLTypes {
+    type Err = error::Error;
+    fn from_str(str: &str) -> error::Result<Self> {
+        let trivia = super::token::TriviaMap::default();
+        let lexer = super::token::Tokenizer::new_with_trivia(str, trivia.clone());
+        Ok(super::grammar::TypsParser::new().parse(Some(&trivia), lexer)?)
+    }
 }
 
 macro_rules! enum_to_doc {
@@ -156,10 +179,28 @@ impl IDLProg {
     }
 }
 
+impl std::str::FromStr for IDLProg {
+    type Err = error::Error;
+    fn from_str(str: &str) -> error::Result<Self> {
+        let trivia = super::token::TriviaMap::default();
+        let lexer = super::token::Tokenizer::new_with_trivia(str, trivia.clone());
+        Ok(super::grammar::IDLProgParser::new().parse(Some(&trivia), lexer)?)
+    }
+}
+
 #[derive(Debug)]
 pub struct IDLInitArgs {
     pub decs: Vec<Dec>,
     pub args: Vec<IDLArgType>,
+}
+
+impl std::str::FromStr for IDLInitArgs {
+    type Err = error::Error;
+    fn from_str(str: &str) -> error::Result<Self> {
+        let trivia = super::token::TriviaMap::default();
+        let lexer = super::token::Tokenizer::new_with_trivia(str, trivia.clone());
+        Ok(super::grammar::IDLInitArgsParser::new().parse(Some(&trivia), lexer)?)
+    }
 }
 
 #[derive(Debug)]

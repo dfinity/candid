@@ -1,12 +1,10 @@
 use super::analysis::{chase_actor, infer_rec};
 use crate::{
     configs::{ConfigState, ConfigTree, Configs, Context, StateElem},
+    syntax::{self, IDLActorType, IDLMergedProg, IDLType},
     Deserialize,
 };
-use candid::types::{
-    syntax::{self, IDLActorType, IDLMergedProg, IDLType},
-    Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner,
-};
+use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use candid::{pretty::utils::*, types::ArgType};
 use convert_case::{Case, Casing};
 use pretty::RcDoc;

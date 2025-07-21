@@ -1,6 +1,6 @@
 use super::javascript::{ident, is_tuple_fields};
+use crate::syntax::{self, IDLMergedProg, IDLType};
 use candid::pretty::utils::*;
-use candid::types::syntax::{self, IDLMergedProg, IDLType};
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 

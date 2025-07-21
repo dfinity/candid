@@ -1,9 +1,9 @@
 // This module implements the Candid to Motoko binding as specified in
 // https://github.com/dfinity/motoko/blob/master/design/IDL-Motoko.md
 
+use crate::syntax::{self, IDLActorType, IDLMergedProg, IDLType};
 use candid::pretty::candid::is_valid_as_id;
 use candid::pretty::utils::*;
-use candid::types::syntax::{self, IDLActorType, IDLMergedProg, IDLType};
 use candid::types::{ArgType, Field, FuncMode, Function, Label, SharedLabel, Type, TypeInner};
 use candid::TypeEnv;
 use pretty::RcDoc;

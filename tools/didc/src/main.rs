@@ -1,12 +1,12 @@
 use anyhow::{bail, Result};
-use candid_parser::candid::types::{
-    subtype,
+use candid_parser::{
+    candid::types::{subtype, Type},
+    pretty_parse,
     syntax::{IDLType, IDLTypes},
-    Type,
 };
 use candid_parser::{
-    configs::Configs, parse_idl_args, parse_idl_type, parse_idl_value, pretty_check_file,
-    pretty_parse_idl_types, pretty_wrap, typing::ast_to_type, Error, IDLArgs, IDLValue, TypeEnv,
+    configs::Configs, parse_idl_args, parse_idl_value, pretty_check_file, pretty_wrap,
+    typing::ast_to_type, Error, IDLArgs, IDLValue, TypeEnv,
 };
 use clap::Parser;
 use console::style;
@@ -91,9 +91,7 @@ enum Command {
     Subtype {
         #[clap(short, long)]
         defs: Option<PathBuf>,
-        #[clap(value_parser = parse_idl_type)]
         ty1: IDLType,
-        #[clap(value_parser = parse_idl_type)]
         ty2: IDLType,
     },
 }
@@ -156,7 +154,7 @@ fn parse_args(str: &str) -> Result<IDLArgs, Error> {
     pretty_wrap("candid arguments", str, parse_idl_args)
 }
 fn parse_types(str: &str) -> Result<IDLTypes, Error> {
-    pretty_parse_idl_types("type annotations", str)
+    pretty_parse("type annotations", str)
 }
 fn load_config(input: &Option<String>) -> Result<Configs, Error> {
     match input {
@@ -228,7 +226,7 @@ fn main() -> Result<()> {
             let content = match target.as_str() {
                 "js" => candid_parser::bindings::javascript::compile(&env, &actor),
                 "ts" => candid_parser::bindings::typescript::compile(&env, &actor, &prog),
-                "did" => candid_parser::candid::pretty::syntax::pretty_print(&prog),
+                "did" => candid_parser::syntax::pretty_print(&prog),
                 "mo" => candid_parser::bindings::motoko::compile(&env, &actor, &prog),
                 "rs" => {
                     use candid_parser::bindings::rust::{compile, Config, ExternalConfig};

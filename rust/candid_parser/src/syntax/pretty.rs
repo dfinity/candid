@@ -2,10 +2,10 @@ use pretty::RcDoc;
 
 use crate::{
     pretty::{
-        candid::{pp_label, pp_modes, pp_text},
+        candid::{pp_docs, pp_label, pp_modes, pp_text},
         utils::{concat, enclose, enclose_space, ident, kwd, lines, str, INDENT_SPACE, LINE_WIDTH},
     },
-    types::syntax::{
+    syntax::{
         Binding, FuncType, IDLActorType, IDLArgType, IDLMergedProg, IDLType, PrimType, TypeField,
     },
 };
@@ -151,10 +151,6 @@ fn pp_defs(prog: &IDLMergedProg) -> RcDoc {
             .append(pp_ty(&b.typ))
             .append(";")
     }))
-}
-
-pub(crate) fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
-    lines(docs.iter().map(|line| RcDoc::text("// ").append(line)))
 }
 
 fn pp_actor(actor: &IDLActorType) -> RcDoc {
