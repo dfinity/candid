@@ -239,7 +239,7 @@ impl<'a> State<'a> {
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
         );
-        let src = candid::pretty::candid::pp_init_args(
+        let src = candid::pretty::candid::pp_named_init_args(
             &env,
             &[ArgType {
                 name: None,

@@ -4,12 +4,9 @@
 
 ### Candid
 
-* Breaking changes:
-  + `pp_args` and `pp_init_args` now require a `&[ArgType]` parameter. The `pp_rets` function has been added, with the signature of the old `pp_args`.
-  + `pretty::candid::pp_label` now takes a `&Label` parameter, instead of a `&SharedLabel`.
-
 * Non-breaking changes:
   + Makes the warning message for the special opt subtyping rule more explicit in the `candid::types::subtype::subtype` and `candid::types::subtype::subtype_with_config` functions.
+  + Added `pp_named_args`, `pp_named_init_args` and `pp_label_raw` in `pretty::candid` module.
 
 ### candid_parser
 
