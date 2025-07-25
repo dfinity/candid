@@ -251,6 +251,7 @@ fn test_func() {
     /// Empty lines
     ///
     /// are preserved
+    ///
     #[candid_method]
     fn id_unused_arg(_a: u8) -> Result<List<u8>, candid::Empty> {
         unreachable!()
@@ -299,6 +300,7 @@ service : (List_2) -> {
   // Empty lines
   // 
   // are preserved
+  // 
   id_unused_arg : (nat8) -> (Result);
   // Doc comment for id_variant
   id_variant : (vec A) -> (Result_1);
