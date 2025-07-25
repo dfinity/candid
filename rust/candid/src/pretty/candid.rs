@@ -157,7 +157,7 @@ fn pp_fields(fs: &[Field], is_variant: bool) -> RcDoc {
 
 pub fn pp_function(func: &Function) -> RcDoc {
     let args = pp_named_args(&func.args);
-    let rets = pp_args(&func.rets);
+    let rets = pp_rets(&func.rets);
     let modes = pp_modes(&func.modes);
     args.append(" ->")
         .append(RcDoc::space())
@@ -186,6 +186,11 @@ pub fn pp_named_args(args: &[ArgType]) -> RcDoc {
 pub fn pp_args(args: &[Type]) -> RcDoc {
     let doc = concat(args.iter().map(pp_ty), ",");
     enclose("(", doc, ")")
+}
+
+/// Pretty-prints return types in the form of `(type1, type2)`.
+pub fn pp_rets(args: &[Type]) -> RcDoc {
+    pp_args(args)
 }
 
 pub fn pp_mode(mode: &FuncMode) -> RcDoc {
