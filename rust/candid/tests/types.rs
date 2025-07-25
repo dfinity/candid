@@ -226,16 +226,31 @@ fn test_func() {
         unreachable!()
     }
 
+    /// Doc comment
+    /**
+     * even with blocks
+     * in the middle
+     */
+    /// and a closing line comment
     #[candid_method]
     fn id_tuple_destructure((a, b): (u8, u8)) -> (u8, u8) {
         (a, b)
     }
 
+    /**
+     * Block doc comment,
+     * on multiple lines.
+     * The * at the start of the line will be reflected in the generated doc comment.
+     */
     #[candid_method]
     fn id_struct_destructure(internal::NamedStruct { a, b }: internal::NamedStruct) -> (u16, i32) {
         (a, b)
     }
 
+    ///
+    /// Empty lines
+    ///
+    /// are preserved
     #[candid_method]
     fn id_unused_arg(_a: u8) -> Result<List<u8>, candid::Empty> {
         unreachable!()
@@ -267,8 +282,23 @@ service : (List_2) -> {
   id_struct : (record { List }) -> (Result) query;
   // Doc comment for id_struct_composite
   id_struct_composite : (record { List }) -> (Result) composite_query;
+  // 
+  // * Block doc comment,
+  // * on multiple lines.
+  // * The * at the start of the line will be reflected in the generated doc comment.
+  // 
   id_struct_destructure : (NamedStruct) -> (nat16, int32);
+  // Doc comment
+  // 
+  // * even with blocks
+  // * in the middle
+  // 
+  // and a closing line comment
   id_tuple_destructure : (record { nat8; nat8 }) -> (nat8, nat8);
+  // 
+  // Empty lines
+  // 
+  // are preserved
   id_unused_arg : (nat8) -> (Result);
   // Doc comment for id_variant
   id_variant : (vec A) -> (Result_1);

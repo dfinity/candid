@@ -276,9 +276,13 @@ fn extract_doc_comments(attrs: &[Attribute]) -> Vec<String> {
             if let syn::Meta::NameValue(meta) = &attr.meta {
                 if let Ok(lit) = get_lit_str(&meta.value) {
                     let doc_content = lit.value();
-                    let trimmed = doc_content.trim_start_matches(' ');
-                    if !trimmed.is_empty() {
-                        docs.push(trimmed.to_string());
+                    if !doc_content.is_empty() {
+                        for line in doc_content.lines() {
+                            let trimmed = line.trim().to_string();
+                            docs.push(trimmed);
+                        }
+                    } else {
+                        docs.push("".to_string());
                     }
                 }
             }
