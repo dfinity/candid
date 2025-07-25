@@ -2,7 +2,7 @@ use pretty::RcDoc;
 
 use crate::{
     pretty::{
-        candid::{pp_docs, pp_label, pp_modes, pp_text},
+        candid::{pp_docs, pp_label_raw, pp_modes, pp_text},
         utils::{concat, enclose, enclose_space, ident, kwd, lines, str, INDENT_SPACE, LINE_WIDTH},
     },
     syntax::{
@@ -49,7 +49,7 @@ fn pp_field(field: &TypeField, is_variant: bool) -> RcDoc {
     } else {
         kwd(" :").append(pp_ty(&field.typ))
     };
-    docs.append(pp_label(&field.label)).append(ty_doc)
+    docs.append(pp_label_raw(&field.label)).append(ty_doc)
 }
 
 fn pp_fields(fs: &[TypeField], is_variant: bool) -> RcDoc {

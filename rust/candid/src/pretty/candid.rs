@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use crate::pretty::utils::*;
-use crate::types::{ArgType, Field, FuncMode, Function, Label, Type, TypeEnv, TypeInner};
+use crate::types::{
+    ArgType, Field, FuncMode, Function, Label, SharedLabel, Type, TypeEnv, TypeInner,
+};
 use pretty::RcDoc;
 
 static KEYWORDS: [&str; 30] = [
@@ -125,7 +127,14 @@ pub fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
     lines(docs.iter().map(|line| RcDoc::text("// ").append(line)))
 }
 
-pub fn pp_label(id: &Label) -> RcDoc {
+/// This function is kept for backward compatibility.
+///
+/// It is recommended to use [`pp_label_raw`] instead, which accepts a [`Label`].
+pub fn pp_label(id: &SharedLabel) -> RcDoc {
+    pp_label_raw(id.as_ref())
+}
+
+pub fn pp_label_raw(id: &Label) -> RcDoc {
     match id {
         Label::Named(id) => pp_text(id),
         Label::Id(_) | Label::Unnamed(_) => RcDoc::as_string(id),
@@ -138,7 +147,7 @@ pub(crate) fn pp_field(field: &Field, is_variant: bool) -> RcDoc {
     } else {
         kwd(" :").append(pp_ty(&field.ty))
     };
-    pp_label(&field.id).append(ty_doc)
+    pp_label_raw(&field.id).append(ty_doc)
 }
 
 fn pp_fields(fs: &[Field], is_variant: bool) -> RcDoc {
@@ -147,7 +156,7 @@ fn pp_fields(fs: &[Field], is_variant: bool) -> RcDoc {
 }
 
 pub fn pp_function(func: &Function) -> RcDoc {
-    let args = pp_args(&func.args);
+    let args = pp_named_args(&func.args);
     let rets = pp_rets(&func.rets);
     let modes = pp_modes(&func.modes);
     args.append(" ->")
@@ -156,7 +165,10 @@ pub fn pp_function(func: &Function) -> RcDoc {
         .nest(INDENT_SPACE)
 }
 
-pub fn pp_args(args: &[ArgType]) -> RcDoc {
+/// Pretty-prints named arguments in the form of `(name1 : type1, name2 : type2)`.
+///
+/// To print unnamed arguments, use [`pp_args`] instead.
+pub fn pp_named_args(args: &[ArgType]) -> RcDoc {
     let args = args.iter().map(|arg| {
         if let Some(name) = &arg.name {
             pp_text(name).append(kwd(" :")).append(pp_ty(&arg.typ))
@@ -168,9 +180,17 @@ pub fn pp_args(args: &[ArgType]) -> RcDoc {
     enclose("(", doc, ")")
 }
 
-pub fn pp_rets(rets: &[Type]) -> RcDoc {
-    let doc = concat(rets.iter().map(pp_ty), ",");
+/// Pretty-prints arguments in the form of `(type1, type2)`.
+///
+/// To print named arguments, use [`pp_named_args`] instead.
+pub fn pp_args(args: &[Type]) -> RcDoc {
+    let doc = concat(args.iter().map(pp_ty), ",");
     enclose("(", doc, ")")
+}
+
+/// Pretty-prints return types in the form of `(type1, type2)`.
+pub fn pp_rets(args: &[Type]) -> RcDoc {
+    pp_args(args)
 }
 
 pub fn pp_mode(mode: &FuncMode) -> RcDoc {
@@ -214,7 +234,7 @@ fn pp_defs(env: &TypeEnv) -> RcDoc {
 }
 
 fn pp_class<'a>(args: &'a [ArgType], t: &'a Type, docs: Option<&'a DocComments>) -> RcDoc<'a> {
-    let doc = pp_args(args).append(" ->").append(RcDoc::space());
+    let doc = pp_named_args(args).append(" ->").append(RcDoc::space());
     match t.as_ref() {
         TypeInner::Service(ref serv) => doc.append(pp_service(serv, docs)),
         TypeInner::Var(ref s) => doc.append(s),
@@ -231,8 +251,17 @@ fn pp_actor<'a>(ty: &'a Type, docs: &'a DocComments) -> RcDoc<'a> {
     }
 }
 
-pub fn pp_init_args<'a>(env: &'a TypeEnv, args: &'a [ArgType]) -> RcDoc<'a> {
+/// Pretty-prints the initialization arguments for a Candid actor.
+///
+/// This function is kept for backward compatibility.
+/// It is recommended to use [`pp_named_init_args`] instead, which prints named arguments.
+pub fn pp_init_args<'a>(env: &'a TypeEnv, args: &'a [Type]) -> RcDoc<'a> {
     pp_defs(env).append(pp_args(args))
+}
+
+/// Pretty-prints the initialization arguments for a Candid actor with named arguments.
+pub fn pp_named_init_args<'a>(env: &'a TypeEnv, args: &'a [ArgType]) -> RcDoc<'a> {
+    pp_defs(env).append(pp_named_args(args))
 }
 
 /// Collects doc comments that can be passed to the [compile_with_docs] function.
@@ -285,7 +314,7 @@ pub fn compile_with_docs(env: &TypeEnv, actor: &Option<Type>, docs: &DocComments
 #[cfg_attr(docsrs, doc(cfg(feature = "value")))]
 #[cfg(feature = "value")]
 pub mod value {
-    use super::{ident_string, pp_label};
+    use super::{ident_string, pp_label_raw};
     use crate::pretty::utils::*;
     use crate::types::value::{IDLArgs, IDLField, IDLValue};
     use crate::types::Label;
@@ -493,7 +522,7 @@ pub mod value {
         } else {
             kwd(" =").append(pp_value(depth - 1, &field.val))
         };
-        pp_label(&field.id).append(val_doc)
+        pp_label_raw(&field.id).append(val_doc)
     }
 
     fn pp_fields(depth: usize, fields: &[IDLField]) -> RcDoc {
