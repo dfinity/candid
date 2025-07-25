@@ -1,6 +1,6 @@
 [package]
 name = "candid"
-version = "0.10.15"
+version = "0.11.0"
 edition = "2021"
 rust-version.workspace = true
 authors = ["DFINITY Team"]
@@ -16,7 +16,7 @@ include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
 # `candid` and `candid_derive` are kept in sync with the same version.
-candid_derive = { path = "../candid_derive", version = "=0.10.15" }
+candid_derive = { path = "../candid_derive", version = "=0.11.0" }
 ic_principal = { path = "../ic_principal", version = "0.1.0" }
 binread = { version = "2.2", features = ["debug_template"] }
 byteorder = "1.5.0"

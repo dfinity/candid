@@ -1,6 +1,6 @@
 [package]
 name = "candid_parser"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 rust-version.workspace = true
 authors = ["DFINITY Team"]
@@ -19,7 +19,7 @@ build = "build.rs"
 lalrpop = "0.20.0"
 
 [dependencies]
-candid = { path = "../candid", version = "0.10.15", features = ["all"] }
+candid = { path = "../candid", version = "0.11.0", features = ["all"] }
 codespan-reporting = "0.11"
 hex.workspace = true
 num-bigint.workspace = true
@@ -38,10 +38,7 @@ arbitrary = { workspace = true, optional = true }
 fake = { version = "2.4", optional = true }
 rand = { version = "0.8", optional = true }
 num-traits = { workspace = true, optional = true }
-dialoguer = { version = "0.11", default-features = false, features = [
-    "editor",
-    "completion",
-], optional = true }
+dialoguer = { version = "0.11", default-features = false, features = ["editor", "completion"], optional = true }
 ctrlc = { version = "3.4", optional = true }
 console = { workspace = true, optional = true }
 
