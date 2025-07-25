@@ -4,7 +4,10 @@
 
 ## 2025-07-25
 
-### candid 0.10.15
+### candid 0.11.0
+
+* Breaking changes:
+  + Parameters of class initializers and functions in `TypeInner` now take `ArgType` instead of `Type`, to preserve argument names.
 
 * Non-breaking changes:
   + Makes the warning message for the special opt subtyping rule more explicit in the `candid::types::subtype::subtype` and `candid::types::subtype::subtype_with_config` functions.
