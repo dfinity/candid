@@ -296,7 +296,14 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 ///
 /// ```ignore
 /// let mut doc_comments = DocComments::empty();
-/// doc_comments.add_service_method("method_name".to_string(), vec!["Doc comment line 1".to_string(), "Doc comment line 2".to_string()]);
+/// doc_comments.add_service_method(
+///   "method_name".to_string(),
+///   vec![
+///     "Doc comment line 1".to_string(),
+///     "".to_string(), // empty lines are preserved
+///     "Doc comment line 2".to_string(),
+///   ],
+/// );
 /// let candid = compile_with_docs(&env, &actor, &doc_comments);
 /// ```
 pub fn compile_with_docs(env: &TypeEnv, actor: &Option<Type>, docs: &DocComments) -> String {
