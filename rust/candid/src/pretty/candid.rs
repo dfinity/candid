@@ -247,7 +247,7 @@ fn pp_actor<'a>(ty: &'a Type, docs: &'a DocComments) -> RcDoc<'a> {
 }
 
 /// Pretty-prints the initialization arguments for a Candid actor.
-/// 
+///
 /// This function is kept for backward compatibility.
 /// It is recommended to use [`pp_named_init_args`] instead, which prints named arguments.
 pub fn pp_init_args<'a>(env: &'a TypeEnv, args: &'a [Type]) -> RcDoc<'a> {
