@@ -19,7 +19,7 @@ build = "build.rs"
 lalrpop = "0.20.0"
 
 [dependencies]
-candid = { path = "../candid", version = "0.10", features = ["all"] }
+candid = { path = "../candid", version = "0.10.15", features = ["all"] }
 codespan-reporting = "0.11"
 hex.workspace = true
 num-bigint.workspace = true
