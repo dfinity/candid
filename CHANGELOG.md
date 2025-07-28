@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-### Candid
+## 2025-07-28
+
+### candid 0.11.0
 
 * Breaking changes:
   + The `args` field of the `candid::types::internal::Function` struct now is a `Vec<ArgType>` instead of `Vec<Type>`, to preserve argument names.
@@ -12,7 +14,12 @@
   + Makes the warning message for the special opt subtyping rule more explicit in the `candid::types::subtype::subtype` and `candid::types::subtype::subtype_with_config` functions.
   + Added `pp_named_args`, `pp_named_init_args` and `pp_label_raw` in `pretty::candid` module.
 
-### candid_parser
+### candid_derive 0.11.0
+
+* Keeps argument names for Rust functions.
+* Starting from this release, `candid` and `candid_derive` are kept in sync with the same version.
+
+### candid_parser 0.2.1
 
 * Breaking changes:
   + The `candid_parser::types` module has been renamed to `candid_parser::syntax`.
@@ -88,11 +95,7 @@
     - `candid::pretty::candid::DocComments` struct, which is used to collect doc comments from Rust canister methods, in the `candid_derive::export_service` macro.
     - `candid::pretty::candid::compile_with_docs` function, which takes a `&DocComments` parameter.
 
-### candid_derive
-
-* Keeps argument names for Rust functions.
-
-### didc
+### didc 0.5.0
 
 * Breaking changes:
   + The `didc test` subcommand has been removed.

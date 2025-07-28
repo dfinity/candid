@@ -1,6 +1,6 @@
 [package]
 name = "candid_derive"
-version = "0.6.6"
+version = "0.11.0" # Sync with `candid` version
 edition = "2021"
 rust-version.workspace = true
 authors = ["DFINITY Team"]
