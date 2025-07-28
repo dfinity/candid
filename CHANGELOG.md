@@ -6,7 +6,7 @@
 
 * Non-breaking changes:
   + Makes the warning message for the special opt subtyping rule more explicit in the `candid::types::subtype::subtype` and `candid::types::subtype::subtype_with_config` functions.
-  + Added `pp_named_args`, `pp_named_init_args` and `pp_label_raw` in `pretty::candid` module.
+  + Added `pp_label_raw` in `pretty::candid` module.
 
 ### candid_parser
 
