@@ -151,8 +151,8 @@ candid::define_function!(pub(crate) T : (S) -> ());
 pub struct Service(pub Principal);
 impl Service {
   /// Doc comment for f1 method of service
-  pub async fn f_1(&self, arg0: &List, test: &serde_bytes::ByteBuf, arg2: &Option<bool>) -> Result<()> {
-    ic_cdk::call(self.0, "f1", (arg0,test,arg2,)).await
+  pub async fn f_1(&self, arg0: &List, arg1: &serde_bytes::ByteBuf, arg2: &Option<bool>) -> Result<()> {
+    ic_cdk::call(self.0, "f1", (arg0,arg1,arg2,)).await
   }
   pub async fn G11(&self, id: &CanisterId, list: &MyList, is_okay: &Option<MyList>, arg3: &Nested) -> Result<(i128,Broker,NestedRes,)> {
     ic_cdk::call(self.0, "g1", (id,list,is_okay,arg3,)).await
@@ -170,8 +170,8 @@ impl Service {
   pub async fn y(&self, arg0: &NestedRecords) -> Result<((NestedRecords,MyVariant,),)> {
     ic_cdk::call(self.0, "y", (arg0,)).await
   }
-  pub async fn f(&self, server: &S) -> Result<()> {
-    ic_cdk::call(self.0, "f", (server,)).await
+  pub async fn f(&self, arg0: &S) -> Result<()> {
+    ic_cdk::call(self.0, "f", (arg0,)).await
   }
   pub async fn g(&self, arg0: &List) -> Result<(B,Tree,Stream,)> {
     ic_cdk::call(self.0, "g", (arg0,)).await

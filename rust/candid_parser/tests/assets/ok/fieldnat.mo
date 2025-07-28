@@ -5,7 +5,7 @@ module {
   public type non_tuple = { _1_  : Text; _2_  : Text };
   public type tuple = (Text, Text);
   public type Self = actor {
-    bab : shared (two : Int, Nat) -> async ();
+    bab : shared (Int, Nat) -> async ();
     bar : shared { _50_ : Int } -> async { #e20; #e30 };
     bas : shared ((Int, Int)) -> async ((Text, Nat));
     baz : shared { _2_  : Int; _50_ : Nat } -> async {};

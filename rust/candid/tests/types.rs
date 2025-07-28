@@ -308,7 +308,7 @@ service : (List_2) -> {
   // on multiple lines
   "oneway" : (text) -> () oneway;
   // Doc comment for 🐂
-  "🐂" : (a : text, b : int32) -> (text, int32) query;
+  "🐂" : (text, int32) -> (text, int32) query;
 }"#;
     assert_eq!(expected, __export_service());
 }
@@ -336,21 +336,6 @@ fn test_counter() {
         }
     }
     candid::export_service!();
-    let expected = r#"service : {
-  inc : () -> ();
-  read : () -> (nat64) query;
-  set : (value : nat64) -> ();
-}"#;
-    assert_eq!(expected, __export_service());
-}
-
-#[test]
-fn test_init_named_args() {
-    #[candid_method(init)]
-    fn init(a: u8) {
-        let _ = a;
-    }
-    candid::export_service!();
-    let expected = r#"service : (a : nat8) -> {}"#;
+    let expected = "service : { inc : () -> (); read : () -> (nat64) query; set : (nat64) -> () }";
     assert_eq!(expected, __export_service());
 }

@@ -11,7 +11,7 @@ module {
   public type o = ?o;
   public type return_ = actor { f : t; g : shared list -> async (if_, stream) };
   public type stream = ?{ head : Nat; next : shared query () -> async stream };
-  public type t = shared (server : return_) -> async ();
+  public type t = shared return_ -> async ();
   public type Self = actor {
     Oneway : shared () -> ();
     f__ : shared o -> async o;

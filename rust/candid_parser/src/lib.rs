@@ -69,7 +69,7 @@
 //!
 //! let method = env.get_method(&actor, "g").unwrap();
 //! assert_eq!(method.is_query(), true);
-//! assert_eq!(method.args.iter().map(|arg| arg.typ.clone()).collect::<Vec<_>>(), vec![TypeInner::Var("List".to_string()).into()]);
+//! assert_eq!(method.args, vec![TypeInner::Var("List".to_string()).into()]);
 //! # Ok(())
 //! # }
 //! ```
@@ -102,7 +102,7 @@
 //! let method = env.get_method(&actor, "f").unwrap();
 //! let args = parse_idl_args("(42, 42, 42, 42)")?;
 //! // Serialize arguments with candid types
-//! let encoded = args.to_bytes_with_types(&env, &method.args.iter().map(|arg| arg.typ.clone()).collect::<Vec<_>>())?;
+//! let encoded = args.to_bytes_with_types(&env, &method.args)?;
 //! let decoded = IDLArgs::from_bytes(&encoded)?;
 //! assert_eq!(decoded.args,
 //!        vec![IDLValue::Nat8(42),

@@ -4,8 +4,8 @@ use crate::{
     syntax::{self, IDLActorType, IDLMergedProg, IDLType},
     Deserialize,
 };
+use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
-use candid::{pretty::utils::*, types::ArgType};
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
 use serde::Serialize;
@@ -239,15 +239,9 @@ impl<'a> State<'a> {
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
         );
-        let src = candid::pretty::candid::pp_named_init_args(
-            &env,
-            &[ArgType {
-                name: None,
-                typ: src.clone(),
-            }],
-        )
-        .pretty(80)
-        .to_string();
+        let src = candid::pretty::candid::pp_init_args(&env, &[src.clone()])
+            .pretty(80)
+            .to_string();
         let match_path = self.state.config_source.get("use_type").unwrap().join(".");
         let test_name = use_type.replace(|c: char| !c.is_ascii_alphanumeric(), "_");
         let body = format!(
@@ -607,18 +601,8 @@ fn test_{test_name}() {{
         }
         lines(res.into_iter())
     }
-    fn pp_args<'b>(&mut self, args: &'b [ArgType], prefix: &'b str) -> RcDoc<'b> {
-        let doc = args.iter().enumerate().map(|(i, t)| {
-            let lab = t.name.clone().unwrap_or_else(|| format!("{prefix}{i}"));
-            let old = self.state.push_state(&StateElem::Label(&lab));
-            let res = self.pp_ty(&t.typ, true);
-            self.state.pop_state(old, StateElem::Label(&lab));
-            res
-        });
-        enclose("(", concat(doc, ","), ")")
-    }
-    fn pp_rets<'b>(&mut self, rets: &'b [Type], prefix: &'b str) -> RcDoc<'b> {
-        let tys = rets.iter().enumerate().map(|(i, t)| {
+    fn pp_args<'b>(&mut self, args: &'b [Type], prefix: &'b str) -> RcDoc<'b> {
+        let tys = args.iter().enumerate().map(|(i, t)| {
             let lab = format!("{prefix}{i}");
             let old = self.state.push_state(&StateElem::Label(&lab));
             let res = self.pp_ty(t, true);
@@ -627,11 +611,14 @@ fn test_{test_name}() {{
         });
         enclose("(", concat(tys.into_iter(), ","), ")")
     }
+    fn pp_rets<'b>(&mut self, rets: &'b [Type]) -> RcDoc<'b> {
+        self.pp_args(rets, "ret")
+    }
     fn pp_ty_func<'b>(&mut self, f: &'b Function) -> RcDoc<'b> {
         let lab = StateElem::TypeStr("func");
         let old = self.state.push_state(&lab);
         let args = self.pp_args(&f.args, "arg");
-        let rets = self.pp_rets(&f.rets, "ret");
+        let rets = self.pp_rets(&f.rets);
         let modes = candid::pretty::candid::pp_modes(&f.modes);
         let res = args
             .append(" ->")
@@ -681,7 +668,7 @@ fn test_{test_name}() {{
             .iter()
             .enumerate()
             .map(|(i, arg)| {
-                let lab = arg.name.clone().unwrap_or_else(|| format!("arg{i}"));
+                let lab = format!("arg{i}");
                 let old = self.state.push_state(&StateElem::Label(&lab));
                 let name = self
                     .state
@@ -690,7 +677,7 @@ fn test_{test_name}() {{
                     .clone()
                     .unwrap_or_else(|| lab.clone());
                 self.state.update_stats("name");
-                let res = self.pp_ty(&arg.typ, true);
+                let res = self.pp_ty(arg, true);
                 self.state.pop_state(old, StateElem::Label(&lab));
                 (name, res)
             })
@@ -740,7 +727,7 @@ fn test_{test_name}() {{
                 .iter()
                 .enumerate()
                 .map(|(i, arg)| {
-                    let lab = arg.name.clone().unwrap_or_else(|| format!("arg{i}"));
+                    let lab = format!("arg{i}");
                     let old = self.state.push_state(&StateElem::Label(&lab));
                     let name = self
                         .state
@@ -749,7 +736,7 @@ fn test_{test_name}() {{
                         .clone()
                         .unwrap_or_else(|| lab.clone());
                     self.state.update_stats("name");
-                    let res = self.pp_ty(&arg.typ, true);
+                    let res = self.pp_ty(arg, true);
                     self.state.pop_state(old, StateElem::Label(&lab));
                     (name, res.pretty(LINE_WIDTH).to_string())
                 })
@@ -1084,7 +1071,7 @@ impl<'b> NominalState<'_, 'b> {
                             .into_iter()
                             .enumerate()
                             .map(|(i, arg)| {
-                                let lab = arg.name.clone().unwrap_or_else(|| format!("arg{i}"));
+                                let lab = format!("arg{i}");
                                 let old = self.state.push_state(&StateElem::Label(&lab));
                                 let idx = if i == 0 {
                                     "".to_string()
@@ -1092,13 +1079,10 @@ impl<'b> NominalState<'_, 'b> {
                                     i.to_string()
                                 };
                                 path.push(TypePath::Func(format!("arg{idx}")));
-                                let ty = self.nominalize(env, path, &arg.typ, None);
+                                let ty = self.nominalize(env, path, &arg, None);
                                 path.pop();
                                 self.state.pop_state(old, StateElem::Label(&lab));
-                                ArgType {
-                                    name: arg.name.clone(),
-                                    typ: ty,
-                                }
+                                ty
                             })
                             .collect(),
                         rets: func
@@ -1184,13 +1168,10 @@ impl<'b> NominalState<'_, 'b> {
                             let elem = StateElem::Label("init");
                             let old = self.state.push_state(&elem);
                             path.push(TypePath::Init);
-                            let ty = self.nominalize(env, path, &arg.typ, None);
+                            let ty = self.nominalize(env, path, arg, None);
                             path.pop();
                             self.state.pop_state(old, elem);
-                            ArgType {
-                                name: arg.name.clone(),
-                                typ: ty,
-                            }
+                            ty
                         })
                         .collect(),
                     self.nominalize(env, path, ty, syntax_ty),

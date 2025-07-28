@@ -6,7 +6,7 @@ type if = variant {
   leaf : int;
 };
 type return = service { f : t; g : (list) -> (if, stream) };
-type t = func (server : return) -> ();
+type t = func (return) -> ();
 type stream = opt record { head : nat; next : func () -> (stream) query };
 service : {
   Oneway : () -> () oneway;

@@ -4,10 +4,6 @@
 
 ### Candid
 
-* Breaking changes:
-  + The `args` field of the `candid::types::internal::Function` struct now is a `Vec<ArgType>` instead of `Vec<Type>`, to preserve argument names.
-  + The `TypeInner::Class` variant now takes `Vec<ArgType>` instead of `Vec<Type>` as its first parameter, to preserve argument names.
-
 * Non-breaking changes:
   + Makes the warning message for the special opt subtyping rule more explicit in the `candid::types::subtype::subtype` and `candid::types::subtype::subtype_with_config` functions.
   + Added `pp_named_args`, `pp_named_init_args` and `pp_label_raw` in `pretty::candid` module.
@@ -16,10 +12,8 @@
 
 * Breaking changes:
   + The `candid_parser::types` module has been renamed to `candid_parser::syntax`.
-  + The `args` field in both `FuncType` and `IDLInitArgs` now have type `Vec<IDLArgType>`.
 
 * Non-breaking changes:
-  + Supports parsing the arguments' names for `func` and `service` (init args).
   + Supports collecting line comments as doc comments in the following cases:
     - above services:
       ```
