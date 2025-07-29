@@ -1,4 +1,3 @@
-#![deny(clippy::all)]
 use types::{JsDecodeArgs, JsEncodeArgs};
 use wasm_bindgen::prelude::*;
 
