@@ -1,7 +1,7 @@
 use super::analysis::{chase_actor, chase_types, infer_rec};
 use candid::pretty::candid::pp_mode;
 use candid::pretty::utils::*;
-use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use candid::types::{ArgType, Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 use std::collections::BTreeSet;
 
@@ -168,13 +168,14 @@ fn pp_function(func: &Function) -> RcDoc {
     enclose("(", doc, ")").nest(INDENT_SPACE)
 }
 
-fn pp_args(args: &[Type]) -> RcDoc {
-    let doc = concat(args.iter().map(pp_ty), ",");
+fn pp_args(args: &[ArgType]) -> RcDoc {
+    let doc = concat(args.iter().map(|arg| pp_ty(&arg.typ)), ",");
     enclose("[", doc, "]")
 }
 
 fn pp_rets(args: &[Type]) -> RcDoc {
-    pp_args(args)
+    let doc = concat(args.iter().map(pp_ty), ",");
+    enclose("[", doc, "]")
 }
 
 fn pp_modes(modes: &[candid::types::FuncMode]) -> RcDoc {
@@ -249,11 +250,12 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let def_list = chase_actor(env, actor).unwrap();
             let recs = infer_rec(env, &def_list).unwrap();
             let defs = pp_defs(env, &def_list, &recs);
-            let init = if let TypeInner::Class(ref args, _) = actor.as_ref() {
-                args.as_slice()
+            let types = if let TypeInner::Class(ref args, _) = actor.as_ref() {
+                args.iter().map(|arg| arg.typ.clone()).collect::<Vec<_>>()
             } else {
-                &[][..]
+                Vec::new()
             };
+            let init = types.as_slice();
             let actor = kwd("return").append(pp_actor(actor, &recs)).append(";");
             let body = defs.append(actor);
             let doc = str("export const idlFactory = ({ IDL }) => ")

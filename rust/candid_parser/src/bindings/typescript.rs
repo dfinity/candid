@@ -206,7 +206,7 @@ fn pp_opt<'a>(
 }
 
 fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
-    let args = func.args.iter().map(|arg| pp_ty(env, arg, true));
+    let args = func.args.iter().map(|arg| pp_ty(env, &arg.typ, true));
     let args = enclose("[", concat(args, ","), "]");
     let rets = match func.rets.len() {
         0 => str("undefined"),
