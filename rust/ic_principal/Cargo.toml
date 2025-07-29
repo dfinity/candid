@@ -35,3 +35,6 @@ arbitrary = ['dep:arbitrary', 'serde']
 convert = ['dep:crc32fast', 'dep:data-encoding', 'dep:thiserror']
 self_authenticating = ['dep:sha2']
 serde = ['dep:serde', 'convert']
+
+[lints]
+workspace = true
