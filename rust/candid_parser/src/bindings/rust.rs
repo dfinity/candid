@@ -4,7 +4,9 @@ use crate::{
     syntax::{self, IDLActorType, IDLMergedProg, IDLType},
     Deserialize,
 };
-use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
+use candid::types::{
+    internal::TypeKey, Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner,
+};
 use candid::{pretty::utils::*, types::ArgType};
 use convert_case::{Case, Casing};
 use pretty::RcDoc;
@@ -15,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 const DOC_COMMENT_PREFIX: &str = "/// ";
 
 /// Maps the names generated during nominalization to the original syntactic types.
-type GeneratedTypes<'a> = BTreeMap<String, &'a IDLType>;
+type GeneratedTypes<'a> = BTreeMap<TypeKey, &'a IDLType>;
 
 #[derive(Default, Deserialize, Clone, Debug)]
 pub struct BindingConfig {
@@ -359,15 +361,15 @@ fn test_{test_name}() {{
         }
     }
 
-    fn pp_var<'b>(&mut self, id: &'b str, is_ref: bool) -> RcDoc<'b> {
+    fn pp_var<'b>(&mut self, id: &'b TypeKey, is_ref: bool) -> RcDoc<'b> {
         let name = if let Some(name) = &self.state.config.name {
             let res = RcDoc::text(name.clone());
             self.state.update_stats("name");
             res
         } else {
-            ident(id, Some(Case::Pascal))
+            ident(id.as_str(), Some(Case::Pascal))
         };
-        if !is_ref && self.recs.contains(id) {
+        if !is_ref && self.recs.contains(id.as_str()) {
             str("Box<").append(name).append(">")
         } else {
             name
@@ -504,13 +506,13 @@ fn test_{test_name}() {{
 
     fn pp_defs(&mut self, def_list: &'a [&'a str]) -> RcDoc<'a> {
         let mut res = Vec::with_capacity(def_list.len());
-        for id in def_list {
+        for &id in def_list {
             let old = self.state.push_state(&StateElem::Label(id));
             if self.state.config.use_type.is_some() {
                 self.state.pop_state(old, StateElem::Label(id));
                 continue;
             }
-            let ty = self.state.env.find_type(id).unwrap();
+            let ty = self.state.env.find_type(&id.into()).unwrap();
             let name = self
                 .state
                 .config
@@ -518,10 +520,11 @@ fn test_{test_name}() {{
                 .clone()
                 .map(RcDoc::text)
                 .unwrap_or_else(|| ident(id, Some(Case::Pascal)));
-            let syntax = self.prog.lookup(id);
+            let type_key = id.into();
+            let syntax = self.prog.lookup(&type_key);
             let syntax_ty = syntax
                 .map(|b| &b.typ)
-                .or_else(|| self.generated_types.get(*id).map(|t| &**t));
+                .or_else(|| self.generated_types.get(&type_key).map(|t| &**t));
             let docs = syntax
                 .map(|b| pp_docs(b.docs.as_ref()))
                 .unwrap_or(RcDoc::nil());
@@ -807,7 +810,9 @@ pub fn emit_bindgen(
     let def_list = if let Some(actor) = &actor {
         chase_actor(&env, actor).unwrap()
     } else {
-        env.0.iter().map(|pair| pair.0.as_ref()).collect::<Vec<_>>()
+        env.to_sorted_iter()
+            .map(|pair| pair.0.as_str())
+            .collect::<Vec<_>>()
     };
     let recs = infer_rec(&env, &def_list).unwrap();
     let mut state = State {
@@ -1022,11 +1027,12 @@ impl<'b> NominalState<'_, 'b> {
                         &TypeInner::Record(fs.to_vec()).into(),
                         syntax,
                     );
-                    env.0.insert(new_var.clone(), ty);
+                    let type_key: TypeKey = new_var.into();
+                    env.0.insert(type_key.clone(), ty);
                     if let Some(syntax) = syntax {
-                        self.generated_types.insert(new_var.clone(), syntax);
+                        self.generated_types.insert(type_key.clone(), syntax);
                     }
-                    TypeInner::Var(new_var)
+                    TypeInner::Var(type_key)
                 }
             }
             TypeInner::Variant(fs) => {
@@ -1067,11 +1073,12 @@ impl<'b> NominalState<'_, 'b> {
                         &TypeInner::Variant(fs.to_vec()).into(),
                         syntax,
                     );
-                    env.0.insert(new_var.clone(), ty);
+                    let type_key: TypeKey = new_var.into();
+                    env.0.insert(type_key.clone(), ty);
                     if let Some(syntax) = syntax {
-                        self.generated_types.insert(new_var.clone(), syntax);
+                        self.generated_types.insert(type_key.clone(), syntax);
                     }
-                    TypeInner::Var(new_var)
+                    TypeInner::Var(type_key)
                 }
             }
             TypeInner::Func(func) => match path.last() {
@@ -1136,8 +1143,8 @@ impl<'b> NominalState<'_, 'b> {
                         &TypeInner::Func(func.clone()).into(),
                         None,
                     );
-                    env.0.insert(new_var.clone(), ty);
-                    TypeInner::Var(new_var)
+                    env.0.insert(new_var.clone().into(), ty);
+                    TypeInner::Var(new_var.into())
                 }
             },
             TypeInner::Service(serv) => match path.last() {
@@ -1168,8 +1175,8 @@ impl<'b> NominalState<'_, 'b> {
                         &TypeInner::Service(serv.clone()).into(),
                         None,
                     );
-                    env.0.insert(new_var.clone(), ty);
-                    TypeInner::Var(new_var)
+                    env.0.insert(new_var.clone().into(), ty);
+                    TypeInner::Var(new_var.into())
                 }
             },
             TypeInner::Class(args, ty) => {
@@ -1211,12 +1218,17 @@ impl<'b> NominalState<'_, 'b> {
         prog: &'b IDLMergedProg,
     ) -> (TypeEnv, Option<Type>) {
         let mut res = TypeEnv(Default::default());
-        for (id, ty) in self.state.env.0.iter() {
-            let elem = StateElem::Label(id);
+        for (id, ty) in self.state.env.to_sorted_iter() {
+            let elem = StateElem::Label(id.as_str());
             let old = self.state.push_state(&elem);
             let syntax = prog.lookup(id).map(|t| &t.typ);
-            let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.clone())], ty, syntax);
-            res.0.insert(id.to_string(), ty);
+            let ty = self.nominalize(
+                &mut res,
+                &mut vec![TypePath::Id(id.as_str().to_string())],
+                ty,
+                syntax,
+            );
+            res.0.insert(id.clone(), ty);
             self.state.pop_state(old, elem);
         }
         let actor = actor

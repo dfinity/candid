@@ -6,7 +6,7 @@ use crate::error;
 use anyhow::{anyhow, bail, Context, Result};
 use candid::{
     idl_hash,
-    types::{FuncMode, Label},
+    types::{internal::TypeKey, FuncMode, Label},
 };
 use std::collections::HashMap;
 
@@ -230,8 +230,8 @@ impl IDLMergedProg {
         Ok(())
     }
 
-    pub fn lookup(&self, id: &str) -> Option<&Binding> {
-        self.typ_decs.iter().find(|b| b.id == id)
+    pub fn lookup(&self, id: &TypeKey) -> Option<&Binding> {
+        self.typ_decs.iter().find(|b| b.id == id.as_str())
     }
 
     pub fn decs(&self) -> Vec<Dec> {

@@ -7,6 +7,7 @@ use candid_parser::{
 };
 use goldenfile::Mint;
 use std::io::Write;
+use std::panic::AssertUnwindSafe;
 use std::path::Path;
 
 #[test]
@@ -134,7 +135,7 @@ fn compiler_test(resource: &str) {
             {
                 match filename.file_name().unwrap().to_str().unwrap() {
                     "unicode.did" | "escape.did" => check_error(
-                        || motoko::compile(&env, &actor, &prog),
+                        AssertUnwindSafe(|| motoko::compile(&env, &actor, &prog)),
                         "not a valid Motoko id",
                     ),
                     _ => {

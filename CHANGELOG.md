@@ -7,6 +7,9 @@
 * Breaking changes:
   + The `args` field of the `candid::types::internal::Function` struct now is a `Vec<ArgType>` instead of `Vec<Type>`, to preserve argument names.
   + The `TypeInner::Class` variant now takes `Vec<ArgType>` instead of `Vec<Type>` as its first parameter, to preserve argument names.
+  + The type representation was optimized to improve performance:
+    - In `Type::Var(var)` `var` now has type `TypeKey` instead of `String`. Calling `var.as_str()` returns `&str` and `var.to_string()` returns a `String`. The string representation of indexed variables remains `table{index}` to maintain compatibility with previous versions.
+    - `TypeEnv` now contains a `HashMap` instead of `BTreeMap`. Code that relied on the iteration order of the map (e.g. `env.0.iter()`) should make use of the newly added `TypeEnv::to_sorted_iter()` method which returns types sorted by their keys.
 
 * Non-breaking changes:
   + Makes the warning message for the special opt subtyping rule more explicit in the `candid::types::subtype::subtype` and `candid::types::subtype::subtype_with_config` functions.
