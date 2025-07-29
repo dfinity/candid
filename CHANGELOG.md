@@ -2,13 +2,15 @@
 
 ## Unreleased
 
-### Candid
+## 2025-07-29
+
+### Candid 0.10.16
 
 * Non-breaking changes:
   + Makes the warning message for the special opt subtyping rule more explicit in the `candid::types::subtype::subtype` and `candid::types::subtype::subtype_with_config` functions.
   + Added `pp_label_raw` in `pretty::candid` module.
 
-### candid_parser
+### candid_parser 0.2.0
 
 * Breaking changes:
   + The `candid_parser::types` module has been renamed to `candid_parser::syntax`.
@@ -82,11 +84,12 @@
     - `candid::pretty::candid::DocComments` struct, which is used to collect doc comments from Rust canister methods, in the `candid_derive::export_service` macro.
     - `candid::pretty::candid::compile_with_docs` function, which takes a `&DocComments` parameter.
 
-### candid_derive
+### candid_derive 0.10.16
 
+* Starting this release, candid_derive is versioned in lockstep with candid.
 * Keeps argument names for Rust functions.
 
-### didc
+### didc 0.5.0
 
 * Breaking changes:
   + The `didc test` subcommand has been removed.
