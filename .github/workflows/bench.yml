@@ -8,59 +8,58 @@ jobs:
     env:
       RUSTC_VERSION: 1.79.0
     steps:
-    - uses: actions/checkout@v4
-    - name: Checkout base branch
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.base_ref }}
-        path: main/
-    - name: Install stable toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: ${{ env.RUSTC_VERSION }}
-        override: true
-        target: wasm32-unknown-unknown
-    - uses: actions/setup-python@v4
-      with:
-        python-version: "3.10"
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pyyaml
-    - name: Cache cargo build
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo
-          target
-          rust/bench/target
-        key: ${{ runner.os }}-bench-0.1.4-${{ hashFiles('**/Cargo.lock') }}
-    - name: Install canbench
-      run: cargo install canbench
-    - name: Run perf for base branch
-      run: |
-        pushd main/rust/bench
-        canbench --persist
-        popd
-        cp main/rust/bench/canbench_results.yml rust/bench/
-    - name: Run perf for PR beanch
-      run: |
-        pushd rust/bench
-        canbench --less-verbose --persist > /tmp/perf.txt
-        python diff.py canbench_results.yml ../../main/rust/bench/canbench_results.yml > /tmp/table.md
-        {
-          cat /tmp/table.md
-          echo "<details><summary>Click to see raw report</summary>"
-          echo
-          echo "\`\`\`"
-          cat /tmp/perf.txt
-          echo "\`\`\`"
-          echo "</details>"
-        } > /tmp/message.txt
-    - name: Post comment
-      uses: thollander/actions-comment-pull-request@v2
-      with:
-        filePath: /tmp/message.txt
-        comment_tag: canbench
-
+      - uses: actions/checkout@v4
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          path: main/
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUSTC_VERSION }}
+          override: true
+          target: wasm32-unknown-unknown
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo
+            target
+            rust/bench/target
+          key: ${{ runner.os }}-bench-0.1.4-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install canbench
+        run: cargo install --version 0.2.0 --locked canbench
+      - name: Run perf for base branch
+        run: |
+          pushd main/rust/bench
+          canbench --show-summary --persist
+          popd
+          cp main/rust/bench/canbench_results.yml rust/bench/
+      - name: Run perf for PR beanch
+        run: |
+          pushd rust/bench
+          canbench --less-verbose --show-summary --persist > /tmp/perf.txt
+          python diff.py canbench_results.yml ../../main/rust/bench/canbench_results.yml > /tmp/table.md
+          {
+            cat /tmp/table.md
+            echo "<details><summary>Click to see raw report</summary>"
+            echo
+            echo "\`\`\`"
+            cat /tmp/perf.txt
+            echo "\`\`\`"
+            echo "</details>"
+          } > /tmp/message.txt
+      - name: Post comment
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          filePath: /tmp/message.txt
+          comment_tag: canbench
