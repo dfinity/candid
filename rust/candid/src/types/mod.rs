@@ -15,7 +15,7 @@ pub mod type_env;
 pub mod value;
 
 pub use self::internal::{
-    get_type, ArgType, Field, FuncMode, Function, Label, SharedLabel, Type, TypeId, TypeInner,
+    get_type, Field, FuncMode, Function, Label, SharedLabel, Type, TypeId, TypeInner,
 };
 pub use type_env::TypeEnv;
 

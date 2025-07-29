@@ -9,7 +9,7 @@ pub struct List(pub Option<(candid::Int,Box<List>,)>);
 pub struct Profile { pub age: u8, pub name: String }
 
 #[ic_cdk::init]
-fn init(arg0: candid::Int, l: List, arg2: Profile) {
+fn init(arg0: candid::Int, arg1: List, arg2: Profile) {
   unimplemented!()
 }
 /// Doc comment for get method in class service

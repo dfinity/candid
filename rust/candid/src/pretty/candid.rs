@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
 use crate::pretty::utils::*;
-use crate::types::{
-    ArgType, Field, FuncMode, Function, Label, SharedLabel, Type, TypeEnv, TypeInner,
-};
+use crate::types::{Field, FuncMode, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
 
 static KEYWORDS: [&str; 30] = [
@@ -156,7 +154,7 @@ fn pp_fields(fs: &[Field], is_variant: bool) -> RcDoc {
 }
 
 pub fn pp_function(func: &Function) -> RcDoc {
-    let args = pp_named_args(&func.args);
+    let args = pp_args(&func.args);
     let rets = pp_rets(&func.rets);
     let modes = pp_modes(&func.modes);
     args.append(" ->")
@@ -165,24 +163,7 @@ pub fn pp_function(func: &Function) -> RcDoc {
         .nest(INDENT_SPACE)
 }
 
-/// Pretty-prints named arguments in the form of `(name1 : type1, name2 : type2)`.
-///
-/// To print unnamed arguments, use [`pp_args`] instead.
-pub fn pp_named_args(args: &[ArgType]) -> RcDoc {
-    let args = args.iter().map(|arg| {
-        if let Some(name) = &arg.name {
-            pp_text(name).append(kwd(" :")).append(pp_ty(&arg.typ))
-        } else {
-            pp_ty(&arg.typ)
-        }
-    });
-    let doc = concat(args, ",");
-    enclose("(", doc, ")")
-}
-
 /// Pretty-prints arguments in the form of `(type1, type2)`.
-///
-/// To print named arguments, use [`pp_named_args`] instead.
 pub fn pp_args(args: &[Type]) -> RcDoc {
     let doc = concat(args.iter().map(pp_ty), ",");
     enclose("(", doc, ")")
@@ -233,8 +214,8 @@ fn pp_defs(env: &TypeEnv) -> RcDoc {
     }))
 }
 
-fn pp_class<'a>(args: &'a [ArgType], t: &'a Type, docs: Option<&'a DocComments>) -> RcDoc<'a> {
-    let doc = pp_named_args(args).append(" ->").append(RcDoc::space());
+fn pp_class<'a>(args: &'a [Type], t: &'a Type, docs: Option<&'a DocComments>) -> RcDoc<'a> {
+    let doc = pp_args(args).append(" ->").append(RcDoc::space());
     match t.as_ref() {
         TypeInner::Service(ref serv) => doc.append(pp_service(serv, docs)),
         TypeInner::Var(ref s) => doc.append(s),
@@ -252,16 +233,8 @@ fn pp_actor<'a>(ty: &'a Type, docs: &'a DocComments) -> RcDoc<'a> {
 }
 
 /// Pretty-prints the initialization arguments for a Candid actor.
-///
-/// This function is kept for backward compatibility.
-/// It is recommended to use [`pp_named_init_args`] instead, which prints named arguments.
 pub fn pp_init_args<'a>(env: &'a TypeEnv, args: &'a [Type]) -> RcDoc<'a> {
     pp_defs(env).append(pp_args(args))
-}
-
-/// Pretty-prints the initialization arguments for a Candid actor with named arguments.
-pub fn pp_named_init_args<'a>(env: &'a TypeEnv, args: &'a [ArgType]) -> RcDoc<'a> {
-    pp_defs(env).append(pp_named_args(args))
 }
 
 /// Collects doc comments that can be passed to the [compile_with_docs] function.

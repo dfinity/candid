@@ -10,7 +10,7 @@ type List = opt record {
 type f = func (List, func (int32) -> (int64)) -> (opt List, res);
 // Doc comment for broker service
 type broker = service {
-  find : (name : text) -> (service { current : () -> (nat32); up : () -> () });
+  find : (text) -> (service { current : () -> (nat32); up : () -> () });
 };
 // Doc comment for nested type
 type nested = record {
@@ -77,14 +77,14 @@ type tree = variant {
 };
 // Doc comment for service id
 type s = service { f : t; g : (list) -> (B, tree, stream) };
-type t = func (server : s) -> ();
+type t = func (s) -> ();
 type stream = opt record { head : nat; next : func () -> (stream) query };
 type b = record { int; nat };
 type a = variant { a; b : b };
 // Doc comment for service
 service : {
   // Doc comment for f1 method of service
-  f1 : (list, test : blob, opt bool) -> () oneway;
+  f1 : (list, blob, opt bool) -> () oneway;
   g1 : (my_type, List, opt List, nested) -> (int, broker, nested_res) query;
   h : (vec opt text, variant { A : nat; B : opt text }, opt List) -> (
       record {

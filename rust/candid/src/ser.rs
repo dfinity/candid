@@ -335,8 +335,8 @@ impl TypeSerialize {
                 }
             }
             TypeInner::Func(ref func) => {
-                for ty in &func.args {
-                    self.build_type(&ty.typ)?;
+                for ty in func.args.iter().chain(func.rets.iter()) {
+                    self.build_type(ty)?;
                 }
                 for ty in &func.rets {
                     self.build_type(ty)?;
@@ -344,7 +344,7 @@ impl TypeSerialize {
                 sleb128_encode(&mut buf, Opcode::Func as i64)?;
                 leb128_encode(&mut buf, func.args.len() as u64)?;
                 for ty in &func.args {
-                    self.encode(&mut buf, &ty.typ)?;
+                    self.encode(&mut buf, ty)?;
                 }
                 leb128_encode(&mut buf, func.rets.len() as u64)?;
                 for ty in &func.rets {

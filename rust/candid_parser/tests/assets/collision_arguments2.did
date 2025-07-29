@@ -1,3 +1,0 @@
-service : (b : nat, bool, b : text) -> {
-    f : (text, text) -> ();
-};

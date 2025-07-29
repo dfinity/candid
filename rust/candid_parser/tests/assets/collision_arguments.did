@@ -1,4 +1,0 @@
-type f = func (a : nat, b : bool, a : text) -> ();
-service : {
-    f : f;
-};

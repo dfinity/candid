@@ -6,9 +6,9 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 use syn::{Attribute, Error, ItemFn, Meta, Result, ReturnType, Signature, Type};
 
-type RawArgs = Vec<(Option<String>, String)>;
+type RawArgs = Vec<String>;
 type RawRets = Vec<String>;
-type ParsedArgs = Vec<(Option<String>, Type)>;
+type ParsedArgs = Vec<Type>;
 type ParsedRets = Vec<Type>;
 
 struct Method {
@@ -43,7 +43,7 @@ pub(crate) fn candid_method(attrs: Vec<Meta>, fun: ItemFn) -> Result<TokenStream
     let (args, rets) = get_args(sig)?;
     let args: RawArgs = args
         .iter()
-        .map(|(name, t)| (name.clone(), format!("{}", t.to_token_stream())))
+        .map(|t| format!("{}", t.to_token_stream()))
         .collect();
     let rets: RawRets = rets
         .iter()
@@ -94,7 +94,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
                     .map(|t| generate_arg(quote! { init_args }, t))
                     .collect::<Vec<_>>();
                 quote! {
-                    let mut init_args: Vec<ArgType> = Vec::new();
+                    let mut init_args: Vec<Type> = Vec::new();
                     #(#args)*
                 }
             });
@@ -138,7 +138,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
                 quote! {
                     {
                         #doc_storage
-                        let mut args: Vec<ArgType> = Vec::new();
+                        let mut args: Vec<Type> = Vec::new();
                         #(#args)*
                         let mut rets: Vec<Type> = Vec::new();
                         #(#rets)*
@@ -149,7 +149,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
             },
         );
         let service = quote! {
-            use #candid::types::{CandidType, Function, Type, ArgType, TypeInner};
+            use #candid::types::{CandidType, Function, Type, TypeInner};
             let mut service = Vec::<(String, Type)>::new();
             let mut env = #candid::types::internal::TypeContainer::new();
             let mut docs = #candid::pretty::candid::DocComments::empty();
@@ -181,22 +181,15 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
     }
 }
 
-fn generate_arg(name: TokenStream, (arg_name, ty): &(Option<String>, String)) -> TokenStream {
-    let arg_name = arg_name
-        .as_ref()
-        .map(|n| quote! { Some(#n.to_string()) })
-        .unwrap_or(quote! { None });
-    let ty = syn::parse_str::<Type>(ty.as_str()).unwrap();
-    quote! {
-        #name.push(ArgType { name: #arg_name, typ: env.add::<#ty>() });
-    }
-}
-
-fn generate_ret(name: TokenStream, ty: &str) -> TokenStream {
+fn generate_arg(name: TokenStream, ty: &str) -> TokenStream {
     let ty = syn::parse_str::<Type>(ty).unwrap();
     quote! {
         #name.push(env.add::<#ty>());
     }
+}
+
+fn generate_ret(name: TokenStream, ty: &str) -> TokenStream {
+    generate_arg(name, ty)
 }
 
 fn get_args(sig: &Signature) -> Result<(ParsedArgs, ParsedRets)> {
@@ -208,20 +201,7 @@ fn get_args(sig: &Signature) -> Result<(ParsedArgs, ParsedRets)> {
                     return Err(Error::new_spanned(arg, "only works for borrowed self"));
                 }
             }
-            syn::FnArg::Typed(syn::PatType { ty, pat, .. }) => {
-                if let syn::Pat::Ident(syn::PatIdent { ident, .. }) = pat.as_ref() {
-                    let arg_name = ident.to_string();
-                    if arg_name.starts_with("_") {
-                        // If the argument name starts with _, it usually means it's not used.
-                        // We don't need to include it in the IDL.
-                        args.push((None, ty.as_ref().clone()));
-                    } else {
-                        args.push((Some(arg_name), ty.as_ref().clone()));
-                    }
-                } else {
-                    args.push((None, ty.as_ref().clone()));
-                }
-            }
+            syn::FnArg::Typed(syn::PatType { ty, .. }) => args.push(ty.as_ref().clone()),
         }
     }
     let rets = match &sig.output {
