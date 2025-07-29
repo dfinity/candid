@@ -1,34 +1,40 @@
 # Changelog
 
-
 ## Unreleased
 
 ### Candid
 
 * [BREAKING]: type representation was optimized to improve performance:
-  * In `Type::Var(var)` `var` now has type `TypeKey` instead of `String`. Calling `var.as_str()` returns `&str` and `var.to_string()` returns a `String`. The string representation of indexed variables remains `table{index}` to maintain compatibility with previous versions.
-  * `TypeEnv` now contains a `HashMap` instead of `BTreeMap`. Code that relied on the iteration order of the map (e.g. `env.0.iter()`) should make use of the newly added `TypeEnv::to_sorted_iter()` method which returns types sorted by their keys.
+  + In `Type::Var(var)` `var` now has type `TypeKey` instead of `String`. Calling `var.as_str()` returns `&str` and `var.to_string()` returns a `String`. The string representation of indexed variables remains `table{index}` to maintain compatibility with previous versions.
+  + `TypeEnv` now contains a `HashMap` instead of `BTreeMap`. Code that relied on the iteration order of the map (e.g. `env.0.iter()`) should make use of the newly added `TypeEnv::to_sorted_iter()` method which returns types sorted by their keys.
+  + The `args` field of the `candid::types::internal::Function` struct now is a `Vec<ArgType>` instead of `Vec<Type>`, to preserve argument names.
+  + The `TypeInner::Class` variant now takes `Vec<ArgType>` instead of `Vec<Type>` as its first parameter, to preserve argument names.
+
+* Non-breaking changes:
+  + Added `pp_named_args`, `pp_named_init_args` in `pretty::candid` module.
+
+### candid_parser
+
+* Breaking changes:
+  + The `args` field in both `FuncType` and `IDLInitArgs` now have type `Vec<IDLArgType>`.
+
+* Non-breaking changes:
+  + Supports parsing the arguments' names for `func` and `service` (init args).
 
 ## 2025-07-29
 
 ### Candid 0.10.16
 
-* Breaking changes:
-  + The `args` field of the `candid::types::internal::Function` struct now is a `Vec<ArgType>` instead of `Vec<Type>`, to preserve argument names.
-  + The `TypeInner::Class` variant now takes `Vec<ArgType>` instead of `Vec<Type>` as its first parameter, to preserve argument names.
-
 * Non-breaking changes:
   + Makes the warning message for the special opt subtyping rule more explicit in the `candid::types::subtype::subtype` and `candid::types::subtype::subtype_with_config` functions.
-  + Added `pp_named_args`, `pp_named_init_args` and `pp_label_raw` in `pretty::candid` module.
+  + Added `pp_label_raw` in `pretty::candid` module.
 
 ### candid_parser 0.2.1
 
 * Breaking changes:
   + The `candid_parser::types` module has been renamed to `candid_parser::syntax`.
-  + The `args` field in both `FuncType` and `IDLInitArgs` now have type `Vec<IDLArgType>`.
 
 * Non-breaking changes:
-  + Supports parsing the arguments' names for `func` and `service` (init args).
   + Supports collecting line comments as doc comments in the following cases:
     - above services:
       ```
