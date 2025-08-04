@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Candid
+
+* Non-breaking changes:
+  + Fixes a regression in pretty printing when concatenating an empty list of documents
+
 ## 2025-07-29
 
 ### Candid 0.10.16
