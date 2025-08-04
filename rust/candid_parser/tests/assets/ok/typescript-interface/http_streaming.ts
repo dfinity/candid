@@ -83,40 +83,7 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-async function loadConfig(): Promise<{
-    backend_host: string;
-    backend_canister_id: string;
-}> {
-    try {
-        const response = await fetch("./env.json");
-        const config = await response.json();
-        return config;
-    } catch  {
-        const fallbackConfig = {
-            backend_host: "undefined",
-            backend_canister_id: "undefined"
-        };
-        return fallbackConfig;
-    }
-}
-export async function createActor(options?: CreateActorOptions): Promise<http_streamingInterface> {
-    const config = await loadConfig();
-    if (!options) {
-        options = {};
-    }
-    if (config.backend_host !== "undefined") {
-        options = {
-            ...options,
-            agentOptions: {
-                ...options.agentOptions,
-                host: config.backend_host
-            }
-        };
-    }
-    let canisterId = _canisterId;
-    if (config.backend_canister_id !== "undefined") {
-        canisterId = config.backend_canister_id;
-    }
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions): http_streamingInterface {
     const actor = _createActor(canisterId, options);
     return new Http_streaming(actor);
 }
@@ -129,8 +96,8 @@ export interface http_streamingInterface {
 import type { HeaderField as _HeaderField, HttpResponse as _HttpResponse, StreamingCallbackHttpResponse as _StreamingCallbackHttpResponse, StreamingStrategy as _StreamingStrategy, StreamingToken as _StreamingToken } from "declarations/http_streaming/http_streaming.did.d.ts";
 class Http_streaming implements http_streamingInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor: ActorSubclass<_SERVICE>){
-        this.#actor = actor;
+    constructor(actor?: ActorSubclass<_SERVICE>){
+        this.#actor = actor ?? _http_streaming;
     }
     async httpStreamingCallback(arg0: StreamingToken): Promise<StreamingCallbackHttpResponse> {
         try {
@@ -163,6 +130,7 @@ class Http_streaming implements http_streamingInterface {
         }
     }
 }
+export const http_streaming: http_streamingInterface = new Http_streaming();
 function from_candid_HttpResponse_n4(value: _HttpResponse): HttpResponse {
     return from_candid_record_n5(value);
 }

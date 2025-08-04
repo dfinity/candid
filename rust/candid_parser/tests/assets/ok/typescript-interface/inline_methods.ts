@@ -69,40 +69,7 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-async function loadConfig(): Promise<{
-    backend_host: string;
-    backend_canister_id: string;
-}> {
-    try {
-        const response = await fetch("./env.json");
-        const config = await response.json();
-        return config;
-    } catch  {
-        const fallbackConfig = {
-            backend_host: "undefined",
-            backend_canister_id: "undefined"
-        };
-        return fallbackConfig;
-    }
-}
-export async function createActor(options?: CreateActorOptions): Promise<inline_methodsInterface> {
-    const config = await loadConfig();
-    if (!options) {
-        options = {};
-    }
-    if (config.backend_host !== "undefined") {
-        options = {
-            ...options,
-            agentOptions: {
-                ...options.agentOptions,
-                host: config.backend_host
-            }
-        };
-    }
-    let canisterId = _canisterId;
-    if (config.backend_canister_id !== "undefined") {
-        canisterId = config.backend_canister_id;
-    }
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions): inline_methodsInterface {
     const actor = _createActor(canisterId, options);
     return new Inline_methods(actor);
 }
@@ -118,8 +85,8 @@ export interface inline_methodsInterface {
 }
 class Inline_methods implements inline_methodsInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor: ActorSubclass<_SERVICE>){
-        this.#actor = actor;
+    constructor(actor?: ActorSubclass<_SERVICE>){
+        this.#actor = actor ?? _inline_methods;
     }
     async add_two(arg0: bigint): Promise<bigint> {
         try {
@@ -192,4 +159,5 @@ class Inline_methods implements inline_methodsInterface {
         }
     }
 }
+export const inline_methods: inline_methodsInterface = new Inline_methods();
 

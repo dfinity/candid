@@ -135,6 +135,7 @@ class Service implements serviceInterface {
         }
     }
 }
+export const service: serviceInterface = new Service();
 function from_candid_opt_n2(value: [] | [Principal]): Principal | null {
     return value.length === 0 ? null : value[0];
 }
