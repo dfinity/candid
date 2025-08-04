@@ -76,22 +76,22 @@ export interface emptyInterface {
 }
 import type { T as _T } from "declarations/empty/empty.did.d.ts";
 class Empty implements emptyInterface {
-    #actor: ActorSubclass<_SERVICE>;
+    private actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
-        this.#actor = actor ?? _empty;
+        this.actor = actor ?? _empty;
     }
     async f(arg0: {
     }): Promise<never> {
         if (this.processError) {
             try {
-                const result = await this.#actor.f(arg0);
+                const result = await this.actor.f(arg0);
                 return from_candid_variant_n1(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.f(arg0);
+            const result = await this.actor.f(arg0);
             return from_candid_variant_n1(result);
         }
     }
@@ -100,14 +100,14 @@ class Empty implements emptyInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.#actor.g(to_candid_T_n2(arg0));
+                const result = await this.actor.g(to_candid_T_n2(arg0));
                 return from_candid_variant_n4(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.g(to_candid_T_n2(arg0));
+            const result = await this.actor.g(to_candid_T_n2(arg0));
             return from_candid_variant_n4(result);
         }
     }
@@ -119,14 +119,14 @@ class Empty implements emptyInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.#actor.h(to_candid_tuple_n7(arg0));
+                const result = await this.actor.h(to_candid_tuple_n7(arg0));
                 return from_candid_variant_n8(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.h(to_candid_tuple_n7(arg0));
+            const result = await this.actor.h(to_candid_tuple_n7(arg0));
             return from_candid_variant_n8(result);
         }
     }

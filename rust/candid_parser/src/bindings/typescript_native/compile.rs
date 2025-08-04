@@ -1167,12 +1167,12 @@ fn create_actor_class(
     converter: &mut TypeConverter,
 ) -> ClassDecl {
     // Create private actor field
-    let actor_field = ClassMember::PrivateProp(PrivateProp {
+    let actor_field = ClassMember::ClassProp(ClassProp {
         span: DUMMY_SP,
-        key: PrivateName {
+        key: PropName::Ident(IdentName {
             span: DUMMY_SP,
-            name: "actor".into(),
-        },
+            sym: "actor".into(),
+        }),
         value: None,
         type_ann: Some(Box::new(TsTypeAnn {
             span: DUMMY_SP,
@@ -1197,10 +1197,11 @@ fn create_actor_class(
                 })),
             })),
         })),
-        accessibility: None,
+        accessibility: Some(Accessibility::Private),
         is_static: false,
         decorators: vec![],
-        ctxt: SyntaxContext::empty(),
+        is_abstract: false,
+        declare: false,
         is_optional: false,
         is_override: false,
         readonly: false,
@@ -1305,9 +1306,9 @@ fn create_actor_class(
                     left: AssignTarget::Simple(SimpleAssignTarget::Member(MemberExpr {
                         span: DUMMY_SP,
                         obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
-                        prop: MemberProp::PrivateName(PrivateName {
+                        prop: MemberProp::Ident(IdentName {
                             span: DUMMY_SP,
-                            name: "actor".into(),
+                            sym: "actor".into(),
                         }),
                     })),
                     right: Box::new(Expr::Bin(BinExpr {
@@ -1474,9 +1475,9 @@ pub fn create_actor_method(
                 obj: Box::new(Expr::Member(MemberExpr {
                     span: DUMMY_SP,
                     obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
-                    prop: MemberProp::PrivateName(PrivateName {
+                    prop: MemberProp::Ident(IdentName {
                         span: DUMMY_SP,
-                        name: "actor".into(),
+                        sym: "actor".into(),
                     }),
                 })),
                 prop: MemberProp::Computed(ComputedPropName {
@@ -1501,9 +1502,9 @@ pub fn create_actor_method(
                 obj: Box::new(Expr::Member(MemberExpr {
                     span: DUMMY_SP,
                     obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
-                    prop: MemberProp::PrivateName(PrivateName {
+                    prop: MemberProp::Ident(IdentName {
                         span: DUMMY_SP,
-                        name: "actor".into(),
+                        sym: "actor".into(),
                     }),
                 })),
                 prop: MemberProp::Ident(get_ident_guarded_keyword_ok(method_id).into()),

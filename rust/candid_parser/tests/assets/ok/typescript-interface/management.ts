@@ -218,63 +218,63 @@ export interface managementInterface {
 }
 import type { bitcoin_address as _bitcoin_address, bitcoin_network as _bitcoin_network, block_hash as _block_hash, canister_id as _canister_id, canister_settings as _canister_settings, definite_canister_settings as _definite_canister_settings, ecdsa_curve as _ecdsa_curve, get_balance_request as _get_balance_request, get_current_fee_percentiles_request as _get_current_fee_percentiles_request, get_utxos_request as _get_utxos_request, get_utxos_response as _get_utxos_response, http_header as _http_header, send_transaction_request as _send_transaction_request, utxo as _utxo, wasm_module as _wasm_module } from "declarations/management/management.did.d.ts";
 class Management implements managementInterface {
-    #actor: ActorSubclass<_SERVICE>;
+    private actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
-        this.#actor = actor ?? _management;
+        this.actor = actor ?? _management;
     }
     async bitcoin_get_balance(arg0: get_balance_request): Promise<satoshi> {
         if (this.processError) {
             try {
-                const result = await this.#actor.bitcoin_get_balance(to_candid_get_balance_request_n1(arg0));
+                const result = await this.actor.bitcoin_get_balance(to_candid_get_balance_request_n1(arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.bitcoin_get_balance(to_candid_get_balance_request_n1(arg0));
+            const result = await this.actor.bitcoin_get_balance(to_candid_get_balance_request_n1(arg0));
             return result;
         }
     }
     async bitcoin_get_current_fee_percentiles(arg0: get_current_fee_percentiles_request): Promise<BigUint64Array | bigint[]> {
         if (this.processError) {
             try {
-                const result = await this.#actor.bitcoin_get_current_fee_percentiles(to_candid_get_current_fee_percentiles_request_n5(arg0));
+                const result = await this.actor.bitcoin_get_current_fee_percentiles(to_candid_get_current_fee_percentiles_request_n5(arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.bitcoin_get_current_fee_percentiles(to_candid_get_current_fee_percentiles_request_n5(arg0));
+            const result = await this.actor.bitcoin_get_current_fee_percentiles(to_candid_get_current_fee_percentiles_request_n5(arg0));
             return result;
         }
     }
     async bitcoin_get_utxos(arg0: get_utxos_request): Promise<get_utxos_response> {
         if (this.processError) {
             try {
-                const result = await this.#actor.bitcoin_get_utxos(to_candid_get_utxos_request_n7(arg0));
+                const result = await this.actor.bitcoin_get_utxos(to_candid_get_utxos_request_n7(arg0));
                 return from_candid_get_utxos_response_n10(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.bitcoin_get_utxos(to_candid_get_utxos_request_n7(arg0));
+            const result = await this.actor.bitcoin_get_utxos(to_candid_get_utxos_request_n7(arg0));
             return from_candid_get_utxos_response_n10(result);
         }
     }
     async bitcoin_send_transaction(arg0: send_transaction_request): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.bitcoin_send_transaction(to_candid_send_transaction_request_n13(arg0));
+                const result = await this.actor.bitcoin_send_transaction(to_candid_send_transaction_request_n13(arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.bitcoin_send_transaction(to_candid_send_transaction_request_n13(arg0));
+            const result = await this.actor.bitcoin_send_transaction(to_candid_send_transaction_request_n13(arg0));
             return result;
         }
     }
@@ -290,14 +290,14 @@ class Management implements managementInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.#actor.canister_status(arg0);
+                const result = await this.actor.canister_status(arg0);
                 return from_candid_record_n15(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.canister_status(arg0);
+            const result = await this.actor.canister_status(arg0);
             return from_candid_record_n15(result);
         }
     }
@@ -308,14 +308,14 @@ class Management implements managementInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.#actor.create_canister(to_candid_record_n17(arg0));
+                const result = await this.actor.create_canister(to_candid_record_n17(arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.create_canister(to_candid_record_n17(arg0));
+            const result = await this.actor.create_canister(to_candid_record_n17(arg0));
             return result;
         }
     }
@@ -324,14 +324,14 @@ class Management implements managementInterface {
     }): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.delete_canister(arg0);
+                const result = await this.actor.delete_canister(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.delete_canister(arg0);
+            const result = await this.actor.delete_canister(arg0);
             return result;
         }
     }
@@ -340,14 +340,14 @@ class Management implements managementInterface {
     }): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.deposit_cycles(arg0);
+                const result = await this.actor.deposit_cycles(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.deposit_cycles(arg0);
+            const result = await this.actor.deposit_cycles(arg0);
             return result;
         }
     }
@@ -364,14 +364,14 @@ class Management implements managementInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.#actor.ecdsa_public_key(to_candid_record_n20(arg0));
+                const result = await this.actor.ecdsa_public_key(to_candid_record_n20(arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.ecdsa_public_key(to_candid_record_n20(arg0));
+            const result = await this.actor.ecdsa_public_key(to_candid_record_n20(arg0));
             return result;
         }
     }
@@ -388,14 +388,14 @@ class Management implements managementInterface {
     }): Promise<http_response> {
         if (this.processError) {
             try {
-                const result = await this.#actor.http_request(to_candid_record_n24(arg0));
+                const result = await this.actor.http_request(to_candid_record_n24(arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.http_request(to_candid_record_n24(arg0));
+            const result = await this.actor.http_request(to_candid_record_n24(arg0));
             return result;
         }
     }
@@ -407,14 +407,14 @@ class Management implements managementInterface {
     }): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.install_code(to_candid_record_n26(arg0));
+                const result = await this.actor.install_code(to_candid_record_n26(arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.install_code(to_candid_record_n26(arg0));
+            const result = await this.actor.install_code(to_candid_record_n26(arg0));
             return result;
         }
     }
@@ -427,14 +427,14 @@ class Management implements managementInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.#actor.provisional_create_canister_with_cycles(to_candid_record_n28(arg0));
+                const result = await this.actor.provisional_create_canister_with_cycles(to_candid_record_n28(arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.provisional_create_canister_with_cycles(to_candid_record_n28(arg0));
+            const result = await this.actor.provisional_create_canister_with_cycles(to_candid_record_n28(arg0));
             return result;
         }
     }
@@ -444,28 +444,28 @@ class Management implements managementInterface {
     }): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.provisional_top_up_canister(arg0);
+                const result = await this.actor.provisional_top_up_canister(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.provisional_top_up_canister(arg0);
+            const result = await this.actor.provisional_top_up_canister(arg0);
             return result;
         }
     }
     async raw_rand(): Promise<Uint8Array | number[]> {
         if (this.processError) {
             try {
-                const result = await this.#actor.raw_rand();
+                const result = await this.actor.raw_rand();
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.raw_rand();
+            const result = await this.actor.raw_rand();
             return result;
         }
     }
@@ -481,14 +481,14 @@ class Management implements managementInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.#actor.sign_with_ecdsa(to_candid_record_n29(arg0));
+                const result = await this.actor.sign_with_ecdsa(to_candid_record_n29(arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.sign_with_ecdsa(to_candid_record_n29(arg0));
+            const result = await this.actor.sign_with_ecdsa(to_candid_record_n29(arg0));
             return result;
         }
     }
@@ -497,14 +497,14 @@ class Management implements managementInterface {
     }): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.start_canister(arg0);
+                const result = await this.actor.start_canister(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.start_canister(arg0);
+            const result = await this.actor.start_canister(arg0);
             return result;
         }
     }
@@ -513,14 +513,14 @@ class Management implements managementInterface {
     }): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.stop_canister(arg0);
+                const result = await this.actor.stop_canister(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.stop_canister(arg0);
+            const result = await this.actor.stop_canister(arg0);
             return result;
         }
     }
@@ -529,14 +529,14 @@ class Management implements managementInterface {
     }): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.uninstall_code(arg0);
+                const result = await this.actor.uninstall_code(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.uninstall_code(arg0);
+            const result = await this.actor.uninstall_code(arg0);
             return result;
         }
     }
@@ -546,14 +546,14 @@ class Management implements managementInterface {
     }): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.update_settings(to_candid_record_n30(arg0));
+                const result = await this.actor.update_settings(to_candid_record_n30(arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.update_settings(to_candid_record_n30(arg0));
+            const result = await this.actor.update_settings(to_candid_record_n30(arg0));
             return result;
         }
     }

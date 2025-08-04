@@ -114,35 +114,35 @@ export interface keywordInterface {
 }
 import type { o as _o } from "declarations/keyword/keyword.did.d.ts";
 class Keyword implements keywordInterface {
-    #actor: ActorSubclass<_SERVICE>;
+    private actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
-        this.#actor = actor ?? _keyword;
+        this.actor = actor ?? _keyword;
     }
     async Oneway(): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.Oneway();
+                const result = await this.actor.Oneway();
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.Oneway();
+            const result = await this.actor.Oneway();
             return result;
         }
     }
     async f_(arg0: o): Promise<o> {
         if (this.processError) {
             try {
-                const result = await this.#actor.f_(to_candid_o_n1(arg0));
+                const result = await this.actor.f_(to_candid_o_n1(arg0));
                 return from_candid_o_n3(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.f_(to_candid_o_n1(arg0));
+            const result = await this.actor.f_(to_candid_o_n1(arg0));
             return from_candid_o_n3(result);
         }
     }
@@ -153,14 +153,14 @@ class Keyword implements keywordInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.#actor.field(arg0);
+                const result = await this.actor.field(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.field(arg0);
+            const result = await this.actor.field(arg0);
             return result;
         }
     }
@@ -170,98 +170,98 @@ class Keyword implements keywordInterface {
     }): Promise<[bigint]> {
         if (this.processError) {
             try {
-                const result = await this.#actor.fieldnat(arg0);
+                const result = await this.actor.fieldnat(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.fieldnat(arg0);
+            const result = await this.actor.fieldnat(arg0);
             return result;
         }
     }
     async oneway(arg0: number): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.oneway(arg0);
+                const result = await this.actor.oneway(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.oneway(arg0);
+            const result = await this.actor.oneway(arg0);
             return result;
         }
     }
     async oneway_(arg0: number): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.oneway_(arg0);
+                const result = await this.actor.oneway_(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.oneway_(arg0);
+            const result = await this.actor.oneway_(arg0);
             return result;
         }
     }
     async query(arg0: Uint8Array | number[]): Promise<Uint8Array | number[]> {
         if (this.processError) {
             try {
-                const result = await this.#actor.query(arg0);
+                const result = await this.actor.query(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.query(arg0);
+            const result = await this.actor.query(arg0);
             return result;
         }
     }
     async return_(arg0: o): Promise<o> {
         if (this.processError) {
             try {
-                const result = await this.#actor.return(to_candid_o_n1(arg0));
+                const result = await this.actor.return(to_candid_o_n1(arg0));
                 return from_candid_o_n3(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.return(to_candid_o_n1(arg0));
+            const result = await this.actor.return(to_candid_o_n1(arg0));
             return from_candid_o_n3(result);
         }
     }
     async service(arg0: Principal): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.service(arg0);
+                const result = await this.actor.service(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.service(arg0);
+            const result = await this.actor.service(arg0);
             return result;
         }
     }
     async tuple(arg0: [bigint, Uint8Array | number[], string]): Promise<[bigint, number]> {
         if (this.processError) {
             try {
-                const result = await this.#actor.tuple(arg0);
+                const result = await this.actor.tuple(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.tuple(arg0);
+            const result = await this.actor.tuple(arg0);
             return result;
         }
     }
@@ -276,14 +276,14 @@ class Keyword implements keywordInterface {
     }): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.variant(to_candid_variant_n5(arg0));
+                const result = await this.actor.variant(to_candid_variant_n5(arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.variant(to_candid_variant_n5(arg0));
+            const result = await this.actor.variant(to_candid_variant_n5(arg0));
             return result;
         }
     }

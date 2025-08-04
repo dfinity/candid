@@ -73,77 +73,77 @@ export interface actorInterface {
 }
 import type { o as _o } from "declarations/actor/actor.did.d.ts";
 class Actor implements actorInterface {
-    #actor: ActorSubclass<_SERVICE>;
+    private actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
-        this.#actor = actor ?? _actor;
+        this.actor = actor ?? _actor;
     }
     async f(arg0: bigint): Promise<[Principal, string]> {
         if (this.processError) {
             try {
-                const result = await this.#actor.f(arg0);
+                const result = await this.actor.f(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.f(arg0);
+            const result = await this.actor.f(arg0);
             return result;
         }
     }
     async g(arg0: number): Promise<number> {
         if (this.processError) {
             try {
-                const result = await this.#actor.g(arg0);
+                const result = await this.actor.g(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.g(arg0);
+            const result = await this.actor.g(arg0);
             return result;
         }
     }
     async h(arg0: number): Promise<number> {
         if (this.processError) {
             try {
-                const result = await this.#actor.h(arg0);
+                const result = await this.actor.h(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.h(arg0);
+            const result = await this.actor.h(arg0);
             return result;
         }
     }
     async h2(arg0: [Principal, string]): Promise<[Principal, string]> {
         if (this.processError) {
             try {
-                const result = await this.#actor.h2(arg0);
+                const result = await this.actor.h2(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.h2(arg0);
+            const result = await this.actor.h2(arg0);
             return result;
         }
     }
     async o(arg0: o): Promise<o> {
         if (this.processError) {
             try {
-                const result = await this.#actor.o(to_candid_o_n1(arg0));
+                const result = await this.actor.o(to_candid_o_n1(arg0));
                 return from_candid_o_n3(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.o(to_candid_o_n1(arg0));
+            const result = await this.actor.o(to_candid_o_n1(arg0));
             return from_candid_o_n3(result);
         }
     }

@@ -89,28 +89,28 @@ export interface recursionInterface extends sInterface {
 }
 import type { A as _A, B as _B, list as _list, node as _node, stream as _stream, tree as _tree } from "declarations/recursion/recursion.did.d.ts";
 class Recursion implements recursionInterface {
-    #actor: ActorSubclass<_SERVICE>;
+    private actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
-        this.#actor = actor ?? _recursion;
+        this.actor = actor ?? _recursion;
     }
     async f(arg0: Principal): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.f(arg0);
+                const result = await this.actor.f(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.f(arg0);
+            const result = await this.actor.f(arg0);
             return result;
         }
     }
     async g(arg0: list): Promise<[B, tree, stream]> {
         if (this.processError) {
             try {
-                const result = await this.#actor.g(to_candid_list_n1(arg0));
+                const result = await this.actor.g(to_candid_list_n1(arg0));
                 return [
                     from_candid_B_n5(result[0]),
                     from_candid_tree_n8(result[1]),
@@ -121,7 +121,7 @@ class Recursion implements recursionInterface {
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.g(to_candid_list_n1(arg0));
+            const result = await this.actor.g(to_candid_list_n1(arg0));
             return [
                 from_candid_B_n5(result[0]),
                 from_candid_tree_n8(result[1]),

@@ -71,35 +71,35 @@ export interface classInterface {
 }
 import type { List as _List } from "declarations/class/class.did.d.ts";
 class Class implements classInterface {
-    #actor: ActorSubclass<_SERVICE>;
+    private actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
-        this.#actor = actor ?? _class;
+        this.actor = actor ?? _class;
     }
     async get(): Promise<List> {
         if (this.processError) {
             try {
-                const result = await this.#actor.get();
+                const result = await this.actor.get();
                 return from_candid_List_n1(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.get();
+            const result = await this.actor.get();
             return from_candid_List_n1(result);
         }
     }
     async set(arg0: List): Promise<List> {
         if (this.processError) {
             try {
-                const result = await this.#actor.set(to_candid_List_n4(arg0));
+                const result = await this.actor.set(to_candid_List_n4(arg0));
                 return from_candid_List_n1(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.set(to_candid_List_n4(arg0));
+            const result = await this.actor.set(to_candid_List_n4(arg0));
             return from_candid_List_n1(result);
         }
     }

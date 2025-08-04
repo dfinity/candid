@@ -88,21 +88,21 @@ export interface fieldnatInterface {
     }>;
 }
 class Fieldnat implements fieldnatInterface {
-    #actor: ActorSubclass<_SERVICE>;
+    private actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
-        this.#actor = actor ?? _fieldnat;
+        this.actor = actor ?? _fieldnat;
     }
     async bab(arg0: bigint, arg1: bigint): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor.bab(arg0, arg1);
+                const result = await this.actor.bab(arg0, arg1);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.bab(arg0, arg1);
+            const result = await this.actor.bab(arg0, arg1);
             return result;
         }
     }
@@ -111,28 +111,28 @@ class Fieldnat implements fieldnatInterface {
     }): Promise<"e20" | "e30"> {
         if (this.processError) {
             try {
-                const result = await this.#actor.bar(arg0);
+                const result = await this.actor.bar(arg0);
                 return from_candid_variant_n1(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.bar(arg0);
+            const result = await this.actor.bar(arg0);
             return from_candid_variant_n1(result);
         }
     }
     async bas(arg0: [bigint, bigint]): Promise<[string, bigint]> {
         if (this.processError) {
             try {
-                const result = await this.#actor.bas(arg0);
+                const result = await this.actor.bas(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.bas(arg0);
+            const result = await this.actor.bas(arg0);
             return result;
         }
     }
@@ -143,28 +143,28 @@ class Fieldnat implements fieldnatInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.#actor.baz(arg0);
+                const result = await this.actor.baz(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.baz(arg0);
+            const result = await this.actor.baz(arg0);
             return result;
         }
     }
     async bba(arg0: tuple): Promise<non_tuple> {
         if (this.processError) {
             try {
-                const result = await this.#actor.bba(arg0);
+                const result = await this.actor.bba(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.bba(arg0);
+            const result = await this.actor.bba(arg0);
             return result;
         }
     }
@@ -173,14 +173,14 @@ class Fieldnat implements fieldnatInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.#actor.bib(arg0);
+                const result = await this.actor.bib(arg0);
                 return from_candid_variant_n2(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.bib(arg0);
+            const result = await this.actor.bib(arg0);
             return from_candid_variant_n2(result);
         }
     }
@@ -192,14 +192,14 @@ class Fieldnat implements fieldnatInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.#actor.foo(arg0);
+                const result = await this.actor.foo(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.foo(arg0);
+            const result = await this.actor.foo(arg0);
             return result;
         }
     }

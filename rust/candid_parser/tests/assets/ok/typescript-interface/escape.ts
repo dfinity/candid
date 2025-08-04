@@ -70,21 +70,21 @@ export interface escapeInterface {
     '\n\'\"\'\'\"\"\r\t'(arg0: t): Promise<void>;
 }
 class Escape implements escapeInterface {
-    #actor: ActorSubclass<_SERVICE>;
+    private actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
-        this.#actor = actor ?? _escape;
+        this.actor = actor ?? _escape;
     }
     async '\n\'\"\'\'\"\"\r\t'(arg0: t): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor["\n'\"''\"\"\r	"](arg0);
+                const result = await this.actor["\n'\"''\"\"\r	"](arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor["\n'\"''\"\"\r	"](arg0);
+            const result = await this.actor["\n'\"''\"\"\r	"](arg0);
             return result;
         }
     }

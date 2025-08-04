@@ -78,14 +78,14 @@ export interface serviceInterface {
     }>;
 }
 class Service implements serviceInterface {
-    #actor: ActorSubclass<_SERVICE>;
+    private actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
-        this.#actor = actor ?? _service;
+        this.actor = actor ?? _service;
     }
     async asArray(): Promise<[Array<Principal>, Array<[Principal, string]>]> {
         if (this.processError) {
             try {
-                const result = await this.#actor.asArray();
+                const result = await this.actor.asArray();
                 return [
                     result[0],
                     result[1]
@@ -95,7 +95,7 @@ class Service implements serviceInterface {
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.asArray();
+            const result = await this.actor.asArray();
             return [
                 result[0],
                 result[1]
@@ -105,7 +105,7 @@ class Service implements serviceInterface {
     async asPrincipal(): Promise<[Principal, [Principal, string]]> {
         if (this.processError) {
             try {
-                const result = await this.#actor.asPrincipal();
+                const result = await this.actor.asPrincipal();
                 return [
                     result[0],
                     result[1]
@@ -115,7 +115,7 @@ class Service implements serviceInterface {
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.asPrincipal();
+            const result = await this.actor.asPrincipal();
             return [
                 result[0],
                 result[1]
@@ -125,14 +125,14 @@ class Service implements serviceInterface {
     async asRecord(): Promise<[Principal, Principal | null, [Principal, string]]> {
         if (this.processError) {
             try {
-                const result = await this.#actor.asRecord();
+                const result = await this.actor.asRecord();
                 return from_candid_tuple_n1(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.asRecord();
+            const result = await this.actor.asRecord();
             return from_candid_tuple_n1(result);
         }
     }
@@ -145,14 +145,14 @@ class Service implements serviceInterface {
     }> {
         if (this.processError) {
             try {
-                const result = await this.#actor.asVariant();
+                const result = await this.actor.asVariant();
                 return from_candid_variant_n3(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.asVariant();
+            const result = await this.actor.asVariant();
             return from_candid_variant_n3(result);
         }
     }

@@ -66,21 +66,21 @@ export const canisterId = _canisterId;
 export interface recursive_classInterface extends sInterface {
 }
 class Recursive_class implements recursive_classInterface {
-    #actor: ActorSubclass<_SERVICE>;
+    private actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
-        this.#actor = actor ?? _recursive_class;
+        this.actor = actor ?? _recursive_class;
     }
     async next(): Promise<Principal> {
         if (this.processError) {
             try {
-                const result = await this.#actor.next();
+                const result = await this.actor.next();
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor.next();
+            const result = await this.actor.next();
             return result;
         }
     }

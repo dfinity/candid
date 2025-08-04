@@ -75,63 +75,63 @@ export interface unicodeInterface {
 }
 import type { B as _B } from "declarations/unicode/unicode.did.d.ts";
 class Unicode implements unicodeInterface {
-    #actor: ActorSubclass<_SERVICE>;
+    private actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
-        this.#actor = actor ?? _unicode;
+        this.actor = actor ?? _unicode;
     }
     async ""(arg0: bigint): Promise<bigint> {
         if (this.processError) {
             try {
-                const result = await this.#actor[""](arg0);
+                const result = await this.actor[""](arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor[""](arg0);
+            const result = await this.actor[""](arg0);
             return result;
         }
     }
     async '✈️  🚗 ⛱️ '(): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.#actor["✈️  🚗 ⛱️ "]();
+                const result = await this.actor["✈️  🚗 ⛱️ "]();
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor["✈️  🚗 ⛱️ "]();
+            const result = await this.actor["✈️  🚗 ⛱️ "]();
             return result;
         }
     }
     async '函数名'(arg0: A): Promise<B> {
         if (this.processError) {
             try {
-                const result = await this.#actor["函数名"](arg0);
+                const result = await this.actor["函数名"](arg0);
                 return from_candid_B_n1(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor["函数名"](arg0);
+            const result = await this.actor["函数名"](arg0);
             return from_candid_B_n1(result);
         }
     }
     async '👀'(arg0: bigint): Promise<bigint> {
         if (this.processError) {
             try {
-                const result = await this.#actor["👀"](arg0);
+                const result = await this.actor["👀"](arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.#actor["👀"](arg0);
+            const result = await this.actor["👀"](arg0);
             return result;
         }
     }
