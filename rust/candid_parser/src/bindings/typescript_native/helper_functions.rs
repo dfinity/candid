@@ -216,7 +216,6 @@ fn generate_agent_imports() -> ImportDecl {
                 imported: None,
                 is_type_only: true,
             }),
-
         ],
         src: Box::new(Str {
             span: DUMMY_SP,
@@ -230,8 +229,6 @@ fn generate_agent_imports() -> ImportDecl {
 }
 
 pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
-
-    
     let capitalized_service_name = service_name
         .chars()
         .next()
@@ -338,32 +335,29 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
                         })),
                         alt: None,
                     }),
-                    // if (caffeineEnv.backend_host !== "undefined") { ... }
+                    // if (process.env.BACKEND_HOST) { ... }
                     Stmt::If(IfStmt {
                         span: DUMMY_SP,
-                        test: Box::new(Expr::Bin(BinExpr {
+                        test: Box::new(Expr::Member(MemberExpr {
                             span: DUMMY_SP,
-                            op: BinaryOp::NotEqEq,
-                            left: Box::new(Expr::Member(MemberExpr {
+                            obj: Box::new(Expr::Member(MemberExpr {
                                 span: DUMMY_SP,
-                                obj: Box::new(Expr::Ident(
-                                        Ident::new(
-                                            "caffeineEnv".into(),
-                                            DUMMY_SP,
-                                            SyntaxContext::empty(),
-                                        ),
-                                    )),
+                                obj: Box::new(Expr::Ident(Ident::new(
+                                    "process".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                ).into())),
                                 prop: MemberProp::Ident(Ident::new(
-                                    "backend_host".into(),
+                                    "env".into(),
                                     DUMMY_SP,
                                     SyntaxContext::empty(),
                                 ).into()),
                             })),
-                            right: Box::new(Expr::Lit(Lit::Str(Str {
-                                span: DUMMY_SP,
-                                value: "undefined".into(),
-                                raw: None,
-                            }))),
+                            prop: MemberProp::Ident(Ident::new(
+                                "BACKEND_HOST".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            ).into()),
                         })),
                         cons: Box::new(Stmt::Block(BlockStmt {
                             span: DUMMY_SP,
@@ -422,21 +416,41 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
                                                                     DUMMY_SP,
                                                                     SyntaxContext::empty(),
                                                                 ).into()),
-                                                                value: Box::new(Expr::Member(MemberExpr {
-                                                                    span: DUMMY_SP,
-                                                                    obj: Box::new(Expr::Ident(
+                                                                value: Box::new(Expr::Member(
+                                                                    MemberExpr {
+                                                                        span: DUMMY_SP,
+                                                                        obj: Box::new(
+                                                                            Expr::Member(MemberExpr {
+                                                                                span: DUMMY_SP,
+                                                                                obj: Box::new(
+                                                                                    Expr::Ident(
+                                                                                        Ident::new(
+                                                                                            "process"
+                                                                                                .into(),
+                                                                                            DUMMY_SP,
+                                                                                            SyntaxContext::empty(),
+                                                                                        ),
+                                                                                    ),
+                                                                                ),
+                                                                                prop: MemberProp::Ident(
+                                                                                    Ident::new(
+                                                                                        "env".into(),
+                                                                                        DUMMY_SP,
+                                                                                        SyntaxContext::empty(),
+                                                                                    ).into(),
+                                                                                ),
+                                                                            }),
+                                                                        ),
+                                                                        prop: MemberProp::Ident(
                                                                             Ident::new(
-                                                                                "caffeineEnv".into(),
+                                                                                "BACKEND_HOST"
+                                                                                    .into(),
                                                                                 DUMMY_SP,
                                                                                 SyntaxContext::empty(),
-                                                                            ),
-                                                                        )),
-                                                                    prop: MemberProp::Ident(Ident::new(
-                                                                        "backend_host".into(),
-                                                                        DUMMY_SP,
-                                                                        SyntaxContext::empty(),
-                                                                    ).into()),
-                                                                }))
+                                                                            ).into(),
+                                                                        ),
+                                                                    },
+                                                                )),
                                                             }),
                                                         )),
                                                     ],

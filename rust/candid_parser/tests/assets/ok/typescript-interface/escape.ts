@@ -61,19 +61,16 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-import caffeineEnv from "./env.json" with {
-    type: "json"
-};
 export function createActor(canisterId: string | Principal, options?: CreateActorOptions): escapeInterface {
     if (!options) {
         options = {};
     }
-    if (caffeineEnv.backend_host !== "undefined") {
+    if (process.env.BACKEND_HOST) {
         options = {
             ...options,
             agentOptions: {
                 ...options.agentOptions,
-                host: caffeineEnv.backend_host
+                host: process.env.BACKEND_HOST
             }
         };
     }
@@ -90,10 +87,10 @@ class Escape implements escapeInterface {
         if (actor) {
             this.#actor = actor;
         } else {
-            if (caffeineEnv.backend_host != "undefined") {
+            if (process.env.BACKEND_HOST) {
                 this.#actor = _createActor(canisterId, {
                     agentOptions: {
-                        host: caffeineEnv.backend_host
+                        host: process.env.BACKEND_HOST
                     }
                 });
             } else {

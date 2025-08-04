@@ -1,8 +1,7 @@
 {
     "compilerOptions": {
-        "target": "ESNext",
-        "module": "ESNext",
-        "moduleResolution": "Node",
+        "target": "ES2020",
+        "module": "CommonJS",
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
@@ -12,8 +11,7 @@
             "declarations/*": [
                 "./declarations/*"
             ]
-        },
-        "resolveJsonModule": true
+        }
     },
     "include": [
         "**/*.ts"
