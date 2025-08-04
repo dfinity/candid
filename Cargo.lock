@@ -479,7 +479,7 @@ dependencies = [
 
 [[package]]
 name = "didc"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "candid_parser 0.2.1",
