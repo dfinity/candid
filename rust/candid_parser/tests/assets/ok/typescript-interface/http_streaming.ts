@@ -96,37 +96,49 @@ export interface http_streamingInterface {
 import type { HeaderField as _HeaderField, HttpResponse as _HttpResponse, StreamingCallbackHttpResponse as _StreamingCallbackHttpResponse, StreamingStrategy as _StreamingStrategy, StreamingToken as _StreamingToken } from "declarations/http_streaming/http_streaming.did.d.ts";
 class Http_streaming implements http_streamingInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor?: ActorSubclass<_SERVICE>){
+    constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
         this.#actor = actor ?? _http_streaming;
     }
     async httpStreamingCallback(arg0: StreamingToken): Promise<StreamingCallbackHttpResponse> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.httpStreamingCallback(arg0);
+                return from_candid_StreamingCallbackHttpResponse_n1(result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.httpStreamingCallback(arg0);
             return from_candid_StreamingCallbackHttpResponse_n1(result);
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async http_request(arg0: HttpRequest): Promise<HttpResponse> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.http_request(arg0);
+                return from_candid_HttpResponse_n4(result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.http_request(arg0);
             return from_candid_HttpResponse_n4(result);
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async upload(arg0: string, arg1: string, arg2: Uint8Array | number[], arg3: boolean): Promise<void> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.upload(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.upload(arg0, arg1, arg2, arg3);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
 }

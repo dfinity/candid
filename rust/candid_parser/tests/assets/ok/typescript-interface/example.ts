@@ -158,65 +158,93 @@ export interface exampleInterface {
 import type { A as _A, B as _B, List as _List, a as _a, b as _b, list as _list, nested as _nested, nested_res as _nested_res, node as _node, res as _res, stream as _stream, tree as _tree } from "declarations/example/example.did.d.ts";
 class Example implements exampleInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor?: ActorSubclass<_SERVICE>){
+    constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
         this.#actor = actor ?? _example;
     }
     async bbbbb(arg0: b): Promise<void> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.bbbbb(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.bbbbb(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async f(arg0: Principal): Promise<void> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.f(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.f(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async f1(arg0: list, arg1: Uint8Array | number[], arg2: boolean | null): Promise<void> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.f1(to_candid_list_n1(arg0), arg1, to_candid_opt_n5(arg2));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.f1(to_candid_list_n1(arg0), arg1, to_candid_opt_n5(arg2));
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async g(arg0: list): Promise<[B, tree, stream]> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.g(to_candid_list_n1(arg0));
+                return [
+                    from_candid_B_n6(result[0]),
+                    from_candid_tree_n9(result[1]),
+                    from_candid_stream_n12(result[2])
+                ];
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.g(to_candid_list_n1(arg0));
             return [
                 from_candid_B_n6(result[0]),
                 from_candid_tree_n9(result[1]),
                 from_candid_stream_n12(result[2])
             ];
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async g1(arg0: my_type, arg1: List, arg2: List | null, arg3: nested): Promise<[bigint, Principal, nested_res]> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.g1(arg0, to_candid_List_n14(arg1), to_candid_opt_n17(arg2), to_candid_nested_n18(arg3));
+                return [
+                    result[0],
+                    result[1],
+                    from_candid_nested_res_n21(result[2])
+                ];
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.g1(arg0, to_candid_List_n14(arg1), to_candid_opt_n17(arg2), to_candid_nested_n18(arg3));
             return [
                 result[0],
                 result[1],
                 from_candid_nested_res_n21(result[2])
             ];
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async h(arg0: Array<string | null>, arg1: {
@@ -228,26 +256,37 @@ class Example implements exampleInterface {
         };
         id: bigint;
     }> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.h(to_candid_vec_n25(arg0), to_candid_variant_n27(arg1), to_candid_opt_n17(arg2));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.h(to_candid_vec_n25(arg0), to_candid_variant_n27(arg1), to_candid_opt_n17(arg2));
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async i(arg0: List, arg1: [Principal, string]): Promise<[List | null, res]> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.i(to_candid_List_n14(arg0), arg1);
+                return [
+                    from_candid_opt_n28(result[0]),
+                    from_candid_res_n32(result[1])
+                ];
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.i(to_candid_List_n14(arg0), arg1);
             return [
                 from_candid_opt_n28(result[0]),
                 from_candid_res_n32(result[1])
             ];
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async x(arg0: a, arg1: b): Promise<[a | null, b | null, {
@@ -257,17 +296,25 @@ class Example implements exampleInterface {
         } | {
             Err: "a" | "b";
         }]> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.x(to_candid_a_n34(arg0), arg1);
+                return [
+                    from_candid_opt_n36(result[0]),
+                    from_candid_opt_n39(result[1]),
+                    from_candid_variant_n40(result[2])
+                ];
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.x(to_candid_a_n34(arg0), arg1);
             return [
                 from_candid_opt_n36(result[0]),
                 from_candid_opt_n39(result[1]),
                 from_candid_variant_n40(result[2])
             ];
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
 }

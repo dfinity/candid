@@ -115,27 +115,35 @@ export interface keywordInterface {
 import type { o as _o } from "declarations/keyword/keyword.did.d.ts";
 class Keyword implements keywordInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor?: ActorSubclass<_SERVICE>){
+    constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
         this.#actor = actor ?? _keyword;
     }
     async Oneway(): Promise<void> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.Oneway();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.Oneway();
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async f_(arg0: o): Promise<o> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.f_(to_candid_o_n1(arg0));
+                return from_candid_o_n3(result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.f_(to_candid_o_n1(arg0));
             return from_candid_o_n3(result);
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async field(arg0: {
@@ -143,86 +151,118 @@ class Keyword implements keywordInterface {
         _1291438163_: number;
     }): Promise<{
     }> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.field(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.field(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async fieldnat(arg0: {
         _2_: bigint;
         2: bigint;
     }): Promise<[bigint]> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.fieldnat(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.fieldnat(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async oneway(arg0: number): Promise<void> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.oneway(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.oneway(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async oneway_(arg0: number): Promise<void> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.oneway_(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.oneway_(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async query(arg0: Uint8Array | number[]): Promise<Uint8Array | number[]> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.query(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.query(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async return_(arg0: o): Promise<o> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.return(to_candid_o_n1(arg0));
+                return from_candid_o_n3(result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.return(to_candid_o_n1(arg0));
             return from_candid_o_n3(result);
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async service(arg0: Principal): Promise<void> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.service(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.service(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async tuple(arg0: [bigint, Uint8Array | number[], string]): Promise<[bigint, number]> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.tuple(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.tuple(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async variant(arg0: {
@@ -234,13 +274,17 @@ class Keyword implements keywordInterface {
     } | {
         D: number;
     }): Promise<void> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.variant(to_candid_variant_n5(arg0));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.variant(to_candid_variant_n5(arg0));
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
 }

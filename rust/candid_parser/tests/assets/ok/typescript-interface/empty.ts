@@ -77,30 +77,38 @@ export interface emptyInterface {
 import type { T as _T } from "declarations/empty/empty.did.d.ts";
 class Empty implements emptyInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor?: ActorSubclass<_SERVICE>){
+    constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
         this.#actor = actor ?? _empty;
     }
     async f(arg0: {
     }): Promise<never> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.f(arg0);
+                return from_candid_variant_n1(result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.f(arg0);
             return from_candid_variant_n1(result);
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async g(arg0: T): Promise<{
         a: T;
     }> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.g(to_candid_T_n2(arg0));
+                return from_candid_variant_n4(result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.g(to_candid_T_n2(arg0));
             return from_candid_variant_n4(result);
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async h(arg0: [T, never]): Promise<{
@@ -109,13 +117,17 @@ class Empty implements emptyInterface {
         b: {
         };
     }> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.h(to_candid_tuple_n7(arg0));
+                return from_candid_variant_n8(result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.h(to_candid_tuple_n7(arg0));
             return from_candid_variant_n8(result);
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
 }

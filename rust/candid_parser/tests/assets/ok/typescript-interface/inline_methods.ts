@@ -85,77 +85,105 @@ export interface inline_methodsInterface {
 }
 class Inline_methods implements inline_methodsInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor?: ActorSubclass<_SERVICE>){
+    constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
         this.#actor = actor ?? _inline_methods;
     }
     async add_two(arg0: bigint): Promise<bigint> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.add_two(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.add_two(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async fn(arg0: bigint): Promise<bigint> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.fn(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.fn(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async high_order_fn(arg0: bigint, arg1: [Principal, string]): Promise<bigint> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.high_order_fn(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.high_order_fn(arg0, arg1);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async high_order_fn_inline(arg0: bigint, arg1: [Principal, string]): Promise<bigint> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.high_order_fn_inline(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.high_order_fn_inline(arg0, arg1);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async high_order_fn_via_id(arg0: bigint, arg1: [Principal, string]): Promise<[Principal, string]> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.high_order_fn_via_id(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.high_order_fn_via_id(arg0, arg1);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async high_order_fn_via_record(arg0: R): Promise<bigint> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.high_order_fn_via_record(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.high_order_fn_via_record(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async high_order_fn_via_record_inline(arg0: RInline): Promise<bigint> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.high_order_fn_via_record_inline(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.high_order_fn_via_record_inline(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
 }

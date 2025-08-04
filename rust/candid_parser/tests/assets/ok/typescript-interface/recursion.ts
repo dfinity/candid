@@ -90,31 +90,43 @@ export interface recursionInterface extends sInterface {
 import type { A as _A, B as _B, list as _list, node as _node, stream as _stream, tree as _tree } from "declarations/recursion/recursion.did.d.ts";
 class Recursion implements recursionInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor?: ActorSubclass<_SERVICE>){
+    constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
         this.#actor = actor ?? _recursion;
     }
     async f(arg0: Principal): Promise<void> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.f(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.f(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async g(arg0: list): Promise<[B, tree, stream]> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.g(to_candid_list_n1(arg0));
+                return [
+                    from_candid_B_n5(result[0]),
+                    from_candid_tree_n8(result[1]),
+                    from_candid_stream_n11(result[2])
+                ];
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.g(to_candid_list_n1(arg0));
             return [
                 from_candid_B_n5(result[0]),
                 from_candid_tree_n8(result[1]),
                 from_candid_stream_n11(result[2])
             ];
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
 }

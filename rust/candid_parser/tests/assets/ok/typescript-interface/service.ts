@@ -79,43 +79,61 @@ export interface serviceInterface {
 }
 class Service implements serviceInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor?: ActorSubclass<_SERVICE>){
+    constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
         this.#actor = actor ?? _service;
     }
     async asArray(): Promise<[Array<Principal>, Array<[Principal, string]>]> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.asArray();
+                return [
+                    result[0],
+                    result[1]
+                ];
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.asArray();
             return [
                 result[0],
                 result[1]
             ];
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async asPrincipal(): Promise<[Principal, [Principal, string]]> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.asPrincipal();
+                return [
+                    result[0],
+                    result[1]
+                ];
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.asPrincipal();
             return [
                 result[0],
                 result[1]
             ];
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async asRecord(): Promise<[Principal, Principal | null, [Principal, string]]> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.asRecord();
+                return from_candid_tuple_n1(result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.asRecord();
             return from_candid_tuple_n1(result);
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async asVariant(): Promise<{
@@ -125,13 +143,17 @@ class Service implements serviceInterface {
             f?: [Principal, string];
         };
     }> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.asVariant();
+                return from_candid_variant_n3(result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.asVariant();
             return from_candid_variant_n3(result);
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
 }

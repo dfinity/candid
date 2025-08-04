@@ -76,47 +76,63 @@ export interface unicodeInterface {
 import type { B as _B } from "declarations/unicode/unicode.did.d.ts";
 class Unicode implements unicodeInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor?: ActorSubclass<_SERVICE>){
+    constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
         this.#actor = actor ?? _unicode;
     }
     async ""(arg0: bigint): Promise<bigint> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor[""](arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor[""](arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async '✈️  🚗 ⛱️ '(): Promise<void> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor["✈️  🚗 ⛱️ "]();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor["✈️  🚗 ⛱️ "]();
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async '函数名'(arg0: A): Promise<B> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor["函数名"](arg0);
+                return from_candid_B_n1(result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor["函数名"](arg0);
             return from_candid_B_n1(result);
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async '👀'(arg0: bigint): Promise<bigint> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor["👀"](arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor["👀"](arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
 }

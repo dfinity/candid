@@ -67,17 +67,21 @@ export interface recursive_classInterface extends sInterface {
 }
 class Recursive_class implements recursive_classInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor?: ActorSubclass<_SERVICE>){
+    constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
         this.#actor = actor ?? _recursive_class;
     }
     async next(): Promise<Principal> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.next();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.next();
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
 }

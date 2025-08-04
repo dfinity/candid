@@ -89,39 +89,51 @@ export interface fieldnatInterface {
 }
 class Fieldnat implements fieldnatInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor?: ActorSubclass<_SERVICE>){
+    constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
         this.#actor = actor ?? _fieldnat;
     }
     async bab(arg0: bigint, arg1: bigint): Promise<void> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.bab(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.bab(arg0, arg1);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async bar(arg0: {
         2: bigint;
     }): Promise<"e20" | "e30"> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.bar(arg0);
+                return from_candid_variant_n1(result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.bar(arg0);
             return from_candid_variant_n1(result);
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async bas(arg0: [bigint, bigint]): Promise<[string, bigint]> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.bas(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.bas(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async baz(arg0: {
@@ -129,35 +141,47 @@ class Fieldnat implements fieldnatInterface {
         2: bigint;
     }): Promise<{
     }> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.baz(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.baz(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async bba(arg0: tuple): Promise<non_tuple> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.bba(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.bba(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async bib(arg0: [bigint]): Promise<{
         _0_: bigint;
     }> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.bib(arg0);
+                return from_candid_variant_n2(result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.bib(arg0);
             return from_candid_variant_n2(result);
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
     async foo(arg0: {
@@ -166,13 +190,17 @@ class Fieldnat implements fieldnatInterface {
         _2_: bigint;
         _2: bigint;
     }> {
-        try {
+        if (this.processError) {
+            try {
+                const result = await this.#actor.foo(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.#actor.foo(arg0);
             return result;
-        } catch (e) {
-            if (e && typeof e === "object" && "message" in e) {
-                throw new Error(extractAgentErrorMessage(e["message"] as string));
-            } else throw e;
         }
     }
 }
