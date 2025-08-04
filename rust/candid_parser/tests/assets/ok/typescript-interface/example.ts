@@ -126,39 +126,21 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-async function loadConfig(): Promise<{
-    backend_host: string;
-    backend_canister_id: string;
-}> {
-    try {
-        const response = await fetch("./env.json");
-        const config = await response.json();
-        return config;
-    } catch  {
-        const fallbackConfig = {
-            backend_host: "undefined",
-            backend_canister_id: "undefined"
-        };
-        return fallbackConfig;
-    }
-}
-export async function createActor(options?: CreateActorOptions): Promise<exampleInterface> {
-    const config = await loadConfig();
+import caffeineEnv from "./env.json" with {
+    type: "json"
+};
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions): exampleInterface {
     if (!options) {
         options = {};
     }
-    if (config.backend_host !== "undefined") {
+    if (caffeineEnv.backend_host !== "undefined") {
         options = {
             ...options,
             agentOptions: {
                 ...options.agentOptions,
-                host: config.backend_host
+                host: caffeineEnv.backend_host
             }
         };
-    }
-    let canisterId = _canisterId;
-    if (config.backend_canister_id !== "undefined") {
-        canisterId = config.backend_canister_id;
     }
     const actor = _createActor(canisterId, options);
     return new Example(actor);
@@ -191,8 +173,20 @@ export interface exampleInterface {
 import type { A as _A, B as _B, List as _List, a as _a, b as _b, list as _list, nested as _nested, nested_res as _nested_res, node as _node, res as _res, stream as _stream, tree as _tree } from "declarations/example/example.did.d.ts";
 class Example implements exampleInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor: ActorSubclass<_SERVICE>){
-        this.#actor = actor;
+    constructor(actor?: ActorSubclass<_SERVICE>){
+        if (actor) {
+            this.#actor = actor;
+        } else {
+            if (caffeineEnv.backend_host != "undefined") {
+                this.#actor = _createActor(canisterId, {
+                    agentOptions: {
+                        host: caffeineEnv.backend_host
+                    }
+                });
+            } else {
+                this.#actor = _createActor(canisterId);
+            }
+        }
     }
     async bbbbb(arg0: b): Promise<void> {
         try {
@@ -304,6 +298,7 @@ class Example implements exampleInterface {
         }
     }
 }
+export const example: exampleInterface = new Example();
 function from_candid_A_n8(value: _A): A {
     return from_candid_opt_n7(value);
 }

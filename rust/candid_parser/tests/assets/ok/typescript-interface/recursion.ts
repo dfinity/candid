@@ -80,39 +80,21 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-async function loadConfig(): Promise<{
-    backend_host: string;
-    backend_canister_id: string;
-}> {
-    try {
-        const response = await fetch("./env.json");
-        const config = await response.json();
-        return config;
-    } catch  {
-        const fallbackConfig = {
-            backend_host: "undefined",
-            backend_canister_id: "undefined"
-        };
-        return fallbackConfig;
-    }
-}
-export async function createActor(options?: CreateActorOptions): Promise<recursionInterface> {
-    const config = await loadConfig();
+import caffeineEnv from "./env.json" with {
+    type: "json"
+};
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions): recursionInterface {
     if (!options) {
         options = {};
     }
-    if (config.backend_host !== "undefined") {
+    if (caffeineEnv.backend_host !== "undefined") {
         options = {
             ...options,
             agentOptions: {
                 ...options.agentOptions,
-                host: config.backend_host
+                host: caffeineEnv.backend_host
             }
         };
-    }
-    let canisterId = _canisterId;
-    if (config.backend_canister_id !== "undefined") {
-        canisterId = config.backend_canister_id;
     }
     const actor = _createActor(canisterId, options);
     return new Recursion(actor);
@@ -123,8 +105,20 @@ export interface recursionInterface extends sInterface {
 import type { A as _A, B as _B, list as _list, node as _node, stream as _stream, tree as _tree } from "declarations/recursion/recursion.did.d.ts";
 class Recursion implements recursionInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor: ActorSubclass<_SERVICE>){
-        this.#actor = actor;
+    constructor(actor?: ActorSubclass<_SERVICE>){
+        if (actor) {
+            this.#actor = actor;
+        } else {
+            if (caffeineEnv.backend_host != "undefined") {
+                this.#actor = _createActor(canisterId, {
+                    agentOptions: {
+                        host: caffeineEnv.backend_host
+                    }
+                });
+            } else {
+                this.#actor = _createActor(canisterId);
+            }
+        }
     }
     async f(arg0: Principal): Promise<void> {
         try {
@@ -151,6 +145,7 @@ class Recursion implements recursionInterface {
         }
     }
 }
+export const recursion: recursionInterface = new Recursion();
 function from_candid_A_n7(value: _A): A {
     return from_candid_opt_n6(value);
 }

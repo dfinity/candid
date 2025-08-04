@@ -79,39 +79,21 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-async function loadConfig(): Promise<{
-    backend_host: string;
-    backend_canister_id: string;
-}> {
-    try {
-        const response = await fetch("./env.json");
-        const config = await response.json();
-        return config;
-    } catch  {
-        const fallbackConfig = {
-            backend_host: "undefined",
-            backend_canister_id: "undefined"
-        };
-        return fallbackConfig;
-    }
-}
-export async function createActor(options?: CreateActorOptions): Promise<keywordInterface> {
-    const config = await loadConfig();
+import caffeineEnv from "./env.json" with {
+    type: "json"
+};
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions): keywordInterface {
     if (!options) {
         options = {};
     }
-    if (config.backend_host !== "undefined") {
+    if (caffeineEnv.backend_host !== "undefined") {
         options = {
             ...options,
             agentOptions: {
                 ...options.agentOptions,
-                host: config.backend_host
+                host: caffeineEnv.backend_host
             }
         };
-    }
-    let canisterId = _canisterId;
-    if (config.backend_canister_id !== "undefined") {
-        canisterId = config.backend_canister_id;
     }
     const actor = _createActor(canisterId, options);
     return new Keyword(actor);
@@ -148,8 +130,20 @@ export interface keywordInterface {
 import type { o as _o } from "declarations/keyword/keyword.did.d.ts";
 class Keyword implements keywordInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor: ActorSubclass<_SERVICE>){
-        this.#actor = actor;
+    constructor(actor?: ActorSubclass<_SERVICE>){
+        if (actor) {
+            this.#actor = actor;
+        } else {
+            if (caffeineEnv.backend_host != "undefined") {
+                this.#actor = _createActor(canisterId, {
+                    agentOptions: {
+                        host: caffeineEnv.backend_host
+                    }
+                });
+            } else {
+                this.#actor = _createActor(canisterId);
+            }
+        }
     }
     async Oneway(): Promise<void> {
         try {
@@ -277,6 +271,7 @@ class Keyword implements keywordInterface {
         }
     }
 }
+export const keyword: keywordInterface = new Keyword();
 function from_candid_o_n3(value: _o): o {
     return from_candid_opt_n4(value);
 }

@@ -121,39 +121,21 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-async function loadConfig(): Promise<{
-    backend_host: string;
-    backend_canister_id: string;
-}> {
-    try {
-        const response = await fetch("./env.json");
-        const config = await response.json();
-        return config;
-    } catch  {
-        const fallbackConfig = {
-            backend_host: "undefined",
-            backend_canister_id: "undefined"
-        };
-        return fallbackConfig;
-    }
-}
-export async function createActor(options?: CreateActorOptions): Promise<managementInterface> {
-    const config = await loadConfig();
+import caffeineEnv from "./env.json" with {
+    type: "json"
+};
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions): managementInterface {
     if (!options) {
         options = {};
     }
-    if (config.backend_host !== "undefined") {
+    if (caffeineEnv.backend_host !== "undefined") {
         options = {
             ...options,
             agentOptions: {
                 ...options.agentOptions,
-                host: config.backend_host
+                host: caffeineEnv.backend_host
             }
         };
-    }
-    let canisterId = _canisterId;
-    if (config.backend_canister_id !== "undefined") {
-        canisterId = config.backend_canister_id;
     }
     const actor = _createActor(canisterId, options);
     return new Management(actor);
@@ -252,8 +234,20 @@ export interface managementInterface {
 import type { bitcoin_address as _bitcoin_address, bitcoin_network as _bitcoin_network, block_hash as _block_hash, canister_id as _canister_id, canister_settings as _canister_settings, definite_canister_settings as _definite_canister_settings, ecdsa_curve as _ecdsa_curve, get_balance_request as _get_balance_request, get_current_fee_percentiles_request as _get_current_fee_percentiles_request, get_utxos_request as _get_utxos_request, get_utxos_response as _get_utxos_response, http_header as _http_header, send_transaction_request as _send_transaction_request, utxo as _utxo, wasm_module as _wasm_module } from "declarations/management/management.did.d.ts";
 class Management implements managementInterface {
     #actor: ActorSubclass<_SERVICE>;
-    constructor(actor: ActorSubclass<_SERVICE>){
-        this.#actor = actor;
+    constructor(actor?: ActorSubclass<_SERVICE>){
+        if (actor) {
+            this.#actor = actor;
+        } else {
+            if (caffeineEnv.backend_host != "undefined") {
+                this.#actor = _createActor(canisterId, {
+                    agentOptions: {
+                        host: caffeineEnv.backend_host
+                    }
+                });
+            } else {
+                this.#actor = _createActor(canisterId);
+            }
+        }
     }
     async bitcoin_get_balance(arg0: get_balance_request): Promise<satoshi> {
         try {
@@ -515,6 +509,7 @@ class Management implements managementInterface {
         }
     }
 }
+export const management: managementInterface = new Management();
 function from_candid_get_utxos_response_n10(value: _get_utxos_response): get_utxos_response {
     return from_candid_record_n11(value);
 }

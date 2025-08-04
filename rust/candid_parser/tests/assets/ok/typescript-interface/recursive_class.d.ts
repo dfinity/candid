@@ -16,7 +16,7 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export declare const createActor: (options?: CreateActorOptions) => Promise<recursive_classInterface>;
+export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => recursive_classInterface;
 export declare const canisterId: string;
 export interface recursive_classInterface extends sInterface {
 }

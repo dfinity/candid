@@ -84,7 +84,7 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export declare const createActor: (options?: CreateActorOptions) => Promise<exampleInterface>;
+export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => exampleInterface;
 export declare const canisterId: string;
 export interface exampleInterface {
     bbbbb(arg0: b): Promise<void>;
