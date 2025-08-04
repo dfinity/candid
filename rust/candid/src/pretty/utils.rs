@@ -55,6 +55,10 @@ pub fn concat<'a, D>(docs: D, sep: &'a str) -> RcDoc<'a>
 where
     D: Iterator<Item = RcDoc<'a>>,
 {
+    let mut docs = docs.peekable();
+    if docs.peek().is_none() {
+        return RcDoc::nil();
+    }
     let singleline = RcDoc::intersperse(docs, RcDoc::text(sep).append(RcDoc::line()));
     let multiline = singleline.clone().append(sep);
     multiline.flat_alt(singleline)
@@ -84,4 +88,17 @@ pub fn quote_ident(id: &str) -> RcDoc {
         .append(format!("{}", id.escape_debug()))
         .append("'")
         .append(RcDoc::space())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn concat_empty() {
+        let t = concat(vec![].into_iter(), ",")
+            .pretty(LINE_WIDTH)
+            .to_string();
+        assert_eq!(t, "");
+    }
 }
