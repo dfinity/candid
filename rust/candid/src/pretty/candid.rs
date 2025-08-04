@@ -105,8 +105,8 @@ pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
         Record(ref fs) => {
             let t = Type(ty.clone().into());
             if t.is_tuple() {
-                let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ";");
-                kwd("record").append(enclose_space("{", tuple, "}"))
+                let fs = fs.iter().map(|f| pp_ty(&f.ty));
+                kwd("record").append(sep_enclose_space(fs, ";", "{", "}"))
             } else {
                 kwd("record").append(pp_fields(fs, false))
             }
@@ -149,8 +149,7 @@ pub(crate) fn pp_field(field: &Field, is_variant: bool) -> RcDoc {
 }
 
 fn pp_fields(fs: &[Field], is_variant: bool) -> RcDoc {
-    let fields = fs.iter().map(|f| pp_field(f, is_variant));
-    enclose_space("{", concat(fields, ";"), "}")
+    sep_enclose_space(fs.iter().map(|f| pp_field(f, is_variant)), ";", "{", "}")
 }
 
 pub fn pp_function(func: &Function) -> RcDoc {
@@ -165,8 +164,7 @@ pub fn pp_function(func: &Function) -> RcDoc {
 
 /// Pretty-prints arguments in the form of `(type1, type2)`.
 pub fn pp_args(args: &[Type]) -> RcDoc {
-    let doc = concat(args.iter().map(pp_ty), ",");
-    enclose("(", doc, ")")
+    sep_enclose(args.iter().map(pp_ty), ",", "(", ")")
 }
 
 /// Pretty-prints return types in the form of `(type1, type2)`.
@@ -186,22 +184,19 @@ pub fn pp_modes(modes: &[FuncMode]) -> RcDoc {
 }
 
 fn pp_service<'a>(serv: &'a [(String, Type)], docs: Option<&'a DocComments>) -> RcDoc<'a> {
-    let doc = concat(
-        serv.iter().map(|(id, func)| {
-            let doc = docs
-                .and_then(|docs| docs.lookup_service_method(id))
-                .map(|docs| pp_docs(docs))
-                .unwrap_or(RcDoc::nil());
-            let func_doc = match func.as_ref() {
-                TypeInner::Func(ref f) => pp_function(f),
-                TypeInner::Var(_) => pp_ty(func),
-                _ => unreachable!(),
-            };
-            doc.append(pp_text(id)).append(kwd(" :")).append(func_doc)
-        }),
-        ";",
-    );
-    enclose_space("{", doc, "}")
+    let methods = serv.iter().map(|(id, func)| {
+        let doc = docs
+            .and_then(|docs| docs.lookup_service_method(id))
+            .map(|docs| pp_docs(docs))
+            .unwrap_or(RcDoc::nil());
+        let func_doc = match func.as_ref() {
+            TypeInner::Func(ref f) => pp_function(f),
+            TypeInner::Var(_) => pp_ty(func),
+            _ => unreachable!(),
+        };
+        doc.append(pp_text(id)).append(kwd(" :")).append(func_doc)
+    });
+    sep_enclose_space(methods, ";", "{", "}")
 }
 
 fn pp_defs(env: &TypeEnv) -> RcDoc {
@@ -506,8 +501,8 @@ pub mod value {
     }
 
     fn pp_fields(depth: usize, fields: &[IDLField]) -> RcDoc {
-        let fs = concat(fields.iter().map(|f| pp_field(depth, f, false)), ";");
-        enclose_space("{", fs, "}")
+        let fs = fields.iter().map(|f| pp_field(depth, f, false));
+        sep_enclose_space(fs, ";", "{", "}")
     }
 
     pub fn pp_char(v: u8) -> String {
@@ -534,13 +529,13 @@ pub mod value {
                     RcDoc::as_string(format!("{v:?}"))
                 } else {
                     let values = vs.iter().map(|v| pp_value(depth - 1, v));
-                    kwd("vec").append(enclose_space("{", concat(values, ";"), "}"))
+                    kwd("vec").append(sep_enclose_space(values, ";", "{", "}"))
                 }
             }
             Record(fields) => {
                 if is_tuple(v) {
                     let fields = fields.iter().map(|f| pp_value(depth - 1, &f.val));
-                    kwd("record").append(enclose_space("{", concat(fields, ";"), "}"))
+                    kwd("record").append(sep_enclose_space(fields, ";", "{", "}"))
                 } else {
                     kwd("record").append(pp_fields(depth, fields))
                 }
@@ -557,6 +552,6 @@ pub mod value {
             .args
             .iter()
             .map(|v| pp_value(MAX_ELEMENTS_FOR_PRETTY_PRINT, v));
-        enclose("(", concat(args, ","), ")")
+        sep_enclose(args, ",", "(", ")")
     }
 }

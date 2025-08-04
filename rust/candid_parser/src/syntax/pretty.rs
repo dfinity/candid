@@ -3,7 +3,7 @@ use pretty::RcDoc;
 use crate::{
     pretty::{
         candid::{pp_docs, pp_label_raw, pp_modes, pp_text},
-        utils::{concat, enclose, enclose_space, ident, kwd, lines, str, INDENT_SPACE, LINE_WIDTH},
+        utils::{ident, kwd, lines, sep_enclose, sep_enclose_space, str, INDENT_SPACE, LINE_WIDTH},
     },
     syntax::{Binding, FuncType, IDLActorType, IDLMergedProg, IDLType, PrimType, TypeField},
 };
@@ -52,7 +52,7 @@ fn pp_field(field: &TypeField, is_variant: bool) -> RcDoc {
 
 fn pp_fields(fs: &[TypeField], is_variant: bool) -> RcDoc {
     let fields = fs.iter().map(|f| pp_field(f, is_variant));
-    enclose_space("{", concat(fields, ";"), "}")
+    sep_enclose_space(fields, ";", "{", "}")
 }
 
 fn pp_opt(ty: &IDLType) -> RcDoc {
@@ -69,8 +69,8 @@ fn pp_vec(ty: &IDLType) -> RcDoc {
 
 fn pp_record(fs: &[TypeField], is_tuple: bool) -> RcDoc {
     if is_tuple {
-        let tuple = concat(fs.iter().map(|f| pp_ty(&f.typ)), ";");
-        kwd("record").append(enclose_space("{", tuple, "}"))
+        let fs = fs.iter().map(|f| pp_ty(&f.typ));
+        kwd("record").append(sep_enclose_space(fs, ";", "{", "}"))
     } else {
         kwd("record").append(pp_fields(fs, false))
     }
@@ -95,8 +95,7 @@ fn pp_method(func: &FuncType) -> RcDoc {
 }
 
 fn pp_args(args: &[IDLType]) -> RcDoc {
-    let doc = concat(args.iter().map(pp_ty), ",");
-    enclose("(", doc, ")")
+    sep_enclose(args.iter().map(pp_ty), ",", "(", ")")
 }
 
 fn pp_rets(rets: &[IDLType]) -> RcDoc {
@@ -119,8 +118,7 @@ fn pp_service_methods(methods: &[Binding]) -> RcDoc {
             .append(kwd(" :"))
             .append(func_doc)
     });
-    let doc = concat(methods, ";");
-    enclose_space("{", doc, "}")
+    sep_enclose_space(methods, ";", "{", "}")
 }
 
 fn pp_class<'a>(args: &'a [IDLType], t: &'a IDLType) -> RcDoc<'a> {

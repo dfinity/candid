@@ -427,8 +427,7 @@ fn test_{test_name}() {{
                     docs.append(self.pp_record_field(f, need_vis, is_ref))
                 })
                 .collect();
-            let fields = concat(fields.into_iter(), ",");
-            enclose_space("{", fields, "}")
+            sep_enclose_space(fields, ",", "{", "}")
         };
         if let Some(old) = old {
             self.state.pop_state(old, StateElem::TypeStr("record"));
@@ -491,7 +490,7 @@ fn test_{test_name}() {{
             let (docs, syntax_field) = find_field(syntax, &f.id);
             docs.append(self.pp_variant_field(f, syntax_field))
         });
-        let res = enclose_space("{", concat(fields, ","), "}");
+        let res = sep_enclose_space(fields, ",", "{", "}");
         self.state.pop_state(old, StateElem::TypeStr("variant"));
         res
     }
@@ -609,7 +608,7 @@ fn test_{test_name}() {{
             self.state.pop_state(old, StateElem::Label(&lab));
             res
         });
-        enclose("(", concat(tys.into_iter(), ","), ")")
+        sep_enclose(tys, ",", "(", ")")
     }
     fn pp_rets<'b>(&mut self, rets: &'b [Type]) -> RcDoc<'b> {
         self.pp_args(rets, "ret")
@@ -643,7 +642,7 @@ fn test_{test_name}() {{
                 .append(kwd("\" :"))
                 .append(func_doc)
         });
-        let res = enclose_space("{", concat(methods, ";"), "}");
+        let res = sep_enclose_space(methods, ";", "{", "}");
         self.state.pop_state(old, lab);
         res
     }

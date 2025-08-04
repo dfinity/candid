@@ -161,17 +161,14 @@ fn pp_record<'a>(
     is_ref: bool,
 ) -> RcDoc<'a> {
     if is_tuple_fields(fields) {
-        let tuple = concat(fields.iter().map(|f| pp_ty(env, &f.ty, is_ref)), ",");
-        enclose("[", tuple, "]")
+        let fs = fields.iter().map(|f| pp_ty(env, &f.ty, is_ref));
+        sep_enclose(fs, ",", "[", "]")
     } else {
-        let fields = concat(
-            fields.iter().map(|f| {
-                let (docs, syntax_field) = find_field(syntax, &f.id);
-                docs.append(pp_field(env, f, syntax_field, is_ref))
-            }),
-            ",",
-        );
-        enclose_space("{", fields, "}")
+        let fields = fields.iter().map(|f| {
+            let (docs, syntax_field) = find_field(syntax, &f.id);
+            docs.append(pp_field(env, f, syntax_field, is_ref))
+        });
+        sep_enclose_space(fields, ",", "{", "}")
     }
 }
 
@@ -207,13 +204,14 @@ fn pp_opt<'a>(
 
 fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
     let args = func.args.iter().map(|arg| pp_ty(env, arg, true));
-    let args = enclose("[", concat(args, ","), "]");
+    let args = sep_enclose(args, ",", "[", "]");
     let rets = match func.rets.len() {
         0 => str("undefined"),
         1 => pp_ty(env, &func.rets[0], true),
-        _ => enclose(
+        _ => sep_enclose(
+            func.rets.iter().map(|ty| pp_ty(env, ty, true)),
+            ",",
             "[",
-            concat(func.rets.iter().map(|ty| pp_ty(env, ty, true)), ","),
             "]",
         ),
     };
@@ -243,7 +241,7 @@ fn pp_service<'a>(
         };
         docs.append(quote_ident(id)).append(kwd(":")).append(func)
     });
-    enclose_space("{", concat(methods, ","), "}")
+    sep_enclose_space(methods, ",", "{", "}")
 }
 
 fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {

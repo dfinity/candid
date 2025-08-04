@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+
+### Candid
+
+* Breaking changes:
+  + Removed the `candid::pretty::concat` function
+  + `candid::pretty::enclose` and `candid::pretty:enclose_space` don't collapse the separators on empty documents anymore
+
 ## 2025-07-29
 
 ### Candid 0.10.16
