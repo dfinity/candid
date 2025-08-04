@@ -122,18 +122,6 @@ export declare interface CreateActorOptions {
     actorOptions?: ActorConfig;
 }
 export function createActor(canisterId: string | Principal, options?: CreateActorOptions): managementInterface {
-    if (!options) {
-        options = {};
-    }
-    if (process.env.BACKEND_HOST) {
-        options = {
-            ...options,
-            agentOptions: {
-                ...options.agentOptions,
-                host: process.env.BACKEND_HOST
-            }
-        };
-    }
     const actor = _createActor(canisterId, options);
     return new Management(actor);
 }
@@ -232,15 +220,7 @@ import type { bitcoin_address as _bitcoin_address, bitcoin_network as _bitcoin_n
 class Management implements managementInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
-        if (!actor) {
-            this.#actor = _createActor(canisterId, {
-                agentOptions: {
-                    host: process.env.BACKEND_HOST
-                }
-            });
-        } else {
-            this.#actor = actor;
-        }
+        this.#actor = actor ?? _management;
     }
     async bitcoin_get_balance(arg0: get_balance_request): Promise<satoshi> {
         try {
