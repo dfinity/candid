@@ -80,18 +80,14 @@ export interface recursive_classInterface extends sInterface {
 class Recursive_class implements recursive_classInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
-        if (actor) {
-            this.#actor = actor;
+        if (!actor) {
+            this.#actor = _createActor(canisterId, {
+                agentOptions: {
+                    host: process.env.BACKEND_HOST
+                }
+            });
         } else {
-            if (process.env.BACKEND_HOST) {
-                this.#actor = _createActor(canisterId, {
-                    agentOptions: {
-                        host: process.env.BACKEND_HOST
-                    }
-                });
-            } else {
-                this.#actor = _createActor(canisterId);
-            }
+            this.#actor = actor;
         }
     }
     async next(): Promise<Principal> {

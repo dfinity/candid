@@ -85,18 +85,14 @@ import type { A as _A, B as _B, C as _C, X as _X, Y as _Y, Z as _Z } from "decla
 class Cyclic implements cyclicInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
-        if (actor) {
-            this.#actor = actor;
+        if (!actor) {
+            this.#actor = _createActor(canisterId, {
+                agentOptions: {
+                    host: process.env.BACKEND_HOST
+                }
+            });
         } else {
-            if (process.env.BACKEND_HOST) {
-                this.#actor = _createActor(canisterId, {
-                    agentOptions: {
-                        host: process.env.BACKEND_HOST
-                    }
-                });
-            } else {
-                this.#actor = _createActor(canisterId);
-            }
+            this.#actor = actor;
         }
     }
     async f(arg0: A, arg1: B, arg2: C, arg3: X, arg4: Y, arg5: Z): Promise<void> {

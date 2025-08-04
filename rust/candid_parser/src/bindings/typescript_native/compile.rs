@@ -1253,12 +1253,109 @@ fn create_actor_class(
             stmts: vec![
                 Stmt::If(IfStmt {
                     span: DUMMY_SP,
-                    test: Box::new(Expr::Ident(Ident::new(
-                        "actor".into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    ))),
+                    test: Box::new(Expr::Unary(UnaryExpr {
+                        span: DUMMY_SP,
+                        op: UnaryOp::Bang,
+                        arg: Box::new(Expr::Ident(Ident::new(
+                            "actor".into(),
+                            DUMMY_SP,
+                            SyntaxContext::empty(),
+                        ))),
+                    })),
                     cons: Box::new(Stmt::Block(BlockStmt {
+                        span: DUMMY_SP,
+                        stmts: vec![
+                            Stmt::Expr(ExprStmt {
+                                span: DUMMY_SP,
+                                expr: Box::new(Expr::Assign(AssignExpr {
+                                    span: DUMMY_SP,
+                                    op: AssignOp::Assign,
+                                    left: AssignTarget::Simple(SimpleAssignTarget::Member(MemberExpr {
+                                        span: DUMMY_SP,
+                                        obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
+                                        prop: MemberProp::PrivateName(PrivateName {
+                                            span: DUMMY_SP,
+                                            name: "actor".into(),
+                                        }),
+                                    })),
+                                    right: Box::new(Expr::Call(CallExpr {
+                                        span: DUMMY_SP,
+                                        callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
+                                            "_createActor".into(),
+                                            DUMMY_SP,
+                                            SyntaxContext::empty(),
+                                        )))),
+                                        args: vec![
+                                            ExprOrSpread {
+                                                spread: None,
+                                                expr: Box::new(Expr::Ident(Ident::new(
+                                                    "canisterId".into(),
+                                                    DUMMY_SP,
+                                                    SyntaxContext::empty(),
+                                                ))),
+                                            },
+                                            ExprOrSpread {
+                                                spread: None,
+                                                expr: Box::new(Expr::Object(ObjectLit {
+                                                    span: DUMMY_SP,
+                                                    props: vec![
+                                                        PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                                                            key: PropName::Ident(Ident::new(
+                                                                "agentOptions".into(),
+                                                                DUMMY_SP,
+                                                                SyntaxContext::empty(),
+                                                            ).into()),
+                                                            value: Box::new(Expr::Object(ObjectLit {
+                                                                span: DUMMY_SP,
+                                                                props: vec![
+                                                                    PropOrSpread::Prop(Box::new(Prop::KeyValue(
+                                                                        KeyValueProp {
+                                                                            key: PropName::Ident(Ident::new(
+                                                                                "host".into(),
+                                                                                DUMMY_SP,
+                                                                                SyntaxContext::empty(),
+                                                                            ).into()),
+                                                                            value: Box::new(Expr::Member(MemberExpr {
+                                                                                span: DUMMY_SP,
+                                                                                obj: Box::new(Expr::Member(MemberExpr {
+                                                                                    span: DUMMY_SP,
+                                                                                    obj: Box::new(Expr::Ident(
+                                                                                        Ident::new(
+                                                                                            "process".into(),
+                                                                                            DUMMY_SP,
+                                                                                            SyntaxContext::empty(),
+                                                                                        ),
+                                                                                    )),
+                                                                                    prop: MemberProp::Ident(Ident::new(
+                                                                                        "env".into(),
+                                                                                        DUMMY_SP,
+                                                                                        SyntaxContext::empty(),
+                                                                                    ).into()),
+                                                                                })),
+                                                                                prop: MemberProp::Ident(Ident::new(
+                                                                                    "BACKEND_HOST".into(),
+                                                                                    DUMMY_SP,
+                                                                                    SyntaxContext::empty(),
+                                                                                ).into()),
+                                                                            })),
+                                                                        },
+                                                                    ))),
+                                                                ],
+                                                            })),
+                                                        })))
+                                                    ],
+                                                })),
+                                            },
+                                        ],
+                                        type_args: None,
+                                        ctxt: SyntaxContext::empty(),
+                                    })),
+                                })),
+                            }),
+                        ],
+                        ctxt: SyntaxContext::empty(),
+                    })),
+                    alt: Some(Box::new(Stmt::Block(BlockStmt {
                         span: DUMMY_SP,
                         stmts: vec![
                             Stmt::Expr(ExprStmt {
@@ -1280,172 +1377,6 @@ fn create_actor_class(
                                         SyntaxContext::empty(),
                                     ))),
                                 })),
-                            }),
-                        ],
-                        ctxt: SyntaxContext::empty(),
-                    })),
-                    alt: Some(Box::new(Stmt::Block(BlockStmt {
-                        span: DUMMY_SP,
-                        stmts: vec![
-                            Stmt::If(IfStmt {
-                                span: DUMMY_SP,
-                                test: Box::new(Expr::Member(MemberExpr {
-                                    span: DUMMY_SP,
-                                    obj: Box::new(Expr::Member(MemberExpr {
-                                        span: DUMMY_SP,
-                                        obj: Box::new(Expr::Ident(
-                                            Ident::new(
-                                                "process".into(),
-                                                DUMMY_SP,
-                                                SyntaxContext::empty(),
-                                            ),
-                                        )),
-                                        prop: MemberProp::Ident(Ident::new(
-                                            "env".into(),
-                                            DUMMY_SP,
-                                            SyntaxContext::empty(),
-                                        ).into()),
-                                    })),
-                                    prop: MemberProp::Ident(Ident::new(
-                                        "BACKEND_HOST".into(),
-                                        DUMMY_SP,
-                                        SyntaxContext::empty(),
-                                    ).into()),
-                                })),
-                                cons: Box::new(Stmt::Block(BlockStmt {
-                                    span: DUMMY_SP,
-                                    stmts: vec![
-                                        Stmt::Expr(ExprStmt {
-                                            span: DUMMY_SP,
-                                            expr: Box::new(Expr::Assign(AssignExpr {
-                                                span: DUMMY_SP,
-                                                op: AssignOp::Assign,
-                                                left: AssignTarget::Simple(SimpleAssignTarget::Member(MemberExpr {
-                                                    span: DUMMY_SP,
-                                                    obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
-                                                    prop: MemberProp::PrivateName(PrivateName {
-                                                        span: DUMMY_SP,
-                                                        name: "actor".into(),
-                                                    }),
-                                                })),
-                                                right: Box::new(Expr::Call(CallExpr {
-                                                    span: DUMMY_SP,
-                                                    callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                                                        "_createActor".into(),
-                                                        DUMMY_SP,
-                                                        SyntaxContext::empty(),
-                                                    )))),
-                                                    args: vec![
-                                                        ExprOrSpread {
-                                                            spread: None,
-                                                            expr: Box::new(Expr::Ident(Ident::new(
-                                                                "canisterId".into(),
-                                                                DUMMY_SP,
-                                                                SyntaxContext::empty(),
-                                                            ))),
-                                                        },
-                                                        ExprOrSpread {
-                                                            spread: None,
-                                                            expr: Box::new(Expr::Object(ObjectLit {
-                                                                span: DUMMY_SP,
-                                                                props: vec![
-                                                                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                                                                        key: PropName::Ident(Ident::new(
-                                                                            "agentOptions".into(),
-                                                                            DUMMY_SP,
-                                                                            SyntaxContext::empty(),
-                                                                        ).into()),
-                                                                        value: Box::new(Expr::Object(ObjectLit {
-                                                                            span: DUMMY_SP,
-                                                                            props: vec![
-                                                                                PropOrSpread::Prop(Box::new(Prop::KeyValue(
-                                                                                    KeyValueProp {
-                                                                                        key: PropName::Ident(Ident::new(
-                                                                                            "host".into(),
-                                                                                            DUMMY_SP,
-                                                                                            SyntaxContext::empty(),
-                                                                                        ).into()),
-                                                                                        value: Box::new(Expr::Member(MemberExpr {
-                                                                                            span: DUMMY_SP,
-                                                                                            obj: Box::new(Expr::Member(MemberExpr {
-                                                                                                span: DUMMY_SP,
-                                                                                                obj: Box::new(Expr::Ident(
-                                                                                                    Ident::new(
-                                                                                                        "process".into(),
-                                                                                                        DUMMY_SP,
-                                                                                                        SyntaxContext::empty(),
-                                                                                                    ),
-                                                                                                )),
-                                                                                                prop: MemberProp::Ident(Ident::new(
-                                                                                                    "env".into(),
-                                                                                                    DUMMY_SP,
-                                                                                                    SyntaxContext::empty(),
-                                                                                                ).into()),
-                                                                                            })),
-                                                                                            prop: MemberProp::Ident(Ident::new(
-                                                                                                "BACKEND_HOST".into(),
-                                                                                                DUMMY_SP,
-                                                                                                SyntaxContext::empty(),
-                                                                                            ).into()),
-                                                                                        })),
-                                                                                    },
-                                                                                ))),
-                                                                            ],
-                                                                        })),
-                                                                    })))
-                                                                ],
-                                                            })),
-                                                        },
-                                                    ],
-                                                    type_args: None,
-                                                    ctxt: SyntaxContext::empty(),
-                                                })),
-                                            })),
-                                        }),
-                                    ],
-                                    ctxt: SyntaxContext::empty(),
-                                })),
-                                alt: Some(Box::new(Stmt::Block(BlockStmt {
-                                    span: DUMMY_SP,
-                                    stmts: vec![
-                                        Stmt::Expr(ExprStmt {
-                                            span: DUMMY_SP,
-                                            expr: Box::new(Expr::Assign(AssignExpr {
-                                                span: DUMMY_SP,
-                                                op: AssignOp::Assign,
-                                                left: AssignTarget::Simple(SimpleAssignTarget::Member(MemberExpr {
-                                                    span: DUMMY_SP,
-                                                    obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
-                                                    prop: MemberProp::PrivateName(PrivateName {
-                                                        span: DUMMY_SP,
-                                                        name: "actor".into(),
-                                                    }),
-                                                })),
-                                                right: Box::new(Expr::Call(CallExpr {
-                                                    span: DUMMY_SP,
-                                                    callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
-                                                        "_createActor".into(),
-                                                        DUMMY_SP,
-                                                        SyntaxContext::empty(),
-                                                    )))),
-                                                    args: vec![
-                                                        ExprOrSpread {
-                                                            spread: None,
-                                                            expr: Box::new(Expr::Ident(Ident::new(
-                                                                "canisterId".into(),
-                                                                DUMMY_SP,
-                                                                SyntaxContext::empty(),
-                                                            ))),
-                                                        },
-                                                    ],
-                                                    type_args: None,
-                                                    ctxt: SyntaxContext::empty(),
-                                                })),
-                                            })),
-                                        }),
-                                    ],
-                                    ctxt: SyntaxContext::empty(),
-                                }))),
                             }),
                         ],
                         ctxt: SyntaxContext::empty(),

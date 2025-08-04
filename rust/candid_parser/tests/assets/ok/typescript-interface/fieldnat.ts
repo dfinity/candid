@@ -102,18 +102,14 @@ export interface fieldnatInterface {
 class Fieldnat implements fieldnatInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
-        if (actor) {
-            this.#actor = actor;
+        if (!actor) {
+            this.#actor = _createActor(canisterId, {
+                agentOptions: {
+                    host: process.env.BACKEND_HOST
+                }
+            });
         } else {
-            if (process.env.BACKEND_HOST) {
-                this.#actor = _createActor(canisterId, {
-                    agentOptions: {
-                        host: process.env.BACKEND_HOST
-                    }
-                });
-            } else {
-                this.#actor = _createActor(canisterId);
-            }
+            this.#actor = actor;
         }
     }
     async bab(arg0: bigint, arg1: bigint): Promise<void> {

@@ -92,18 +92,14 @@ export interface serviceInterface {
 class Service implements serviceInterface {
     #actor: ActorSubclass<_SERVICE>;
     constructor(actor?: ActorSubclass<_SERVICE>){
-        if (actor) {
-            this.#actor = actor;
+        if (!actor) {
+            this.#actor = _createActor(canisterId, {
+                agentOptions: {
+                    host: process.env.BACKEND_HOST
+                }
+            });
         } else {
-            if (process.env.BACKEND_HOST) {
-                this.#actor = _createActor(canisterId, {
-                    agentOptions: {
-                        host: process.env.BACKEND_HOST
-                    }
-                });
-            } else {
-                this.#actor = _createActor(canisterId);
-            }
+            this.#actor = actor;
         }
     }
     async asArray(): Promise<[Array<Principal>, Array<[Principal, string]>]> {
