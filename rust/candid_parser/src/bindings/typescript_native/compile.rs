@@ -1,10 +1,12 @@
 use super::super::javascript::is_tuple;
 use super::generate_wrapper::{convert_multi_return_from_candid, TypeConverter};
-use super::helper_functions::{
-    add_create_actor_imports_and_interface, add_option_helpers_interface,
-    add_option_helpers_wrapper, create_canister_id_assignment, create_canister_id_declaration,
+use super::preamble::actor::{
+    create_canister_id_assignment, create_canister_id_declaration,
     generate_create_actor_function, generate_create_actor_function_declaration,
 };
+use super::preamble::options::{add_option_helpers_interface,
+    add_option_helpers_wrapper};
+use super::preamble::imports::add_create_actor_imports_and_interface;
 use super::ident::{
     contains_unicode_characters, get_ident_guarded, get_ident_guarded_keyword_ok,
 };

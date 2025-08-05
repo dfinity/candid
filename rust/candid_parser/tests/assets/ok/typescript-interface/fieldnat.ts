@@ -44,11 +44,6 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
-function extractAgentErrorMessage(error: string): string {
-    const errorString = String(error);
-    const match = errorString.match(/with message:\s*'([^']+)'/s);
-    return match ? match[1] : errorString;
-}
 export interface non_tuple {
     _1_: string;
     _2_: string;
