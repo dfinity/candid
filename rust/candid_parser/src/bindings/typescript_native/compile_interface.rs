@@ -1,5 +1,5 @@
-use super::generate_wrapper::TypeConverter;
-use super::ident::get_ident_guarded;
+use super::conversion_functions_generator::TypeConverter;
+use super::utils::get_ident_guarded;
 use super::preamble::actor::interface_canister_initialization;
 use super::preamble::imports::{interface_create_actor_options, interface_imports};
 use super::preamble::options::interface_options_utils;
@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use swc_core::common::DUMMY_SP;
 use swc_core::ecma::ast::*;
 
-use super::convert_types::{add_type_definitions, create_interface_from_service};
+use super::new_typescript_native_types::{add_type_definitions, create_interface_from_service};
 
 pub fn compile_interface(env: &TypeEnv, actor: &Option<Type>, service_name: &str) -> String {
     let enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)> = &mut HashMap::new();

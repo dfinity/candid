@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 
-use super::ident::get_ident_guarded_keyword_ok;
+use super::utils::get_ident_guarded_keyword_ok;
 
 pub struct CandidTypesConverter<'a> {
     env: &'a TypeEnv,

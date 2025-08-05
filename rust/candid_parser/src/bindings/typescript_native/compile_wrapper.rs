@@ -1,14 +1,14 @@
-use super::generate_wrapper::TypeConverter;
-use super::ident::{contains_unicode_characters, get_ident_guarded, get_ident_guarded_keyword_ok};
+use super::conversion_functions_generator::TypeConverter;
+use super::utils::{contains_unicode_characters, get_ident_guarded, get_ident_guarded_keyword_ok};
 use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
 
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 
-use super::convert_types::convert_type;
-use super::generate_wrapper::convert_multi_return_from_candid;
+use super::new_typescript_native_types::convert_type;
+use super::conversion_functions_generator::convert_multi_return_from_candid;
 
-use super::convert_types::add_type_definitions;
+use super::new_typescript_native_types::add_type_definitions;
 use super::preamble::actor::wrapper_canister_initialization;
 use super::preamble::imports::{interface_create_actor_options, wrapper_imports};
 use super::preamble::options::{interface_options_utils, wrapper_options_utils};

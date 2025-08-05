@@ -1,11 +1,46 @@
 use super::super::javascript::is_tuple;
-use super::ident::{get_ident_guarded, get_ident_guarded_keyword_ok};
+use super::utils::{get_ident_guarded, get_ident_guarded_keyword_ok};
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use std::collections::HashMap;
 
-use super::utils::is_recursive_optional;
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
+
+// Helper function to determine if a type is recursively optional
+pub fn is_recursive_optional(
+    env: &TypeEnv,
+    ty: &Type,
+    visited: &mut std::collections::HashSet<String>,
+) -> bool {
+    use TypeInner::*;
+
+    match ty.as_ref() {
+        Var(id) => {
+            if !visited.insert(id.clone()) {
+                // We've seen this type before, it's recursive
+                return true;
+            }
+
+            if let Ok(inner_type) = env.find_type(id) {
+                is_recursive_optional(env, inner_type, visited)
+            } else {
+                false
+            }
+        }
+        Opt(inner) => {
+            // If we have an optional type, check its inner type
+            if let Var(id) = inner.as_ref() {
+                if visited.contains(id) {
+                    // Found recursive optional
+                    return true;
+                }
+            }
+            is_recursive_optional(env, inner, visited)
+        }
+        _ => false,
+    }
+}
+
 
 // Create TS interface from Candid service
 pub fn create_interface_from_service(

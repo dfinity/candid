@@ -1,7 +1,7 @@
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 
-use super::super::ident::get_ident_guarded;
+use super::super::utils::get_ident_guarded;
 
 pub fn interface_canister_initialization(service_name: &str, module: &mut Module) {
     let actor_interface = ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
