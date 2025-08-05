@@ -423,7 +423,11 @@ impl<'a> OriginalTypescriptTypes<'a> {
         }
     }
 
-    pub fn add_import_for_original_type_definitions(&mut self, module: &mut Module, service_name: &str) {
+    pub fn add_import_for_original_type_definitions(
+        &mut self,
+        module: &mut Module,
+        service_name: &str,
+    ) {
         // Use the collected required imports instead of passed-in types
         let required_imports = self.get_required_candid_imports();
         if required_imports.is_empty() {

@@ -118,37 +118,37 @@ impl<'a> TypeConverter<'a> {
 
     fn type_prefix(&self, ty: &Type) -> &str {
         match ty.as_ref() {
-           TypeInner::Null => "null",
-                    TypeInner::Bool => "bool",
-                    TypeInner::Nat => "nat",
-                    TypeInner::Int => "int",
-                    TypeInner::Nat8 => "nat8",
-                    TypeInner::Nat16 => "nat16",
-                    TypeInner::Nat32 => "nat32",
-                    TypeInner::Nat64 => "nat64",
-                    TypeInner::Int8 => "int8",
-                    TypeInner::Int16 => "int16",
-                    TypeInner::Int32 => "int32",
-                    TypeInner::Int64 => "int64",
-                    TypeInner::Float32 => "float32",
-                    TypeInner::Float64 => "float64",
-                    TypeInner::Text => "text",
-                    TypeInner::Reserved => "reserved",
-                    TypeInner::Empty => "empty",
-                    TypeInner::Principal => "principal",
-                    TypeInner::Opt(_) => "opt",
-                    TypeInner::Vec(_) => "vec",
-                    TypeInner::Record(fields) => {
-                        if self.is_tuple(fields) {
-                            "tuple"
-                        } else {
-                            "record"
-                        }
-                    }
-                    TypeInner::Variant(_) => "variant",
-                    TypeInner::Func(_) => "func",
-                    TypeInner::Service(_) => "service",
-                    _ => "anonymous",
+            TypeInner::Null => "null",
+            TypeInner::Bool => "bool",
+            TypeInner::Nat => "nat",
+            TypeInner::Int => "int",
+            TypeInner::Nat8 => "nat8",
+            TypeInner::Nat16 => "nat16",
+            TypeInner::Nat32 => "nat32",
+            TypeInner::Nat64 => "nat64",
+            TypeInner::Int8 => "int8",
+            TypeInner::Int16 => "int16",
+            TypeInner::Int32 => "int32",
+            TypeInner::Int64 => "int64",
+            TypeInner::Float32 => "float32",
+            TypeInner::Float64 => "float64",
+            TypeInner::Text => "text",
+            TypeInner::Reserved => "reserved",
+            TypeInner::Empty => "empty",
+            TypeInner::Principal => "principal",
+            TypeInner::Opt(_) => "opt",
+            TypeInner::Vec(_) => "vec",
+            TypeInner::Record(fields) => {
+                if self.is_tuple(fields) {
+                    "tuple"
+                } else {
+                    "record"
+                }
+            }
+            TypeInner::Variant(_) => "variant",
+            TypeInner::Func(_) => "func",
+            TypeInner::Service(_) => "service",
+            _ => "anonymous",
         }
     }
 
@@ -1575,7 +1575,11 @@ impl<'a> TypeConverter<'a> {
     }
 
     /// Add imports for Candid types
-    pub fn add_import_for_original_type_definitions(&mut self, module: &mut Module, service_name: &str) {
+    pub fn add_import_for_original_type_definitions(
+        &mut self,
+        module: &mut Module,
+        service_name: &str,
+    ) {
         self.original_types
             .add_import_for_original_type_definitions(module, service_name);
     }
