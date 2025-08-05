@@ -1,16 +1,15 @@
-use super::super::javascript::is_tuple;
 use super::generate_wrapper::TypeConverter;
-use super::ident::{get_ident_guarded, get_ident_guarded_keyword_ok};
+use super::ident::get_ident_guarded;
 use super::preamble::actor::{interface_canister_initialization, wrapper_canister_initialization};
 use super::preamble::imports::{
     interface_create_actor_options, interface_imports, wrapper_imports,
 };
 use super::preamble::options::{interface_options_utils, wrapper_options_utils};
 use super::utils::render_ast;
-use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
+use candid::types::{Field, Type, TypeEnv, TypeInner};
 use std::collections::HashMap;
 
-use swc_core::common::{SyntaxContext, DUMMY_SP};
+use swc_core::common::DUMMY_SP;
 use swc_core::ecma::ast::*;
 
 use super::compile_interface::{add_type_definitions, create_interface_from_service};

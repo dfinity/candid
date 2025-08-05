@@ -1589,60 +1589,6 @@ impl<'a> TypeConverter<'a> {
         true
     }
 
-    /// Generates imports for named Candid types
-    pub fn generate_imports(&mut self) -> Vec<ModuleItem> {
-        let mut imports = Vec::new();
-        let mut imported_types = HashSet::new();
-
-        // Collect all variable types that need to be imported
-        for type_fingerprint in self.to_candid_functions.keys() {
-            if let TypeInner::Var(id) = type_fingerprint.as_ref() {
-                imported_types.insert(id.clone());
-            }
-        }
-
-        // Do the same for from_candid_functions
-        for type_fingerprint in self.from_candid_functions.keys() {
-            if let TypeInner::Var(id) = type_fingerprint.as_ref() {
-                imported_types.insert(id.clone());
-            }
-        }
-
-        // Generate import statements
-        for type_name in imported_types {
-            // Create import statement: import { type_name as _type_name } from "declarations/type_name";
-            let import_stmt = ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
-                span: DUMMY_SP,
-                specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
-                    span: DUMMY_SP,
-                    local: Ident::new(
-                        format!("_{}", type_name).into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    ),
-                    imported: Some(ModuleExportName::Ident(Ident::new(
-                        type_name.clone().into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    ))),
-                    is_type_only: false,
-                })],
-                src: Box::new(Str {
-                    span: DUMMY_SP,
-                    value: format!("declarations/{}", type_name).into(),
-                    raw: None,
-                }),
-                type_only: false,
-                with: None,
-                phase: Default::default(),
-            }));
-
-            imports.push(import_stmt);
-        }
-
-        imports
-    }
-
     pub fn convert_to_candid(&mut self, expr: &Expr, ty: &Type) -> Expr {
         // For simple types that don't need conversion, return the expression directly
         if !self.needs_conversion(ty) {
