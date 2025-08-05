@@ -1,13 +1,112 @@
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 
-pub fn add_create_actor_imports_and_interface(module: &mut Module) {
+pub fn interface_imports(module: &mut Module) {
     // Add import declaration for types from "@dfinity/agent"
     let import_decl = generate_agent_imports();
     module
         .body
         .push(ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl)));
+}
 
+pub fn wrapper_imports(module: &mut Module, service_name: &str) {
+    let dashed_name = service_name.replace('-', "_");
+
+    // Import Actor
+    module
+        .body
+        .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+            span: DUMMY_SP,
+            specifiers: vec![
+                ImportSpecifier::Named(ImportNamedSpecifier {
+                    span: DUMMY_SP,
+                    local: Ident::new(
+                        format!("_{}", service_name).into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ),
+                    imported: Some(ModuleExportName::Ident(Ident::new(
+                        service_name.into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ))),
+                    is_type_only: false,
+                }),
+                ImportSpecifier::Named(ImportNamedSpecifier {
+                    span: DUMMY_SP,
+                    local: Ident::new("_createActor".into(), DUMMY_SP, SyntaxContext::empty()),
+                    imported: Some(ModuleExportName::Ident(Ident::new(
+                        "createActor".into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ))),
+                    is_type_only: false,
+                }),
+                ImportSpecifier::Named(ImportNamedSpecifier {
+                    span: DUMMY_SP,
+                    local: Ident::new("_canisterId".into(), DUMMY_SP, SyntaxContext::empty()),
+                    imported: Some(ModuleExportName::Ident(Ident::new(
+                        "canisterId".into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ))),
+                    is_type_only: false,
+                }),
+            ],
+            src: Box::new(Str {
+                span: DUMMY_SP,
+                value: format!("declarations/{}", dashed_name).into(),
+                raw: None,
+            }),
+            type_only: false,
+            with: None,
+            phase: Default::default(),
+        })));
+
+    // Import ActorSubclass
+    module
+        .body
+        .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+            span: DUMMY_SP,
+            specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
+                span: DUMMY_SP,
+                local: Ident::new("ActorSubclass".into(), DUMMY_SP, SyntaxContext::empty()),
+                imported: None,
+                is_type_only: true,
+            })],
+            src: Box::new(Str {
+                span: DUMMY_SP,
+                value: "@dfinity/agent".into(),
+                raw: None,
+            }),
+            type_only: false,
+            with: None,
+            phase: Default::default(),
+        })));
+
+    // Import _SERVICE
+    module
+        .body
+        .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+            span: DUMMY_SP,
+            specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
+                span: DUMMY_SP,
+                local: Ident::new("_SERVICE".into(), DUMMY_SP, SyntaxContext::empty()),
+                imported: None,
+                is_type_only: false,
+            })],
+            src: Box::new(Str {
+                span: DUMMY_SP,
+                value: format!("declarations/{}/{}.did.d.js", dashed_name, dashed_name).into(),
+                raw: None,
+            }),
+            type_only: false,
+            with: None,
+            phase: Default::default(),
+        })));
+}
+
+pub fn interface_create_actor_options(module: &mut Module) {
     let create_actor_options_interface = generate_create_actor_options_interface();
     module
         .body
@@ -15,20 +114,34 @@ pub fn add_create_actor_imports_and_interface(module: &mut Module) {
             span: DUMMY_SP,
             decl: Decl::TsInterface(create_actor_options_interface),
         })));
+}
 
-    // Add CreateActorOptions interface declaration
+pub fn add_principal_import(module: &mut Module) {
+    module
+        .body
+        .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+            span: DUMMY_SP,
+            specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
+                span: DUMMY_SP,
+                local: Ident::new("Principal".into(), DUMMY_SP, SyntaxContext::empty()),
+                imported: None,
+                is_type_only: false,
+            })],
+            src: Box::new(Str {
+                span: DUMMY_SP,
+                value: "@dfinity/principal".into(),
+                raw: None,
+            }),
+            type_only: true,
+            with: None,
+            phase: Default::default(),
+        })));
 }
 
 fn generate_agent_imports() -> ImportDecl {
     ImportDecl {
         span: DUMMY_SP,
         specifiers: vec![
-            ImportSpecifier::Named(ImportNamedSpecifier {
-                span: DUMMY_SP,
-                local: Ident::new("ActorCallError".into(), DUMMY_SP, SyntaxContext::empty()),
-                imported: None,
-                is_type_only: false,
-            }),
             ImportSpecifier::Named(ImportNamedSpecifier {
                 span: DUMMY_SP,
                 local: Ident::new("HttpAgentOptions".into(), DUMMY_SP, SyntaxContext::empty()),

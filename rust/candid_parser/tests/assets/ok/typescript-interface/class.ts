@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import { class as _class, createActor as _createActor, canisterId as _canisterId } from "declarations/class";
 import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/class/class.did.d.js";
@@ -49,7 +50,6 @@ export interface Profile {
     age: number;
     name: string;
 }
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

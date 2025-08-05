@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import { management as _management, createActor as _createActor, canisterId as _canisterId } from "declarations/management";
 import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/management/management.did.d.js";
@@ -108,7 +109,6 @@ export interface utxo {
     outpoint: outpoint;
 }
 export type wasm_module = Uint8Array | number[];
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -119,6 +119,28 @@ export function createActor(canisterId: string | Principal, options?: CreateActo
     return new Management(actor);
 }
 export const canisterId = _canisterId;
+export enum Variant_get_head_post {
+    get = "get",
+    head = "head",
+    post = "post"
+}
+export enum Variant_reinstall_upgrade_install {
+    reinstall = "reinstall",
+    upgrade = "upgrade",
+    install = "install"
+}
+export enum Variant_stopped_stopping_running {
+    stopped = "stopped",
+    stopping = "stopping",
+    running = "running"
+}
+export enum bitcoin_network {
+    mainnet = "mainnet",
+    testnet = "testnet"
+}
+export enum ecdsa_curve {
+    secp256k1 = "secp256k1"
+}
 export interface managementInterface {
     bitcoin_get_balance(arg0: get_balance_request): Promise<satoshi>;
     bitcoin_get_current_fee_percentiles(arg0: get_current_fee_percentiles_request): Promise<BigUint64Array | bigint[]>;
@@ -925,27 +947,5 @@ function to_candid_variant_n9(value: {
     } : "min_confirmations" in value ? {
         min_confirmations: value.min_confirmations
     } : value;
-}
-export enum Variant_get_head_post {
-    get = "get",
-    head = "head",
-    post = "post"
-}
-export enum Variant_reinstall_upgrade_install {
-    reinstall = "reinstall",
-    upgrade = "upgrade",
-    install = "install"
-}
-export enum Variant_stopped_stopping_running {
-    stopped = "stopped",
-    stopping = "stopping",
-    running = "running"
-}
-export enum bitcoin_network {
-    mainnet = "mainnet",
-    testnet = "testnet"
-}
-export enum ecdsa_curve {
-    secp256k1 = "secp256k1"
 }
 

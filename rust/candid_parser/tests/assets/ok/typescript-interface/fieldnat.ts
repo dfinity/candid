@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import { fieldnat as _fieldnat, createActor as _createActor, canisterId as _canisterId } from "declarations/fieldnat";
 import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/fieldnat/fieldnat.did.d.js";
@@ -49,7 +50,6 @@ export interface non_tuple {
     _2_: string;
 }
 export type tuple = [string, string];
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -60,6 +60,10 @@ export function createActor(canisterId: string | Principal, options?: CreateActo
     return new Fieldnat(actor);
 }
 export const canisterId = _canisterId;
+export enum Variant_e20_e30 {
+    e20 = "e20",
+    e30 = "e30"
+}
 export interface fieldnatInterface {
     bab(two: bigint, arg1: bigint): Promise<void>;
     bar(arg0: {
@@ -215,9 +219,5 @@ function from_candid_variant_n2(value: {
     return "_0_" in value ? {
         _0_: value._0_
     } : value;
-}
-export enum Variant_e20_e30 {
-    e20 = "e20",
-    e30 = "e30"
 }
 

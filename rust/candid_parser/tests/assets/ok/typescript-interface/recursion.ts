@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import { recursion as _recursion, createActor as _createActor, canisterId as _canisterId } from "declarations/recursion";
 import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/recursion/recursion.did.d.js";
@@ -69,7 +70,6 @@ export type tree = {
 } | {
     leaf: bigint;
 };
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

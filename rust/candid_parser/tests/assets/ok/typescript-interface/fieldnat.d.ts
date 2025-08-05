@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
 export interface Some<T> {
     _tag: "Some";
@@ -12,7 +13,6 @@ export interface non_tuple {
     _2_: string;
 }
 export type tuple = [string, string];
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -20,6 +20,10 @@ export declare interface CreateActorOptions {
 }
 export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => fieldnatInterface;
 export declare const canisterId: string;
+export enum Variant_e20_e30 {
+    e20 = "e20",
+    e30 = "e30"
+}
 export interface fieldnatInterface {
     bab(two: bigint, arg1: bigint): Promise<void>;
     bar(arg0: {
@@ -41,9 +45,5 @@ export interface fieldnatInterface {
         _2_: bigint;
         _2: bigint;
     }>;
-}
-export enum Variant_e20_e30 {
-    e20 = "e20",
-    e30 = "e30"
 }
 

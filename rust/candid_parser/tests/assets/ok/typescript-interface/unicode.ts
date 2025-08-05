@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import { unicode as _unicode, createActor as _createActor, canisterId as _canisterId } from "declarations/unicode";
 import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/unicode/unicode.did.d.js";
@@ -50,7 +51,6 @@ export interface A {
     '字段名': bigint;
     '字 段 名2': bigint;
 }
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -61,6 +61,12 @@ export function createActor(canisterId: string | Principal, options?: CreateActo
     return new Unicode(actor);
 }
 export const canisterId = _canisterId;
+export enum B {
+    "" = "",
+    '空的' = "空的",
+    '  空的  ' = "  空的  ",
+    '1⃣️2⃣️3⃣️' = "1⃣️2⃣️3⃣️"
+}
 export interface unicodeInterface {
     ""(arg0: bigint): Promise<bigint>;
     '✈️  🚗 ⛱️ '(): Promise<void>;
@@ -181,11 +187,5 @@ function to_candid_variant_n2(value: B): {
     } : value == B["1⃣️2⃣️3⃣️"] ? {
         '1⃣️2⃣️3⃣️': null
     } : value;
-}
-export enum B {
-    "" = "",
-    '空的' = "空的",
-    '  空的  ' = "  空的  ",
-    '1⃣️2⃣️3⃣️' = "1⃣️2⃣️3⃣️"
 }
 

@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import { recursive_class as _recursive_class, createActor as _createActor, canisterId as _canisterId } from "declarations/recursive_class";
 import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/recursive_class/recursive_class.did.d.js";
@@ -47,7 +48,6 @@ function record_opt_to_undefined<T>(arg: T | null): T | undefined {
 export interface sInterface {
     next(): Promise<Principal>;
 }
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import { example as _example, createActor as _createActor, canisterId as _canisterId } from "declarations/example";
 import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/example/example.did.d.js";
@@ -115,7 +116,6 @@ export type tree = {
 } | {
     leaf: bigint;
 };
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -126,6 +126,20 @@ export function createActor(canisterId: string | Principal, options?: CreateActo
     return new Example(actor);
 }
 export const canisterId = _canisterId;
+export enum Variant_Ok_Err {
+    Ok = "Ok",
+    Err = "Err"
+}
+export enum Variant__42__A_B_C {
+    _42_ = "_42_",
+    A = "A",
+    B = "B",
+    C = "C"
+}
+export enum Variant_a_b {
+    a = "a",
+    b = "b"
+}
 export interface exampleInterface {
     bbbbb(arg0: b): Promise<void>;
     f: t;
@@ -693,19 +707,5 @@ function to_candid_variant_n35(value: {
 }
 function to_candid_vec_n25(value: Array<string | null>): Array<[] | [string]> {
     return value.map((x)=>to_candid_opt_n26(x));
-}
-export enum Variant_Ok_Err {
-    Ok = "Ok",
-    Err = "Err"
-}
-export enum Variant__42__A_B_C {
-    _42_ = "_42_",
-    A = "A",
-    B = "B",
-    C = "C"
-}
-export enum Variant_a_b {
-    a = "a",
-    b = "b"
 }
 

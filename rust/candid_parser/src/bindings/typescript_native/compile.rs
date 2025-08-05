@@ -5,21 +5,18 @@ use super::preamble::actor::{
     create_canister_id_assignment, create_canister_id_declaration, generate_create_actor_function,
     generate_create_actor_function_declaration,
 };
-use super::preamble::imports::add_create_actor_imports_and_interface;
+use super::preamble::imports::{
+    add_principal_import, interface_create_actor_options, interface_imports, wrapper_imports,
+};
 use super::preamble::options::{add_option_helpers_interface, add_option_helpers_wrapper};
+use super::utils::render_ast;
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use std::collections::HashMap;
-use swc_core::common::comments::SingleThreadedComments;
-use swc_core::common::source_map::SourceMap;
-use swc_core::common::sync::Lrc;
+
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
-use swc_core::ecma::codegen::{text_writer::JsWriter, Config, Emitter};
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: &str) -> String {
-    let cm = Lrc::new(SourceMap::default());
-    let comments = SingleThreadedComments::default();
-
     let enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)> = &mut HashMap::new();
 
     let mut module = Module {
@@ -28,8 +25,10 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
         shebang: None,
     };
 
+    interface_imports(&mut module);
+
     if target == "wrapper" {
-        add_imports(&mut module, service_name);
+        wrapper_imports(&mut module, service_name);
     }
 
     add_principal_import(&mut module);
@@ -41,39 +40,44 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
 
     add_type_definitions(enum_declarations, env, &mut module);
 
-    add_create_actor_imports_and_interface(&mut module);
+    interface_create_actor_options(&mut module);
 
     // createActor declaration / function
     if target == "interface" {
-        let create_actor_fn = generate_create_actor_function_declaration(service_name);
-        module
-            .body
-            .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-                span: DUMMY_SP,
-                decl: Decl::Var(Box::new(create_actor_fn)),
-            })));
+        let actor_interface = ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+            span: DUMMY_SP,
+            decl: Decl::Var(Box::new(generate_create_actor_function_declaration(
+                service_name,
+            ))),
+        }));
+        module.body.push(actor_interface);
 
         let create_canister_id = create_canister_id_declaration();
         module.body.push(create_canister_id);
     }
 
     if target == "wrapper" && actor.is_some() {
-        let create_actor_fn = generate_create_actor_function(service_name);
-        module
-            .body
-            .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-                span: DUMMY_SP,
-                decl: Decl::Fn(create_actor_fn),
-            })));
+        let wrapper = ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+            span: DUMMY_SP,
+            decl: Decl::Fn(generate_create_actor_function(service_name)),
+        }));
+        module.body.push(wrapper);
         let create_canister_id = create_canister_id_assignment();
         module.body.push(create_canister_id);
     }
 
+    let mut actor_module = Module {
+        span: DUMMY_SP,
+        body: vec![],
+        shebang: None,
+    };
+
     if let Some(actor_type) = actor {
         let mut converter = TypeConverter::new(env, enum_declarations);
+
         add_actor_implementation(
             env,
-            &mut module,
+            &mut actor_module,
             actor_type,
             service_name,
             target,
@@ -90,7 +94,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
         });
 
         for stmt in sorted_functions {
-            module.body.push(ModuleItem::Stmt(stmt.clone()));
+            actor_module.body.push(ModuleItem::Stmt(stmt.clone()));
         }
     }
 
@@ -107,143 +111,13 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
             })));
     }
 
+    module.body.extend(actor_module.body);
+
     // Generate code from the AST
-    let mut buf = vec![];
-    {
-        let writer = JsWriter::new(cm.clone(), "\n", &mut buf, None);
-        let mut emitter = Emitter {
-            cfg: Config::default().with_minify(false),
-            cm: cm.clone(),
-            comments: Some(&comments),
-            wr: Box::new(writer),
-        };
-
-        emitter.emit_module(&module).unwrap();
-    }
-
-    String::from_utf8(buf).unwrap()
-}
-
-// Add standard imports
-fn add_imports(module: &mut Module, service_name: &str) {
-    let dashed_name = service_name.replace('-', "_");
-
-    // Import Actor
-    module
-        .body
-        .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
-            span: DUMMY_SP,
-            specifiers: vec![
-                ImportSpecifier::Named(ImportNamedSpecifier {
-                    span: DUMMY_SP,
-                    local: Ident::new(
-                        format!("_{}", service_name).into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    ),
-                    imported: Some(ModuleExportName::Ident(Ident::new(
-                        service_name.into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    ))),
-                    is_type_only: false,
-                }),
-                ImportSpecifier::Named(ImportNamedSpecifier {
-                    span: DUMMY_SP,
-                    local: Ident::new("_createActor".into(), DUMMY_SP, SyntaxContext::empty()),
-                    imported: Some(ModuleExportName::Ident(Ident::new(
-                        "createActor".into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    ))),
-                    is_type_only: false,
-                }),
-                ImportSpecifier::Named(ImportNamedSpecifier {
-                    span: DUMMY_SP,
-                    local: Ident::new("_canisterId".into(), DUMMY_SP, SyntaxContext::empty()),
-                    imported: Some(ModuleExportName::Ident(Ident::new(
-                        "canisterId".into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    ))),
-                    is_type_only: false,
-                }),
-            ],
-            src: Box::new(Str {
-                span: DUMMY_SP,
-                value: format!("declarations/{}", dashed_name).into(),
-                raw: None,
-            }),
-            type_only: false,
-            with: None,
-            phase: Default::default(),
-        })));
-
-    // Import ActorSubclass
-    module
-        .body
-        .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
-            span: DUMMY_SP,
-            specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
-                span: DUMMY_SP,
-                local: Ident::new("ActorSubclass".into(), DUMMY_SP, SyntaxContext::empty()),
-                imported: None,
-                is_type_only: true,
-            })],
-            src: Box::new(Str {
-                span: DUMMY_SP,
-                value: "@dfinity/agent".into(),
-                raw: None,
-            }),
-            type_only: false,
-            with: None,
-            phase: Default::default(),
-        })));
-
-    // Import _SERVICE
-    module
-        .body
-        .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
-            span: DUMMY_SP,
-            specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
-                span: DUMMY_SP,
-                local: Ident::new("_SERVICE".into(), DUMMY_SP, SyntaxContext::empty()),
-                imported: None,
-                is_type_only: false,
-            })],
-            src: Box::new(Str {
-                span: DUMMY_SP,
-                value: format!("declarations/{}/{}.did.d.js", dashed_name, dashed_name).into(),
-                raw: None,
-            }),
-            type_only: false,
-            with: None,
-            phase: Default::default(),
-        })));
+    render_ast(&module)
 }
 
 // Add Principal type import
-fn add_principal_import(module: &mut Module) {
-    module
-        .body
-        .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
-            span: DUMMY_SP,
-            specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
-                span: DUMMY_SP,
-                local: Ident::new("Principal".into(), DUMMY_SP, SyntaxContext::empty()),
-                imported: None,
-                is_type_only: false,
-            })],
-            src: Box::new(Str {
-                span: DUMMY_SP,
-                value: "@dfinity/principal".into(),
-                raw: None,
-            }),
-            type_only: true,
-            with: None,
-            phase: Default::default(),
-        })));
-}
 
 // Add all type definitions from the environment
 fn add_type_definitions(

@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import { cyclic as _cyclic, createActor as _createActor, canisterId as _canisterId } from "declarations/cyclic";
 import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/cyclic/cyclic.did.d.js";
@@ -50,7 +51,6 @@ export type C = A;
 export type X = Y;
 export type Y = Z;
 export type Z = A;
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

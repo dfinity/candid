@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
 export interface Some<T> {
     _tag: "Some";
@@ -11,7 +12,6 @@ export type f = (arg0: number) => Promise<number>;
 export type g = f;
 export type h = (arg0: [Principal, string]) => Promise<[Principal, string]>;
 export type o = Some<o> | None;
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

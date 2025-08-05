@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import { keyword as _keyword, createActor as _createActor, canisterId as _canisterId } from "declarations/keyword";
 import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/keyword/keyword.did.d.js";
@@ -68,7 +69,6 @@ export type stream = {
     next: [Principal, string];
 } | null;
 export type t = (server: Principal) => Promise<void>;
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import { service as _service, createActor as _createActor, canisterId as _canisterId } from "declarations/service";
 import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/service/service.did.d.js";
@@ -49,7 +50,6 @@ export interface ServiceInterface {
     f: Func;
 }
 export type Service2 = ServiceInterface;
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

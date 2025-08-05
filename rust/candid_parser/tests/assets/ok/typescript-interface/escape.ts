@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import { escape as _escape, createActor as _createActor, canisterId as _canisterId } from "declarations/escape";
 import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/escape/escape.did.d.js";
@@ -50,7 +51,6 @@ export interface t {
     '\"\'': bigint;
     '\\\n\'\"': bigint;
 }
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

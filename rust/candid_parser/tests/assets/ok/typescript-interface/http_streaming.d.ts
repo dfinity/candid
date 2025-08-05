@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
 export interface Some<T> {
     _tag: "Some";
@@ -35,7 +36,6 @@ export interface StreamingToken {
     resource: string;
     index: bigint;
 }
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

@@ -1,3 +1,4 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
 export interface Some<T> {
     _tag: "Some";
@@ -78,7 +79,6 @@ export type tree = {
 } | {
     leaf: bigint;
 };
-import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -86,6 +86,20 @@ export declare interface CreateActorOptions {
 }
 export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => exampleInterface;
 export declare const canisterId: string;
+export enum Variant_Ok_Err {
+    Ok = "Ok",
+    Err = "Err"
+}
+export enum Variant__42__A_B_C {
+    _42_ = "_42_",
+    A = "A",
+    B = "B",
+    C = "C"
+}
+export enum Variant_a_b {
+    a = "a",
+    b = "b"
+}
 export interface exampleInterface {
     bbbbb(arg0: b): Promise<void>;
     f: t;
@@ -109,19 +123,5 @@ export interface exampleInterface {
         } | {
             Err: Variant_a_b;
         }]>;
-}
-export enum Variant_Ok_Err {
-    Ok = "Ok",
-    Err = "Err"
-}
-export enum Variant__42__A_B_C {
-    _42_ = "_42_",
-    A = "A",
-    B = "B",
-    C = "C"
-}
-export enum Variant_a_b {
-    a = "a",
-    b = "b"
 }
 
