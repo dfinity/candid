@@ -1,5 +1,5 @@
 use super::candid_types::CandidTypesConverter;
-use super::compile_interface::convert_type;
+use super::convert_types::convert_type;
 use super::ident::{contains_unicode_characters, get_ident_guarded};
 use super::utils::is_recursive_optional;
 use candid::types::{Field, Label, Type, TypeEnv, TypeInner};
