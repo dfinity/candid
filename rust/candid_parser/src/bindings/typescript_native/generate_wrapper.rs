@@ -720,7 +720,7 @@ impl<'a> TypeConverter<'a> {
                 });
             }
 
-            return result;
+            result
         } else {
             // For variants with different types, check for _tag property
             // This is for TypeScript unions of object types: { tag1: value1 } | { tag2: value2 }
@@ -823,7 +823,7 @@ impl<'a> TypeConverter<'a> {
                 });
             }
 
-            return result;
+            result
         }
     }
     fn convert_func_to_candid_body(

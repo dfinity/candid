@@ -151,9 +151,9 @@ pub fn get_typescript_ident(name: &str, filter_keywords: bool) -> String {
     if name.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_') {
         // If the name contains non-alphanumeric characters (except underscore),
         // or contains quotes, we need to quote it to make it a valid TypeScript property name
-        return format!("'{}'", name.escape_debug());
+        format!("'{}'", name.escape_debug())
     } else {
-        return name.to_string();
+        name.to_string()
     }
 }
 

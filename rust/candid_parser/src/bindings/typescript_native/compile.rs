@@ -20,7 +20,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
     let cm = Lrc::new(SourceMap::default());
     let comments = SingleThreadedComments::default();
 
-    let mut enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)> = &mut HashMap::new();
+    let enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)> = &mut HashMap::new();
 
     let mut module = Module {
         span: DUMMY_SP,
@@ -39,7 +39,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
         add_option_helpers_wrapper(&mut module);
     }
 
-    add_type_definitions(&mut enum_declarations, env, &mut module);
+    add_type_definitions(enum_declarations, env, &mut module);
 
     add_create_actor_imports_and_interface(&mut module);
 
@@ -1014,7 +1014,7 @@ fn create_variant_type(
 
         if all_null {
             // Only create enum if it doesn't already exist
-            if !enum_declarations.contains_key(&fs.to_vec()) {
+            enum_declarations.entry(fs.to_vec()).or_insert_with(|| {
                 let enum_name = if let Some(name) = type_name {
                     name.to_string()
                 } else {
@@ -1059,8 +1059,8 @@ fn create_variant_type(
                 };
 
                 // Store the enum declaration with its name as key
-                enum_declarations.insert(fs.to_vec(), (enum_decl, enum_name.clone()));
-            }
+                (enum_decl, enum_name.clone())
+            });
 
             let enum_name = enum_declarations.get(&fs.to_vec()).unwrap().1.clone();
 
@@ -1633,7 +1633,7 @@ pub fn create_actor_method(
         })
         .collect::<Vec<_>>();
 
-    let actor_call = if contains_unicode_characters(&method_id) {
+    let actor_call = if contains_unicode_characters(method_id) {
         Expr::Call(CallExpr {
             span: DUMMY_SP,
             callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
