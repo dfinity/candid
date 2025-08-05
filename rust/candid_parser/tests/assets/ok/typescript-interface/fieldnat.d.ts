@@ -24,7 +24,7 @@ export interface fieldnatInterface {
     bab(two: bigint, arg1: bigint): Promise<void>;
     bar(arg0: {
         2: bigint;
-    }): Promise<"e20" | "e30">;
+    }): Promise<Variant_e20_e30>;
     bas(arg0: [bigint, bigint]): Promise<[string, bigint]>;
     baz(arg0: {
         _2_: bigint;
@@ -41,5 +41,9 @@ export interface fieldnatInterface {
         _2_: bigint;
         _2: bigint;
     }>;
+}
+export enum Variant_e20_e30 {
+    e20 = "e20",
+    e30 = "e30"
 }
 

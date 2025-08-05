@@ -1,7 +1,7 @@
 #! /bin/bash
 
 # Define the list of files to skip
-SKIP_FILES=("bad_comment" "bad_import" "bad_import2" "bad_import3" "collision_arguments" "collision_arguments2" "collision_fields" "collision_fields2" "comment" "invalid_cyclic" "not_func" "not_serv" "oneway" "surrogate" "underline")
+SKIP_FILES=("bad_comment" "bad_import" "bad_import2" "bad_import3" "collision_arguments" "collision_arguments2" "collision_fields" "collision_fields2" "comment" "invalid_cyclic" "not_func" "not_serv" "oneway" "surrogate" "underline" "undefine")
 # Function to check if a file should be skipped
 should_skip() {
     local filename="$1"

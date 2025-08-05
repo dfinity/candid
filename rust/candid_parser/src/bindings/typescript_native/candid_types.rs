@@ -23,9 +23,12 @@ impl<'a> CandidTypesConverter<'a> {
         if fields.is_empty() {
             return false;
         }
-        fields
-            .iter()
-            .all(|f| matches!(&*f.id, Label::Id(_) | Label::Unnamed(_)))
+        for (i, field) in fields.iter().enumerate() {
+            if field.id.get_id() != (i as u32) {
+                return false;
+            }
+        }
+        true
     }
 
     fn get_required_candid_imports(&self) -> &HashSet<String> {

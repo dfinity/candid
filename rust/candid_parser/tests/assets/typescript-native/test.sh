@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+set -euo pipefail
 # Usage: test.sh <test_case>
 
 # Define cleanup function for exit
@@ -43,17 +43,18 @@ echo "Created temporary directory: $TEMP_DIR"
 
 cp $1 $TEMP_DIR/$CANDID_NAME.did
 
-if [ ! -f "$1.did" ]; then
-    echo "Candid file `<test_case>/$1.did` does not exist"
+if [ ! -f "$1" ]; then
+    echo "Candid file test_case/$1.did does not exist"
+    exit 1
 fi
 
 
-cargo run --package caffeine-stub -- bind --target ts-native-interface $TEMP_DIR/$CANDID_NAME.did > ${TEMP_DIR}/$CANDID_NAME.d.ts
-cargo run --package caffeine-stub -- bind --target ts-native-wrapper $TEMP_DIR/$CANDID_NAME.did > ${TEMP_DIR}/$CANDID_NAME.ts
+cargo run --package caffeine-stub -- bind --target ts-native-interface $ORIGINAL_DIR/$1 > ${TEMP_DIR}/$CANDID_NAME.d.ts
+cargo run --package caffeine-stub -- bind --target ts-native-wrapper $ORIGINAL_DIR/$1 > ${TEMP_DIR}/$CANDID_NAME.ts
 
 mkdir -p ${TEMP_DIR}/declarations/$CANDID_NAME
-cargo run --package caffeine-stub -- bind --target ts $TEMP_DIR/$CANDID_NAME.did > ${TEMP_DIR}/declarations/$CANDID_NAME/$CANDID_NAME.did.d.ts
-cargo run --package caffeine-stub -- bind --target js $TEMP_DIR/$CANDID_NAME.did > ${TEMP_DIR}/declarations/$CANDID_NAME/$CANDID_NAME.did.js
+cargo run --package caffeine-stub -- bind --target ts $ORIGINAL_DIR/$1 > ${TEMP_DIR}/declarations/$CANDID_NAME/$CANDID_NAME.did.d.ts
+cargo run --package caffeine-stub -- bind --target js $ORIGINAL_DIR/$1 > ${TEMP_DIR}/declarations/$CANDID_NAME/$CANDID_NAME.did.js
 
 
 export_code="export const $CANDID_NAME = canisterId ? createActor(canisterId) : undefined;"

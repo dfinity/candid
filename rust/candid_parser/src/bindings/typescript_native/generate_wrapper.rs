@@ -4,6 +4,7 @@ use candid::types::{Field, Label, Type, TypeEnv, TypeInner};
 use std::collections::{HashMap, HashSet};
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
+use super::ident::{contains_unicode_characters, get_ident_guarded};
 /// Provides functions to generate JavaScript expressions that convert
 /// between TypeScript and Candid representations using a function-based approach.
 pub struct TypeConverter<'a> {
@@ -23,11 +24,12 @@ pub struct TypeConverter<'a> {
     // Counter for unique function names
     function_counter: usize,
     candid_types_converter: CandidTypesConverter<'a>,
+    enum_declarations: &'a mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
 }
 
 impl<'a> TypeConverter<'a> {
     /// Create a new TypeConverter with the given type environment
-    pub fn new(env: &'a TypeEnv) -> Self {
+    pub fn new(env: &'a TypeEnv, enum_declarations: &'a mut HashMap<Vec<Field>, (TsEnumDecl, String)>) -> Self {
         TypeConverter {
             env,
             to_candid_functions: HashMap::new(),
@@ -40,12 +42,18 @@ impl<'a> TypeConverter<'a> {
             processing_conversion: HashSet::new(),
             function_counter: 0,
             candid_types_converter: CandidTypesConverter::new(env),
+            enum_declarations,
         }
     }
 
     /// Get all generated function declarations
     pub fn get_generated_functions(&self) -> Vec<Stmt> {
         self.generated_functions.values().cloned().collect()
+    }
+
+    /// Get mutable access to enum_declarations
+    pub fn enum_declarations_mut(&mut self) -> &mut HashMap<Vec<Field>, (TsEnumDecl, String)> {
+        self.enum_declarations
     }
 
     /// Check if a type requires conversion or can be passed through directly
@@ -638,60 +646,75 @@ impl<'a> TypeConverter<'a> {
         }
 
         // Check if all variants have the same type (especially null)
-        let all_same_type = fields.iter().skip(1).all(|f| {
-            let first_type = &fields[0].ty;
-            match (first_type.as_ref(), f.ty.as_ref()) {
-                (TypeInner::Null, TypeInner::Null) => true,
-                (a, b) => a == b,
-            }
-        });
+        let all_null = fields.iter().all(|f| matches!(f.ty.as_ref(), TypeInner::Null));
+        if all_null {
+                // For enums, compare against enum members
+                let enum_name = self.enum_declarations.get(&fields.to_vec()).unwrap().1.clone();
 
-        if all_same_type {
-            // For variants with same type (like string literals), handle with simple string matching
-            let mut result = self.create_ident(param_name); // Default fallback
+                let mut result = self.create_ident(param_name); // Default fallback
 
-            // Process all fields in reverse order to build the chain
-            for field in fields.iter().rev() {
-                let field_name = match &*field.id {
-                    Label::Named(name) => name.clone(),
-                    Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
-                };
+                // Process all fields in reverse order to build the chain
+                for field in fields.iter().rev() {
+                    let field_name = match &*field.id {
+                        Label::Named(name) => name.clone(),
+                        Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
+                    };
 
-                // Create condition: value === "field_name" or value == "field_name"
-                let condition = Expr::Bin(BinExpr {
-                    span: DUMMY_SP,
-                    op: BinaryOp::EqEq,
-                    left: Box::new(self.create_ident(param_name)),
-                    right: Box::new(Expr::Lit(Lit::Str(Str {
+                   let enum_member = if contains_unicode_characters(&field_name) {
+                    Expr::Member(MemberExpr {
                         span: DUMMY_SP,
-                        value: field_name.clone().into(),
-                        raw: None,
-                    }))),
-                });
+                        obj: Box::new(self.create_ident(&enum_name)),
+                        prop: MemberProp::Computed(ComputedPropName {
+                            span: DUMMY_SP,
+                            expr: Box::new(Expr::Lit(Lit::Str(Str {
+                                span: DUMMY_SP,
+                                value: field_name.clone().into(),
+                                raw: None,
+                            }))),
+                        }),
+                    })
+                } else {
+                    Expr::Member(MemberExpr {
+                            span: DUMMY_SP,
+                            obj: Box::new(self.create_ident(&enum_name)),
+                            prop: MemberProp::Ident(
+                                Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                            ),
+                        })
+                };
+        
 
-                // Create result: { field_name: null }
-                let field_result = Expr::Object(ObjectLit {
-                    span: DUMMY_SP,
-                    props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                        key: PropName::Ident(
-                            Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty()).into(),
-                        ),
-                        value: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
-                    })))],
-                });
+                    let condition = Expr::Bin(BinExpr {
+                        span: DUMMY_SP,
+                        op: BinaryOp::EqEq,
+                        left: Box::new(self.create_ident(param_name)),
+                        right: Box::new(enum_member),
+                    });
 
-                // Create a new conditional with this field's condition and result,
-                // with the previous result as the alternate
-                result = Expr::Cond(CondExpr {
-                    span: DUMMY_SP,
-                    test: Box::new(condition),
-                    cons: Box::new(field_result),
-                    alt: Box::new(result),
-                });
+                    // Create result: { field_name: null }
+                    let field_result = Expr::Object(ObjectLit {
+                        span: DUMMY_SP,
+                        props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                            key: PropName::Ident(
+                               get_ident_guarded(&field_name).into(),       
+                            ),
+                            value: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
+                        })))],
+                    });
+
+                    // Create a new conditional with this field's condition and result,
+                    // with the previous result as the alternate
+                    result = Expr::Cond(CondExpr {
+                        span: DUMMY_SP,
+                        test: Box::new(condition),
+                        cons: Box::new(field_result),
+                        alt: Box::new(result),
+                    });
+                }
+
+                return result;
             }
-
-            return result;
-        } else {
+        else {
             // For variants with different types, check for _tag property
             // This is for TypeScript unions of object types: { tag1: value1 } | { tag2: value2 }
 
@@ -718,30 +741,75 @@ impl<'a> TypeConverter<'a> {
 
                 // Create result: { field_name: field_value }
                 // Use a clone of field_name to avoid the "use after move" error
-                let field_name_for_key = field_name.clone();
-                let field_result = Expr::Object(ObjectLit {
+        
+                let field_access = Expr::Member(MemberExpr {
                     span: DUMMY_SP,
-                    props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                        key: PropName::Ident(
-                            Ident::new(field_name_for_key.into(), DUMMY_SP, SyntaxContext::empty())
-                                .into(),
-                        ),
-                        value: Box::new(Expr::Member(MemberExpr {
-                            span: DUMMY_SP,
-                            obj: Box::new(self.create_ident(param_name)),
-                            prop: MemberProp::Ident(
-                                Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty())
-                                    .into(),
-                            ),
-                        })),
-                    })))],
+                    obj: Box::new(self.create_ident(param_name)),
+                    prop: MemberProp::Ident(
+                        Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                    ),
                 });
+               
+
+                let field_result = match field.ty.as_ref() {
+                    TypeInner::Opt(inner) => {
+                        // For optional fields, handle undefined/null specially
+                        if !self.needs_conversion(inner) {
+                            Expr::Cond(CondExpr {
+                                span: DUMMY_SP,
+                                test: Box::new(field_access.clone()),
+                                cons: Box::new(self.create_call(
+                                    "candid_some",
+                                    vec![self.create_arg(field_access.clone())],
+                                )),
+                                alt: Box::new(self.create_call("candid_none", vec![])),
+                            })
+                        } else {
+                            let inner_function_name = self.get_to_candid_function_name(inner);
+                            self.generate_to_candid_function(inner, &inner_function_name);
+
+                            Expr::Cond(CondExpr {
+                                span: DUMMY_SP,
+                                test: Box::new(field_access.clone()),
+                                cons: Box::new(self.create_call(
+                                    "candid_some",
+                                    vec![self.create_arg(self.create_call(
+                                        &inner_function_name,
+                                        vec![self.create_arg(field_access.clone())],
+                                    ))],
+                                )),
+                                alt: Box::new(self.create_call("candid_none", vec![])),
+                            })
+                        }
+                    }
+                    _ => {
+                        // For normal fields, check if conversion is needed
+                        if !self.needs_conversion(&field.ty) {
+                            field_access
+                        } else {
+                            let inner_function_name = self.get_to_candid_function_name(&field.ty);
+                            self.generate_to_candid_function(&field.ty, &inner_function_name);
+                            // Convert the value using appropriate function
+                            self.create_call(
+                                &inner_function_name,
+                                vec![self.create_arg(field_access.clone())],
+                            )
+                        
+                        }
+                    }
+                };
 
                 // Create a new conditional with this field's condition and result
                 result = Expr::Cond(CondExpr {
                     span: DUMMY_SP,
                     test: Box::new(condition),
-                    cons: Box::new(field_result),
+                    cons: Box::new(Expr::Object(ObjectLit {
+                        span: DUMMY_SP,
+                        props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                            key: PropName::Ident(Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty()).into()),
+                            value: Box::new(field_result),
+                        })))],
+                    })),
                     alt: Box::new(result),
                 });
             }
@@ -868,8 +936,8 @@ impl<'a> TypeConverter<'a> {
     }
 
     /// Create a TypeScript type annotation for a given Candid type
-    fn create_ts_type_annotation(&self, ty: &Type) -> TsType {
-        convert_type(self.env, ty, true)
+    fn create_ts_type_annotation(&mut self, ty: &Type) -> TsType {
+        convert_type(self.enum_declarations, self.env, ty, true)
     }
 
     fn generate_from_candid_body(&mut self, ty: &Type, param_name: &str) -> Expr {
@@ -1307,21 +1375,18 @@ impl<'a> TypeConverter<'a> {
     }
 
     fn convert_variant_from_candid_body(&mut self, fields: &[Field], param_name: &str) -> Expr {
+        if fields.is_empty() {
+            return self.create_ident(param_name);
+        }
         // Check if all variants have the same type (especially null)
-        let all_same_type = fields.iter().skip(1).all(|f| {
-            let first_type = &fields[0].ty;
-            match (first_type.as_ref(), f.ty.as_ref()) {
-                (TypeInner::Null, TypeInner::Null) => true,
-                (a, b) => a == b,
-            }
-        });
+        let all_null = fields.iter().all(|f| matches!(f.ty.as_ref(), TypeInner::Null));
 
-        // For variants with all null or same simple type, return the tag as string
-        if all_same_type
-            && fields
-                .iter()
-                .all(|f| matches!(f.ty.as_ref(), TypeInner::Null))
+        // For variants with all null or same simple type, return the enum member
+        if all_null
         {
+            // Determine the enum name based on whether this is a named type or anonymous
+            let enum_name = self.enum_declarations.get(&fields.to_vec()).unwrap().1.clone();
+
             let mut conditions = Vec::new();
 
             for field in fields {
@@ -1342,12 +1407,30 @@ impl<'a> TypeConverter<'a> {
                     right: Box::new(self.create_ident(param_name)),
                 });
 
-                // Return the tag name as a string
-                let result = Expr::Lit(Lit::Str(Str {
-                    span: DUMMY_SP,
-                    value: field_name.into(),
-                    raw: None,
-                }));
+                // Return the enum member access
+                // let result = 
+                let result = if contains_unicode_characters(&field_name) {
+                    Expr::Member(MemberExpr {
+                        span: DUMMY_SP,
+                        obj: Box::new(self.create_ident(&enum_name)),
+                        prop: MemberProp::Computed(ComputedPropName {
+                            span: DUMMY_SP,
+                            expr: Box::new(Expr::Lit(Lit::Str(Str {
+                                span: DUMMY_SP,
+                                value: field_name.clone().into(),
+                                raw: None,
+                            }))),
+                        }),
+                    })
+                } else {
+                    Expr::Member(MemberExpr {
+                            span: DUMMY_SP,
+                            obj: Box::new(self.create_ident(&enum_name)),
+                            prop: MemberProp::Ident(
+                                Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                            ),
+                        })
+                };
 
                 conditions.push((test, result));
             }
@@ -1492,9 +1575,12 @@ impl<'a> TypeConverter<'a> {
         if fields.is_empty() {
             return false;
         }
-        fields
-            .iter()
-            .all(|f| matches!(&*f.id, Label::Id(_) | Label::Unnamed(_)))
+        for (i, field) in fields.iter().enumerate() {
+            if field.id.get_id() != (i as u32) {
+                return false;
+            }
+        }
+        true
     }
 
     /// Generates imports for named Candid types

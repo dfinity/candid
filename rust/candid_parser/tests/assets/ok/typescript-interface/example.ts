@@ -77,11 +77,11 @@ export interface nested {
         _43_: number;
     };
     _40_: bigint;
-    _41_: "_42" | "A" | "B" | "C";
+    _41_: Variant__42__A_B_C;
     _42_: bigint;
 }
 export type nested_res = {
-    Ok: "Ok" | "Err";
+    Ok: Variant_Ok_Err;
 } | {
     Err: {
         Ok: {
@@ -140,7 +140,7 @@ export interface exampleInterface {
     h(arg0: Array<string | null>, arg1: {
         A: bigint;
     } | {
-        B?: string;
+        B: string | null;
     }, arg2: List | null): Promise<{
         _42_: {
         };
@@ -152,7 +152,7 @@ export interface exampleInterface {
                 result: string;
             };
         } | {
-            Err: "a" | "b";
+            Err: Variant_a_b;
         }]>;
 }
 import type { A as _A, B as _B, List as _List, a as _a, b as _b, list as _list, nested as _nested, nested_res as _nested_res, node as _node, res as _res, stream as _stream, tree as _tree } from "declarations/example/example.did.d.ts";
@@ -250,7 +250,7 @@ class Example implements exampleInterface {
     async h(arg0: Array<string | null>, arg1: {
         A: bigint;
     } | {
-        B?: string;
+        B: string | null;
     }, arg2: List | null): Promise<{
         _42_: {
         };
@@ -294,7 +294,7 @@ class Example implements exampleInterface {
                 result: string;
             };
         } | {
-            Err: "a" | "b";
+            Err: Variant_a_b;
         }]> {
         if (this.processError) {
             try {
@@ -438,7 +438,7 @@ function from_candid_variant_n22(value: {
         Err: [bigint];
     };
 }): {
-    Ok: "Ok" | "Err";
+    Ok: Variant_Ok_Err;
 } | {
     Err: {
         Ok: {
@@ -458,8 +458,8 @@ function from_candid_variant_n23(value: {
     Ok: null;
 } | {
     Err: null;
-}): "Ok" | "Err" {
-    return "Ok" in value ? "Ok" : "Err" in value ? "Err" : value;
+}): Variant_Ok_Err {
+    return "Ok" in value ? Variant_Ok_Err.Ok : "Err" in value ? Variant_Ok_Err.Err : value;
 }
 function from_candid_variant_n24(value: {
     Ok: {
@@ -529,7 +529,7 @@ function from_candid_variant_n40(value: {
         result: string;
     };
 } | {
-    Err: "a" | "b";
+    Err: Variant_a_b;
 } {
     return "Ok" in value ? {
         Ok: value.Ok
@@ -541,8 +541,8 @@ function from_candid_variant_n41(value: {
     a: null;
 } | {
     b: null;
-}): "a" | "b" {
-    return "a" in value ? "a" : "b" in value ? "b" : value;
+}): Variant_a_b {
+    return "a" in value ? Variant_a_b.a : "b" in value ? Variant_a_b.b : value;
 }
 function to_candid_List_n14(value: List): _List {
     return to_candid_opt_n15(value);
@@ -554,7 +554,7 @@ function to_candid_list_n1(value: list): _list {
     return to_candid_opt_n2(value);
 }
 function to_candid_nested_n18(value: nested): _nested {
-    return to_candid_tuple_n19(value);
+    return to_candid_record_n19(value);
 }
 function to_candid_node_n3(value: node): _node {
     return to_candid_record_n4(value);
@@ -592,6 +592,49 @@ function to_candid_record_n16(value: {
         tail: to_candid_List_n14(value.tail)
     };
 }
+function to_candid_record_n19(value: {
+    _0_: bigint;
+    _1_: bigint;
+    _2_: [bigint, bigint];
+    _3_: {
+        _0_: bigint;
+        _42_: bigint;
+        _43_: number;
+    };
+    _40_: bigint;
+    _41_: Variant__42__A_B_C;
+    _42_: bigint;
+}): {
+    _0_: bigint;
+    _1_: bigint;
+    _2_: [bigint, bigint];
+    _3_: {
+        _0_: bigint;
+        _42_: bigint;
+        _43_: number;
+    };
+    _40_: bigint;
+    _41_: {
+        _42_: null;
+    } | {
+        A: null;
+    } | {
+        B: null;
+    } | {
+        C: null;
+    };
+    _42_: bigint;
+} {
+    return {
+        _0_: value._0_,
+        _1_: value._1_,
+        _2_: value._2_,
+        _3_: value._3_,
+        _40_: value._40_,
+        _41_: to_candid_variant_n20(value._41_),
+        _42_: value._42_
+    };
+}
 function to_candid_record_n4(value: {
     head: bigint;
     tail: list;
@@ -604,38 +647,7 @@ function to_candid_record_n4(value: {
         tail: to_candid_list_n1(value.tail)
     };
 }
-function to_candid_tuple_n19(value: {
-    _0_: bigint;
-    _1_: bigint;
-    _2_: [bigint, bigint];
-    _3_: {
-        _0_: bigint;
-        _42_: bigint;
-        _43_: number;
-    };
-    _40_: bigint;
-    _41_: "_42" | "A" | "B" | "C";
-    _42_: bigint;
-}): [bigint, bigint, [bigint, bigint], [bigint, bigint, number], bigint, {
-        _42_: null;
-    } | {
-        A: null;
-    } | {
-        B: null;
-    } | {
-        C: null;
-    }, bigint] {
-    return [
-        value[0],
-        value[1],
-        value[2],
-        value[3],
-        value[4],
-        to_candid_variant_n20(value[5]),
-        value[6]
-    ];
-}
-function to_candid_variant_n20(value: "_42" | "A" | "B" | "C"): {
+function to_candid_variant_n20(value: Variant__42__A_B_C): {
     _42_: null;
 } | {
     A: null;
@@ -644,20 +656,20 @@ function to_candid_variant_n20(value: "_42" | "A" | "B" | "C"): {
 } | {
     C: null;
 } {
-    return value == "_42_" ? {
+    return value == Variant__42__A_B_C._42_ ? {
         _42_: null
-    } : value == "A" ? {
+    } : value == Variant__42__A_B_C.A ? {
         A: null
-    } : value == "B" ? {
+    } : value == Variant__42__A_B_C.B ? {
         B: null
-    } : value == "C" ? {
+    } : value == Variant__42__A_B_C.C ? {
         C: null
     } : value;
 }
 function to_candid_variant_n27(value: {
     A: bigint;
 } | {
-    B?: string;
+    B: string | null;
 }): {
     A: bigint;
 } | {
@@ -666,7 +678,7 @@ function to_candid_variant_n27(value: {
     return "A" in value ? {
         A: value.A
     } : "B" in value ? {
-        B: value.B
+        B: value.B ? candid_some(value.B) : candid_none()
     } : value;
 }
 function to_candid_variant_n35(value: {
@@ -686,5 +698,19 @@ function to_candid_variant_n35(value: {
 }
 function to_candid_vec_n25(value: Array<string | null>): Array<[] | [string]> {
     return value.map((x)=>to_candid_opt_n26(x));
+}
+export enum Variant_Ok_Err {
+    Ok = "Ok",
+    Err = "Err"
+}
+export enum Variant__42__A_B_C {
+    _42_ = "_42_",
+    A = "A",
+    B = "B",
+    C = "C"
+}
+export enum Variant_a_b {
+    a = "a",
+    b = "b"
 }
 

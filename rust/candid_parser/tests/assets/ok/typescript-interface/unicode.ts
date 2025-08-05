@@ -55,7 +55,6 @@ export interface A {
     '字段名': bigint;
     '字 段 名2': bigint;
 }
-export type B = "" | "空的" | "  空的  " | "1⃣️2⃣️3⃣️";
 import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
@@ -70,6 +69,7 @@ export const canisterId = _canisterId;
 export interface unicodeInterface {
     ""(arg0: bigint): Promise<bigint>;
     '✈️  🚗 ⛱️ '(): Promise<void>;
+    '函'(arg0: B): Promise<A>;
     '函数名'(arg0: A): Promise<B>;
     '👀'(arg0: bigint): Promise<bigint>;
 }
@@ -107,18 +107,32 @@ class Unicode implements unicodeInterface {
             return result;
         }
     }
+    async '函'(arg0: B): Promise<A> {
+        if (this.processError) {
+            try {
+                const result = await this.actor["函"](to_candid_B_n1(arg0));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor["函"](to_candid_B_n1(arg0));
+            return result;
+        }
+    }
     async '函数名'(arg0: A): Promise<B> {
         if (this.processError) {
             try {
                 const result = await this.actor["函数名"](arg0);
-                return from_candid_B_n1(result);
+                return from_candid_B_n3(result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor["函数名"](arg0);
-            return from_candid_B_n1(result);
+            return from_candid_B_n3(result);
         }
     }
     async '👀'(arg0: bigint): Promise<bigint> {
@@ -137,10 +151,10 @@ class Unicode implements unicodeInterface {
     }
 }
 export const unicode: unicodeInterface = new Unicode();
-function from_candid_B_n1(value: _B): B {
-    return from_candid_variant_n2(value);
+function from_candid_B_n3(value: _B): B {
+    return from_candid_variant_n4(value);
 }
-function from_candid_variant_n2(value: {
+function from_candid_variant_n4(value: {
     "": null;
 } | {
     '空的': null;
@@ -148,7 +162,35 @@ function from_candid_variant_n2(value: {
     '  空的  ': null;
 } | {
     '1⃣️2⃣️3⃣️': null;
-}): "" | "空的" | "  空的  " | "1⃣️2⃣️3⃣️" {
-    return "" in value ? "" : "空的" in value ? "空的" : "  空的  " in value ? "  空的  " : "1⃣️2⃣️3⃣️" in value ? "1⃣️2⃣️3⃣️" : value;
+}): B {
+    return "" in value ? B[""] : "空的" in value ? B["空的"] : "  空的  " in value ? B["  空的  "] : "1⃣️2⃣️3⃣️" in value ? B["1⃣️2⃣️3⃣️"] : value;
+}
+function to_candid_B_n1(value: B): _B {
+    return to_candid_variant_n2(value);
+}
+function to_candid_variant_n2(value: B): {
+    "": null;
+} | {
+    '空的': null;
+} | {
+    '  空的  ': null;
+} | {
+    '1⃣️2⃣️3⃣️': null;
+} {
+    return value == B[""] ? {
+        "": null
+    } : value == B["空的"] ? {
+        '空的': null
+    } : value == B["  空的  "] ? {
+        '  空的  ': null
+    } : value == B["1⃣️2⃣️3⃣️"] ? {
+        '1⃣️2⃣️3⃣️': null
+    } : value;
+}
+export enum B {
+    "" = "",
+    '空的' = "空的",
+    '  空的  ' = "  空的  ",
+    '1⃣️2⃣️3⃣️' = "1⃣️2⃣️3⃣️"
 }
 

@@ -50,7 +50,6 @@ function extractAgentErrorMessage(error: string): string {
     return match ? match[1] : errorString;
 }
 export type bitcoin_address = string;
-export type bitcoin_network = "mainnet" | "testnet";
 export type block_hash = Uint8Array | number[];
 export type canister_id = Principal;
 export interface canister_settings {
@@ -65,7 +64,6 @@ export interface definite_canister_settings {
     memory_allocation: bigint;
     compute_allocation: bigint;
 }
-export type ecdsa_curve = "secp256k1";
 export interface get_balance_request {
     network: bitcoin_network;
     address: bitcoin_address;
@@ -134,7 +132,7 @@ export interface managementInterface {
     canister_status(arg0: {
         canister_id: canister_id;
     }): Promise<{
-        status: "stopped" | "stopping" | "running";
+        status: Variant_stopped_stopping_running;
         memory_size: bigint;
         cycles: bigint;
         settings: definite_canister_settings;
@@ -165,7 +163,7 @@ export interface managementInterface {
     }>;
     http_request(arg0: {
         url: string;
-        method: "get" | "head" | "post";
+        method: Variant_get_head_post;
         max_response_bytes?: bigint;
         body?: Uint8Array | number[];
         transform?: {
@@ -177,7 +175,7 @@ export interface managementInterface {
     install_code(arg0: {
         arg: Uint8Array | number[];
         wasm_module: wasm_module;
-        mode: "reinstall" | "upgrade" | "install";
+        mode: Variant_reinstall_upgrade_install;
         canister_id: canister_id;
     }): Promise<void>;
     provisional_create_canister_with_cycles(arg0: {
@@ -281,7 +279,7 @@ class Management implements managementInterface {
     async canister_status(arg0: {
         canister_id: canister_id;
     }): Promise<{
-        status: "stopped" | "stopping" | "running";
+        status: Variant_stopped_stopping_running;
         memory_size: bigint;
         cycles: bigint;
         settings: definite_canister_settings;
@@ -377,7 +375,7 @@ class Management implements managementInterface {
     }
     async http_request(arg0: {
         url: string;
-        method: "get" | "head" | "post";
+        method: Variant_get_head_post;
         max_response_bytes?: bigint;
         body?: Uint8Array | number[];
         transform?: {
@@ -402,7 +400,7 @@ class Management implements managementInterface {
     async install_code(arg0: {
         arg: Uint8Array | number[];
         wasm_module: wasm_module;
-        mode: "reinstall" | "upgrade" | "install";
+        mode: Variant_reinstall_upgrade_install;
         canister_id: canister_id;
     }): Promise<void> {
         if (this.processError) {
@@ -597,7 +595,7 @@ function from_candid_record_n15(value: {
     idle_cycles_burned_per_day: bigint;
     module_hash: [] | [Uint8Array | number[]];
 }): {
-    status: "stopped" | "stopping" | "running";
+    status: Variant_stopped_stopping_running;
     memory_size: bigint;
     cycles: bigint;
     settings: definite_canister_settings;
@@ -619,8 +617,8 @@ function from_candid_variant_n16(value: {
     stopping: null;
 } | {
     running: null;
-}): "stopped" | "stopping" | "running" {
-    return "stopped" in value ? "stopped" : "stopping" in value ? "stopping" : "running" in value ? "running" : value;
+}): Variant_stopped_stopping_running {
+    return "stopped" in value ? Variant_stopped_stopping_running.stopped : "stopping" in value ? Variant_stopped_stopping_running.stopping : "running" in value ? Variant_stopped_stopping_running.running : value;
 }
 function to_candid_bitcoin_network_n3(value: bitcoin_network): _bitcoin_network {
     return to_candid_variant_n4(value);
@@ -729,7 +727,7 @@ function to_candid_record_n21(value: {
 }
 function to_candid_record_n24(value: {
     url: string;
-    method: "get" | "head" | "post";
+    method: Variant_get_head_post;
     max_response_bytes?: bigint;
     body?: Uint8Array | number[];
     transform?: {
@@ -766,7 +764,7 @@ function to_candid_record_n24(value: {
 function to_candid_record_n26(value: {
     arg: Uint8Array | number[];
     wasm_module: wasm_module;
-    mode: "reinstall" | "upgrade" | "install";
+    mode: Variant_reinstall_upgrade_install;
     canister_id: canister_id;
 }): {
     arg: Uint8Array | number[];
@@ -870,51 +868,51 @@ function to_candid_record_n8(value: {
 function to_candid_send_transaction_request_n13(value: send_transaction_request): _send_transaction_request {
     return to_candid_record_n14(value);
 }
-function to_candid_variant_n23(value: "secp256k1"): {
+function to_candid_variant_n23(value: ecdsa_curve): {
     secp256k1: null;
 } {
-    return value == "secp256k1" ? {
+    return value == ecdsa_curve.secp256k1 ? {
         secp256k1: null
     } : value;
 }
-function to_candid_variant_n25(value: "get" | "head" | "post"): {
+function to_candid_variant_n25(value: Variant_get_head_post): {
     get: null;
 } | {
     head: null;
 } | {
     post: null;
 } {
-    return value == "get" ? {
+    return value == Variant_get_head_post.get ? {
         get: null
-    } : value == "head" ? {
+    } : value == Variant_get_head_post.head ? {
         head: null
-    } : value == "post" ? {
+    } : value == Variant_get_head_post.post ? {
         post: null
     } : value;
 }
-function to_candid_variant_n27(value: "reinstall" | "upgrade" | "install"): {
+function to_candid_variant_n27(value: Variant_reinstall_upgrade_install): {
     reinstall: null;
 } | {
     upgrade: null;
 } | {
     install: null;
 } {
-    return value == "reinstall" ? {
+    return value == Variant_reinstall_upgrade_install.reinstall ? {
         reinstall: null
-    } : value == "upgrade" ? {
+    } : value == Variant_reinstall_upgrade_install.upgrade ? {
         upgrade: null
-    } : value == "install" ? {
+    } : value == Variant_reinstall_upgrade_install.install ? {
         install: null
     } : value;
 }
-function to_candid_variant_n4(value: "mainnet" | "testnet"): {
+function to_candid_variant_n4(value: bitcoin_network): {
     mainnet: null;
 } | {
     testnet: null;
 } {
-    return value == "mainnet" ? {
+    return value == bitcoin_network.mainnet ? {
         mainnet: null
-    } : value == "testnet" ? {
+    } : value == bitcoin_network.testnet ? {
         testnet: null
     } : value;
 }
@@ -932,5 +930,27 @@ function to_candid_variant_n9(value: {
     } : "min_confirmations" in value ? {
         min_confirmations: value.min_confirmations
     } : value;
+}
+export enum Variant_get_head_post {
+    get = "get",
+    head = "head",
+    post = "post"
+}
+export enum Variant_reinstall_upgrade_install {
+    reinstall = "reinstall",
+    upgrade = "upgrade",
+    install = "install"
+}
+export enum Variant_stopped_stopping_running {
+    stopped = "stopped",
+    stopping = "stopping",
+    running = "running"
+}
+export enum bitcoin_network {
+    mainnet = "mainnet",
+    testnet = "testnet"
+}
+export enum ecdsa_curve {
+    secp256k1 = "secp256k1"
 }
 

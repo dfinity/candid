@@ -13,7 +13,6 @@ export interface A {
     '字段名': bigint;
     '字 段 名2': bigint;
 }
-export type B = "" | "空的" | "  空的  " | "1⃣️2⃣️3⃣️";
 import { ActorCallError, type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 export declare interface CreateActorOptions {
     agent?: Agent;
@@ -25,7 +24,14 @@ export declare const canisterId: string;
 export interface unicodeInterface {
     ""(arg0: bigint): Promise<bigint>;
     '✈️  🚗 ⛱️ '(): Promise<void>;
+    '函'(arg0: B): Promise<A>;
     '函数名'(arg0: A): Promise<B>;
     '👀'(arg0: bigint): Promise<bigint>;
+}
+export enum B {
+    "" = "",
+    '空的' = "空的",
+    '  空的  ' = "  空的  ",
+    '1⃣️2⃣️3⃣️' = "1⃣️2⃣️3⃣️"
 }
 

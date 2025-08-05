@@ -35,11 +35,11 @@ export interface nested {
         _43_: number;
     };
     _40_: bigint;
-    _41_: "_42" | "A" | "B" | "C";
+    _41_: Variant__42__A_B_C;
     _42_: bigint;
 }
 export type nested_res = {
-    Ok: "Ok" | "Err";
+    Ok: Variant_Ok_Err;
 } | {
     Err: {
         Ok: {
@@ -95,7 +95,7 @@ export interface exampleInterface {
     h(arg0: Array<string | null>, arg1: {
         A: bigint;
     } | {
-        B?: string;
+        B: string | null;
     }, arg2: List | null): Promise<{
         _42_: {
         };
@@ -107,7 +107,21 @@ export interface exampleInterface {
                 result: string;
             };
         } | {
-            Err: "a" | "b";
+            Err: Variant_a_b;
         }]>;
+}
+export enum Variant_Ok_Err {
+    Ok = "Ok",
+    Err = "Err"
+}
+export enum Variant__42__A_B_C {
+    _42_ = "_42_",
+    A = "A",
+    B = "B",
+    C = "C"
+}
+export enum Variant_a_b {
+    a = "a",
+    b = "b"
 }
 

@@ -69,7 +69,7 @@ export interface fieldnatInterface {
     bab(two: bigint, arg1: bigint): Promise<void>;
     bar(arg0: {
         2: bigint;
-    }): Promise<"e20" | "e30">;
+    }): Promise<Variant_e20_e30>;
     bas(arg0: [bigint, bigint]): Promise<[string, bigint]>;
     baz(arg0: {
         _2_: bigint;
@@ -108,7 +108,7 @@ class Fieldnat implements fieldnatInterface {
     }
     async bar(arg0: {
         2: bigint;
-    }): Promise<"e20" | "e30"> {
+    }): Promise<Variant_e20_e30> {
         if (this.processError) {
             try {
                 const result = await this.actor.bar(arg0);
@@ -209,8 +209,8 @@ function from_candid_variant_n1(value: {
     e20: null;
 } | {
     e30: null;
-}): "e20" | "e30" {
-    return "e20" in value ? "e20" : "e30" in value ? "e30" : value;
+}): Variant_e20_e30 {
+    return "e20" in value ? Variant_e20_e30.e20 : "e30" in value ? Variant_e20_e30.e30 : value;
 }
 function from_candid_variant_n2(value: {
     _0_: bigint;
@@ -220,5 +220,9 @@ function from_candid_variant_n2(value: {
     return "_0_" in value ? {
         _0_: value._0_
     } : value;
+}
+export enum Variant_e20_e30 {
+    e20 = "e20",
+    e30 = "e30"
 }
 
