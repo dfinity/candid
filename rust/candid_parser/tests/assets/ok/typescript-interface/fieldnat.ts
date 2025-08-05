@@ -1,7 +1,6 @@
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { type HttpAgentOptions, type ActorConfig, type Agent, type ActorSubclass } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
 import { fieldnat as _fieldnat, createActor as _createActor, canisterId as _canisterId } from "declarations/fieldnat";
-import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/fieldnat/fieldnat.did.d.js";
 export interface Some<T> {
     _tag: "Some";

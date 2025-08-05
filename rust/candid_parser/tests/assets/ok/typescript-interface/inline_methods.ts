@@ -1,7 +1,6 @@
-import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import { type HttpAgentOptions, type ActorConfig, type Agent, type ActorSubclass } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
 import { inline_methods as _inline_methods, createActor as _createActor, canisterId as _canisterId } from "declarations/inline_methods";
-import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/inline_methods/inline_methods.did.d.js";
 export interface Some<T> {
     _tag: "Some";
