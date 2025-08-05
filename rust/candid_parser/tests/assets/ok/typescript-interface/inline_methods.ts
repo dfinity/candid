@@ -64,9 +64,9 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): inline_methodsInterface {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): inline_methodsInterface {
     const actor = _createActor(canisterId, options);
-    return new Inline_methods(actor);
+    return new Inline_methods(actor, processError);
 }
 export const canisterId = _canisterId;
 export interface inline_methodsInterface {

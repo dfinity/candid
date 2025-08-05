@@ -45,7 +45,7 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
                         })),
                     }),
                 },
-                // options: CreateActorOptions
+                // options?: CreateActorOptions
                 Param {
                     span: DUMMY_SP,
                     decorators: vec![],
@@ -67,6 +67,49 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
                                 )),
                                 type_params: None,
                             })),
+                        })),
+                    }),
+                },
+                // processError?: (error: unknown) => never
+                Param {
+                    span: DUMMY_SP,
+                    decorators: vec![],
+                    pat: Pat::Ident(BindingIdent {
+                        id: Ident {
+                            span: DUMMY_SP,
+                            sym: "processError".into(),
+                            optional: true,
+                            ctxt: SyntaxContext::empty(),
+                        },
+                        type_ann: Some(Box::new(TsTypeAnn {
+                            span: DUMMY_SP,
+                            type_ann: Box::new(TsType::TsFnOrConstructorType(
+                                TsFnOrConstructorType::TsFnType(TsFnType {
+                                    span: DUMMY_SP,
+                                    params: vec![TsFnParam::Ident(BindingIdent {
+                                        id: Ident::new(
+                                            "error".into(),
+                                            DUMMY_SP,
+                                            SyntaxContext::empty(),
+                                        ),
+                                        type_ann: Some(Box::new(TsTypeAnn {
+                                            span: DUMMY_SP,
+                                            type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
+                                                span: DUMMY_SP,
+                                                kind: TsKeywordTypeKind::TsUnknownKeyword,
+                                            })),
+                                        })),
+                                    })],
+                                    type_params: None,
+                                    type_ann: Box::new(TsTypeAnn {
+                                        span: DUMMY_SP,
+                                        type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
+                                            span: DUMMY_SP,
+                                            kind: TsKeywordTypeKind::TsNeverKeyword,
+                                        })),
+                                    }),
+                                }),
+                            )),
                         })),
                     }),
                 },
@@ -119,7 +162,7 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
                             definite: false,
                         }],
                     }))),
-                    // return new Backend(actor);
+                    // return new Backend(actor, processError);
                     Stmt::Return(ReturnStmt {
                         span: DUMMY_SP,
                         arg: Some(Box::new(Expr::New(NewExpr {
@@ -129,14 +172,24 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
                                 DUMMY_SP,
                                 SyntaxContext::empty(),
                             ))),
-                            args: Some(vec![ExprOrSpread {
-                                spread: None,
-                                expr: Box::new(Expr::Ident(Ident::new(
-                                    "actor".into(),
-                                    DUMMY_SP,
-                                    SyntaxContext::empty(),
-                                ))),
-                            }]),
+                            args: Some(vec![
+                                ExprOrSpread {
+                                    spread: None,
+                                    expr: Box::new(Expr::Ident(Ident::new(
+                                        "actor".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    ))),
+                                },
+                                ExprOrSpread {
+                                    spread: None,
+                                    expr: Box::new(Expr::Ident(Ident::new(
+                                        "processError".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    ))),
+                                },
+                            ]),
                             type_args: None,
                             ctxt: SyntaxContext::empty(),
                         }))),
@@ -269,7 +322,7 @@ pub fn generate_create_actor_function_declaration(service_name: &str) -> VarDecl
                                 TsFnParam::Ident(BindingIdent {
                                     id: Ident {
                                         span: DUMMY_SP,
-                                        sym: "actor".into(),
+                                        sym: "options".into(),
                                         optional: true,
                                         ctxt: SyntaxContext::empty(),
                                     },
@@ -284,6 +337,45 @@ pub fn generate_create_actor_function_declaration(service_name: &str) -> VarDecl
                                             )),
                                             type_params: None,
                                         })),
+                                    })),
+                                }),
+                                // Third parameter: processError?: (error: unknown) => void
+                                TsFnParam::Ident(BindingIdent {
+                                    id: Ident {
+                                        span: DUMMY_SP,
+                                        sym: "processError".into(),
+                                        optional: true,
+                                        ctxt: SyntaxContext::empty(),
+                                    },
+                                    type_ann: Some(Box::new(TsTypeAnn {
+                                        span: DUMMY_SP,
+                                        type_ann: Box::new(TsType::TsFnOrConstructorType(
+                                            TsFnOrConstructorType::TsFnType(TsFnType {
+                                                span: DUMMY_SP,
+                                                params: vec![TsFnParam::Ident(BindingIdent {
+                                                    id: Ident::new(
+                                                        "error".into(),
+                                                        DUMMY_SP,
+                                                        SyntaxContext::empty(),
+                                                    ),
+                                                    type_ann: Some(Box::new(TsTypeAnn {
+                                                        span: DUMMY_SP,
+                                                        type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
+                                                            span: DUMMY_SP,
+                                                            kind: TsKeywordTypeKind::TsUnknownKeyword,
+                                                        })),
+                                                    })),
+                                                })],
+                                                type_params: None,
+                                                type_ann: Box::new(TsTypeAnn {
+                                                    span: DUMMY_SP,
+                                                    type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
+                                                        span: DUMMY_SP,
+                                                        kind: TsKeywordTypeKind::TsNeverKeyword,
+                                                    })),
+                                                }),
+                                            }),
+                                        )),
                                     })),
                                 }),
                             ],

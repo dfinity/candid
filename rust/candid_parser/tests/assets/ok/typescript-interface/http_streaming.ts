@@ -78,9 +78,9 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): http_streamingInterface {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): http_streamingInterface {
     const actor = _createActor(canisterId, options);
-    return new Http_streaming(actor);
+    return new Http_streaming(actor, processError);
 }
 export const canisterId = _canisterId;
 export interface http_streamingInterface {

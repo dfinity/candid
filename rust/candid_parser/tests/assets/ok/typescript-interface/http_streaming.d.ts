@@ -41,7 +41,7 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => http_streamingInterface;
+export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => http_streamingInterface;
 export declare const canisterId: string;
 export interface http_streamingInterface {
     httpStreamingCallback(token: StreamingToken): Promise<StreamingCallbackHttpResponse>;

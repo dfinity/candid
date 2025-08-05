@@ -19,7 +19,7 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => escapeInterface;
+export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => escapeInterface;
 export declare const canisterId: string;
 export interface escapeInterface {
     '\n\'\"\'\'\"\"\r\t'(arg0: t): Promise<void>;

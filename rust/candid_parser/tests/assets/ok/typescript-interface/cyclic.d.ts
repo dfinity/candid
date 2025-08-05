@@ -19,7 +19,7 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => cyclicInterface;
+export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => cyclicInterface;
 export declare const canisterId: string;
 export interface cyclicInterface {
     f(arg0: A, arg1: B, arg2: C, arg3: X, arg4: Y, arg5: Z): Promise<void>;

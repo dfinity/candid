@@ -18,7 +18,7 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => serviceInterface;
+export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => serviceInterface;
 export declare const canisterId: string;
 export interface serviceInterface {
     asArray(): Promise<[Array<Principal>, Array<[Principal, string]>]>;

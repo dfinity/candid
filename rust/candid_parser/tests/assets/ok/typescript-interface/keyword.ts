@@ -74,9 +74,9 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): keywordInterface {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): keywordInterface {
     const actor = _createActor(canisterId, options);
-    return new Keyword(actor);
+    return new Keyword(actor, processError);
 }
 export const canisterId = _canisterId;
 export interface keywordInterface {

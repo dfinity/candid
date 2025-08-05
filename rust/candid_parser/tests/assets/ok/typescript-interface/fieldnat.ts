@@ -55,9 +55,9 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): fieldnatInterface {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): fieldnatInterface {
     const actor = _createActor(canisterId, options);
-    return new Fieldnat(actor);
+    return new Fieldnat(actor, processError);
 }
 export const canisterId = _canisterId;
 export enum Variant_e20_e30 {

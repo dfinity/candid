@@ -75,9 +75,9 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): recursionInterface {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): recursionInterface {
     const actor = _createActor(canisterId, options);
-    return new Recursion(actor);
+    return new Recursion(actor, processError);
 }
 export const canisterId = _canisterId;
 export interface recursionInterface extends sInterface {

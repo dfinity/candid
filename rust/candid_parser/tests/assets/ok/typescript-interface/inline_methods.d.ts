@@ -27,7 +27,7 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => inline_methodsInterface;
+export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => inline_methodsInterface;
 export declare const canisterId: string;
 export interface inline_methodsInterface {
     add_two(arg0: bigint): Promise<bigint>;

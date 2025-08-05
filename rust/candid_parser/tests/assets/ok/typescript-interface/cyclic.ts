@@ -56,9 +56,9 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): cyclicInterface {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): cyclicInterface {
     const actor = _createActor(canisterId, options);
-    return new Cyclic(actor);
+    return new Cyclic(actor, processError);
 }
 export const canisterId = _canisterId;
 export interface cyclicInterface {

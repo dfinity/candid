@@ -121,9 +121,9 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): exampleInterface {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): exampleInterface {
     const actor = _createActor(canisterId, options);
-    return new Example(actor);
+    return new Example(actor, processError);
 }
 export const canisterId = _canisterId;
 export enum Variant_Ok_Err {

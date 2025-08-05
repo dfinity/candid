@@ -18,7 +18,7 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export declare const createActor: (canisterId: string | Principal, actor?: CreateActorOptions) => fieldnatInterface;
+export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => fieldnatInterface;
 export declare const canisterId: string;
 export enum Variant_e20_e30 {
     e20 = "e20",

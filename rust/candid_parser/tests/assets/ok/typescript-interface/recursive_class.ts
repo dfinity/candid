@@ -53,9 +53,9 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): recursive_classInterface {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): recursive_classInterface {
     const actor = _createActor(canisterId, options);
-    return new Recursive_class(actor);
+    return new Recursive_class(actor, processError);
 }
 export const canisterId = _canisterId;
 export interface recursive_classInterface extends sInterface {

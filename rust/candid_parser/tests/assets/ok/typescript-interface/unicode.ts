@@ -56,9 +56,9 @@ export declare interface CreateActorOptions {
     agentOptions?: HttpAgentOptions;
     actorOptions?: ActorConfig;
 }
-export function createActor(canisterId: string | Principal, options?: CreateActorOptions): unicodeInterface {
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): unicodeInterface {
     const actor = _createActor(canisterId, options);
-    return new Unicode(actor);
+    return new Unicode(actor, processError);
 }
 export const canisterId = _canisterId;
 export enum B {
