@@ -1,11 +1,8 @@
-
 use super::generate_wrapper::TypeConverter;
 use super::ident::get_ident_guarded;
-use super::preamble::actor::{interface_canister_initialization};
-use super::preamble::imports::{
-    interface_create_actor_options, interface_imports,
-};
-use super::preamble::options::{interface_options_utils};
+use super::preamble::actor::interface_canister_initialization;
+use super::preamble::imports::{interface_create_actor_options, interface_imports};
+use super::preamble::options::interface_options_utils;
 use super::utils::render_ast;
 use candid::types::{Field, Type, TypeEnv, TypeInner};
 use std::collections::HashMap;
@@ -79,7 +76,6 @@ pub fn compile_interface(env: &TypeEnv, actor: &Option<Type>, service_name: &str
     // Generate code from the AST
     render_ast(&module)
 }
-
 
 fn interface_actor_implementation(
     env: &TypeEnv,

@@ -1,6 +1,6 @@
 use super::generate_wrapper::TypeConverter;
 use super::ident::{contains_unicode_characters, get_ident_guarded, get_ident_guarded_keyword_ok};
-use candid::types::{Function, Type, TypeEnv, TypeInner, Field};
+use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
 
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
@@ -8,17 +8,14 @@ use swc_core::ecma::ast::*;
 use super::convert_types::convert_type;
 use super::generate_wrapper::convert_multi_return_from_candid;
 
-
-use super::preamble::actor::{wrapper_canister_initialization};
-use super::preamble::imports::{
-    interface_create_actor_options, wrapper_imports,
-};
-use super::convert_types::{add_type_definitions};
+use super::convert_types::add_type_definitions;
+use super::preamble::actor::wrapper_canister_initialization;
+use super::preamble::imports::{interface_create_actor_options, wrapper_imports};
 use super::preamble::options::{interface_options_utils, wrapper_options_utils};
 use super::utils::render_ast;
 
-use std::collections::HashMap;
 use super::compile_interface::{interface_actor_service, interface_actor_var};
+use std::collections::HashMap;
 
 pub fn compile_wrapper(env: &TypeEnv, actor: &Option<Type>, service_name: &str) -> String {
     let enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)> = &mut HashMap::new();
@@ -195,8 +192,6 @@ fn wrapper_actor_var(
         &capitalized_service_name,
     ));
 }
-
-
 
 fn create_actor_class(
     env: &TypeEnv,

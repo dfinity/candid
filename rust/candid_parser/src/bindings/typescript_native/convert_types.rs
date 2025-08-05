@@ -52,7 +52,6 @@ pub fn create_interface_from_service(
     }
 }
 
-
 // Convert Candid type to TypeScript type
 pub fn convert_type(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
@@ -155,13 +154,17 @@ pub fn convert_type(
 
 // Internal functions
 
-fn create_opt_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>, env: &TypeEnv, t: &Type, is_ref: bool) -> TsType {
+fn create_opt_type(
+    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    env: &TypeEnv,
+    t: &Type,
+    is_ref: bool,
+) -> TsType {
     use TypeInner::*;
     match t.as_ref() {
-    Opt(_) => {
-        // Use Some<T> | None for nested optionals
-        TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
-            TsUnionType {
+        Opt(_) => {
+            // Use Some<T> | None for nested optionals
+            TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(TsUnionType {
                 span: DUMMY_SP,
                 types: vec![
                     Box::new(TsType::TsTypeRef(TsTypeRef {
@@ -173,12 +176,7 @@ fn create_opt_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, Stri
                         )),
                         type_params: Some(Box::new(TsTypeParamInstantiation {
                             span: DUMMY_SP,
-                            params: vec![Box::new(convert_type(
-                                enum_declarations,
-                                env,
-                                t,
-                                is_ref,
-                            ))],
+                            params: vec![Box::new(convert_type(enum_declarations, env, t, is_ref))],
                         })),
                     })),
                     Box::new(TsType::TsTypeRef(TsTypeRef {
@@ -191,73 +189,71 @@ fn create_opt_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, Stri
                         type_params: None,
                     })),
                 ],
-            },
-        ))
-    }
-    Var(id) => {
-        // Check for recursion
-        let is_recursive = if let Ok(inner_type) = env.find_type(id) {
-            let mut visited = std::collections::HashSet::new();
-            is_recursive_optional(env, inner_type, &mut visited)
-        } else {
-            false
-        };
-
-        if is_recursive {
-            // Use Some<T> | None for recursive optionals
-            TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
-                TsUnionType {
-                    span: DUMMY_SP,
-                    types: vec![
-                        Box::new(TsType::TsTypeRef(TsTypeRef {
-                            span: DUMMY_SP,
-                            type_name: TsEntityName::Ident(Ident::new(
-                                "Some".into(),
-                                DUMMY_SP,
-                                SyntaxContext::empty(),
-                            )),
-                            type_params: Some(Box::new(TsTypeParamInstantiation {
-                                span: DUMMY_SP,
-                                params: vec![Box::new(convert_type(
-                                    enum_declarations,
-                                    env,
-                                    t,
-                                    is_ref,
-                                ))],
-                            })),
-                        })),
-                        Box::new(TsType::TsTypeRef(TsTypeRef {
-                            span: DUMMY_SP,
-                            type_name: TsEntityName::Ident(Ident::new(
-                                "None".into(),
-                                DUMMY_SP,
-                                SyntaxContext::empty(),
-                            )),
-                            type_params: None,
-                        })),
-                    ],
-                },
-            ))
-        } else {
-            // Use T | null for non-recursive optionals with Var
-            TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
-                TsUnionType {
-                    span: DUMMY_SP,
-                    types: vec![
-                        Box::new(convert_type(enum_declarations, env, t, is_ref)),
-                        Box::new(TsType::TsKeywordType(TsKeywordType {
-                            span: DUMMY_SP,
-                            kind: TsKeywordTypeKind::TsNullKeyword,
-                        })),
-                    ],
-                },
-            ))
+            }))
         }
-    }
-    _ => {
-        // Use T | null for simple optionals
-        TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
-            TsUnionType {
+        Var(id) => {
+            // Check for recursion
+            let is_recursive = if let Ok(inner_type) = env.find_type(id) {
+                let mut visited = std::collections::HashSet::new();
+                is_recursive_optional(env, inner_type, &mut visited)
+            } else {
+                false
+            };
+
+            if is_recursive {
+                // Use Some<T> | None for recursive optionals
+                TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
+                    TsUnionType {
+                        span: DUMMY_SP,
+                        types: vec![
+                            Box::new(TsType::TsTypeRef(TsTypeRef {
+                                span: DUMMY_SP,
+                                type_name: TsEntityName::Ident(Ident::new(
+                                    "Some".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                )),
+                                type_params: Some(Box::new(TsTypeParamInstantiation {
+                                    span: DUMMY_SP,
+                                    params: vec![Box::new(convert_type(
+                                        enum_declarations,
+                                        env,
+                                        t,
+                                        is_ref,
+                                    ))],
+                                })),
+                            })),
+                            Box::new(TsType::TsTypeRef(TsTypeRef {
+                                span: DUMMY_SP,
+                                type_name: TsEntityName::Ident(Ident::new(
+                                    "None".into(),
+                                    DUMMY_SP,
+                                    SyntaxContext::empty(),
+                                )),
+                                type_params: None,
+                            })),
+                        ],
+                    },
+                ))
+            } else {
+                // Use T | null for non-recursive optionals with Var
+                TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
+                    TsUnionType {
+                        span: DUMMY_SP,
+                        types: vec![
+                            Box::new(convert_type(enum_declarations, env, t, is_ref)),
+                            Box::new(TsType::TsKeywordType(TsKeywordType {
+                                span: DUMMY_SP,
+                                kind: TsKeywordTypeKind::TsNullKeyword,
+                            })),
+                        ],
+                    },
+                ))
+            }
+        }
+        _ => {
+            // Use T | null for simple optionals
+            TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(TsUnionType {
                 span: DUMMY_SP,
                 types: vec![
                     Box::new(convert_type(enum_declarations, env, t, is_ref)),
@@ -266,13 +262,17 @@ fn create_opt_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, Stri
                         kind: TsKeywordTypeKind::TsNullKeyword,
                     })),
                 ],
-            },
-        ))
+            }))
+        }
     }
-}   
 }
 
-fn create_vector_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>, env: &TypeEnv, t: &Type, is_ref: bool) -> TsType {
+fn create_vector_type(
+    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    env: &TypeEnv,
+    t: &Type,
+    is_ref: bool,
+) -> TsType {
     use TypeInner::*;
     let ty = match t.as_ref() {
         Var(ref id) => {
@@ -316,7 +316,13 @@ fn create_vector_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, S
     }
 }
 
-fn create_record_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>, env: &TypeEnv, ty: &Type, fs: &[Field], is_ref: bool) -> TsType {
+fn create_record_type(
+    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    env: &TypeEnv,
+    ty: &Type,
+    fs: &[Field],
+    is_ref: bool,
+) -> TsType {
     if is_tuple(ty) {
         // Create tuple type
         TsType::TsTupleType(TsTupleType {
@@ -372,7 +378,6 @@ fn create_union_array_type(typed_array: &str, elem_type: &str) -> TsType {
         ],
     }))
 }
-
 
 fn create_variant_type(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
@@ -468,7 +473,6 @@ fn create_variant_type(
         }
     }
 }
-
 
 // Add all type definitions from the environment
 pub fn add_type_definitions(
@@ -874,28 +878,28 @@ fn create_function_type(
 fn create_function_type_ref() -> TsType {
     // Function references are represented as [Principal, string]
     TsType::TsTupleType(TsTupleType {
-      span: DUMMY_SP,
-      elem_types: vec![
-          TsType::TsTypeRef(TsTypeRef {
-              span: DUMMY_SP,
-              type_name: TsEntityName::Ident(Ident::new(
-                  "Principal".into(),
-                  DUMMY_SP,
-                  SyntaxContext::empty(),
-              )),
-              type_params: None,
-          }),
-          TsType::TsKeywordType(TsKeywordType {
-              span: DUMMY_SP,
-              kind: TsKeywordTypeKind::TsStringKeyword,
-          }),
-      ]
-      .into_iter()
-      .map(|t| TsTupleElement {
-          span: DUMMY_SP,
-          label: None,
-          ty: Box::new(t),
-      })
-      .collect(),
-  })
+        span: DUMMY_SP,
+        elem_types: vec![
+            TsType::TsTypeRef(TsTypeRef {
+                span: DUMMY_SP,
+                type_name: TsEntityName::Ident(Ident::new(
+                    "Principal".into(),
+                    DUMMY_SP,
+                    SyntaxContext::empty(),
+                )),
+                type_params: None,
+            }),
+            TsType::TsKeywordType(TsKeywordType {
+                span: DUMMY_SP,
+                kind: TsKeywordTypeKind::TsStringKeyword,
+            }),
+        ]
+        .into_iter()
+        .map(|t| TsTupleElement {
+            span: DUMMY_SP,
+            label: None,
+            ty: Box::new(t),
+        })
+        .collect(),
+    })
 }

@@ -1,10 +1,8 @@
 use super::generate_wrapper::TypeConverter;
 use super::ident::get_ident_guarded;
-use super::preamble::actor::{interface_canister_initialization};
-use super::preamble::imports::{
-    interface_create_actor_options, interface_imports,
-};
-use super::preamble::options::{interface_options_utils};
+use super::preamble::actor::interface_canister_initialization;
+use super::preamble::imports::{interface_create_actor_options, interface_imports};
+use super::preamble::options::interface_options_utils;
 use super::utils::render_ast;
 use candid::types::{Field, Type, TypeEnv, TypeInner};
 use std::collections::HashMap;
@@ -12,9 +10,9 @@ use std::collections::HashMap;
 use swc_core::common::DUMMY_SP;
 use swc_core::ecma::ast::*;
 
-use super::convert_types::{add_type_definitions, create_interface_from_service};
-use super::compile_wrapper::compile_wrapper;
 use super::compile_interface::compile_interface;
+use super::compile_wrapper::compile_wrapper;
+use super::convert_types::{add_type_definitions, create_interface_from_service};
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: &str) -> String {
     if target == "interface" {
