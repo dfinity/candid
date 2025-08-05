@@ -1,12 +1,12 @@
 use super::new_typescript_native_types::{convert_type, is_recursive_optional};
-use super::original_typescript_types::CandidTypesConverter;
+use super::original_typescript_types::OriginalTypescriptTypes;
 use super::utils::{contains_unicode_characters, get_ident_guarded};
 use candid::types::{Field, Label, Type, TypeEnv, TypeInner};
 use std::collections::{HashMap, HashSet};
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
-/// Provides functions to generate JavaScript expressions that convert
-/// between TypeScript and Candid representations using a function-based approach.
+/// Provides functions to generate TypeScript expressions that convert
+/// between new TypeScript Native and original TypeScript (current agent-js) representations by generating conversion functions.
 pub struct TypeConverter<'a> {
     env: &'a TypeEnv,
     // Track function names by type
@@ -23,7 +23,7 @@ pub struct TypeConverter<'a> {
     processing_conversion: HashSet<Type>,
     // Counter for unique function names
     function_counter: usize,
-    candid_types_converter: CandidTypesConverter<'a>,
+    original_types: OriginalTypescriptTypes<'a>,
     enum_declarations: &'a mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
 }
 
@@ -44,7 +44,7 @@ impl<'a> TypeConverter<'a> {
             processing_from_candid: HashSet::new(),
             processing_conversion: HashSet::new(),
             function_counter: 0,
-            candid_types_converter: CandidTypesConverter::new(env),
+            original_types: OriginalTypescriptTypes::new(env),
             enum_declarations,
         }
     }
@@ -91,16 +91,17 @@ impl<'a> TypeConverter<'a> {
             TypeInner::Int64 => false,
             TypeInner::Principal => false,
             TypeInner::Empty => false,
-
+            TypeInner::Func(_) => false,
+            TypeInner::Service(_) => false,
             // Types that always need conversion
             TypeInner::Opt(_) => true,
+            TypeInner::Variant(_) => true,
             // Container types - need conversion only if their contents need conversion
             TypeInner::Vec(inner) => self.needs_conversion(inner),
             TypeInner::Record(fields) => {
                 // Only needs conversion if any field needs conversion
                 fields.iter().any(|field| self.needs_conversion(&field.ty))
             }
-            TypeInner::Variant(_) => true,
             TypeInner::Var(id) => {
                 // Check if the named type needs conversion
                 if let Ok(actual_ty) = self.env.rec_find_type(id) {
@@ -109,27 +110,15 @@ impl<'a> TypeConverter<'a> {
                     true // Conservative default
                 }
             }
-            TypeInner::Func(_) => false,
-            TypeInner::Service(_) => false,
             _ => true, // Conservative default - convert if unsure
         };
         self.processing_conversion.remove(ty);
         result
     }
 
-    /// Get the function name for converting from TypeScript to Candid
-    fn get_to_candid_function_name(&mut self, ty: &Type) -> String {
-        if let Some(name) = self.to_candid_functions.get(ty) {
-            return name.clone();
-        }
-
-        // Generate a base name for the function
-        let base_name = match ty.as_ref() {
-            TypeInner::Var(id) => format!("to_candid_{}", id),
-            _ => {
-                // For anonymous types, use a descriptive prefix based on the type
-                let type_prefix = match ty.as_ref() {
-                    TypeInner::Null => "null",
+    fn type_prefix(&self, ty: &Type) -> &str {
+        match ty.as_ref() {
+           TypeInner::Null => "null",
                     TypeInner::Bool => "bool",
                     TypeInner::Nat => "nat",
                     TypeInner::Int => "int",
@@ -160,7 +149,21 @@ impl<'a> TypeConverter<'a> {
                     TypeInner::Func(_) => "func",
                     TypeInner::Service(_) => "service",
                     _ => "anonymous",
-                };
+        }
+    }
+
+    /// Get the function name for converting from TypeScript to Candid
+    fn get_to_candid_function_name(&mut self, ty: &Type) -> String {
+        if let Some(name) = self.to_candid_functions.get(ty) {
+            return name.clone();
+        }
+
+        // Generate a base name for the function
+        let base_name = match ty.as_ref() {
+            TypeInner::Var(id) => format!("to_candid_{}", id),
+            _ => {
+                // For anonymous types, use a descriptive prefix based on the type
+                let type_prefix = self.type_prefix(ty);
                 format!("to_candid_{}", type_prefix)
             }
         };
@@ -184,39 +187,7 @@ impl<'a> TypeConverter<'a> {
             TypeInner::Var(id) => format!("from_candid_{}", id),
             _ => {
                 // For anonymous types, use a descriptive prefix based on the type
-                let type_prefix = match ty.as_ref() {
-                    TypeInner::Null => "null",
-                    TypeInner::Bool => "bool",
-                    TypeInner::Nat => "nat",
-                    TypeInner::Int => "int",
-                    TypeInner::Nat8 => "nat8",
-                    TypeInner::Nat16 => "nat16",
-                    TypeInner::Nat32 => "nat32",
-                    TypeInner::Nat64 => "nat64",
-                    TypeInner::Int8 => "int8",
-                    TypeInner::Int16 => "int16",
-                    TypeInner::Int32 => "int32",
-                    TypeInner::Int64 => "int64",
-                    TypeInner::Float32 => "float32",
-                    TypeInner::Float64 => "float64",
-                    TypeInner::Text => "text",
-                    TypeInner::Reserved => "reserved",
-                    TypeInner::Empty => "empty",
-                    TypeInner::Principal => "principal",
-                    TypeInner::Opt(_) => "opt",
-                    TypeInner::Vec(_) => "vec",
-                    TypeInner::Record(fields) => {
-                        if self.is_tuple(fields) {
-                            "tuple"
-                        } else {
-                            "record"
-                        }
-                    }
-                    TypeInner::Variant(_) => "variant",
-                    TypeInner::Func(_) => "func",
-                    TypeInner::Service(_) => "service",
-                    _ => "anonymous",
-                };
+                let type_prefix = self.type_prefix(ty);
                 format!("from_candid_{}", type_prefix)
             }
         };
@@ -273,7 +244,7 @@ impl<'a> TypeConverter<'a> {
             TypeInner::Text => self.create_ident(param_name),
             TypeInner::Reserved => self.create_ident(param_name),
             TypeInner::Empty => {
-                // Empty type is represented as null in JavaScript
+                // Empty type is represented as null in TypeScript
                 Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))
             }
             TypeInner::Principal => self.convert_principal_to_candid_body(param_name),
@@ -312,7 +283,7 @@ impl<'a> TypeConverter<'a> {
         }
     }
 
-    // --- Type-specific conversion methods (TypeScript -> Candid) ---
+    // --- Type-specific conversion methods (TypeScript Native -> Candid) ---
 
     fn convert_principal_to_candid_body(&mut self, param_name: &str) -> Expr {
         // Principal objects are already compatible
@@ -864,7 +835,7 @@ impl<'a> TypeConverter<'a> {
 
         // Generate parameter type annotation (Candid type)
         let param_name = "value";
-        let param_type_ann = self.candid_types_converter.get_candid_type(ty);
+        let param_type_ann = self.original_types.get_type(ty);
 
         // Generate return type annotation (TypeScript type)
         let return_type_ann = self.create_ts_type_annotation(ty);
@@ -1604,9 +1575,9 @@ impl<'a> TypeConverter<'a> {
     }
 
     /// Add imports for Candid types
-    pub fn add_candid_type_imports(&mut self, module: &mut Module, service_name: &str) {
-        self.candid_types_converter
-            .add_candid_type_imports(module, service_name);
+    pub fn add_import_for_original_type_definitions(&mut self, module: &mut Module, service_name: &str) {
+        self.original_types
+            .add_import_for_original_type_definitions(module, service_name);
     }
 
     /// Generate a function that converts from TypeScript to Candid
@@ -1627,7 +1598,7 @@ impl<'a> TypeConverter<'a> {
         let param_type_ann = self.create_ts_type_annotation(ty);
 
         // Generate return type annotation - use Candid type for complex types
-        let return_type_ann = self.candid_types_converter.get_candid_type(ty);
+        let return_type_ann = self.original_types.get_type(ty);
 
         // Generate function body
         let body_expr = if is_recursive {

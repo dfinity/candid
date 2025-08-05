@@ -27,13 +27,9 @@ pub fn compile_wrapper(env: &TypeEnv, actor: &Option<Type>, service_name: &str) 
     };
 
     wrapper_imports(&mut module, service_name);
-
     interface_options_utils(&mut module);
-
     wrapper_options_utils(&mut module);
-
     add_type_definitions(enum_declarations, env, &mut module);
-
     interface_create_actor_options(&mut module);
 
     if actor.is_some() {
@@ -135,7 +131,7 @@ fn wrapper_actor_service(
         converter,
     );
 
-    converter.add_candid_type_imports(module, service_name);
+    converter.add_import_for_original_type_definitions(module, service_name);
 
     module
         .body
@@ -182,7 +178,7 @@ fn wrapper_actor_var(
         serv,
         converter,
     );
-    converter.add_candid_type_imports(module, service_name);
+    converter.add_import_for_original_type_definitions(module, service_name);
     module
         .body
         .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));

@@ -5,12 +5,12 @@ use swc_core::ecma::ast::*;
 
 use super::utils::get_ident_guarded_keyword_ok;
 
-pub struct CandidTypesConverter<'a> {
+pub struct OriginalTypescriptTypes<'a> {
     env: &'a TypeEnv,
     required_candid_imports: HashSet<String>,
 }
 
-impl<'a> CandidTypesConverter<'a> {
+impl<'a> OriginalTypescriptTypes<'a> {
     pub fn new(env: &'a TypeEnv) -> Self {
         Self {
             env,
@@ -40,7 +40,7 @@ impl<'a> CandidTypesConverter<'a> {
         self.required_candid_imports.insert(type_id.to_string());
     }
 
-    fn create_candid_var_type(&mut self, id: &str) -> TsType {
+    fn create_var_type(&mut self, id: &str) -> TsType {
         let ty = self.env.rec_find_type(id).unwrap();
         if matches!(ty.as_ref(), TypeInner::Func(_)) {
             return self.create_inline_actor_method();
@@ -66,9 +66,9 @@ impl<'a> CandidTypesConverter<'a> {
     /// candid-ts printer module.
     ///
     /// The key difference from parameter types is the representation of optionals and tuples.
-    fn create_candid_type(&mut self, ty: &Type) -> TsType {
+    fn create_type(&mut self, ty: &Type) -> TsType {
         match ty.as_ref() {
-            TypeInner::Var(id) => self.create_candid_var_type(id),
+            TypeInner::Var(id) => self.create_var_type(id),
             TypeInner::Opt(inner) => {
                 // For Option types, return "[] | [T]" to match pp_ty output
                 TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
@@ -86,7 +86,7 @@ impl<'a> CandidTypesConverter<'a> {
                                 elem_types: vec![TsTupleElement {
                                     span: DUMMY_SP,
                                     label: None,
-                                    ty: Box::new(self.create_candid_type_ref(inner)),
+                                    ty: Box::new(self.create_type_ref(inner)),
                                 }],
                             })),
                         ],
@@ -103,7 +103,7 @@ impl<'a> CandidTypesConverter<'a> {
                             .map(|field| TsTupleElement {
                                 span: DUMMY_SP,
                                 label: None,
-                                ty: Box::new(self.create_candid_type_ref(&field.ty)),
+                                ty: Box::new(self.create_type_ref(&field.ty)),
                             })
                             .collect(),
                     })
@@ -138,7 +138,7 @@ impl<'a> CandidTypesConverter<'a> {
                                                             span: DUMMY_SP,
                                                             label: None,
                                                             ty: Box::new(
-                                                                self.create_candid_type_ref(inner),
+                                                                self.create_type_ref(inner),
                                                             ),
                                                         }],
                                                     })),
@@ -146,7 +146,7 @@ impl<'a> CandidTypesConverter<'a> {
                                             }),
                                         )
                                     }
-                                    _ => self.create_candid_type_ref(&field.ty),
+                                    _ => self.create_type_ref(&field.ty),
                                 };
 
                                 TsTypeElement::TsPropertySignature(TsPropertySignature {
@@ -260,7 +260,7 @@ impl<'a> CandidTypesConverter<'a> {
                             )),
                             type_params: Some(Box::new(TsTypeParamInstantiation {
                                 span: DUMMY_SP,
-                                params: vec![Box::new(self.get_candid_type(ty))],
+                                params: vec![Box::new(self.get_type(ty))],
                             })),
                         })
                     }
@@ -395,35 +395,35 @@ impl<'a> CandidTypesConverter<'a> {
             optional: false,
             type_ann: Some(Box::new(TsTypeAnn {
                 span: DUMMY_SP,
-                type_ann: Box::new(self.get_candid_type(&field.ty)),
+                type_ann: Box::new(self.get_type(&field.ty)),
             })),
         })
     }
 
     /// Helper function that handles references to types by name.
     /// For named types (TypeInner::Var), it creates a type reference.
-    /// For other types, it defers to create_candid_type.
-    fn create_candid_type_ref(&mut self, ty: &Type) -> TsType {
+    /// For other types, it defers to create_type.
+    fn create_type_ref(&mut self, ty: &Type) -> TsType {
         match ty.as_ref() {
-            TypeInner::Var(id) => self.create_candid_var_type(id),
+            TypeInner::Var(id) => self.create_var_type(id),
             _ => {
                 // For anonymous types, use a detailed structure
-                self.create_candid_type(ty)
+                self.create_type(ty)
             }
         }
     }
 
-    pub fn get_candid_type(&mut self, ty: &Type) -> TsType {
+    pub fn get_type(&mut self, ty: &Type) -> TsType {
         match ty.as_ref() {
             TypeInner::Record(_) | TypeInner::Variant(_) => {
                 // For records and variants, use the imported Candid type if available
-                self.create_candid_type_ref(ty)
+                self.create_type_ref(ty)
             }
-            _ => self.create_candid_type(ty),
+            _ => self.create_type(ty),
         }
     }
 
-    pub fn add_candid_type_imports(&mut self, module: &mut Module, service_name: &str) {
+    pub fn add_import_for_original_type_definitions(&mut self, module: &mut Module, service_name: &str) {
         // Use the collected required imports instead of passed-in types
         let required_imports = self.get_required_candid_imports();
         if required_imports.is_empty() {
