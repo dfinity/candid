@@ -41,7 +41,6 @@ pub fn is_recursive_optional(
     }
 }
 
-
 // Create TS interface from Candid service
 pub fn create_interface_from_service(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,

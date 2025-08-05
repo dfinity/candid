@@ -5,8 +5,8 @@ use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 
-use super::new_typescript_native_types::convert_type;
 use super::conversion_functions_generator::convert_multi_return_from_candid;
+use super::new_typescript_native_types::convert_type;
 
 use super::new_typescript_native_types::add_type_definitions;
 use super::preamble::actor::wrapper_canister_initialization;

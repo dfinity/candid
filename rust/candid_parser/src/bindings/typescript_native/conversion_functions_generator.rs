@@ -1,5 +1,5 @@
-use super::original_typescript_types::CandidTypesConverter;
 use super::new_typescript_native_types::{convert_type, is_recursive_optional};
+use super::original_typescript_types::CandidTypesConverter;
 use super::utils::{contains_unicode_characters, get_ident_guarded};
 use candid::types::{Field, Label, Type, TypeEnv, TypeInner};
 use std::collections::{HashMap, HashSet};

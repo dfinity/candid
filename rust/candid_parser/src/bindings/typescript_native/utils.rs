@@ -1,10 +1,10 @@
+use swc_core::common::comments::SingleThreadedComments;
+use swc_core::common::source_map::SourceMap;
+use swc_core::common::sync::Lrc;
 use swc_core::ecma::{
     ast::Module,
     codegen::{text_writer::JsWriter, Config, Emitter},
 };
-use swc_core::common::comments::SingleThreadedComments;
-use swc_core::common::source_map::SourceMap;
-use swc_core::common::sync::Lrc;
 
 pub fn render_ast(module: &Module) -> String {
     let mut buf = vec![];

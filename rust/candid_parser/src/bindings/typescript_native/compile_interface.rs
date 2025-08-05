@@ -1,8 +1,8 @@
 use super::conversion_functions_generator::TypeConverter;
-use super::utils::get_ident_guarded;
 use super::preamble::actor::interface_canister_initialization;
 use super::preamble::imports::{interface_create_actor_options, interface_imports};
 use super::preamble::options::interface_options_utils;
+use super::utils::get_ident_guarded;
 use super::utils::render_ast;
 use candid::types::{Field, Type, TypeEnv, TypeInner};
 use std::collections::HashMap;
