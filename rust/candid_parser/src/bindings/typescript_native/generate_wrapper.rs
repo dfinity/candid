@@ -1,10 +1,10 @@
 use super::candid_types::CandidTypesConverter;
 use super::compile::convert_type;
+use super::ident::{contains_unicode_characters, get_ident_guarded};
 use candid::types::{Field, Label, Type, TypeEnv, TypeInner};
 use std::collections::{HashMap, HashSet};
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
-use super::ident::{contains_unicode_characters, get_ident_guarded};
 /// Provides functions to generate JavaScript expressions that convert
 /// between TypeScript and Candid representations using a function-based approach.
 pub struct TypeConverter<'a> {
@@ -29,7 +29,10 @@ pub struct TypeConverter<'a> {
 
 impl<'a> TypeConverter<'a> {
     /// Create a new TypeConverter with the given type environment
-    pub fn new(env: &'a TypeEnv, enum_declarations: &'a mut HashMap<Vec<Field>, (TsEnumDecl, String)>) -> Self {
+    pub fn new(
+        env: &'a TypeEnv,
+        enum_declarations: &'a mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    ) -> Self {
         TypeConverter {
             env,
             to_candid_functions: HashMap::new(),
@@ -363,7 +366,7 @@ impl<'a> TypeConverter<'a> {
                     // Generate conversion function for the inner type
                     let inner_function_name = self.get_to_candid_function_name(inner);
                     self.generate_to_candid_function(inner, &inner_function_name);
-                    
+
                     return Expr::Cond(CondExpr {
                         span: DUMMY_SP,
                         test: Box::new(Expr::Bin(BinExpr {
@@ -646,21 +649,28 @@ impl<'a> TypeConverter<'a> {
         }
 
         // Check if all variants have the same type (especially null)
-        let all_null = fields.iter().all(|f| matches!(f.ty.as_ref(), TypeInner::Null));
+        let all_null = fields
+            .iter()
+            .all(|f| matches!(f.ty.as_ref(), TypeInner::Null));
         if all_null {
-                // For enums, compare against enum members
-                let enum_name = self.enum_declarations.get(&fields.to_vec()).unwrap().1.clone();
+            // For enums, compare against enum members
+            let enum_name = self
+                .enum_declarations
+                .get(&fields.to_vec())
+                .unwrap()
+                .1
+                .clone();
 
-                let mut result = self.create_ident(param_name); // Default fallback
+            let mut result = self.create_ident(param_name); // Default fallback
 
-                // Process all fields in reverse order to build the chain
-                for field in fields.iter().rev() {
-                    let field_name = match &*field.id {
-                        Label::Named(name) => name.clone(),
-                        Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
-                    };
+            // Process all fields in reverse order to build the chain
+            for field in fields.iter().rev() {
+                let field_name = match &*field.id {
+                    Label::Named(name) => name.clone(),
+                    Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
+                };
 
-                   let enum_member = if contains_unicode_characters(&field_name) {
+                let enum_member = if contains_unicode_characters(&field_name) {
                     Expr::Member(MemberExpr {
                         span: DUMMY_SP,
                         obj: Box::new(self.create_ident(&enum_name)),
@@ -675,46 +685,43 @@ impl<'a> TypeConverter<'a> {
                     })
                 } else {
                     Expr::Member(MemberExpr {
-                            span: DUMMY_SP,
-                            obj: Box::new(self.create_ident(&enum_name)),
-                            prop: MemberProp::Ident(
-                                Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty()).into(),
-                            ),
-                        })
+                        span: DUMMY_SP,
+                        obj: Box::new(self.create_ident(&enum_name)),
+                        prop: MemberProp::Ident(
+                            Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty())
+                                .into(),
+                        ),
+                    })
                 };
-        
 
-                    let condition = Expr::Bin(BinExpr {
-                        span: DUMMY_SP,
-                        op: BinaryOp::EqEq,
-                        left: Box::new(self.create_ident(param_name)),
-                        right: Box::new(enum_member),
-                    });
+                let condition = Expr::Bin(BinExpr {
+                    span: DUMMY_SP,
+                    op: BinaryOp::EqEq,
+                    left: Box::new(self.create_ident(param_name)),
+                    right: Box::new(enum_member),
+                });
 
-                    // Create result: { field_name: null }
-                    let field_result = Expr::Object(ObjectLit {
-                        span: DUMMY_SP,
-                        props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                            key: PropName::Ident(
-                               get_ident_guarded(&field_name).into(),       
-                            ),
-                            value: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
-                        })))],
-                    });
+                // Create result: { field_name: null }
+                let field_result = Expr::Object(ObjectLit {
+                    span: DUMMY_SP,
+                    props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                        key: PropName::Ident(get_ident_guarded(&field_name).into()),
+                        value: Box::new(Expr::Lit(Lit::Null(Null { span: DUMMY_SP }))),
+                    })))],
+                });
 
-                    // Create a new conditional with this field's condition and result,
-                    // with the previous result as the alternate
-                    result = Expr::Cond(CondExpr {
-                        span: DUMMY_SP,
-                        test: Box::new(condition),
-                        cons: Box::new(field_result),
-                        alt: Box::new(result),
-                    });
-                }
-
-                return result;
+                // Create a new conditional with this field's condition and result,
+                // with the previous result as the alternate
+                result = Expr::Cond(CondExpr {
+                    span: DUMMY_SP,
+                    test: Box::new(condition),
+                    cons: Box::new(field_result),
+                    alt: Box::new(result),
+                });
             }
-        else {
+
+            return result;
+        } else {
             // For variants with different types, check for _tag property
             // This is for TypeScript unions of object types: { tag1: value1 } | { tag2: value2 }
 
@@ -741,15 +748,15 @@ impl<'a> TypeConverter<'a> {
 
                 // Create result: { field_name: field_value }
                 // Use a clone of field_name to avoid the "use after move" error
-        
+
                 let field_access = Expr::Member(MemberExpr {
                     span: DUMMY_SP,
                     obj: Box::new(self.create_ident(param_name)),
                     prop: MemberProp::Ident(
-                        Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                        Ident::new(field_name.clone().into(), DUMMY_SP, SyntaxContext::empty())
+                            .into(),
                     ),
                 });
-               
 
                 let field_result = match field.ty.as_ref() {
                     TypeInner::Opt(inner) => {
@@ -794,7 +801,6 @@ impl<'a> TypeConverter<'a> {
                                 &inner_function_name,
                                 vec![self.create_arg(field_access.clone())],
                             )
-                        
                         }
                     }
                 };
@@ -806,7 +812,10 @@ impl<'a> TypeConverter<'a> {
                     cons: Box::new(Expr::Object(ObjectLit {
                         span: DUMMY_SP,
                         props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                            key: PropName::Ident(Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty()).into()),
+                            key: PropName::Ident(
+                                Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty())
+                                    .into(),
+                            ),
                             value: Box::new(field_result),
                         })))],
                     })),
@@ -1379,13 +1388,19 @@ impl<'a> TypeConverter<'a> {
             return self.create_ident(param_name);
         }
         // Check if all variants have the same type (especially null)
-        let all_null = fields.iter().all(|f| matches!(f.ty.as_ref(), TypeInner::Null));
+        let all_null = fields
+            .iter()
+            .all(|f| matches!(f.ty.as_ref(), TypeInner::Null));
 
         // For variants with all null or same simple type, return the enum member
-        if all_null
-        {
+        if all_null {
             // Determine the enum name based on whether this is a named type or anonymous
-            let enum_name = self.enum_declarations.get(&fields.to_vec()).unwrap().1.clone();
+            let enum_name = self
+                .enum_declarations
+                .get(&fields.to_vec())
+                .unwrap()
+                .1
+                .clone();
 
             let mut conditions = Vec::new();
 
@@ -1408,7 +1423,7 @@ impl<'a> TypeConverter<'a> {
                 });
 
                 // Return the enum member access
-                // let result = 
+                // let result =
                 let result = if contains_unicode_characters(&field_name) {
                     Expr::Member(MemberExpr {
                         span: DUMMY_SP,
@@ -1424,12 +1439,12 @@ impl<'a> TypeConverter<'a> {
                     })
                 } else {
                     Expr::Member(MemberExpr {
-                            span: DUMMY_SP,
-                            obj: Box::new(self.create_ident(&enum_name)),
-                            prop: MemberProp::Ident(
-                                Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty()).into(),
-                            ),
-                        })
+                        span: DUMMY_SP,
+                        obj: Box::new(self.create_ident(&enum_name)),
+                        prop: MemberProp::Ident(
+                            Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                        ),
+                    })
                 };
 
                 conditions.push((test, result));

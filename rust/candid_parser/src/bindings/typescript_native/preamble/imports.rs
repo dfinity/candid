@@ -59,7 +59,6 @@ fn generate_agent_imports() -> ImportDecl {
     }
 }
 
-
 fn generate_create_actor_options_interface() -> Box<TsInterfaceDecl> {
     Box::new(TsInterfaceDecl {
         span: DUMMY_SP,

@@ -1,15 +1,12 @@
 use super::super::javascript::is_tuple;
 use super::generate_wrapper::{convert_multi_return_from_candid, TypeConverter};
+use super::ident::{contains_unicode_characters, get_ident_guarded, get_ident_guarded_keyword_ok};
 use super::preamble::actor::{
-    create_canister_id_assignment, create_canister_id_declaration,
-    generate_create_actor_function, generate_create_actor_function_declaration,
+    create_canister_id_assignment, create_canister_id_declaration, generate_create_actor_function,
+    generate_create_actor_function_declaration,
 };
-use super::preamble::options::{add_option_helpers_interface,
-    add_option_helpers_wrapper};
 use super::preamble::imports::add_create_actor_imports_and_interface;
-use super::ident::{
-    contains_unicode_characters, get_ident_guarded, get_ident_guarded_keyword_ok,
-};
+use super::preamble::options::{add_option_helpers_interface, add_option_helpers_wrapper};
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use std::collections::HashMap;
 use swc_core::common::comments::SingleThreadedComments;
@@ -23,7 +20,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
     let cm = Lrc::new(SourceMap::default());
     let comments = SingleThreadedComments::default();
 
-    let mut enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)> = &mut  HashMap::new();
+    let mut enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)> = &mut HashMap::new();
 
     let mut module = Module {
         span: DUMMY_SP,
@@ -41,11 +38,8 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
     if target == "wrapper" {
         add_option_helpers_wrapper(&mut module);
     }
-    
 
-    add_type_definitions(& mut enum_declarations, env, &mut module);
-
-  
+    add_type_definitions(&mut enum_declarations, env, &mut module);
 
     add_create_actor_imports_and_interface(&mut module);
 
@@ -100,18 +94,18 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
         }
     }
 
-      // Add enum declarations to the module, sorted by name for stability
-      let mut sorted_enums: Vec<_> = enum_declarations.clone().into_iter().collect();
-      sorted_enums.sort_by_key(|(_, (_, enum_name))| enum_name.clone());
-      
-      for (_, enum_decl) in sorted_enums {
-          module
-              .body
-              .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-                  span: DUMMY_SP,
-                  decl: Decl::TsEnum(Box::new(enum_decl.0)),
-              })));
-      }
+    // Add enum declarations to the module, sorted by name for stability
+    let mut sorted_enums: Vec<_> = enum_declarations.clone().into_iter().collect();
+    sorted_enums.sort_by_key(|(_, (_, enum_name))| enum_name.clone());
+
+    for (_, enum_decl) in sorted_enums {
+        module
+            .body
+            .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+                span: DUMMY_SP,
+                decl: Decl::TsEnum(Box::new(enum_decl.0)),
+            })));
+    }
 
     // Generate code from the AST
     let mut buf = vec![];
@@ -252,13 +246,17 @@ fn add_principal_import(module: &mut Module) {
 }
 
 // Add all type definitions from the environment
-fn add_type_definitions(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>, env: &TypeEnv, module: &mut Module) {
+fn add_type_definitions(
+    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    env: &TypeEnv,
+    module: &mut Module,
+) {
     for id in env.0.keys() {
         if let Ok(ty) = env.find_type(id) {
             match ty.as_ref() {
                 TypeInner::Record(_) if !is_tuple(ty) => {
                     // Generate interface for record types
-                    let interface = create_interface_from_record(enum_declarations,env, id, ty);
+                    let interface = create_interface_from_record(enum_declarations, env, id, ty);
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
@@ -278,7 +276,8 @@ fn add_type_definitions(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl,
                 }
                 TypeInner::Func(ref func) => {
                     // Generate type alias for function types
-                    let type_alias = create_type_alias_from_function(enum_declarations, env, id, func);
+                    let type_alias =
+                        create_type_alias_from_function(enum_declarations, env, id, func);
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
@@ -289,14 +288,15 @@ fn add_type_definitions(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl,
                 TypeInner::Variant(ref fs) => {
                     // Check if all variants have null type
                     let all_null = fs.iter().all(|f| matches!(f.ty.as_ref(), TypeInner::Null));
-                    
+
                     if all_null {
                         // For variants with all null types, directly create the enum
                         // Don't create a type alias
                         create_variant_type(enum_declarations, env, fs, Some(id));
                     } else {
                         // For other variants, create a type alias to the union type
-                        let variant_type = create_variant_type(enum_declarations, env, fs, Some(id));
+                        let variant_type =
+                            create_variant_type(enum_declarations, env, fs, Some(id));
                         let type_alias = TsTypeAliasDecl {
                             span: DUMMY_SP,
                             declare: false,
@@ -352,7 +352,12 @@ fn add_type_definitions(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl,
 }
 
 // Create TS interface from Candid record
-fn create_interface_from_record(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>, env: &TypeEnv, id: &str, ty: &Type) -> TsInterfaceDecl {
+fn create_interface_from_record(
+    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    env: &TypeEnv,
+    id: &str,
+    ty: &Type,
+) -> TsInterfaceDecl {
     let members = if let TypeInner::Record(ref fields) = ty.as_ref() {
         fields
             .iter()
@@ -385,7 +390,9 @@ fn create_interface_from_service(
     let members = serv
         .iter()
         .map(|(method_id, method_ty)| match method_ty.as_ref() {
-            TypeInner::Func(ref func) => create_method_signature(enum_declarations, env, method_id, func),
+            TypeInner::Func(ref func) => {
+                create_method_signature(enum_declarations, env, method_id, func)
+            }
             TypeInner::Var(ref id) => TsTypeElement::TsPropertySignature(TsPropertySignature {
                 span: DUMMY_SP,
                 key: Box::new(Expr::Ident(get_ident_guarded(method_id))),
@@ -393,7 +400,6 @@ fn create_interface_from_service(
                 optional: false,
                 readonly: false,
                 type_ann: Some(Box::new(TsTypeAnn {
-
                     span: DUMMY_SP,
                     type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
                         span: DUMMY_SP,
@@ -402,7 +408,7 @@ fn create_interface_from_service(
                     })),
                 })),
             }),
-            _ => unreachable!()
+            _ => unreachable!(),
         })
         .collect();
 
@@ -420,7 +426,12 @@ fn create_interface_from_service(
 }
 
 // Create TS type alias from Candid function
-fn create_type_alias_from_function(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>, env: &TypeEnv, id: &str, func: &Function) -> TsTypeAliasDecl {
+fn create_type_alias_from_function(
+    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    env: &TypeEnv,
+    id: &str,
+    func: &Function,
+) -> TsTypeAliasDecl {
     TsTypeAliasDecl {
         span: DUMMY_SP,
         declare: false,
@@ -431,7 +442,12 @@ fn create_type_alias_from_function(enum_declarations: &mut HashMap<Vec<Field>, (
 }
 
 // Create general TS type alias
-fn create_type_alias(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>, env: &TypeEnv, id: &str, ty: &Type) -> TsTypeAliasDecl {
+fn create_type_alias(
+    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    env: &TypeEnv,
+    id: &str,
+    ty: &Type,
+) -> TsTypeAliasDecl {
     TsTypeAliasDecl {
         span: DUMMY_SP,
         declare: false,
@@ -442,7 +458,11 @@ fn create_type_alias(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, St
 }
 
 // Create TS property signature from Candid field
-fn create_property_signature(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>, env: &TypeEnv, field: &Field) -> TsTypeElement {
+fn create_property_signature(
+    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    env: &TypeEnv,
+    field: &Field,
+) -> TsTypeElement {
     let field_name = match &*field.id {
         Label::Named(str) => Box::new(Expr::Ident(get_ident_guarded_keyword_ok(str))),
         Label::Id(n) | Label::Unnamed(n) => Box::new(Expr::Ident(Ident::new(
@@ -473,7 +493,11 @@ fn create_property_signature(enum_declarations: &mut HashMap<Vec<Field>, (TsEnum
 }
 
 // Create TS property signature from Candid field
-fn create_property_signature_for_variant(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>, env: &TypeEnv, field: &Field) -> TsTypeElement {
+fn create_property_signature_for_variant(
+    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    env: &TypeEnv,
+    field: &Field,
+) -> TsTypeElement {
     let field_name = match &*field.id {
         Label::Named(str) => Box::new(Expr::Ident(get_ident_guarded_keyword_ok(str))),
         Label::Id(n) | Label::Unnamed(n) => Box::new(Expr::Ident(Ident::new(
@@ -491,18 +515,16 @@ fn create_property_signature_for_variant(enum_declarations: &mut HashMap<Vec<Fie
     };
 
     let type_ann = if is_optional {
-        TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
-            TsUnionType {
-                span: DUMMY_SP,
-                types: vec![
-                    Box::new(type_ann),
-                    Box::new(TsType::TsKeywordType(TsKeywordType {
-                        span: DUMMY_SP,
-                        kind: TsKeywordTypeKind::TsNullKeyword,
-                    })),
-                ],
-            },
-        ))
+        TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(TsUnionType {
+            span: DUMMY_SP,
+            types: vec![
+                Box::new(type_ann),
+                Box::new(TsType::TsKeywordType(TsKeywordType {
+                    span: DUMMY_SP,
+                    kind: TsKeywordTypeKind::TsNullKeyword,
+                })),
+            ],
+        }))
     } else {
         type_ann
     };
@@ -520,16 +542,20 @@ fn create_property_signature_for_variant(enum_declarations: &mut HashMap<Vec<Fie
     })
 }
 
-
 // Create TS method signature from Candid function
-fn create_method_signature(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>, env: &TypeEnv, method_id: &str, func: &Function) -> TsTypeElement {
+fn create_method_signature(
+    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    env: &TypeEnv,
+    method_id: &str,
+    func: &Function,
+) -> TsTypeElement {
     // Create parameters
     let params = func
         .args
         .iter()
         .enumerate()
         .map(|(i, arg_ty)| {
-            let var_name = arg_ty.name.clone().unwrap_or_else(||  format!("arg{}", i));
+            let var_name = arg_ty.name.clone().unwrap_or_else(|| format!("arg{}", i));
             TsFnParam::Ident(BindingIdent {
                 id: Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty()),
                 type_ann: Some(Box::new(TsTypeAnn {
@@ -593,14 +619,18 @@ fn create_method_signature(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDe
 }
 
 // Create a function type representation
-fn create_function_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>, env: &TypeEnv, func: &Function) -> TsType {
+fn create_function_type(
+    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    env: &TypeEnv,
+    func: &Function,
+) -> TsType {
     // Create parameters
     let params = func
         .args
         .iter()
         .enumerate()
         .map(|(i, arg_ty)| {
-            let var_name = arg_ty.name.clone().unwrap_or_else(||  format!("arg{}", i));
+            let var_name = arg_ty.name.clone().unwrap_or_else(|| format!("arg{}", i));
             TsFnParam::Ident(BindingIdent {
                 id: Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty()),
                 type_ann: Some(Box::new(TsTypeAnn {
@@ -660,7 +690,12 @@ fn create_function_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl,
 }
 
 // Convert Candid type to TypeScript type
-pub fn convert_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>, env: &TypeEnv, ty: &Type, is_ref: bool) -> TsType {
+pub fn convert_type(
+    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    env: &TypeEnv,
+    ty: &Type,
+    is_ref: bool,
+) -> TsType {
     use TypeInner::*;
 
     match ty.as_ref() {
@@ -744,7 +779,12 @@ pub fn convert_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, Str
                                     )),
                                     type_params: Some(Box::new(TsTypeParamInstantiation {
                                         span: DUMMY_SP,
-                                        params: vec![Box::new(convert_type(enum_declarations, env, t, is_ref))],
+                                        params: vec![Box::new(convert_type(
+                                            enum_declarations,
+                                            env,
+                                            t,
+                                            is_ref,
+                                        ))],
                                     })),
                                 })),
                                 Box::new(TsType::TsTypeRef(TsTypeRef {
@@ -784,7 +824,12 @@ pub fn convert_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, Str
                                         )),
                                         type_params: Some(Box::new(TsTypeParamInstantiation {
                                             span: DUMMY_SP,
-                                            params: vec![Box::new(convert_type(enum_declarations, env, t, is_ref))],
+                                            params: vec![Box::new(convert_type(
+                                                enum_declarations,
+                                                env,
+                                                t,
+                                                is_ref,
+                                            ))],
                                         })),
                                     })),
                                     Box::new(TsType::TsTypeRef(TsTypeRef {
@@ -952,7 +997,8 @@ pub fn convert_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, Str
     }
 }
 
-fn create_variant_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+fn create_variant_type(
+    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
     env: &TypeEnv,
     fs: &[Field],
     type_name: Option<&str>,
@@ -969,7 +1015,6 @@ fn create_variant_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, 
         if all_null {
             // Only create enum if it doesn't already exist
             if !enum_declarations.contains_key(&fs.to_vec()) {
-
                 let enum_name = if let Some(name) = type_name {
                     name.to_string()
                 } else {
@@ -1027,20 +1072,22 @@ fn create_variant_type(enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, 
             })
         } else {
             // Create union of object types (original behavior)
-            TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(
-                TsUnionType {
-                    span: DUMMY_SP,
-                    types: fs
-                        .iter()
-                        .map(|f| {
-                            Box::new(TsType::TsTypeLit(TsTypeLit {
-                                span: DUMMY_SP,
-                                members: vec![ create_property_signature_for_variant(enum_declarations, env, f)],
-                            }))
-                        })
-                        .collect(),
-                },
-            ))
+            TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(TsUnionType {
+                span: DUMMY_SP,
+                types: fs
+                    .iter()
+                    .map(|f| {
+                        Box::new(TsType::TsTypeLit(TsTypeLit {
+                            span: DUMMY_SP,
+                            members: vec![create_property_signature_for_variant(
+                                enum_declarations,
+                                env,
+                                f,
+                            )],
+                        }))
+                    })
+                    .collect(),
+            }))
         }
     }
 }
@@ -1110,7 +1157,8 @@ fn add_actor_service_implementation(
     target: &str,
     converter: &mut TypeConverter,
 ) {
-    let interface = create_interface_from_service(converter.enum_declarations_mut(), env, service_name, serv);
+    let interface =
+        create_interface_from_service(converter.enum_declarations_mut(), env, service_name, serv);
     module
         .body
         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
@@ -1314,8 +1362,6 @@ fn create_actor_class(
         definite: false,
     });
 
-
-
     // Create constructor
     let constructor = ClassMember::Constructor(Constructor {
         span: DUMMY_SP,
@@ -1373,31 +1419,33 @@ fn create_actor_class(
                     },
                     type_ann: Some(Box::new(TsTypeAnn {
                         span: DUMMY_SP,
-                        type_ann: Box::new(TsType::TsFnOrConstructorType(TsFnOrConstructorType::TsFnType(TsFnType {
-                            span: DUMMY_SP,
-                            params: vec![TsFnParam::Ident(BindingIdent {
-                                id: Ident::new(
-                                    "error".into(),
-                                    DUMMY_SP,
-                                    SyntaxContext::empty(),
-                                ),
-                                type_ann: Some(Box::new(TsTypeAnn {
+                        type_ann: Box::new(TsType::TsFnOrConstructorType(
+                            TsFnOrConstructorType::TsFnType(TsFnType {
+                                span: DUMMY_SP,
+                                params: vec![TsFnParam::Ident(BindingIdent {
+                                    id: Ident::new(
+                                        "error".into(),
+                                        DUMMY_SP,
+                                        SyntaxContext::empty(),
+                                    ),
+                                    type_ann: Some(Box::new(TsTypeAnn {
+                                        span: DUMMY_SP,
+                                        type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
+                                            span: DUMMY_SP,
+                                            kind: TsKeywordTypeKind::TsUnknownKeyword,
+                                        })),
+                                    })),
+                                })],
+                                type_params: None,
+                                type_ann: Box::new(TsTypeAnn {
                                     span: DUMMY_SP,
                                     type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
                                         span: DUMMY_SP,
-                                        kind: TsKeywordTypeKind::TsUnknownKeyword,
+                                        kind: TsKeywordTypeKind::TsNeverKeyword,
                                     })),
-                                })),
-                            })],
-                            type_params: None,
-                            type_ann: Box::new(TsTypeAnn {
-                                span: DUMMY_SP,
-                                type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
-                                    span: DUMMY_SP,
-                                    kind: TsKeywordTypeKind::TsNeverKeyword,
-                                })),
+                                }),
                             }),
-                        }))),
+                        )),
                     })),
                 }),
             }),
@@ -1449,8 +1497,10 @@ fn create_actor_class(
             } else if let TypeInner::Var(ref inner_id) = func_ty.as_ref() {
                 let inner_id = env.rec_find_type(inner_id).unwrap();
                 match inner_id.as_ref() {
-                    TypeInner::Func(ref func) => Some(create_actor_method(env, method_id, func, converter)),
-                    _ => None
+                    TypeInner::Func(ref func) => {
+                        Some(create_actor_method(env, method_id, func, converter))
+                    }
+                    _ => None,
                 }
             } else {
                 None
@@ -1498,20 +1548,25 @@ pub fn create_actor_method(
         .args
         .iter()
         .enumerate()
-        .map(|(i, arg_ty)|{ 
-            let var_name =  format!("arg{}", i);
+        .map(|(i, arg_ty)| {
+            let var_name = format!("arg{}", i);
             Param {
-            span: DUMMY_SP,
-            decorators: vec![],
-            pat: Pat::Ident(BindingIdent {
-                id: Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty()),
-                type_ann: Some(Box::new(TsTypeAnn {
-                    span: DUMMY_SP,
-                    type_ann: Box::new(convert_type(converter.enum_declarations_mut(), env, &arg_ty.typ, true)),
-                })),
-            }),
-        } }
-    )
+                span: DUMMY_SP,
+                decorators: vec![],
+                pat: Pat::Ident(BindingIdent {
+                    id: Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty()),
+                    type_ann: Some(Box::new(TsTypeAnn {
+                        span: DUMMY_SP,
+                        type_ann: Box::new(convert_type(
+                            converter.enum_declarations_mut(),
+                            env,
+                            &arg_ty.typ,
+                            true,
+                        )),
+                    })),
+                }),
+            }
+        })
         .collect();
 
     // Create return type
@@ -1519,7 +1574,7 @@ pub fn create_actor_method(
         0 => TsType::TsKeywordType(TsKeywordType {
             span: DUMMY_SP,
             kind: TsKeywordTypeKind::TsVoidKeyword,
-        }), 
+        }),
         1 => convert_type(converter.enum_declarations_mut(), env, &func.rets[0], true),
         _ => {
             // Create a tuple type for multiple return values
@@ -1531,7 +1586,12 @@ pub fn create_actor_method(
                     .map(|ty| TsTupleElement {
                         span: DUMMY_SP,
                         label: None,
-                        ty: Box::new(convert_type(converter.enum_declarations_mut(), env, ty, true)),
+                        ty: Box::new(convert_type(
+                            converter.enum_declarations_mut(),
+                            env,
+                            ty,
+                            true,
+                        )),
                     })
                     .collect(),
             })
@@ -1558,7 +1618,7 @@ pub fn create_actor_method(
         .iter()
         .enumerate()
         .map(|(i, arg_ty)| {
-            let var_name =  format!("arg{}", i);
+            let var_name = format!("arg{}", i);
 
             let arg_ident = Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty());
             let arg_expr = Expr::Ident(arg_ident);
@@ -1670,11 +1730,9 @@ pub fn create_actor_method(
             test: Box::new(Expr::Member(MemberExpr {
                 span: DUMMY_SP,
                 obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
-                prop: MemberProp::Ident(Ident::new(
-                    "processError".into(),
-                    DUMMY_SP,
-                    SyntaxContext::empty(),
-                ).into()),
+                prop: MemberProp::Ident(
+                    Ident::new("processError".into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                ),
             })),
             cons: Box::new(Stmt::Block(BlockStmt {
                 span: DUMMY_SP,
@@ -1701,15 +1759,22 @@ pub fn create_actor_method(
                                         span: DUMMY_SP,
                                         expr: Box::new(Expr::Call(CallExpr {
                                             span: DUMMY_SP,
-                                            callee: Callee::Expr(Box::new(Expr::Member(MemberExpr {
-                                                span: DUMMY_SP,
-                                                obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
-                                                prop: MemberProp::Ident(Ident::new(
-                                                    "processError".into(),
-                                                    DUMMY_SP,
-                                                    SyntaxContext::empty(),
-                                                ).into()),
-                                            }))),
+                                            callee: Callee::Expr(Box::new(Expr::Member(
+                                                MemberExpr {
+                                                    span: DUMMY_SP,
+                                                    obj: Box::new(Expr::This(ThisExpr {
+                                                        span: DUMMY_SP,
+                                                    })),
+                                                    prop: MemberProp::Ident(
+                                                        Ident::new(
+                                                            "processError".into(),
+                                                            DUMMY_SP,
+                                                            SyntaxContext::empty(),
+                                                        )
+                                                        .into(),
+                                                    ),
+                                                },
+                                            ))),
                                             args: vec![ExprOrSpread {
                                                 spread: None,
                                                 expr: Box::new(Expr::Ident(Ident::new(
@@ -1825,4 +1890,3 @@ pub fn is_recursive_optional(
         _ => false,
     }
 }
-

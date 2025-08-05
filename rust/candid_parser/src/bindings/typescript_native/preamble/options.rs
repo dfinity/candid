@@ -1,7 +1,6 @@
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 
-
 pub fn add_option_helpers_interface(module: &mut Module) {
     let some_type = create_some_type();
     module
@@ -68,10 +67,7 @@ pub fn add_option_helpers_wrapper(module: &mut Module) {
     module
         .body
         .push(ModuleItem::Stmt(Stmt::Decl(Decl::Fn(opt_struct_function))));
-
 }
-
-
 
 fn generate_unwrap_function() -> FnDecl {
     FnDecl {
@@ -888,7 +884,6 @@ fn create_option_type() -> TsTypeAliasDecl {
     }
 }
 
-
 fn generate_record_opt_undefined() -> FnDecl {
     FnDecl {
         ident: Ident::new(
@@ -1001,4 +996,3 @@ fn generate_record_opt_undefined() -> FnDecl {
         }),
     }
 }
-

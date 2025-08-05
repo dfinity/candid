@@ -40,12 +40,12 @@ impl<'a> CandidTypesConverter<'a> {
         self.required_candid_imports.insert(type_id.to_string());
     }
 
-    fn create_candid_var_type( &mut self, id: &str) -> TsType {
+    fn create_candid_var_type(&mut self, id: &str) -> TsType {
         let ty = self.env.rec_find_type(id).unwrap();
-        if matches!(ty.as_ref(),  TypeInner::Func(_)) {
+        if matches!(ty.as_ref(), TypeInner::Func(_)) {
             return self.create_inline_actor_method();
         }
-        if matches!(ty.as_ref(), TypeInner:: Service(_)) {
+        if matches!(ty.as_ref(), TypeInner::Service(_)) {
             return self.create_inline_service();
         }
         // For named types, use the imported Candid type

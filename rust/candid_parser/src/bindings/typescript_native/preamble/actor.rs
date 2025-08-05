@@ -3,7 +3,6 @@ use swc_core::ecma::ast::*;
 
 use super::super::ident::get_ident_guarded;
 
-
 pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
     let capitalized_service_name = service_name
         .chars()
