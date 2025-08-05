@@ -1,8 +1,8 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import type { Principal } from "@dfinity/principal";
 import { unicode as _unicode, createActor as _createActor, canisterId as _canisterId } from "declarations/unicode";
 import { type ActorSubclass } from "@dfinity/agent";
 import { _SERVICE } from "declarations/unicode/unicode.did.d.js";
-import type { Principal } from "@dfinity/principal";
 export interface Some<T> {
     _tag: "Some";
     value: T;

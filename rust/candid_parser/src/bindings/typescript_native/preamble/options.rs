@@ -1,7 +1,7 @@
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 
-pub fn add_option_helpers_interface(module: &mut Module) {
+pub fn interface_options_utils(module: &mut Module) {
     let some_type = create_some_type();
     module
         .body
@@ -27,7 +27,7 @@ pub fn add_option_helpers_interface(module: &mut Module) {
         })));
 }
 
-pub fn add_option_helpers_wrapper(module: &mut Module) {
+pub fn wrapper_options_utils(module: &mut Module) {
     let some_function = create_some_function();
     module
         .body

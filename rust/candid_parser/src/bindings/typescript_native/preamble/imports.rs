@@ -3,10 +3,8 @@ use swc_core::ecma::ast::*;
 
 pub fn interface_imports(module: &mut Module) {
     // Add import declaration for types from "@dfinity/agent"
-    let import_decl = generate_agent_imports();
-    module
-        .body
-        .push(ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl)));
+    dfinity_agent_imports(module);
+    dfinity_principal_import(module);
 }
 
 pub fn wrapper_imports(module: &mut Module, service_name: &str) {
@@ -116,7 +114,7 @@ pub fn interface_create_actor_options(module: &mut Module) {
         })));
 }
 
-pub fn add_principal_import(module: &mut Module) {
+fn dfinity_principal_import(module: &mut Module) {
     module
         .body
         .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
@@ -138,8 +136,8 @@ pub fn add_principal_import(module: &mut Module) {
         })));
 }
 
-fn generate_agent_imports() -> ImportDecl {
-    ImportDecl {
+fn dfinity_agent_imports(module: &mut Module) {
+    let import_decl = ImportDecl {
         span: DUMMY_SP,
         specifiers: vec![
             ImportSpecifier::Named(ImportNamedSpecifier {
@@ -169,7 +167,10 @@ fn generate_agent_imports() -> ImportDecl {
         type_only: false,
         with: None,
         phase: Default::default(),
-    }
+    };
+    module
+        .body
+        .push(ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl)));
 }
 
 fn generate_create_actor_options_interface() -> Box<TsInterfaceDecl> {

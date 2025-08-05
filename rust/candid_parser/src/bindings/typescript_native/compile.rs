@@ -1,14 +1,11 @@
 use super::super::javascript::is_tuple;
 use super::generate_wrapper::{convert_multi_return_from_candid, TypeConverter};
 use super::ident::{contains_unicode_characters, get_ident_guarded, get_ident_guarded_keyword_ok};
-use super::preamble::actor::{
-    create_canister_id_assignment, create_canister_id_declaration, generate_create_actor_function,
-    generate_create_actor_function_declaration,
-};
+use super::preamble::actor::{interface_canister_initialization, wrapper_canister_initialization};
 use super::preamble::imports::{
-    add_principal_import, interface_create_actor_options, interface_imports, wrapper_imports,
+    interface_create_actor_options, interface_imports, wrapper_imports,
 };
-use super::preamble::options::{add_option_helpers_interface, add_option_helpers_wrapper};
+use super::preamble::options::{interface_options_utils, wrapper_options_utils};
 use super::utils::render_ast;
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use std::collections::HashMap;
@@ -26,44 +23,26 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>, service_name: &str, target: 
     };
 
     interface_imports(&mut module);
-
     if target == "wrapper" {
         wrapper_imports(&mut module, service_name);
     }
 
-    add_principal_import(&mut module);
-    add_option_helpers_interface(&mut module);
-
+    interface_options_utils(&mut module);
     if target == "wrapper" {
-        add_option_helpers_wrapper(&mut module);
+        wrapper_options_utils(&mut module);
     }
 
     add_type_definitions(enum_declarations, env, &mut module);
 
     interface_create_actor_options(&mut module);
 
-    // createActor declaration / function
-    if target == "interface" {
-        let actor_interface = ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-            span: DUMMY_SP,
-            decl: Decl::Var(Box::new(generate_create_actor_function_declaration(
-                service_name,
-            ))),
-        }));
-        module.body.push(actor_interface);
 
-        let create_canister_id = create_canister_id_declaration();
-        module.body.push(create_canister_id);
+    if target == "interface" {
+        interface_canister_initialization(service_name, &mut module);
     }
 
     if target == "wrapper" && actor.is_some() {
-        let wrapper = ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-            span: DUMMY_SP,
-            decl: Decl::Fn(generate_create_actor_function(service_name)),
-        }));
-        module.body.push(wrapper);
-        let create_canister_id = create_canister_id_assignment();
-        module.body.push(create_canister_id);
+        wrapper_canister_initialization(service_name, &mut module);
     }
 
     let mut actor_module = Module {

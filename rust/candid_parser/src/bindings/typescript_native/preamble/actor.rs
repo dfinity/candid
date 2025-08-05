@@ -3,7 +3,30 @@ use swc_core::ecma::ast::*;
 
 use super::super::ident::get_ident_guarded;
 
-pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
+pub fn interface_canister_initialization(service_name: &str, module: &mut Module) {
+    let actor_interface = ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+        span: DUMMY_SP,
+        decl: Decl::Var(Box::new(generate_create_actor_function_declaration(
+            service_name,
+        ))),
+    }));
+    module.body.push(actor_interface);
+
+    let create_canister_id = create_canister_id_declaration();
+    module.body.push(create_canister_id);
+}
+
+pub fn wrapper_canister_initialization(service_name: &str, module: &mut Module) {
+    let wrapper = ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+        span: DUMMY_SP,
+        decl: Decl::Fn(generate_create_actor_function(service_name)),
+    }));
+    module.body.push(wrapper);
+    let create_canister_id = create_canister_id_assignment();
+    module.body.push(create_canister_id);
+}
+
+fn generate_create_actor_function(service_name: &str) -> FnDecl {
     let capitalized_service_name = service_name
         .chars()
         .next()
@@ -94,10 +117,12 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
                                         ),
                                         type_ann: Some(Box::new(TsTypeAnn {
                                             span: DUMMY_SP,
-                                            type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
-                                                span: DUMMY_SP,
-                                                kind: TsKeywordTypeKind::TsUnknownKeyword,
-                                            })),
+                                            type_ann: Box::new(TsType::TsKeywordType(
+                                                TsKeywordType {
+                                                    span: DUMMY_SP,
+                                                    kind: TsKeywordTypeKind::TsUnknownKeyword,
+                                                },
+                                            )),
                                         })),
                                     })],
                                     type_params: None,
@@ -216,7 +241,7 @@ pub fn generate_create_actor_function(service_name: &str) -> FnDecl {
     }
 }
 
-pub fn create_canister_id_declaration() -> ModuleItem {
+fn create_canister_id_declaration() -> ModuleItem {
     ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
         span: DUMMY_SP,
         decl: Decl::Var(Box::new(VarDecl {
@@ -243,7 +268,7 @@ pub fn create_canister_id_declaration() -> ModuleItem {
     }))
 }
 
-pub fn create_canister_id_assignment() -> ModuleItem {
+fn create_canister_id_assignment() -> ModuleItem {
     ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
         span: DUMMY_SP,
         decl: Decl::Var(Box::new(VarDecl {
@@ -268,7 +293,7 @@ pub fn create_canister_id_assignment() -> ModuleItem {
     }))
 }
 
-pub fn generate_create_actor_function_declaration(service_name: &str) -> VarDecl {
+fn generate_create_actor_function_declaration(service_name: &str) -> VarDecl {
     VarDecl {
         ctxt: SyntaxContext::empty(),
         span: DUMMY_SP,
