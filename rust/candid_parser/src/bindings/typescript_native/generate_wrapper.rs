@@ -1,6 +1,7 @@
 use super::candid_types::CandidTypesConverter;
-use super::compile::convert_type;
+use super::compile_interface::convert_type;
 use super::ident::{contains_unicode_characters, get_ident_guarded};
+use super::utils::is_recursive_optional;
 use candid::types::{Field, Label, Type, TypeEnv, TypeInner};
 use std::collections::{HashMap, HashSet};
 use swc_core::common::{SyntaxContext, DUMMY_SP};
@@ -354,12 +355,7 @@ impl<'a> TypeConverter<'a> {
         if let TypeInner::Var(id) = inner.as_ref() {
             if let Ok(inner_type) = self.env.find_type(id) {
                 let mut visited = std::collections::HashSet::new();
-                let is_recursive =
-                    crate::bindings::typescript_native::compile::is_recursive_optional(
-                        self.env,
-                        inner_type,
-                        &mut visited,
-                    );
+                let is_recursive = is_recursive_optional(self.env, inner_type, &mut visited);
 
                 if is_recursive {
                     // For recursive patterns using Some/None, check for _tag property
@@ -1023,12 +1019,7 @@ impl<'a> TypeConverter<'a> {
         if let TypeInner::Var(id) = inner.as_ref() {
             if let Ok(inner_type) = self.env.find_type(id) {
                 let mut visited = std::collections::HashSet::new();
-                let is_recursive =
-                    crate::bindings::typescript_native::compile::is_recursive_optional(
-                        self.env,
-                        inner_type,
-                        &mut visited,
-                    );
+                let is_recursive = is_recursive_optional(self.env, inner_type, &mut visited);
 
                 if is_recursive {
                     // Get or create a reference to the inner type conversion function
