@@ -192,10 +192,10 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 
 * Add an "assist" feature. Given a type, construct Candid value in the terminal with interactive dialogue.
 
-### caffeine-stub 0.3.6
+### didc 0.3.6
 
-* Add `caffeine-stub assist` command.
-* Fix `caffeine-stub decode --format blob`.
+* Add `didc assist` command.
+* Fix `didc decode --format blob`.
 
 ## 2023-12-15
 
@@ -304,9 +304,9 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 * Bump agent-js to fix the new response code change
 * Bump candid to 0.9
 
-### caffeine-stub
+### didc
 
-* Add a strict mode for `caffeine-stub check` which checks for structural equality instead of backward compatibility.
+* Add a strict mode for `didc check` which checks for structural equality instead of backward compatibility.
 
 ## 2023-06-30 (Rust 0.9.0)
 
@@ -409,7 +409,7 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 
 ## 2021-09-09
 
-* Release ARM binary for `caffeine-stub`
+* Release ARM binary for `didc`
 * Refine the spec for opt rules
 
 ## 2021-08-17
@@ -463,9 +463,9 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 
 ### Tools
 
-* `caffeine-stub bind` to support Motoko bindings
-* `caffeine-stub hash` to compute hash of a field name
-* `caffeine-stub decode` can decode blob format
+* `didc bind` to support Motoko bindings
+* `didc hash` to compute hash of a field name
+* `didc decode` can decode blob format
 * Candid UI canister
 
 ## 2021-04-07 (Rust 0.6.19 -- 0.6.21)
@@ -486,7 +486,7 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 ### Other
 
 * Benchmark for Rust library with criterion
-* `caffeine-stub check` and `caffeine-stub subtype` command to check for subtyping
+* `didc check` and `didc subtype` command to check for subtyping
 * Conditional running CI for Coq or Rust library
 
 ## 2021-03-04 (Rust 0.6.17)
@@ -503,7 +503,7 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 ### Other
 
 * Documentation for type mapping and howto section
-* `caffeine-stub bind` to generate typescript binding
+* `didc bind` to generate typescript binding
 
 ## 2021-02-01
 
@@ -516,7 +516,7 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 
 * Candid user guide
 * More Coq proof for MiniCandid
-* `caffeine-stub random` command and an experimental config file
+* `didc random` command and an experimental config file
 
 ## 2021-01-12 (Rust 0.6.13)
 
@@ -533,7 +533,7 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 ### Other
 
 * Test suites for reference types
-* `caffeine-stub encode` supports outputing blob format
+* `didc encode` supports outputing blob format
 
 ## 2020-12-07
 
@@ -617,7 +617,7 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 
 ### Tools
 
-* Publish `caffeine-stub` and `candiff` binary in the release
+* Publish `didc` and `candiff` binary in the release
 * Generate JS tests from the Candid test suites
 
 ## 2020-08-14
@@ -638,5 +638,5 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 
 ### Tools
 
-* Initial commit for caffeine-stub and candiff tools
+* Initial commit for didc and candiff tools
 * Add Candid test suite
