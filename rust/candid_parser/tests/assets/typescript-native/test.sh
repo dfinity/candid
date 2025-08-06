@@ -49,12 +49,12 @@ if [ ! -f "$1" ]; then
 fi
 
 
-cargo run --package caffeine-stub -- bind --target ts-native-interface $ORIGINAL_DIR/$1 > ${TEMP_DIR}/$CANDID_NAME.d.ts
-cargo run --package caffeine-stub -- bind --target ts-native-wrapper $ORIGINAL_DIR/$1 > ${TEMP_DIR}/$CANDID_NAME.ts
+cargo run --package didc -- bind --target ts-native-interface $ORIGINAL_DIR/$1 > ${TEMP_DIR}/$CANDID_NAME.d.ts
+cargo run --package didc -- bind --target ts-native-wrapper $ORIGINAL_DIR/$1 > ${TEMP_DIR}/$CANDID_NAME.ts
 
 mkdir -p ${TEMP_DIR}/declarations/$CANDID_NAME
-cargo run --package caffeine-stub -- bind --target ts $ORIGINAL_DIR/$1 > ${TEMP_DIR}/declarations/$CANDID_NAME/$CANDID_NAME.did.d.ts
-cargo run --package caffeine-stub -- bind --target js $ORIGINAL_DIR/$1 > ${TEMP_DIR}/declarations/$CANDID_NAME/$CANDID_NAME.did.js
+cargo run --package didc -- bind --target ts $ORIGINAL_DIR/$1 > ${TEMP_DIR}/declarations/$CANDID_NAME/$CANDID_NAME.did.d.ts
+cargo run --package didc -- bind --target js $ORIGINAL_DIR/$1 > ${TEMP_DIR}/declarations/$CANDID_NAME/$CANDID_NAME.did.js
 
 
 export_code="export const $CANDID_NAME = canisterId ? createActor(canisterId) : undefined;"
