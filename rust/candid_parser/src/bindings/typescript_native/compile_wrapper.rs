@@ -1,7 +1,7 @@
 use super::conversion_functions_generator::TypeConverter;
 use super::utils::{contains_unicode_characters, get_ident_guarded, get_ident_guarded_keyword_ok};
-use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
 use candid::types::internal::TypeKey;
+use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 

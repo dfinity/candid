@@ -708,7 +708,7 @@ impl<'a> TypeConverter<'a> {
                         Ident::new("__kind__".into(), DUMMY_SP, SyntaxContext::empty()).into(),
                     ),
                 });
-                
+
                 let condition = Expr::Bin(BinExpr {
                     span: DUMMY_SP,
                     op: BinaryOp::EqEqEq,

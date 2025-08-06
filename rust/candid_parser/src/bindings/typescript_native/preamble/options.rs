@@ -392,7 +392,8 @@ fn create_is_some_function() -> FnDecl {
                                 SyntaxContext::empty(),
                             ))),
                             prop: MemberProp::Ident(
-                                Ident::new("__kind__".into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                                Ident::new("__kind__".into(), DUMMY_SP, SyntaxContext::empty())
+                                    .into(),
                             ),
                         })),
                         right: Box::new(Expr::Lit(Lit::Str(Str {
@@ -511,7 +512,8 @@ fn create_is_none_function() -> FnDecl {
                                 SyntaxContext::empty(),
                             ))),
                             prop: MemberProp::Ident(
-                                Ident::new("__kind__".into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                                Ident::new("__kind__".into(), DUMMY_SP, SyntaxContext::empty())
+                                    .into(),
                             ),
                         })),
                         right: Box::new(Expr::Lit(Lit::Str(Str {
@@ -690,7 +692,8 @@ fn create_none_function() -> FnDecl {
                         span: DUMMY_SP,
                         props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
                             key: PropName::Ident(
-                                Ident::new("__kind__".into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                                Ident::new("__kind__".into(), DUMMY_SP, SyntaxContext::empty())
+                                    .into(),
                             ),
                             value: Box::new(Expr::Lit(Lit::Str(Str {
                                 span: DUMMY_SP,

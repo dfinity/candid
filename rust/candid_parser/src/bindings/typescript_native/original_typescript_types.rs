@@ -1,5 +1,5 @@
-use candid::types::{Field, Label, Type, TypeEnv, TypeInner};
 use candid::types::internal::TypeKey;
+use candid::types::{Field, Label, Type, TypeEnv, TypeInner};
 use std::collections::HashSet;
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;

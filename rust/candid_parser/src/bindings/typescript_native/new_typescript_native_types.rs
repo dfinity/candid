@@ -497,7 +497,7 @@ fn create_variant_type(
                             Label::Named(name) => name.clone(),
                             Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
                         };
-                        
+
                         // Create the __kind__ property
                         let kind_prop = TsTypeElement::TsPropertySignature(TsPropertySignature {
                             span: DUMMY_SP,
@@ -521,14 +521,11 @@ fn create_variant_type(
                                 })),
                             })),
                         });
-                        
+
                         // Create the value property
-                        let value_prop = create_property_signature_for_variant(
-                            enum_declarations,
-                            env,
-                            f,
-                        );
-                        
+                        let value_prop =
+                            create_property_signature_for_variant(enum_declarations, env, f);
+
                         Box::new(TsType::TsTypeLit(TsTypeLit {
                             span: DUMMY_SP,
                             members: vec![kind_prop, value_prop],
@@ -551,7 +548,8 @@ pub fn add_type_definitions(
             match ty.as_ref() {
                 TypeInner::Record(_) if !is_tuple(ty) => {
                     // Generate interface for record types
-                    let interface = create_interface_from_record(enum_declarations, env, id.as_str(), ty);
+                    let interface =
+                        create_interface_from_record(enum_declarations, env, id.as_str(), ty);
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
@@ -561,7 +559,8 @@ pub fn add_type_definitions(
                 }
                 TypeInner::Service(ref serv) => {
                     // Generate interface for service types
-                    let interface = create_interface_from_service(enum_declarations, env, id.as_str(), serv);
+                    let interface =
+                        create_interface_from_service(enum_declarations, env, id.as_str(), serv);
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
