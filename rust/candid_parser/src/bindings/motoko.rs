@@ -4,7 +4,7 @@
 use crate::syntax::{self, IDLActorType, IDLMergedProg, IDLType};
 use candid::pretty::candid::is_valid_as_id;
 use candid::pretty::utils::*;
-use candid::types::{Field, FuncMode, Function, Label, SharedLabel, Type, TypeInner};
+use candid::types::{ArgType, Field, FuncMode, Function, Label, SharedLabel, Type, TypeInner};
 use candid::TypeEnv;
 use pretty::RcDoc;
 
@@ -138,7 +138,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
         Text => str("Text"),
         Reserved => str("Any"),
         Empty => str("None"),
-        Var(ref s) => escape(s, false),
+        Var(ref s) => escape(s.as_str(), false),
         Principal => str("Principal"),
         Opt(ref t) => str("?").append(pp_ty(t)),
         Vec(ref t) => pp_vec(t, None),
@@ -185,7 +185,34 @@ fn pp_function(func: &Function) -> RcDoc {
     }
     .nest(INDENT_SPACE)
 }
-fn pp_args(args: &[Type]) -> RcDoc {
+fn pp_args(args: &[ArgType]) -> RcDoc {
+    match args {
+        [ty] => {
+            let typ = if is_tuple(&ty.typ) {
+                enclose("(", pp_ty(&ty.typ), ")")
+            } else {
+                pp_ty(&ty.typ)
+            };
+            if let Some(name) = &ty.name {
+                enclose("(", escape(name, false).append(" : ").append(typ), ")")
+            } else {
+                typ
+            }
+        }
+        _ => {
+            let args = args.iter().map(|arg| {
+                if let Some(name) = &arg.name {
+                    escape(name, false).append(" : ").append(pp_ty(&arg.typ))
+                } else {
+                    pp_ty(&arg.typ)
+                }
+            });
+            enclose("(", concat(args, ","), ")")
+        }
+    }
+}
+
+fn pp_rets(args: &[Type]) -> RcDoc {
     match args {
         [ty] => {
             if is_tuple(ty) {
@@ -194,15 +221,8 @@ fn pp_args(args: &[Type]) -> RcDoc {
                 pp_ty(ty)
             }
         }
-        _ => {
-            let doc = concat(args.iter().map(pp_ty), ",");
-            enclose("(", doc, ")")
-        }
+        _ => enclose("(", concat(args.iter().map(pp_ty), ","), ")"),
     }
-}
-
-fn pp_rets(args: &[Type]) -> RcDoc {
-    pp_args(args)
 }
 
 fn pp_service<'a>(serv: &'a [(String, Type)], syntax: Option<&'a [syntax::Binding]>) -> RcDoc<'a> {
@@ -280,7 +300,7 @@ fn pp_variant<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) 
     enclose_space("{", concat(fields, ";"), "}")
 }
 
-fn pp_class<'a>((args, ty): (&'a [Type], &'a Type), syntax: Option<&'a IDLType>) -> RcDoc<'a> {
+fn pp_class<'a>((args, ty): (&'a [ArgType], &'a Type), syntax: Option<&'a IDLType>) -> RcDoc<'a> {
     let doc = pp_args(args).append(" -> async ");
     match ty.as_ref() {
         TypeInner::Service(_) => doc.append(pp_ty_rich(ty, syntax)),
@@ -295,12 +315,12 @@ fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
 
 fn pp_defs<'a>(env: &'a TypeEnv, prog: &'a IDLMergedProg) -> RcDoc<'a> {
     lines(env.0.iter().map(|(id, ty)| {
-        let syntax = prog.lookup(id);
+        let syntax = prog.lookup(id.as_str());
         let docs = syntax
             .map(|b| pp_docs(b.docs.as_ref()))
             .unwrap_or(RcDoc::nil());
         docs.append(kwd("public type"))
-            .append(escape(id, false))
+            .append(escape(id.as_str(), false))
             .append(" = ")
             .append(pp_ty_rich(ty, syntax.map(|b| &b.typ)))
             .append(";")

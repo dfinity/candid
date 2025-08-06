@@ -1,12 +1,12 @@
 use crate::{
     pretty_parse,
     syntax::{
-        Binding, Dec, IDLActorType, IDLInitArgs, IDLMergedProg, IDLProg, IDLType, PrimType,
-        TypeField,
+        Binding, Dec, IDLActorType, IDLArgType, IDLInitArgs, IDLMergedProg, IDLProg, IDLType,
+        PrimType, TypeField,
     },
     Error, Result,
 };
-use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
+use candid::types::{ArgType, Field, Function, Type, TypeEnv, TypeInner};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -51,8 +51,9 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
     match t {
         IDLType::PrimT(prim) => Ok(check_prim(prim)),
         IDLType::VarT(id) => {
-            env.te.find_type(id)?;
-            Ok(TypeInner::Var(id.to_string()).into())
+            let key = id.as_str().into();
+            env.te.find_type(&key)?;
+            Ok(TypeInner::Var(key).into())
         }
         IDLType::OptT(t) => {
             let t = check_type(env, t)?;
@@ -74,7 +75,7 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
         IDLType::FuncT(func) => {
             let mut t1 = Vec::new();
             for arg in func.args.iter() {
-                t1.push(check_type(env, arg)?);
+                t1.push(check_arg(env, arg)?);
             }
             let mut t2 = Vec::new();
             for t in func.rets.iter() {
@@ -102,6 +103,13 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
         }
         IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
     }
+}
+
+fn check_arg(env: &Env, arg: &IDLArgType) -> Result<ArgType> {
+    Ok(ArgType {
+        name: arg.name.clone(),
+        typ: check_type(env, &arg.typ)?,
+    })
 }
 
 fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
@@ -139,7 +147,7 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
         match dec {
             Dec::TypD(Binding { id, typ, docs: _ }) => {
                 let t = check_type(env, typ)?;
-                env.te.0.insert(id.to_string(), t);
+                env.te.0.insert(id.clone().into(), t);
             }
             Dec::ImportType(_) | Dec::ImportServ(_) => (),
         }
@@ -151,7 +159,7 @@ fn check_cycle(env: &TypeEnv) -> Result<()> {
     fn has_cycle<'a>(seen: &mut BTreeSet<&'a str>, env: &'a TypeEnv, t: &'a Type) -> Result<bool> {
         match t.as_ref() {
             TypeInner::Var(id) => {
-                if seen.insert(id) {
+                if seen.insert(id.as_str()) {
                     let ty = env.find_type(id)?;
                     has_cycle(seen, env, ty)
                 } else {
@@ -173,7 +181,10 @@ fn check_cycle(env: &TypeEnv) -> Result<()> {
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         if let Dec::TypD(Binding { id, .. }) = dec {
-            let duplicate = env.te.0.insert(id.to_string(), TypeInner::Unknown.into());
+            let duplicate = env
+                .te
+                .0
+                .insert(id.as_str().into(), TypeInner::Unknown.into());
             if duplicate.is_some() {
                 return Err(Error::msg(format!("duplicate binding for {id}")));
             }
@@ -193,7 +204,7 @@ fn check_actor(env: &Env, actor: &Option<IDLActorType>) -> Result<Option<Type>> 
         Some(IDLType::ClassT(ts, t)) => {
             let mut args = Vec::new();
             for arg in ts.iter() {
-                args.push(check_type(env, arg)?);
+                args.push(check_arg(env, arg)?);
             }
             let serv = check_type(env, t)?;
             env.te.as_service(&serv)?;
@@ -262,13 +273,13 @@ pub fn check_init_args(
     te: &mut TypeEnv,
     main_env: &TypeEnv,
     prog: &IDLInitArgs,
-) -> Result<Vec<Type>> {
+) -> Result<Vec<ArgType>> {
     let mut env = Env { te, pre: false };
     check_decs(&mut env, &prog.decs)?;
     env.te.merge(main_env)?;
     let mut args = Vec::new();
     for arg in prog.args.iter() {
-        args.push(check_type(&env, arg)?);
+        args.push(check_arg(&env, arg)?);
     }
     Ok(args)
 }

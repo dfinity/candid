@@ -1,4 +1,5 @@
 use crate::{check_prog, pretty_check_file, pretty_parse, Error, Result};
+use candid::types::internal::TypeKey;
 use candid::{
     types::{Type, TypeInner},
     TypeEnv,
@@ -59,7 +60,10 @@ pub fn instantiate_candid(candid: CandidSource) -> Result<(Vec<Type>, (TypeEnv, 
     let serv = serv.ok_or_else(|| Error::msg("the Candid interface has no main service type"))?;
     let serv = env.trace_type(&serv)?;
     Ok(match serv.as_ref() {
-        TypeInner::Class(args, ty) => (args.clone(), (env, ty.clone())),
+        TypeInner::Class(args, ty) => (
+            args.iter().map(|arg| arg.typ.clone()).collect::<Vec<_>>(),
+            (env, ty.clone()),
+        ),
         TypeInner::Service(_) => (vec![], (env, serv)),
         _ => unreachable!(),
     })
@@ -75,8 +79,8 @@ pub fn get_metadata(env: &TypeEnv, serv: &Option<Type>) -> Option<String> {
     let def_list = crate::bindings::analysis::chase_actor(env, &serv).ok()?;
     let mut filtered = TypeEnv::new();
     for d in def_list {
-        if let Some(t) = env.0.get(d) {
-            filtered.0.insert(d.to_string(), t.clone());
+        if let Some(t) = env.0.get(&TypeKey::from(d)) {
+            filtered.0.insert(d.to_string().into(), t.clone());
         }
     }
     Some(candid::pretty::candid::compile(&filtered, &Some(serv)))
@@ -115,6 +119,6 @@ pub fn check_rust_type<T: candid::CandidType>(candid_args: &str) -> Result<()> {
     let ty = rust_env.add::<T>();
     let ty = env.merge_type(rust_env.env, ty);
     let mut gamma = std::collections::HashSet::new();
-    equal(&mut gamma, &env, &args[0], &ty)?;
+    equal(&mut gamma, &env, &args[0].typ, &ty)?;
     Ok(())
 }

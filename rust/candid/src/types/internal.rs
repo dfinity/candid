@@ -1,9 +1,14 @@
 use super::CandidType;
 use crate::idl_hash;
+use crate::types::type_env::TypeMap;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::fmt::Debug;
+use std::hash::Hash;
+
+pub use crate::types::type_key::TypeKey;
 
 // This is a re-implementation of std::any::TypeId to get rid of 'static constraint.
 // The current TypeId doesn't consider lifetime while computing the hash, which is
@@ -25,7 +30,7 @@ impl TypeId {
 impl std::fmt::Display for TypeId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = NAME.with(|n| n.borrow_mut().get(self));
-        write!(f, "{name}")
+        f.write_str(&name)
     }
 }
 pub fn type_of<T>(_: &T) -> TypeId {
@@ -114,8 +119,9 @@ impl TypeContainer {
                 }
                 let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
-                    self.env.0.insert(id.to_string(), res);
-                    TypeInner::Var(id.to_string())
+                    let type_key = TypeKey::from(id.to_string());
+                    self.env.0.insert(type_key.clone(), res);
+                    TypeInner::Var(type_key)
                 } else {
                     // if the type is part of an enum, the id won't be recorded.
                     // we want to inline the type in this case.
@@ -134,21 +140,29 @@ impl TypeContainer {
                 .into();
                 let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
-                    self.env.0.insert(id.to_string(), res);
-                    TypeInner::Var(id.to_string())
+                    let type_key = TypeKey::from(id.to_string());
+                    self.env.0.insert(type_key.clone(), res);
+                    TypeInner::Var(type_key)
                 } else {
                     return res;
                 }
             }
             TypeInner::Knot(id) => {
-                let name = id.to_string();
                 let ty = ENV.with(|e| e.borrow().get(id).unwrap().clone());
-                self.env.0.insert(id.to_string(), ty);
-                TypeInner::Var(name)
+                let type_key = TypeKey::from(id.to_string());
+                self.env.0.insert(type_key.clone(), ty);
+                TypeInner::Var(type_key)
             }
             TypeInner::Func(func) => TypeInner::Func(Function {
                 modes: func.modes.clone(),
-                args: func.args.iter().map(|arg| self.go(arg)).collect(),
+                args: func
+                    .args
+                    .iter()
+                    .map(|arg| ArgType {
+                        name: arg.name.clone(),
+                        typ: self.go(&arg.typ),
+                    })
+                    .collect(),
                 rets: func.rets.iter().map(|arg| self.go(arg)).collect(),
             }),
             TypeInner::Service(serv) => TypeInner::Service(
@@ -156,9 +170,16 @@ impl TypeContainer {
                     .map(|(id, t)| (id.clone(), self.go(t)))
                     .collect(),
             ),
-            TypeInner::Class(inits, ref ty) => {
-                TypeInner::Class(inits.iter().map(|t| self.go(t)).collect(), self.go(ty))
-            }
+            TypeInner::Class(inits, ref ty) => TypeInner::Class(
+                inits
+                    .iter()
+                    .map(|t| ArgType {
+                        name: t.name.clone(),
+                        typ: self.go(&t.typ),
+                    })
+                    .collect(),
+                self.go(ty),
+            ),
             t => t.clone(),
         }
         .into()
@@ -188,7 +209,7 @@ pub enum TypeInner {
     Reserved,
     Empty,
     Knot(TypeId), // For recursive types from Rust
-    Var(String),  // For variables from Candid file
+    Var(TypeKey), // For variables from Candid file
     Unknown,
     Opt(Type),
     Vec(Type),
@@ -196,7 +217,7 @@ pub enum TypeInner {
     Variant(Vec<Field>),
     Func(Function),
     Service(Vec<(String, Type)>),
-    Class(Vec<Type>, Type),
+    Class(Vec<ArgType>, Type),
     Principal,
     Future,
 }
@@ -249,12 +270,12 @@ impl Type {
     pub fn is_blob(&self, env: &crate::TypeEnv) -> bool {
         self.as_ref().is_blob(env)
     }
-    pub fn subst(&self, tau: &std::collections::BTreeMap<String, String>) -> Self {
+    pub fn subst(&self, tau: &TypeMap<TypeKey>) -> Self {
         use TypeInner::*;
         match self.as_ref() {
             Var(id) => match tau.get(id) {
-                None => Var(id.to_string()),
-                Some(new_id) => Var(new_id.to_string()),
+                None => Var(id.clone()),
+                Some(new_id) => Var(new_id.clone()),
             },
             Opt(t) => Opt(t.subst(tau)),
             Vec(t) => Vec(t.subst(tau)),
@@ -278,7 +299,14 @@ impl Type {
                 let func = func.clone();
                 Func(Function {
                     modes: func.modes,
-                    args: func.args.into_iter().map(|t| t.subst(tau)).collect(),
+                    args: func
+                        .args
+                        .into_iter()
+                        .map(|t| ArgType {
+                            name: t.name,
+                            typ: t.typ.subst(tau),
+                        })
+                        .collect(),
                     rets: func.rets.into_iter().map(|t| t.subst(tau)).collect(),
                 })
             }
@@ -287,7 +315,15 @@ impl Type {
                     .map(|(meth, ty)| (meth.clone(), ty.subst(tau)))
                     .collect(),
             ),
-            Class(args, ty) => Class(args.iter().map(|t| t.subst(tau)).collect(), ty.subst(tau)),
+            Class(args, ty) => Class(
+                args.iter()
+                    .map(|t| ArgType {
+                        name: t.name.clone(),
+                        typ: t.typ.subst(tau),
+                    })
+                    .collect(),
+                ty.subst(tau),
+            ),
             _ => return self.clone(),
         }
         .into()
@@ -331,7 +367,7 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
         Reserved => 8,
         Principal => 9,
         Knot(_) => 10,
-        Var(id) => id.len() as i32,
+        Var(id) => id.as_str().len() as i32,
         Opt(t) => 4 + text_size(t, limit - 4)?,
         Vec(t) => 4 + text_size(t, limit - 4)?,
         Record(fs) | Variant(fs) => {
@@ -353,7 +389,12 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
             let mut cnt = mode + 6;
             let mut limit = limit - cnt;
             for t in &func.args {
-                cnt += text_size(t, limit)?;
+                if let Some(name) = t.name.as_ref() {
+                    let id_size = name.len() as i32;
+                    cnt += id_size + text_size(&t.typ, limit - id_size - 3)? + 3;
+                } else {
+                    cnt += text_size(&t.typ, limit)?;
+                }
                 limit -= cnt;
             }
             for t in &func.rets {
@@ -510,8 +551,14 @@ pub enum FuncMode {
 #[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 pub struct Function {
     pub modes: Vec<FuncMode>,
-    pub args: Vec<Type>,
+    pub args: Vec<ArgType>,
     pub rets: Vec<Type>,
+}
+
+#[derive(Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
+pub struct ArgType {
+    pub name: Option<String>,
+    pub typ: Type,
 }
 
 #[cfg(feature = "printer")]
@@ -540,16 +587,16 @@ impl Function {
 /// `func!((u8, &str) -> (Nat) query)` expands to `Type(Rc::new(TypeInner::Func(...)))`
 macro_rules! func {
     ( ( $($arg:ty),* $(,)? ) -> ( $($ret:ty),* $(,)? ) ) => {
-        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![] }))
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*].into_iter().map(|arg| $crate::types::ArgType { name: None, typ: arg }).collect(), rets: vec![$(<$ret>::ty()),*], modes: vec![] }))
     };
     ( ( $($arg:ty),* $(,)? ) -> ( $($ret:ty),* $(,)? ) query ) => {
-        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::Query] }))
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*].into_iter().map(|arg| $crate::types::ArgType { name: None, typ: arg }).collect(), rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::Query] }))
     };
     ( ( $($arg:ty),* $(,)? ) -> ( $($ret:ty),* $(,)? ) composite_query ) => {
-        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::CompositeQuery] }))
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*].into_iter().map(|arg| $crate::types::ArgType { name: None, typ: arg }).collect(), rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::CompositeQuery] }))
     };
     ( ( $($arg:ty),* $(,)? ) -> ( $($ret:ty),* $(,)? ) oneway ) => {
-        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*], rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::Oneway] }))
+        Into::<$crate::types::Type>::into($crate::types::TypeInner::Func($crate::types::Function { args: vec![$(<$arg>::ty()),*].into_iter().map(|arg| $crate::types::ArgType { name: None, typ: arg }).collect(), rets: vec![$(<$ret>::ty()),*], modes: vec![$crate::types::FuncMode::Oneway] }))
     };
 }
 #[macro_export]
