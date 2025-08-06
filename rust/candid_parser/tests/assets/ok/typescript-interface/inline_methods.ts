@@ -45,7 +45,6 @@ function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
 export type Fn = (arg0: bigint) => Promise<bigint>;
-export type Gn = Fn;
 export interface R {
     x: bigint;
     fn: [Principal, string];
@@ -58,6 +57,7 @@ export interface RInline {
     x: bigint;
     fn: [Principal, string];
 }
+export type Gn = Fn;
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

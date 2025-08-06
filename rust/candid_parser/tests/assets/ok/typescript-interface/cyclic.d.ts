@@ -9,11 +9,11 @@ export interface None {
 }
 export type Option<T> = Some<T> | None;
 export type A = Some<B> | None;
-export type B = Some<C> | None;
-export type C = A;
-export type X = Y;
-export type Y = Z;
 export type Z = A;
+export type X = Y;
+export type C = A;
+export type Y = Z;
+export type B = Some<C> | None;
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

@@ -44,10 +44,10 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
-export type Func = () => Promise<Principal>;
 export interface ServiceInterface {
     f: Func;
 }
+export type Func = () => Promise<Principal>;
 export type Service2 = ServiceInterface;
 export declare interface CreateActorOptions {
     agent?: Agent;

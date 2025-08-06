@@ -44,24 +44,6 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
-export type HeaderField = [string, string];
-export interface HttpRequest {
-    url: string;
-    method: string;
-    body: Uint8Array | number[];
-    headers: Array<HeaderField>;
-}
-export interface HttpResponse {
-    body: Uint8Array | number[];
-    headers: Array<HeaderField>;
-    streaming_strategy?: StreamingStrategy;
-    status_code: number;
-}
-export type StreamingCallback = (arg0: StreamingToken) => Promise<StreamingCallbackHttpResponse>;
-export interface StreamingCallbackHttpResponse {
-    token?: StreamingToken;
-    body: Uint8Array | number[];
-}
 export type StreamingStrategy = {
     __kind__: "Callback";
     Callback: {
@@ -69,9 +51,27 @@ export type StreamingStrategy = {
         callback: [Principal, string];
     };
 };
+export type HeaderField = [string, string];
+export type StreamingCallback = (arg0: StreamingToken) => Promise<StreamingCallbackHttpResponse>;
+export interface HttpResponse {
+    body: Uint8Array | number[];
+    headers: Array<HeaderField>;
+    streaming_strategy?: StreamingStrategy;
+    status_code: number;
+}
+export interface StreamingCallbackHttpResponse {
+    token?: StreamingToken;
+    body: Uint8Array | number[];
+}
 export interface StreamingToken {
     resource: string;
     index: bigint;
+}
+export interface HttpRequest {
+    url: string;
+    method: string;
+    body: Uint8Array | number[];
+    headers: Array<HeaderField>;
 }
 export declare interface CreateActorOptions {
     agent?: Agent;

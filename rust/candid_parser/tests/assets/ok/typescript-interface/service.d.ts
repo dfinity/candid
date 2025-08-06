@@ -8,10 +8,10 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
-export type Func = () => Promise<Principal>;
 export interface ServiceInterface {
     f: Func;
 }
+export type Func = () => Promise<Principal>;
 export type Service2 = ServiceInterface;
 export declare interface CreateActorOptions {
     agent?: Agent;

@@ -1,8 +1,10 @@
 use candid::types::TypeEnv;
-use candid_parser::bindings::{javascript, motoko, rust, typescript, typescript_native};
-use candid_parser::configs::Configs;
-use candid_parser::types::IDLProg;
-use candid_parser::typing::{check_file, check_prog};
+use candid_parser::{
+    bindings::{javascript, motoko, rust, typescript, typescript_native},
+    configs::Configs,
+    syntax::{pretty_print, Dec, IDLProg, IDLType},
+    typing::{check_file, check_prog},
+};
 use goldenfile::Mint;
 use std::io::Write;
 use std::panic::AssertUnwindSafe;
@@ -213,7 +215,7 @@ fn compiler_test_typescript_native(resource: &str) {
         .next()
         .unwrap_or_default();
     match check_file(&candid_path) {
-        Ok((env, actor)) => {
+        Ok((env, actor, _)) => {
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("ts")).unwrap();
                 let content =

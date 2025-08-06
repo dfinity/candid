@@ -8,12 +8,40 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
-export type A = B;
-export type B = Some<A> | None;
+export type my_variant = {
+    __kind__: "a";
+    a: {
+        b: string;
+    };
+} | {
+    __kind__: "c";
+    c: {
+        d: string;
+        e: Array<{
+            f: bigint;
+        }>;
+    } | null;
+};
+export interface sInterface {
+    f: t;
+    g(arg0: list): Promise<[B, tree, stream]>;
+}
 export type List = {
     head: bigint;
     tail: List;
 } | null;
+export type list = node | null;
+export type tree = {
+    __kind__: "branch";
+    branch: {
+        val: bigint;
+        left: tree;
+        right: tree;
+    };
+} | {
+    __kind__: "leaf";
+    leaf: bigint;
+};
 export type a = {
     __kind__: "a";
     a: null;
@@ -21,13 +49,18 @@ export type a = {
     __kind__: "b";
     b: b;
 };
-export type b = [bigint, bigint];
 export interface brokerInterface {
     find(name: string): Promise<Principal>;
 }
-export type f = (arg0: List, arg1: [Principal, string]) => Promise<[List | null, res]>;
-export type list = node | null;
+export type t = (server: Principal) => Promise<void>;
 export type my_type = Principal;
+export type f = (arg0: List, arg1: [Principal, string]) => Promise<[List | null, res]>;
+export type b = [bigint, bigint];
+export type stream = {
+    head: bigint;
+    next: [Principal, string];
+} | null;
+export type A = B;
 export interface nested {
     _0_: bigint;
     _1_: bigint;
@@ -56,10 +89,12 @@ export type nested_res = {
         Err: [bigint];
     };
 };
-export interface node {
-    head: bigint;
-    tail: list;
+export interface nested_records {
+    nested?: {
+        nested_field: string;
+    };
 }
+export type B = Some<A> | None;
 export type res = {
     __kind__: "Ok";
     Ok: [bigint, bigint];
@@ -69,26 +104,10 @@ export type res = {
         error: string;
     };
 };
-export interface sInterface {
-    f: t;
-    g(arg0: list): Promise<[B, tree, stream]>;
-}
-export type stream = {
+export interface node {
     head: bigint;
-    next: [Principal, string];
-} | null;
-export type t = (server: Principal) => Promise<void>;
-export type tree = {
-    __kind__: "branch";
-    branch: {
-        val: bigint;
-        left: tree;
-        right: tree;
-    };
-} | {
-    __kind__: "leaf";
-    leaf: bigint;
-};
+    tail: list;
+}
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
@@ -111,10 +130,7 @@ export enum Variant_a_b {
     b = "b"
 }
 export interface exampleInterface {
-    bbbbb(arg0: b): Promise<void>;
-    f: t;
     f1(arg0: list, test: Uint8Array | number[], arg2: boolean | null): Promise<void>;
-    g(arg0: list): Promise<[B, tree, stream]>;
     g1(arg0: my_type, arg1: List, arg2: List | null, arg3: nested): Promise<[bigint, Principal, nested_res]>;
     h(arg0: Array<string | null>, arg1: {
         __kind__: "A";
@@ -137,5 +153,9 @@ export interface exampleInterface {
             __kind__: "Err";
             Err: Variant_a_b;
         }]>;
+    y(arg0: nested_records): Promise<[nested_records, my_variant]>;
+    f: t;
+    g(arg0: list): Promise<[B, tree, stream]>;
+    bbbbb(arg0: b): Promise<void>;
 }
 

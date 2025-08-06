@@ -44,22 +44,17 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
-export type A = B;
-export type B = Some<A> | None;
-export type list = node | null;
-export interface node {
-    head: bigint;
-    tail: list;
-}
-export interface sInterface {
-    f: t;
-    g(arg0: list): Promise<[B, tree, stream]>;
-}
 export type stream = {
     head: bigint;
     next: [Principal, string];
 } | null;
-export type t = (server: Principal) => Promise<void>;
+export type A = B;
+export interface sInterface {
+    f: t;
+    g(arg0: list): Promise<[B, tree, stream]>;
+}
+export type B = Some<A> | None;
+export type list = node | null;
 export type tree = {
     __kind__: "branch";
     branch: {
@@ -71,6 +66,11 @@ export type tree = {
     __kind__: "leaf";
     leaf: bigint;
 };
+export type t = (server: Principal) => Promise<void>;
+export interface node {
+    head: bigint;
+    tail: list;
+}
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

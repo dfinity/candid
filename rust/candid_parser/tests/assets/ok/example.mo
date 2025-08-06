@@ -2,31 +2,6 @@
 // Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 
 module {
-  public type A = B;
-  public type B = ?A;
-  /// Doc comment for List
-  public type List = ?{
-    /// Doc comment for List head
-    head : Int;
-    /// Doc comment for List tail
-    tail : List;
-  };
-  public type a = { #a; #b : b };
-  public type b = (Int, Nat);
-  /// Doc comment for broker service
-  public type broker = actor {
-    find : shared (name : Text) -> async actor {
-        current : shared () -> async Nat32;
-        up : shared () -> async ();
-      };
-  };
-  public type f = shared (List, shared Int32 -> async Int64) -> async (
-      ?List,
-      res,
-    );
-  public type list = ?node;
-  /// Doc comment for prim type
-  public type my_type = Principal;
   public type my_variant = {
     /// Doc comment for my_variant field a
     #a : {
@@ -45,6 +20,38 @@ module {
       ];
     };
   };
+  /// Doc comment for service id
+  public type s = actor { f : t; g : shared list -> async (B, tree, stream) };
+  /// Doc comment for List
+  public type List = ?{
+    /// Doc comment for List head
+    head : Int;
+    /// Doc comment for List tail
+    tail : List;
+  };
+  public type list = ?node;
+  public type tree = {
+    #branch : { val : Int; left : tree; right : tree };
+    #leaf : Int;
+  };
+  public type a = { #a; #b : b };
+  /// Doc comment for broker service
+  public type broker = actor {
+    find : shared (name : Text) -> async actor {
+        current : shared () -> async Nat32;
+        up : shared () -> async ();
+      };
+  };
+  public type t = shared (server : s) -> async ();
+  /// Doc comment for prim type
+  public type my_type = Principal;
+  public type f = shared (List, shared Int32 -> async Int64) -> async (
+      ?List,
+      res,
+    );
+  public type b = (Int, Nat);
+  public type stream = ?{ head : Nat; next : shared query () -> async stream };
+  public type A = B;
   /// Doc comment for nested type
   public type nested = {
     _0_  : Nat;
@@ -56,14 +63,6 @@ module {
     _41_  : { #_42_ ; #A; #B; #C };
     _42_  : Nat;
   };
-  /// Doc comment for nested_records
-  public type nested_records = {
-    /// Doc comment for nested_records field nested
-    nested : ?{
-      /// Doc comment for nested_records field nested_field
-      nested_field : Text;
-    };
-  };
   public type nested_res = {
     #Ok : { #Ok; #Err };
     #Err : {
@@ -73,7 +72,15 @@ module {
       #Err : { _0_  : Int };
     };
   };
-  public type node = { head : Nat; tail : list };
+  /// Doc comment for nested_records
+  public type nested_records = {
+    /// Doc comment for nested_records field nested
+    nested : ?{
+      /// Doc comment for nested_records field nested_field
+      nested_field : Text;
+    };
+  };
+  public type B = ?A;
   /// Doc comment for res type
   public type res = {
     /// Doc comment for Ok variant
@@ -85,14 +92,7 @@ module {
       error : Text;
     };
   };
-  /// Doc comment for service id
-  public type s = actor { f : t; g : shared list -> async (B, tree, stream) };
-  public type stream = ?{ head : Nat; next : shared query () -> async stream };
-  public type t = shared (server : s) -> async ();
-  public type tree = {
-    #branch : { val : Int; left : tree; right : tree };
-    #leaf : Int;
-  };
+  public type node = { head : Nat; tail : list };
   /// Doc comment for service
   public type Self = actor {
     /// Doc comment for f1 method of service

@@ -225,7 +225,7 @@ fn main() -> Result<()> {
             }
             let content = match target.as_str() {
                 "js" => candid_parser::bindings::javascript::compile(&env, &actor),
-                "ts" => candid_parser::bindings::typescript::compile(&env, &actor),
+                "ts" => candid_parser::bindings::typescript::compile(&env, &actor, &prog),
                 "ts-native-interface" | "ts-native-wrapper" => {
                     let target = match target.as_str() {
                         "ts-native-interface" => "interface",
@@ -245,8 +245,8 @@ fn main() -> Result<()> {
                         target,
                     )
                 }
-                "did" => candid_parser::pretty::candid::compile(&env, &actor),
-                "mo" => candid_parser::bindings::motoko::compile(&env, &actor),
+                "did" => candid_parser::syntax::pretty_print(&prog),
+                "mo" => candid_parser::bindings::motoko::compile(&env, &actor, &prog),
                 "rs" => {
                     use candid_parser::bindings::rust::{compile, Config, ExternalConfig};
                     let external = configs

@@ -9,28 +9,6 @@ export interface None {
 }
 export type Option<T> = Some<T> | None;
 export type bitcoin_address = string;
-export type block_hash = Uint8Array | number[];
-export type canister_id = Principal;
-export interface canister_settings {
-    freezing_threshold?: bigint;
-    controllers?: Array<Principal>;
-    memory_allocation?: bigint;
-    compute_allocation?: bigint;
-}
-export interface definite_canister_settings {
-    freezing_threshold: bigint;
-    controllers: Array<Principal>;
-    memory_allocation: bigint;
-    compute_allocation: bigint;
-}
-export interface get_balance_request {
-    network: bitcoin_network;
-    address: bitcoin_address;
-    min_confirmations?: number;
-}
-export interface get_current_fee_percentiles_request {
-    network: bitcoin_network;
-}
 export interface get_utxos_request {
     network: bitcoin_network;
     filter?: {
@@ -42,38 +20,60 @@ export interface get_utxos_request {
     };
     address: bitcoin_address;
 }
+export interface canister_settings {
+    freezing_threshold?: bigint;
+    controllers?: Array<Principal>;
+    memory_allocation?: bigint;
+    compute_allocation?: bigint;
+}
+export type user_id = Principal;
+export interface get_current_fee_percentiles_request {
+    network: bitcoin_network;
+}
+export interface outpoint {
+    txid: Uint8Array | number[];
+    vout: number;
+}
+export interface get_balance_request {
+    network: bitcoin_network;
+    address: bitcoin_address;
+    min_confirmations?: number;
+}
+export interface definite_canister_settings {
+    freezing_threshold: bigint;
+    controllers: Array<Principal>;
+    memory_allocation: bigint;
+    compute_allocation: bigint;
+}
+export type satoshi = bigint;
+export type millisatoshi_per_byte = bigint;
+export type wasm_module = Uint8Array | number[];
+export interface send_transaction_request {
+    transaction: Uint8Array | number[];
+    network: bitcoin_network;
+}
 export interface get_utxos_response {
     next_page?: Uint8Array | number[];
     tip_height: number;
     tip_block_hash: block_hash;
     utxos: Array<utxo>;
 }
-export interface http_header {
-    value: string;
-    name: string;
+export type block_hash = Uint8Array | number[];
+export type canister_id = Principal;
+export interface utxo {
+    height: number;
+    value: satoshi;
+    outpoint: outpoint;
 }
 export interface http_response {
     status: bigint;
     body: Uint8Array | number[];
     headers: Array<http_header>;
 }
-export type millisatoshi_per_byte = bigint;
-export interface outpoint {
-    txid: Uint8Array | number[];
-    vout: number;
+export interface http_header {
+    value: string;
+    name: string;
 }
-export type satoshi = bigint;
-export interface send_transaction_request {
-    transaction: Uint8Array | number[];
-    network: bitcoin_network;
-}
-export type user_id = Principal;
-export interface utxo {
-    height: number;
-    value: satoshi;
-    outpoint: outpoint;
-}
-export type wasm_module = Uint8Array | number[];
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;

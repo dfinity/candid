@@ -45,11 +45,11 @@ function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
 export type A = Some<B> | None;
-export type B = Some<C> | None;
-export type C = A;
-export type X = Y;
-export type Y = Z;
 export type Z = A;
+export type X = Y;
+export type C = A;
+export type Y = Z;
+export type B = Some<C> | None;
 export declare interface CreateActorOptions {
     agent?: Agent;
     agentOptions?: HttpAgentOptions;
