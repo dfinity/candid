@@ -34,8 +34,10 @@ export interface get_current_fee_percentiles_request {
 export interface get_utxos_request {
     network: bitcoin_network;
     filter?: {
+        __kind__: "page";
         page: Uint8Array | number[];
     } | {
+        __kind__: "min_confirmations";
         min_confirmations: number;
     };
     address: bitcoin_address;

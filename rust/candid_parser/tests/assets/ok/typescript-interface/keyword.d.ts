@@ -9,12 +9,14 @@ export interface None {
 }
 export type Option<T> = Some<T> | None;
 export type if_ = {
+    __kind__: "branch";
     branch: {
         val: bigint;
         left: if_;
         right: if_;
     };
 } | {
+    __kind__: "leaf";
     leaf: bigint;
 };
 export type list = node | null;
@@ -58,12 +60,16 @@ export interface keywordInterface {
     service: t;
     tuple(arg0: [bigint, Uint8Array | number[], string]): Promise<[bigint, number]>;
     variant(arg0: {
+        __kind__: "A";
         A: null;
     } | {
+        __kind__: "B";
         B: null;
     } | {
+        __kind__: "C";
         C: null;
     } | {
+        __kind__: "D";
         D: number;
     }): Promise<void>;
 }

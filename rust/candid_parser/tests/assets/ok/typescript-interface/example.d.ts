@@ -15,8 +15,10 @@ export type List = {
     tail: List;
 } | null;
 export type a = {
+    __kind__: "a";
     a: null;
 } | {
+    __kind__: "b";
     b: b;
 };
 export type b = [bigint, bigint];
@@ -40,13 +42,17 @@ export interface nested {
     _42_: bigint;
 }
 export type nested_res = {
+    __kind__: "Ok";
     Ok: Variant_Ok_Err;
 } | {
+    __kind__: "Err";
     Err: {
+        __kind__: "Ok";
         Ok: {
             content: string;
         };
     } | {
+        __kind__: "Err";
         Err: [bigint];
     };
 };
@@ -55,8 +61,10 @@ export interface node {
     tail: list;
 }
 export type res = {
+    __kind__: "Ok";
     Ok: [bigint, bigint];
 } | {
+    __kind__: "Err";
     Err: {
         error: string;
     };
@@ -71,12 +79,14 @@ export type stream = {
 } | null;
 export type t = (server: Principal) => Promise<void>;
 export type tree = {
+    __kind__: "branch";
     branch: {
         val: bigint;
         left: tree;
         right: tree;
     };
 } | {
+    __kind__: "leaf";
     leaf: bigint;
 };
 export declare interface CreateActorOptions {
@@ -107,8 +117,10 @@ export interface exampleInterface {
     g(arg0: list): Promise<[B, tree, stream]>;
     g1(arg0: my_type, arg1: List, arg2: List | null, arg3: nested): Promise<[bigint, Principal, nested_res]>;
     h(arg0: Array<string | null>, arg1: {
+        __kind__: "A";
         A: bigint;
     } | {
+        __kind__: "B";
         B: string | null;
     }, arg2: List | null): Promise<{
         _42_: {
@@ -117,10 +129,12 @@ export interface exampleInterface {
     }>;
     i: f;
     x(arg0: a, arg1: b): Promise<[a | null, b | null, {
+            __kind__: "Ok";
             Ok: {
                 result: string;
             };
         } | {
+            __kind__: "Err";
             Err: Variant_a_b;
         }]>;
 }

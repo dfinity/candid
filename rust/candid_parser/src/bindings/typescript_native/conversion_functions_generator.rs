@@ -688,8 +688,8 @@ impl<'a> TypeConverter<'a> {
 
             result
         } else {
-            // For variants with different types, check for _tag property
-            // This is for TypeScript unions of object types: { tag1: value1 } | { tag2: value2 }
+            // For variants with different types, check for __kind__ property
+            // This is for discriminated union: { __kind__: 'tag1', tag1: value1 } | { __kind__: 'tag2', tag2: value2 }
 
             // Build a series of conditions to check each tag
             let mut result = self.create_ident(param_name); // Default fallback
@@ -700,19 +700,27 @@ impl<'a> TypeConverter<'a> {
                     Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
                 };
 
-                // Check if this variant field exists on the object using: field in value
+                // Check if the __kind__ field matches this variant
+                let kind_access = Expr::Member(MemberExpr {
+                    span: DUMMY_SP,
+                    obj: Box::new(self.create_ident(param_name)),
+                    prop: MemberProp::Ident(
+                        Ident::new("__kind__".into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                    ),
+                });
+                
                 let condition = Expr::Bin(BinExpr {
                     span: DUMMY_SP,
-                    op: BinaryOp::In,
-                    left: Box::new(Expr::Lit(Lit::Str(Str {
+                    op: BinaryOp::EqEqEq,
+                    left: Box::new(kind_access),
+                    right: Box::new(Expr::Lit(Lit::Str(Str {
                         span: DUMMY_SP,
                         value: field_name.clone().into(),
                         raw: None,
                     }))),
-                    right: Box::new(self.create_ident(param_name)),
                 });
 
-                // Create result: { field_name: field_value }
+                // Get the field value from the object
                 // Use a clone of field_name to avoid the "use after move" error
 
                 let field_access = Expr::Member(MemberExpr {
@@ -1448,7 +1456,7 @@ impl<'a> TypeConverter<'a> {
             return expr;
         }
 
-        // For variants with different types, create objects with each tag and value
+        // For variants with different types, create discriminated union objects
         let mut conditions = Vec::new();
 
         for field in fields {
@@ -1487,15 +1495,29 @@ impl<'a> TypeConverter<'a> {
                 self.create_call(&function_name, vec![self.create_arg(field_access)])
             };
 
-            // Create a new object with the converted value
+            // Create a discriminated union object with __kind__ and the field value
             let result = Expr::Object(ObjectLit {
                 span: DUMMY_SP,
-                props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                    key: PropName::Ident(
-                        Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty()).into(),
-                    ),
-                    value: Box::new(value),
-                })))],
+                props: vec![
+                    // __kind__ property
+                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                        key: PropName::Ident(
+                            Ident::new("__kind__".into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                        ),
+                        value: Box::new(Expr::Lit(Lit::Str(Str {
+                            span: DUMMY_SP,
+                            value: field_name.clone().into(),
+                            raw: None,
+                        }))),
+                    }))),
+                    // field value property
+                    PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                        key: PropName::Ident(
+                            Ident::new(field_name.into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                        ),
+                        value: Box::new(value),
+                    }))),
+                ],
             });
 
             conditions.push((test, result));

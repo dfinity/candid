@@ -37,6 +37,7 @@ export interface fieldnatInterface {
     }>;
     bba(arg0: tuple): Promise<non_tuple>;
     bib(arg0: [bigint]): Promise<{
+        __kind__: "_0_";
         _0_: bigint;
     }>;
     foo(arg0: {

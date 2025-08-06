@@ -64,8 +64,10 @@ export interface serviceInterface {
     asPrincipal(): Promise<[Principal, [Principal, string]]>;
     asRecord(): Promise<[Principal, Principal | null, [Principal, string]]>;
     asVariant(): Promise<{
+        __kind__: "a";
         a: Principal;
     } | {
+        __kind__: "b";
         b: {
             f?: [Principal, string];
         };
@@ -131,8 +133,10 @@ class Service implements serviceInterface {
         }
     }
     async asVariant(): Promise<{
+        __kind__: "a";
         a: Principal;
     } | {
+        __kind__: "b";
         b: {
             f?: [Principal, string];
         };
@@ -181,15 +185,19 @@ function from_candid_variant_n3(value: {
         f: [] | [[Principal, string]];
     };
 }): {
+    __kind__: "a";
     a: Principal;
 } | {
+    __kind__: "b";
     b: {
         f?: [Principal, string];
     };
 } {
     return "a" in value ? {
+        __kind__: "a",
         a: value.a
     } : "b" in value ? {
+        __kind__: "b",
         b: from_candid_record_n4(value.b)
     } : value;
 }

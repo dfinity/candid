@@ -61,12 +61,14 @@ export type stream = {
 } | null;
 export type t = (server: Principal) => Promise<void>;
 export type tree = {
+    __kind__: "branch";
     branch: {
         val: bigint;
         left: tree;
         right: tree;
     };
 } | {
+    __kind__: "leaf";
     leaf: bigint;
 };
 export declare interface CreateActorOptions {
@@ -173,17 +175,21 @@ function from_candid_variant_n9(value: {
 } | {
     leaf: bigint;
 }): {
+    __kind__: "branch";
     branch: {
         val: bigint;
         left: tree;
         right: tree;
     };
 } | {
+    __kind__: "leaf";
     leaf: bigint;
 } {
     return "branch" in value ? {
+        __kind__: "branch",
         branch: from_candid_record_n10(value.branch)
     } : "leaf" in value ? {
+        __kind__: "leaf",
         leaf: value.leaf
     } : value;
 }

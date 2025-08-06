@@ -25,12 +25,14 @@ export type stream = {
 } | null;
 export type t = (server: Principal) => Promise<void>;
 export type tree = {
+    __kind__: "branch";
     branch: {
         val: bigint;
         left: tree;
         right: tree;
     };
 } | {
+    __kind__: "leaf";
     leaf: bigint;
 };
 export declare interface CreateActorOptions {

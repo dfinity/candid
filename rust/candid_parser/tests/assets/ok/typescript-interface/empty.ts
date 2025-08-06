@@ -59,11 +59,14 @@ export interface emptyInterface {
     f(arg0: {
     }): Promise<never>;
     g(arg0: T): Promise<{
+        __kind__: "a";
         a: T;
     }>;
     h(arg0: [T, never]): Promise<{
+        __kind__: "a";
         a: T;
     } | {
+        __kind__: "b";
         b: {
         };
     }>;
@@ -90,6 +93,7 @@ class Empty implements emptyInterface {
         }
     }
     async g(arg0: T): Promise<{
+        __kind__: "a";
         a: T;
     }> {
         if (this.processError) {
@@ -106,8 +110,10 @@ class Empty implements emptyInterface {
         }
     }
     async h(arg0: [T, never]): Promise<{
+        __kind__: "a";
         a: T;
     } | {
+        __kind__: "b";
         b: {
         };
     }> {
@@ -140,9 +146,11 @@ function from_candid_variant_n1(value: never): never {
 function from_candid_variant_n4(value: {
     a: _T;
 }): {
+    __kind__: "a";
     a: T;
 } {
     return "a" in value ? {
+        __kind__: "a",
         a: from_candid_T_n5(value.a)
     } : value;
 }
@@ -152,14 +160,18 @@ function from_candid_variant_n8(value: {
     b: {
     };
 }): {
+    __kind__: "a";
     a: T;
 } | {
+    __kind__: "b";
     b: {
     };
 } {
     return "a" in value ? {
+        __kind__: "a",
         a: from_candid_T_n5(value.a)
     } : "b" in value ? {
+        __kind__: "b",
         b: value.b
     } : value;
 }

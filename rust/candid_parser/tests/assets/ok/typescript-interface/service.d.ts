@@ -25,8 +25,10 @@ export interface serviceInterface {
     asPrincipal(): Promise<[Principal, [Principal, string]]>;
     asRecord(): Promise<[Principal, Principal | null, [Principal, string]]>;
     asVariant(): Promise<{
+        __kind__: "a";
         a: Principal;
     } | {
+        __kind__: "b";
         b: {
             f?: [Principal, string];
         };

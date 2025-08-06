@@ -70,8 +70,10 @@ export interface get_current_fee_percentiles_request {
 export interface get_utxos_request {
     network: bitcoin_network;
     filter?: {
+        __kind__: "page";
         page: Uint8Array | number[];
     } | {
+        __kind__: "min_confirmations";
         min_confirmations: number;
     };
     address: bitcoin_address;
@@ -861,8 +863,10 @@ function to_candid_record_n6(value: {
 function to_candid_record_n8(value: {
     network: bitcoin_network;
     filter?: {
+        __kind__: "page";
         page: Uint8Array | number[];
     } | {
+        __kind__: "min_confirmations";
         min_confirmations: number;
     };
     address: bitcoin_address;
@@ -933,17 +937,19 @@ function to_candid_variant_n4(value: bitcoin_network): {
     } : value;
 }
 function to_candid_variant_n9(value: {
+    __kind__: "page";
     page: Uint8Array | number[];
 } | {
+    __kind__: "min_confirmations";
     min_confirmations: number;
 }): {
     page: Uint8Array | number[];
 } | {
     min_confirmations: number;
 } {
-    return "page" in value ? {
+    return value.__kind__ === "page" ? {
         page: value.page
-    } : "min_confirmations" in value ? {
+    } : value.__kind__ === "min_confirmations" ? {
         min_confirmations: value.min_confirmations
     } : value;
 }

@@ -487,19 +487,51 @@ fn create_variant_type(
                 type_params: None,
             })
         } else {
-            // Create union of object types (original behavior)
+            // Create discriminated union with __kind__ field
             TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(TsUnionType {
                 span: DUMMY_SP,
                 types: fs
                     .iter()
                     .map(|f| {
+                        let field_name = match &*f.id {
+                            Label::Named(name) => name.clone(),
+                            Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
+                        };
+                        
+                        // Create the __kind__ property
+                        let kind_prop = TsTypeElement::TsPropertySignature(TsPropertySignature {
+                            span: DUMMY_SP,
+                            readonly: false,
+                            key: Box::new(Expr::Ident(Ident::new(
+                                "__kind__".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            ))),
+                            computed: false,
+                            optional: false,
+                            type_ann: Some(Box::new(TsTypeAnn {
+                                span: DUMMY_SP,
+                                type_ann: Box::new(TsType::TsLitType(TsLitType {
+                                    span: DUMMY_SP,
+                                    lit: TsLit::Str(Str {
+                                        span: DUMMY_SP,
+                                        value: field_name.clone().into(),
+                                        raw: None,
+                                    }),
+                                })),
+                            })),
+                        });
+                        
+                        // Create the value property
+                        let value_prop = create_property_signature_for_variant(
+                            enum_declarations,
+                            env,
+                            f,
+                        );
+                        
                         Box::new(TsType::TsTypeLit(TsTypeLit {
                             span: DUMMY_SP,
-                            members: vec![create_property_signature_for_variant(
-                                enum_declarations,
-                                env,
-                                f,
-                            )],
+                            members: vec![kind_prop, value_prop],
                         }))
                     })
                     .collect(),

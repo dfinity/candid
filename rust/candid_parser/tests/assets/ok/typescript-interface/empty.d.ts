@@ -20,11 +20,14 @@ export interface emptyInterface {
     f(arg0: {
     }): Promise<never>;
     g(arg0: T): Promise<{
+        __kind__: "a";
         a: T;
     }>;
     h(arg0: [T, never]): Promise<{
+        __kind__: "a";
         a: T;
     } | {
+        __kind__: "b";
         b: {
         };
     }>;

@@ -45,12 +45,14 @@ function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
 export type if_ = {
+    __kind__: "branch";
     branch: {
         val: bigint;
         left: if_;
         right: if_;
     };
 } | {
+    __kind__: "leaf";
     leaf: bigint;
 };
 export type list = node | null;
@@ -97,12 +99,16 @@ export interface keywordInterface {
     service: t;
     tuple(arg0: [bigint, Uint8Array | number[], string]): Promise<[bigint, number]>;
     variant(arg0: {
+        __kind__: "A";
         A: null;
     } | {
+        __kind__: "B";
         B: null;
     } | {
+        __kind__: "C";
         C: null;
     } | {
+        __kind__: "D";
         D: number;
     }): Promise<void>;
 }
@@ -260,12 +266,16 @@ class Keyword implements keywordInterface {
         }
     }
     async variant(arg0: {
+        __kind__: "A";
         A: null;
     } | {
+        __kind__: "B";
         B: null;
     } | {
+        __kind__: "C";
         C: null;
     } | {
+        __kind__: "D";
         D: number;
     }): Promise<void> {
         if (this.processError) {
@@ -296,12 +306,16 @@ function to_candid_opt_n2(value: Some<o> | None): [] | [_o] {
     return value._tag === "None" ? candid_none() : candid_some(to_candid_o_n1(value.value));
 }
 function to_candid_variant_n5(value: {
+    __kind__: "A";
     A: null;
 } | {
+    __kind__: "B";
     B: null;
 } | {
+    __kind__: "C";
     C: null;
 } | {
+    __kind__: "D";
     D: number;
 }): {
     A: null;
@@ -312,13 +326,13 @@ function to_candid_variant_n5(value: {
 } | {
     D: number;
 } {
-    return "A" in value ? {
+    return value.__kind__ === "A" ? {
         A: value.A
-    } : "B" in value ? {
+    } : value.__kind__ === "B" ? {
         B: value.B
-    } : "C" in value ? {
+    } : value.__kind__ === "C" ? {
         C: value.C
-    } : "D" in value ? {
+    } : value.__kind__ === "D" ? {
         D: value.D
     } : value;
 }

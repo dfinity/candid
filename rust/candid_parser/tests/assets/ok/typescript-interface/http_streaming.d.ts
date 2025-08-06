@@ -27,6 +27,7 @@ export interface StreamingCallbackHttpResponse {
     body: Uint8Array | number[];
 }
 export type StreamingStrategy = {
+    __kind__: "Callback";
     Callback: {
         token: StreamingToken;
         callback: [Principal, string];

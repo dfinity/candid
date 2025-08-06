@@ -51,8 +51,10 @@ export type List = {
     tail: List;
 } | null;
 export type a = {
+    __kind__: "a";
     a: null;
 } | {
+    __kind__: "b";
     b: b;
 };
 export type b = [bigint, bigint];
@@ -76,13 +78,17 @@ export interface nested {
     _42_: bigint;
 }
 export type nested_res = {
+    __kind__: "Ok";
     Ok: Variant_Ok_Err;
 } | {
+    __kind__: "Err";
     Err: {
+        __kind__: "Ok";
         Ok: {
             content: string;
         };
     } | {
+        __kind__: "Err";
         Err: [bigint];
     };
 };
@@ -91,8 +97,10 @@ export interface node {
     tail: list;
 }
 export type res = {
+    __kind__: "Ok";
     Ok: [bigint, bigint];
 } | {
+    __kind__: "Err";
     Err: {
         error: string;
     };
@@ -107,12 +115,14 @@ export type stream = {
 } | null;
 export type t = (server: Principal) => Promise<void>;
 export type tree = {
+    __kind__: "branch";
     branch: {
         val: bigint;
         left: tree;
         right: tree;
     };
 } | {
+    __kind__: "leaf";
     leaf: bigint;
 };
 export declare interface CreateActorOptions {
@@ -146,8 +156,10 @@ export interface exampleInterface {
     g(arg0: list): Promise<[B, tree, stream]>;
     g1(arg0: my_type, arg1: List, arg2: List | null, arg3: nested): Promise<[bigint, Principal, nested_res]>;
     h(arg0: Array<string | null>, arg1: {
+        __kind__: "A";
         A: bigint;
     } | {
+        __kind__: "B";
         B: string | null;
     }, arg2: List | null): Promise<{
         _42_: {
@@ -156,10 +168,12 @@ export interface exampleInterface {
     }>;
     i: f;
     x(arg0: a, arg1: b): Promise<[a | null, b | null, {
+            __kind__: "Ok";
             Ok: {
                 result: string;
             };
         } | {
+            __kind__: "Err";
             Err: Variant_a_b;
         }]>;
 }
@@ -256,8 +270,10 @@ class Example implements exampleInterface {
         }
     }
     async h(arg0: Array<string | null>, arg1: {
+        __kind__: "A";
         A: bigint;
     } | {
+        __kind__: "B";
         B: string | null;
     }, arg2: List | null): Promise<{
         _42_: {
@@ -298,10 +314,12 @@ class Example implements exampleInterface {
         }
     }
     async x(arg0: a, arg1: b): Promise<[a | null, b | null, {
+            __kind__: "Ok";
             Ok: {
                 result: string;
             };
         } | {
+            __kind__: "Err";
             Err: Variant_a_b;
         }]> {
         if (this.processError) {
@@ -417,17 +435,21 @@ function from_candid_variant_n10(value: {
 } | {
     leaf: bigint;
 }): {
+    __kind__: "branch";
     branch: {
         val: bigint;
         left: tree;
         right: tree;
     };
 } | {
+    __kind__: "leaf";
     leaf: bigint;
 } {
     return "branch" in value ? {
+        __kind__: "branch",
         branch: from_candid_record_n11(value.branch)
     } : "leaf" in value ? {
+        __kind__: "leaf",
         leaf: value.leaf
     } : value;
 }
@@ -446,19 +468,25 @@ function from_candid_variant_n22(value: {
         Err: [bigint];
     };
 }): {
+    __kind__: "Ok";
     Ok: Variant_Ok_Err;
 } | {
+    __kind__: "Err";
     Err: {
+        __kind__: "Ok";
         Ok: {
             content: string;
         };
     } | {
+        __kind__: "Err";
         Err: [bigint];
     };
 } {
     return "Ok" in value ? {
+        __kind__: "Ok",
         Ok: from_candid_variant_n23(value.Ok)
     } : "Err" in value ? {
+        __kind__: "Err",
         Err: from_candid_variant_n24(value.Err)
     } : value;
 }
@@ -476,15 +504,19 @@ function from_candid_variant_n24(value: {
 } | {
     Err: [bigint];
 }): {
+    __kind__: "Ok";
     Ok: {
         content: string;
     };
 } | {
+    __kind__: "Err";
     Err: [bigint];
 } {
     return "Ok" in value ? {
+        __kind__: "Ok",
         Ok: value.Ok
     } : "Err" in value ? {
+        __kind__: "Err",
         Err: value.Err
     } : value;
 }
@@ -495,15 +527,19 @@ function from_candid_variant_n33(value: {
         error: string;
     };
 }): {
+    __kind__: "Ok";
     Ok: [bigint, bigint];
 } | {
+    __kind__: "Err";
     Err: {
         error: string;
     };
 } {
     return "Ok" in value ? {
+        __kind__: "Ok",
         Ok: value.Ok
     } : "Err" in value ? {
+        __kind__: "Err",
         Err: value.Err
     } : value;
 }
@@ -512,13 +548,17 @@ function from_candid_variant_n38(value: {
 } | {
     b: _b;
 }): {
+    __kind__: "a";
     a: null;
 } | {
+    __kind__: "b";
     b: b;
 } {
     return "a" in value ? {
+        __kind__: "a",
         a: value.a
     } : "b" in value ? {
+        __kind__: "b",
         b: value.b
     } : value;
 }
@@ -533,15 +573,19 @@ function from_candid_variant_n40(value: {
         b: null;
     };
 }): {
+    __kind__: "Ok";
     Ok: {
         result: string;
     };
 } | {
+    __kind__: "Err";
     Err: Variant_a_b;
 } {
     return "Ok" in value ? {
+        __kind__: "Ok",
         Ok: value.Ok
     } : "Err" in value ? {
+        __kind__: "Err",
         Err: from_candid_variant_n41(value.Err)
     } : value;
 }
@@ -675,32 +719,36 @@ function to_candid_variant_n20(value: Variant__42__A_B_C): {
     } : value;
 }
 function to_candid_variant_n27(value: {
+    __kind__: "A";
     A: bigint;
 } | {
+    __kind__: "B";
     B: string | null;
 }): {
     A: bigint;
 } | {
     B: [] | [string];
 } {
-    return "A" in value ? {
+    return value.__kind__ === "A" ? {
         A: value.A
-    } : "B" in value ? {
+    } : value.__kind__ === "B" ? {
         B: value.B ? candid_some(value.B) : candid_none()
     } : value;
 }
 function to_candid_variant_n35(value: {
+    __kind__: "a";
     a: null;
 } | {
+    __kind__: "b";
     b: b;
 }): {
     a: null;
 } | {
     b: _b;
 } {
-    return "a" in value ? {
+    return value.__kind__ === "a" ? {
         a: value.a
-    } : "b" in value ? {
+    } : value.__kind__ === "b" ? {
         b: value.b
     } : value;
 }

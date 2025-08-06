@@ -63,6 +63,7 @@ export interface StreamingCallbackHttpResponse {
     body: Uint8Array | number[];
 }
 export type StreamingStrategy = {
+    __kind__: "Callback";
     Callback: {
         token: StreamingToken;
         callback: [Principal, string];
@@ -188,12 +189,14 @@ function from_candid_variant_n8(value: {
         callback: [Principal, string];
     };
 }): {
+    __kind__: "Callback";
     Callback: {
         token: StreamingToken;
         callback: [Principal, string];
     };
 } {
     return "Callback" in value ? {
+        __kind__: "Callback",
         Callback: value.Callback
     } : value;
 }

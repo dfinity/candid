@@ -76,6 +76,7 @@ export interface fieldnatInterface {
     }>;
     bba(arg0: tuple): Promise<non_tuple>;
     bib(arg0: [bigint]): Promise<{
+        __kind__: "_0_";
         _0_: bigint;
     }>;
     foo(arg0: {
@@ -167,6 +168,7 @@ class Fieldnat implements fieldnatInterface {
         }
     }
     async bib(arg0: [bigint]): Promise<{
+        __kind__: "_0_";
         _0_: bigint;
     }> {
         if (this.processError) {
@@ -213,9 +215,11 @@ function from_candid_variant_n1(value: {
 function from_candid_variant_n2(value: {
     _0_: bigint;
 }): {
+    __kind__: "_0_";
     _0_: bigint;
 } {
     return "_0_" in value ? {
+        __kind__: "_0_",
         _0_: value._0_
     } : value;
 }
