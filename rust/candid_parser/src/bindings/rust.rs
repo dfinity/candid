@@ -1032,7 +1032,7 @@ impl<'b> NominalState<'_, 'b> {
                     if let Some(syntax) = syntax {
                         self.generated_types.insert(new_var.clone(), syntax);
                     }
-                    TypeInner::Var(new_var.into())
+                    TypeInner::Var(new_var)
                 }
             }
             TypeInner::Variant(fs) => {
@@ -1078,7 +1078,7 @@ impl<'b> NominalState<'_, 'b> {
                     if let Some(syntax) = syntax {
                         self.generated_types.insert(new_var.clone(), syntax);
                     }
-                    TypeInner::Var(new_var.into())
+                    TypeInner::Var(new_var)
                 }
             }
             TypeInner::Func(func) => match path.last() {
