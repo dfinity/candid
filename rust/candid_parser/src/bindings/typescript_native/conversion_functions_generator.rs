@@ -328,7 +328,7 @@ impl<'a> TypeConverter<'a> {
                 let is_recursive = is_recursive_optional(self.env, inner_type, &mut visited);
 
                 if is_recursive {
-                    // For recursive patterns using Some/None, check for _tag property
+                    // For recursive patterns using Some/None, check for __kind__ property
                     // Generate conversion function for the inner type
                     let inner_function_name = self.get_to_candid_function_name(inner);
                     self.generate_to_candid_function(inner, &inner_function_name);
@@ -342,7 +342,7 @@ impl<'a> TypeConverter<'a> {
                                 span: DUMMY_SP,
                                 obj: Box::new(self.create_ident(param_name)),
                                 prop: MemberProp::Ident(
-                                    Ident::new("_tag".into(), DUMMY_SP, SyntaxContext::empty())
+                                    Ident::new("__kind__".into(), DUMMY_SP, SyntaxContext::empty())
                                         .into(),
                                 ),
                             })),

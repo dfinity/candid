@@ -3,29 +3,29 @@ import type { Principal } from "@dfinity/principal";
 import { empty as _empty, createActor as _createActor, canisterId as _canisterId } from "declarations/empty";
 import { _SERVICE } from "declarations/empty/empty.did.d.js";
 export interface Some<T> {
-    _tag: "Some";
+    __kind__: "Some";
     value: T;
 }
 export interface None {
-    _tag: "None";
+    __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
 function some<T>(value: T): Some<T> {
     return {
-        _tag: "Some",
+        __kind__: "Some",
         value: value
     };
 }
 function none(): None {
     return {
-        _tag: "None"
+        __kind__: "None"
     };
 }
 function isNone<T>(option: Option<T>): option is None {
-    return option._tag === "None";
+    return option.__kind__ === "None";
 }
 function isSome<T>(option: Option<T>): option is Some<T> {
-    return option._tag === "Some";
+    return option.__kind__ === "Some";
 }
 function unwrap<T>(option: Option<T>): T {
     if (isNone(option)) {
