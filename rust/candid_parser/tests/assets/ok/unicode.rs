@@ -5,17 +5,6 @@ use candid::{self, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult as Result;
 
 #[derive(CandidType, Deserialize)]
-pub enum B {
-  #[serde(rename="")]
-  _0_,
-  #[serde(rename="空的")]
-  _650764729_,
-  #[serde(rename="  空的  ")]
-  _1036827129_,
-  #[serde(rename="1⃣️2⃣️3⃣️")]
-  _3099250646_,
-}
-#[derive(CandidType, Deserialize)]
 pub struct A {
   #[serde(rename="\u{e000}")]
   pub _11864174_: candid::Nat,
@@ -26,6 +15,17 @@ pub struct A {
   #[serde(rename="字 段 名2")]
   pub _3133479156_: candid::Nat,
 }
+#[derive(CandidType, Deserialize)]
+pub enum B {
+  #[serde(rename="")]
+  _0_,
+  #[serde(rename="空的")]
+  _650764729_,
+  #[serde(rename="  空的  ")]
+  _1036827129_,
+  #[serde(rename="1⃣️2⃣️3⃣️")]
+  _3099250646_,
+}
 
 pub struct Service(pub Principal);
 impl Service {
@@ -34,9 +34,6 @@ impl Service {
   }
   pub async fn _356566390_(&self) -> Result<()> {
     ic_cdk::call(self.0, "✈️  🚗 ⛱️ ", ()).await
-  }
-  pub async fn _11418235_(&self, arg0: &B) -> Result<(A,)> {
-    ic_cdk::call(self.0, "函", (arg0,)).await
   }
   pub async fn _3300066460_(&self, arg0: &A) -> Result<(B,)> {
     ic_cdk::call(self.0, "函数名", (arg0,)).await
