@@ -1,7 +1,7 @@
 use super::conversion_functions_generator::TypeConverter;
 use super::utils::{contains_unicode_characters, get_ident_guarded, get_ident_guarded_keyword_ok};
 use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
-
+use candid::types::internal::TypeKey;
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 
@@ -148,11 +148,11 @@ fn wrapper_actor_service(
 fn wrapper_actor_var(
     env: &TypeEnv,
     module: &mut Module,
-    type_id: &str,
+    type_id: &TypeKey,
     service_name: &str,
     converter: &mut TypeConverter,
 ) {
-    interface_actor_var(module, type_id, service_name);
+    interface_actor_var(module, type_id.as_str(), service_name);
     let type_ref = env.find_type(type_id).unwrap();
     let serv = match type_ref.as_ref() {
         TypeInner::Service(ref serv) => serv,

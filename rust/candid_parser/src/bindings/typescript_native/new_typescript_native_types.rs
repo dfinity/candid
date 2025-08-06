@@ -16,7 +16,7 @@ pub fn is_recursive_optional(
 
     match ty.as_ref() {
         Var(id) => {
-            if !visited.insert(id.clone()) {
+            if !visited.insert(id.as_str().to_string()) {
                 // We've seen this type before, it's recursive
                 return true;
             }
@@ -30,7 +30,7 @@ pub fn is_recursive_optional(
         Opt(inner) => {
             // If we have an optional type, check its inner type
             if let Var(id) = inner.as_ref() {
-                if visited.contains(id) {
+                if visited.contains(id.as_str()) {
                     // Found recursive optional
                     return true;
                 }
@@ -54,7 +54,7 @@ pub fn create_interface_from_service(
             TypeInner::Func(ref func) => {
                 create_method_signature(enum_declarations, env, method_id, func)
             }
-            TypeInner::Var(ref id) => TsTypeElement::TsPropertySignature(TsPropertySignature {
+            TypeInner::Var(ref var_id) => TsTypeElement::TsPropertySignature(TsPropertySignature {
                 span: DUMMY_SP,
                 key: Box::new(Expr::Ident(get_ident_guarded(method_id))),
                 computed: false,
@@ -64,7 +64,7 @@ pub fn create_interface_from_service(
                     span: DUMMY_SP,
                     type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
                         span: DUMMY_SP,
-                        type_name: TsEntityName::Ident(get_ident_guarded(id)),
+                        type_name: TsEntityName::Ident(get_ident_guarded(var_id.as_str())),
                         type_params: None,
                     })),
                 })),
@@ -146,14 +146,14 @@ pub fn convert_type(
                 } else {
                     TsType::TsTypeRef(TsTypeRef {
                         span: DUMMY_SP,
-                        type_name: TsEntityName::Ident(get_ident_guarded(id)),
+                        type_name: TsEntityName::Ident(get_ident_guarded(id.as_str())),
                         type_params: None,
                     })
                 }
             } else {
                 TsType::TsTypeRef(TsTypeRef {
                     span: DUMMY_SP,
-                    type_name: TsEntityName::Ident(get_ident_guarded(id)),
+                    type_name: TsEntityName::Ident(get_ident_guarded(id.as_str())),
                     type_params: None,
                 })
             }
@@ -551,7 +551,7 @@ pub fn add_type_definitions(
             match ty.as_ref() {
                 TypeInner::Record(_) if !is_tuple(ty) => {
                     // Generate interface for record types
-                    let interface = create_interface_from_record(enum_declarations, env, id, ty);
+                    let interface = create_interface_from_record(enum_declarations, env, id.as_str(), ty);
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
@@ -561,7 +561,7 @@ pub fn add_type_definitions(
                 }
                 TypeInner::Service(ref serv) => {
                     // Generate interface for service types
-                    let interface = create_interface_from_service(enum_declarations, env, id, serv);
+                    let interface = create_interface_from_service(enum_declarations, env, id.as_str(), serv);
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
@@ -572,7 +572,7 @@ pub fn add_type_definitions(
                 TypeInner::Func(ref func) => {
                     // Generate type alias for function types
                     let type_alias =
-                        create_type_alias_from_function(enum_declarations, env, id, func);
+                        create_type_alias_from_function(enum_declarations, env, id.as_str(), func);
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
@@ -587,15 +587,15 @@ pub fn add_type_definitions(
                     if all_null {
                         // For variants with all null types, directly create the enum
                         // Don't create a type alias
-                        create_variant_type(enum_declarations, env, fs, Some(id));
+                        create_variant_type(enum_declarations, env, fs, Some(id.as_str()));
                     } else {
                         // For other variants, create a type alias to the union type
                         let variant_type =
-                            create_variant_type(enum_declarations, env, fs, Some(id));
+                            create_variant_type(enum_declarations, env, fs, Some(id.as_str()));
                         let type_alias = TsTypeAliasDecl {
                             span: DUMMY_SP,
                             declare: false,
-                            id: get_ident_guarded(id),
+                            id: get_ident_guarded(id.as_str()),
                             type_params: None,
                             type_ann: Box::new(variant_type),
                         };
@@ -611,12 +611,12 @@ pub fn add_type_definitions(
                     let inner_type = env.rec_find_type(inner_id).unwrap();
                     let inner_name = match inner_type.as_ref() {
                         TypeInner::Service(_) => format!("{}Interface", inner_id),
-                        _ => inner_id.clone(),
+                        _ => inner_id.as_str().to_string(),
                     };
                     let type_alias = TsTypeAliasDecl {
                         span: DUMMY_SP,
                         declare: false,
-                        id: get_ident_guarded(id),
+                        id: get_ident_guarded(id.as_str()),
                         type_params: None,
                         type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
                             span: DUMMY_SP,
@@ -633,7 +633,7 @@ pub fn add_type_definitions(
                 }
                 _ => {
                     // Generate type alias for other types
-                    let type_alias = create_type_alias(enum_declarations, env, id, ty);
+                    let type_alias = create_type_alias(enum_declarations, env, id.as_str(), ty);
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {

@@ -88,7 +88,7 @@ fn interface_actor_implementation(
         TypeInner::Service(ref serv) => {
             interface_actor_service(env, module, serv, service_name, converter)
         }
-        TypeInner::Var(id) => interface_actor_var(module, id, service_name),
+        TypeInner::Var(id) => interface_actor_var(module, id.as_str(), service_name),
         TypeInner::Class(_, t) => {
             interface_actor_implementation(env, module, t, service_name, converter)
         }
