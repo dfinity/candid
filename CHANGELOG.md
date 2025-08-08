@@ -25,6 +25,13 @@
   + Supports parsing the arguments' names for `func` and `service` (init args).
 >>>>>>> origin/next
 
+## 2025-08-04
+
+### Candid 0.10.17
+
+* Non-breaking changes:
+  + Fixes a regression in pretty printing when concatenating an empty list of documents
+
 ## 2025-07-29
 
 ### Candid 0.10.16
