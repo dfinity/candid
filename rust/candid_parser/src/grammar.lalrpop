@@ -1,7 +1,7 @@
 use super::test::{Assert, Input, Test};
-use super::token::{Token, error2, LexicalError, Span, TriviaMap};
+use super::token::{Token, error, error2, LexicalError, Span, TriviaMap};
 use candid::{Principal, types::Label};
-use crate::syntax::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLActorType};
+use crate::syntax::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLArgType, IDLActorType};
 use candid::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
 use candid::types::{TypeEnv, FuncMode};
 use candid::utils::check_unique;
@@ -217,16 +217,24 @@ VariantFieldTyp: TypeField = {
     <doc_comment:DocComment> <id:FieldId> =>? Ok(TypeField { label: Label::Id(id), typ: IDLType::PrimT(PrimType::Null), docs: doc_comment.unwrap_or_default() }),
 }
 
-TupTyp: Vec<IDLType> = "(" <SepBy<ArgTyp, ",">> ")" => <>;
+ArgTupTyp: Vec<IDLArgType> = "(" <SepBy<ArgTyp, ",">> ")" =>? {
+    let args = <>;
+    let mut named_args: Vec<String> = args.iter().filter_map(|a| a.name.clone()).collect();
+    named_args.sort();
+    check_unique(named_args.iter()).map_err(|e| error(e))?;
+    Ok(args)
+};
+
+TupTyp: Vec<IDLType> = "(" <SepBy<Typ, ",">> ")" => <>;
 
 FuncTyp: FuncType = {
-    <args:TupTyp> "->" <rets:TupTyp> <modes:FuncMode*> =>
+    <args:ArgTupTyp> "->" <rets:TupTyp> <modes:FuncMode*> =>
         FuncType { modes, args, rets },
 }
 
-ArgTyp: IDLType = {
-    Typ => <>,
-    Name ":" <Typ> => <>,
+ArgTyp: IDLArgType = {
+    <t:Typ> => IDLArgType::new(t),
+    <n:Name> ":" <t:Typ> => IDLArgType::new_with_name(t, n),
 }
 
 FuncMode: FuncMode = {
@@ -263,7 +271,7 @@ Actor: IDLType = {
 
 MainActor: IDLActorType = {
     <doc_comment: DocComment> "service" "id"? ":" <t:Actor> ";"? => IDLActorType { typ: t, docs: doc_comment.unwrap_or_default() },
-    <doc_comment: DocComment> "service" "id"? ":" <args:TupTyp> "->" <t:Actor> ";"? => IDLActorType { typ: IDLType::ClassT(args, Box::new(t)), docs: doc_comment.unwrap_or_default() },
+    <doc_comment: DocComment> "service" "id"? ":" <args:ArgTupTyp> "->" <t:Actor> ";"? => IDLActorType { typ: IDLType::ClassT(args, Box::new(t)), docs: doc_comment.unwrap_or_default() },
 }
 
 pub IDLProg: IDLProg = {
@@ -271,7 +279,7 @@ pub IDLProg: IDLProg = {
 }
 
 pub IDLInitArgs: IDLInitArgs = {
-    <decs:SepBy<Def, ";">> <args:TupTyp> => IDLInitArgs { decs, args }
+    <decs:SepBy<Def, ";">> <args:ArgTupTyp> => IDLInitArgs { decs, args }
 }
 
 // Test file. Follows the "specification" in test/README.md

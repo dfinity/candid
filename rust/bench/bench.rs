@@ -216,10 +216,15 @@ fn nns() -> BenchResult {
         let args = candid_parser::parse_idl_args(motion_proposal).unwrap();
         let serv = serv.unwrap();
         let method = &env.get_method(&serv, "manage_neuron").unwrap();
+        let arg_tys = method
+            .args
+            .iter()
+            .map(|arg| arg.typ.clone())
+            .collect::<Vec<_>>();
         drop(_p);
         let bytes = {
             let _p = bench_scope("1. Encoding");
-            args.to_bytes_with_types(&env, &method.args).unwrap()
+            args.to_bytes_with_types(&env, &arg_tys).unwrap()
         };
         {
             let _p = bench_scope("2. Decoding");
