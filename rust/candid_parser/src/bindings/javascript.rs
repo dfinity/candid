@@ -275,7 +275,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
                 Vec::new()
             };
             let init = types.as_slice();
-            let init_types: Vec<Type> = init.iter().map(|a| a.clone()).collect();
+            let init_types: Vec<Type> = init.iter().cloned().collect();
 
             let import_doc = pp_imports();
             let defs = pp_defs(env, &def_list, &recs, true);
@@ -297,7 +297,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 
             let init_defs = chase_types(env, &init_types).unwrap();
             let init_recs = infer_rec(env, &init_defs).unwrap();
-            let init_defs_refs: Vec<&str> = init_defs.iter().map(|s| *s).collect();
+            let init_defs_refs: Vec<&str> = init_defs.iter().copied().collect();
             let init_defs_doc = pp_defs(env, &init_defs_refs, &init_recs, false);
             let init_doc = kwd("return").append(pp_rets(&init_types)).append(";");
             let init_doc = init_defs_doc.append(init_doc);
