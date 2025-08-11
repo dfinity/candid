@@ -142,7 +142,7 @@ fn pp_class<'a>(args: &'a [IDLArgType], t: &'a IDLType) -> RcDoc<'a> {
     }
 }
 
-fn pp_defs<'a>(prog: &'a IDLMergedProg) -> RcDoc<'a> {
+fn pp_defs(prog: &IDLMergedProg) -> RcDoc<'_> {
     lines(prog.bindings().map(|b| {
         let docs = pp_docs(&b.docs);
         docs.append(kwd("type"))
@@ -153,7 +153,7 @@ fn pp_defs<'a>(prog: &'a IDLMergedProg) -> RcDoc<'a> {
     }))
 }
 
-fn pp_actor<'a>(actor: &'a IDLActorType) -> RcDoc<'a> {
+fn pp_actor(actor: &IDLActorType) -> RcDoc<'_> {
     let docs = pp_docs(&actor.docs);
     let service_doc = match actor.typ {
         IDLType::ServT(ref serv) => pp_service_methods(serv),
