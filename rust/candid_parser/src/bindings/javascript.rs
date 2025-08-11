@@ -91,7 +91,7 @@ static KEYWORDS: [&str; 64] = [
     "with",
     "yield",
 ];
-pub(crate) fn ident(id: &str) -> RcDoc {
+pub(crate) fn ident(id: &str) -> RcDoc<'_> {
     if KEYWORDS.contains(&id) {
         str(id).append("_")
     } else {
@@ -99,7 +99,7 @@ pub(crate) fn ident(id: &str) -> RcDoc {
     }
 }
 
-fn pp_ty(ty: &Type) -> RcDoc {
+fn pp_ty(ty: &Type) -> RcDoc<'_> {
     use TypeInner::*;
     match ty.as_ref() {
         Null => str("IDL.Null"),
@@ -139,7 +139,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
     }
 }
 
-fn pp_label(id: &SharedLabel) -> RcDoc {
+fn pp_label(id: &SharedLabel) -> RcDoc<'_> {
     match &**id {
         Label::Named(str) => quote_ident(str),
         Label::Id(n) | Label::Unnamed(n) => str("_")
@@ -149,18 +149,18 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
     }
 }
 
-fn pp_field(field: &Field) -> RcDoc {
+fn pp_field(field: &Field) -> RcDoc<'_> {
     pp_label(&field.id)
         .append(kwd(":"))
         .append(pp_ty(&field.ty))
 }
 
-fn pp_fields(fs: &[Field]) -> RcDoc {
+fn pp_fields(fs: &[Field]) -> RcDoc<'_> {
     let fields = concat(fs.iter().map(pp_field), ",");
     enclose_space("({", fields, "})")
 }
 
-fn pp_function(func: &Function) -> RcDoc {
+fn pp_function(func: &Function) -> RcDoc<'_> {
     let args = pp_args(&func.args);
     let rets = pp_rets(&func.rets);
     let modes = pp_modes(&func.modes);
@@ -168,17 +168,17 @@ fn pp_function(func: &Function) -> RcDoc {
     enclose("(", doc, ")").nest(INDENT_SPACE)
 }
 
-fn pp_args(args: &[ArgType]) -> RcDoc {
+fn pp_args(args: &[ArgType]) -> RcDoc<'_> {
     let doc = concat(args.iter().map(|arg| pp_ty(&arg.typ)), ",");
     enclose("[", doc, "]")
 }
 
-fn pp_rets(args: &[Type]) -> RcDoc {
+fn pp_rets(args: &[Type]) -> RcDoc<'_> {
     let doc = concat(args.iter().map(pp_ty), ",");
     enclose("[", doc, "]")
 }
 
-fn pp_modes(modes: &[candid::types::FuncMode]) -> RcDoc {
+fn pp_modes(modes: &[candid::types::FuncMode]) -> RcDoc<'_> {
     let doc = concat(
         modes
             .iter()
@@ -188,7 +188,7 @@ fn pp_modes(modes: &[candid::types::FuncMode]) -> RcDoc {
     enclose("[", doc, "]")
 }
 
-fn pp_service(serv: &[(String, Type)]) -> RcDoc {
+fn pp_service(serv: &[(String, Type)]) -> RcDoc<'_> {
     let doc = concat(
         serv.iter()
             .map(|(id, func)| quote_ident(id).append(kwd(":")).append(pp_ty(func))),
@@ -298,7 +298,7 @@ pub mod value {
             _ => false,
         }
     }
-    fn pp_label(id: &Label) -> RcDoc {
+    fn pp_label(id: &Label) -> RcDoc<'_> {
         match id {
             Label::Named(str) => quote_ident(str),
             Label::Id(n) | Label::Unnamed(n) => str("_")
@@ -307,17 +307,17 @@ pub mod value {
                 .append(RcDoc::space()),
         }
     }
-    fn pp_field(field: &IDLField) -> RcDoc {
+    fn pp_field(field: &IDLField) -> RcDoc<'_> {
         pp_label(&field.id)
             .append(": ")
             .append(pp_value(&field.val))
     }
 
-    fn pp_fields(fields: &[IDLField]) -> RcDoc {
+    fn pp_fields(fields: &[IDLField]) -> RcDoc<'_> {
         concat(fields.iter().map(pp_field), ",")
     }
 
-    pub fn pp_value(v: &IDLValue) -> RcDoc {
+    pub fn pp_value(v: &IDLValue) -> RcDoc<'_> {
         use IDLValue::*;
         match v {
             Number(_) | Int(_) | Nat(_) | Int64(_) | Nat64(_) => {
@@ -362,7 +362,7 @@ pub mod value {
         }
     }
 
-    pub fn pp_args(args: &IDLArgs) -> RcDoc {
+    pub fn pp_args(args: &IDLArgs) -> RcDoc<'_> {
         let body = concat(args.args.iter().map(pp_value), ",");
         enclose("[", body, "]")
     }
