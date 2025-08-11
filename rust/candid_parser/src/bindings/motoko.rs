@@ -78,7 +78,7 @@ static KEYWORDS: [&str; 48] = [
     "while",
     "with",
 ];
-fn escape(id: &str, is_method: bool) -> RcDoc {
+fn escape(id: &str, is_method: bool) -> RcDoc<'_> {
     if KEYWORDS.contains(&id) {
         str(id).append("_")
     } else if is_valid_as_id(id) {
@@ -118,7 +118,7 @@ fn pp_ty_rich<'a>(ty: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
     }
 }
 
-fn pp_ty(ty: &Type) -> RcDoc {
+fn pp_ty(ty: &Type) -> RcDoc<'_> {
     use TypeInner::*;
     match ty.as_ref() {
         Null => str("Null"),
@@ -151,7 +151,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
     }
 }
 
-fn pp_label(id: &SharedLabel) -> RcDoc {
+fn pp_label(id: &SharedLabel) -> RcDoc<'_> {
     match &**id {
         Label::Named(str) => escape(str, false),
         Label::Id(n) | Label::Unnamed(n) => str("_")
@@ -161,7 +161,7 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
     }
 }
 
-fn pp_function(func: &Function) -> RcDoc {
+fn pp_function(func: &Function) -> RcDoc<'_> {
     let args = pp_args(&func.args);
     let rets = pp_rets(&func.rets);
     match func.modes.as_slice() {
@@ -185,7 +185,7 @@ fn pp_function(func: &Function) -> RcDoc {
     }
     .nest(INDENT_SPACE)
 }
-fn pp_args(args: &[ArgType]) -> RcDoc {
+fn pp_args(args: &[ArgType]) -> RcDoc<'_> {
     match args {
         [ty] => {
             let typ = if is_tuple(&ty.typ) {
@@ -212,7 +212,7 @@ fn pp_args(args: &[ArgType]) -> RcDoc {
     }
 }
 
-fn pp_rets(args: &[Type]) -> RcDoc {
+fn pp_rets(args: &[Type]) -> RcDoc<'_> {
     match args {
         [ty] => {
             if is_tuple(ty) {

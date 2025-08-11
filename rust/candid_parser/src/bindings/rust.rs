@@ -131,7 +131,7 @@ static KEYWORDS: [&str; 51] = [
     "while", "async", "await", "dyn", "abstract", "become", "box", "do", "final", "macro",
     "override", "priv", "typeof", "unsized", "virtual", "yield", "try",
 ];
-fn ident_(id: &str, case: Option<Case>) -> (RcDoc, bool) {
+fn ident_(id: &str, case: Option<Case>) -> (RcDoc<'_>, bool) {
     if id.is_empty()
         || id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
         || id.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
@@ -152,7 +152,7 @@ fn ident_(id: &str, case: Option<Case>) -> (RcDoc, bool) {
         (RcDoc::text(id), is_rename)
     }
 }
-fn ident(id: &str, case: Option<Case>) -> RcDoc {
+fn ident(id: &str, case: Option<Case>) -> RcDoc<'_> {
     ident_(id, case).0
 }
 fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
@@ -1031,7 +1031,7 @@ impl<'b> NominalState<'_, 'b> {
                     if let Some(syntax) = syntax {
                         self.generated_types.insert(new_var.clone(), syntax);
                     }
-                    TypeInner::Var(new_var.into())
+                    TypeInner::Var(new_var)
                 }
             }
             TypeInner::Variant(fs) => {
@@ -1077,7 +1077,7 @@ impl<'b> NominalState<'_, 'b> {
                     if let Some(syntax) = syntax {
                         self.generated_types.insert(new_var.clone(), syntax);
                     }
-                    TypeInner::Var(new_var.into())
+                    TypeInner::Var(new_var)
                 }
             }
             TypeInner::Func(func) => match path.last() {

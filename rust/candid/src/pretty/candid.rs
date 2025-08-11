@@ -71,15 +71,15 @@ fn ident_string(id: &str) -> String {
     }
 }
 
-pub fn pp_text(id: &str) -> RcDoc {
+pub fn pp_text(id: &str) -> RcDoc<'_> {
     RcDoc::text(ident_string(id))
 }
 
-pub fn pp_ty(ty: &Type) -> RcDoc {
+pub fn pp_ty(ty: &Type) -> RcDoc<'_> {
     pp_ty_inner(ty.as_ref())
 }
 
-pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc {
+pub fn pp_ty_inner(ty: &TypeInner) -> RcDoc<'_> {
     use TypeInner::*;
     match ty {
         Null => str("null"),
@@ -130,18 +130,18 @@ pub fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
 /// This function is kept for backward compatibility.
 ///
 /// It is recommended to use [`pp_label_raw`] instead, which accepts a [`Label`].
-pub fn pp_label(id: &SharedLabel) -> RcDoc {
+pub fn pp_label(id: &SharedLabel) -> RcDoc<'_> {
     pp_label_raw(id.as_ref())
 }
 
-pub fn pp_label_raw(id: &Label) -> RcDoc {
+pub fn pp_label_raw(id: &Label) -> RcDoc<'_> {
     match id {
         Label::Named(id) => pp_text(id),
         Label::Id(_) | Label::Unnamed(_) => RcDoc::as_string(id),
     }
 }
 
-pub(crate) fn pp_field(field: &Field, is_variant: bool) -> RcDoc {
+pub(crate) fn pp_field(field: &Field, is_variant: bool) -> RcDoc<'_> {
     let ty_doc = if is_variant && *field.ty == TypeInner::Null {
         RcDoc::nil()
     } else {
@@ -150,11 +150,11 @@ pub(crate) fn pp_field(field: &Field, is_variant: bool) -> RcDoc {
     pp_label_raw(&field.id).append(ty_doc)
 }
 
-fn pp_fields(fs: &[Field], is_variant: bool) -> RcDoc {
+fn pp_fields(fs: &[Field], is_variant: bool) -> RcDoc<'_> {
     sep_enclose_space(fs.iter().map(|f| pp_field(f, is_variant)), ";", "{", "}")
 }
 
-pub fn pp_function(func: &Function) -> RcDoc {
+pub fn pp_function(func: &Function) -> RcDoc<'_> {
     let args = pp_named_args(&func.args);
     let rets = pp_rets(&func.rets);
     let modes = pp_modes(&func.modes);
@@ -167,7 +167,7 @@ pub fn pp_function(func: &Function) -> RcDoc {
 /// Pretty-prints named arguments in the form of `(name1 : type1, name2 : type2)`.
 ///
 /// To print unnamed arguments, use [`pp_args`] instead.
-pub fn pp_named_args(args: &[ArgType]) -> RcDoc {
+pub fn pp_named_args(args: &[ArgType]) -> RcDoc<'_> {
     let args = args.iter().map(|arg| {
         if let Some(name) = &arg.name {
             pp_text(name).append(kwd(" :")).append(pp_ty(&arg.typ))
@@ -181,23 +181,23 @@ pub fn pp_named_args(args: &[ArgType]) -> RcDoc {
 /// Pretty-prints arguments in the form of `(type1, type2)`.
 ///
 /// To print named arguments, use [`pp_named_args`] instead.
-pub fn pp_args(args: &[Type]) -> RcDoc {
+pub fn pp_args(args: &[Type]) -> RcDoc<'_> {
     sep_enclose(args.iter().map(pp_ty), ",", "(", ")")
 }
 
 /// Pretty-prints return types in the form of `(type1, type2)`.
-pub fn pp_rets(args: &[Type]) -> RcDoc {
+pub fn pp_rets(args: &[Type]) -> RcDoc<'_> {
     pp_args(args)
 }
 
-pub fn pp_mode(mode: &FuncMode) -> RcDoc {
+pub fn pp_mode(mode: &FuncMode) -> RcDoc<'_> {
     match mode {
         FuncMode::Oneway => RcDoc::text("oneway"),
         FuncMode::Query => RcDoc::text("query"),
         FuncMode::CompositeQuery => RcDoc::text("composite_query"),
     }
 }
-pub fn pp_modes(modes: &[FuncMode]) -> RcDoc {
+pub fn pp_modes(modes: &[FuncMode]) -> RcDoc<'_> {
     RcDoc::concat(modes.iter().map(|m| RcDoc::space().append(pp_mode(m))))
 }
 
@@ -217,7 +217,7 @@ fn pp_service<'a>(serv: &'a [(String, Type)], docs: Option<&'a DocComments>) -> 
     sep_enclose_space(methods, ";", "{", "}")
 }
 
-fn pp_defs(env: &TypeEnv) -> RcDoc {
+fn pp_defs(env: &TypeEnv) -> RcDoc<'_> {
     lines(env.to_sorted_iter().map(|(id, ty)| {
         kwd("type")
             .append(ident(id.as_str()))
@@ -517,7 +517,7 @@ pub mod value {
         }
     }
 
-    fn pp_field(depth: usize, field: &IDLField, is_variant: bool) -> RcDoc {
+    fn pp_field(depth: usize, field: &IDLField, is_variant: bool) -> RcDoc<'_> {
         let val_doc = if is_variant && field.val == IDLValue::Null {
             RcDoc::nil()
         } else {
@@ -526,7 +526,7 @@ pub mod value {
         pp_label_raw(&field.id).append(val_doc)
     }
 
-    fn pp_fields(depth: usize, fields: &[IDLField]) -> RcDoc {
+    fn pp_fields(depth: usize, fields: &[IDLField]) -> RcDoc<'_> {
         let fs = fields.iter().map(|f| pp_field(depth, f, false));
         sep_enclose_space(fs, ";", "{", "}")
     }
@@ -539,7 +539,7 @@ pub mod value {
             format!("\\{v:02x}")
         }
     }
-    pub fn pp_value(depth: usize, v: &IDLValue) -> RcDoc {
+    pub fn pp_value(depth: usize, v: &IDLValue) -> RcDoc<'_> {
         use IDLValue::*;
         if depth == 0 {
             return RcDoc::as_string(format!("{v:?}"));
@@ -573,7 +573,7 @@ pub mod value {
         }
     }
 
-    pub fn pp_args(args: &IDLArgs) -> RcDoc {
+    pub fn pp_args(args: &IDLArgs) -> RcDoc<'_> {
         let args = args
             .args
             .iter()

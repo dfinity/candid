@@ -7,6 +7,7 @@ use candid::{
     Decode,
 };
 use candid_parser::{parse_idl_args, syntax::IDLProg, typing::check_prog};
+use std::slice;
 
 #[test]
 fn test_parser() {
@@ -130,7 +131,7 @@ fn test_variant() {
     ));
     let bytes = hex("4449444c016b02b3d3c9017fe6fdd5017f010000");
     test_decode(&bytes, &value);
-    let encoded = IDLArgs::new(&[value.clone()]).to_bytes().unwrap();
+    let encoded = IDLArgs::new(slice::from_ref(&value)).to_bytes().unwrap();
     test_decode(&encoded, &value);
 }
 
@@ -153,7 +154,7 @@ fn check(v: IDLValue, bytes: &str) {
 }
 
 fn test_encode(v: &IDLValue, expected: &[u8]) {
-    let args = IDLArgs::new(&[v.clone()]);
+    let args = IDLArgs::new(slice::from_ref(v));
     let encoded = args.to_bytes().unwrap();
     assert_eq!(
         encoded, expected,
