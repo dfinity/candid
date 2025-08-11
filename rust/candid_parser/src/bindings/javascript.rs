@@ -272,7 +272,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
                 .append(";");
 
             let idl_init_args = str("export const idlInitArgs = ")
-                .append(pp_rets(&init_types))
+                .append(pp_rets(init_types))
                 .append(";");
 
             let idl_factory_return = kwd("return").append(actor).append(";");
@@ -280,10 +280,10 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let idl_factory_doc = str("export const idlFactory = ({ IDL }) => ")
                 .append(enclose_space("{", idl_factory_body, "};"));
 
-            let init_defs = chase_types(env, &init_types).unwrap();
+            let init_defs = chase_types(env, init_types).unwrap();
             let init_recs = infer_rec(env, &init_defs).unwrap();
             let init_defs_doc = pp_defs(env, &init_defs, &init_recs, false);
-            let init_doc = kwd("return").append(pp_rets(&init_types)).append(";");
+            let init_doc = kwd("return").append(pp_rets(init_types)).append(";");
             let init_doc = init_defs_doc.append(init_doc);
             let init_doc =
                 str("export const init = ({ IDL }) => ").append(enclose_space("{", init_doc, "};"));
