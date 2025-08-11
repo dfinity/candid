@@ -3,7 +3,7 @@ use pretty::RcDoc;
 use crate::{
     pretty::{
         candid::{pp_docs, pp_label_raw, pp_modes, pp_text},
-        utils::{concat, enclose, enclose_space, ident, kwd, lines, str, INDENT_SPACE, LINE_WIDTH},
+        utils::{ident, kwd, lines, sep_enclose, sep_enclose_space, str, INDENT_SPACE, LINE_WIDTH},
     },
     syntax::{
         Binding, FuncType, IDLActorType, IDLArgType, IDLMergedProg, IDLType, PrimType, TypeField,
@@ -54,7 +54,7 @@ fn pp_field(field: &TypeField, is_variant: bool) -> RcDoc<'_> {
 
 fn pp_fields(fs: &[TypeField], is_variant: bool) -> RcDoc<'_> {
     let fields = fs.iter().map(|f| pp_field(f, is_variant));
-    enclose_space("{", concat(fields, ";"), "}")
+    sep_enclose_space(fields, ";", "{", "}")
 }
 
 fn pp_opt(ty: &IDLType) -> RcDoc<'_> {
@@ -71,8 +71,8 @@ fn pp_vec(ty: &IDLType) -> RcDoc<'_> {
 
 fn pp_record(fs: &[TypeField], is_tuple: bool) -> RcDoc<'_> {
     if is_tuple {
-        let tuple = concat(fs.iter().map(|f| pp_ty(&f.typ)), ";");
-        kwd("record").append(enclose_space("{", tuple, "}"))
+        let fs = fs.iter().map(|f| pp_ty(&f.typ));
+        kwd("record").append(sep_enclose_space(fs, ";", "{", "}"))
     } else {
         kwd("record").append(pp_fields(fs, false))
     }
@@ -104,13 +104,11 @@ fn pp_args(args: &[IDLArgType]) -> RcDoc<'_> {
             pp_ty(&arg.typ)
         }
     });
-    let doc = concat(args, ",");
-    enclose("(", doc, ")")
+    sep_enclose(args, ",", "(", ")")
 }
 
 fn pp_rets(rets: &[IDLType]) -> RcDoc<'_> {
-    let doc = concat(rets.iter().map(pp_ty), ",");
-    enclose("(", doc, ")")
+    sep_enclose(rets.iter().map(pp_ty), ",", "(", ")")
 }
 
 fn pp_service(methods: &[Binding]) -> RcDoc<'_> {
@@ -129,8 +127,7 @@ fn pp_service_methods(methods: &[Binding]) -> RcDoc<'_> {
             .append(kwd(" :"))
             .append(func_doc)
     });
-    let doc = concat(methods, ";");
-    enclose_space("{", doc, "}")
+    sep_enclose_space(methods, ";", "{", "}")
 }
 
 fn pp_class<'a>(args: &'a [IDLArgType], t: &'a IDLType) -> RcDoc<'a> {

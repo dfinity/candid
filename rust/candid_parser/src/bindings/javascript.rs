@@ -125,8 +125,8 @@ fn pp_ty(ty: &Type) -> RcDoc<'_> {
         Vec(ref t) => str("IDL.Vec").append(enclose("(", pp_ty(t), ")")),
         Record(ref fs) => {
             if is_tuple(ty) {
-                let tuple = concat(fs.iter().map(|f| pp_ty(&f.ty)), ",");
-                str("IDL.Tuple").append(enclose("(", tuple, ")"))
+                let fs = fs.iter().map(|f| pp_ty(&f.ty));
+                str("IDL.Tuple").append(sep_enclose(fs, ",", "(", ")"))
             } else {
                 str("IDL.Record").append(pp_fields(fs))
             }
@@ -156,45 +156,37 @@ fn pp_field(field: &Field) -> RcDoc<'_> {
 }
 
 fn pp_fields(fs: &[Field]) -> RcDoc<'_> {
-    let fields = concat(fs.iter().map(pp_field), ",");
-    enclose_space("({", fields, "})")
+    sep_enclose_space(fs.iter().map(pp_field), ",", "({", "})")
 }
 
 fn pp_function(func: &Function) -> RcDoc<'_> {
     let args = pp_args(&func.args);
     let rets = pp_rets(&func.rets);
     let modes = pp_modes(&func.modes);
-    let doc = concat([args, rets, modes].into_iter(), ",");
-    enclose("(", doc, ")").nest(INDENT_SPACE)
+    sep_enclose([args, rets, modes], ",", "(", ")").nest(INDENT_SPACE)
 }
 
 fn pp_args(args: &[ArgType]) -> RcDoc<'_> {
-    let doc = concat(args.iter().map(|arg| pp_ty(&arg.typ)), ",");
-    enclose("[", doc, "]")
+    let args = args.iter().map(|arg| pp_ty(&arg.typ));
+    sep_enclose(args, ",", "[", "]")
 }
 
 fn pp_rets(args: &[Type]) -> RcDoc<'_> {
-    let doc = concat(args.iter().map(pp_ty), ",");
-    enclose("[", doc, "]")
+    sep_enclose(args.iter().map(pp_ty), ",", "[", "]")
 }
 
 fn pp_modes(modes: &[candid::types::FuncMode]) -> RcDoc<'_> {
-    let doc = concat(
-        modes
-            .iter()
-            .map(|m| str("'").append(pp_mode(m)).append("'")),
-        ",",
-    );
-    enclose("[", doc, "]")
+    let ms = modes
+        .iter()
+        .map(|m| str("'").append(pp_mode(m)).append("'"));
+    sep_enclose(ms, ",", "[", "]")
 }
 
 fn pp_service(serv: &[(String, Type)]) -> RcDoc<'_> {
-    let doc = concat(
-        serv.iter()
-            .map(|(id, func)| quote_ident(id).append(kwd(":")).append(pp_ty(func))),
-        ",",
-    );
-    enclose_space("({", doc, "})")
+    let ms = serv
+        .iter()
+        .map(|(id, func)| quote_ident(id).append(kwd(":")).append(pp_ty(func)));
+    sep_enclose_space(ms, ",", "({", "})")
 }
 
 fn pp_defs<'a>(
@@ -313,10 +305,6 @@ pub mod value {
             .append(pp_value(&field.val))
     }
 
-    fn pp_fields(fields: &[IDLField]) -> RcDoc<'_> {
-        concat(fields.iter().map(pp_field), ",")
-    }
-
     pub fn pp_value(v: &IDLValue) -> RcDoc<'_> {
         use IDLValue::*;
         match v {
@@ -342,20 +330,13 @@ pub mod value {
             Text(s) => RcDoc::text(format!("'{}'", s.escape_debug())),
             None => RcDoc::text("[]"),
             Opt(v) => enclose_space("[", pp_value(v), "]"),
-            Blob(blob) => {
-                let body = concat(blob.iter().map(RcDoc::as_string), ",");
-                enclose_space("[", body, "]")
-            }
-            Vec(vs) => {
-                let body = concat(vs.iter().map(pp_value), ",");
-                enclose_space("[", body, "]")
-            }
+            Blob(blob) => sep_enclose_space(blob.iter().map(RcDoc::as_string), ",", "[", "]"),
+            Vec(vs) => sep_enclose_space(vs.iter().map(pp_value), ",", "[", "]"),
             Record(fields) => {
                 if is_tuple(v) {
-                    let tuple = concat(fields.iter().map(|f| pp_value(&f.val)), ",");
-                    enclose_space("[", tuple, "]")
+                    sep_enclose_space(fields.iter().map(|f| pp_value(&f.val)), ",", "[", "]")
                 } else {
-                    enclose_space("{", pp_fields(fields), "}")
+                    sep_enclose_space(fields.iter().map(pp_field), ",", "{", "}")
                 }
             }
             Variant(v) => enclose_space("{", pp_field(&v.0), "}"),
@@ -363,7 +344,6 @@ pub mod value {
     }
 
     pub fn pp_args(args: &IDLArgs) -> RcDoc<'_> {
-        let body = concat(args.args.iter().map(pp_value), ",");
-        enclose("[", body, "]")
+        sep_enclose(args.args.iter().map(pp_value), ",", "[", "]")
     }
 }

@@ -4,7 +4,7 @@
 use candid::{self, CandidType, Deserialize, Principal};
 
 #[derive(CandidType, Deserialize)]
-pub struct List(pub Option<(candid::Int,Box<List>,)>);
+pub struct List(pub Option<(candid::Int, Box<List>)>);
 #[derive(CandidType, Deserialize)]
 pub struct Profile { pub age: u8, pub name: String }
 

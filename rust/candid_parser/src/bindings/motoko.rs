@@ -207,7 +207,7 @@ fn pp_args(args: &[ArgType]) -> RcDoc<'_> {
                     pp_ty(&arg.typ)
                 }
             });
-            enclose("(", concat(args, ","), ")")
+            sep_enclose(args, ",", "(", ")")
         }
     }
 }
@@ -221,7 +221,7 @@ fn pp_rets(args: &[Type]) -> RcDoc<'_> {
                 pp_ty(ty)
             }
         }
-        _ => enclose("(", concat(args.iter().map(pp_ty), ","), ")"),
+        _ => sep_enclose(args.iter().map(pp_ty), ",", "(", ")"),
     }
 }
 
@@ -239,12 +239,11 @@ fn pp_service<'a>(serv: &'a [(String, Type)], syntax: Option<&'a [syntax::Bindin
             .append(" : ")
             .append(pp_ty_rich(func, syntax_field_ty))
     });
-    kwd("actor").append(enclose_space("{", concat(methods, ";"), "}"))
+    kwd("actor").append(sep_enclose_space(methods, ";", "{", "}"))
 }
 
 fn pp_tuple<'a>(fields: &'a [Field]) -> RcDoc<'a> {
-    let tuple = concat(fields.iter().map(|f| pp_ty(&f.ty)), ",");
-    enclose("(", tuple, ")")
+    sep_enclose(fields.iter().map(|f| pp_ty(&f.ty)), ",", "(", ")")
 }
 
 fn pp_vec<'a>(inner: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
@@ -280,7 +279,7 @@ fn pp_record<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) -
             .append(" : ")
             .append(pp_ty_rich(&field.ty, syntax_field))
     });
-    enclose_space("{", concat(fields, ";"), "}")
+    sep_enclose_space(fields, ";", "{", "}")
 }
 
 fn pp_variant<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) -> RcDoc<'a> {
@@ -297,7 +296,7 @@ fn pp_variant<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) 
             doc
         }
     });
-    enclose_space("{", concat(fields, ";"), "}")
+    sep_enclose_space(fields, ";", "{", "}")
 }
 
 fn pp_class<'a>((args, ty): (&'a [ArgType], &'a Type), syntax: Option<&'a IDLType>) -> RcDoc<'a> {
