@@ -17,7 +17,7 @@ pub struct BazArg {
 #[derive(CandidType, Deserialize)]
 pub struct BazRet {}
 #[derive(CandidType, Deserialize)]
-pub struct Tuple (pub String,pub String,);
+pub struct Tuple (pub String, pub String);
 #[derive(CandidType, Deserialize)]
 pub struct NonTuple { pub _1_: String, pub _2_: String }
 #[derive(CandidType, Deserialize)]
@@ -35,7 +35,7 @@ impl Service {
   pub async fn bar(&self, arg0: &BarArg) -> Result<(BarRet,)> {
     ic_cdk::call(self.0, "bar", (arg0,)).await
   }
-  pub async fn bas(&self, arg0: &(candid::Int,candid::Int,)) -> Result<((String,candid::Nat,),)> {
+  pub async fn bas(&self, arg0: &(candid::Int, candid::Int)) -> Result<((String, candid::Nat),)> {
     ic_cdk::call(self.0, "bas", (arg0,)).await
   }
   pub async fn baz(&self, arg0: &BazArg) -> Result<(BazRet,)> {
@@ -44,7 +44,7 @@ impl Service {
   pub async fn bba(&self, arg0: &Tuple) -> Result<(NonTuple,)> {
     ic_cdk::call(self.0, "bba", (arg0,)).await
   }
-  pub async fn bib(&self, arg0: &(candid::Int,)) -> Result<(BibRet,)> {
+  pub async fn bib(&self, arg0: &(candid::Int)) -> Result<(BibRet,)> {
     ic_cdk::call(self.0, "bib", (arg0,)).await
   }
   pub async fn foo(&self, arg0: &FooArg) -> Result<(FooRet,)> {

@@ -9,7 +9,7 @@ pub struct FArg {}
 #[derive(CandidType, Deserialize)]
 pub enum FRet {}
 #[derive(CandidType, Deserialize)]
-pub struct T (pub Box<T>,);
+pub struct T (pub Box<T>);
 #[derive(CandidType, Deserialize)]
 pub enum GRet { #[serde(rename="a")] A(Box<T>) }
 #[derive(CandidType, Deserialize)]
@@ -23,7 +23,7 @@ impl Service {
   pub async fn g(&self, arg0: &T) -> Result<(GRet,)> {
     ic_cdk::call(self.0, "g", (arg0,)).await
   }
-  pub async fn h(&self, arg0: &(T,candid::Empty,)) -> Result<(HRet,)> {
+  pub async fn h(&self, arg0: &(T, candid::Empty)) -> Result<(HRet,)> {
     ic_cdk::call(self.0, "h", (arg0,)).await
   }
 }

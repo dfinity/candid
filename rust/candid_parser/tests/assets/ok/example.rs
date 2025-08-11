@@ -44,7 +44,7 @@ pub(crate) struct Nested {
   pub(crate) _0_: u128,
   pub(crate) _1_: u128,
   /// Doc comment for nested record
-  pub(crate) _2_: (u128,candid::Int,),
+  pub(crate) _2_: (u128, candid::Int),
   pub(crate) _3_: Nested3,
   pub(crate) _40_: u128,
   pub(crate) _41_: Nested41,
@@ -60,7 +60,7 @@ candid::define_service!(pub(crate) Broker : {
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) struct NestedResErrOk { pub(crate) content: String }
 pub(crate) type NestedRes = std::result::Result<
-  my::Result<(), ()>, another::Result<NestedResErrOk, (candid::Int,)>
+  my::Result<(), ()>, another::Result<NestedResErrOk, (candid::Int)>
 >;
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) enum HArg1 { A(u128), B(Option<String>) }
@@ -76,13 +76,13 @@ pub(crate) struct ResErr {
   pub(crate) error: String,
 }
 /// Doc comment for res type
-pub(crate) type Res = std::result::Result<(candid::Int,u128,), ResErr>;
+pub(crate) type Res = std::result::Result<(candid::Int, u128), ResErr>;
 candid::define_function!(pub(crate) F : (MyList, FArg1) -> (
     Option<MyList>,
     Res,
   ));
 #[derive(CandidType, Deserialize, Debug)]
-pub(crate) struct B (pub(crate) candid::Int,pub(crate) u128,);
+pub(crate) struct B (pub(crate) candid::Int, pub(crate) u128);
 #[derive(CandidType, Deserialize, Debug)]
 pub(crate) enum A { #[serde(rename="a")] A, #[serde(rename="b")] B(B) }
 #[derive(CandidType, Deserialize, Debug)]
@@ -167,7 +167,7 @@ impl Service {
   pub async fn x(&self, arg0: &A, arg1: &B) -> Result<(Option<A>,Option<B>,std::result::Result<XRet2Ok, Error>,)> {
     ic_cdk::call(self.0, "x", (arg0,arg1,)).await
   }
-  pub async fn y(&self, arg0: &NestedRecords) -> Result<((NestedRecords,MyVariant,),)> {
+  pub async fn y(&self, arg0: &NestedRecords) -> Result<((NestedRecords, MyVariant),)> {
     ic_cdk::call(self.0, "y", (arg0,)).await
   }
   pub async fn f(&self, server: &S) -> Result<()> {

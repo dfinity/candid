@@ -23,7 +23,7 @@ impl Service {
   pub async fn as_principal(&self) -> Result<(Service2,Func,)> {
     ic_cdk::call(self.0, "asPrincipal", ()).await
   }
-  pub async fn as_record(&self) -> Result<((Service2,Option<Service>,Func,),)> {
+  pub async fn as_record(&self) -> Result<((Service2, Option<Service>, Func),)> {
     ic_cdk::call(self.0, "asRecord", ()).await
   }
   pub async fn as_variant(&self) -> Result<(AsVariantRet,)> {
