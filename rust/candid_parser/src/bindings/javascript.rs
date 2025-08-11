@@ -175,7 +175,7 @@ fn pp_rets(args: &[Type]) -> RcDoc<'_> {
     sep_enclose(args.iter().map(pp_ty), ",", "[", "]")
 }
 
-fn pp_modes(modes: &[candid::types::FuncMode]) -> RcDoc {
+fn pp_modes(modes: &[candid::types::FuncMode]) -> RcDoc<'_> {
     let ms = modes
         .iter()
         .map(|m| str("'").append(pp_mode(m)).append("'"));
