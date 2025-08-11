@@ -238,7 +238,11 @@ fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
     }
 }
 
-pub fn pp_deprecation_comment<'a>() -> RcDoc<'a> {
+fn pp_imports<'a>() -> RcDoc<'a> {
+    str("import { IDL } from '@dfinity/candid';")
+}
+
+pub fn pp_idl_factory_deprecation_comment<'a>() -> RcDoc<'a> {
     str("/**").append(RcDoc::hardline())
         .append(" * @deprecated Since `@dfinity/candid` v3.2.1, you can import IDL types directly from this module instead of using this factory function.")
         .append(RcDoc::hardline())
@@ -251,7 +255,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
         None => {
             let def_list: Vec<_> = env.to_sorted_iter().map(|pair| pair.0.as_str()).collect();
             let recs = infer_rec(env, &def_list).unwrap();
-            let import_doc = str("import { IDL } from '@dfinity/candid';");
+            let import_doc = pp_imports();
             let doc = pp_defs(env, &def_list, &recs, true);
             let result = import_doc
                 .append(RcDoc::hardline())
@@ -273,7 +277,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let init = types.as_slice();
             let init_types: Vec<Type> = init.iter().map(|a| a.clone()).collect();
 
-            let import_doc = str("import { IDL } from '@dfinity/candid';");
+            let import_doc = pp_imports();
             let defs = pp_defs(env, &def_list, &recs, true);
             let actor = pp_actor(actor, &recs);
 
@@ -287,7 +291,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 
             let idl_factory_return = kwd("return").append(actor).append(";");
             let idl_factory_body = pp_defs(env, &def_list, &recs, false).append(idl_factory_return);
-            let idl_factory_doc = pp_deprecation_comment()
+            let idl_factory_doc = pp_idl_factory_deprecation_comment()
                 .append(str("export const idlFactory = ({ IDL }) => "))
                 .append(enclose_space("{", idl_factory_body, "};"));
 
@@ -297,7 +301,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let init_defs_doc = pp_defs(env, &init_defs_refs, &init_recs, false);
             let init_doc = kwd("return").append(pp_rets(&init_types)).append(";");
             let init_doc = init_defs_doc.append(init_doc);
-            let init_doc = pp_deprecation_comment()
+            let init_doc = pp_idl_factory_deprecation_comment()
                 .append(str("export const init = ({ IDL }) => "))
                 .append(enclose_space("{", init_doc, "};"));
             let init_doc = init_doc.pretty(LINE_WIDTH).to_string();
