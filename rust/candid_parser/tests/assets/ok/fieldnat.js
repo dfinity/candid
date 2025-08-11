@@ -31,9 +31,6 @@ export const idlService = IDL.Service({
 
 export const idlInitArgs = [];
 
-/**
- * @deprecated Since `@dfinity/candid` v3.2.1, you can import IDL types directly from this module instead of using this factory function.
- */
 export const idlFactory = ({ IDL }) => {
   const tuple = IDL.Tuple(IDL.Text, IDL.Text);
   const non_tuple = IDL.Record({ _1_ : IDL.Text, _2_ : IDL.Text });
@@ -68,7 +65,4 @@ export const idlFactory = ({ IDL }) => {
   });
 };
 
-/**
- * @deprecated Since `@dfinity/candid` v3.2.1, you can import IDL types directly from this module instead of using this factory function.
- */
 export const init = ({ IDL }) => { return []; };

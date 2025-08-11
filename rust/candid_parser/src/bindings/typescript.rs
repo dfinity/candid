@@ -1,4 +1,4 @@
-use super::javascript::{ident, is_tuple_fields, pp_idl_factory_deprecation_comment};
+use super::javascript::{ident, is_tuple_fields};
 use crate::syntax::{self, IDLMergedProg, IDLType};
 use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
@@ -337,10 +337,8 @@ import type { Principal } from '@dfinity/principal';
                 .append(RcDoc::line())
                 .append("export declare const idlInitArgs: IDL.Type[];")
                 .append(RcDoc::line())
-                .append(pp_idl_factory_deprecation_comment())
                 .append("export declare const idlFactory: IDL.InterfaceFactory;")
                 .append(RcDoc::line())
-                .append(pp_idl_factory_deprecation_comment())
                 .append("export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];")
         }
     };

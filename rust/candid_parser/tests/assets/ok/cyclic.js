@@ -14,9 +14,6 @@ export const idlService = IDL.Service({
 
 export const idlInitArgs = [];
 
-/**
- * @deprecated Since `@dfinity/candid` v3.2.1, you can import IDL types directly from this module instead of using this factory function.
- */
 export const idlFactory = ({ IDL }) => {
   const A = IDL.Rec();
   const C = A;
@@ -28,7 +25,4 @@ export const idlFactory = ({ IDL }) => {
   return IDL.Service({ 'f' : IDL.Func([A, B, C, X, Y, Z], [], []) });
 };
 
-/**
- * @deprecated Since `@dfinity/candid` v3.2.1, you can import IDL types directly from this module instead of using this factory function.
- */
 export const init = ({ IDL }) => { return []; };
