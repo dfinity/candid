@@ -6,6 +6,13 @@ use candid::types::{Field, Label, Type, TypeEnv, TypeInner};
 use std::collections::{HashMap, HashSet};
 use swc_core::common::{comments::SingleThreadedComments, SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
+// Type aliases to simplify complex types used throughout this module
+type EnumDeclarations = HashMap<Vec<Field>, (TsEnumDecl, String)>;
+type ConvMut<'a> = (
+    &'a mut EnumDeclarations,
+    &'a mut SingleThreadedComments,
+    &'a mut PosCursor,
+);
 /// Provides functions to generate TypeScript expressions that convert
 /// between new TypeScript Native and original TypeScript (current agent-js) representations by generating conversion functions.
 pub struct TypeConverter<'a> {
@@ -25,7 +32,7 @@ pub struct TypeConverter<'a> {
     // Counter for unique function names
     function_counter: usize,
     original_types: OriginalTypescriptTypes<'a>,
-    enum_declarations: &'a mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &'a mut EnumDeclarations,
     // For adding comments to the generated functions
     comments: &'a mut SingleThreadedComments,
     cursor: &'a mut PosCursor,
@@ -35,7 +42,7 @@ impl<'a> TypeConverter<'a> {
     /// Create a new TypeConverter with the given type environment
     pub fn new(
         env: &'a TypeEnv,
-        enum_declarations: &'a mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+        enum_declarations: &'a mut EnumDeclarations,
         comments: &'a mut SingleThreadedComments,
         cursor: &'a mut PosCursor,
     ) -> Self {
@@ -62,13 +69,7 @@ impl<'a> TypeConverter<'a> {
         self.generated_functions.values().cloned().collect()
     }
 
-    pub fn conv_mut(
-        &mut self,
-    ) -> (
-        &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-        &mut SingleThreadedComments,
-        &mut PosCursor,
-    ) {
+    pub fn conv_mut(&mut self) -> ConvMut<'_> {
         (
             &mut self.enum_declarations,
             &mut self.comments,
