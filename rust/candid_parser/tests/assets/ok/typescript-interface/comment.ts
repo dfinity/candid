@@ -44,6 +44,10 @@ function candid_none<T>(): [] {
 function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
+/**
+ * line comment
+ * 
+*/
 export type id = number;
 export declare interface CreateActorOptions {
     agent?: Agent;

@@ -1,12 +1,13 @@
 use super::conversion_functions_generator::TypeConverter;
 use super::utils::{contains_unicode_characters, get_ident_guarded, get_ident_guarded_keyword_ok};
 use candid::types::internal::TypeKey;
+use crate::syntax::{IDLMergedProg};
 use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 
 use super::conversion_functions_generator::convert_multi_return_from_candid;
-use super::new_typescript_native_types::convert_type;
+use super::new_typescript_native_types::{convert_type_with_converter};
 
 use super::new_typescript_native_types::add_type_definitions;
 use super::preamble::actor::wrapper_canister_initialization;
@@ -16,8 +17,13 @@ use super::utils::render_ast;
 
 use super::compile_interface::{interface_actor_service, interface_actor_var};
 use std::collections::HashMap;
+use swc_core::common::comments::SingleThreadedComments;
+use super::comments::PosCursor;
+use crate::syntax::IDLType;
+use swc_core::common::Span;
+use super::comments::add_comments;
 
-pub fn compile_wrapper(env: &TypeEnv, actor: &Option<Type>, service_name: &str) -> String {
+pub fn compile_wrapper(env: &TypeEnv, actor: &Option<Type>, service_name: &str, prog: &IDLMergedProg) -> String {
     let enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)> = &mut HashMap::new();
 
     let mut module = Module {
@@ -29,7 +35,10 @@ pub fn compile_wrapper(env: &TypeEnv, actor: &Option<Type>, service_name: &str) 
     wrapper_imports(&mut module, service_name);
     interface_options_utils(&mut module);
     wrapper_options_utils(&mut module);
-    add_type_definitions(enum_declarations, env, &mut module);
+    // Prepare a shared comments store and cursor if needed by generators
+    let mut comments = swc_core::common::comments::SingleThreadedComments::default();
+    let mut cursor = super::comments::PosCursor::new();
+    add_type_definitions(enum_declarations, &mut comments, &mut cursor, env, &mut module, prog);
     interface_create_actor_options(&mut module);
 
     if actor.is_some() {
@@ -43,14 +52,17 @@ pub fn compile_wrapper(env: &TypeEnv, actor: &Option<Type>, service_name: &str) 
     };
 
     if let Some(actor_type) = actor {
-        let mut converter = TypeConverter::new(env, enum_declarations);
-
+        let syntax_actor = prog.resolve_actor().ok().flatten();
+        let span = syntax_actor.as_ref().map(|s| add_comments(&mut comments, &mut cursor, s.docs.as_ref())).unwrap_or(DUMMY_SP);
+        let mut converter = TypeConverter::new(env, enum_declarations, &mut comments, &mut cursor);
         wrapper_actor_implementation(
             env,
             &mut actor_module,
             actor_type,
+            syntax_actor.as_ref().map(|s| &s.typ),
             service_name,
             &mut converter,
+            span,
         );
 
         let mut sorted_functions = converter.get_generated_functions();
@@ -83,7 +95,7 @@ pub fn compile_wrapper(env: &TypeEnv, actor: &Option<Type>, service_name: &str) 
     module.body.extend(actor_module.body);
 
     // Generate code from the AST
-    render_ast(&module)
+    render_ast(&module, &comments)
 }
 
 // Add actor implementation
@@ -91,16 +103,18 @@ fn wrapper_actor_implementation(
     env: &TypeEnv,
     module: &mut Module,
     actor_type: &Type,
+    syntax: Option<&IDLType>,
     service_name: &str,
     converter: &mut TypeConverter,
+    span: Span,
 ) {
     match actor_type.as_ref() {
         TypeInner::Service(ref serv) => {
-            wrapper_actor_service(env, module, serv, service_name, converter)
+            wrapper_actor_service( env, syntax, module, serv, service_name, converter, span)
         }
-        TypeInner::Var(id) => wrapper_actor_var(env, module, id, service_name, converter),
+        TypeInner::Var(id) => wrapper_actor_var(env, module, id, service_name, converter, span),
         TypeInner::Class(_, t) => {
-            wrapper_actor_implementation(env, module, t, service_name, converter)
+            wrapper_actor_implementation(env, module, t, syntax, service_name, converter, span)
         }
         _ => {}
     }
@@ -108,12 +122,14 @@ fn wrapper_actor_implementation(
 
 fn wrapper_actor_service(
     env: &TypeEnv,
+    syntax: Option<&IDLType>,
     module: &mut Module,
     serv: &[(String, Type)],
     service_name: &str,
     converter: &mut TypeConverter,
+    span: Span,
 ) {
-    interface_actor_service(env, module, serv, service_name, converter);
+    interface_actor_service(env, syntax, module, serv, service_name, converter, span);
 
     // Create a single TypeConverter instance
     let capitalized_service_name = service_name
@@ -151,8 +167,9 @@ fn wrapper_actor_var(
     type_id: &TypeKey,
     service_name: &str,
     converter: &mut TypeConverter,
+    span: Span,
 ) {
-    interface_actor_var(module, type_id.as_str(), service_name);
+    interface_actor_var(module, type_id.as_str(), service_name, span);
     let type_ref = env.find_type(type_id).unwrap();
     let serv = match type_ref.as_ref() {
         TypeInner::Service(ref serv) => serv,
@@ -432,10 +449,11 @@ fn create_actor_method(
                     id: Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty()),
                     type_ann: Some(Box::new(TsTypeAnn {
                         span: DUMMY_SP,
-                        type_ann: Box::new(convert_type(
-                            converter.enum_declarations_mut(),
+                    type_ann: Box::new(convert_type_with_converter(
+                            converter,
                             env,
                             &arg_ty.typ,
+                            None,
                             true,
                         )),
                     })),
@@ -449,8 +467,8 @@ fn create_actor_method(
         0 => TsType::TsKeywordType(TsKeywordType {
             span: DUMMY_SP,
             kind: TsKeywordTypeKind::TsVoidKeyword,
-        }),
-        1 => convert_type(converter.enum_declarations_mut(), env, &func.rets[0], true),
+                }),
+                1 => convert_type_with_converter(converter, env, &func.rets[0], None, true),
         _ => {
             // Create a tuple type for multiple return values
             TsType::TsTupleType(TsTupleType {
@@ -461,10 +479,11 @@ fn create_actor_method(
                     .map(|ty| TsTupleElement {
                         span: DUMMY_SP,
                         label: None,
-                        ty: Box::new(convert_type(
-                            converter.enum_declarations_mut(),
+                        ty: Box::new(convert_type_with_converter(
+                             converter,
                             env,
                             ty,
+                            None,
                             true,
                         )),
                     })

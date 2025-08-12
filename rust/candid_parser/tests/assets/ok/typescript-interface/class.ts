@@ -59,6 +59,9 @@ export function createActor(canisterId: string | Principal, options?: CreateActo
     return new Class(actor, processError);
 }
 export const canisterId = _canisterId;
+/**
+ * Doc comment for class service
+*/
 export interface classInterface {
     get(): Promise<List>;
     set(arg0: List): Promise<List>;

@@ -3,15 +3,15 @@ use swc_core::common::source_map::SourceMap;
 use swc_core::common::sync::Lrc;
 use swc_core::ecma::{
     ast::Module,
-    codegen::{text_writer::JsWriter, Config, Emitter},
+    codegen::{text_writer::JsWriter, text_writer::WriteJs, Config, Emitter},
 };
 
-pub fn render_ast(module: &Module) -> String {
+pub fn render_ast(module: &Module, comments: &SingleThreadedComments) -> String {
     let mut buf = vec![];
-    let comments = SingleThreadedComments::default();
     let cm = Lrc::new(SourceMap::default());
     {
         let writer = JsWriter::new(cm.clone(), "\n", &mut buf, None);
+        let writer = NewlineAfterBlockComments::new(writer);
         let mut emitter = Emitter {
             cfg: Config::default().with_minify(false),
             cm: cm.clone(),
@@ -23,6 +23,84 @@ pub fn render_ast(module: &Module) -> String {
     }
 
     String::from_utf8(buf).unwrap()
+}
+
+// Writer wrapper to enforce a newline after block comments so following tokens don't begin on the same line
+struct NewlineAfterBlockComments<W: WriteJs> {
+    inner: W,
+    suppress_space_after_comment: bool,
+}
+
+impl<W: WriteJs> NewlineAfterBlockComments<W> {
+    fn new(inner: W) -> Self {
+        Self { inner, suppress_space_after_comment: false }
+    }
+}
+
+impl<W: WriteJs> WriteJs for NewlineAfterBlockComments<W> {
+    #[inline]
+    fn increase_indent(&mut self) -> swc_core::ecma::codegen::Result { self.inner.increase_indent() }
+    #[inline]
+    fn decrease_indent(&mut self) -> swc_core::ecma::codegen::Result { self.inner.decrease_indent() }
+    #[inline]
+    fn write_semi(&mut self, span: Option<swc_core::common::Span>) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_semi(span) }
+    #[inline]
+    fn write_space(&mut self) -> swc_core::ecma::codegen::Result {
+        if self.suppress_space_after_comment {
+            self.suppress_space_after_comment = false;
+            return Ok(());
+        }
+        self.inner.write_space()
+    }
+    #[inline]
+    fn write_keyword(&mut self, span: Option<swc_core::common::Span>, s: &'static str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_keyword(span, s) }
+    #[inline]
+    fn write_operator(&mut self, span: Option<swc_core::common::Span>, s: &str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_operator(span, s) }
+    #[inline]
+    fn write_param(&mut self, s: &str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_param(s) }
+    #[inline]
+    fn write_property(&mut self, s: &str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_property(s) }
+    #[inline]
+    fn write_line(&mut self) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_line() }
+    #[inline]
+    fn write_lit(&mut self, span: swc_core::common::Span, s: &str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_lit(span, s) }
+    #[inline]
+    fn write_comment(&mut self, s: &str) -> swc_core::ecma::codegen::Result {
+        if s.contains('\n') {
+            let mut iter = s.split('\n').peekable();
+            if let Some(first) = iter.next() {
+                self.inner.write_comment(first)?;
+            }
+            while let Some(rest) = iter.next() {
+                self.inner.write_line()?;
+                self.inner.write_comment(rest)?;
+            }
+        } else {
+            self.inner.write_comment(s)?;
+        }
+        // Ensure next token starts on a new, properly indented line after a block comment
+        if s.trim_end().ends_with("*/") {
+            self.suppress_space_after_comment = true; // skip a single space that codegen may emit next
+            self.inner.write_line()?;
+        }
+        Ok(())
+    }
+    #[inline]
+    fn write_str_lit(&mut self, span: swc_core::common::Span, s: &str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_str_lit(span, s) }
+    #[inline]
+    fn write_str(&mut self, s: &str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_str(s) }
+    #[inline]
+    fn write_symbol(&mut self, span: swc_core::common::Span, s: &str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_symbol(span, s) }
+    #[inline]
+    fn write_punct(&mut self, span: Option<swc_core::common::Span>, s: &'static str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_punct(span, s) }
+    #[inline]
+    fn care_about_srcmap(&self) -> bool { self.inner.care_about_srcmap() }
+    #[inline]
+    fn add_srcmap(&mut self, pos: swc_core::common::BytePos) -> swc_core::ecma::codegen::Result { self.inner.add_srcmap(pos) }
+    #[inline]
+    fn commit_pending_semi(&mut self) -> swc_core::ecma::codegen::Result { self.inner.commit_pending_semi() }
+    #[inline(always)]
+    fn can_ignore_invalid_unicodes(&mut self) -> bool { self.inner.can_ignore_invalid_unicodes() }
 }
 
 use swc_core::common::{SyntaxContext, DUMMY_SP};

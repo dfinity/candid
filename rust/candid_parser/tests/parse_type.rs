@@ -215,11 +215,11 @@ fn compiler_test_typescript_native(resource: &str) {
         .next()
         .unwrap_or_default();
     match check_file(&candid_path) {
-        Ok((env, actor, _)) => {
+        Ok((env, actor, prog)) => {
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("ts")).unwrap();
                 let content =
-                    typescript_native::compile::compile(&env, &actor, service_name, "wrapper");
+                    typescript_native::compile::compile(&env, &actor, service_name, "wrapper", &prog);
                 writeln!(output, "{content}").unwrap();
             }
             {
@@ -227,7 +227,7 @@ fn compiler_test_typescript_native(resource: &str) {
                     .new_goldenfile(filename.with_extension("d.ts"))
                     .unwrap();
                 let content =
-                    typescript_native::compile::compile(&env, &actor, service_name, "interface");
+                    typescript_native::compile::compile(&env, &actor, service_name, "interface", &prog);
                 writeln!(output, "{content}").unwrap();
             }
         }

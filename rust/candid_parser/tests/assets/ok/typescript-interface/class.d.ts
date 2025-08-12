@@ -20,7 +20,13 @@ export declare interface CreateActorOptions {
 }
 export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => classInterface;
 export declare const canisterId: string;
+/**
+ * Doc comment for class service
+*/
 export interface classInterface {
+    /**
+     * Doc comment for get method in class service
+    */
     get(): Promise<List>;
     set(arg0: List): Promise<List>;
 }

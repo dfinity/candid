@@ -6,13 +6,15 @@ use super::utils::get_ident_guarded;
 use super::utils::render_ast;
 use candid::types::{Field, Type, TypeEnv, TypeInner};
 use std::collections::HashMap;
-
+use crate::bindings::typescript_native::comments::{add_comments, PosCursor};
+use crate::syntax::{IDLMergedProg, IDLActorType, IDLType};
 use swc_core::common::DUMMY_SP;
 use swc_core::ecma::ast::*;
-
+use swc_core::common::comments::SingleThreadedComments;
+use swc_core::common::Span;
 use super::new_typescript_native_types::{add_type_definitions, create_interface_from_service};
 
-pub fn compile_interface(env: &TypeEnv, actor: &Option<Type>, service_name: &str) -> String {
+pub fn compile_interface(env: &TypeEnv, actor: &Option<Type>, service_name: &str, prog: &IDLMergedProg) -> String {
     let enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)> = &mut HashMap::new();
 
     let mut module = Module {
@@ -23,7 +25,9 @@ pub fn compile_interface(env: &TypeEnv, actor: &Option<Type>, service_name: &str
 
     interface_imports(&mut module);
     interface_options_utils(&mut module);
-    add_type_definitions(enum_declarations, env, &mut module);
+    let mut comments = swc_core::common::comments::SingleThreadedComments::default();
+    let mut cursor = super::comments::PosCursor::new();
+    add_type_definitions(enum_declarations, &mut comments, &mut cursor, env, &mut module, prog);
     interface_create_actor_options(&mut module);
     interface_canister_initialization(service_name, &mut module);
 
@@ -34,14 +38,17 @@ pub fn compile_interface(env: &TypeEnv, actor: &Option<Type>, service_name: &str
     };
 
     if let Some(actor_type) = actor {
-        let mut converter = TypeConverter::new(env, enum_declarations);
-
+        let syntax_actor = prog.resolve_actor().ok().flatten();
+        let span = syntax_actor.as_ref().map(|s| add_comments(&mut comments, &mut cursor, s.docs.as_ref())).unwrap_or(DUMMY_SP);
+        let mut converter = TypeConverter::new(env, enum_declarations, &mut comments, &mut cursor);
         interface_actor_implementation(
             env,
             &mut actor_module,
             actor_type,
+            syntax_actor.as_ref().map(|s| &s.typ),
             service_name,
             &mut converter,
+            span,
         );
 
         let mut sorted_functions = converter.get_generated_functions();
@@ -74,23 +81,31 @@ pub fn compile_interface(env: &TypeEnv, actor: &Option<Type>, service_name: &str
     module.body.extend(actor_module.body);
 
     // Generate code from the AST
-    render_ast(&module)
+    render_ast(&module, &comments)
 }
 
 fn interface_actor_implementation(
     env: &TypeEnv,
     module: &mut Module,
     actor_type: &Type,
+    syntax: Option<&IDLType>,
     service_name: &str,
     converter: &mut TypeConverter,
+    span: Span,
 ) {
     match actor_type.as_ref() {
         TypeInner::Service(ref serv) => {
-            interface_actor_service(env, module, serv, service_name, converter)
+            interface_actor_service(env, syntax, module, serv, service_name, converter, span)
         }
-        TypeInner::Var(id) => interface_actor_var(module, id.as_str(), service_name),
+        TypeInner::Var(id) => {
+            interface_actor_var( module, id.as_str(), service_name, span)
+        }
         TypeInner::Class(_, t) => {
-            interface_actor_implementation(env, module, t, service_name, converter)
+            if let Some(IDLType::ClassT(_, syntax_t)) = syntax {
+                interface_actor_implementation(env, module, t, Some(syntax_t), service_name, converter, span)
+            } else {
+                interface_actor_implementation(env, module, t, None, service_name, converter, span)
+            }
         }
         _ => {}
     }
@@ -101,22 +116,24 @@ fn interface_actor_implementation(
 /// Add actor implementation from service definition
 pub fn interface_actor_service(
     env: &TypeEnv,
+    syntax: Option<&IDLType>,
     module: &mut Module,
     serv: &[(String, Type)],
     service_name: &str,
     converter: &mut TypeConverter,
+    span: Span,
 ) {
-    let interface =
-        create_interface_from_service(converter.enum_declarations_mut(), env, service_name, serv);
+    let (enum_declarations, comments, cursor) = converter.conv_mut();
+    let interface = create_interface_from_service(enum_declarations, comments, cursor, env, service_name, syntax, serv);
     module
         .body
         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-            span: DUMMY_SP,
+            span: span,
             decl: Decl::TsInterface(Box::new(interface)),
         })));
 }
 
-pub fn interface_actor_var(module: &mut Module, type_id: &str, service_name: &str) {
+pub fn interface_actor_var(module: &mut Module, type_id: &str, service_name: &str, span: Span) {
     let interface = TsInterfaceDecl {
         span: DUMMY_SP,
         declare: false,
@@ -138,7 +155,7 @@ pub fn interface_actor_var(module: &mut Module, type_id: &str, service_name: &st
     module
         .body
         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-            span: DUMMY_SP,
+            span: span,
             decl: Decl::TsInterface(Box::new(interface)),
         })));
 }

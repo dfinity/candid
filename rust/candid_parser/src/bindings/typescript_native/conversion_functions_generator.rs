@@ -1,9 +1,10 @@
-use super::new_typescript_native_types::{convert_type, is_recursive_optional};
+use super::new_typescript_native_types::{is_recursive_optional, convert_type_with_converter};
 use super::original_typescript_types::OriginalTypescriptTypes;
 use super::utils::{contains_unicode_characters, get_ident_guarded};
 use candid::types::{Field, Label, Type, TypeEnv, TypeInner};
 use std::collections::{HashMap, HashSet};
-use swc_core::common::{SyntaxContext, DUMMY_SP};
+use swc_core::common::{comments::{SingleThreadedComments}, SyntaxContext, DUMMY_SP};
+use super::comments::PosCursor;
 use swc_core::ecma::ast::*;
 /// Provides functions to generate TypeScript expressions that convert
 /// between new TypeScript Native and original TypeScript (current agent-js) representations by generating conversion functions.
@@ -25,6 +26,9 @@ pub struct TypeConverter<'a> {
     function_counter: usize,
     original_types: OriginalTypescriptTypes<'a>,
     enum_declarations: &'a mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    // For adding comments to the generated functions
+    comments: &'a mut SingleThreadedComments    ,
+    cursor: &'a mut PosCursor,
 }
 
 impl<'a> TypeConverter<'a> {
@@ -32,6 +36,8 @@ impl<'a> TypeConverter<'a> {
     pub fn new(
         env: &'a TypeEnv,
         enum_declarations: &'a mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+        comments: &'a mut SingleThreadedComments,
+        cursor: &'a mut PosCursor,
     ) -> Self {
         TypeConverter {
             env,
@@ -46,6 +52,8 @@ impl<'a> TypeConverter<'a> {
             function_counter: 0,
             original_types: OriginalTypescriptTypes::new(env),
             enum_declarations,
+            comments,
+            cursor,
         }
     }
 
@@ -53,10 +61,9 @@ impl<'a> TypeConverter<'a> {
     pub fn get_generated_functions(&self) -> Vec<Stmt> {
         self.generated_functions.values().cloned().collect()
     }
-
-    /// Get mutable access to enum_declarations
-    pub fn enum_declarations_mut(&mut self) -> &mut HashMap<Vec<Field>, (TsEnumDecl, String)> {
-        self.enum_declarations
+    
+    pub fn conv_mut(&mut self) -> (&mut HashMap<Vec<Field>, (TsEnumDecl, String)>, &mut SingleThreadedComments, &mut PosCursor) {
+        (&mut self.enum_declarations, &mut self.comments, &mut self.cursor)
     }
 
     /// Check if a type requires conversion or can be passed through directly
@@ -920,7 +927,7 @@ impl<'a> TypeConverter<'a> {
 
     /// Create a TypeScript type annotation for a given Candid type
     fn create_ts_type_annotation(&mut self, ty: &Type) -> TsType {
-        convert_type(self.enum_declarations, self.env, ty, true)
+        convert_type_with_converter(self, self.env, ty, None, true)
     }
 
     fn generate_from_candid_body(&mut self, ty: &Type, param_name: &str) -> Expr {

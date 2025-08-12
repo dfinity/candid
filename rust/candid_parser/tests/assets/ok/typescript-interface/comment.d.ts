@@ -8,6 +8,10 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
+/**
+ * line comment
+ * 
+*/
 export type id = number;
 export declare interface CreateActorOptions {
     agent?: Agent;

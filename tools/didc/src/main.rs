@@ -243,6 +243,7 @@ fn main() -> Result<()> {
                         &actor,
                         service_name.as_str(),
                         target,
+                        &prog,
                     )
                 }
                 "did" => candid_parser::syntax::pretty_print(&prog),
