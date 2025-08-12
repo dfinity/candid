@@ -1,5 +1,7 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
+import { CreateActorOptions } from "declarations/fieldnat";
+import { _SERVICE } from "declarations/fieldnat/fieldnat.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
     value: T;
@@ -13,11 +15,6 @@ export interface non_tuple {
     _2_: string;
 }
 export type tuple = [string, string];
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
-}
 export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => fieldnatInterface;
 export declare const canisterId: string;
 export enum Variant_e20_e30 {

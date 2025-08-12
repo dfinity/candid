@@ -1,7 +1,7 @@
 use super::conversion_functions_generator::TypeConverter;
 use super::new_typescript_native_types::{add_type_definitions, create_interface_from_service};
 use super::preamble::actor::interface_canister_initialization;
-use super::preamble::imports::{interface_create_actor_options, interface_imports};
+use super::preamble::imports::{interface_imports};
 use super::preamble::options::interface_options_utils;
 use super::utils::get_ident_guarded;
 use super::utils::render_ast;
@@ -28,7 +28,7 @@ pub fn compile_interface(
         shebang: None,
     };
 
-    interface_imports(&mut module);
+    interface_imports(&mut module, service_name);
     interface_options_utils(&mut module);
     let mut comments = swc_core::common::comments::SingleThreadedComments::default();
     let mut cursor = super::comments::PosCursor::new();
@@ -40,7 +40,6 @@ pub fn compile_interface(
         &mut module,
         prog,
     );
-    interface_create_actor_options(&mut module);
     interface_canister_initialization(service_name, &mut module);
 
     let mut actor_module = Module {

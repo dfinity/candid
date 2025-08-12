@@ -1,6 +1,6 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent, type ActorSubclass } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
-import { cyclic as _cyclic, createActor as _createActor, canisterId as _canisterId } from "declarations/cyclic";
+import { cyclic as _cyclic, createActor as _createActor, canisterId as _canisterId, CreateActorOptions } from "declarations/cyclic";
 import { _SERVICE } from "declarations/cyclic/cyclic.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
@@ -50,11 +50,6 @@ export type X = Y;
 export type C = A;
 export type Y = Z;
 export type B = Some<C> | None;
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
-}
 export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): cyclicInterface {
     const actor = _createActor(canisterId, options);
     return new Cyclic(actor, processError);

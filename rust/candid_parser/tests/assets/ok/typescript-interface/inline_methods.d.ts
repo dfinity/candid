@@ -1,5 +1,7 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
+import { CreateActorOptions } from "declarations/inline_methods";
+import { _SERVICE } from "declarations/inline_methods/inline_methods.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
     value: T;
@@ -22,11 +24,6 @@ export interface RInline {
     fn: [Principal, string];
 }
 export type Gn = Fn;
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
-}
 export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => inline_methodsInterface;
 export declare const canisterId: string;
 export interface inline_methodsInterface {

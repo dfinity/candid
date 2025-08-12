@@ -1,6 +1,6 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent, type ActorSubclass } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
-import { comment as _comment, createActor as _createActor, canisterId as _canisterId } from "declarations/comment";
+import { comment as _comment, createActor as _createActor, canisterId as _canisterId, CreateActorOptions } from "declarations/comment";
 import { _SERVICE } from "declarations/comment/comment.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
@@ -49,9 +49,4 @@ function record_opt_to_undefined<T>(arg: T | null): T | undefined {
  * 
 */
 export type id = number;
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
-}
 

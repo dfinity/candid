@@ -1,5 +1,7 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
+import { CreateActorOptions } from "declarations/example";
+import { _SERVICE } from "declarations/example/example.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
     value: T;
@@ -144,11 +146,6 @@ export type res = {
 export interface node {
     head: bigint;
     tail: list;
-}
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
 }
 export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => exampleInterface;
 export declare const canisterId: string;

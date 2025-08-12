@@ -1,6 +1,6 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent, type ActorSubclass } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
-import { service as _service, createActor as _createActor, canisterId as _canisterId } from "declarations/service";
+import { service as _service, createActor as _createActor, canisterId as _canisterId, CreateActorOptions } from "declarations/service";
 import { _SERVICE } from "declarations/service/service.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
@@ -49,11 +49,6 @@ export interface ServiceInterface {
 }
 export type Func = () => Promise<Principal>;
 export type Service2 = ServiceInterface;
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
-}
 export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): serviceInterface {
     const actor = _createActor(canisterId, options);
     return new Service(actor, processError);

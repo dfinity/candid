@@ -1,6 +1,6 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent, type ActorSubclass } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
-import { empty as _empty, createActor as _createActor, canisterId as _canisterId } from "declarations/empty";
+import { empty as _empty, createActor as _createActor, canisterId as _canisterId, CreateActorOptions } from "declarations/empty";
 import { _SERVICE } from "declarations/empty/empty.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
@@ -45,11 +45,6 @@ function record_opt_to_undefined<T>(arg: T | null): T | undefined {
     return arg == null ? undefined : arg;
 }
 export type T = [T];
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
-}
 export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): emptyInterface {
     const actor = _createActor(canisterId, options);
     return new Empty(actor, processError);

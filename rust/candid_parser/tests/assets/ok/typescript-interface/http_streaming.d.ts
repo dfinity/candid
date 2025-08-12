@@ -1,5 +1,7 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
+import { CreateActorOptions } from "declarations/http_streaming";
+import { _SERVICE } from "declarations/http_streaming/http_streaming.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
     value: T;
@@ -36,11 +38,6 @@ export interface HttpRequest {
     method: string;
     body: Uint8Array | number[];
     headers: Array<HeaderField>;
-}
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
 }
 export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => http_streamingInterface;
 export declare const canisterId: string;

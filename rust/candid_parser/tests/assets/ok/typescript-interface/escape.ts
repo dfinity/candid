@@ -1,6 +1,6 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent, type ActorSubclass } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
-import { escape as _escape, createActor as _createActor, canisterId as _canisterId } from "declarations/escape";
+import { escape as _escape, createActor as _createActor, canisterId as _canisterId, CreateActorOptions } from "declarations/escape";
 import { _SERVICE } from "declarations/escape/escape.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
@@ -49,11 +49,6 @@ export interface t {
     '\'': bigint;
     '\"\'': bigint;
     '\\\n\'\"': bigint;
-}
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
 }
 export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): escapeInterface {
     const actor = _createActor(canisterId, options);

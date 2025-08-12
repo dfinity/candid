@@ -1,5 +1,7 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
+import { CreateActorOptions } from "declarations/recursion";
+import { _SERVICE } from "declarations/recursion/recursion.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
     value: T;
@@ -34,11 +36,6 @@ export type t = (server: Principal) => Promise<void>;
 export interface node {
     head: bigint;
     tail: list;
-}
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
 }
 export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => recursionInterface;
 export declare const canisterId: string;

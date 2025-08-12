@@ -1,5 +1,7 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
+import { CreateActorOptions } from "declarations/management";
+import { _SERVICE } from "declarations/management/management.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
     value: T;
@@ -73,11 +75,6 @@ export interface http_response {
 export interface http_header {
     value: string;
     name: string;
-}
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
 }
 export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => managementInterface;
 export declare const canisterId: string;

@@ -1,6 +1,6 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent, type ActorSubclass } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
-import { management as _management, createActor as _createActor, canisterId as _canisterId } from "declarations/management";
+import { management as _management, createActor as _createActor, canisterId as _canisterId, CreateActorOptions } from "declarations/management";
 import { _SERVICE } from "declarations/management/management.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
@@ -109,11 +109,6 @@ export interface http_response {
 export interface http_header {
     value: string;
     name: string;
-}
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
 }
 export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): managementInterface {
     const actor = _createActor(canisterId, options);

@@ -1,5 +1,7 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
+import { CreateActorOptions } from "declarations/unicode";
+import { _SERVICE } from "declarations/unicode/unicode.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
     value: T;
@@ -13,11 +15,6 @@ export interface A {
     '📦🍦': bigint;
     '字段名': bigint;
     '字 段 名2': bigint;
-}
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
 }
 export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => unicodeInterface;
 export declare const canisterId: string;

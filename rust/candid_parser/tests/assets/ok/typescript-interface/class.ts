@@ -1,6 +1,6 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent, type ActorSubclass } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
-import { class as _class, createActor as _createActor, canisterId as _canisterId } from "declarations/class";
+import { class as _class, createActor as _createActor, canisterId as _canisterId, CreateActorOptions } from "declarations/class";
 import { _SERVICE } from "declarations/class/class.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
@@ -48,11 +48,6 @@ export type List = [bigint, List] | null;
 export interface Profile {
     age: number;
     name: string;
-}
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
 }
 export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): classInterface {
     const actor = _createActor(canisterId, options);

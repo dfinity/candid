@@ -1,6 +1,6 @@
 import { type HttpAgentOptions, type ActorConfig, type Agent, type ActorSubclass } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
-import { optional as _optional, createActor as _createActor, canisterId as _canisterId } from "declarations/optional";
+import { optional as _optional, createActor as _createActor, canisterId as _canisterId, CreateActorOptions } from "declarations/optional";
 import { _SERVICE } from "declarations/optional/optional.did.d.js";
 export interface Some<T> {
     __kind__: "Some";
@@ -48,11 +48,6 @@ export type option2 = option1 | null;
 export type nested = Some<bigint | null> | None;
 export type option1 = bigint | null;
 export type option3 = option2 | null;
-export declare interface CreateActorOptions {
-    agent?: Agent;
-    agentOptions?: HttpAgentOptions;
-    actorOptions?: ActorConfig;
-}
 export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): optionalInterface {
     const actor = _createActor(canisterId, options);
     return new Optional(actor, processError);
