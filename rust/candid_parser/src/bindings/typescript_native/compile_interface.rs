@@ -5,11 +5,10 @@ use super::preamble::imports::{interface_create_actor_options, interface_imports
 use super::preamble::options::interface_options_utils;
 use super::utils::get_ident_guarded;
 use super::utils::render_ast;
-use crate::bindings::typescript_native::comments::{add_comments, PosCursor};
-use crate::syntax::{IDLActorType, IDLMergedProg, IDLType};
+use crate::bindings::typescript_native::comments::add_comments;
+use crate::syntax::{IDLMergedProg, IDLType};
 use candid::types::{Field, Type, TypeEnv, TypeInner};
 use std::collections::HashMap;
-use swc_core::common::comments::SingleThreadedComments;
 use swc_core::common::Span;
 use swc_core::common::DUMMY_SP;
 use swc_core::ecma::ast::*;
@@ -157,7 +156,7 @@ pub fn interface_actor_service(
     module
         .body
         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-            span: span,
+            span,
             decl: Decl::TsInterface(Box::new(interface)),
         })));
 }
@@ -184,7 +183,7 @@ pub fn interface_actor_var(module: &mut Module, type_id: &str, service_name: &st
     module
         .body
         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-            span: span,
+            span,
             decl: Decl::TsInterface(Box::new(interface)),
         })));
 }

@@ -5,7 +5,7 @@ use super::utils::{get_ident_guarded, get_ident_guarded_keyword_ok};
 use crate::syntax::{self, IDLMergedProg, IDLType};
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use std::collections::HashMap;
-use swc_core::common::comments::{Comment, Comments, SingleThreadedComments};
+use swc_core::common::comments::SingleThreadedComments;
 use swc_core::common::Span;
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
@@ -78,7 +78,7 @@ pub fn create_interface_from_service(
                 ),
                 TypeInner::Var(ref var_id) => {
                     TsTypeElement::TsPropertySignature(TsPropertySignature {
-                        span: span,
+                        span,
                         key: Box::new(Expr::Ident(get_ident_guarded(method_id))),
                         computed: false,
                         optional: false,
@@ -469,7 +469,7 @@ fn create_record_type(
     if is_tuple(ty) {
         // Create tuple type
         TsType::TsTupleType(TsTupleType {
-            span: span,
+            span,
             elem_types: fs
                 .iter()
                 .map(|f| TsTupleElement {
@@ -490,7 +490,7 @@ fn create_record_type(
     } else {
         // Create record type
         TsType::TsTypeLit(TsTypeLit {
-            span: span,
+            span,
             members: fs
                 .iter()
                 .map(|f| {
@@ -592,7 +592,7 @@ fn create_variant_type(
                         let (span, _) = find_field(comments, cursor, syntax_fields, &f.id);
 
                         TsEnumMember {
-                            span: span,
+                            span,
                             id: TsEnumMemberId::Ident(get_ident_guarded(&member_name)),
                             init: Some(Box::new(Expr::Lit(Lit::Str(Str {
                                 span: DUMMY_SP,
@@ -640,7 +640,7 @@ fn create_variant_type(
 
                         // Create the __kind__ property
                         let kind_prop = TsTypeElement::TsPropertySignature(TsPropertySignature {
-                            span: span,
+                            span,
                             readonly: false,
                             key: Box::new(Expr::Ident(Ident::new(
                                 "__kind__".into(),
@@ -697,7 +697,7 @@ pub fn add_type_definitions(
             let syntax = prog.lookup(id.as_str());
             let syntax_ty = syntax.map(|s| &s.typ);
             let span = syntax
-                .map(|s| add_comments(comments, cursor, &s.docs.as_ref()))
+                .map(|s| add_comments(comments, cursor, s.docs.as_ref()))
                 .unwrap_or(DUMMY_SP);
             match ty.as_ref() {
                 TypeInner::Record(_) if !is_tuple(ty) => {
@@ -815,7 +815,7 @@ pub fn add_type_definitions(
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-                            span: span,
+                            span,
                             decl: Decl::TsTypeAlias(Box::new(type_alias)),
                         })));
                 }
@@ -832,7 +832,7 @@ pub fn add_type_definitions(
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-                            span: span,
+                            span,
                             decl: Decl::TsTypeAlias(Box::new(type_alias)),
                         })));
                 }
@@ -1013,8 +1013,9 @@ fn create_property_signature(
             ),
         )
     };
-    let res = TsTypeElement::TsPropertySignature(TsPropertySignature {
-        span: span,
+    
+    TsTypeElement::TsPropertySignature(TsPropertySignature {
+        span,
         readonly: false,
         key: field_name,
         computed: false,
@@ -1023,8 +1024,7 @@ fn create_property_signature(
             span: DUMMY_SP,
             type_ann: Box::new(type_ann),
         })),
-    });
-    res
+    })
 }
 
 // Create TS property signature from Candid field
@@ -1192,7 +1192,7 @@ fn create_method_signature(
     });
 
     TsTypeElement::TsMethodSignature(TsMethodSignature {
-        span: span,
+        span,
         key: Box::new(Expr::Ident(get_ident_guarded(method_id))),
         computed: false,
         optional: false,

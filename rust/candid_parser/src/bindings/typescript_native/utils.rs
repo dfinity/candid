@@ -114,7 +114,7 @@ impl<W: WriteJs> WriteJs for NewlineAfterBlockComments<W> {
             if let Some(first) = iter.next() {
                 self.inner.write_comment(first)?;
             }
-            while let Some(rest) = iter.next() {
+            for rest in iter {
                 self.inner.write_line()?;
                 self.inner.write_comment(rest)?;
             }

@@ -16,11 +16,9 @@ use super::preamble::options::{interface_options_utils, wrapper_options_utils};
 use super::utils::render_ast;
 
 use super::comments::add_comments;
-use super::comments::PosCursor;
 use super::compile_interface::{interface_actor_service, interface_actor_var};
 use crate::syntax::IDLType;
 use std::collections::HashMap;
-use swc_core::common::comments::SingleThreadedComments;
 use swc_core::common::Span;
 
 pub fn compile_wrapper(

@@ -1,9 +1,7 @@
-use crate::syntax::Binding;
 use swc_core::common::{
     comments::{Comment, CommentKind, Comments, SingleThreadedComments},
     BytePos, Span, DUMMY_SP,
 };
-use swc_core::ecma::ast::*;
 
 // Simple monotonic position source for synthetic spans
 pub struct PosCursor {
@@ -20,7 +18,7 @@ impl PosCursor {
     }
 }
 
-fn make_comment<'a>(docs: &'a [String]) -> Option<Comment> {
+fn make_comment(docs: &[String]) -> Option<Comment> {
     if docs.is_empty() {
         None
     } else {
@@ -28,7 +26,7 @@ fn make_comment<'a>(docs: &'a [String]) -> Option<Comment> {
         let mut comment_text = String::new();
         comment_text.push_str("*\n");
         for line in docs {
-            comment_text.push_str(" ");
+            comment_text.push(' ');
             comment_text.push_str(&format!("* {}", line));
             comment_text.push('\n');
         }
@@ -37,7 +35,7 @@ fn make_comment<'a>(docs: &'a [String]) -> Option<Comment> {
             comment_text.pop();
         }
 
-        comment_text.push_str("\n");
+        comment_text.push('\n');
 
         Some(Comment {
             span: DUMMY_SP,
@@ -56,7 +54,7 @@ pub fn add_comments<'a>(
     cursor: &'a mut PosCursor,
     docs: &'a [String],
 ) -> Span {
-    return match docs.len() {
+    match docs.len() {
         0 => DUMMY_SP,
         _ => {
             let d = make_comment(docs);
@@ -66,5 +64,5 @@ pub fn add_comments<'a>(
             }
             span
         }
-    };
+    }
 }
