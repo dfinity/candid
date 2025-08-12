@@ -11,7 +11,7 @@ use super::new_typescript_native_types::convert_type_with_converter;
 
 use super::new_typescript_native_types::add_type_definitions;
 use super::preamble::actor::wrapper_canister_initialization;
-use super::preamble::imports::{wrapper_imports};
+use super::preamble::imports::wrapper_imports;
 use super::preamble::options::{interface_options_utils, wrapper_options_utils};
 use super::utils::{render_ast, EnumDeclarations};
 

@@ -20,14 +20,16 @@ fn old_bindings_imports_interface(module: &mut Module, service_name: &str) {
         .body
         .push(ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
             span: DUMMY_SP,
-            specifiers: vec![
-                ImportSpecifier::Named(ImportNamedSpecifier {
-                    span: DUMMY_SP,
-                    local: Ident::new("CreateActorOptions".into(), DUMMY_SP, SyntaxContext::empty()),
-                    imported: None,
-                    is_type_only: false,
-                }),
-            ],
+            specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
+                span: DUMMY_SP,
+                local: Ident::new(
+                    "CreateActorOptions".into(),
+                    DUMMY_SP,
+                    SyntaxContext::empty(),
+                ),
+                imported: None,
+                is_type_only: false,
+            })],
             src: Box::new(Str {
                 span: DUMMY_SP,
                 value: format!("declarations/{}", dashed_name).into(),
@@ -104,7 +106,11 @@ fn old_bindings_imports(module: &mut Module, service_name: &str) {
                 }),
                 ImportSpecifier::Named(ImportNamedSpecifier {
                     span: DUMMY_SP,
-                    local: Ident::new("CreateActorOptions".into(), DUMMY_SP, SyntaxContext::empty()),
+                    local: Ident::new(
+                        "CreateActorOptions".into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ),
                     imported: None,
                     is_type_only: false,
                 }),
@@ -140,8 +146,6 @@ fn old_bindings_imports(module: &mut Module, service_name: &str) {
             phase: Default::default(),
         })));
 }
-
-
 
 fn dfinity_principal_import(module: &mut Module) {
     module

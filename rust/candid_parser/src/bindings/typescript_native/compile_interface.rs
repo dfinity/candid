@@ -1,7 +1,7 @@
 use super::conversion_functions_generator::TypeConverter;
 use super::new_typescript_native_types::{add_type_definitions, create_interface_from_service};
 use super::preamble::actor::interface_canister_initialization;
-use super::preamble::imports::{interface_imports};
+use super::preamble::imports::interface_imports;
 use super::preamble::options::interface_options_utils;
 use super::utils::get_ident_guarded;
 use super::utils::render_ast;
