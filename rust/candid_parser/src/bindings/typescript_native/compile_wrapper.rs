@@ -1,4 +1,4 @@
-use super::conversion_functions_generator::{TypeConverter};
+use super::conversion_functions_generator::TypeConverter;
 use super::utils::{contains_unicode_characters, get_ident_guarded, get_ident_guarded_keyword_ok};
 use crate::syntax::IDLMergedProg;
 use candid::types::internal::TypeKey;
@@ -14,7 +14,6 @@ use super::preamble::actor::wrapper_canister_initialization;
 use super::preamble::imports::{interface_create_actor_options, wrapper_imports};
 use super::preamble::options::{interface_options_utils, wrapper_options_utils};
 use super::utils::{render_ast, EnumDeclarations};
-
 
 use super::comments::add_comments;
 use super::compile_interface::{interface_actor_service, interface_actor_var};

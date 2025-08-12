@@ -1,6 +1,7 @@
 use super::super::javascript::is_tuple;
 use super::comments::{add_comments, PosCursor};
-use super::conversion_functions_generator::{TypeConverter};
+use super::conversion_functions_generator::TypeConverter;
+use super::utils::EnumDeclarations;
 use super::utils::{get_ident_guarded, get_ident_guarded_keyword_ok};
 use crate::syntax::{self, IDLMergedProg, IDLType};
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
@@ -8,7 +9,6 @@ use swc_core::common::comments::SingleThreadedComments;
 use swc_core::common::Span;
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
-use super::utils::EnumDeclarations;
 
 // Helper function to determine if a type is recursively optional
 pub fn is_recursive_optional(

@@ -1,7 +1,7 @@
 use super::comments::PosCursor;
 use super::new_typescript_native_types::{convert_type_with_converter, is_recursive_optional};
 use super::original_typescript_types::OriginalTypescriptTypes;
-use super::utils::{contains_unicode_characters, EnumDeclarations, get_ident_guarded};
+use super::utils::{contains_unicode_characters, get_ident_guarded, EnumDeclarations};
 use candid::types::{Field, Label, Type, TypeEnv, TypeInner};
 use std::collections::{HashMap, HashSet};
 use swc_core::common::{comments::SingleThreadedComments, SyntaxContext, DUMMY_SP};
