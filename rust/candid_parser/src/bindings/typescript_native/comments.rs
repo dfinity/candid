@@ -1,9 +1,9 @@
+use crate::syntax::Binding;
 use swc_core::common::{
     comments::{Comment, CommentKind, Comments, SingleThreadedComments},
     BytePos, Span, DUMMY_SP,
 };
 use swc_core::ecma::ast::*;
-use crate::syntax::Binding;
 
 // Simple monotonic position source for synthetic spans
 pub struct PosCursor {
@@ -36,32 +36,35 @@ fn make_comment<'a>(docs: &'a [String]) -> Option<Comment> {
         if comment_text.ends_with('\n') {
             comment_text.pop();
         }
-        
-           comment_text.push_str("\n");
-        
+
+        comment_text.push_str("\n");
+
         Some(Comment {
             span: DUMMY_SP,
             kind: CommentKind::Block,
             text: comment_text.into(),
             // swc_core 0.80+ uses None for comments attached to no specific position
             // If you want to attach to leading, set as Some(true)
-            // For now, we use None 
+            // For now, we use None
             // has_trailing_newline: false, // Only in newer swc
         })
     }
 }
 
-pub fn add_comments<'a>(comments: &'a mut SingleThreadedComments, cursor: &'a mut PosCursor, docs: &'a [String]) -> Span {
+pub fn add_comments<'a>(
+    comments: &'a mut SingleThreadedComments,
+    cursor: &'a mut PosCursor,
+    docs: &'a [String],
+) -> Span {
     return match docs.len() {
         0 => DUMMY_SP,
         _ => {
-        let d = make_comment(docs);
-        let span = cursor.new_synthetic_span();
-        if let Some(d) = d {
-            comments.add_leading(span.lo, d);
-        }
-        span
+            let d = make_comment(docs);
+            let span = cursor.new_synthetic_span();
+            if let Some(d) = d {
+                comments.add_leading(span.lo, d);
+            }
+            span
         }
     };
-    
 }

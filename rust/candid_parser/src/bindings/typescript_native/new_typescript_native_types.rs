@@ -1,14 +1,14 @@
 use super::super::javascript::is_tuple;
+use super::comments::{add_comments, PosCursor};
+use super::conversion_functions_generator::TypeConverter;
 use super::utils::{get_ident_guarded, get_ident_guarded_keyword_ok};
+use crate::syntax::{self, IDLMergedProg, IDLType};
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
 use std::collections::HashMap;
-use crate::syntax::{self, IDLMergedProg, IDLType};
-use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::common::comments::{Comment, Comments, SingleThreadedComments};
-use swc_core::ecma::ast::*;
-use super::comments::{PosCursor, add_comments};
-use super::conversion_functions_generator::TypeConverter;
 use swc_core::common::Span;
+use swc_core::common::{SyntaxContext, DUMMY_SP};
+use swc_core::ecma::ast::*;
 // Helper function to determine if a type is recursively optional
 pub fn is_recursive_optional(
     env: &TypeEnv,
@@ -47,7 +47,7 @@ pub fn is_recursive_optional(
 // Create TS interface from Candid service
 pub fn create_interface_from_service(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-    comments: &mut SingleThreadedComments,  
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
     id: &str,
@@ -60,33 +60,42 @@ pub fn create_interface_from_service(
     };
     let members = serv
         .iter()
-        .map(|(method_id, method_ty)|  {
-        let span = syntax_serv
-            .and_then(|bindings| bindings.iter().find(|b| &b.id == method_id))
-            .map(|b| add_comments(comments, cursor, b.docs.as_ref()))
-            .unwrap_or(DUMMY_SP);
-          
-        match method_ty.as_ref() {
-            TypeInner::Func(ref func) => {
-                create_method_signature(enum_declarations, comments, cursor, env, method_id, func, span)
+        .map(|(method_id, method_ty)| {
+            let span = syntax_serv
+                .and_then(|bindings| bindings.iter().find(|b| &b.id == method_id))
+                .map(|b| add_comments(comments, cursor, b.docs.as_ref()))
+                .unwrap_or(DUMMY_SP);
+
+            match method_ty.as_ref() {
+                TypeInner::Func(ref func) => create_method_signature(
+                    enum_declarations,
+                    comments,
+                    cursor,
+                    env,
+                    method_id,
+                    func,
+                    span,
+                ),
+                TypeInner::Var(ref var_id) => {
+                    TsTypeElement::TsPropertySignature(TsPropertySignature {
+                        span: span,
+                        key: Box::new(Expr::Ident(get_ident_guarded(method_id))),
+                        computed: false,
+                        optional: false,
+                        readonly: false,
+                        type_ann: Some(Box::new(TsTypeAnn {
+                            span: DUMMY_SP,
+                            type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                                span: DUMMY_SP,
+                                type_name: TsEntityName::Ident(get_ident_guarded(var_id.as_str())),
+                                type_params: None,
+                            })),
+                        })),
+                    })
+                }
+                _ => unreachable!(),
             }
-            TypeInner::Var(ref var_id) => TsTypeElement::TsPropertySignature(TsPropertySignature {
-                span: span,
-                key: Box::new(Expr::Ident(get_ident_guarded(method_id))),
-                computed: false,
-                optional: false,
-                readonly: false,
-                type_ann: Some(Box::new(TsTypeAnn {
-                    span: DUMMY_SP,
-                    type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
-                        span: DUMMY_SP,
-                        type_name: TsEntityName::Ident(get_ident_guarded(var_id.as_str())),
-                        type_params: None,
-                    })),
-                })),
-            }),
-            _ => unreachable!(),
-        }})
+        })
         .collect();
 
     TsInterfaceDecl {
@@ -102,7 +111,6 @@ pub fn create_interface_from_service(
     }
 }
 
-
 pub fn convert_type_with_converter(
     converter: &mut TypeConverter,
     env: &TypeEnv,
@@ -117,7 +125,7 @@ pub fn convert_type_with_converter(
 // Convert Candid type to TypeScript type
 pub fn convert_type(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-    comments: &mut SingleThreadedComments,  
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
     ty: &Type,
@@ -192,11 +200,24 @@ pub fn convert_type(
         // Optional types
         Opt(ref t) => create_opt_type(enum_declarations, comments, cursor, env, t, syntax, is_ref),
         // Vector types
-        Vec(ref t) => create_vector_type(enum_declarations, comments, cursor, env, syntax, t, is_ref),
+        Vec(ref t) => {
+            create_vector_type(enum_declarations, comments, cursor, env, syntax, t, is_ref)
+        }
         // Record types
-        Record(ref fs) => create_record_type(enum_declarations, comments, cursor, env, ty,  syntax, fs, is_ref),
+        Record(ref fs) => create_record_type(
+            enum_declarations,
+            comments,
+            cursor,
+            env,
+            ty,
+            syntax,
+            fs,
+            is_ref,
+        ),
         // Variant types
-        Variant(ref fs) => create_variant_type(enum_declarations, comments, cursor, env, syntax, fs, None),
+        Variant(ref fs) => {
+            create_variant_type(enum_declarations, comments, cursor, env, syntax, fs, None)
+        }
         Func(_) => create_function_type_ref(),
         // Note: we map to a generic principal type for now
         // see https://github.com/dfinity/candid/issues/606
@@ -221,7 +242,7 @@ pub fn convert_type(
 
 fn create_opt_type(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-    comments: &mut SingleThreadedComments,  
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
     t: &Type,
@@ -248,7 +269,15 @@ fn create_opt_type(
                         )),
                         type_params: Some(Box::new(TsTypeParamInstantiation {
                             span: DUMMY_SP,
-                            params: vec![Box::new(convert_type(enum_declarations, comments, cursor, env, t, syntax_inner, is_ref))],
+                            params: vec![Box::new(convert_type(
+                                enum_declarations,
+                                comments,
+                                cursor,
+                                env,
+                                t,
+                                syntax_inner,
+                                is_ref,
+                            ))],
                         })),
                     })),
                     Box::new(TsType::TsTypeRef(TsTypeRef {
@@ -293,7 +322,7 @@ fn create_opt_type(
                                         cursor,
                                         env,
                                         t,
-                                        syntax_inner,   
+                                        syntax_inner,
                                         is_ref,
                                     ))],
                                 })),
@@ -316,7 +345,15 @@ fn create_opt_type(
                     TsUnionType {
                         span: DUMMY_SP,
                         types: vec![
-                            Box::new(convert_type(enum_declarations, comments, cursor, env, t, syntax_inner, is_ref)),
+                            Box::new(convert_type(
+                                enum_declarations,
+                                comments,
+                                cursor,
+                                env,
+                                t,
+                                syntax_inner,
+                                is_ref,
+                            )),
                             Box::new(TsType::TsKeywordType(TsKeywordType {
                                 span: DUMMY_SP,
                                 kind: TsKeywordTypeKind::TsNullKeyword,
@@ -331,7 +368,15 @@ fn create_opt_type(
             TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(TsUnionType {
                 span: DUMMY_SP,
                 types: vec![
-                    Box::new(convert_type(enum_declarations, comments, cursor, env, t, syntax_inner, is_ref)),
+                    Box::new(convert_type(
+                        enum_declarations,
+                        comments,
+                        cursor,
+                        env,
+                        t,
+                        syntax_inner,
+                        is_ref,
+                    )),
                     Box::new(TsType::TsKeywordType(TsKeywordType {
                         span: DUMMY_SP,
                         kind: TsKeywordTypeKind::TsNullKeyword,
@@ -344,7 +389,7 @@ fn create_opt_type(
 
 fn create_vector_type(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-    comments: &mut SingleThreadedComments,  
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
     syntax: Option<&IDLType>,
@@ -391,7 +436,15 @@ fn create_vector_type(
                 )),
                 type_params: Some(Box::new(TsTypeParamInstantiation {
                     span: DUMMY_SP,
-                    params: vec![Box::new(convert_type(enum_declarations, comments, cursor, env, t, syntax_inner, is_ref))],
+                    params: vec![Box::new(convert_type(
+                        enum_declarations,
+                        comments,
+                        cursor,
+                        env,
+                        t,
+                        syntax_inner,
+                        is_ref,
+                    ))],
                 })),
             })
         }
@@ -400,7 +453,7 @@ fn create_vector_type(
 
 fn create_record_type(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-    comments: &mut SingleThreadedComments,  
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
     ty: &Type,
@@ -422,7 +475,15 @@ fn create_record_type(
                 .map(|f| TsTupleElement {
                     span: DUMMY_SP,
                     label: None,
-                    ty: Box::new(convert_type(enum_declarations, comments, cursor, env, &f.ty, None, is_ref)),
+                    ty: Box::new(convert_type(
+                        enum_declarations,
+                        comments,
+                        cursor,
+                        env,
+                        &f.ty,
+                        None,
+                        is_ref,
+                    )),
                 })
                 .collect(),
         })
@@ -433,9 +494,18 @@ fn create_record_type(
             members: fs
                 .iter()
                 .map(|f| {
-                    let (span, syntax_field_ty) = find_field(comments, cursor, syntax_fields, &f.id);
-                    create_property_signature(enum_declarations, comments, cursor, env, f, syntax_field_ty, span)
-                }) 
+                    let (span, syntax_field_ty) =
+                        find_field(comments, cursor, syntax_fields, &f.id);
+                    create_property_signature(
+                        enum_declarations,
+                        comments,
+                        cursor,
+                        env,
+                        f,
+                        syntax_field_ty,
+                        span,
+                    )
+                })
                 .collect(),
         })
     }
@@ -474,7 +544,7 @@ fn create_union_array_type(typed_array: &str, elem_type: &str) -> TsType {
 
 fn create_variant_type(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-    comments: &mut SingleThreadedComments,  
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
     syntax: Option<&IDLType>,
@@ -565,7 +635,8 @@ fn create_variant_type(
                             Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
                         };
 
-                        let (span, syntax_field_ty) = find_field(comments, cursor, syntax_fields, &f.id);
+                        let (span, syntax_field_ty) =
+                            find_field(comments, cursor, syntax_fields, &f.id);
 
                         // Create the __kind__ property
                         let kind_prop = TsTypeElement::TsPropertySignature(TsPropertySignature {
@@ -592,8 +663,14 @@ fn create_variant_type(
                         });
 
                         // Create the value property
-                        let value_prop =
-                            create_property_signature_for_variant(enum_declarations, comments, cursor, env, f, syntax_field_ty);
+                        let value_prop = create_property_signature_for_variant(
+                            enum_declarations,
+                            comments,
+                            cursor,
+                            env,
+                            f,
+                            syntax_field_ty,
+                        );
 
                         Box::new(TsType::TsTypeLit(TsTypeLit {
                             span: DUMMY_SP,
@@ -609,7 +686,7 @@ fn create_variant_type(
 // Add all type definitions from the environment
 pub fn add_type_definitions(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-    comments: &mut SingleThreadedComments,      
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
     module: &mut Module,
@@ -619,12 +696,21 @@ pub fn add_type_definitions(
         if let Ok(ty) = env.find_type(id) {
             let syntax = prog.lookup(id.as_str());
             let syntax_ty = syntax.map(|s| &s.typ);
-            let span = syntax.map(|s| add_comments(comments, cursor, &s.docs.as_ref())).unwrap_or(DUMMY_SP);
+            let span = syntax
+                .map(|s| add_comments(comments, cursor, &s.docs.as_ref()))
+                .unwrap_or(DUMMY_SP);
             match ty.as_ref() {
                 TypeInner::Record(_) if !is_tuple(ty) => {
                     // Generate interface for record types
-                    let interface =
-                        create_interface_from_record(enum_declarations, comments, cursor, env, id.as_str(), ty, syntax_ty);
+                    let interface = create_interface_from_record(
+                        enum_declarations,
+                        comments,
+                        cursor,
+                        env,
+                        id.as_str(),
+                        ty,
+                        syntax_ty,
+                    );
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
@@ -634,8 +720,15 @@ pub fn add_type_definitions(
                 }
                 TypeInner::Service(ref serv) => {
                     // Generate interface for service types
-                    let interface =
-                        create_interface_from_service(enum_declarations, comments, cursor, env, id.as_str(),  syntax_ty, serv);
+                    let interface = create_interface_from_service(
+                        enum_declarations,
+                        comments,
+                        cursor,
+                        env,
+                        id.as_str(),
+                        syntax_ty,
+                        serv,
+                    );
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
@@ -645,8 +738,14 @@ pub fn add_type_definitions(
                 }
                 TypeInner::Func(ref func) => {
                     // Generate type alias for function types
-                    let type_alias =
-                        create_type_alias_from_function(enum_declarations, comments, cursor, env, id.as_str(), func);
+                    let type_alias = create_type_alias_from_function(
+                        enum_declarations,
+                        comments,
+                        cursor,
+                        env,
+                        id.as_str(),
+                        func,
+                    );
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
@@ -661,11 +760,26 @@ pub fn add_type_definitions(
                     if all_null {
                         // For variants with all null types, directly create the enum
                         // Don't create a type alias
-                        create_variant_type(enum_declarations, comments, cursor, env, syntax_ty, fs, Some(id.as_str()));
+                        create_variant_type(
+                            enum_declarations,
+                            comments,
+                            cursor,
+                            env,
+                            syntax_ty,
+                            fs,
+                            Some(id.as_str()),
+                        );
                     } else {
                         // For other variants, create a type alias to the union type
-                        let variant_type =
-                            create_variant_type(enum_declarations, comments, cursor, env,  syntax_ty, fs, Some(id.as_str()));
+                        let variant_type = create_variant_type(
+                            enum_declarations,
+                            comments,
+                            cursor,
+                            env,
+                            syntax_ty,
+                            fs,
+                            Some(id.as_str()),
+                        );
                         let type_alias = TsTypeAliasDecl {
                             span: DUMMY_SP,
                             declare: false,
@@ -707,7 +821,14 @@ pub fn add_type_definitions(
                 }
                 _ => {
                     // Generate type alias for other types
-                    let type_alias = create_type_alias(enum_declarations, comments, cursor, env, id.as_str(), ty);
+                    let type_alias = create_type_alias(
+                        enum_declarations,
+                        comments,
+                        cursor,
+                        env,
+                        id.as_str(),
+                        ty,
+                    );
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
@@ -723,7 +844,7 @@ pub fn add_type_definitions(
 // Create TS interface from Candid record
 
 fn find_field<'a>(
-    comments: &mut SingleThreadedComments,  
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     fields: Option<&'a Vec<syntax::TypeField>>,
     label: &Label,
@@ -739,11 +860,9 @@ fn find_field<'a>(
     (span, syntax_field_ty)
 }
 
-
-
 fn create_interface_from_record(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-    comments: &mut SingleThreadedComments,  
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
     id: &str,
@@ -757,17 +876,30 @@ fn create_interface_from_record(
     let members = if let TypeInner::Record(ref fields) = ty.as_ref() {
         fields
             .iter()
-            .map(|field| {
-                match &syntax_fields {
-                    Some(a) => {
-                        let (span, syntax_field_ty) = find_field(comments, cursor, Some(a), &field.id);
-                        create_property_signature(enum_declarations, comments, cursor, env, field, syntax_field_ty, span)
-                    }
-                    None => {
-                        create_property_signature(enum_declarations, comments, cursor, env, field, None, DUMMY_SP)
-                    }
+            .map(|field| match &syntax_fields {
+                Some(a) => {
+                    let (span, syntax_field_ty) = find_field(comments, cursor, Some(a), &field.id);
+                    create_property_signature(
+                        enum_declarations,
+                        comments,
+                        cursor,
+                        env,
+                        field,
+                        syntax_field_ty,
+                        span,
+                    )
                 }
-    }).collect()
+                None => create_property_signature(
+                    enum_declarations,
+                    comments,
+                    cursor,
+                    env,
+                    field,
+                    None,
+                    DUMMY_SP,
+                ),
+            })
+            .collect()
     } else {
         vec![]
     };
@@ -787,7 +919,7 @@ fn create_interface_from_record(
 // Create TS type alias from Candid function
 fn create_type_alias_from_function(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-    comments: &mut SingleThreadedComments,  
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
     id: &str,
@@ -798,14 +930,20 @@ fn create_type_alias_from_function(
         declare: false,
         id: get_ident_guarded(id),
         type_params: None,
-        type_ann: Box::new(create_function_type(enum_declarations, comments, cursor, env, func)),
+        type_ann: Box::new(create_function_type(
+            enum_declarations,
+            comments,
+            cursor,
+            env,
+            func,
+        )),
     }
 }
 
 // Create general TS type alias
 fn create_type_alias(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-    comments: &mut SingleThreadedComments,  
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
     id: &str,
@@ -816,14 +954,22 @@ fn create_type_alias(
         declare: false,
         id: get_ident_guarded(id),
         type_params: None,
-        type_ann: Box::new(convert_type(enum_declarations, comments, cursor, env, ty, None, false)),
+        type_ann: Box::new(convert_type(
+            enum_declarations,
+            comments,
+            cursor,
+            env,
+            ty,
+            None,
+            false,
+        )),
     }
 }
 
 // Create TS property signature from Candid field
 fn create_property_signature(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-    comments: &mut SingleThreadedComments,  
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
     field: &Field,
@@ -841,9 +987,31 @@ fn create_property_signature(
 
     // Check if the field type is optional
     let (is_optional, type_ann) = if let TypeInner::Opt(ref inner_type) = field.ty.as_ref() {
-        (true, convert_type(enum_declarations, comments, cursor, env, inner_type, syntax, true))
+        (
+            true,
+            convert_type(
+                enum_declarations,
+                comments,
+                cursor,
+                env,
+                inner_type,
+                syntax,
+                true,
+            ),
+        )
     } else {
-        (false, convert_type(enum_declarations, comments, cursor, env, &field.ty, syntax, true))
+        (
+            false,
+            convert_type(
+                enum_declarations,
+                comments,
+                cursor,
+                env,
+                &field.ty,
+                syntax,
+                true,
+            ),
+        )
     };
     let res = TsTypeElement::TsPropertySignature(TsPropertySignature {
         span: span,
@@ -862,7 +1030,7 @@ fn create_property_signature(
 // Create TS property signature from Candid field
 fn create_property_signature_for_variant(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-    comments: &mut SingleThreadedComments,  
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
     field: &Field,
@@ -879,9 +1047,31 @@ fn create_property_signature_for_variant(
 
     // Check if the field type is optional
     let (is_optional, type_ann) = if let TypeInner::Opt(ref inner_type) = field.ty.as_ref() {
-        (true, convert_type(enum_declarations, comments, cursor, env, inner_type, syntax, true))
+        (
+            true,
+            convert_type(
+                enum_declarations,
+                comments,
+                cursor,
+                env,
+                inner_type,
+                syntax,
+                true,
+            ),
+        )
     } else {
-        (false, convert_type(enum_declarations, comments, cursor, env, &field.ty, syntax, true))
+        (
+            false,
+            convert_type(
+                enum_declarations,
+                comments,
+                cursor,
+                env,
+                &field.ty,
+                syntax,
+                true,
+            ),
+        )
     };
 
     let type_ann = if is_optional {
@@ -915,7 +1105,7 @@ fn create_property_signature_for_variant(
 // Create TS method signature from Candid function
 fn create_method_signature(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-    comments: &mut SingleThreadedComments,  
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
     method_id: &str,
@@ -933,7 +1123,15 @@ fn create_method_signature(
                 id: Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty()),
                 type_ann: Some(Box::new(TsTypeAnn {
                     span: DUMMY_SP,
-                    type_ann: Box::new(convert_type(enum_declarations, comments, cursor, env, &arg_ty.typ, None, true)),
+                    type_ann: Box::new(convert_type(
+                        enum_declarations,
+                        comments,
+                        cursor,
+                        env,
+                        &arg_ty.typ,
+                        None,
+                        true,
+                    )),
                 })),
             })
         })
@@ -945,7 +1143,15 @@ fn create_method_signature(
             span: DUMMY_SP,
             kind: TsKeywordTypeKind::TsVoidKeyword,
         }),
-        1 => convert_type(enum_declarations, comments, cursor, env, &func.rets[0], None, true),
+        1 => convert_type(
+            enum_declarations,
+            comments,
+            cursor,
+            env,
+            &func.rets[0],
+            None,
+            true,
+        ),
         _ => {
             // Create a tuple type for multiple return values
             TsType::TsTupleType(TsTupleType {
@@ -956,7 +1162,15 @@ fn create_method_signature(
                     .map(|ty| TsTupleElement {
                         span: DUMMY_SP,
                         label: None,
-                        ty: Box::new(convert_type(enum_declarations, comments, cursor, env, ty, None, true)),
+                        ty: Box::new(convert_type(
+                            enum_declarations,
+                            comments,
+                            cursor,
+                            env,
+                            ty,
+                            None,
+                            true,
+                        )),
                     })
                     .collect(),
             })
@@ -994,7 +1208,7 @@ fn create_method_signature(
 // Create a function type representation
 fn create_function_type(
     enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
-    comments: &mut SingleThreadedComments,  
+    comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
     func: &Function,
@@ -1010,7 +1224,15 @@ fn create_function_type(
                 id: Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty()),
                 type_ann: Some(Box::new(TsTypeAnn {
                     span: DUMMY_SP,
-                    type_ann: Box::new(convert_type(enum_declarations, comments, cursor, env, &arg_ty.typ, None, true)),
+                    type_ann: Box::new(convert_type(
+                        enum_declarations,
+                        comments,
+                        cursor,
+                        env,
+                        &arg_ty.typ,
+                        None,
+                        true,
+                    )),
                 })),
             })
         })
@@ -1022,7 +1244,15 @@ fn create_function_type(
             span: DUMMY_SP,
             kind: TsKeywordTypeKind::TsVoidKeyword,
         }),
-        1 => convert_type(enum_declarations, comments, cursor, env, &func.rets[0], None, true),
+        1 => convert_type(
+            enum_declarations,
+            comments,
+            cursor,
+            env,
+            &func.rets[0],
+            None,
+            true,
+        ),
         _ => {
             // Create a tuple type for multiple return values
             TsType::TsTupleType(TsTupleType {
@@ -1033,7 +1263,15 @@ fn create_function_type(
                     .map(|ty| TsTupleElement {
                         span: DUMMY_SP,
                         label: None,
-                        ty: Box::new(convert_type(enum_declarations, comments, cursor, env, ty, None, true)),
+                        ty: Box::new(convert_type(
+                            enum_declarations,
+                            comments,
+                            cursor,
+                            env,
+                            ty,
+                            None,
+                            true,
+                        )),
                     })
                     .collect(),
             })

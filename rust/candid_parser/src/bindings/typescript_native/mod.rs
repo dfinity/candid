@@ -1,3 +1,4 @@
+mod comments;
 pub mod compile;
 mod compile_interface;
 mod compile_wrapper;
@@ -6,4 +7,3 @@ mod new_typescript_native_types;
 mod original_typescript_types;
 mod preamble;
 mod utils;
-mod comments;

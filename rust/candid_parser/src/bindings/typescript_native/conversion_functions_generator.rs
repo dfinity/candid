@@ -1,10 +1,10 @@
-use super::new_typescript_native_types::{is_recursive_optional, convert_type_with_converter};
+use super::comments::PosCursor;
+use super::new_typescript_native_types::{convert_type_with_converter, is_recursive_optional};
 use super::original_typescript_types::OriginalTypescriptTypes;
 use super::utils::{contains_unicode_characters, get_ident_guarded};
 use candid::types::{Field, Label, Type, TypeEnv, TypeInner};
 use std::collections::{HashMap, HashSet};
-use swc_core::common::{comments::{SingleThreadedComments}, SyntaxContext, DUMMY_SP};
-use super::comments::PosCursor;
+use swc_core::common::{comments::SingleThreadedComments, SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 /// Provides functions to generate TypeScript expressions that convert
 /// between new TypeScript Native and original TypeScript (current agent-js) representations by generating conversion functions.
@@ -27,7 +27,7 @@ pub struct TypeConverter<'a> {
     original_types: OriginalTypescriptTypes<'a>,
     enum_declarations: &'a mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
     // For adding comments to the generated functions
-    comments: &'a mut SingleThreadedComments    ,
+    comments: &'a mut SingleThreadedComments,
     cursor: &'a mut PosCursor,
 }
 
@@ -61,9 +61,19 @@ impl<'a> TypeConverter<'a> {
     pub fn get_generated_functions(&self) -> Vec<Stmt> {
         self.generated_functions.values().cloned().collect()
     }
-    
-    pub fn conv_mut(&mut self) -> (&mut HashMap<Vec<Field>, (TsEnumDecl, String)>, &mut SingleThreadedComments, &mut PosCursor) {
-        (&mut self.enum_declarations, &mut self.comments, &mut self.cursor)
+
+    pub fn conv_mut(
+        &mut self,
+    ) -> (
+        &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+        &mut SingleThreadedComments,
+        &mut PosCursor,
+    ) {
+        (
+            &mut self.enum_declarations,
+            &mut self.comments,
+            &mut self.cursor,
+        )
     }
 
     /// Check if a type requires conversion or can be passed through directly

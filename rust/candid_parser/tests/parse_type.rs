@@ -218,16 +218,26 @@ fn compiler_test_typescript_native(resource: &str) {
         Ok((env, actor, prog)) => {
             {
                 let mut output = mint.new_goldenfile(filename.with_extension("ts")).unwrap();
-                let content =
-                    typescript_native::compile::compile(&env, &actor, service_name, "wrapper", &prog);
+                let content = typescript_native::compile::compile(
+                    &env,
+                    &actor,
+                    service_name,
+                    "wrapper",
+                    &prog,
+                );
                 writeln!(output, "{content}").unwrap();
             }
             {
                 let mut output = mint
                     .new_goldenfile(filename.with_extension("d.ts"))
                     .unwrap();
-                let content =
-                    typescript_native::compile::compile(&env, &actor, service_name, "interface", &prog);
+                let content = typescript_native::compile::compile(
+                    &env,
+                    &actor,
+                    service_name,
+                    "interface",
+                    &prog,
+                );
                 writeln!(output, "{content}").unwrap();
             }
         }

@@ -33,17 +33,30 @@ struct NewlineAfterBlockComments<W: WriteJs> {
 
 impl<W: WriteJs> NewlineAfterBlockComments<W> {
     fn new(inner: W) -> Self {
-        Self { inner, suppress_space_after_comment: false }
+        Self {
+            inner,
+            suppress_space_after_comment: false,
+        }
     }
 }
 
 impl<W: WriteJs> WriteJs for NewlineAfterBlockComments<W> {
     #[inline]
-    fn increase_indent(&mut self) -> swc_core::ecma::codegen::Result { self.inner.increase_indent() }
+    fn increase_indent(&mut self) -> swc_core::ecma::codegen::Result {
+        self.inner.increase_indent()
+    }
     #[inline]
-    fn decrease_indent(&mut self) -> swc_core::ecma::codegen::Result { self.inner.decrease_indent() }
+    fn decrease_indent(&mut self) -> swc_core::ecma::codegen::Result {
+        self.inner.decrease_indent()
+    }
     #[inline]
-    fn write_semi(&mut self, span: Option<swc_core::common::Span>) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_semi(span) }
+    fn write_semi(
+        &mut self,
+        span: Option<swc_core::common::Span>,
+    ) -> swc_core::ecma::codegen::Result {
+        self.suppress_space_after_comment = false;
+        self.inner.write_semi(span)
+    }
     #[inline]
     fn write_space(&mut self) -> swc_core::ecma::codegen::Result {
         if self.suppress_space_after_comment {
@@ -53,17 +66,47 @@ impl<W: WriteJs> WriteJs for NewlineAfterBlockComments<W> {
         self.inner.write_space()
     }
     #[inline]
-    fn write_keyword(&mut self, span: Option<swc_core::common::Span>, s: &'static str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_keyword(span, s) }
+    fn write_keyword(
+        &mut self,
+        span: Option<swc_core::common::Span>,
+        s: &'static str,
+    ) -> swc_core::ecma::codegen::Result {
+        self.suppress_space_after_comment = false;
+        self.inner.write_keyword(span, s)
+    }
     #[inline]
-    fn write_operator(&mut self, span: Option<swc_core::common::Span>, s: &str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_operator(span, s) }
+    fn write_operator(
+        &mut self,
+        span: Option<swc_core::common::Span>,
+        s: &str,
+    ) -> swc_core::ecma::codegen::Result {
+        self.suppress_space_after_comment = false;
+        self.inner.write_operator(span, s)
+    }
     #[inline]
-    fn write_param(&mut self, s: &str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_param(s) }
+    fn write_param(&mut self, s: &str) -> swc_core::ecma::codegen::Result {
+        self.suppress_space_after_comment = false;
+        self.inner.write_param(s)
+    }
     #[inline]
-    fn write_property(&mut self, s: &str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_property(s) }
+    fn write_property(&mut self, s: &str) -> swc_core::ecma::codegen::Result {
+        self.suppress_space_after_comment = false;
+        self.inner.write_property(s)
+    }
     #[inline]
-    fn write_line(&mut self) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_line() }
+    fn write_line(&mut self) -> swc_core::ecma::codegen::Result {
+        self.suppress_space_after_comment = false;
+        self.inner.write_line()
+    }
     #[inline]
-    fn write_lit(&mut self, span: swc_core::common::Span, s: &str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_lit(span, s) }
+    fn write_lit(
+        &mut self,
+        span: swc_core::common::Span,
+        s: &str,
+    ) -> swc_core::ecma::codegen::Result {
+        self.suppress_space_after_comment = false;
+        self.inner.write_lit(span, s)
+    }
     #[inline]
     fn write_comment(&mut self, s: &str) -> swc_core::ecma::codegen::Result {
         if s.contains('\n') {
@@ -86,21 +129,53 @@ impl<W: WriteJs> WriteJs for NewlineAfterBlockComments<W> {
         Ok(())
     }
     #[inline]
-    fn write_str_lit(&mut self, span: swc_core::common::Span, s: &str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_str_lit(span, s) }
+    fn write_str_lit(
+        &mut self,
+        span: swc_core::common::Span,
+        s: &str,
+    ) -> swc_core::ecma::codegen::Result {
+        self.suppress_space_after_comment = false;
+        self.inner.write_str_lit(span, s)
+    }
     #[inline]
-    fn write_str(&mut self, s: &str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_str(s) }
+    fn write_str(&mut self, s: &str) -> swc_core::ecma::codegen::Result {
+        self.suppress_space_after_comment = false;
+        self.inner.write_str(s)
+    }
     #[inline]
-    fn write_symbol(&mut self, span: swc_core::common::Span, s: &str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_symbol(span, s) }
+    fn write_symbol(
+        &mut self,
+        span: swc_core::common::Span,
+        s: &str,
+    ) -> swc_core::ecma::codegen::Result {
+        self.suppress_space_after_comment = false;
+        self.inner.write_symbol(span, s)
+    }
     #[inline]
-    fn write_punct(&mut self, span: Option<swc_core::common::Span>, s: &'static str) -> swc_core::ecma::codegen::Result { self.suppress_space_after_comment = false; self.inner.write_punct(span, s) }
+    fn write_punct(
+        &mut self,
+        span: Option<swc_core::common::Span>,
+        s: &'static str,
+    ) -> swc_core::ecma::codegen::Result {
+        self.suppress_space_after_comment = false;
+        self.inner.write_punct(span, s)
+    }
     #[inline]
-    fn care_about_srcmap(&self) -> bool { self.inner.care_about_srcmap() }
+    fn care_about_srcmap(&self) -> bool {
+        self.inner.care_about_srcmap()
+    }
     #[inline]
-    fn add_srcmap(&mut self, pos: swc_core::common::BytePos) -> swc_core::ecma::codegen::Result { self.inner.add_srcmap(pos) }
+    fn add_srcmap(&mut self, pos: swc_core::common::BytePos) -> swc_core::ecma::codegen::Result {
+        self.inner.add_srcmap(pos)
+    }
     #[inline]
-    fn commit_pending_semi(&mut self) -> swc_core::ecma::codegen::Result { self.inner.commit_pending_semi() }
+    fn commit_pending_semi(&mut self) -> swc_core::ecma::codegen::Result {
+        self.inner.commit_pending_semi()
+    }
     #[inline(always)]
-    fn can_ignore_invalid_unicodes(&mut self) -> bool { self.inner.can_ignore_invalid_unicodes() }
+    fn can_ignore_invalid_unicodes(&mut self) -> bool {
+        self.inner.can_ignore_invalid_unicodes()
+    }
 }
 
 use swc_core::common::{SyntaxContext, DUMMY_SP};
