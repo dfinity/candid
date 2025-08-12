@@ -1,4 +1,4 @@
-use super::conversion_functions_generator::TypeConverter;
+use super::conversion_functions_generator::{TypeConverter};
 use super::new_typescript_native_types::{add_type_definitions, create_interface_from_service};
 use super::preamble::actor::interface_canister_initialization;
 use super::preamble::imports::{interface_create_actor_options, interface_imports};
@@ -7,11 +7,12 @@ use super::utils::get_ident_guarded;
 use super::utils::render_ast;
 use crate::bindings::typescript_native::comments::add_comments;
 use crate::syntax::{IDLMergedProg, IDLType};
-use candid::types::{Field, Type, TypeEnv, TypeInner};
+use candid::types::{Type, TypeEnv, TypeInner};
 use std::collections::HashMap;
 use swc_core::common::Span;
 use swc_core::common::DUMMY_SP;
 use swc_core::ecma::ast::*;
+use super::utils::EnumDeclarations;
 
 pub fn compile_interface(
     env: &TypeEnv,
@@ -19,7 +20,7 @@ pub fn compile_interface(
     service_name: &str,
     prog: &IDLMergedProg,
 ) -> String {
-    let enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)> = &mut HashMap::new();
+    let enum_declarations: &mut EnumDeclarations = &mut HashMap::new();
 
     let mut module = Module {
         span: DUMMY_SP,

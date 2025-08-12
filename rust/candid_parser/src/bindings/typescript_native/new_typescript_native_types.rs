@@ -1,14 +1,15 @@
 use super::super::javascript::is_tuple;
 use super::comments::{add_comments, PosCursor};
-use super::conversion_functions_generator::TypeConverter;
+use super::conversion_functions_generator::{TypeConverter};
 use super::utils::{get_ident_guarded, get_ident_guarded_keyword_ok};
 use crate::syntax::{self, IDLMergedProg, IDLType};
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
-use std::collections::HashMap;
 use swc_core::common::comments::SingleThreadedComments;
 use swc_core::common::Span;
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
+use super::utils::EnumDeclarations;
+
 // Helper function to determine if a type is recursively optional
 pub fn is_recursive_optional(
     env: &TypeEnv,
@@ -46,7 +47,7 @@ pub fn is_recursive_optional(
 
 // Create TS interface from Candid service
 pub fn create_interface_from_service(
-    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &mut EnumDeclarations,
     comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
@@ -124,7 +125,7 @@ pub fn convert_type_with_converter(
 
 // Convert Candid type to TypeScript type
 pub fn convert_type(
-    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &mut EnumDeclarations,
     comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
@@ -241,7 +242,7 @@ pub fn convert_type(
 // Internal functions
 
 fn create_opt_type(
-    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &mut EnumDeclarations,
     comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
@@ -388,7 +389,7 @@ fn create_opt_type(
 }
 
 fn create_vector_type(
-    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &mut EnumDeclarations,
     comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
@@ -452,7 +453,7 @@ fn create_vector_type(
 }
 
 fn create_record_type(
-    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &mut EnumDeclarations,
     comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
@@ -543,7 +544,7 @@ fn create_union_array_type(typed_array: &str, elem_type: &str) -> TsType {
 }
 
 fn create_variant_type(
-    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &mut EnumDeclarations,
     comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
@@ -685,7 +686,7 @@ fn create_variant_type(
 
 // Add all type definitions from the environment
 pub fn add_type_definitions(
-    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &mut EnumDeclarations,
     comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
@@ -861,7 +862,7 @@ fn find_field<'a>(
 }
 
 fn create_interface_from_record(
-    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &mut EnumDeclarations,
     comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
@@ -918,7 +919,7 @@ fn create_interface_from_record(
 
 // Create TS type alias from Candid function
 fn create_type_alias_from_function(
-    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &mut EnumDeclarations,
     comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
@@ -942,7 +943,7 @@ fn create_type_alias_from_function(
 
 // Create general TS type alias
 fn create_type_alias(
-    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &mut EnumDeclarations,
     comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
@@ -968,7 +969,7 @@ fn create_type_alias(
 
 // Create TS property signature from Candid field
 fn create_property_signature(
-    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &mut EnumDeclarations,
     comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
@@ -1029,7 +1030,7 @@ fn create_property_signature(
 
 // Create TS property signature from Candid field
 fn create_property_signature_for_variant(
-    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &mut EnumDeclarations,
     comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
@@ -1104,7 +1105,7 @@ fn create_property_signature_for_variant(
 
 // Create TS method signature from Candid function
 fn create_method_signature(
-    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &mut EnumDeclarations,
     comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,
@@ -1207,7 +1208,7 @@ fn create_method_signature(
 
 // Create a function type representation
 fn create_function_type(
-    enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)>,
+    enum_declarations: &mut EnumDeclarations,
     comments: &mut SingleThreadedComments,
     cursor: &mut PosCursor,
     env: &TypeEnv,

@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use candid::types::Field;
+use swc_core::ecma::ast::TsEnumDecl;
 use swc_core::common::comments::SingleThreadedComments;
 use swc_core::common::source_map::SourceMap;
 use swc_core::common::sync::Lrc;
@@ -5,6 +8,8 @@ use swc_core::ecma::{
     ast::Module,
     codegen::{text_writer::JsWriter, text_writer::WriteJs, Config, Emitter},
 };
+
+pub type EnumDeclarations = HashMap<Vec<Field>, (TsEnumDecl, String)>;
 
 pub fn render_ast(module: &Module, comments: &SingleThreadedComments) -> String {
     let mut buf = vec![];

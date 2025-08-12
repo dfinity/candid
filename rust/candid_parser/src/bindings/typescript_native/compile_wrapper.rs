@@ -1,8 +1,8 @@
-use super::conversion_functions_generator::TypeConverter;
+use super::conversion_functions_generator::{TypeConverter};
 use super::utils::{contains_unicode_characters, get_ident_guarded, get_ident_guarded_keyword_ok};
 use crate::syntax::IDLMergedProg;
 use candid::types::internal::TypeKey;
-use candid::types::{Field, Function, Type, TypeEnv, TypeInner};
+use candid::types::{Function, Type, TypeEnv, TypeInner};
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
 
@@ -13,7 +13,8 @@ use super::new_typescript_native_types::add_type_definitions;
 use super::preamble::actor::wrapper_canister_initialization;
 use super::preamble::imports::{interface_create_actor_options, wrapper_imports};
 use super::preamble::options::{interface_options_utils, wrapper_options_utils};
-use super::utils::render_ast;
+use super::utils::{render_ast, EnumDeclarations};
+
 
 use super::comments::add_comments;
 use super::compile_interface::{interface_actor_service, interface_actor_var};
@@ -27,7 +28,7 @@ pub fn compile_wrapper(
     service_name: &str,
     prog: &IDLMergedProg,
 ) -> String {
-    let enum_declarations: &mut HashMap<Vec<Field>, (TsEnumDecl, String)> = &mut HashMap::new();
+    let enum_declarations: &mut EnumDeclarations = &mut HashMap::new();
 
     let mut module = Module {
         span: DUMMY_SP,
