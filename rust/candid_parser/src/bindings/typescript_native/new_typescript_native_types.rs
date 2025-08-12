@@ -1013,7 +1013,7 @@ fn create_property_signature(
             ),
         )
     };
-    
+
     TsTypeElement::TsPropertySignature(TsPropertySignature {
         span,
         readonly: false,
