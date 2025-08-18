@@ -35,6 +35,7 @@ export const idlFactory = ({ IDL }) => {
     '  空的  ' : IDL.Null,
     '1⃣️2⃣️3⃣️' : IDL.Null,
   });
+  
   return IDL.Service({
     '' : IDL.Func([IDL.Nat], [IDL.Nat], []),
     '✈️  🚗 ⛱️ ' : IDL.Func([], [], ['oneway']),

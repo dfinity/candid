@@ -22,6 +22,7 @@ export const idlFactory = ({ IDL }) => {
   const Z = A;
   const Y = Z;
   const X = Y;
+  
   return IDL.Service({ 'f' : IDL.Func([A, B, C, X, Y, Z], [], []) });
 };
 

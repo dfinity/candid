@@ -20,6 +20,7 @@ export const idlFactory = ({ IDL }) => {
     '\"\'' : IDL.Nat,
     '\\\n\'\"' : IDL.Nat,
   });
+  
   return IDL.Service({ '\n\'\"\'\'\"\"\r\t' : IDL.Func([t], [], []) });
 };
 

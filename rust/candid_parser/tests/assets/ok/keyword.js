@@ -92,6 +92,7 @@ export const idlFactory = ({ IDL }) => {
     'g' : IDL.Func([list], [if_, stream], []),
   });
   t.fill(IDL.Func([return_], [], []));
+  
   return IDL.Service({
     'Oneway' : IDL.Func([], [], ['oneway']),
     'f_' : IDL.Func([o], [o], []),

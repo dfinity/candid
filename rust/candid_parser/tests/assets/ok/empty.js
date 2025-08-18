@@ -18,6 +18,7 @@ export const idlInitArgs = [];
 export const idlFactory = ({ IDL }) => {
   const T = IDL.Rec();
   T.fill(IDL.Tuple(T));
+  
   return IDL.Service({
     'f' : IDL.Func([IDL.Record({})], [IDL.Variant({})], []),
     'g' : IDL.Func([T], [IDL.Variant({ 'a' : T })], []),

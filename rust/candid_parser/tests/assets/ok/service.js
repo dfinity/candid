@@ -28,6 +28,7 @@ export const idlFactory = ({ IDL }) => {
   const Func = IDL.Func([], [Service], []);
   Service.fill(IDL.Service({ 'f' : Func }));
   const Service2 = Service;
+  
   return IDL.Service({
     'asArray' : IDL.Func([], [IDL.Vec(Service2), IDL.Vec(Func)], ['query']),
     'asPrincipal' : IDL.Func([], [Service2, Func], []),

@@ -211,6 +211,7 @@ export const idlFactory = ({ IDL }) => {
     'g' : IDL.Func([list], [B, tree, stream], []),
   });
   t.fill(IDL.Func([s], [], []));
+  
   return IDL.Service({
     'f1' : IDL.Func(
         [list, IDL.Vec(IDL.Nat8), IDL.Opt(IDL.Bool)],

@@ -204,7 +204,7 @@ fn pp_defs<'a>(
             .append(ident(id))
             .append(" = IDL.Rec();")
     }));
-    let defs = lines(def_list.iter().map(|&id| {
+    let mut defs = lines(def_list.iter().map(|&id| {
         let ty = env.find_type(&id.into()).unwrap();
         if recs.contains(id) {
             ident(id)
@@ -220,6 +220,9 @@ fn pp_defs<'a>(
                 .append(";")
         }
     }));
+    if !def_list.is_empty() {
+        defs = defs.append(RcDoc::hardline())
+    }
     recs_doc.append(defs)
 }
 
@@ -291,7 +294,6 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 
             let result = pp_imports()
                 .append(defs)
-                .append(RcDoc::hardline())
                 .append(idl_service)
                 .append(RcDoc::hardline())
                 .append(RcDoc::hardline())

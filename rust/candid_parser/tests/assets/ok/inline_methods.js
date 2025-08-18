@@ -42,6 +42,7 @@ export const idlFactory = ({ IDL }) => {
     'x' : IDL.Nat,
     'fn' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
   });
+  
   return IDL.Service({
     'add_two' : IDL.Func([IDL.Nat], [IDL.Nat], []),
     'fn' : Fn,

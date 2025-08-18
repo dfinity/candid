@@ -55,6 +55,7 @@ export const idlFactory = ({ IDL }) => {
   s.fill(
     IDL.Service({ 'f' : t, 'g' : IDL.Func([list], [B, tree, stream], []) })
   );
+  
   return s.getType();
 };
 

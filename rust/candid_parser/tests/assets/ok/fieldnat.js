@@ -34,6 +34,7 @@ export const idlInitArgs = [];
 export const idlFactory = ({ IDL }) => {
   const tuple = IDL.Tuple(IDL.Text, IDL.Text);
   const non_tuple = IDL.Record({ _1_ : IDL.Text, _2_ : IDL.Text });
+  
   return IDL.Service({
     'bab' : IDL.Func([IDL.Int, IDL.Nat], [], []),
     'bar' : IDL.Func(

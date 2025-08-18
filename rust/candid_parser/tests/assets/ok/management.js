@@ -297,6 +297,7 @@ export const idlFactory = ({ IDL }) => {
     'headers' : IDL.Vec(http_header),
   });
   const wasm_module = IDL.Vec(IDL.Nat8);
+  
   return IDL.Service({
     'bitcoin_get_balance' : IDL.Func([get_balance_request], [satoshi], []),
     'bitcoin_get_current_fee_percentiles' : IDL.Func(
