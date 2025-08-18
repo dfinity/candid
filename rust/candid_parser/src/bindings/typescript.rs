@@ -317,9 +317,9 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type, syntax: Option<&'a IDLType>) -> 
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>, prog: &IDLMergedProg) -> String {
-    let header = r#"import type { Principal } from '@dfinity/principal';
-import type { ActorMethod } from '@dfinity/agent';
+    let header = r#"import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
+import type { Principal } from '@dfinity/principal';
 "#;
     let syntax_actor = prog.resolve_actor().ok().flatten();
     let def_list: Vec<_> = env.to_sorted_iter().map(|pair| pair.0.as_str()).collect();
@@ -332,6 +332,10 @@ import type { IDL } from '@dfinity/candid';
                 .map(|s| pp_docs(s.docs.as_ref()))
                 .unwrap_or(RcDoc::nil());
             docs.append(pp_actor(env, actor, syntax_actor.as_ref().map(|s| &s.typ)))
+                .append(RcDoc::line())
+                .append("export declare const idlService: IDL.ServiceClass;")
+                .append(RcDoc::line())
+                .append("export declare const idlInitArgs: IDL.Type[];")
                 .append(RcDoc::line())
                 .append("export declare const idlFactory: IDL.InterfaceFactory;")
                 .append(RcDoc::line())

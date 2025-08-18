@@ -1,6 +1,6 @@
-import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
+import type { Principal } from '@dfinity/principal';
 
 export interface non_tuple { _1_ : string, _2_ : string }
 export type tuple = [string, string];
@@ -13,5 +13,7 @@ export interface _SERVICE {
   'bib' : ActorMethod<[[bigint]], { _0_ : bigint }>,
   'foo' : ActorMethod<[{ _2_ : bigint }], { _2_ : bigint, '_2' : bigint }>,
 }
+export declare const idlService: IDL.ServiceClass;
+export declare const idlInitArgs: IDL.Type[];
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

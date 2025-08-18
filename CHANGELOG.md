@@ -15,6 +15,8 @@
 
 * Non-breaking changes:
   + Added `pp_named_args`, `pp_named_init_args` in `pretty::candid` module.
+  + The `JavaScript` `didc` target now exports its generated IDL type objects.
+  + The `JavaScript` and `TypeScript` `didc` targets now export `idlService` and `idlInitArgs` (non-factory-function altneratives to `idlFactory` and `init`).
 
 ### candid_parser
 
