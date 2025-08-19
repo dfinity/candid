@@ -1,6 +1,6 @@
-import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
+import type { Principal } from '@dfinity/principal';
 
 export type f = ActorMethod<[number], number>;
 export type g = f;
@@ -13,5 +13,7 @@ export interface _SERVICE {
   'h2' : h,
   'o' : ActorMethod<[o], o>,
 }
+export declare const idlService: IDL.ServiceClass;
+export declare const idlInitArgs: IDL.Type[];
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

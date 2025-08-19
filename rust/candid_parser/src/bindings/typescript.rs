@@ -99,7 +99,7 @@ fn pp_inline_service<'a>() -> RcDoc<'a> {
     str("Principal")
 }
 
-fn pp_label(id: &SharedLabel) -> RcDoc {
+fn pp_label(id: &SharedLabel) -> RcDoc<'_> {
     match &**id {
         Label::Named(str) => quote_ident(str),
         Label::Id(n) | Label::Unnamed(n) => str("_")
@@ -161,17 +161,14 @@ fn pp_record<'a>(
     is_ref: bool,
 ) -> RcDoc<'a> {
     if is_tuple_fields(fields) {
-        let tuple = concat(fields.iter().map(|f| pp_ty(env, &f.ty, is_ref)), ",");
-        enclose("[", tuple, "]")
+        let fs = fields.iter().map(|f| pp_ty(env, &f.ty, is_ref));
+        sep_enclose(fs, ",", "[", "]")
     } else {
-        let fields = concat(
-            fields.iter().map(|f| {
-                let (docs, syntax_field) = find_field(syntax, &f.id);
-                docs.append(pp_field(env, f, syntax_field, is_ref))
-            }),
-            ",",
-        );
-        enclose_space("{", fields, "}")
+        let fields = fields.iter().map(|f| {
+            let (docs, syntax_field) = find_field(syntax, &f.id);
+            docs.append(pp_field(env, f, syntax_field, is_ref))
+        });
+        sep_enclose_space(fields, ",", "{", "}")
     }
 }
 
@@ -207,13 +204,14 @@ fn pp_opt<'a>(
 
 fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
     let args = func.args.iter().map(|arg| pp_ty(env, &arg.typ, true));
-    let args = enclose("[", concat(args, ","), "]");
+    let args = sep_enclose(args, ",", "[", "]");
     let rets = match func.rets.len() {
         0 => str("undefined"),
         1 => pp_ty(env, &func.rets[0], true),
-        _ => enclose(
+        _ => sep_enclose(
+            func.rets.iter().map(|ty| pp_ty(env, ty, true)),
+            ",",
             "[",
-            concat(func.rets.iter().map(|ty| pp_ty(env, ty, true)), ","),
             "]",
         ),
     };
@@ -243,7 +241,7 @@ fn pp_service<'a>(
         };
         docs.append(quote_ident(id)).append(kwd(":")).append(func)
     });
-    enclose_space("{", concat(methods, ","), "}")
+    sep_enclose_space(methods, ",", "{", "}")
 }
 
 fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
@@ -319,9 +317,9 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type, syntax: Option<&'a IDLType>) -> 
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>, prog: &IDLMergedProg) -> String {
-    let header = r#"import type { Principal } from '@dfinity/principal';
-import type { ActorMethod } from '@dfinity/agent';
+    let header = r#"import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
+import type { Principal } from '@dfinity/principal';
 "#;
     let syntax_actor = prog.resolve_actor().ok().flatten();
     let def_list: Vec<_> = env.to_sorted_iter().map(|pair| pair.0.as_str()).collect();
@@ -334,6 +332,10 @@ import type { IDL } from '@dfinity/candid';
                 .map(|s| pp_docs(s.docs.as_ref()))
                 .unwrap_or(RcDoc::nil());
             docs.append(pp_actor(env, actor, syntax_actor.as_ref().map(|s| &s.typ)))
+                .append(RcDoc::line())
+                .append("export declare const idlService: IDL.ServiceClass;")
+                .append(RcDoc::line())
+                .append("export declare const idlInitArgs: IDL.Type[];")
                 .append(RcDoc::line())
                 .append("export declare const idlFactory: IDL.InterfaceFactory;")
                 .append(RcDoc::line())

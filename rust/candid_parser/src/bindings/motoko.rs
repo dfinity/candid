@@ -78,7 +78,7 @@ static KEYWORDS: [&str; 48] = [
     "while",
     "with",
 ];
-fn escape(id: &str, is_method: bool) -> RcDoc {
+fn escape(id: &str, is_method: bool) -> RcDoc<'_> {
     if KEYWORDS.contains(&id) {
         str(id).append("_")
     } else if is_valid_as_id(id) {
@@ -118,7 +118,7 @@ fn pp_ty_rich<'a>(ty: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
     }
 }
 
-fn pp_ty(ty: &Type) -> RcDoc {
+fn pp_ty(ty: &Type) -> RcDoc<'_> {
     use TypeInner::*;
     match ty.as_ref() {
         Null => str("Null"),
@@ -151,7 +151,7 @@ fn pp_ty(ty: &Type) -> RcDoc {
     }
 }
 
-fn pp_label(id: &SharedLabel) -> RcDoc {
+fn pp_label(id: &SharedLabel) -> RcDoc<'_> {
     match &**id {
         Label::Named(str) => escape(str, false),
         Label::Id(n) | Label::Unnamed(n) => str("_")
@@ -161,7 +161,7 @@ fn pp_label(id: &SharedLabel) -> RcDoc {
     }
 }
 
-fn pp_function(func: &Function) -> RcDoc {
+fn pp_function(func: &Function) -> RcDoc<'_> {
     let args = pp_args(&func.args);
     let rets = pp_rets(&func.rets);
     match func.modes.as_slice() {
@@ -185,7 +185,7 @@ fn pp_function(func: &Function) -> RcDoc {
     }
     .nest(INDENT_SPACE)
 }
-fn pp_args(args: &[ArgType]) -> RcDoc {
+fn pp_args(args: &[ArgType]) -> RcDoc<'_> {
     match args {
         [ty] => {
             let typ = if is_tuple(&ty.typ) {
@@ -207,12 +207,12 @@ fn pp_args(args: &[ArgType]) -> RcDoc {
                     pp_ty(&arg.typ)
                 }
             });
-            enclose("(", concat(args, ","), ")")
+            sep_enclose(args, ",", "(", ")")
         }
     }
 }
 
-fn pp_rets(args: &[Type]) -> RcDoc {
+fn pp_rets(args: &[Type]) -> RcDoc<'_> {
     match args {
         [ty] => {
             if is_tuple(ty) {
@@ -221,7 +221,7 @@ fn pp_rets(args: &[Type]) -> RcDoc {
                 pp_ty(ty)
             }
         }
-        _ => enclose("(", concat(args.iter().map(pp_ty), ","), ")"),
+        _ => sep_enclose(args.iter().map(pp_ty), ",", "(", ")"),
     }
 }
 
@@ -239,12 +239,11 @@ fn pp_service<'a>(serv: &'a [(String, Type)], syntax: Option<&'a [syntax::Bindin
             .append(" : ")
             .append(pp_ty_rich(func, syntax_field_ty))
     });
-    kwd("actor").append(enclose_space("{", concat(methods, ";"), "}"))
+    kwd("actor").append(sep_enclose_space(methods, ";", "{", "}"))
 }
 
 fn pp_tuple<'a>(fields: &'a [Field]) -> RcDoc<'a> {
-    let tuple = concat(fields.iter().map(|f| pp_ty(&f.ty)), ",");
-    enclose("(", tuple, ")")
+    sep_enclose(fields.iter().map(|f| pp_ty(&f.ty)), ",", "(", ")")
 }
 
 fn pp_vec<'a>(inner: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
@@ -280,7 +279,7 @@ fn pp_record<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) -
             .append(" : ")
             .append(pp_ty_rich(&field.ty, syntax_field))
     });
-    enclose_space("{", concat(fields, ";"), "}")
+    sep_enclose_space(fields, ";", "{", "}")
 }
 
 fn pp_variant<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) -> RcDoc<'a> {
@@ -297,7 +296,7 @@ fn pp_variant<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) 
             doc
         }
     });
-    enclose_space("{", concat(fields, ";"), "}")
+    sep_enclose_space(fields, ";", "{", "}")
 }
 
 fn pp_class<'a>((args, ty): (&'a [ArgType], &'a Type), syntax: Option<&'a IDLType>) -> RcDoc<'a> {

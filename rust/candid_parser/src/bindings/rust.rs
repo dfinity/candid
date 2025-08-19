@@ -131,7 +131,7 @@ static KEYWORDS: [&str; 51] = [
     "while", "async", "await", "dyn", "abstract", "become", "box", "do", "final", "macro",
     "override", "priv", "typeof", "unsized", "virtual", "yield", "try",
 ];
-fn ident_(id: &str, case: Option<Case>) -> (RcDoc, bool) {
+fn ident_(id: &str, case: Option<Case>) -> (RcDoc<'_>, bool) {
     if id.is_empty()
         || id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
         || id.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
@@ -152,7 +152,7 @@ fn ident_(id: &str, case: Option<Case>) -> (RcDoc, bool) {
         (RcDoc::text(id), is_rename)
     }
 }
-fn ident(id: &str, case: Option<Case>) -> RcDoc {
+fn ident(id: &str, case: Option<Case>) -> RcDoc<'_> {
     ident_(id, case).0
 }
 fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
@@ -394,11 +394,11 @@ fn test_{test_name}() {{
             } else {
                 RcDoc::nil()
             };
-            let res = vis.append(self.pp_ty(&f.ty, is_ref)).append(",");
+            let res = vis.append(self.pp_ty(&f.ty, is_ref));
             self.state.pop_state(old, StateElem::Label(&lab));
             res
         });
-        enclose("(", RcDoc::concat(tuple), ")")
+        sep_enclose(tuple, ",", "(", ")")
     }
 
     fn pp_record_field<'b>(&mut self, field: &'b Field, need_vis: bool, is_ref: bool) -> RcDoc<'b> {
@@ -435,8 +435,7 @@ fn test_{test_name}() {{
                     docs.append(self.pp_record_field(f, need_vis, is_ref))
                 })
                 .collect();
-            let fields = concat(fields.into_iter(), ",");
-            enclose_space("{", fields, "}")
+            sep_enclose_space(fields, ",", "{", "}")
         };
         if let Some(old) = old {
             self.state.pop_state(old, StateElem::TypeStr("record"));
@@ -499,7 +498,7 @@ fn test_{test_name}() {{
             let (docs, syntax_field) = find_field(syntax, &f.id);
             docs.append(self.pp_variant_field(f, syntax_field))
         });
-        let res = enclose_space("{", concat(fields, ","), "}");
+        let res = sep_enclose_space(fields, ",", "{", "}");
         self.state.pop_state(old, StateElem::TypeStr("variant"));
         res
     }
@@ -611,14 +610,14 @@ fn test_{test_name}() {{
         lines(res.into_iter())
     }
     fn pp_args<'b>(&mut self, args: &'b [ArgType], prefix: &'b str) -> RcDoc<'b> {
-        let doc = args.iter().enumerate().map(|(i, t)| {
+        let args = args.iter().enumerate().map(|(i, t)| {
             let lab = t.name.clone().unwrap_or_else(|| format!("{prefix}{i}"));
             let old = self.state.push_state(&StateElem::Label(&lab));
             let res = self.pp_ty(&t.typ, true);
             self.state.pop_state(old, StateElem::Label(&lab));
             res
         });
-        enclose("(", concat(doc, ","), ")")
+        sep_enclose(args, ",", "(", ")")
     }
     fn pp_rets<'b>(&mut self, rets: &'b [Type], prefix: &'b str) -> RcDoc<'b> {
         let tys = rets.iter().enumerate().map(|(i, t)| {
@@ -628,7 +627,7 @@ fn test_{test_name}() {{
             self.state.pop_state(old, StateElem::Label(&lab));
             res
         });
-        enclose("(", concat(tys.into_iter(), ","), ")")
+        sep_enclose(tys, ",", "(", ")")
     }
     fn pp_ty_func<'b>(&mut self, f: &'b Function) -> RcDoc<'b> {
         let lab = StateElem::TypeStr("func");
@@ -659,7 +658,7 @@ fn test_{test_name}() {{
                 .append(kwd("\" :"))
                 .append(func_doc)
         });
-        let res = enclose_space("{", concat(methods, ";"), "}");
+        let res = sep_enclose_space(methods, ";", "{", "}");
         self.state.pop_state(old, lab);
         res
     }

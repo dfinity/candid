@@ -12,7 +12,7 @@ pub struct StreamingCallbackHttpResponse {
   pub body: serde_bytes::ByteBuf,
 }
 #[derive(CandidType, Deserialize)]
-pub struct HeaderField (pub String,pub String,);
+pub struct HeaderField (pub String, pub String);
 #[derive(CandidType, Deserialize)]
 pub struct HttpRequest {
   pub url: String,
