@@ -509,7 +509,7 @@ fn create_variant_type(
 
             // Only create enum if it doesn't already exist
             let (enum_declarations, _, _) = top_level_nodes;
-            if !enum_declarations.contains_key(&fs.to_vec()) {
+            enum_declarations.entry(fs.to_vec()).or_insert_with(|| {
                 let enum_name = if let Some(name) = type_name {
                     name.to_string()
                 } else {
@@ -541,8 +541,8 @@ fn create_variant_type(
                 };
 
                 // Store the enum declaration with its name as key
-                enum_declarations.insert(fs.to_vec(), (enum_decl, enum_name.clone()));
-            }
+                (enum_decl, enum_name.clone())
+            });
 
             let enum_name = enum_declarations.get(&fs.to_vec()).unwrap().1.clone();
 

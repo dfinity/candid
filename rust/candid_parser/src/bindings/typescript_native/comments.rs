@@ -50,7 +50,7 @@ fn make_comment(docs: &[String]) -> Option<Comment> {
     }
 }
 
-pub fn add_comments<'a>(top_level_nodes: &mut TopLevelNodes, docs: &'a [String]) -> Span {
+pub fn add_comments(top_level_nodes: &mut TopLevelNodes, docs: &[String]) -> Span {
     use swc_core::common::comments::Comments;
     let (_, comments, cursor) = top_level_nodes;
     match docs.len() {
