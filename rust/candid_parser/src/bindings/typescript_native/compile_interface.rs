@@ -20,7 +20,7 @@ pub fn compile_interface(
     service_name: &str,
     prog: &IDLMergedProg,
 ) -> String {
-    let enum_declarations: &mut EnumDeclarations = &mut HashMap::new();
+    let mut enum_declarations: EnumDeclarations = HashMap::new();
 
     let mut module = Module {
         span: DUMMY_SP,
@@ -32,14 +32,8 @@ pub fn compile_interface(
     interface_options_utils(&mut module);
     let mut comments = swc_core::common::comments::SingleThreadedComments::default();
     let mut cursor = super::comments::PosCursor::new();
-    add_type_definitions(
-        enum_declarations,
-        &mut comments,
-        &mut cursor,
-        env,
-        &mut module,
-        prog,
-    );
+    let mut top_level_nodes = (&mut enum_declarations, &mut comments, &mut cursor);
+    add_type_definitions(&mut top_level_nodes, env, &mut module, prog);
     interface_canister_initialization(service_name, &mut module);
 
     let mut actor_module = Module {
@@ -52,35 +46,39 @@ pub fn compile_interface(
         let syntax_actor = prog.resolve_actor().ok().flatten();
         let span = syntax_actor
             .as_ref()
-            .map(|s| add_comments(&mut comments, &mut cursor, s.docs.as_ref()))
+            .map(|s| add_comments(&mut top_level_nodes, s.docs.as_ref()))
             .unwrap_or(DUMMY_SP);
-        let mut converter = TypeConverter::new(env, enum_declarations, &mut comments, &mut cursor);
-        interface_actor_implementation(
-            env,
-            &mut actor_module,
-            actor_type,
-            syntax_actor.as_ref().map(|s| &s.typ),
-            service_name,
-            &mut converter,
-            span,
-        );
+        
+        // Scope the converter to release the mutable borrow of top_level_nodes
+        {
+            let mut converter = TypeConverter::new(env, &mut top_level_nodes);
+            interface_actor_implementation(
+                env,
+                &mut actor_module,
+                actor_type,
+                syntax_actor.as_ref().map(|s| &s.typ),
+                service_name,
+                &mut converter,
+                span,
+            );
 
-        let mut sorted_functions = converter.get_generated_functions();
-        sorted_functions.sort_by(|a, b| {
-            if let (Stmt::Decl(Decl::Fn(fn_a)), Stmt::Decl(Decl::Fn(fn_b))) = (a, b) {
-                fn_a.ident.sym.to_string().cmp(&fn_b.ident.sym.to_string())
-            } else {
-                std::cmp::Ordering::Equal
+            let mut sorted_functions = converter.get_generated_functions();
+            sorted_functions.sort_by(|a, b| {
+                if let (Stmt::Decl(Decl::Fn(fn_a)), Stmt::Decl(Decl::Fn(fn_b))) = (a, b) {
+                    fn_a.ident.sym.to_string().cmp(&fn_b.ident.sym.to_string())
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            });
+
+            for stmt in sorted_functions {
+                actor_module.body.push(ModuleItem::Stmt(stmt.clone()));
             }
-        });
-
-        for stmt in sorted_functions {
-            actor_module.body.push(ModuleItem::Stmt(stmt.clone()));
         }
     }
 
     // Add enum declarations to the module, sorted by name for stability
-    let mut sorted_enums: Vec<_> = enum_declarations.clone().into_iter().collect();
+    let mut sorted_enums: Vec<_> = enum_declarations.iter().collect();
     sorted_enums.sort_by_key(|(_, (_, enum_name))| enum_name.clone());
 
     for (_, enum_decl) in sorted_enums {
@@ -88,7 +86,7 @@ pub fn compile_interface(
             .body
             .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
                 span: DUMMY_SP,
-                decl: Decl::TsEnum(Box::new(enum_decl.0)),
+                decl: Decl::TsEnum(Box::new(enum_decl.0.clone())),
             })));
     }
 
@@ -143,11 +141,8 @@ pub fn interface_actor_service(
     converter: &mut TypeConverter,
     span: Span,
 ) {
-    let (enum_declarations, comments, cursor) = converter.conv_mut();
     let interface = create_interface_from_service(
-        enum_declarations,
-        comments,
-        cursor,
+        & mut converter.top_level_nodes(),
         env,
         service_name,
         syntax,

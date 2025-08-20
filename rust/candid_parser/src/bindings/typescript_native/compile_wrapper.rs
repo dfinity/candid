@@ -27,7 +27,7 @@ pub fn compile_wrapper(
     service_name: &str,
     prog: &IDLMergedProg,
 ) -> String {
-    let enum_declarations: &mut EnumDeclarations = &mut HashMap::new();
+    let mut enum_declarations: EnumDeclarations = HashMap::new();
 
     let mut module = Module {
         span: DUMMY_SP,
@@ -41,14 +41,8 @@ pub fn compile_wrapper(
     // Prepare a shared comments store and cursor if needed by generators
     let mut comments = swc_core::common::comments::SingleThreadedComments::default();
     let mut cursor = super::comments::PosCursor::new();
-    add_type_definitions(
-        enum_declarations,
-        &mut comments,
-        &mut cursor,
-        env,
-        &mut module,
-        prog,
-    );
+    let mut top_level_nodes = (&mut enum_declarations, &mut comments, &mut cursor);
+    add_type_definitions(&mut top_level_nodes, env, &mut module, prog);
 
     if actor.is_some() {
         wrapper_canister_initialization(service_name, &mut module);
@@ -64,9 +58,10 @@ pub fn compile_wrapper(
         let syntax_actor = prog.resolve_actor().ok().flatten();
         let span = syntax_actor
             .as_ref()
-            .map(|s| add_comments(&mut comments, &mut cursor, s.docs.as_ref()))
+            .map(|s| add_comments(&mut top_level_nodes, s.docs.as_ref()))
             .unwrap_or(DUMMY_SP);
-        let mut converter = TypeConverter::new(env, enum_declarations, &mut comments, &mut cursor);
+        {
+        let mut converter = TypeConverter::new(env, &mut top_level_nodes);
         wrapper_actor_implementation(
             env,
             &mut actor_module,
@@ -89,6 +84,7 @@ pub fn compile_wrapper(
         for stmt in sorted_functions {
             actor_module.body.push(ModuleItem::Stmt(stmt.clone()));
         }
+    }
     }
 
     // Add enum declarations to the module, sorted by name for stability

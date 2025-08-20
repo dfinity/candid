@@ -1,11 +1,9 @@
 use super::super::javascript::is_tuple;
-use super::comments::{add_comments, PosCursor};
-use super::conversion_functions_generator::TypeConverter;
-use super::utils::EnumDeclarations;
+use super::comments::add_comments;
+use super::conversion_functions_generator::{TopLevelNodes, TypeConverter};
 use super::utils::{get_ident_guarded, get_ident_guarded_keyword_ok};
 use crate::syntax::{self, IDLMergedProg, IDLType};
 use candid::types::{Field, Function, Label, Type, TypeEnv, TypeInner};
-use swc_core::common::comments::SingleThreadedComments;
 use swc_core::common::Span;
 use swc_core::common::{SyntaxContext, DUMMY_SP};
 use swc_core::ecma::ast::*;
@@ -47,9 +45,7 @@ pub fn is_recursive_optional(
 
 // Create TS interface from Candid service
 pub fn create_interface_from_service(
-    enum_declarations: &mut EnumDeclarations,
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     env: &TypeEnv,
     id: &str,
     syntax: Option<&IDLType>,
@@ -64,14 +60,12 @@ pub fn create_interface_from_service(
         .map(|(method_id, method_ty)| {
             let span = syntax_serv
                 .and_then(|bindings| bindings.iter().find(|b| &b.id == method_id))
-                .map(|b| add_comments(comments, cursor, b.docs.as_ref()))
+                .map(|b| add_comments(top_level_nodes, b.docs.as_ref()))
                 .unwrap_or(DUMMY_SP);
 
             match method_ty.as_ref() {
                 TypeInner::Func(ref func) => create_method_signature(
-                    enum_declarations,
-                    comments,
-                    cursor,
+                    top_level_nodes,
                     env,
                     method_id,
                     func,
@@ -119,15 +113,13 @@ pub fn convert_type_with_converter(
     syntax: Option<&IDLType>,
     is_ref: bool,
 ) -> TsType {
-    let (enum_declarations, comments, cursor) = converter.conv_mut();
-    convert_type(enum_declarations, comments, cursor, env, ty, syntax, is_ref)
+    let mut top_level_nodes = converter.top_level_nodes();
+    convert_type(&mut top_level_nodes, env, ty, syntax, is_ref)
 }
 
 // Convert Candid type to TypeScript type
 pub fn convert_type(
-    enum_declarations: &mut EnumDeclarations,
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     env: &TypeEnv,
     ty: &Type,
     syntax: Option<&IDLType>,
@@ -182,7 +174,7 @@ pub fn convert_type(
             if is_ref {
                 let ty = env.rec_find_type(id).unwrap();
                 if matches!(ty.as_ref(), Service(_) | Func(_)) {
-                    convert_type(enum_declarations, comments, cursor, env, ty, None, false)
+                    convert_type(top_level_nodes, env, ty, None, false)
                 } else {
                     TsType::TsTypeRef(TsTypeRef {
                         span: DUMMY_SP,
@@ -199,16 +191,14 @@ pub fn convert_type(
             }
         }
         // Optional types
-        Opt(ref t) => create_opt_type(enum_declarations, comments, cursor, env, t, syntax, is_ref),
+        Opt(ref t) => create_opt_type(top_level_nodes, env, t, syntax, is_ref),
         // Vector types
         Vec(ref t) => {
-            create_vector_type(enum_declarations, comments, cursor, env, syntax, t, is_ref)
+            create_vector_type(top_level_nodes, env, syntax, t, is_ref)
         }
         // Record types
         Record(ref fs) => create_record_type(
-            enum_declarations,
-            comments,
-            cursor,
+            top_level_nodes,
             env,
             ty,
             syntax,
@@ -217,7 +207,7 @@ pub fn convert_type(
         ),
         // Variant types
         Variant(ref fs) => {
-            create_variant_type(enum_declarations, comments, cursor, env, syntax, fs, None)
+            create_variant_type(top_level_nodes, env, syntax, fs, None)
         }
         Func(_) => create_function_type_ref(),
         // Note: we map to a generic principal type for now
@@ -242,9 +232,7 @@ pub fn convert_type(
 // Internal functions
 
 fn create_opt_type(
-    enum_declarations: &mut EnumDeclarations,
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     env: &TypeEnv,
     t: &Type,
     syntax: Option<&IDLType>,
@@ -271,9 +259,7 @@ fn create_opt_type(
                         type_params: Some(Box::new(TsTypeParamInstantiation {
                             span: DUMMY_SP,
                             params: vec![Box::new(convert_type(
-                                enum_declarations,
-                                comments,
-                                cursor,
+                                top_level_nodes,
                                 env,
                                 t,
                                 syntax_inner,
@@ -318,9 +304,7 @@ fn create_opt_type(
                                 type_params: Some(Box::new(TsTypeParamInstantiation {
                                     span: DUMMY_SP,
                                     params: vec![Box::new(convert_type(
-                                        enum_declarations,
-                                        comments,
-                                        cursor,
+                                        top_level_nodes,
                                         env,
                                         t,
                                         syntax_inner,
@@ -347,9 +331,7 @@ fn create_opt_type(
                         span: DUMMY_SP,
                         types: vec![
                             Box::new(convert_type(
-                                enum_declarations,
-                                comments,
-                                cursor,
+                                top_level_nodes,
                                 env,
                                 t,
                                 syntax_inner,
@@ -370,9 +352,7 @@ fn create_opt_type(
                 span: DUMMY_SP,
                 types: vec![
                     Box::new(convert_type(
-                        enum_declarations,
-                        comments,
-                        cursor,
+                        top_level_nodes,
                         env,
                         t,
                         syntax_inner,
@@ -389,9 +369,7 @@ fn create_opt_type(
 }
 
 fn create_vector_type(
-    enum_declarations: &mut EnumDeclarations,
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     env: &TypeEnv,
     syntax: Option<&IDLType>,
     t: &Type,
@@ -438,9 +416,7 @@ fn create_vector_type(
                 type_params: Some(Box::new(TsTypeParamInstantiation {
                     span: DUMMY_SP,
                     params: vec![Box::new(convert_type(
-                        enum_declarations,
-                        comments,
-                        cursor,
+                        top_level_nodes,
                         env,
                         t,
                         syntax_inner,
@@ -453,9 +429,7 @@ fn create_vector_type(
 }
 
 fn create_record_type(
-    enum_declarations: &mut EnumDeclarations,
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     env: &TypeEnv,
     ty: &Type,
     syntax: Option<&IDLType>,
@@ -477,9 +451,7 @@ fn create_record_type(
                     span: DUMMY_SP,
                     label: None,
                     ty: Box::new(convert_type(
-                        enum_declarations,
-                        comments,
-                        cursor,
+                        top_level_nodes,
                         env,
                         &f.ty,
                         None,
@@ -496,11 +468,9 @@ fn create_record_type(
                 .iter()
                 .map(|f| {
                     let (span, syntax_field_ty) =
-                        find_field(comments, cursor, syntax_fields, &f.id);
+                        find_field(top_level_nodes, syntax_fields, &f.id);
                     create_property_signature(
-                        enum_declarations,
-                        comments,
-                        cursor,
+                        top_level_nodes,
                         env,
                         f,
                         syntax_field_ty,
@@ -544,9 +514,7 @@ fn create_union_array_type(typed_array: &str, elem_type: &str) -> TsType {
 }
 
 fn create_variant_type(
-    enum_declarations: &mut EnumDeclarations,
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     env: &TypeEnv,
     syntax: Option<&IDLType>,
     fs: &[Field],
@@ -566,32 +534,36 @@ fn create_variant_type(
         let all_null = fs.iter().all(|f| matches!(f.ty.as_ref(), TypeInner::Null));
 
         if all_null {
+            // Collect field information first, before destructuring top_level_nodes
+            let field_info: Vec<(String, Span)> = fs
+                .iter()
+                .map(|f| {
+                    let member_name = match &*f.id {
+                        Label::Named(name) => name.clone(),
+                        Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
+                    };
+                    let (span, _) = find_field(top_level_nodes, syntax_fields, &f.id);
+                    (member_name, span)
+                })
+                .collect();
+            
             // Only create enum if it doesn't already exist
-            enum_declarations.entry(fs.to_vec()).or_insert_with(|| {
+            let (enum_declarations, _, _) = top_level_nodes;
+            if !enum_declarations.contains_key(&fs.to_vec()) {
                 let enum_name = if let Some(name) = type_name {
                     name.to_string()
                 } else {
                     // Generate stable name based on field names for inline variants
-                    let field_names: Vec<String> = fs
+                    let field_names: Vec<String> = field_info
                         .iter()
-                        .map(|f| match &*f.id {
-                            Label::Named(name) => name.clone(),
-                            Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
-                        })
+                        .map(|(name, _)| name.clone())
                         .collect();
                     format!("Variant_{}", field_names.join("_"))
                 };
                 // Create enum members
-                let members = fs
-                    .iter()
-                    .map(|f| {
-                        let member_name = match &*f.id {
-                            Label::Named(name) => name.clone(),
-                            Label::Id(n) | Label::Unnamed(n) => format!("_{}_", n),
-                        };
-
-                        let (span, _) = find_field(comments, cursor, syntax_fields, &f.id);
-
+                let members = field_info
+                    .into_iter()
+                    .map(|(member_name, span)| {
                         TsEnumMember {
                             span,
                             id: TsEnumMemberId::Ident(get_ident_guarded(&member_name)),
@@ -613,8 +585,8 @@ fn create_variant_type(
                 };
 
                 // Store the enum declaration with its name as key
-                (enum_decl, enum_name.clone())
-            });
+                enum_declarations.insert(fs.to_vec(), (enum_decl, enum_name.clone()));
+            }
 
             let enum_name = enum_declarations.get(&fs.to_vec()).unwrap().1.clone();
 
@@ -637,7 +609,7 @@ fn create_variant_type(
                         };
 
                         let (span, syntax_field_ty) =
-                            find_field(comments, cursor, syntax_fields, &f.id);
+                            find_field(top_level_nodes, syntax_fields, &f.id);
 
                         // Create the __kind__ property
                         let kind_prop = TsTypeElement::TsPropertySignature(TsPropertySignature {
@@ -665,9 +637,7 @@ fn create_variant_type(
 
                         // Create the value property
                         let value_prop = create_property_signature_for_variant(
-                            enum_declarations,
-                            comments,
-                            cursor,
+                            top_level_nodes,
                             env,
                             f,
                             syntax_field_ty,
@@ -686,9 +656,7 @@ fn create_variant_type(
 
 // Add all type definitions from the environment
 pub fn add_type_definitions(
-    enum_declarations: &mut EnumDeclarations,
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     env: &TypeEnv,
     module: &mut Module,
     prog: &IDLMergedProg,
@@ -698,15 +666,13 @@ pub fn add_type_definitions(
             let syntax = prog.lookup(id.as_str());
             let syntax_ty = syntax.map(|s| &s.typ);
             let span = syntax
-                .map(|s| add_comments(comments, cursor, s.docs.as_ref()))
+                .map(|s| add_comments(top_level_nodes, s.docs.as_ref()))
                 .unwrap_or(DUMMY_SP);
             match ty.as_ref() {
                 TypeInner::Record(_) if !is_tuple(ty) => {
                     // Generate interface for record types
                     let interface = create_interface_from_record(
-                        enum_declarations,
-                        comments,
-                        cursor,
+                        top_level_nodes,
                         env,
                         id.as_str(),
                         ty,
@@ -722,9 +688,7 @@ pub fn add_type_definitions(
                 TypeInner::Service(ref serv) => {
                     // Generate interface for service types
                     let interface = create_interface_from_service(
-                        enum_declarations,
-                        comments,
-                        cursor,
+                        top_level_nodes,
                         env,
                         id.as_str(),
                         syntax_ty,
@@ -740,9 +704,7 @@ pub fn add_type_definitions(
                 TypeInner::Func(ref func) => {
                     // Generate type alias for function types
                     let type_alias = create_type_alias_from_function(
-                        enum_declarations,
-                        comments,
-                        cursor,
+                        top_level_nodes,
                         env,
                         id.as_str(),
                         func,
@@ -762,9 +724,7 @@ pub fn add_type_definitions(
                         // For variants with all null types, directly create the enum
                         // Don't create a type alias
                         create_variant_type(
-                            enum_declarations,
-                            comments,
-                            cursor,
+                            top_level_nodes,
                             env,
                             syntax_ty,
                             fs,
@@ -773,9 +733,7 @@ pub fn add_type_definitions(
                     } else {
                         // For other variants, create a type alias to the union type
                         let variant_type = create_variant_type(
-                            enum_declarations,
-                            comments,
-                            cursor,
+                            top_level_nodes,
                             env,
                             syntax_ty,
                             fs,
@@ -823,9 +781,7 @@ pub fn add_type_definitions(
                 _ => {
                     // Generate type alias for other types
                     let type_alias = create_type_alias(
-                        enum_declarations,
-                        comments,
-                        cursor,
+                        top_level_nodes,
                         env,
                         id.as_str(),
                         ty,
@@ -845,8 +801,7 @@ pub fn add_type_definitions(
 // Create TS interface from Candid record
 
 fn find_field<'a>(
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     fields: Option<&'a Vec<syntax::TypeField>>,
     label: &Label,
 ) -> (Span, Option<&'a syntax::IDLType>) {
@@ -854,7 +809,7 @@ fn find_field<'a>(
     let mut syntax_field_ty = None;
     if let Some(bs) = fields {
         if let Some(field) = bs.iter().find(|b| b.label == *label) {
-            span = add_comments(comments, cursor, &field.docs);
+            span = add_comments(top_level_nodes, &field.docs);
             syntax_field_ty = Some(&field.typ);
         }
     };
@@ -862,9 +817,7 @@ fn find_field<'a>(
 }
 
 fn create_interface_from_record(
-    enum_declarations: &mut EnumDeclarations,
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     env: &TypeEnv,
     id: &str,
     ty: &Type,
@@ -879,11 +832,9 @@ fn create_interface_from_record(
             .iter()
             .map(|field| match &syntax_fields {
                 Some(a) => {
-                    let (span, syntax_field_ty) = find_field(comments, cursor, Some(a), &field.id);
+                    let (span, syntax_field_ty) = find_field(top_level_nodes, Some(a), &field.id);
                     create_property_signature(
-                        enum_declarations,
-                        comments,
-                        cursor,
+                        top_level_nodes,
                         env,
                         field,
                         syntax_field_ty,
@@ -891,9 +842,7 @@ fn create_interface_from_record(
                     )
                 }
                 None => create_property_signature(
-                    enum_declarations,
-                    comments,
-                    cursor,
+                    top_level_nodes,
                     env,
                     field,
                     None,
@@ -919,9 +868,7 @@ fn create_interface_from_record(
 
 // Create TS type alias from Candid function
 fn create_type_alias_from_function(
-    enum_declarations: &mut EnumDeclarations,
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     env: &TypeEnv,
     id: &str,
     func: &Function,
@@ -932,9 +879,7 @@ fn create_type_alias_from_function(
         id: get_ident_guarded(id),
         type_params: None,
         type_ann: Box::new(create_function_type(
-            enum_declarations,
-            comments,
-            cursor,
+            top_level_nodes,
             env,
             func,
         )),
@@ -943,9 +888,7 @@ fn create_type_alias_from_function(
 
 // Create general TS type alias
 fn create_type_alias(
-    enum_declarations: &mut EnumDeclarations,
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     env: &TypeEnv,
     id: &str,
     ty: &Type,
@@ -956,9 +899,7 @@ fn create_type_alias(
         id: get_ident_guarded(id),
         type_params: None,
         type_ann: Box::new(convert_type(
-            enum_declarations,
-            comments,
-            cursor,
+            top_level_nodes,
             env,
             ty,
             None,
@@ -969,9 +910,7 @@ fn create_type_alias(
 
 // Create TS property signature from Candid field
 fn create_property_signature(
-    enum_declarations: &mut EnumDeclarations,
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     env: &TypeEnv,
     field: &Field,
     syntax: Option<&IDLType>,
@@ -991,9 +930,7 @@ fn create_property_signature(
         (
             true,
             convert_type(
-                enum_declarations,
-                comments,
-                cursor,
+                top_level_nodes,
                 env,
                 inner_type,
                 syntax,
@@ -1004,9 +941,7 @@ fn create_property_signature(
         (
             false,
             convert_type(
-                enum_declarations,
-                comments,
-                cursor,
+                top_level_nodes,
                 env,
                 &field.ty,
                 syntax,
@@ -1030,9 +965,7 @@ fn create_property_signature(
 
 // Create TS property signature from Candid field
 fn create_property_signature_for_variant(
-    enum_declarations: &mut EnumDeclarations,
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     env: &TypeEnv,
     field: &Field,
     syntax: Option<&IDLType>,
@@ -1051,9 +984,7 @@ fn create_property_signature_for_variant(
         (
             true,
             convert_type(
-                enum_declarations,
-                comments,
-                cursor,
+                top_level_nodes,
                 env,
                 inner_type,
                 syntax,
@@ -1064,9 +995,7 @@ fn create_property_signature_for_variant(
         (
             false,
             convert_type(
-                enum_declarations,
-                comments,
-                cursor,
+                top_level_nodes,
                 env,
                 &field.ty,
                 syntax,
@@ -1105,9 +1034,7 @@ fn create_property_signature_for_variant(
 
 // Create TS method signature from Candid function
 fn create_method_signature(
-    enum_declarations: &mut EnumDeclarations,
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     env: &TypeEnv,
     method_id: &str,
     func: &Function,
@@ -1125,9 +1052,7 @@ fn create_method_signature(
                 type_ann: Some(Box::new(TsTypeAnn {
                     span: DUMMY_SP,
                     type_ann: Box::new(convert_type(
-                        enum_declarations,
-                        comments,
-                        cursor,
+                        top_level_nodes,
                         env,
                         &arg_ty.typ,
                         None,
@@ -1145,9 +1070,7 @@ fn create_method_signature(
             kind: TsKeywordTypeKind::TsVoidKeyword,
         }),
         1 => convert_type(
-            enum_declarations,
-            comments,
-            cursor,
+            top_level_nodes,
             env,
             &func.rets[0],
             None,
@@ -1164,9 +1087,7 @@ fn create_method_signature(
                         span: DUMMY_SP,
                         label: None,
                         ty: Box::new(convert_type(
-                            enum_declarations,
-                            comments,
-                            cursor,
+                            top_level_nodes,
                             env,
                             ty,
                             None,
@@ -1208,9 +1129,7 @@ fn create_method_signature(
 
 // Create a function type representation
 fn create_function_type(
-    enum_declarations: &mut EnumDeclarations,
-    comments: &mut SingleThreadedComments,
-    cursor: &mut PosCursor,
+    top_level_nodes: &mut TopLevelNodes,
     env: &TypeEnv,
     func: &Function,
 ) -> TsType {
@@ -1226,9 +1145,7 @@ fn create_function_type(
                 type_ann: Some(Box::new(TsTypeAnn {
                     span: DUMMY_SP,
                     type_ann: Box::new(convert_type(
-                        enum_declarations,
-                        comments,
-                        cursor,
+                        top_level_nodes,
                         env,
                         &arg_ty.typ,
                         None,
@@ -1246,9 +1163,7 @@ fn create_function_type(
             kind: TsKeywordTypeKind::TsVoidKeyword,
         }),
         1 => convert_type(
-            enum_declarations,
-            comments,
-            cursor,
+            top_level_nodes,
             env,
             &func.rets[0],
             None,
@@ -1265,9 +1180,7 @@ fn create_function_type(
                         span: DUMMY_SP,
                         label: None,
                         ty: Box::new(convert_type(
-                            enum_declarations,
-                            comments,
-                            cursor,
+                            top_level_nodes,
                             env,
                             ty,
                             None,

@@ -8,8 +8,8 @@ use swc_core::common::{comments::SingleThreadedComments, SyntaxContext, DUMMY_SP
 use swc_core::ecma::ast::*;
 // Type aliases to simplify complex types used throughout this module
 
-pub type ConvMut<'a> = (
-    &'a mut EnumDeclarations,
+pub type TopLevelNodes<'a> = (
+    &'a mut  EnumDeclarations,
     &'a mut SingleThreadedComments,
     &'a mut PosCursor,
 );
@@ -42,10 +42,9 @@ impl<'a> TypeConverter<'a> {
     /// Create a new TypeConverter with the given type environment
     pub fn new(
         env: &'a TypeEnv,
-        enum_declarations: &'a mut EnumDeclarations,
-        comments: &'a mut SingleThreadedComments,
-        cursor: &'a mut PosCursor,
+        top_level_nodes: &'a mut TopLevelNodes<'a>,
     ) -> Self {
+        let (enum_declarations, comments, cursor) = top_level_nodes;
         TypeConverter {
             env,
             to_candid_functions: HashMap::new(),
@@ -69,12 +68,8 @@ impl<'a> TypeConverter<'a> {
         self.generated_functions.values().cloned().collect()
     }
 
-    pub fn conv_mut(&mut self) -> ConvMut<'_> {
-        (
-            &mut self.enum_declarations,
-            &mut self.comments,
-            &mut self.cursor,
-        )
+    pub fn top_level_nodes(&mut self) -> TopLevelNodes {
+        (&mut self.enum_declarations, &mut self.comments, &mut self.cursor)
     }
 
     /// Check if a type requires conversion or can be passed through directly
