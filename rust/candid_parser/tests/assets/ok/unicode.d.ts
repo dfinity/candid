@@ -15,6 +15,7 @@ export type B = { '' : null } |
 export interface _SERVICE {
   '' : ActorMethod<[bigint], bigint>,
   '✈️  🚗 ⛱️ ' : ActorMethod<[], undefined>,
+  '函' : ActorMethod<[B], A>,
   '函数名' : ActorMethod<[A], B>,
   '👀' : ActorMethod<[bigint], bigint>,
 }

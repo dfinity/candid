@@ -1,0 +1,44 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent } from "@dfinity/agent";
+import type { Principal } from "@dfinity/principal";
+import { CreateActorOptions } from "declarations/recursion";
+import { _SERVICE } from "declarations/recursion/recursion.did.d.js";
+export interface Some<T> {
+    __kind__: "Some";
+    value: T;
+}
+export interface None {
+    __kind__: "None";
+}
+export type Option<T> = Some<T> | None;
+export type stream = {
+    head: bigint;
+    next: [Principal, string];
+} | null;
+export type A = B;
+export interface sInterface {
+    f: t;
+    g(arg0: list): Promise<[B, tree, stream]>;
+}
+export type B = Some<A> | None;
+export type list = node | null;
+export type tree = {
+    __kind__: "branch";
+    branch: {
+        val: bigint;
+        left: tree;
+        right: tree;
+    };
+} | {
+    __kind__: "leaf";
+    leaf: bigint;
+};
+export type t = (server: Principal) => Promise<void>;
+export interface node {
+    head: bigint;
+    tail: list;
+}
+export declare const createActor: (canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never) => recursionInterface;
+export declare const canisterId: string;
+export interface recursionInterface extends sInterface {
+}
+

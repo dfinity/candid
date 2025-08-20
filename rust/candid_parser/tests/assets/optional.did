@@ -1,0 +1,8 @@
+type option1 = opt nat;
+type option2 = opt option1;
+type option3 = opt option2;
+type nested = opt opt nat;
+
+service : {
+  f: () -> (option1, option2);
+}

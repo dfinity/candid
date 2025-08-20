@@ -1,0 +1,199 @@
+import { type HttpAgentOptions, type ActorConfig, type Agent, type ActorSubclass } from "@dfinity/agent";
+import type { Principal } from "@dfinity/principal";
+import { service as _service, createActor as _createActor, canisterId as _canisterId, CreateActorOptions } from "declarations/service";
+import { _SERVICE } from "declarations/service/service.did.d.js";
+export interface Some<T> {
+    __kind__: "Some";
+    value: T;
+}
+export interface None {
+    __kind__: "None";
+}
+export type Option<T> = Some<T> | None;
+function some<T>(value: T): Some<T> {
+    return {
+        __kind__: "Some",
+        value: value
+    };
+}
+function none(): None {
+    return {
+        __kind__: "None"
+    };
+}
+function isNone<T>(option: Option<T>): option is None {
+    return option.__kind__ === "None";
+}
+function isSome<T>(option: Option<T>): option is Some<T> {
+    return option.__kind__ === "Some";
+}
+function unwrap<T>(option: Option<T>): T {
+    if (isNone(option)) {
+        throw new Error("unwrap: none");
+    }
+    return option.value;
+}
+function candid_some<T>(value: T): [T] {
+    return [
+        value
+    ];
+}
+function candid_none<T>(): [] {
+    return [];
+}
+function record_opt_to_undefined<T>(arg: T | null): T | undefined {
+    return arg == null ? undefined : arg;
+}
+export interface ServiceInterface {
+    f: Func;
+}
+export type Func = () => Promise<Principal>;
+export type Service2 = ServiceInterface;
+export function createActor(canisterId: string | Principal, options?: CreateActorOptions, processError?: (error: unknown) => never): serviceInterface {
+    const actor = _createActor(canisterId, options);
+    return new Service(actor, processError);
+}
+export const canisterId = _canisterId;
+export interface serviceInterface {
+    asArray(): Promise<[Array<Principal>, Array<[Principal, string]>]>;
+    asPrincipal(): Promise<[Principal, [Principal, string]]>;
+    asRecord(): Promise<[Principal, Principal | null, [Principal, string]]>;
+    asVariant(): Promise<{
+        __kind__: "a";
+        a: Principal;
+    } | {
+        __kind__: "b";
+        b: {
+            f?: [Principal, string];
+        };
+    }>;
+}
+class Service implements serviceInterface {
+    private actor: ActorSubclass<_SERVICE>;
+    constructor(actor?: ActorSubclass<_SERVICE>, private processError?: (error: unknown) => never){
+        this.actor = actor ?? _service;
+    }
+    async asArray(): Promise<[Array<Principal>, Array<[Principal, string]>]> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.asArray();
+                return [
+                    result[0],
+                    result[1]
+                ];
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.asArray();
+            return [
+                result[0],
+                result[1]
+            ];
+        }
+    }
+    async asPrincipal(): Promise<[Principal, [Principal, string]]> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.asPrincipal();
+                return [
+                    result[0],
+                    result[1]
+                ];
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.asPrincipal();
+            return [
+                result[0],
+                result[1]
+            ];
+        }
+    }
+    async asRecord(): Promise<[Principal, Principal | null, [Principal, string]]> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.asRecord();
+                return from_candid_tuple_n1(result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.asRecord();
+            return from_candid_tuple_n1(result);
+        }
+    }
+    async asVariant(): Promise<{
+        __kind__: "a";
+        a: Principal;
+    } | {
+        __kind__: "b";
+        b: {
+            f?: [Principal, string];
+        };
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.asVariant();
+                return from_candid_variant_n3(result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.asVariant();
+            return from_candid_variant_n3(result);
+        }
+    }
+}
+export const service: serviceInterface = new Service();
+function from_candid_opt_n2(value: [] | [Principal]): Principal | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n5(value: [] | [[Principal, string]]): [Principal, string] | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_record_n4(value: {
+    f: [] | [[Principal, string]];
+}): {
+    f?: [Principal, string];
+} {
+    return {
+        f: record_opt_to_undefined(from_candid_opt_n5(value.f))
+    };
+}
+function from_candid_tuple_n1(value: [Principal, [] | [Principal], [Principal, string]]): [Principal, Principal | null, [Principal, string]] {
+    return [
+        value[0],
+        from_candid_opt_n2(value[1]),
+        value[2]
+    ];
+}
+function from_candid_variant_n3(value: {
+    a: Principal;
+} | {
+    b: {
+        f: [] | [[Principal, string]];
+    };
+}): {
+    __kind__: "a";
+    a: Principal;
+} | {
+    __kind__: "b";
+    b: {
+        f?: [Principal, string];
+    };
+} {
+    return "a" in value ? {
+        __kind__: "a",
+        a: value.a
+    } : "b" in value ? {
+        __kind__: "b",
+        b: from_candid_record_n4(value.b)
+    } : value;
+}
+

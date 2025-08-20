@@ -6,7 +6,7 @@ use pretty::RcDoc;
 use std::collections::BTreeSet;
 
 // The definition of tuple is language specific.
-fn is_tuple(t: &Type) -> bool {
+pub fn is_tuple(t: &Type) -> bool {
     match t.as_ref() {
         TypeInner::Record(ref fs) => is_tuple_fields(fs),
         _ => false,
