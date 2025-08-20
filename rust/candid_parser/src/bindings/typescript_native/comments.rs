@@ -1,8 +1,8 @@
+use super::conversion_functions_generator::TopLevelNodes;
 use swc_core::common::{
     comments::{Comment, CommentKind},
     BytePos, Span, DUMMY_SP,
 };
-use super::conversion_functions_generator::TopLevelNodes;
 
 // Simple monotonic position source for synthetic spans
 pub struct PosCursor {
@@ -50,10 +50,7 @@ fn make_comment(docs: &[String]) -> Option<Comment> {
     }
 }
 
-pub fn add_comments<'a>(
-    top_level_nodes: &mut TopLevelNodes,
-    docs: &'a [String],
-) -> Span {
+pub fn add_comments<'a>(top_level_nodes: &mut TopLevelNodes, docs: &'a [String]) -> Span {
     use swc_core::common::comments::Comments;
     let (_, comments, cursor) = top_level_nodes;
     match docs.len() {

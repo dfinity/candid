@@ -9,7 +9,7 @@ use swc_core::ecma::ast::*;
 // Type aliases to simplify complex types used throughout this module
 
 pub type TopLevelNodes<'a> = (
-    &'a mut  EnumDeclarations,
+    &'a mut EnumDeclarations,
     &'a mut SingleThreadedComments,
     &'a mut PosCursor,
 );
@@ -40,10 +40,7 @@ pub struct TypeConverter<'a> {
 
 impl<'a> TypeConverter<'a> {
     /// Create a new TypeConverter with the given type environment
-    pub fn new(
-        env: &'a TypeEnv,
-        top_level_nodes: &'a mut TopLevelNodes<'a>,
-    ) -> Self {
+    pub fn new(env: &'a TypeEnv, top_level_nodes: &'a mut TopLevelNodes<'a>) -> Self {
         let (enum_declarations, comments, cursor) = top_level_nodes;
         TypeConverter {
             env,
@@ -69,7 +66,11 @@ impl<'a> TypeConverter<'a> {
     }
 
     pub fn top_level_nodes(&mut self) -> TopLevelNodes {
-        (&mut self.enum_declarations, &mut self.comments, &mut self.cursor)
+        (
+            &mut self.enum_declarations,
+            &mut self.comments,
+            &mut self.cursor,
+        )
     }
 
     /// Check if a type requires conversion or can be passed through directly

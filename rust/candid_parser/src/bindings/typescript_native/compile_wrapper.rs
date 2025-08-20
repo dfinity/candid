@@ -61,30 +61,30 @@ pub fn compile_wrapper(
             .map(|s| add_comments(&mut top_level_nodes, s.docs.as_ref()))
             .unwrap_or(DUMMY_SP);
         {
-        let mut converter = TypeConverter::new(env, &mut top_level_nodes);
-        wrapper_actor_implementation(
-            env,
-            &mut actor_module,
-            actor_type,
-            syntax_actor.as_ref().map(|s| &s.typ),
-            service_name,
-            &mut converter,
-            span,
-        );
+            let mut converter = TypeConverter::new(env, &mut top_level_nodes);
+            wrapper_actor_implementation(
+                env,
+                &mut actor_module,
+                actor_type,
+                syntax_actor.as_ref().map(|s| &s.typ),
+                service_name,
+                &mut converter,
+                span,
+            );
 
-        let mut sorted_functions = converter.get_generated_functions();
-        sorted_functions.sort_by(|a, b| {
-            if let (Stmt::Decl(Decl::Fn(fn_a)), Stmt::Decl(Decl::Fn(fn_b))) = (a, b) {
-                fn_a.ident.sym.to_string().cmp(&fn_b.ident.sym.to_string())
-            } else {
-                std::cmp::Ordering::Equal
+            let mut sorted_functions = converter.get_generated_functions();
+            sorted_functions.sort_by(|a, b| {
+                if let (Stmt::Decl(Decl::Fn(fn_a)), Stmt::Decl(Decl::Fn(fn_b))) = (a, b) {
+                    fn_a.ident.sym.to_string().cmp(&fn_b.ident.sym.to_string())
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            });
+
+            for stmt in sorted_functions {
+                actor_module.body.push(ModuleItem::Stmt(stmt.clone()));
             }
-        });
-
-        for stmt in sorted_functions {
-            actor_module.body.push(ModuleItem::Stmt(stmt.clone()));
         }
-    }
     }
 
     // Add enum declarations to the module, sorted by name for stability

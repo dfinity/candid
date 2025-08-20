@@ -48,7 +48,7 @@ pub fn compile_interface(
             .as_ref()
             .map(|s| add_comments(&mut top_level_nodes, s.docs.as_ref()))
             .unwrap_or(DUMMY_SP);
-        
+
         // Scope the converter to release the mutable borrow of top_level_nodes
         {
             let mut converter = TypeConverter::new(env, &mut top_level_nodes);
@@ -142,7 +142,7 @@ pub fn interface_actor_service(
     span: Span,
 ) {
     let interface = create_interface_from_service(
-        & mut converter.top_level_nodes(),
+        &mut converter.top_level_nodes(),
         env,
         service_name,
         syntax,

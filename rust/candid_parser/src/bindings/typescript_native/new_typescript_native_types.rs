@@ -64,13 +64,9 @@ pub fn create_interface_from_service(
                 .unwrap_or(DUMMY_SP);
 
             match method_ty.as_ref() {
-                TypeInner::Func(ref func) => create_method_signature(
-                    top_level_nodes,
-                    env,
-                    method_id,
-                    func,
-                    span,
-                ),
+                TypeInner::Func(ref func) => {
+                    create_method_signature(top_level_nodes, env, method_id, func, span)
+                }
                 TypeInner::Var(ref var_id) => {
                     TsTypeElement::TsPropertySignature(TsPropertySignature {
                         span,
@@ -193,22 +189,11 @@ pub fn convert_type(
         // Optional types
         Opt(ref t) => create_opt_type(top_level_nodes, env, t, syntax, is_ref),
         // Vector types
-        Vec(ref t) => {
-            create_vector_type(top_level_nodes, env, syntax, t, is_ref)
-        }
+        Vec(ref t) => create_vector_type(top_level_nodes, env, syntax, t, is_ref),
         // Record types
-        Record(ref fs) => create_record_type(
-            top_level_nodes,
-            env,
-            ty,
-            syntax,
-            fs,
-            is_ref,
-        ),
+        Record(ref fs) => create_record_type(top_level_nodes, env, ty, syntax, fs, is_ref),
         // Variant types
-        Variant(ref fs) => {
-            create_variant_type(top_level_nodes, env, syntax, fs, None)
-        }
+        Variant(ref fs) => create_variant_type(top_level_nodes, env, syntax, fs, None),
         Func(_) => create_function_type_ref(),
         // Note: we map to a generic principal type for now
         // see https://github.com/dfinity/candid/issues/606
@@ -330,13 +315,7 @@ fn create_opt_type(
                     TsUnionType {
                         span: DUMMY_SP,
                         types: vec![
-                            Box::new(convert_type(
-                                top_level_nodes,
-                                env,
-                                t,
-                                syntax_inner,
-                                is_ref,
-                            )),
+                            Box::new(convert_type(top_level_nodes, env, t, syntax_inner, is_ref)),
                             Box::new(TsType::TsKeywordType(TsKeywordType {
                                 span: DUMMY_SP,
                                 kind: TsKeywordTypeKind::TsNullKeyword,
@@ -351,13 +330,7 @@ fn create_opt_type(
             TsType::TsUnionOrIntersectionType(TsUnionOrIntersectionType::TsUnionType(TsUnionType {
                 span: DUMMY_SP,
                 types: vec![
-                    Box::new(convert_type(
-                        top_level_nodes,
-                        env,
-                        t,
-                        syntax_inner,
-                        is_ref,
-                    )),
+                    Box::new(convert_type(top_level_nodes, env, t, syntax_inner, is_ref)),
                     Box::new(TsType::TsKeywordType(TsKeywordType {
                         span: DUMMY_SP,
                         kind: TsKeywordTypeKind::TsNullKeyword,
@@ -450,13 +423,7 @@ fn create_record_type(
                 .map(|f| TsTupleElement {
                     span: DUMMY_SP,
                     label: None,
-                    ty: Box::new(convert_type(
-                        top_level_nodes,
-                        env,
-                        &f.ty,
-                        None,
-                        is_ref,
-                    )),
+                    ty: Box::new(convert_type(top_level_nodes, env, &f.ty, None, is_ref)),
                 })
                 .collect(),
         })
@@ -467,15 +434,8 @@ fn create_record_type(
             members: fs
                 .iter()
                 .map(|f| {
-                    let (span, syntax_field_ty) =
-                        find_field(top_level_nodes, syntax_fields, &f.id);
-                    create_property_signature(
-                        top_level_nodes,
-                        env,
-                        f,
-                        syntax_field_ty,
-                        span,
-                    )
+                    let (span, syntax_field_ty) = find_field(top_level_nodes, syntax_fields, &f.id);
+                    create_property_signature(top_level_nodes, env, f, syntax_field_ty, span)
                 })
                 .collect(),
         })
@@ -546,7 +506,7 @@ fn create_variant_type(
                     (member_name, span)
                 })
                 .collect();
-            
+
             // Only create enum if it doesn't already exist
             let (enum_declarations, _, _) = top_level_nodes;
             if !enum_declarations.contains_key(&fs.to_vec()) {
@@ -554,25 +514,21 @@ fn create_variant_type(
                     name.to_string()
                 } else {
                     // Generate stable name based on field names for inline variants
-                    let field_names: Vec<String> = field_info
-                        .iter()
-                        .map(|(name, _)| name.clone())
-                        .collect();
+                    let field_names: Vec<String> =
+                        field_info.iter().map(|(name, _)| name.clone()).collect();
                     format!("Variant_{}", field_names.join("_"))
                 };
                 // Create enum members
                 let members = field_info
                     .into_iter()
-                    .map(|(member_name, span)| {
-                        TsEnumMember {
-                            span,
-                            id: TsEnumMemberId::Ident(get_ident_guarded(&member_name)),
-                            init: Some(Box::new(Expr::Lit(Lit::Str(Str {
-                                span: DUMMY_SP,
-                                value: member_name.into(),
-                                raw: None,
-                            })))),
-                        }
+                    .map(|(member_name, span)| TsEnumMember {
+                        span,
+                        id: TsEnumMemberId::Ident(get_ident_guarded(&member_name)),
+                        init: Some(Box::new(Expr::Lit(Lit::Str(Str {
+                            span: DUMMY_SP,
+                            value: member_name.into(),
+                            raw: None,
+                        })))),
                     })
                     .collect();
                 // Create the enum declaration
@@ -703,12 +659,8 @@ pub fn add_type_definitions(
                 }
                 TypeInner::Func(ref func) => {
                     // Generate type alias for function types
-                    let type_alias = create_type_alias_from_function(
-                        top_level_nodes,
-                        env,
-                        id.as_str(),
-                        func,
-                    );
+                    let type_alias =
+                        create_type_alias_from_function(top_level_nodes, env, id.as_str(), func);
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
@@ -723,13 +675,7 @@ pub fn add_type_definitions(
                     if all_null {
                         // For variants with all null types, directly create the enum
                         // Don't create a type alias
-                        create_variant_type(
-                            top_level_nodes,
-                            env,
-                            syntax_ty,
-                            fs,
-                            Some(id.as_str()),
-                        );
+                        create_variant_type(top_level_nodes, env, syntax_ty, fs, Some(id.as_str()));
                     } else {
                         // For other variants, create a type alias to the union type
                         let variant_type = create_variant_type(
@@ -780,12 +726,7 @@ pub fn add_type_definitions(
                 }
                 _ => {
                     // Generate type alias for other types
-                    let type_alias = create_type_alias(
-                        top_level_nodes,
-                        env,
-                        id.as_str(),
-                        ty,
-                    );
+                    let type_alias = create_type_alias(top_level_nodes, env, id.as_str(), ty);
                     module
                         .body
                         .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
@@ -833,21 +774,9 @@ fn create_interface_from_record(
             .map(|field| match &syntax_fields {
                 Some(a) => {
                     let (span, syntax_field_ty) = find_field(top_level_nodes, Some(a), &field.id);
-                    create_property_signature(
-                        top_level_nodes,
-                        env,
-                        field,
-                        syntax_field_ty,
-                        span,
-                    )
+                    create_property_signature(top_level_nodes, env, field, syntax_field_ty, span)
                 }
-                None => create_property_signature(
-                    top_level_nodes,
-                    env,
-                    field,
-                    None,
-                    DUMMY_SP,
-                ),
+                None => create_property_signature(top_level_nodes, env, field, None, DUMMY_SP),
             })
             .collect()
     } else {
@@ -878,11 +807,7 @@ fn create_type_alias_from_function(
         declare: false,
         id: get_ident_guarded(id),
         type_params: None,
-        type_ann: Box::new(create_function_type(
-            top_level_nodes,
-            env,
-            func,
-        )),
+        type_ann: Box::new(create_function_type(top_level_nodes, env, func)),
     }
 }
 
@@ -898,13 +823,7 @@ fn create_type_alias(
         declare: false,
         id: get_ident_guarded(id),
         type_params: None,
-        type_ann: Box::new(convert_type(
-            top_level_nodes,
-            env,
-            ty,
-            None,
-            false,
-        )),
+        type_ann: Box::new(convert_type(top_level_nodes, env, ty, None, false)),
     }
 }
 
@@ -929,24 +848,12 @@ fn create_property_signature(
     let (is_optional, type_ann) = if let TypeInner::Opt(ref inner_type) = field.ty.as_ref() {
         (
             true,
-            convert_type(
-                top_level_nodes,
-                env,
-                inner_type,
-                syntax,
-                true,
-            ),
+            convert_type(top_level_nodes, env, inner_type, syntax, true),
         )
     } else {
         (
             false,
-            convert_type(
-                top_level_nodes,
-                env,
-                &field.ty,
-                syntax,
-                true,
-            ),
+            convert_type(top_level_nodes, env, &field.ty, syntax, true),
         )
     };
 
@@ -983,24 +890,12 @@ fn create_property_signature_for_variant(
     let (is_optional, type_ann) = if let TypeInner::Opt(ref inner_type) = field.ty.as_ref() {
         (
             true,
-            convert_type(
-                top_level_nodes,
-                env,
-                inner_type,
-                syntax,
-                true,
-            ),
+            convert_type(top_level_nodes, env, inner_type, syntax, true),
         )
     } else {
         (
             false,
-            convert_type(
-                top_level_nodes,
-                env,
-                &field.ty,
-                syntax,
-                true,
-            ),
+            convert_type(top_level_nodes, env, &field.ty, syntax, true),
         )
     };
 
@@ -1051,13 +946,7 @@ fn create_method_signature(
                 id: Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty()),
                 type_ann: Some(Box::new(TsTypeAnn {
                     span: DUMMY_SP,
-                    type_ann: Box::new(convert_type(
-                        top_level_nodes,
-                        env,
-                        &arg_ty.typ,
-                        None,
-                        true,
-                    )),
+                    type_ann: Box::new(convert_type(top_level_nodes, env, &arg_ty.typ, None, true)),
                 })),
             })
         })
@@ -1069,13 +958,7 @@ fn create_method_signature(
             span: DUMMY_SP,
             kind: TsKeywordTypeKind::TsVoidKeyword,
         }),
-        1 => convert_type(
-            top_level_nodes,
-            env,
-            &func.rets[0],
-            None,
-            true,
-        ),
+        1 => convert_type(top_level_nodes, env, &func.rets[0], None, true),
         _ => {
             // Create a tuple type for multiple return values
             TsType::TsTupleType(TsTupleType {
@@ -1086,13 +969,7 @@ fn create_method_signature(
                     .map(|ty| TsTupleElement {
                         span: DUMMY_SP,
                         label: None,
-                        ty: Box::new(convert_type(
-                            top_level_nodes,
-                            env,
-                            ty,
-                            None,
-                            true,
-                        )),
+                        ty: Box::new(convert_type(top_level_nodes, env, ty, None, true)),
                     })
                     .collect(),
             })
@@ -1144,13 +1021,7 @@ fn create_function_type(
                 id: Ident::new(var_name.into(), DUMMY_SP, SyntaxContext::empty()),
                 type_ann: Some(Box::new(TsTypeAnn {
                     span: DUMMY_SP,
-                    type_ann: Box::new(convert_type(
-                        top_level_nodes,
-                        env,
-                        &arg_ty.typ,
-                        None,
-                        true,
-                    )),
+                    type_ann: Box::new(convert_type(top_level_nodes, env, &arg_ty.typ, None, true)),
                 })),
             })
         })
@@ -1162,13 +1033,7 @@ fn create_function_type(
             span: DUMMY_SP,
             kind: TsKeywordTypeKind::TsVoidKeyword,
         }),
-        1 => convert_type(
-            top_level_nodes,
-            env,
-            &func.rets[0],
-            None,
-            true,
-        ),
+        1 => convert_type(top_level_nodes, env, &func.rets[0], None, true),
         _ => {
             // Create a tuple type for multiple return values
             TsType::TsTupleType(TsTupleType {
@@ -1179,13 +1044,7 @@ fn create_function_type(
                     .map(|ty| TsTupleElement {
                         span: DUMMY_SP,
                         label: None,
-                        ty: Box::new(convert_type(
-                            top_level_nodes,
-                            env,
-                            ty,
-                            None,
-                            true,
-                        )),
+                        ty: Box::new(convert_type(top_level_nodes, env, ty, None, true)),
                     })
                     .collect(),
             })
