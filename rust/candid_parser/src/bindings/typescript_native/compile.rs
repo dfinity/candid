@@ -13,7 +13,7 @@ pub fn compile(
     if target == "interface" {
         compile_interface(env, actor, service_name, prog)
     } else if target == "wrapper" {
-        return compile_wrapper(env, actor, service_name, prog);
+        compile_wrapper(env, actor, service_name, prog)
     } else {
         panic!("Invalid target: {}", target);
     }

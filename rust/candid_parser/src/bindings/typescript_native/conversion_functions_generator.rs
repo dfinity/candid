@@ -65,7 +65,7 @@ impl<'a> TypeConverter<'a> {
         self.generated_functions.values().cloned().collect()
     }
 
-    pub fn top_level_nodes(&mut self) -> TopLevelNodes {
+    pub fn top_level_nodes(&mut self) -> TopLevelNodes<'_> {
         (
             &mut self.enum_declarations,
             &mut self.comments,
