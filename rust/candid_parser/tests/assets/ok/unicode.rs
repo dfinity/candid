@@ -2,7 +2,7 @@
 // You may want to manually adjust some of the types.
 #![allow(dead_code, unused_imports)]
 use candid::{self, CandidType, Deserialize, Principal};
-use ic_cdk::api::call::CallResult as Result;
+use ic_cdk::call::{Call, CallResult as Result};
 
 #[derive(CandidType, Deserialize)]
 pub struct A {
@@ -30,16 +30,16 @@ pub enum B {
 pub struct Service(pub Principal);
 impl Service {
   pub async fn _0_(&self, arg0: &candid::Nat) -> Result<(candid::Nat,)> {
-    ic_cdk::call(self.0, "", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "").with_args(&(arg0,)).await?.candid()?)
   }
   pub async fn _356566390_(&self) -> Result<()> {
-    ic_cdk::call(self.0, "✈️  🚗 ⛱️ ", ()).await
+    Ok(Call::bounded_wait(self.0, "✈️  🚗 ⛱️ ").with_args(&()).await?.candid()?)
   }
   pub async fn _3300066460_(&self, arg0: &A) -> Result<(B,)> {
-    ic_cdk::call(self.0, "函数名", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "函数名").with_args(&(arg0,)).await?.candid()?)
   }
   pub async fn _2669435454_(&self, arg0: &candid::Nat) -> Result<(candid::Nat,)> {
-    ic_cdk::call(self.0, "👀", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "👀").with_args(&(arg0,)).await?.candid()?)
   }
 }
 /// Canister ID: `aaaaa-aa`

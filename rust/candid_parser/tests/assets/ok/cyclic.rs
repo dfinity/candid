@@ -2,7 +2,7 @@
 // You may want to manually adjust some of the types.
 #![allow(dead_code, unused_imports)]
 use candid::{self, CandidType, Deserialize, Principal};
-use ic_cdk::api::call::CallResult as Result;
+use ic_cdk::call::{Call, CallResult as Result};
 
 pub type C = Box<A>;
 pub type B = Option<C>;
@@ -15,7 +15,7 @@ pub type X = Y;
 pub struct Service(pub Principal);
 impl Service {
   pub async fn f(&self, arg0: &A, arg1: &B, arg2: &C, arg3: &X, arg4: &Y, arg5: &Z) -> Result<()> {
-    ic_cdk::call(self.0, "f", (arg0,arg1,arg2,arg3,arg4,arg5,)).await
+    Ok(Call::bounded_wait(self.0, "f").with_args(&(arg0,arg1,arg2,arg3,arg4,arg5,)).await?.candid()?)
   }
 }
 /// Canister ID: `aaaaa-aa`

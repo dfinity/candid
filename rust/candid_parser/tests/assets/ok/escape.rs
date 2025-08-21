@@ -2,7 +2,7 @@
 // You may want to manually adjust some of the types.
 #![allow(dead_code, unused_imports)]
 use candid::{self, CandidType, Deserialize, Principal};
-use ic_cdk::api::call::CallResult as Result;
+use ic_cdk::call::{Call, CallResult as Result};
 
 #[derive(CandidType, Deserialize)]
 pub struct T {
@@ -19,7 +19,7 @@ pub struct T {
 pub struct Service(pub Principal);
 impl Service {
   pub async fn _2635468193_(&self, arg0: &T) -> Result<()> {
-    ic_cdk::call(self.0, "\n\'\"\'\'\"\"\r\t", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "\n\'\"\'\'\"\"\r\t").with_args(&(arg0,)).await?.candid()?)
   }
 }
 /// Canister ID: `aaaaa-aa`

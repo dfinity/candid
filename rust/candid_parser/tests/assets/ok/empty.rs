@@ -2,7 +2,7 @@
 // You may want to manually adjust some of the types.
 #![allow(dead_code, unused_imports)]
 use candid::{self, CandidType, Deserialize, Principal};
-use ic_cdk::api::call::CallResult as Result;
+use ic_cdk::call::{Call, CallResult as Result};
 
 #[derive(CandidType, Deserialize)]
 pub struct FArg {}
@@ -18,13 +18,13 @@ pub enum HRet { #[serde(rename="a")] A(Box<T>), #[serde(rename="b")] B{} }
 pub struct Service(pub Principal);
 impl Service {
   pub async fn f(&self, arg0: &FArg) -> Result<(FRet,)> {
-    ic_cdk::call(self.0, "f", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "f").with_args(&(arg0,)).await?.candid()?)
   }
   pub async fn g(&self, arg0: &T) -> Result<(GRet,)> {
-    ic_cdk::call(self.0, "g", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "g").with_args(&(arg0,)).await?.candid()?)
   }
   pub async fn h(&self, arg0: &(T, candid::Empty)) -> Result<(HRet,)> {
-    ic_cdk::call(self.0, "h", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "h").with_args(&(arg0,)).await?.candid()?)
   }
 }
 /// Canister ID: `aaaaa-aa`

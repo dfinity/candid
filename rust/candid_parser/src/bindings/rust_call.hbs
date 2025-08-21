@@ -2,7 +2,7 @@
 // You may want to manually adjust some of the types.
 #![allow(dead_code, unused_imports)]
 use {{candid_crate}}::{self, CandidType, Deserialize, Principal};
-use ic_cdk::api::call::CallResult as Result;
+use ic_cdk::call::{Call, CallResult as Result};
 
 {{type_defs}}
 {{#if methods}}
@@ -16,7 +16,7 @@ impl {{PascalCase service_name}} {
   {{../../doc_comment_prefix}}{{this}}
   {{/each}}
   pub async fn {{this.name}}(&self{{#each this.args}}, {{this.0}}: &{{this.1}}{{/each}}) -> Result<({{#each this.rets}}{{this}},{{/each}})> {
-    ic_cdk::call(self.0, "{{escape_debug this.original_name}}", ({{#each this.args}}{{this.0}},{{/each}})).await
+    Ok(Call::bounded_wait(self.0, "{{escape_debug this.original_name}}").with_args(&({{#each this.args}}{{this.0}},{{/each}})).await?.candid()?)
   }
   {{/each}}
 }

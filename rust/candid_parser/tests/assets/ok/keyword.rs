@@ -2,7 +2,7 @@
 // You may want to manually adjust some of the types.
 #![allow(dead_code, unused_imports)]
 use candid::{self, CandidType, Deserialize, Principal};
-use ic_cdk::api::call::CallResult as Result;
+use ic_cdk::call::{Call, CallResult as Result};
 
 #[derive(CandidType, Deserialize)]
 pub struct O(pub Option<Box<O>>);
@@ -43,37 +43,37 @@ pub enum VariantArg { A, B, C, D(f64) }
 pub struct Service(pub Principal);
 impl Service {
   pub async fn oneway(&self) -> Result<()> {
-    ic_cdk::call(self.0, "Oneway", ()).await
+    Ok(Call::bounded_wait(self.0, "Oneway").with_args(&()).await?.candid()?)
   }
   pub async fn f(&self, arg0: &O) -> Result<(O,)> {
-    ic_cdk::call(self.0, "f_", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "f_").with_args(&(arg0,)).await?.candid()?)
   }
   pub async fn field(&self, arg0: &FieldArg) -> Result<(FieldRet,)> {
-    ic_cdk::call(self.0, "field", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "field").with_args(&(arg0,)).await?.candid()?)
   }
   pub async fn fieldnat(&self, arg0: &FieldnatArg) -> Result<((candid::Int),)> {
-    ic_cdk::call(self.0, "fieldnat", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "fieldnat").with_args(&(arg0,)).await?.candid()?)
   }
   pub async fn oneway(&self, arg0: &u8) -> Result<()> {
-    ic_cdk::call(self.0, "oneway", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "oneway").with_args(&(arg0,)).await?.candid()?)
   }
   pub async fn oneway(&self, arg0: &u8) -> Result<()> {
-    ic_cdk::call(self.0, "oneway_", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "oneway_").with_args(&(arg0,)).await?.candid()?)
   }
   pub async fn query(&self, arg0: &serde_bytes::ByteBuf) -> Result<(serde_bytes::ByteBuf,)> {
-    ic_cdk::call(self.0, "query", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "query").with_args(&(arg0,)).await?.candid()?)
   }
   pub async fn r#return(&self, arg0: &O) -> Result<(O,)> {
-    ic_cdk::call(self.0, "return", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "return").with_args(&(arg0,)).await?.candid()?)
   }
   pub async fn service(&self, server: &Return) -> Result<()> {
-    ic_cdk::call(self.0, "service", (server,)).await
+    Ok(Call::bounded_wait(self.0, "service").with_args(&(server,)).await?.candid()?)
   }
   pub async fn tuple(&self, arg0: &(candid::Int, serde_bytes::ByteBuf, String)) -> Result<((candid::Int, u8),)> {
-    ic_cdk::call(self.0, "tuple", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "tuple").with_args(&(arg0,)).await?.candid()?)
   }
   pub async fn variant(&self, arg0: &VariantArg) -> Result<()> {
-    ic_cdk::call(self.0, "variant", (arg0,)).await
+    Ok(Call::bounded_wait(self.0, "variant").with_args(&(arg0,)).await?.candid()?)
   }
 }
 /// Canister ID: `aaaaa-aa`
