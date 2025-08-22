@@ -24,25 +24,25 @@ pub struct RInline { pub x: candid::Nat, pub r#fn: RInlineFn }
 
 pub struct Service(pub Principal);
 impl Service {
-  pub async fn add_two(&self, arg0: &candid::Nat) -> Result<(candid::Nat,)> {
+  pub async fn add_two(&self, arg0: &candid::Nat) -> Result<candid::Nat> {
     Ok(Call::bounded_wait(self.0, "add_two").with_arg(arg0).await?.candid()?)
   }
-  pub async fn r#fn(&self, arg0: &candid::Nat) -> Result<(candid::Nat,)> {
+  pub async fn r#fn(&self, arg0: &candid::Nat) -> Result<candid::Nat> {
     Ok(Call::bounded_wait(self.0, "fn").with_arg(arg0).await?.candid()?)
   }
-  pub async fn high_order_fn(&self, arg0: &candid::Nat, arg1: &Fn) -> Result<(candid::Nat,)> {
+  pub async fn high_order_fn(&self, arg0: &candid::Nat, arg1: &Fn) -> Result<candid::Nat> {
     Ok(Call::bounded_wait(self.0, "high_order_fn").with_args(&(arg0, arg1)).await?.candid()?)
   }
-  pub async fn high_order_fn_inline(&self, arg0: &candid::Nat, arg1: &HighOrderFnInlineArg1) -> Result<(candid::Nat,)> {
+  pub async fn high_order_fn_inline(&self, arg0: &candid::Nat, arg1: &HighOrderFnInlineArg1) -> Result<candid::Nat> {
     Ok(Call::bounded_wait(self.0, "high_order_fn_inline").with_args(&(arg0, arg1)).await?.candid()?)
   }
-  pub async fn high_order_fn_via_id(&self, arg0: &candid::Nat, arg1: &Gn) -> Result<(Fn,)> {
+  pub async fn high_order_fn_via_id(&self, arg0: &candid::Nat, arg1: &Gn) -> Result<Fn> {
     Ok(Call::bounded_wait(self.0, "high_order_fn_via_id").with_args(&(arg0, arg1)).await?.candid()?)
   }
-  pub async fn high_order_fn_via_record(&self, arg0: &R) -> Result<(candid::Nat,)> {
+  pub async fn high_order_fn_via_record(&self, arg0: &R) -> Result<candid::Nat> {
     Ok(Call::bounded_wait(self.0, "high_order_fn_via_record").with_arg(arg0).await?.candid()?)
   }
-  pub async fn high_order_fn_via_record_inline(&self, arg0: &RInline) -> Result<(candid::Nat,)> {
+  pub async fn high_order_fn_via_record_inline(&self, arg0: &RInline) -> Result<candid::Nat> {
     Ok(Call::bounded_wait(self.0, "high_order_fn_via_record_inline").with_arg(arg0).await?.candid()?)
   }
 }

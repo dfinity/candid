@@ -17,16 +17,16 @@ pub enum AsVariantRet {
 
 pub struct Service(pub Principal);
 impl Service {
-  pub async fn as_array(&self) -> Result<(Vec<Service2>,Vec<Func>,)> {
+  pub async fn as_array(&self) -> Result<(Vec<Service2>, Vec<Func>)> {
     Ok(Call::bounded_wait(self.0, "asArray").await?.candid()?)
   }
-  pub async fn as_principal(&self) -> Result<(Service2,Func,)> {
+  pub async fn as_principal(&self) -> Result<(Service2, Func)> {
     Ok(Call::bounded_wait(self.0, "asPrincipal").await?.candid()?)
   }
-  pub async fn as_record(&self) -> Result<((Service2, Option<Service>, Func),)> {
+  pub async fn as_record(&self) -> Result<(Service2, Option<Service>, Func)> {
     Ok(Call::bounded_wait(self.0, "asRecord").await?.candid()?)
   }
-  pub async fn as_variant(&self) -> Result<(AsVariantRet,)> {
+  pub async fn as_variant(&self) -> Result<AsVariantRet> {
     Ok(Call::bounded_wait(self.0, "asVariant").await?.candid()?)
   }
 }

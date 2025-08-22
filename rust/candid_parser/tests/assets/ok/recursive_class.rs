@@ -8,7 +8,7 @@ candid::define_service!(pub S : { "next" : candid::func!(() -> (S)) });
 
 pub struct Service(pub Principal);
 impl Service {
-  pub async fn next(&self) -> Result<(S,)> {
+  pub async fn next(&self) -> Result<S> {
     Ok(Call::bounded_wait(self.0, "next").await?.candid()?)
   }
 }

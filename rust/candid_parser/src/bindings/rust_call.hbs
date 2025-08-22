@@ -15,8 +15,8 @@ impl {{PascalCase service_name}} {
   {{#each this.docs}}
   {{../../doc_comment_prefix}}{{this}}
   {{/each}}
-  pub async fn {{this.name}}(&self{{#each this.args}}, {{this.0}}: &{{this.1}}{{/each}}) -> Result<({{#each this.rets}}{{this}},{{/each}})> {
-    Ok(Call::bounded_wait(self.0, "{{escape_debug this.original_name}}"){{#if (eq this.args_len 0)}}{{else}}{{#if (eq this.args_len 1)}}.with_arg({{this.args.0.0}}){{else}}.with_args(&({{#each this.args}}{{this.0}}{{#unless @last}}, {{/unless}}{{/each}})){{/if}}{{/if}}.await?.candid()?)
+  pub async fn {{this.name}}(&self{{#each this.args}}, {{this.0}}: &{{this.1}}{{/each}}) -> Result<{{#if (eq (len this.rets) 1)}}{{this.rets.0}}{{else}}({{#each this.rets}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}){{/if}}> {
+    Ok(Call::bounded_wait(self.0, "{{escape_debug this.original_name}}"){{#if (eq (len this.args) 0)}}{{else}}{{#if (eq (len this.args) 1)}}.with_arg({{this.args.0.0}}){{else}}.with_args(&({{#each this.args}}{{this.0}}{{#unless @last}}, {{/unless}}{{/each}})){{/if}}{{/if}}.await?.candid()?)
   }
   {{/each}}
 }

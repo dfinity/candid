@@ -17,13 +17,13 @@ pub enum HRet { #[serde(rename="a")] A(Box<T>), #[serde(rename="b")] B{} }
 
 pub struct Service(pub Principal);
 impl Service {
-  pub async fn f(&self, arg0: &FArg) -> Result<(FRet,)> {
+  pub async fn f(&self, arg0: &FArg) -> Result<FRet> {
     Ok(Call::bounded_wait(self.0, "f").with_arg(arg0).await?.candid()?)
   }
-  pub async fn g(&self, arg0: &T) -> Result<(GRet,)> {
+  pub async fn g(&self, arg0: &T) -> Result<GRet> {
     Ok(Call::bounded_wait(self.0, "g").with_arg(arg0).await?.candid()?)
   }
-  pub async fn h(&self, arg0: &(T, candid::Empty)) -> Result<(HRet,)> {
+  pub async fn h(&self, arg0: &(T, candid::Empty)) -> Result<HRet> {
     Ok(Call::bounded_wait(self.0, "h").with_arg(arg0).await?.candid()?)
   }
 }

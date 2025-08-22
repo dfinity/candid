@@ -306,6 +306,7 @@ dependencies = [
  "pretty",
  "rand",
  "serde",
+ "serde_json",
  "test-generator",
  "thiserror",
  "toml",

@@ -154,26 +154,26 @@ impl Service {
   pub async fn f_1(&self, arg0: &List, test: &serde_bytes::ByteBuf, arg2: &Option<bool>) -> Result<()> {
     Ok(Call::bounded_wait(self.0, "f1").with_args(&(arg0, test, arg2)).await?.candid()?)
   }
-  pub async fn G11(&self, id: &CanisterId, list: &MyList, is_okay: &Option<MyList>, arg3: &Nested) -> Result<(i128,Broker,NestedRes,)> {
+  pub async fn G11(&self, id: &CanisterId, list: &MyList, is_okay: &Option<MyList>, arg3: &Nested) -> Result<(i128, Broker, NestedRes)> {
     Ok(Call::bounded_wait(self.0, "g1").with_args(&(id, list, is_okay, arg3)).await?.candid()?)
   }
-  pub async fn h(&self, arg0: &Vec<Option<String>>, arg1: &HArg1, arg2: &Option<MyList>) -> Result<(HRet,)> {
+  pub async fn h(&self, arg0: &Vec<Option<String>>, arg1: &HArg1, arg2: &Option<MyList>) -> Result<HRet> {
     Ok(Call::bounded_wait(self.0, "h").with_args(&(arg0, arg1, arg2)).await?.candid()?)
   }
   /// Doc comment for i method of service
-  pub async fn i(&self, arg0: &MyList, arg1: &FArg1) -> Result<(Option<MyList>,Res,)> {
+  pub async fn i(&self, arg0: &MyList, arg1: &FArg1) -> Result<(Option<MyList>, Res)> {
     Ok(Call::bounded_wait(self.0, "i").with_args(&(arg0, arg1)).await?.candid()?)
   }
-  pub async fn x(&self, arg0: &A, arg1: &B) -> Result<(Option<A>,Option<B>,std::result::Result<XRet2Ok, Error>,)> {
+  pub async fn x(&self, arg0: &A, arg1: &B) -> Result<(Option<A>, Option<B>, std::result::Result<XRet2Ok, Error>)> {
     Ok(Call::bounded_wait(self.0, "x").with_args(&(arg0, arg1)).await?.candid()?)
   }
-  pub async fn y(&self, arg0: &NestedRecords) -> Result<((NestedRecords, MyVariant),)> {
+  pub async fn y(&self, arg0: &NestedRecords) -> Result<(NestedRecords, MyVariant)> {
     Ok(Call::bounded_wait(self.0, "y").with_arg(arg0).await?.candid()?)
   }
   pub async fn f(&self, server: &S) -> Result<()> {
     Ok(Call::bounded_wait(self.0, "f").with_arg(server).await?.candid()?)
   }
-  pub async fn g(&self, arg0: &List) -> Result<(B,Tree,Stream,)> {
+  pub async fn g(&self, arg0: &List) -> Result<(B, Tree, Stream)> {
     Ok(Call::bounded_wait(self.0, "g").with_arg(arg0).await?.candid()?)
   }
   /// Doc comment for imported bbbbb service method

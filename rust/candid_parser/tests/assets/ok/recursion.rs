@@ -34,7 +34,7 @@ impl Service {
   pub async fn f(&self, server: &S) -> Result<()> {
     Ok(Call::bounded_wait(self.0, "f").with_arg(server).await?.candid()?)
   }
-  pub async fn g(&self, arg0: &List) -> Result<(B,Tree,Stream,)> {
+  pub async fn g(&self, arg0: &List) -> Result<(B, Tree, Stream)> {
     Ok(Call::bounded_wait(self.0, "g").with_arg(arg0).await?.candid()?)
   }
 }
