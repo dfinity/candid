@@ -719,6 +719,7 @@ fn test_{test_name}() {{
         let res = Method {
             name,
             original_name: id.to_string(),
+            args_len: args.len(),
             args: args
                 .into_iter()
                 .map(|(id, t)| (id, t.pretty(LINE_WIDTH).to_string()))
@@ -788,6 +789,7 @@ pub struct Output {
 pub struct Method {
     pub name: String,
     pub original_name: String,
+    pub args_len: usize,
     pub args: Vec<(String, String)>,
     pub rets: Vec<String>,
     pub mode: String,

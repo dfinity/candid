@@ -19,7 +19,7 @@ pub struct T {
 pub struct Service(pub Principal);
 impl Service {
   pub async fn _2635468193_(&self, arg0: &T) -> Result<()> {
-    Ok(Call::bounded_wait(self.0, "\n\'\"\'\'\"\"\r\t").with_args(&(arg0,)).await?.candid()?)
+    Ok(Call::bounded_wait(self.0, "\n\'\"\'\'\"\"\r\t").with_arg(arg0).await?.candid()?)
   }
 }
 /// Canister ID: `aaaaa-aa`

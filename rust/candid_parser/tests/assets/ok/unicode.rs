@@ -30,16 +30,16 @@ pub enum B {
 pub struct Service(pub Principal);
 impl Service {
   pub async fn _0_(&self, arg0: &candid::Nat) -> Result<(candid::Nat,)> {
-    Ok(Call::bounded_wait(self.0, "").with_args(&(arg0,)).await?.candid()?)
+    Ok(Call::bounded_wait(self.0, "").with_arg(arg0).await?.candid()?)
   }
   pub async fn _356566390_(&self) -> Result<()> {
-    Ok(Call::bounded_wait(self.0, "✈️  🚗 ⛱️ ").with_args(&()).await?.candid()?)
+    Ok(Call::bounded_wait(self.0, "✈️  🚗 ⛱️ ").await?.candid()?)
   }
   pub async fn _3300066460_(&self, arg0: &A) -> Result<(B,)> {
-    Ok(Call::bounded_wait(self.0, "函数名").with_args(&(arg0,)).await?.candid()?)
+    Ok(Call::bounded_wait(self.0, "函数名").with_arg(arg0).await?.candid()?)
   }
   pub async fn _2669435454_(&self, arg0: &candid::Nat) -> Result<(candid::Nat,)> {
-    Ok(Call::bounded_wait(self.0, "👀").with_args(&(arg0,)).await?.candid()?)
+    Ok(Call::bounded_wait(self.0, "👀").with_arg(arg0).await?.candid()?)
   }
 }
 /// Canister ID: `aaaaa-aa`

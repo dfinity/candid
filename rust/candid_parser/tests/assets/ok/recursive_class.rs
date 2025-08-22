@@ -9,7 +9,7 @@ candid::define_service!(pub S : { "next" : candid::func!(() -> (S)) });
 pub struct Service(pub Principal);
 impl Service {
   pub async fn next(&self) -> Result<(S,)> {
-    Ok(Call::bounded_wait(self.0, "next").with_args(&()).await?.candid()?)
+    Ok(Call::bounded_wait(self.0, "next").await?.candid()?)
   }
 }
 /// Canister ID: `aaaaa-aa`
