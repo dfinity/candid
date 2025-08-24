@@ -32,7 +32,7 @@ enum Command {
     Bind {
         /// Specifies did file for code generation
         input: PathBuf,
-        #[clap(short, long, value_parser = ["js", "ts", "did", "mo", "rs", "rs-agent", "rs-stub"])]
+        #[clap(short, long, value_parser = ["js", "ts", "did", "mo", "rs", "rs-legacy", "rs-agent", "rs-stub"])]
         /// Specifies target language
         target: String,
         #[clap(short, long)]
@@ -235,6 +235,15 @@ fn main() -> Result<()> {
                         .map(|x| x.clone().try_into().unwrap())
                         .unwrap_or(ExternalConfig::default());
                     let config = Config::new(configs);
+                    let (res, unused) = compile(&config, &env, &actor, &prog, external);
+                    warn_unused(&unused);
+                    res
+                },
+                "rs-legacy" => {
+                    use candid_parser::bindings::rust::{compile, Config, ExternalConfig};
+                    let config = Config::new(configs);
+                    let mut external = ExternalConfig::default();
+                    external.0.insert("target".to_string(), "canister_call_legacy".to_string());
                     let (res, unused) = compile(&config, &env, &actor, &prog, external);
                     warn_unused(&unused);
                     res

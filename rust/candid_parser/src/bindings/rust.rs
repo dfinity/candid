@@ -899,6 +899,7 @@ pub fn compile(
 ) -> (String, Vec<String>) {
     let source = match external.0.get("target").map(|s| s.as_str()) {
         Some("canister_call") | None => Cow::Borrowed(include_str!("rust_call.hbs")),
+        Some("canister_call_legacy") => Cow::Borrowed(include_str!("rust_call_legacy.hbs")),
         Some("agent") => Cow::Borrowed(include_str!("rust_agent.hbs")),
         Some("stub") => {
             let metadata = crate::utils::get_metadata(env, actor);
