@@ -2,7 +2,7 @@
 // You may want to manually adjust some of the types.
 #![allow(dead_code, unused_imports)]
 use candid::{self, CandidType, Deserialize, Principal};
-use ic_cdk::api::call::CallResult as Result;
+use ic_cdk::call::{Call, CallResult as Result};
 
 candid::define_function!(pub Func : () -> (Service));
 candid::define_service!(pub Service : { "f" : Func::ty() });
@@ -17,17 +17,17 @@ pub enum AsVariantRet {
 
 pub struct Service(pub Principal);
 impl Service {
-  pub async fn as_array(&self) -> Result<(Vec<Service2>,Vec<Func>,)> {
-    ic_cdk::call(self.0, "asArray", ()).await
+  pub async fn as_array(&self) -> Result<(Vec<Service2>, Vec<Func>)> {
+    Ok(Call::bounded_wait(self.0, "asArray").await?.candid()?)
   }
-  pub async fn as_principal(&self) -> Result<(Service2,Func,)> {
-    ic_cdk::call(self.0, "asPrincipal", ()).await
+  pub async fn as_principal(&self) -> Result<(Service2, Func)> {
+    Ok(Call::bounded_wait(self.0, "asPrincipal").await?.candid()?)
   }
-  pub async fn as_record(&self) -> Result<((Service2, Option<Service>, Func),)> {
-    ic_cdk::call(self.0, "asRecord", ()).await
+  pub async fn as_record(&self) -> Result<(Service2, Option<Service>, Func)> {
+    Ok(Call::bounded_wait(self.0, "asRecord").await?.candid()?)
   }
-  pub async fn as_variant(&self) -> Result<(AsVariantRet,)> {
-    ic_cdk::call(self.0, "asVariant", ()).await
+  pub async fn as_variant(&self) -> Result<AsVariantRet> {
+    Ok(Call::bounded_wait(self.0, "asVariant").await?.candid()?)
   }
 }
 /// Canister ID: `aaaaa-aa`
