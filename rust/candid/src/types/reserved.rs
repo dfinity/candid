@@ -2,9 +2,10 @@
 
 use super::{CandidType, Serializer, Type, TypeInner};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
+use serde::Serialize;
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Reserved;
 #[derive(PartialEq, Eq, Debug)]
 pub enum Empty {}
@@ -33,6 +34,15 @@ impl CandidType for Empty {
     }
 }
 
+impl Serialize for Reserved {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_none()
+    }
+}
+
 impl<'de> Deserialize<'de> for Reserved {
     fn deserialize<D>(deserializer: D) -> Result<Reserved, D::Error>
     where
@@ -57,5 +67,30 @@ impl<'de> Deserialize<'de> for Empty {
             }
         }
         deserializer.deserialize_any(EmptyVisitor)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Deserialize;
+
+    #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+    pub struct TestStruct {
+        inner: Reserved,
+    }
+
+    #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+    pub struct TestStructUpgraded {
+        inner: Option<String>,
+    }
+
+    #[test]
+    fn test_serde_with_json() {
+        let test_struct = TestStruct { inner: Reserved };
+        let serialized = serde_json::to_string(&test_struct).unwrap();
+        let deserialized = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(test_struct, deserialized);
+        let _upgraded = serde_json::from_str::<TestStructUpgraded>(&serialized).unwrap();
     }
 }

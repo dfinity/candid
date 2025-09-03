@@ -99,7 +99,7 @@ fn pp_inline_service<'a>() -> RcDoc<'a> {
     str("Principal")
 }
 
-fn pp_label(id: &SharedLabel) -> RcDoc {
+fn pp_label(id: &SharedLabel) -> RcDoc<'_> {
     match &**id {
         Label::Named(str) => quote_ident(str),
         Label::Id(n) | Label::Unnamed(n) => str("_")
