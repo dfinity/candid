@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 2025-09-03
+
+### Candid 0.10.18
+
+* Non-breaking changes:
+  + Implement `serde::Serialize` and `PartialOrd`, `Ord`, `Hash` for the `Reserved` type.
+
 ## 2025-08-04
 
 ### Candid 0.10.17
