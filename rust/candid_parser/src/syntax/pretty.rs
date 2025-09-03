@@ -8,7 +8,7 @@ use crate::{
     syntax::{Binding, FuncType, IDLActorType, IDLMergedProg, IDLType, PrimType, TypeField},
 };
 
-fn pp_ty(ty: &IDLType) -> RcDoc {
+fn pp_ty(ty: &IDLType) -> RcDoc<'_> {
     use IDLType::*;
     match ty {
         PrimT(PrimType::Null) => str("null"),
@@ -40,7 +40,7 @@ fn pp_ty(ty: &IDLType) -> RcDoc {
     }
 }
 
-fn pp_field(field: &TypeField, is_variant: bool) -> RcDoc {
+fn pp_field(field: &TypeField, is_variant: bool) -> RcDoc<'_> {
     let docs = pp_docs(&field.docs);
     let ty_doc = if is_variant && field.typ == IDLType::PrimT(PrimType::Null) {
         RcDoc::nil()
@@ -50,16 +50,16 @@ fn pp_field(field: &TypeField, is_variant: bool) -> RcDoc {
     docs.append(pp_label_raw(&field.label)).append(ty_doc)
 }
 
-fn pp_fields(fs: &[TypeField], is_variant: bool) -> RcDoc {
+fn pp_fields(fs: &[TypeField], is_variant: bool) -> RcDoc<'_> {
     let fields = fs.iter().map(|f| pp_field(f, is_variant));
     enclose_space("{", concat(fields, ";"), "}")
 }
 
-fn pp_opt(ty: &IDLType) -> RcDoc {
+fn pp_opt(ty: &IDLType) -> RcDoc<'_> {
     kwd("opt").append(pp_ty(ty))
 }
 
-fn pp_vec(ty: &IDLType) -> RcDoc {
+fn pp_vec(ty: &IDLType) -> RcDoc<'_> {
     if matches!(ty, IDLType::PrimT(PrimType::Nat8)) {
         str("blob")
     } else {
@@ -67,7 +67,7 @@ fn pp_vec(ty: &IDLType) -> RcDoc {
     }
 }
 
-fn pp_record(fs: &[TypeField], is_tuple: bool) -> RcDoc {
+fn pp_record(fs: &[TypeField], is_tuple: bool) -> RcDoc<'_> {
     if is_tuple {
         let tuple = concat(fs.iter().map(|f| pp_ty(&f.typ)), ";");
         kwd("record").append(enclose_space("{", tuple, "}"))
@@ -76,15 +76,15 @@ fn pp_record(fs: &[TypeField], is_tuple: bool) -> RcDoc {
     }
 }
 
-fn pp_variant(fs: &[TypeField]) -> RcDoc {
+fn pp_variant(fs: &[TypeField]) -> RcDoc<'_> {
     kwd("variant").append(pp_fields(fs, true))
 }
 
-fn pp_function(func: &FuncType) -> RcDoc {
+fn pp_function(func: &FuncType) -> RcDoc<'_> {
     kwd("func").append(pp_method(func))
 }
 
-fn pp_method(func: &FuncType) -> RcDoc {
+fn pp_method(func: &FuncType) -> RcDoc<'_> {
     let args = pp_args(&func.args);
     let rets = pp_rets(&func.rets);
     let modes = pp_modes(&func.modes);
@@ -94,20 +94,20 @@ fn pp_method(func: &FuncType) -> RcDoc {
         .nest(INDENT_SPACE)
 }
 
-fn pp_args(args: &[IDLType]) -> RcDoc {
+fn pp_args(args: &[IDLType]) -> RcDoc<'_> {
     let doc = concat(args.iter().map(pp_ty), ",");
     enclose("(", doc, ")")
 }
 
-fn pp_rets(rets: &[IDLType]) -> RcDoc {
+fn pp_rets(rets: &[IDLType]) -> RcDoc<'_> {
     pp_args(rets)
 }
 
-fn pp_service(methods: &[Binding]) -> RcDoc {
+fn pp_service(methods: &[Binding]) -> RcDoc<'_> {
     kwd("service").append(pp_service_methods(methods))
 }
 
-fn pp_service_methods(methods: &[Binding]) -> RcDoc {
+fn pp_service_methods(methods: &[Binding]) -> RcDoc<'_> {
     let methods = methods.iter().map(|b| {
         let docs = pp_docs(&b.docs);
         let func_doc = match b.typ {
@@ -132,7 +132,7 @@ fn pp_class<'a>(args: &'a [IDLType], t: &'a IDLType) -> RcDoc<'a> {
     }
 }
 
-fn pp_defs(prog: &IDLMergedProg) -> RcDoc {
+fn pp_defs(prog: &IDLMergedProg) -> RcDoc<'_> {
     lines(prog.bindings().map(|b| {
         let docs = pp_docs(&b.docs);
         docs.append(kwd("type"))
@@ -143,7 +143,7 @@ fn pp_defs(prog: &IDLMergedProg) -> RcDoc {
     }))
 }
 
-fn pp_actor(actor: &IDLActorType) -> RcDoc {
+fn pp_actor(actor: &IDLActorType) -> RcDoc<'_> {
     let docs = pp_docs(&actor.docs);
     let service_doc = match actor.typ {
         IDLType::ServT(ref serv) => pp_service_methods(serv),

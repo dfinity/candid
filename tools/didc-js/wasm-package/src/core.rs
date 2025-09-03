@@ -63,7 +63,7 @@ pub fn encode(args: EncodeArgs) -> Result<String, LibraryError> {
                     })?;
 
             idl_args
-                .to_bytes_with_types(&idl.env, &[type_def.clone()])
+                .to_bytes_with_types(&idl.env, std::slice::from_ref(type_def))
                 .map_err(|e| LibraryError::IdlArgsToBytesFailed {
                     reason: format!("Could not encode input to bytes {}", e),
                 })?
