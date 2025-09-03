@@ -5,7 +5,7 @@ use serde::de::{self, Deserialize, Deserializer, Visitor};
 use serde::Serialize;
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize)]
 pub struct Reserved;
 #[derive(PartialEq, Eq, Debug)]
 pub enum Empty {}
