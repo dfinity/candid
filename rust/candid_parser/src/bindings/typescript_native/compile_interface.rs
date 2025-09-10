@@ -129,8 +129,6 @@ fn interface_actor_implementation(
     }
 }
 
-// Add actor implementation from service definition
-
 /// Add actor implementation from service definition
 pub fn interface_actor_service(
     env: &TypeEnv,

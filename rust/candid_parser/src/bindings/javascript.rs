@@ -242,7 +242,7 @@ fn pp_actor<'a>(ty: &'a Type, recs: &'a BTreeSet<&'a str>) -> RcDoc<'a> {
 }
 
 fn pp_imports<'a>() -> RcDoc<'a> {
-    str("import { IDL } from '@dfinity/candid';")
+    str("import { IDL } from '@icp-sdk/core/candid';")
         .append(RcDoc::hardline())
         .append(RcDoc::hardline())
 }

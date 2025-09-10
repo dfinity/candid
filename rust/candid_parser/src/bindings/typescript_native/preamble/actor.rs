@@ -4,6 +4,13 @@ use swc_core::ecma::ast::*;
 use super::super::utils::get_ident_guarded;
 
 pub fn interface_canister_initialization(service_name: &str, module: &mut Module) {
+    let create_actor_options = generate_create_actor_options();
+    module
+        .body
+        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+            span: DUMMY_SP,
+            decl: Decl::TsInterface(Box::new(create_actor_options)),
+        })));
     let actor_interface = ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
         span: DUMMY_SP,
         decl: Decl::Var(Box::new(generate_create_actor_function_declaration(
@@ -17,6 +24,13 @@ pub fn interface_canister_initialization(service_name: &str, module: &mut Module
 }
 
 pub fn wrapper_canister_initialization(service_name: &str, module: &mut Module) {
+    let create_actor_options = generate_create_actor_options();
+    module
+        .body
+        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+            span: DUMMY_SP,
+            decl: Decl::TsInterface(Box::new(create_actor_options)),
+        })));
     let wrapper = ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
         span: DUMMY_SP,
         decl: Decl::Fn(generate_create_actor_function(service_name)),
@@ -24,6 +38,94 @@ pub fn wrapper_canister_initialization(service_name: &str, module: &mut Module) 
     module.body.push(wrapper);
     let create_canister_id = create_canister_id_assignment();
     module.body.push(create_canister_id);
+}
+
+fn generate_create_actor_options() -> TsInterfaceDecl {
+    TsInterfaceDecl {
+        span: DUMMY_SP,
+        declare: false,
+        id: Ident::new(
+            "CreateActorOptions".into(),
+            DUMMY_SP,
+            SyntaxContext::empty(),
+        ),
+        type_params: None,
+        extends: vec![],
+        body: TsInterfaceBody {
+            span: DUMMY_SP,
+            body: vec![
+                TsTypeElement::TsPropertySignature(TsPropertySignature {
+                    span: DUMMY_SP,
+                    readonly: false,
+                    key: Box::new(Expr::Ident(Ident::new(
+                        "agent".into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ))),
+                    computed: false,
+                    optional: true,
+                    type_ann: Some(Box::new(TsTypeAnn {
+                        span: DUMMY_SP,
+                        type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                            span: DUMMY_SP,
+                            type_name: TsEntityName::Ident(Ident::new(
+                                "Agent".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            )),
+                            type_params: None,
+                        })),
+                    })),
+                }),
+                TsTypeElement::TsPropertySignature(TsPropertySignature {
+                    span: DUMMY_SP,
+                    readonly: false,
+                    key: Box::new(Expr::Ident(Ident::new(
+                        "agentOptions".into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ))),
+                    computed: false,
+                    optional: true,
+                    type_ann: Some(Box::new(TsTypeAnn {
+                        span: DUMMY_SP,
+                        type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                            span: DUMMY_SP,
+                            type_name: TsEntityName::Ident(Ident::new(
+                                "HttpAgentOptions".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            )),
+                            type_params: None,
+                        })),
+                    })),
+                }),
+                TsTypeElement::TsPropertySignature(TsPropertySignature {
+                    span: DUMMY_SP,
+                    readonly: false,
+                    key: Box::new(Expr::Ident(Ident::new(
+                        "actorOptions".into(),
+                        DUMMY_SP,
+                        SyntaxContext::empty(),
+                    ))),
+                    computed: false,
+                    optional: true,
+                    type_ann: Some(Box::new(TsTypeAnn {
+                        span: DUMMY_SP,
+                        type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                            span: DUMMY_SP,
+                            type_name: TsEntityName::Ident(Ident::new(
+                                "ActorConfig".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            )),
+                            type_params: None,
+                        })),
+                    })),
+                }),
+            ],
+        },
+    }
 }
 
 fn generate_create_actor_function(service_name: &str) -> FnDecl {
@@ -37,37 +139,6 @@ fn generate_create_actor_function(service_name: &str) -> FnDecl {
         declare: false,
         function: Box::new(Function {
             params: vec![
-                // canisterId: string | Principal
-                Param {
-                    span: DUMMY_SP,
-                    decorators: vec![],
-                    pat: Pat::Ident(BindingIdent {
-                        id: Ident::new("canisterId".into(), DUMMY_SP, SyntaxContext::empty()),
-                        type_ann: Some(Box::new(TsTypeAnn {
-                            span: DUMMY_SP,
-                            type_ann: Box::new(TsType::TsUnionOrIntersectionType(
-                                TsUnionOrIntersectionType::TsUnionType(TsUnionType {
-                                    span: DUMMY_SP,
-                                    types: vec![
-                                        Box::new(TsType::TsKeywordType(TsKeywordType {
-                                            span: DUMMY_SP,
-                                            kind: TsKeywordTypeKind::TsStringKeyword,
-                                        })),
-                                        Box::new(TsType::TsTypeRef(TsTypeRef {
-                                            span: DUMMY_SP,
-                                            type_name: TsEntityName::Ident(Ident::new(
-                                                "Principal".into(),
-                                                DUMMY_SP,
-                                                SyntaxContext::empty(),
-                                            )),
-                                            type_params: None,
-                                        })),
-                                    ],
-                                }),
-                            )),
-                        })),
-                    }),
-                },
                 // options?: CreateActorOptions
                 Param {
                     span: DUMMY_SP,
@@ -309,40 +380,6 @@ fn generate_create_actor_function_declaration(service_name: &str) -> VarDecl {
                         TsFnOrConstructorType::TsFnType(TsFnType {
                             span: DUMMY_SP,
                             params: vec![
-                                // First parameter: canisterId: string | Principal
-                                TsFnParam::Ident(BindingIdent {
-                                    id: Ident::new(
-                                        "canisterId".into(),
-                                        DUMMY_SP,
-                                        SyntaxContext::empty(),
-                                    ),
-                                    type_ann: Some(Box::new(TsTypeAnn {
-                                        span: DUMMY_SP,
-                                        type_ann: Box::new(TsType::TsUnionOrIntersectionType(
-                                            TsUnionOrIntersectionType::TsUnionType(TsUnionType {
-                                                span: DUMMY_SP,
-                                                types: vec![
-                                                    Box::new(TsType::TsKeywordType(
-                                                        TsKeywordType {
-                                                            span: DUMMY_SP,
-                                                            kind:
-                                                                TsKeywordTypeKind::TsStringKeyword,
-                                                        },
-                                                    )),
-                                                    Box::new(TsType::TsTypeRef(TsTypeRef {
-                                                        span: DUMMY_SP,
-                                                        type_name: TsEntityName::Ident(Ident::new(
-                                                            "Principal".into(),
-                                                            DUMMY_SP,
-                                                            SyntaxContext::empty(),
-                                                        )),
-                                                        type_params: None,
-                                                    })),
-                                                ],
-                                            }),
-                                        )),
-                                    })),
-                                }),
                                 // Second parameter: options?: CreateActorOptions
                                 TsFnParam::Ident(BindingIdent {
                                     id: Ident {
