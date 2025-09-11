@@ -10,7 +10,6 @@ use super::conversion_functions_generator::convert_multi_return_from_candid;
 use super::new_typescript_native_types::convert_type_with_converter;
 
 use super::new_typescript_native_types::add_type_definitions;
-use super::preamble::actor::wrapper_canister_initialization;
 use super::preamble::imports::wrapper_imports;
 use super::preamble::options::{interface_options_utils, wrapper_options_utils};
 use super::utils::{render_ast, EnumDeclarations};
@@ -44,10 +43,6 @@ pub fn compile_wrapper(
     let mut top_level_nodes = (&mut enum_declarations, &mut comments, &mut cursor);
     add_type_definitions(&mut top_level_nodes, env, &mut module, prog);
 
-    if actor.is_some() {
-        wrapper_canister_initialization(service_name, &mut module);
-    }
-
     let mut actor_module = Module {
         span: DUMMY_SP,
         body: vec![],
@@ -55,6 +50,7 @@ pub fn compile_wrapper(
     };
 
     if let Some(actor_type) = actor {
+        type_process_error_fn(&mut actor_module);
         let syntax_actor = prog.resolve_actor().ok().flatten();
         let span = syntax_actor
             .as_ref()
@@ -159,13 +155,10 @@ fn wrapper_actor_service(
 
     module
         .body
-        .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
-
-    // Export the instance of the class
-    module.body.push(create_actor_instance(
-        service_name,
-        &capitalized_service_name,
-    ));
+        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+            span: DUMMY_SP,
+            decl: Decl::Class(class_decl),
+        })));
 }
 
 // Add actor implementation from a type reference
@@ -206,12 +199,10 @@ fn wrapper_actor_var(
     converter.add_import_for_original_type_definitions(module, service_name);
     module
         .body
-        .push(ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))));
-    // Export the instance of the class
-    module.body.push(create_actor_instance(
-        service_name,
-        &capitalized_service_name,
-    ));
+        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+            span: DUMMY_SP,
+            decl: Decl::Class(class_decl),
+        })));
 }
 
 fn create_actor_class(
@@ -270,14 +261,17 @@ fn create_actor_class(
             Ident::new("constructor".into(), DUMMY_SP, SyntaxContext::empty()).into(),
         ),
         params: vec![
-            ParamOrTsParamProp::Param(Param {
+            ParamOrTsParamProp::TsParamProp(TsParamProp {
                 span: DUMMY_SP,
                 decorators: vec![],
-                pat: Pat::Ident(BindingIdent {
+                accessibility: Some(Accessibility::Private),
+                is_override: false,
+                readonly: false,
+                param: TsParamPropParam::Ident(BindingIdent {
                     id: Ident {
                         span: DUMMY_SP,
                         sym: "actor".into(),
-                        optional: true,
+                        optional: false,
                         ctxt: SyntaxContext::empty(),
                     },
                     type_ann: Some(Box::new(TsTypeAnn {
@@ -320,68 +314,22 @@ fn create_actor_class(
                     },
                     type_ann: Some(Box::new(TsTypeAnn {
                         span: DUMMY_SP,
-                        type_ann: Box::new(TsType::TsFnOrConstructorType(
-                            TsFnOrConstructorType::TsFnType(TsFnType {
-                                span: DUMMY_SP,
-                                params: vec![TsFnParam::Ident(BindingIdent {
-                                    id: Ident::new(
-                                        "error".into(),
-                                        DUMMY_SP,
-                                        SyntaxContext::empty(),
-                                    ),
-                                    type_ann: Some(Box::new(TsTypeAnn {
-                                        span: DUMMY_SP,
-                                        type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
-                                            span: DUMMY_SP,
-                                            kind: TsKeywordTypeKind::TsUnknownKeyword,
-                                        })),
-                                    })),
-                                })],
-                                type_params: None,
-                                type_ann: Box::new(TsTypeAnn {
-                                    span: DUMMY_SP,
-                                    type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
-                                        span: DUMMY_SP,
-                                        kind: TsKeywordTypeKind::TsNeverKeyword,
-                                    })),
-                                }),
-                            }),
-                        )),
+                        type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
+                            span: DUMMY_SP,
+                            type_name: TsEntityName::Ident(Ident::new(
+                                "ProcessErrorFn".into(),
+                                DUMMY_SP,
+                                SyntaxContext::empty(),
+                            )),
+                            type_params: None,
+                        })),
                     })),
                 }),
             }),
         ],
         body: Some(BlockStmt {
             span: DUMMY_SP,
-            stmts: vec![Stmt::Expr(ExprStmt {
-                span: DUMMY_SP,
-                expr: Box::new(Expr::Assign(AssignExpr {
-                    span: DUMMY_SP,
-                    op: AssignOp::Assign,
-                    left: AssignTarget::Simple(SimpleAssignTarget::Member(MemberExpr {
-                        span: DUMMY_SP,
-                        obj: Box::new(Expr::This(ThisExpr { span: DUMMY_SP })),
-                        prop: MemberProp::Ident(IdentName {
-                            span: DUMMY_SP,
-                            sym: "actor".into(),
-                        }),
-                    })),
-                    right: Box::new(Expr::Bin(BinExpr {
-                        span: DUMMY_SP,
-                        op: BinaryOp::NullishCoalescing,
-                        left: Box::new(Expr::Ident(Ident::new(
-                            "actor".into(),
-                            DUMMY_SP,
-                            SyntaxContext::empty(),
-                        ))),
-                        right: Box::new(Expr::Ident(Ident::new(
-                            format!("_{}", service_name).into(),
-                            DUMMY_SP,
-                            SyntaxContext::empty(),
-                        ))),
-                    })),
-                })),
-            })],
+            stmts: vec![],
             ctxt: SyntaxContext::empty(),
         }),
         accessibility: None,
@@ -752,43 +700,43 @@ fn create_actor_method(
     })
 }
 
-fn create_actor_instance(service_name: &str, capitalized_service_name: &str) -> ModuleItem {
-    ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-        span: DUMMY_SP,
-        decl: Decl::Var(Box::new(VarDecl {
-            span: DUMMY_SP,
-            kind: VarDeclKind::Const,
-            declare: false,
-            decls: vec![VarDeclarator {
-                span: DUMMY_SP,
-                name: Pat::Ident(BindingIdent {
-                    id: get_ident_guarded(service_name),
+fn type_process_error_fn(module: &mut Module) {
+    let span = DUMMY_SP;
+
+    let type_declaration = TsTypeAliasDecl {
+        span,
+        declare: false,
+        id: Ident::new("ProcessErrorFn".into(), span, SyntaxContext::empty()),
+        type_params: None,
+        type_ann: Box::new(TsType::TsFnOrConstructorType(
+            TsFnOrConstructorType::TsFnType(TsFnType {
+                span,
+                params: vec![TsFnParam::Ident(BindingIdent {
+                    id: Ident::new("error".into(), span, SyntaxContext::empty()),
                     type_ann: Some(Box::new(TsTypeAnn {
-                        span: DUMMY_SP,
-                        type_ann: Box::new(TsType::TsTypeRef(TsTypeRef {
-                            span: DUMMY_SP,
-                            type_name: TsEntityName::Ident(get_ident_guarded(&format!(
-                                "{}Interface",
-                                service_name
-                            ))),
-                            type_params: None,
+                        span,
+                        type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
+                            span,
+                            kind: TsKeywordTypeKind::TsUnknownKeyword,
                         })),
                     })),
+                })],
+                type_params: None,
+                type_ann: Box::new(TsTypeAnn {
+                    span,
+                    type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
+                        span,
+                        kind: TsKeywordTypeKind::TsNeverKeyword,
+                    })),
                 }),
-                init: Some(Box::new(Expr::New(NewExpr {
-                    span: DUMMY_SP,
-                    callee: Box::new(Expr::Ident(Ident::new(
-                        capitalized_service_name.into(),
-                        DUMMY_SP,
-                        SyntaxContext::empty(),
-                    ))),
-                    args: Some(vec![]),
-                    type_args: None,
-                    ctxt: SyntaxContext::empty(),
-                }))),
-                definite: false,
-            }],
-            ctxt: SyntaxContext::empty(),
-        })),
-    }))
+            }),
+        )),
+    };
+
+    module
+        .body
+        .push(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
+            span,
+            decl: Decl::TsTypeAlias(Box::new(type_declaration)),
+        })));
 }

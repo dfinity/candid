@@ -1,6 +1,5 @@
 use super::conversion_functions_generator::TypeConverter;
 use super::new_typescript_native_types::{add_type_definitions, create_interface_from_service};
-use super::preamble::actor::interface_canister_initialization;
 use super::preamble::imports::interface_imports;
 use super::preamble::options::interface_options_utils;
 use super::utils::get_ident_guarded;
@@ -34,7 +33,6 @@ pub fn compile_interface(
     let mut cursor = super::comments::PosCursor::new();
     let mut top_level_nodes = (&mut enum_declarations, &mut comments, &mut cursor);
     add_type_definitions(&mut top_level_nodes, env, &mut module, prog);
-    interface_canister_initialization(service_name, &mut module);
 
     let mut actor_module = Module {
         span: DUMMY_SP,
