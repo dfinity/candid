@@ -18,9 +18,6 @@ pub fn interface_canister_initialization(service_name: &str, module: &mut Module
         ))),
     }));
     module.body.push(actor_interface);
-
-    let create_canister_id = create_canister_id_declaration();
-    module.body.push(create_canister_id);
 }
 
 pub fn wrapper_canister_initialization(service_name: &str, module: &mut Module) {
@@ -36,8 +33,6 @@ pub fn wrapper_canister_initialization(service_name: &str, module: &mut Module) 
         decl: Decl::Fn(generate_create_actor_function(service_name)),
     }));
     module.body.push(wrapper);
-    let create_canister_id = create_canister_id_assignment();
-    module.body.push(create_canister_id);
 }
 
 fn generate_create_actor_options() -> TsInterfaceDecl {
@@ -310,58 +305,6 @@ fn generate_create_actor_function(service_name: &str) -> FnDecl {
             ctxt: SyntaxContext::empty(),
         }),
     }
-}
-
-fn create_canister_id_declaration() -> ModuleItem {
-    ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-        span: DUMMY_SP,
-        decl: Decl::Var(Box::new(VarDecl {
-            span: DUMMY_SP,
-            ctxt: SyntaxContext::empty(),
-            kind: VarDeclKind::Const,
-            declare: true,
-            decls: vec![VarDeclarator {
-                span: DUMMY_SP,
-                name: Pat::Ident(BindingIdent {
-                    id: Ident::new("canisterId".into(), DUMMY_SP, SyntaxContext::empty()),
-                    type_ann: Some(Box::new(TsTypeAnn {
-                        span: DUMMY_SP,
-                        type_ann: Box::new(TsType::TsKeywordType(TsKeywordType {
-                            span: DUMMY_SP,
-                            kind: TsKeywordTypeKind::TsStringKeyword,
-                        })),
-                    })),
-                }),
-                init: None,
-                definite: false,
-            }],
-        })),
-    }))
-}
-
-fn create_canister_id_assignment() -> ModuleItem {
-    ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(ExportDecl {
-        span: DUMMY_SP,
-        decl: Decl::Var(Box::new(VarDecl {
-            span: DUMMY_SP,
-            ctxt: SyntaxContext::empty(),
-            kind: VarDeclKind::Const,
-            declare: false,
-            decls: vec![VarDeclarator {
-                span: DUMMY_SP,
-                name: Pat::Ident(BindingIdent {
-                    id: Ident::new("canisterId".into(), DUMMY_SP, SyntaxContext::empty()),
-                    type_ann: None,
-                }),
-                init: Some(Box::new(Expr::Ident(Ident::new(
-                    "_canisterId".into(),
-                    DUMMY_SP,
-                    SyntaxContext::empty(),
-                )))),
-                definite: false,
-            }],
-        })),
-    }))
 }
 
 fn generate_create_actor_function_declaration(service_name: &str) -> VarDecl {
