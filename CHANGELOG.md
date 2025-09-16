@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 2025-09-15
+
+### Candid 0.10.19
+
+* Non-breaking changes:
+  + Fixes a compatibility issue with `serde` v1.0.220 and later.
+
 ## 2025-09-03
 
 ### Candid 0.10.18
