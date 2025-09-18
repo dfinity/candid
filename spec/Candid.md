@@ -812,7 +812,7 @@ opt <datatype> <: opt <datatype'>
 
 not (null <: <datatype>)
 not (<datatype> <: <datatype'>)
----------------------------------
+-------------------------------
 <datatype> <: opt <datatype'>
 ```
 *Note:* These rules are necessary in the presence of the unusual record and variant rules shown below. Without them, certain upgrades may generally be valid one step at a time, but not taken together, which could cause problems for clients catching up with multiple upgrades.
