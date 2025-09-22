@@ -961,15 +961,9 @@ opt <v> : opt <t> ~> null : opt <t'>
 Coercing a non-null, non-optional and non-reserved type at an option type treats it as an optional value, if it can be decoded successfully at the content type:
 ```
 not (null <: <t>)
-not (<v'> = null)
 <v> : <t> ~> <v'> : <t'>
 --------------------------------
 <v> : <t> ~> opt <v'> : opt <t'>
-
-not (null <: <t>)
-<v> : <t> ~> null : <t'>
-----------------------------
-<v> : <t> ~> null : opt <t'>
 ```
 
 Any other value goes to `null`:
