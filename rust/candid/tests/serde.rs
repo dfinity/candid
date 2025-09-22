@@ -1,6 +1,6 @@
 use candid::{
     decode_one_with_config, encode_one, CandidType, Decode, DecoderConfig, Deserialize, Encode,
-    Int, Nat,
+    Int, Nat, Reserved,
 };
 use candid_parser::utils::check_rust_type;
 
@@ -191,6 +191,71 @@ fn test_option() {
     });
     let expected = A { canister_id: None };
     test_decode(&bytes, &expected);
+    // Deserialize `null : null` to `opt null`, `opt opt null`, and `opt opt null`.
+    let null: () = ();
+    let bytes = encode(&null);
+    let none_null: Option<()> = None;
+    test_decode(&bytes, &none_null);
+    let none_none_null: Option<Option<()>> = None;
+    test_decode(&bytes, &none_none_null);
+    // Deserialize `null : reserved` to `opt reserved`, `opt opt reserved`, and `opt opt reserved`.
+    let reserved: Reserved = Reserved;
+    let bytes = encode(&reserved);
+    let none_reserved: Option<Reserved> = None;
+    test_decode(&bytes, &none_reserved);
+    let none_none_reserved: Option<Option<Reserved>> = None;
+    test_decode(&bytes, &none_none_reserved);
+    // Deserialize `5 : nat64` to `opt reserved`, `opt opt reserved`, and `opt opt reserved`.
+    let nat64: u64 = 5;
+    let bytes = encode(&nat64);
+    let some_reserved: Option<Reserved> = Some(Reserved);
+    test_decode(&bytes, &some_reserved);
+    let some_some_reserved: Option<Option<Reserved>> = Some(Some(Reserved));
+    test_decode(&bytes, &some_some_reserved);
+    let some_some_some_reserved: Option<Option<Option<Reserved>>> = Some(Some(Some(Reserved)));
+    test_decode(&bytes, &some_some_some_reserved);
+    // Deserialize `5 : nat64` to `opt nat64`, `opt opt nat64`, and `opt opt opt nat64`.
+    let bytes = encode(&nat64);
+    let some_nat64: Option<u64> = Some(nat64);
+    test_decode(&bytes, &some_nat64);
+    let some_some_nat64: Option<Option<u64>> = Some(Some(nat64));
+    test_decode(&bytes, &some_some_nat64);
+    let some_some_some_nat64: Option<Option<Option<u64>>> = Some(Some(Some(nat64)));
+    test_decode(&bytes, &some_some_some_nat64);
+    // Deserialize `5 : nat` to `opt int`, `opt opt int`, and `opt opt opt int`.
+    let nat: Nat = 5_u64.into();
+    let int: Int = 5.into();
+    let bytes = encode(&nat);
+    let some_int: Option<Int> = Some(int.clone());
+    test_decode(&bytes, &some_int);
+    let some_some_int: Option<Option<Int>> = Some(Some(int.clone()));
+    test_decode(&bytes, &some_some_int);
+    let some_some_some_int: Option<Option<Option<Int>>> = Some(Some(Some(int.clone())));
+    test_decode(&bytes, &some_some_some_int);
+    // Deserialize `5 : int` to `opt nat`, `opt opt nat`, and `opt opt opt nat`.
+    let bytes = encode(&int);
+    let none_nat: Option<Nat> = None;
+    test_decode(&bytes, &none_nat);
+    let some_none_nat: Option<Option<Nat>> = Some(None);
+    test_decode(&bytes, &some_none_nat);
+    let some_some_none_nat: Option<Option<Option<Nat>>> = Some(Some(None));
+    test_decode(&bytes, &some_some_none_nat);
+    // Deserialize `opt 5 : opt nat64` to `opt nat64`, `opt opt nat64`, and `opt opt opt nat64`.
+    let bytes = encode(&some_nat64);
+    test_decode(&bytes, &some_nat64);
+    test_decode(&bytes, &some_some_nat64);
+    test_decode(&bytes, &some_some_some_nat64);
+    // Deserialize `opt 5 : opt nat` to `opt int`, `opt opt int`, and `opt opt opt int`.
+    let some_nat: Option<Nat> = Some(nat.clone());
+    let bytes = encode(&some_nat);
+    test_decode(&bytes, &some_int);
+    test_decode(&bytes, &some_some_int);
+    test_decode(&bytes, &some_some_some_int);
+    // Deserialize `opt 5 : opt int` to `opt nat`, `opt opt nat`, and `opt opt opt nat`.
+    let bytes = encode(&some_int);
+    test_decode(&bytes, &none_nat);
+    test_decode(&bytes, &some_none_nat);
+    test_decode(&bytes, &some_some_none_nat);
 }
 
 #[test]
