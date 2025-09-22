@@ -191,21 +191,34 @@ fn test_option() {
     });
     let expected = A { canister_id: None };
     test_decode(&bytes, &expected);
-    // Deserialize `null : null` to `opt null`, `opt opt null`, and `opt opt null`.
+    // Deserialize `null : null` to `opt null`, `opt opt null`, and `opt opt opt null`.
     let null: () = ();
     let bytes = encode(&null);
     let none_null: Option<()> = None;
     test_decode(&bytes, &none_null);
     let none_none_null: Option<Option<()>> = None;
     test_decode(&bytes, &none_none_null);
-    // Deserialize `null : reserved` to `opt reserved`, `opt opt reserved`, and `opt opt reserved`.
+    let none_none_none_null: Option<Option<Option<()>>> = None;
+    test_decode(&bytes, &none_none_none_null);
+    // Deserialize `5 : nat64` to `opt null`, `opt opt null`, and `opt opt opt null`.
+    let nat64: u64 = 5;
+    let bytes = encode(&nat64);
+    let none_null: Option<()> = None;
+    test_decode(&bytes, &none_null);
+    let some_none_null: Option<Option<()>> = Some(None);
+    test_decode(&bytes, &some_none_null);
+    let some_some_none_null: Option<Option<Option<()>>> = Some(Some(None));
+    test_decode(&bytes, &some_some_none_null);
+    // Deserialize `null : reserved` to `opt reserved`, `opt opt reserved`, and `opt opt opt reserved`.
     let reserved: Reserved = Reserved;
     let bytes = encode(&reserved);
     let none_reserved: Option<Reserved> = None;
     test_decode(&bytes, &none_reserved);
     let none_none_reserved: Option<Option<Reserved>> = None;
     test_decode(&bytes, &none_none_reserved);
-    // Deserialize `5 : nat64` to `opt reserved`, `opt opt reserved`, and `opt opt reserved`.
+    let none_none_none_reserved: Option<Option<Option<Reserved>>> = None;
+    test_decode(&bytes, &none_none_none_reserved);
+    // Deserialize `5 : nat64` to `opt reserved`, `opt opt reserved`, and `opt opt opt reserved`.
     let nat64: u64 = 5;
     let bytes = encode(&nat64);
     let some_reserved: Option<Reserved> = Some(Reserved);
