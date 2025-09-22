@@ -953,12 +953,12 @@ An optional value coerces at an option type, if the constituent value has a suit
 ----------------------------------------
 opt <v> : opt <t> ~> opt <v'> : opt <t'>
 
-not (<v> : <t> ~> _ : <t'>)
+not (exists <w>. <v> : <t> ~> <w> : <t'>)
 ----------------------------------------
 opt <v> : opt <t> ~> null : opt <t'>
 ```
 
-Coercing a non-null, non-optional and non-reserved type at an option type treats it as an optional value, if it can be decoded successfully:
+Coercing a non-null, non-optional and non-reserved type at an option type treats it as an optional value, if it can be decoded successfully at the content type:
 ```
 not (null <: <t>)
 not (<v'> = null)
@@ -979,7 +979,7 @@ not (<v> = null)
 <v> : reserved ~> null : opt <t'>
 
 not (null <: <t>)
-not (<v> : <t> ~> _ : <t'>)
+not (exists <w>. <v> : <t> ~> <w> : <t'>)
 ----------------------------
 <v> : <t> ~> null : opt <t'>
 ```
