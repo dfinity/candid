@@ -208,7 +208,13 @@ fn test_option() {
 
 // the value `null` of type `null` is represented as Rust value `()` of Rust type `()`
 // the value `null` of type `reserved` is represented as Rust value `Reserved` of Rust type `Reserved`
-fn coerce_to_nested_option_null<T: CandidType + Clone, U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>>(t: T, u: U) {
+fn coerce_to_nested_option_null<
+    T: CandidType + Clone,
+    U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>,
+>(
+    t: T,
+    u: U,
+) {
     // Deserialize `null : T` to `null : opt U`, `null : opt opt U`, and `null : opt opt opt U`.
     coerce_to_nested_option_none::<T, U>(t.clone());
     // Deserialize `null : opt T` to `null : opt U`, `null : opt opt U`, and `null : opt opt opt U`.
@@ -217,7 +223,13 @@ fn coerce_to_nested_option_null<T: CandidType + Clone, U: CandidType + Clone + D
     coerce_to_nested_option_some_none::<Option<T>, U>(Some(t), u);
 }
 
-fn coerce_to_nested_option_success<T: CandidType + Clone, U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>>(t: T, u: U) {
+fn coerce_to_nested_option_success<
+    T: CandidType + Clone,
+    U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>,
+>(
+    t: T,
+    u: U,
+) {
     // Deserialize `t : T` to `opt u : opt U`, `opt opt u : opt opt U`, and `opt opt opt u : opt opt opt U`.
     coerce_to_nested_option_some_some_some::<T, U>(t.clone(), u.clone());
     // Deserialize `null : opt T` to `null : opt U`, `null : opt opt U`, and `null : opt opt opt U`.
@@ -226,7 +238,12 @@ fn coerce_to_nested_option_success<T: CandidType + Clone, U: CandidType + Clone 
     coerce_to_nested_option_some_some_some::<Option<T>, U>(Some(t), u);
 }
 
-fn coerce_to_nested_option_failure<T: CandidType + Clone, U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>>(t: T) {
+fn coerce_to_nested_option_failure<
+    T: CandidType + Clone,
+    U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>,
+>(
+    t: T,
+) {
     // Deserialize `t : T` to `null : opt U`, `opt null : opt opt U`, and `opt opt null : opt opt opt U`.
     coerce_to_nested_option_some_some_none::<T, U>(t.clone());
     // Deserialize `null : opt T` to `null : opt U`, `null : opt opt U`, and `null : opt opt opt U`.
