@@ -193,44 +193,46 @@ fn test_option() {
     let expected = A { canister_id: None };
     test_decode(&bytes, &expected);
 
-    // Deserialize `null : null` to `opt null`, `opt opt null`, and `opt opt opt null`.
-    coerce_to_nested_option_none::<(), ()>(());
-    // Deserialize `5 : nat64` to `opt null`, `opt opt null`, and `opt opt opt null`.
-    coerce_to_nested_option_some_none::<u64, ()>(5_u64);
-    // Deserialize `null : opt nat64` to `opt null`, `opt opt null`, and `opt opt opt null`.
-    coerce_to_nested_option_none::<Option<u64>, ()>(None);
-    // Deserialize `opt 5 : opt nat64` to `opt null`, `opt opt null`, and `opt opt opt null`.
-    coerce_to_nested_option_some_none::<Option<u64>, ()>(Some(5_u64));
+    coerce_to_nested_option_null::<(), ()>((), ());
+    coerce_to_nested_option_null::<(), Reserved>((), Reserved);
+    coerce_to_nested_option_null::<Reserved, Reserved>(Reserved, Reserved);
+    coerce_to_nested_option_null::<Reserved, ()>(Reserved, ()); // `null : reserved` coerces to `null : null`
 
-    // Deserialize `null : reserved` to `opt reserved`, `opt opt reserved`, and `opt opt opt reserved`.
-    coerce_to_nested_option_none::<Reserved, Reserved>(Reserved);
-    // Deserialize `5 : nat64` to `opt reserved`, `opt opt reserved`, and `opt opt opt reserved`.
     coerce_to_nested_option_success::<u64, Reserved>(5_u64, Reserved);
-    // Deserialize `null : opt nat64` to `opt reserved`, `opt opt reserved`, and `opt opt opt reserved`.
-    coerce_to_nested_option_none::<Option<u64>, Reserved>(None);
-    // Deserialize `opt 5 : opt nat64` to `opt reserved`, `opt opt reserved`, and `opt opt opt reserved`.
-    coerce_to_nested_option_success::<Option<u64>, Reserved>(Some(5_u64), Reserved);
-
-    // Deserialize `5 : nat64` to `opt nat64`, `opt opt nat64`, and `opt opt opt nat64`.
     coerce_to_nested_option_success::<u64, u64>(5_u64, 5_u64);
-    // Deserialize `null : opt nat64` to `opt nat64`, `opt opt nat64`, and `opt opt opt nat64`.
-    coerce_to_nested_option_none::<Option<u64>, u64>(None);
-    // Deserialize `opt 5 : opt nat64` to `opt nat64`, `opt opt nat64`, and `opt opt opt nat64`.
-    coerce_to_nested_option_success::<Option<u64>, u64>(Some(5_u64), 5_u64);
+    coerce_to_nested_option_failure::<u64, ()>(5_u64);
 
-    // Deserialize `5 : nat` to `opt int`, `opt opt int`, and `opt opt opt int`.
     coerce_to_nested_option_success::<Nat, Int>(5_u64.into(), 5.into());
-    // Deserialize `null : opt nat` to `opt int`, `opt opt int`, and `opt opt opt int`.
-    coerce_to_nested_option_none::<Option<Nat>, Int>(None);
-    // Deserialize `opt 5 : opt nat` to `opt int`, `opt opt int`, and `opt opt opt int`.
-    coerce_to_nested_option_success::<Option<Nat>, Int>(Some(5_u64.into()), 5.into());
+    coerce_to_nested_option_failure::<Int, Nat>(5.into());
+}
 
-    // Deserialize `5 : int` to `opt nat`, `opt opt nat`, and `opt opt opt nat`.
-    coerce_to_nested_option_some_none::<Int, Nat>(5.into());
-    // Deserialize `null : opt int` to `opt nat`, `opt opt nat`, and `opt opt opt nat`.
-    coerce_to_nested_option_none::<Option<Int>, Nat>(None);
-    // Deserialize `opt 5 : opt int` to `opt nat`, `opt opt nat`, and `opt opt opt nat`.
-    coerce_to_nested_option_some_none::<Option<Int>, Nat>(Some(5.into()));
+// the value `null` of type `null` is represented as Rust value `()` of Rust type `()`
+// the value `null` of type `reserved` is represented as Rust value `Reserved` of Rust type `Reserved`
+fn coerce_to_nested_option_null<T: CandidType + Clone, U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>>(t: T, u: U) {
+    // Deserialize `null : T` to `null : opt U`, `null : opt opt U`, and `null : opt opt opt U`.
+    coerce_to_nested_option_none::<T, U>(t.clone());
+    // Deserialize `null : opt T` to `null : opt U`, `null : opt opt U`, and `null : opt opt opt U`.
+    coerce_to_nested_option_none::<Option<T>, U>(None);
+    // Deserialize `opt null : opt T` to `opt null : opt U`, `opt null : opt opt U`, and `opt null : opt opt opt U`.
+    coerce_to_nested_option_some_none::<Option<T>, U>(Some(t), u);
+}
+
+fn coerce_to_nested_option_success<T: CandidType + Clone, U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>>(t: T, u: U) {
+    // Deserialize `t : T` to `opt u : opt U`, `opt opt u : opt opt U`, and `opt opt opt u : opt opt opt U`.
+    coerce_to_nested_option_some_some_some::<T, U>(t.clone(), u.clone());
+    // Deserialize `null : opt T` to `null : opt U`, `null : opt opt U`, and `null : opt opt opt U`.
+    coerce_to_nested_option_none::<Option<T>, U>(None);
+    // Deserialize `opt t : opt T` to `opt u : opt U`, `opt opt u : opt opt U`, and `opt opt opt u : opt opt opt U`.
+    coerce_to_nested_option_some_some_some::<Option<T>, U>(Some(t), u);
+}
+
+fn coerce_to_nested_option_failure<T: CandidType + Clone, U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>>(t: T) {
+    // Deserialize `t : T` to `null : opt U`, `opt null : opt opt U`, and `opt opt null : opt opt opt U`.
+    coerce_to_nested_option_some_some_none::<T, U>(t.clone());
+    // Deserialize `null : opt T` to `null : opt U`, `null : opt opt U`, and `null : opt opt opt U`.
+    coerce_to_nested_option_none::<Option<T>, U>(None);
+    // Deserialize `opt t : opt T` to `null : opt U`, `opt null : opt opt U`, and `opt opt null : opt opt opt U`.
+    coerce_to_nested_option_some_some_none::<Option<T>, U>(Some(t));
 }
 
 fn coerce_to_nested_option_none<
@@ -253,6 +255,22 @@ fn coerce_to_nested_option_some_none<
     U: CandidType + Debug + PartialEq + for<'a> Deserialize<'a>,
 >(
     t: T,
+    u: U,
+) {
+    let bytes = encode(&t);
+    let some: Option<U> = Some(u);
+    test_decode(&bytes, &some);
+    let some_none: Option<Option<U>> = Some(None);
+    test_decode(&bytes, &some_none);
+    let some_none_none: Option<Option<Option<U>>> = Some(None);
+    test_decode(&bytes, &some_none_none);
+}
+
+fn coerce_to_nested_option_some_some_none<
+    T: CandidType,
+    U: CandidType + Debug + PartialEq + for<'a> Deserialize<'a>,
+>(
+    t: T,
 ) {
     let bytes = encode(&t);
     let none: Option<U> = None;
@@ -263,7 +281,7 @@ fn coerce_to_nested_option_some_none<
     test_decode(&bytes, &some_some_none);
 }
 
-fn coerce_to_nested_option_success<
+fn coerce_to_nested_option_some_some_some<
     T: CandidType,
     U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>,
 >(
