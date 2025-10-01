@@ -205,6 +205,23 @@ assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa
 
 assert blob "DIDL\07\6c\07\c3\e3\aa\02\01\d3\e3\aa\02\7e\d5\e3\aa\02\02\db\e3\aa\02\01\a2\e5\aa\02\04\bb\f1\aa\02\06\86\8e\b7\02\75\6c\02\d3\e3\aa\02\7e\86\8e\b7\02\75\6b\02\d1\a7\cf\02\7f\f1\f3\92\8e\04\03\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\02\6e\05\6c\02\a0\d2\ac\a8\04\7c\90\ed\da\e7\04\04\6b\02\d3\e3\aa\02\7f\86\8e\b7\02\7f\01\00\01\0b\00\00\00\01\00\00\0a\00\00\00\01\14\00\00\2a\00\00\00" !: (record { foo: int; new_field: bool }) "new record field";
 
+// parsing reserved as null
+assert blob "DIDL\00\01\70" == "(null)" : (reserved) "reserved";
+assert blob "DIDL\00\01\70"            !: (null) "parsing reserved as null";
+assert blob "DIDL\01\6c\01\00\70\01\00" == "(record { 0 = null })" : (record { 0 : reserved }) "record with reserved field";
+assert blob "DIDL\01\6c\01\00\70\01\00"                           !: (record { 0 : null }) "parsing record with reserved field as record with null field";
+assert blob "DIDL\01\6b\01\00\70\01\00\00" == "(variant { 0 = null })" : (variant { 0 : reserved }) "variant with reserved field";
+assert blob "DIDL\01\6b\01\00\70\01\00\00"                            !: (variant { 0 : null }) "parsing variant with reserved field as variant with null field";
+assert blob "DIDL\01\6d\70\01\00\01" == "(vec { null })" : (vec reserved) "vector with reserved elements";
+assert blob "DIDL\01\6d\70\01\00\01"                    !: (vec null) "parsing vector with reserved elements as vector with null elements";
+assert blob "DIDL\01\6e\70\01\00\01" == "(opt null)" : (opt reserved) "optional reserved element";
+assert blob "DIDL\01\6e\70\01\00\01" == "(null)"     : (opt null) "parsing optional reserved element as optional null element";
+
+// missing data
+assert blob "DIDL\00\02\7d\7d\05\06" == "(5, 6)" : (nat, nat, opt nat) "parsing a top-level tuple into a longer top-level tuple";
+assert blob "DIDL\01\6c\01\00\7d\01\00\05" == "(record { 0 = 5 })" : (record { 1 : opt nat }) "parsing record with extra field that is less than the expected field";
+assert blob "DIDL\01\6c\01\01\7d\01\00\05" == "(record { 1 = 5 })" : (record { 0 : opt nat }) "parsing record with extra field that is greater than the expected field";
+
 // Future types
 // This uses 0x67 for the “future type”; bump (well, decrement) once that
 // becomes a concrete future type
