@@ -136,6 +136,8 @@ pub struct Tokenizer<'input> {
     lex: Lexer<'input, Token>,
     comment_buffer: Vec<String>,
     trivia: Option<TriviaMap>,
+    last_comment_end: Option<usize>,
+    last_token_line_end: Option<usize>,
 }
 
 impl<'input> Tokenizer<'input> {
@@ -145,6 +147,8 @@ impl<'input> Tokenizer<'input> {
             lex,
             comment_buffer: vec![],
             trivia: None,
+            last_comment_end: None,
+            last_token_line_end: None,
         }
     }
 
@@ -154,7 +158,43 @@ impl<'input> Tokenizer<'input> {
             lex,
             comment_buffer: vec![],
             trivia: Some(trivia),
+            last_comment_end: None,
+            last_token_line_end: None,
         }
+    }
+
+    /// Count newlines between two positions in the source
+    fn count_newlines_between(&self, start: usize, end: usize) -> usize {
+        let source = self.lex.source();
+        if start < end && end <= source.len() {
+            source[start..end].chars().filter(|&c| c == '\n').count()
+        } else {
+            0
+        }
+    }
+
+    /// Check if there's a blank line (or more) between the end of the last comment
+    /// and the start of the current token
+    fn has_blank_line_before_token(&self, token_start: usize) -> bool {
+        self.last_comment_end
+            .map(|end| self.count_newlines_between(end, token_start) >= 2)
+            .unwrap_or(false)
+    }
+
+    /// Check if the comment is on the same line as the previous token (inline comment)
+    fn is_inline_comment(&self, comment_start: usize) -> bool {
+        self.last_token_line_end
+            .map(|line_end| comment_start <= line_end)
+            .unwrap_or(false)
+    }
+
+    /// Find the end of the line containing the given position
+    fn find_line_end(&self, pos: usize) -> usize {
+        let source = self.lex.source();
+        source[pos..]
+            .find('\n')
+            .map(|offset| pos + offset)
+            .unwrap_or(source.len())
     }
 }
 
@@ -207,8 +247,12 @@ impl Iterator for Tokenizer<'_> {
             }
             Ok(Token::LineComment) => {
                 let content = parse_doc_comment(&self.lex);
-                if self.trivia.is_some() {
+                if self.trivia.is_some() && !self.is_inline_comment(span.start) {
+                    if self.has_blank_line_before_token(span.start) {
+                        self.comment_buffer.clear();
+                    }
                     self.comment_buffer.push(content.to_string());
+                    self.last_comment_end = Some(span.end);
                 }
                 self.next()
             }
@@ -234,6 +278,9 @@ impl Iterator for Tokenizer<'_> {
                     }
                 }
                 self.lex = lex.morph::<Token>();
+                // Update last_comment_end to skip over the block comment
+                // This prevents block comments from breaking doc comment continuity
+                self.last_comment_end = Some(self.lex.span().start);
                 self.next()
             }
             Ok(Token::StartString) => {
@@ -312,12 +359,22 @@ impl Iterator for Tokenizer<'_> {
                 Some(Ok((span.start, Token::Text(result), self.lex.span().end)))
             }
             Ok(token) => {
+                // Check for blank line before getting mutable reference
+                let has_blank_line = self.has_blank_line_before_token(span.start);
+
                 if let Some(trivia) = &mut self.trivia {
                     if !self.comment_buffer.is_empty() {
-                        let content: Vec<String> = mem::take(&mut self.comment_buffer);
-                        trivia.borrow_mut().insert(span.start, content);
+                        if !has_blank_line {
+                            let content: Vec<String> = mem::take(&mut self.comment_buffer);
+                            trivia.borrow_mut().insert(span.start, content);
+                        } else {
+                            self.comment_buffer.clear();
+                        }
                     }
+                    self.last_comment_end = None;
                 }
+                self.last_token_line_end = Some(self.find_line_end(span.end));
+
                 Some(Ok((span.start, token, span.end)))
             }
         }
