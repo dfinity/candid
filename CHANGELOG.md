@@ -26,6 +26,18 @@
 * Non-breaking changes:
   + Supports parsing the arguments' names for `func` and `service` (init args).
 
+## 2025-10-02
+
+### candid_parser 0.2.2
+
+* Non-breaking changes:
+  + fix: ignore inline comments or separated by newlines
+
+### didc 0.5.2
+
+* Non-breaking changes:
+  + fix: ignore inline comments or separated by newlines
+
 ## 2025-09-15
 
 ### Candid 0.10.19
