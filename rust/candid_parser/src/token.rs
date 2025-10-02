@@ -136,7 +136,6 @@ pub struct Tokenizer<'input> {
     lex: Lexer<'input, Token>,
     comment_buffer: Vec<String>,
     trivia: Option<TriviaMap>,
-    source: &'input str,
     last_comment_end: Option<usize>,
     last_token_line_end: Option<usize>,
 }
@@ -148,7 +147,6 @@ impl<'input> Tokenizer<'input> {
             lex,
             comment_buffer: vec![],
             trivia: None,
-            source: input,
             last_comment_end: None,
             last_token_line_end: None,
         }
@@ -160,7 +158,6 @@ impl<'input> Tokenizer<'input> {
             lex,
             comment_buffer: vec![],
             trivia: Some(trivia),
-            source: input,
             last_comment_end: None,
             last_token_line_end: None,
         }
@@ -168,11 +165,9 @@ impl<'input> Tokenizer<'input> {
 
     /// Count newlines between two positions in the source
     fn count_newlines_between(&self, start: usize, end: usize) -> usize {
-        if start < end && end <= self.source.len() {
-            self.source[start..end]
-                .chars()
-                .filter(|&c| c == '\n')
-                .count()
+        let source = self.lex.source();
+        if start < end && end <= source.len() {
+            source[start..end].chars().filter(|&c| c == '\n').count()
         } else {
             0
         }
@@ -195,10 +190,11 @@ impl<'input> Tokenizer<'input> {
 
     /// Find the end of the line containing the given position
     fn find_line_end(&self, pos: usize) -> usize {
-        self.source[pos..]
+        let source = self.lex.source();
+        source[pos..]
             .find('\n')
             .map(|offset| pos + offset)
-            .unwrap_or(self.source.len())
+            .unwrap_or(source.len())
     }
 }
 
