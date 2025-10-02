@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2025-10-02
+
 ### candid_parser 0.2.2
 
 * Non-breaking changes:
