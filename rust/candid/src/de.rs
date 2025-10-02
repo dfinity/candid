@@ -592,6 +592,9 @@ impl<'de> Deserializer<'de> {
         // we also cannot downcast V to concrete type, because of 'de
         // The only option left seems to be type_name, but it is not guaranteed to be stable, so there is risk here.
             && !tid.name.starts_with("serde::de::impls::OptionVisitor<")
+            // serde v1.0.220 refactored the module path
+            // This confirms the assertion above that this is not stable.
+            && !tid.name.starts_with("serde_core::de::impls::OptionVisitor<")
         {
             #[cfg(feature = "value")]
             if tid != TypeId::of::<crate::types::value::IDLValueVisitor>() {

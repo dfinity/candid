@@ -26,6 +26,20 @@
 * Non-breaking changes:
   + Supports parsing the arguments' names for `func` and `service` (init args).
 
+## 2025-09-15
+
+### Candid 0.10.19
+
+* Non-breaking changes:
+  + Fixes a compatibility issue with `serde` v1.0.220 and later.
+
+## 2025-09-03
+
+### Candid 0.10.18
+
+* Non-breaking changes:
+  + Implement `serde::Serialize` and `PartialOrd`, `Ord`, `Hash` for the `Reserved` type.
+
 ## 2025-08-04
 
 ### Candid 0.10.17
