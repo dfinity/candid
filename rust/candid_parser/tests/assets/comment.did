@@ -1,10 +1,19 @@
+// this comment should be ignored
+
+// this multi-line comment
+// should be ignored
+
+/* this block comment
+should be ignored
+*/
+
 // line comment
 /* gjkf
 jgfkg
 */
 //
 type id/**/ =/* gfj/*/**/*/
-*/ nat8;
+*/ nat8; // this comment should be ignored
 /*
 fgjgf
 //
