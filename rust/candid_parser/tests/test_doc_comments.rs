@@ -30,9 +30,9 @@ fn test_inline_comments_not_attached() {
     // Test that inline comments are not attached to the next field
     let input = r#"
 type network = variant {
-  mainnet;
-  testnet;  // Bitcoin testnet4.
-  regtest;
+  mainnet; // This first inline comment should be ignored
+  testnet;  // This second inline comment should be ignored
+  regtest;            // This third inline comment should be ignored
 };
 "#;
 
@@ -110,6 +110,48 @@ type my_type = nat;
         "Comments separated by multiple blank lines should not be attached, but found: {:?}",
         binding.docs
     );
+}
+
+#[test]
+fn test_multiple_comments() {
+    let input = r#"
+// This comment should be ignored
+
+// This multi-line comment
+// should be ignored
+
+/* This block comment should be ignored */
+
+/*
+This multi-line block comment
+should be ignored
+*/
+
+// Doc comment for my_type
+type my_type = variant {
+  mainnet;
+  testnet;
+  regtest;
+};
+
+// This comment at the end should be ignored
+"#;
+
+    let prog: IDLProg = input.parse().unwrap();
+    let binding = extract_type_declaration(&prog.decs[0]);
+
+    assert_eq!(binding.id, "my_type");
+    assert_eq!(binding.docs, vec!["Doc comment for my_type"]);
+
+    let fields = extract_variant_fields(&binding.typ);
+    assert_eq!(fields.len(), 3);
+    for field in fields {
+        assert!(
+            field.docs.is_empty(),
+            "Comments should not be attached to fields, but found: {:?}",
+            field.docs
+        );
+    }
 }
 
 fn extract_type_declaration(dec: &Dec) -> &Binding {
