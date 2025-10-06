@@ -79,6 +79,7 @@ assert "(record { whatever = 0 })"  == "(record {})"                            
 assert blob "DIDL\01\6c\01\01\7c\01\00\2a"                                       !: (record {2:int}) "record: missing field";
 assert blob "DIDL\01\6c\01\01\7c\01\00\2a" == "(record { 2 = null })"             : (record {2:opt int}) "record: missing opt field";
 assert blob "DIDL\01\6c\00\01\00" == "(record { 2 = null })"                      : (record {2:null}) "record: missing null field";
+assert blob "DIDL\01\6c\00\01\00" == "(record { })"                               : (record {2:null}) "record: missing null field also in textual format";
 assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01" == "(record {42; true})"      : (record {int; bool}) "record: tuple";
 assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01" == "(record {1 = true})"      : (record {1:bool}) "record: ignore fields";
 assert blob "DIDL\01\6c\02\00\7c\01\7e\01\00\2a\01"                              !: (record {bool; int}) "record: type mismatch";

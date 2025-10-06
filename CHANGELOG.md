@@ -3,7 +3,7 @@
 ## Unreleased
 
 * fix: values of types `reserved` at any context do not coerce into values of type `null`
-* fix: missing fields of type `null` in the textual format are decoded into a default value
+* fix: missing record fields of type `null` in the textual format are decoded into a default value
 
 ## 2025-10-02
 
