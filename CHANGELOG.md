@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+* fix: values of types `reserved` at any context do not coerce into values of type `null`
+* fix: missing record fields of type `null` in the textual format are decoded into a default value
+
+## 2025-10-02
+
+### candid_parser 0.2.2
+
+* Non-breaking changes:
+  + fix: ignore inline comments or separated by newlines
+
+### didc 0.5.2
+
+* Non-breaking changes:
+  + fix: ignore inline comments or separated by newlines
+
 ## 2025-09-15
 
 ### Candid 0.10.19

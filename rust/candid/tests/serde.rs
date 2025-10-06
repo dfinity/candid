@@ -880,7 +880,7 @@ fn test_multiargs() {
     let tuple = Decode!(
         &bytes,
         Vec<(Int, &str)>,
-        (Int, String),
+        (Int, String, ()),
         Option<i32>,
         (),
         candid::Reserved
