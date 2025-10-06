@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* fix: missing record fields of type `null` in the textual format are decoded into a default value
+
 ## 2025-10-02
 
 ### candid_parser 0.2.2
