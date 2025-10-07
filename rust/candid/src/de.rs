@@ -838,16 +838,8 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             }
             (_, TypeInner::Opt(t2)) => {
                 self.expect_type = self.table.trace_type(t2)?;
-                if !matches!(
-                    self.expect_type.as_ref(),
-                    TypeInner::Null | TypeInner::Reserved | TypeInner::Opt(_)
-                ) {
-                    check_recursion! {
-                        self.recoverable_visit_some(visitor)
-                    }
-                } else {
-                    self.deserialize_ignored_any(serde::de::IgnoredAny)?;
-                    visitor.visit_none()
+                check_recursion! {
+                    self.recoverable_visit_some(visitor)
                 }
             }
             (_, _) => check!(false),
