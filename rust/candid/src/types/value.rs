@@ -248,6 +248,7 @@ impl IDLValue {
                         .get(id.as_ref())
                         .cloned()
                         .or_else(|| match env.trace_type(ty).unwrap().as_ref() {
+                            TypeInner::Null => Some(&IDLValue::Null),
                             TypeInner::Opt(_) => Some(&IDLValue::None),
                             TypeInner::Reserved => Some(&IDLValue::Reserved),
                             _ => None,
