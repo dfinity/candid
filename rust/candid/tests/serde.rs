@@ -193,10 +193,10 @@ fn test_option() {
     let expected = A { canister_id: None };
     test_decode(&bytes, &expected);
 
-    coerce_to_nested_option_null::<(), ()>((), ());
-    coerce_to_nested_option_null::<(), Reserved>((), Reserved);
-    coerce_to_nested_option_null::<Reserved, Reserved>(Reserved, Reserved);
-    coerce_to_nested_option_null::<Reserved, ()>(Reserved, ()); // `null : reserved` coerces to `null : null`
+    coerce_to_nested_option_null_success::<(), ()>((), ());
+    coerce_to_nested_option_null_success::<(), Reserved>((), Reserved);
+    coerce_to_nested_option_null_success::<Reserved, Reserved>(Reserved, Reserved);
+    coerce_to_nested_option_null_failure::<Reserved, ()>(Reserved);
 
     coerce_to_nested_option_success::<u64, Reserved>(5_u64, Reserved);
     coerce_to_nested_option_success::<u64, u64>(5_u64, 5_u64);
@@ -206,9 +206,9 @@ fn test_option() {
     coerce_to_nested_option_failure::<Int, Nat>(5.into());
 }
 
-// the value `null` of type `null` is represented as Rust value `()` of Rust type `()`
-// the value `null` of type `reserved` is represented as Rust value `Reserved` of Rust type `Reserved`
-fn coerce_to_nested_option_null<
+// The value `null` of type `null` is represented as Rust value `()` of Rust type `()`.
+// The value `null` of type `reserved` is represented as Rust value `Reserved` of Rust type `Reserved`.
+fn coerce_to_nested_option_null_success<
     T: CandidType + Clone,
     U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>,
 >(
@@ -221,6 +221,22 @@ fn coerce_to_nested_option_null<
     coerce_to_nested_option_none::<Option<T>, U>(None);
     // Deserialize `opt null : opt T` to `opt null : opt U`, `opt null : opt opt U`, and `opt null : opt opt opt U`.
     coerce_to_nested_option_some_none::<Option<T>, U>(Some(t), u);
+}
+
+// The value `null` of type `null` is represented as Rust value `()` of Rust type `()`.
+// The value `null` of type `reserved` is represented as Rust value `Reserved` of Rust type `Reserved`.
+fn coerce_to_nested_option_null_failure<
+    T: CandidType + Clone,
+    U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>,
+>(
+    t: T,
+) {
+    // Deserialize `null : T` to `null : opt U`, `null : opt opt U`, and `null : opt opt opt U`.
+    coerce_to_nested_option_none::<T, U>(t.clone());
+    // Deserialize `null : opt T` to `null : opt U`, `null : opt opt U`, and `null : opt opt opt U`.
+    coerce_to_nested_option_none::<Option<T>, U>(None);
+    // Deserialize `opt null : opt T` to `null : opt U`, `opt null : opt opt U`, and `opt null : opt opt opt U`.
+    coerce_to_nested_option_none_some_none::<Option<T>, U>(Some(t));
 }
 
 fn coerce_to_nested_option_success<
@@ -265,6 +281,21 @@ fn coerce_to_nested_option_none<
     test_decode(&bytes, &none_none);
     let none_none_none: Option<Option<Option<U>>> = None;
     test_decode(&bytes, &none_none_none);
+}
+
+fn coerce_to_nested_option_none_some_none<
+    T: CandidType,
+    U: CandidType + Debug + PartialEq + for<'a> Deserialize<'a>,
+>(
+    t: T,
+) {
+    let bytes = encode(&t);
+    let none: Option<U> = None;
+    test_decode(&bytes, &none);
+    let some_none: Option<Option<U>> = Some(None);
+    test_decode(&bytes, &some_none);
+    let some_none_none: Option<Option<Option<U>>> = Some(None);
+    test_decode(&bytes, &some_none_none);
 }
 
 fn coerce_to_nested_option_some_none<
