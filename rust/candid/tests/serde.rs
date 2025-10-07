@@ -210,7 +210,7 @@ fn test_option() {
 // The value `null` of type `reserved` is represented as Rust value `Reserved` of Rust type `Reserved`.
 fn coerce_to_nested_option_null_success<
     T: CandidType + Clone,
-    U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>,
+    U: CandidType + Debug + PartialEq + for<'a> Deserialize<'a>,
 >(
     t: T,
     u: U,
@@ -227,7 +227,7 @@ fn coerce_to_nested_option_null_success<
 // The value `null` of type `reserved` is represented as Rust value `Reserved` of Rust type `Reserved`.
 fn coerce_to_nested_option_null_failure<
     T: CandidType + Clone,
-    U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>,
+    U: CandidType + Debug + PartialEq + for<'a> Deserialize<'a>,
 >(
     t: T,
 ) {
@@ -256,7 +256,7 @@ fn coerce_to_nested_option_success<
 
 fn coerce_to_nested_option_failure<
     T: CandidType + Clone,
-    U: CandidType + Clone + Debug + PartialEq + for<'a> Deserialize<'a>,
+    U: CandidType + Debug + PartialEq + for<'a> Deserialize<'a>,
 >(
     t: T,
 ) {
