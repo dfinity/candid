@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+* fix: subtyping and coercion rules for optional types
 * fix: coercion of values into nested optional types
 * fix: values of types `reserved` at any context do not coerce into values of type `null`
 * fix: missing record fields of type `null` in the textual format are decoded into a default value
