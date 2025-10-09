@@ -221,8 +221,8 @@ pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<(
             Ok(())
         }
         (Class(init1, ty1), Class(init2, ty2)) => {
-            let init_1 = to_tuple(&init1);
-            let init_2 = to_tuple(&init2);
+            let init_1 = to_tuple(init1);
+            let init_2 = to_tuple(init2);
             equal(gamma, env, &init_1, &init_2).context(format!(
                 "Mismatch in init args: {} and {}",
                 pp_args(init1),
