@@ -7,7 +7,7 @@
 * [BREAKING]: type representation was optimized to improve performance:
   + In `Type::Var(var)` `var` now has type `TypeKey` instead of `String`. Calling `var.as_str()` returns `&str` and `var.to_string()` returns a `String`. The string representation of indexed variables remains `table{index}` to maintain compatibility with previous versions.
   + `TypeEnv` now contains a `HashMap` instead of `BTreeMap`. Code that relied on the iteration order of the map (e.g. `env.0.iter()`) should make use of the newly added `TypeEnv::to_sorted_iter()` method which returns types sorted by their keys.
-  + The `args` field of the `candid::types::internal::Function` struct now is a `Vec<ArgType>` instead of `Vec<Type>`, to preserve argument names.
+  + The `args` and `rets` fields of the `candid::types::internal::Function` struct now are a `Vec<ArgType>` instead of `Vec<Type>`, to preserve names.
   + The `TypeInner::Class` variant now takes `Vec<ArgType>` instead of `Vec<Type>` as its first parameter, to preserve argument names.
 
 * [BREAKING]: Removed the `candid::pretty::concat` function
@@ -16,7 +16,7 @@
 * Non-breaking changes:
   + Added `pp_named_args`, `pp_named_init_args` in `pretty::candid` module.
   + The `JavaScript` `didc` target now exports its generated IDL type objects.
-  + The `JavaScript` and `TypeScript` `didc` targets now export `idlService` and `idlInitArgs` (non-factory-function altneratives to `idlFactory` and `init`).
+  + The `JavaScript` and `TypeScript` `didc` targets now export `idlService` and `idlInitArgs` (non-factory-function alternatives to `idlFactory` and `init`).
   + fix: subtyping and coercion rules for optional types
   + fix: coercion of values into nested optional types
   + fix: values of types `reserved` at any context do not coerce into values of type `null`
@@ -26,6 +26,7 @@
 
 * Breaking changes:
   + The `args` field in both `FuncType` and `IDLInitArgs` now have type `Vec<IDLArgType>`.
+  + The `rets` field in `FuncType` now has type `Vec<IDLArgType>`.
 
 * Non-breaking changes:
   + Supports parsing the arguments' names for `func` and `service` (init args).
