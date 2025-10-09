@@ -767,6 +767,7 @@ pub struct Output {
     pub init_args: Option<Vec<(String, String)>>,
     pub tests: String,
     pub actor_docs: Vec<String>,
+    pub service_name: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -813,6 +814,7 @@ pub fn emit_bindgen(
     } else {
         (Vec::new(), None, Vec::new())
     };
+    let service_name = state.state.config.name.clone();
     let tests = state.tests.into_values().collect::<Vec<_>>().join("\n");
     let unused = state.state.report_unused();
     (
@@ -822,6 +824,7 @@ pub fn emit_bindgen(
             init_args,
             tests,
             actor_docs,
+            service_name,
         },
         unused,
     )
@@ -830,13 +833,14 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
     let hbs = get_hbs();
     #[derive(Serialize)]
     struct HBOutput {
-        #[serde(flatten)]
-        external: BTreeMap<String, String>,
         type_defs: String,
         methods: Vec<Method>,
         init_args: Option<Vec<(String, String)>>,
         tests: String,
         actor_docs: Vec<String>,
+        service_name: Option<String>,
+        #[serde(flatten)]
+        external: BTreeMap<String, String>,
     }
     let data = HBOutput {
         type_defs: output.type_defs,
@@ -845,6 +849,7 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         init_args: output.init_args,
         tests: output.tests,
         actor_docs: output.actor_docs,
+        service_name: output.service_name,
     };
     hbs.render_template(template, &data).unwrap()
 }
