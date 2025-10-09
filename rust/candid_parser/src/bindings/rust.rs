@@ -619,11 +619,11 @@ fn test_{test_name}() {{
         });
         sep_enclose(args, ",", "(", ")")
     }
-    fn pp_rets<'b>(&mut self, rets: &'b [Type], prefix: &'b str) -> RcDoc<'b> {
+    fn pp_rets<'b>(&mut self, rets: &'b [ArgType], prefix: &'b str) -> RcDoc<'b> {
         let tys = rets.iter().enumerate().map(|(i, t)| {
             let lab = format!("{prefix}{i}");
             let old = self.state.push_state(&StateElem::Label(&lab));
-            let res = self.pp_ty(t, true);
+            let res = self.pp_ty(&t.typ, true);
             self.state.pop_state(old, StateElem::Label(&lab));
             res
         });
@@ -701,10 +701,10 @@ fn test_{test_name}() {{
             .rets
             .iter()
             .enumerate()
-            .map(|(i, ty)| {
+            .map(|(i, ret)| {
                 let lab = format!("ret{i}");
                 let old = self.state.push_state(&StateElem::Label(&lab));
-                let res = self.pp_ty(ty, true);
+                let res = self.pp_ty(&ret.typ, true);
                 self.state.pop_state(old, StateElem::Label(&lab));
                 res
             })
@@ -1111,7 +1111,7 @@ impl<'b> NominalState<'_, 'b> {
                             .rets
                             .into_iter()
                             .enumerate()
-                            .map(|(i, ty)| {
+                            .map(|(i, ret)| {
                                 let lab = format!("ret{i}");
                                 let old = self.state.push_state(&StateElem::Label(&lab));
                                 let idx = if i == 0 {
@@ -1120,10 +1120,13 @@ impl<'b> NominalState<'_, 'b> {
                                     i.to_string()
                                 };
                                 path.push(TypePath::Func(format!("ret{idx}")));
-                                let ty = self.nominalize(env, path, &ty, None);
+                                let ty = self.nominalize(env, path, &ret.typ, None);
                                 path.pop();
                                 self.state.pop_state(old, StateElem::Label(&lab));
-                                ty
+                                ArgType {
+                                    name: ret.name.clone(),
+                                    typ: ty,
+                                }
                             })
                             .collect(),
                     })

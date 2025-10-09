@@ -217,7 +217,7 @@ VariantFieldTyp: TypeField = {
     <doc_comment:DocComment> <id:FieldId> =>? Ok(TypeField { label: Label::Id(id), typ: IDLType::PrimT(PrimType::Null), docs: doc_comment.unwrap_or_default() }),
 }
 
-ArgTupTyp: Vec<IDLArgType> = "(" <SepBy<ArgTyp, ",">> ")" =>? {
+TupTyp: Vec<IDLArgType> = "(" <SepBy<ArgTyp, ",">> ")" =>? {
     let args = <>;
     let mut named_args: Vec<String> = args.iter().filter_map(|a| a.name.clone()).collect();
     named_args.sort();
@@ -225,10 +225,8 @@ ArgTupTyp: Vec<IDLArgType> = "(" <SepBy<ArgTyp, ",">> ")" =>? {
     Ok(args)
 };
 
-TupTyp: Vec<IDLType> = "(" <SepBy<Typ, ",">> ")" => <>;
-
 FuncTyp: FuncType = {
-    <args:ArgTupTyp> "->" <rets:TupTyp> <modes:FuncMode*> =>
+    <args:TupTyp> "->" <rets:TupTyp> <modes:FuncMode*> =>
         FuncType { modes, args, rets },
 }
 
@@ -271,7 +269,7 @@ Actor: IDLType = {
 
 MainActor: IDLActorType = {
     <doc_comment: DocComment> "service" "id"? ":" <t:Actor> ";"? => IDLActorType { typ: t, docs: doc_comment.unwrap_or_default() },
-    <doc_comment: DocComment> "service" "id"? ":" <args:ArgTupTyp> "->" <t:Actor> ";"? => IDLActorType { typ: IDLType::ClassT(args, Box::new(t)), docs: doc_comment.unwrap_or_default() },
+    <doc_comment: DocComment> "service" "id"? ":" <args:TupTyp> "->" <t:Actor> ";"? => IDLActorType { typ: IDLType::ClassT(args, Box::new(t)), docs: doc_comment.unwrap_or_default() },
 }
 
 pub IDLProg: IDLProg = {
@@ -279,7 +277,7 @@ pub IDLProg: IDLProg = {
 }
 
 pub IDLInitArgs: IDLInitArgs = {
-    <decs:SepBy<Def, ";">> <args:ArgTupTyp> => IDLInitArgs { decs, args }
+    <decs:SepBy<Def, ";">> <args:TupTyp> => IDLInitArgs { decs, args }
 }
 
 // Test file. Follows the "specification" in test/README.md

@@ -58,7 +58,8 @@ pub fn chase_type<'a>(
         }
         Func(f) => {
             let args = f.args.iter().map(|arg| &arg.typ);
-            for ty in args.clone().chain(f.rets.iter()) {
+            let rets = f.rets.iter().map(|ret| &ret.typ);
+            for ty in args.chain(rets) {
                 chase_type(seen, res, env, ty)?;
             }
         }
@@ -117,7 +118,7 @@ pub fn chase_def_use<'a>(
         }
         for (i, arg) in func.rets.iter().enumerate() {
             let mut used = Vec::new();
-            chase_type(&mut BTreeSet::new(), &mut used, env, arg)?;
+            chase_type(&mut BTreeSet::new(), &mut used, env, &arg.typ)?;
             for var in used {
                 res.entry(var.to_string())
                     .or_insert_with(Vec::new)
@@ -162,7 +163,8 @@ pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTree
             }
             Func(f) => {
                 let args = f.args.iter().map(|arg| &arg.typ);
-                for ty in args.clone().chain(f.rets.iter()) {
+                let rets = f.rets.iter().map(|ret| &ret.typ);
+                for ty in args.chain(rets) {
                     go(seen, res, _env, ty)?;
                 }
             }

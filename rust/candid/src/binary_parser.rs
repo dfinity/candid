@@ -205,7 +205,10 @@ impl ConsType {
                     });
                 }
                 for ret in &f.rets {
-                    rets.push(ret.to_type(len)?);
+                    rets.push(ArgType {
+                        name: None,
+                        typ: ret.to_type(len)?,
+                    });
                 }
                 TypeInner::Func(Function {
                     modes: f.ann.iter().map(|x| x.inner.clone()).collect(),

@@ -3,7 +3,7 @@ type Service2 = Service;
 type Func = func () -> (Service);
 service : {
   asArray : () -> (vec Service2, vec Func) query;
-  asPrincipal : () -> (Service2, Func);
+  asPrincipal : () -> (ret0 : Service2, ret1 : Func);
   asRecord : () -> (record { Service2; opt Service; Func });
   asVariant : () -> (variant { a : Service2; b : record { f : opt Func } });
 }

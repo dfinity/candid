@@ -156,7 +156,7 @@ fn pp_fields(fs: &[Field], is_variant: bool) -> RcDoc<'_> {
 
 pub fn pp_function(func: &Function) -> RcDoc<'_> {
     let args = pp_named_args(&func.args);
-    let rets = pp_rets(&func.rets);
+    let rets = pp_named_args(&func.rets);
     let modes = pp_modes(&func.modes);
     args.append(" ->")
         .append(RcDoc::space())
@@ -183,11 +183,6 @@ pub fn pp_named_args(args: &[ArgType]) -> RcDoc<'_> {
 /// To print named arguments, use [`pp_named_args`] instead.
 pub fn pp_args(args: &[Type]) -> RcDoc<'_> {
     sep_enclose(args.iter().map(pp_ty), ",", "(", ")")
-}
-
-/// Pretty-prints return types in the form of `(type1, type2)`.
-pub fn pp_rets(args: &[Type]) -> RcDoc<'_> {
-    pp_args(args)
 }
 
 pub fn pp_mode(mode: &FuncMode) -> RcDoc<'_> {

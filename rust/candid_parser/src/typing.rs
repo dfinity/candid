@@ -79,7 +79,7 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
             }
             let mut t2 = Vec::new();
             for t in func.rets.iter() {
-                t2.push(check_type(env, t)?);
+                t2.push(check_arg(env, t)?);
             }
             if func.modes.len() > 1 {
                 return Err(Error::msg("cannot have more than one mode"));

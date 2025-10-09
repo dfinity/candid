@@ -66,10 +66,15 @@ service : {
     {
         let str = "(opt record { head = 1000; tail = opt record {head = -2000; tail = null}}, variant {a = 42})";
         let args = parse_idl_args(str).unwrap();
-        let encoded = args.to_bytes_with_types(&env, &method.rets).unwrap();
+        let rets = method
+            .rets
+            .iter()
+            .map(|ret| ret.typ.clone())
+            .collect::<Vec<_>>();
+        let encoded = args.to_bytes_with_types(&env, &rets).unwrap();
         let decoded = IDLArgs::from_bytes(&encoded).unwrap();
         assert_eq!(decoded.to_string(), "(\n  opt record {\n    1_158_359_328 = 1_000 : int16;\n    1_291_237_008 = opt record {\n      1_158_359_328 = -2_000 : int16;\n      1_291_237_008 = null;\n    };\n  },\n  variant { 97 = 42 : nat },\n)");
-        let decoded = IDLArgs::from_bytes_with_types(&encoded, &env, &method.rets).unwrap();
+        let decoded = IDLArgs::from_bytes_with_types(&encoded, &env, &rets).unwrap();
         assert_eq!(
             decoded.to_string(),
             "(\n  opt record {\n    head = 1_000 : int16;\n    tail = opt record { head = -2_000 : int16; tail = null };\n  },\n  variant { a = 42 : nat },\n)"

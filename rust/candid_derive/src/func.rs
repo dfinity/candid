@@ -140,7 +140,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
                         #doc_storage
                         let mut args: Vec<ArgType> = Vec::new();
                         #(#args)*
-                        let mut rets: Vec<Type> = Vec::new();
+                        let mut rets: Vec<ArgType> = Vec::new();
                         #(#rets)*
                         let func = Function { args, rets, modes: #modes };
                         service.push((#name.to_string(), TypeInner::Func(func).into()));
@@ -195,7 +195,7 @@ fn generate_arg(name: TokenStream, (arg_name, ty): &(Option<String>, String)) ->
 fn generate_ret(name: TokenStream, ty: &str) -> TokenStream {
     let ty = syn::parse_str::<Type>(ty).unwrap();
     quote! {
-        #name.push(env.add::<#ty>());
+        #name.push(ArgType { name: None, typ: env.add::<#ty>() });
     }
 }
 
