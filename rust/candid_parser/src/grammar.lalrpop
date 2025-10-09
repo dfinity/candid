@@ -225,6 +225,11 @@ NamedArgTupTyp: Vec<IDLArgType> = "(" <SepBy<NamedArgTyp, ",">> ")" =>? {
     Ok(args)
 };
 
+NamedArgTyp: IDLArgType = {
+    <t:Typ> => IDLArgType::new(t),
+    <n:Name> ":" <t:Typ> => IDLArgType::new_with_name(t, n),
+}
+
 TupTyp: Vec<IDLType> = "(" <SepBy<ArgTyp, ",">> ")" => <>;
 
 FuncTyp: FuncType = {
@@ -235,11 +240,6 @@ FuncTyp: FuncType = {
 ArgTyp: IDLType = {
     Typ => <>,
     Name ":" <Typ> => <>,
-}
-
-NamedArgTyp: IDLArgType = {
-    <t:Typ> => IDLArgType::new(t),
-    <n:Name> ":" <t:Typ> => IDLArgType::new_with_name(t, n),
 }
 
 FuncMode: FuncMode = {
