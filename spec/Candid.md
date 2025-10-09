@@ -785,37 +785,40 @@ An option type can be specialised via its constituent type.
 opt <datatype> <: opt <datatype'>
 ```
 
-Furthermore, an option type can be specialised to `null`:
+Furthermore, an option type can be specialised to `null` and `reserved`:
 ```
 ------------------------
 null <: opt <datatype>
+
+--------------------------
+reserved <: opt <datatype>
 ```
 
 It can also be specialised to its constituent type, unless that type is itself optional:
 
 ```
-not (null <: <datatype'>)
+not (null <: <datatype>)
 <datatype> <: <datatype'>
 -----------------------------
 <datatype> <: opt <datatype'>
 ```
-The premise means that the rule does not apply when the constituent type is itself `null`, an option or `reserved`. That restriction is necessary so that there is no ambiguity. For example, otherwise there would be two ways to interpret `null` when going from `opt nat` to `opt opt nat`, either as `null` or as `?null`.
+The premise means that the rule does not apply when the constituent type is itself `null`, an option or `reserved`. That restriction is necessary so that there is no ambiguity. For example, otherwise there would be two ways to interpret `null` when going from `opt nat` to `opt opt nat`, either as `null` or as `opt null`.
 
 Finally, in order to maintain *transitivity* of subtyping, two unusual rules allow, in fact, *any* type to be regarded as a subtype of an option.
 ```
-not (<datatype> <: opt <datatype'>)
----------------------------------
-opt <datatype> <: opt <datatype'>
-
-not (null <: <datatype'>)
 not (<datatype> <: <datatype'>)
 ---------------------------------
 opt <datatype> <: opt <datatype'>
+
+not (null <: <datatype>)
+not (<datatype> <: <datatype'>)
+-------------------------------
+<datatype> <: opt <datatype'>
 ```
 *Note:* These rules are necessary in the presence of the unusual record and variant rules shown below. Without them, certain upgrades may generally be valid one step at a time, but not taken together, which could cause problems for clients catching up with multiple upgrades.
 For example, given a record type `record {666 : nat}` it is valid to remove the field `666` by the rule below and evolve the type to `record { 666 : opt nat }` and then to `record {}`.
 A later step might legally re-add a field of the same name but with a different type, producing, e.g.,`record {666 : opt text}`.
-A client having missed some of the  intermediate steps will have to upgrade directly to the newest version of the type.
+A client having missed some of the intermediate steps will have to upgrade directly to the newest version of the type.
 If the type cannot be decoded, its value will be treated as `null`.
 
 In practice, users are strongly discouraged to ever remove a record field or a variant tag and later re-add it with a different meaning. Instead of removing an optional record/variant field, it should be replaced with `opt empty` or `reserved`, to prevent re-use of that field.
@@ -950,15 +953,14 @@ An optional value coerces at an option type, if the constituent value has a suit
 ----------------------------------------
 opt <v> : opt <t> ~> opt <v'> : opt <t'>
 
-not (<v> : <t> ~> _ : <t'>)
+not (exists <w>. <v> : <t> ~> <w> : <t'>)
 ----------------------------------------
 opt <v> : opt <t> ~> null : opt <t'>
 ```
 
-Coercing a non-null, non-optional and non-reserved type at an option type treats it as an optional value, if it can be decoded successfully:
+Coercing a non-null, non-optional and non-reserved type at an option type treats it as an optional value, if it can be decoded successfully at the content type:
 ```
 not (null <: <t>)
-not (null <: <t'>)
 <v> : <t> ~> <v'> : <t'>
 --------------------------------
 <v> : <t> ~> opt <v'> : opt <t'>
@@ -966,16 +968,12 @@ not (null <: <t'>)
 
 Any other value goes to `null`:
 ```
+not (<v> = null)
 ---------------------------------
 <v> : reserved ~> null : opt <t'>
 
-not (null <: <t'>)
-not (<v> : <t> ~> _ : <t'>)
---------------------------------
-<v> : <t> ~> null : opt <t'>
-
-null <: <t'>
 not (null <: <t>)
+not (exists <w>. <v> : <t> ~> <w> : <t'>)
 ----------------------------
 <v> : <t> ~> null : opt <t'>
 ```

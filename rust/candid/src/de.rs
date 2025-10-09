@@ -74,7 +74,7 @@ impl<'de> IDLDeserialize<'de> {
                 TypeInner::Opt(_) | TypeInner::Reserved | TypeInner::Null
             ) {
                 self.de.expect_type = expected_type;
-                self.de.wire_type = TypeInner::Reserved.into();
+                self.de.wire_type = TypeInner::Null.into();
                 return T::deserialize(&mut self.de);
             } else if self.de.config.full_error_message
                 || text_size(&expected_type, MAX_TYPE_LEN).is_ok()
@@ -754,8 +754,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     {
         self.unroll_type()?;
         check!(
-            *self.expect_type == TypeInner::Null
-                && matches!(*self.wire_type, TypeInner::Null | TypeInner::Reserved),
+            *self.expect_type == TypeInner::Null && matches!(*self.wire_type, TypeInner::Null),
             "unit"
         );
         self.add_cost(1)?;
@@ -839,16 +838,8 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             }
             (_, TypeInner::Opt(t2)) => {
                 self.expect_type = self.table.trace_type(t2)?;
-                if !matches!(
-                    self.expect_type.as_ref(),
-                    TypeInner::Null | TypeInner::Reserved | TypeInner::Opt(_)
-                ) {
-                    check_recursion! {
-                        self.recoverable_visit_some(visitor)
-                    }
-                } else {
-                    self.deserialize_ignored_any(serde::de::IgnoredAny)?;
-                    visitor.visit_none()
+                check_recursion! {
+                    self.recoverable_visit_some(visitor)
                 }
             }
             (_, _) => check!(false),
@@ -1125,7 +1116,7 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
                 self.de.wire_type = wire
                     .pop_front()
                     .map(|f| f.ty)
-                    .unwrap_or_else(|| TypeInner::Reserved.into());
+                    .unwrap_or_else(|| TypeInner::Null.into());
                 seed.deserialize(&mut *self.de).map(Some)
             }
             _ => Err(Error::subtype("expect vector or tuple")),
@@ -1175,7 +1166,7 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                                     ),
                                     format!("field {field} is not optional field")
                                 );
-                                self.de.wire_type = TypeInner::Reserved.into();
+                                self.de.wire_type = TypeInner::Null.into();
                             }
                             Ordering::Greater => {
                                 self.de.set_field_name(Label::Named("_".to_owned()).into());
@@ -1192,7 +1183,7 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                     (Some(e), None) => {
                         self.de.set_field_name(e.id.clone());
                         self.de.expect_type = expect.pop_front().unwrap().ty;
-                        self.de.wire_type = TypeInner::Reserved.into();
+                        self.de.wire_type = TypeInner::Null.into();
                     }
                     (None, None) => return Ok(None),
                 }
