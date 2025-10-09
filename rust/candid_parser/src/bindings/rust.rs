@@ -814,7 +814,7 @@ pub fn emit_bindgen(
     } else {
         (Vec::new(), None, Vec::new())
     };
-    let service_name = dbg!(&state.state.config).name.clone();
+    let service_name = state.state.config.name.clone();
     let tests = state.tests.into_values().collect::<Vec<_>>().join("\n");
     let unused = state.state.report_unused();
     (
