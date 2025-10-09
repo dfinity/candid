@@ -833,14 +833,14 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
     let hbs = get_hbs();
     #[derive(Serialize)]
     struct HBOutput {
-        #[serde(flatten)]
-        external: BTreeMap<String, String>,
         type_defs: String,
         methods: Vec<Method>,
         init_args: Option<Vec<(String, String)>>,
         tests: String,
         actor_docs: Vec<String>,
         service_name: Option<String>,
+        #[serde(flatten)]
+        external: BTreeMap<String, String>,
     }
     let data = HBOutput {
         type_defs: output.type_defs,
