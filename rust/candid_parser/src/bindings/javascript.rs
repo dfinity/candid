@@ -161,18 +161,20 @@ fn pp_fields(fs: &[Field]) -> RcDoc<'_> {
 
 fn pp_function(func: &Function) -> RcDoc<'_> {
     let args = pp_args(&func.args);
-    let rets = pp_rets(&func.rets);
+    let rets = pp_args(&func.rets);
     let modes = pp_modes(&func.modes);
     sep_enclose([args, rets, modes], ",", "(", ")").nest(INDENT_SPACE)
 }
 
 fn pp_args(args: &[ArgType]) -> RcDoc<'_> {
-    let args = args.iter().map(|arg| pp_ty(&arg.typ));
-    sep_enclose(args, ",", "[", "]")
+    pp_types(args.iter().map(|arg| &arg.typ))
 }
 
-fn pp_rets(args: &[Type]) -> RcDoc<'_> {
-    sep_enclose(args.iter().map(pp_ty), ",", "[", "]")
+fn pp_types<'a, T>(types: T) -> RcDoc<'a>
+where
+    T: Iterator<Item = &'a Type>,
+{
+    sep_enclose(types.map(pp_ty), ",", "[", "]")
 }
 
 fn pp_modes(modes: &[candid::types::FuncMode]) -> RcDoc<'_> {
@@ -275,7 +277,7 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
                 .append(";");
 
             let idl_init_args = str("export const idlInitArgs = ")
-                .append(pp_rets(init_types))
+                .append(pp_types(init_types.iter()))
                 .append(";");
 
             let idl_factory_return = kwd("return").append(actor).append(";");
@@ -286,7 +288,9 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
             let init_defs = chase_types(env, init_types).unwrap();
             let init_recs = infer_rec(env, &init_defs).unwrap();
             let init_defs_doc = pp_defs(env, &init_defs, &init_recs, false);
-            let init_doc = kwd("return").append(pp_rets(init_types)).append(";");
+            let init_doc = kwd("return")
+                .append(pp_types(init_types.iter()))
+                .append(";");
             let init_doc = init_defs_doc.append(init_doc);
             let init_doc =
                 str("export const init = ({ IDL }) => ").append(enclose_space("{", init_doc, "};"));

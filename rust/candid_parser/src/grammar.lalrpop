@@ -217,7 +217,7 @@ VariantFieldTyp: TypeField = {
     <doc_comment:DocComment> <id:FieldId> =>? Ok(TypeField { label: Label::Id(id), typ: IDLType::PrimT(PrimType::Null), docs: doc_comment.unwrap_or_default() }),
 }
 
-NamedArgTupTyp: Vec<IDLArgType> = "(" <SepBy<NamedArgTyp, ",">> ")" =>? {
+TupTyp: Vec<IDLArgType> = "(" <SepBy<ArgTyp, ",">> ")" =>? {
     let args = <>;
     let mut named_args: Vec<String> = args.iter().filter_map(|a| a.name.clone()).collect();
     named_args.sort();
@@ -225,21 +225,14 @@ NamedArgTupTyp: Vec<IDLArgType> = "(" <SepBy<NamedArgTyp, ",">> ")" =>? {
     Ok(args)
 };
 
-NamedArgTyp: IDLArgType = {
-    <t:Typ> => IDLArgType::new(t),
-    <n:Name> ":" <t:Typ> => IDLArgType::new_with_name(t, n),
-}
-
-TupTyp: Vec<IDLType> = "(" <SepBy<ArgTyp, ",">> ")" => <>;
-
 FuncTyp: FuncType = {
-    <args:NamedArgTupTyp> "->" <rets:TupTyp> <modes:FuncMode*> =>
+    <args:TupTyp> "->" <rets:TupTyp> <modes:FuncMode*> =>
         FuncType { modes, args, rets },
 }
 
-ArgTyp: IDLType = {
-    Typ => <>,
-    Name ":" <Typ> => <>,
+ArgTyp: IDLArgType = {
+    <t:Typ> => IDLArgType::new(t),
+    <n:Name> ":" <t:Typ> => IDLArgType::new_with_name(t, n),
 }
 
 FuncMode: FuncMode = {
@@ -276,7 +269,7 @@ Actor: IDLType = {
 
 MainActor: IDLActorType = {
     <doc_comment: DocComment> "service" "id"? ":" <t:Actor> ";"? => IDLActorType { typ: t, docs: doc_comment.unwrap_or_default() },
-    <doc_comment: DocComment> "service" "id"? ":" <args:NamedArgTupTyp> "->" <t:Actor> ";"? => IDLActorType { typ: IDLType::ClassT(args, Box::new(t)), docs: doc_comment.unwrap_or_default() },
+    <doc_comment: DocComment> "service" "id"? ":" <args:TupTyp> "->" <t:Actor> ";"? => IDLActorType { typ: IDLType::ClassT(args, Box::new(t)), docs: doc_comment.unwrap_or_default() },
 }
 
 pub IDLProg: IDLProg = {
@@ -284,7 +277,7 @@ pub IDLProg: IDLProg = {
 }
 
 pub IDLInitArgs: IDLInitArgs = {
-    <decs:SepBy<Def, ";">> <args:NamedArgTupTyp> => IDLInitArgs { decs, args }
+    <decs:SepBy<Def, ";">> <args:TupTyp> => IDLInitArgs { decs, args }
 }
 
 // Test file. Follows the "specification" in test/README.md

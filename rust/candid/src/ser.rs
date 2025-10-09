@@ -339,7 +339,7 @@ impl TypeSerialize {
                     self.build_type(&ty.typ)?;
                 }
                 for ty in &func.rets {
-                    self.build_type(ty)?;
+                    self.build_type(&ty.typ)?;
                 }
                 sleb128_encode(&mut buf, Opcode::Func as i64)?;
                 leb128_encode(&mut buf, func.args.len() as u64)?;
@@ -348,7 +348,7 @@ impl TypeSerialize {
                 }
                 leb128_encode(&mut buf, func.rets.len() as u64)?;
                 for ty in &func.rets {
-                    self.encode(&mut buf, ty)?;
+                    self.encode(&mut buf, &ty.typ)?;
                 }
                 leb128_encode(&mut buf, func.modes.len() as u64)?;
                 for m in &func.modes {

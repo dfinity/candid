@@ -212,16 +212,17 @@ fn pp_args(args: &[ArgType]) -> RcDoc<'_> {
     }
 }
 
-fn pp_rets(args: &[Type]) -> RcDoc<'_> {
-    match args {
+fn pp_rets(rets: &[ArgType]) -> RcDoc<'_> {
+    match rets {
         [ty] => {
-            if is_tuple(ty) {
-                enclose("(", pp_ty(ty), ")")
+            let typ = &ty.typ;
+            if is_tuple(typ) {
+                enclose("(", pp_ty(typ), ")")
             } else {
-                pp_ty(ty)
+                pp_ty(typ)
             }
         }
-        _ => sep_enclose(args.iter().map(pp_ty), ",", "(", ")"),
+        _ => sep_enclose(rets.iter().map(|ret| pp_ty(&ret.typ)), ",", "(", ")"),
     }
 }
 

@@ -51,7 +51,7 @@ impl std::str::FromStr for IDLType {
 
 #[derive(Debug, Clone)]
 pub struct IDLTypes {
-    pub args: Vec<IDLType>,
+    pub args: Vec<IDLArgType>,
 }
 
 impl std::str::FromStr for IDLTypes {
@@ -107,7 +107,7 @@ pub enum PrimType {
 pub struct FuncType {
     pub modes: Vec<FuncMode>,
     pub args: Vec<IDLArgType>,
-    pub rets: Vec<IDLType>,
+    pub rets: Vec<IDLArgType>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

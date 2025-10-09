@@ -207,9 +207,9 @@ fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
     let args = sep_enclose(args, ",", "[", "]");
     let rets = match func.rets.len() {
         0 => str("undefined"),
-        1 => pp_ty(env, &func.rets[0], true),
+        1 => pp_ty(env, &func.rets[0].typ, true),
         _ => sep_enclose(
-            func.rets.iter().map(|ty| pp_ty(env, ty, true)),
+            func.rets.iter().map(|ty| pp_ty(env, &ty.typ, true)),
             ",",
             "[",
             "]",

@@ -88,7 +88,7 @@ fn pp_function(func: &FuncType) -> RcDoc<'_> {
 
 fn pp_method(func: &FuncType) -> RcDoc<'_> {
     let args = pp_args(&func.args);
-    let rets = pp_rets(&func.rets);
+    let rets = pp_args(&func.rets);
     let modes = pp_modes(&func.modes);
     args.append(" ->")
         .append(RcDoc::space())
@@ -105,10 +105,6 @@ fn pp_args(args: &[IDLArgType]) -> RcDoc<'_> {
         }
     });
     sep_enclose(args, ",", "(", ")")
-}
-
-fn pp_rets(rets: &[IDLType]) -> RcDoc<'_> {
-    sep_enclose(rets.iter().map(pp_ty), ",", "(", ")")
 }
 
 fn pp_service(methods: &[Binding]) -> RcDoc<'_> {

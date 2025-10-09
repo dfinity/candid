@@ -131,7 +131,7 @@ impl TypeAnnotation {
             (Some(tys), None) => {
                 let mut types = Vec::new();
                 for ty in tys.args.iter() {
-                    types.push(ast_to_type(&env, ty)?);
+                    types.push(ast_to_type(&env, &ty.typ)?);
                 }
                 Ok((env, types))
             }
@@ -139,10 +139,11 @@ impl TypeAnnotation {
                 let actor = actor
                     .ok_or_else(|| Error::msg("Cannot use --method with a non-service did file"))?;
                 let func = env.get_method(&actor, meth)?;
-                let types = match mode {
-                    Mode::Encode => func.args.iter().map(|arg| arg.typ.clone()).collect(),
-                    Mode::Decode => func.rets.clone(),
+                let types_iter = match mode {
+                    Mode::Encode => func.args.iter(),
+                    Mode::Decode => func.rets.iter(),
                 };
+                let types = types_iter.map(|arg| arg.typ.clone()).collect();
                 Ok((env, types))
             }
             _ => unreachable!(),

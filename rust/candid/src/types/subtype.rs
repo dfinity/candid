@@ -139,10 +139,20 @@ fn subtype_(
                 .iter()
                 .map(|arg| arg.typ.clone())
                 .collect::<std::vec::Vec<_>>();
+            let f1_rets = f1
+                .rets
+                .iter()
+                .map(|arg| arg.typ.clone())
+                .collect::<std::vec::Vec<_>>();
+            let f2_rets = f2
+                .rets
+                .iter()
+                .map(|arg| arg.typ.clone())
+                .collect::<std::vec::Vec<_>>();
             let args1 = to_tuple(&f1_args);
             let args2 = to_tuple(&f2_args);
-            let rets1 = to_tuple(&f1.rets);
-            let rets2 = to_tuple(&f2.rets);
+            let rets1 = to_tuple(&f1_rets);
+            let rets2 = to_tuple(&f2_rets);
             subtype_(report, gamma, env, &args2, &args1)
                 .context("Subtype fails at function input type")?;
             subtype_(report, gamma, env, &rets1, &rets2)
@@ -232,10 +242,20 @@ pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<(
                 .iter()
                 .map(|arg| arg.typ.clone())
                 .collect::<std::vec::Vec<_>>();
+            let f1_rets = f1
+                .rets
+                .iter()
+                .map(|arg| arg.typ.clone())
+                .collect::<std::vec::Vec<_>>();
+            let f2_rets = f2
+                .rets
+                .iter()
+                .map(|arg| arg.typ.clone())
+                .collect::<std::vec::Vec<_>>();
             let args1 = to_tuple(&f1_args);
             let args2 = to_tuple(&f2_args);
-            let rets1 = to_tuple(&f1.rets);
-            let rets2 = to_tuple(&f2.rets);
+            let rets1 = to_tuple(&f1_rets);
+            let rets2 = to_tuple(&f2_rets);
             equal(gamma, env, &args1, &args2).context("Mismatch in function input type")?;
             equal(gamma, env, &rets1, &rets2).context("Mismatch in function return type")?;
             Ok(())
