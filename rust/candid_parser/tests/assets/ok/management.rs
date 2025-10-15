@@ -96,7 +96,7 @@ pub struct DeleteCanisterArg { pub canister_id: CanisterId }
 #[derive(CandidType, Deserialize)]
 pub struct DepositCyclesArg { pub canister_id: CanisterId }
 #[derive(CandidType, Deserialize)]
-pub enum EcdsaCurve { #[serde(rename="secp256k1")] Secp256K1 }
+pub enum EcdsaCurve { #[serde(rename="secp256k1")] Secp256k1 }
 #[derive(CandidType, Deserialize)]
 pub struct EcdsaPublicKeyArgKeyId { pub name: String, pub curve: EcdsaCurve }
 #[derive(CandidType, Deserialize)]

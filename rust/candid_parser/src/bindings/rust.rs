@@ -137,33 +137,18 @@ static KEYWORDS: [&str; 48] = [
 /// Rust keywords that cannot be raw identifiers, i.e. prepending `r#` is not allowed.
 static UNUSABLE_RAW_IDENTIFIERS: [&str; 5] = ["crate", "self", "Self", "super", "_"];
 
-fn ident(id: &str, case: Option<Case>) -> (RcDoc<'_>, bool) {
-    if id.is_empty()
-        || id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
-        || id.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
-    {
-        return (RcDoc::text(format!("_{}_", candid::idl_hash(id))), true);
-    }
-    let (is_rename, id) = if let Some(case) = case {
-        let new_id = id.to_case(case);
-        (new_id != id, new_id)
-    } else {
-        (false, id.to_owned())
-    };
-    if ["crate", "self", "super", "Self", "Result", "Principal"].contains(&id.as_str()) {
-        (RcDoc::text(format!("{id}_")), true)
-    } else if KEYWORDS.contains(&id.as_str()) {
-        (RcDoc::text(format!("r#{id}")), is_rename)
-    } else {
-        (RcDoc::text(id), is_rename)
-    }
+enum IdentifierCase {
+    Snake,
+    UpperCamel,
 }
 
-/// Converts a given string to a valid Rust identifier in snake_case.
+/// Converts a given string to a valid Rust identifier in UpperCamelCase (PascalCase).
+///
+/// Leading and trailing underscores are preserved.
 ///
 /// # Returns
 /// A tuple containing the formatted identifier as `RcDoc` and a boolean indicating whether the identifier was modified.
-fn snake_case_ident(id: &str) -> (RcDoc<'_>, bool) {
+fn to_identifier_case(id: &str, case: IdentifierCase) -> (RcDoc<'_>, bool) {
     if id.is_empty()
         || id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
         || id.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
@@ -171,30 +156,10 @@ fn snake_case_ident(id: &str) -> (RcDoc<'_>, bool) {
         (RcDoc::text(format!("_{}_", candid::idl_hash(id))), true)
     } else {
         // above checks ensure the id contains only ASCII alphanumeric and underscores
-
-        // Process the string to insert underscores before uppercase letters (if needed) and convert to lowercase.
-        // If the uppercase letter is at the start or follows an underscore, do not insert an additional underscore.
-        let mut processed = String::new();
-        let mut prev_char_was_underscore = true; // Initialize to true so no '_' is added before the very first character
-        for (i, c) in id.chars().enumerate() {
-            if c.is_ascii_uppercase() {
-                // Check the conditions for inserting an underscore
-                // 1. Not the first character (i > 0)
-                // 2. The previous character was NOT an underscore
-                if i > 0 && !prev_char_was_underscore {
-                    processed.push('_');
-                }
-                // Convert to lowercase and append
-                processed.push(c.to_ascii_lowercase());
-                // Update the state for the next iteration
-                prev_char_was_underscore = false; // The char we just added (lowercase) is not an underscore
-            } else {
-                // Append the character as is (lowercase letter, digit, or underscore)
-                processed.push(c);
-                // Update the state for the next iteration
-                prev_char_was_underscore = c == '_';
-            }
-        }
+        let processed = match case {
+            IdentifierCase::Snake => to_snake_case(id),
+            IdentifierCase::UpperCamel => to_upper_camel_case(id),
+        };
         let modified = processed != id;
 
         if KEYWORDS.contains(&processed.as_str()) {
@@ -204,6 +169,97 @@ fn snake_case_ident(id: &str) -> (RcDoc<'_>, bool) {
         } else {
             (RcDoc::text(processed), modified)
         }
+    }
+}
+
+/// Converts a given string to a valid Rust identifier in snake_case.
+///
+/// Input string is assumed to contain only ASCII alphanumeric characters and underscores.
+///
+/// Insert underscores before uppercase letters (if needed) and convert to lowercase.
+/// If the uppercase letter is at the start or follows an underscore, do not insert an additional underscore.
+fn to_snake_case(s: &str) -> String {
+    let mut processed = String::new();
+    let mut prev_char_was_underscore = true; // Initialize to true so no '_' is added before the very first character
+    for (i, c) in s.chars().enumerate() {
+        if c.is_ascii_uppercase() {
+            // Check the conditions for inserting an underscore
+            // 1. Not the first character (i > 0)
+            // 2. The previous character was NOT an underscore
+            if i > 0 && !prev_char_was_underscore {
+                processed.push('_');
+            }
+            // Convert to lowercase and append
+            processed.push(c.to_ascii_lowercase());
+            // Update the state for the next iteration
+            prev_char_was_underscore = false; // The char we just added (lowercase) is not an underscore
+        } else {
+            // Append the character as is (lowercase letter, digit, or underscore)
+            processed.push(c);
+            // Update the state for the next iteration
+            prev_char_was_underscore = c == '_';
+        }
+    }
+    processed
+}
+
+/// Converts a given string to a valid Rust identifier in UpperCamelCase (PascalCase).
+///
+/// Input string is assumed to contain only ASCII alphanumeric characters and underscores.
+///
+/// Underscores in the middle of the string are removed, and the character following each underscore is capitalized.
+/// Leading and trailing underscores are preserved.
+fn to_upper_camel_case(s: &str) -> String {
+    let mut processed = String::new();
+    let mut is_leading_underscores = true;
+    let mut consecutive_underscores = 0;
+    for (i, c) in s.chars().enumerate() {
+        match c {
+            '_' => {
+                if i == s.len() - 1 {
+                    // trailing underscores
+                    processed.push_str(&"_".repeat(consecutive_underscores + 1));
+                } else {
+                    consecutive_underscores += 1;
+                }
+            }
+            c => {
+                if is_leading_underscores {
+                    // leading underscores
+                    processed.push_str(&"_".repeat(consecutive_underscores));
+                    consecutive_underscores = 0;
+                    is_leading_underscores = false;
+                    // capitalize the first non-underscore character
+                    processed.push(c.to_ascii_uppercase());
+                } else if consecutive_underscores > 0 {
+                    // underscores in the middle
+                    consecutive_underscores = 0;
+                    // capitalize the character following underscores
+                    processed.push(c.to_ascii_uppercase());
+                } else {
+                    processed.push(c);
+                }
+            }
+        }
+    }
+    processed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::to_upper_camel_case;
+
+    #[test]
+    fn test_to_upper_camel_case() {
+        assert_eq!(to_upper_camel_case("example_name"), "ExampleName");
+        assert_eq!(to_upper_camel_case("_"), "_");
+        assert_eq!(to_upper_camel_case("_A"), "_A");
+        assert_eq!(to_upper_camel_case("A_"), "A_");
+        assert_eq!(to_upper_camel_case("_A_"), "_A_");
+        assert_eq!(to_upper_camel_case("__A__"), "__A__");
+        assert_eq!(to_upper_camel_case("__a__"), "__A__");
+        assert_eq!(to_upper_camel_case("__A_B__"), "__AB__");
+        assert_eq!(to_upper_camel_case("__Aa___B__c__"), "__AaBC__");
     }
 }
 
@@ -382,9 +438,9 @@ fn test_{test_name}() {{
                     res
                 } else {
                     if is_variant {
-                        ident(id, Some(Case::Pascal))
+                        to_identifier_case(id, IdentifierCase::UpperCamel)
                     } else {
-                        snake_case_ident(id)
+                        to_identifier_case(id, IdentifierCase::Snake)
                     }
                 };
                 let attr = if is_rename {
@@ -410,7 +466,7 @@ fn test_{test_name}() {{
             self.state.update_stats("name");
             res
         } else {
-            ident(id, Some(Case::Pascal)).0
+            to_identifier_case(id, IdentifierCase::UpperCamel).0
         };
         if !is_ref && self.recs.contains(id) {
             str("Box<").append(name).append(">")
@@ -562,7 +618,7 @@ fn test_{test_name}() {{
                 .name
                 .clone()
                 .map(RcDoc::text)
-                .unwrap_or_else(|| ident(id, Some(Case::Pascal)).0);
+                .unwrap_or_else(|| to_identifier_case(id, IdentifierCase::UpperCamel).0);
             let syntax = self.prog.lookup(id);
             let syntax_ty = syntax
                 .map(|b| &b.typ)
@@ -707,12 +763,12 @@ fn test_{test_name}() {{
     ) -> Method {
         use candid::types::internal::FuncMode;
         let old = self.state.push_state(&StateElem::Label(id));
-        let name = self
-            .state
-            .config
-            .name
-            .clone()
-            .unwrap_or_else(|| snake_case_ident(id).0.pretty(LINE_WIDTH).to_string());
+        let name = self.state.config.name.clone().unwrap_or_else(|| {
+            to_identifier_case(id, IdentifierCase::Snake)
+                .0
+                .pretty(LINE_WIDTH)
+                .to_string()
+        });
         self.state.update_stats("name");
         let args: Vec<_> = func
             .args
