@@ -12,6 +12,9 @@ use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
+mod identifier;
+use identifier::{to_identifier_case, IdentifierCase};
+
 const DOC_COMMENT_PREFIX: &str = "/// ";
 
 /// Maps the names generated during nominalization to the original syntactic types.
@@ -120,146 +123,6 @@ fn parse_use_type(input: &str) -> (String, bool) {
         (t.trim_end().to_string(), false)
     } else {
         (input.to_string(), true)
-    }
-}
-
-/// Rust strict and reserved keywords.
-///
-/// https://doc.rust-lang.org/reference/keywords.html#strict-keywords
-static KEYWORDS: [&str; 48] = [
-    "as", "break", "const", "continue", "else", "enum", "extern", "false", "fn", "for", "if",
-    "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return", "static",
-    "struct", "trait", "true", "type", "unsafe", "use", "where", "while", "async", "await", "dyn",
-    "abstract", "become", "box", "do", "final", "macro", "override", "priv", "typeof", "unsized",
-    "virtual", "yield", "try", "gen",
-];
-
-/// Rust keywords that cannot be raw identifiers, i.e. prepending `r#` is not allowed.
-static UNUSABLE_RAW_IDENTIFIERS: [&str; 5] = ["crate", "self", "Self", "super", "_"];
-
-enum IdentifierCase {
-    Snake,
-    UpperCamel,
-}
-
-/// Converts a given string to a valid Rust identifier in UpperCamelCase (PascalCase).
-///
-/// Leading and trailing underscores are preserved.
-///
-/// # Returns
-/// A tuple containing the formatted identifier as `RcDoc` and a boolean indicating whether the identifier was modified.
-fn to_identifier_case(id: &str, case: IdentifierCase) -> (RcDoc<'_>, bool) {
-    if id.is_empty()
-        || id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
-        || id.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
-    {
-        (RcDoc::text(format!("_{}_", candid::idl_hash(id))), true)
-    } else {
-        // above checks ensure the id contains only ASCII alphanumeric and underscores
-        let processed = match case {
-            IdentifierCase::Snake => to_snake_case(id),
-            IdentifierCase::UpperCamel => to_upper_camel_case(id),
-        };
-        let modified = processed != id;
-
-        if KEYWORDS.contains(&processed.as_str()) {
-            (RcDoc::text(format!("r#{}", processed)), modified)
-        } else if UNUSABLE_RAW_IDENTIFIERS.contains(&processed.as_str()) {
-            (RcDoc::text(format!("{}_", processed)), true)
-        } else {
-            (RcDoc::text(processed), modified)
-        }
-    }
-}
-
-/// Converts a given string to a valid Rust identifier in snake_case.
-///
-/// Input string is assumed to contain only ASCII alphanumeric characters and underscores.
-///
-/// Insert underscores before uppercase letters (if needed) and convert to lowercase.
-/// If the uppercase letter is at the start or follows an underscore, do not insert an additional underscore.
-fn to_snake_case(s: &str) -> String {
-    let mut processed = String::new();
-    let mut prev_char_was_underscore = true; // Initialize to true so no '_' is added before the very first character
-    for (i, c) in s.chars().enumerate() {
-        if c.is_ascii_uppercase() {
-            // Check the conditions for inserting an underscore
-            // 1. Not the first character (i > 0)
-            // 2. The previous character was NOT an underscore
-            if i > 0 && !prev_char_was_underscore {
-                processed.push('_');
-            }
-            // Convert to lowercase and append
-            processed.push(c.to_ascii_lowercase());
-            // Update the state for the next iteration
-            prev_char_was_underscore = false; // The char we just added (lowercase) is not an underscore
-        } else {
-            // Append the character as is (lowercase letter, digit, or underscore)
-            processed.push(c);
-            // Update the state for the next iteration
-            prev_char_was_underscore = c == '_';
-        }
-    }
-    processed
-}
-
-/// Converts a given string to a valid Rust identifier in UpperCamelCase (PascalCase).
-///
-/// Input string is assumed to contain only ASCII alphanumeric characters and underscores.
-///
-/// Underscores in the middle of the string are removed, and the character following each underscore is capitalized.
-/// Leading and trailing underscores are preserved.
-fn to_upper_camel_case(s: &str) -> String {
-    let mut processed = String::new();
-    let mut is_leading_underscores = true;
-    let mut consecutive_underscores = 0;
-    for (i, c) in s.chars().enumerate() {
-        match c {
-            '_' => {
-                if i == s.len() - 1 {
-                    // trailing underscores
-                    processed.push_str(&"_".repeat(consecutive_underscores + 1));
-                } else {
-                    consecutive_underscores += 1;
-                }
-            }
-            c => {
-                if is_leading_underscores {
-                    // leading underscores
-                    processed.push_str(&"_".repeat(consecutive_underscores));
-                    consecutive_underscores = 0;
-                    is_leading_underscores = false;
-                    // capitalize the first non-underscore character
-                    processed.push(c.to_ascii_uppercase());
-                } else if consecutive_underscores > 0 {
-                    // underscores in the middle
-                    consecutive_underscores = 0;
-                    // capitalize the character following underscores
-                    processed.push(c.to_ascii_uppercase());
-                } else {
-                    processed.push(c);
-                }
-            }
-        }
-    }
-    processed
-}
-
-#[cfg(test)]
-mod tests {
-    use super::to_upper_camel_case;
-
-    #[test]
-    fn test_to_upper_camel_case() {
-        assert_eq!(to_upper_camel_case("example_name"), "ExampleName");
-        assert_eq!(to_upper_camel_case("_"), "_");
-        assert_eq!(to_upper_camel_case("_A"), "_A");
-        assert_eq!(to_upper_camel_case("A_"), "A_");
-        assert_eq!(to_upper_camel_case("_A_"), "_A_");
-        assert_eq!(to_upper_camel_case("__A__"), "__A__");
-        assert_eq!(to_upper_camel_case("__a__"), "__A__");
-        assert_eq!(to_upper_camel_case("__A_B__"), "__AB__");
-        assert_eq!(to_upper_camel_case("__Aa___B__c__"), "__AaBC__");
     }
 }
 
