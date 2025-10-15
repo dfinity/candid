@@ -299,12 +299,10 @@ fn test_{test_name}() {{
                     let res = (RcDoc::text(name.clone()), true);
                     self.state.update_stats("name");
                     res
+                } else if is_variant {
+                    to_identifier_case(id, IdentifierCase::UpperCamel)
                 } else {
-                    if is_variant {
-                        to_identifier_case(id, IdentifierCase::UpperCamel)
-                    } else {
-                        to_identifier_case(id, IdentifierCase::Snake)
-                    }
+                    to_identifier_case(id, IdentifierCase::Snake)
                 };
                 let attr = if is_rename {
                     attr.append("#[serde(rename=\"")
