@@ -122,13 +122,21 @@ fn parse_use_type(input: &str) -> (String, bool) {
         (input.to_string(), true)
     }
 }
-static KEYWORDS: [&str; 51] = [
-    "as", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn", "for",
-    "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return",
-    "self", "Self", "static", "struct", "super", "trait", "true", "type", "unsafe", "use", "where",
-    "while", "async", "await", "dyn", "abstract", "become", "box", "do", "final", "macro",
-    "override", "priv", "typeof", "unsized", "virtual", "yield", "try",
+
+/// Rust strict and reserved keywords.
+///
+/// https://doc.rust-lang.org/reference/keywords.html#strict-keywords
+static KEYWORDS: [&str; 48] = [
+    "as", "break", "const", "continue", "else", "enum", "extern", "false", "fn", "for", "if",
+    "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return", "static",
+    "struct", "trait", "true", "type", "unsafe", "use", "where", "while", "async", "await", "dyn",
+    "abstract", "become", "box", "do", "final", "macro", "override", "priv", "typeof", "unsized",
+    "virtual", "yield", "try", "gen",
 ];
+
+/// Rust keywords that cannot be raw identifiers, i.e. prepending `r#` is not allowed.
+static UNUSABLE_RAW_IDENTIFIERS: [&str; 5] = ["crate", "self", "Self", "super", "_"];
+
 fn ident(id: &str, case: Option<Case>) -> (RcDoc<'_>, bool) {
     if id.is_empty()
         || id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
@@ -148,6 +156,54 @@ fn ident(id: &str, case: Option<Case>) -> (RcDoc<'_>, bool) {
         (RcDoc::text(format!("r#{id}")), is_rename)
     } else {
         (RcDoc::text(id), is_rename)
+    }
+}
+
+/// Converts a given string to a valid Rust identifier in snake_case.
+///
+/// # Returns
+/// A tuple containing the formatted identifier as `RcDoc` and a boolean indicating whether the identifier was modified.
+fn snake_case_ident(id: &str) -> (RcDoc<'_>, bool) {
+    if id.is_empty()
+        || id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
+        || id.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
+    {
+        (RcDoc::text(format!("_{}_", candid::idl_hash(id))), true)
+    } else {
+        // above checks ensure the id contains only ASCII alphanumeric and underscores
+
+        // Process the string to insert underscores before uppercase letters (if needed) and convert to lowercase.
+        // If the uppercase letter is at the start or follows an underscore, do not insert an additional underscore.
+        let mut processed = String::new();
+        let mut prev_char_was_underscore = true; // Initialize to true so no '_' is added before the very first character
+        for (i, c) in id.chars().enumerate() {
+            if c.is_ascii_uppercase() {
+                // Check the conditions for inserting an underscore
+                // 1. Not the first character (i > 0)
+                // 2. The previous character was NOT an underscore
+                if i > 0 && !prev_char_was_underscore {
+                    processed.push('_');
+                }
+                // Convert to lowercase and append
+                processed.push(c.to_ascii_lowercase());
+                // Update the state for the next iteration
+                prev_char_was_underscore = false; // The char we just added (lowercase) is not an underscore
+            } else {
+                // Append the character as is (lowercase letter, digit, or underscore)
+                processed.push(c);
+                // Update the state for the next iteration
+                prev_char_was_underscore = c == '_';
+            }
+        }
+        let modified = processed != id;
+
+        if KEYWORDS.contains(&processed.as_str()) {
+            (RcDoc::text(format!("r#{}", processed)), modified)
+        } else if UNUSABLE_RAW_IDENTIFIERS.contains(&processed.as_str()) {
+            (RcDoc::text(format!("{}_", processed)), true)
+        } else {
+            (RcDoc::text(processed), modified)
+        }
     }
 }
 
@@ -325,14 +381,11 @@ fn test_{test_name}() {{
                     self.state.update_stats("name");
                     res
                 } else {
-                    let case = if is_variant {
-                        Some(Case::Pascal)
-                    } else if !id.starts_with('_') {
-                        Some(Case::Snake)
+                    if is_variant {
+                        ident(id, Some(Case::Pascal))
                     } else {
-                        None
-                    };
-                    ident(id, case)
+                        snake_case_ident(id)
+                    }
                 };
                 let attr = if is_rename {
                     attr.append("#[serde(rename=\"")
@@ -654,12 +707,12 @@ fn test_{test_name}() {{
     ) -> Method {
         use candid::types::internal::FuncMode;
         let old = self.state.push_state(&StateElem::Label(id));
-        let name = self.state.config.name.clone().unwrap_or_else(|| {
-            ident(id, Some(Case::Snake))
-                .0
-                .pretty(LINE_WIDTH)
-                .to_string()
-        });
+        let name = self
+            .state
+            .config
+            .name
+            .clone()
+            .unwrap_or_else(|| snake_case_ident(id).0.pretty(LINE_WIDTH).to_string());
         self.state.update_stats("name");
         let args: Vec<_> = func
             .args
