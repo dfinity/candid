@@ -7,6 +7,17 @@
 * fix: values of types `reserved` at any context do not coerce into values of type `null`
 * fix: missing record fields of type `null` in the textual format are decoded into a default value
 
+### candid_parser & didc
+
+* Non-breaking changes:
+  + fix: struct field and function names in Rust binding are more intuitive and predictable.
+    + Rust binding convert identifiers into cases conforms to Rust naming convention.
+        Since `didc` v0.5, some identifiers started to be renamed. E.g. struct field `amount_e8s` was renamed to `amount_e_8_s`.
+        Now, field name like `amount_e8s` won't be renamed.
+    + Please check `to_identifier_case()` in [rust/candid_parser/src/bindings/rust/identifier.rs](rust/candid_parser/src/bindings/rust/identifier.rs) for more details.
+    + Note: different identifiers might be converted to the same one, potentially causing naming conflicts.
+        If this happens, you'll need to use the [Type Selector Config](spec/Type-selector.md) to specify custom names.
+ 
 ## 2025-10-02
 
 ### candid_parser 0.2.2
