@@ -129,7 +129,7 @@ static KEYWORDS: [&str; 51] = [
     "while", "async", "await", "dyn", "abstract", "become", "box", "do", "final", "macro",
     "override", "priv", "typeof", "unsized", "virtual", "yield", "try",
 ];
-fn ident_(id: &str, case: Option<Case>) -> (RcDoc<'_>, bool) {
+fn ident(id: &str, case: Option<Case>) -> (RcDoc<'_>, bool) {
     if id.is_empty()
         || id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
         || id.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
@@ -150,9 +150,7 @@ fn ident_(id: &str, case: Option<Case>) -> (RcDoc<'_>, bool) {
         (RcDoc::text(id), is_rename)
     }
 }
-fn ident(id: &str, case: Option<Case>) -> RcDoc<'_> {
-    ident_(id, case).0
-}
+
 fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
     match vis {
         Some(vis) if vis.is_empty() => RcDoc::nil(),
@@ -334,7 +332,7 @@ fn test_{test_name}() {{
                     } else {
                         None
                     };
-                    ident_(id, case)
+                    ident(id, case)
                 };
                 let attr = if is_rename {
                     attr.append("#[serde(rename=\"")
@@ -359,7 +357,7 @@ fn test_{test_name}() {{
             self.state.update_stats("name");
             res
         } else {
-            ident(id, Some(Case::Pascal))
+            ident(id, Some(Case::Pascal)).0
         };
         if !is_ref && self.recs.contains(id) {
             str("Box<").append(name).append(">")
@@ -511,7 +509,7 @@ fn test_{test_name}() {{
                 .name
                 .clone()
                 .map(RcDoc::text)
-                .unwrap_or_else(|| ident(id, Some(Case::Pascal)));
+                .unwrap_or_else(|| ident(id, Some(Case::Pascal)).0);
             let syntax = self.prog.lookup(id);
             let syntax_ty = syntax
                 .map(|b| &b.typ)
@@ -656,12 +654,12 @@ fn test_{test_name}() {{
     ) -> Method {
         use candid::types::internal::FuncMode;
         let old = self.state.push_state(&StateElem::Label(id));
-        let name = self
-            .state
-            .config
-            .name
-            .clone()
-            .unwrap_or_else(|| ident(id, Some(Case::Snake)).pretty(LINE_WIDTH).to_string());
+        let name = self.state.config.name.clone().unwrap_or_else(|| {
+            ident(id, Some(Case::Snake))
+                .0
+                .pretty(LINE_WIDTH)
+                .to_string()
+        });
         self.state.update_stats("name");
         let args: Vec<_> = func
             .args
