@@ -40,8 +40,8 @@ pub(super) enum IdentifierCase {
 ///
 /// The processing includes:
 /// - Validating the identifier to ensure it starts with an ASCII alphabetic character or underscore,
-///  and contains only ASCII alphanumeric characters and underscores. If invalid, it is replaced with
-///  a sanitized version (`_hash_`).
+///   and contains only ASCII alphanumeric characters and underscores. If invalid, it is replaced with
+///   a sanitized version (`_hash_`).
 /// - Converting the identifier to the specified case (snake_case or UpperCamelCase).
 /// - Handling Rust keywords by prefixing with `r#` if necessary. (e.g., `type` => `r#type`)
 /// - Appending an underscore for identifiers that cannot be raw identifiers. (e.g., `crate` => `crate_`)
