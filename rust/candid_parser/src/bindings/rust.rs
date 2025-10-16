@@ -806,7 +806,7 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         init_args: Option<Vec<(String, String)>>,
         tests: String,
         actor_docs: Vec<String>,
-        service_name: Option<String>,
+        service_name: String,
         #[serde(flatten)]
         external: BTreeMap<String, String>,
     }
@@ -817,7 +817,7 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         init_args: output.init_args,
         tests: output.tests,
         actor_docs: output.actor_docs,
-        service_name: output.service_name,
+        service_name: output.service_name.unwrap_or_else(|| "service".to_string()),
     };
     hbs.render_template(template, &data).unwrap()
 }
@@ -834,7 +834,6 @@ impl Default for ExternalConfig {
         Self(
             [
                 ("candid_crate", "candid"),
-                ("service_name", "service"),
                 ("target", "canister_call"),
                 ("doc_comment_prefix", DOC_COMMENT_PREFIX),
             ]
