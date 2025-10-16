@@ -2,15 +2,21 @@
 
 ## Unreleased
 
-* fix: subtyping and coercion rules for optional types
-* fix: coercion of values into nested optional types
-* fix: values of types `reserved` at any context do not coerce into values of type `null`
-* fix: missing record fields of type `null` in the textual format are decoded into a default value
+## 2025-10-26
 
-### candid_parser & didc
+### Candid 0.10.20
 
 * Non-breaking changes:
-  + fix: struct field and function names in Rust binding are more intuitive and predictable.
+  + fix: subtyping and coercion rules for optional types
+  + fix: coercion of values into nested optional types
+  + fix: values of types `reserved` at any context do not coerce into values of type `null`
+  + fix: missing record fields of type `null` in the textual format are decoded into a default value
+
+### candid_parser 0.2.3 & didc 0.5.3
+
+* Non-breaking changes:
+  + Rust binding: Sets `service_name` based on top level name config
+  + Rust binding: Makes struct field and function names are more intuitive and predictable.
     - Rust binding convert identifiers into cases conforms to Rust naming convention.
         Since `didc` v0.5, some identifiers started to be renamed. E.g. struct field `amount_e8s` was renamed to `amount_e_8_s`.
         Now, field name like `amount_e8s` won't be renamed.
