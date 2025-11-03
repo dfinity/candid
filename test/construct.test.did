@@ -226,9 +226,9 @@ assert blob "DIDL\01\6e\70\01\00\01" == "(null)"     : (opt null) "parsing optio
 
 // parsing other data as null
 assert blob "DIDL\00\01\7D\05"         !: (null) "parsing 5 as null";
-assert blob "DIDL\00\00"               == "(opt null)" "missing argument as null";
 
 // missing data
+assert blob "DIDL\00\00" == "(null)" "parsing an empty top-level tuple into a longer top-level tuple";
 assert blob "DIDL\00\02\7d\7d\05\06" == "(5, 6)" : (nat, nat, null) "parsing a top-level tuple into a longer top-level tuple";
 assert blob "DIDL\01\6c\01\00\7d\01\00\05" == "(record { 0 = 5 })" : (record { 1 : null }) "parsing into record with expected field that is greater than extra field on the wire";
 assert blob "DIDL\01\6c\01\01\7d\01\00\05" == "(record { 1 = 5 })" : (record { 0 : null }) "parsing into record with expected field that is less than extra field on the wire";
