@@ -1,7 +1,7 @@
 use super::analysis::{chase_actor, infer_rec};
 use crate::{
     configs::{ConfigState, ConfigTree, Configs, Context, StateElem},
-    syntax::{self, IDLActorType, IDLMergedProg, IDLType},
+    syntax::{self, IDLActorType, IDLMergedProg, IDLType, IDLTypeKind},
     Deserialize,
 };
 use candid::pretty::utils::*;
@@ -157,19 +157,17 @@ fn find_field<'a>(
 }
 
 fn record_syntax_fields(syntax: Option<&IDLType>) -> Option<&[syntax::TypeField]> {
-    if let Some(IDLType::RecordT(syntax_fields)) = syntax {
-        Some(syntax_fields.as_slice())
-    } else {
-        None
-    }
+    syntax.and_then(|ty| match &ty.kind {
+        IDLTypeKind::RecordT(fields) => Some(fields.as_slice()),
+        _ => None,
+    })
 }
 
 fn variant_syntax_fields(syntax: Option<&IDLType>) -> Option<&[syntax::TypeField]> {
-    if let Some(IDLType::VariantT(syntax_fields)) = syntax {
-        Some(syntax_fields.as_slice())
-    } else {
-        None
-    }
+    syntax.and_then(|ty| match &ty.kind {
+        IDLTypeKind::VariantT(fields) => Some(fields.as_slice()),
+        _ => None,
+    })
 }
 
 fn actor_methods(actor: Option<&IDLActorType>) -> &[syntax::Binding] {
@@ -178,15 +176,12 @@ fn actor_methods(actor: Option<&IDLActorType>) -> &[syntax::Binding] {
         None => return &[],
     };
 
-    match typ {
-        IDLType::ServT(methods) => methods,
-        IDLType::ClassT(_, inner) => {
-            if let IDLType::ServT(methods) = inner.as_ref() {
-                methods
-            } else {
-                &[]
-            }
-        }
+    match &typ.kind {
+        IDLTypeKind::ServT(methods) => methods,
+        IDLTypeKind::ClassT(_, inner) => match &inner.kind {
+            IDLTypeKind::ServT(methods) => methods,
+            _ => &[],
+        },
         _ => &[],
     }
 }
@@ -924,22 +919,20 @@ impl<'b> NominalState<'_, 'b> {
         let res = match t.as_ref() {
             TypeInner::Opt(ty) => {
                 path.push(TypePath::Opt);
-                let syntax_ty = if let Some(IDLType::OptT(inner)) = syntax {
-                    Some(inner.as_ref())
-                } else {
-                    None
-                };
+                let syntax_ty = syntax.and_then(|s| match &s.kind {
+                    IDLTypeKind::OptT(inner) => Some(inner.as_ref()),
+                    _ => None,
+                });
                 let ty = self.nominalize(env, path, ty, syntax_ty);
                 path.pop();
                 TypeInner::Opt(ty)
             }
             TypeInner::Vec(ty) => {
                 path.push(TypePath::Vec);
-                let syntax_ty = if let Some(IDLType::VecT(inner)) = syntax {
-                    Some(inner.as_ref())
-                } else {
-                    None
-                };
+                let syntax_ty = syntax.and_then(|s| match &s.kind {
+                    IDLTypeKind::VecT(inner) => Some(inner.as_ref()),
+                    _ => None,
+                });
                 let ty = self.nominalize(env, path, ty, syntax_ty);
                 path.pop();
                 TypeInner::Vec(ty)
@@ -1129,11 +1122,10 @@ impl<'b> NominalState<'_, 'b> {
                 }
             },
             TypeInner::Class(args, ty) => {
-                let syntax_ty = if let Some(IDLType::ClassT(_, syntax_ty)) = syntax {
-                    Some(syntax_ty.as_ref())
-                } else {
-                    None
-                };
+                let syntax_ty = syntax.and_then(|s| match &s.kind {
+                    IDLTypeKind::ClassT(_, syntax_ty) => Some(syntax_ty.as_ref()),
+                    _ => None,
+                });
                 TypeInner::Class(
                     args.iter()
                         .map(|arg| {

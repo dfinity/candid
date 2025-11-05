@@ -1,8 +1,8 @@
 use crate::{
     pretty_parse,
     syntax::{
-        Binding, Dec, IDLActorType, IDLInitArgs, IDLMergedProg, IDLProg, IDLType, PrimType,
-        TypeField,
+        Binding, Dec, IDLActorType, IDLInitArgs, IDLMergedProg, IDLProg, IDLType, IDLTypeKind,
+        PrimType, TypeField,
     },
     Error, Result,
 };
@@ -48,30 +48,30 @@ fn check_prim(prim: &PrimType) -> Type {
 }
 
 pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
-    match t {
-        IDLType::PrimT(prim) => Ok(check_prim(prim)),
-        IDLType::VarT(id) => {
+    match &t.kind {
+        IDLTypeKind::PrimT(prim) => Ok(check_prim(prim)),
+        IDLTypeKind::VarT(id) => {
             env.te.find_type(id)?;
             Ok(TypeInner::Var(id.to_string()).into())
         }
-        IDLType::OptT(t) => {
+        IDLTypeKind::OptT(t) => {
             let t = check_type(env, t)?;
             Ok(TypeInner::Opt(t).into())
         }
-        IDLType::VecT(t) => {
+        IDLTypeKind::VecT(t) => {
             let t = check_type(env, t)?;
             Ok(TypeInner::Vec(t).into())
         }
-        IDLType::RecordT(fs) => {
+        IDLTypeKind::RecordT(fs) => {
             let fs = check_fields(env, fs)?;
             Ok(TypeInner::Record(fs).into())
         }
-        IDLType::VariantT(fs) => {
+        IDLTypeKind::VariantT(fs) => {
             let fs = check_fields(env, fs)?;
             Ok(TypeInner::Variant(fs).into())
         }
-        IDLType::PrincipalT => Ok(TypeInner::Principal.into()),
-        IDLType::FuncT(func) => {
+        IDLTypeKind::PrincipalT => Ok(TypeInner::Principal.into()),
+        IDLTypeKind::FuncT(func) => {
             let mut t1 = Vec::new();
             for arg in func.args.iter() {
                 t1.push(check_type(env, arg)?);
@@ -96,11 +96,11 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
             };
             Ok(TypeInner::Func(f).into())
         }
-        IDLType::ServT(ms) => {
+        IDLTypeKind::ServT(ms) => {
             let ms = check_meths(env, ms)?;
             Ok(TypeInner::Service(ms).into())
         }
-        IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
+        IDLTypeKind::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
     }
 }
 
@@ -137,11 +137,16 @@ fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
 fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         match dec {
-            Dec::TypD(Binding { id, typ, docs: _ }) => {
+            Dec::TypD(Binding {
+                id,
+                typ,
+                docs: _,
+                span: _,
+            }) => {
                 let t = check_type(env, typ)?;
                 env.te.0.insert(id.to_string(), t);
             }
-            Dec::ImportType(_) | Dec::ImportServ(_) => (),
+            Dec::ImportType { .. } | Dec::ImportServ { .. } => (),
         }
     }
     Ok(())
@@ -190,7 +195,10 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
 fn check_actor(env: &Env, actor: &Option<IDLActorType>) -> Result<Option<Type>> {
     match actor.as_ref().map(|a| &a.typ) {
         None => Ok(None),
-        Some(IDLType::ClassT(ts, t)) => {
+        Some(IDLType {
+            kind: IDLTypeKind::ClassT(ts, t),
+            ..
+        }) => {
             let mut args = Vec::new();
             for arg in ts.iter() {
                 args.push(check_type(env, arg)?);
@@ -225,8 +233,8 @@ fn load_imports(
     list: &mut Vec<(PathBuf, String, IDLProg)>,
 ) -> Result<()> {
     for dec in prog.decs.iter() {
-        let include_serv = matches!(dec, Dec::ImportServ(_));
-        if let Dec::ImportType(file) | Dec::ImportServ(file) = dec {
+        if let Dec::ImportType { path: file, .. } | Dec::ImportServ { path: file, .. } = dec {
+            let include_serv = matches!(dec, Dec::ImportServ { .. });
             let path = resolve_path(base, file);
             match visited.get_mut(&path) {
                 Some(x) => *x = *x || include_serv,

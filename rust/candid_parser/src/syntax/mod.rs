@@ -2,7 +2,7 @@ mod pretty;
 
 pub use pretty::pretty_print;
 
-use crate::error;
+use crate::{error, token::Span};
 use anyhow::{anyhow, bail, Context, Result};
 use candid::{
     idl_hash,
@@ -11,32 +11,40 @@ use candid::{
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum IDLType {
-    PrimT(PrimType),
-    VarT(String),
-    FuncT(FuncType),
-    OptT(Box<IDLType>),
-    VecT(Box<IDLType>),
-    RecordT(Vec<TypeField>),
-    VariantT(Vec<TypeField>),
-    ServT(Vec<Binding>),
-    ClassT(Vec<IDLType>, Box<IDLType>),
-    PrincipalT,
+pub struct Spanned<T> {
+    pub value: T,
+    pub span: Span,
+}
+
+impl<T> Spanned<T> {
+    pub fn new(value: T, span: Span) -> Self {
+        Spanned { value, span }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IDLType {
+    pub span: Span,
+    pub kind: IDLTypeKind,
 }
 
 impl IDLType {
+    pub fn new(span: Span, kind: IDLTypeKind) -> Self {
+        IDLType { span, kind }
+    }
+
     pub fn is_tuple(&self) -> bool {
-        match self {
-            IDLType::RecordT(ref fs) => {
-                for (i, field) in fs.iter().enumerate() {
-                    if field.label.get_id() != (i as u32) {
-                        return false;
-                    }
-                }
-                true
-            }
+        match &self.kind {
+            IDLTypeKind::RecordT(ref fs) => fs
+                .iter()
+                .enumerate()
+                .all(|(i, field)| field.label.get_id() == (i as u32)),
             _ => false,
         }
+    }
+
+    pub fn synthetic(kind: IDLTypeKind) -> Self {
+        IDLType { span: 0..0, kind }
     }
 }
 
@@ -47,6 +55,20 @@ impl std::str::FromStr for IDLType {
         let lexer = super::token::Tokenizer::new_with_trivia(str, trivia.clone());
         Ok(super::grammar::TypParser::new().parse(Some(&trivia), lexer)?)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IDLTypeKind {
+    PrimT(PrimType),
+    VarT(String),
+    FuncT(FuncType),
+    OptT(Box<IDLType>),
+    VecT(Box<IDLType>),
+    RecordT(Vec<TypeField>),
+    VariantT(Vec<TypeField>),
+    ServT(Vec<Binding>),
+    ClassT(Vec<IDLType>, Box<IDLType>),
+    PrincipalT,
 }
 
 #[derive(Debug, Clone)]
@@ -115,13 +137,14 @@ pub struct TypeField {
     pub label: Label,
     pub typ: IDLType,
     pub docs: Vec<String>,
+    pub span: Span,
 }
 
 #[derive(Debug)]
 pub enum Dec {
     TypD(Binding),
-    ImportType(String),
-    ImportServ(String),
+    ImportType { path: String, span: Span },
+    ImportServ { path: String, span: Span },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,18 +152,21 @@ pub struct Binding {
     pub id: String,
     pub typ: IDLType,
     pub docs: Vec<String>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
 pub struct IDLActorType {
     pub typ: IDLType,
     pub docs: Vec<String>,
+    pub span: Span,
 }
 
 #[derive(Debug)]
 pub struct IDLProg {
     pub decs: Vec<Dec>,
     pub actor: Option<IDLActorType>,
+    pub span: Span,
 }
 
 impl IDLProg {
@@ -168,6 +194,7 @@ impl std::str::FromStr for IDLProg {
 pub struct IDLInitArgs {
     pub decs: Vec<Dec>,
     pub args: Vec<IDLType>,
+    pub span: Span,
 }
 
 impl std::str::FromStr for IDLInitArgs {
@@ -219,32 +246,35 @@ impl IDLMergedProg {
     }
 
     pub fn resolve_actor(&self) -> Result<Option<IDLActorType>> {
-        let (init_args, top_level_docs, mut methods) = match &self.main_actor {
+        let mut init_args: Option<Vec<IDLType>> = None;
+        let mut top_level_docs: Vec<String> = vec![];
+        let mut actor_span: Span = 0..0;
+        let mut methods = match &self.main_actor {
             None => {
                 if self.service_imports.is_empty() {
                     return Ok(None);
-                } else {
-                    (None, vec![], vec![])
+                }
+                vec![]
+            }
+            Some(actor) if self.service_imports.is_empty() => return Ok(Some(actor.clone())),
+            Some(actor) => {
+                top_level_docs = actor.docs.clone();
+                actor_span = actor.span.clone();
+                match &actor.typ.kind {
+                    IDLTypeKind::ClassT(args, inner) => {
+                        init_args = Some(args.clone());
+                        self.chase_service((**inner).clone(), None)?
+                    }
+                    _ => self.chase_service(actor.typ.clone(), None)?,
                 }
             }
-            Some(t) if self.service_imports.is_empty() => return Ok(Some(t.clone())),
-            Some(IDLActorType {
-                typ: IDLType::ClassT(args, inner),
-                docs,
-            }) => (
-                Some(args.clone()),
-                docs.clone(),
-                self.chase_service(*inner.clone(), None)?,
-            ),
-            Some(ty) => (
-                None,
-                ty.docs.clone(),
-                self.chase_service(ty.typ.clone(), None)?,
-            ),
         };
 
         for (name, typ) in &self.service_imports {
             methods.extend(self.chase_service(typ.typ.clone(), Some(name))?);
+            if top_level_docs.is_empty() {
+                top_level_docs = typ.docs.clone();
+            }
         }
 
         let mut hashes: HashMap<u32, &str> = HashMap::new();
@@ -255,21 +285,24 @@ impl IDLMergedProg {
             }
         }
 
+        let service_type = IDLType::synthetic(IDLTypeKind::ServT(methods));
         let typ = if let Some(args) = init_args {
-            IDLType::ClassT(args, Box::new(IDLType::ServT(methods)))
+            IDLType::synthetic(IDLTypeKind::ClassT(args, Box::new(service_type.clone())))
         } else {
-            IDLType::ServT(methods)
+            service_type
         };
+
         Ok(Some(IDLActorType {
             typ,
             docs: top_level_docs,
+            span: actor_span,
         }))
     }
 
     // NOTE: We don't worry about cyclic type definitions, as we rule those out earlier when checking the type decs
     fn chase_service(&self, ty: IDLType, import_name: Option<&str>) -> Result<Vec<Binding>> {
-        match ty {
-            IDLType::VarT(v) => {
+        match ty.kind {
+            IDLTypeKind::VarT(v) => {
                 let resolved = self
                     .typ_decs
                     .iter()
@@ -277,10 +310,10 @@ impl IDLMergedProg {
                     .with_context(|| format!("Unbound type identifier {v}"))?;
                 self.chase_service(resolved.typ.clone(), import_name)
             }
-            IDLType::ServT(bindings) => Ok(bindings),
-            ty => Err(import_name
+            IDLTypeKind::ServT(bindings) => Ok(bindings),
+            ty_kind => Err(import_name
                 .map(|name| anyhow!("Imported service file \"{name}\" has a service constructor"))
-                .unwrap_or(anyhow!("not a service type: {:?}", ty))),
+                .unwrap_or(anyhow!("not a service type: {:?}", ty_kind))),
         }
     }
 }

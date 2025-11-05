@@ -1,7 +1,7 @@
 use super::test::{Assert, Input, Test};
 use super::token::{Token, error2, LexicalError, Span, TriviaMap};
 use candid::{Principal, types::Label};
-use crate::syntax::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLActorType};
+use crate::syntax::{Binding, Dec, FuncType, IDLActorType, IDLInitArgs, IDLProg, IDLType, IDLTypeKind, IDLTypes, PrimType, TypeField};
 use candid::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
 use candid::types::{TypeEnv, FuncMode};
 use candid::utils::check_unique;
@@ -163,58 +163,101 @@ pub Typs: IDLTypes = TupTyp => IDLTypes { args:<> };
 
 pub Typ: IDLType = {
     PrimTyp => <>,
-    "opt" <Typ> => IDLType::OptT(Box::new(<>)),
-    "vec" <Typ> => IDLType::VecT(Box::new(<>)),
-    "blob" => IDLType::VecT(Box::new(IDLType::PrimT(PrimType::Nat8))),
-    "record" "{" <Sp<SepBy<RecordFieldTyp, ";">>> "}" =>? {
+    <l:@L> "opt" <typ:Typ> <r:@R> => IDLType::new(l..r, IDLTypeKind::OptT(Box::new(typ))),
+    <l:@L> "vec" <typ:Typ> <r:@R> => IDLType::new(l..r, IDLTypeKind::VecT(Box::new(typ))),
+    <l:@L> "blob" <r:@R> => {
+        let span = l..r;
+        let elem = IDLType::new(span.clone(), IDLTypeKind::PrimT(PrimType::Nat8));
+        IDLType::new(span, IDLTypeKind::VecT(Box::new(elem)))
+    },
+    <l:@L> "record" "{" <fields:Sp<SepBy<RecordFieldTyp, ";">>> "}" <r:@R> =>? {
         let mut id: u32 = 0;
-        let span = <>.1.clone();
-        let mut fs: Vec<TypeField> = <>.0.iter().map(|f| {
-          let label = match f.label {
-              Label::Unnamed(_) => { id = id + 1; Label::Unnamed(id - 1) },
-              ref l => { id = l.get_id() + 1; l.clone() },
-          };
-          TypeField { label, typ: f.typ.clone(), docs: f.docs.clone() }
+        let span = l..r;
+        let inner_span = fields.1.clone();
+        let mut fs: Vec<TypeField> = fields.0.iter().map(|f| {
+            let label = match &f.label {
+                Label::Unnamed(_) => {
+                    id += 1;
+                    Label::Unnamed(id - 1)
+                }
+                ref l => {
+                    id = l.get_id() + 1;
+                    (*l).clone()
+                }
+            };
+            TypeField {
+                label,
+                typ: f.typ.clone(),
+                docs: f.docs.clone(),
+                span: f.span.clone(),
+            }
         }).collect();
         fs.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
-        check_unique(fs.iter().map(|f| &f.label)).map_err(|e| error2(e, span))?;
-        Ok(IDLType::RecordT(fs))
+        check_unique(fs.iter().map(|f| &f.label)).map_err(|e| error2(e, inner_span))?;
+        Ok(IDLType::new(span, IDLTypeKind::RecordT(fs)))
     },
-    "variant" "{" <mut fs:Sp<SepBy<VariantFieldTyp, ";">>> "}" =>? {
-        let span = fs.1.clone();
-        fs.0.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
-        check_unique(fs.0.iter().map(|f| &f.label)).map_err(|e| error2(e, span))?;
-        Ok(IDLType::VariantT(fs.0))
+    <l:@L> "variant" "{" <mut fields:Sp<SepBy<VariantFieldTyp, ";">>> "}" <r:@R> =>? {
+        let span = l..r;
+        let inner_span = fields.1.clone();
+        fields.0.sort_unstable_by_key(|TypeField { label, .. }| label.get_id());
+        check_unique(fields.0.iter().map(|f| &f.label)).map_err(|e| error2(e, inner_span))?;
+        Ok(IDLType::new(span, IDLTypeKind::VariantT(fields.0)))
     },
-    "func" <FuncTyp> => IDLType::FuncT(<>),
-    "service" <ActorTyp> => IDLType::ServT(<>),
-    "principal" => IDLType::PrincipalT,
+    <l:@L> "func" <typ:FuncTyp> <r:@R> => IDLType::new(l..r, IDLTypeKind::FuncT(typ)),
+    <l:@L> "service" <typ:ActorTyp> <r:@R> => IDLType::new(l..r, IDLTypeKind::ServT(typ)),
+    <l:@L> "principal" <r:@R> => IDLType::new(l..r, IDLTypeKind::PrincipalT),
 }
 
 PrimTyp: IDLType = {
-    "null" => IDLType::PrimT(PrimType::Null),
-    "id" => {
-      match PrimType::str_to_enum(&<>) {
-        Some(p) => IDLType::PrimT(p),
-        None => IDLType::VarT(<>),
-      }
+    <l:@L> "null" <r:@R> => IDLType::new(l..r, IDLTypeKind::PrimT(PrimType::Null)),
+    <l:@L> <ident:"id"> <r:@R> => {
+        let span = l..r;
+        match PrimType::str_to_enum(&ident) {
+            Some(p) => IDLType::new(span, IDLTypeKind::PrimT(p)),
+            None => IDLType::new(span, IDLTypeKind::VarT(ident)),
+        }
     },
 }
 
 FieldTyp: TypeField = {
-    <doc_comment:DocComment> <id:FieldId> ":" <typ:Typ> =>? Ok(TypeField { label: Label::Id(id), typ, docs: doc_comment.unwrap_or_default() }),
-    <doc_comment:DocComment> <n:Name> ":" <typ:Typ> => TypeField { label: Label::Named(n), typ, docs: doc_comment.unwrap_or_default() },
+    <l:@L> <doc_comment:DocComment> <id:FieldId> ":" <typ:Typ> <r:@R> =>? Ok(TypeField {
+        label: Label::Id(id),
+        typ,
+        docs: doc_comment.unwrap_or_default(),
+        span: l..r,
+    }),
+    <l:@L> <doc_comment:DocComment> <n:Name> ":" <typ:Typ> <r:@R> => TypeField {
+        label: Label::Named(n),
+        typ,
+        docs: doc_comment.unwrap_or_default(),
+        span: l..r,
+    },
 }
 
 RecordFieldTyp: TypeField = {
     FieldTyp => <>,
-    <doc_comment:DocComment> <typ:Typ> => TypeField { label: Label::Unnamed(0), typ, docs: doc_comment.unwrap_or_default() },
+    <l:@L> <doc_comment:DocComment> <typ:Typ> <r:@R> => TypeField {
+        label: Label::Unnamed(0),
+        typ,
+        docs: doc_comment.unwrap_or_default(),
+        span: l..r,
+    },
 }
 
 VariantFieldTyp: TypeField = {
     FieldTyp => <>,
-    <doc_comment:DocComment> <n:Name> => TypeField { label: Label::Named(n), typ: IDLType::PrimT(PrimType::Null), docs: doc_comment.unwrap_or_default() },
-    <doc_comment:DocComment> <id:FieldId> =>? Ok(TypeField { label: Label::Id(id), typ: IDLType::PrimT(PrimType::Null), docs: doc_comment.unwrap_or_default() }),
+    <l:@L> <doc_comment:DocComment> <n:Name> <r:@R> => TypeField {
+        label: Label::Named(n),
+        typ: IDLType::new(l..r, IDLTypeKind::PrimT(PrimType::Null)),
+        docs: doc_comment.unwrap_or_default(),
+        span: l..r,
+    },
+    <l:@L> <doc_comment:DocComment> <id:FieldId> <r:@R> =>? Ok(TypeField {
+        label: Label::Id(id),
+        typ: IDLType::new(l..r, IDLTypeKind::PrimT(PrimType::Null)),
+        docs: doc_comment.unwrap_or_default(),
+        span: l..r,
+    }),
 }
 
 TupTyp: Vec<IDLType> = "(" <SepBy<ArgTyp, ",">> ")" => <>;
@@ -245,33 +288,56 @@ ActorTyp: Vec<Binding> = {
 }
 
 MethTyp: Binding = {
-    <doc_comment: DocComment> <n:Name> ":" <f:FuncTyp> => Binding { id: n, typ: IDLType::FuncT(f), docs: doc_comment.unwrap_or_default() },
-    <doc_comment: DocComment> <n:Name> ":" <id:"id"> => Binding { id: n, typ: IDLType::VarT(id), docs: doc_comment.unwrap_or_default() },
+    <l:@L> <doc_comment: DocComment> <n:Name> ":" <f:FuncTyp> <r:@R> => Binding {
+        id: n,
+        typ: IDLType::new(l..r, IDLTypeKind::FuncT(f)),
+        docs: doc_comment.unwrap_or_default(),
+        span: l..r,
+    },
+    <l:@L> <doc_comment: DocComment> <n:Name> ":" <id:"id"> <r:@R> => Binding {
+        id: n,
+        typ: IDLType::new(l..r, IDLTypeKind::VarT(id)),
+        docs: doc_comment.unwrap_or_default(),
+        span: l..r,
+    },
 }
 
 // Type declarations
 Def: Dec = {
-    <doc_comment: DocComment> "type" <id:"id"> "=" <t:Typ> => Dec::TypD(Binding { id: id, typ: t, docs: doc_comment.unwrap_or_default() }),
-    "import" <Text> => Dec::ImportType(<>),
-    "import" "service" <Text> => Dec::ImportServ(<>),
+    <l:@L> <doc_comment: DocComment> "type" <id:"id"> "=" <t:Typ> <r:@R> => Dec::TypD(Binding {
+        id: id,
+        typ: t,
+        docs: doc_comment.unwrap_or_default(),
+        span: l..r,
+    }),
+    <l:@L> "import" <text:Text> <r:@R> => Dec::ImportType { path: text, span: l..r },
+    <l:@L> "import" "service" <text:Text> <r:@R> => Dec::ImportServ { path: text, span: l..r },
 }
 
 Actor: IDLType = {
-    ActorTyp => IDLType::ServT(<>),
-    "id" => IDLType::VarT(<>),
+    <l:@L> <typ:ActorTyp> <r:@R> => IDLType::new(l..r, IDLTypeKind::ServT(typ)),
+    <l:@L> <name:"id"> <r:@R> => IDLType::new(l..r, IDLTypeKind::VarT(name)),
 }
 
 MainActor: IDLActorType = {
-    <doc_comment: DocComment> "service" "id"? ":" <t:Actor> ";"? => IDLActorType { typ: t, docs: doc_comment.unwrap_or_default() },
-    <doc_comment: DocComment> "service" "id"? ":" <args:TupTyp> "->" <t:Actor> ";"? => IDLActorType { typ: IDLType::ClassT(args, Box::new(t)), docs: doc_comment.unwrap_or_default() },
+    <l:@L> <doc_comment: DocComment> "service" "id"? ":" <t:Actor> ";"? <r:@R> => IDLActorType {
+        typ: t,
+        docs: doc_comment.unwrap_or_default(),
+        span: l..r,
+    },
+    <l:@L> <doc_comment: DocComment> "service" "id"? ":" <args:TupTyp> "->" <t:Actor> ";"? <r:@R> => IDLActorType {
+        typ: IDLType::new(l..r, IDLTypeKind::ClassT(args, Box::new(t))),
+        docs: doc_comment.unwrap_or_default(),
+        span: l..r,
+    },
 }
 
 pub IDLProg: IDLProg = {
-    <decs:SepBy<Def, ";">> <actor:MainActor?> => IDLProg { decs, actor }
+    <l:@L> <decs:SepBy<Def, ";">> <actor:MainActor?> <r:@R> => IDLProg { decs, actor, span: l..r }
 }
 
 pub IDLInitArgs: IDLInitArgs = {
-    <decs:SepBy<Def, ";">> <args:TupTyp> => IDLInitArgs { decs, args }
+    <l:@L> <decs:SepBy<Def, ";">> <args:TupTyp> <r:@R> => IDLInitArgs { decs, args, span: l..r }
 }
 
 // Test file. Follows the "specification" in test/README.md

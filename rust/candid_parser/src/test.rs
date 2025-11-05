@@ -151,6 +151,7 @@ pub fn check(test: Test) -> Result<()> {
     let prog = IDLProg {
         decs: test.defs,
         actor: None,
+        span: 0..0,
     };
     check_prog(&mut env, &prog)?;
     let mut count = 0;

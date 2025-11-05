@@ -1,4 +1,4 @@
-use candid_parser::syntax::{Binding, Dec, IDLProg, IDLType, TypeField};
+use candid_parser::syntax::{Binding, Dec, IDLProg, IDLType, IDLTypeKind, TypeField};
 
 #[test]
 fn test_doc_comments_separated_by_blank_line() {
@@ -162,7 +162,7 @@ fn extract_type_declaration(dec: &Dec) -> &Binding {
 }
 
 fn extract_variant_fields(typ: &IDLType) -> &[TypeField] {
-    if let IDLType::VariantT(fields) = typ {
+    if let IDLTypeKind::VariantT(fields) = &typ.kind {
         return fields;
     }
     panic!("Expected a variant type");
