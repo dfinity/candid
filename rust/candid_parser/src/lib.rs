@@ -151,3 +151,28 @@ pub fn parse_idl_value(s: &str) -> crate::Result<candid::IDLValue> {
     let lexer = token::Tokenizer::new(s);
     Ok(grammar::ArgParser::new().parse(None, lexer)?)
 }
+
+/// Parse an `IDLProg` from any iterator over lexer tokens.
+///
+/// This allows callers to provide their own iterator that may, for example,
+/// record every consumed token before it is fed to the parser.
+pub fn parse_idl_prog_from_tokens<I>(
+    trivia: Option<&token::TriviaMap>,
+    tokens: I,
+) -> std::result::Result<IDLProg, token::ParserError>
+where
+    I: IntoIterator<Item = std::result::Result<(usize, token::Token, usize), token::LexicalError>>,
+{
+    IDLProg::parse_from_tokens(trivia, tokens)
+}
+
+/// Parse a `.did` program while attempting to recover from syntax errors.
+///
+/// The returned vector contains every `lalrpop_util::ParseError` that was reported
+/// during parsing. Lexer errors bubble up as `ParseError::User { .. }`, which
+/// lets callers distinguish them from structural syntax issues.
+pub fn parse_prog_lossy(s: &str) -> (Option<IDLProg>, Vec<token::ParserError>) {
+    let trivia = token::TriviaMap::default();
+    let lexer = token::Tokenizer::new_with_trivia(s, trivia.clone());
+    IDLProg::parse_lossy_from_tokens(Some(&trivia), lexer)
+}

@@ -2,7 +2,10 @@ mod pretty;
 
 pub use pretty::pretty_print;
 
-use crate::{error, token::Span};
+use crate::{
+    error,
+    token::{LexicalError, ParserError, Span, Token, TriviaMap},
+};
 use anyhow::{anyhow, bail, Context, Result};
 use candid::{
     idl_hash,
@@ -179,6 +182,29 @@ impl IDLProg {
             }
         })
     }
+
+    pub fn parse_from_tokens<I>(
+        trivia: Option<&TriviaMap>,
+        tokens: I,
+    ) -> std::result::Result<Self, ParserError>
+    where
+        I: IntoIterator<Item = std::result::Result<(usize, Token, usize), LexicalError>>,
+    {
+        super::grammar::IDLProgParser::new().parse(trivia, tokens)
+    }
+
+    pub fn parse_lossy_from_tokens<I>(
+        trivia: Option<&TriviaMap>,
+        tokens: I,
+    ) -> (Option<Self>, Vec<ParserError>)
+    where
+        I: IntoIterator<Item = std::result::Result<(usize, Token, usize), LexicalError>>,
+    {
+        match super::grammar::IDLProgLossyParser::new().parse(trivia, tokens) {
+            Ok(result) => result,
+            Err(err) => (None, vec![err]),
+        }
+    }
 }
 
 impl std::str::FromStr for IDLProg {
@@ -186,7 +212,7 @@ impl std::str::FromStr for IDLProg {
     fn from_str(str: &str) -> error::Result<Self> {
         let trivia = super::token::TriviaMap::default();
         let lexer = super::token::Tokenizer::new_with_trivia(str, trivia.clone());
-        Ok(super::grammar::IDLProgParser::new().parse(Some(&trivia), lexer)?)
+        Ok(Self::parse_from_tokens(Some(&trivia), lexer)?)
     }
 }
 

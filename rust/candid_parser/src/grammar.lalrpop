@@ -1,5 +1,5 @@
 use super::test::{Assert, Input, Test};
-use super::token::{Token, error2, LexicalError, Span, TriviaMap};
+use super::token::{error2, LexicalError, ParserError, Span, Token, TriviaMap};
 use candid::{Principal, types::Label};
 use crate::syntax::{Binding, Dec, FuncType, IDLActorType, IDLInitArgs, IDLProg, IDLType, IDLTypeKind, IDLTypes, PrimType, TypeField};
 use candid::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
@@ -314,6 +314,11 @@ Def: Dec = {
     <l:@L> "import" "service" <text:Text> <r:@R> => Dec::ImportServ { path: text, span: l..r },
 }
 
+RecoverDef: Result<Dec, ParserError> = {
+    Def => Ok(<>),
+    <err:!> => Err(err.error),
+}
+
 Actor: IDLType = {
     <l:@L> <typ:ActorTyp> <r:@R> => IDLType::new(l..r, IDLTypeKind::ServT(typ)),
     <l:@L> <name:"id"> <r:@R> => IDLType::new(l..r, IDLTypeKind::VarT(name)),
@@ -332,8 +337,44 @@ MainActor: IDLActorType = {
     },
 }
 
+MainActorLossy: Result<IDLActorType, ParserError> = {
+    MainActor => Ok(<>),
+    <_doc_comment: DocComment> "service" "id"? ":" <err:!> ";"? => Err(err.error),
+    <_doc_comment: DocComment> "service" "id"? ":" <_args:TupTyp> "->" <err:!> ";"? => Err(err.error),
+    <_doc_comment: DocComment> "service" <err:!> => Err(err.error),
+}
+
 pub IDLProg: IDLProg = {
     <l:@L> <decs:SepBy<Def, ";">> <actor:MainActor?> <r:@R> => IDLProg { decs, actor, span: l..r }
+}
+
+pub IDLProgLossy: (Option<IDLProg>, Vec<ParserError>) = {
+    <l:@L> <decs:SepBy<RecoverDef, ";">> <actor:MainActorLossy?> <r:@R> => {
+        let mut errors = Vec::new();
+        let mut ok_decs = Vec::new();
+        for dec in decs {
+            match dec {
+                Ok(dec) => ok_decs.push(dec),
+                Err(err) => errors.push(err),
+            }
+        }
+        let actor = match actor {
+            None => None,
+            Some(result) => match result {
+                Ok(actor) => Some(actor),
+                Err(err) => {
+                    errors.push(err);
+                    None
+                }
+            },
+        };
+        let prog = if ok_decs.is_empty() && actor.is_none() {
+            None
+        } else {
+            Some(IDLProg { decs: ok_decs, actor, span: l..r })
+        };
+        (prog, errors)
+    }
 }
 
 pub IDLInitArgs: IDLInitArgs = {
