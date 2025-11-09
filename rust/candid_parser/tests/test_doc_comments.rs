@@ -162,7 +162,7 @@ fn extract_type_declaration(dec: &Dec) -> &Binding {
 }
 
 fn extract_variant_fields(typ: &IDLType) -> &[TypeField] {
-    if let IDLTypeKind::VariantT(fields) = &typ.kind {
+    if let IDLTypeKind::VariantT(fields) = typ {
         return fields;
     }
     panic!("Expected a variant type");

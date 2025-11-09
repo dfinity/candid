@@ -1,7 +1,8 @@
 use super::test::{Assert, Input, Test};
 use super::token::{error2, LexicalError, ParserError, Span, Token, TriviaMap};
 use candid::{Principal, types::Label};
-use crate::syntax::{Binding, Dec, FuncType, IDLActorType, IDLInitArgs, IDLProg, IDLType, IDLTypeKind, IDLTypes, PrimType, TypeField};
+use crate::syntax::spanned::{Binding, Dec, FuncType, IDLActorType, IDLInitArgs, IDLProg, IDLType, IDLTypeKind, IDLTypes, TypeField};
+use crate::syntax::PrimType;
 use candid::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
 use candid::types::{TypeEnv, FuncMode};
 use candid::utils::check_unique;
@@ -113,7 +114,8 @@ AnnVal: IDLValue = {
     <Arg> => <>,
     <arg:Sp<Arg>> ":" <typ:Sp<Typ>> =>? {
         let env = TypeEnv::new();
-        let typ = crate::typing::ast_to_type(&env, &typ.0).map_err(|e| error2(e, typ.1))?;
+        let spanless: crate::syntax::IDLType = typ.0.clone().into();
+        let typ = crate::typing::ast_to_type(&env, &spanless).map_err(|e| error2(e, typ.1))?;
         arg.0.annotate_type(true, &env, &typ).map_err(|e| error2(e, arg.1))
     }
 }
@@ -395,14 +397,29 @@ Assert: Assert = <id:Sp<"id">> <assert:Assertion> =>? {
 };
 
 Assertion: Assert = {
-    <left:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: None, typ, pass: true, desc },
-    <left:Input> "!:" <typ:TupTyp> <desc:Text?> => Assert { left, right: None, typ, pass: false, desc },
-    <left:Input> "==" <right:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: Some(right), typ, pass: true, desc },
-    <left:Input> "!=" <right:Input> ":" <typ:TupTyp> <desc:Text?> => Assert { left, right: Some(right), typ, pass: false, desc },
+    <left:Input> ":" <typ:TupTyp> <desc:Text?> => {
+        let typ: Vec<crate::syntax::IDLType> = typ.into_iter().map(Into::into).collect();
+        Assert { left, right: None, typ, pass: true, desc }
+    },
+    <left:Input> "!:" <typ:TupTyp> <desc:Text?> => {
+        let typ: Vec<crate::syntax::IDLType> = typ.into_iter().map(Into::into).collect();
+        Assert { left, right: None, typ, pass: false, desc }
+    },
+    <left:Input> "==" <right:Input> ":" <typ:TupTyp> <desc:Text?> => {
+        let typ: Vec<crate::syntax::IDLType> = typ.into_iter().map(Into::into).collect();
+        Assert { left, right: Some(right), typ, pass: true, desc }
+    },
+    <left:Input> "!=" <right:Input> ":" <typ:TupTyp> <desc:Text?> => {
+        let typ: Vec<crate::syntax::IDLType> = typ.into_iter().map(Into::into).collect();
+        Assert { left, right: Some(right), typ, pass: false, desc }
+    },
 }
 
 pub Test: Test = {
-    <defs:SepBy<Def, ";">> <asserts:SepBy<Assert, ";">> => Test { defs, asserts },
+    <defs:SepBy<Def, ";">> <asserts:SepBy<Assert, ";">> => {
+        let defs = defs.into_iter().map(Into::into).collect();
+        Test { defs, asserts }
+    },
 }
 
 // Common util

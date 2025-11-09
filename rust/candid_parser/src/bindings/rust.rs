@@ -157,14 +157,14 @@ fn find_field<'a>(
 }
 
 fn record_syntax_fields(syntax: Option<&IDLType>) -> Option<&[syntax::TypeField]> {
-    syntax.and_then(|ty| match &ty.kind {
+    syntax.and_then(|ty| match ty {
         IDLTypeKind::RecordT(fields) => Some(fields.as_slice()),
         _ => None,
     })
 }
 
 fn variant_syntax_fields(syntax: Option<&IDLType>) -> Option<&[syntax::TypeField]> {
-    syntax.and_then(|ty| match &ty.kind {
+    syntax.and_then(|ty| match ty {
         IDLTypeKind::VariantT(fields) => Some(fields.as_slice()),
         _ => None,
     })
@@ -176,9 +176,9 @@ fn actor_methods(actor: Option<&IDLActorType>) -> &[syntax::Binding] {
         None => return &[],
     };
 
-    match &typ.kind {
+    match typ {
         IDLTypeKind::ServT(methods) => methods,
-        IDLTypeKind::ClassT(_, inner) => match &inner.kind {
+        IDLTypeKind::ClassT(_, inner) => match inner.as_ref() {
             IDLTypeKind::ServT(methods) => methods,
             _ => &[],
         },
@@ -919,7 +919,7 @@ impl<'b> NominalState<'_, 'b> {
         let res = match t.as_ref() {
             TypeInner::Opt(ty) => {
                 path.push(TypePath::Opt);
-                let syntax_ty = syntax.and_then(|s| match &s.kind {
+                let syntax_ty = syntax.and_then(|s| match s {
                     IDLTypeKind::OptT(inner) => Some(inner.as_ref()),
                     _ => None,
                 });
@@ -929,7 +929,7 @@ impl<'b> NominalState<'_, 'b> {
             }
             TypeInner::Vec(ty) => {
                 path.push(TypePath::Vec);
-                let syntax_ty = syntax.and_then(|s| match &s.kind {
+                let syntax_ty = syntax.and_then(|s| match s {
                     IDLTypeKind::VecT(inner) => Some(inner.as_ref()),
                     _ => None,
                 });
@@ -1122,7 +1122,7 @@ impl<'b> NominalState<'_, 'b> {
                 }
             },
             TypeInner::Class(args, ty) => {
-                let syntax_ty = syntax.and_then(|s| match &s.kind {
+                let syntax_ty = syntax.and_then(|s| match s {
                     IDLTypeKind::ClassT(_, syntax_ty) => Some(syntax_ty.as_ref()),
                     _ => None,
                 });

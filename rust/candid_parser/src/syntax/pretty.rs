@@ -11,7 +11,7 @@ use crate::{
 };
 
 fn pp_ty(ty: &IDLType) -> RcDoc<'_> {
-    match &ty.kind {
+    match ty {
         IDLTypeKind::PrimT(PrimType::Null) => str("null"),
         IDLTypeKind::PrimT(PrimType::Bool) => str("bool"),
         IDLTypeKind::PrimT(PrimType::Nat) => str("nat"),
@@ -43,7 +43,7 @@ fn pp_ty(ty: &IDLType) -> RcDoc<'_> {
 
 fn pp_field(field: &TypeField, is_variant: bool) -> RcDoc<'_> {
     let docs = pp_docs(&field.docs);
-    let ty_doc = if is_variant && matches!(field.typ.kind, IDLTypeKind::PrimT(PrimType::Null)) {
+    let ty_doc = if is_variant && matches!(field.typ, IDLTypeKind::PrimT(PrimType::Null)) {
         RcDoc::nil()
     } else {
         kwd(" :").append(pp_ty(&field.typ))
@@ -61,7 +61,7 @@ fn pp_opt(ty: &IDLType) -> RcDoc<'_> {
 }
 
 fn pp_vec(ty: &IDLType) -> RcDoc<'_> {
-    if matches!(ty.kind, IDLTypeKind::PrimT(PrimType::Nat8)) {
+    if matches!(ty, IDLTypeKind::PrimT(PrimType::Nat8)) {
         str("blob")
     } else {
         kwd("vec").append(pp_ty(ty))
@@ -111,7 +111,7 @@ fn pp_service(methods: &[Binding]) -> RcDoc<'_> {
 fn pp_service_methods(methods: &[Binding]) -> RcDoc<'_> {
     let methods = methods.iter().map(|b| {
         let docs = pp_docs(&b.docs);
-        let func_doc = match &b.typ.kind {
+        let func_doc = match &b.typ {
             IDLTypeKind::FuncT(ref f) => pp_method(f),
             IDLTypeKind::VarT(_) => pp_ty(&b.typ),
             _ => unreachable!(),
@@ -126,7 +126,7 @@ fn pp_service_methods(methods: &[Binding]) -> RcDoc<'_> {
 
 fn pp_class<'a>(args: &'a [IDLType], t: &'a IDLType) -> RcDoc<'a> {
     let doc = pp_args(args).append(" ->").append(RcDoc::space());
-    match &t.kind {
+    match t {
         IDLTypeKind::ServT(ref serv) => doc.append(pp_service_methods(serv)),
         IDLTypeKind::VarT(ref s) => doc.append(s),
         _ => unreachable!(),
@@ -146,7 +146,7 @@ fn pp_defs(prog: &IDLMergedProg) -> RcDoc<'_> {
 
 fn pp_actor(actor: &IDLActorType) -> RcDoc<'_> {
     let docs = pp_docs(&actor.docs);
-    let service_doc = match &actor.typ.kind {
+    let service_doc = match &actor.typ {
         IDLTypeKind::ServT(ref serv) => pp_service_methods(serv),
         IDLTypeKind::VarT(_) | IDLTypeKind::ClassT(_, _) => pp_ty(&actor.typ),
         _ => unreachable!(),

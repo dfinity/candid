@@ -42,7 +42,7 @@ service server : {
     let actor = ast.actor.unwrap();
     assert_eq!(actor.docs, vec!["Doc comment for service"]);
 
-    let methods = if let IDLTypeKind::ServT(methods) = &actor.typ.kind {
+    let methods = if let IDLTypeKind::ServT(methods) = &actor.typ {
         methods
     } else {
         panic!("actor is not a service");
@@ -84,9 +84,9 @@ service server : {
             }
         })
         .unwrap();
-    match &list.typ.kind {
+    match &list.typ {
         IDLTypeKind::OptT(list_inner) => {
-            let fields = if let IDLTypeKind::RecordT(fields) = &list_inner.kind {
+            let fields = if let IDLTypeKind::RecordT(fields) = list_inner.as_ref() {
                 fields
             } else {
                 panic!("inner is not a record");

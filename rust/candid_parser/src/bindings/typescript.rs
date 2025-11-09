@@ -31,42 +31,32 @@ fn pp_ty_rich<'a>(
 ) -> RcDoc<'a> {
     match ty.as_ref() {
         TypeInner::Record(ref fields) => {
-            if let Some(syntax_ty) = syntax {
-                if let IDLTypeKind::RecordT(syntax_fields) = &syntax_ty.kind {
-                    return pp_record(env, fields, Some(syntax_fields), is_ref);
-                }
+            if let Some(IDLTypeKind::RecordT(syntax_fields)) = syntax {
+                return pp_record(env, fields, Some(syntax_fields), is_ref);
             }
             pp_record(env, fields, None, is_ref)
         }
         TypeInner::Variant(ref fields) => {
-            if let Some(syntax_ty) = syntax {
-                if let IDLTypeKind::VariantT(syntax_fields) = &syntax_ty.kind {
-                    return pp_variant(env, fields, Some(syntax_fields), is_ref);
-                }
+            if let Some(IDLTypeKind::VariantT(syntax_fields)) = syntax {
+                return pp_variant(env, fields, Some(syntax_fields), is_ref);
             }
             pp_variant(env, fields, None, is_ref)
         }
         TypeInner::Service(ref serv) => {
-            if let Some(syntax_ty) = syntax {
-                if let IDLTypeKind::ServT(syntax_serv) = &syntax_ty.kind {
-                    return pp_service(env, serv, Some(syntax_serv));
-                }
+            if let Some(IDLTypeKind::ServT(syntax_serv)) = syntax {
+                return pp_service(env, serv, Some(syntax_serv));
             }
             pp_service(env, serv, None)
         }
         TypeInner::Opt(ref t) => {
-            if let Some(syntax_ty) = syntax {
-                if let IDLTypeKind::OptT(syntax_inner) = &syntax_ty.kind {
-                    return pp_opt(env, t, Some(syntax_inner), is_ref);
-                }
+            if let Some(IDLTypeKind::OptT(syntax_inner)) = syntax {
+                return pp_opt(env, t, Some(syntax_inner), is_ref);
             }
             pp_opt(env, t, None, is_ref)
         }
         TypeInner::Vec(ref t) => {
-            if let Some(syntax_ty) = syntax {
-                if let IDLTypeKind::VecT(syntax_inner) = &syntax_ty.kind {
-                    return pp_vec(env, t, Some(syntax_inner), is_ref);
-                }
+            if let Some(IDLTypeKind::VecT(syntax_inner)) = syntax {
+                return pp_vec(env, t, Some(syntax_inner), is_ref);
             }
             pp_vec(env, t, None, is_ref)
         }
@@ -333,10 +323,8 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type, syntax: Option<&'a IDLType>) -> 
             .append(str(id))
             .append(str(" {}")),
         TypeInner::Class(_, t) => {
-            if let Some(syntax_ty) = syntax {
-                if let IDLTypeKind::ClassT(_, syntax_t) = &syntax_ty.kind {
-                    return pp_actor(env, t, Some(syntax_t));
-                }
+            if let Some(IDLTypeKind::ClassT(_, syntax_t)) = syntax {
+                return pp_actor(env, t, Some(syntax_t));
             }
             pp_actor(env, t, None)
         }
