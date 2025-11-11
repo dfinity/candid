@@ -14,6 +14,9 @@ use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
+mod identifier;
+use identifier::{to_identifier_case, IdentifierCase};
+
 const DOC_COMMENT_PREFIX: &str = "/// ";
 
 /// Maps the names generated during nominalization to the original syntactic types.
@@ -124,37 +127,7 @@ fn parse_use_type(input: &str) -> (String, bool) {
         (input.to_string(), true)
     }
 }
-static KEYWORDS: [&str; 51] = [
-    "as", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn", "for",
-    "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return",
-    "self", "Self", "static", "struct", "super", "trait", "true", "type", "unsafe", "use", "where",
-    "while", "async", "await", "dyn", "abstract", "become", "box", "do", "final", "macro",
-    "override", "priv", "typeof", "unsized", "virtual", "yield", "try",
-];
-fn ident_(id: &str, case: Option<Case>) -> (RcDoc<'_>, bool) {
-    if id.is_empty()
-        || id.starts_with(|c: char| !c.is_ascii_alphabetic() && c != '_')
-        || id.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
-    {
-        return (RcDoc::text(format!("_{}_", candid::idl_hash(id))), true);
-    }
-    let (is_rename, id) = if let Some(case) = case {
-        let new_id = id.to_case(case);
-        (new_id != id, new_id)
-    } else {
-        (false, id.to_owned())
-    };
-    if ["crate", "self", "super", "Self", "Result", "Principal"].contains(&id.as_str()) {
-        (RcDoc::text(format!("{id}_")), true)
-    } else if KEYWORDS.contains(&id.as_str()) {
-        (RcDoc::text(format!("r#{id}")), is_rename)
-    } else {
-        (RcDoc::text(id), is_rename)
-    }
-}
-fn ident(id: &str, case: Option<Case>) -> RcDoc<'_> {
-    ident_(id, case).0
-}
+
 fn pp_vis<'a>(vis: &Option<String>) -> RcDoc<'a> {
     match vis {
         Some(vis) if vis.is_empty() => RcDoc::nil(),
@@ -334,15 +307,10 @@ fn test_{test_name}() {{
                     let res = (RcDoc::text(name.clone()), true);
                     self.state.update_stats("name");
                     res
+                } else if is_variant {
+                    to_identifier_case(id, IdentifierCase::UpperCamel)
                 } else {
-                    let case = if is_variant {
-                        Some(Case::Pascal)
-                    } else if !id.starts_with('_') {
-                        Some(Case::Snake)
-                    } else {
-                        None
-                    };
-                    ident_(id, case)
+                    to_identifier_case(id, IdentifierCase::Snake)
                 };
                 let attr = if is_rename {
                     attr.append("#[serde(rename=\"")
@@ -367,7 +335,7 @@ fn test_{test_name}() {{
             self.state.update_stats("name");
             res
         } else {
-            ident(id, Some(Case::Pascal))
+            to_identifier_case(id, IdentifierCase::UpperCamel).0
         };
         if !is_ref && self.recs.contains(id) {
             str("Box<").append(name).append(">")
@@ -519,7 +487,7 @@ fn test_{test_name}() {{
                 .name
                 .clone()
                 .map(RcDoc::text)
-                .unwrap_or_else(|| ident(id, Some(Case::Pascal)));
+                .unwrap_or_else(|| to_identifier_case(id, IdentifierCase::UpperCamel).0);
             let syntax = self.prog.lookup(id);
             let syntax_ty = syntax
                 .map(|b| &b.typ)
@@ -671,12 +639,12 @@ fn test_{test_name}() {{
     ) -> Method {
         use candid::types::internal::FuncMode;
         let old = self.state.push_state(&StateElem::Label(id));
-        let name = self
-            .state
-            .config
-            .name
-            .clone()
-            .unwrap_or_else(|| ident(id, Some(Case::Snake)).pretty(LINE_WIDTH).to_string());
+        let name = self.state.config.name.clone().unwrap_or_else(|| {
+            to_identifier_case(id, IdentifierCase::Snake)
+                .0
+                .pretty(LINE_WIDTH)
+                .to_string()
+        });
         self.state.update_stats("name");
         let args: Vec<_> = func
             .args
@@ -782,6 +750,7 @@ pub struct Output {
     pub init_args: Option<Vec<(String, String)>>,
     pub tests: String,
     pub actor_docs: Vec<String>,
+    pub service_name: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -830,6 +799,7 @@ pub fn emit_bindgen(
     } else {
         (Vec::new(), None, Vec::new())
     };
+    let service_name = state.state.config.name.clone();
     let tests = state.tests.into_values().collect::<Vec<_>>().join("\n");
     let unused = state.state.report_unused();
     (
@@ -839,6 +809,7 @@ pub fn emit_bindgen(
             init_args,
             tests,
             actor_docs,
+            service_name,
         },
         unused,
     )
@@ -847,13 +818,14 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
     let hbs = get_hbs();
     #[derive(Serialize)]
     struct HBOutput {
-        #[serde(flatten)]
-        external: BTreeMap<String, String>,
         type_defs: String,
         methods: Vec<Method>,
         init_args: Option<Vec<(String, String)>>,
         tests: String,
         actor_docs: Vec<String>,
+        service_name: String,
+        #[serde(flatten)]
+        external: BTreeMap<String, String>,
     }
     let data = HBOutput {
         type_defs: output.type_defs,
@@ -862,6 +834,7 @@ pub fn output_handlebar(output: Output, config: ExternalConfig, template: &str) 
         init_args: output.init_args,
         tests: output.tests,
         actor_docs: output.actor_docs,
+        service_name: output.service_name.unwrap_or_else(|| "service".to_string()),
     };
     hbs.render_template(template, &data).unwrap()
 }
@@ -878,7 +851,6 @@ impl Default for ExternalConfig {
         Self(
             [
                 ("candid_crate", "candid"),
-                ("service_name", "service"),
                 ("target", "canister_call"),
                 ("doc_comment_prefix", DOC_COMMENT_PREFIX),
             ]

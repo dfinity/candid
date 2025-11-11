@@ -151,7 +151,7 @@ candid::define_function!(pub(crate) T : (S) -> ());
 pub struct Service(pub Principal);
 impl Service {
   /// Doc comment for f1 method of service
-  pub async fn f_1(&self, arg0: &List, test: &serde_bytes::ByteBuf, arg2: &Option<bool>) -> Result<()> {
+  pub async fn f1(&self, arg0: &List, test: &serde_bytes::ByteBuf, arg2: &Option<bool>) -> Result<()> {
     ic_cdk::call(self.0, "f1", (arg0,test,arg2,)).await
   }
   pub async fn G11(&self, id: &CanisterId, list: &MyList, is_okay: &Option<MyList>, arg3: &Nested) -> Result<(i128,Broker,NestedRes,)> {

@@ -17,10 +17,6 @@
   + Added `pp_named_args`, `pp_named_init_args` in `pretty::candid` module.
   + The `JavaScript` `didc` target now exports its generated IDL type objects.
   + The `JavaScript` and `TypeScript` `didc` targets now export `idlService` and `idlInitArgs` (non-factory-function alternatives to `idlFactory` and `init`).
-  + fix: subtyping and coercion rules for optional types
-  + fix: coercion of values into nested optional types
-  + fix: values of types `reserved` at any context do not coerce into values of type `null`
-  + fix: missing record fields of type `null` in the textual format are decoded into a default value
 
 ### candid_parser
 
@@ -31,6 +27,28 @@
 * Non-breaking changes:
   + Supports parsing the arguments' names for `func` and `service` (init args).
 
+## 2025-10-26
+
+### Candid 0.10.20
+
+* Non-breaking changes:
+  + fix: subtyping and coercion rules for optional types
+  + fix: coercion of values into nested optional types
+  + fix: values of types `reserved` at any context do not coerce into values of type `null`
+  + fix: missing record fields of type `null` in the textual format are decoded into a default value
+
+### candid_parser 0.2.3 & didc 0.5.3
+
+* Non-breaking changes:
+  + Rust binding: Sets `service_name` based on top level name config
+  + Rust binding: Makes struct field and function names are more intuitive and predictable.
+    - Rust binding convert identifiers into cases conforms to Rust naming convention.
+        Since `didc` v0.5, some identifiers started to be renamed. E.g. struct field `amount_e8s` was renamed to `amount_e_8_s`.
+        Now, field name like `amount_e8s` won't be renamed.
+    - Please check `to_identifier_case()` in [rust/candid_parser/src/bindings/rust/identifier.rs](rust/candid_parser/src/bindings/rust/identifier.rs) for more details.
+    - Note: different identifiers might be converted to the same one, potentially causing naming conflicts.
+        If this happens, you'll need to use the [Type Selector Config](spec/Type-selector.md) to specify custom names.
+ 
 ## 2025-10-02
 
 ### candid_parser 0.2.2

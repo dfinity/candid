@@ -45,7 +45,7 @@ impl Service {
   pub async fn oneway(&self) -> Result<()> {
     ic_cdk::call(self.0, "Oneway", ()).await
   }
-  pub async fn f(&self, arg0: &O) -> Result<(O,)> {
+  pub async fn f_(&self, arg0: &O) -> Result<(O,)> {
     ic_cdk::call(self.0, "f_", (arg0,)).await
   }
   pub async fn field(&self, arg0: &FieldArg) -> Result<(FieldRet,)> {
@@ -57,7 +57,7 @@ impl Service {
   pub async fn oneway(&self, arg0: &u8) -> Result<()> {
     ic_cdk::call(self.0, "oneway", (arg0,)).await
   }
-  pub async fn oneway(&self, arg0: &u8) -> Result<()> {
+  pub async fn oneway_(&self, arg0: &u8) -> Result<()> {
     ic_cdk::call(self.0, "oneway_", (arg0,)).await
   }
   pub async fn query(&self, arg0: &serde_bytes::ByteBuf) -> Result<(serde_bytes::ByteBuf,)> {
