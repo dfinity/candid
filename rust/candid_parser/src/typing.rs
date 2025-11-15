@@ -1,8 +1,8 @@
 use crate::{
     pretty_parse,
     syntax::{
-        Binding, Dec, IDLActorType, IDLInitArgs, IDLMergedProg, IDLProg, IDLType, IDLTypeKind,
-        PrimType, TypeField,
+        Binding, Dec, IDLActorType, IDLInitArgs, IDLMergedProg, IDLProg, IDLType, PrimType,
+        TypeField,
     },
     Error, Result,
 };
@@ -47,31 +47,35 @@ fn check_prim(prim: &PrimType) -> Type {
     .into()
 }
 
-pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
+pub fn check_type<T>(env: &Env, t: T) -> Result<Type>
+where
+    T: AsRef<IDLType>,
+{
+    let t = t.as_ref();
     match t {
-        IDLTypeKind::PrimT(prim) => Ok(check_prim(prim)),
-        IDLTypeKind::VarT(id) => {
+        IDLType::PrimT(prim) => Ok(check_prim(prim)),
+        IDLType::VarT(id) => {
             env.te.find_type(id)?;
             Ok(TypeInner::Var(id.to_string()).into())
         }
-        IDLTypeKind::OptT(t) => {
+        IDLType::OptT(t) => {
             let t = check_type(env, t)?;
             Ok(TypeInner::Opt(t).into())
         }
-        IDLTypeKind::VecT(t) => {
+        IDLType::VecT(t) => {
             let t = check_type(env, t)?;
             Ok(TypeInner::Vec(t).into())
         }
-        IDLTypeKind::RecordT(fs) => {
+        IDLType::RecordT(fs) => {
             let fs = check_fields(env, fs)?;
             Ok(TypeInner::Record(fs).into())
         }
-        IDLTypeKind::VariantT(fs) => {
+        IDLType::VariantT(fs) => {
             let fs = check_fields(env, fs)?;
             Ok(TypeInner::Variant(fs).into())
         }
-        IDLTypeKind::PrincipalT => Ok(TypeInner::Principal.into()),
-        IDLTypeKind::FuncT(func) => {
+        IDLType::PrincipalT => Ok(TypeInner::Principal.into()),
+        IDLType::FuncT(func) => {
             let mut t1 = Vec::new();
             for arg in func.args.iter() {
                 t1.push(check_type(env, arg)?);
@@ -96,11 +100,11 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
             };
             Ok(TypeInner::Func(f).into())
         }
-        IDLTypeKind::ServT(ms) => {
+        IDLType::ServT(ms) => {
             let ms = check_meths(env, ms)?;
             Ok(TypeInner::Service(ms).into())
         }
-        IDLTypeKind::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
+        IDLType::ClassT(_, _) => Err(Error::msg("service constructor not supported")),
     }
 }
 
@@ -136,9 +140,17 @@ fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
 
 fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
-        if let Dec::TypD(Binding { id, typ, .. }) = dec {
-            let t = check_type(env, typ)?;
-            env.te.0.insert(id.to_string(), t);
+        match dec {
+            Dec::TypD(Binding {
+                id,
+                typ,
+                docs: _,
+                span: _,
+            }) => {
+                let t = check_type(env, typ)?;
+                env.te.0.insert(id.to_string(), t);
+            }
+            Dec::ImportType { .. } | Dec::ImportServ { .. } => (),
         }
     }
     Ok(())
@@ -187,20 +199,22 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
 fn check_actor(env: &Env, actor: &Option<IDLActorType>) -> Result<Option<Type>> {
     match actor.as_ref().map(|a| &a.typ) {
         None => Ok(None),
-        Some(IDLTypeKind::ClassT(ts, t)) => {
-            let mut args = Vec::new();
-            for arg in ts.iter() {
-                args.push(check_type(env, arg)?);
+        Some(typ) => match &typ.kind {
+            IDLType::ClassT(ts, t) => {
+                let mut args = Vec::new();
+                for arg in ts.iter() {
+                    args.push(check_type(env, arg)?);
+                }
+                let serv = check_type(env, t)?;
+                env.te.as_service(&serv)?;
+                Ok(Some(TypeInner::Class(args, serv).into()))
             }
-            let serv = check_type(env, t)?;
-            env.te.as_service(&serv)?;
-            Ok(Some(TypeInner::Class(args, serv).into()))
-        }
-        Some(typ) => {
-            let t = check_type(env, typ)?;
-            env.te.as_service(&t)?;
-            Ok(Some(t))
-        }
+            _ => {
+                let t = check_type(env, typ)?;
+                env.te.as_service(&t)?;
+                Ok(Some(t))
+            }
+        },
     }
 }
 
@@ -222,11 +236,8 @@ fn load_imports(
     list: &mut Vec<(PathBuf, String, IDLProg)>,
 ) -> Result<()> {
     for dec in prog.decs.iter() {
-        if let Some((file, include_serv)) = match dec {
-            Dec::ImportType(file) => Some((file, false)),
-            Dec::ImportServ(file) => Some((file, true)),
-            _ => None,
-        } {
+        let include_serv = matches!(dec, Dec::ImportServ { .. });
+        if let Dec::ImportType { path: file, .. } | Dec::ImportServ { path: file, .. } = dec {
             let path = resolve_path(base, file);
             match visited.get_mut(&path) {
                 Some(x) => *x = *x || include_serv,

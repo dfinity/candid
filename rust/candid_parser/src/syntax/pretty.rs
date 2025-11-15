@@ -6,47 +6,49 @@ use crate::{
         utils::{concat, enclose, enclose_space, ident, kwd, lines, str, INDENT_SPACE, LINE_WIDTH},
     },
     syntax::{
-        Binding, FuncType, IDLActorType, IDLMergedProg, IDLType, IDLTypeKind, PrimType, TypeField,
+        Binding, FuncType, IDLActorType, IDLMergedProg, IDLType, IDLTypeWithSpan, PrimType,
+        TypeField,
     },
 };
 
 fn pp_ty(ty: &IDLType) -> RcDoc<'_> {
+    use IDLType::*;
     match ty {
-        IDLTypeKind::PrimT(PrimType::Null) => str("null"),
-        IDLTypeKind::PrimT(PrimType::Bool) => str("bool"),
-        IDLTypeKind::PrimT(PrimType::Nat) => str("nat"),
-        IDLTypeKind::PrimT(PrimType::Int) => str("int"),
-        IDLTypeKind::PrimT(PrimType::Nat8) => str("nat8"),
-        IDLTypeKind::PrimT(PrimType::Nat16) => str("nat16"),
-        IDLTypeKind::PrimT(PrimType::Nat32) => str("nat32"),
-        IDLTypeKind::PrimT(PrimType::Nat64) => str("nat64"),
-        IDLTypeKind::PrimT(PrimType::Int8) => str("int8"),
-        IDLTypeKind::PrimT(PrimType::Int16) => str("int16"),
-        IDLTypeKind::PrimT(PrimType::Int32) => str("int32"),
-        IDLTypeKind::PrimT(PrimType::Int64) => str("int64"),
-        IDLTypeKind::PrimT(PrimType::Float32) => str("float32"),
-        IDLTypeKind::PrimT(PrimType::Float64) => str("float64"),
-        IDLTypeKind::PrimT(PrimType::Text) => str("text"),
-        IDLTypeKind::PrimT(PrimType::Reserved) => str("reserved"),
-        IDLTypeKind::PrimT(PrimType::Empty) => str("empty"),
-        IDLTypeKind::VarT(ref s) => str(s),
-        IDLTypeKind::PrincipalT => str("principal"),
-        IDLTypeKind::OptT(ref t) => pp_opt(t),
-        IDLTypeKind::VecT(ref t) => pp_vec(t),
-        IDLTypeKind::RecordT(ref fs) => pp_record(fs, ty.is_tuple()),
-        IDLTypeKind::VariantT(ref fs) => pp_variant(fs),
-        IDLTypeKind::FuncT(ref func) => pp_function(func),
-        IDLTypeKind::ServT(ref serv) => pp_service(serv),
-        IDLTypeKind::ClassT(ref args, ref t) => pp_class(args, t),
+        PrimT(PrimType::Null) => str("null"),
+        PrimT(PrimType::Bool) => str("bool"),
+        PrimT(PrimType::Nat) => str("nat"),
+        PrimT(PrimType::Int) => str("int"),
+        PrimT(PrimType::Nat8) => str("nat8"),
+        PrimT(PrimType::Nat16) => str("nat16"),
+        PrimT(PrimType::Nat32) => str("nat32"),
+        PrimT(PrimType::Nat64) => str("nat64"),
+        PrimT(PrimType::Int8) => str("int8"),
+        PrimT(PrimType::Int16) => str("int16"),
+        PrimT(PrimType::Int32) => str("int32"),
+        PrimT(PrimType::Int64) => str("int64"),
+        PrimT(PrimType::Float32) => str("float32"),
+        PrimT(PrimType::Float64) => str("float64"),
+        PrimT(PrimType::Text) => str("text"),
+        PrimT(PrimType::Reserved) => str("reserved"),
+        PrimT(PrimType::Empty) => str("empty"),
+        VarT(ref s) => str(s),
+        PrincipalT => str("principal"),
+        OptT(ref t) => pp_opt(t),
+        VecT(ref t) => pp_vec(t),
+        RecordT(ref fs) => pp_record(fs, ty.is_tuple()),
+        VariantT(ref fs) => pp_variant(fs),
+        FuncT(ref func) => pp_function(func),
+        ServT(ref serv) => pp_service(serv),
+        ClassT(ref args, ref t) => pp_class(args, t),
     }
 }
 
 fn pp_field(field: &TypeField, is_variant: bool) -> RcDoc<'_> {
     let docs = pp_docs(&field.docs);
-    let ty_doc = if is_variant && matches!(field.typ, IDLTypeKind::PrimT(PrimType::Null)) {
+    let ty_doc = if is_variant && matches!(field.typ.kind, IDLType::PrimT(PrimType::Null)) {
         RcDoc::nil()
     } else {
-        kwd(" :").append(pp_ty(&field.typ))
+        kwd(" :").append(pp_ty(&field.typ.kind))
     };
     docs.append(pp_label_raw(&field.label)).append(ty_doc)
 }
@@ -56,21 +58,21 @@ fn pp_fields(fs: &[TypeField], is_variant: bool) -> RcDoc<'_> {
     enclose_space("{", concat(fields, ";"), "}")
 }
 
-fn pp_opt(ty: &IDLType) -> RcDoc<'_> {
-    kwd("opt").append(pp_ty(ty))
+fn pp_opt(ty: &IDLTypeWithSpan) -> RcDoc<'_> {
+    kwd("opt").append(pp_ty(&ty.kind))
 }
 
-fn pp_vec(ty: &IDLType) -> RcDoc<'_> {
-    if matches!(ty, IDLTypeKind::PrimT(PrimType::Nat8)) {
+fn pp_vec(ty: &IDLTypeWithSpan) -> RcDoc<'_> {
+    if matches!(ty.kind, IDLType::PrimT(PrimType::Nat8)) {
         str("blob")
     } else {
-        kwd("vec").append(pp_ty(ty))
+        kwd("vec").append(pp_ty(&ty.kind))
     }
 }
 
 fn pp_record(fs: &[TypeField], is_tuple: bool) -> RcDoc<'_> {
     if is_tuple {
-        let tuple = concat(fs.iter().map(|f| pp_ty(&f.typ)), ";");
+        let tuple = concat(fs.iter().map(|f| pp_ty(&f.typ.kind)), ";");
         kwd("record").append(enclose_space("{", tuple, "}"))
     } else {
         kwd("record").append(pp_fields(fs, false))
@@ -95,12 +97,12 @@ fn pp_method(func: &FuncType) -> RcDoc<'_> {
         .nest(INDENT_SPACE)
 }
 
-fn pp_args(args: &[IDLType]) -> RcDoc<'_> {
-    let doc = concat(args.iter().map(pp_ty), ",");
+fn pp_args(args: &[IDLTypeWithSpan]) -> RcDoc<'_> {
+    let doc = concat(args.iter().map(|ty| pp_ty(&ty.kind)), ",");
     enclose("(", doc, ")")
 }
 
-fn pp_rets(rets: &[IDLType]) -> RcDoc<'_> {
+fn pp_rets(rets: &[IDLTypeWithSpan]) -> RcDoc<'_> {
     pp_args(rets)
 }
 
@@ -111,9 +113,9 @@ fn pp_service(methods: &[Binding]) -> RcDoc<'_> {
 fn pp_service_methods(methods: &[Binding]) -> RcDoc<'_> {
     let methods = methods.iter().map(|b| {
         let docs = pp_docs(&b.docs);
-        let func_doc = match &b.typ {
-            IDLTypeKind::FuncT(ref f) => pp_method(f),
-            IDLTypeKind::VarT(_) => pp_ty(&b.typ),
+        let func_doc = match &b.typ.kind {
+            IDLType::FuncT(ref f) => pp_method(f),
+            IDLType::VarT(_) => pp_ty(&b.typ.kind),
             _ => unreachable!(),
         };
         docs.append(pp_text(&b.id))
@@ -124,11 +126,11 @@ fn pp_service_methods(methods: &[Binding]) -> RcDoc<'_> {
     enclose_space("{", doc, "}")
 }
 
-fn pp_class<'a>(args: &'a [IDLType], t: &'a IDLType) -> RcDoc<'a> {
+fn pp_class<'a>(args: &'a [IDLTypeWithSpan], t: &'a IDLTypeWithSpan) -> RcDoc<'a> {
     let doc = pp_args(args).append(" ->").append(RcDoc::space());
-    match t {
-        IDLTypeKind::ServT(ref serv) => doc.append(pp_service_methods(serv)),
-        IDLTypeKind::VarT(ref s) => doc.append(s),
+    match &t.kind {
+        IDLType::ServT(ref serv) => doc.append(pp_service_methods(serv)),
+        IDLType::VarT(ref s) => doc.append(s),
         _ => unreachable!(),
     }
 }
@@ -139,16 +141,16 @@ fn pp_defs(prog: &IDLMergedProg) -> RcDoc<'_> {
         docs.append(kwd("type"))
             .append(ident(&b.id))
             .append(kwd("="))
-            .append(pp_ty(&b.typ))
+            .append(pp_ty(&b.typ.kind))
             .append(";")
     }))
 }
 
 fn pp_actor(actor: &IDLActorType) -> RcDoc<'_> {
     let docs = pp_docs(&actor.docs);
-    let service_doc = match &actor.typ {
-        IDLTypeKind::ServT(ref serv) => pp_service_methods(serv),
-        IDLTypeKind::VarT(_) | IDLTypeKind::ClassT(_, _) => pp_ty(&actor.typ),
+    let service_doc = match &actor.typ.kind {
+        IDLType::ServT(ref serv) => pp_service_methods(serv),
+        IDLType::VarT(_) | IDLType::ClassT(_, _) => pp_ty(&actor.typ.kind),
         _ => unreachable!(),
     };
     docs.append(kwd("service :")).append(service_doc)

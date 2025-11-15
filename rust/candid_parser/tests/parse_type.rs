@@ -2,7 +2,7 @@ use candid::types::TypeEnv;
 use candid_parser::{
     bindings::{javascript, motoko, rust, typescript},
     configs::Configs,
-    syntax::{pretty_print, Dec, IDLProg, IDLTypeKind},
+    syntax::{pretty_print, Dec, IDLProg, IDLType},
     typing::{check_file, check_prog},
 };
 use goldenfile::Mint;
@@ -42,9 +42,7 @@ service server : {
     let actor = ast.actor.unwrap();
     assert_eq!(actor.docs, vec!["Doc comment for service"]);
 
-    let methods = if let IDLTypeKind::ServT(methods) = &actor.typ {
-        methods
-    } else {
+    let IDLType::ServT(methods) = &actor.typ.kind else {
         panic!("actor is not a service");
     };
     assert_eq!(methods[0].docs, vec!["Doc comment for f"]);
@@ -84,11 +82,9 @@ service server : {
             }
         })
         .unwrap();
-    match &list.typ {
-        IDLTypeKind::OptT(list_inner) => {
-            let fields = if let IDLTypeKind::RecordT(fields) = list_inner.as_ref() {
-                fields
-            } else {
+    match &list.typ.kind {
+        IDLType::OptT(list_inner) => {
+            let IDLType::RecordT(fields) = &list_inner.kind else {
                 panic!("inner is not a record");
             };
             assert_eq!(fields[0].docs, vec!["Doc comment for List.head"]);

@@ -1,7 +1,7 @@
 // This module implements the Candid to Motoko binding as specified in
 // https://github.com/dfinity/motoko/blob/master/design/IDL-Motoko.md
 
-use crate::syntax::{self, IDLActorType, IDLMergedProg, IDLType, IDLTypeKind};
+use crate::syntax::{self, IDLActorType, IDLMergedProg, IDLType};
 use candid::pretty::candid::is_valid_as_id;
 use candid::pretty::utils::*;
 use candid::types::{Field, FuncMode, Function, Label, SharedLabel, Type, TypeInner};
@@ -97,44 +97,26 @@ fn escape(id: &str, is_method: bool) -> RcDoc<'_> {
 }
 
 fn pp_ty_rich<'a>(ty: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
-    match ty.as_ref() {
-        TypeInner::Service(ref meths) => {
-            if let Some(IDLTypeKind::ServT(methods)) = syntax {
-                return pp_service(meths, Some(methods));
-            }
-            pp_service(meths, None)
+    match (ty.as_ref(), syntax) {
+        (TypeInner::Service(ref meths), Some(IDLType::ServT(methods))) => {
+            pp_service(meths, Some(methods))
         }
-        TypeInner::Class(ref args, t) => {
-            if let Some(IDLTypeKind::ClassT(_, syntax_t)) = syntax {
-                return pp_class((args, t), Some(syntax_t));
-            }
-            pp_class((args, t), None)
+        (TypeInner::Class(ref args, t), Some(IDLType::ClassT(_, syntax_t))) => {
+            pp_class((args, t), Some(&syntax_t.kind))
         }
-        TypeInner::Record(ref fields) => {
-            if let Some(IDLTypeKind::RecordT(syntax_fields)) = syntax {
-                return pp_record(fields, Some(syntax_fields));
-            }
-            pp_record(fields, None)
+        (TypeInner::Record(ref fields), Some(IDLType::RecordT(syntax_fields))) => {
+            pp_record(fields, Some(syntax_fields))
         }
-        TypeInner::Variant(ref fields) => {
-            if let Some(IDLTypeKind::VariantT(syntax_fields)) = syntax {
-                return pp_variant(fields, Some(syntax_fields));
-            }
-            pp_variant(fields, None)
+        (TypeInner::Variant(ref fields), Some(IDLType::VariantT(syntax_fields))) => {
+            pp_variant(fields, Some(syntax_fields))
         }
-        TypeInner::Opt(ref inner) => {
-            if let Some(IDLTypeKind::OptT(syntax_inner)) = syntax {
-                return str("?").append(pp_ty_rich(inner, Some(syntax_inner)));
-            }
-            str("?").append(pp_ty(inner))
+        (TypeInner::Opt(ref inner), Some(IDLType::OptT(syntax))) => {
+            str("?").append(pp_ty_rich(inner, Some(&syntax.kind)))
         }
-        TypeInner::Vec(ref inner) => {
-            if let Some(IDLTypeKind::VecT(syntax_inner)) = syntax {
-                return pp_vec(inner, Some(syntax_inner));
-            }
-            pp_vec(inner, None)
+        (TypeInner::Vec(ref inner), Some(IDLType::VecT(syntax))) => {
+            pp_vec(inner, Some(&syntax.kind))
         }
-        _ => pp_ty(ty),
+        (_, _) => pp_ty(ty),
     }
 }
 
@@ -232,7 +214,7 @@ fn pp_service<'a>(serv: &'a [(String, Type)], syntax: Option<&'a [syntax::Bindin
         if let Some(bs) = syntax {
             if let Some(b) = bs.iter().find(|b| &b.id == id) {
                 docs = pp_docs(&b.docs);
-                syntax_field_ty = Some(&b.typ)
+                syntax_field_ty = Some(&b.typ.kind)
             }
         }
         docs.append(escape(id, true))
@@ -264,7 +246,7 @@ fn find_field<'a>(
     if let Some(bs) = fields {
         if let Some(field) = bs.iter().find(|b| b.label == *label) {
             docs = pp_docs(&field.docs);
-            syntax_field_ty = Some(&field.typ);
+            syntax_field_ty = Some(&field.typ.kind);
         }
     };
     (docs, syntax_field_ty)
@@ -322,7 +304,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, prog: &'a IDLMergedProg) -> RcDoc<'a> {
         docs.append(kwd("public type"))
             .append(escape(id, false))
             .append(" = ")
-            .append(pp_ty_rich(ty, syntax.map(|b| &b.typ)))
+            .append(pp_ty_rich(ty, syntax.map(|b| &b.typ.kind)))
             .append(";")
     }))
 }
@@ -330,33 +312,27 @@ fn pp_defs<'a>(env: &'a TypeEnv, prog: &'a IDLMergedProg) -> RcDoc<'a> {
 fn pp_actor<'a>(ty: &'a Type, syntax: Option<&'a IDLActorType>) -> RcDoc<'a> {
     let self_doc = kwd("public type Self =");
     match ty.as_ref() {
-        TypeInner::Service(ref serv) => {
-            if let Some(IDLActorType {
-                typ: IDLTypeKind::ServT(fields),
-                docs,
-                ..
-            }) = syntax
-            {
-                let docs = pp_docs(docs);
-                docs.append(self_doc).append(pp_service(serv, Some(fields)))
-            } else {
-                pp_service(serv, None)
-            }
-        }
-        TypeInner::Class(ref args, ref t) => {
-            if let Some(IDLActorType {
-                typ: IDLTypeKind::ClassT(_, syntax_t),
-                docs,
-                ..
-            }) = syntax
-            {
-                let docs = pp_docs(docs);
-                docs.append(self_doc)
-                    .append(pp_class((args, t), Some(syntax_t)))
-            } else {
-                self_doc.append(pp_class((args, t), None))
-            }
-        }
+        TypeInner::Service(ref serv) => match syntax {
+            Some(IDLActorType { typ, docs, .. }) => match &typ.kind {
+                IDLType::ServT(fields) => {
+                    let docs = pp_docs(docs);
+                    docs.append(self_doc).append(pp_service(serv, Some(fields)))
+                }
+                _ => pp_service(serv, None),
+            },
+            None => pp_service(serv, None),
+        },
+        TypeInner::Class(ref args, ref t) => match syntax {
+            Some(IDLActorType { typ, docs, .. }) => match &typ.kind {
+                IDLType::ClassT(_, syntax_t) => {
+                    let docs = pp_docs(docs);
+                    docs.append(self_doc)
+                        .append(pp_class((args, t), Some(&syntax_t.kind)))
+                }
+                _ => self_doc.append(pp_class((args, t), None)),
+            },
+            None => self_doc.append(pp_class((args, t), None)),
+        },
         TypeInner::Var(_) => self_doc.append(pp_ty(ty)),
         _ => unreachable!(),
     }

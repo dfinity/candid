@@ -1,5 +1,5 @@
 use super::javascript::{ident, is_tuple_fields};
-use crate::syntax::{self, IDLMergedProg, IDLType, IDLTypeKind};
+use crate::syntax::{self, IDLMergedProg, IDLType};
 use candid::pretty::utils::*;
 use candid::types::{Field, Function, Label, SharedLabel, Type, TypeEnv, TypeInner};
 use pretty::RcDoc;
@@ -17,7 +17,7 @@ fn find_field<'a>(
     if let Some(bs) = fields {
         if let Some(field) = bs.iter().find(|b| b.label == *label) {
             docs = pp_docs(&field.docs);
-            syntax_field_ty = Some(&field.typ);
+            syntax_field_ty = Some(&field.typ.kind);
         }
     };
     (docs, syntax_field_ty)
@@ -29,38 +29,23 @@ fn pp_ty_rich<'a>(
     syntax: Option<&'a IDLType>,
     is_ref: bool,
 ) -> RcDoc<'a> {
-    match ty.as_ref() {
-        TypeInner::Record(ref fields) => {
-            if let Some(IDLTypeKind::RecordT(syntax_fields)) = syntax {
-                return pp_record(env, fields, Some(syntax_fields), is_ref);
-            }
-            pp_record(env, fields, None, is_ref)
+    match (ty.as_ref(), syntax) {
+        (TypeInner::Record(ref fields), Some(IDLType::RecordT(syntax_fields))) => {
+            pp_record(env, fields, Some(syntax_fields), is_ref)
         }
-        TypeInner::Variant(ref fields) => {
-            if let Some(IDLTypeKind::VariantT(syntax_fields)) = syntax {
-                return pp_variant(env, fields, Some(syntax_fields), is_ref);
-            }
-            pp_variant(env, fields, None, is_ref)
+        (TypeInner::Variant(ref fields), Some(IDLType::VariantT(syntax_fields))) => {
+            pp_variant(env, fields, Some(syntax_fields), is_ref)
         }
-        TypeInner::Service(ref serv) => {
-            if let Some(IDLTypeKind::ServT(syntax_serv)) = syntax {
-                return pp_service(env, serv, Some(syntax_serv));
-            }
-            pp_service(env, serv, None)
+        (TypeInner::Service(ref serv), Some(IDLType::ServT(syntax_serv))) => {
+            pp_service(env, serv, Some(syntax_serv))
         }
-        TypeInner::Opt(ref t) => {
-            if let Some(IDLTypeKind::OptT(syntax_inner)) = syntax {
-                return pp_opt(env, t, Some(syntax_inner), is_ref);
-            }
-            pp_opt(env, t, None, is_ref)
+        (TypeInner::Opt(ref t), Some(IDLType::OptT(syntax_inner))) => {
+            pp_opt(env, t, Some(&syntax_inner.kind), is_ref)
         }
-        TypeInner::Vec(ref t) => {
-            if let Some(IDLTypeKind::VecT(syntax_inner)) = syntax {
-                return pp_vec(env, t, Some(syntax_inner), is_ref);
-            }
-            pp_vec(env, t, None, is_ref)
+        (TypeInner::Vec(ref t), Some(IDLType::VecT(syntax_inner))) => {
+            pp_vec(env, t, Some(&syntax_inner.kind), is_ref)
         }
-        _ => pp_ty(env, ty, is_ref),
+        (_, _) => pp_ty(env, ty, is_ref),
     }
 }
 
@@ -281,7 +266,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], prog: &'a IDLMergedPro
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         let syntax = prog.lookup(id);
-        let syntax_ty = syntax.map(|s| &s.typ);
+        let syntax_ty = syntax.map(|s| &s.typ.kind);
         let docs = syntax
             .map(|b| pp_docs(b.docs.as_ref()))
             .unwrap_or(RcDoc::nil());
@@ -323,10 +308,11 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type, syntax: Option<&'a IDLType>) -> 
             .append(str(id))
             .append(str(" {}")),
         TypeInner::Class(_, t) => {
-            if let Some(IDLTypeKind::ClassT(_, syntax_t)) = syntax {
-                return pp_actor(env, t, Some(syntax_t));
+            if let Some(IDLType::ClassT(_, syntax_t)) = syntax {
+                pp_actor(env, t, Some(&syntax_t.kind))
+            } else {
+                pp_actor(env, t, None)
             }
-            pp_actor(env, t, None)
         }
         _ => unreachable!(),
     }
@@ -347,11 +333,15 @@ import type { IDL } from '@dfinity/candid';
                 .as_ref()
                 .map(|s| pp_docs(s.docs.as_ref()))
                 .unwrap_or(RcDoc::nil());
-            docs.append(pp_actor(env, actor, syntax_actor.as_ref().map(|s| &s.typ)))
-                .append(RcDoc::line())
-                .append("export declare const idlFactory: IDL.InterfaceFactory;")
-                .append(RcDoc::line())
-                .append("export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];")
+            docs.append(pp_actor(
+                env,
+                actor,
+                syntax_actor.as_ref().map(|s| &s.typ.kind),
+            ))
+            .append(RcDoc::line())
+            .append("export declare const idlFactory: IDL.InterfaceFactory;")
+            .append(RcDoc::line())
+            .append("export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];")
         }
     };
     let doc = RcDoc::text(header)
