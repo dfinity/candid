@@ -4,9 +4,10 @@ members = [
 ]
 resolver = "2"
 
-[profile.release]
-lto = true
-opt-level = 2
+[profile.canister]
+inherits = "release"
+opt-level = "z"
+strip = "debuginfo"
 
 [patch.crates-io.candid]
 path = "../../rust/candid"

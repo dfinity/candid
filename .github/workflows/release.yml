@@ -16,7 +16,7 @@ jobs:
             name: linux64
             artifact_name: target/x86_64-unknown-linux-musl/release/didc
             asset_name: didc-linux64
-          - os: macos-13-large
+          - os: macos-15-intel
             name: macos
             artifact_name: target/release/didc
             asset_name: didc-macos
@@ -26,21 +26,11 @@ jobs:
             asset_name: didc-arm32
     steps:
       - uses: actions/checkout@v4
-      - name: Install stable toolchain
-        if: matrix.name != 'arm'
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - name: Install stable toolchain
+      - name: Install Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Add arm target
         if: matrix.name == 'arm'
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          target: arm-unknown-linux-gnueabihf
+        run: rustup target add arm-unknown-linux-gnueabihf
       - name: Build
         if: matrix.name == 'linux64'
         run: |
@@ -77,10 +67,6 @@ jobs:
             asset_name: didc-linux64
           - os: ubuntu-22.04
             asset_name: didc-linux64
-          - os: macos-14-large
-            asset_name: didc-macos
-          - os: macos-13-large
-            asset_name: didc-macos
     steps:
       - name: Get executable
         id: download
@@ -113,4 +99,37 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: didc
           asset_name: ${{ matrix.asset_name }}
+          tag: ${{ github.ref }}
+
+  candid-ui:
+    name: Build and publish candid_ui canister
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Install binaryen
+        run: |
+          sudo apt-get update -yy
+          sudo apt-get install -yy binaryen
+      - name: Build candid_ui
+        working-directory: tools/ui
+        run: |
+          npm install
+          npm run build
+          cargo build --target wasm32-unknown-unknown --profile canister --package didjs
+          wasm-opt --strip-debug -Oz target/wasm32-unknown-unknown/canister/didjs.wasm -o target/wasm32-unknown-unknown/canister/didjs_opt.wasm
+      - name: Prepare asset
+        run: |
+          cp tools/ui/target/wasm32-unknown-unknown/canister/didjs_opt.wasm candid_ui.wasm
+      - name: Upload candid_ui to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: candid_ui.wasm
+          asset_name: candid_ui.wasm
           tag: ${{ github.ref }}
