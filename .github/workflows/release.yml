@@ -125,7 +125,7 @@ jobs:
           wasm-opt --strip-debug -Oz target/wasm32-unknown-unknown/canister/didjs.wasm -o target/wasm32-unknown-unknown/canister/didjs_opt.wasm
       - name: Prepare asset
         run: |
-          cp tools/ui/target/wasm32-unknown-unknown/canister/didjs.wasm candid_ui.wasm
+          cp tools/ui/target/wasm32-unknown-unknown/canister/didjs_opt.wasm candid_ui.wasm
       - name: Upload candid_ui to release
         uses: svenstaro/upload-release-action@v2
         with:
