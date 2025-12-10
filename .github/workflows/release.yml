@@ -26,21 +26,11 @@ jobs:
             asset_name: didc-arm32
     steps:
       - uses: actions/checkout@v4
-      - name: Install stable toolchain
-        if: matrix.name != 'arm'
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - name: Install stable toolchain
+      - name: Install Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Add arm target
         if: matrix.name == 'arm'
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          target: arm-unknown-linux-gnueabihf
+        run: rustup target add arm-unknown-linux-gnueabihf
       - name: Build
         if: matrix.name == 'linux64'
         run: |
@@ -125,12 +115,7 @@ jobs:
         with:
           node-version: '20'
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          target: wasm32-unknown-unknown
+        run: rustup show active-toolchain || rustup toolchain install
       - name: Install binaryen
         run: |
           sudo apt-get update -yy
