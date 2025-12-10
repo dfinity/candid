@@ -114,3 +114,41 @@ jobs:
           file: didc
           asset_name: ${{ matrix.asset_name }}
           tag: ${{ github.ref }}
+
+  candid-ui:
+    name: Build and publish candid_ui canister
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          target: wasm32-unknown-unknown
+      - name: Install binaryen
+        run: |
+          sudo apt-get update -yy
+          sudo apt-get install -yy binaryen
+      - name: Build candid_ui
+        working-directory: tools/ui
+        run: |
+          npm install
+          npm run build
+          cargo build --target wasm32-unknown-unknown --release --package didjs
+          wasm-opt --strip-debug -Oz target/wasm32-unknown-unknown/release/didjs.wasm -o target/wasm32-unknown-unknown/release/didjs_opt.wasm
+      - name: Prepare asset
+        run: |
+          cp tools/ui/target/wasm32-unknown-unknown/release/didjs_opt.wasm candid_ui.wasm
+      - name: Upload candid_ui to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: candid_ui.wasm
+          asset_name: candid_ui.wasm
+          tag: ${{ github.ref }}
