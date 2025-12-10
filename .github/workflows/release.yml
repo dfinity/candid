@@ -116,20 +116,15 @@ jobs:
           node-version: '20'
       - name: Install Rust toolchain
         run: rustup show active-toolchain || rustup toolchain install
-      - name: Install binaryen
-        run: |
-          sudo apt-get update -yy
-          sudo apt-get install -yy binaryen
       - name: Build candid_ui
         working-directory: tools/ui
         run: |
           npm install
           npm run build
-          cargo build --target wasm32-unknown-unknown --release --package didjs
-          wasm-opt --strip-debug -Oz target/wasm32-unknown-unknown/release/didjs.wasm -o target/wasm32-unknown-unknown/release/didjs_opt.wasm
+          cargo build --target wasm32-unknown-unknown --profile canister --package didjs
       - name: Prepare asset
         run: |
-          cp tools/ui/target/wasm32-unknown-unknown/release/didjs_opt.wasm candid_ui.wasm
+          cp tools/ui/target/wasm32-unknown-unknown/canister/didjs.wasm candid_ui.wasm
       - name: Upload candid_ui to release
         uses: svenstaro/upload-release-action@v2
         with:
