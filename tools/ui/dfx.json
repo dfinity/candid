@@ -6,7 +6,8 @@
       "wasm": "target/wasm32-unknown-unknown/canister/didjs.wasm",
       "build": [
         "npm run build",
-        "cargo build --target wasm32-unknown-unknown --profile canister --package didjs"
+        "cargo build --target wasm32-unknown-unknown --profile canister --package didjs",
+        "wasm-opt --strip-debug -Oz target/wasm32-unknown-unknown/canister/didjs.wasm -o target/wasm32-unknown-unknown/canister/didjs_opt.wasm"
       ],
       "metadata": [
         {
