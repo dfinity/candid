@@ -16,7 +16,7 @@ jobs:
             name: linux64
             artifact_name: target/x86_64-unknown-linux-musl/release/didc
             asset_name: didc-linux64
-          - os: macos-13-large
+          - os: macos-14-large
             name: macos
             artifact_name: target/release/didc
             asset_name: didc-macos
@@ -77,9 +77,9 @@ jobs:
             asset_name: didc-linux64
           - os: ubuntu-22.04
             asset_name: didc-linux64
-          - os: macos-14-large
+          - os: macos-15-large
             asset_name: didc-macos
-          - os: macos-13-large
+          - os: macos-14-large
             asset_name: didc-macos
     steps:
       - name: Get executable
