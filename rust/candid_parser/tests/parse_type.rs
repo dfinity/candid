@@ -42,7 +42,7 @@ service server : {
     let actor = ast.actor.unwrap();
     assert_eq!(actor.docs, vec!["Doc comment for service"]);
 
-    let IDLType::ServT(methods) = &actor.typ else {
+    let IDLType::ServT(methods) = &actor.typ.kind else {
         panic!("actor is not a service");
     };
     assert_eq!(methods[0].docs, vec!["Doc comment for f"]);
@@ -82,9 +82,9 @@ service server : {
             }
         })
         .unwrap();
-    match &list.typ {
+    match &list.typ.kind {
         IDLType::OptT(list_inner) => {
-            let IDLType::RecordT(fields) = list_inner.as_ref() else {
+            let IDLType::RecordT(fields) = &list_inner.kind else {
                 panic!("inner is not a record");
             };
             assert_eq!(fields[0].docs, vec!["Doc comment for List.head"]);
