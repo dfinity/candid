@@ -246,14 +246,19 @@ fn pp_service<'a>(
     enclose_space("{", concat(methods, ","), "}")
 }
 
+/// Escapes doc comment content to prevent comment injection attacks.
+/// Replaces `*/` with `*\/` to prevent premature comment termination.
+fn escape_doc_comment(line: &str) -> String {
+    line.replace("*/", r"*\/")
+}
+
 fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
     if docs.is_empty() {
         RcDoc::nil()
     } else {
-        let docs = lines(
-            docs.iter()
-                .map(|line| RcDoc::text(DOC_COMMENT_LINE_PREFIX).append(line)),
-        );
+        let docs = lines(docs.iter().map(|line| {
+            RcDoc::text(DOC_COMMENT_LINE_PREFIX).append(RcDoc::text(escape_doc_comment(line)))
+        }));
         RcDoc::text(DOC_COMMENT_PREFIX)
             .append(RcDoc::hardline())
             .append(docs)
