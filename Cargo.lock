@@ -216,7 +216,7 @@ dependencies = [
  "binread",
  "byteorder",
  "candid_derive 0.10.20",
- "candid_parser 0.2.3",
+ "candid_parser 0.2.4",
  "hex",
  "ic_principal 0.1.1",
  "leb128",
@@ -276,7 +276,7 @@ dependencies = [
 
 [[package]]
 name = "candid_parser"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -479,10 +479,10 @@ dependencies = [
 
 [[package]]
 name = "didc"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "anyhow",
- "candid_parser 0.2.3",
+ "candid_parser 0.2.4",
  "clap",
  "console",
  "hex",

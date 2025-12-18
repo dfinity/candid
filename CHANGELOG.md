@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 2025-12-18
+
+### candid_parser 0.2.4 & didc 0.5.4
+
+* Non-breaking changes:
+  + fix: escape `*/` to prevent premature JS doc comment termination
+
 ## 2025-10-26
 
 ### Candid 0.10.20
