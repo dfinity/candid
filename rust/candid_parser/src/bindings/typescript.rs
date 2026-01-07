@@ -324,9 +324,9 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type, syntax: Option<&'a IDLType>) -> 
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>, prog: &IDLMergedProg) -> String {
-    let header = r#"import type { Principal } from '@dfinity/principal';
-import type { ActorMethod } from '@dfinity/agent';
-import type { IDL } from '@dfinity/candid';
+    let header = r#"import type { Principal } from '@icp-sdk/core/principal';
+import type { ActorMethod } from '@icp-sdk/core/agent';
+import type { IDL } from '@icp-sdk/core/candid';
 "#;
     let syntax_actor = prog.resolve_actor().ok().flatten();
     let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
