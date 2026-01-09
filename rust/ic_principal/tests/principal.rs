@@ -267,6 +267,9 @@ fn impl_traits() {
 
     #[cfg(feature = "serde")]
     assert!(impls::impls!(Principal: Serialize & Deserialize<'static>));
+
+    #[cfg(feature = "rangemap")]
+    assert!(impls::impls!(Principal: rangemap::StepLite));
 }
 
 #[test]
@@ -292,4 +295,22 @@ fn self_authenticating_ok() {
         142, 166, 42, 197, 179, 228, 47, 2,
     ]);
     assert_eq!(p1, p2);
+}
+
+#[test]
+#[cfg(feature = "rangemap")]
+fn rangemap_steplite_impl_works() {
+    use rangemap::{RangeInclusiveSet, StepLite};
+
+    let p1 = Principal::from_slice(&[0, 1, 2, 0]);
+    let p2 = Principal::from_slice(&[0, 1, 3, 0]);
+
+    assert_eq!(p1.add_one(), p2);
+    assert_eq!(p2.sub_one(), p1);
+
+    let mut set = RangeInclusiveSet::new();
+    set.insert(p1..=p2);
+    assert!(set.contains(&p1));
+    assert!(set.contains(&p2));
+    assert!(!set.contains(&Principal::from_slice(&[0, 1, 4, 0])));
 }
