@@ -178,7 +178,7 @@ dependencies = [
 
 [[package]]
 name = "candid_parser"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "candid",
@@ -498,7 +498,7 @@ checksum = "8de254dd67bbd58073e23dc1c8553ba12fa1dc610a19de94ad2bbcd0460c067f"
 
 [[package]]
 name = "ic_principal"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "arbitrary",
  "crc32fast",
