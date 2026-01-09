@@ -195,7 +195,7 @@ dependencies = [
  "byteorder",
  "candid_derive 0.6.6",
  "hex",
- "ic_principal 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ic_principal 0.1.1",
  "leb128",
  "num-bigint",
  "num-traits",
@@ -216,9 +216,9 @@ dependencies = [
  "binread",
  "byteorder",
  "candid_derive 0.10.20",
- "candid_parser 0.2.4",
+ "candid_parser 0.3.0",
  "hex",
- "ic_principal 0.1.1",
+ "ic_principal 0.1.2",
  "leb128",
  "num-bigint",
  "num-traits",
@@ -276,7 +276,7 @@ dependencies = [
 
 [[package]]
 name = "candid_parser"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -479,10 +479,10 @@ dependencies = [
 
 [[package]]
 name = "didc"
-version = "0.5.4"
+version = "0.6.0"
 dependencies = [
  "anyhow",
- "candid_parser 0.2.4",
+ "candid_parser 0.3.0",
  "clap",
  "console",
  "hex",
@@ -689,6 +689,20 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 [[package]]
 name = "ic_principal"
 version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1762deb6f7c8d8c2bdee4b6c5a47b60195b74e9b5280faa5ba29692f8e17429c"
+dependencies = [
+ "arbitrary",
+ "crc32fast",
+ "data-encoding",
+ "serde",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
+name = "ic_principal"
+version = "0.1.2"
 dependencies = [
  "arbitrary",
  "crc32fast",
@@ -699,20 +713,6 @@ dependencies = [
  "serde_cbor",
  "serde_json",
  "serde_test",
- "sha2",
- "thiserror",
-]
-
-[[package]]
-name = "ic_principal"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1762deb6f7c8d8c2bdee4b6c5a47b60195b74e9b5280faa5ba29692f8e17429c"
-dependencies = [
- "arbitrary",
- "crc32fast",
- "data-encoding",
- "serde",
  "sha2",
  "thiserror",
 ]
