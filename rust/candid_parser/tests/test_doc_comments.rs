@@ -41,7 +41,7 @@ type network = variant {
     assert_eq!(binding.id, "network");
 
     // No field should have the inline comment
-    let fields = extract_variant_fields(&binding.typ);
+    let fields = extract_variant_fields(&binding.typ.kind);
     assert_eq!(fields.len(), 3);
     for field in fields {
         assert!(
@@ -78,7 +78,7 @@ type network = variant {
     );
     assert_eq!(binding.docs[0], "Doc comment for network");
 
-    let fields = extract_variant_fields(&binding.typ);
+    let fields = extract_variant_fields(&binding.typ.kind);
     assert_eq!(fields.len(), 3);
 
     // Check that only the testnet field has the doc comment
@@ -143,7 +143,7 @@ type my_type = variant {
     assert_eq!(binding.id, "my_type");
     assert_eq!(binding.docs, vec!["Doc comment for my_type"]);
 
-    let fields = extract_variant_fields(&binding.typ);
+    let fields = extract_variant_fields(&binding.typ.kind);
     assert_eq!(fields.len(), 3);
     for field in fields {
         assert!(
