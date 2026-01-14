@@ -196,5 +196,6 @@ assert blob "DIDL\00\01\71\03\e2\28\a1" !: (reserved) "reserved from invalid utf
 assert blob "DIDL\00\01\6f"                      !: (empty) "cannot decode empty type";
 assert blob "DIDL\01\6e\6f\01\00\00" == "(null)"  : (opt empty) "okay to decode non-empty value";
 
+
 assert blob "DIDL\00\0a\7f\7e\7d\7c\7f\70\7f\7b\7a\79\01\2a\2a\2a\2a\00\2a\00\00\00"
     == "(null, true, 42, 42, null, null, null, 42, 42, 42)" : (null, bool, nat, int, null, reserved, null, nat8, nat16, nat32) "multiple arguments";
