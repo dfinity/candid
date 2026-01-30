@@ -29,7 +29,6 @@ pub struct Header {
     #[br(args(max_type_len))]
     table: Table,
     #[br(parse_with = read_leb)]
-    #[br(assert(len <= max_type_len.unwrap_or(MAX_TYPE_TABLE_LEN as usize) as u64, "args length exceeded"))]
     len: u64,
     #[br(count = len)]
     args: Vec<IndexType>,
