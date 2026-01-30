@@ -5,6 +5,8 @@ use binread::io::{Read, Seek};
 use binread::{BinRead, BinResult, Error as BError, ReadOptions};
 use std::convert::TryInto;
 
+const MAX_TYPE_TABLE_LEN: u64 = 10_000; // Max type entries
+
 fn read_leb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, (): ()) -> BinResult<u64> {
     let pos = reader.stream_position()?;
     leb128::read::unsigned(reader).map_err(|_| BError::Custom {
@@ -22,16 +24,22 @@ fn read_sleb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, (): ()) -> BinRes
 
 #[derive(BinRead, Debug)]
 #[br(magic = b"DIDL")]
+#[br(import(max_type_len: Option<usize>))]
 pub struct Header {
+    #[br(args(max_type_len))]
     table: Table,
     #[br(parse_with = read_leb)]
+    #[br(assert(len <= max_type_len.unwrap_or(MAX_TYPE_TABLE_LEN as usize) as u64, "args length exceeded"))]
     len: u64,
     #[br(count = len)]
     args: Vec<IndexType>,
 }
+
 #[derive(BinRead, Debug)]
+#[br(import(max_type_len: Option<usize>))]
 struct Table {
-    #[br(parse_with = read_leb, assert(len <= i64::MAX as u64, "type table size out of range"))]
+    #[br(parse_with = read_leb)]
+    #[br(assert(len <= max_type_len.unwrap_or(MAX_TYPE_TABLE_LEN as usize) as u64, "type table size exceeded"))]
     len: u64,
     #[br(count = len)]
     table: Vec<ConsType>,
