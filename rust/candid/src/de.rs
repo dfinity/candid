@@ -143,6 +143,7 @@ impl<'de> IDLDeserialize<'de> {
 pub struct DecoderConfig {
     pub decoding_quota: Option<usize>,
     pub skipping_quota: Option<usize>,
+    pub max_type_len: Option<usize>,
     full_error_message: bool,
 }
 impl DecoderConfig {
@@ -153,6 +154,7 @@ impl DecoderConfig {
         Self {
             decoding_quota: None,
             skipping_quota: None,
+            max_type_len: None,
             #[cfg(not(target_arch = "wasm32"))]
             full_error_message: true,
             #[cfg(target_arch = "wasm32")]
@@ -212,6 +214,11 @@ impl DecoderConfig {
         self.skipping_quota = Some(n);
         self
     }
+    /// Set the max type table size
+    pub fn set_max_type_len(&mut self, n: usize) -> &mut Self {
+        self.max_type_len = Some(n);
+        self
+    }
     /// When set to false, error message only displays the concrete type when the type is small.
     /// The error message also doesn't include the decoding states.
     /// When set to true, error message always shows the full type and decoding states.
@@ -230,6 +237,7 @@ impl DecoderConfig {
         Self {
             decoding_quota,
             skipping_quota,
+            max_type_len: original.max_type_len,
             full_error_message: original.full_error_message,
         }
     }
@@ -318,7 +326,7 @@ struct Deserializer<'de> {
 impl<'de> Deserializer<'de> {
     fn from_bytes(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
         let mut reader = Cursor::new(bytes);
-        let header = Header::read(&mut reader)?;
+        let header = Header::read_args(&mut reader, (config.max_type_len,))?;
         let (env, types) = header.to_types()?;
         Ok(Deserializer {
             input: reader,
