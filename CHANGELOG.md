@@ -5,7 +5,7 @@
 ### Candid
 
 * Breaking changes:
-  + Enforce limits on type table size and argument length in the binary parser.
+  + Enforce limits on type table size in the binary parser.
 * Non-breaking changes:
   + Add `max_type_len` to `DecoderConfig` to configure the type table size limit during binary parsing.
 
