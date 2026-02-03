@@ -2,12 +2,12 @@
 
 ## Unreleased
 
-### Candid
+## 2026-02-03
 
-* Breaking changes:
-  + Enforce limits on type table size in the binary parser.
+### Candid 0.10.21
+
 * Non-breaking changes:
-  + Add `max_type_len` to `DecoderConfig` to configure the type table size limit during binary parsing.
+  + Add `max_type_len` to `DecoderConfig` to configure the type table size limit (default: 10,000) during binary parsing.
 
 ## 2026-01-09
 
