@@ -150,7 +150,7 @@ fn find_field<'a>(
     if let Some(bs) = fields {
         if let Some(field) = bs.iter().find(|b| b.label == *label) {
             docs = pp_docs(&field.docs);
-            syntax_field_ty = Some(&field.typ);
+            syntax_field_ty = Some(&field.typ.kind);
         }
     };
     (docs, syntax_field_ty)
@@ -178,7 +178,7 @@ fn actor_methods(actor: Option<&IDLActorType>) -> &[syntax::Binding] {
         None => return &[],
     };
 
-    match typ {
+    match &typ.kind {
         IDLType::ServT(methods) => methods,
         IDLType::ClassT(_, inner) => {
             if let IDLType::ServT(methods) = inner.as_ref() {
@@ -482,7 +482,7 @@ fn test_{test_name}() {{
                 .unwrap_or_else(|| to_identifier_case(id, IdentifierCase::UpperCamel).0);
             let syntax = self.prog.lookup(id);
             let syntax_ty = syntax
-                .map(|b| &b.typ)
+                .map(|b| &b.typ.kind)
                 .or_else(|| self.generated_types.get(*id).map(|t| &**t));
             let docs = syntax
                 .map(|b| pp_docs(b.docs.as_ref()))
@@ -958,8 +958,9 @@ impl<'b> NominalState<'_, 'b> {
                             let elem = StateElem::Label(&lab);
                             let old = self.state.push_state(&elem);
                             path.push(TypePath::RecordField(id.to_string()));
-                            let syntax_field = syntax_fields
-                                .and_then(|s| s.iter().find(|f| f.label == **id).map(|f| &f.typ));
+                            let syntax_field = syntax_fields.and_then(|s| {
+                                s.iter().find(|f| f.label == **id).map(|f| &f.typ.kind)
+                            });
                             let ty = self.nominalize(env, path, ty, syntax_field);
                             path.pop();
                             self.state.pop_state(old, elem);
@@ -1003,8 +1004,9 @@ impl<'b> NominalState<'_, 'b> {
                             } else {
                                 path.push(TypePath::VariantField(id.to_string()));
                             }
-                            let syntax_field = syntax_fields
-                                .and_then(|s| s.iter().find(|f| f.label == **id).map(|f| &f.typ));
+                            let syntax_field = syntax_fields.and_then(|s| {
+                                s.iter().find(|f| f.label == **id).map(|f| &f.typ.kind)
+                            });
                             let ty = self.nominalize(env, path, ty, syntax_field);
                             path.pop();
                             self.state.pop_state(old, StateElem::Label(&lab));
@@ -1167,7 +1169,7 @@ impl<'b> NominalState<'_, 'b> {
         for (id, ty) in self.state.env.0.iter() {
             let elem = StateElem::Label(id);
             let old = self.state.push_state(&elem);
-            let syntax = prog.lookup(id).map(|t| &t.typ);
+            let syntax = prog.lookup(id).map(|t| &t.typ.kind);
             let ty = self.nominalize(&mut res, &mut vec![TypePath::Id(id.clone())], ty, syntax);
             res.0.insert(id.to_string(), ty);
             self.state.pop_state(old, elem);
