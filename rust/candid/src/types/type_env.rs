@@ -87,7 +87,6 @@ impl TypeEnv {
         depth: &mut u16,
     ) -> Result<bool> {
         *depth += 1;
-        #[cfg(not(target_arch = "wasm32"))]
         crate::utils::check_recursion_depth(*depth)?;
         let result = match res.get(id) {
             None => {
