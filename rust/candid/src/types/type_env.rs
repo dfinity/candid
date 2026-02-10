@@ -69,7 +69,11 @@ impl TypeEnv {
     pub fn as_func<'a>(&'a self, t: &'a Type) -> Result<&'a Function> {
         self.as_func_with_depth(t, &RecursionDepth::new())
     }
-    fn as_func_with_depth<'a>(&'a self, t: &'a Type, depth: &RecursionDepth) -> Result<&'a Function> {
+    fn as_func_with_depth<'a>(
+        &'a self,
+        t: &'a Type,
+        depth: &RecursionDepth,
+    ) -> Result<&'a Function> {
         let _guard = depth.guard()?;
         match t.as_ref() {
             TypeInner::Func(f) => Ok(f),

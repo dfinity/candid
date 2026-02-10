@@ -16,7 +16,14 @@ pub enum OptReport {
 }
 /// Check if t1 <: t2
 pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<()> {
-    subtype_(OptReport::Warning, gamma, env, t1, t2, &RecursionDepth::new())
+    subtype_(
+        OptReport::Warning,
+        gamma,
+        env,
+        t1,
+        t2,
+        &RecursionDepth::new(),
+    )
 }
 /// Check if t1 <: t2, and report the special opt rule as `Slience`, `Warning` or `Error`.
 pub fn subtype_with_config(
