@@ -3,6 +3,19 @@ use crate::ser::IDLBuilder;
 use crate::{CandidType, Error, Result};
 use serde::de::Deserialize;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn check_recursion_depth(depth: u16) -> Result<()> {
+    match stacker::remaining_stack() {
+        Some(size) if size < 32768 => Err(Error::msg(format!(
+            "Recursion limit exceeded at depth {depth}"
+        ))),
+        None if depth > 512 => Err(Error::msg(format!(
+            "Recursion limit exceeded at depth {depth}. Cannot detect stack size, use a conservative bound"
+        ))),
+        _ => Ok(()),
+    }
+}
+
 pub fn check_unique<'a, I, T>(sorted: I) -> Result<()>
 where
     T: 'a + PartialEq + std::fmt::Display,

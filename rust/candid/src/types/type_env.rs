@@ -84,8 +84,12 @@ impl TypeEnv {
         &'a self,
         res: &mut BTreeMap<&'a str, Option<bool>>,
         id: &'a str,
+        depth: &mut u16,
     ) -> Result<bool> {
-        match res.get(id) {
+        *depth += 1;
+        #[cfg(not(target_arch = "wasm32"))]
+        crate::utils::check_recursion_depth(*depth)?;
+        let result = match res.get(id) {
             None => {
                 res.insert(id, None);
                 let t = self.find_type(id)?;
@@ -94,31 +98,35 @@ impl TypeEnv {
                         for f in fs {
                             // Assume env only comes from type table, f.ty is either primitive or var.
                             if let TypeInner::Var(f_id) = f.ty.as_ref() {
-                                if self.is_empty(res, f_id)? {
+                                if self.is_empty(res, f_id, depth)? {
                                     res.insert(id, Some(true));
+                                    *depth -= 1;
                                     return Ok(true);
                                 }
                             }
                         }
                         false
                     }
-                    TypeInner::Var(id) => self.is_empty(res, id)?,
+                    TypeInner::Var(id) => self.is_empty(res, id, depth)?,
                     _ => false,
                 };
                 res.insert(id, Some(result));
-                Ok(result)
+                result
             }
             Some(None) => {
                 res.insert(id, Some(true));
-                Ok(true)
+                true
             }
-            Some(Some(b)) => Ok(*b),
-        }
+            Some(Some(b)) => *b,
+        };
+        *depth -= 1;
+        Ok(result)
     }
     pub fn replace_empty(&mut self) -> Result<()> {
         let mut res = BTreeMap::new();
         for name in self.0.keys() {
-            self.is_empty(&mut res, name)?;
+            let mut depth = 0;
+            self.is_empty(&mut res, name, &mut depth)?;
         }
         let ids: Vec<_> = res
             .iter()
