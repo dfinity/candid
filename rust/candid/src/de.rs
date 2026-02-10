@@ -67,7 +67,10 @@ impl<'de> IDLDeserialize<'de> {
     where
         T: de::Deserialize<'de> + CandidType,
     {
-        let expected_type = self.de.table.trace_type_with_depth(&expected_type, &self.de.recursion_depth)?;
+        let expected_type = self
+            .de
+            .table
+            .trace_type_with_depth(&expected_type, &self.de.recursion_depth)?;
         if self.de.types.is_empty() {
             if matches!(
                 expected_type.as_ref(),
@@ -380,14 +383,18 @@ impl<'de> Deserializer<'de> {
             TypeInner::Var(_) | TypeInner::Knot(_)
         ) {
             self.add_cost(1)?;
-            self.expect_type = self.table.trace_type_with_depth(&self.expect_type, &self.recursion_depth)?;
+            self.expect_type = self
+                .table
+                .trace_type_with_depth(&self.expect_type, &self.recursion_depth)?;
         }
         if matches!(
             self.wire_type.as_ref(),
             TypeInner::Var(_) | TypeInner::Knot(_)
         ) {
             self.add_cost(1)?;
-            self.wire_type = self.table.trace_type_with_depth(&self.wire_type, &self.recursion_depth)?;
+            self.wire_type = self
+                .table
+                .trace_type_with_depth(&self.wire_type, &self.recursion_depth)?;
         }
         Ok(())
     }
@@ -821,7 +828,9 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 }
             }
             (_, TypeInner::Opt(t2)) => {
-                self.expect_type = self.table.trace_type_with_depth(t2, &self.recursion_depth)?;
+                self.expect_type = self
+                    .table
+                    .trace_type_with_depth(t2, &self.recursion_depth)?;
                 let _guard = self.recursion_depth.guard()?;
                 self.recoverable_visit_some(visitor)
             }
@@ -1135,7 +1144,10 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                                 let field = e.id.clone();
                                 self.de.set_field_name(field.clone());
                                 let expect = expect.pop_front().unwrap().ty;
-                                self.de.expect_type = self.de.table.trace_type_with_depth(&expect, &self.de.recursion_depth)?;
+                                self.de.expect_type = self
+                                    .de
+                                    .table
+                                    .trace_type_with_depth(&expect, &self.de.recursion_depth)?;
                                 check!(
                                     matches!(
                                         self.de.expect_type.as_ref(),
