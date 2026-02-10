@@ -53,8 +53,9 @@ impl RecursionDepth {
             .checked_add(1)
             .ok_or_else(|| Error::msg("Recursion depth overflow"))?;
         self.0.set(new_depth);
+        let guard = DepthGuard(self.0.clone());
         check_recursion_depth(new_depth)?;
-        Ok(DepthGuard(self.0.clone()))
+        Ok(guard)
     }
 }
 

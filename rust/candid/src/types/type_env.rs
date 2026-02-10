@@ -45,7 +45,11 @@ impl TypeEnv {
     pub fn rec_find_type(&self, name: &str) -> Result<&Type> {
         self.rec_find_type_with_depth(name, &RecursionDepth::new())
     }
-    fn rec_find_type_with_depth(&self, name: &str, depth: &RecursionDepth) -> Result<&Type> {
+    pub(crate) fn rec_find_type_with_depth(
+        &self,
+        name: &str,
+        depth: &RecursionDepth,
+    ) -> Result<&Type> {
         let _guard = depth.guard()?;
         let t = self.find_type(name)?;
         match t.as_ref() {
@@ -56,7 +60,11 @@ impl TypeEnv {
     pub fn trace_type<'a>(&'a self, t: &'a Type) -> Result<Type> {
         self.trace_type_with_depth(t, &RecursionDepth::new())
     }
-    fn trace_type_with_depth<'a>(&'a self, t: &'a Type, depth: &RecursionDepth) -> Result<Type> {
+    pub(crate) fn trace_type_with_depth<'a>(
+        &'a self,
+        t: &'a Type,
+        depth: &RecursionDepth,
+    ) -> Result<Type> {
         let _guard = depth.guard()?;
         match t.as_ref() {
             TypeInner::Var(id) => self.trace_type_with_depth(self.find_type(id)?, depth),

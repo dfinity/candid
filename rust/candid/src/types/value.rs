@@ -172,7 +172,7 @@ impl IDLValue {
         let _guard = depth.guard()?;
         Ok(match (self, t.as_ref()) {
             (_, TypeInner::Var(id)) => {
-                let ty = env.rec_find_type(id)?;
+                let ty = env.rec_find_type_with_depth(id, depth)?;
                 self.annotate_type_with_depth(from_parser, env, ty, depth)?
             }
             (_, TypeInner::Knot(ref id)) => {
@@ -215,7 +215,7 @@ impl IDLValue {
             (v, TypeInner::Opt(ty))
                 if !from_parser
                     && !matches!(
-                        env.trace_type(ty)?.as_ref(),
+                        env.trace_type_with_depth(ty, depth)?.as_ref(),
                         TypeInner::Null | TypeInner::Reserved | TypeInner::Opt(_)
                     ) =>
             {
@@ -257,12 +257,14 @@ impl IDLValue {
                     let val = fields
                         .get(id.as_ref())
                         .cloned()
-                        .or_else(|| match env.trace_type(ty).unwrap().as_ref() {
-                            TypeInner::Null => Some(&IDLValue::Null),
-                            TypeInner::Opt(_) => Some(&IDLValue::None),
-                            TypeInner::Reserved => Some(&IDLValue::Reserved),
-                            _ => None,
-                        })
+                        .or_else(
+                            || match env.trace_type_with_depth(ty, depth).unwrap().as_ref() {
+                                TypeInner::Null => Some(&IDLValue::Null),
+                                TypeInner::Opt(_) => Some(&IDLValue::None),
+                                TypeInner::Reserved => Some(&IDLValue::Reserved),
+                                _ => None,
+                            },
+                        )
                         .ok_or_else(|| Error::msg(format!("record field {id} not found")))?;
                     let val = val.annotate_type_with_depth(from_parser, env, ty, depth)?;
                     res.push(IDLField {

@@ -58,7 +58,7 @@ fn subtype_(
                 report,
                 gamma,
                 env,
-                env.rec_find_type(id).unwrap(),
+                env.rec_find_type_with_depth(id, depth).unwrap(),
                 t2,
                 depth,
             ),
@@ -67,7 +67,7 @@ fn subtype_(
                 gamma,
                 env,
                 t1,
-                env.rec_find_type(id).unwrap(),
+                env.rec_find_type_with_depth(id, depth).unwrap(),
                 depth,
             ),
             (Knot(id), _) => subtype_(report, gamma, env, &find_type(id).unwrap(), t2, depth),
@@ -88,7 +88,10 @@ fn subtype_(
         (Opt(ty1), Opt(ty2)) if subtype_(report, gamma, env, ty1, ty2, depth).is_ok() => Ok(()),
         (_, Opt(ty2))
             if subtype_(report, gamma, env, t1, ty2, depth).is_ok()
-                && !matches!(env.trace_type(ty2)?.as_ref(), Null | Reserved | Opt(_)) =>
+                && !matches!(
+                    env.trace_type_with_depth(ty2, depth)?.as_ref(),
+                    Null | Reserved | Opt(_)
+                ) =>
         {
             Ok(())
         }
@@ -111,7 +114,10 @@ fn subtype_(
                         })?
                     }
                     None => {
-                        if !matches!(env.trace_type(ty2)?.as_ref(), Null | Reserved | Opt(_)) {
+                        if !matches!(
+                            env.trace_type_with_depth(ty2, depth)?.as_ref(),
+                            Null | Reserved | Opt(_)
+                        ) {
                             return Err(Error::msg(format!("Record field {id}: {ty2} is only in the expected type and is not of type opt, null or reserved")));
                         }
                     }
@@ -125,7 +131,7 @@ fn subtype_(
                 match fields.get(id) {
                     Some(ty2) => {
                         subtype_(report, gamma, env, ty1, ty2, depth).with_context(|| {
-                            format!("Variant field {id}: {ty1} is not a subtype_ of {ty2}")
+                            format!("Variant field {id}: {ty1} is not a subtype of {ty2}")
                         })?
                     }
                     None => {
@@ -201,8 +207,20 @@ fn equal_impl(
             return Ok(());
         }
         let res = match (t1.as_ref(), t2.as_ref()) {
-            (Var(id), _) => equal_impl(gamma, env, env.rec_find_type(id).unwrap(), t2, depth),
-            (_, Var(id)) => equal_impl(gamma, env, t1, env.rec_find_type(id).unwrap(), depth),
+            (Var(id), _) => equal_impl(
+                gamma,
+                env,
+                env.rec_find_type_with_depth(id, depth).unwrap(),
+                t2,
+                depth,
+            ),
+            (_, Var(id)) => equal_impl(
+                gamma,
+                env,
+                t1,
+                env.rec_find_type_with_depth(id, depth).unwrap(),
+                depth,
+            ),
             (Knot(id), _) => equal_impl(gamma, env, &find_type(id).unwrap(), t2, depth),
             (_, Knot(id)) => equal_impl(gamma, env, t1, &find_type(id).unwrap(), depth),
             (_, _) => unreachable!(),
