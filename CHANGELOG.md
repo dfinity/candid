@@ -4,7 +4,7 @@
 
 * Non-breaking changes:
   + Enhance recursion guard
-    - Use `target_family = "wasm"` for platform detection to cover both wasm32 and wasm64; use stack-based check on native platforms, a generous depth limit on wasm, and a conservative depth limit on other niche platforms
+    - Use `target_family = "wasm"` for platform detection to cover both wasm32 and wasm64; skip recursion check on wasm (sandboxed), use stack-based check on native platforms and a conservative depth limit on other niche platforms
     - Apply recursion guard to `TypeEnv::is_empty`
 
 ## 2026-02-03

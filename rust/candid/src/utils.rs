@@ -9,30 +9,24 @@ use serde::de::Deserialize;
 /// remaining stack space (< 32 KiB triggers an error). If the stack size cannot
 /// be determined (exotic platforms), falls back to a conservative depth limit of 512.
 ///
-/// On wasm targets, `stacker` cannot detect the stack size, so a generous depth
-/// limit of 4096 is used instead. This is safe because wasm execution is always
-/// sandboxed (both in canisters and in browsers), so a stack overflow cannot
-/// compromise the host.
-pub(crate) fn check_recursion_depth(depth: u16) -> Result<()> {
+/// On wasm targets, this is a no-op. Wasm execution is always sandboxed (both in
+/// canisters and in browsers), so a stack overflow cannot compromise the host.
+/// Imposing a fixed depth limit would risk rejecting legitimate deeply-nested
+/// payloads, since `stacker` cannot measure the actual remaining stack on wasm.
+pub(crate) fn check_recursion_depth(_depth: u16) -> Result<()> {
     #[cfg(not(target_family = "wasm"))]
     match stacker::remaining_stack() {
         Some(size) if size < 32768 => {
             return Err(Error::msg(format!(
-                "Recursion limit exceeded at depth {depth}"
+                "Recursion limit exceeded at depth {_depth}"
             )))
         }
-        None if depth > 512 => {
+        None if _depth > 512 => {
             return Err(Error::msg(format!(
-                "Recursion limit exceeded at depth {depth}. Cannot detect stack size, use a conservative bound"
+                "Recursion limit exceeded at depth {_depth}. Cannot detect stack size, use a conservative bound"
             )))
         }
         _ => (),
-    }
-    #[cfg(target_family = "wasm")]
-    if depth > 4096 {
-        return Err(Error::msg(format!(
-            "Recursion limit exceeded at depth {depth}"
-        )));
     }
     Ok(())
 }
