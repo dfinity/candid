@@ -281,15 +281,6 @@ macro_rules! check {
         }
     }};
 }
-macro_rules! check_recursion {
-    ($this:ident $($body:tt)*) => {
-        $this.recursion_depth += 1;
-        crate::utils::check_recursion_depth($this.recursion_depth)?;
-        let __ret = { $this $($body)* };
-        $this.recursion_depth -= 1;
-        __ret
-    };
-}
 
 #[derive(Clone)]
 struct Deserializer<'de> {
@@ -307,7 +298,7 @@ struct Deserializer<'de> {
     // It only affects the field id generation in enum type.
     is_untyped: bool,
     config: DecoderConfig,
-    recursion_depth: u16,
+    recursion_depth: crate::utils::RecursionDepth,
 }
 
 impl<'de> Deserializer<'de> {
@@ -325,7 +316,7 @@ impl<'de> Deserializer<'de> {
             field_name: None,
             is_untyped: false,
             config: config.clone(),
-            recursion_depth: 0,
+            recursion_depth: crate::utils::RecursionDepth::new(),
         })
     }
     fn dump_state(&self) -> String {
@@ -823,18 +814,16 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 self.wire_type = t1.clone();
                 self.expect_type = t2.clone();
                 if BoolValue::read(&mut self.input)?.0 {
-                    check_recursion! {
-                        self.recoverable_visit_some(visitor)
-                    }
+                    let _guard = self.recursion_depth.guard()?;
+                    self.recoverable_visit_some(visitor)
                 } else {
                     visitor.visit_none()
                 }
             }
             (_, TypeInner::Opt(t2)) => {
                 self.expect_type = self.table.trace_type(t2)?;
-                check_recursion! {
-                    self.recoverable_visit_some(visitor)
-                }
+                let _guard = self.recursion_depth.guard()?;
+                self.recoverable_visit_some(visitor)
             }
             (_, _) => check!(false),
         }
@@ -843,7 +832,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_recursion! {
+        let _guard = self.recursion_depth.guard()?;
         self.unroll_type()?;
         self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
@@ -868,7 +857,6 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 Ok(value)
             }
             _ => check!(false),
-        }
         }
     }
     fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
@@ -900,7 +888,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_recursion! {
+        let _guard = self.recursion_depth.guard()?;
         self.unroll_type()?;
         self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
@@ -934,16 +922,14 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             }
             _ => check!(false),
         }
-        }
     }
     fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        check_recursion! {
-            self.add_cost(1)?;
-            self.deserialize_seq(visitor)
-        }
+        let _guard = self.recursion_depth.guard()?;
+        self.add_cost(1)?;
+        self.deserialize_seq(visitor)
     }
     fn deserialize_tuple_struct<V>(
         self,
@@ -954,10 +940,9 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_recursion! {
-            self.add_cost(1)?;
-            self.deserialize_seq(visitor)
-        }
+        let _guard = self.recursion_depth.guard()?;
+        self.add_cost(1)?;
+        self.deserialize_seq(visitor)
     }
     fn deserialize_struct<V>(
         self,
@@ -968,7 +953,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_recursion! {
+        let _guard = self.recursion_depth.guard()?;
         self.unroll_type()?;
         self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
@@ -981,7 +966,6 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             }
             _ => check!(false),
         }
-        }
     }
     fn deserialize_enum<V>(
         self,
@@ -992,7 +976,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_recursion! {
+        let _guard = self.recursion_depth.guard()?;
         self.unroll_type()?;
         self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
@@ -1014,7 +998,6 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 visitor.visit_enum(Compound::new(self, Style::Enum { expect, wire }))
             }
             _ => check!(false),
-        }
         }
     }
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value>

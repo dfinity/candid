@@ -1,6 +1,6 @@
 use super::internal::{find_type, Field, Label, Type, TypeInner};
 use crate::types::TypeEnv;
-use crate::utils::check_recursion_depth;
+use crate::utils::RecursionDepth;
 use crate::{Error, Result};
 use anyhow::Context;
 use std::collections::{HashMap, HashSet};
@@ -16,7 +16,7 @@ pub enum OptReport {
 }
 /// Check if t1 <: t2
 pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<()> {
-    subtype_(OptReport::Warning, gamma, env, t1, t2, &mut 0)
+    subtype_(OptReport::Warning, gamma, env, t1, t2, &RecursionDepth::new())
 }
 /// Check if t1 <: t2, and report the special opt rule as `Slience`, `Warning` or `Error`.
 pub fn subtype_with_config(
@@ -26,7 +26,7 @@ pub fn subtype_with_config(
     t1: &Type,
     t2: &Type,
 ) -> Result<()> {
-    subtype_(report, gamma, env, t1, t2, &mut 0)
+    subtype_(report, gamma, env, t1, t2, &RecursionDepth::new())
 }
 
 fn subtype_(
@@ -35,18 +35,15 @@ fn subtype_(
     env: &TypeEnv,
     t1: &Type,
     t2: &Type,
-    depth: &mut u16,
+    depth: &RecursionDepth,
 ) -> Result<()> {
-    *depth += 1;
-    check_recursion_depth(*depth)?;
+    let _guard = depth.guard()?;
     use TypeInner::*;
     if t1 == t2 {
-        *depth -= 1;
         return Ok(());
     }
     if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
         if !gamma.insert((t1.clone(), t2.clone())) {
-            *depth -= 1;
             return Ok(());
         }
         let res = match (t1.as_ref(), t2.as_ref()) {
@@ -73,10 +70,9 @@ fn subtype_(
         if res.is_err() {
             gamma.remove(&(t1.clone(), t2.clone()));
         }
-        *depth -= 1;
         return res;
     }
-    let result = match (t1.as_ref(), t2.as_ref()) {
+    match (t1.as_ref(), t2.as_ref()) {
         (_, Reserved) => Ok(()),
         (Empty, _) => Ok(()),
         (Nat, Int) => Ok(()),
@@ -109,7 +105,6 @@ fn subtype_(
                     }
                     None => {
                         if !matches!(env.trace_type(ty2)?.as_ref(), Null | Reserved | Opt(_)) {
-                            *depth -= 1;
                             return Err(Error::msg(format!("Record field {id}: {ty2} is only in the expected type and is not of type opt, null or reserved")));
                         }
                     }
@@ -127,7 +122,6 @@ fn subtype_(
                         })?
                     }
                     None => {
-                        *depth -= 1;
                         return Err(Error::msg(format!(
                             "Variant field {id} not found in the expected type"
                         )));
@@ -146,7 +140,6 @@ fn subtype_(
                         })?
                     }
                     None => {
-                        *depth -= 1;
                         return Err(Error::msg(format!(
                             "Method {name} is only in the expected type"
                         )));
@@ -157,7 +150,6 @@ fn subtype_(
         }
         (Func(f1), Func(f2)) => {
             if f1.modes != f2.modes {
-                *depth -= 1;
                 return Err(Error::msg("Function mode mismatch"));
             }
             let args1 = to_tuple(&f1.args);
@@ -176,15 +168,13 @@ fn subtype_(
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
         (_, _) => Err(Error::msg(format!("{t1} is not a subtype of {t2}"))),
-    };
-    *depth -= 1;
-    result
+    }
 }
 
 /// Check if t1 and t2 are structurally equivalent, ignoring the variable naming differences.
 /// Note that this is more strict than `t1 <: t2` and `t2 <: t1`, because of the special opt rule.
 pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<()> {
-    equal_impl(gamma, env, t1, t2, &mut 0)
+    equal_impl(gamma, env, t1, t2, &RecursionDepth::new())
 }
 
 fn equal_impl(
@@ -192,18 +182,15 @@ fn equal_impl(
     env: &TypeEnv,
     t1: &Type,
     t2: &Type,
-    depth: &mut u16,
+    depth: &RecursionDepth,
 ) -> Result<()> {
-    *depth += 1;
-    check_recursion_depth(*depth)?;
+    let _guard = depth.guard()?;
     use TypeInner::*;
     if t1 == t2 {
-        *depth -= 1;
         return Ok(());
     }
     if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
         if !gamma.insert((t1.clone(), t2.clone())) {
-            *depth -= 1;
             return Ok(());
         }
         let res = match (t1.as_ref(), t2.as_ref()) {
@@ -216,10 +203,9 @@ fn equal_impl(
         if res.is_err() {
             gamma.remove(&(t1.clone(), t2.clone()));
         }
-        *depth -= 1;
         return res;
     }
-    let result = match (t1.as_ref(), t2.as_ref()) {
+    match (t1.as_ref(), t2.as_ref()) {
         (Opt(ty1), Opt(ty2)) => equal_impl(gamma, env, ty1, ty2, depth),
         (Vec(ty1), Vec(ty2)) => equal_impl(gamma, env, ty1, ty2, depth),
         (Record(fs1), Record(fs2)) | (Variant(fs1), Variant(fs2)) => {
@@ -227,7 +213,6 @@ fn equal_impl(
                 .context("Different field length")?;
             for (f1, f2) in fs1.iter().zip(fs2.iter()) {
                 if f1.id != f2.id {
-                    *depth -= 1;
                     return Err(Error::msg(format!(
                         "Field name mismatch: {} and {}",
                         f1.id, f2.id
@@ -245,7 +230,6 @@ fn equal_impl(
                 .context("Different method length")?;
             for (m1, m2) in ms1.iter().zip(ms2.iter()) {
                 if m1.0 != m2.0 {
-                    *depth -= 1;
                     return Err(Error::msg(format!(
                         "Method name mismatch: {} and {}",
                         m1.0, m2.0
@@ -260,7 +244,6 @@ fn equal_impl(
         }
         (Func(f1), Func(f2)) => {
             if f1.modes != f2.modes {
-                *depth -= 1;
                 return Err(Error::msg("Function mode mismatch"));
             }
             let args1 = to_tuple(&f1.args);
@@ -286,9 +269,7 @@ fn equal_impl(
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
         (_, _) => Err(Error::msg(format!("{t1} is not equal to {t2}"))),
-    };
-    *depth -= 1;
-    result
+    }
 }
 
 fn assert_length<I, F, K, D>(left: &[I], right: &[I], get_key: F, display: D) -> Result<()>

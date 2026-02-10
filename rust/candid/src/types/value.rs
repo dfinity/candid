@@ -160,18 +160,17 @@ impl IDLValue {
     /// string, we need to set `from_parser` to true to enable converting numbers to the expected
     /// types, and disable the opt rules.
     pub fn annotate_type(&self, from_parser: bool, env: &TypeEnv, t: &Type) -> Result<Self> {
-        self.annotate_type_with_depth(from_parser, env, t, &mut 0)
+        self.annotate_type_with_depth(from_parser, env, t, &crate::utils::RecursionDepth::new())
     }
     fn annotate_type_with_depth(
         &self,
         from_parser: bool,
         env: &TypeEnv,
         t: &Type,
-        depth: &mut u16,
+        depth: &crate::utils::RecursionDepth,
     ) -> Result<Self> {
-        *depth += 1;
-        crate::utils::check_recursion_depth(*depth)?;
-        let result = match (self, t.as_ref()) {
+        let _guard = depth.guard()?;
+        Ok(match (self, t.as_ref()) {
             (_, TypeInner::Var(id)) => {
                 let ty = env.rec_find_type(id)?;
                 self.annotate_type_with_depth(from_parser, env, ty, depth)?
@@ -283,11 +282,9 @@ impl IDLValue {
                             id: f.id.as_ref().clone(),
                             val,
                         };
-                        *depth -= 1;
                         return Ok(IDLValue::Variant(VariantValue(Box::new(field), i as u64)));
                     }
                 }
-                *depth -= 1;
                 return Err(Error::msg(format!("variant field {} not found", v.0.id)));
             }
             (IDLValue::Principal(id), TypeInner::Principal) => IDLValue::Principal(*id),
@@ -311,14 +308,11 @@ impl IDLValue {
                 }
             },
             _ => {
-                *depth -= 1;
                 return Err(Error::msg(format!(
                     "type mismatch: {self} cannot be of type {t}"
-                )));
+                )))
             }
-        };
-        *depth -= 1;
-        Ok(result)
+        })
     }
     // This will only be called when the type is not provided
     pub fn value_ty(&self) -> Type {
