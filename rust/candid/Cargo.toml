@@ -32,7 +32,7 @@ pretty = { workspace = true, optional = true }
 num-bigint = { workspace = true, optional = true }
 num-traits = { workspace = true, optional = true }
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
 stacker = "0.1"
 
 [dev-dependencies]

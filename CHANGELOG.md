@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+* Non-breaking changes:
+  + Enhance recursion guard
+    - Use `target_family = "wasm"` for platform detection to cover both wasm32 and wasm64; skip recursion check on wasm (sandboxed), use stack-based check on native platforms and a conservative depth limit on other niche platforms
+    - Apply recursion guard to all recursive functions on deserialization path: type environment operations (`TypeEnv::is_empty`, `trace_type`, `rec_find_type`, `as_func`, `as_service`), value type annotation (`IDLValue::annotate_type`), subtype checking (`subtype_()`, `equal()`), and all deserializer methods (`deserialize_option`, `deserialize_seq`, `deserialize_map`, `deserialize_tuple`, `deserialize_tuple_struct`, `deserialize_struct`, `deserialize_enum`)
+    - Refactor to use RAII guard pattern (`RecursionDepth` with `DepthGuard`) for automatic depth management, eliminating manual increment/decrement operations
+
 ## 2026-02-03
 
 ### Candid 0.10.21

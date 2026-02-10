@@ -160,14 +160,24 @@ impl IDLValue {
     /// string, we need to set `from_parser` to true to enable converting numbers to the expected
     /// types, and disable the opt rules.
     pub fn annotate_type(&self, from_parser: bool, env: &TypeEnv, t: &Type) -> Result<Self> {
+        self.annotate_type_with_depth(from_parser, env, t, &crate::utils::RecursionDepth::new())
+    }
+    fn annotate_type_with_depth(
+        &self,
+        from_parser: bool,
+        env: &TypeEnv,
+        t: &Type,
+        depth: &crate::utils::RecursionDepth,
+    ) -> Result<Self> {
+        let _guard = depth.guard()?;
         Ok(match (self, t.as_ref()) {
             (_, TypeInner::Var(id)) => {
-                let ty = env.rec_find_type(id)?;
-                self.annotate_type(from_parser, env, ty)?
+                let ty = env.rec_find_type_with_depth(id, depth)?;
+                self.annotate_type_with_depth(from_parser, env, ty, depth)?
             }
             (_, TypeInner::Knot(ref id)) => {
                 let ty = crate::types::internal::find_type(id).unwrap();
-                self.annotate_type(from_parser, env, &ty)?
+                self.annotate_type_with_depth(from_parser, env, &ty, depth)?
             }
             (_, TypeInner::Reserved) => IDLValue::Reserved,
             (IDLValue::Float64(n), TypeInner::Float32) if from_parser => {
@@ -193,23 +203,23 @@ impl IDLValue {
             (IDLValue::Null, TypeInner::Opt(_)) => IDLValue::None,
             (IDLValue::Reserved, TypeInner::Opt(_)) => IDLValue::None,
             (IDLValue::None, TypeInner::Opt(_)) => IDLValue::None,
-            (IDLValue::Opt(v), TypeInner::Opt(ty)) if from_parser => {
-                IDLValue::Opt(Box::new(v.annotate_type(from_parser, env, ty)?))
-            }
+            (IDLValue::Opt(v), TypeInner::Opt(ty)) if from_parser => IDLValue::Opt(Box::new(
+                v.annotate_type_with_depth(from_parser, env, ty, depth)?,
+            )),
             // liberal decoding of optionals
             (IDLValue::Opt(v), TypeInner::Opt(ty)) if !from_parser => v
-                .annotate_type(from_parser, env, ty)
+                .annotate_type_with_depth(from_parser, env, ty, depth)
                 .map(|v| IDLValue::Opt(Box::new(v)))
                 .unwrap_or(IDLValue::None),
             // try consituent type
             (v, TypeInner::Opt(ty))
                 if !from_parser
                     && !matches!(
-                        env.trace_type(ty)?.as_ref(),
+                        env.trace_type_with_depth(ty, depth)?.as_ref(),
                         TypeInner::Null | TypeInner::Reserved | TypeInner::Opt(_)
                     ) =>
             {
-                v.annotate_type(from_parser, env, ty)
+                v.annotate_type_with_depth(from_parser, env, ty, depth)
                     .map(|v| IDLValue::Opt(Box::new(v)))
                     .unwrap_or(IDLValue::None)
             }
@@ -234,7 +244,7 @@ impl IDLValue {
             (IDLValue::Vec(vec), TypeInner::Vec(ty)) => {
                 let mut res = Vec::with_capacity(vec.len());
                 for e in vec.iter() {
-                    let v = e.annotate_type(from_parser, env, ty)?;
+                    let v = e.annotate_type_with_depth(from_parser, env, ty, depth)?;
                     res.push(v);
                 }
                 IDLValue::Vec(res)
@@ -247,14 +257,16 @@ impl IDLValue {
                     let val = fields
                         .get(id.as_ref())
                         .cloned()
-                        .or_else(|| match env.trace_type(ty).unwrap().as_ref() {
-                            TypeInner::Null => Some(&IDLValue::Null),
-                            TypeInner::Opt(_) => Some(&IDLValue::None),
-                            TypeInner::Reserved => Some(&IDLValue::Reserved),
-                            _ => None,
-                        })
+                        .or_else(
+                            || match env.trace_type_with_depth(ty, depth).unwrap().as_ref() {
+                                TypeInner::Null => Some(&IDLValue::Null),
+                                TypeInner::Opt(_) => Some(&IDLValue::None),
+                                TypeInner::Reserved => Some(&IDLValue::Reserved),
+                                _ => None,
+                            },
+                        )
                         .ok_or_else(|| Error::msg(format!("record field {id} not found")))?;
-                    let val = val.annotate_type(from_parser, env, ty)?;
+                    let val = val.annotate_type_with_depth(from_parser, env, ty, depth)?;
                     res.push(IDLField {
                         id: id.as_ref().clone(),
                         val,
@@ -265,7 +277,9 @@ impl IDLValue {
             (IDLValue::Variant(v), TypeInner::Variant(fs)) => {
                 for (i, f) in fs.iter().enumerate() {
                     if v.0.id == *f.id {
-                        let val = v.0.val.annotate_type(from_parser, env, &f.ty)?;
+                        let val =
+                            v.0.val
+                                .annotate_type_with_depth(from_parser, env, &f.ty, depth)?;
                         let field = IDLField {
                             id: f.id.as_ref().clone(),
                             val,

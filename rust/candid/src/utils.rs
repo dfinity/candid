@@ -3,6 +3,78 @@ use crate::ser::IDLBuilder;
 use crate::{CandidType, Error, Result};
 use serde::de::Deserialize;
 
+/// Guard against stack overflow from deep recursion.
+///
+/// On native platforms, uses `stacker::remaining_stack()` to check the actual
+/// remaining stack space (< 32 KiB triggers an error). If the stack size cannot
+/// be determined (exotic platforms), falls back to a conservative depth limit of 512.
+///
+/// On wasm targets, this is a no-op. Wasm execution is always sandboxed (both in
+/// canisters and in browsers), so a stack overflow cannot compromise the host.
+/// Imposing a fixed depth limit would risk rejecting legitimate deeply-nested
+/// payloads, since `stacker` cannot measure the actual remaining stack on wasm.
+fn check_recursion_depth(_depth: u16) -> Result<()> {
+    #[cfg(not(target_family = "wasm"))]
+    match stacker::remaining_stack() {
+        Some(size) if size < 32768 => {
+            return Err(Error::msg(format!(
+                "Recursion limit exceeded at depth {_depth}"
+            )))
+        }
+        None if _depth > 512 => {
+            return Err(Error::msg(format!(
+                "Recursion limit exceeded at depth {_depth}. Cannot detect stack size, use a conservative bound"
+            )))
+        }
+        _ => (),
+    }
+    Ok(())
+}
+
+/// Tracks recursion depth with overflow protection.
+///
+/// Use `guard()` to increment depth with automatic decrement via RAII.
+/// Uses interior mutability to allow passing to recursive functions and cloning.
+#[derive(Debug, Clone)]
+pub(crate) struct RecursionDepth(std::rc::Rc<std::cell::Cell<u16>>);
+
+impl RecursionDepth {
+    /// Creates a new recursion depth tracker starting at 0.
+    pub(crate) fn new() -> Self {
+        Self(std::rc::Rc::new(std::cell::Cell::new(0)))
+    }
+
+    /// Increments depth and returns a guard that will automatically decrement on drop.
+    ///
+    /// Returns an error if recursion limit is exceeded.
+    pub(crate) fn guard(&self) -> Result<DepthGuard> {
+        let current = self.0.get();
+        let new_depth = current
+            .checked_add(1)
+            .ok_or_else(|| Error::msg("Recursion depth overflow"))?;
+        self.0.set(new_depth);
+        let guard = DepthGuard(self.0.clone());
+        check_recursion_depth(new_depth)?;
+        Ok(guard)
+    }
+}
+
+/// RAII guard that automatically decrements recursion depth on drop.
+///
+/// Created by calling `RecursionDepth::guard()`.
+#[derive(Debug)]
+pub(crate) struct DepthGuard(std::rc::Rc<std::cell::Cell<u16>>);
+
+impl Drop for DepthGuard {
+    fn drop(&mut self) {
+        let current = self.0.get();
+        let new_depth = current
+            .checked_sub(1)
+            .expect("Recursion depth underflow - this is a bug");
+        self.0.set(new_depth);
+    }
+}
+
 pub fn check_unique<'a, I, T>(sorted: I) -> Result<()>
 where
     T: 'a + PartialEq + std::fmt::Display,

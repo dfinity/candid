@@ -67,7 +67,10 @@ impl<'de> IDLDeserialize<'de> {
     where
         T: de::Deserialize<'de> + CandidType,
     {
-        let expected_type = self.de.table.trace_type(&expected_type)?;
+        let expected_type = self
+            .de
+            .table
+            .trace_type_with_depth(&expected_type, &self.de.recursion_depth)?;
         if self.de.types.is_empty() {
             if matches!(
                 expected_type.as_ref(),
@@ -281,27 +284,6 @@ macro_rules! check {
         }
     }};
 }
-#[cfg(not(target_arch = "wasm32"))]
-macro_rules! check_recursion {
-    ($this:ident $($body:tt)*) => {
-        $this.recursion_depth += 1;
-        match stacker::remaining_stack() {
-            Some(size) if size < 32768 => return Err(Error::msg(format!("Recursion limit exceeded at depth {}", $this.recursion_depth))),
-            None if $this.recursion_depth > 512 => return Err(Error::msg(format!("Recursion limit exceeded at depth {}. Cannot detect stack size, use a conservative bound", $this.recursion_depth))),
-            _ => (),
-        }
-        let __ret = { $this $($body)* };
-        $this.recursion_depth -= 1;
-        __ret
-    };
-}
-// No need to check recursion depth for wasm32, because canisters are running in a sandbox
-#[cfg(target_arch = "wasm32")]
-macro_rules! check_recursion {
-    ($this:ident $($body:tt)*) => {
-        $this $($body)*
-    };
-}
 
 #[derive(Clone)]
 struct Deserializer<'de> {
@@ -319,8 +301,7 @@ struct Deserializer<'de> {
     // It only affects the field id generation in enum type.
     is_untyped: bool,
     config: DecoderConfig,
-    #[cfg(not(target_arch = "wasm32"))]
-    recursion_depth: u16,
+    recursion_depth: crate::utils::RecursionDepth,
 }
 
 impl<'de> Deserializer<'de> {
@@ -338,8 +319,7 @@ impl<'de> Deserializer<'de> {
             field_name: None,
             is_untyped: false,
             config: config.clone(),
-            #[cfg(not(target_arch = "wasm32"))]
-            recursion_depth: 0,
+            recursion_depth: crate::utils::RecursionDepth::new(),
         })
     }
     fn dump_state(&self) -> String {
@@ -403,14 +383,18 @@ impl<'de> Deserializer<'de> {
             TypeInner::Var(_) | TypeInner::Knot(_)
         ) {
             self.add_cost(1)?;
-            self.expect_type = self.table.trace_type(&self.expect_type)?;
+            self.expect_type = self
+                .table
+                .trace_type_with_depth(&self.expect_type, &self.recursion_depth)?;
         }
         if matches!(
             self.wire_type.as_ref(),
             TypeInner::Var(_) | TypeInner::Knot(_)
         ) {
             self.add_cost(1)?;
-            self.wire_type = self.table.trace_type(&self.wire_type)?;
+            self.wire_type = self
+                .table
+                .trace_type_with_depth(&self.wire_type, &self.recursion_depth)?;
         }
         Ok(())
     }
@@ -837,18 +821,18 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 self.wire_type = t1.clone();
                 self.expect_type = t2.clone();
                 if BoolValue::read(&mut self.input)?.0 {
-                    check_recursion! {
-                        self.recoverable_visit_some(visitor)
-                    }
+                    let _guard = self.recursion_depth.guard()?;
+                    self.recoverable_visit_some(visitor)
                 } else {
                     visitor.visit_none()
                 }
             }
             (_, TypeInner::Opt(t2)) => {
-                self.expect_type = self.table.trace_type(t2)?;
-                check_recursion! {
-                    self.recoverable_visit_some(visitor)
-                }
+                self.expect_type = self
+                    .table
+                    .trace_type_with_depth(t2, &self.recursion_depth)?;
+                let _guard = self.recursion_depth.guard()?;
+                self.recoverable_visit_some(visitor)
             }
             (_, _) => check!(false),
         }
@@ -857,13 +841,13 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_recursion! {
+        let _guard = self.recursion_depth.guard()?;
         self.unroll_type()?;
         self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
                 let expect = e.clone();
-                let wire = self.table.trace_type(w)?;
+                let wire = self.table.trace_type_with_depth(w, &self.recursion_depth)?;
                 let len = Len::read(&mut self.input)?.0;
                 visitor.visit_seq(Compound::new(self, Style::Vector { len, expect, wire }))
             }
@@ -882,7 +866,6 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 Ok(value)
             }
             _ => check!(false),
-        }
         }
     }
     fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
@@ -914,13 +897,13 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_recursion! {
+        let _guard = self.recursion_depth.guard()?;
         self.unroll_type()?;
         self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
-                let e = self.table.trace_type(e)?;
-                let w = self.table.trace_type(w)?;
+                let e = self.table.trace_type_with_depth(e, &self.recursion_depth)?;
+                let w = self.table.trace_type_with_depth(w, &self.recursion_depth)?;
                 match (e.as_ref(), w.as_ref()) {
                     (TypeInner::Record(ref e), TypeInner::Record(ref w)) => {
                         match (&e[..], &w[..]) {
@@ -948,16 +931,14 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             }
             _ => check!(false),
         }
-        }
     }
     fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        check_recursion! {
-            self.add_cost(1)?;
-            self.deserialize_seq(visitor)
-        }
+        let _guard = self.recursion_depth.guard()?;
+        self.add_cost(1)?;
+        self.deserialize_seq(visitor)
     }
     fn deserialize_tuple_struct<V>(
         self,
@@ -968,10 +949,9 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_recursion! {
-            self.add_cost(1)?;
-            self.deserialize_seq(visitor)
-        }
+        let _guard = self.recursion_depth.guard()?;
+        self.add_cost(1)?;
+        self.deserialize_seq(visitor)
     }
     fn deserialize_struct<V>(
         self,
@@ -982,7 +962,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_recursion! {
+        let _guard = self.recursion_depth.guard()?;
         self.unroll_type()?;
         self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
@@ -995,7 +975,6 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             }
             _ => check!(false),
         }
-        }
     }
     fn deserialize_enum<V>(
         self,
@@ -1006,7 +985,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_recursion! {
+        let _guard = self.recursion_depth.guard()?;
         self.unroll_type()?;
         self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
@@ -1028,7 +1007,6 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 visitor.visit_enum(Compound::new(self, Style::Enum { expect, wire }))
             }
             _ => check!(false),
-        }
         }
     }
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value>
@@ -1166,7 +1144,10 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                                 let field = e.id.clone();
                                 self.de.set_field_name(field.clone());
                                 let expect = expect.pop_front().unwrap().ty;
-                                self.de.expect_type = self.de.table.trace_type(&expect)?;
+                                self.de.expect_type = self
+                                    .de
+                                    .table
+                                    .trace_type_with_depth(&expect, &self.de.recursion_depth)?;
                                 check!(
                                     matches!(
                                         self.de.expect_type.as_ref(),

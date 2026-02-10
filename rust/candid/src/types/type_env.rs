@@ -1,4 +1,5 @@
 use crate::types::{Function, Type, TypeInner};
+use crate::utils::RecursionDepth;
 use crate::{Error, Result};
 use std::collections::BTreeMap;
 
@@ -42,33 +43,65 @@ impl TypeEnv {
         }
     }
     pub fn rec_find_type(&self, name: &str) -> Result<&Type> {
+        self.rec_find_type_with_depth(name, &RecursionDepth::new())
+    }
+    pub(crate) fn rec_find_type_with_depth(
+        &self,
+        name: &str,
+        depth: &RecursionDepth,
+    ) -> Result<&Type> {
+        let _guard = depth.guard()?;
         let t = self.find_type(name)?;
         match t.as_ref() {
-            TypeInner::Var(id) => self.rec_find_type(id),
+            TypeInner::Var(id) => self.rec_find_type_with_depth(id, depth),
             _ => Ok(t),
         }
     }
     pub fn trace_type<'a>(&'a self, t: &'a Type) -> Result<Type> {
+        self.trace_type_with_depth(t, &RecursionDepth::new())
+    }
+    pub(crate) fn trace_type_with_depth<'a>(
+        &'a self,
+        t: &'a Type,
+        depth: &RecursionDepth,
+    ) -> Result<Type> {
+        let _guard = depth.guard()?;
         match t.as_ref() {
-            TypeInner::Var(id) => self.trace_type(self.find_type(id)?),
+            TypeInner::Var(id) => self.trace_type_with_depth(self.find_type(id)?, depth),
             TypeInner::Knot(ref id) => {
-                self.trace_type(&crate::types::internal::find_type(id).unwrap())
+                self.trace_type_with_depth(&crate::types::internal::find_type(id).unwrap(), depth)
             }
             _ => Ok(t.clone()),
         }
     }
     pub fn as_func<'a>(&'a self, t: &'a Type) -> Result<&'a Function> {
+        self.as_func_with_depth(t, &RecursionDepth::new())
+    }
+    fn as_func_with_depth<'a>(
+        &'a self,
+        t: &'a Type,
+        depth: &RecursionDepth,
+    ) -> Result<&'a Function> {
+        let _guard = depth.guard()?;
         match t.as_ref() {
             TypeInner::Func(f) => Ok(f),
-            TypeInner::Var(id) => self.as_func(self.find_type(id)?),
+            TypeInner::Var(id) => self.as_func_with_depth(self.find_type(id)?, depth),
             _ => Err(Error::msg(format!("not a function type: {t}"))),
         }
     }
     pub fn as_service<'a>(&'a self, t: &'a Type) -> Result<&'a [(String, Type)]> {
+        self.as_service_with_depth(t, &RecursionDepth::new())
+    }
+    fn as_service_with_depth<'a>(
+        &'a self,
+        t: &'a Type,
+        depth: &RecursionDepth,
+    ) -> Result<&'a [(String, Type)]> {
+        let _guard = depth.guard()?;
         match t.as_ref() {
             TypeInner::Service(s) => Ok(s),
-            TypeInner::Var(id) => self.as_service(self.find_type(id)?),
-            TypeInner::Class(_, ty) => self.as_service(ty),
+            TypeInner::Var(id) => self.as_service_with_depth(self.find_type(id)?, depth),
+            TypeInner::Class(_, ty) => self.as_service_with_depth(ty, depth),
             _ => Err(Error::msg(format!("not a service type: {t}"))),
         }
     }
@@ -84,8 +117,10 @@ impl TypeEnv {
         &'a self,
         res: &mut BTreeMap<&'a str, Option<bool>>,
         id: &'a str,
+        depth: &RecursionDepth,
     ) -> Result<bool> {
-        match res.get(id) {
+        let _guard = depth.guard()?;
+        let result = match res.get(id) {
             None => {
                 res.insert(id, None);
                 let t = self.find_type(id)?;
@@ -94,7 +129,7 @@ impl TypeEnv {
                         for f in fs {
                             // Assume env only comes from type table, f.ty is either primitive or var.
                             if let TypeInner::Var(f_id) = f.ty.as_ref() {
-                                if self.is_empty(res, f_id)? {
+                                if self.is_empty(res, f_id, depth)? {
                                     res.insert(id, Some(true));
                                     return Ok(true);
                                 }
@@ -102,23 +137,24 @@ impl TypeEnv {
                         }
                         false
                     }
-                    TypeInner::Var(id) => self.is_empty(res, id)?,
+                    TypeInner::Var(id) => self.is_empty(res, id, depth)?,
                     _ => false,
                 };
                 res.insert(id, Some(result));
-                Ok(result)
+                result
             }
             Some(None) => {
                 res.insert(id, Some(true));
-                Ok(true)
+                true
             }
-            Some(Some(b)) => Ok(*b),
-        }
+            Some(Some(b)) => *b,
+        };
+        Ok(result)
     }
     pub fn replace_empty(&mut self) -> Result<()> {
         let mut res = BTreeMap::new();
         for name in self.0.keys() {
-            self.is_empty(&mut res, name)?;
+            self.is_empty(&mut res, name, &RecursionDepth::new())?;
         }
         let ids: Vec<_> = res
             .iter()
