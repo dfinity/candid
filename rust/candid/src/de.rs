@@ -67,7 +67,7 @@ impl<'de> IDLDeserialize<'de> {
     where
         T: de::Deserialize<'de> + CandidType,
     {
-        let expected_type = self.de.table.trace_type(&expected_type)?;
+        let expected_type = self.de.table.trace_type_with_depth(&expected_type, &self.de.recursion_depth)?;
         if self.de.types.is_empty() {
             if matches!(
                 expected_type.as_ref(),
@@ -380,14 +380,14 @@ impl<'de> Deserializer<'de> {
             TypeInner::Var(_) | TypeInner::Knot(_)
         ) {
             self.add_cost(1)?;
-            self.expect_type = self.table.trace_type(&self.expect_type)?;
+            self.expect_type = self.table.trace_type_with_depth(&self.expect_type, &self.recursion_depth)?;
         }
         if matches!(
             self.wire_type.as_ref(),
             TypeInner::Var(_) | TypeInner::Knot(_)
         ) {
             self.add_cost(1)?;
-            self.wire_type = self.table.trace_type(&self.wire_type)?;
+            self.wire_type = self.table.trace_type_with_depth(&self.wire_type, &self.recursion_depth)?;
         }
         Ok(())
     }
@@ -821,7 +821,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 }
             }
             (_, TypeInner::Opt(t2)) => {
-                self.expect_type = self.table.trace_type(t2)?;
+                self.expect_type = self.table.trace_type_with_depth(t2, &self.recursion_depth)?;
                 let _guard = self.recursion_depth.guard()?;
                 self.recoverable_visit_some(visitor)
             }
@@ -838,7 +838,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
                 let expect = e.clone();
-                let wire = self.table.trace_type(w)?;
+                let wire = self.table.trace_type_with_depth(w, &self.recursion_depth)?;
                 let len = Len::read(&mut self.input)?.0;
                 visitor.visit_seq(Compound::new(self, Style::Vector { len, expect, wire }))
             }
@@ -893,8 +893,8 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
-                let e = self.table.trace_type(e)?;
-                let w = self.table.trace_type(w)?;
+                let e = self.table.trace_type_with_depth(e, &self.recursion_depth)?;
+                let w = self.table.trace_type_with_depth(w, &self.recursion_depth)?;
                 match (e.as_ref(), w.as_ref()) {
                     (TypeInner::Record(ref e), TypeInner::Record(ref w)) => {
                         match (&e[..], &w[..]) {
@@ -1135,7 +1135,7 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                                 let field = e.id.clone();
                                 self.de.set_field_name(field.clone());
                                 let expect = expect.pop_front().unwrap().ty;
-                                self.de.expect_type = self.de.table.trace_type(&expect)?;
+                                self.de.expect_type = self.de.table.trace_type_with_depth(&expect, &self.de.recursion_depth)?;
                                 check!(
                                     matches!(
                                         self.de.expect_type.as_ref(),
