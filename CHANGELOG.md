@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2026-02-10
+
+### Candid 0.10.22
+
 * Non-breaking changes:
   + Enhance recursion guard
     - Use `target_family = "wasm"` for platform detection to cover both wasm32 and wasm64; skip recursion check on wasm (sandboxed), use stack-based check on native platforms and a conservative depth limit on other niche platforms
