@@ -1,5 +1,6 @@
 use super::internal::{find_type, Field, Label, Type, TypeInner};
 use crate::types::TypeEnv;
+use crate::utils::check_recursion_depth;
 use crate::{Error, Result};
 use anyhow::Context;
 use std::collections::{HashMap, HashSet};
@@ -15,7 +16,7 @@ pub enum OptReport {
 }
 /// Check if t1 <: t2
 pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<()> {
-    subtype_(OptReport::Warning, gamma, env, t1, t2)
+    subtype_(OptReport::Warning, gamma, env, t1, t2, &mut 0)
 }
 /// Check if t1 <: t2, and report the special opt rule as `Slience`, `Warning` or `Error`.
 pub fn subtype_with_config(
@@ -25,7 +26,7 @@ pub fn subtype_with_config(
     t1: &Type,
     t2: &Type,
 ) -> Result<()> {
-    subtype_(report, gamma, env, t1, t2)
+    subtype_(report, gamma, env, t1, t2, &mut 0)
 }
 
 fn subtype_(
@@ -34,36 +35,56 @@ fn subtype_(
     env: &TypeEnv,
     t1: &Type,
     t2: &Type,
+    depth: &mut u16,
 ) -> Result<()> {
+    *depth += 1;
+    check_recursion_depth(*depth)?;
     use TypeInner::*;
     if t1 == t2 {
+        *depth -= 1;
         return Ok(());
     }
     if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
         if !gamma.insert((t1.clone(), t2.clone())) {
+            *depth -= 1;
             return Ok(());
         }
         let res = match (t1.as_ref(), t2.as_ref()) {
-            (Var(id), _) => subtype_(report, gamma, env, env.rec_find_type(id).unwrap(), t2),
-            (_, Var(id)) => subtype_(report, gamma, env, t1, env.rec_find_type(id).unwrap()),
-            (Knot(id), _) => subtype_(report, gamma, env, &find_type(id).unwrap(), t2),
-            (_, Knot(id)) => subtype_(report, gamma, env, t1, &find_type(id).unwrap()),
+            (Var(id), _) => subtype_(
+                report,
+                gamma,
+                env,
+                env.rec_find_type(id).unwrap(),
+                t2,
+                depth,
+            ),
+            (_, Var(id)) => subtype_(
+                report,
+                gamma,
+                env,
+                t1,
+                env.rec_find_type(id).unwrap(),
+                depth,
+            ),
+            (Knot(id), _) => subtype_(report, gamma, env, &find_type(id).unwrap(), t2, depth),
+            (_, Knot(id)) => subtype_(report, gamma, env, t1, &find_type(id).unwrap(), depth),
             (_, _) => unreachable!(),
         };
         if res.is_err() {
             gamma.remove(&(t1.clone(), t2.clone()));
         }
+        *depth -= 1;
         return res;
     }
-    match (t1.as_ref(), t2.as_ref()) {
+    let result = match (t1.as_ref(), t2.as_ref()) {
         (_, Reserved) => Ok(()),
         (Empty, _) => Ok(()),
         (Nat, Int) => Ok(()),
-        (Vec(ty1), Vec(ty2)) => subtype_(report, gamma, env, ty1, ty2),
+        (Vec(ty1), Vec(ty2)) => subtype_(report, gamma, env, ty1, ty2, depth),
         (Null, Opt(_)) => Ok(()),
-        (Opt(ty1), Opt(ty2)) if subtype_(report, gamma, env, ty1, ty2).is_ok() => Ok(()),
+        (Opt(ty1), Opt(ty2)) if subtype_(report, gamma, env, ty1, ty2, depth).is_ok() => Ok(()),
         (_, Opt(ty2))
-            if subtype_(report, gamma, env, t1, ty2).is_ok()
+            if subtype_(report, gamma, env, t1, ty2, depth).is_ok()
                 && !matches!(env.trace_type(ty2)?.as_ref(), Null | Reserved | Opt(_)) =>
         {
             Ok(())
@@ -81,11 +102,14 @@ fn subtype_(
             let fields: HashMap<_, _> = fs1.iter().map(|Field { id, ty }| (id, ty)).collect();
             for Field { id, ty: ty2 } in fs2 {
                 match fields.get(id) {
-                    Some(ty1) => subtype_(report, gamma, env, ty1, ty2).with_context(|| {
-                        format!("Record field {id}: {ty1} is not a subtype of {ty2}")
-                    })?,
+                    Some(ty1) => {
+                        subtype_(report, gamma, env, ty1, ty2, depth).with_context(|| {
+                            format!("Record field {id}: {ty1} is not a subtype of {ty2}")
+                        })?
+                    }
                     None => {
                         if !matches!(env.trace_type(ty2)?.as_ref(), Null | Reserved | Opt(_)) {
+                            *depth -= 1;
                             return Err(Error::msg(format!("Record field {id}: {ty2} is only in the expected type and is not of type opt, null or reserved")));
                         }
                     }
@@ -97,13 +121,16 @@ fn subtype_(
             let fields: HashMap<_, _> = fs2.iter().map(|Field { id, ty }| (id, ty)).collect();
             for Field { id, ty: ty1 } in fs1 {
                 match fields.get(id) {
-                    Some(ty2) => subtype_(report, gamma, env, ty1, ty2).with_context(|| {
-                        format!("Variant field {id}: {ty1} is not a subtype_ of {ty2}")
-                    })?,
+                    Some(ty2) => {
+                        subtype_(report, gamma, env, ty1, ty2, depth).with_context(|| {
+                            format!("Variant field {id}: {ty1} is not a subtype_ of {ty2}")
+                        })?
+                    }
                     None => {
+                        *depth -= 1;
                         return Err(Error::msg(format!(
                             "Variant field {id} not found in the expected type"
-                        )))
+                        )));
                     }
                 }
             }
@@ -113,13 +140,16 @@ fn subtype_(
             let meths: HashMap<_, _> = ms1.iter().cloned().collect();
             for (name, ty2) in ms2 {
                 match meths.get(name) {
-                    Some(ty1) => subtype_(report, gamma, env, ty1, ty2).with_context(|| {
-                        format!("Method {name}: {ty1} is not a subtype of {ty2}")
-                    })?,
+                    Some(ty1) => {
+                        subtype_(report, gamma, env, ty1, ty2, depth).with_context(|| {
+                            format!("Method {name}: {ty1} is not a subtype of {ty2}")
+                        })?
+                    }
                     None => {
+                        *depth -= 1;
                         return Err(Error::msg(format!(
                             "Method {name} is only in the expected type"
-                        )))
+                        )));
                     }
                 }
             }
@@ -127,64 +157,83 @@ fn subtype_(
         }
         (Func(f1), Func(f2)) => {
             if f1.modes != f2.modes {
+                *depth -= 1;
                 return Err(Error::msg("Function mode mismatch"));
             }
             let args1 = to_tuple(&f1.args);
             let args2 = to_tuple(&f2.args);
             let rets1 = to_tuple(&f1.rets);
             let rets2 = to_tuple(&f2.rets);
-            subtype_(report, gamma, env, &args2, &args1)
+            subtype_(report, gamma, env, &args2, &args1, depth)
                 .context("Subtype fails at function input type")?;
-            subtype_(report, gamma, env, &rets1, &rets2)
+            subtype_(report, gamma, env, &rets1, &rets2, depth)
                 .context("Subtype fails at function return type")?;
             Ok(())
         }
         // This only works in the first order case, but service constructor only appears at the top level according to the spec.
-        (Class(_, t), _) => subtype_(report, gamma, env, t, t2),
-        (_, Class(_, t)) => subtype_(report, gamma, env, t1, t),
+        (Class(_, t), _) => subtype_(report, gamma, env, t, t2, depth),
+        (_, Class(_, t)) => subtype_(report, gamma, env, t1, t, depth),
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
         (_, _) => Err(Error::msg(format!("{t1} is not a subtype of {t2}"))),
-    }
+    };
+    *depth -= 1;
+    result
 }
 
 /// Check if t1 and t2 are structurally equivalent, ignoring the variable naming differences.
 /// Note that this is more strict than `t1 <: t2` and `t2 <: t1`, because of the special opt rule.
 pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<()> {
+    equal_impl(gamma, env, t1, t2, &mut 0)
+}
+
+fn equal_impl(
+    gamma: &mut Gamma,
+    env: &TypeEnv,
+    t1: &Type,
+    t2: &Type,
+    depth: &mut u16,
+) -> Result<()> {
+    *depth += 1;
+    check_recursion_depth(*depth)?;
     use TypeInner::*;
     if t1 == t2 {
+        *depth -= 1;
         return Ok(());
     }
     if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
         if !gamma.insert((t1.clone(), t2.clone())) {
+            *depth -= 1;
             return Ok(());
         }
         let res = match (t1.as_ref(), t2.as_ref()) {
-            (Var(id), _) => equal(gamma, env, env.rec_find_type(id).unwrap(), t2),
-            (_, Var(id)) => equal(gamma, env, t1, env.rec_find_type(id).unwrap()),
-            (Knot(id), _) => equal(gamma, env, &find_type(id).unwrap(), t2),
-            (_, Knot(id)) => equal(gamma, env, t1, &find_type(id).unwrap()),
+            (Var(id), _) => equal_impl(gamma, env, env.rec_find_type(id).unwrap(), t2, depth),
+            (_, Var(id)) => equal_impl(gamma, env, t1, env.rec_find_type(id).unwrap(), depth),
+            (Knot(id), _) => equal_impl(gamma, env, &find_type(id).unwrap(), t2, depth),
+            (_, Knot(id)) => equal_impl(gamma, env, t1, &find_type(id).unwrap(), depth),
             (_, _) => unreachable!(),
         };
         if res.is_err() {
             gamma.remove(&(t1.clone(), t2.clone()));
         }
+        *depth -= 1;
         return res;
     }
-    match (t1.as_ref(), t2.as_ref()) {
-        (Opt(ty1), Opt(ty2)) => equal(gamma, env, ty1, ty2),
-        (Vec(ty1), Vec(ty2)) => equal(gamma, env, ty1, ty2),
+    let result = match (t1.as_ref(), t2.as_ref()) {
+        (Opt(ty1), Opt(ty2)) => equal_impl(gamma, env, ty1, ty2, depth),
+        (Vec(ty1), Vec(ty2)) => equal_impl(gamma, env, ty1, ty2, depth),
         (Record(fs1), Record(fs2)) | (Variant(fs1), Variant(fs2)) => {
             assert_length(fs1, fs2, |x| x.id.clone(), |x| x.to_string())
                 .context("Different field length")?;
             for (f1, f2) in fs1.iter().zip(fs2.iter()) {
                 if f1.id != f2.id {
+                    *depth -= 1;
                     return Err(Error::msg(format!(
                         "Field name mismatch: {} and {}",
                         f1.id, f2.id
                     )));
                 }
-                equal(gamma, env, &f1.ty, &f2.ty).context(format!(
+                equal_impl(gamma, env, &f1.ty, &f2.ty, depth).context(format!(
                     "Field {} has different types: {} and {}",
                     f1.id, f1.ty, f2.ty
                 ))?;
@@ -196,12 +245,13 @@ pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<(
                 .context("Different method length")?;
             for (m1, m2) in ms1.iter().zip(ms2.iter()) {
                 if m1.0 != m2.0 {
+                    *depth -= 1;
                     return Err(Error::msg(format!(
                         "Method name mismatch: {} and {}",
                         m1.0, m2.0
                     )));
                 }
-                equal(gamma, env, &m1.1, &m2.1).context(format!(
+                equal_impl(gamma, env, &m1.1, &m2.1, depth).context(format!(
                     "Method {} has different types: {} and {}",
                     m1.0, m1.1, m2.1
                 ))?;
@@ -210,30 +260,35 @@ pub fn equal(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<(
         }
         (Func(f1), Func(f2)) => {
             if f1.modes != f2.modes {
+                *depth -= 1;
                 return Err(Error::msg("Function mode mismatch"));
             }
             let args1 = to_tuple(&f1.args);
             let args2 = to_tuple(&f2.args);
             let rets1 = to_tuple(&f1.rets);
             let rets2 = to_tuple(&f2.rets);
-            equal(gamma, env, &args1, &args2).context("Mismatch in function input type")?;
-            equal(gamma, env, &rets1, &rets2).context("Mismatch in function return type")?;
+            equal_impl(gamma, env, &args1, &args2, depth)
+                .context("Mismatch in function input type")?;
+            equal_impl(gamma, env, &rets1, &rets2, depth)
+                .context("Mismatch in function return type")?;
             Ok(())
         }
         (Class(init1, ty1), Class(init2, ty2)) => {
             let init_1 = to_tuple(init1);
             let init_2 = to_tuple(init2);
-            equal(gamma, env, &init_1, &init_2).context(format!(
+            equal_impl(gamma, env, &init_1, &init_2, depth).context(format!(
                 "Mismatch in init args: {} and {}",
                 pp_args(init1),
                 pp_args(init2)
             ))?;
-            equal(gamma, env, ty1, ty2)
+            equal_impl(gamma, env, ty1, ty2, depth)
         }
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
         (_, _) => Err(Error::msg(format!("{t1} is not equal to {t2}"))),
-    }
+    };
+    *depth -= 1;
+    result
 }
 
 fn assert_length<I, F, K, D>(left: &[I], right: &[I], get_key: F, display: D) -> Result<()>
