@@ -102,7 +102,7 @@ fn pp_ty_rich<'a>(ty: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
             pp_service(meths, Some(methods))
         }
         (TypeInner::Class(ref args, t), Some(IDLType::ClassT(_, syntax_t))) => {
-            pp_class((args, t), Some(syntax_t))
+            pp_class((args, t), Some(&syntax_t.kind))
         }
         (TypeInner::Record(ref fields), Some(IDLType::RecordT(syntax_fields))) => {
             pp_record(fields, Some(syntax_fields))
@@ -111,9 +111,11 @@ fn pp_ty_rich<'a>(ty: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
             pp_variant(fields, Some(syntax_fields))
         }
         (TypeInner::Opt(ref inner), Some(IDLType::OptT(syntax))) => {
-            str("?").append(pp_ty_rich(inner, Some(syntax)))
+            str("?").append(pp_ty_rich(inner, Some(&syntax.kind)))
         }
-        (TypeInner::Vec(ref inner), Some(IDLType::VecT(syntax))) => pp_vec(inner, Some(syntax)),
+        (TypeInner::Vec(ref inner), Some(IDLType::VecT(syntax))) => {
+            pp_vec(inner, Some(&syntax.kind))
+        }
         (_, _) => pp_ty(ty),
     }
 }
@@ -212,7 +214,7 @@ fn pp_service<'a>(serv: &'a [(String, Type)], syntax: Option<&'a [syntax::Bindin
         if let Some(bs) = syntax {
             if let Some(b) = bs.iter().find(|b| &b.id == id) {
                 docs = pp_docs(&b.docs);
-                syntax_field_ty = Some(&b.typ)
+                syntax_field_ty = Some(&b.typ.kind)
             }
         }
         docs.append(escape(id, true))
@@ -244,7 +246,7 @@ fn find_field<'a>(
     if let Some(bs) = fields {
         if let Some(field) = bs.iter().find(|b| b.label == *label) {
             docs = pp_docs(&field.docs);
-            syntax_field_ty = Some(&field.typ);
+            syntax_field_ty = Some(&field.typ.kind);
         }
     };
     (docs, syntax_field_ty)
@@ -302,7 +304,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, prog: &'a IDLMergedProg) -> RcDoc<'a> {
         docs.append(kwd("public type"))
             .append(escape(id, false))
             .append(" = ")
-            .append(pp_ty_rich(ty, syntax.map(|b| &b.typ)))
+            .append(pp_ty_rich(ty, syntax.map(|b| &b.typ.kind)))
             .append(";")
     }))
 }
@@ -311,25 +313,25 @@ fn pp_actor<'a>(ty: &'a Type, syntax: Option<&'a IDLActorType>) -> RcDoc<'a> {
     let self_doc = kwd("public type Self =");
     match ty.as_ref() {
         TypeInner::Service(ref serv) => match syntax {
-            Some(IDLActorType {
-                typ: IDLType::ServT(ref fields),
-                docs,
-            }) => {
-                let docs = pp_docs(docs);
-                docs.append(self_doc).append(pp_service(serv, Some(fields)))
-            }
-            _ => pp_service(serv, None),
+            Some(IDLActorType { typ, docs, .. }) => match &typ.kind {
+                IDLType::ServT(fields) => {
+                    let docs = pp_docs(docs);
+                    docs.append(self_doc).append(pp_service(serv, Some(fields)))
+                }
+                _ => pp_service(serv, None),
+            },
+            None => pp_service(serv, None),
         },
         TypeInner::Class(ref args, ref t) => match syntax {
-            Some(IDLActorType {
-                typ: IDLType::ClassT(_, syntax_t),
-                docs,
-            }) => {
-                let docs = pp_docs(docs);
-                docs.append(self_doc)
-                    .append(pp_class((args, t), Some(syntax_t)))
-            }
-            _ => self_doc.append(pp_class((args, t), None)),
+            Some(IDLActorType { typ, docs, .. }) => match &typ.kind {
+                IDLType::ClassT(_, syntax_t) => {
+                    let docs = pp_docs(docs);
+                    docs.append(self_doc)
+                        .append(pp_class((args, t), Some(&syntax_t.kind)))
+                }
+                _ => self_doc.append(pp_class((args, t), None)),
+            },
+            None => self_doc.append(pp_class((args, t), None)),
         },
         TypeInner::Var(_) => self_doc.append(pp_ty(ty)),
         _ => unreachable!(),
