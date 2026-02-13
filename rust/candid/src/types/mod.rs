@@ -19,6 +19,7 @@ pub use self::internal::{
 };
 pub use type_env::TypeEnv;
 
+pub mod bounded_vec;
 pub mod leb128;
 #[cfg(feature = "bignum")]
 pub mod number;
