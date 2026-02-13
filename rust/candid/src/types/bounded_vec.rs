@@ -1,11 +1,8 @@
 use data_size::DataSize;
 use serde::{Deserialize, Deserializer};
-use std::{fmt, rc::Rc};
+use std::fmt;
 
-use crate::{
-    types::{Field, Label, TypeInner},
-    CandidType,
-};
+use crate::{types::TypeInner, CandidType};
 
 /// Indicates that `BoundedVec<...>` template parameter (eg. length, total data size, etc) is unbounded.
 pub const UNBOUNDED: usize = usize::MAX;
@@ -32,11 +29,6 @@ impl<
 {
     fn _ty() -> super::Type {
         TypeInner::Vec(T::_ty()).into()
-        // TypeInner::Record(vec![Field {
-        //     id: Rc::new(Label::Unnamed(0)),
-        //     ty: TypeInner::Vec(T::_ty()).into(),
-        // }])
-        // .into()
     }
 
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
@@ -260,7 +252,6 @@ mod tests {
 
             // Act.
             let result = Decode!(&Encode!(&data).unwrap(), BoundedLen);
-            println!("{:?}", result);
 
             // Assert.
             if i <= MAX_ALLOWED_LEN {
@@ -272,7 +263,7 @@ mod tests {
                 assert!(result.is_err());
                 let error = result.unwrap_err();
                 assert!(
-                    error.to_string().contains(&format!(
+                    format!("{error:?}").contains(&format!(
                         "Deserialize error: The number of elements exceeds maximum allowed {MAX_ALLOWED_LEN}"
                     )),
                     "Actual: {}",
@@ -312,7 +303,7 @@ mod tests {
                 assert!(result.is_err());
                 let error = result.unwrap_err();
                 assert!(
-                    error.to_string().contains(&format!(
+                    format!("{error:?}").contains(&format!(
                         "Deserialize error: The total data size exceeds maximum allowed {MAX_ALLOWED_TOTAL_DATA_SIZE}"
                     )),
                     "Actual: {}",
@@ -347,7 +338,7 @@ mod tests {
                 assert!(result.is_err());
                 let error = result.unwrap_err();
                 assert!(
-                    error.to_string().contains(&format!(
+                    format!("{error:?}").contains(&format!(
                         "Deserialize error: The single element data size exceeds maximum allowed {MAX_ALLOWED_ELEMENT_DATA_SIZE}"
                     )),
                     "Actual: {}",
