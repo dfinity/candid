@@ -251,7 +251,8 @@ mod tests {
             let data = BoundedLen::new(vec![42; i]);
 
             // Act.
-            let result = Decode!(&Encode!(&data).unwrap(), BoundedLen);
+            let bytes = Encode!(&data).unwrap();
+            let result = Decode!(&bytes, BoundedLen);
 
             // Assert.
             if i <= MAX_ALLOWED_LEN {
@@ -267,7 +268,7 @@ mod tests {
                         "Deserialize error: The number of elements exceeds maximum allowed {MAX_ALLOWED_LEN}"
                     )),
                     "Actual: {}",
-                    error.to_string()
+                    error
                 );
             }
         }
@@ -291,7 +292,8 @@ mod tests {
             let actual_total_size = data.get().data_size();
 
             // Act.
-            let result = Decode!(&Encode!(&data).unwrap(), BoundedSize);
+            let bytes = Encode!(&data).unwrap();
+            let result = Decode!(&bytes, BoundedSize);
 
             // Assert.
             if actual_total_size <= MAX_ALLOWED_TOTAL_DATA_SIZE {
@@ -307,7 +309,7 @@ mod tests {
                         "Deserialize error: The total data size exceeds maximum allowed {MAX_ALLOWED_TOTAL_DATA_SIZE}"
                     )),
                     "Actual: {}",
-                    error.to_string()
+                    error
                 );
             }
         }
@@ -326,7 +328,8 @@ mod tests {
             let data = BoundedSize::new(vec![element; 42]);
 
             // Act.
-            let result = Decode!(&Encode!(&data).unwrap(), BoundedSize);
+            let bytes = Encode!(&data).unwrap();
+            let result = Decode!(&bytes, BoundedSize);
 
             // Assert.
             if element_size <= MAX_ALLOWED_ELEMENT_DATA_SIZE {
@@ -342,7 +345,7 @@ mod tests {
                         "Deserialize error: The single element data size exceeds maximum allowed {MAX_ALLOWED_ELEMENT_DATA_SIZE}"
                     )),
                     "Actual: {}",
-                    error.to_string()
+                    error
                 );
             }
         }
