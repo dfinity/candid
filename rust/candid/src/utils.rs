@@ -162,6 +162,9 @@ macro_rules! Decode {
         $de.get_value::<$ty>()
             .and_then(|val| Decode!(@GetValue [$($ans)* val] $de $($tail,)* ))
     }};
+    (@GetValue [$ans:ident] $de:ident) => {{
+        Ok($ans)
+    }};
     (@GetValue [$($ans:ident)*] $de:ident) => {{
         Ok(($($ans),*))
     }};
@@ -598,3 +601,18 @@ encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l
 encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l: L, m: M, n: N, o: O);
 #[rustfmt::skip]
 encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l: L, m: M, n: N, o: O, p: P);
+
+#[cfg(test)]
+mod tests {
+
+    /// Ensures that the code does not trigger the `clippy::double_parens` lint.
+    /// This test was added to prevent regressions where unnecessary parentheses
+    /// could cause Clippy warnings or errors.
+    #[test]
+    fn test_decode_single_value() {
+        let bytes = Encode!(&"hello").unwrap();
+        // This code used to get `clippy::double_parens` error.
+        let value = Decode!(&bytes, String).unwrap();
+        assert_eq!(value, "hello");
+    }
+}
