@@ -603,7 +603,6 @@ encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l
 encode_impl!(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I, j: J, k: K, l: L, m: M, n: N, o: O, p: P);
 
 #[cfg(test)]
-
 mod tests {
 
     /// Ensures that the code does not trigger the `clippy::double_parens` lint.
