@@ -7,10 +7,22 @@ use crate::{types::TypeInner, CandidType};
 /// Indicates that `BoundedVec<...>` template parameter (eg. length, total data size, etc) is unbounded.
 pub const UNBOUNDED: usize = usize::MAX;
 
-/// Struct for bounding vector by different parameters:
+/// Struct for bounding a vector by different parameters:
 /// - number of elements
 /// - total data size in bytes
 /// - single element data size in bytes
+///
+/// ```
+/// // E.g., a user of your service sends candid-encoded bytes:
+/// let too_long = vec![13u64; 11];
+/// let bytes_too_long = Encode!(&too_long).unwrap();
+/// // Your service should decode the untrusted bytes with care, by decoding to BoundedVec<10, _, _, _>.
+/// // Since the user sent 11 elements and you allow at most 10, this will fail, keeping the service safe from certain exploits.
+/// let error =
+///     Decode!(&bytes_too_long, BoundedVec<10, UNBOUNDED, UNBOUNDED, u64>).unwrap_err();
+/// assert!(format!("{error:?}").contains("exceeds maximum allowed"));
+/// ```
+///
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
 pub struct BoundedVec<
     const MAX_ALLOWED_LEN: usize,
