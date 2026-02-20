@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-### Candid
+## 2026-02-20
+
+### Candid 0.10.23
 
 * Non-breaking changes:
   + Add `BoundedVec` type to `candid::types::bounded_vec` for bounding a vector by number of elements, total data size, and per-element data size during deserialization
