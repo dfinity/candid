@@ -13,6 +13,8 @@ pub const UNBOUNDED: usize = usize::MAX;
 /// - single element data size in bytes
 ///
 /// ```
+/// # use candid::{Decode, Encode};
+/// # use candid::types::bounded_vec::{BoundedVec, UNBOUNDED};
 /// // E.g., a user of your service sends candid-encoded bytes:
 /// let too_long = vec![13u64; 11];
 /// let bytes_too_long = Encode!(&too_long).unwrap();
