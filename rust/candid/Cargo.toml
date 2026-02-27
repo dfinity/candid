@@ -1,7 +1,7 @@
 [package]
 name = "candid"
 # sync with the version in `candid_derive/Cargo.toml`
-version = "0.10.23"
+version = "0.10.24"
 edition = "2021"
 rust-version.workspace = true
 authors = ["DFINITY Team"]
@@ -16,7 +16,7 @@ keywords = ["internet-computer", "idl", "candid", "dfinity"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
-candid_derive = { path = "../candid_derive", version = "=0.10.23" }
+candid_derive = { path = "../candid_derive", version = "=0.10.24" }
 ic_principal = { path = "../ic_principal", version = "0.1.0" }
 binread = { version = "2.2", features = ["debug_template"] }
 byteorder = "1.5.0"

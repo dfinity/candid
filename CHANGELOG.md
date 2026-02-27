@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 2026-02-27
+
+### Candid 0.10.24
+
+* Non-breaking changes:
+  + Implement `DataSize` for `Principal`, enabling `Principal` as an element type in `BoundedVec`
+
 ## 2026-02-20
 
 ### Candid 0.10.23

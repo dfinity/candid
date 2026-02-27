@@ -156,7 +156,7 @@ dependencies = [
 
 [[package]]
 name = "candid"
-version = "0.10.23"
+version = "0.10.24"
 dependencies = [
  "anyhow",
  "binread",
@@ -177,7 +177,7 @@ dependencies = [
 
 [[package]]
 name = "candid_derive"
-version = "0.10.23"
+version = "0.10.24"
 dependencies = [
  "lazy_static",
  "proc-macro2",

@@ -367,9 +367,6 @@ mod tests {
 }
 
 mod data_size {
-    // We implement a standalone trait `DataSize` here and use it
-    // instead of `CountBytes`.
-
     /// Trait to reasonably estimate the memory usage of a value in bytes.
     ///
     /// Default implementation returns zero.
@@ -413,6 +410,12 @@ mod data_size {
     impl<T: DataSize> DataSize for Vec<T> {
         fn data_size(&self) -> usize {
             std::mem::size_of::<Self>() + self.iter().map(|x| x.data_size()).sum::<usize>()
+        }
+    }
+
+    impl DataSize for ic_principal::Principal {
+        fn data_size(&self) -> usize {
+            self.as_slice().len()
         }
     }
 
