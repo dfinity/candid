@@ -122,6 +122,25 @@ where
     }
 }
 
+#[cfg(target_endian = "little")]
+fn fixed_primitive_byte_size<T: CandidType>() -> Option<usize> {
+    use super::internal::TypeId;
+    let tid = TypeId::of::<T>();
+    if tid == TypeId::of::<bool>() || tid == TypeId::of::<u8>() || tid == TypeId::of::<i8>() {
+        Some(1)
+    } else if tid == TypeId::of::<u16>() || tid == TypeId::of::<i16>() {
+        Some(2)
+    } else if tid == TypeId::of::<u32>() || tid == TypeId::of::<i32>() || tid == TypeId::of::<f32>()
+    {
+        Some(4)
+    } else if tid == TypeId::of::<u64>() || tid == TypeId::of::<i64>() || tid == TypeId::of::<f64>()
+    {
+        Some(8)
+    } else {
+        None
+    }
+}
+
 impl<T> CandidType for [T]
 where
     T: CandidType,
@@ -134,6 +153,15 @@ where
         S: Serializer,
     {
         let mut ser = serializer.serialize_vec(self.len())?;
+        #[cfg(target_endian = "little")]
+        if let Some(element_size) = fixed_primitive_byte_size::<T>() {
+            let bytes = unsafe {
+                std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * element_size)
+            };
+            if Compound::try_write_raw_elements(&mut ser, bytes)? {
+                return Ok(());
+            }
+        }
         for e in self {
             Compound::serialize_element(&mut ser, &e)?;
         }
@@ -242,7 +270,17 @@ use std::hash::{BuildHasher, Hash};
 map_impl!(BTreeMap<K: Ord, V>);
 map_impl!(HashMap<K: Eq + Hash, V, H: BuildHasher>);
 
-seq_impl!(Vec<K>);
+impl<K: CandidType> CandidType for Vec<K> {
+    fn _ty() -> Type {
+        TypeInner::Vec(K::ty()).into()
+    }
+    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
+    where
+        S: Serializer,
+    {
+        self.as_slice().idl_serialize(serializer)
+    }
+}
 seq_impl!(VecDeque<K>);
 seq_impl!(LinkedList<K>);
 seq_impl!(BinaryHeap<K: Ord>);
@@ -257,11 +295,7 @@ impl<T: CandidType, const N: usize> CandidType for [T; N] {
     where
         S: Serializer,
     {
-        let mut ser = serializer.serialize_vec(N)?;
-        for e in self {
-            Compound::serialize_element(&mut ser, &e)?;
-        }
-        Ok(())
+        self.as_slice().idl_serialize(serializer)
     }
 }
 
