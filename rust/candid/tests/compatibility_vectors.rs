@@ -74,8 +74,5 @@ fn bulk_encode_primitive_vectors_round_trip() {
     );
 
     let empty: Vec<i32> = vec![];
-    assert_eq!(
-        Decode!(&Encode!(&empty).unwrap(), Vec<i32>).unwrap(),
-        empty
-    );
+    assert_eq!(Decode!(&Encode!(&empty).unwrap(), Vec<i32>).unwrap(), empty);
 }
