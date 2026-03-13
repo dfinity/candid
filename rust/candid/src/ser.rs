@@ -427,7 +427,9 @@ impl TypeSerialize {
     #[doc(hidden)]
     pub fn serialize(&mut self) -> Result<()> {
         leb128_encode(&mut self.result, self.type_table.len() as u64)?;
-        self.result.append(&mut self.type_table.concat());
+        for entry in &self.type_table {
+            self.result.extend_from_slice(entry);
+        }
 
         leb128_encode(&mut self.result, self.args.len() as u64)?;
         let mut ty_encode = Vec::new();
