@@ -737,15 +737,63 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     }
 
     primitive_impl!(i8, TypeInner::Int8, PrimitiveType::Int8, 1, read_i8);
-    primitive_impl!(i16, TypeInner::Int16, PrimitiveType::Int16, 2, read_i16::<LittleEndian>);
-    primitive_impl!(i32, TypeInner::Int32, PrimitiveType::Int32, 4, read_i32::<LittleEndian>);
-    primitive_impl!(i64, TypeInner::Int64, PrimitiveType::Int64, 8, read_i64::<LittleEndian>);
+    primitive_impl!(
+        i16,
+        TypeInner::Int16,
+        PrimitiveType::Int16,
+        2,
+        read_i16::<LittleEndian>
+    );
+    primitive_impl!(
+        i32,
+        TypeInner::Int32,
+        PrimitiveType::Int32,
+        4,
+        read_i32::<LittleEndian>
+    );
+    primitive_impl!(
+        i64,
+        TypeInner::Int64,
+        PrimitiveType::Int64,
+        8,
+        read_i64::<LittleEndian>
+    );
     primitive_impl!(u8, TypeInner::Nat8, PrimitiveType::Nat8, 1, read_u8);
-    primitive_impl!(u16, TypeInner::Nat16, PrimitiveType::Nat16, 2, read_u16::<LittleEndian>);
-    primitive_impl!(u32, TypeInner::Nat32, PrimitiveType::Nat32, 4, read_u32::<LittleEndian>);
-    primitive_impl!(u64, TypeInner::Nat64, PrimitiveType::Nat64, 8, read_u64::<LittleEndian>);
-    primitive_impl!(f32, TypeInner::Float32, PrimitiveType::Float32, 4, read_f32::<LittleEndian>);
-    primitive_impl!(f64, TypeInner::Float64, PrimitiveType::Float64, 8, read_f64::<LittleEndian>);
+    primitive_impl!(
+        u16,
+        TypeInner::Nat16,
+        PrimitiveType::Nat16,
+        2,
+        read_u16::<LittleEndian>
+    );
+    primitive_impl!(
+        u32,
+        TypeInner::Nat32,
+        PrimitiveType::Nat32,
+        4,
+        read_u32::<LittleEndian>
+    );
+    primitive_impl!(
+        u64,
+        TypeInner::Nat64,
+        PrimitiveType::Nat64,
+        8,
+        read_u64::<LittleEndian>
+    );
+    primitive_impl!(
+        f32,
+        TypeInner::Float32,
+        PrimitiveType::Float32,
+        4,
+        read_f32::<LittleEndian>
+    );
+    primitive_impl!(
+        f64,
+        TypeInner::Float64,
+        PrimitiveType::Float64,
+        8,
+        read_f64::<LittleEndian>
+    );
 
     fn is_human_readable(&self) -> bool {
         false
