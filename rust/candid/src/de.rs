@@ -851,9 +851,9 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 let len = Len::read(&mut self.input)?.0;
                 visitor.visit_seq(Compound::new(self, Style::Vector { len, expect, wire }))
             }
-            (TypeInner::Record(e), TypeInner::Record(w)) => {
-                let expect = e.clone().into();
-                let wire = w.clone().into();
+            (TypeInner::Record(_), TypeInner::Record(_)) => {
+                let expect = self.expect_type.clone();
+                let wire = self.wire_type.clone();
                 check!(self.expect_type.is_tuple(), "seq_tuple");
                 if !self.wire_type.is_tuple() {
                     return Err(Error::subtype(format!(
@@ -861,8 +861,15 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                         self.wire_type
                     )));
                 }
-                let value =
-                    visitor.visit_seq(Compound::new(self, Style::Struct { expect, wire }))?;
+                let value = visitor.visit_seq(Compound::new(
+                    self,
+                    Style::Struct {
+                        expect,
+                        wire,
+                        expect_idx: 0,
+                        wire_idx: 0,
+                    },
+                ))?;
                 Ok(value)
             }
             _ => check!(false),
@@ -966,11 +973,16 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         self.unroll_type()?;
         self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
-            (TypeInner::Record(e), TypeInner::Record(w)) => {
-                let expect = e.clone().into();
-                let wire = w.clone().into();
-                let value =
-                    visitor.visit_map(Compound::new(self, Style::Struct { expect, wire }))?;
+            (TypeInner::Record(_), TypeInner::Record(_)) => {
+                let value = visitor.visit_map(Compound::new(
+                    self,
+                    Style::Struct {
+                        expect: self.expect_type.clone(),
+                        wire: self.wire_type.clone(),
+                        expect_idx: 0,
+                        wire_idx: 0,
+                    },
+                ))?;
                 Ok(value)
             }
             _ => check!(false),
@@ -1041,8 +1053,10 @@ enum Style {
         wire: Type,
     },
     Struct {
-        expect: VecDeque<Field>,
-        wire: VecDeque<Field>,
+        expect: Type,
+        wire: Type,
+        expect_idx: usize,
+        wire_idx: usize,
     },
     Enum {
         expect: Field,
@@ -1089,19 +1103,35 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
                 seed.deserialize(&mut *self.de).map(Some)
             }
             Style::Struct {
-                ref mut expect,
-                ref mut wire,
+                ref expect,
+                ref wire,
+                ref mut expect_idx,
+                ref mut wire_idx,
             } => {
-                if expect.is_empty() && wire.is_empty() {
+                let expect_fields = match expect.as_ref() {
+                    TypeInner::Record(fields) => fields,
+                    _ => unreachable!(),
+                };
+                let wire_fields = match wire.as_ref() {
+                    TypeInner::Record(fields) => fields,
+                    _ => unreachable!(),
+                };
+                if *expect_idx >= expect_fields.len() && *wire_idx >= wire_fields.len() {
                     return Ok(None);
                 }
-                self.de.expect_type = expect
-                    .pop_front()
-                    .map(|f| f.ty)
+                self.de.expect_type = expect_fields
+                    .get(*expect_idx)
+                    .map(|f| {
+                        *expect_idx += 1;
+                        f.ty.clone()
+                    })
                     .unwrap_or_else(|| TypeInner::Reserved.into());
-                self.de.wire_type = wire
-                    .pop_front()
-                    .map(|f| f.ty)
+                self.de.wire_type = wire_fields
+                    .get(*wire_idx)
+                    .map(|f| {
+                        *wire_idx += 1;
+                        f.ty.clone()
+                    })
                     .unwrap_or_else(|| TypeInner::Null.into());
                 seed.deserialize(&mut *self.de).map(Some)
             }
@@ -1112,7 +1142,22 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
     fn size_hint(&self) -> Option<usize> {
         match &self.style {
             Style::Vector { len, .. } => Some(*len),
-            Style::Struct { expect, wire, .. } => Some(expect.len().min(wire.len())),
+            Style::Struct {
+                expect,
+                wire,
+                expect_idx,
+                wire_idx,
+            } => {
+                let expect_len = match expect.as_ref() {
+                    TypeInner::Record(fields) => fields.len().saturating_sub(*expect_idx),
+                    _ => 0,
+                };
+                let wire_len = match wire.as_ref() {
+                    TypeInner::Record(fields) => fields.len().saturating_sub(*wire_idx),
+                    _ => 0,
+                };
+                Some(expect_len.min(wire_len))
+            }
             _ => None,
         }
     }
@@ -1127,23 +1172,36 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
         self.de.add_cost(4)?;
         match self.style {
             Style::Struct {
-                ref mut expect,
-                ref mut wire,
+                ref expect,
+                ref wire,
+                ref mut expect_idx,
+                ref mut wire_idx,
             } => {
-                match (expect.front(), wire.front()) {
+                let expect_fields = match expect.as_ref() {
+                    TypeInner::Record(fields) => fields,
+                    _ => unreachable!(),
+                };
+                let wire_fields = match wire.as_ref() {
+                    TypeInner::Record(fields) => fields,
+                    _ => unreachable!(),
+                };
+                match (expect_fields.get(*expect_idx), wire_fields.get(*wire_idx)) {
                     (Some(e), Some(w)) => {
                         use std::cmp::Ordering;
                         match e.id.get_id().cmp(&w.id.get_id()) {
                             Ordering::Equal => {
                                 self.de.set_field_name(e.id.clone());
-                                self.de.expect_type = expect.pop_front().unwrap().ty;
-                                self.de.wire_type = wire.pop_front().unwrap().ty;
+                                self.de.expect_type = e.ty.clone();
+                                self.de.wire_type = w.ty.clone();
+                                *expect_idx += 1;
+                                *wire_idx += 1;
                             }
                             Ordering::Less => {
                                 // by subtyping rules, expect_type can only be opt, reserved or null.
                                 let field = e.id.clone();
                                 self.de.set_field_name(field.clone());
-                                let expect = expect.pop_front().unwrap().ty;
+                                let expect = e.ty.clone();
+                                *expect_idx += 1;
                                 self.de.expect_type = self
                                     .de
                                     .table
@@ -1159,20 +1217,23 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                             }
                             Ordering::Greater => {
                                 self.de.set_field_name(Label::Named("_".to_owned()).into());
-                                self.de.wire_type = wire.pop_front().unwrap().ty;
+                                self.de.wire_type = w.ty.clone();
                                 self.de.expect_type = TypeInner::Reserved.into();
+                                *wire_idx += 1;
                             }
                         }
                     }
                     (None, Some(_)) => {
                         self.de.set_field_name(Label::Named("_".to_owned()).into());
-                        self.de.wire_type = wire.pop_front().unwrap().ty;
+                        self.de.wire_type = wire_fields[*wire_idx].ty.clone();
                         self.de.expect_type = TypeInner::Reserved.into();
+                        *wire_idx += 1;
                     }
                     (Some(e), None) => {
                         self.de.set_field_name(e.id.clone());
-                        self.de.expect_type = expect.pop_front().unwrap().ty;
+                        self.de.expect_type = e.ty.clone();
                         self.de.wire_type = TypeInner::Null.into();
+                        *expect_idx += 1;
                     }
                     (None, None) => return Ok(None),
                 }
@@ -1216,7 +1277,22 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
     fn size_hint(&self) -> Option<usize> {
         match &self.style {
             Style::Map { len, .. } => Some(*len),
-            Style::Struct { expect, wire, .. } => Some(expect.len().min(wire.len())),
+            Style::Struct {
+                expect,
+                wire,
+                expect_idx,
+                wire_idx,
+            } => {
+                let expect_len = match expect.as_ref() {
+                    TypeInner::Record(fields) => fields.len().saturating_sub(*expect_idx),
+                    _ => 0,
+                };
+                let wire_len = match wire.as_ref() {
+                    TypeInner::Record(fields) => fields.len().saturating_sub(*wire_idx),
+                    _ => 0,
+                };
+                Some(expect_len.min(wire_len))
+            }
             _ => None,
         }
     }
