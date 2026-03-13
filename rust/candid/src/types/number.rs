@@ -322,59 +322,58 @@ impl Int {
     where
         R: io::Read,
     {
-        let mut small = 0u64;
+        let mut small = 0i64;
         let mut shift = 0u32;
         loop {
             let mut buf = [0];
             r.read_exact(&mut buf)?;
             let byte = buf[0];
-            let low_bits = u64::from(byte & 0x7f);
-            if leb128_fits_u64(low_bits, shift) {
-                small |= low_bits << shift;
-                if byte & 0x80u8 == 0 {
-                    // Last byte: sign-extend and return as i64 if possible.
-                    let total_bits = shift + 7;
-                    if byte & 0x40u8 != 0 {
-                        // Negative: fill bits from total_bits upward with 1s.
-                        let signed = if total_bits >= 64 {
-                            // Bit 63 is already the LEB sign bit inside small.
-                            small as i64
-                        } else {
-                            let sign_mask = !((1u64 << total_bits) - 1);
-                            (small | sign_mask) as i64
-                        };
-                        return Ok(Int(BigInt::from(signed)));
-                    } else if small <= i64::MAX as u64 {
-                        return Ok(Int(BigInt::from(small as i64)));
-                    } else {
-                        // Positive value in [2^63, 2^64-1]: fits u64 but not i64.
-                        return Ok(Int(BigInt::from(BigUint::from(small))));
-                    }
+            let low_bits = i64::from(byte & 0x7f);
+
+            let fits_i64 = if shift < 57 {
+                true
+            } else if shift < 64 {
+                let remaining_bits = 64 - shift;
+                if (byte & 0x40) != 0 {
+                    (low_bits | !0x7f) >> (remaining_bits - 1) == -1
+                } else {
+                    low_bits >> (remaining_bits - 1) == 0
                 }
+            } else {
+                false
+            };
+
+            if fits_i64 {
+                small |= low_bits << shift;
                 shift += 7;
+                if byte & 0x80 == 0 {
+                    if shift < 64 && (byte & 0x40) != 0 {
+                        small |= !0i64 << shift;
+                    }
+                    return Ok(Int(BigInt::from(small)));
+                }
                 continue;
             }
 
-            // Value overflows u64: fall back to BigInt for remaining bytes.
-            let mut result = BigInt::from(BigUint::from(small));
-            result |= BigInt::from(low_bits) << shift;
-            if byte & 0x80u8 == 0 {
-                shift += 7;
-                if byte & 0x40u8 != 0 {
+            let mut result = BigInt::from(small);
+            let big_low_bits = BigInt::from(byte & 0x7fu8);
+            result |= big_low_bits << shift;
+            shift += 7;
+            if byte & 0x80 == 0 {
+                if (byte & 0x40) != 0 {
                     result |= BigInt::from(-1) << shift;
                 }
                 return Ok(Int(result));
             }
-            shift += 7;
             loop {
                 let mut buf = [0];
                 r.read_exact(&mut buf)?;
                 let byte = buf[0];
-                let low_bits = BigInt::from(byte & 0x7fu8);
-                result |= low_bits << shift;
+                let big_low_bits = BigInt::from(byte & 0x7fu8);
+                result |= big_low_bits << shift;
                 shift += 7;
-                if byte & 0x80u8 == 0 {
-                    if byte & 0x40u8 != 0 {
+                if byte & 0x80 == 0 {
+                    if (byte & 0x40) != 0 {
                         result |= BigInt::from(-1) << shift;
                     }
                     return Ok(Int(result));
