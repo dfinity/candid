@@ -633,6 +633,15 @@ enum PrimitiveType {
     Float64,
 }
 
+fn primitive_byte_cost(p: PrimitiveType) -> usize {
+    match p {
+        PrimitiveType::Bool | PrimitiveType::Int8 | PrimitiveType::Nat8 => 1,
+        PrimitiveType::Int16 | PrimitiveType::Nat16 => 2,
+        PrimitiveType::Int32 | PrimitiveType::Nat32 | PrimitiveType::Float32 => 4,
+        PrimitiveType::Int64 | PrimitiveType::Nat64 | PrimitiveType::Float64 => 8,
+    }
+}
+
 fn exact_primitive_type(expect: &Type, wire: &Type) -> Option<PrimitiveType> {
     match (expect.as_ref(), wire.as_ref()) {
         (TypeInner::Bool, TypeInner::Bool) => Some(PrimitiveType::Bool),
@@ -656,7 +665,6 @@ macro_rules! primitive_impl {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
                 if self.primitive_vec_fast_path == Some($fast) {
-                    self.add_cost($cost)?;
                     let val = self.input.$($value)*().map_err(|_| Error::msg(format!("Cannot read {} value", stringify!($type))))?;
                     return visitor.[<visit_ $ty>](val);
                 }
@@ -846,7 +854,6 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         if self.primitive_vec_fast_path == Some(PrimitiveType::Bool) {
-            self.add_cost(1)?;
             let res = BoolValue::read(&mut self.input)?;
             return visitor.visit_bool(res.0);
         }
@@ -944,7 +951,15 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 let wire = self.table.trace_type_with_depth(w, &self.recursion_depth)?;
                 let len = Len::read(&mut self.input)?.0;
                 let exact_primitive = exact_primitive_type(&expect, &wire);
-                visitor.visit_seq(Compound::new(
+                if let Some(prim) = exact_primitive {
+                    let per_element_cost = 3 + primitive_byte_cost(prim);
+                    self.add_cost(
+                        len.checked_mul(per_element_cost)
+                            .ok_or_else(|| Error::msg("Vec length overflow"))?,
+                    )?;
+                    self.primitive_vec_fast_path = exact_primitive;
+                }
+                let result = visitor.visit_seq(Compound::new(
                     self,
                     Style::Vector {
                         len,
@@ -952,7 +967,11 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                         wire,
                         exact_primitive,
                     },
-                ))
+                ));
+                if exact_primitive.is_some() {
+                    self.primitive_vec_fast_path = None;
+                }
+                result
             }
             (TypeInner::Record(_), TypeInner::Record(_)) => {
                 let expect = self.expect_type.clone();
@@ -1211,7 +1230,6 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
     where
         T: de::DeserializeSeed<'de>,
     {
-        self.de.add_cost(3)?;
         match self.style {
             Style::Vector {
                 ref mut len,
@@ -1223,16 +1241,14 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
                     return Ok(None);
                 }
                 *len -= 1;
-                let old_fast_path = self.de.primitive_vec_fast_path;
-                if let Some(exact_primitive) = exact_primitive {
-                    self.de.primitive_vec_fast_path = Some(exact_primitive);
+                if exact_primitive.is_some() {
+                    seed.deserialize(&mut *self.de).map(Some)
                 } else {
+                    self.de.add_cost(3)?;
                     self.de.expect_type = expect.clone();
                     self.de.wire_type = wire.clone();
+                    seed.deserialize(&mut *self.de).map(Some)
                 }
-                let result = seed.deserialize(&mut *self.de).map(Some);
-                self.de.primitive_vec_fast_path = old_fast_path;
-                result
             }
             Style::Struct {
                 ref expect,
@@ -1240,6 +1256,7 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
                 ref mut expect_idx,
                 ref mut wire_idx,
             } => {
+                self.de.add_cost(3)?;
                 let expect_fields = match expect.as_ref() {
                     TypeInner::Record(fields) => fields,
                     _ => unreachable!(),
