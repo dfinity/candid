@@ -214,6 +214,10 @@ impl Nat {
         W: ?Sized + io::Write,
     {
         use num_traits::cast::ToPrimitive;
+        if let Some(value) = self.0.to_u64() {
+            leb128::write::unsigned(w, value)?;
+            return Ok(());
+        }
         let zero = BigUint::from(0u8);
         let mut value = self.0.clone();
         loop {
@@ -234,17 +238,46 @@ impl Nat {
     where
         R: io::Read,
     {
-        let mut result = BigUint::from(0u8);
-        let mut shift = 0;
+        let mut small = 0u64;
+        let mut shift = 0u32;
         loop {
             let mut buf = [0];
             r.read_exact(&mut buf)?;
-            let low_bits = BigUint::from(buf[0] & 0x7fu8);
-            result |= low_bits << shift;
-            if buf[0] & 0x80u8 == 0 {
+            let byte = buf[0];
+            let low_bits = u64::from(byte & 0x7f);
+            let fits_u64 = if shift == 0 {
+                true
+            } else if shift < 64 {
+                low_bits < (1u64 << (64 - shift))
+            } else {
+                false
+            };
+            if fits_u64 {
+                small |= low_bits << shift;
+                if byte & 0x80u8 == 0 {
+                    return Ok(Nat(BigUint::from(small)));
+                }
+                shift += 7;
+                continue;
+            }
+
+            let mut result = BigUint::from(small);
+            result |= BigUint::from(low_bits) << shift;
+            if byte & 0x80u8 == 0 {
                 return Ok(Nat(result));
             }
             shift += 7;
+            loop {
+                let mut buf = [0];
+                r.read_exact(&mut buf)?;
+                let byte = buf[0];
+                let low_bits = BigUint::from(byte & 0x7fu8);
+                result |= low_bits << shift;
+                if byte & 0x80u8 == 0 {
+                    return Ok(Nat(result));
+                }
+                shift += 7;
+            }
         }
     }
 }
@@ -255,6 +288,10 @@ impl Int {
         W: ?Sized + io::Write,
     {
         use num_traits::cast::ToPrimitive;
+        if let Some(value) = self.0.to_i64() {
+            leb128::write::signed(w, value)?;
+            return Ok(());
+        }
         let zero = BigInt::from(0);
         let mut value = self.0.clone();
         loop {
