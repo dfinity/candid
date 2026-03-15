@@ -208,12 +208,29 @@ impl<'de> Deserialize<'de> for Nat {
 
 // LEB128 encoding for bignum.
 
+/// Returns true if OR-ing `low_bits` at position `shift` fits within a u64.
+/// The `shift < 64` guard prevents a debug-mode panic from the shift expression.
+#[inline]
+fn leb128_fits_u64(low_bits: u64, shift: u32) -> bool {
+    if shift == 0 {
+        true
+    } else if shift < 64 {
+        low_bits < (1u64 << (64 - shift))
+    } else {
+        false
+    }
+}
+
 impl Nat {
     pub fn encode<W>(&self, w: &mut W) -> crate::Result<()>
     where
         W: ?Sized + io::Write,
     {
         use num_traits::cast::ToPrimitive;
+        if let Some(value) = self.0.to_u64() {
+            leb128::write::unsigned(w, value)?;
+            return Ok(());
+        }
         let zero = BigUint::from(0u8);
         let mut value = self.0.clone();
         loop {
@@ -234,17 +251,39 @@ impl Nat {
     where
         R: io::Read,
     {
-        let mut result = BigUint::from(0u8);
-        let mut shift = 0;
+        let mut small = 0u64;
+        let mut shift = 0u32;
         loop {
             let mut buf = [0];
             r.read_exact(&mut buf)?;
-            let low_bits = BigUint::from(buf[0] & 0x7fu8);
-            result |= low_bits << shift;
-            if buf[0] & 0x80u8 == 0 {
+            let byte = buf[0];
+            let low_bits = u64::from(byte & 0x7f);
+            if leb128_fits_u64(low_bits, shift) {
+                small |= low_bits << shift;
+                if byte & 0x80u8 == 0 {
+                    return Ok(Nat(BigUint::from(small)));
+                }
+                shift += 7;
+                continue;
+            }
+
+            let mut result = BigUint::from(small);
+            result |= BigUint::from(low_bits) << shift;
+            if byte & 0x80u8 == 0 {
                 return Ok(Nat(result));
             }
             shift += 7;
+            loop {
+                let mut buf = [0];
+                r.read_exact(&mut buf)?;
+                let byte = buf[0];
+                let low_bits = BigUint::from(byte & 0x7fu8);
+                result |= low_bits << shift;
+                if byte & 0x80u8 == 0 {
+                    return Ok(Nat(result));
+                }
+                shift += 7;
+            }
         }
     }
 }
@@ -255,6 +294,10 @@ impl Int {
         W: ?Sized + io::Write,
     {
         use num_traits::cast::ToPrimitive;
+        if let Some(value) = self.0.to_i64() {
+            leb128::write::signed(w, value)?;
+            return Ok(());
+        }
         let zero = BigInt::from(0);
         let mut value = self.0.clone();
         loop {
@@ -279,24 +322,65 @@ impl Int {
     where
         R: io::Read,
     {
-        let mut result = BigInt::from(0);
-        let mut shift = 0;
-        let mut byte;
+        let mut small = 0u64;
+        let mut shift = 0u32;
         loop {
             let mut buf = [0];
             r.read_exact(&mut buf)?;
-            byte = buf[0];
-            let low_bits = BigInt::from(byte & 0x7fu8);
-            result |= low_bits << shift;
-            shift += 7;
+            let byte = buf[0];
+            let low_bits = u64::from(byte & 0x7f);
+            if leb128_fits_u64(low_bits, shift) {
+                small |= low_bits << shift;
+                if byte & 0x80u8 == 0 {
+                    // Last byte: sign-extend and return as i64 if possible.
+                    let total_bits = shift + 7;
+                    if byte & 0x40u8 != 0 {
+                        // Negative: fill bits from total_bits upward with 1s.
+                        let signed = if total_bits >= 64 {
+                            // Bit 63 is already the LEB sign bit inside small.
+                            small as i64
+                        } else {
+                            let sign_mask = !((1u64 << total_bits) - 1);
+                            (small | sign_mask) as i64
+                        };
+                        return Ok(Int(BigInt::from(signed)));
+                    } else if small <= i64::MAX as u64 {
+                        return Ok(Int(BigInt::from(small as i64)));
+                    } else {
+                        // Positive value in [2^63, 2^64-1]: fits u64 but not i64.
+                        return Ok(Int(BigInt::from(BigUint::from(small))));
+                    }
+                }
+                shift += 7;
+                continue;
+            }
+
+            // Value overflows u64: fall back to BigInt for remaining bytes.
+            let mut result = BigInt::from(BigUint::from(small));
+            result |= BigInt::from(low_bits) << shift;
             if byte & 0x80u8 == 0 {
-                break;
+                shift += 7;
+                if byte & 0x40u8 != 0 {
+                    result |= BigInt::from(-1) << shift;
+                }
+                return Ok(Int(result));
+            }
+            shift += 7;
+            loop {
+                let mut buf = [0];
+                r.read_exact(&mut buf)?;
+                let byte = buf[0];
+                let low_bits = BigInt::from(byte & 0x7fu8);
+                result |= low_bits << shift;
+                shift += 7;
+                if byte & 0x80u8 == 0 {
+                    if byte & 0x40u8 != 0 {
+                        result |= BigInt::from(-1) << shift;
+                    }
+                    return Ok(Int(result));
+                }
             }
         }
-        if (0x40u8 & byte) == 0x40u8 {
-            result |= BigInt::from(-1) << shift;
-        }
-        Ok(Int(result))
     }
 }
 
