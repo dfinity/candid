@@ -275,6 +275,8 @@ fn struct_from_ast(fields: &syn::Fields, custom_candid_path: &Option<TokenStream
         syn::Fields::Unnamed(ref fields) => {
             let (fs, doc, idents, is_bytes) = fields_from_ast(&fields.unnamed, custom_candid_path);
             if idents.len() == 1 {
+                // Newtypes are inlined to the inner type (no record wrapper),
+                // so field-level docs are not representable in the output.
                 let newtype = derive_type(&fields.unnamed[0].ty, custom_candid_path);
                 Shape {
                     ty: quote! { #newtype },
