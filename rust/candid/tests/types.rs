@@ -339,3 +339,120 @@ fn test_counter() {
     let expected = "service : { inc : () -> (); read : () -> (nat64) query; set : (nat64) -> () }";
     assert_eq!(expected, __export_service());
 }
+
+#[test]
+fn test_export_service_type_and_field_docs() {
+    /// Status docs.
+    #[derive(CandidType, Deserialize)]
+    enum Status {
+        /// Account is active.
+        Active,
+        /// Account is banned.
+        Banned(String),
+    }
+
+    /// User payload docs.
+    #[derive(CandidType, Deserialize)]
+    struct User {
+        /// Stable identifier.
+        id: u64,
+        /// Display name.
+        name: String,
+    }
+
+    /// Lookup docs.
+    #[candid_method(query)]
+    fn lookup(_: User) -> Status {
+        unreachable!()
+    }
+
+    candid::export_service!();
+    let expected = r#"// Status docs.
+type Status = variant {
+  // Account is active.
+  Active;
+  // Account is banned.
+  Banned : text;
+};
+// User payload docs.
+type User = record {
+  // Stable identifier.
+  id : nat64;
+  // Display name.
+  name : text;
+};
+service : {
+  // Lookup docs.
+  lookup : (User) -> (Status) query;
+}"#;
+    assert_eq!(expected, __export_service());
+}
+
+#[test]
+fn test_exported_did_parses_with_docs_attached() {
+    use candid_parser::syntax::{Dec, IDLProg, IDLType};
+
+    /// Status docs.
+    #[derive(CandidType, Deserialize)]
+    enum Status {
+        /// Account is active.
+        Active,
+        /// Account is banned.
+        Banned(String),
+    }
+
+    /// User payload docs.
+    #[derive(CandidType, Deserialize)]
+    struct User {
+        /// Stable identifier.
+        id: u64,
+        /// Display name.
+        name: String,
+    }
+
+    /// Lookup docs.
+    #[candid_method(query)]
+    fn lookup(_: User) -> Status {
+        unreachable!()
+    }
+
+    candid::export_service!();
+    let ast: IDLProg = __export_service().parse().unwrap();
+
+    let status = ast
+        .decs
+        .iter()
+        .find_map(|dec| match dec {
+            Dec::TypD(binding) if binding.id == "Status" => Some(binding),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(status.docs, vec!["Status docs."]);
+    let IDLType::VariantT(status_fields) = &status.typ else {
+        panic!("expected Status to be a variant");
+    };
+    assert_eq!(status_fields[0].docs, vec!["Account is active."]);
+    assert_eq!(status_fields[1].docs, vec!["Account is banned."]);
+
+    let user = ast
+        .decs
+        .iter()
+        .find_map(|dec| match dec {
+            Dec::TypD(binding) if binding.id == "User" => Some(binding),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(user.docs, vec!["User payload docs."]);
+    let IDLType::RecordT(user_fields) = &user.typ else {
+        panic!("expected User to be a record");
+    };
+    assert_eq!(user_fields[0].docs, vec!["Stable identifier."]);
+    assert_eq!(user_fields[1].docs, vec!["Display name."]);
+
+    let actor = ast.actor.unwrap();
+    let IDLType::ServT(methods) = &actor.typ else {
+        panic!("expected actor to be a service");
+    };
+    assert_eq!(methods[0].id, "lookup");
+    assert_eq!(methods[0].docs, vec!["Lookup docs."]);
+}
