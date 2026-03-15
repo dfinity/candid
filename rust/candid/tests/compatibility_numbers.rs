@@ -13,9 +13,12 @@ fn number_fast_paths_preserve_small_and_large_values() {
     assert_eq!(decoded_nat_values, nat_values);
 
     let int_values = vec![
+        Int::from(0),
         Int::from(-1),
         Int::from(42),
         Int::from(i64::MIN),
+        Int::from(i64::MAX),
+        Int::parse(b"24197857200151251861972493965091130863").unwrap(),
         Int::parse(b"-600000000000000000000000000000000000").unwrap(),
     ];
     let int_bytes = Encode!(&int_values).unwrap();
