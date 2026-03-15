@@ -302,6 +302,7 @@ struct Deserializer<'de> {
     is_untyped: bool,
     config: DecoderConfig,
     recursion_depth: crate::utils::RecursionDepth,
+    primitive_vec_fast_path: Option<PrimitiveType>,
 }
 
 impl<'de> Deserializer<'de> {
@@ -320,6 +321,7 @@ impl<'de> Deserializer<'de> {
             is_untyped: false,
             config: config.clone(),
             recursion_depth: crate::utils::RecursionDepth::new(),
+            primitive_vec_fast_path: None,
         })
     }
     fn dump_state(&self) -> String {
@@ -616,11 +618,56 @@ impl<'de> Deserializer<'de> {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum PrimitiveType {
+    Bool,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    Nat8,
+    Nat16,
+    Nat32,
+    Nat64,
+    Float32,
+    Float64,
+}
+
+fn primitive_byte_cost(p: PrimitiveType) -> usize {
+    match p {
+        PrimitiveType::Bool | PrimitiveType::Int8 | PrimitiveType::Nat8 => 1,
+        PrimitiveType::Int16 | PrimitiveType::Nat16 => 2,
+        PrimitiveType::Int32 | PrimitiveType::Nat32 | PrimitiveType::Float32 => 4,
+        PrimitiveType::Int64 | PrimitiveType::Nat64 | PrimitiveType::Float64 => 8,
+    }
+}
+
+fn exact_primitive_type(expect: &Type, wire: &Type) -> Option<PrimitiveType> {
+    match (expect.as_ref(), wire.as_ref()) {
+        (TypeInner::Bool, TypeInner::Bool) => Some(PrimitiveType::Bool),
+        (TypeInner::Int8, TypeInner::Int8) => Some(PrimitiveType::Int8),
+        (TypeInner::Int16, TypeInner::Int16) => Some(PrimitiveType::Int16),
+        (TypeInner::Int32, TypeInner::Int32) => Some(PrimitiveType::Int32),
+        (TypeInner::Int64, TypeInner::Int64) => Some(PrimitiveType::Int64),
+        (TypeInner::Nat8, TypeInner::Nat8) => Some(PrimitiveType::Nat8),
+        (TypeInner::Nat16, TypeInner::Nat16) => Some(PrimitiveType::Nat16),
+        (TypeInner::Nat32, TypeInner::Nat32) => Some(PrimitiveType::Nat32),
+        (TypeInner::Nat64, TypeInner::Nat64) => Some(PrimitiveType::Nat64),
+        (TypeInner::Float32, TypeInner::Float32) => Some(PrimitiveType::Float32),
+        (TypeInner::Float64, TypeInner::Float64) => Some(PrimitiveType::Float64),
+        _ => None,
+    }
+}
+
 macro_rules! primitive_impl {
-    ($ty:ident, $type:expr, $cost:literal, $($value:tt)*) => {
+    ($ty:ident, $type:expr, $fast:expr, $cost:literal, $($value:tt)*) => {
         paste::item! {
             fn [<deserialize_ $ty>]<V>(self, visitor: V) -> Result<V::Value>
             where V: Visitor<'de> {
+                if self.primitive_vec_fast_path == Some($fast) {
+                    let val = self.input.$($value)*().map_err(|_| Error::msg(format!("Cannot read {} value", stringify!($type))))?;
+                    return visitor.[<visit_ $ty>](val);
+                }
                 self.unroll_type()?;
                 check!(*self.expect_type == $type && *self.wire_type == $type, stringify!($type));
                 self.add_cost($cost)?;
@@ -697,16 +744,64 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         v
     }
 
-    primitive_impl!(i8, TypeInner::Int8, 1, read_i8);
-    primitive_impl!(i16, TypeInner::Int16, 2, read_i16::<LittleEndian>);
-    primitive_impl!(i32, TypeInner::Int32, 4, read_i32::<LittleEndian>);
-    primitive_impl!(i64, TypeInner::Int64, 8, read_i64::<LittleEndian>);
-    primitive_impl!(u8, TypeInner::Nat8, 1, read_u8);
-    primitive_impl!(u16, TypeInner::Nat16, 2, read_u16::<LittleEndian>);
-    primitive_impl!(u32, TypeInner::Nat32, 4, read_u32::<LittleEndian>);
-    primitive_impl!(u64, TypeInner::Nat64, 8, read_u64::<LittleEndian>);
-    primitive_impl!(f32, TypeInner::Float32, 4, read_f32::<LittleEndian>);
-    primitive_impl!(f64, TypeInner::Float64, 8, read_f64::<LittleEndian>);
+    primitive_impl!(i8, TypeInner::Int8, PrimitiveType::Int8, 1, read_i8);
+    primitive_impl!(
+        i16,
+        TypeInner::Int16,
+        PrimitiveType::Int16,
+        2,
+        read_i16::<LittleEndian>
+    );
+    primitive_impl!(
+        i32,
+        TypeInner::Int32,
+        PrimitiveType::Int32,
+        4,
+        read_i32::<LittleEndian>
+    );
+    primitive_impl!(
+        i64,
+        TypeInner::Int64,
+        PrimitiveType::Int64,
+        8,
+        read_i64::<LittleEndian>
+    );
+    primitive_impl!(u8, TypeInner::Nat8, PrimitiveType::Nat8, 1, read_u8);
+    primitive_impl!(
+        u16,
+        TypeInner::Nat16,
+        PrimitiveType::Nat16,
+        2,
+        read_u16::<LittleEndian>
+    );
+    primitive_impl!(
+        u32,
+        TypeInner::Nat32,
+        PrimitiveType::Nat32,
+        4,
+        read_u32::<LittleEndian>
+    );
+    primitive_impl!(
+        u64,
+        TypeInner::Nat64,
+        PrimitiveType::Nat64,
+        8,
+        read_u64::<LittleEndian>
+    );
+    primitive_impl!(
+        f32,
+        TypeInner::Float32,
+        PrimitiveType::Float32,
+        4,
+        read_f32::<LittleEndian>
+    );
+    primitive_impl!(
+        f64,
+        TypeInner::Float64,
+        PrimitiveType::Float64,
+        8,
+        read_f64::<LittleEndian>
+    );
 
     fn is_human_readable(&self) -> bool {
         false
@@ -752,10 +847,16 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         self.add_cost(1)?;
         visitor.visit_unit()
     }
+    // Bool is handled separately from `primitive_impl!` because its wire encoding
+    // uses `BoolValue::read` rather than a plain numeric read.
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
+        if self.primitive_vec_fast_path == Some(PrimitiveType::Bool) {
+            let res = BoolValue::read(&mut self.input)?;
+            return visitor.visit_bool(res.0);
+        }
         self.unroll_type()?;
         check!(
             *self.expect_type == TypeInner::Bool && *self.wire_type == TypeInner::Bool,
@@ -849,11 +950,32 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 let expect = e.clone();
                 let wire = self.table.trace_type_with_depth(w, &self.recursion_depth)?;
                 let len = Len::read(&mut self.input)?.0;
-                visitor.visit_seq(Compound::new(self, Style::Vector { len, expect, wire }))
+                let exact_primitive = exact_primitive_type(&expect, &wire);
+                if let Some(prim) = exact_primitive {
+                    let per_element_cost = 3 + primitive_byte_cost(prim);
+                    self.add_cost(
+                        len.checked_mul(per_element_cost)
+                            .ok_or_else(|| Error::msg("Vec length overflow"))?,
+                    )?;
+                    self.primitive_vec_fast_path = exact_primitive;
+                }
+                let result = visitor.visit_seq(Compound::new(
+                    self,
+                    Style::Vector {
+                        len,
+                        expect,
+                        wire,
+                        exact_primitive,
+                    },
+                ));
+                if exact_primitive.is_some() {
+                    self.primitive_vec_fast_path = None;
+                }
+                result
             }
-            (TypeInner::Record(e), TypeInner::Record(w)) => {
-                let expect = e.clone().into();
-                let wire = w.clone().into();
+            (TypeInner::Record(_), TypeInner::Record(_)) => {
+                let expect = self.expect_type.clone();
+                let wire = self.wire_type.clone();
                 check!(self.expect_type.is_tuple(), "seq_tuple");
                 if !self.wire_type.is_tuple() {
                     return Err(Error::subtype(format!(
@@ -861,8 +983,15 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                         self.wire_type
                     )));
                 }
-                let value =
-                    visitor.visit_seq(Compound::new(self, Style::Struct { expect, wire }))?;
+                let value = visitor.visit_seq(Compound::new(
+                    self,
+                    Style::Struct {
+                        expect,
+                        wire,
+                        expect_idx: 0,
+                        wire_idx: 0,
+                    },
+                ))?;
                 Ok(value)
             }
             _ => check!(false),
@@ -966,11 +1095,16 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         self.unroll_type()?;
         self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
-            (TypeInner::Record(e), TypeInner::Record(w)) => {
-                let expect = e.clone().into();
-                let wire = w.clone().into();
-                let value =
-                    visitor.visit_map(Compound::new(self, Style::Struct { expect, wire }))?;
+            (TypeInner::Record(_), TypeInner::Record(_)) => {
+                let value = visitor.visit_map(Compound::new(
+                    self,
+                    Style::Struct {
+                        expect: self.expect_type.clone(),
+                        wire: self.wire_type.clone(),
+                        expect_idx: 0,
+                        wire_idx: 0,
+                    },
+                ))?;
                 Ok(value)
             }
             _ => check!(false),
@@ -1039,10 +1173,13 @@ enum Style {
         len: usize,
         expect: Type,
         wire: Type,
+        exact_primitive: Option<PrimitiveType>,
     },
     Struct {
-        expect: VecDeque<Field>,
-        wire: VecDeque<Field>,
+        expect: Type,
+        wire: Type,
+        expect_idx: usize,
+        wire_idx: usize,
     },
     Enum {
         expect: Field,
@@ -1060,6 +1197,26 @@ struct Compound<'a, 'de> {
     style: Style,
 }
 
+impl Style {
+    fn struct_remaining(&self) -> Option<usize> {
+        match self {
+            Style::Struct {
+                expect,
+                wire,
+                expect_idx,
+                wire_idx,
+            } => {
+                let remaining = |ty: &Type, idx: usize| match ty.as_ref() {
+                    TypeInner::Record(fields) => fields.len().saturating_sub(idx),
+                    _ => 0,
+                };
+                Some(remaining(expect, *expect_idx).min(remaining(wire, *wire_idx)))
+            }
+            _ => None,
+        }
+    }
+}
+
 impl<'a, 'de> Compound<'a, 'de> {
     fn new(de: &'a mut Deserializer<'de>, style: Style) -> Self {
         Compound { de, style }
@@ -1073,35 +1230,57 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
     where
         T: de::DeserializeSeed<'de>,
     {
-        self.de.add_cost(3)?;
         match self.style {
             Style::Vector {
                 ref mut len,
                 ref expect,
                 ref wire,
+                exact_primitive,
             } => {
                 if *len == 0 {
                     return Ok(None);
                 }
                 *len -= 1;
-                self.de.expect_type = expect.clone();
-                self.de.wire_type = wire.clone();
-                seed.deserialize(&mut *self.de).map(Some)
+                if exact_primitive.is_some() {
+                    seed.deserialize(&mut *self.de).map(Some)
+                } else {
+                    self.de.add_cost(3)?;
+                    self.de.expect_type = expect.clone();
+                    self.de.wire_type = wire.clone();
+                    seed.deserialize(&mut *self.de).map(Some)
+                }
             }
             Style::Struct {
-                ref mut expect,
-                ref mut wire,
+                ref expect,
+                ref wire,
+                ref mut expect_idx,
+                ref mut wire_idx,
             } => {
-                if expect.is_empty() && wire.is_empty() {
+                self.de.add_cost(3)?;
+                let expect_fields = match expect.as_ref() {
+                    TypeInner::Record(fields) => fields,
+                    _ => unreachable!(),
+                };
+                let wire_fields = match wire.as_ref() {
+                    TypeInner::Record(fields) => fields,
+                    _ => unreachable!(),
+                };
+                if *expect_idx >= expect_fields.len() && *wire_idx >= wire_fields.len() {
                     return Ok(None);
                 }
-                self.de.expect_type = expect
-                    .pop_front()
-                    .map(|f| f.ty)
+                self.de.expect_type = expect_fields
+                    .get(*expect_idx)
+                    .map(|f| {
+                        *expect_idx += 1;
+                        f.ty.clone()
+                    })
                     .unwrap_or_else(|| TypeInner::Reserved.into());
-                self.de.wire_type = wire
-                    .pop_front()
-                    .map(|f| f.ty)
+                self.de.wire_type = wire_fields
+                    .get(*wire_idx)
+                    .map(|f| {
+                        *wire_idx += 1;
+                        f.ty.clone()
+                    })
                     .unwrap_or_else(|| TypeInner::Null.into());
                 seed.deserialize(&mut *self.de).map(Some)
             }
@@ -1112,9 +1291,16 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
     fn size_hint(&self) -> Option<usize> {
         match &self.style {
             Style::Vector { len, .. } => Some(*len),
-            Style::Struct { expect, wire, .. } => Some(expect.len().min(wire.len())),
-            _ => None,
+            _ => self.style.struct_remaining(),
         }
+    }
+}
+
+impl Drop for Compound<'_, '_> {
+    fn drop(&mut self) {
+        // Reset fast-path state so it cannot leak if this Compound is dropped
+        // before all elements are consumed (e.g., on an error path).
+        self.de.primitive_vec_fast_path = None;
     }
 }
 
@@ -1127,23 +1313,36 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
         self.de.add_cost(4)?;
         match self.style {
             Style::Struct {
-                ref mut expect,
-                ref mut wire,
+                ref expect,
+                ref wire,
+                ref mut expect_idx,
+                ref mut wire_idx,
             } => {
-                match (expect.front(), wire.front()) {
+                let expect_fields = match expect.as_ref() {
+                    TypeInner::Record(fields) => fields,
+                    _ => unreachable!(),
+                };
+                let wire_fields = match wire.as_ref() {
+                    TypeInner::Record(fields) => fields,
+                    _ => unreachable!(),
+                };
+                match (expect_fields.get(*expect_idx), wire_fields.get(*wire_idx)) {
                     (Some(e), Some(w)) => {
                         use std::cmp::Ordering;
                         match e.id.get_id().cmp(&w.id.get_id()) {
                             Ordering::Equal => {
                                 self.de.set_field_name(e.id.clone());
-                                self.de.expect_type = expect.pop_front().unwrap().ty;
-                                self.de.wire_type = wire.pop_front().unwrap().ty;
+                                self.de.expect_type = e.ty.clone();
+                                self.de.wire_type = w.ty.clone();
+                                *expect_idx += 1;
+                                *wire_idx += 1;
                             }
                             Ordering::Less => {
                                 // by subtyping rules, expect_type can only be opt, reserved or null.
                                 let field = e.id.clone();
                                 self.de.set_field_name(field.clone());
-                                let expect = expect.pop_front().unwrap().ty;
+                                let expect = e.ty.clone();
+                                *expect_idx += 1;
                                 self.de.expect_type = self
                                     .de
                                     .table
@@ -1159,20 +1358,23 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                             }
                             Ordering::Greater => {
                                 self.de.set_field_name(Label::Named("_".to_owned()).into());
-                                self.de.wire_type = wire.pop_front().unwrap().ty;
+                                self.de.wire_type = w.ty.clone();
                                 self.de.expect_type = TypeInner::Reserved.into();
+                                *wire_idx += 1;
                             }
                         }
                     }
                     (None, Some(_)) => {
                         self.de.set_field_name(Label::Named("_".to_owned()).into());
-                        self.de.wire_type = wire.pop_front().unwrap().ty;
+                        self.de.wire_type = wire_fields[*wire_idx].ty.clone();
                         self.de.expect_type = TypeInner::Reserved.into();
+                        *wire_idx += 1;
                     }
                     (Some(e), None) => {
                         self.de.set_field_name(e.id.clone());
-                        self.de.expect_type = expect.pop_front().unwrap().ty;
+                        self.de.expect_type = e.ty.clone();
                         self.de.wire_type = TypeInner::Null.into();
+                        *expect_idx += 1;
                     }
                     (None, None) => return Ok(None),
                 }
@@ -1216,8 +1418,7 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
     fn size_hint(&self) -> Option<usize> {
         match &self.style {
             Style::Map { len, .. } => Some(*len),
-            Style::Struct { expect, wire, .. } => Some(expect.len().min(wire.len())),
-            _ => None,
+            _ => self.style.struct_remaining(),
         }
     }
 }
@@ -1273,7 +1474,7 @@ impl<'de> de::VariantAccess<'de> for Compound<'_, 'de> {
         T: de::DeserializeSeed<'de>,
     {
         self.de.add_cost(1)?;
-        seed.deserialize(self.de)
+        seed.deserialize(&mut *self.de)
     }
 
     fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value>
@@ -1281,7 +1482,7 @@ impl<'de> de::VariantAccess<'de> for Compound<'_, 'de> {
         V: Visitor<'de>,
     {
         self.de.add_cost(1)?;
-        de::Deserializer::deserialize_tuple(self.de, len, visitor)
+        de::Deserializer::deserialize_tuple(&mut *self.de, len, visitor)
     }
 
     fn struct_variant<V>(self, fields: &'static [&'static str], visitor: V) -> Result<V::Value>
@@ -1289,6 +1490,6 @@ impl<'de> de::VariantAccess<'de> for Compound<'_, 'de> {
         V: Visitor<'de>,
     {
         self.de.add_cost(1)?;
-        de::Deserializer::deserialize_struct(self.de, "_", fields, visitor)
+        de::Deserializer::deserialize_struct(&mut *self.de, "_", fields, visitor)
     }
 }

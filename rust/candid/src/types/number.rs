@@ -214,6 +214,10 @@ impl Nat {
         W: ?Sized + io::Write,
     {
         use num_traits::cast::ToPrimitive;
+        if let Some(value) = self.0.to_u64() {
+            leb128::write::unsigned(w, value)?;
+            return Ok(());
+        }
         let zero = BigUint::from(0u8);
         let mut value = self.0.clone();
         loop {
@@ -234,17 +238,39 @@ impl Nat {
     where
         R: io::Read,
     {
-        let mut result = BigUint::from(0u8);
-        let mut shift = 0;
+        let mut small = 0u64;
+        let mut shift = 0u32;
         loop {
             let mut buf = [0];
             r.read_exact(&mut buf)?;
-            let low_bits = BigUint::from(buf[0] & 0x7fu8);
-            result |= low_bits << shift;
-            if buf[0] & 0x80u8 == 0 {
+            let byte = buf[0];
+            let low_bits = u64::from(byte & 0x7f);
+            if shift == 0 || (shift < 64 && low_bits < (1u64 << (64 - shift))) {
+                small |= low_bits << shift;
+                if byte & 0x80u8 == 0 {
+                    return Ok(Nat(BigUint::from(small)));
+                }
+                shift += 7;
+                continue;
+            }
+
+            let mut result = BigUint::from(small);
+            result |= BigUint::from(low_bits) << shift;
+            if byte & 0x80u8 == 0 {
                 return Ok(Nat(result));
             }
             shift += 7;
+            loop {
+                let mut buf = [0];
+                r.read_exact(&mut buf)?;
+                let byte = buf[0];
+                let low_bits = BigUint::from(byte & 0x7fu8);
+                result |= low_bits << shift;
+                if byte & 0x80u8 == 0 {
+                    return Ok(Nat(result));
+                }
+                shift += 7;
+            }
         }
     }
 }
@@ -255,6 +281,10 @@ impl Int {
         W: ?Sized + io::Write,
     {
         use num_traits::cast::ToPrimitive;
+        if let Some(value) = self.0.to_i64() {
+            leb128::write::signed(w, value)?;
+            return Ok(());
+        }
         let zero = BigInt::from(0);
         let mut value = self.0.clone();
         loop {
@@ -279,24 +309,64 @@ impl Int {
     where
         R: io::Read,
     {
-        let mut result = BigInt::from(0);
-        let mut shift = 0;
-        let mut byte;
+        let mut small = 0i64;
+        let mut shift = 0u32;
         loop {
             let mut buf = [0];
             r.read_exact(&mut buf)?;
-            byte = buf[0];
-            let low_bits = BigInt::from(byte & 0x7fu8);
-            result |= low_bits << shift;
+            let byte = buf[0];
+            let low_bits = i64::from(byte & 0x7f);
+
+            let fits_i64 = if shift < 57 {
+                true
+            } else if shift < 64 {
+                let remaining_bits = 64 - shift;
+                if (byte & 0x40) != 0 {
+                    (low_bits | !0x7f) >> (remaining_bits - 1) == -1
+                } else {
+                    low_bits >> (remaining_bits - 1) == 0
+                }
+            } else {
+                false
+            };
+
+            if fits_i64 {
+                small |= low_bits << shift;
+                shift += 7;
+                if byte & 0x80 == 0 {
+                    if shift < 64 && (byte & 0x40) != 0 {
+                        small |= !0i64 << shift;
+                    }
+                    return Ok(Int(BigInt::from(small)));
+                }
+                continue;
+            }
+
+            let mut result = BigInt::from(small);
+            let big_low_bits = BigInt::from(byte & 0x7fu8);
+            result |= big_low_bits << shift;
             shift += 7;
-            if byte & 0x80u8 == 0 {
-                break;
+            if byte & 0x80 == 0 {
+                if (byte & 0x40) != 0 {
+                    result |= BigInt::from(-1) << shift;
+                }
+                return Ok(Int(result));
+            }
+            loop {
+                let mut buf = [0];
+                r.read_exact(&mut buf)?;
+                let byte = buf[0];
+                let big_low_bits = BigInt::from(byte & 0x7fu8);
+                result |= big_low_bits << shift;
+                shift += 7;
+                if byte & 0x80 == 0 {
+                    if (byte & 0x40) != 0 {
+                        result |= BigInt::from(-1) << shift;
+                    }
+                    return Ok(Int(result));
+                }
             }
         }
-        if (0x40u8 & byte) == 0x40u8 {
-            result |= BigInt::from(-1) << shift;
-        }
-        Ok(Int(result))
     }
 }
 
