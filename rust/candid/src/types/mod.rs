@@ -108,4 +108,9 @@ pub trait Compound {
     // or generalize this function to take a closure for with.
     #[doc(hidden)]
     fn serialize_blob(&mut self, blob: &[u8]) -> Result<(), Self::Error>;
+    /// Write raw element bytes directly for a primitive vector.
+    /// Returns Ok(true) if written, Ok(false) if not supported (caller should use per-element fallback).
+    fn try_write_raw_elements(&mut self, _bytes: &[u8]) -> Result<bool, Self::Error> {
+        Ok(false)
+    }
 }

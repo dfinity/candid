@@ -48,3 +48,31 @@ fn mismatched_rust_type_does_not_use_fast_path() {
     let bytes = Encode!(&values).unwrap();
     assert!(Decode!(&bytes, Vec<u32>).is_err());
 }
+
+#[test]
+fn bulk_encode_primitive_vectors_round_trip() {
+    let u8s: Vec<u8> = vec![0, 1, 127, 255];
+    assert_eq!(Decode!(&Encode!(&u8s).unwrap(), Vec<u8>).unwrap(), u8s);
+
+    let i16s: Vec<i16> = vec![i16::MIN, -1, 0, 1, i16::MAX];
+    assert_eq!(Decode!(&Encode!(&i16s).unwrap(), Vec<i16>).unwrap(), i16s);
+
+    let u32s: Vec<u32> = vec![0, 1, u32::MAX];
+    assert_eq!(Decode!(&Encode!(&u32s).unwrap(), Vec<u32>).unwrap(), u32s);
+
+    let f64s: Vec<f64> = vec![0.0, -1.0, f64::INFINITY, f64::NAN];
+    let decoded = Decode!(&Encode!(&f64s).unwrap(), Vec<f64>).unwrap();
+    assert_eq!(decoded[0], 0.0);
+    assert_eq!(decoded[1], -1.0);
+    assert_eq!(decoded[2], f64::INFINITY);
+    assert!(decoded[3].is_nan());
+
+    let bools: Vec<bool> = vec![true, false, true];
+    assert_eq!(
+        Decode!(&Encode!(&bools).unwrap(), Vec<bool>).unwrap(),
+        bools
+    );
+
+    let empty: Vec<i32> = vec![];
+    assert_eq!(Decode!(&Encode!(&empty).unwrap(), Vec<i32>).unwrap(), empty);
+}
