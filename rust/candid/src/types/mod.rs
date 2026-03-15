@@ -15,7 +15,8 @@ pub mod type_env;
 pub mod value;
 
 pub use self::internal::{
-    get_type, Field, FuncMode, Function, Label, SharedLabel, Type, TypeId, TypeInner,
+    get_type, Field, FieldDoc, FuncMode, Function, Label, SharedLabel, Type, TypeDoc, TypeDocs,
+    TypeId, TypeInner,
 };
 pub use type_env::TypeEnv;
 
@@ -44,7 +45,8 @@ pub trait CandidType {
             self::internal::env_add(id.clone(), TypeInner::Unknown.into());
             let t = Self::_ty();
             self::internal::env_add(id.clone(), t.clone());
-            self::internal::env_id(id, t.clone());
+            self::internal::env_id(id.clone(), t.clone());
+            self::internal::env_doc(id, Self::_ty_doc());
             t
         }
     }
@@ -52,6 +54,9 @@ pub trait CandidType {
         TypeId::of::<Self>()
     }
     fn _ty() -> Type;
+    fn _ty_doc() -> internal::TypeDoc {
+        internal::TypeDoc::default()
+    }
     // only serialize the value encoding
     fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
     where

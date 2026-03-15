@@ -1,10 +1,10 @@
-use super::{candid_path, get_lit_str};
+use super::{candid_path, docs::extract_doc_comments, get_lit_str};
 use lazy_static::lazy_static;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
-use syn::{Attribute, Error, ItemFn, Meta, Result, ReturnType, Signature, Type};
+use syn::{Error, ItemFn, Meta, Result, ReturnType, Signature, Type};
 
 type RawArgs = Vec<String>;
 type RawRets = Vec<String>;
@@ -169,6 +169,7 @@ pub(crate) fn export_service(path: Option<TokenStream>) -> TokenStream {
             fn __export_service() -> String {
                 #service
                 #actor
+                docs.extend_types(env.docs);
                 let result = #candid::pretty::candid::compile_with_docs(&env.env, &actor, &docs);
                 format!("{}", result)
             }
@@ -247,26 +248,4 @@ fn get_candid_attribute(attrs: Vec<Meta>) -> Result<CandidAttribute> {
         }
     }
     Ok(res)
-}
-
-fn extract_doc_comments(attrs: &[Attribute]) -> Vec<String> {
-    let mut docs = Vec::new();
-    for attr in attrs {
-        if attr.path().is_ident("doc") {
-            if let syn::Meta::NameValue(meta) = &attr.meta {
-                if let Ok(lit) = get_lit_str(&meta.value) {
-                    let doc_content = lit.value();
-                    if !doc_content.is_empty() {
-                        for line in doc_content.lines() {
-                            let trimmed = line.trim().to_string();
-                            docs.push(trimmed);
-                        }
-                    } else {
-                        docs.push("".to_string());
-                    }
-                }
-            }
-        }
-    }
-    docs
 }
