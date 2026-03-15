@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* Non-breaking changes:
+  + Preserve Rust doc comments on exported Candid types, record fields, and variant members when generating `.did` files via `#[derive(CandidType)]`
+
 ## 2026-02-27
 
 ### Candid 0.10.24

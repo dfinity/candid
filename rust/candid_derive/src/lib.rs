@@ -2,6 +2,7 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, Result};
 
 mod derive;
+mod docs;
 mod func;
 
 #[proc_macro_derive(CandidType, attributes(candid_path))]
