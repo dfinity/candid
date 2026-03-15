@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 mod nns;
 
 const N: usize = 2097152;
-const COST: usize = 20_000_000;
+const COST: usize = 25_000_000;
 const SKIP: usize = 10_000;
 
 #[bench(raw)]
@@ -83,7 +83,7 @@ fn vec_nat() -> BenchResult {
 fn vec_nat64() -> BenchResult {
     let vec: Vec<u64> = (0u64..N as u64).collect();
     let mut config = DecoderConfig::new();
-    config.set_decoding_quota(25_000_000).set_skipping_quota(SKIP);
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
     bench_fn(|| {
         let bytes = {
             let _p = bench_scope("1. Encoding");
