@@ -245,6 +245,10 @@ impl Nat {
             r.read_exact(&mut buf)?;
             let byte = buf[0];
             let low_bits = u64::from(byte & 0x7f);
+            // Check whether OR-ing low_bits at position `shift` would overflow u64.
+            // The `shift < 64` guard is required before the shift expression to
+            // avoid a debug-mode panic; when shift >= 64 the value already exceeds
+            // u64 capacity so we fall through to the BigInt path unconditionally.
             let fits_u64 = if shift == 0 {
                 true
             } else if shift < 64 {
@@ -323,6 +327,8 @@ impl Int {
             r.read_exact(&mut buf)?;
             let byte = buf[0];
             let low_bits = u64::from(byte & 0x7f);
+            // Same overflow guard as Nat::decode: shift < 64 must hold before
+            // evaluating the shift expression to avoid a debug-mode panic.
             let fits_u64 = if shift == 0 {
                 true
             } else if shift < 64 {
