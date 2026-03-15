@@ -338,9 +338,9 @@ impl DocComments {
         self.type_defs.get(name)
     }
 
-    pub fn extend_types(&mut self, docs: &TypeDocs) {
-        for (name, doc) in &docs.named {
-            self.add_type_def(name.clone(), doc.clone());
+    pub fn extend_types(&mut self, docs: TypeDocs) {
+        for (name, doc) in docs.named {
+            self.add_type_def(name, doc);
         }
     }
 }
