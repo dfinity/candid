@@ -208,6 +208,19 @@ impl<'de> Deserialize<'de> for Nat {
 
 // LEB128 encoding for bignum.
 
+/// Returns true if OR-ing `low_bits` at position `shift` fits within a u64.
+/// The `shift < 64` guard prevents a debug-mode panic from the shift expression.
+#[inline]
+fn leb128_fits_u64(low_bits: u64, shift: u32) -> bool {
+    if shift == 0 {
+        true
+    } else if shift < 64 {
+        low_bits < (1u64 << (64 - shift))
+    } else {
+        false
+    }
+}
+
 impl Nat {
     pub fn encode<W>(&self, w: &mut W) -> crate::Result<()>
     where
@@ -245,18 +258,7 @@ impl Nat {
             r.read_exact(&mut buf)?;
             let byte = buf[0];
             let low_bits = u64::from(byte & 0x7f);
-            // Check whether OR-ing low_bits at position `shift` would overflow u64.
-            // The `shift < 64` guard is required before the shift expression to
-            // avoid a debug-mode panic; when shift >= 64 the value already exceeds
-            // u64 capacity so we fall through to the BigInt path unconditionally.
-            let fits_u64 = if shift == 0 {
-                true
-            } else if shift < 64 {
-                low_bits < (1u64 << (64 - shift))
-            } else {
-                false
-            };
-            if fits_u64 {
+            if leb128_fits_u64(low_bits, shift) {
                 small |= low_bits << shift;
                 if byte & 0x80u8 == 0 {
                     return Ok(Nat(BigUint::from(small)));
@@ -327,16 +329,7 @@ impl Int {
             r.read_exact(&mut buf)?;
             let byte = buf[0];
             let low_bits = u64::from(byte & 0x7f);
-            // Same overflow guard as Nat::decode: shift < 64 must hold before
-            // evaluating the shift expression to avoid a debug-mode panic.
-            let fits_u64 = if shift == 0 {
-                true
-            } else if shift < 64 {
-                low_bits < (1u64 << (64 - shift))
-            } else {
-                false
-            };
-            if fits_u64 {
+            if leb128_fits_u64(low_bits, shift) {
                 small |= low_bits << shift;
                 if byte & 0x80u8 == 0 {
                     // Last byte: sign-extend and return as i64 if possible.
