@@ -1,4 +1,4 @@
-use super::{candid_path, get_lit_str, idl_hash};
+use super::{candid_path, docs::extract_doc_comments, get_lit_str, idl_hash};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::BTreeSet;
@@ -11,14 +11,22 @@ pub(crate) fn derive_idl_type(
     custom_candid_path: &Option<TokenStream>,
 ) -> TokenStream {
     let candid = candid_path(custom_candid_path);
+    let root_docs = extract_doc_comments(&input.attrs);
     let name = input.ident;
     let generics = add_trait_bounds(input.generics, custom_candid_path);
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-    let (ty_body, ser_body) = match input.data {
-        Data::Enum(ref data) => enum_from_ast(&name, &data.variants, custom_candid_path),
+    let (ty_body, ty_doc_body, ser_body) = match input.data {
+        Data::Enum(ref data) => {
+            enum_from_ast(&name, &root_docs, &data.variants, custom_candid_path)
+        }
         Data::Struct(ref data) => {
-            let (ty, idents, is_bytes, _) = struct_from_ast(&data.fields, custom_candid_path);
-            (ty, serialize_struct(&idents, &is_bytes, custom_candid_path))
+            let mut shape = struct_from_ast(&data.fields, custom_candid_path);
+            shape.doc.docs = root_docs;
+            (
+                shape.ty,
+                quote_type_doc(&candid, &shape.doc),
+                serialize_struct(&shape.members, &shape.is_bytes, custom_candid_path),
+            )
         }
         Data::Union(_) => unimplemented!("doesn't derive union type"),
     };
@@ -26,6 +34,9 @@ pub(crate) fn derive_idl_type(
         impl #impl_generics #candid::types::CandidType for #name #ty_generics #where_clause {
             fn _ty() -> #candid::types::Type {
                 #ty_body
+            }
+            fn _ty_doc() -> #candid::types::TypeDoc {
+                #ty_doc_body
             }
             fn id() -> #candid::types::TypeId { #candid::types::TypeId::of::<#name #ty_generics>() }
 
@@ -41,11 +52,50 @@ pub(crate) fn derive_idl_type(
     gen
 }
 
+#[derive(Clone, Default)]
+struct TypeDocSpec {
+    docs: Vec<String>,
+    fields: Vec<DocField>,
+}
+
+impl TypeDocSpec {
+    fn is_empty(&self) -> bool {
+        self.docs.is_empty() && self.fields.iter().all(DocField::is_empty)
+    }
+}
+
+#[derive(Clone)]
+struct DocField {
+    key: u32,
+    docs: Vec<String>,
+    ty: Option<Box<TypeDocSpec>>,
+}
+
+impl DocField {
+    fn is_empty(&self) -> bool {
+        self.docs.is_empty()
+            && match self.ty.as_deref() {
+                None => true,
+                Some(doc) => doc.is_empty(),
+            }
+    }
+}
+
+struct Shape {
+    ty: TokenStream,
+    doc: TypeDocSpec,
+    members: Vec<Ident>,
+    is_bytes: Vec<bool>,
+    style: Style,
+}
+
 struct Variant {
     real_ident: syn::Ident,
     renamed_ident: String,
     hash: u32,
     ty: TokenStream,
+    docs: Vec<String>,
+    payload_doc: Option<TypeDocSpec>,
     members: Vec<Ident>,
     with_bytes: bool,
     style: Style,
@@ -91,9 +141,10 @@ impl Variant {
 
 fn enum_from_ast(
     name: &syn::Ident,
+    root_docs: &[String],
     variants: &Punctuated<syn::Variant, Token![,]>,
     custom_candid_path: &Option<TokenStream>,
-) -> (TokenStream, TokenStream) {
+) -> (TokenStream, TokenStream, TokenStream) {
     let mut fs: Vec<_> = variants
         .iter()
         .map(|variant| {
@@ -107,15 +158,17 @@ fn enum_from_ast(
                     (id, hash)
                 }
             };
-            let (ty, idents, _, style) = struct_from_ast(&variant.fields, custom_candid_path);
+            let shape = struct_from_ast(&variant.fields, custom_candid_path);
             Variant {
                 real_ident: id,
                 renamed_ident,
                 hash,
-                ty,
-                members: idents,
+                ty: shape.ty,
+                docs: extract_doc_comments(&variant.attrs),
+                payload_doc: (!shape.doc.is_empty()).then_some(shape.doc),
+                members: shape.members,
                 with_bytes: attrs.with_bytes,
-                style,
+                style: shape.style,
             }
         })
         .collect();
@@ -136,6 +189,20 @@ fn enum_from_ast(
             ]
         ).into()
     };
+    let ty_doc_gen = quote_type_doc(
+        &candid,
+        &TypeDocSpec {
+            docs: root_docs.to_vec(),
+            fields: fs
+                .iter()
+                .map(|variant| DocField {
+                    key: variant.hash,
+                    docs: variant.docs.clone(),
+                    ty: variant.payload_doc.clone().map(Box::new),
+                })
+                .collect(),
+        },
+    );
 
     let id = fs.iter().map(|Variant { real_ident, .. }| {
         syn::parse_str::<TokenStream>(&format!("{name}::{real_ident}")).unwrap()
@@ -168,7 +235,7 @@ fn enum_from_ast(
         };
         Ok(())
     };
-    (ty_gen, variant_gen)
+    (ty_gen, ty_doc_gen, variant_gen)
 }
 
 fn serialize_struct(
@@ -192,41 +259,49 @@ fn serialize_struct(
     }
 }
 
-fn struct_from_ast(
-    fields: &syn::Fields,
-    custom_candid_path: &Option<TokenStream>,
-) -> (TokenStream, Vec<Ident>, Vec<bool>, Style) {
+fn struct_from_ast(fields: &syn::Fields, custom_candid_path: &Option<TokenStream>) -> Shape {
     let candid = candid_path(custom_candid_path);
     match *fields {
         syn::Fields::Named(ref fields) => {
-            let (fs, idents, is_bytes) = fields_from_ast(&fields.named, custom_candid_path);
-            (
-                quote! { #candid::types::TypeInner::Record(#fs).into() },
-                idents,
+            let (fs, doc, idents, is_bytes) = fields_from_ast(&fields.named, custom_candid_path);
+            Shape {
+                ty: quote! { #candid::types::TypeInner::Record(#fs).into() },
+                doc,
+                members: idents,
                 is_bytes,
-                Style::Struct,
-            )
-        }
-        syn::Fields::Unnamed(ref fields) => {
-            let (fs, idents, is_bytes) = fields_from_ast(&fields.unnamed, custom_candid_path);
-            if idents.len() == 1 {
-                let newtype = derive_type(&fields.unnamed[0].ty, custom_candid_path);
-                (quote! { #newtype }, idents, is_bytes, Style::Tuple)
-            } else {
-                (
-                    quote! { #candid::types::TypeInner::Record(#fs).into() },
-                    idents,
-                    is_bytes,
-                    Style::Tuple,
-                )
+                style: Style::Struct,
             }
         }
-        syn::Fields::Unit => (
-            quote! { #candid::types::TypeInner::Null.into() },
-            Vec::new(),
-            Vec::new(),
-            Style::Unit,
-        ),
+        syn::Fields::Unnamed(ref fields) => {
+            let (fs, doc, idents, is_bytes) = fields_from_ast(&fields.unnamed, custom_candid_path);
+            if idents.len() == 1 {
+                // Newtypes are inlined to the inner type (no record wrapper),
+                // so field-level docs are not representable in the output.
+                let newtype = derive_type(&fields.unnamed[0].ty, custom_candid_path);
+                Shape {
+                    ty: quote! { #newtype },
+                    doc: TypeDocSpec::default(),
+                    members: idents,
+                    is_bytes,
+                    style: Style::Tuple,
+                }
+            } else {
+                Shape {
+                    ty: quote! { #candid::types::TypeInner::Record(#fs).into() },
+                    doc,
+                    members: idents,
+                    is_bytes,
+                    style: Style::Tuple,
+                }
+            }
+        }
+        syn::Fields::Unit => Shape {
+            ty: quote! { #candid::types::TypeInner::Null.into() },
+            doc: TypeDocSpec::default(),
+            members: Vec::new(),
+            is_bytes: Vec::new(),
+            style: Style::Unit,
+        },
     }
 }
 
@@ -261,6 +336,7 @@ struct Field {
     renamed_ident: Ident,
     hash: u32,
     ty: TokenStream,
+    docs: Vec<String>,
     with_bytes: bool,
 }
 
@@ -327,7 +403,7 @@ fn get_attrs(attrs: &[syn::Attribute]) -> Attributes {
 fn fields_from_ast(
     fields: &Punctuated<syn::Field, syn::Token![,]>,
     custom_candid_path: &Option<TokenStream>,
-) -> (TokenStream, Vec<Ident>, Vec<bool>) {
+) -> (TokenStream, TypeDocSpec, Vec<Ident>, Vec<bool>) {
     let candid = candid_path(custom_candid_path);
     let mut fs: Vec<_> = fields
         .iter()
@@ -356,6 +432,7 @@ fn fields_from_ast(
                 renamed_ident,
                 hash,
                 ty: derive_type(&field.ty, custom_candid_path),
+                docs: extract_doc_comments(&field.attrs),
                 with_bytes: attrs.with_bytes,
             }
         })
@@ -390,7 +467,64 @@ fn fields_from_ast(
         .map(|Field { real_ident, .. }| real_ident.clone())
         .collect();
     let is_bytes: Vec<_> = fs.iter().map(|f| f.with_bytes).collect();
-    (ty_gen, idents, is_bytes)
+    let doc = TypeDocSpec {
+        docs: Vec::new(),
+        fields: fs
+            .iter()
+            .map(|field| DocField {
+                key: field.hash,
+                docs: field.docs.clone(),
+                ty: None,
+            })
+            .collect(),
+    };
+    (ty_gen, doc, idents, is_bytes)
+}
+
+fn quote_doc_lines(docs: &[String]) -> Vec<TokenStream> {
+    docs.iter().map(|doc| quote! { #doc.to_string() }).collect()
+}
+
+fn quote_type_doc(candid: &TokenStream, doc: &TypeDocSpec) -> TokenStream {
+    if doc.is_empty() {
+        return quote! { #candid::types::TypeDoc::default() };
+    }
+    let docs = quote_doc_lines(&doc.docs);
+    let field_inserts: Vec<_> = doc
+        .fields
+        .iter()
+        .filter(|field| !field.is_empty())
+        .map(|field| {
+            let key = field.key;
+            let field_doc = quote_field_doc(candid, field);
+            quote! {
+                doc.fields.insert(#key, #field_doc);
+            }
+        })
+        .collect();
+    quote! {{
+        let mut doc = #candid::types::TypeDoc::default();
+        doc.docs = vec![#(#docs,)*];
+        #(#field_inserts)*
+        doc
+    }}
+}
+
+fn quote_field_doc(candid: &TokenStream, doc: &DocField) -> TokenStream {
+    let docs = quote_doc_lines(&doc.docs);
+    let ty = match doc.ty.as_deref() {
+        Some(ty) if !ty.is_empty() => {
+            let ty = quote_type_doc(candid, ty);
+            quote! { Some(Box::new(#ty)) }
+        }
+        _ => quote! { None },
+    };
+    quote! {
+        #candid::types::FieldDoc {
+            docs: vec![#(#docs,)*],
+            ty: #ty,
+        }
+    }
 }
 
 fn derive_type(t: &syn::Type, custom_candid_path: &Option<TokenStream>) -> TokenStream {
