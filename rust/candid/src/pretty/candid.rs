@@ -199,28 +199,6 @@ fn has_field_docs(doc: Option<&TypeDoc>) -> bool {
 fn pp_ty_with_doc<'a>(ty: &'a Type, doc: Option<&'a TypeDoc>) -> RcDoc<'a> {
     use TypeInner::*;
     match ty.as_ref() {
-        Null => str("null"),
-        Bool => str("bool"),
-        Nat => str("nat"),
-        Int => str("int"),
-        Nat8 => str("nat8"),
-        Nat16 => str("nat16"),
-        Nat32 => str("nat32"),
-        Nat64 => str("nat64"),
-        Int8 => str("int8"),
-        Int16 => str("int16"),
-        Int32 => str("int32"),
-        Int64 => str("int64"),
-        Float32 => str("float32"),
-        Float64 => str("float64"),
-        Text => str("text"),
-        Reserved => str("reserved"),
-        Empty => str("empty"),
-        Var(ref s) => str(s),
-        Principal => str("principal"),
-        Opt(ref t) => kwd("opt").append(pp_ty_with_doc(t, None)),
-        Vec(ref t) if matches!(t.as_ref(), Nat8) => str("blob"),
-        Vec(ref t) => kwd("vec").append(pp_ty_with_doc(t, None)),
         Record(ref fs) => {
             if ty.is_tuple() && !has_field_docs(doc) {
                 let tuple = concat(fs.iter().map(|f| pp_ty_with_doc(&f.ty, None)), ";");
@@ -230,12 +208,7 @@ fn pp_ty_with_doc<'a>(ty: &'a Type, doc: Option<&'a TypeDoc>) -> RcDoc<'a> {
             }
         }
         Variant(ref fs) => kwd("variant").append(pp_fields_with_doc(fs, true, doc)),
-        Func(ref func) => kwd("func").append(pp_function(func)),
-        Service(ref serv) => kwd("service").append(pp_service(serv, None)),
-        Class(ref args, ref t) => pp_class(args, t, None),
-        Knot(ref id) => RcDoc::text(format!("{id}")),
-        Unknown => str("unknown"),
-        Future => str("future"),
+        ty => pp_ty_inner(ty),
     }
 }
 

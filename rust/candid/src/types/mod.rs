@@ -45,8 +45,8 @@ pub trait CandidType {
             self::internal::env_add(id.clone(), TypeInner::Unknown.into());
             let t = Self::_ty();
             self::internal::env_add(id.clone(), t.clone());
-            self::internal::env_id(id, t.clone());
-            self::internal::env_doc(Self::id(), Self::_ty_doc());
+            self::internal::env_id(id.clone(), t.clone());
+            self::internal::env_doc(id, Self::_ty_doc());
             t
         }
     }
