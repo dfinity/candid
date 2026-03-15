@@ -208,19 +208,6 @@ impl<'de> Deserialize<'de> for Nat {
 
 // LEB128 encoding for bignum.
 
-/// Returns true if OR-ing `low_bits` at position `shift` fits within a u64.
-/// The `shift < 64` guard prevents a debug-mode panic from the shift expression.
-#[inline]
-fn leb128_fits_u64(low_bits: u64, shift: u32) -> bool {
-    if shift == 0 {
-        true
-    } else if shift < 64 {
-        low_bits < (1u64 << (64 - shift))
-    } else {
-        false
-    }
-}
-
 impl Nat {
     pub fn encode<W>(&self, w: &mut W) -> crate::Result<()>
     where
@@ -258,7 +245,7 @@ impl Nat {
             r.read_exact(&mut buf)?;
             let byte = buf[0];
             let low_bits = u64::from(byte & 0x7f);
-            if leb128_fits_u64(low_bits, shift) {
+            if shift == 0 || (shift < 64 && low_bits < (1u64 << (64 - shift))) {
                 small |= low_bits << shift;
                 if byte & 0x80u8 == 0 {
                     return Ok(Nat(BigUint::from(small)));
