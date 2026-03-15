@@ -1074,6 +1074,26 @@ struct Compound<'a, 'de> {
     style: Style,
 }
 
+impl Style {
+    fn struct_remaining(&self) -> Option<usize> {
+        match self {
+            Style::Struct {
+                expect,
+                wire,
+                expect_idx,
+                wire_idx,
+            } => {
+                let remaining = |ty: &Type, idx: usize| match ty.as_ref() {
+                    TypeInner::Record(fields) => fields.len().saturating_sub(idx),
+                    _ => 0,
+                };
+                Some(remaining(expect, *expect_idx).min(remaining(wire, *wire_idx)))
+            }
+            _ => None,
+        }
+    }
+}
+
 impl<'a, 'de> Compound<'a, 'de> {
     fn new(de: &'a mut Deserializer<'de>, style: Style) -> Self {
         Compound { de, style }
@@ -1142,23 +1162,7 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
     fn size_hint(&self) -> Option<usize> {
         match &self.style {
             Style::Vector { len, .. } => Some(*len),
-            Style::Struct {
-                expect,
-                wire,
-                expect_idx,
-                wire_idx,
-            } => {
-                let expect_len = match expect.as_ref() {
-                    TypeInner::Record(fields) => fields.len().saturating_sub(*expect_idx),
-                    _ => 0,
-                };
-                let wire_len = match wire.as_ref() {
-                    TypeInner::Record(fields) => fields.len().saturating_sub(*wire_idx),
-                    _ => 0,
-                };
-                Some(expect_len.min(wire_len))
-            }
-            _ => None,
+            _ => self.style.struct_remaining(),
         }
     }
 }
@@ -1277,23 +1281,7 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
     fn size_hint(&self) -> Option<usize> {
         match &self.style {
             Style::Map { len, .. } => Some(*len),
-            Style::Struct {
-                expect,
-                wire,
-                expect_idx,
-                wire_idx,
-            } => {
-                let expect_len = match expect.as_ref() {
-                    TypeInner::Record(fields) => fields.len().saturating_sub(*expect_idx),
-                    _ => 0,
-                };
-                let wire_len = match wire.as_ref() {
-                    TypeInner::Record(fields) => fields.len().saturating_sub(*wire_idx),
-                    _ => 0,
-                };
-                Some(expect_len.min(wire_len))
-            }
-            _ => None,
+            _ => self.style.struct_remaining(),
         }
     }
 }
