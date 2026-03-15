@@ -839,6 +839,8 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         self.add_cost(1)?;
         visitor.visit_unit()
     }
+    // Bool is handled separately from `primitive_impl!` because its wire encoding
+    // uses `BoolValue::read` rather than a plain numeric read.
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -1228,6 +1230,14 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
     }
 }
 
+impl Drop for Compound<'_, '_> {
+    fn drop(&mut self) {
+        // Reset fast-path state so it cannot leak if this Compound is dropped
+        // before all elements are consumed (e.g., on an error path).
+        self.de.primitive_vec_fast_path = None;
+    }
+}
+
 impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
     type Error = Error;
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>>
@@ -1383,7 +1393,7 @@ impl<'de> de::VariantAccess<'de> for Compound<'_, 'de> {
         T: de::DeserializeSeed<'de>,
     {
         self.de.add_cost(1)?;
-        seed.deserialize(self.de)
+        seed.deserialize(&mut *self.de)
     }
 
     fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value>
@@ -1391,7 +1401,7 @@ impl<'de> de::VariantAccess<'de> for Compound<'_, 'de> {
         V: Visitor<'de>,
     {
         self.de.add_cost(1)?;
-        de::Deserializer::deserialize_tuple(self.de, len, visitor)
+        de::Deserializer::deserialize_tuple(&mut *self.de, len, visitor)
     }
 
     fn struct_variant<V>(self, fields: &'static [&'static str], visitor: V) -> Result<V::Value>
@@ -1399,6 +1409,6 @@ impl<'de> de::VariantAccess<'de> for Compound<'_, 'de> {
         V: Visitor<'de>,
     {
         self.de.add_cost(1)?;
-        de::Deserializer::deserialize_struct(self.de, "_", fields, visitor)
+        de::Deserializer::deserialize_struct(&mut *self.de, "_", fields, visitor)
     }
 }
