@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 mod nns;
 
 const N: usize = 2097152;
-const COST: usize = 20_000_000;
+const COST: usize = 25_000_000;
 const SKIP: usize = 10_000;
 
 #[bench(raw)]
@@ -58,6 +58,57 @@ fn vec_int16() -> BenchResult {
         {
             let _p = bench_scope("2. Decoding");
             Decode!([config]; &bytes, Vec<i16>).unwrap();
+        }
+    })
+}
+
+#[bench(raw)]
+fn vec_nat() -> BenchResult {
+    let vec: Vec<Nat> = (0u64..262144).map(Nat::from).collect();
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            Encode!(&vec).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            Decode!([config]; &bytes, Vec<Nat>).unwrap();
+        }
+    })
+}
+
+#[bench(raw)]
+fn vec_nat64() -> BenchResult {
+    let vec: Vec<u64> = (0u64..N as u64).collect();
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            Encode!(&vec).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            Decode!([config]; &bytes, Vec<u64>).unwrap();
+        }
+    })
+}
+
+#[bench(raw)]
+fn vec_nat32() -> BenchResult {
+    let vec: Vec<u32> = (0u32..N as u32).collect();
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            Encode!(&vec).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            Decode!([config]; &bytes, Vec<u32>).unwrap();
         }
     })
 }

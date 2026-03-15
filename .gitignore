@@ -1,5 +1,6 @@
 target/
 .canbench/
+canbench_results.yml
 
 # IDEs
 .idea/
