@@ -1256,29 +1256,22 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                                     && matches!(wk.as_ref(), TypeInner::Text);
                                 #[cfg(feature = "bignum")]
                                 let value_bignum_fast = match (ev.as_ref(), wv.as_ref()) {
-                                    (TypeInner::Nat, TypeInner::Nat) => {
-                                        Some(BigNumFastPath::Nat)
-                                    }
-                                    (TypeInner::Int, TypeInner::Int) => {
-                                        Some(BigNumFastPath::Int)
-                                    }
+                                    (TypeInner::Nat, TypeInner::Nat) => Some(BigNumFastPath::Nat),
+                                    (TypeInner::Int, TypeInner::Int) => Some(BigNumFastPath::Int),
                                     (TypeInner::Int, TypeInner::Nat) => {
                                         Some(BigNumFastPath::NatAsInt)
                                     }
                                     _ => None,
                                 };
                                 #[cfg(feature = "bignum")]
-                                let any_fast =
-                                    key_text_fast || value_bignum_fast.is_some();
+                                let any_fast = key_text_fast || value_bignum_fast.is_some();
                                 #[cfg(not(feature = "bignum"))]
                                 let any_fast = key_text_fast;
 
                                 if any_fast {
                                     self.add_cost(
                                         len.checked_mul(7)
-                                            .ok_or_else(|| {
-                                                Error::msg("Map length overflow")
-                                            })?,
+                                            .ok_or_else(|| Error::msg("Map length overflow"))?,
                                     )?;
                                     if key_text_fast {
                                         self.text_fast_path = true;
@@ -1721,8 +1714,7 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                 }
                 *len -= 1;
                 #[cfg(feature = "bignum")]
-                let any_fast =
-                    self.de.text_fast_path || self.de.bignum_vec_fast_path.is_some();
+                let any_fast = self.de.text_fast_path || self.de.bignum_vec_fast_path.is_some();
                 #[cfg(not(feature = "bignum"))]
                 let any_fast = self.de.text_fast_path;
                 if !any_fast {
@@ -1744,8 +1736,7 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
         match &self.style {
             Style::Map { expect, wire, .. } => {
                 #[cfg(feature = "bignum")]
-                let any_fast =
-                    self.de.text_fast_path || self.de.bignum_vec_fast_path.is_some();
+                let any_fast = self.de.text_fast_path || self.de.bignum_vec_fast_path.is_some();
                 #[cfg(not(feature = "bignum"))]
                 let any_fast = self.de.text_fast_path;
                 if !any_fast {
