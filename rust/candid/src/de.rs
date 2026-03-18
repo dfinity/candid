@@ -351,6 +351,13 @@ impl<'de> Deserializer<'de> {
     }
     #[inline]
     fn read_leb_u64(&mut self) -> Result<u64> {
+        self.try_read_leb_u64()?
+            .ok_or_else(|| Error::msg("LEB128 overflow"))
+    }
+    /// Returns `Ok(None)` on overflow (value too large for u64), `Err` on I/O error (e.g. EOF).
+    /// This lets callers fall through to a bignum path on overflow without swallowing real errors.
+    #[inline]
+    fn try_read_leb_u64(&mut self) -> Result<Option<u64>> {
         let slice = self.input.get_ref();
         let mut pos = self.input.position() as usize;
         let end = slice.len();
@@ -368,16 +375,18 @@ impl<'de> Deserializer<'de> {
             }
             if byte & 0x80 == 0 {
                 self.input.set_position(pos as u64);
-                return Ok(result);
+                return Ok(Some(result));
             }
             shift += 7;
             if shift >= 70 {
-                return Err(Error::msg("LEB128 overflow"));
+                return Ok(None);
             }
         }
     }
+    /// Returns `Ok(None)` on overflow (value too large for i64), `Err` on I/O error (e.g. EOF).
+    /// This lets callers fall through to a bignum path on overflow without swallowing real errors.
     #[inline]
-    fn read_leb_i64(&mut self) -> Result<i64> {
+    fn try_read_leb_i64(&mut self) -> Result<Option<i64>> {
         let slice = self.input.get_ref();
         let mut pos = self.input.position() as usize;
         let end = slice.len();
@@ -399,14 +408,14 @@ impl<'de> Deserializer<'de> {
                 break;
             }
             if shift >= 70 {
-                return Err(Error::msg("LEB128 overflow"));
+                return Ok(None);
             }
         }
         if shift < 64 && byte & 0x40 != 0 {
             result |= !0i64 << shift;
         }
         self.input.set_position(pos as u64);
-        Ok(result)
+        Ok(Some(result))
     }
     #[inline]
     fn read_len(&mut self) -> Result<usize> {
@@ -533,23 +542,23 @@ impl<'de> Deserializer<'de> {
             let is_int = matches!(self.wire_type.as_ref(), TypeInner::Int);
             if is_int {
                 let pos = self.input.position();
-                match self.read_leb_i64() {
-                    Ok(value) => {
+                match self.try_read_leb_i64()? {
+                    Some(value) => {
                         self.add_cost((self.input.position() - pos) as usize)?;
                         return visitor.visit_i64(value);
                     }
-                    Err(_) => {
+                    None => {
                         self.input.set_position(pos);
                     }
                 }
             } else if is_nat {
                 let pos = self.input.position();
-                match self.read_leb_u64() {
-                    Ok(value) => {
+                match self.try_read_leb_u64()? {
+                    Some(value) => {
                         self.add_cost((self.input.position() - pos) as usize)?;
                         return visitor.visit_u64(value);
                     }
-                    Err(_) => {
+                    None => {
                         self.input.set_position(pos);
                     }
                 }
@@ -586,12 +595,12 @@ impl<'de> Deserializer<'de> {
         }
         if !self.is_untyped {
             let pos = self.input.position();
-            match self.read_leb_u64() {
-                Ok(value) => {
+            match self.try_read_leb_u64()? {
+                Some(value) => {
                     self.add_cost((self.input.position() - pos) as usize)?;
                     return visitor.visit_u64(value);
                 }
-                Err(_) => {
+                None => {
                     self.input.set_position(pos);
                 }
             }
