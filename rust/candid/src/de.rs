@@ -1033,14 +1033,17 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                             )));
                         }
                         let data = &slice[pos..pos + total_bytes];
-                        let result = visitor.visit_seq(PrimitiveVecAccess {
+                        let mut access = PrimitiveVecAccess {
                             data,
                             offset: 0,
                             remaining: len,
                             element_size: byte_size,
                             prim,
-                        });
-                        self.input.set_position((pos + total_bytes) as u64);
+                        };
+                        let result = visitor.visit_seq(&mut access);
+                        // Advance by bytes actually consumed, not total_bytes, so
+                        // the cursor is correct if the visitor short-circuits.
+                        self.input.set_position((pos + access.offset) as u64);
                         return result;
                     }
 
