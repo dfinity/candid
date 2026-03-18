@@ -9,7 +9,7 @@ use super::{
 #[cfg(feature = "bignum")]
 use super::{Int, Nat};
 use crate::{
-    binary_parser::{BoolValue, Header, Len, PrincipalBytes},
+    binary_parser::{Header, Len, PrincipalBytes},
     types::subtype::{subtype_with_config, Gamma, OptReport},
 };
 use anyhow::{anyhow, Context};
@@ -303,6 +303,9 @@ struct Deserializer<'de> {
     config: DecoderConfig,
     recursion_depth: crate::utils::RecursionDepth,
     primitive_vec_fast_path: Option<PrimitiveType>,
+    #[cfg(feature = "bignum")]
+    bignum_vec_fast_path: Option<BigNumFastPath>,
+    text_fast_path: bool,
 }
 
 impl<'de> Deserializer<'de> {
@@ -322,6 +325,9 @@ impl<'de> Deserializer<'de> {
             config: config.clone(),
             recursion_depth: crate::utils::RecursionDepth::new(),
             primitive_vec_fast_path: None,
+            #[cfg(feature = "bignum")]
+            bignum_vec_fast_path: None,
+            text_fast_path: false,
         })
     }
     fn dump_state(&self) -> String {
@@ -343,6 +349,89 @@ impl<'de> Deserializer<'de> {
         }
         res
     }
+    #[inline]
+    fn read_leb_u64(&mut self) -> Result<u64> {
+        self.try_read_leb_u64()?
+            .ok_or_else(|| Error::msg("LEB128 overflow"))
+    }
+    /// Returns `Ok(None)` on overflow (value too large for u64), `Err` on I/O error (e.g. EOF).
+    /// This lets callers fall through to a bignum path on overflow without swallowing real errors.
+    #[inline]
+    fn try_read_leb_u64(&mut self) -> Result<Option<u64>> {
+        let slice = self.input.get_ref();
+        let mut pos = self.input.position() as usize;
+        let end = slice.len();
+        let mut result: u64 = 0;
+        let mut shift: u32 = 0;
+        loop {
+            if pos >= end {
+                return Err(Error::msg("unexpected end of LEB128"));
+            }
+            let byte = slice[pos];
+            pos += 1;
+            let low = (byte & 0x7f) as u64;
+            if shift < 64 {
+                result |= low << shift;
+            }
+            if byte & 0x80 == 0 {
+                self.input.set_position(pos as u64);
+                return Ok(Some(result));
+            }
+            shift += 7;
+            if shift >= 70 {
+                return Ok(None);
+            }
+        }
+    }
+    /// Returns `Ok(None)` on overflow (value too large for i64), `Err` on I/O error (e.g. EOF).
+    /// This lets callers fall through to a bignum path on overflow without swallowing real errors.
+    #[inline]
+    fn try_read_leb_i64(&mut self) -> Result<Option<i64>> {
+        let slice = self.input.get_ref();
+        let mut pos = self.input.position() as usize;
+        let end = slice.len();
+        let mut result: i64 = 0;
+        let mut shift: u32 = 0;
+        let mut byte;
+        loop {
+            if pos >= end {
+                return Err(Error::msg("unexpected end of LEB128"));
+            }
+            byte = slice[pos];
+            pos += 1;
+            let low = (byte & 0x7f) as i64;
+            if shift < 64 {
+                result |= low << shift;
+            }
+            shift += 7;
+            if byte & 0x80 == 0 {
+                break;
+            }
+            if shift >= 70 {
+                return Ok(None);
+            }
+        }
+        if shift < 64 && byte & 0x40 != 0 {
+            result |= !0i64 << shift;
+        }
+        self.input.set_position(pos as u64);
+        Ok(Some(result))
+    }
+    #[inline]
+    fn read_len(&mut self) -> Result<usize> {
+        let val = self.read_leb_u64()?;
+        usize::try_from(val).map_err(|_| Error::msg("length out of usize range"))
+    }
+    #[inline]
+    fn read_bool_val(&mut self) -> Result<bool> {
+        let byte = self.input.read_u8()?;
+        match byte {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(Error::msg("Expect 00 or 01")),
+        }
+    }
+    #[inline]
     fn borrow_bytes(&mut self, len: usize) -> Result<&'de [u8]> {
         let pos = self.input.position() as usize;
         let slice = self.input.get_ref();
@@ -379,6 +468,7 @@ impl<'de> Deserializer<'de> {
         .map_err(Error::subtype)?;
         Ok(())
     }
+    #[inline]
     fn unroll_type(&mut self) -> Result<()> {
         if matches!(
             self.expect_type.as_ref(),
@@ -400,6 +490,7 @@ impl<'de> Deserializer<'de> {
         }
         Ok(())
     }
+    #[inline]
     fn add_cost(&mut self, cost: usize) -> Result<()> {
         if let Some(n) = self.config.decoding_quota {
             let cost = if self.is_untyped {
@@ -442,16 +533,50 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.unroll_type()?;
-        assert!(*self.expect_type == TypeInner::Int);
+        if self.bignum_vec_fast_path.is_none() {
+            self.unroll_type()?;
+            assert!(*self.expect_type == TypeInner::Int);
+        }
+        if !self.is_untyped {
+            let is_nat = matches!(self.wire_type.as_ref(), TypeInner::Nat);
+            let is_int = matches!(self.wire_type.as_ref(), TypeInner::Int);
+            if is_int {
+                let pos = self.input.position();
+                match self.try_read_leb_i64()? {
+                    Some(value) => {
+                        self.add_cost((self.input.position() - pos) as usize)?;
+                        return visitor.visit_i64(value);
+                    }
+                    None => {
+                        self.input.set_position(pos);
+                    }
+                }
+            } else if is_nat {
+                let pos = self.input.position();
+                match self.try_read_leb_u64()? {
+                    Some(value) => {
+                        self.add_cost((self.input.position() - pos) as usize)?;
+                        return visitor.visit_u64(value);
+                    }
+                    None => {
+                        self.input.set_position(pos);
+                    }
+                }
+            } else {
+                return Err(Error::subtype(format!(
+                    "{} cannot be deserialized to int",
+                    self.wire_type
+                )));
+            }
+        }
+        let bignum_pos = self.input.position();
         let mut bytes = vec![0u8];
-        let pos = self.input.position();
         let int = match self.wire_type.as_ref() {
             TypeInner::Int => Int::decode(&mut self.input).map_err(Error::msg)?,
             TypeInner::Nat => Int(Nat::decode(&mut self.input).map_err(Error::msg)?.0.into()),
             t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
         };
-        self.add_cost((self.input.position() - pos) as usize)?;
+        self.add_cost((self.input.position() - bignum_pos) as usize)?;
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
         visitor.visit_byte_buf(bytes)
     }
@@ -461,13 +586,27 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.unroll_type()?;
-        check!(
-            *self.expect_type == TypeInner::Nat && *self.wire_type == TypeInner::Nat,
-            "nat"
-        );
-        let mut bytes = vec![1u8];
+        if self.bignum_vec_fast_path.is_none() {
+            self.unroll_type()?;
+            check!(
+                *self.expect_type == TypeInner::Nat && *self.wire_type == TypeInner::Nat,
+                "nat"
+            );
+        }
+        if !self.is_untyped {
+            let pos = self.input.position();
+            match self.try_read_leb_u64()? {
+                Some(value) => {
+                    self.add_cost((self.input.position() - pos) as usize)?;
+                    return visitor.visit_u64(value);
+                }
+                None => {
+                    self.input.set_position(pos);
+                }
+            }
+        }
         let pos = self.input.position();
+        let mut bytes = vec![1u8];
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
         self.add_cost((self.input.position() - pos) as usize)?;
         bytes.extend_from_slice(&nat.0.to_bytes_le());
@@ -514,12 +653,12 @@ impl<'de> Deserializer<'de> {
     {
         self.unroll_type()?;
         self.check_subtype()?;
-        if !BoolValue::read(&mut self.input)?.0 {
+        if !self.read_bool_val()? {
             return Err(Error::msg("Opaque reference not supported"));
         }
         let mut bytes = vec![5u8];
         let id = PrincipalBytes::read(&mut self.input)?;
-        let len = Len::read(&mut self.input)?.0;
+        let len = self.read_len()?;
         let meth = self.borrow_bytes(len)?;
         self.add_cost(
             std::cmp::max(30, id.len as usize)
@@ -541,7 +680,7 @@ impl<'de> Deserializer<'de> {
             self.expect_type.is_blob(&self.table) && self.wire_type.is_blob(&self.table),
             "blob"
         );
-        let len = Len::read(&mut self.input)?.0;
+        let len = self.read_len()?;
         self.add_cost(len.saturating_add(1))?;
         let blob = self.borrow_bytes(len)?;
         let mut bytes = Vec::with_capacity(len + 1);
@@ -563,9 +702,9 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        let len = Len::read(&mut self.input)?.0 as u64;
+        let len = self.read_len()? as u64;
         self.add_cost((len as usize).saturating_add(1))?;
-        Len::read(&mut self.input)?;
+        self.read_len()?;
         let slice_len = self.input.get_ref().len() as u64;
         let pos = self.input.position();
         if len > slice_len || pos + len > slice_len {
@@ -642,6 +781,14 @@ fn primitive_byte_cost(p: PrimitiveType) -> usize {
     }
 }
 
+#[cfg(feature = "bignum")]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum BigNumFastPath {
+    Nat,
+    Int,
+    NatAsInt,
+}
+
 fn exact_primitive_type(expect: &Type, wire: &Type) -> Option<PrimitiveType> {
     match (expect.as_ref(), wire.as_ref()) {
         (TypeInner::Bool, TypeInner::Bool) => Some(PrimitiveType::Bool),
@@ -686,6 +833,13 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     {
         if self.field_name.is_some() {
             return self.deserialize_identifier(visitor);
+        }
+        #[cfg(feature = "bignum")]
+        if let Some(fast) = self.bignum_vec_fast_path {
+            return match fast {
+                BigNumFastPath::Nat => self.deserialize_nat(visitor),
+                BigNumFastPath::Int | BigNumFastPath::NatAsInt => self.deserialize_int(visitor),
+            };
         }
         self.unroll_type()?;
         match self.expect_type.as_ref() {
@@ -854,8 +1008,8 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         if self.primitive_vec_fast_path == Some(PrimitiveType::Bool) {
-            let res = BoolValue::read(&mut self.input)?;
-            return visitor.visit_bool(res.0);
+            let val = self.read_bool_val()?;
+            return visitor.visit_bool(val);
         }
         self.unroll_type()?;
         check!(
@@ -863,34 +1017,27 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             "bool"
         );
         self.add_cost(1)?;
-        let res = BoolValue::read(&mut self.input)?;
-        visitor.visit_bool(res.0)
+        let val = self.read_bool_val()?;
+        visitor.visit_bool(val)
     }
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        self.unroll_type()?;
-        check!(
-            *self.expect_type == TypeInner::Text && *self.wire_type == TypeInner::Text,
-            "text"
-        );
-        let len = Len::read(&mut self.input)?.0;
-        self.add_cost(len.saturating_add(1))?;
-        let bytes = self.borrow_bytes(len)?.to_owned();
-        let value = String::from_utf8(bytes).map_err(Error::msg)?;
-        visitor.visit_string(value)
+        self.deserialize_str(visitor)
     }
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        self.unroll_type()?;
-        check!(
-            *self.expect_type == TypeInner::Text && *self.wire_type == TypeInner::Text,
-            "text"
-        );
-        let len = Len::read(&mut self.input)?.0;
+        if !self.text_fast_path {
+            self.unroll_type()?;
+            check!(
+                *self.expect_type == TypeInner::Text && *self.wire_type == TypeInner::Text,
+                "text"
+            );
+        }
+        let len = self.read_len()?;
         self.add_cost(len.saturating_add(1))?;
         let slice = self.borrow_bytes(len)?;
         let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
@@ -921,7 +1068,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             (TypeInner::Opt(t1), TypeInner::Opt(t2)) => {
                 self.wire_type = t1.clone();
                 self.expect_type = t2.clone();
-                if BoolValue::read(&mut self.input)?.0 {
+                if self.read_bool_val()? {
                     let _guard = self.recursion_depth.guard()?;
                     self.recoverable_visit_some(visitor)
                 } else {
@@ -949,7 +1096,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
                 let expect = e.clone();
                 let wire = self.table.trace_type_with_depth(w, &self.recursion_depth)?;
-                let len = Len::read(&mut self.input)?.0;
+                let len = self.read_len()?;
                 let exact_primitive = exact_primitive_type(&expect, &wire);
                 if let Some(prim) = exact_primitive {
                     let per_element_cost = 3 + primitive_byte_cost(prim);
@@ -957,7 +1104,61 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                         len.checked_mul(per_element_cost)
                             .ok_or_else(|| Error::msg("Vec length overflow"))?,
                     )?;
-                    self.primitive_vec_fast_path = exact_primitive;
+
+                    #[cfg(target_endian = "little")]
+                    {
+                        let byte_size = primitive_byte_cost(prim);
+                        let total_bytes = len
+                            .checked_mul(byte_size)
+                            .ok_or_else(|| Error::msg("Vec byte length overflow"))?;
+                        let pos = self.input.position() as usize;
+                        let slice = self.input.get_ref();
+                        if pos + total_bytes > slice.len() {
+                            return Err(Error::msg(format!(
+                                "Not enough bytes for primitive vec: need {total_bytes}, have {}",
+                                slice.len() - pos
+                            )));
+                        }
+                        let data = &slice[pos..pos + total_bytes];
+                        let mut access = PrimitiveVecAccess {
+                            data,
+                            offset: 0,
+                            remaining: len,
+                            element_size: byte_size,
+                            prim,
+                        };
+                        let result = visitor.visit_seq(&mut access);
+                        // Advance by bytes actually consumed, not total_bytes, so
+                        // the cursor is correct if the visitor short-circuits.
+                        self.input.set_position((pos + access.offset) as u64);
+                        return result;
+                    }
+
+                    #[cfg(not(target_endian = "little"))]
+                    {
+                        self.primitive_vec_fast_path = exact_primitive;
+                    }
+                }
+                #[cfg(feature = "bignum")]
+                let bignum_fast = if exact_primitive.is_none() {
+                    match (expect.as_ref(), wire.as_ref()) {
+                        (TypeInner::Nat, TypeInner::Nat) => Some(BigNumFastPath::Nat),
+                        (TypeInner::Int, TypeInner::Int) => Some(BigNumFastPath::Int),
+                        (TypeInner::Int, TypeInner::Nat) => Some(BigNumFastPath::NatAsInt),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+                #[cfg(feature = "bignum")]
+                if let Some(fast) = bignum_fast {
+                    self.add_cost(
+                        len.checked_mul(3)
+                            .ok_or_else(|| Error::msg("Vec length overflow"))?,
+                    )?;
+                    self.bignum_vec_fast_path = Some(fast);
+                    self.expect_type = expect.clone();
+                    self.wire_type = wire.clone();
                 }
                 let result = visitor.visit_seq(Compound::new(
                     self,
@@ -968,9 +1169,6 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                         exact_primitive,
                     },
                 ));
-                if exact_primitive.is_some() {
-                    self.primitive_vec_fast_path = None;
-                }
                 result
             }
             (TypeInner::Record(_), TypeInner::Record(_)) => {
@@ -1004,7 +1202,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 && *self.wire_type == TypeInner::Vec(TypeInner::Nat8.into()),
             "vec nat8"
         );
-        let len = Len::read(&mut self.input)?.0;
+        let len = self.read_len()?;
         self.add_cost(len.saturating_add(1))?;
         let bytes = self.borrow_bytes(len)?.to_owned();
         visitor.visit_byte_buf(bytes)
@@ -1014,7 +1212,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         match self.expect_type.as_ref() {
             TypeInner::Principal => self.deserialize_principal(visitor),
             TypeInner::Vec(t) if **t == TypeInner::Nat8 => {
-                let len = Len::read(&mut self.input)?.0;
+                let len = self.read_len()?;
                 self.add_cost(len.saturating_add(1))?;
                 let slice = self.borrow_bytes(len)?;
                 visitor.visit_borrowed_bytes(slice)
@@ -1046,11 +1244,49 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                             {
                                 let expect = (ek.clone(), ev.clone());
                                 let wire = (wk.clone(), wv.clone());
-                                let len = Len::read(&mut self.input)?.0;
-                                visitor.visit_map(Compound::new(
+                                let len = self.read_len()?;
+
+                                let key_text_fast = matches!(ek.as_ref(), TypeInner::Text)
+                                    && matches!(wk.as_ref(), TypeInner::Text);
+                                #[cfg(feature = "bignum")]
+                                let value_bignum_fast = match (ev.as_ref(), wv.as_ref()) {
+                                    (TypeInner::Nat, TypeInner::Nat) => Some(BigNumFastPath::Nat),
+                                    (TypeInner::Int, TypeInner::Int) => Some(BigNumFastPath::Int),
+                                    (TypeInner::Int, TypeInner::Nat) => {
+                                        Some(BigNumFastPath::NatAsInt)
+                                    }
+                                    _ => None,
+                                };
+                                #[cfg(feature = "bignum")]
+                                let any_fast = key_text_fast || value_bignum_fast.is_some();
+                                #[cfg(not(feature = "bignum"))]
+                                let any_fast = key_text_fast;
+
+                                if any_fast {
+                                    self.add_cost(
+                                        len.checked_mul(7)
+                                            .ok_or_else(|| Error::msg("Map length overflow"))?,
+                                    )?;
+                                    if key_text_fast {
+                                        self.text_fast_path = true;
+                                    }
+                                    #[cfg(feature = "bignum")]
+                                    if let Some(fast) = value_bignum_fast {
+                                        self.bignum_vec_fast_path = Some(fast);
+                                        self.wire_type = wv.clone();
+                                    }
+                                }
+
+                                let result = visitor.visit_map(Compound::new(
                                     self,
                                     Style::Map { len, expect, wire },
-                                ))
+                                ));
+                                self.text_fast_path = false;
+                                #[cfg(feature = "bignum")]
+                                {
+                                    self.bignum_vec_fast_path = None;
+                                }
+                                result
                             }
                             _ => Err(Error::subtype("expect a key-value pair")),
                         }
@@ -1192,6 +1428,81 @@ enum Style {
     },
 }
 
+#[cfg(target_endian = "little")]
+struct PrimitiveVecAccess<'de> {
+    data: &'de [u8],
+    offset: usize,
+    remaining: usize,
+    element_size: usize,
+    prim: PrimitiveType,
+}
+
+#[cfg(target_endian = "little")]
+impl<'de> de::SeqAccess<'de> for PrimitiveVecAccess<'de> {
+    type Error = Error;
+
+    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        use serde::de::IntoDeserializer;
+        if self.remaining == 0 {
+            return Ok(None);
+        }
+        self.remaining -= 1;
+        let bytes = &self.data[self.offset..self.offset + self.element_size];
+        self.offset += self.element_size;
+
+        match self.prim {
+            PrimitiveType::Bool => match bytes[0] {
+                0 => seed.deserialize(false.into_deserializer()).map(Some),
+                1 => seed.deserialize(true.into_deserializer()).map(Some),
+                _ => Err(Error::msg("Expect 00 or 01")),
+            },
+            PrimitiveType::Nat8 => seed.deserialize(bytes[0].into_deserializer()).map(Some),
+            PrimitiveType::Int8 => seed
+                .deserialize((bytes[0] as i8).into_deserializer())
+                .map(Some),
+            PrimitiveType::Nat16 => {
+                let v = u16::from_le_bytes(bytes.try_into().unwrap());
+                seed.deserialize(v.into_deserializer()).map(Some)
+            }
+            PrimitiveType::Int16 => {
+                let v = i16::from_le_bytes(bytes.try_into().unwrap());
+                seed.deserialize(v.into_deserializer()).map(Some)
+            }
+            PrimitiveType::Nat32 => {
+                let v = u32::from_le_bytes(bytes.try_into().unwrap());
+                seed.deserialize(v.into_deserializer()).map(Some)
+            }
+            PrimitiveType::Int32 => {
+                let v = i32::from_le_bytes(bytes.try_into().unwrap());
+                seed.deserialize(v.into_deserializer()).map(Some)
+            }
+            PrimitiveType::Float32 => {
+                let v = f32::from_le_bytes(bytes.try_into().unwrap());
+                seed.deserialize(v.into_deserializer()).map(Some)
+            }
+            PrimitiveType::Nat64 => {
+                let v = u64::from_le_bytes(bytes.try_into().unwrap());
+                seed.deserialize(v.into_deserializer()).map(Some)
+            }
+            PrimitiveType::Int64 => {
+                let v = i64::from_le_bytes(bytes.try_into().unwrap());
+                seed.deserialize(v.into_deserializer()).map(Some)
+            }
+            PrimitiveType::Float64 => {
+                let v = f64::from_le_bytes(bytes.try_into().unwrap());
+                seed.deserialize(v.into_deserializer()).map(Some)
+            }
+        }
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.remaining)
+    }
+}
+
 struct Compound<'a, 'de> {
     de: &'a mut Deserializer<'de>,
     style: Style,
@@ -1241,14 +1552,16 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
                     return Ok(None);
                 }
                 *len -= 1;
-                if exact_primitive.is_some() {
-                    seed.deserialize(&mut *self.de).map(Some)
-                } else {
+                self.de.expect_type = expect.clone();
+                self.de.wire_type = wire.clone();
+                #[cfg(feature = "bignum")]
+                let is_fast = exact_primitive.is_some() || self.de.bignum_vec_fast_path.is_some();
+                #[cfg(not(feature = "bignum"))]
+                let is_fast = exact_primitive.is_some();
+                if !is_fast {
                     self.de.add_cost(3)?;
-                    self.de.expect_type = expect.clone();
-                    self.de.wire_type = wire.clone();
-                    seed.deserialize(&mut *self.de).map(Some)
                 }
+                seed.deserialize(&mut *self.de).map(Some)
             }
             Style::Struct {
                 ref expect,
@@ -1298,9 +1611,12 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
 
 impl Drop for Compound<'_, '_> {
     fn drop(&mut self) {
-        // Reset fast-path state so it cannot leak if this Compound is dropped
-        // before all elements are consumed (e.g., on an error path).
         self.de.primitive_vec_fast_path = None;
+        self.de.text_fast_path = false;
+        #[cfg(feature = "bignum")]
+        {
+            self.de.bignum_vec_fast_path = None;
+        }
     }
 }
 
@@ -1385,13 +1701,21 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                 ref expect,
                 ref wire,
             } => {
-                // This only comes from deserialize_map
                 if *len == 0 {
                     return Ok(None);
                 }
-                self.de.expect_type = expect.0.clone();
-                self.de.wire_type = wire.0.clone();
                 *len -= 1;
+                #[cfg(feature = "bignum")]
+                let any_fast = self.de.text_fast_path || self.de.bignum_vec_fast_path.is_some();
+                #[cfg(not(feature = "bignum"))]
+                let any_fast = self.de.text_fast_path;
+                if !any_fast {
+                    self.de.add_cost(4)?;
+                }
+                if !self.de.text_fast_path {
+                    self.de.expect_type = expect.0.clone();
+                    self.de.wire_type = wire.0.clone();
+                }
                 seed.deserialize(&mut *self.de).map(Some)
             }
             _ => Err(Error::msg("expect struct or map")),
@@ -1403,9 +1727,21 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
     {
         match &self.style {
             Style::Map { expect, wire, .. } => {
-                self.de.add_cost(3)?;
-                self.de.expect_type = expect.1.clone();
-                self.de.wire_type = wire.1.clone();
+                #[cfg(feature = "bignum")]
+                let any_fast = self.de.text_fast_path || self.de.bignum_vec_fast_path.is_some();
+                #[cfg(not(feature = "bignum"))]
+                let any_fast = self.de.text_fast_path;
+                if !any_fast {
+                    self.de.add_cost(3)?;
+                }
+                #[cfg(feature = "bignum")]
+                let value_fast = self.de.bignum_vec_fast_path.is_some();
+                #[cfg(not(feature = "bignum"))]
+                let value_fast = false;
+                if !value_fast {
+                    self.de.expect_type = expect.1.clone();
+                    self.de.wire_type = wire.1.clone();
+                }
                 seed.deserialize(&mut *self.de)
             }
             _ => {

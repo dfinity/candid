@@ -76,3 +76,12 @@ fn bulk_encode_primitive_vectors_round_trip() {
     let empty: Vec<i32> = vec![];
     assert_eq!(Decode!(&Encode!(&empty).unwrap(), Vec<i32>).unwrap(), empty);
 }
+
+#[test]
+fn primitive_vector_is_extra_args() {
+    let extra = vec![1i16, 2, 3];
+    let bytes = Encode!(&123u8, &extra).unwrap();
+
+    let decoded_values = Decode!(&bytes, u8).unwrap();
+    assert_eq!(decoded_values, 123);
+}
