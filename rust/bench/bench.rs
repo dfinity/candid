@@ -1,5 +1,7 @@
 use canbench_rs::{bench, bench_fn, bench_scope, BenchResult};
-use candid::{CandidType, Decode, DecoderConfig, Deserialize, Encode, Int, Nat};
+use candid::{
+    CandidType, Decode, DecoderConfig, Deserialize, Encode, IDLArgs, IDLValue, Int, Nat, Principal,
+};
 use std::collections::BTreeMap;
 
 #[allow(clippy::all)]
@@ -327,6 +329,584 @@ fn extra_args() -> BenchResult {
     bench_fn(|| {
         assert!(Decode!([config]; &vec_null).is_err());
         assert!(Decode!([config]; &vec_opt_record).is_err());
+    })
+}
+
+// Vec of fully populated complex structs (21 fields, nested vecs/maps/opts)
+// Exercises the dominant real-world payload shape: list endpoints returning large records.
+// The existing nns_list_proposal benchmark uses mostly-empty ProposalInfo; this uses
+// fully-populated Neurons which are ~5-10x heavier per element.
+#[bench(raw)]
+fn nns_list_neurons() -> BenchResult {
+    use crate::nns::*;
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
+
+    let make_neuron = |i: u64| Neuron {
+        id: Some(NeuronId { id: i }),
+        staked_maturity_e8s_equivalent: Some(1_000_000),
+        controller: Some(Principal::from_slice(&i.to_be_bytes())),
+        recent_ballots: (0..100)
+            .map(|j| BallotInfo {
+                vote: if j % 2 == 0 { 1 } else { 2 },
+                proposal_id: Some(NeuronId { id: j }),
+            })
+            .collect(),
+        kyc_verified: true,
+        neuron_type: Some(1),
+        not_for_profit: false,
+        maturity_e8s_equivalent: 500_000,
+        cached_neuron_stake_e8s: 10_000_000_000,
+        created_timestamp_seconds: 1_700_000_000 + i,
+        auto_stake_maturity: Some(true),
+        aging_since_timestamp_seconds: 1_700_000_000,
+        hot_keys: (0..5)
+            .map(|j| Principal::from_slice(&[j as u8; 10]))
+            .collect(),
+        account: serde_bytes::ByteBuf::from(vec![i as u8; 32]),
+        joined_community_fund_timestamp_seconds: Some(1_700_000_000),
+        dissolve_state: Some(DissolveState::DissolveDelaySeconds(15_778_800)),
+        followees: (0..10)
+            .map(|topic| {
+                (
+                    topic,
+                    Followees {
+                        followees: (0..5).map(|f| NeuronId { id: f as u64 }).collect(),
+                    },
+                )
+            })
+            .collect(),
+        neuron_fees_e8s: 10_000,
+        transfer: Some(NeuronStakeTransfer {
+            to_subaccount: serde_bytes::ByteBuf::from(vec![0u8; 32]),
+            neuron_stake_e8s: 10_000_000_000,
+            from: Some(Principal::from_slice(&[1u8; 10])),
+            memo: 42,
+            from_subaccount: serde_bytes::ByteBuf::from(vec![0u8; 32]),
+            transfer_timestamp: 1_700_000_000,
+            block_height: 1_000_000,
+        }),
+        known_neuron_data: Some(KnownNeuronData {
+            name: format!("neuron-{}", i),
+            description: Some(format!("A known neuron #{}", i)),
+        }),
+        spawn_at_timestamp_seconds: None,
+    };
+
+    let neuron_infos: Vec<(u64, nns::NeuronInfo)> = (0..100)
+        .map(|i| {
+            (
+                i,
+                nns::NeuronInfo {
+                    dissolve_delay_seconds: 15_778_800,
+                    recent_ballots: (0..100)
+                        .map(|j| BallotInfo {
+                            vote: 1,
+                            proposal_id: Some(NeuronId { id: j }),
+                        })
+                        .collect(),
+                    neuron_type: Some(1),
+                    created_timestamp_seconds: 1_700_000_000,
+                    state: 1,
+                    stake_e8s: 10_000_000_000,
+                    joined_community_fund_timestamp_seconds: Some(1_700_000_000),
+                    retrieved_at_timestamp_seconds: 1_700_000_000,
+                    known_neuron_data: Some(KnownNeuronData {
+                        name: format!("neuron-{}", i),
+                        description: Some(format!("Known neuron #{}", i)),
+                    }),
+                    voting_power: 20_000_000_000,
+                    age_seconds: 31_557_600,
+                },
+            )
+        })
+        .collect();
+
+    let response = nns::ListNeuronsResponse {
+        neuron_infos,
+        full_neurons: (0..100).map(make_neuron).collect(),
+    };
+
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            Encode!(&response).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            Decode!([config]; &bytes, nns::ListNeuronsResponse).unwrap();
+        }
+    })
+}
+
+// Schema evolution — encode with a newer type (16 fields), decode with an older
+// type (4 fields). Forces the decoder to skip 12 unknown fields per record, exercising
+// the field-skipping mechanism that has zero coverage in the existing benchmark.
+#[bench(raw)]
+fn subtype_decode() -> BenchResult {
+    #[derive(CandidType)]
+    struct RecordV2 {
+        id: u64,
+        name: String,
+        balance: u64,
+        active: bool,
+        score: f64,
+        owner: Principal,
+        data: serde_bytes::ByteBuf,
+        count: u32,
+        extra_field_1: String,
+        extra_field_2: u64,
+        extra_field_3: Option<String>,
+        extra_field_4: Vec<u8>,
+        extra_field_5: bool,
+        extra_field_6: f64,
+        extra_field_7: Principal,
+        extra_field_8: u32,
+    }
+
+    #[derive(CandidType, Deserialize)]
+    struct RecordV1 {
+        id: u64,
+        name: String,
+        balance: u64,
+        active: bool,
+    }
+
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST);
+
+    let records: Vec<RecordV2> = (0..1000)
+        .map(|i| RecordV2 {
+            id: i as u64,
+            name: format!("record-{}", i),
+            balance: i as u64 * 1000,
+            active: i % 2 == 0,
+            score: i as f64 * 1.5,
+            owner: Principal::from_slice(&(i as u32).to_be_bytes()),
+            data: serde_bytes::ByteBuf::from(vec![i as u8; 64]),
+            count: i as u32,
+            extra_field_1: format!("extra-{}", i),
+            extra_field_2: i as u64 * 42,
+            extra_field_3: Some(format!("optional-{}", i)),
+            extra_field_4: vec![i as u8; 16],
+            extra_field_5: i % 3 == 0,
+            extra_field_6: i as f64 * 2.7,
+            extra_field_7: Principal::from_slice(&(i as u32 + 1000).to_be_bytes()),
+            extra_field_8: i as u32 * 7,
+        })
+        .collect();
+
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            Encode!(&records).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            Decode!([config]; &bytes, Vec<RecordV1>).unwrap();
+        }
+    })
+}
+
+// Vec of service references (subscriber/registry collection pattern).
+// This is the ONLY decode path where check_subtype() fires (deserialize_service
+// and deserialize_function). The existing benchmark has zero coverage of this
+// code path. See https://github.com/dfinity/candid/issues/603
+#[bench(raw)]
+fn vec_service() -> BenchResult {
+    use candid::types::{Function, TypeEnv, TypeInner};
+
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST);
+
+    let method_type: candid::types::Type = TypeInner::Func(Function {
+        modes: vec![],
+        args: vec![TypeInner::Text.into()],
+        rets: vec![TypeInner::Nat64.into()],
+    })
+    .into();
+
+    let methods: Vec<(String, candid::types::Type)> = (0..20)
+        .map(|i| (format!("method_{:02}", i), method_type.clone()))
+        .collect();
+
+    let service_type: candid::types::Type = TypeInner::Service(methods).into();
+    let vec_service_type: candid::types::Type = TypeInner::Vec(service_type).into();
+
+    let services: Vec<IDLValue> = (0..1000)
+        .map(|i| {
+            let bytes = (i as u64).to_be_bytes();
+            IDLValue::Service(Principal::from_slice(&bytes))
+        })
+        .collect();
+
+    let args = IDLArgs::new(&[IDLValue::Vec(services)]);
+    let env = TypeEnv::new();
+    let types = vec![vec_service_type.clone()];
+
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            args.to_bytes_with_types(&env, &types).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            IDLArgs::from_bytes_with_types_with_config(&bytes, &env, &types, &config).unwrap();
+        }
+    })
+}
+
+// Ok/Err discriminated union — the canonical ICP canister return type.
+// Every canister method returns variant { Ok: Record; Err: ErrorEnum }.
+// Tests heterogeneous variant payloads (struct vs enum) which the existing
+// variant_list benchmark (homogeneous recursive) does not cover.
+#[bench(raw)]
+fn result_variant() -> BenchResult {
+    #[derive(CandidType, Deserialize)]
+    struct AccountResponse {
+        account: Principal,
+        balance_real: i128,
+        balance_fake: i128,
+        balance_ledger: i128,
+        last_update: u64,
+        overdraft_limit: u128,
+        name: String,
+    }
+
+    #[derive(CandidType, Deserialize)]
+    enum AccountError {
+        NotAuthorized(Principal),
+        AccountNotFound,
+        InsufficientBalance { needed: u128, available: i128 },
+        InternalError(String),
+    }
+
+    #[derive(CandidType, Deserialize)]
+    enum AccountResult {
+        Ok(AccountResponse),
+        Err(AccountError),
+    }
+
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
+
+    let results: Vec<AccountResult> = (0..1000)
+        .map(|i| {
+            if i % 4 == 0 {
+                AccountResult::Err(AccountError::InsufficientBalance {
+                    needed: i as u128 * 1000,
+                    available: i as i128 * 100,
+                })
+            } else if i % 4 == 1 {
+                AccountResult::Err(AccountError::NotAuthorized(Principal::from_slice(
+                    &(i as u32).to_be_bytes(),
+                )))
+            } else {
+                AccountResult::Ok(AccountResponse {
+                    account: Principal::from_slice(&(i as u32).to_be_bytes()),
+                    balance_real: i as i128 * 1_000_000,
+                    balance_fake: 0,
+                    balance_ledger: i as i128 * 1_000_000,
+                    last_update: 1_700_000_000 + i as u64,
+                    overdraft_limit: 10_000_000_000,
+                    name: format!("account-{}", i),
+                })
+            }
+        })
+        .collect();
+
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            Encode!(&results).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            Decode!([config]; &bytes, Vec<AccountResult>).unwrap();
+        }
+    })
+}
+
+// GovernanceCachedMetrics — 34+ fields including ~10 bucket maps of
+// vec record { nat64; float64 }. Tests field hash matching overhead at scale
+// and exercises float64 encoding (not covered elsewhere).
+#[bench(raw)]
+fn wide_record() -> BenchResult {
+    use crate::nns::GovernanceCachedMetrics;
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
+
+    let buckets: Vec<(u64, f64)> = (0..20)
+        .map(|i| (i * 15_778_800, i as f64 * 1_000_000.0))
+        .collect();
+    let count_buckets: Vec<(u64, u64)> = (0..20).map(|i| (i * 15_778_800, i * 100)).collect();
+
+    let metrics = GovernanceCachedMetrics {
+        total_maturity_e8s_equivalent: 50_000_000_000_000,
+        not_dissolving_neurons_e8s_buckets: buckets.clone(),
+        dissolving_neurons_staked_maturity_e8s_equivalent_sum: 1_000_000_000,
+        garbage_collectable_neurons_count: 42,
+        dissolving_neurons_staked_maturity_e8s_equivalent_buckets: buckets.clone(),
+        neurons_with_invalid_stake_count: 3,
+        not_dissolving_neurons_count_buckets: count_buckets.clone(),
+        ect_neuron_count: 100,
+        total_supply_icp: 500_000_000_000_000_000,
+        neurons_with_less_than_6_months_dissolve_delay_count: 5_000,
+        dissolved_neurons_count: 10_000,
+        community_fund_total_maturity_e8s_equivalent: 1_000_000_000_000,
+        total_staked_e8s_seed: 2_000_000_000_000,
+        total_staked_maturity_e8s_equivalent_ect: 500_000_000,
+        total_staked_e8s: 100_000_000_000_000_000,
+        not_dissolving_neurons_count: 30_000,
+        total_locked_e8s: 80_000_000_000_000_000,
+        neurons_fund_total_active_neurons: 200,
+        total_staked_maturity_e8s_equivalent: 5_000_000_000_000,
+        not_dissolving_neurons_e8s_buckets_ect: buckets.clone(),
+        total_staked_e8s_ect: 3_000_000_000_000,
+        not_dissolving_neurons_staked_maturity_e8s_equivalent_sum: 2_000_000_000,
+        dissolved_neurons_e8s: 500_000_000_000,
+        dissolving_neurons_e8s_buckets_seed: buckets.clone(),
+        neurons_with_less_than_6_months_dissolve_delay_e8s: 1_000_000_000_000,
+        not_dissolving_neurons_staked_maturity_e8s_equivalent_buckets: buckets.clone(),
+        dissolving_neurons_count_buckets: count_buckets.clone(),
+        dissolving_neurons_e8s_buckets_ect: buckets.clone(),
+        dissolving_neurons_count: 15_000,
+        dissolving_neurons_e8s_buckets: buckets.clone(),
+        total_staked_maturity_e8s_equivalent_seed: 700_000_000,
+        community_fund_total_staked_e8s: 5_000_000_000_000,
+        not_dissolving_neurons_e8s_buckets_seed: buckets,
+        timestamp_seconds: 1_700_000_000,
+        seed_neuron_count: 500,
+    };
+
+    let metrics_vec: Vec<GovernanceCachedMetrics> = std::iter::repeat(metrics).take(100).collect();
+
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            Encode!(&metrics_vec).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            Decode!([config]; &bytes, Vec<GovernanceCachedMetrics>).unwrap();
+        }
+    })
+}
+
+// 21-arm enum with mixed payload shapes (unit, tuple, struct variants).
+// The existing variant_list only tests a 2-arm recursive variant. This tests
+// variant tag matching overhead at scale with heterogeneous payloads.
+#[bench(raw)]
+fn large_variant() -> BenchResult {
+    #[derive(CandidType, Deserialize, Clone)]
+    enum LargeAction {
+        Transfer {
+            from: Principal,
+            to: Principal,
+            amount: u64,
+            memo: Option<u64>,
+        },
+        Approve {
+            spender: Principal,
+            amount: u64,
+            expires_at: Option<u64>,
+        },
+        Burn {
+            amount: u64,
+        },
+        Mint {
+            to: Principal,
+            amount: u64,
+        },
+        SetFee(u64),
+        SetAdmin(Principal),
+        Pause,
+        Unpause,
+        Upgrade(serde_bytes::ByteBuf),
+        AddMinter(Principal),
+        RemoveMinter(Principal),
+        SetName(String),
+        SetSymbol(String),
+        SetLogo(String),
+        SetMetadata {
+            key: String,
+            value: String,
+        },
+        CreateProposal {
+            title: String,
+            summary: String,
+            url: String,
+        },
+        Vote {
+            proposal_id: u64,
+            vote: bool,
+        },
+        Execute(u64),
+        Reject(u64),
+        RegisterNeuron {
+            stake: u64,
+            dissolve_delay: u64,
+        },
+        DisburseNeuron {
+            neuron_id: u64,
+            to: Principal,
+            amount: Option<u64>,
+        },
+    }
+
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
+
+    let actions: Vec<LargeAction> = (0..2100)
+        .map(|i| {
+            let p = Principal::from_slice(&(i as u32).to_be_bytes());
+            match i % 21 {
+                0 => LargeAction::Transfer {
+                    from: p,
+                    to: p,
+                    amount: i as u64 * 100,
+                    memo: Some(42),
+                },
+                1 => LargeAction::Approve {
+                    spender: p,
+                    amount: i as u64,
+                    expires_at: Some(1_700_000_000),
+                },
+                2 => LargeAction::Burn {
+                    amount: i as u64 * 50,
+                },
+                3 => LargeAction::Mint {
+                    to: p,
+                    amount: i as u64 * 1000,
+                },
+                4 => LargeAction::SetFee(i as u64),
+                5 => LargeAction::SetAdmin(p),
+                6 => LargeAction::Pause,
+                7 => LargeAction::Unpause,
+                8 => LargeAction::Upgrade(serde_bytes::ByteBuf::from(vec![i as u8; 32])),
+                9 => LargeAction::AddMinter(p),
+                10 => LargeAction::RemoveMinter(p),
+                11 => LargeAction::SetName(format!("name-{}", i)),
+                12 => LargeAction::SetSymbol(format!("SYM{}", i)),
+                13 => LargeAction::SetLogo(format!("https://example.com/logo-{}.png", i)),
+                14 => LargeAction::SetMetadata {
+                    key: format!("key-{}", i),
+                    value: format!("val-{}", i),
+                },
+                15 => LargeAction::CreateProposal {
+                    title: format!("Proposal {}", i),
+                    summary: format!("Summary for {}", i),
+                    url: format!("https://example.com/{}", i),
+                },
+                16 => LargeAction::Vote {
+                    proposal_id: i as u64,
+                    vote: i % 2 == 0,
+                },
+                17 => LargeAction::Execute(i as u64),
+                18 => LargeAction::Reject(i as u64),
+                19 => LargeAction::RegisterNeuron {
+                    stake: i as u64 * 100_000_000,
+                    dissolve_delay: 15_778_800,
+                },
+                _ => LargeAction::DisburseNeuron {
+                    neuron_id: i as u64,
+                    to: p,
+                    amount: Some(i as u64 * 100),
+                },
+            }
+        })
+        .collect();
+
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            Encode!(&actions).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            Decode!([config]; &bytes, Vec<LargeAction>).unwrap();
+        }
+    })
+}
+
+// Option<Option<T>> — "3-state update" semantics used in real ICP APIs.
+// None = don't change, Some(None) = clear, Some(Some(x)) = set.
+// Exercises Candid's opt subtyping rules with double-wrapped optionals.
+#[bench(raw)]
+fn double_option() -> BenchResult {
+    #[derive(CandidType, Deserialize)]
+    struct UpdateRequest {
+        target_balance: Option<Option<i128>>,
+        expiration: Option<Option<u64>>,
+        spending_limit: Option<Option<u128>>,
+        description: Option<Option<String>>,
+        account: Principal,
+    }
+
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
+
+    let requests: Vec<UpdateRequest> = (0..1000)
+        .map(|i| match i % 3 {
+            0 => UpdateRequest {
+                target_balance: None,
+                expiration: None,
+                spending_limit: None,
+                description: None,
+                account: Principal::from_slice(&(i as u32).to_be_bytes()),
+            },
+            1 => UpdateRequest {
+                target_balance: Some(None),
+                expiration: Some(None),
+                spending_limit: Some(None),
+                description: Some(None),
+                account: Principal::from_slice(&(i as u32).to_be_bytes()),
+            },
+            _ => UpdateRequest {
+                target_balance: Some(Some(i as i128 * 1_000_000)),
+                expiration: Some(Some(1_700_000_000 + i as u64)),
+                spending_limit: Some(Some(i as u128 * 500)),
+                description: Some(Some(format!("update-{}", i))),
+                account: Principal::from_slice(&(i as u32).to_be_bytes()),
+            },
+        })
+        .collect();
+
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            Encode!(&requests).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            Decode!([config]; &bytes, Vec<UpdateRequest>).unwrap();
+        }
+    })
+}
+
+// Multi-argument Encode!/Decode! — real canister calls often pass multiple
+// arguments (e.g., principal + amount + memo). This exercises a different
+// internal code path than single-struct encoding.
+#[bench(raw)]
+fn multi_arg() -> BenchResult {
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
+
+    let principals: Vec<Principal> = (0..1000)
+        .map(|i| Principal::from_slice(&(i as u64).to_be_bytes()))
+        .collect();
+    let amounts: Vec<u64> = (0..1000).map(|i| i * 1_000_000).collect();
+    let memos: Vec<String> = (0..1000).map(|i| format!("memo-{}", i)).collect();
+
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            Encode!(&principals, &amounts, &memos).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            Decode!([config]; &bytes, Vec<Principal>, Vec<u64>, Vec<String>).unwrap();
+        }
     })
 }
 
