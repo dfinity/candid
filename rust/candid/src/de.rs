@@ -450,7 +450,10 @@ impl<'de> Deserializer<'de> {
             self.unroll_type()?;
             assert!(*self.expect_type == TypeInner::Int);
         } else {
-            debug_assert!(!self.is_untyped, "bignum_vec_fast_path requires typed input");
+            debug_assert!(
+                !self.is_untyped,
+                "bignum_vec_fast_path requires typed input"
+            );
         }
         let pos = self.input.position();
         if !self.is_untyped {
@@ -501,7 +504,10 @@ impl<'de> Deserializer<'de> {
                 "nat"
             );
         } else {
-            debug_assert!(!self.is_untyped, "bignum_vec_fast_path requires typed input");
+            debug_assert!(
+                !self.is_untyped,
+                "bignum_vec_fast_path requires typed input"
+            );
         }
         let pos = self.input.position();
         if !self.is_untyped {
