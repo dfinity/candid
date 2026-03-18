@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-03-18
+
+### Candid 0.10.26
+
+* Bug fixes:
+  + Fix decoding failure when a trailing argument is a primitive vector
+
 ## 2026-03-16
 
 ### Candid 0.10.25
