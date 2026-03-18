@@ -1024,18 +1024,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if !self.text_fast_path {
-            self.unroll_type()?;
-            check!(
-                *self.expect_type == TypeInner::Text && *self.wire_type == TypeInner::Text,
-                "text"
-            );
-        }
-        let len = self.read_len()?;
-        self.add_cost(len.saturating_add(1))?;
-        let slice = self.borrow_bytes(len)?;
-        let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
-        visitor.visit_borrowed_str(value)
+        self.deserialize_str(visitor)
     }
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
     where
@@ -1131,14 +1120,17 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                             )));
                         }
                         let data = &slice[pos..pos + total_bytes];
-                        let result = visitor.visit_seq(PrimitiveVecAccess {
+                        let mut access = PrimitiveVecAccess {
                             data,
                             offset: 0,
                             remaining: len,
                             element_size: byte_size,
                             prim,
-                        });
-                        self.input.set_position((pos + total_bytes) as u64);
+                        };
+                        let result = visitor.visit_seq(&mut access);
+                        // Advance by bytes actually consumed, not total_bytes, so
+                        // the cursor is correct if the visitor short-circuits.
+                        self.input.set_position((pos + access.offset) as u64);
                         return result;
                     }
 
@@ -1177,13 +1169,6 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                         exact_primitive,
                     },
                 ));
-                if exact_primitive.is_some() {
-                    self.primitive_vec_fast_path = None;
-                }
-                #[cfg(feature = "bignum")]
-                if bignum_fast.is_some() {
-                    self.bignum_vec_fast_path = None;
-                }
                 result
             }
             (TypeInner::Record(_), TypeInner::Record(_)) => {
@@ -1567,18 +1552,16 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
                     return Ok(None);
                 }
                 *len -= 1;
+                self.de.expect_type = expect.clone();
+                self.de.wire_type = wire.clone();
                 #[cfg(feature = "bignum")]
                 let is_fast = exact_primitive.is_some() || self.de.bignum_vec_fast_path.is_some();
                 #[cfg(not(feature = "bignum"))]
                 let is_fast = exact_primitive.is_some();
-                if is_fast {
-                    seed.deserialize(&mut *self.de).map(Some)
-                } else {
+                if !is_fast {
                     self.de.add_cost(3)?;
-                    self.de.expect_type = expect.clone();
-                    self.de.wire_type = wire.clone();
-                    seed.deserialize(&mut *self.de).map(Some)
                 }
+                seed.deserialize(&mut *self.de).map(Some)
             }
             Style::Struct {
                 ref expect,
