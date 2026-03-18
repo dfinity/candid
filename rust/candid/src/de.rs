@@ -1079,13 +1079,6 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                         exact_primitive,
                     },
                 ));
-                if exact_primitive.is_some() {
-                    self.primitive_vec_fast_path = None;
-                }
-                #[cfg(feature = "bignum")]
-                if bignum_fast.is_some() {
-                    self.bignum_vec_fast_path = None;
-                }
                 result
             }
             (TypeInner::Record(_), TypeInner::Record(_)) => {
@@ -1492,6 +1485,8 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
 
 impl Drop for Compound<'_, '_> {
     fn drop(&mut self) {
+        // Reset fast-path state so it cannot leak if this Compound is dropped
+        // before all elements are consumed (e.g., on an error path).
         self.de.primitive_vec_fast_path = None;
         #[cfg(feature = "bignum")]
         {
