@@ -498,11 +498,11 @@ fn subtype_decode() -> BenchResult {
 
     bench_fn(|| {
         let bytes = {
-            let _p = bench_scope("1. Encoding (v2, 16 fields)");
+            let _p = bench_scope("1. Encoding");
             Encode!(&records).unwrap()
         };
         {
-            let _p = bench_scope("2. Decoding (as v1, skipping 12 fields)");
+            let _p = bench_scope("2. Decoding");
             Decode!([config]; &bytes, Vec<RecordV1>).unwrap();
         }
     })
