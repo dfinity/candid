@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-03-17
+
+### Candid 0.10.25 (patch)
+
+* Bug fixes:
+  + Fix decoding failure when a trailing/extra argument is a primitive vector (`vec int8/16/32/64`, `vec nat8/16/32/64`, `vec float32/64`, `vec bool`). The fast-path optimization introduced in #712 skipped updating `expect_type`/`wire_type` per element, causing `deserialize_ignored_any` to misidentify the element type and corrupt the byte stream.
+
 ## 2026-03-16
 
 ### Candid 0.10.25
