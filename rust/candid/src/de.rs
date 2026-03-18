@@ -1428,18 +1428,16 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
                     return Ok(None);
                 }
                 *len -= 1;
+                self.de.expect_type = expect.clone();
+                self.de.wire_type = wire.clone();
                 #[cfg(feature = "bignum")]
                 let is_fast = exact_primitive.is_some() || self.de.bignum_vec_fast_path.is_some();
                 #[cfg(not(feature = "bignum"))]
                 let is_fast = exact_primitive.is_some();
-                if is_fast {
-                    seed.deserialize(&mut *self.de).map(Some)
-                } else {
+                if !is_fast {
                     self.de.add_cost(3)?;
-                    self.de.expect_type = expect.clone();
-                    self.de.wire_type = wire.clone();
-                    seed.deserialize(&mut *self.de).map(Some)
                 }
+                seed.deserialize(&mut *self.de).map(Some)
             }
             Style::Struct {
                 ref expect,
