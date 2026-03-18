@@ -934,16 +934,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.unroll_type()?;
-        check!(
-            *self.expect_type == TypeInner::Text && *self.wire_type == TypeInner::Text,
-            "text"
-        );
-        let len = Len::read(&mut self.input)?.0;
-        self.add_cost(len.saturating_add(1))?;
-        let slice = self.borrow_bytes(len)?;
-        let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
-        visitor.visit_borrowed_str(value)
+        self.deserialize_str(visitor)
     }
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
     where
