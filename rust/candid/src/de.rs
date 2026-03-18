@@ -1241,14 +1241,12 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
                     return Ok(None);
                 }
                 *len -= 1;
-                if exact_primitive.is_some() {
-                    seed.deserialize(&mut *self.de).map(Some)
-                } else {
+                self.de.expect_type = expect.clone();
+                self.de.wire_type = wire.clone();
+                if exact_primitive.is_none() {
                     self.de.add_cost(3)?;
-                    self.de.expect_type = expect.clone();
-                    self.de.wire_type = wire.clone();
-                    seed.deserialize(&mut *self.de).map(Some)
                 }
+                seed.deserialize(&mut *self.de).map(Some)
             }
             Style::Struct {
                 ref expect,
