@@ -9,7 +9,7 @@ use super::{
 #[cfg(feature = "bignum")]
 use super::{Int, Nat};
 use crate::{
-    binary_parser::{BoolValue, Header, Len, PrincipalBytes},
+    binary_parser::{Header, Len, PrincipalBytes},
     types::subtype::{subtype_with_config, Gamma, OptReport},
 };
 use anyhow::{anyhow, Context};
@@ -305,6 +305,7 @@ struct Deserializer<'de> {
     primitive_vec_fast_path: Option<PrimitiveType>,
     #[cfg(feature = "bignum")]
     bignum_vec_fast_path: Option<BigNumFastPath>,
+    text_fast_path: bool,
 }
 
 impl<'de> Deserializer<'de> {
@@ -326,6 +327,7 @@ impl<'de> Deserializer<'de> {
             primitive_vec_fast_path: None,
             #[cfg(feature = "bignum")]
             bignum_vec_fast_path: None,
+            text_fast_path: false,
         })
     }
     fn dump_state(&self) -> String {
@@ -347,6 +349,80 @@ impl<'de> Deserializer<'de> {
         }
         res
     }
+    #[inline]
+    fn read_leb_u64(&mut self) -> Result<u64> {
+        let slice = self.input.get_ref();
+        let mut pos = self.input.position() as usize;
+        let end = slice.len();
+        let mut result: u64 = 0;
+        let mut shift: u32 = 0;
+        loop {
+            if pos >= end {
+                return Err(Error::msg("unexpected end of LEB128"));
+            }
+            let byte = slice[pos];
+            pos += 1;
+            let low = (byte & 0x7f) as u64;
+            if shift < 64 {
+                result |= low << shift;
+            }
+            if byte & 0x80 == 0 {
+                self.input.set_position(pos as u64);
+                return Ok(result);
+            }
+            shift += 7;
+            if shift >= 70 {
+                return Err(Error::msg("LEB128 overflow"));
+            }
+        }
+    }
+    #[inline]
+    fn read_leb_i64(&mut self) -> Result<i64> {
+        let slice = self.input.get_ref();
+        let mut pos = self.input.position() as usize;
+        let end = slice.len();
+        let mut result: i64 = 0;
+        let mut shift: u32 = 0;
+        let mut byte;
+        loop {
+            if pos >= end {
+                return Err(Error::msg("unexpected end of LEB128"));
+            }
+            byte = slice[pos];
+            pos += 1;
+            let low = (byte & 0x7f) as i64;
+            if shift < 64 {
+                result |= low << shift;
+            }
+            shift += 7;
+            if byte & 0x80 == 0 {
+                break;
+            }
+            if shift >= 70 {
+                return Err(Error::msg("LEB128 overflow"));
+            }
+        }
+        if shift < 64 && byte & 0x40 != 0 {
+            result |= !0i64 << shift;
+        }
+        self.input.set_position(pos as u64);
+        Ok(result)
+    }
+    #[inline]
+    fn read_len(&mut self) -> Result<usize> {
+        let val = self.read_leb_u64()?;
+        usize::try_from(val).map_err(|_| Error::msg("length out of usize range"))
+    }
+    #[inline]
+    fn read_bool_val(&mut self) -> Result<bool> {
+        let byte = self.input.read_u8()?;
+        match byte {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(Error::msg("Expect 00 or 01")),
+        }
+    }
+    #[inline]
     fn borrow_bytes(&mut self, len: usize) -> Result<&'de [u8]> {
         let pos = self.input.position() as usize;
         let slice = self.input.get_ref();
@@ -383,6 +459,7 @@ impl<'de> Deserializer<'de> {
         .map_err(Error::subtype)?;
         Ok(())
     }
+    #[inline]
     fn unroll_type(&mut self) -> Result<()> {
         if matches!(
             self.expect_type.as_ref(),
@@ -404,6 +481,7 @@ impl<'de> Deserializer<'de> {
         }
         Ok(())
     }
+    #[inline]
     fn add_cost(&mut self, cost: usize) -> Result<()> {
         if let Some(n) = self.config.decoding_quota {
             let cost = if self.is_untyped {
@@ -450,39 +528,46 @@ impl<'de> Deserializer<'de> {
             self.unroll_type()?;
             assert!(*self.expect_type == TypeInner::Int);
         }
-        let pos = self.input.position();
         if !self.is_untyped {
-            match self.wire_type.as_ref() {
-                TypeInner::Int => match leb128::read::signed(&mut self.input) {
+            let is_nat = matches!(self.wire_type.as_ref(), TypeInner::Nat);
+            let is_int = matches!(self.wire_type.as_ref(), TypeInner::Int);
+            if is_int {
+                let pos = self.input.position();
+                match self.read_leb_i64() {
                     Ok(value) => {
                         self.add_cost((self.input.position() - pos) as usize)?;
                         return visitor.visit_i64(value);
                     }
-                    Err(leb128::read::Error::Overflow) => {
+                    Err(_) => {
                         self.input.set_position(pos);
                     }
-                    Err(e) => return Err(Error::msg(e)),
-                },
-                TypeInner::Nat => match leb128::read::unsigned(&mut self.input) {
+                }
+            } else if is_nat {
+                let pos = self.input.position();
+                match self.read_leb_u64() {
                     Ok(value) => {
                         self.add_cost((self.input.position() - pos) as usize)?;
                         return visitor.visit_u64(value);
                     }
-                    Err(leb128::read::Error::Overflow) => {
+                    Err(_) => {
                         self.input.set_position(pos);
                     }
-                    Err(e) => return Err(Error::msg(e)),
-                },
-                t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
+                }
+            } else {
+                return Err(Error::subtype(format!(
+                    "{} cannot be deserialized to int",
+                    self.wire_type
+                )));
             }
         }
+        let bignum_pos = self.input.position();
         let mut bytes = vec![0u8];
         let int = match self.wire_type.as_ref() {
             TypeInner::Int => Int::decode(&mut self.input).map_err(Error::msg)?,
             TypeInner::Nat => Int(Nat::decode(&mut self.input).map_err(Error::msg)?.0.into()),
             t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
         };
-        self.add_cost((self.input.position() - pos) as usize)?;
+        self.add_cost((self.input.position() - bignum_pos) as usize)?;
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
         visitor.visit_byte_buf(bytes)
     }
@@ -499,19 +584,19 @@ impl<'de> Deserializer<'de> {
                 "nat"
             );
         }
-        let pos = self.input.position();
         if !self.is_untyped {
-            match leb128::read::unsigned(&mut self.input) {
+            let pos = self.input.position();
+            match self.read_leb_u64() {
                 Ok(value) => {
                     self.add_cost((self.input.position() - pos) as usize)?;
                     return visitor.visit_u64(value);
                 }
-                Err(leb128::read::Error::Overflow) => {
+                Err(_) => {
                     self.input.set_position(pos);
                 }
-                Err(e) => return Err(Error::msg(e)),
             }
         }
+        let pos = self.input.position();
         let mut bytes = vec![1u8];
         let nat = Nat::decode(&mut self.input).map_err(Error::msg)?;
         self.add_cost((self.input.position() - pos) as usize)?;
@@ -559,12 +644,12 @@ impl<'de> Deserializer<'de> {
     {
         self.unroll_type()?;
         self.check_subtype()?;
-        if !BoolValue::read(&mut self.input)?.0 {
+        if !self.read_bool_val()? {
             return Err(Error::msg("Opaque reference not supported"));
         }
         let mut bytes = vec![5u8];
         let id = PrincipalBytes::read(&mut self.input)?;
-        let len = Len::read(&mut self.input)?.0;
+        let len = self.read_len()?;
         let meth = self.borrow_bytes(len)?;
         self.add_cost(
             std::cmp::max(30, id.len as usize)
@@ -586,7 +671,7 @@ impl<'de> Deserializer<'de> {
             self.expect_type.is_blob(&self.table) && self.wire_type.is_blob(&self.table),
             "blob"
         );
-        let len = Len::read(&mut self.input)?.0;
+        let len = self.read_len()?;
         self.add_cost(len.saturating_add(1))?;
         let blob = self.borrow_bytes(len)?;
         let mut bytes = Vec::with_capacity(len + 1);
@@ -608,9 +693,9 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        let len = Len::read(&mut self.input)?.0 as u64;
+        let len = self.read_len()? as u64;
         self.add_cost((len as usize).saturating_add(1))?;
-        Len::read(&mut self.input)?;
+        self.read_len()?;
         let slice_len = self.input.get_ref().len() as u64;
         let pos = self.input.position();
         if len > slice_len || pos + len > slice_len {
@@ -914,8 +999,8 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         if self.primitive_vec_fast_path == Some(PrimitiveType::Bool) {
-            let res = BoolValue::read(&mut self.input)?;
-            return visitor.visit_bool(res.0);
+            let val = self.read_bool_val()?;
+            return visitor.visit_bool(val);
         }
         self.unroll_type()?;
         check!(
@@ -923,19 +1008,21 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             "bool"
         );
         self.add_cost(1)?;
-        let res = BoolValue::read(&mut self.input)?;
-        visitor.visit_bool(res.0)
+        let val = self.read_bool_val()?;
+        visitor.visit_bool(val)
     }
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        self.unroll_type()?;
-        check!(
-            *self.expect_type == TypeInner::Text && *self.wire_type == TypeInner::Text,
-            "text"
-        );
-        let len = Len::read(&mut self.input)?.0;
+        if !self.text_fast_path {
+            self.unroll_type()?;
+            check!(
+                *self.expect_type == TypeInner::Text && *self.wire_type == TypeInner::Text,
+                "text"
+            );
+        }
+        let len = self.read_len()?;
         self.add_cost(len.saturating_add(1))?;
         let slice = self.borrow_bytes(len)?;
         let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
@@ -945,12 +1032,14 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.unroll_type()?;
-        check!(
-            *self.expect_type == TypeInner::Text && *self.wire_type == TypeInner::Text,
-            "text"
-        );
-        let len = Len::read(&mut self.input)?.0;
+        if !self.text_fast_path {
+            self.unroll_type()?;
+            check!(
+                *self.expect_type == TypeInner::Text && *self.wire_type == TypeInner::Text,
+                "text"
+            );
+        }
+        let len = self.read_len()?;
         self.add_cost(len.saturating_add(1))?;
         let slice = self.borrow_bytes(len)?;
         let value: &str = std::str::from_utf8(slice).map_err(Error::msg)?;
@@ -981,7 +1070,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             (TypeInner::Opt(t1), TypeInner::Opt(t2)) => {
                 self.wire_type = t1.clone();
                 self.expect_type = t2.clone();
-                if BoolValue::read(&mut self.input)?.0 {
+                if self.read_bool_val()? {
                     let _guard = self.recursion_depth.guard()?;
                     self.recoverable_visit_some(visitor)
                 } else {
@@ -1009,7 +1098,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             (TypeInner::Vec(e), TypeInner::Vec(w)) => {
                 let expect = e.clone();
                 let wire = self.table.trace_type_with_depth(w, &self.recursion_depth)?;
-                let len = Len::read(&mut self.input)?.0;
+                let len = self.read_len()?;
                 let exact_primitive = exact_primitive_type(&expect, &wire);
                 if let Some(prim) = exact_primitive {
                     let per_element_cost = 3 + primitive_byte_cost(prim);
@@ -1119,7 +1208,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 && *self.wire_type == TypeInner::Vec(TypeInner::Nat8.into()),
             "vec nat8"
         );
-        let len = Len::read(&mut self.input)?.0;
+        let len = self.read_len()?;
         self.add_cost(len.saturating_add(1))?;
         let bytes = self.borrow_bytes(len)?.to_owned();
         visitor.visit_byte_buf(bytes)
@@ -1129,7 +1218,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         match self.expect_type.as_ref() {
             TypeInner::Principal => self.deserialize_principal(visitor),
             TypeInner::Vec(t) if **t == TypeInner::Nat8 => {
-                let len = Len::read(&mut self.input)?.0;
+                let len = self.read_len()?;
                 self.add_cost(len.saturating_add(1))?;
                 let slice = self.borrow_bytes(len)?;
                 visitor.visit_borrowed_bytes(slice)
@@ -1161,11 +1250,56 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                             {
                                 let expect = (ek.clone(), ev.clone());
                                 let wire = (wk.clone(), wv.clone());
-                                let len = Len::read(&mut self.input)?.0;
-                                visitor.visit_map(Compound::new(
+                                let len = self.read_len()?;
+
+                                let key_text_fast = matches!(ek.as_ref(), TypeInner::Text)
+                                    && matches!(wk.as_ref(), TypeInner::Text);
+                                #[cfg(feature = "bignum")]
+                                let value_bignum_fast = match (ev.as_ref(), wv.as_ref()) {
+                                    (TypeInner::Nat, TypeInner::Nat) => {
+                                        Some(BigNumFastPath::Nat)
+                                    }
+                                    (TypeInner::Int, TypeInner::Int) => {
+                                        Some(BigNumFastPath::Int)
+                                    }
+                                    (TypeInner::Int, TypeInner::Nat) => {
+                                        Some(BigNumFastPath::NatAsInt)
+                                    }
+                                    _ => None,
+                                };
+                                #[cfg(feature = "bignum")]
+                                let any_fast =
+                                    key_text_fast || value_bignum_fast.is_some();
+                                #[cfg(not(feature = "bignum"))]
+                                let any_fast = key_text_fast;
+
+                                if any_fast {
+                                    self.add_cost(
+                                        len.checked_mul(7)
+                                            .ok_or_else(|| {
+                                                Error::msg("Map length overflow")
+                                            })?,
+                                    )?;
+                                    if key_text_fast {
+                                        self.text_fast_path = true;
+                                    }
+                                    #[cfg(feature = "bignum")]
+                                    if let Some(fast) = value_bignum_fast {
+                                        self.bignum_vec_fast_path = Some(fast);
+                                        self.wire_type = wv.clone();
+                                    }
+                                }
+
+                                let result = visitor.visit_map(Compound::new(
                                     self,
                                     Style::Map { len, expect, wire },
-                                ))
+                                ));
+                                self.text_fast_path = false;
+                                #[cfg(feature = "bignum")]
+                                {
+                                    self.bignum_vec_fast_path = None;
+                                }
+                                result
                             }
                             _ => Err(Error::subtype("expect a key-value pair")),
                         }
@@ -1493,6 +1627,7 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
 impl Drop for Compound<'_, '_> {
     fn drop(&mut self) {
         self.de.primitive_vec_fast_path = None;
+        self.de.text_fast_path = false;
         #[cfg(feature = "bignum")]
         {
             self.de.bignum_vec_fast_path = None;
@@ -1581,13 +1716,22 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                 ref expect,
                 ref wire,
             } => {
-                // This only comes from deserialize_map
                 if *len == 0 {
                     return Ok(None);
                 }
-                self.de.expect_type = expect.0.clone();
-                self.de.wire_type = wire.0.clone();
                 *len -= 1;
+                #[cfg(feature = "bignum")]
+                let any_fast =
+                    self.de.text_fast_path || self.de.bignum_vec_fast_path.is_some();
+                #[cfg(not(feature = "bignum"))]
+                let any_fast = self.de.text_fast_path;
+                if !any_fast {
+                    self.de.add_cost(4)?;
+                }
+                if !self.de.text_fast_path {
+                    self.de.expect_type = expect.0.clone();
+                    self.de.wire_type = wire.0.clone();
+                }
                 seed.deserialize(&mut *self.de).map(Some)
             }
             _ => Err(Error::msg("expect struct or map")),
@@ -1599,9 +1743,22 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
     {
         match &self.style {
             Style::Map { expect, wire, .. } => {
-                self.de.add_cost(3)?;
-                self.de.expect_type = expect.1.clone();
-                self.de.wire_type = wire.1.clone();
+                #[cfg(feature = "bignum")]
+                let any_fast =
+                    self.de.text_fast_path || self.de.bignum_vec_fast_path.is_some();
+                #[cfg(not(feature = "bignum"))]
+                let any_fast = self.de.text_fast_path;
+                if !any_fast {
+                    self.de.add_cost(3)?;
+                }
+                #[cfg(feature = "bignum")]
+                let value_fast = self.de.bignum_vec_fast_path.is_some();
+                #[cfg(not(feature = "bignum"))]
+                let value_fast = false;
+                if !value_fast {
+                    self.de.expect_type = expect.1.clone();
+                    self.de.wire_type = wire.1.clone();
+                }
                 seed.deserialize(&mut *self.de)
             }
             _ => {
