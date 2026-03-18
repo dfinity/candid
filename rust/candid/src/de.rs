@@ -1339,9 +1339,9 @@ impl<'de> de::SeqAccess<'de> for PrimitiveVecAccess<'de> {
                 _ => Err(Error::msg("Expect 00 or 01")),
             },
             PrimitiveType::Nat8 => seed.deserialize(bytes[0].into_deserializer()).map(Some),
-            PrimitiveType::Int8 => {
-                seed.deserialize((bytes[0] as i8).into_deserializer()).map(Some)
-            }
+            PrimitiveType::Int8 => seed
+                .deserialize((bytes[0] as i8).into_deserializer())
+                .map(Some),
             PrimitiveType::Nat16 => {
                 let v = u16::from_le_bytes(bytes.try_into().unwrap());
                 seed.deserialize(v.into_deserializer()).map(Some)
@@ -1432,8 +1432,7 @@ impl<'de> de::SeqAccess<'de> for Compound<'_, 'de> {
                 }
                 *len -= 1;
                 #[cfg(feature = "bignum")]
-                let is_fast =
-                    exact_primitive.is_some() || self.de.bignum_vec_fast_path.is_some();
+                let is_fast = exact_primitive.is_some() || self.de.bignum_vec_fast_path.is_some();
                 #[cfg(not(feature = "bignum"))]
                 let is_fast = exact_primitive.is_some();
                 if is_fast {
