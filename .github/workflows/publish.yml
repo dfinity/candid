@@ -1,0 +1,65 @@
+name: Publish crates to crates.io
+
+on:
+  workflow_dispatch:
+    inputs:
+      ic_principal:
+        description: "Publish ic_principal"
+        type: boolean
+        default: false
+      candid:
+        description: "Publish candid and candid_derive"
+        type: boolean
+        default: false
+      candid_parser:
+        description: "Publish candid_parser"
+        type: boolean
+        default: false
+
+jobs:
+  publish:
+    name: Publish selected crates
+    runs-on: ubuntu-24.04
+    if: >-
+      inputs.ic_principal || inputs.candid || inputs.candid_parser
+
+    permissions:
+      contents: read
+      id-token: write # Required for trusted publishing via OIDC
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: false
+
+      - name: Authenticate with crates.io
+        id: auth
+        uses: rust-lang/crates-io-auth-action@v1
+
+      # Crates are ordered by dependency: publish dependencies before dependents.
+      # ic_principal has no workspace deps.
+      # candid_derive has no workspace deps.
+      # candid depends on ic_principal, candid_derive.
+      # candid_parser depends on candid.
+
+      - name: Publish ic_principal
+        if: inputs.ic_principal
+        run: cargo publish -p ic_principal
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+      - name: Publish candid and candid_derive
+        if: inputs.candid
+        run: cargo publish -p candid_derive && cargo publish -p candid
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+      - name: Publish candid_parser
+        if: inputs.candid_parser
+        run: cargo publish -p candid_parser
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
