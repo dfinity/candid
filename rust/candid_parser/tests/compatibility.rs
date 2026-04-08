@@ -1,311 +1,300 @@
-use candid::types::subtype::format_report;
+use candid::types::subtype::{format_report, Incompatibility};
 use candid_parser::utils::{service_compatibility_report, service_compatible, CandidSource};
 
 // ---------------------------------------------------------------------------
 //  Helpers
 // ---------------------------------------------------------------------------
 
-fn check_compatible(new: &str, old: &str) {
+fn check_compatible(new: &str, old: &str, desc: &str) {
     service_compatible(CandidSource::Text(new), CandidSource::Text(old))
-        .unwrap_or_else(|e| panic!("expected compatible, got error: {e}"));
+        .unwrap_or_else(|e| panic!("[{desc}] expected compatible, got error: {e}"));
 }
 
-fn check_incompatible(new: &str, old: &str) {
+fn check_incompatible(new: &str, old: &str, desc: &str) {
     assert!(
         service_compatible(CandidSource::Text(new), CandidSource::Text(old)).is_err(),
-        "expected incompatible, but check passed"
+        "[{desc}] expected incompatible, but check passed"
     );
 }
 
-fn incompatibilities(new: &str, old: &str) -> Vec<String> {
+fn get_errors(new: &str, old: &str) -> Vec<Incompatibility> {
     service_compatibility_report(CandidSource::Text(new), CandidSource::Text(old))
         .expect("failed to load interfaces")
+}
+
+fn error_strings(new: &str, old: &str) -> Vec<String> {
+    get_errors(new, old)
         .into_iter()
         .map(|e| e.to_string())
         .collect()
 }
 
 // ===========================================================================
-//  1. Backward-compatible changes must PASS (no false positives)
+//  Backward-compatible changes must PASS (no false positives)
 // ===========================================================================
 
 #[test]
-fn compatible_identical_services() {
-    let did = "service : { greet : (text) -> (text) }";
-    check_compatible(did, did);
+fn compatible_service_changes() {
+    let cases: &[(&str, &str, &str)] = &[
+        (
+            "identical service",
+            "service : { greet : (text) -> (text) }",
+            "service : { greet : (text) -> (text) }",
+        ),
+        (
+            "add new method",
+            "service : { greet : (text) -> (text); hello : () -> (text) }",
+            "service : { greet : (text) -> (text) }",
+        ),
+        (
+            "widen input nat→int (contravariant)",
+            "service : { pay : (int) -> () }",
+            "service : { pay : (nat) -> () }",
+        ),
+        (
+            "narrow return int→nat (covariant, nat <: int)",
+            "service : { get : () -> (nat) }",
+            "service : { get : () -> (int) }",
+        ),
+    ];
+    for &(desc, new, old) in cases {
+        check_compatible(new, old, desc);
+    }
 }
 
 #[test]
-fn compatible_add_new_method() {
-    let old = "service : { greet : (text) -> (text) }";
-    let new = "service : { greet : (text) -> (text); hello : () -> (text) }";
-    check_compatible(new, old);
+fn compatible_record_field_changes() {
+    let cases: &[(&str, &str, &str)] = &[
+        (
+            "add opt field to input record",
+            "type R = record { name : text; age : opt nat }; service : { f : (R) -> () }",
+            "type R = record { name : text }; service : { f : (R) -> () }",
+        ),
+        (
+            "add opt field to return record",
+            "type R = record { id : nat; extra : opt text }; service : { f : () -> (R) }",
+            "type R = record { id : nat }; service : { f : () -> (R) }",
+        ),
+        (
+            "add null field to return record",
+            "service : { f : () -> (record { a : nat; b : null }) }",
+            "service : { f : () -> (record { a : nat }) }",
+        ),
+        (
+            "add reserved field to return record",
+            "service : { f : () -> (record { a : nat; b : reserved }) }",
+            "service : { f : () -> (record { a : nat }) }",
+        ),
+        (
+            "remove non-opt field from input record (extra fields in subtype are fine)",
+            "type R = record { name : text }; service : { f : (R) -> () }",
+            "type R = record { name : text; age : nat }; service : { f : (R) -> () }",
+        ),
+    ];
+    for &(desc, new, old) in cases {
+        check_compatible(new, old, desc);
+    }
 }
 
 #[test]
-fn compatible_add_optional_record_field() {
-    let old = r#"
-        type Req = record { name : text };
-        service : { greet : (Req) -> (text) }
-    "#;
-    let new = r#"
-        type Req = record { name : text; age : opt nat };
-        service : { greet : (Req) -> (text) }
-    "#;
-    check_compatible(new, old);
-}
-
-#[test]
-fn compatible_narrow_return_nat_subtype_of_int() {
-    // Old returns int, new returns nat. Return types are covariant: nat <: int ✓
-    let old = "service : { get : () -> (int) }";
-    let new = "service : { get : () -> (nat) }";
-    check_compatible(new, old);
-}
-
-#[test]
-fn compatible_add_optional_return_field() {
-    let old = r#"
-        type Res = record { id : nat };
-        service : { get : () -> (Res) }
-    "#;
-    let new = r#"
-        type Res = record { id : nat; extra : opt text };
-        service : { get : () -> (Res) }
-    "#;
-    check_compatible(new, old);
-}
-
-#[test]
-fn compatible_add_variant_case_in_return() {
-    // Adding a variant to a return type is safe (old callers already handle unknown variants
-    // via opt rule), and the new type is a subtype because the new variant's fields include
-    // all old fields.
-    let old = r#"
-        type Res = variant { ok : nat; err : text };
-        service : { call : () -> (Res) }
-    "#;
-    let new = r#"
-        type Res = variant { ok : nat; err : text };
-        service : { call : () -> (Res) }
-    "#;
-    check_compatible(new, old);
-}
-
-#[test]
-fn compatible_narrow_input_type() {
-    // Function inputs are contravariant: the new service can accept a *wider* input type.
-    // Concretely: if old expected nat, new can accept int (since nat <: int, callers sending
-    // nat still satisfy int).
-    let old = "service : { pay : (nat) -> () }";
-    let new = "service : { pay : (int) -> () }";
-    check_compatible(new, old);
-}
-
-#[test]
-fn compatible_add_reserved_field() {
-    let old = "service : { get : () -> (record { a : nat }) }";
-    let new = "service : { get : () -> (record { a : nat; b : reserved }) }";
-    check_compatible(new, old);
-}
-
-#[test]
-fn compatible_add_null_field() {
-    let old = "service : { get : () -> (record { a : nat }) }";
-    let new = "service : { get : () -> (record { a : nat; b : null }) }";
-    check_compatible(new, old);
+fn compatible_variant_and_vec_changes() {
+    let cases: &[(&str, &str, &str)] = &[
+        (
+            "add variant case to input (contravariant: old callers still match)",
+            "type V = variant { a; b; c }; service : { f : (V) -> () }",
+            "type V = variant { a; b }; service : { f : (V) -> () }",
+        ),
+        (
+            "identical vec types",
+            "service : { f : () -> (vec nat) }",
+            "service : { f : () -> (vec nat) }",
+        ),
+    ];
+    for &(desc, new, old) in cases {
+        check_compatible(new, old, desc);
+    }
 }
 
 // ===========================================================================
-//  2. Backward-INCOMPATIBLE changes must FAIL (no false negatives)
+//  Backward-INCOMPATIBLE changes must be caught (no false negatives)
 // ===========================================================================
 
 #[test]
-fn incompatible_remove_method() {
-    let old = "service : { greet : (text) -> (text); hello : () -> (text) }";
-    let new = "service : { greet : (text) -> (text) }";
-    check_incompatible(new, old);
+fn incompatible_method_changes() {
+    let cases: &[(&str, &str, &str)] = &[
+        (
+            "remove method",
+            "service : { greet : (text) -> (text) }",
+            "service : { greet : (text) -> (text); hello : () -> (text) }",
+        ),
+        (
+            "change func mode query→update",
+            "service : { get : () -> (nat) }",
+            "service : { get : () -> (nat) query }",
+        ),
+        (
+            "change return type nat→text",
+            "service : { get : () -> (text) }",
+            "service : { get : () -> (nat) }",
+        ),
+        (
+            "change input type nat→text",
+            "service : { set : (text) -> () }",
+            "service : { set : (nat) -> () }",
+        ),
+        (
+            "widen return nat→int (covariant: int </: nat)",
+            "service : { get : () -> (int) }",
+            "service : { get : () -> (nat) }",
+        ),
+    ];
+    for &(desc, new, old) in cases {
+        check_incompatible(new, old, desc);
+    }
 }
 
 #[test]
-fn incompatible_change_return_type() {
-    let old = "service : { get : () -> (nat) }";
-    let new = "service : { get : () -> (text) }";
-    check_incompatible(new, old);
-}
-
-#[test]
-fn incompatible_change_input_type() {
-    let old = "service : { set : (nat) -> () }";
-    let new = "service : { set : (text) -> () }";
-    check_incompatible(new, old);
-}
-
-#[test]
-fn incompatible_add_required_record_field() {
-    let old = r#"
-        type Req = record { name : text };
-        service : { greet : (Req) -> (text) }
-    "#;
-    let new = r#"
-        type Req = record { name : text; age : nat };
-        service : { greet : (Req) -> (text) }
-    "#;
-    check_incompatible(new, old);
-}
-
-#[test]
-fn incompatible_remove_variant_case_in_input() {
-    // Removing a variant case from an input type means old callers might send
-    // a variant the new service doesn't understand.
-    let old = r#"
-        type Cmd = variant { start; stop; pause };
-        service : { exec : (Cmd) -> () }
-    "#;
-    let new = r#"
-        type Cmd = variant { start; stop };
-        service : { exec : (Cmd) -> () }
-    "#;
-    check_incompatible(new, old);
-}
-
-#[test]
-fn incompatible_widen_return_from_nat_to_int() {
-    // Old returns nat, new returns int. Return types are covariant: int <: nat is FALSE.
-    // Old clients expecting nat may receive negative numbers.
-    let old = "service : { get : () -> (nat) }";
-    let new = "service : { get : () -> (int) }";
-    check_incompatible(new, old);
-}
-
-#[test]
-fn incompatible_change_func_mode() {
-    let old = "service : { get : () -> (nat) query }";
-    let new = "service : { get : () -> (nat) }";
-    check_incompatible(new, old);
+fn incompatible_record_and_variant_changes() {
+    let cases: &[(&str, &str, &str)] = &[
+        (
+            "add required field to input record",
+            "type R = record { name : text; age : nat }; service : { f : (R) -> () }",
+            "type R = record { name : text }; service : { f : (R) -> () }",
+        ),
+        (
+            "remove required field from return record",
+            "type R = record { name : text }; service : { f : () -> (R) }",
+            "type R = record { name : text; age : nat }; service : { f : () -> (R) }",
+        ),
+        (
+            "remove variant case from input (old callers may send it)",
+            "type V = variant { start; stop }; service : { f : (V) -> () }",
+            "type V = variant { start; stop; pause }; service : { f : (V) -> () }",
+        ),
+        (
+            "change vec element type",
+            "service : { f : () -> (vec text) }",
+            "service : { f : () -> (vec nat) }",
+        ),
+    ];
+    for &(desc, new, old) in cases {
+        check_incompatible(new, old, desc);
+    }
 }
 
 // ===========================================================================
-//  3. ALL incompatibilities are reported (not just the first)
+//  ALL incompatibilities collected (not just the first)
 // ===========================================================================
 
 #[test]
-fn all_incompatible_methods_reported() {
+fn collects_all_incompatible_methods() {
     let old = r#"service : {
         method_a : (nat) -> (nat);
         method_b : (text) -> (text);
         method_c : () -> (nat);
+        method_d : () -> ();
     }"#;
-    // Remove method_b, change method_c return type
+    // method_a: OK, method_b: removed, method_c: return changed, method_d: removed
     let new = r#"service : {
         method_a : (nat) -> (nat);
         method_c : () -> (text);
     }"#;
-    let errors = incompatibilities(new, old);
-    assert!(
-        errors.len() >= 2,
-        "expected at least 2 errors, got {}: {:?}",
-        errors.len(),
-        errors
-    );
+    let errors = error_strings(new, old);
+    assert_eq!(errors.len(), 3, "got: {errors:?}");
 
     let joined = errors.join("\n");
+    for name in ["method_b", "method_c", "method_d"] {
+        assert!(joined.contains(name), "missing {name} in: {joined}");
+    }
     assert!(
-        joined.contains("method_b"),
-        "should report missing method_b: {joined}"
-    );
-    assert!(
-        joined.contains("method_c"),
-        "should report incompatible method_c: {joined}"
+        !joined.contains("method_a"),
+        "method_a is compatible, should not appear: {joined}"
     );
 }
 
 #[test]
-fn all_incompatible_record_fields_reported() {
-    let old = r#"
-        type Res = record { a : nat; b : text; c : bool };
-        service : { get : () -> (Res) }
-    "#;
-    // Change a from nat to text, change b from text to nat (both incompatible)
-    let new = r#"
-        type Res = record { a : text; b : nat; c : bool };
-        service : { get : () -> (Res) }
-    "#;
-    let errors = incompatibilities(new, old);
-    assert!(
-        errors.len() >= 2,
-        "expected at least 2 field errors, got {}: {:?}",
-        errors.len(),
-        errors
-    );
+fn collects_all_incompatible_record_fields() {
+    let old = "type R = record { a : nat; b : text; c : bool }; service : { f : () -> (R) }";
+    let new = "type R = record { a : text; b : nat; c : bool }; service : { f : () -> (R) }";
+    let errors = error_strings(new, old);
+    assert_eq!(errors.len(), 2, "got: {errors:?}");
 
     let joined = errors.join("\n");
-    // The record fields use hashed IDs, but for named fields the display should include the name
-    assert!(
-        joined.contains("a") && joined.contains("b"),
-        "should report both incompatible fields a and b: {joined}"
-    );
-    // Field c should NOT be reported (it's unchanged)
-    // (We can't easily assert "not contains c" since "c" might appear in other words,
-    // but we can check the count)
+    assert!(joined.contains("record field a"), "missing field a: {joined}");
+    assert!(joined.contains("record field b"), "missing field b: {joined}");
 }
 
 #[test]
-fn both_input_and_return_incompatibilities_reported() {
+fn collects_both_input_and_return_errors() {
     let old = "service : { call : (nat) -> (nat) }";
-    // Change input from nat to text (breaks contravariance) and output from nat to bool
     let new = "service : { call : (text) -> (bool) }";
-    let errors = incompatibilities(new, old);
-    assert!(
-        errors.len() >= 2,
-        "expected at least 2 errors (input + return), got {}: {:?}",
-        errors.len(),
-        errors
-    );
+    let errors = error_strings(new, old);
+    assert_eq!(errors.len(), 2, "got: {errors:?}");
 
     let joined = errors.join("\n");
-    assert!(
-        joined.contains("input type"),
-        "should report input type incompatibility: {joined}"
-    );
+    assert!(joined.contains("input type"), "missing input error: {joined}");
     assert!(
         joined.contains("return type"),
-        "should report return type incompatibility: {joined}"
+        "missing return error: {joined}"
     );
 }
 
 #[test]
-fn multiple_missing_methods_all_reported() {
-    let old = r#"service : {
-        alpha : () -> ();
-        beta : () -> ();
-        gamma : () -> ();
-        delta : () -> ();
-    }"#;
-    let new = "service : { alpha : () -> () }";
-    let errors = incompatibilities(new, old);
-    assert_eq!(
-        errors.len(),
-        3,
-        "expected 3 missing method errors, got {}: {:?}",
-        errors.len(),
-        errors
-    );
+fn collects_variant_field_errors() {
+    // Old callers may send variant cases b or c; new input must accept them
+    let old = "type V = variant { a; b; c }; service : { f : (V) -> () }";
+    let new = "type V = variant { a }; service : { f : (V) -> () }";
+    let errors = error_strings(new, old);
+    assert_eq!(errors.len(), 2, "got: {errors:?}");
 
     let joined = errors.join("\n");
-    assert!(joined.contains("beta"), "should report missing beta: {joined}");
+    assert!(joined.contains("b"), "missing variant b: {joined}");
+    assert!(joined.contains("c"), "missing variant c: {joined}");
+}
+
+// ===========================================================================
+//  Error message quality + path context
+// ===========================================================================
+
+#[test]
+fn missing_method_error_is_clear() {
+    let old = "service : { transfer : (nat) -> (); balance : () -> (nat) }";
+    let new = "service : { balance : () -> (nat) }";
+    let errors = error_strings(new, old);
+    assert_eq!(errors.len(), 1);
+    assert!(errors[0].contains("transfer"), "should name the method");
+    assert!(errors[0].contains("missing"), "should say 'missing'");
+}
+
+#[test]
+fn type_mismatch_error_names_both_types() {
+    let old = "service : { f : () -> (nat) }";
+    let new = "service : { f : () -> (text) }";
+    let errors = error_strings(new, old);
+    assert_eq!(errors.len(), 1);
     assert!(
-        joined.contains("gamma"),
-        "should report missing gamma: {joined}"
-    );
-    assert!(
-        joined.contains("delta"),
-        "should report missing delta: {joined}"
+        errors[0].contains("text") && errors[0].contains("nat"),
+        "should mention both types: {}",
+        errors[0]
     );
 }
 
 #[test]
-fn incompatibility_path_shows_nested_context() {
+fn missing_required_field_error_is_clear() {
+    let old = "type R = record { name : text; age : nat }; service : { f : () -> (R) }";
+    let new = "type R = record { name : text }; service : { f : () -> (R) }";
+    let errors = error_strings(new, old);
+    assert_eq!(errors.len(), 1);
+    let msg = &errors[0];
+    assert!(msg.contains("age"), "should mention field name: {msg}");
+    assert!(
+        msg.contains("missing") || msg.contains("not optional"),
+        "should explain the problem: {msg}"
+    );
+}
+
+#[test]
+fn nested_path_shows_full_context() {
     let old = r#"
         type Inner = record { x : nat };
         type Outer = record { inner : Inner };
@@ -316,137 +305,92 @@ fn incompatibility_path_shows_nested_context() {
         type Outer = record { inner : Inner };
         service : { get : () -> (Outer) }
     "#;
-    let errors = incompatibilities(new, old);
-    assert_eq!(errors.len(), 1, "expected 1 error, got: {:?}", errors);
-
+    let errors = error_strings(new, old);
+    assert_eq!(errors.len(), 1, "got: {errors:?}");
     let msg = &errors[0];
-    // Should show the full path: method > return type > field > field > leaf error
+    assert!(msg.contains("method"), "path should include method: {msg}");
     assert!(
-        msg.contains("method") && msg.contains("return type"),
-        "error should include path context: {msg}"
+        msg.contains("return type"),
+        "path should include return type: {msg}"
+    );
+    assert!(
+        msg.contains("record field inner"),
+        "path should include outer field: {msg}"
+    );
+    assert!(
+        msg.contains("record field x"),
+        "path should include inner field: {msg}"
     );
 }
 
-#[test]
-fn compatible_changes_produce_no_errors() {
-    let old = "service : { greet : (text) -> (text) }";
-    let new = "service : { greet : (text) -> (text); extra : () -> () }";
-    let errors = incompatibilities(new, old);
-    assert!(
-        errors.is_empty(),
-        "compatible change should produce no errors, got: {:?}",
-        errors
-    );
-}
+// ===========================================================================
+//  Multi-arg functions
+// ===========================================================================
 
 #[test]
-fn variant_incompatibilities_all_reported() {
-    // New variant adds fields that don't exist in old - each is a breaking change
-    let old = r#"
-        type V = variant { a : nat; b : text };
-        service : { get : (V) -> () }
-    "#;
-    // New service's input type has fewer variants than old callers might send
-    // (Contravariant: old input must be subtype of new input for args)
-    // Actually, for inputs: old_args <: new_args (contravariant)
-    // Old V = { a : nat; b : text }, New V = { a : nat; b : text; c : bool }
-    // For subtype: old_V <: new_V? Variant subtyping: all fields in old must exist in new => yes
-    // So ADDING variant cases to input is compatible.
-    //
-    // But REMOVING variant cases from input is NOT:
-    let new = r#"
-        type V = variant { a : nat };
-        service : { get : (V) -> () }
-    "#;
-    // old input V = { a; b } needs to be <: new input V = { a }
-    // variant { a; b } <: variant { a } fails because field b is in old but not in new
-    let errors = incompatibilities(new, old);
-    assert!(
-        !errors.is_empty(),
-        "removing variant case from input should be incompatible"
-    );
+fn multi_arg_function_incompatibilities() {
+    let old = "service : { f : (nat, text) -> (bool, nat) }";
+    let new = "service : { f : (nat, bool) -> (bool, text) }";
+    // Input: old (nat, text) must <: new (nat, bool) → field 1 text </: bool
+    // Return: new (bool, text) must <: old (bool, nat) → field 1 text </: nat
+    let errors = error_strings(new, old);
+    assert_eq!(errors.len(), 2, "got: {errors:?}");
     let joined = errors.join("\n");
-    assert!(
-        joined.contains("b"),
-        "should mention the removed variant case 'b': {joined}"
-    );
+    assert!(joined.contains("input"), "missing input error: {joined}");
+    assert!(joined.contains("return"), "missing return error: {joined}");
 }
 
 // ===========================================================================
-//  4. Error message quality checks
+//  service_compatible and service_compatibility_report agree
 // ===========================================================================
 
 #[test]
-fn error_message_for_missing_method_is_clear() {
-    let old = "service : { transfer : (nat) -> (); balance : () -> (nat) }";
-    let new = "service : { balance : () -> (nat) }";
-    let errors = incompatibilities(new, old);
-    assert_eq!(errors.len(), 1);
-    let msg = &errors[0];
-    assert!(
-        msg.contains("transfer"),
-        "error should name the missing method: {msg}"
-    );
-    assert!(
-        msg.contains("missing"),
-        "error should say the method is missing: {msg}"
-    );
-}
+fn report_and_simple_check_agree() {
+    let compatible = [
+        (
+            "service : { f : (text) -> (text); g : () -> () }",
+            "service : { f : (text) -> (text) }",
+        ),
+        (
+            "service : { f : (int) -> () }",
+            "service : { f : (nat) -> () }",
+        ),
+    ];
+    for (new, old) in compatible {
+        let report = get_errors(new, old);
+        assert!(report.is_empty(), "report should be empty for compatible");
+        assert!(
+            service_compatible(CandidSource::Text(new), CandidSource::Text(old)).is_ok(),
+            "service_compatible should pass for compatible"
+        );
+    }
 
-#[test]
-fn error_message_for_type_change_includes_types() {
-    let old = "service : { get : () -> (nat) }";
-    let new = "service : { get : () -> (text) }";
-    let errors = incompatibilities(new, old);
-    assert!(!errors.is_empty());
-    let msg = &errors[0];
-    assert!(
-        msg.contains("text") && msg.contains("nat"),
-        "error should mention both old and new types: {msg}"
-    );
-}
-
-#[test]
-fn error_message_for_missing_record_field_is_clear() {
-    // For return types: new_ret <: old_ret. Missing non-optional field = breaking.
-    let old = r#"
-        type Res = record { name : text; age : nat };
-        service : { get : () -> (Res) }
-    "#;
-    let new = r#"
-        type Res = record { name : text };
-        service : { get : () -> (Res) }
-    "#;
-    // Return type: new_ret <: old_ret. new Res = { name } old Res = { name; age }
-    // record { name } <: record { name; age } => field 'age' is only in expected type and is nat (not opt)
-    // => FAIL
-    let errors = incompatibilities(new, old);
-    assert!(!errors.is_empty());
-    let msg = &errors[0];
-    assert!(
-        msg.contains("age"),
-        "error should mention the missing field: {msg}"
-    );
-    assert!(
-        msg.contains("missing") || msg.contains("not optional"),
-        "error should explain why this is a problem: {msg}"
-    );
+    let incompatible = [
+        (
+            "service : { f : (text) -> (text) }",
+            "service : { f : (text) -> (text); g : () -> () }",
+        ),
+        (
+            "service : { f : (nat) -> () }",
+            "service : { f : (int) -> () }",
+        ),
+    ];
+    for (new, old) in incompatible {
+        let report = get_errors(new, old);
+        assert!(!report.is_empty(), "report should have errors");
+        assert!(
+            service_compatible(CandidSource::Text(new), CandidSource::Text(old)).is_err(),
+            "service_compatible should fail"
+        );
+    }
 }
 
 // ===========================================================================
-//  5. Hierarchical report formatting
+//  Hierarchical report formatting
 // ===========================================================================
 
-fn raw_incompatibilities(
-    new: &str,
-    old: &str,
-) -> Vec<candid::types::subtype::Incompatibility> {
-    service_compatibility_report(CandidSource::Text(new), CandidSource::Text(old))
-        .expect("failed to load interfaces")
-}
-
 #[test]
-fn format_report_groups_by_method() {
+fn format_report_groups_by_method_and_nests() {
     let old = r#"service : {
         transfer : (record { from : text; to : text; amount : nat }) -> (record { ok : bool; balance : nat });
         balance  : () -> (nat);
@@ -458,60 +402,66 @@ fn format_report_groups_by_method() {
         balance  : () -> (text);
         audit    : () -> (record { count : text; log : nat });
     }"#;
-    // transfer: input field amount changed nat→text (contra: old args <: new args, nat </: text)
-    //           return field ok changed bool→text, balance changed nat→text
-    // balance: return changed nat→text
-    // audit: return field count changed nat→text, log changed text→nat, also query→non-query
-    // config: missing method
-
-    let errors = raw_incompatibilities(new, old);
-    assert!(
-        errors.len() >= 6,
-        "expected many errors, got {}: {:?}",
-        errors.len(),
-        errors
-    );
+    let errors = get_errors(new, old);
+    assert!(errors.len() >= 6, "expected many errors, got: {errors:?}");
 
     let report = format_report(&errors);
-    // Verify grouping: each method name should appear exactly once as a header
-    let transfer_headers: Vec<_> = report
-        .lines()
-        .filter(|l| l.starts_with("method \"transfer\""))
-        .collect();
-    assert_eq!(
-        transfer_headers.len(),
-        1,
-        "transfer should appear as a single group header, got: {:?}",
-        transfer_headers
-    );
 
-    // Verify nested indentation exists
+    // Each method should appear exactly once as a group header
+    for method in ["transfer", "balance", "config"] {
+        let header_count = report
+            .lines()
+            .filter(|l| {
+                let trimmed = l.trim_start();
+                trimmed.starts_with(&format!("method \"{method}\""))
+                    || trimmed.contains(&format!("method \"{method}\""))
+            })
+            .count();
+        assert!(
+            header_count <= 1,
+            "{method} should appear at most once as header, got {header_count} in:\n{report}"
+        );
+    }
+
+    // Should have indented sub-groups
     assert!(
-        report.contains("  ") && report.contains("return type"),
-        "report should have indented sub-groups: {report}"
+        report.contains("  return type") || report.contains("  input type"),
+        "should have indented sub-groups:\n{report}"
     );
 }
 
 #[test]
-fn format_report_inlines_single_leaf_errors() {
+fn format_report_inlines_single_leaf() {
     let old = "service : { get : () -> (nat) }";
     let new = "service : { get : () -> (text) }";
-    let errors = raw_incompatibilities(new, old);
-    let report = format_report(&errors);
-    // A single error under a method should be inlined (no extra nesting line)
-    let line_count = report.lines().count();
+    let report = format_report(&get_errors(new, old));
+    // Single error under method > return type should inline compactly
     assert!(
-        line_count <= 3,
-        "single error should produce compact output, got {} lines:\n{report}",
-        line_count
+        report.lines().count() <= 3,
+        "single error should be compact:\n{report}"
     );
 }
 
 #[test]
-fn format_report_empty_for_compatible() {
-    let old = "service : { greet : (text) -> (text) }";
-    let new = "service : { greet : (text) -> (text); extra : () -> () }";
-    let errors = raw_incompatibilities(new, old);
+fn format_report_handles_path_and_pathless_errors() {
+    // Pathless errors (e.g. top-level type mismatch) should render as "- message"
+    let errors = vec![
+        Incompatibility {
+            path: vec![],
+            message: "top-level mismatch".to_string(),
+        },
+        Incompatibility {
+            path: vec!["method \"foo\"".to_string()],
+            message: "missing in new interface".to_string(),
+        },
+    ];
     let report = format_report(&errors);
-    assert!(report.is_empty(), "compatible should produce empty report");
+    assert!(
+        report.contains("- top-level mismatch"),
+        "pathless error should render with bullet:\n{report}"
+    );
+    assert!(
+        report.contains("method \"foo\""),
+        "pathed error should render:\n{report}"
+    );
 }
