@@ -474,3 +474,59 @@ fn format_report_handles_path_and_pathless_errors() {
         "pathed error should render:\n{report}"
     );
 }
+
+// ===========================================================================
+//  Input-side message wording
+// ===========================================================================
+
+#[test]
+fn input_record_required_field_added_message_names_correct_side() {
+    let old = "type R = record { name : text }; service : { f : (R) -> () }";
+    let new = "type R = record { name : text; age : nat }; service : { f : (R) -> () }";
+    let errors = error_strings(new, old);
+    assert_eq!(
+        errors.len(),
+        1,
+        "expected exactly one error, got: {errors:?}"
+    );
+    let msg = &errors[0];
+    assert!(
+        !msg.contains("new type is missing"),
+        "message incorrectly blames the new type for the missing field: {msg}"
+    );
+    assert!(msg.contains("age"), "message should mention the field name: {msg}");
+}
+
+#[test]
+fn input_variant_case_removed_message_names_correct_side() {
+    let old = "type V = variant { a; b }; service : { f : (V) -> () }";
+    let new = "type V = variant { a }; service : { f : (V) -> () }";
+    let errors = error_strings(new, old);
+    assert_eq!(
+        errors.len(),
+        1,
+        "expected exactly one error, got: {errors:?}"
+    );
+    let msg = &errors[0];
+    assert!(
+        !msg.contains("new variant has field"),
+        "message incorrectly says the new variant has the dropped case: {msg}"
+    );
+    assert!(msg.contains("b"), "message should mention the variant case name: {msg}");
+}
+
+#[test]
+fn input_arg_count_increase_message_has_correct_counts() {
+    let old = "service : { f : (nat) -> () }";
+    let new = "service : { f : (nat, text) -> () }";
+    let errors = error_strings(new, old);
+    assert!(!errors.is_empty(), "expected at least one error, got none");
+    let msg = errors
+        .iter()
+        .find(|e| e.contains("arg"))
+        .unwrap_or_else(|| panic!("no arg-count error found in: {errors:?}"));
+    assert!(
+        msg.contains("old has 1") && msg.contains("new has 2"),
+        "arg-count message has wrong old/new values: {msg}"
+    );
+}
