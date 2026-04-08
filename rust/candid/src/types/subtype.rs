@@ -176,6 +176,7 @@ pub fn subtype_check_all(
         &RecursionDepth::new(),
         &mut Vec::new(),
         &mut errors,
+        false,
     );
     errors
 }
@@ -193,6 +194,7 @@ fn subtype_collect_(
     depth: &RecursionDepth,
     path: &mut Vec<String>,
     errors: &mut Vec<Incompatibility>,
+    is_input: bool,
 ) {
     let _guard = match depth.guard() {
         Ok(g) => g,
@@ -224,6 +226,7 @@ fn subtype_collect_(
                 depth,
                 path,
                 errors,
+                is_input,
             ),
             (_, Var(id)) => subtype_collect_(
                 report,
@@ -234,6 +237,7 @@ fn subtype_collect_(
                 depth,
                 path,
                 errors,
+                is_input,
             ),
             (Knot(id), _) => subtype_collect_(
                 report,
@@ -244,6 +248,7 @@ fn subtype_collect_(
                 depth,
                 path,
                 errors,
+                is_input,
             ),
             (_, Knot(id)) => subtype_collect_(
                 report,
@@ -254,6 +259,7 @@ fn subtype_collect_(
                 depth,
                 path,
                 errors,
+                is_input,
             ),
             (_, _) => unreachable!(),
         };
@@ -267,7 +273,7 @@ fn subtype_collect_(
         (Empty, _) => (),
         (Nat, Int) => (),
         (Vec(ty1), Vec(ty2)) => {
-            subtype_collect_(report, gamma, env, ty1, ty2, depth, path, errors);
+            subtype_collect_(report, gamma, env, ty1, ty2, depth, path, errors, is_input);
         }
         (Null, Opt(_)) => (),
         // For opt rules we delegate to the existing subtype_ to test the condition,
@@ -299,7 +305,9 @@ fn subtype_collect_(
                 match fields.get(id) {
                     Some(ty1) => {
                         path.push(format!("record field {id}"));
-                        subtype_collect_(report, gamma, env, ty1, ty2, depth, path, errors);
+                        subtype_collect_(
+                            report, gamma, env, ty1, ty2, depth, path, errors, is_input,
+                        );
                         path.pop();
                     }
                     None => {
@@ -310,10 +318,17 @@ fn subtype_collect_(
                         if !is_optional {
                             errors.push(Incompatibility {
                                 path: path.clone(),
-                                message: format!(
-                                    "new type is missing required field {id} (type {ty2}), \
-                                     which is expected by the old type and is not optional"
-                                ),
+                                message: if is_input {
+                                    format!(
+                                        "new service requires field {id} (type {ty2}), \
+                                         which old callers don't provide and is not optional"
+                                    )
+                                } else {
+                                    format!(
+                                        "new type is missing required field {id} (type {ty2}), \
+                                         which is expected by the old type and is not optional"
+                                    )
+                                },
                             });
                         }
                     }
@@ -326,15 +341,24 @@ fn subtype_collect_(
                 match fields.get(id) {
                     Some(ty2) => {
                         path.push(format!("variant field {id}"));
-                        subtype_collect_(report, gamma, env, ty1, ty2, depth, path, errors);
+                        subtype_collect_(
+                            report, gamma, env, ty1, ty2, depth, path, errors, is_input,
+                        );
                         path.pop();
                     }
                     None => {
                         errors.push(Incompatibility {
                             path: path.clone(),
-                            message: format!(
-                                "new variant has field {id} that does not exist in the old type"
-                            ),
+                            message: if is_input {
+                                format!(
+                                    "old callers may send variant case {id}, \
+                                     which the new service no longer handles"
+                                )
+                            } else {
+                                format!(
+                                    "new variant has field {id} that does not exist in the old type"
+                                )
+                            },
                         });
                     }
                 }
@@ -346,7 +370,7 @@ fn subtype_collect_(
                 match meths.get(name) {
                     Some(ty1) => {
                         path.push(format!("method \"{name}\""));
-                        subtype_collect_(report, gamma, env, ty1, ty2, depth, path, errors);
+                        subtype_collect_(report, gamma, env, ty1, ty2, depth, path, errors, false);
                         path.pop();
                     }
                     None => {
@@ -390,10 +414,10 @@ fn subtype_collect_(
             );
         }
         (Class(_, t), _) => {
-            subtype_collect_(report, gamma, env, t, t2, depth, path, errors);
+            subtype_collect_(report, gamma, env, t, t2, depth, path, errors, is_input);
         }
         (_, Class(_, t)) => {
-            subtype_collect_(report, gamma, env, t1, t, depth, path, errors);
+            subtype_collect_(report, gamma, env, t1, t, depth, path, errors, is_input);
         }
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
@@ -438,6 +462,7 @@ fn check_func_params(
             depth,
             path,
             errors,
+            is_input,
         );
         path.pop();
     } else {
@@ -446,11 +471,12 @@ fn check_func_params(
         path.push(if sub_params.len() == sup_params.len() {
             format!("{label} types")
         } else if is_input {
+            // sub_params = old args, sup_params = new args (contravariant swap)
             format!(
                 "{label} types (old has {} arg{}, new has {})",
-                sup_params.len(),
-                if sup_params.len() == 1 { "" } else { "s" },
-                sub_params.len()
+                sub_params.len(),
+                if sub_params.len() == 1 { "" } else { "s" },
+                sup_params.len()
             )
         } else {
             format!(
@@ -461,7 +487,7 @@ fn check_func_params(
             )
         });
         subtype_collect_(
-            report, gamma, env, &sub_tuple, &sup_tuple, depth, path, errors,
+            report, gamma, env, &sub_tuple, &sup_tuple, depth, path, errors, is_input,
         );
         path.pop();
     }
