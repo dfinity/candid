@@ -191,7 +191,26 @@ fn main() -> Result<()> {
                         if strict {
                             subtype::equal(&mut gamma, &env, &t1, &t2)?;
                         } else {
-                            subtype::subtype(&mut gamma, &env, &t1, &t2)?;
+                            let errors =
+                                subtype::subtype_check_all(&mut gamma, &env, &t1, &t2);
+                            if !errors.is_empty() {
+                                let report = subtype::format_report(&errors);
+                                eprintln!(
+                                    "{} {} incompatible change{} found:\n",
+                                    style("Error:").red().bold(),
+                                    errors.len(),
+                                    if errors.len() == 1 { "" } else { "s" }
+                                );
+                                for line in report.lines() {
+                                    eprintln!("  {line}");
+                                }
+                                eprintln!();
+                                bail!(
+                                    "new interface is not backward compatible ({} breaking change{})",
+                                    errors.len(),
+                                    if errors.len() == 1 { "" } else { "s" }
+                                );
+                            }
                         }
                     }
                     _ => {
