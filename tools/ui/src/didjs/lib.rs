@@ -69,7 +69,17 @@ fn subtype(new: String, old: String) -> Result<(), String> {
     let old_actor = check_prog(&mut old_env, &old).unwrap().unwrap();
     let mut gamma = std::collections::HashSet::new();
     let old_actor = new_env.merge_type(old_env, old_actor);
-    subtype::subtype(&mut gamma, &new_env, &new_actor, &old_actor).map_err(|e| e.to_string())
+    let errors = subtype::subtype_check_all(&mut gamma, &new_env, &new_actor, &old_actor);
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        let report = subtype::format_report(&errors);
+        Err(format!(
+            "{} incompatible change{} found:\n\n{report}",
+            errors.len(),
+            if errors.len() == 1 { "" } else { "s" }
+        ))
+    }
 }
 
 fn retrieve(path: &str) -> Option<(&str, &'static [u8])> {
