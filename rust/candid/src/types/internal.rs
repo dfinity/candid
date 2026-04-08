@@ -17,7 +17,7 @@ impl TypeId {
     pub fn of<T: ?Sized>() -> Self {
         let name = std::any::type_name::<T>();
         TypeId {
-            id: TypeId::of::<T> as usize,
+            id: TypeId::of::<T> as *const () as usize,
             name,
         }
     }
