@@ -494,7 +494,10 @@ fn input_record_required_field_added_message_names_correct_side() {
         !msg.contains("new type is missing"),
         "message incorrectly blames the new type for the missing field: {msg}"
     );
-    assert!(msg.contains("age"), "message should mention the field name: {msg}");
+    assert!(
+        msg.contains("age"),
+        "message should mention the field name: {msg}"
+    );
 }
 
 #[test]
@@ -512,7 +515,10 @@ fn input_variant_case_removed_message_names_correct_side() {
         !msg.contains("new variant has field"),
         "message incorrectly says the new variant has the dropped case: {msg}"
     );
-    assert!(msg.contains("b"), "message should mention the variant case name: {msg}");
+    assert!(
+        msg.contains("b"),
+        "message should mention the variant case name: {msg}"
+    );
 }
 
 #[test]
