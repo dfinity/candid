@@ -191,8 +191,7 @@ fn main() -> Result<()> {
                         if strict {
                             subtype::equal(&mut gamma, &env, &t1, &t2)?;
                         } else {
-                            let errors =
-                                subtype::subtype_check_all(&mut gamma, &env, &t1, &t2);
+                            let errors = subtype::subtype_check_all(&mut gamma, &env, &t1, &t2);
                             if !errors.is_empty() {
                                 let report = subtype::format_report(&errors);
                                 eprintln!(

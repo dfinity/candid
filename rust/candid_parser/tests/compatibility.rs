@@ -220,8 +220,14 @@ fn collects_all_incompatible_record_fields() {
     assert_eq!(errors.len(), 2, "got: {errors:?}");
 
     let joined = errors.join("\n");
-    assert!(joined.contains("record field a"), "missing field a: {joined}");
-    assert!(joined.contains("record field b"), "missing field b: {joined}");
+    assert!(
+        joined.contains("record field a"),
+        "missing field a: {joined}"
+    );
+    assert!(
+        joined.contains("record field b"),
+        "missing field b: {joined}"
+    );
 }
 
 #[test]
@@ -232,7 +238,10 @@ fn collects_both_input_and_return_errors() {
     assert_eq!(errors.len(), 2, "got: {errors:?}");
 
     let joined = errors.join("\n");
-    assert!(joined.contains("input type"), "missing input error: {joined}");
+    assert!(
+        joined.contains("input type"),
+        "missing input error: {joined}"
+    );
     assert!(
         joined.contains("return type"),
         "missing return error: {joined}"

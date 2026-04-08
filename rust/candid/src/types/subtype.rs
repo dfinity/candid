@@ -205,6 +205,7 @@ pub fn subtype_check_all_with_config(
 /// Internal collecting variant of `subtype_`. Instead of short-circuiting on
 /// the first error, this continues through all fields/methods/args and pushes
 /// every incompatibility it finds into `errors`.
+#[allow(clippy::too_many_arguments)]
 fn subtype_collect_(
     report: OptReport,
     gamma: &mut Gamma,
@@ -293,21 +294,14 @@ fn subtype_collect_(
         (Null, Opt(_)) => (),
         // For opt rules we delegate to the existing subtype_ to test the condition,
         // since these are probes, not things that generate multiple independent errors.
-        (Opt(ty1), Opt(ty2))
-            if subtype_(report, gamma, env, ty1, ty2, depth).is_ok() =>
-        {
-            ()
-        }
+        (Opt(ty1), Opt(ty2)) if subtype_(report, gamma, env, ty1, ty2, depth).is_ok() => {}
         (_, Opt(ty2))
             if subtype_(report, gamma, env, t1, ty2, depth).is_ok()
                 && !matches!(
                     env.trace_type_with_depth(ty2, depth)
                         .map(|t| t.as_ref().clone()),
                     Ok(Null | Reserved | Opt(_))
-                ) =>
-        {
-            ()
-        }
+                ) => {}
         (_, Opt(_)) => {
             let msg = format!("WARNING: {t1} <: {t2} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/c7659ca/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.");
             match report {
@@ -411,12 +405,10 @@ fn subtype_collect_(
             // Check each argument directly instead of wrapping in a tuple record,
             // so we get clean error paths like "input argument 1" instead of "record field 0".
             check_func_params(
-                report, gamma, env, &f2.args, &f1.args, depth, path, errors,
-                "input", true,
+                report, gamma, env, &f2.args, &f1.args, depth, path, errors, "input", true,
             );
             check_func_params(
-                report, gamma, env, &f1.rets, &f2.rets, depth, path, errors,
-                "return", false,
+                report, gamma, env, &f1.rets, &f2.rets, depth, path, errors, "return", false,
             );
         }
         (Class(_, t), _) => {
@@ -460,7 +452,14 @@ fn check_func_params(
     if sub_params.len() == 1 && sup_params.len() == 1 {
         path.push(format!("{label} type"));
         subtype_collect_(
-            report, gamma, env, &sub_params[0], &sup_params[0], depth, path, errors,
+            report,
+            gamma,
+            env,
+            &sub_params[0],
+            &sup_params[0],
+            depth,
+            path,
+            errors,
         );
         path.pop();
     } else {
@@ -483,7 +482,9 @@ fn check_func_params(
                 sub_params.len()
             )
         });
-        subtype_collect_(report, gamma, env, &sub_tuple, &sup_tuple, depth, path, errors);
+        subtype_collect_(
+            report, gamma, env, &sub_tuple, &sup_tuple, depth, path, errors,
+        );
         path.pop();
     }
 }
