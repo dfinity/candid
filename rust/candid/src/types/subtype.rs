@@ -180,28 +180,6 @@ pub fn subtype_check_all(
     errors
 }
 
-/// Like [`subtype_check_all`] but with configurable opt-rule reporting.
-pub fn subtype_check_all_with_config(
-    report: OptReport,
-    gamma: &mut Gamma,
-    env: &TypeEnv,
-    t1: &Type,
-    t2: &Type,
-) -> Vec<Incompatibility> {
-    let mut errors = Vec::new();
-    subtype_collect_(
-        report,
-        gamma,
-        env,
-        t1,
-        t2,
-        &RecursionDepth::new(),
-        &mut Vec::new(),
-        &mut errors,
-    );
-    errors
-}
-
 /// Internal collecting variant of `subtype_`. Instead of short-circuiting on
 /// the first error, this continues through all fields/methods/args and pushes
 /// every incompatibility it finds into `errors`.
