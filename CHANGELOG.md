@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-04-08
+
+### didc 0.6.1
+
+* Non-breaking changes:
+  + `didc check` now reports **all** incompatible changes at once, grouped by method, instead of stopping at the first error
+  + Clearer error messages: e.g. "missing in new interface" and "function annotation changed from query to update"
+
+### candid_parser 0.3.1
+
+* Non-breaking changes:
+  + Add `service_compatibility_report()` returning a full grouped compatibility report as a string
+
+### Candid 0.10.27
+
+* Non-breaking changes:
+  + Add `subtype_check_all()` to collect all subtype errors in one pass (previously stopped at the first)
+  + Add `Incompatibility` type and `format_report()` for structured, hierarchical error reporting
+
 ## 2026-03-18
 
 ### Candid 0.10.26
