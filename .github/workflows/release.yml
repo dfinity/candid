@@ -25,7 +25,7 @@ jobs:
             artifact_name: target/arm-unknown-linux-gnueabihf/release/didc
             asset_name: didc-arm32
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install Rust toolchain
         run: rustup show active-toolchain || rustup toolchain install
       - name: Add arm target
@@ -44,13 +44,13 @@ jobs:
         run: cargo build --package didc --release --locked
       - name: Cross build
         if: matrix.name == 'arm'
-        uses: actions-rs/cargo@v1
+        uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505 # v1.0.3
         with:
           use-cross: true
           command: build
           args: --package didc --target arm-unknown-linux-gnueabihf --release --locked
       - name: "Upload assets"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ matrix.asset_name }}
           path: ${{ matrix.artifact_name }}
@@ -70,7 +70,7 @@ jobs:
     steps:
       - name: Get executable
         id: download
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ${{ matrix.asset_name }}
       - name: Executable runs
@@ -90,11 +90,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get executable
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ${{ matrix.asset_name }}
       - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v2
+        uses: svenstaro/upload-release-action@29e53e917877a24fad85510ded594ab3c9ca12de # 2.11.5
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: didc
@@ -105,9 +105,9 @@ jobs:
     name: Build and publish candid_ui canister
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
       - name: Install Rust toolchain
@@ -127,7 +127,7 @@ jobs:
         run: |
           cp tools/ui/target/wasm32-unknown-unknown/canister/didjs_opt.wasm candid_ui.wasm
       - name: Upload candid_ui to release
-        uses: svenstaro/upload-release-action@v2
+        uses: svenstaro/upload-release-action@29e53e917877a24fad85510ded594ab3c9ca12de # 2.11.5
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: candid_ui.wasm
