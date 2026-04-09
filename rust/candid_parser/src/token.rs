@@ -223,7 +223,7 @@ impl LexicalError {
     }
 }
 
-pub(crate) type ParserError = ParseError<usize, Token, LexicalError>;
+pub type ParserError = ParseError<usize, Token, LexicalError>;
 pub fn error<E: ToString>(err: E) -> ParserError {
     ParseError::User {
         error: LexicalError::new(err, 0..0),
