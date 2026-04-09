@@ -39,6 +39,25 @@ pub fn service_compatible(new: CandidSource, old: CandidSource) -> Result<()> {
     Ok(())
 }
 
+/// Check compatibility of two service types, returning **all** incompatibilities
+/// instead of stopping at the first one.
+///
+/// Returns an empty `Vec` when the new interface is backward-compatible with the old one.
+pub fn service_compatibility_report(
+    new: CandidSource,
+    old: CandidSource,
+) -> Result<Vec<candid::types::subtype::Incompatibility>> {
+    let (mut env, t1) = new.load()?;
+    let t1 = t1.ok_or_else(|| Error::msg("new interface has no main service type"))?;
+    let (env2, t2) = old.load()?;
+    let t2 = t2.ok_or_else(|| Error::msg("old interface has no main service type"))?;
+    let mut gamma = std::collections::HashSet::new();
+    let t2 = env.merge_type(env2, t2);
+    Ok(candid::types::subtype::subtype_check_all(
+        &mut gamma, &env, &t1, &t2,
+    ))
+}
+
 /// Check structural equality of two service types
 pub fn service_equal(left: CandidSource, right: CandidSource) -> Result<()> {
     let (mut env, t1) = left.load()?;
