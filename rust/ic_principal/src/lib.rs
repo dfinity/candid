@@ -440,3 +440,17 @@ impl rangemap::StepLite for Principal {
         new
     }
 }
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for Principal {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Principal".into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "string",
+            "description": "ICP principal in text format."
+        })
+    }
+}

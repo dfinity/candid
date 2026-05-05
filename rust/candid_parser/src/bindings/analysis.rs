@@ -42,12 +42,10 @@ pub fn chase_type<'a>(
 ) -> Result<()> {
     use TypeInner::*;
     match t.as_ref() {
-        Var(id) => {
-            if seen.insert(id) {
-                let t = env.find_type(id)?;
-                chase_type(seen, res, env, t)?;
-                res.push(id);
-            }
+        Var(id) if seen.insert(id) => {
+            let t = env.find_type(id)?;
+            chase_type(seen, res, env, t)?;
+            res.push(id);
         }
         Opt(ty) | Vec(ty) => chase_type(seen, res, env, ty)?,
         Record(fs) | Variant(fs) => {
@@ -147,10 +145,8 @@ pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTree
     ) -> Result<()> {
         use TypeInner::*;
         match t.as_ref() {
-            Var(id) => {
-                if seen.insert(id) {
-                    res.insert(id);
-                }
+            Var(id) if seen.insert(id) => {
+                res.insert(id);
             }
             Opt(ty) | Vec(ty) => go(seen, res, _env, ty)?,
             Record(fs) | Variant(fs) => {
