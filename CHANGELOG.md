@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### candid_parser
+
+* Bug fixes:
+  + Motoko binding: emit `Float32` for Candid `float32` instead of panicking. `float32` support was added to Motoko in version 1.4.0.
+
 ## 2026-04-08
 
 ### didc 0.6.1
