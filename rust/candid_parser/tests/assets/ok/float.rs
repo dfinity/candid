@@ -4,6 +4,7 @@
 use candid::{self, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult as Result;
 
+
 pub struct Service(pub Principal);
 impl Service {
   pub async fn identity32(&self, arg0: &f32) -> Result<(f32,)> {
