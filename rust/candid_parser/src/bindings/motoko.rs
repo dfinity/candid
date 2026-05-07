@@ -123,7 +123,10 @@ fn type_display_name(env: &TypeEnv, id: &str) -> String {
     let camel = to_upper_camel_case(id);
     let collision = camel.is_empty()
         || camel == "Self"
-        || env.0.keys().any(|k| k != id && to_upper_camel_case(k) == camel);
+        || env
+            .0
+            .keys()
+            .any(|k| k != id && to_upper_camel_case(k) == camel);
     if collision {
         let fallback = escape_str(id);
         // escape_str doesn't know about "Self" being reserved, so guard explicitly.
@@ -154,7 +157,9 @@ fn pp_ty_rich<'a>(env: &'a TypeEnv, ty: &'a Type, syntax: Option<&'a IDLType>) -
         (TypeInner::Opt(ref inner), Some(IDLType::OptT(syntax))) => {
             str("?").append(pp_ty_rich(env, inner, Some(syntax)))
         }
-        (TypeInner::Vec(ref inner), Some(IDLType::VecT(syntax))) => pp_vec(env, inner, Some(syntax)),
+        (TypeInner::Vec(ref inner), Some(IDLType::VecT(syntax))) => {
+            pp_vec(env, inner, Some(syntax))
+        }
         (_, _) => pp_ty(env, ty),
     }
 }
@@ -246,7 +251,11 @@ fn pp_rets<'a>(env: &'a TypeEnv, args: &'a [Type]) -> RcDoc<'a> {
     pp_args(env, args)
 }
 
-fn pp_service<'a>(env: &'a TypeEnv, serv: &'a [(String, Type)], syntax: Option<&'a [syntax::Binding]>) -> RcDoc<'a> {
+fn pp_service<'a>(
+    env: &'a TypeEnv,
+    serv: &'a [(String, Type)],
+    syntax: Option<&'a [syntax::Binding]>,
+) -> RcDoc<'a> {
     let methods = serv.iter().map(|(id, func)| {
         let mut docs = RcDoc::nil();
         let mut syntax_field_ty = None;
@@ -291,7 +300,11 @@ fn find_field<'a>(
     (docs, syntax_field_ty)
 }
 
-fn pp_record<'a>(env: &'a TypeEnv, fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) -> RcDoc<'a> {
+fn pp_record<'a>(
+    env: &'a TypeEnv,
+    fields: &'a [Field],
+    syntax: Option<&'a [syntax::TypeField]>,
+) -> RcDoc<'a> {
     if is_tuple_fields(fields) {
         return pp_tuple(env, fields);
     }
@@ -304,7 +317,11 @@ fn pp_record<'a>(env: &'a TypeEnv, fields: &'a [Field], syntax: Option<&'a [synt
     enclose_space("{", concat(fields, ";"), "}")
 }
 
-fn pp_variant<'a>(env: &'a TypeEnv, fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) -> RcDoc<'a> {
+fn pp_variant<'a>(
+    env: &'a TypeEnv,
+    fields: &'a [Field],
+    syntax: Option<&'a [syntax::TypeField]>,
+) -> RcDoc<'a> {
     if fields.is_empty() {
         return str("{#}");
     }
@@ -321,7 +338,11 @@ fn pp_variant<'a>(env: &'a TypeEnv, fields: &'a [Field], syntax: Option<&'a [syn
     enclose_space("{", concat(fields, ";"), "}")
 }
 
-fn pp_class<'a>(env: &'a TypeEnv, (args, ty): (&'a [Type], &'a Type), syntax: Option<&'a IDLType>) -> RcDoc<'a> {
+fn pp_class<'a>(
+    env: &'a TypeEnv,
+    (args, ty): (&'a [Type], &'a Type),
+    syntax: Option<&'a IDLType>,
+) -> RcDoc<'a> {
     let doc = pp_args(env, args).append(" -> async ");
     match ty.as_ref() {
         TypeInner::Service(_) => doc.append(pp_ty_rich(env, ty, syntax)),
@@ -357,7 +378,8 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type, syntax: Option<&'a IDLActorType>
                 docs,
             }) => {
                 let docs = pp_docs(docs);
-                docs.append(self_doc).append(pp_service(env, serv, Some(fields)))
+                docs.append(self_doc)
+                    .append(pp_service(env, serv, Some(fields)))
             }
             _ => pp_service(env, serv, None),
         },
