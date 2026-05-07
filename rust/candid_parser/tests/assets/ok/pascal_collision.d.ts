@@ -8,7 +8,7 @@ import type { IDL } from '@icp-sdk/core/candid';
 export type FooBaz = bigint;
 export type fooBar = string;
 /**
- * Two names that both map to the same PascalCase form — both should fall back.
+ * Two names that map to the same PascalCase form — first alphabetically wins, second falls back.
  */
 export type foo_bar = bigint;
 export type foo_baz = string;

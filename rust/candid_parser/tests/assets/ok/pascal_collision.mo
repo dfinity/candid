@@ -4,8 +4,8 @@
 module {
   /// PascalCase output collides with a verbatim env key — foo_baz should fall back.
   public type FooBaz = Nat;
-  public type fooBar = Text;
-  /// Two names that both map to the same PascalCase form — both should fall back.
+  public type FooBar = Text;
+  /// Two names that map to the same PascalCase form — first alphabetically wins, second falls back.
   public type foo_bar = Nat;
   public type foo_baz = Text;
 

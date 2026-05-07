@@ -1,4 +1,4 @@
-// Two names that both map to the same PascalCase form — both should fall back.
+// Two names that map to the same PascalCase form — first alphabetically wins, second falls back.
 type foo_bar = nat;
 type fooBar = text;
 // PascalCase output collides with a verbatim env key — foo_baz should fall back.

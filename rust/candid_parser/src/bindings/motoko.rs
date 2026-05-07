@@ -7,7 +7,7 @@ use candid::pretty::utils::*;
 use candid::types::{Field, FuncMode, Function, Label, SharedLabel, Type, TypeInner};
 use candid::TypeEnv;
 use pretty::RcDoc;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // The definition of tuple is language specific.
 fn is_tuple(t: &Type) -> bool {
@@ -97,10 +97,8 @@ fn escape(id: &str, is_method: bool) -> RcDoc<'_> {
     RcDoc::text(escape_str(id))
 }
 
-// Capitalises the first letter and each letter following '_', stripping
-// underscores. Returns None for names that don't start with a lowercase letter;
-// those are left as-is by build_names. A trailing '_' is silently consumed
-// (the capitalize flag is set but no character follows).
+// Strips underscores and capitalises each segment start. Returns None for
+// names not starting with lowercase (left as-is). Trailing '_' is consumed.
 fn to_pascal_case(s: &str) -> Option<String> {
     if !s.starts_with(|c: char| c.is_ascii_lowercase()) {
         return None;
@@ -120,44 +118,32 @@ fn to_pascal_case(s: &str) -> Option<String> {
     Some(out)
 }
 
-// Precomputes the display name for every type alias in env. Used once at the
-// top of compile so all printer functions can do O(1) name lookups.
-//
-// A PascalCase name is used when it is unambiguous: no other name in env maps
-// to the same PascalCase form (count == 1), the result is not the reserved
-// "Self", and no verbatim env key already has that name.
+// Precomputes display names for all env type aliases.
 fn build_names(env: &TypeEnv) -> HashMap<String, String> {
-    let mut pascal_counts: HashMap<String, usize> = HashMap::new();
-    for id in env.0.keys() {
-        if let Some(pascal) = to_pascal_case(id) {
-            *pascal_counts.entry(pascal).or_default() += 1;
-        }
-    }
-
-    env.0
+    // Baseline: every id gets its escaped original name (collision-free).
+    let mut names: HashMap<String, String> = env
+        .0
         .keys()
         .map(|id| {
-            let display = match to_pascal_case(id) {
-                Some(pascal)
-                    if pascal_counts.get(&pascal).copied() == Some(1)
-                        && pascal != "Self"
-                        && !env.0.contains_key(&pascal) =>
-                {
-                    pascal
-                }
-                _ => {
-                    let fallback = escape_str(id);
-                    // escape_str doesn't reserve "Self"; guard explicitly.
-                    if fallback == "Self" {
-                        format!("{fallback}_")
-                    } else {
-                        fallback
-                    }
-                }
-            };
-            (id.clone(), display)
+            let f = escape_str(id);
+            // escape_str doesn't reserve "Self".
+            (id.clone(), if f == "Self" { format!("{f}_") } else { f })
         })
-        .collect()
+        .collect();
+
+    // Upgrade to PascalCase where the name is unclaimed (first alphabetically wins).
+    let mut taken: HashSet<String> = names.values().cloned().collect();
+    for id in env.0.keys() {
+        if let Some(pascal) = to_pascal_case(id) {
+            if pascal != "Self" && !taken.contains(&pascal) {
+                let display = names.get_mut(id).unwrap();
+                taken.remove(display.as_str());
+                taken.insert(pascal.clone());
+                *display = pascal;
+            }
+        }
+    }
+    names
 }
 
 #[derive(Copy, Clone)]
