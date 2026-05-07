@@ -95,7 +95,7 @@ fn escape(id: &str, is_method: bool) -> RcDoc<'_> {
     RcDoc::text(escape_str(id))
 }
 
-fn to_upper_camel_case(s: &str) -> String {
+fn to_pascal_case(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut capitalize = true;
     for c in s.chars() {
@@ -112,7 +112,7 @@ fn to_upper_camel_case(s: &str) -> String {
     out
 }
 
-// Returns the UpperCamelCase display name for a type alias, falling back to the
+// Returns the PascalCase display name for a type alias, falling back to the
 // original escaped name when:
 //   - the transform produces an empty string (e.g. id = "_"),
 //   - the result would collide with another alias in env, or
@@ -120,13 +120,13 @@ fn to_upper_camel_case(s: &str) -> String {
 //     present, and being conservative here avoids surprises if a file is later
 //     extended with a service declaration).
 fn type_display_name(env: &TypeEnv, id: &str) -> String {
-    let camel = to_upper_camel_case(id);
+    let camel = to_pascal_case(id);
     let collision = camel.is_empty()
         || camel == "Self"
         || env
             .0
             .keys()
-            .any(|k| k != id && to_upper_camel_case(k) == camel);
+            .any(|k| k != id && to_pascal_case(k) == camel);
     if collision {
         let fallback = escape_str(id);
         // escape_str doesn't know about "Self" being reserved, so guard explicitly.
