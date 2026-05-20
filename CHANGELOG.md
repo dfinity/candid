@@ -1,8 +1,14 @@
 # Changelog
 
-## Unreleased
+## 2026-05-20
 
-### candid_parser
+### Candid 0.10.28
+
+* Bug fixes:
+  + Fix LEB128/SLEB128 fast path silently truncating `Nat`/`Int` values near the `u64`/`i64` boundary during decoding
+  + Fix `Int::decode` truncating large magnitudes due to fast-path leakage
+
+### candid_parser 0.3.2
 
 * Bug fixes:
   + Motoko binding: emit `Float32` for Candid `float32` instead of panicking. `float32` support was added to Motoko in version 1.4.0.
