@@ -354,8 +354,12 @@ impl<'de> Deserializer<'de> {
         self.try_read_leb_u64()?
             .ok_or_else(|| Error::msg("LEB128 overflow"))
     }
-    /// Returns `Ok(None)` on overflow (value too large for u64), `Err` on I/O error (e.g. EOF).
+    /// Returns `Ok(None)` on overflow (value may not fit in u64), `Err` on I/O error (e.g. EOF).
     /// This lets callers fall through to a bignum path on overflow without swallowing real errors.
+    ///
+    /// The fast path covers up to 9 LEB128 bytes (values that fit in 63 bits, i.e. < 2^63).
+    /// Larger values bail to the bignum path, which keeps this hot loop simple — values needing
+    /// the 10th byte may or may not fit in u64, and the boundary check would just slow it down.
     #[inline]
     fn try_read_leb_u64(&mut self) -> Result<Option<u64>> {
         let slice = self.input.get_ref();
@@ -369,22 +373,22 @@ impl<'de> Deserializer<'de> {
             }
             let byte = slice[pos];
             pos += 1;
-            let low = (byte & 0x7f) as u64;
-            if shift < 64 {
-                result |= low << shift;
-            }
+            result |= ((byte & 0x7f) as u64) << shift;
             if byte & 0x80 == 0 {
                 self.input.set_position(pos as u64);
                 return Ok(Some(result));
             }
             shift += 7;
-            if shift >= 70 {
+            if shift >= 63 {
                 return Ok(None);
             }
         }
     }
-    /// Returns `Ok(None)` on overflow (value too large for i64), `Err` on I/O error (e.g. EOF).
+    /// Returns `Ok(None)` on overflow (value may not fit in i64), `Err` on I/O error (e.g. EOF).
     /// This lets callers fall through to a bignum path on overflow without swallowing real errors.
+    ///
+    /// The fast path covers up to 9 LEB128 bytes (values in roughly -2^62 .. 2^62). Larger
+    /// values bail to the bignum path, keeping this hot loop simple.
     #[inline]
     fn try_read_leb_i64(&mut self) -> Result<Option<i64>> {
         let slice = self.input.get_ref();
@@ -399,19 +403,16 @@ impl<'de> Deserializer<'de> {
             }
             byte = slice[pos];
             pos += 1;
-            let low = (byte & 0x7f) as i64;
-            if shift < 64 {
-                result |= low << shift;
-            }
+            result |= ((byte & 0x7f) as i64) << shift;
             shift += 7;
             if byte & 0x80 == 0 {
                 break;
             }
-            if shift >= 70 {
+            if shift >= 63 {
                 return Ok(None);
             }
         }
-        if shift < 64 && byte & 0x40 != 0 {
+        if byte & 0x40 != 0 {
             result |= !0i64 << shift;
         }
         self.input.set_position(pos as u64);
