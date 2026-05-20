@@ -123,6 +123,40 @@ fn test_bignum_roundtrip_across_fast_path_boundary() {
     }
 }
 
+// Regression for a pre-existing bug in `Int::decode`'s small-value fast
+// path (#717): at shift=63 the `fits_i64` check treated a chunk whose
+// non-data bits matched the sign-extension pattern as "fits", even when
+// the byte's continuation bit was set. The shift `low_bits << 63` then
+// silently truncated, and the resulting `i64` value was carried into the
+// `BigInt` slow path as a corrupt seed — e.g. `i128::MAX` round-tripped
+// to -1.
+#[test]
+fn test_int_decode_large_magnitude_roundtrip() {
+    use std::ops::Mul;
+    for v in [
+        i128::MAX,
+        i128::MIN,
+        i128::MAX - 1,
+        i128::MIN + 1,
+        1_i128 << 100,
+        -(1_i128 << 100),
+        (1_i128 << 126) - 1,
+        -(1_i128 << 126),
+    ] {
+        let n = Int::from(v);
+        let bytes = Encode!(&n).unwrap();
+        assert_eq!(Decode!(&bytes, Int).unwrap(), n, "Int roundtrip {v}");
+    }
+    // Beyond i128: ±(i128::MAX * 3).
+    let huge = Int::from(i128::MAX).mul(Int::from(3));
+    assert_eq!(Decode!(&Encode!(&huge).unwrap(), Int).unwrap(), huge);
+    let huge_neg = Int::from(i128::MIN).mul(Int::from(3));
+    assert_eq!(
+        Decode!(&Encode!(&huge_neg).unwrap(), Int).unwrap(),
+        huge_neg
+    );
+}
+
 #[test]
 fn test_fixed_number() {
     all_check(42u8, "4449444c00017b2a");

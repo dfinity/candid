@@ -319,7 +319,11 @@ impl Int {
 
             let fits_i64 = if shift < 57 {
                 true
-            } else if shift < 64 {
+            } else if shift < 64 && byte & 0x80 == 0 {
+                // Only the terminal byte can confirm the value fits in i64:
+                // if continuation is set, more bytes follow at shifts >= 64
+                // and the value's high bits won't fit. Without this guard,
+                // `low_bits << shift` would silently truncate bits 1..6.
                 let remaining_bits = 64 - shift;
                 if (byte & 0x40) != 0 {
                     (low_bits | !0x7f) >> (remaining_bits - 1) == -1
