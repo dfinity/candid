@@ -796,6 +796,45 @@ fn test_vector() {
     );
 }
 
+/// Regression test: decoding a `BTreeMap<String, V>` where `V` is an enum containing
+/// a `BTreeMap<K, V2>` with a non-text enum key used to fail with "Type mismatch".
+///
+/// The bug was that `text_fast_path`, set to `true` by the outer string-keyed map's
+/// `deserialize_map`, leaked into the inner map's `next_key_seed`.  There it
+/// suppressed the update of `expect_type`/`wire_type` for the inner key, so that
+/// `deserialize_enum` on the inner key saw a stale (non-variant) `expect_type` and
+/// raised a subtyping error at `de.rs:1380`.
+#[test]
+fn test_nested_map_non_text_key() {
+    use std::collections::BTreeMap;
+
+    #[derive(CandidType, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    enum MapKey {
+        A,
+        B,
+    }
+
+    #[derive(CandidType, Deserialize, Debug, Clone, PartialEq)]
+    enum Value {
+        Fun(BTreeMap<MapKey, u32>),
+        Lit(String),
+    }
+
+    let mut inner: BTreeMap<MapKey, u32> = BTreeMap::new();
+    inner.insert(MapKey::A, 1);
+    inner.insert(MapKey::B, 2);
+
+    let mut outer: BTreeMap<String, Value> = BTreeMap::new();
+    outer.insert("fun".to_string(), Value::Fun(inner));
+    outer.insert("lit".to_string(), Value::Lit("hello".to_string()));
+
+    // encode → decode must round-trip without "Type mismatch" panic
+    let bytes = encode_one(&outer).unwrap();
+    let config = get_config();
+    let decoded = decode_one_with_config::<BTreeMap<String, Value>>(&bytes, &config).unwrap();
+    assert_eq!(outer, decoded);
+}
+
 #[test]
 fn test_collection() {
     use std::collections::{BTreeMap, BTreeSet, HashMap};

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-05-27
+
+### Candid 0.10.29
+
+* Bug fixes:
+  + Fix `text_fast_path` leakage between nested maps: an inner map with non-text keys would fail with a "Type mismatch" error when enclosed in an outer map with text keys
+
 ## 2026-05-20
 
 ### Candid 0.10.28

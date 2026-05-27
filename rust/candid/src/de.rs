@@ -1280,7 +1280,12 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
 
                                 let result = visitor.visit_map(Compound::new(
                                     self,
-                                    Style::Map { len, expect, wire },
+                                    Style::Map {
+                                        len,
+                                        expect,
+                                        wire,
+                                        key_text_fast,
+                                    },
                                 ));
                                 self.text_fast_path = false;
                                 #[cfg(feature = "bignum")]
@@ -1426,6 +1431,7 @@ enum Style {
         len: usize,
         expect: (Type, Type),
         wire: (Type, Type),
+        key_text_fast: bool,
     },
 }
 
@@ -1701,19 +1707,26 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                 ref mut len,
                 ref expect,
                 ref wire,
+                key_text_fast,
             } => {
                 if *len == 0 {
                     return Ok(None);
                 }
                 *len -= 1;
                 #[cfg(feature = "bignum")]
-                let any_fast = self.de.text_fast_path || self.de.bignum_vec_fast_path.is_some();
+                let any_fast = key_text_fast || self.de.bignum_vec_fast_path.is_some();
                 #[cfg(not(feature = "bignum"))]
-                let any_fast = self.de.text_fast_path;
+                let any_fast = key_text_fast;
                 if !any_fast {
                     self.de.add_cost(4)?;
                 }
-                if !self.de.text_fast_path {
+                // Always set text_fast_path based on THIS map's key type. The global
+                // text_fast_path may be true from an enclosing map with text keys; using
+                // it directly would skip setting expect_type/wire_type for non-text keys
+                // of this (inner) map, leading to a "Type mismatch" when deserializing
+                // those keys.
+                self.de.text_fast_path = key_text_fast;
+                if !key_text_fast {
                     self.de.expect_type = expect.0.clone();
                     self.de.wire_type = wire.0.clone();
                 }
