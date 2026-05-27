@@ -1280,7 +1280,12 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
 
                                 let result = visitor.visit_map(Compound::new(
                                     self,
-                                    Style::Map { len, expect, wire, key_text_fast },
+                                    Style::Map {
+                                        len,
+                                        expect,
+                                        wire,
+                                        key_text_fast,
+                                    },
                                 ));
                                 self.text_fast_path = false;
                                 #[cfg(feature = "bignum")]
