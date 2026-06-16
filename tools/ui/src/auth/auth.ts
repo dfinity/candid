@@ -1,10 +1,10 @@
-import { Principal } from "@dfinity/principal"
-import { authClient } from "../candid"
+import { Principal } from "@icp-sdk/core/principal"
+import { authClient, createAuthClient } from "../candid"
 import { refresh_actor } from "../index"
 import { dfinityLogo, copyIcon } from "./icons"
 
 export async function renderAuth() {
-  const is_logged = await authClient?.isAuthenticated();
+  const is_logged = authClient?.isAuthenticated() ?? false;
   is_logged ? await insertLogout() : insertLoginForm();
 }
 
@@ -66,18 +66,17 @@ async function insertLoginForm() {
     }
 
     buttonLogin.addEventListener("click", async () => {
-      let config: any = {
-        identityProvider: provider,
-        onSuccess: async () => {
-          refresh_actor(cid);
-          insertLogout();
-        },
-        onError: (err: any) => console.error(err),
-      };
-      if (origin) {
-        config = {...config, derivationOrigin: origin};
+      try {
+        const client = createAuthClient({
+          identityProvider: provider!,
+          ...(origin ? { derivationOrigin: origin } : {}),
+        });
+        await client.signIn();
+        refresh_actor(cid);
+        await insertLogout();
+      } catch (err) {
+        console.error(err);
       }
-      await authClient?.login(config);
     });
   } catch (err) {
     console.error(err);
@@ -87,11 +86,11 @@ async function insertLoginForm() {
   }
 }
 
-function insertLogout() {
+async function insertLogout() {
   const auth = document.getElementById("authentication");
   auth!.innerHTML = "";
 
-  CopyId();
+  await CopyId();
   LogoutButton();
 }
 
@@ -110,7 +109,7 @@ function LogoutButton() {
   auth!.appendChild(buttonLogout);
 }
 
-function CopyId() {
+async function CopyId() {
   if (!authClient) {
     return;
   }
@@ -119,7 +118,8 @@ function CopyId() {
 
   const copyText = document.createElement("span");
 
-  const id = authClient.getIdentity().getPrincipal().toString();
+  const identity = await authClient.getIdentity();
+  const id = identity.getPrincipal().toString();
   const idShort = id.slice(0, 5) + "..." + id.slice(-5);
   copyText.innerText = idShort;
 
@@ -143,6 +143,6 @@ function CopyId() {
 }
 
 async function logout() {
-  await authClient?.logout();
+  await authClient?.signOut();
   window.location.reload();
 }
