@@ -7,16 +7,26 @@ The frontend `ui` fetches the Candid interface from the running canister (curren
 
 ## Build
 
-You need `dfx`, `cargo`, `npm` and `wasm-opt` for building the canister.
+You need [`icp`](https://cli.internetcomputer.org), `cargo`, `npm`, `wasm-opt` and
+`ic-wasm` for building the canister. The frontend is bundled with [Vite](https://vite.dev).
 
 ```bash
 cd ui/
 npm install
-dfx start --background
-dfx canister create --all
-dfx build
-dfx canister install --all
+icp network start -d   # start a local replica in the background
+icp deploy             # build + deploy the didjs canister locally
 ```
+
+To deploy to mainnet (the `ic` environment), which targets the existing
+`a4gq6-oaaaa-aaaab-qaa4q-cai` canister:
+
+```bash
+icp deploy -e ic
+```
+
+Project configuration lives in `icp.yaml`. Canister id mappings are stored under
+`.icp/`: the mainnet mapping (`.icp/data/mappings/ic.ids.json`) is committed, while
+local replica state under `.icp/cache/` is ephemeral and git-ignored.
 
 ## Usage
 
