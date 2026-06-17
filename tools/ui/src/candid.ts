@@ -1,9 +1,10 @@
 import { EXTERNAL_CONFIG_PROMISE } from './external';
-import { Actor, HttpAgent, ActorSubclass, CanisterStatus, MANAGEMENT_CANISTER_ID } from '@icp-sdk/core/agent';
+import { Actor, HttpAgent, ActorSubclass, CanisterStatus } from '@icp-sdk/core/agent';
 import {
   IDL, InputBox, renderInput, renderValue
 } from '@icp-sdk/core/candid';
 import {Principal} from '@icp-sdk/core/principal'
+import { IcManagementCanister } from '@icp-sdk/canisters/ic-management';
 import './candid.css';
 import { AuthClient, type AuthClientCreateOptions } from "@icp-sdk/auth/client";
 
@@ -141,30 +142,10 @@ function timestampToString(nanoseconds: bigint) {
 let last_log_idx: bigint = -1n;
 export async function getCanisterLogs(canisterId: Principal, logger: any) {
   try {
-    const managementInterface: IDL.InterfaceFactory = ({ IDL }) => {
-      const CanisterLogRecord = IDL.Record({
-        idx: IDL.Nat64,
-        timestamp_nanos: IDL.Nat64,
-        content: IDL.Vec(IDL.Nat8),
-      });
-      return IDL.Service({
-        fetch_canister_logs: IDL.Func(
-          [IDL.Record({ canister_id: IDL.Principal })],
-          [IDL.Record({ canister_log_records: IDL.Vec(CanisterLogRecord) })],
-          ['query'],
-        ),
-      });
-    };
-    // fetch_canister_logs is a management-canister query that must be routed to
-    // the target canister's subnet, so the effective canister id is the target.
-    const actor = Actor.createActor(managementInterface, {
-      agent,
-      canisterId: MANAGEMENT_CANISTER_ID,
-      effectiveCanisterId: canisterId,
-    });
-    const logs = await actor.fetch_canister_logs({ canister_id: canisterId }) as {
-      canister_log_records: Array<{ idx: bigint; timestamp_nanos: bigint; content: Uint8Array }>;
-    };
+    // fetch_canister_logs is a management-canister query; IcManagementCanister
+    // routes it to the target canister's subnet via the effective canister id.
+    const management = IcManagementCanister.create({ agent });
+    const logs = await management.fetchCanisterLogs(canisterId);
     let array = logs.canister_log_records;
     const idx = array.findIndex((e) => e.idx > last_log_idx);
     if (idx > 0) {

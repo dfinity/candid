@@ -10,6 +10,7 @@
   },
   "devDependencies": {
     "@icp-sdk/auth": "^7.1.0",
+    "@icp-sdk/canisters": "^3.6.0",
     "@icp-sdk/core": "^5.4.0",
     "typescript": "^5.6.2",
     "vite": "^6.0.0",
