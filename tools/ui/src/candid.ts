@@ -1,11 +1,12 @@
 import { EXTERNAL_CONFIG_PROMISE } from './external';
-import { Actor, HttpAgent, ActorSubclass, CanisterStatus, getManagementCanister } from '@dfinity/agent';
+import { Actor, HttpAgent, ActorSubclass, CanisterStatus } from '@icp-sdk/core/agent';
 import {
   IDL, InputBox, renderInput, renderValue
-} from '@dfinity/candid';
-import {Principal} from '@dfinity/principal'
+} from '@icp-sdk/core/candid';
+import {Principal} from '@icp-sdk/core/principal'
+import { IcManagementCanister } from '@icp-sdk/canisters/ic-management';
 import './candid.css';
-import { AuthClient } from "@dfinity/auth-client";
+import { AuthClient, type AuthClientCreateOptions } from "@icp-sdk/auth/client";
 
 declare var flamegraph: any;
 declare var d3: any;
@@ -20,11 +21,27 @@ function isKnownMainnet(agent: HttpAgent) {
 
 export let authClient: AuthClient | undefined;
 
+// Construct (or reconstruct) the shared AuthClient. The @icp-sdk/auth client
+// takes the identity provider and derivation origin at construction time
+// (unlike the old callback-based login()), so callers that know the provider
+// — e.g. the login button derives it from the `ii` query param — build it here.
+export function createAuthClient(options?: AuthClientCreateOptions): AuthClient {
+  authClient = new AuthClient({
+    idleOptions: {
+      disableIdle: true,
+      disableDefaultIdleCallback: true,
+    },
+    ...options,
+  });
+  return authClient;
+}
+
 const agent = HttpAgent.createSync();
 if (!isKnownMainnet(agent)) {
   agent.fetchRootKey();
 }
 
+// TODO this should come back from a cookie like with the asset canister
 function getCanisterId(): Principal {
   // Check the query params.
   const maybeCanisterId = new URLSearchParams(window.location.search).get(
@@ -81,16 +98,12 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   const dataUri = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(js);
   const candid: any = await eval('import("' + dataUri + '")');
 
-  authClient = authClient ?? (await AuthClient.create({
-    idleOptions: {
-      disableIdle: true,
-      disableDefaultIdleCallback: true,
-    },
-  }))
-  if (await authClient.isAuthenticated()) {
-    agent.replaceIdentity(authClient.getIdentity());
+  const client = authClient ?? createAuthClient();
+  if (client.isAuthenticated()) {
+    const identity = await client.getIdentity();
+    agent.replaceIdentity(identity);
     console.log("Authenticated with Internet Identity Principal")
-    console.log(authClient.getIdentity().getPrincipal().toString())
+    console.log(identity.getPrincipal().toString())
   }
 
   return Actor.createActor(candid.idlFactory, { agent, canisterId });
@@ -129,8 +142,10 @@ function timestampToString(nanoseconds: bigint) {
 let last_log_idx: bigint = -1n;
 export async function getCanisterLogs(canisterId: Principal, logger: any) {
   try {
-    const actor = getManagementCanister({ agent });
-    const logs = await actor.fetch_canister_logs({ canister_id: canisterId });
+    // fetch_canister_logs is a management-canister query; IcManagementCanister
+    // routes it to the target canister's subnet via the effective canister id.
+    const management = IcManagementCanister.create({ agent });
+    const logs = await management.fetchCanisterLogs(canisterId);
     let array = logs.canister_log_records;
     const idx = array.findIndex((e) => e.idx > last_log_idx);
     if (idx > 0) {
@@ -170,14 +185,11 @@ export async function getCycles(canisterId: Principal): Promise<bigint|undefined
 
 export async function getNames(canisterId: Principal) {
   try {
-    const paths : CanisterStatus.Path[] = [{
-      kind: 'metadata',
-      path: 'name',
-      key: 'name',
-      decodeStrategy: 'raw',
-    }];
+    const paths : CanisterStatus.Path[] = [
+      new CanisterStatus.CustomPath('name', 'name', 'raw'),
+    ];
     const status = await CanisterStatus.request({ agent, canisterId, paths });
-    const blob = status.get('name') as ArrayBuffer;
+    const blob = status.get('name') as Uint8Array;
     const decoded = IDL.decode([IDL.Vec(IDL.Tuple(IDL.Nat16, IDL.Text))], blob)[0] as Array<[number,string]>;
     decoded.forEach(([id, name]) => names[id] = name);
   } catch(err) {

@@ -9,11 +9,9 @@
     "dev": "vite"
   },
   "devDependencies": {
-    "@dfinity/agent": "2.1.3",
-    "@dfinity/candid": "2.1.3",
-    "@dfinity/auth-client": "2.1.3",
-    "@dfinity/identity": "2.1.3",
-    "@dfinity/principal": "2.1.3",
+    "@icp-sdk/auth": "^7.1.0",
+    "@icp-sdk/canisters": "^3.6.0",
+    "@icp-sdk/core": "^5.4.0",
     "typescript": "^5.6.2",
     "vite": "^6.0.0",
     "vite-plugin-css-injected-by-js": "^3.5.2"
