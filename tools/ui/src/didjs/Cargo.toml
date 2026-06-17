@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 [dependencies]
 candid = "0.10"
 candid_parser = "0.1"
-ic-cdk = "0.19"
+ic-cdk = "0.20"
 ic-http-certification = { git = "https://github.com/dfinity/response-verification", rev = "35dd2bd316682cbd3d33720af7e1dd14ffc47b50" }
 hex = "0.4.3"
 percent-encoding = "2.3"

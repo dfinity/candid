@@ -32,7 +32,7 @@ export function createAuthClient(options?: AuthClientCreateOptions): AuthClient 
   return authClient;
 }
 
-const canisterEnv = getCanisterEnv<{readonly "PUBLIC_CANISTER_ID:didjs": string}>();
+const canisterEnv = getCanisterEnv<{readonly "CANISTER_ID": string}>();
 const agent = HttpAgent.createSync();
 agent.rootKey = canisterEnv.IC_ROOT_KEY;
 
@@ -262,7 +262,7 @@ async function renderFlameGraph(profiler: any) {
 
 async function didToJs(candid_source: string): Promise<undefined | string> {
   // call didjs canister
-  const didjs_id = canisterEnv["PUBLIC_CANISTER_ID:didjs"];
+  const didjs_id = canisterEnv["CANISTER_ID"];
   const didjs_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
     did_to_js: IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
   });

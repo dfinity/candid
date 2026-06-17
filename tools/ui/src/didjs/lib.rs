@@ -1,7 +1,7 @@
 use candid::types::{subtype, Type, TypeInner};
 use candid_parser::{check_prog, IDLProg, TypeEnv};
 use ic_cdk::api::{
-    certified_data_set, data_certificate, env_var_count, env_var_name, env_var_value, root_key,
+    certified_data_set, data_certificate, root_key,
 };
 use ic_cdk::{init, post_upgrade};
 use ic_http_certification::{
@@ -11,7 +11,7 @@ use ic_http_certification::{
 };
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 #[ic_cdk::query]
 fn did_to_js(prog: String) -> Option<String> {
@@ -126,9 +126,7 @@ fn http_request(request: HttpRequest) -> HttpResponse<'static> {
     response
 }
 
-
 // Storage
-
 
 // The static assets served by this canister, baked into the wasm at build time.
 const INDEX_HTML: &[u8] = include_bytes!("../../dist/didjs/index.html");
@@ -161,36 +159,20 @@ thread_local! {
     static NOT_FOUND: RefCell<Option<CertifiedHttpResponse>> = const { RefCell::new(None) };
 }
 
-// The `ic_env` cookie carries the canister environment (the IC root key and any
-// `PUBLIC_*` environment variables) to the frontend. It is only attached to
-// `text/html` responses. Mirrors the asset canister in dfinity/sdk:
-// src/canisters/frontend/ic-certified-assets/src/{cookies,system_context/canister_env}.rs
+// The `ic_env` cookie carries environment data compatible with the canister environment
+// variables cookie. It is only attached to `text/html` responses.
 const SET_COOKIE_HEADER_NAME: &str = "Set-Cookie";
 const IC_ENV_COOKIE_NAME: &str = "ic_env";
-const IC_ROOT_KEY_VALUE_KEY: &str = "ic_root_key";
-const PUBLIC_ENV_VAR_NAME_PREFIX: &str = "PUBLIC_";
-const COOKIE_VALUES_SEPARATOR: &str = "&";
 
-// Builds the (URL-encoded) `ic_env` cookie value from the canister environment:
-// `ic_root_key=<hex>` followed by each `PUBLIC_*` env var, joined by `&`.
+// Builds the (URL-encoded) `ic_env` cookie value
+// `ic_root_key=<hex>` and CANISTER_ID, joined by `&`.
 fn encoded_canister_env() -> String {
-    let mut values = vec![format!(
-        "{IC_ROOT_KEY_VALUE_KEY}={}",
-        hex::encode(root_key())
-    )];
+    let values = [
+        format!("ic_root_key={}", hex::encode(root_key())),
+        format!("CANISTER_ID={}", ic_cdk::api::canister_self()),
+    ];
 
-    // BTreeMap keeps the env vars in a stable, sorted order.
-    let mut public_env_vars = BTreeMap::new();
-    for i in 0..env_var_count() {
-        let name = env_var_name(i);
-        if name.starts_with(PUBLIC_ENV_VAR_NAME_PREFIX) {
-            let value = env_var_value(&name);
-            public_env_vars.insert(name, value);
-        }
-    }
-    values.extend(public_env_vars.iter().map(|(k, v)| format!("{k}={v}")));
-
-    utf8_percent_encode(&values.join(COOKIE_VALUES_SEPARATOR), NON_ALPHANUMERIC).to_string()
+    utf8_percent_encode(&values.join("&"), NON_ALPHANUMERIC).to_string()
 }
 
 // Certification
