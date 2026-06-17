@@ -1,23 +1,17 @@
 use candid::types::{subtype, Type, TypeInner};
-use candid_parser::{check_prog, CandidType, Deserialize, IDLProg, TypeEnv};
-use ic_cdk::api::{data_certificate, set_certified_data};
+use candid_parser::{check_prog, IDLProg, TypeEnv};
+use ic_cdk::api::{
+    certified_data_set, data_certificate, env_var_count, env_var_name, env_var_value, root_key,
+};
 use ic_cdk::{init, post_upgrade};
 use ic_http_certification::{
-    utils::{add_skip_certification_header, skip_certification_certified_data},
-    HttpResponse,
+    utils::add_v2_certificate_header, DefaultCelBuilder, DefaultResponseCertification,
+    HttpCertification, HttpCertificationPath, HttpCertificationTree, HttpCertificationTreeEntry,
+    HttpRequest, HttpResponse, CERTIFICATE_EXPRESSION_HEADER_NAME,
 };
-
-#[derive(CandidType, Deserialize)]
-pub struct HeaderField(pub String, pub String);
-
-#[derive(CandidType, Deserialize)]
-pub struct HttpRequest {
-    pub method: String,
-    pub url: String,
-    pub headers: Vec<HeaderField>,
-    #[serde(with = "serde_bytes")]
-    pub body: Vec<u8>,
-}
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
 
 #[ic_cdk::query]
 fn did_to_js(prog: String) -> Option<String> {
@@ -53,6 +47,16 @@ fn binding(prog: String, lang: String) -> Option<String> {
     Some(res)
 }
 
+#[init]
+fn init() {
+    certify_all_assets();
+}
+
+#[post_upgrade]
+fn post_upgrade() {
+    init();
+}
+
 #[ic_cdk::query]
 fn merge_init_args(prog: String, init_args: String) -> Option<String> {
     let (env, actor) = candid_parser::utils::merge_init_args(&prog, &init_args).ok()?;
@@ -82,66 +86,204 @@ fn subtype(new: String, old: String) -> Result<(), String> {
     }
 }
 
-fn retrieve(path: &str) -> Option<(&str, &'static [u8])> {
-    match path {
-        "/index.html" | "/" => Some(("text/html", include_bytes!("../../dist/didjs/index.html"))),
-        "/favicon.ico" => Some((
-            "image/x-icon",
-            include_bytes!("../../dist/didjs/favicon.ico"),
-        )),
-        "/index.js" => Some((
-            "application/javascript",
-            include_bytes!("../../dist/didjs/index.js"),
-        )),
-        _ => None,
-    }
-}
-
-fn get_path(url: &str) -> Option<&str> {
-    url.split('?').next()
-}
-
 #[ic_cdk::query]
 fn http_request(request: HttpRequest) -> HttpResponse<'static> {
     //TODO add /canister_id/ as endpoint when ICQC is available.
-    let path = get_path(request.url.as_str()).unwrap_or("/");
-    let mut response = if let Some((content_type, bytes)) = retrieve(path) {
-        HttpResponse::builder()
-            .with_status_code(200)
-            .with_headers(vec![
-                ("Content-Type".to_string(), content_type.to_string()),
-                ("Content-Length".to_string(), format!("{}", bytes.len())),
-                ("Cache-Control".to_string(), format!("max-age={}", 600)),
-                (
-                    "Cross-Origin-Embedder-Policy".to_string(),
-                    "require-corp".to_string(),
-                ),
-                (
-                    "Cross-Origin-Resource-Policy".to_string(),
-                    "cross-origin".to_string(),
-                ),
-            ])
-            .with_body(bytes)
-            .build()
-    } else {
-        HttpResponse::builder()
-            .with_status_code(404)
-            .with_headers(Vec::new())
-            .with_body(path.as_bytes().to_vec())
-            .build()
-    };
-    add_skip_certification_header(data_certificate().unwrap(), &mut response);
+    let req_path = request.get_path().unwrap_or_else(|_| "/".to_string());
+
+    // Look up the exact-path response, falling back to the certified 404 wildcard.
+    let (tree_path, certified) = RESPONSES.with_borrow(|responses| {
+        if let Some(certified) = responses.get(&req_path) {
+            (HttpCertificationPath::exact(&req_path), certified.clone())
+        } else {
+            (
+                not_found_tree_path(),
+                NOT_FOUND.with_borrow(|n| n.clone().unwrap()),
+            )
+        }
+    });
+
+    let CertifiedHttpResponse {
+        mut response,
+        certification,
+    } = certified;
+
+    HTTP_TREE.with_borrow(|tree| {
+        let witness = tree
+            .witness(
+                &HttpCertificationTreeEntry::new(&tree_path, certification),
+                &req_path,
+            )
+            .unwrap();
+        add_v2_certificate_header(
+            &data_certificate().expect("No data certificate available"),
+            &mut response,
+            &witness,
+            &tree_path.to_expr_path(),
+        );
+    });
+
     response
 }
 
-#[init]
-fn init() {
-    set_certified_data(&skip_certification_certified_data());
+
+// Storage
+
+
+// The static assets served by this canister, baked into the wasm at build time.
+const INDEX_HTML: &[u8] = include_bytes!("../../dist/didjs/index.html");
+const FAVICON: &[u8] = include_bytes!("../../dist/didjs/favicon.ico");
+const INDEX_JS: &[u8] = include_bytes!("../../dist/didjs/index.js");
+
+// `/` and `/index.html` both serve the SPA entry point.
+const ASSETS: &[(&str, &str, &[u8])] = &[
+    ("/", "text/html", INDEX_HTML),
+    ("/index.html", "text/html", INDEX_HTML),
+    ("/favicon.ico", "image/x-icon", FAVICON),
+    ("/index.js", "application/javascript", INDEX_JS),
+];
+
+// Body returned (and certified) for any request that doesn't match a known asset.
+const NOT_FOUND_BODY: &[u8] = b"Not found";
+
+// A pre-certified response, ready to be served alongside its tree witness.
+#[derive(Clone)]
+struct CertifiedHttpResponse {
+    response: HttpResponse<'static>,
+    certification: HttpCertification,
 }
 
-#[post_upgrade]
-fn post_upgrade() {
-    init();
+thread_local! {
+    static HTTP_TREE: RefCell<HttpCertificationTree> = RefCell::new(HttpCertificationTree::default());
+    // Exact-path responses, keyed by request path.
+    static RESPONSES: RefCell<HashMap<String, CertifiedHttpResponse>> = RefCell::new(HashMap::new());
+    // Wildcard fallback served for any unmatched path.
+    static NOT_FOUND: RefCell<Option<CertifiedHttpResponse>> = const { RefCell::new(None) };
+}
+
+// The `ic_env` cookie carries the canister environment (the IC root key and any
+// `PUBLIC_*` environment variables) to the frontend. It is only attached to
+// `text/html` responses. Mirrors the asset canister in dfinity/sdk:
+// src/canisters/frontend/ic-certified-assets/src/{cookies,system_context/canister_env}.rs
+const SET_COOKIE_HEADER_NAME: &str = "Set-Cookie";
+const IC_ENV_COOKIE_NAME: &str = "ic_env";
+const IC_ROOT_KEY_VALUE_KEY: &str = "ic_root_key";
+const PUBLIC_ENV_VAR_NAME_PREFIX: &str = "PUBLIC_";
+const COOKIE_VALUES_SEPARATOR: &str = "&";
+
+// Builds the (URL-encoded) `ic_env` cookie value from the canister environment:
+// `ic_root_key=<hex>` followed by each `PUBLIC_*` env var, joined by `&`.
+fn encoded_canister_env() -> String {
+    let mut values = vec![format!(
+        "{IC_ROOT_KEY_VALUE_KEY}={}",
+        hex::encode(root_key())
+    )];
+
+    // BTreeMap keeps the env vars in a stable, sorted order.
+    let mut public_env_vars = BTreeMap::new();
+    for i in 0..env_var_count() {
+        let name = env_var_name(i);
+        if name.starts_with(PUBLIC_ENV_VAR_NAME_PREFIX) {
+            let value = env_var_value(&name);
+            public_env_vars.insert(name, value);
+        }
+    }
+    values.extend(public_env_vars.iter().map(|(k, v)| format!("{k}={v}")));
+
+    utf8_percent_encode(&values.join(COOKIE_VALUES_SEPARATOR), NON_ALPHANUMERIC).to_string()
+}
+
+// Certification
+
+fn build_response(
+    status_code: u16,
+    content_type: &str,
+    body: &'static [u8],
+    cel_expr_str: &str,
+    encoded_canister_env: &str,
+) -> HttpResponse<'static> {
+    let mut headers = vec![
+        (
+            CERTIFICATE_EXPRESSION_HEADER_NAME.to_string(),
+            cel_expr_str.to_string(),
+        ),
+        ("Content-Type".to_string(), content_type.to_string()),
+        ("Content-Length".to_string(), format!("{}", body.len())),
+        ("Cache-Control".to_string(), format!("max-age={}", 600)),
+        (
+            "Cross-Origin-Embedder-Policy".to_string(),
+            "require-corp".to_string(),
+        ),
+        (
+            "Cross-Origin-Resource-Policy".to_string(),
+            "cross-origin".to_string(),
+        ),
+    ];
+
+    // Attach the canister environment cookie to HTML responses only.
+    if content_type == "text/html" {
+        headers.push((
+            SET_COOKIE_HEADER_NAME.to_string(),
+            format!("{IC_ENV_COOKIE_NAME}={encoded_canister_env}; SameSite=Lax"),
+        ));
+    }
+
+    HttpResponse::builder()
+        .with_status_code(status_code)
+        .with_headers(headers)
+        .with_body(body)
+        .build()
+}
+
+fn certify_all_assets() {
+    let canister_env = encoded_canister_env();
+
+    // We certify the full response (no excluded headers) and exclude the request.
+    let cel = DefaultCelBuilder::response_only_certification()
+        .with_response_certification(DefaultResponseCertification::response_header_exclusions(
+            vec![],
+        ))
+        .build();
+    let cel_str = cel.to_string();
+
+    HTTP_TREE.with_borrow_mut(|tree| {
+        // Certify each static asset at its exact path.
+        for (path, content_type, body) in ASSETS {
+            let response = build_response(200, content_type, body, &cel_str, &canister_env);
+            let certification = HttpCertification::response_only(&cel, &response, None).unwrap();
+            let tree_path = HttpCertificationPath::exact(*path);
+            tree.insert(&HttpCertificationTreeEntry::new(&tree_path, certification));
+            RESPONSES.with_borrow_mut(|responses| {
+                responses.insert(
+                    path.to_string(),
+                    CertifiedHttpResponse {
+                        response,
+                        certification,
+                    },
+                );
+            });
+        }
+
+        // Certify a 404 response under a wildcard path, covering every other request.
+        let response = build_response(404, "text/plain", NOT_FOUND_BODY, &cel_str, &canister_env);
+        let certification = HttpCertification::response_only(&cel, &response, None).unwrap();
+        tree.insert(&HttpCertificationTreeEntry::new(
+            not_found_tree_path(),
+            certification,
+        ));
+        NOT_FOUND.with_borrow_mut(|not_found| {
+            *not_found = Some(CertifiedHttpResponse {
+                response,
+                certification,
+            });
+        });
+
+        certified_data_set(tree.root_hash());
+    });
+}
+
+fn not_found_tree_path() -> HttpCertificationPath<'static> {
+    HttpCertificationPath::wildcard("")
 }
 
 ic_cdk::export_candid!();
