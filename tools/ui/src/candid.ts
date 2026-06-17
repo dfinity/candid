@@ -78,19 +78,9 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
     }
   }
   if (!js) {
+    // Read the interface from the canister's `candid:service` metadata — the
+    // standard, certified way for a canister to expose its Candid interface.
     js = await getDidJsFromMetadata(canisterId);
-    if (!js) {
-      try {
-        js = await getDidJsFromTmpHack(canisterId);
-      } catch(err) {
-        if (/no query method/.test(err as any)) {
-          console.warn(err);
-          js = undefined;
-        } else {
-          throw(err);
-        }
-      }
-    }
   }
   if (!js) {
     throw new Error('Cannot fetch candid file');
@@ -201,14 +191,20 @@ async function getDidJsFromPostMessage(canisterId: Principal): Promise<undefined
   return new Promise((resolve,reject)=>{})
 }
 
+
 async function getDidJsFromMetadata(canisterId: Principal): Promise<undefined | string> {
-  const status = await CanisterStatus.request({ agent, canisterId, paths: ['candid'] });
-  const did = status.get('candid') as string | null;
-  if (did) {
-    return didToJs(did);
-  } else {
-    return undefined;
+  // The 'candid' path resolves to the `candid:service` metadata section and is
+  // read (and certified) via the canister's read_state endpoint.
+  try {
+    const status = await CanisterStatus.request({ agent, canisterId, paths: ['candid'] });
+    const did = status.get('candid') as string | null;
+    if (did) {
+      return didToJs(did);
+    }
+  } catch (err) {
+    console.warn('Failed to read candid:service metadata:', err);
   }
+  return undefined;
 }
 
 export async function getProfiling(canisterId: Principal): Promise<Array<[number, bigint]>|undefined> {
@@ -291,15 +287,6 @@ async function renderFlameGraph(profiler: any) {
     d3.select("#chart").datum(profiling).call(chart);
     div.id = 'old-chart';
   }
-}
-
-async function getDidJsFromTmpHack(canisterId: Principal): Promise<undefined | string> {
-  const common_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
-    __get_candid_interface_tmp_hack: IDL.Func([], [IDL.Text], ['query']),
-  });
-  const actor: ActorSubclass = Actor.createActor(common_interface, { agent, canisterId });
-  const candid_source = await actor.__get_candid_interface_tmp_hack() as string;
-  return didToJs(candid_source);
 }
 
 async function didToJs(candid_source: string): Promise<undefined | string> {
