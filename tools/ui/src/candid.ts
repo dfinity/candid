@@ -5,6 +5,7 @@ import {
 } from '@icp-sdk/core/candid';
 import {Principal} from '@icp-sdk/core/principal'
 import { IcManagementCanister } from '@icp-sdk/canisters/ic-management';
+import { getCanisterEnv } from '@icp-sdk/core/agent/canister-env';
 import './candid.css';
 import { AuthClient, type AuthClientCreateOptions } from "@icp-sdk/auth/client";
 
@@ -13,11 +14,6 @@ declare var d3: any;
 
 const names: Record<number,string> = {};
 
-function isKnownMainnet(agent: HttpAgent) {
-  // @ts-ignore
-  const hostname = agent.host.hostname;
-  return hostname.endsWith('.icp0.io') || hostname.endsWith('.ic0.app');
-}
 
 export let authClient: AuthClient | undefined;
 
@@ -36,34 +32,9 @@ export function createAuthClient(options?: AuthClientCreateOptions): AuthClient 
   return authClient;
 }
 
+const canisterEnv = getCanisterEnv<{readonly "PUBLIC_CANISTER_ID:didjs": string}>();
 const agent = HttpAgent.createSync();
-if (!isKnownMainnet(agent)) {
-  agent.fetchRootKey();
-}
-
-// TODO this should come back from a cookie like with the asset canister
-function getCanisterId(): Principal {
-  // Check the query params.
-  const maybeCanisterId = new URLSearchParams(window.location.search).get(
-    "canisterId"
-  );
-  if (maybeCanisterId) {
-    return Principal.fromText(maybeCanisterId);
-  }
-
-  // Return the first canister ID when resolving from the right hand side.
-  const domain = window.location.hostname.split(".").reverse();
-  for (const subdomain of domain) {
-    try {
-      if (subdomain.length >= 25) {
-        // The following throws if it can't decode or the checksum is invalid.
-        return Principal.fromText(subdomain);
-      }
-    } catch (_) {}
-  }
-
-  throw new Error("Could not find the canister ID.");
-}
+agent.rootKey = canisterEnv.IC_ROOT_KEY;
 
 export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> {
   let js;
@@ -291,7 +262,7 @@ async function renderFlameGraph(profiler: any) {
 
 async function didToJs(candid_source: string): Promise<undefined | string> {
   // call didjs canister
-  const didjs_id = getCanisterId();
+  const didjs_id = canisterEnv["PUBLIC_CANISTER_ID:didjs"];
   const didjs_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
     did_to_js: IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
   });
