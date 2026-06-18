@@ -6,7 +6,8 @@ import {
 import {Principal} from '@icp-sdk/core/principal'
 import { IcManagementCanister } from '@icp-sdk/canisters/ic-management';
 import { getCanisterEnv } from '@icp-sdk/core/agent/canister-env';
-import { createActor as createProfilerActor, type Profiler } from './bindings/profiler/profiler';
+import { createActor as createProfilerActor } from './bindings/profiler/profiler';
+import { idlFactory as didjsIdlFactory, type _SERVICE as DidjsService } from './bindings/didjs/declarations/didjs.did';
 import './candid.css';
 import { AuthClient, type AuthClientCreateOptions } from "@icp-sdk/auth/client";
 
@@ -252,15 +253,9 @@ async function renderFlameGraph(profiler: any) {
 async function didToJs(candid_source: string): Promise<undefined | string> {
   // call didjs canister
   const didjs_id = canisterEnv["CANISTER_ID"];
-  const didjs_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
-    did_to_js: IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
-  });
-  const didjs: ActorSubclass = Actor.createActor(didjs_interface, { agent, canisterId: didjs_id });
-  const js: any = await didjs.did_to_js(candid_source);
-  if (JSON.stringify(js) === JSON.stringify([])) {
-    return undefined;
-  }
-  return js[0];
+  const didjs = Actor.createActor<DidjsService>(didjsIdlFactory, { agent, canisterId: didjs_id });
+  const [js] = await didjs.did_to_js(candid_source);
+  return js;
 }
 
 function is_query(func: IDL.FuncClass): boolean {

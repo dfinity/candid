@@ -20,6 +20,16 @@ export default defineConfig({
       didFile: "./src/profiler.did",
       outDir: "./src/bindings/profiler",
     }),
+    // Generate typed bindings for the didjs canister's own interface
+    // (`did_to_js` etc.) from its candid definition. The high-level actor
+    // wrapper is disabled because the `subtype` method has a parameter named
+    // `new` (a JS reserved word) that the wrapper can't represent; we use the
+    // low-level idlFactory + _SERVICE from the declarations instead.
+    icpBindgen({
+      didFile: "./src/didjs/didjs.did",
+      outDir: "./src/bindings/didjs",
+      output: { actor: { disabled: true } },
+    }),
   ],
   // Some @dfinity packages reference `global`; map it to `globalThis` for the browser.
   define: {
