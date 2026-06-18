@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import cssInjectedByJsPlugin from "vite-plugin-css-injected-by-js";
+import { icpBindgen } from "@icp-sdk/bindgen/plugins/vite";
 
 // The `didjs` canister embeds the built frontend directly via
 // `include_bytes!("../../dist/didjs/{index.html,index.js,favicon.ico}")`
@@ -11,7 +12,15 @@ import cssInjectedByJsPlugin from "vite-plugin-css-injected-by-js";
 export default defineConfig({
   // Inline imported CSS into the JS bundle (the canister only serves index.js,
   // not a separate stylesheet) — mirrors the previous webpack `style-loader`.
-  plugins: [cssInjectedByJsPlugin()],
+  plugins: [
+    cssInjectedByJsPlugin(),
+    // Generate typed bindings for the fixed ic-wasm profiler interface
+    // (`__get_cycles` / `__get_profiling`) from src/profiler.did.
+    icpBindgen({
+      didFile: "./src/profiler.did",
+      outDir: "./src/bindings/profiler",
+    }),
+  ],
   // Some @dfinity packages reference `global`; map it to `globalThis` for the browser.
   define: {
     global: "globalThis",
