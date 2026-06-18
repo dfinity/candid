@@ -5,7 +5,10 @@ use crate::{
         candid::{pp_docs, pp_label_raw, pp_modes, pp_text},
         utils::{concat, enclose, enclose_space, ident, kwd, lines, str, INDENT_SPACE, LINE_WIDTH},
     },
-    syntax::{Binding, FuncType, IDLActorType, IDLMergedProg, IDLType, PrimType, TypeField},
+    syntax::{
+        Binding, FuncType, IDLActorType, IDLMergedProg, IDLType, IDLTypeWithSpan, PrimType,
+        TypeField,
+    },
 };
 
 fn pp_ty(ty: &IDLType) -> RcDoc<'_> {
@@ -42,10 +45,10 @@ fn pp_ty(ty: &IDLType) -> RcDoc<'_> {
 
 fn pp_field(field: &TypeField, is_variant: bool) -> RcDoc<'_> {
     let docs = pp_docs(&field.docs);
-    let ty_doc = if is_variant && field.typ == IDLType::PrimT(PrimType::Null) {
+    let ty_doc = if is_variant && matches!(field.typ.kind, IDLType::PrimT(PrimType::Null)) {
         RcDoc::nil()
     } else {
-        kwd(" :").append(pp_ty(&field.typ))
+        kwd(" :").append(pp_ty(&field.typ.kind))
     };
     docs.append(pp_label_raw(&field.label)).append(ty_doc)
 }
@@ -55,21 +58,21 @@ fn pp_fields(fs: &[TypeField], is_variant: bool) -> RcDoc<'_> {
     enclose_space("{", concat(fields, ";"), "}")
 }
 
-fn pp_opt(ty: &IDLType) -> RcDoc<'_> {
-    kwd("opt").append(pp_ty(ty))
+fn pp_opt(ty: &IDLTypeWithSpan) -> RcDoc<'_> {
+    kwd("opt").append(pp_ty(&ty.kind))
 }
 
-fn pp_vec(ty: &IDLType) -> RcDoc<'_> {
-    if matches!(ty, IDLType::PrimT(PrimType::Nat8)) {
+fn pp_vec(ty: &IDLTypeWithSpan) -> RcDoc<'_> {
+    if matches!(ty.kind, IDLType::PrimT(PrimType::Nat8)) {
         str("blob")
     } else {
-        kwd("vec").append(pp_ty(ty))
+        kwd("vec").append(pp_ty(&ty.kind))
     }
 }
 
 fn pp_record(fs: &[TypeField], is_tuple: bool) -> RcDoc<'_> {
     if is_tuple {
-        let tuple = concat(fs.iter().map(|f| pp_ty(&f.typ)), ";");
+        let tuple = concat(fs.iter().map(|f| pp_ty(&f.typ.kind)), ";");
         kwd("record").append(enclose_space("{", tuple, "}"))
     } else {
         kwd("record").append(pp_fields(fs, false))
@@ -94,12 +97,12 @@ fn pp_method(func: &FuncType) -> RcDoc<'_> {
         .nest(INDENT_SPACE)
 }
 
-fn pp_args(args: &[IDLType]) -> RcDoc<'_> {
-    let doc = concat(args.iter().map(pp_ty), ",");
+fn pp_args(args: &[IDLTypeWithSpan]) -> RcDoc<'_> {
+    let doc = concat(args.iter().map(|ty| pp_ty(&ty.kind)), ",");
     enclose("(", doc, ")")
 }
 
-fn pp_rets(rets: &[IDLType]) -> RcDoc<'_> {
+fn pp_rets(rets: &[IDLTypeWithSpan]) -> RcDoc<'_> {
     pp_args(rets)
 }
 
@@ -110,9 +113,9 @@ fn pp_service(methods: &[Binding]) -> RcDoc<'_> {
 fn pp_service_methods(methods: &[Binding]) -> RcDoc<'_> {
     let methods = methods.iter().map(|b| {
         let docs = pp_docs(&b.docs);
-        let func_doc = match b.typ {
+        let func_doc = match &b.typ.kind {
             IDLType::FuncT(ref f) => pp_method(f),
-            IDLType::VarT(_) => pp_ty(&b.typ),
+            IDLType::VarT(_) => pp_ty(&b.typ.kind),
             _ => unreachable!(),
         };
         docs.append(pp_text(&b.id))
@@ -123,9 +126,9 @@ fn pp_service_methods(methods: &[Binding]) -> RcDoc<'_> {
     enclose_space("{", doc, "}")
 }
 
-fn pp_class<'a>(args: &'a [IDLType], t: &'a IDLType) -> RcDoc<'a> {
+fn pp_class<'a>(args: &'a [IDLTypeWithSpan], t: &'a IDLTypeWithSpan) -> RcDoc<'a> {
     let doc = pp_args(args).append(" ->").append(RcDoc::space());
-    match t {
+    match &t.kind {
         IDLType::ServT(ref serv) => doc.append(pp_service_methods(serv)),
         IDLType::VarT(ref s) => doc.append(s),
         _ => unreachable!(),
@@ -138,16 +141,16 @@ fn pp_defs(prog: &IDLMergedProg) -> RcDoc<'_> {
         docs.append(kwd("type"))
             .append(ident(&b.id))
             .append(kwd("="))
-            .append(pp_ty(&b.typ))
+            .append(pp_ty(&b.typ.kind))
             .append(";")
     }))
 }
 
 fn pp_actor(actor: &IDLActorType) -> RcDoc<'_> {
     let docs = pp_docs(&actor.docs);
-    let service_doc = match actor.typ {
+    let service_doc = match &actor.typ.kind {
         IDLType::ServT(ref serv) => pp_service_methods(serv),
-        IDLType::VarT(_) | IDLType::ClassT(_, _) => pp_ty(&actor.typ),
+        IDLType::VarT(_) | IDLType::ClassT(_, _) => pp_ty(&actor.typ.kind),
         _ => unreachable!(),
     };
     docs.append(kwd("service :")).append(service_doc)

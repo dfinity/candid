@@ -17,7 +17,7 @@ fn find_field<'a>(
     if let Some(bs) = fields {
         if let Some(field) = bs.iter().find(|b| b.label == *label) {
             docs = pp_docs(&field.docs);
-            syntax_field_ty = Some(&field.typ);
+            syntax_field_ty = Some(&field.typ.kind);
         }
     };
     (docs, syntax_field_ty)
@@ -40,10 +40,10 @@ fn pp_ty_rich<'a>(
             pp_service(env, serv, Some(syntax_serv))
         }
         (TypeInner::Opt(ref t), Some(IDLType::OptT(syntax_inner))) => {
-            pp_opt(env, t, Some(syntax_inner), is_ref)
+            pp_opt(env, t, Some(&syntax_inner.kind), is_ref)
         }
         (TypeInner::Vec(ref t), Some(IDLType::VecT(syntax_inner))) => {
-            pp_vec(env, t, Some(syntax_inner), is_ref)
+            pp_vec(env, t, Some(&syntax_inner.kind), is_ref)
         }
         (_, _) => pp_ty(env, ty, is_ref),
     }
@@ -271,7 +271,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], prog: &'a IDLMergedPro
     lines(def_list.iter().map(|id| {
         let ty = env.find_type(id).unwrap();
         let syntax = prog.lookup(id);
-        let syntax_ty = syntax.map(|s| &s.typ);
+        let syntax_ty = syntax.map(|s| &s.typ.kind);
         let docs = syntax
             .map(|b| pp_docs(b.docs.as_ref()))
             .unwrap_or(RcDoc::nil());
@@ -314,7 +314,7 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type, syntax: Option<&'a IDLType>) -> 
             .append(str(" {}")),
         TypeInner::Class(_, t) => {
             if let Some(IDLType::ClassT(_, syntax_t)) = syntax {
-                pp_actor(env, t, Some(syntax_t))
+                pp_actor(env, t, Some(&syntax_t.kind))
             } else {
                 pp_actor(env, t, None)
             }
@@ -338,11 +338,15 @@ import type { IDL } from '@icp-sdk/core/candid';
                 .as_ref()
                 .map(|s| pp_docs(s.docs.as_ref()))
                 .unwrap_or(RcDoc::nil());
-            docs.append(pp_actor(env, actor, syntax_actor.as_ref().map(|s| &s.typ)))
-                .append(RcDoc::line())
-                .append("export declare const idlFactory: IDL.InterfaceFactory;")
-                .append(RcDoc::line())
-                .append("export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];")
+            docs.append(pp_actor(
+                env,
+                actor,
+                syntax_actor.as_ref().map(|s| &s.typ.kind),
+            ))
+            .append(RcDoc::line())
+            .append("export declare const idlFactory: IDL.InterfaceFactory;")
+            .append(RcDoc::line())
+            .append("export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];")
         }
     };
     let doc = RcDoc::text(header)
