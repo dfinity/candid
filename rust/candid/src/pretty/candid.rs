@@ -200,8 +200,12 @@ fn pp_ty_with_doc<'a>(ty: &'a Type, doc: Option<&'a TypeDoc>) -> RcDoc<'a> {
     match ty.as_ref() {
         Record(ref fs) => {
             if ty.is_tuple() && !has_field_docs(doc) {
-                let tuple =
-                    sep_enclose_space(fs.iter().map(|f| pp_ty_with_doc(&f.ty, None)), ";", "{", "}");
+                let tuple = sep_enclose_space(
+                    fs.iter().map(|f| pp_ty_with_doc(&f.ty, None)),
+                    ";",
+                    "{",
+                    "}",
+                );
                 kwd("record").append(tuple)
             } else {
                 kwd("record").append(pp_fields_with_doc(fs, false, doc))

@@ -519,15 +519,21 @@ fn subtype_decode() -> BenchResult {
 // code path. See https://github.com/dfinity/candid/issues/603
 #[bench(raw)]
 fn vec_service() -> BenchResult {
-    use candid::types::{Function, TypeEnv, TypeInner};
+    use candid::types::{ArgType, Function, TypeEnv, TypeInner};
 
     let mut config = DecoderConfig::new();
     config.set_decoding_quota(COST);
 
     let method_type: candid::types::Type = TypeInner::Func(Function {
         modes: vec![],
-        args: vec![TypeInner::Text.into()],
-        rets: vec![TypeInner::Nat64.into()],
+        args: vec![ArgType {
+            name: None,
+            typ: TypeInner::Text.into(),
+        }],
+        rets: vec![ArgType {
+            name: None,
+            typ: TypeInner::Nat64.into(),
+        }],
     })
     .into();
 
