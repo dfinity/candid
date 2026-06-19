@@ -22,7 +22,7 @@ impl TypeId {
     pub fn of<T: ?Sized>() -> Self {
         let name = std::any::type_name::<T>();
         TypeId {
-            id: TypeId::of::<T> as usize,
+            id: TypeId::of::<T> as *const () as usize,
             name,
         }
     }
@@ -75,6 +75,39 @@ impl TypeName {
     }
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TypeDocs {
+    pub named: BTreeMap<String, TypeDoc>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TypeDoc {
+    pub docs: Vec<String>,
+    pub fields: BTreeMap<u32, FieldDoc>,
+}
+
+impl TypeDoc {
+    pub fn is_empty(&self) -> bool {
+        self.docs.is_empty() && self.fields.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FieldDoc {
+    pub docs: Vec<String>,
+    pub ty: Option<Box<TypeDoc>>,
+}
+
+impl FieldDoc {
+    pub fn is_empty(&self) -> bool {
+        self.docs.is_empty()
+            && match self.ty.as_deref() {
+                None => true,
+                Some(doc) => doc.is_empty(),
+            }
+    }
+}
+
 /// Used for `candid_derive::export_service` to generate `TypeEnv` from `Type`.
 ///
 /// It performs a global rewriting of `Type` to resolve:
@@ -89,11 +122,13 @@ impl TypeName {
 #[derive(Default)]
 pub struct TypeContainer {
     pub env: crate::TypeEnv,
+    pub docs: TypeDocs,
 }
 impl TypeContainer {
     pub fn new() -> Self {
         TypeContainer {
             env: crate::TypeEnv::new(),
+            docs: TypeDocs::default(),
         }
     }
     pub fn add<T: CandidType>(&mut self) -> Type {
@@ -119,8 +154,10 @@ impl TypeContainer {
                 }
                 let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
-                    let type_key = TypeKey::from(id.to_string());
+                    let name = id.to_string();
+                    let type_key = TypeKey::from(name.clone());
                     self.env.0.insert(type_key.clone(), res);
+                    self.remember_named_doc(&id, &name);
                     TypeInner::Var(type_key)
                 } else {
                     // if the type is part of an enum, the id won't be recorded.
@@ -140,8 +177,10 @@ impl TypeContainer {
                 .into();
                 let id = ID.with(|n| n.borrow().get(t).cloned());
                 if let Some(id) = id {
-                    let type_key = TypeKey::from(id.to_string());
+                    let name = id.to_string();
+                    let type_key = TypeKey::from(name.clone());
                     self.env.0.insert(type_key.clone(), res);
+                    self.remember_named_doc(&id, &name);
                     TypeInner::Var(type_key)
                 } else {
                     return res;
@@ -149,8 +188,10 @@ impl TypeContainer {
             }
             TypeInner::Knot(id) => {
                 let ty = ENV.with(|e| e.borrow().get(id).unwrap().clone());
-                let type_key = TypeKey::from(id.to_string());
+                let name = id.to_string();
+                let type_key = TypeKey::from(name.clone());
                 self.env.0.insert(type_key.clone(), ty);
+                self.remember_named_doc(id, &name);
                 TypeInner::Var(type_key)
             }
             TypeInner::Func(func) => TypeInner::Func(Function {
@@ -190,6 +231,14 @@ impl TypeContainer {
             t => t.clone(),
         }
         .into()
+    }
+
+    fn remember_named_doc(&mut self, id: &TypeId, name: &str) {
+        if let Some(doc) = find_type_doc(id) {
+            if !doc.is_empty() {
+                self.docs.named.entry(name.to_string()).or_insert(doc);
+            }
+        }
     }
 }
 
@@ -704,6 +753,7 @@ pub fn unroll(t: &Type) -> Type {
 
 thread_local! {
     static ENV: RefCell<BTreeMap<TypeId, Type>> = const { RefCell::new(BTreeMap::new()) };
+    static DOC_ENV: RefCell<BTreeMap<TypeId, TypeDoc>> = const { RefCell::new(BTreeMap::new()) };
     // only used for TypeContainer
     static ID: RefCell<BTreeMap<Type, TypeId>> = const { RefCell::new(BTreeMap::new()) };
     static NAME: RefCell<TypeName> = RefCell::new(TypeName::default());
@@ -711,6 +761,10 @@ thread_local! {
 
 pub fn find_type(id: &TypeId) -> Option<Type> {
     ENV.with(|e| e.borrow().get(id).cloned())
+}
+
+pub fn find_type_doc(id: &TypeId) -> Option<TypeDoc> {
+    DOC_ENV.with(|e| e.borrow().get(id).cloned())
 }
 
 // only for debugging
@@ -724,6 +778,7 @@ pub(crate) fn env_add(id: TypeId, t: Type) {
 }
 pub fn env_clear() {
     ENV.with(|e| e.borrow_mut().clear());
+    DOC_ENV.with(|e| e.borrow_mut().clear());
 }
 
 pub(crate) fn env_id(id: TypeId, t: Type) {
@@ -742,6 +797,10 @@ pub(crate) fn env_id(id: TypeId, t: Type) {
             }
         }
     });
+}
+
+pub(crate) fn env_doc(id: TypeId, doc: TypeDoc) {
+    DOC_ENV.with(|e| e.borrow_mut().insert(id, doc));
 }
 
 pub fn get_type<T>(_v: &T) -> Type

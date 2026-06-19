@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use crate::pretty::utils::*;
 use crate::types::{
-    ArgType, Field, FuncMode, Function, Label, SharedLabel, Type, TypeEnv, TypeInner,
+    ArgType, Field, FieldDoc, FuncMode, Function, Label, SharedLabel, Type, TypeDoc, TypeDocs,
+    TypeEnv, TypeInner,
 };
 use pretty::RcDoc;
 
@@ -127,6 +128,12 @@ pub fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
     lines(docs.iter().map(|line| RcDoc::text("// ").append(line)))
 }
 
+fn maybe_pp_docs<'a>(docs: Option<&'a [String]>) -> RcDoc<'a> {
+    docs.filter(|docs| !docs.is_empty())
+        .map(pp_docs)
+        .unwrap_or_else(RcDoc::nil)
+}
+
 /// This function is kept for backward compatibility.
 ///
 /// It is recommended to use [`pp_label_raw`] instead, which accepts a [`Label`].
@@ -152,6 +159,57 @@ pub(crate) fn pp_field(field: &Field, is_variant: bool) -> RcDoc<'_> {
 
 fn pp_fields(fs: &[Field], is_variant: bool) -> RcDoc<'_> {
     sep_enclose_space(fs.iter().map(|f| pp_field(f, is_variant)), ";", "{", "}")
+}
+
+fn pp_field_with_doc<'a>(
+    field: &'a Field,
+    is_variant: bool,
+    doc: Option<&'a FieldDoc>,
+) -> RcDoc<'a> {
+    let docs = maybe_pp_docs(doc.map(|doc| doc.docs.as_slice()));
+    let ty_doc = if is_variant && *field.ty == TypeInner::Null {
+        RcDoc::nil()
+    } else {
+        kwd(" :").append(pp_ty_with_doc(
+            &field.ty,
+            doc.and_then(|doc| doc.ty.as_deref()),
+        ))
+    };
+    docs.append(pp_label_raw(&field.id)).append(ty_doc)
+}
+
+fn pp_fields_with_doc<'a>(
+    fs: &'a [Field],
+    is_variant: bool,
+    doc: Option<&'a TypeDoc>,
+) -> RcDoc<'a> {
+    let fields = fs.iter().map(|field| {
+        let field_doc = doc.and_then(|doc| doc.fields.get(&field.id.get_id()));
+        pp_field_with_doc(field, is_variant, field_doc)
+    });
+    sep_enclose_space(fields, ";", "{", "}")
+}
+
+fn has_field_docs(doc: Option<&TypeDoc>) -> bool {
+    doc.map(|doc| doc.fields.values().any(|field| !field.is_empty()))
+        .unwrap_or(false)
+}
+
+fn pp_ty_with_doc<'a>(ty: &'a Type, doc: Option<&'a TypeDoc>) -> RcDoc<'a> {
+    use TypeInner::*;
+    match ty.as_ref() {
+        Record(ref fs) => {
+            if ty.is_tuple() && !has_field_docs(doc) {
+                let tuple =
+                    sep_enclose_space(fs.iter().map(|f| pp_ty_with_doc(&f.ty, None)), ";", "{", "}");
+                kwd("record").append(tuple)
+            } else {
+                kwd("record").append(pp_fields_with_doc(fs, false, doc))
+            }
+        }
+        Variant(ref fs) => kwd("variant").append(pp_fields_with_doc(fs, true, doc)),
+        ty => pp_ty_inner(ty),
+    }
 }
 
 pub fn pp_function(func: &Function) -> RcDoc<'_> {
@@ -212,12 +270,24 @@ fn pp_service<'a>(serv: &'a [(String, Type)], docs: Option<&'a DocComments>) -> 
     sep_enclose_space(methods, ";", "{", "}")
 }
 
-fn pp_defs(env: &TypeEnv) -> RcDoc<'_> {
+fn pp_defs_plain(env: &TypeEnv) -> RcDoc<'_> {
     lines(env.to_sorted_iter().map(|(id, ty)| {
         kwd("type")
             .append(ident(id.as_str()))
             .append(kwd("="))
             .append(pp_ty(ty))
+            .append(";")
+    }))
+}
+
+fn pp_defs<'a>(env: &'a TypeEnv, docs: &'a DocComments) -> RcDoc<'a> {
+    lines(env.to_sorted_iter().map(|(id, ty)| {
+        let type_doc = docs.lookup_type_def(id.as_str());
+        maybe_pp_docs(type_doc.map(|doc| doc.docs.as_slice()))
+            .append(kwd("type"))
+            .append(ident(id.as_str()))
+            .append(kwd("="))
+            .append(pp_ty_with_doc(ty, type_doc))
             .append(";")
     }))
 }
@@ -245,18 +315,19 @@ fn pp_actor<'a>(ty: &'a Type, docs: &'a DocComments) -> RcDoc<'a> {
 /// This function is kept for backward compatibility.
 /// It is recommended to use [`pp_named_init_args`] instead, which prints named arguments.
 pub fn pp_init_args<'a>(env: &'a TypeEnv, args: &'a [Type]) -> RcDoc<'a> {
-    pp_defs(env).append(pp_args(args))
+    pp_defs_plain(env).append(pp_args(args))
 }
 
 /// Pretty-prints the initialization arguments for a Candid actor with named arguments.
 pub fn pp_named_init_args<'a>(env: &'a TypeEnv, args: &'a [ArgType]) -> RcDoc<'a> {
-    pp_defs(env).append(pp_named_args(args))
+    pp_defs_plain(env).append(pp_named_args(args))
 }
 
 /// Collects doc comments that can be passed to the [compile_with_docs] function.
 #[derive(Default, Debug)]
 pub struct DocComments {
     service_methods: HashMap<String, Vec<String>>,
+    type_defs: HashMap<String, TypeDoc>,
 }
 
 impl DocComments {
@@ -270,6 +341,22 @@ impl DocComments {
 
     pub fn lookup_service_method(&self, method: &str) -> Option<&Vec<String>> {
         self.service_methods.get(method)
+    }
+
+    pub fn add_type_def(&mut self, name: String, doc: TypeDoc) {
+        if !doc.is_empty() {
+            self.type_defs.insert(name, doc);
+        }
+    }
+
+    pub fn lookup_type_def(&self, name: &str) -> Option<&TypeDoc> {
+        self.type_defs.get(name)
+    }
+
+    pub fn extend_types(&mut self, docs: TypeDocs) {
+        for (name, doc) in docs.named {
+            self.add_type_def(name, doc);
+        }
     }
 }
 
@@ -297,9 +384,9 @@ pub fn compile(env: &TypeEnv, actor: &Option<Type>) -> String {
 /// ```
 pub fn compile_with_docs(env: &TypeEnv, actor: &Option<Type>, docs: &DocComments) -> String {
     match actor {
-        None => pp_defs(env).pretty(LINE_WIDTH).to_string(),
+        None => pp_defs(env, docs).pretty(LINE_WIDTH).to_string(),
         Some(actor) => {
-            let defs = pp_defs(env);
+            let defs = pp_defs(env, docs);
             let actor = kwd("service :").append(pp_actor(actor, docs));
             let doc = defs.append(actor);
             doc.pretty(LINE_WIDTH).to_string()

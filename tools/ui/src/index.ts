@@ -1,7 +1,7 @@
 import { fetchActor, render, getCycles, getNames } from "./candid";
 import { renderAuth } from "./auth/auth";
-import { Principal } from "@dfinity/principal";
-import { ActorSubclass } from "@dfinity/agent";
+import { Principal } from "@icp-sdk/core/principal";
+import { ActorSubclass } from "@icp-sdk/core/agent";
 
 let actor: ActorSubclass | undefined;
 

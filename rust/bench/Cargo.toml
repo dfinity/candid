@@ -9,7 +9,7 @@ name = "bench"
 path = "bench.rs"
 
 [dependencies]
-candid = { path = "../candid" }
+candid = { path = "../candid", features = ["value"] }
 candid_parser = { path = "../candid_parser" }
 canbench-rs = "0.2.0"
 ic-cdk = "0.17"

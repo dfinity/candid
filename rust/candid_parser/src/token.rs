@@ -246,12 +246,11 @@ impl Iterator for Tokenizer<'_> {
                 Some(Err(LexicalError::new(err, span)))
             }
             Ok(Token::LineComment) => {
-                let content = parse_doc_comment(&self.lex);
                 if self.trivia.is_some() && !self.is_inline_comment(span.start) {
                     if self.has_blank_line_before_token(span.start) {
                         self.comment_buffer.clear();
                     }
-                    self.comment_buffer.push(content.to_string());
+                    self.comment_buffer.push(parse_doc_comment(&self.lex));
                     self.last_comment_end = Some(span.end);
                 }
                 self.next()
@@ -278,9 +277,11 @@ impl Iterator for Tokenizer<'_> {
                     }
                 }
                 self.lex = lex.morph::<Token>();
-                // Update last_comment_end to skip over the block comment
-                // This prevents block comments from breaking doc comment continuity
-                self.last_comment_end = Some(self.lex.span().start);
+                if self.trivia.is_some() {
+                    // Update last_comment_end to skip over the block comment.
+                    // This prevents block comments from breaking doc comment continuity.
+                    self.last_comment_end = Some(self.lex.span().start);
+                }
                 self.next()
             }
             Ok(Token::StartString) => {
@@ -359,21 +360,21 @@ impl Iterator for Tokenizer<'_> {
                 Some(Ok((span.start, Token::Text(result), self.lex.span().end)))
             }
             Ok(token) => {
-                // Check for blank line before getting mutable reference
-                let has_blank_line = self.has_blank_line_before_token(span.start);
-
-                if let Some(trivia) = &mut self.trivia {
-                    if !self.comment_buffer.is_empty() {
-                        if !has_blank_line {
-                            let content: Vec<String> = mem::take(&mut self.comment_buffer);
-                            trivia.borrow_mut().insert(span.start, content);
-                        } else {
-                            self.comment_buffer.clear();
+                if self.trivia.is_some() {
+                    let has_blank_line = self.has_blank_line_before_token(span.start);
+                    if let Some(trivia) = &mut self.trivia {
+                        if !self.comment_buffer.is_empty() {
+                            if !has_blank_line {
+                                let content: Vec<String> = mem::take(&mut self.comment_buffer);
+                                trivia.borrow_mut().insert(span.start, content);
+                            } else {
+                                self.comment_buffer.clear();
+                            }
                         }
+                        self.last_comment_end = None;
+                        self.last_token_line_end = Some(self.find_line_end(span.end));
                     }
-                    self.last_comment_end = None;
                 }
-                self.last_token_line_end = Some(self.find_line_end(span.end));
 
                 Some(Ok((span.start, token, span.end)))
             }

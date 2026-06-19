@@ -1,52 +1,40 @@
 import { EXTERNAL_CONFIG_PROMISE } from './external';
-import { Actor, HttpAgent, ActorSubclass, CanisterStatus, getManagementCanister } from '@dfinity/agent';
+import { Actor, HttpAgent, ActorSubclass, CanisterStatus } from '@icp-sdk/core/agent';
 import {
   IDL, InputBox, renderInput, renderValue
-} from '@dfinity/candid';
-import {Principal} from '@dfinity/principal'
+} from '@icp-sdk/core/candid';
+import {Principal} from '@icp-sdk/core/principal'
+import { IcManagementCanister } from '@icp-sdk/canisters/ic-management';
+import { getCanisterEnv } from '@icp-sdk/core/agent/canister-env';
 import './candid.css';
-import { AuthClient } from "@dfinity/auth-client";
+import { AuthClient, type AuthClientCreateOptions } from "@icp-sdk/auth/client";
 
 declare var flamegraph: any;
 declare var d3: any;
 
 const names: Record<number,string> = {};
 
-function isKnownMainnet(agent: HttpAgent) {
-  // @ts-ignore
-  const hostname = agent.host.hostname;
-  return hostname.endsWith('.icp0.io') || hostname.endsWith('.ic0.app');
-}
 
 export let authClient: AuthClient | undefined;
 
+// Construct (or reconstruct) the shared AuthClient. The @icp-sdk/auth client
+// takes the identity provider and derivation origin at construction time
+// (unlike the old callback-based login()), so callers that know the provider
+// — e.g. the login button derives it from the `ii` query param — build it here.
+export function createAuthClient(options?: AuthClientCreateOptions): AuthClient {
+  authClient = new AuthClient({
+    idleOptions: {
+      disableIdle: true,
+      disableDefaultIdleCallback: true,
+    },
+    ...options,
+  });
+  return authClient;
+}
+
+const canisterEnv = getCanisterEnv<{readonly "CANISTER_ID": string}>();
 const agent = HttpAgent.createSync();
-if (!isKnownMainnet(agent)) {
-  agent.fetchRootKey();
-}
-
-function getCanisterId(): Principal {
-  // Check the query params.
-  const maybeCanisterId = new URLSearchParams(window.location.search).get(
-    "canisterId"
-  );
-  if (maybeCanisterId) {
-    return Principal.fromText(maybeCanisterId);
-  }
-
-  // Return the first canister ID when resolving from the right hand side.
-  const domain = window.location.hostname.split(".").reverse();
-  for (const subdomain of domain) {
-    try {
-      if (subdomain.length >= 25) {
-        // The following throws if it can't decode or the checksum is invalid.
-        return Principal.fromText(subdomain);
-      }
-    } catch (_) {}
-  }
-
-  throw new Error("Could not find the canister ID.");
-}
+agent.rootKey = canisterEnv.IC_ROOT_KEY;
 
 export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> {
   let js;
@@ -61,19 +49,9 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
     }
   }
   if (!js) {
+    // Read the interface from the canister's `candid:service` metadata — the
+    // standard, certified way for a canister to expose its Candid interface.
     js = await getDidJsFromMetadata(canisterId);
-    if (!js) {
-      try {
-        js = await getDidJsFromTmpHack(canisterId);
-      } catch(err) {
-        if (/no query method/.test(err as any)) {
-          console.warn(err);
-          js = undefined;
-        } else {
-          throw(err);
-        }
-      }
-    }
   }
   if (!js) {
     throw new Error('Cannot fetch candid file');
@@ -81,16 +59,12 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   const dataUri = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(js);
   const candid: any = await eval('import("' + dataUri + '")');
 
-  authClient = authClient ?? (await AuthClient.create({
-    idleOptions: {
-      disableIdle: true,
-      disableDefaultIdleCallback: true,
-    },
-  }))
-  if (await authClient.isAuthenticated()) {
-    agent.replaceIdentity(authClient.getIdentity());
+  const client = authClient ?? createAuthClient();
+  if (client.isAuthenticated()) {
+    const identity = await client.getIdentity();
+    agent.replaceIdentity(identity);
     console.log("Authenticated with Internet Identity Principal")
-    console.log(authClient.getIdentity().getPrincipal().toString())
+    console.log(identity.getPrincipal().toString())
   }
 
   return Actor.createActor(candid.idlFactory, { agent, canisterId });
@@ -129,8 +103,10 @@ function timestampToString(nanoseconds: bigint) {
 let last_log_idx: bigint = -1n;
 export async function getCanisterLogs(canisterId: Principal, logger: any) {
   try {
-    const actor = getManagementCanister({ agent });
-    const logs = await actor.fetch_canister_logs({ canister_id: canisterId });
+    // fetch_canister_logs is a management-canister query; IcManagementCanister
+    // routes it to the target canister's subnet via the effective canister id.
+    const management = IcManagementCanister.create({ agent });
+    const logs = await management.fetchCanisterLogs(canisterId);
     let array = logs.canister_log_records;
     const idx = array.findIndex((e) => e.idx > last_log_idx);
     if (idx > 0) {
@@ -170,14 +146,11 @@ export async function getCycles(canisterId: Principal): Promise<bigint|undefined
 
 export async function getNames(canisterId: Principal) {
   try {
-    const paths : CanisterStatus.Path[] = [{
-      kind: 'metadata',
-      path: 'name',
-      key: 'name',
-      decodeStrategy: 'raw',
-    }];
+    const paths : CanisterStatus.Path[] = [
+      new CanisterStatus.CustomPath('name', 'name', 'raw'),
+    ];
     const status = await CanisterStatus.request({ agent, canisterId, paths });
-    const blob = status.get('name') as ArrayBuffer;
+    const blob = status.get('name') as Uint8Array;
     const decoded = IDL.decode([IDL.Vec(IDL.Tuple(IDL.Nat16, IDL.Text))], blob)[0] as Array<[number,string]>;
     decoded.forEach(([id, name]) => names[id] = name);
   } catch(err) {
@@ -189,14 +162,20 @@ async function getDidJsFromPostMessage(canisterId: Principal): Promise<undefined
   return new Promise((resolve,reject)=>{})
 }
 
+
 async function getDidJsFromMetadata(canisterId: Principal): Promise<undefined | string> {
-  const status = await CanisterStatus.request({ agent, canisterId, paths: ['candid'] });
-  const did = status.get('candid') as string | null;
-  if (did) {
-    return didToJs(did);
-  } else {
-    return undefined;
+  // The 'candid' path resolves to the `candid:service` metadata section and is
+  // read (and certified) via the canister's read_state endpoint.
+  try {
+    const status = await CanisterStatus.request({ agent, canisterId, paths: ['candid'] });
+    const did = status.get('candid') as string | null;
+    if (did) {
+      return didToJs(did);
+    }
+  } catch (err) {
+    console.warn('Failed to read candid:service metadata:', err);
   }
+  return undefined;
 }
 
 export async function getProfiling(canisterId: Principal): Promise<Array<[number, bigint]>|undefined> {
@@ -281,18 +260,9 @@ async function renderFlameGraph(profiler: any) {
   }
 }
 
-async function getDidJsFromTmpHack(canisterId: Principal): Promise<undefined | string> {
-  const common_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
-    __get_candid_interface_tmp_hack: IDL.Func([], [IDL.Text], ['query']),
-  });
-  const actor: ActorSubclass = Actor.createActor(common_interface, { agent, canisterId });
-  const candid_source = await actor.__get_candid_interface_tmp_hack() as string;
-  return didToJs(candid_source);
-}
-
 async function didToJs(candid_source: string): Promise<undefined | string> {
   // call didjs canister
-  const didjs_id = getCanisterId();
+  const didjs_id = canisterEnv["CANISTER_ID"];
   const didjs_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
     did_to_js: IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
   });
