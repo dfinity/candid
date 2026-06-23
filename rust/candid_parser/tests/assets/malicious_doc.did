@@ -1,0 +1,13 @@
+// */ import { malicious } from 'attacker'; console.log('injected!'); /*
+// Normal doc line
+// Another */ attempt /* to inject
+type MaliciousType = record {
+  // Doc comment for field with */ malicious code /* in it
+  field : text
+};
+
+// Service with */ malicious */ doc
+service : {
+  // Method with */ in doc comment
+  get : () -> (MaliciousType) query
+}

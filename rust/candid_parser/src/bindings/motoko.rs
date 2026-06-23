@@ -133,7 +133,7 @@ fn pp_ty(ty: &Type) -> RcDoc<'_> {
         Int16 => str("Int16"),
         Int32 => str("Int32"),
         Int64 => str("Int64"),
-        Float32 => panic!("float32 not supported in Motoko"),
+        Float32 => str("Float32"),
         Float64 => str("Float"),
         Text => str("Text"),
         Reserved => str("Any"),

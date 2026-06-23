@@ -3,7 +3,7 @@
 A multi-purpose tool for Candid.
 
 ```
-didc 0.4.0
+didc 0.6.0
 
 USAGE:
     didc <SUBCOMMAND>

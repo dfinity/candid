@@ -414,3 +414,43 @@ impl<'a> Arbitrary<'a> for Principal {
         Ok(principal)
     }
 }
+
+#[cfg(feature = "rangemap")]
+impl rangemap::StepLite for Principal {
+    fn add_one(&self) -> Self {
+        let mut new = *self;
+        // do not increment the tag byte
+        for byte in new.bytes[..new.len as usize - 1].iter_mut().rev() {
+            *byte = byte.wrapping_add(1);
+            if *byte != 0 {
+                break;
+            }
+        }
+        new
+    }
+    fn sub_one(&self) -> Self {
+        let mut new = *self;
+        // do not decrement the tag byte
+        for byte in new.bytes[..new.len as usize - 1].iter_mut().rev() {
+            *byte = byte.wrapping_sub(1);
+            if *byte != 255 {
+                break;
+            }
+        }
+        new
+    }
+}
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for Principal {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Principal".into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "string",
+            "description": "ICP principal in text format."
+        })
+    }
+}

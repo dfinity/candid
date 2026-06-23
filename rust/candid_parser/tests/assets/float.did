@@ -1,0 +1,5 @@
+service : {
+  to_f32 : (float64) -> (float32);
+  to_f64 : (float32) -> (float64);
+  identity32 : (float32) -> (float32);
+}

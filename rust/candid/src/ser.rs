@@ -230,6 +230,10 @@ impl types::Compound for Compound<'_> {
         use crate::types::Serializer;
         self.ser.serialize_blob(blob)
     }
+    fn try_write_raw_elements(&mut self, bytes: &[u8]) -> Result<bool> {
+        self.ser.write(bytes)?;
+        Ok(true)
+    }
 }
 
 /// A structure for serializing Rust values to IDL types.

@@ -244,14 +244,19 @@ fn pp_service<'a>(
     sep_enclose_space(methods, ",", "{", "}")
 }
 
+/// Escapes doc comment content to prevent comment injection attacks.
+/// Replaces `*/` with `*\/` to prevent premature comment termination.
+fn escape_doc_comment(line: &str) -> String {
+    line.replace("*/", r"*\/")
+}
+
 fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
     if docs.is_empty() {
         RcDoc::nil()
     } else {
-        let docs = lines(
-            docs.iter()
-                .map(|line| RcDoc::text(DOC_COMMENT_LINE_PREFIX).append(line)),
-        );
+        let docs = lines(docs.iter().map(|line| {
+            RcDoc::text(DOC_COMMENT_LINE_PREFIX).append(RcDoc::text(escape_doc_comment(line)))
+        }));
         RcDoc::text(DOC_COMMENT_PREFIX)
             .append(RcDoc::hardline())
             .append(docs)
@@ -317,9 +322,9 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type, syntax: Option<&'a IDLType>) -> 
 }
 
 pub fn compile(env: &TypeEnv, actor: &Option<Type>, prog: &IDLMergedProg) -> String {
-    let header = r#"import type { ActorMethod } from '@dfinity/agent';
-import type { IDL } from '@dfinity/candid';
-import type { Principal } from '@dfinity/principal';
+    let header = r#"import type { Principal } from '@icp-sdk/core/principal';
+import type { ActorMethod } from '@icp-sdk/core/agent';
+import type { IDL } from '@icp-sdk/core/candid';
 "#;
     let syntax_actor = prog.resolve_actor().ok().flatten();
     let def_list: Vec<_> = env.to_sorted_iter().map(|pair| pair.0.as_str()).collect();

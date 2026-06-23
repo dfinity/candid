@@ -6,6 +6,7 @@ use crate::{
     },
     Error, Result,
 };
+use candid::types::internal::TypeKey;
 use candid::types::{ArgType, Field, Function, Type, TypeEnv, TypeInner};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -178,6 +179,80 @@ fn check_cycle(env: &TypeEnv) -> Result<()> {
     Ok(())
 }
 
+fn validate_func(env: &TypeEnv, seen: &mut BTreeMap<TypeKey, bool>, func: &Function) -> Result<()> {
+    for arg in func.args.iter() {
+        validate_type(env, seen, &arg.typ)?;
+    }
+    for ret in func.rets.iter() {
+        validate_type(env, seen, &ret.typ)?;
+    }
+    Ok(())
+}
+
+fn validate_type(env: &TypeEnv, seen: &mut BTreeMap<TypeKey, bool>, t: &Type) -> Result<()> {
+    match t.as_ref() {
+        TypeInner::Null
+        | TypeInner::Bool
+        | TypeInner::Nat
+        | TypeInner::Int
+        | TypeInner::Nat8
+        | TypeInner::Nat16
+        | TypeInner::Nat32
+        | TypeInner::Nat64
+        | TypeInner::Int8
+        | TypeInner::Int16
+        | TypeInner::Int32
+        | TypeInner::Int64
+        | TypeInner::Float32
+        | TypeInner::Float64
+        | TypeInner::Text
+        | TypeInner::Reserved
+        | TypeInner::Empty
+        | TypeInner::Unknown
+        | TypeInner::Principal
+        | TypeInner::Future
+        | TypeInner::Knot(_) => Ok(()),
+        TypeInner::Var(id) => match seen.get(id) {
+            Some(true) | Some(false) => Ok(()),
+            None => {
+                seen.insert(id.clone(), false);
+                let res = validate_type(env, seen, env.find_type(id)?);
+                seen.insert(id.clone(), true);
+                res
+            }
+        },
+        TypeInner::Opt(ty) | TypeInner::Vec(ty) => validate_type(env, seen, ty),
+        TypeInner::Record(fields) | TypeInner::Variant(fields) => {
+            for field in fields.iter() {
+                validate_type(env, seen, &field.ty)?;
+            }
+            Ok(())
+        }
+        TypeInner::Func(func) => validate_func(env, seen, func),
+        TypeInner::Service(methods) => {
+            for (_, ty) in methods.iter() {
+                let func = env.as_func(ty)?;
+                validate_func(env, seen, func)?;
+            }
+            Ok(())
+        }
+        TypeInner::Class(args, ty) => {
+            for arg in args.iter() {
+                validate_type(env, seen, &arg.typ)?;
+            }
+            validate_type(env, seen, ty)
+        }
+    }
+}
+
+fn validate_decs(env: &TypeEnv) -> Result<()> {
+    let mut seen = BTreeMap::new();
+    for ty in env.0.values() {
+        validate_type(env, &mut seen, ty)?;
+    }
+    Ok(())
+}
+
 fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     for dec in decs.iter() {
         if let Dec::TypD(Binding { id, .. }) = dec {
@@ -194,7 +269,7 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     check_defs(env, decs)?;
     check_cycle(env.te)?;
     env.pre = false;
-    check_defs(env, decs)?;
+    validate_decs(env.te)?;
     Ok(())
 }
 

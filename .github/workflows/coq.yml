@@ -11,8 +11,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v12
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: cachix/install-nix-action@07da2520eebede906fbeefa9dd0a2b635323909d # v12
       #- run: nix-build s coq
       # The above would also build the shell, includling niv.
       # This would be useful behaviour if our CI seeds some cache.

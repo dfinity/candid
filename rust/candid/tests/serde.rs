@@ -76,6 +76,87 @@ fn test_integer() {
     check_error(|| test_decode(&hex("4449444c00017c2a"), &42i64), "Int64");
 }
 
+// Regression for the v0.10.27 round-trip bug: the LEB128 fast path in
+// `deserialize_nat`/`deserialize_int` silently truncated values that didn't
+// fit in u64/i64 (e.g. `1 << 64` decoded as 0). The fast path now bails to
+// the bignum decoder for any value spanning bit 63 or beyond.
+#[test]
+fn test_bignum_roundtrip_across_fast_path_boundary() {
+    use std::ops::Mul;
+
+    // The minimal reproducer from the original bug report.
+    #[derive(CandidType, Deserialize, Debug, PartialEq)]
+    struct Foo {
+        amount: Option<Nat>,
+    }
+    let foo = Foo {
+        amount: Some(Nat::from(1_u128 << 64)),
+    };
+    let bytes = Encode!(&foo).unwrap();
+    assert_eq!(Decode!(&bytes, Foo).unwrap(), foo);
+
+    // Sweep Nat across the 63/64/65/... bit boundary plus a value past u128.
+    for k in 60..=68 {
+        for v in [(1_u128 << k) - 1, 1_u128 << k, (1_u128 << k) + 1] {
+            let n = Nat::from(v);
+            let bytes = Encode!(&n).unwrap();
+            assert_eq!(Decode!(&bytes, Nat).unwrap(), n, "Nat roundtrip {v}");
+        }
+    }
+    let big = Nat::from(u128::MAX).mul(Nat::from(7u32));
+    assert_eq!(Decode!(&Encode!(&big).unwrap(), Nat).unwrap(), big);
+
+    // Int boundary: values straddling i64 limits and a 65-bit value.
+    for v in [
+        i64::MAX as i128 - 1,
+        i64::MAX as i128,
+        i64::MAX as i128 + 1,
+        i64::MIN as i128 - 1,
+        i64::MIN as i128,
+        i64::MIN as i128 + 1,
+        1_i128 << 65,
+        -(1_i128 << 65),
+    ] {
+        let n = Int::from(v);
+        let bytes = Encode!(&n).unwrap();
+        assert_eq!(Decode!(&bytes, Int).unwrap(), n, "Int roundtrip {v}");
+    }
+}
+
+// Regression for a pre-existing bug in `Int::decode`'s small-value fast
+// path (#717): at shift=63 the `fits_i64` check treated a chunk whose
+// non-data bits matched the sign-extension pattern as "fits", even when
+// the byte's continuation bit was set. The shift `low_bits << 63` then
+// silently truncated, and the resulting `i64` value was carried into the
+// `BigInt` slow path as a corrupt seed — e.g. `i128::MAX` round-tripped
+// to -1.
+#[test]
+fn test_int_decode_large_magnitude_roundtrip() {
+    use std::ops::Mul;
+    for v in [
+        i128::MAX,
+        i128::MIN,
+        i128::MAX - 1,
+        i128::MIN + 1,
+        1_i128 << 100,
+        -(1_i128 << 100),
+        (1_i128 << 126) - 1,
+        -(1_i128 << 126),
+    ] {
+        let n = Int::from(v);
+        let bytes = Encode!(&n).unwrap();
+        assert_eq!(Decode!(&bytes, Int).unwrap(), n, "Int roundtrip {v}");
+    }
+    // Beyond i128: ±(i128::MAX * 3).
+    let huge = Int::from(i128::MAX).mul(Int::from(3));
+    assert_eq!(Decode!(&Encode!(&huge).unwrap(), Int).unwrap(), huge);
+    let huge_neg = Int::from(i128::MIN).mul(Int::from(3));
+    assert_eq!(
+        Decode!(&Encode!(&huge_neg).unwrap(), Int).unwrap(),
+        huge_neg
+    );
+}
+
 #[test]
 fn test_fixed_number() {
     all_check(42u8, "4449444c00017b2a");
@@ -713,6 +794,45 @@ fn test_vector() {
         || test_decode(&bytes, &candid::Reserved),
         "Skipping cost exceeds the limit",
     );
+}
+
+/// Regression test: decoding a `BTreeMap<String, V>` where `V` is an enum containing
+/// a `BTreeMap<K, V2>` with a non-text enum key used to fail with "Type mismatch".
+///
+/// The bug was that `text_fast_path`, set to `true` by the outer string-keyed map's
+/// `deserialize_map`, leaked into the inner map's `next_key_seed`.  There it
+/// suppressed the update of `expect_type`/`wire_type` for the inner key, so that
+/// `deserialize_enum` on the inner key saw a stale (non-variant) `expect_type` and
+/// raised a subtyping error at `de.rs:1380`.
+#[test]
+fn test_nested_map_non_text_key() {
+    use std::collections::BTreeMap;
+
+    #[derive(CandidType, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    enum MapKey {
+        A,
+        B,
+    }
+
+    #[derive(CandidType, Deserialize, Debug, Clone, PartialEq)]
+    enum Value {
+        Fun(BTreeMap<MapKey, u32>),
+        Lit(String),
+    }
+
+    let mut inner: BTreeMap<MapKey, u32> = BTreeMap::new();
+    inner.insert(MapKey::A, 1);
+    inner.insert(MapKey::B, 2);
+
+    let mut outer: BTreeMap<String, Value> = BTreeMap::new();
+    outer.insert("fun".to_string(), Value::Fun(inner));
+    outer.insert("lit".to_string(), Value::Lit("hello".to_string()));
+
+    // encode → decode must round-trip without "Type mismatch" panic
+    let bytes = encode_one(&outer).unwrap();
+    let config = get_config();
+    let decoded = decode_one_with_config::<BTreeMap<String, Value>>(&bytes, &config).unwrap();
+    assert_eq!(outer, decoded);
 }
 
 #[test]
