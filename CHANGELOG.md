@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-23
+
+### Candid 0.10.30
+
+* Non-breaking changes:
+  + Add `pretty::utils::sep_enclose` and `sep_enclose_space`: list/tuple pretty-printing combinators that separate items and enclose them in delimiters, emitting a trailing separator on multi-line layouts.
+  + Add `TypeEnv::to_sorted_iter()` to iterate bindings in a deterministic, key-sorted order.
+
+### candid_parser 0.4.0
+
+* Breaking changes:
+  + Parse and preserve **named function arguments and results**. The AST now carries argument names so consumers (e.g. binding generators) can emit meaningful parameter names:
+    - New `syntax::IDLArgType { typ: IDLType, name: Option<String> }` with `IDLArgType::new` / `IDLArgType::new_with_name`. Purely numeric names are normalized to `None`.
+    - `syntax::FuncType::{args, rets}`, `syntax::IDLType::ClassT`, `syntax::IDLTypes::args`, and `syntax::IDLInitArgs::args` now hold `Vec<IDLArgType>` instead of `Vec<IDLType>`.
+    - The pretty-printer now round-trips argument names (e.g. `(from : principal)`).
+  + Type checking is unchanged: names are dropped when lowering to `candid::types::Function`, so the `candid` crate is unaffected.
+
 ## 2026-05-27
 
 ### Candid 0.10.29
