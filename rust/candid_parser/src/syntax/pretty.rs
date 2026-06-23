@@ -3,9 +3,11 @@ use pretty::RcDoc;
 use crate::{
     pretty::{
         candid::{pp_docs, pp_label_raw, pp_modes, pp_text},
-        utils::{concat, enclose, enclose_space, ident, kwd, lines, str, INDENT_SPACE, LINE_WIDTH},
+        utils::{ident, kwd, lines, sep_enclose, sep_enclose_space, str, INDENT_SPACE, LINE_WIDTH},
     },
-    syntax::{Binding, FuncType, IDLActorType, IDLMergedProg, IDLType, PrimType, TypeField},
+    syntax::{
+        Binding, FuncType, IDLActorType, IDLArgType, IDLMergedProg, IDLType, PrimType, TypeField,
+    },
 };
 
 fn pp_ty(ty: &IDLType) -> RcDoc<'_> {
@@ -52,7 +54,7 @@ fn pp_field(field: &TypeField, is_variant: bool) -> RcDoc<'_> {
 
 fn pp_fields(fs: &[TypeField], is_variant: bool) -> RcDoc<'_> {
     let fields = fs.iter().map(|f| pp_field(f, is_variant));
-    enclose_space("{", concat(fields, ";"), "}")
+    sep_enclose_space(fields, ";", "{", "}")
 }
 
 fn pp_opt(ty: &IDLType) -> RcDoc<'_> {
@@ -69,8 +71,8 @@ fn pp_vec(ty: &IDLType) -> RcDoc<'_> {
 
 fn pp_record(fs: &[TypeField], is_tuple: bool) -> RcDoc<'_> {
     if is_tuple {
-        let tuple = concat(fs.iter().map(|f| pp_ty(&f.typ)), ";");
-        kwd("record").append(enclose_space("{", tuple, "}"))
+        let fs = fs.iter().map(|f| pp_ty(&f.typ));
+        kwd("record").append(sep_enclose_space(fs, ";", "{", "}"))
     } else {
         kwd("record").append(pp_fields(fs, false))
     }
@@ -86,7 +88,7 @@ fn pp_function(func: &FuncType) -> RcDoc<'_> {
 
 fn pp_method(func: &FuncType) -> RcDoc<'_> {
     let args = pp_args(&func.args);
-    let rets = pp_rets(&func.rets);
+    let rets = pp_args(&func.rets);
     let modes = pp_modes(&func.modes);
     args.append(" ->")
         .append(RcDoc::space())
@@ -94,13 +96,15 @@ fn pp_method(func: &FuncType) -> RcDoc<'_> {
         .nest(INDENT_SPACE)
 }
 
-fn pp_args(args: &[IDLType]) -> RcDoc<'_> {
-    let doc = concat(args.iter().map(pp_ty), ",");
-    enclose("(", doc, ")")
-}
-
-fn pp_rets(rets: &[IDLType]) -> RcDoc<'_> {
-    pp_args(rets)
+fn pp_args(args: &[IDLArgType]) -> RcDoc<'_> {
+    let args = args.iter().map(|arg| {
+        if let Some(name) = &arg.name {
+            pp_text(name).append(kwd(" :")).append(pp_ty(&arg.typ))
+        } else {
+            pp_ty(&arg.typ)
+        }
+    });
+    sep_enclose(args, ",", "(", ")")
 }
 
 fn pp_service(methods: &[Binding]) -> RcDoc<'_> {
@@ -119,11 +123,10 @@ fn pp_service_methods(methods: &[Binding]) -> RcDoc<'_> {
             .append(kwd(" :"))
             .append(func_doc)
     });
-    let doc = concat(methods, ";");
-    enclose_space("{", doc, "}")
+    sep_enclose_space(methods, ";", "{", "}")
 }
 
-fn pp_class<'a>(args: &'a [IDLType], t: &'a IDLType) -> RcDoc<'a> {
+fn pp_class<'a>(args: &'a [IDLArgType], t: &'a IDLType) -> RcDoc<'a> {
     let doc = pp_args(args).append(" ->").append(RcDoc::space());
     match t {
         IDLType::ServT(ref serv) => doc.append(pp_service_methods(serv)),

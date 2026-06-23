@@ -77,7 +77,7 @@ fn pp_ty<'a>(env: &'a TypeEnv, ty: &'a Type, is_ref: bool) -> RcDoc<'a> {
             if is_ref && matches!(ty.as_ref(), Service(_)) {
                 return pp_inline_service();
             }
-            ident(id)
+            ident(id.as_str())
         }
         Principal => str("Principal"),
         Opt(ref t) => pp_opt(env, t, None, is_ref),
@@ -161,17 +161,14 @@ fn pp_record<'a>(
     is_ref: bool,
 ) -> RcDoc<'a> {
     if is_tuple_fields(fields) {
-        let tuple = concat(fields.iter().map(|f| pp_ty(env, &f.ty, is_ref)), ",");
-        enclose("[", tuple, "]")
+        let fs = fields.iter().map(|f| pp_ty(env, &f.ty, is_ref));
+        sep_enclose(fs, ",", "[", "]")
     } else {
-        let fields = concat(
-            fields.iter().map(|f| {
-                let (docs, syntax_field) = find_field(syntax, &f.id);
-                docs.append(pp_field(env, f, syntax_field, is_ref))
-            }),
-            ",",
-        );
-        enclose_space("{", fields, "}")
+        let fields = fields.iter().map(|f| {
+            let (docs, syntax_field) = find_field(syntax, &f.id);
+            docs.append(pp_field(env, f, syntax_field, is_ref))
+        });
+        sep_enclose_space(fields, ",", "{", "}")
     }
 }
 
@@ -206,14 +203,15 @@ fn pp_opt<'a>(
 }
 
 fn pp_function<'a>(env: &'a TypeEnv, func: &'a Function) -> RcDoc<'a> {
-    let args = func.args.iter().map(|arg| pp_ty(env, arg, true));
-    let args = enclose("[", concat(args, ","), "]");
+    let args = func.args.iter().map(|arg| pp_ty(env, &arg.typ, true));
+    let args = sep_enclose(args, ",", "[", "]");
     let rets = match func.rets.len() {
         0 => str("undefined"),
-        1 => pp_ty(env, &func.rets[0], true),
-        _ => enclose(
+        1 => pp_ty(env, &func.rets[0].typ, true),
+        _ => sep_enclose(
+            func.rets.iter().map(|ty| pp_ty(env, &ty.typ, true)),
+            ",",
             "[",
-            concat(func.rets.iter().map(|ty| pp_ty(env, ty, true)), ","),
             "]",
         ),
     };
@@ -238,12 +236,12 @@ fn pp_service<'a>(
         }
         let func = match func.as_ref() {
             TypeInner::Func(ref func) => pp_function(env, func),
-            TypeInner::Var(ref id) => ident(id),
+            TypeInner::Var(ref id) => ident(id.as_str()),
             _ => unreachable!(),
         };
         docs.append(quote_ident(id)).append(kwd(":")).append(func)
     });
-    enclose_space("{", concat(methods, ","), "}")
+    sep_enclose_space(methods, ",", "{", "}")
 }
 
 /// Escapes doc comment content to prevent comment injection attacks.
@@ -268,8 +266,8 @@ fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
 }
 
 fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], prog: &'a IDLMergedProg) -> RcDoc<'a> {
-    lines(def_list.iter().map(|id| {
-        let ty = env.find_type(id).unwrap();
+    lines(def_list.iter().map(|&id| {
+        let ty = env.find_type(&id.into()).unwrap();
         let syntax = prog.lookup(id);
         let syntax_ty = syntax.map(|s| &s.typ);
         let docs = syntax
@@ -292,7 +290,7 @@ fn pp_defs<'a>(env: &'a TypeEnv, def_list: &'a [&'a str], prog: &'a IDLMergedPro
             TypeInner::Var(ref inner_id) => kwd("export type")
                 .append(ident(id))
                 .append(" = ")
-                .append(ident(inner_id))
+                .append(ident(inner_id.as_str()))
                 .append(";"),
             _ => kwd("export type")
                 .append(ident(id))
@@ -310,7 +308,7 @@ fn pp_actor<'a>(env: &'a TypeEnv, ty: &'a Type, syntax: Option<&'a IDLType>) -> 
         TypeInner::Service(_) => service_doc.append(pp_ty_rich(env, ty, syntax, false)),
         TypeInner::Var(id) => service_doc
             .append(kwd("extends"))
-            .append(str(id))
+            .append(str(id.as_str()))
             .append(str(" {}")),
         TypeInner::Class(_, t) => {
             if let Some(IDLType::ClassT(_, syntax_t)) = syntax {
@@ -329,7 +327,7 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 "#;
     let syntax_actor = prog.resolve_actor().ok().flatten();
-    let def_list: Vec<_> = env.0.iter().map(|pair| pair.0.as_ref()).collect();
+    let def_list: Vec<_> = env.to_sorted_iter().map(|pair| pair.0.as_str()).collect();
     let defs = pp_defs(env, &def_list, prog);
     let actor = match actor {
         None => RcDoc::nil(),
@@ -339,6 +337,10 @@ import type { IDL } from '@icp-sdk/core/candid';
                 .map(|s| pp_docs(s.docs.as_ref()))
                 .unwrap_or(RcDoc::nil());
             docs.append(pp_actor(env, actor, syntax_actor.as_ref().map(|s| &s.typ)))
+                .append(RcDoc::line())
+                .append("export declare const idlService: IDL.ServiceClass;")
+                .append(RcDoc::line())
+                .append("export declare const idlInitArgs: IDL.Type[];")
                 .append(RcDoc::line())
                 .append("export declare const idlFactory: IDL.InterfaceFactory;")
                 .append(RcDoc::line())

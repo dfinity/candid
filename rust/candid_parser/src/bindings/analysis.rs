@@ -1,4 +1,5 @@
 use crate::{Error, Result};
+use candid::types::internal::TypeKey;
 use candid::types::{Type, TypeEnv, TypeInner};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -42,10 +43,12 @@ pub fn chase_type<'a>(
 ) -> Result<()> {
     use TypeInner::*;
     match t.as_ref() {
-        Var(id) if seen.insert(id) => {
-            let t = env.find_type(id)?;
-            chase_type(seen, res, env, t)?;
-            res.push(id);
+        Var(id) => {
+            if seen.insert(id.as_str()) {
+                let t = env.find_type(id)?;
+                chase_type(seen, res, env, t)?;
+                res.push(id.as_str());
+            }
         }
         Opt(ty) | Vec(ty) => chase_type(seen, res, env, ty)?,
         Record(fs) | Variant(fs) => {
@@ -54,7 +57,9 @@ pub fn chase_type<'a>(
             }
         }
         Func(f) => {
-            for ty in f.args.iter().chain(f.rets.iter()) {
+            let args = f.args.iter().map(|arg| &arg.typ);
+            let rets = f.rets.iter().map(|ret| &ret.typ);
+            for ty in args.chain(rets) {
                 chase_type(seen, res, env, ty)?;
             }
         }
@@ -65,7 +70,7 @@ pub fn chase_type<'a>(
         }
         Class(args, t) => {
             for arg in args.iter() {
-                chase_type(seen, res, env, arg)?;
+                chase_type(seen, res, env, &arg.typ)?;
             }
             chase_type(seen, res, env, t)?;
         }
@@ -92,7 +97,7 @@ pub fn chase_def_use<'a>(
     if let TypeInner::Class(args, _) = actor.as_ref() {
         for (i, arg) in args.iter().enumerate() {
             let mut used = Vec::new();
-            chase_type(&mut BTreeSet::new(), &mut used, env, arg)?;
+            chase_type(&mut BTreeSet::new(), &mut used, env, &arg.typ)?;
             for var in used {
                 res.entry(var.to_string())
                     .or_insert_with(Vec::new)
@@ -104,7 +109,7 @@ pub fn chase_def_use<'a>(
         let func = env.as_func(ty)?;
         for (i, arg) in func.args.iter().enumerate() {
             let mut used = Vec::new();
-            chase_type(&mut BTreeSet::new(), &mut used, env, arg)?;
+            chase_type(&mut BTreeSet::new(), &mut used, env, &arg.typ)?;
             for var in used {
                 res.entry(var.to_string())
                     .or_insert_with(Vec::new)
@@ -113,7 +118,7 @@ pub fn chase_def_use<'a>(
         }
         for (i, arg) in func.rets.iter().enumerate() {
             let mut used = Vec::new();
-            chase_type(&mut BTreeSet::new(), &mut used, env, arg)?;
+            chase_type(&mut BTreeSet::new(), &mut used, env, &arg.typ)?;
             for var in used {
                 res.entry(var.to_string())
                     .or_insert_with(Vec::new)
@@ -145,8 +150,10 @@ pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTree
     ) -> Result<()> {
         use TypeInner::*;
         match t.as_ref() {
-            Var(id) if seen.insert(id) => {
-                res.insert(id);
+            Var(id) => {
+                if seen.insert(id.as_str()) {
+                    res.insert(id.as_str());
+                }
             }
             Opt(ty) | Vec(ty) => go(seen, res, _env, ty)?,
             Record(fs) | Variant(fs) => {
@@ -155,7 +162,9 @@ pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTree
                 }
             }
             Func(f) => {
-                for ty in f.args.iter().chain(f.rets.iter()) {
+                let args = f.args.iter().map(|arg| &arg.typ);
+                let rets = f.rets.iter().map(|ret| &ret.typ);
+                for ty in args.chain(rets) {
                     go(seen, res, _env, ty)?;
                 }
             }
@@ -166,7 +175,7 @@ pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTree
             }
             Class(args, t) => {
                 for arg in args.iter() {
-                    go(seen, res, _env, arg)?;
+                    go(seen, res, _env, &arg.typ)?;
                 }
                 go(seen, res, _env, t)?;
             }
@@ -174,8 +183,8 @@ pub fn infer_rec<'a>(_env: &'a TypeEnv, def_list: &'a [&'a str]) -> Result<BTree
         }
         Ok(())
     }
-    for var in def_list.iter() {
-        let t = _env.0.get(*var).unwrap();
+    for &var in def_list.iter() {
+        let t = _env.0.get(&TypeKey::from(var)).unwrap();
         go(&mut seen, &mut res, _env, t)?;
         seen.insert(var);
     }

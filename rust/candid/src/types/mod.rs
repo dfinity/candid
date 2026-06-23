@@ -15,8 +15,8 @@ pub mod type_env;
 pub mod value;
 
 pub use self::internal::{
-    get_type, Field, FieldDoc, FuncMode, Function, Label, SharedLabel, Type, TypeDoc, TypeDocs,
-    TypeId, TypeInner,
+    get_type, ArgType, Field, FieldDoc, FuncMode, Function, Label, SharedLabel, Type, TypeDoc,
+    TypeDocs, TypeId, TypeInner,
 };
 pub use type_env::TypeEnv;
 
@@ -31,6 +31,7 @@ pub mod result;
 
 pub mod arc;
 pub mod rc;
+mod type_key;
 
 pub trait CandidType {
     // memoized type derivation

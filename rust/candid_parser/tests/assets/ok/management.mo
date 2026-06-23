@@ -3,14 +3,27 @@
 
 module {
   public type bitcoin_address = Text;
-  public type bitcoin_network = { #mainnet; #testnet };
-  public type block_hash = Blob;
-  public type canister_id = Principal;
+  public type ecdsa_curve = { #secp256k1 };
+  public type get_utxos_request = {
+    network : bitcoin_network;
+    filter : ?{ #page : Blob; #min_confirmations : Nat32 };
+    address : bitcoin_address;
+  };
   public type canister_settings = {
     freezing_threshold : ?Nat;
     controllers : ?[Principal];
     memory_allocation : ?Nat;
     compute_allocation : ?Nat;
+  };
+  public type user_id = Principal;
+  public type get_current_fee_percentiles_request = {
+    network : bitcoin_network;
+  };
+  public type outpoint = { txid : Blob; vout : Nat32 };
+  public type get_balance_request = {
+    network : bitcoin_network;
+    address : bitcoin_address;
+    min_confirmations : ?Nat32;
   };
   public type definite_canister_settings = {
     freezing_threshold : Nat;
@@ -18,19 +31,13 @@ module {
     memory_allocation : Nat;
     compute_allocation : Nat;
   };
-  public type ecdsa_curve = { #secp256k1 };
-  public type get_balance_request = {
+  public type satoshi = Nat64;
+  public type bitcoin_network = { #mainnet; #testnet };
+  public type millisatoshi_per_byte = Nat64;
+  public type wasm_module = Blob;
+  public type send_transaction_request = {
+    transaction : Blob;
     network : bitcoin_network;
-    address : bitcoin_address;
-    min_confirmations : ?Nat32;
-  };
-  public type get_current_fee_percentiles_request = {
-    network : bitcoin_network;
-  };
-  public type get_utxos_request = {
-    network : bitcoin_network;
-    filter : ?{ #page : Blob; #min_confirmations : Nat32 };
-    address : bitcoin_address;
   };
   public type get_utxos_response = {
     next_page : ?Blob;
@@ -38,22 +45,15 @@ module {
     tip_block_hash : block_hash;
     utxos : [utxo];
   };
-  public type http_header = { value : Text; name : Text };
+  public type block_hash = Blob;
+  public type canister_id = Principal;
+  public type utxo = { height : Nat32; value : satoshi; outpoint : outpoint };
   public type http_response = {
     status : Nat;
     body : Blob;
     headers : [http_header];
   };
-  public type millisatoshi_per_byte = Nat64;
-  public type outpoint = { txid : Blob; vout : Nat32 };
-  public type satoshi = Nat64;
-  public type send_transaction_request = {
-    transaction : Blob;
-    network : bitcoin_network;
-  };
-  public type user_id = Principal;
-  public type utxo = { height : Nat32; value : satoshi; outpoint : outpoint };
-  public type wasm_module = Blob;
+  public type http_header = { value : Text; name : Text };
   public type Self = actor {
     bitcoin_get_balance : shared get_balance_request -> async satoshi;
     bitcoin_get_current_fee_percentiles : shared get_current_fee_percentiles_request -> async [

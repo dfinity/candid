@@ -3,10 +3,10 @@
 
 module {
   public type A = ?B;
-  public type B = ?C;
-  public type C = A;
-  public type X = Y;
-  public type Y = Z;
   public type Z = A;
+  public type X = Y;
+  public type C = A;
+  public type Y = Z;
+  public type B = ?C;
   public type Self = actor { f : shared (A, B, C, X, Y, Z) -> async () }
 }

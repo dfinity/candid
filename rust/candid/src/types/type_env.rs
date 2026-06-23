@@ -1,18 +1,23 @@
+use crate::types::internal::TypeKey;
 use crate::types::{Function, Type, TypeInner};
 use crate::utils::RecursionDepth;
 use crate::{Error, Result};
-use std::collections::BTreeMap;
+use foldhash::fast::FixedState;
+use hashbrown::HashMap;
+
+pub type TypeMap<V> = HashMap<TypeKey, V, FixedState>;
 
 #[derive(Debug, Clone, Default)]
-pub struct TypeEnv(pub BTreeMap<String, Type>);
+pub struct TypeEnv(pub TypeMap<Type>);
 
 impl TypeEnv {
     pub fn new() -> Self {
-        TypeEnv(BTreeMap::new())
+        TypeEnv(TypeMap::default())
     }
+
     pub fn merge<'a>(&'a mut self, env: &TypeEnv) -> Result<&'a mut Self> {
-        for (k, v) in &env.0 {
-            let entry = self.0.entry(k.to_string()).or_insert_with(|| v.clone());
+        for (k, v) in env.0.iter() {
+            let entry = self.0.entry(k.clone()).or_insert_with(|| v.clone());
             if *entry != *v {
                 return Err(Error::msg("inconsistent binding"));
             }
@@ -20,11 +25,11 @@ impl TypeEnv {
         Ok(self)
     }
     pub fn merge_type(&mut self, env: TypeEnv, ty: Type) -> Type {
-        let tau: BTreeMap<String, String> = env
+        let tau: TypeMap<TypeKey> = env
             .0
             .keys()
             .filter(|k| self.0.contains_key(*k))
-            .map(|k| (k.clone(), format!("{k}/1")))
+            .map(|k| (k.clone(), format!("{k}/1").into()))
             .collect();
         for (k, t) in env.0 {
             let t = t.subst(&tau);
@@ -36,18 +41,19 @@ impl TypeEnv {
         }
         ty.subst(&tau)
     }
-    pub fn find_type(&self, name: &str) -> Result<&Type> {
-        match self.0.get(name) {
-            None => Err(Error::msg(format!("Unbound type identifier {name}"))),
+    pub fn find_type(&self, key: &TypeKey) -> Result<&Type> {
+        match self.0.get(key) {
+            None => Err(Error::msg(format!("Unbound type identifier {key}"))),
             Some(t) => Ok(t),
         }
     }
-    pub fn rec_find_type(&self, name: &str) -> Result<&Type> {
+
+    pub fn rec_find_type(&self, name: &TypeKey) -> Result<&Type> {
         self.rec_find_type_with_depth(name, &RecursionDepth::new())
     }
     pub(crate) fn rec_find_type_with_depth(
         &self,
-        name: &str,
+        name: &TypeKey,
         depth: &RecursionDepth,
     ) -> Result<&Type> {
         let _guard = depth.guard()?;
@@ -115,8 +121,8 @@ impl TypeEnv {
     }
     fn is_empty<'a>(
         &'a self,
-        res: &mut BTreeMap<&'a str, Option<bool>>,
-        id: &'a str,
+        res: &mut HashMap<&'a TypeKey, Option<bool>, FixedState>,
+        id: &'a TypeKey,
         depth: &RecursionDepth,
     ) -> Result<bool> {
         let _guard = depth.guard()?;
@@ -152,24 +158,34 @@ impl TypeEnv {
         Ok(result)
     }
     pub fn replace_empty(&mut self) -> Result<()> {
-        let mut res = BTreeMap::new();
-        for name in self.0.keys() {
-            self.is_empty(&mut res, name, &RecursionDepth::new())?;
+        let mut res = HashMap::default();
+        for key in self.0.keys() {
+            self.is_empty(&mut res, key, &RecursionDepth::new())?;
         }
         let ids: Vec<_> = res
-            .iter()
+            .into_iter()
             .filter(|(_, v)| matches!(v, Some(true)))
-            .map(|(id, _)| id.to_string())
+            .map(|(id, _)| id.to_owned())
             .collect();
         for id in ids {
             self.0.insert(id, TypeInner::Empty.into());
         }
         Ok(())
     }
+
+    /// Creates an iterator that iterates over the types in the order of keys.
+    ///
+    /// The implementation collects elements into a temporary vector and sorts the vector.
+    pub fn to_sorted_iter(&self) -> impl Iterator<Item = (&TypeKey, &Type)> {
+        let mut vec: Vec<_> = self.0.iter().collect();
+        vec.sort_unstable_by_key(|elem| elem.0);
+        vec.into_iter()
+    }
 }
+
 impl std::fmt::Display for TypeEnv {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (k, v) in &self.0 {
+        for (k, v) in self.to_sorted_iter() {
             writeln!(f, "type {k} = {v}")?;
         }
         Ok(())

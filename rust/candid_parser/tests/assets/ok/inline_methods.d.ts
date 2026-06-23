@@ -23,5 +23,7 @@ export interface _SERVICE {
   'high_order_fn_via_record' : ActorMethod<[R], bigint>,
   'high_order_fn_via_record_inline' : ActorMethod<[RInline], bigint>,
 }
+export declare const idlService: IDL.ServiceClass;
+export declare const idlInitArgs: IDL.Type[];
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

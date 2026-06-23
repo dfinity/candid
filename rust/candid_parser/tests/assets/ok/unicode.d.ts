@@ -18,5 +18,7 @@ export interface _SERVICE {
   '函数名' : ActorMethod<[A], B>,
   '👀' : ActorMethod<[bigint], bigint>,
 }
+export declare const idlService: IDL.ServiceClass;
+export declare const idlInitArgs: IDL.Type[];
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

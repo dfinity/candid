@@ -51,7 +51,7 @@ impl Service {
   pub async fn field(&self, arg0: &FieldArg) -> Result<(FieldRet,)> {
     ic_cdk::call(self.0, "field", (arg0,)).await
   }
-  pub async fn fieldnat(&self, arg0: &FieldnatArg) -> Result<((candid::Int,),)> {
+  pub async fn fieldnat(&self, arg0: &FieldnatArg) -> Result<((candid::Int),)> {
     ic_cdk::call(self.0, "fieldnat", (arg0,)).await
   }
   pub async fn oneway(&self, arg0: &u8) -> Result<()> {
@@ -66,10 +66,10 @@ impl Service {
   pub async fn r#return(&self, arg0: &O) -> Result<(O,)> {
     ic_cdk::call(self.0, "return", (arg0,)).await
   }
-  pub async fn service(&self, arg0: &Return) -> Result<()> {
-    ic_cdk::call(self.0, "service", (arg0,)).await
+  pub async fn service(&self, server: &Return) -> Result<()> {
+    ic_cdk::call(self.0, "service", (server,)).await
   }
-  pub async fn tuple(&self, arg0: &(candid::Int,serde_bytes::ByteBuf,String,)) -> Result<((candid::Int,u8,),)> {
+  pub async fn tuple(&self, arg0: &(candid::Int, serde_bytes::ByteBuf, String)) -> Result<((candid::Int, u8),)> {
     ic_cdk::call(self.0, "tuple", (arg0,)).await
   }
   pub async fn variant(&self, arg0: &VariantArg) -> Result<()> {

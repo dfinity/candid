@@ -1,5 +1,5 @@
 use super::internal::{find_type, Field, Label, Type, TypeInner};
-use crate::types::TypeEnv;
+use crate::types::{ArgType, TypeEnv};
 use crate::utils::RecursionDepth;
 use crate::{Error, Result};
 use anyhow::Context;
@@ -441,8 +441,8 @@ fn check_func_params(
     report: OptReport,
     gamma: &mut Gamma,
     env: &TypeEnv,
-    sub_params: &[Type],
-    sup_params: &[Type],
+    sub_params: &[ArgType],
+    sup_params: &[ArgType],
     depth: &RecursionDepth,
     path: &mut Vec<String>,
     errors: &mut Vec<Incompatibility>,
@@ -457,8 +457,8 @@ fn check_func_params(
             report,
             gamma,
             env,
-            &sub_params[0],
-            &sup_params[0],
+            &sub_params[0].typ,
+            &sup_params[0].typ,
             depth,
             path,
             errors,
@@ -797,20 +797,20 @@ where
     }
 }
 
-fn to_tuple(args: &[Type]) -> Type {
+fn to_tuple(args: &[ArgType]) -> Type {
     TypeInner::Record(
         args.iter()
             .enumerate()
-            .map(|(i, ty)| Field {
+            .map(|(i, arg)| Field {
                 id: Label::Id(i as u32).into(),
-                ty: ty.clone(),
+                ty: arg.typ.clone(),
             })
             .collect(),
     )
     .into()
 }
 #[cfg(not(feature = "printer"))]
-fn pp_args(args: &[crate::types::Type]) -> String {
+fn pp_args(args: &[crate::types::ArgType]) -> String {
     use std::fmt::Write;
     let mut s = String::new();
     write!(&mut s, "(").unwrap();
@@ -821,7 +821,7 @@ fn pp_args(args: &[crate::types::Type]) -> String {
     s
 }
 #[cfg(feature = "printer")]
-fn pp_args(args: &[crate::types::Type]) -> String {
-    use crate::pretty::candid::pp_args;
-    pp_args(args).pretty(80).to_string()
+fn pp_args(args: &[crate::types::ArgType]) -> String {
+    use crate::pretty::candid::pp_named_args;
+    pp_named_args(args).pretty(80).to_string()
 }

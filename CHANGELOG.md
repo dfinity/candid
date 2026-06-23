@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+### Candid
+
+* [BREAKING]: type representation was optimized to improve performance:
+  + In `Type::Var(var)` `var` now has type `TypeKey` instead of `String`. Calling `var.as_str()` returns `&str` and `var.to_string()` returns a `String`. The string representation of indexed variables remains `table{index}` to maintain compatibility with previous versions.
+  + `TypeEnv` now contains a `HashMap` instead of `BTreeMap`. Code that relied on the iteration order of the map (e.g. `env.0.iter()`) should make use of the newly added `TypeEnv::to_sorted_iter()` method which returns types sorted by their keys.
+  + The `args` and `rets` fields of the `candid::types::internal::Function` struct now are a `Vec<ArgType>` instead of `Vec<Type>`, to preserve names.
+  + The `TypeInner::Class` variant now takes `Vec<ArgType>` instead of `Vec<Type>` as its first parameter, to preserve argument names.
+
+* [BREAKING]: Removed the `candid::pretty::concat` function
+  + `candid::pretty::enclose` and `candid::pretty:enclose_space` don't collapse the separators on empty documents anymore
+
+* Non-breaking changes:
+  + Added `pp_named_args`, `pp_named_init_args` in `pretty::candid` module.
+  + The `JavaScript` `didc` target now exports its generated IDL type objects.
+  + The `JavaScript` and `TypeScript` `didc` targets now export `idlService` and `idlInitArgs` (non-factory-function alternatives to `idlFactory` and `init`).
+
+### candid_parser
+
+* Breaking changes:
+  + The `args` field in both `FuncType` and `IDLInitArgs` now have type `Vec<IDLArgType>`.
+  + The `rets` field in `FuncType` now has type `Vec<IDLArgType>`.
+
+* Non-breaking changes:
+  + Supports parsing the arguments' names for `func` and `service` (init args).
+
 ## 2026-05-27
 
 ### Candid 0.10.29
@@ -539,7 +566,7 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 * Bump ic-types to 0.3
 * `candid::utils::service_compatible` to check for upgrade compatibility of two service types
 
-## 2021-12-20 
+## 2021-12-20
 
 ### Rust (0.7.9)
 
@@ -565,7 +592,7 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 
 ### Rust (0.7.5 -- 0.7.7)
 
-* Support import when parsing did files with `check_file` function 
+* Support import when parsing did files with `check_file` function
 * Fix TypeScript binding for reference types
 
 ### Candid UI
@@ -584,7 +611,7 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 * Add `#[candid_path("path_to_candid")]` helper attribute to the candid derive macro
 * Update `ic-types` to 0.2.0
 
-## 2021-06-03 
+## 2021-06-03
 
 ### Spec
 
@@ -624,7 +651,7 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 * Fix TypeScript binding for tuple
 * Rust support for Func and Service value
 
-## 2021-03-17 
+## 2021-03-17
 
 ### Rust (0.6.18)
 
@@ -775,7 +802,7 @@ The source code of this tool has been removed, as it was deprecated in [PR#405](
 
 * No longer requires the shortest LEB128 number in deserialization [#79](https://github.com/dfinity/candid/pull/79)
 
-### Rust 
+### Rust
 
 * Parser improvements:
   + Floats in fractional number, no e-notation yet
