@@ -131,7 +131,7 @@ impl TypeAnnotation {
             (Some(tys), None) => {
                 let mut types = Vec::new();
                 for ty in tys.args.iter() {
-                    types.push(ast_to_type(&env, ty)?);
+                    types.push(ast_to_type(&env, &ty.typ)?);
                 }
                 Ok((env, types))
             }

@@ -1,4 +1,4 @@
-use pretty::RcDoc;
+use pretty::{RcAllocator, RcDoc};
 
 pub const INDENT_SPACE: isize = 2;
 pub const LINE_WIDTH: usize = 80;
@@ -88,6 +88,48 @@ pub fn quote_ident(id: &str) -> RcDoc<'_> {
         .append(format!("{}", id.escape_debug()))
         .append("'")
         .append(RcDoc::space())
+}
+
+/// Separate each item in `docs` with the separator `sep`, and enclose the result in `open` and `close`.
+/// When placed on multiple lines, the last element gets a trailing separator.
+pub fn sep_enclose<'a, D, S, O, C>(docs: D, sep: S, open: O, close: C) -> RcDoc<'a>
+where
+    D: IntoIterator<Item = RcDoc<'a>>,
+    S: pretty::Pretty<'a, RcAllocator>,
+    O: pretty::Pretty<'a, RcAllocator>,
+    C: pretty::Pretty<'a, RcAllocator>,
+{
+    let sep = sep.pretty(&RcAllocator);
+    let elems = RcDoc::intersperse(docs, sep.clone().append(RcDoc::line()));
+    open.pretty(&RcAllocator)
+        .into_doc()
+        .append(RcDoc::line_())
+        .append(elems)
+        .append(sep.flat_alt(RcDoc::nil()))
+        .nest(INDENT_SPACE)
+        .append(RcDoc::line_())
+        .append(close.pretty(&RcAllocator))
+        .group()
+}
+
+/// Like `sep_enclose`, but inserts a space between the opening delimiter and the first element,
+/// and between the last element and the closing delimiter when placed on a single line.
+pub fn sep_enclose_space<'a, D, S, O, C>(docs: D, sep: S, open: O, close: C) -> RcDoc<'a>
+where
+    D: IntoIterator<Item = RcDoc<'a>>,
+    S: pretty::Pretty<'a, RcAllocator>,
+    O: pretty::Pretty<'a, RcAllocator>,
+    C: pretty::Pretty<'a, RcAllocator>,
+{
+    let mut docs = docs.into_iter().peekable();
+    if docs.peek().is_none() {
+        return open.pretty(&RcAllocator).append(close).into_doc();
+    }
+    let open = open
+        .pretty(&RcAllocator)
+        .append(RcDoc::nil().flat_alt(RcDoc::space()));
+    let close = RcDoc::nil().flat_alt(RcDoc::space()).append(close);
+    sep_enclose(docs, sep, open, close)
 }
 
 #[cfg(test)]

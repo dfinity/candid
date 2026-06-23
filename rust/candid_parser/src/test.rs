@@ -1,5 +1,5 @@
 use super::typing::check_prog;
-use crate::syntax::{Dec, IDLProg, IDLType};
+use crate::syntax::{Dec, IDLArgType, IDLProg};
 use crate::{Error, Result};
 use candid::types::value::IDLArgs;
 use candid::types::{Type, TypeEnv};
@@ -7,7 +7,7 @@ use candid::DecoderConfig;
 
 const DECODING_COST: usize = 20_000_000;
 
-type TupType = Vec<IDLType>;
+type TupType = Vec<IDLArgType>;
 
 pub struct Test {
     pub defs: Vec<Dec>,
@@ -158,7 +158,7 @@ pub fn check(test: Test) -> Result<()> {
         print!("Checking {} {}...", i + 1, assert.desc());
         let mut types = Vec::new();
         for ty in assert.typ.iter() {
-            types.push(super::typing::ast_to_type(&env, ty)?);
+            types.push(super::typing::ast_to_type(&env, &ty.typ)?);
         }
         let input = assert.left.parse(&env, &types);
         let pass = if let Some(assert_right) = &assert.right {
