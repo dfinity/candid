@@ -1,5 +1,5 @@
 use super::test::{Assert, Input, Test};
-use super::token::{Token, error, error2, LexicalError, Span, TriviaMap};
+use super::token::{Token, error2, LexicalError, Span, TriviaMap};
 use candid::{Principal, types::Label};
 use crate::syntax::{IDLType, PrimType, TypeField, FuncType, Binding, Dec, IDLProg, IDLTypes, IDLInitArgs, IDLArgType, IDLActorType};
 use candid::types::value::{IDLField, IDLValue, IDLArgs, VariantValue};
@@ -217,12 +217,12 @@ VariantFieldTyp: TypeField = {
     <doc_comment:DocComment> <id:FieldId> =>? Ok(TypeField { label: Label::Id(id), typ: IDLType::PrimT(PrimType::Null), docs: doc_comment.unwrap_or_default() }),
 }
 
-TupTyp: Vec<IDLArgType> = "(" <SepBy<ArgTyp, ",">> ")" =>? {
-    let args = <>;
-    let mut named_args: Vec<String> = args.iter().filter_map(|a| a.name.clone()).collect();
+TupTyp: Vec<IDLArgType> = "(" <args:Sp<SepBy<ArgTyp, ",">>> ")" =>? {
+    let span = args.1.clone();
+    let mut named_args: Vec<String> = args.0.iter().filter_map(|a| a.name.clone()).collect();
     named_args.sort();
-    check_unique(named_args.iter()).map_err(|e| error(e))?;
-    Ok(args)
+    check_unique(named_args.iter()).map_err(|e| error2(e, span))?;
+    Ok(args.0)
 };
 
 FuncTyp: FuncType = {

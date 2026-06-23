@@ -123,7 +123,7 @@ impl IDLArgType {
 
     /// Create a new IDLArgType with a name.
     /// If the name is an `u32` number, we set it to None
-    /// as we don't want to use it as a arg name.
+    /// as we don't want to use it as an arg name.
     pub fn new_with_name(typ: IDLType, name: String) -> Self {
         let name = if name.parse::<u32>().is_ok() {
             None
