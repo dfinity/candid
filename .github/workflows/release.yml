@@ -40,7 +40,7 @@ jobs:
         if: matrix.target
         run: rustup target add ${{ matrix.target}}
       - name: Set up musl
-        if: ${{ contains(matrix.os, 'ubuntu') && contains(matrix.target, 'musl') }}
+        if: ${{ contains(matrix.os, 'ubuntu') && contains(matrix.target, 'musl') && !matrix.cross }}
         run: sudo apt-get update -yy && sudo apt-get install -yy musl musl-dev musl-tools
       - name: Build
         uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505 # v1.0.3
