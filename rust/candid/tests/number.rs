@@ -170,3 +170,145 @@ fn check(num: &str, int_hex: &str, nat_hex: &str) {
         assert_eq!(decoded, nat);
     }
 }
+
+/// A `len`-byte LEB128 body whose 7-bit groups are all `0x7f`: `len - 1`
+/// continuation bytes (`0xff`) followed by a terminator (`0x7f`). Decoded as a
+/// `nat` this is `2^(7*len) - 1`; decoded as an `int` (sign bit set on the final
+/// group) it is `-1`. Handy for exercising the bignum path with a long value.
+fn all_ones_leb128(len: usize) -> Vec<u8> {
+    let mut bytes = vec![0xffu8; len.saturating_sub(1)];
+    bytes.push(0x7f);
+    bytes
+}
+
+/// Values straddling the `u64` fast-path boundary must all roundtrip, including
+/// the first one that overflows it and so takes the bignum path.
+#[test]
+fn nat_u64_boundary_roundtrip() {
+    for v in [
+        0u128,
+        u128::from(u64::MAX) - 1,
+        u128::from(u64::MAX),
+        u128::from(u64::MAX) + 1,
+        u128::MAX,
+    ] {
+        let n = Nat::from(v);
+        let mut enc = Vec::new();
+        n.encode(&mut enc).unwrap();
+        let decoded = Nat::decode(&mut &enc[..]).unwrap();
+        assert_eq!(decoded, n, "nat boundary value {v}");
+    }
+}
+
+/// Values straddling the positive and negative `i64` fast-path boundaries.
+#[test]
+fn int_i64_boundary_roundtrip() {
+    for v in [
+        0i128,
+        i128::from(i64::MAX),
+        i128::from(i64::MAX) + 1,
+        i128::from(i64::MIN),
+        i128::from(i64::MIN) - 1,
+        i128::MAX,
+        i128::MIN,
+    ] {
+        let i = Int::from(v);
+        let mut enc = Vec::new();
+        i.encode(&mut enc).unwrap();
+        let decoded = Int::decode(&mut &enc[..]).unwrap();
+        assert_eq!(decoded, i, "int boundary value {v}");
+    }
+}
+
+/// Large `nat` values exercise the bignum decode path at scale. `2^(7*len) - 1`
+/// is its own canonical LEB128 encoding (all groups are `0x7f`), so re-encoding
+/// the decoded value must reproduce the input byte-for-byte.
+#[test]
+fn nat_large_bignum_roundtrip() {
+    for len in [10usize, 11, 100, 1000, 50_000] {
+        let bytes = all_ones_leb128(len);
+        let n = Nat::decode(&mut &bytes[..]).unwrap();
+        let mut re = Vec::new();
+        n.encode(&mut re).unwrap();
+        assert_eq!(re, bytes, "nat len={len} canonical re-encode");
+        // Confirm the value really overflowed the u64 fast path.
+        assert!(n.0.to_u64().is_none(), "nat len={len} must exceed u64");
+    }
+}
+
+/// An all-`0xff`..`0x7f` sleb128 stream decodes to `-1` regardless of length:
+/// the sign bit is set and every magnitude bit is one. Exercises the bignum
+/// path's two's-complement sign handling for arbitrarily long inputs.
+#[test]
+fn int_all_continuation_is_minus_one() {
+    for len in [2usize, 10, 100, 1000, 50_000] {
+        let bytes = all_ones_leb128(len);
+        let i = Int::decode(&mut &bytes[..]).unwrap();
+        assert_eq!(
+            i,
+            Int::from(-1),
+            "all-0xff sleb128 (len={len}) decodes to -1"
+        );
+    }
+}
+
+/// `len - 1` zero groups (`0x80`) then a `0x7f` terminator decodes to
+/// `-2^(7*(len-1))`: a genuine large-magnitude negative bignum. Re-encoding and
+/// decoding must be stable.
+#[test]
+fn int_large_negative_bignum_roundtrip() {
+    let zero = Int::from(0);
+    for len in [11usize, 100, 1000, 50_000] {
+        let mut bytes = vec![0x80u8; len.saturating_sub(1)];
+        bytes.push(0x7f);
+        let i = Int::decode(&mut &bytes[..]).unwrap();
+        assert!(i < zero, "len={len} should be negative");
+        let mut re = Vec::new();
+        i.encode(&mut re).unwrap();
+        let i2 = Int::decode(&mut &re[..]).unwrap();
+        assert_eq!(i, i2, "neg bignum roundtrip len={len}");
+    }
+}
+
+/// Randomized roundtrip over large (beyond u64/i64) `nat`/`int` values, covering
+/// both signs. `decode` is independently pinned by the exact-byte and
+/// closed-form tests above, so `decode(encode(v)) == v` validates that `encode`
+/// is semantically correct, and byte-stability under re-encode confirms the
+/// output is canonical (minimal).
+#[test]
+fn bignum_random_roundtrip() {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+
+    let roundtrip_nat = |n: &Nat| {
+        let mut enc = Vec::new();
+        n.encode(&mut enc).unwrap();
+        let dec = Nat::decode(&mut &enc[..]).unwrap();
+        assert_eq!(&dec, n, "nat decode(encode(v)) == v");
+        let mut enc2 = Vec::new();
+        dec.encode(&mut enc2).unwrap();
+        assert_eq!(enc, enc2, "nat canonical re-encode");
+    };
+    let roundtrip_int = |i: &Int| {
+        let mut enc = Vec::new();
+        i.encode(&mut enc).unwrap();
+        let dec = Int::decode(&mut &enc[..]).unwrap();
+        assert_eq!(&dec, i, "int decode(encode(v)) == v");
+        let mut enc2 = Vec::new();
+        dec.encode(&mut enc2).unwrap();
+        assert_eq!(enc, enc2, "int canonical re-encode");
+    };
+
+    for _ in 0..1000 {
+        // Grow well past u64/i64 (>= 2^150) so the bignum path is exercised.
+        let mut nat = Nat::from(rng.gen::<u64>());
+        let mut int = Int::from(rng.gen::<i64>());
+        for _ in 0..rng.gen_range(4..12) {
+            nat = nat * (1u64 << 50) + rng.gen::<u64>();
+            int = int * (1i64 << 50) + rng.gen::<i64>();
+        }
+        roundtrip_nat(&nat);
+        roundtrip_int(&int);
+        roundtrip_int(&(int * (-1i128))); // exercise the negative encode path too
+    }
+}
