@@ -49,13 +49,34 @@ We provide a [test suite](test/) to check Candid implementations for compliance.
 
 ## Release
 
-To make a release in this repo:
+This repo ships two kinds of release artifacts, each driven by its own tag.
+
+### `candid_ui` canister wasm
+
+Released on a date-based tag. As the repo contains several targets, it is hard to
+give a version to the tag, so the tag is always today's date:
 
 * Update `CHANGELOG.md` and merge the PR into master.
 * `git tag 2020-04-01 -m "2020-04-01"`
 * `git push origin 2020-04-01`
 
-The tag is always today's date. As the repo contains several targets, it is hard to give a version to the tag.
+This triggers [`candid-ui.yml`](.github/workflows/candid-ui.yml), which builds and
+uploads `candid_ui.wasm` to the matching GitHub release.
+
+### `didc` binaries
+
+Released by [cargo-dist](https://opensource.axo.dev/cargo-dist/) on a SemVer tag
+matching the `didc` crate version in [`tools/didc/Cargo.toml`](tools/didc/Cargo.toml):
+
+* Bump the `didc` version and merge the PR into master.
+* `git tag didc-v0.6.1 -m "didc-v0.6.1"`
+* `git push origin didc-v0.6.1`
+
+This triggers [`didc-release.yml`](.github/workflows/didc-release.yml), which builds
+`didc` for linux (x86_64, x86_64-musl, arm64) and macOS (x86_64, arm64), and uploads
+the archives, a shell installer, and checksums to the GitHub release. The build
+config lives in [`dist-workspace.toml`](dist-workspace.toml); regenerate the workflow
+with `dist generate` after editing it.
 
 ## Contribution
 
