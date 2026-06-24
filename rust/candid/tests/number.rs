@@ -171,12 +171,13 @@ fn check(num: &str, int_hex: &str, nat_hex: &str) {
     }
 }
 
-/// A `len`-byte LEB128 body whose 7-bit groups are all `0x7f`: `len - 1`
-/// continuation bytes (`0xff`) followed by a terminator (`0x7f`). Decoded as a
-/// `nat` this is `2^(7*len) - 1`; decoded as an `int` (sign bit set on the final
-/// group) it is `-1`. Handy for exercising the bignum path with a long value.
+/// A `len`-byte LEB128 body (`len >= 1`) whose 7-bit groups are all `0x7f`:
+/// `len - 1` continuation bytes (`0xff`) followed by a terminator (`0x7f`).
+/// Decoded as a `nat` this is `2^(7*len) - 1`; decoded as an `int` (sign bit set
+/// on the final group) it is `-1`. Handy for exercising the bignum path with a
+/// long value.
 fn all_ones_leb128(len: usize) -> Vec<u8> {
-    let mut bytes = vec![0xffu8; len.saturating_sub(1)];
+    let mut bytes = vec![0xffu8; len - 1];
     bytes.push(0x7f);
     bytes
 }
@@ -259,7 +260,7 @@ fn int_all_continuation_is_minus_one() {
 fn int_large_negative_bignum_roundtrip() {
     let zero = Int::from(0);
     for len in [11usize, 100, 1000, 50_000] {
-        let mut bytes = vec![0x80u8; len.saturating_sub(1)];
+        let mut bytes = vec![0x80u8; len - 1];
         bytes.push(0x7f);
         let i = Int::decode(&mut &bytes[..]).unwrap();
         assert!(i < zero, "len={len} should be negative");
