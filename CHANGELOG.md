@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-24
+
+### Candid 0.10.31
+
+* Non-breaking changes:
+  + Encode and decode large `Nat`/`Int` values in linear time. Values beyond the `u64`/`i64` fast path were previously processed one LEB128/SLEB128 group at a time, shifting the whole bignum on every byte (O(n²) in the encoded length); they now build the value in a single O(n) pass.
+
 ## 2026-06-23
 
 ### Candid 0.10.30
