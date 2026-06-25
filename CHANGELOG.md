@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-06-25
+
+### Candid 0.10.31
+
+* Non-breaking changes:
+  + Encode and decode large `Nat`/`Int` values in linear time. Values beyond the `u64`/`i64` fast path were previously processed one LEB128/SLEB128 group at a time, shifting the whole bignum on every byte (O(n²) in the encoded length); they now build the value in a single O(n) pass.
+
+### didc 0.6.2
+
+* Non-breaking changes:
+  + Upgrade candid_parser dependency to v0.4.0.
+
 ## 2026-06-23
 
 ### Candid 0.10.30
