@@ -1,0 +1,47 @@
+name: Release candid_ui
+
+# The candid_ui canister wasm is released on the repo's date-based tags
+# (e.g. 2025-12-18). The didc binaries are released separately by
+# .github/workflows/didc-release.yml on `didc-vX.Y.Z` tags.
+on:
+  push:
+    tags:
+      # Date tags of the form YYYY-MM-DD. This intentionally does not match the
+      # `didc-vX.Y.Z` tags used by the cargo-dist didc release workflow.
+      - "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+
+jobs:
+  candid-ui:
+    name: Build and publish candid_ui canister
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Install Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+      - name: Install Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Install binaryen
+        run: |
+          sudo apt-get update -yy
+          sudo apt-get install -yy binaryen
+      - name: Build candid_ui
+        working-directory: tools/ui
+        run: |
+          npm ci
+          npm run build
+          cargo build --target wasm32-unknown-unknown --profile canister --package didjs --locked
+          wasm-opt --strip-debug -Oz target/wasm32-unknown-unknown/canister/didjs.wasm -o target/wasm32-unknown-unknown/canister/didjs_opt.wasm
+      - name: Prepare asset
+        run: |
+          cp tools/ui/target/wasm32-unknown-unknown/canister/didjs_opt.wasm candid_ui.wasm
+      - name: Upload candid_ui to release
+        uses: svenstaro/upload-release-action@29e53e917877a24fad85510ded594ab3c9ca12de # 2.11.5
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: candid_ui.wasm
+          asset_name: candid_ui.wasm
+          tag: ${{ github.ref }}
