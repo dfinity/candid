@@ -232,10 +232,23 @@ impl Principal {
         format!("{self}")
     }
 
-    /// Return the [`Principal`]'s underlying slice of bytes.
+    /// Returns the [`Principal`]'s underlying slice of bytes.
     #[inline]
     pub fn as_slice(&self) -> &[u8] {
         &self.bytes[..self.len as usize]
+    }
+
+    /// Returns the [`Principal`]'s length.
+    #[inline]
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> u8 {
+        self.len
+    }
+
+    /// Returns the [`Principal`]'s underlying byte array.
+    #[inline]
+    pub fn as_bytes(&self) -> &[u8; Self::MAX_LENGTH_IN_BYTES] {
+        &self.bytes
     }
 }
 
