@@ -618,10 +618,11 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        check!(
-            *self.expect_type == TypeInner::Principal && *self.wire_type == TypeInner::Principal,
-            "principal"
-        );
+        // Dispatched only when the expected type is `principal`; `check_subtype`
+        // then admits both `principal` (reflexive) and `service <actortype>`
+        // (spec: `service <: principal`) as wire types. Both are read as the
+        // same `PrincipalBytes`, so a service reference decodes as its principal.
+        self.check_subtype()?;
         let mut bytes = vec![2u8];
         let id = PrincipalBytes::read(&mut self.input)?;
         self.add_cost(std::cmp::max(30, id.len as usize))?;

@@ -26,6 +26,12 @@ assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\01\01\01\03\ca\ff\ee"
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\02\03foo\00\04foo\32\00\01\01\01\03\ca\ff\ee"
   == "(service \"w7x7r-cok77-xa\")" : (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service";
 
+// service <: principal: a service reference value decodes at type `principal`
+// (identical wire encoding). The reverse (a principal at `service {}`) is rejected above.
+assert blob "DIDL\01\69\00\01\00\01\03\ca\ff\ee" == "(principal \"w7x7r-cok77-xa\")" : (principal) "service {} value decodes at principal";
+assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\01\01\01\03\ca\ff\ee"
+  == "(principal \"w7x7r-cok77-xa\")" : (principal) "service {foo} value decodes at principal";
+
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\03\03foo\00\04foo\32\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service: too long";
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\04foo\32\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service: too short";
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\02\04foo\32\00\03foo\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service: unsorted";
