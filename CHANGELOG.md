@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-07-02
+
+### ic_principal 0.1.4
+
+* Non-breaking changes:
+  + Add `Principal::as_fixed_bytes()`, returning a reference to the underlying fixed-size `[u8; MAX_LENGTH_IN_BYTES]` backing array. Bytes at index `len()` and beyond are always zero.
+  + Add `Principal::len()`, returning the number of significant bytes in the `Principal` (equivalent to `as_slice().len()`).
+
 ## 2026-06-25
 
 ### Candid 0.10.31

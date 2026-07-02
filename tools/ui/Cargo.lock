@@ -523,7 +523,7 @@ checksum = "c77c8932bff1f09502d0d8c079d5a206a06afe523e35e816162cf4d30b5bf80d"
 
 [[package]]
 name = "ic_principal"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "arbitrary",
  "crc32fast",
