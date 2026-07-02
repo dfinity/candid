@@ -1,22 +1,29 @@
 {}:
 let
-  sources =  import ./sources.nix;
-
   subpath = import ./gitSource.nix;
+
+  # Re-pinned to a modern nixpkgs that provides coq_8_18.
+  #
+  # The previous niv pin (nixos-20.09) no longer evaluates on current nix, and
+  # the default `coq` is now Rocq 9.x, which renamed the stdlib namespace
+  # (Coq.* -> Stdlib.*) and relocated FunInd — both of which these proofs use.
+  # coq_8_18 is the newest coq that still accepts them unchanged.
+  nixpkgs = fetchTarball {
+    url = "https://github.com/NixOS/nixpkgs/archive/e8273b29fe1390ec8d4603f2477357555291432e.tar.gz";
+    sha256 = "sha256-mFP086y1bNA1g9AsY/pCue3H3W2R7ayroHyRbZrcMf0=";
+  };
 
   overlays = [
     (pkgs: super: { local = {
-      # Fetch niv from nix/sources.json, newer than nixpkgs
-      niv = (import sources.niv {}).niv;
-
       # the main product: building the theories
       theories = pkgs.stdenv.mkDerivation {
         name = "candid-coq";
         src = subpath ./..;
         buildInputs = [
           pkgs.dune_2
-          pkgs.coq
-          pkgs.ocaml
+          pkgs.coq_8_18
+          pkgs.coq_8_18.ocaml
+          pkgs.coq_8_18.ocamlPackages.findlib
         ];
         buildPhase = ''
           dune build --display=short
@@ -31,24 +38,8 @@ let
         inputsFrom = [
           pkgs.local.theories
         ];
-        propagatedBuildInputs = [
-          pkgs.niv
-        ];
-
-        # This helps with using GUI programs like coqide
-        LOCALE_ARCHIVE = pkgs.stdenv.lib.optionalString pkgs.stdenv.isLinux "${pkgs.glibcLocales}/lib/locale/locale-archive";
-
-        # allow building this as a derivation, so that CI can biuld and cache
-        # the dependencies of shell
-        phases = ["installPhase" "fixupPhase"];
-        installPhase = ''
-          mkdir $out
-        '';
-        preferLocalBuild = true;
-        allowSubstitutes = true;
       };
     };})
   ];
 
-in import sources.nixpkgs { inherit overlays; }
-
+in import nixpkgs { inherit overlays; }
