@@ -756,6 +756,14 @@ An exception are integers, which can be specialised to natural numbers:
 nat <: int
 ```
 
+Similarly, a principal can be specialised to any service reference:
+
+```
+
+--------------------------------
+service <actortype> <: principal
+```
+
 Additional rules apply to `empty` and `reserved`, which makes these a bottom resp. top type:
 ```
 
@@ -919,6 +927,12 @@ Values of type `nat` coerce at type `int`:
 ```
 --------------------------
 <nat> : nat ~> <nat> : int
+```
+
+A service reference coerces at type `principal` (both share the same value form, so this is the identity on the reference):
+```
+---------------------------------------------------------------------
+service <text> : service <actortype> ~> principal <text> : principal
 ```
 
 Coercion into `reserved` is the constant map (this is arbitrarily using `null` as “the” value of `reserved`):
