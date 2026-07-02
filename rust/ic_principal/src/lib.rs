@@ -232,22 +232,36 @@ impl Principal {
         format!("{self}")
     }
 
-    /// Returns the [`Principal`]'s underlying slice of bytes.
+    /// Returns the [`Principal`]'s significant bytes as a slice: the first
+    /// [`len`](Self::len) bytes of the backing array, without the trailing
+    /// zero padding.
+    ///
+    /// Use [`as_fixed_bytes`](Self::as_fixed_bytes) to get the full,
+    /// fixed-size backing array instead.
     #[inline]
     pub fn as_slice(&self) -> &[u8] {
         &self.bytes[..self.len as usize]
     }
 
-    /// Returns the [`Principal`]'s length.
+    /// Returns the number of significant bytes in the [`Principal`], between
+    /// `0` and [`MAX_LENGTH_IN_BYTES`](Self::MAX_LENGTH_IN_BYTES) inclusive.
+    ///
+    /// This equals the length of the slice returned by
+    /// [`as_slice`](Self::as_slice).
     #[inline]
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> u8 {
         self.len
     }
 
-    /// Returns the [`Principal`]'s underlying byte array.
+    /// Returns a reference to the [`Principal`]'s fixed-size backing array.
+    ///
+    /// The array is always [`MAX_LENGTH_IN_BYTES`](Self::MAX_LENGTH_IN_BYTES)
+    /// long; bytes from index [`len`](Self::len) onwards are always zero.
+    /// Prefer [`as_slice`](Self::as_slice) for the significant bytes without
+    /// padding.
     #[inline]
-    pub fn as_bytes(&self) -> &[u8; Self::MAX_LENGTH_IN_BYTES] {
+    pub fn as_fixed_bytes(&self) -> &[u8; Self::MAX_LENGTH_IN_BYTES] {
         &self.bytes
     }
 }

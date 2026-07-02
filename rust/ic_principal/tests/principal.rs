@@ -335,7 +335,7 @@ fn as_slice_len_principal() {
 }
 
 #[test]
-fn as_bytes() {
+fn as_fixed_bytes() {
     fn principal_bytes(slice: &[u8]) -> [u8; Principal::MAX_LENGTH_IN_BYTES] {
         let mut bytes = [0; Principal::MAX_LENGTH_IN_BYTES];
         bytes[..slice.len()].copy_from_slice(slice);
@@ -345,14 +345,14 @@ fn as_bytes() {
     let anonymous_principal = Principal::anonymous();
     assert_eq!(anonymous_principal.len(), 1);
     assert_eq!(
-        anonymous_principal.as_bytes(),
+        anonymous_principal.as_fixed_bytes(),
         &principal_bytes(&ANONYMOUS_CANISTER_BYTES[..])
     );
 
     let management_canister = Principal::management_canister();
     assert_eq!(management_canister.len(), 0);
     assert_eq!(
-        management_canister.as_bytes(),
+        management_canister.as_fixed_bytes(),
         &[0; Principal::MAX_LENGTH_IN_BYTES]
     );
 
@@ -360,15 +360,21 @@ fn as_bytes() {
     let self_authenticating = Principal::self_authenticating(key);
     assert_eq!(self_authenticating.len(), 29);
     assert_eq!(
-        self_authenticating.as_bytes(),
+        self_authenticating.as_fixed_bytes(),
         &principal_bytes(self_authenticating.as_slice())
     );
 
     let from_slice = Principal::from_slice(&TEST_CASE_BYTES);
     assert_eq!(from_slice.len(), 9);
-    assert_eq!(from_slice.as_bytes(), &principal_bytes(&TEST_CASE_BYTES));
+    assert_eq!(
+        from_slice.as_fixed_bytes(),
+        &principal_bytes(&TEST_CASE_BYTES)
+    );
 
     let from_text = Principal::from_text(TEST_CASE_TEXT).unwrap();
     assert_eq!(from_text.len(), 9);
-    assert_eq!(from_text.as_bytes(), &principal_bytes(&TEST_CASE_BYTES));
+    assert_eq!(
+        from_text.as_fixed_bytes(),
+        &principal_bytes(&TEST_CASE_BYTES)
+    );
 }
