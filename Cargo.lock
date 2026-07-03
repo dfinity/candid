@@ -218,7 +218,7 @@ dependencies = [
  "candid_derive 0.10.31",
  "candid_parser 0.4.0",
  "hex",
- "ic_principal 0.1.4",
+ "ic_principal 0.1.5",
  "leb128",
  "num-bigint",
  "num-traits",
@@ -708,7 +708,7 @@ dependencies = [
 
 [[package]]
 name = "ic_principal"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "arbitrary",
  "crc32fast",

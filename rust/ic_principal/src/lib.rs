@@ -239,8 +239,8 @@ impl Principal {
     /// Use [`as_fixed_bytes`](Self::as_fixed_bytes) to get the full,
     /// fixed-size backing array instead.
     #[inline]
-    pub fn as_slice(&self) -> &[u8] {
-        &self.bytes[..self.len as usize]
+    pub const fn as_slice(&self) -> &[u8] {
+        &self.bytes.split_at(self.len as usize).0
     }
 
     /// Returns the number of significant bytes in the [`Principal`], between
@@ -250,7 +250,7 @@ impl Principal {
     /// [`as_slice`](Self::as_slice).
     #[inline]
     #[allow(clippy::len_without_is_empty)]
-    pub fn len(&self) -> u8 {
+    pub const fn len(&self) -> u8 {
         self.len
     }
 
@@ -261,7 +261,7 @@ impl Principal {
     /// Prefer [`as_slice`](Self::as_slice) for the significant bytes without
     /// padding.
     #[inline]
-    pub fn as_fixed_bytes(&self) -> &[u8; Self::MAX_LENGTH_IN_BYTES] {
+    pub const fn as_fixed_bytes(&self) -> &[u8; Self::MAX_LENGTH_IN_BYTES] {
         &self.bytes
     }
 }
