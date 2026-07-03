@@ -618,11 +618,22 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
-        // Dispatched only when the expected type is `principal`; `check_subtype`
-        // then admits both `principal` (reflexive) and `service <actortype>`
-        // (spec: `service <: principal`) as wire types. Both are read as the
-        // same `PrincipalBytes`, so a service reference decodes as its principal.
-        self.check_subtype()?;
+        // Dispatched only when the expected type is `principal`. Accept exactly
+        // the two wire types that share the `PrincipalBytes` encoding: `principal`
+        // (reflexive) and `service <actortype>` (spec: `service <: principal`), so
+        // a service reference decodes as its principal. We match the wire type
+        // directly rather than calling `check_subtype()`: the general subtype
+        // relation also admits `empty` (bottom) `<: principal`, which would let a
+        // payload declare wire type `empty` yet be decoded as a principal from
+        // arbitrary trailing bytes. Matching also avoids the subtype-check
+        // overhead on this common decoding path.
+        check!(
+            matches!(
+                self.wire_type.as_ref(),
+                TypeInner::Principal | TypeInner::Service(_)
+            ),
+            "expected principal or service reference"
+        );
         let mut bytes = vec![2u8];
         let id = PrincipalBytes::read(&mut self.input)?;
         self.add_cost(std::cmp::max(30, id.len as usize))?;
