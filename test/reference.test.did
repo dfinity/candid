@@ -36,6 +36,16 @@ assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\01\01\01\03\ca\ff\ee"
 // it would let a payload declare wire type `empty` yet be decoded as a principal
 // from arbitrary trailing bytes. Same trailing bytes as the `\68` principal above.
 assert blob "DIDL\00\01\6f\01\03\ca\ff\ee" !: (principal) "principal: reject empty (bottom) wire type";
+// A recursive service type (its method returns the service itself) still decodes
+// at `principal`: the wire type unrolls to a `service` head and only the
+// PrincipalBytes are read from the value stream.
+assert blob "DIDL\02\69\01\01m\01\6a\00\01\01\00\01\00\01\03\ca\ff\ee"
+  == "(principal \"w7x7r-cok77-xa\")" : (principal) "recursive service value decodes at principal";
+// Only `principal`/`service` wire types coerce to `principal`; other reference and
+// aggregate wire types are rejected (they do not share the PrincipalBytes encoding).
+assert blob "DIDL\01\6a\00\00\00\01\00\01\01\03\ca\ff\ee\01\61" !: (principal) "principal: reject func wire type";
+assert blob "DIDL\01\6c\00\01\00"                               !: (principal) "principal: reject record wire type";
+assert blob "DIDL\01\6e\7d\01\00\00"                            !: (principal) "principal: reject opt wire type";
 
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\03\03foo\00\04foo\32\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service: too long";
 assert blob "DIDL\02\6a\01\71\01\7d\00\69\01\03foo\00\04foo\32\00\01\01\01\03\ca\ff\ee" !: (service { foo : (text) -> (nat); foo2 : (text) -> (nat) }) "service: too short";
