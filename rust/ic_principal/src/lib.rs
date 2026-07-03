@@ -240,7 +240,7 @@ impl Principal {
     /// fixed-size backing array instead.
     #[inline]
     pub const fn as_slice(&self) -> &[u8] {
-        &self.bytes.split_at(self.len as usize).0
+        self.bytes.split_at(self.len as usize).0
     }
 
     /// Returns the number of significant bytes in the [`Principal`], between
