@@ -632,7 +632,7 @@ impl<'de> Deserializer<'de> {
                 self.wire_type.as_ref(),
                 TypeInner::Principal | TypeInner::Service(_)
             ),
-            "expected principal or service reference"
+            "principal"
         );
         let mut bytes = vec![2u8];
         let id = PrincipalBytes::read(&mut self.input)?;
