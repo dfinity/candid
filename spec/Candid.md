@@ -929,7 +929,7 @@ Values of type `nat` coerce at type `int`:
 <nat> : nat ~> <nat> : int
 ```
 
-A service reference coerces at type `principal` (both share the same value form, so this is the identity on the reference):
+A service reference coerces at type `principal` (both share the same value form, so this is the identity on the value):
 ```
 ---------------------------------------------------------------------
 service <text> : service <actortype> ~> principal <text> : principal

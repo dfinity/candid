@@ -5,7 +5,7 @@
 ### Candid 0.10.32
 
 * Non-breaking changes:
-  + A service reference now decodes where a `principal` is expected: `service <actortype>` is a subtype of `principal` (spec addition: `service <: principal`, modelled on `nat <: int`). The subtype checker and the deserializer accept a service reference at type `principal`; the two share an identical wire encoding, so the coercion is the identity on the reference. The reverse (a `principal` at a `service` type) remains rejected.
+  + A service reference now decodes where a `principal` is expected: `service <actortype>` is a subtype of `principal` (spec addition: `service <: principal`, modelled analogously to `nat <: int`). The subtype checker and the deserializer accept a service reference at type `principal`; the two share an identical wire encoding, so the coercion is the identity on the reference. The reverse (a `principal` at a `service` type) remains rejected.
 
 ### ic_principal 0.1.4
 
