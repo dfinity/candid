@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-07-03
+
+### ic_principal 0.1.5
+
+* Non-breaking changes:
+  + Make `Principal::as_slice()`, `Principal::len()` and `Principal::as_fixed_bytes()` const functions.
+
 ## 2026-07-02
 
 ### Candid 0.10.32
