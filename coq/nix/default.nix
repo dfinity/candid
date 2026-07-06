@@ -10,7 +10,7 @@ let
   # coq_8_18 is the newest coq that still accepts them unchanged.
   nixpkgs = fetchTarball {
     url = "https://github.com/NixOS/nixpkgs/archive/e8273b29fe1390ec8d4603f2477357555291432e.tar.gz";
-    sha256 = "sha256-mFP086y1bNA1g9AsY/pCue3H3W2R7ayroHyRbZrcMf0=";
+    sha256 = "1k8idy9ka87c7gjb9aiqrcx4l9kwblv8fs4pwf0byjivsmbjfdhi";
   };
 
   overlays = [
