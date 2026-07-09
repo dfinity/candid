@@ -46,7 +46,7 @@ async function insertLoginForm() {
     const is_mainnet = mainnet_domain !== undefined;
     let provider = params.get("ii");
     if (is_mainnet && !provider) {
-      provider = "https://identity.internetcomputer.org";
+      provider = "https://id.ai/authorize";
     }
     if (!provider) {
       console.warn("If you want to use Internet Identity, please provide a URL to your local Internet Identity service using the `ii` query parameter");
