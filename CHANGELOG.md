@@ -68,6 +68,9 @@
 
 ### candid_parser 0.3.2
 
+* **Breaking changes:**
+  + Motoko binding: type alias names are now emitted in PascalCase (e.g. `my_type` → `MyType`, `list` → `List`). Names that cannot be unambiguously converted — those not starting with a lowercase letter, those where two names would collide to the same PascalCase form, or those whose PascalCase form is already taken by another type — fall back to the original escaped name. Any code referencing generated Motoko type aliases by name will need to be updated.
+
 * Bug fixes:
   + Motoko binding: emit `Float32` for Candid `float32` instead of panicking. `float32` support was added to Motoko in version 1.4.0.
 
