@@ -37,18 +37,18 @@ impl Error {
     }
 }
 
-fn get_binread_labels(e: &binread::Error) -> Vec<Label> {
-    use binread::Error::*;
+fn get_binread_labels(e: &binrw::Error) -> Vec<Label> {
+    use binrw::Error::*;
     match e {
         BadMagic { pos, .. } => {
-            let pos = (pos * 2) as usize;
+            let pos = (*pos * 2) as usize;
             vec![Label {
                 pos,
                 message: "Unexpected bytes".to_string(),
             }]
         }
         Custom { pos, err } => {
-            let pos = (pos * 2) as usize;
+            let pos = (*pos * 2) as usize;
             let err = err
                 .downcast_ref::<&str>()
                 .unwrap_or(&"unknown error (there's a bug in error reporting)");
@@ -61,7 +61,7 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label> {
             pos,
             variant_errors,
         } => {
-            let pos = (pos * 2) as usize;
+            let pos = (*pos * 2) as usize;
             let variant = variant_errors
                 .iter()
                 .find(|(_, e)| !matches!(e, BadMagic { .. }));
@@ -82,20 +82,21 @@ fn get_binread_labels(e: &binread::Error) -> Vec<Label> {
             }
         }
         NoVariantMatch { pos } => {
-            let pos = (pos * 2) as usize;
+            let pos = (*pos * 2) as usize;
             vec![Label {
                 pos,
                 message: "No variant match".to_string(),
             }]
         }
         AssertFail { pos, message } => {
-            let pos = (pos * 2) as usize;
+            let pos = (*pos * 2) as usize;
             vec![Label {
                 pos,
                 message: message.to_string(),
             }]
         }
         Io(_) => vec![],
+        Backtrace(backtrace) => get_binread_labels(&backtrace.error),
         _ => unreachable!(),
     }
 }
@@ -126,8 +127,8 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<binread::Error> for Error {
-    fn from(e: binread::Error) -> Error {
+impl From<binrw::Error> for Error {
+    fn from(e: binrw::Error) -> Error {
         Error::Binread(get_binread_labels(&e))
     }
 }

@@ -13,7 +13,7 @@ use crate::{
     types::subtype::{subtype_with_config, Gamma, OptReport},
 };
 use anyhow::{anyhow, Context};
-use binread::BinRead;
+use binrw::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
 use std::fmt::Write;
@@ -311,7 +311,7 @@ struct Deserializer<'de> {
 impl<'de> Deserializer<'de> {
     fn from_bytes(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
         let mut reader = Cursor::new(bytes);
-        let header = Header::read_args(&mut reader, (config.max_type_len,))?;
+        let header = Header::read_le_args(&mut reader, (config.max_type_len,))?;
         let (env, types) = header.to_types()?;
         Ok(Deserializer {
             input: reader,
@@ -635,7 +635,7 @@ impl<'de> Deserializer<'de> {
             "principal"
         );
         let mut bytes = vec![2u8];
-        let id = PrincipalBytes::read(&mut self.input)?;
+        let id = PrincipalBytes::read_le(&mut self.input)?;
         self.add_cost(std::cmp::max(30, id.len as usize))?;
         bytes.extend_from_slice(&id.inner);
         visitor.visit_byte_buf(bytes)
@@ -655,7 +655,7 @@ impl<'de> Deserializer<'de> {
         self.unroll_type()?;
         self.check_subtype()?;
         let mut bytes = vec![4u8];
-        let id = PrincipalBytes::read(&mut self.input)?;
+        let id = PrincipalBytes::read_le(&mut self.input)?;
         self.add_cost(std::cmp::max(30, id.len as usize))?;
         bytes.extend_from_slice(&id.inner);
         visitor.visit_byte_buf(bytes)
@@ -670,7 +670,7 @@ impl<'de> Deserializer<'de> {
             return Err(Error::msg("Opaque reference not supported"));
         }
         let mut bytes = vec![5u8];
-        let id = PrincipalBytes::read(&mut self.input)?;
+        let id = PrincipalBytes::read_le(&mut self.input)?;
         let len = self.read_len()?;
         let meth = self.borrow_bytes(len)?;
         self.add_cost(
@@ -1378,7 +1378,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Variant(e), TypeInner::Variant(w)) => {
-                let index = Len::read(&mut self.input)?.0;
+                let index = Len::read_le(&mut self.input)?.0;
                 let len = w.len();
                 if index >= len {
                     return Err(Error::msg(format!(
