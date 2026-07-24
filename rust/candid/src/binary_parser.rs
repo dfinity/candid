@@ -154,8 +154,7 @@ pub struct BoolValue(
 );
 #[derive(BinRead)]
 pub struct Len(
-    #[br(parse_with = read_leb_usize, args("len", "length out of usize range"))]
-    pub usize,
+    #[br(parse_with = read_leb_usize, args("len", "length out of usize range"))] pub usize,
 );
 #[derive(BinRead)]
 pub struct PrincipalBytes {
