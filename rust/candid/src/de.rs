@@ -1456,9 +1456,16 @@ struct PrimitiveVecAccess<'de> {
     prim: PrimitiveType,
 }
 
-/// Adds newtype-struct support (e.g. `struct EventIndex(u32)`) to serde's
-/// value deserializers, which lack it, by forwarding through
-/// `visit_newtype_struct` like the main `Deserializer` does.
+/// Adapts serde's value deserializers to candid's contract in the two places they
+/// differ from the main `Deserializer`:
+///
+/// * they have no `deserialize_newtype_struct`, so a newtype element (e.g.
+///   `struct EventIndex(u32)`) failed to decode; it now forwards through
+///   `visit_newtype_struct` as the main `Deserializer` does, which also makes
+///   nested newtypes unwrap recursively;
+/// * they inherit serde's default `is_human_readable() == true`, which would send
+///   an impl that branches on it down its human-readable path even though candid
+///   is a binary format.
 #[cfg(target_endian = "little")]
 struct NewtypeCompat<D>(D);
 
@@ -1474,6 +1481,9 @@ impl<'de, D: de::Deserializer<'de, Error = Error>> de::Deserializer<'de> for New
         visitor: V,
     ) -> Result<V::Value> {
         visitor.visit_newtype_struct(self)
+    }
+    fn is_human_readable(&self) -> bool {
+        false
     }
     serde::forward_to_deserialize_any! {
         bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string

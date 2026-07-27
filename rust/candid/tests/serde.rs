@@ -856,6 +856,47 @@ fn test_nested_map_non_text_key() {
     assert_eq!(outer, decoded);
 }
 
+/// Regression test: elements decoded through the bulk primitive-vec fast path must
+/// report the same `is_human_readable()` answer as the main deserializer, which is
+/// `false` because candid is a binary format.
+///
+/// The fast path hands each element to a serde value deserializer, which inherits
+/// serde's default `is_human_readable() == true`. A `Deserialize` impl that branches
+/// on it — the common "string when human-readable, native when binary" pattern — then
+/// took the wrong branch inside a `vec`, silently decoding to a different value than
+/// the same bytes decoded on their own, with no error raised.
+#[test]
+fn test_primitive_vec_reports_binary_format() {
+    #[derive(CandidType, Debug, PartialEq)]
+    struct Flag(u32);
+
+    impl<'de> Deserialize<'de> for Flag {
+        fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+            // Stand in for the string-parsing branch such impls would take.
+            let human_readable = d.is_human_readable();
+            let v = u32::deserialize(d)?;
+            Ok(Flag(if human_readable { u32::MAX } else { v }))
+        }
+    }
+
+    // Scalar: goes through the main `Deserializer`.
+    let config = get_config();
+    let scalar = decode_one_with_config::<Flag>(&encode(&Flag(7)), &config).unwrap();
+    assert_eq!(
+        scalar,
+        Flag(7),
+        "main deserializer must report a binary format"
+    );
+
+    // Inside a vec: goes through the bulk primitive-vec fast path, which must agree.
+    let v = vec![Flag(7), Flag(8)];
+    let decoded = decode_one_with_config::<Vec<Flag>>(&encode(&v), &config).unwrap();
+    assert_eq!(
+        decoded, v,
+        "bulk primitive-vec fast path must report a binary format like the main deserializer"
+    );
+}
+
 #[test]
 fn test_collection() {
     use std::collections::{BTreeMap, BTreeSet, HashMap};
