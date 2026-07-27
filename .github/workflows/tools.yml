@@ -22,9 +22,8 @@ env:
   TERM: xterm-256color
   WORKING_DIR: tools/didc-js
 
-# Neither job here is a required status check, so a workflow-level `paths:`
-# filter is safe. See the comment in rust.yml for why the required `rust` check
-# cannot be gated the same way.
+# Neither job is a required status check, so a workflow-level `paths:` filter is
+# safe here. See rust.yml for why the required check cannot use one.
 
 jobs:
   build-didc:

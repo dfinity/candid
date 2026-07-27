@@ -1,8 +1,19 @@
+# Its own workspace, not a member of the root one: `[patch.crates-io]` below is
+# only honored in a workspace root, and it is needed so that ic-cdk's and
+# canbench-rs' transitive `candid` resolves to this repo rather than crates.io.
 [workspace]
+
+# Mirrors the root workspace's policy so local runs match CI.
+[workspace.lints.clippy]
+all = { level = "deny", priority = 0 }
+uninlined_format_args = { level = "allow", priority = 1 }
 
 [package]
 name = "bench"
 edition = "2021"
+
+[lints]
+workspace = true
 
 [[bin]]
 name = "bench"

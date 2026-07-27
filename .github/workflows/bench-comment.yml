@@ -1,15 +1,11 @@
 name: Rust Bench Comment
 
-# Posts the benchmark table produced by bench.yml as a pull request comment.
+# Posts the benchmark table produced by bench.yml. Split out because fork PRs
+# give bench.yml a read-only token; `workflow_run` runs in the base repository
+# and does get a writable one.
 #
-# This is split out because pull requests from forks get a read-only
-# `GITHUB_TOKEN`, so bench.yml cannot comment on them — every fork PR failed at
-# the "Post comment" step with "Resource not accessible by integration" (#755).
-#
-# `workflow_run` runs in the context of the base repository with the workflow
-# definition from the default branch, so it does get a writable token. The
-# security requirement that comes with that: this workflow must never execute
-# code from the pull request. It only downloads a text artifact and posts it.
+# Because it holds a writable token, this workflow must never execute code from
+# the pull request. Keep it to downloading the artifact and posting it.
 on:
   workflow_run:
     workflows: ["Rust Bench"]
@@ -38,10 +34,8 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # `github.event.workflow_run.pull_requests` is empty for fork pull
-      # requests, so the number is read from the artifact instead. It is
-      # validated as digits-only before use: the artifact was produced by a
-      # workflow run triggered from an untrusted fork.
+      # `workflow_run.pull_requests` is empty for fork PRs, so the number comes
+      # from the artifact — untrusted, hence the digits-only scrub.
       - name: Read pull request number
         id: pr
         run: |

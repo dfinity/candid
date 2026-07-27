@@ -13,12 +13,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# This workflow builds and runs benchmark code from the pull request, so it must
-# never hold a writable token. Pull requests from forks get a read-only
-# `GITHUB_TOKEN` regardless of what is declared here, which is why posting the
-# result comment from this job failed on every fork PR (#755: "Resource not
-# accessible by integration"). The comment is posted by bench-comment.yml
-# instead, which runs on `workflow_run` in the base repository context.
+# Runs benchmark code from the pull request, so it must never hold a writable
+# token — and fork PRs get a read-only one regardless. The result is posted by
+# bench-comment.yml, which runs on `workflow_run` and can comment.
 permissions:
   contents: read
 
@@ -52,15 +49,19 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
         with:
-          # rust-cache keys on the workspace, but the bench crate has its own
-          # lockfile and target dir; include it so both are cached together.
+          # rust/bench is its own workspace with its own lockfile and target dir.
           cache-workspaces: |
             .
             rust/bench
-          # Cache ~/.cargo/bin separately below instead: rust-cache's key includes
-          # the Cargo.lock hash, so canbench would be rebuilt from source every
-          # time a dependency moves, even though its own version never changed.
+          # canbench is cached below on its own version instead; rust-cache's key
+          # includes the Cargo.lock hash and would rebuild it on every dep bump.
           cache-bin: false
+      - name: Check bench formatting
+        working-directory: rust/bench
+        run: cargo fmt -- --check
+      - name: Lint bench
+        working-directory: rust/bench
+        run: cargo clippy --all-targets -- -D warnings
       - name: Cache canbench
         id: canbench-cache
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
@@ -90,8 +91,8 @@ jobs:
             echo "\`\`\`"
             echo "</details>"
           } > /tmp/message.txt
-      # The PR number is carried in the artifact because
-      # `github.event.workflow_run.pull_requests` is empty for fork pull requests.
+      # The PR number travels in the artifact: `workflow_run.pull_requests` is
+      # empty for fork PRs.
       - name: Collect comment payload
         run: |
           mkdir -p /tmp/bench-comment

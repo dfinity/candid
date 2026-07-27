@@ -12,8 +12,6 @@ concurrency:
 
 jobs:
   cargo-deny:
-    # Named `license-check:required` until 2026-07; the `:required` suffix is the
-    # repo's marker for checks in branch protection, and this one no longer is.
     name: license-check
     runs-on: ubuntu-24.04
     steps:
