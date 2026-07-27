@@ -7,6 +7,16 @@
 * Bug fixes:
   + Fix decoding a `vec` of fixed-width primitives into newtype elements (e.g. `struct EventIndex(u32)`), which failed with a spurious subtyping error since 0.10.27. The bulk decode fast path fed each element through serde's value deserializers, which do not implement `deserialize_newtype_struct`; they now go through a wrapper that forwards it, as the main deserializer does. Nested newtypes are unwrapped recursively.
 
+* Breaking changes:
+  + Migrated from the deprecated [`binread`](https://github.com/jam1garner/binread) crate to its successor `binrw`. The types in the `candid::binary_parser` module (`Header`, `PrincipalBytes`, `Len`, `BoolValue`) now implement `binrw::BinRead` instead of `binread::BinRead`, and `From<binread::Error> for candid::Error` is replaced by `From<binrw::Error>`.
+
+    Released as a patch rather than a minor bump because the affected surface is limited to those trait impls. `binary_parser` is an internal wire-format parsing module that is `pub` only incidentally — it is used nowhere outside candid's own deserializer, and it is now `#[doc(hidden)]` to say so. Code is affected only if it depends on `binread` directly *and* names these impls; the wire format, decoder error messages, byte offsets, type layouts, and all function signatures are unchanged, so the worst case is a compile error rather than a behaviour change.
+
+* Non-breaking changes:
+  + Decoding is faster as a side effect of the `binrw` migration, which drops `binread`'s `debug_template` codegen: up to 37% fewer instructions on variant-heavy payloads (`multi_arg` −36.6%, `result_variant` −10.3%, `large_variant` −9.5%, `subtype_decode` −8.0%, `double_option` −7.0%), with no regressions.
+  + Dropped the duplicate `syn 1.x` dependency tree that `binread_derive` pinned (along with `rustversion`).
+  + A future unrecognized `binrw::Error` variant now degrades to a label-less error instead of panicking, since `binrw::Error` is `#[non_exhaustive]` and decoding runs on untrusted input.
+
 ## 2026-07-06
 
 ### Candid 0.10.32
