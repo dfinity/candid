@@ -1,0 +1,60 @@
+name: Rust Bench Comment
+
+# Posts the benchmark table produced by bench.yml as a pull request comment.
+#
+# This is split out because pull requests from forks get a read-only
+# `GITHUB_TOKEN`, so bench.yml cannot comment on them — every fork PR failed at
+# the "Post comment" step with "Resource not accessible by integration" (#755).
+#
+# `workflow_run` runs in the context of the base repository with the workflow
+# definition from the default branch, so it does get a writable token. The
+# security requirement that comes with that: this workflow must never execute
+# code from the pull request. It only downloads a text artifact and posts it.
+on:
+  workflow_run:
+    workflows: ["Rust Bench"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  # Required to download an artifact produced by a *different* workflow run.
+  actions: read
+  pull-requests: write
+
+jobs:
+  comment:
+    name: post benchmark comment
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download comment payload
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: bench-comment
+          path: payload
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # `github.event.workflow_run.pull_requests` is empty for fork pull
+      # requests, so the number is read from the artifact instead. It is
+      # validated as digits-only before use: the artifact was produced by a
+      # workflow run triggered from an untrusted fork.
+      - name: Read pull request number
+        id: pr
+        run: |
+          number=$(tr -dc '0-9' < payload/pr-number.txt)
+          if [ -z "$number" ]; then
+            echo "No pull request number in artifact" >&2
+            exit 1
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Post comment
+        uses: thollander/actions-comment-pull-request@24bffb9b452ba05a4f3f77933840a6a841d1b32b # v3.0.1
+        with:
+          file-path: payload/message.txt
+          pr-number: ${{ steps.pr.outputs.number }}
+          comment-tag: canbench
