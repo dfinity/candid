@@ -523,7 +523,7 @@ pub mod value {
                         for v in vs.iter() {
                             match v {
                                 // only here for completeness. The deserializer should generate IDLValue::Blob instead.
-                                Nat8(v) => write!(f, "{}", &pp_char(*v))?,
+                                Nat8(v) => write!(f, "{}", pp_char(*v))?,
                                 _ => unreachable!(),
                             }
                         }
