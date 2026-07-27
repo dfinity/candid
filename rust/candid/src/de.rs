@@ -1456,6 +1456,39 @@ struct PrimitiveVecAccess<'de> {
     prim: PrimitiveType,
 }
 
+/// Adds newtype-struct support (e.g. `struct EventIndex(u32)`) to serde's
+/// value deserializers, which lack it, by forwarding through
+/// `visit_newtype_struct` like the main `Deserializer` does.
+#[cfg(target_endian = "little")]
+struct NewtypeCompat<D>(D);
+
+#[cfg(target_endian = "little")]
+impl<'de, D: de::Deserializer<'de, Error = Error>> de::Deserializer<'de> for NewtypeCompat<D> {
+    type Error = Error;
+    fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+        self.0.deserialize_any(visitor)
+    }
+    fn deserialize_newtype_struct<V: Visitor<'de>>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value> {
+        visitor.visit_newtype_struct(self)
+    }
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf option unit unit_struct seq tuple
+        tuple_struct map struct enum identifier ignored_any
+    }
+}
+
+#[cfg(target_endian = "little")]
+fn newtype_compat<'de, T: de::IntoDeserializer<'de, Error>>(
+    value: T,
+) -> NewtypeCompat<T::Deserializer> {
+    NewtypeCompat(value.into_deserializer())
+}
+
 #[cfg(target_endian = "little")]
 impl<'de> de::SeqAccess<'de> for PrimitiveVecAccess<'de> {
     type Error = Error;
@@ -1464,7 +1497,6 @@ impl<'de> de::SeqAccess<'de> for PrimitiveVecAccess<'de> {
     where
         T: de::DeserializeSeed<'de>,
     {
-        use serde::de::IntoDeserializer;
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -1474,45 +1506,43 @@ impl<'de> de::SeqAccess<'de> for PrimitiveVecAccess<'de> {
 
         match self.prim {
             PrimitiveType::Bool => match bytes[0] {
-                0 => seed.deserialize(false.into_deserializer()).map(Some),
-                1 => seed.deserialize(true.into_deserializer()).map(Some),
+                0 => seed.deserialize(newtype_compat(false)).map(Some),
+                1 => seed.deserialize(newtype_compat(true)).map(Some),
                 _ => Err(Error::msg("Expect 00 or 01")),
             },
-            PrimitiveType::Nat8 => seed.deserialize(bytes[0].into_deserializer()).map(Some),
-            PrimitiveType::Int8 => seed
-                .deserialize((bytes[0] as i8).into_deserializer())
-                .map(Some),
+            PrimitiveType::Nat8 => seed.deserialize(newtype_compat(bytes[0])).map(Some),
+            PrimitiveType::Int8 => seed.deserialize(newtype_compat(bytes[0] as i8)).map(Some),
             PrimitiveType::Nat16 => {
                 let v = u16::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
             PrimitiveType::Int16 => {
                 let v = i16::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
             PrimitiveType::Nat32 => {
                 let v = u32::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
             PrimitiveType::Int32 => {
                 let v = i32::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
             PrimitiveType::Float32 => {
                 let v = f32::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
             PrimitiveType::Nat64 => {
                 let v = u64::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
             PrimitiveType::Int64 => {
                 let v = i64::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
             PrimitiveType::Float64 => {
                 let v = f64::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
         }
     }

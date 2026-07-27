@@ -665,6 +665,27 @@ fn test_newtype() {
         A(i32),
     }
     all_check(Y::A(42), "4449444c016b0141750100002a000000");
+
+    // #752: the bulk decode fast path for vectors of fixed-width primitives
+    // must support newtype elements, including nested ones.
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct Wrapped(X);
+    let v = vec![Wrapped(X(1)), Wrapped(X(2))];
+    test_decode(&encode(&v), &v);
+
+    // bool/nat8/int8 read their bytes differently from the other widths.
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct B(bool);
+    let v = vec![B(true), B(false)];
+    test_decode(&encode(&v), &v);
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct N8(u8);
+    let v = vec![N8(0), N8(255)];
+    test_decode(&encode(&v), &v);
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct I8(i8);
+    let v = vec![I8(-128), I8(127)];
+    test_decode(&encode(&v), &v);
 }
 
 #[test]
