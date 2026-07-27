@@ -14,43 +14,42 @@ deleted until `candid` v1 is published *and* dfx and ic-cdk have migrated, and
 
 `candid`, `candid_parser` and `candid_derive` are already ours, so v1 is a new
 major version of those crates rather than a new set of names. Only the layer
-crates below are new; their spelling (`_` vs `-`) is an open question — the
-existing family uses `_`.
+crates below are new, and they use `_` to match the existing family.
 
 ```
 ic_principal                    (existing crate; unchanged, already correctly split)
    ↑
-candid-types      Type, Label, Field, Function, TypeEnv, field-id hash.
+candid_types      Type, Label, Field, Function, TypeEnv, field-id hash.
                   no_std-capable. No serde, no binary, no global state.
    ↑
-candid-subtype    Subtyping + coercion decision procedures.
+candid_subtype    Subtyping + coercion decision procedures.
    ↑              Mirrors lean/ 1:1. The verified core.
-candid-wire       Type table + memory encoding, untyped:
+candid_wire       Type table + memory encoding, untyped:
    ↑              bytes <-> (TypeEnv, Vec<Type>, values). Cost metering.
    ├───────────────────────────┐
-candid-value                candid (facade) + derive macro
+candid_value                candid (facade) + derive macro
    Dynamic value repr,      CandidType trait, native decode trait (no serde),
    pretty printing          Encode!/Decode!
                                ↑
-candid-syntax     Lexer, AST, .did parsing, type checking, spans, diagnostics.
+candid_syntax     Lexer, AST, .did parsing, type checking, spans, diagnostics.
    ↑
-candid-bindgen    IR, name mangling, type-selector config, template helpers.
+candid_bindgen    IR, name mangling, type-selector config, template helpers.
 
-out of tree:      candid-bindgen-{rust,js,ts,motoko}
+out of tree:      candid_bindgen_{rust,js,ts,motoko}
 ```
 
 ### Why these seams
 
-- **`candid-types` has no global state.** The current implementation keeps four
+- **`candid_types` has no global state.** The current implementation keeps four
   `thread_local! RefCell` maps
   ([rust/candid/src/types/internal.rs:692](../rust/candid/src/types/internal.rs#L692)),
   which makes `CandidType::ty()` impure and makes generated `.did` type names
   depend on the order types were first derived. Here, types are built into an
   explicit `TypeEnv` passed by the caller, with recursion handled by arena indices.
-- **`candid-subtype` is a separate crate** specifically so the Lean-mirrored
+- **`candid_subtype` is a separate crate** specifically so the Lean-mirrored
   surface has a crate boundary. As a module inside something larger, the
   correspondence rots silently.
-- **`candid-wire` must be usable with zero derive and zero serde.** Anyone writing
+- **`candid_wire` must be usable with zero derive and zero serde.** Anyone writing
   a fuzzer, an interceptor, a `didc`-like tool, or a non-Rust FFI binding needs
   only this crate. It is also the only crate that touches untrusted bytes, which
   makes it the right place to concentrate Kani and fuzzing.
@@ -132,7 +131,7 @@ two exports do not obviously survive:
 
 ## Verification posture
 
-`candid-subtype` and `candid-wire` are written to be checkable, which constrains
+`candid_subtype` and `candid_wire` are written to be checkable, which constrains
 their style: pure functions, no interior mutability, no `unsafe`, no trait-object
 indirection in the core paths. Concretely this means
 [Kani](https://github.com/model-checking/kani) for panic-freedom on the wire

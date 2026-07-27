@@ -85,7 +85,7 @@ decode_one_with_skipping_quota, decode_one_with_decoding_and_skipping_quota,
 Write names out. Options go in a config struct or a builder, never into the
 function name.
 
-### 5. No `unsafe` in `candid-subtype` or `candid-wire`
+### 5. No `unsafe` in `candid_subtype` or `candid_wire`
 
 These two crates are the verification target. No `unsafe`, no interior
 mutability, no trait-object indirection in core paths. This is a hard constraint,
@@ -104,15 +104,15 @@ with the general path, and it must be covered by the same conformance vectors.
 
 - **The Lean model in [`lean/`](../lean/) is the specification.** Where Rust and
   Lean disagree, that is a bug in one of them and it gets investigated, not
-  papered over. `candid-subtype` in particular should read as a transcription of
+  papered over. `candid_subtype` in particular should read as a transcription of
   its Lean counterpart.
 - **Every behaviour is a conformance vector.** New behaviour lands with vectors in
   [`conformance/`](../conformance/), not just Rust unit tests — the vectors are
   what other implementations consume.
-- **`candid-wire` stands alone.** It must be usable with no derive macro and no
-  serde. If you need `candid-value` or the facade to make it work, the layering is
+- **`candid_wire` stands alone.** It must be usable with no derive macro and no
+  serde. If you need `candid_value` or the facade to make it work, the layering is
   wrong.
-- **Untrusted input.** Everything in `candid-wire` parses bytes from the network.
+- **Untrusted input.** Everything in `candid_wire` parses bytes from the network.
   Bounded allocation, explicit cost accounting, no unbounded recursion.
 
 ## Status

@@ -191,23 +191,23 @@ definition for everyone else.
 ```
 ic_principal                    (existing; unchanged, already correctly split)
    ↑
-candid-types      Type, Label, Field, Function, TypeEnv, field-id hash.
+candid_types      Type, Label, Field, Function, TypeEnv, field-id hash.
                   no_std-capable. No serde, no binary, NO GLOBAL STATE.
    ↑
-candid-subtype    Subtyping + coercion decision procedures. Mirrors Lean 1:1.
+candid_subtype    Subtyping + coercion decision procedures. Mirrors Lean 1:1.
    ↑               The verified core: small, pure, Aeneas-shaped.
-candid-wire       Type table + memory encoding, untyped:
+candid_wire       Type table + memory encoding, untyped:
    ↑               bytes <-> (TypeEnv, Vec<Type>, values). Cost metering.
    ├───────────────────────────┐
-candid-value                candid (facade) + derive macro
+candid_value                candid (facade) + derive macro
    IDLValue equivalent,     CandidType trait, native decode trait (no serde),
    pretty printing          Encode!/Decode!
                                ↑
-candid-syntax     Lexer, AST, .did parsing, type checking, spans, diagnostics.
+candid_syntax     Lexer, AST, .did parsing, type checking, spans, diagnostics.
    ↑
-candid-bindgen    IR, name mangling, type-selector config, template helpers.
+candid_bindgen    IR, name mangling, type-selector config, template helpers.
 
-out of tree:      candid-bindgen-{rust,js,ts,motoko}
+out of tree:      candid_bindgen_{rust,js,ts,motoko}
 ```
 
 **On naming.** `candid`, `candid_parser`, `candid_derive` and `ic_principal` are
@@ -221,10 +221,9 @@ both transitively still breaks at the boundary between them. That friction is re
 and no naming scheme fixes it — it is what the migration story in §7 has to
 address.
 
-Only the genuinely new layer crates need new names, and the open choice there is
-`_` versus `-` for consistency with the existing family, which uses `_`. crates.io
-treats the two as equivalent for uniqueness, so the choice is cosmetic and either
-spelling reserves both.
+Only the genuinely new layer crates need new names, and they use `_` to match the
+existing family. crates.io treats `_` and `-` as equivalent for uniqueness, so
+publishing `candid_types` also reserves `candid-types`.
 
 Rust still requires proc macros to live in a dedicated crate
 ([rust-lang/rust#54727](https://github.com/rust-lang/rust/issues/54727)), so a
@@ -282,7 +281,7 @@ practical tiers:
 Tier 4 is worth one note: Aeneas cannot handle `unsafe`, interior mutability, or
 serde-style generic traits, so today's decoder is out of reach regardless. But
 "written so that it *could* be Aeneas-verified" is a useful design constraint on
-`candid-subtype` and `candid-wire` even if we never run the tool.
+`candid_subtype` and `candid_wire` even if we never run the tool.
 
 ---
 
@@ -366,7 +365,6 @@ move to their own repo rather than vanish.
 
 ## 7. Open questions
 
-- Names for the new layer crates: `_` or `-`? The existing family uses `_`.
 - What stays in the derive crate. `CandidType` clearly does. `candid_method` and
   `export_service` need rethinking — they communicate across proc-macro
   invocations through a `lazy_static! Mutex`, which the code itself flags as
@@ -379,7 +377,7 @@ move to their own repo rather than vanish.
 - Whether the canonical encoding profile (deterministic type-table ordering, no
   unused entries, shortest-form LEB128) should be normative in the spec or a
   separate conformance profile.
-- Whether `candid-serde-compat` — a bridge letting `serde::Deserialize` types be
+- Whether `candid_serde_compat` — a bridge letting `serde::Deserialize` types be
   used at a Candid boundary during migration — is worth shipping, given that it
   necessarily inherits the bug class described in §1.3. Current thinking: ship it,
   scope it to foreign types you do not control, and make coercion failures loud
