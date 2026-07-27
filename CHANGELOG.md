@@ -2,10 +2,12 @@
 
 ## 2026-07-27
 
-### Candid 0.10.33
+### Candid 0.10.34
 
 * Bug fixes:
   + Fix decoding a `vec` of fixed-width primitives into newtype elements (e.g. `struct EventIndex(u32)`), which failed with a spurious subtyping error since 0.10.27. The bulk decode fast path fed each element through serde's value deserializers, which do not implement `deserialize_newtype_struct`; they now go through a wrapper that forwards it, as the main deserializer does. Nested newtypes are unwrapped recursively.
+
+### Candid 0.10.33
 
 * Breaking changes:
   + Migrated from the deprecated [`binread`](https://github.com/jam1garner/binread) crate to its successor `binrw`. The types in the `candid::binary_parser` module (`Header`, `PrincipalBytes`, `Len`, `BoolValue`) now implement `binrw::BinRead` instead of `binread::BinRead`, and `From<binread::Error> for candid::Error` is replaced by `From<binrw::Error>`.
