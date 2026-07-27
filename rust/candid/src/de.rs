@@ -35,7 +35,7 @@ impl<'de> IDLDeserialize<'de> {
     pub fn new_with_config(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
         let mut de = Deserializer::from_bytes(bytes, config).with_context(|| {
             if config.full_error_message || bytes.len() <= 500 {
-                format!("Cannot parse header {}", &hex::encode(bytes))
+                format!("Cannot parse header {}", hex::encode(bytes))
             } else {
                 "Cannot parse header".to_string()
             }
