@@ -161,6 +161,15 @@ thread_local! {
 
 // The `ic_env` cookie carries environment data compatible with the canister environment
 // variables cookie. It is only attached to `text/html` responses.
+//
+// `Secure; SameSite=None; Partitioned` (CHIPS) so page scripts can still read it when the
+// UI is shown inside a **cross-site iframe** (e.g. the icp.ninja backend preview): a
+// `SameSite=Lax` cookie is never stored in a third-party context, so `getCanisterEnv()`
+// would throw before the app boots. `Partitioned` scopes the cookie to the embedding
+// top-level site, so it does not become a blanket cross-site cookie. (`ic_env` is
+// read-only client state, never sent back, so `None` only affects whether the browser
+// stores it, not any request.) Kept byte-compatible with the asset canister's
+// `render_env_cookie`.
 const SET_COOKIE_HEADER_NAME: &str = "Set-Cookie";
 const IC_ENV_COOKIE_NAME: &str = "ic_env";
 
@@ -206,7 +215,9 @@ fn build_response(
     if content_type == "text/html" {
         headers.push((
             SET_COOKIE_HEADER_NAME.to_string(),
-            format!("{IC_ENV_COOKIE_NAME}={encoded_canister_env}; SameSite=Lax"),
+            format!(
+                "{IC_ENV_COOKIE_NAME}={encoded_canister_env}; Secure; SameSite=None; Partitioned"
+            ),
         ));
     }
 
