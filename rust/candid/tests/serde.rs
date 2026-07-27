@@ -665,6 +665,27 @@ fn test_newtype() {
         A(i32),
     }
     all_check(Y::A(42), "4449444c016b0141750100002a000000");
+
+    // #752: the bulk decode fast path for vectors of fixed-width primitives
+    // must support newtype elements, including nested ones.
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct Wrapped(X);
+    let v = vec![Wrapped(X(1)), Wrapped(X(2))];
+    test_decode(&encode(&v), &v);
+
+    // bool/nat8/int8 read their bytes differently from the other widths.
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct B(bool);
+    let v = vec![B(true), B(false)];
+    test_decode(&encode(&v), &v);
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct N8(u8);
+    let v = vec![N8(0), N8(255)];
+    test_decode(&encode(&v), &v);
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct I8(i8);
+    let v = vec![I8(-128), I8(127)];
+    test_decode(&encode(&v), &v);
 }
 
 #[test]
@@ -833,6 +854,47 @@ fn test_nested_map_non_text_key() {
     let config = get_config();
     let decoded = decode_one_with_config::<BTreeMap<String, Value>>(&bytes, &config).unwrap();
     assert_eq!(outer, decoded);
+}
+
+/// Regression test: elements decoded through the bulk primitive-vec fast path must
+/// report the same `is_human_readable()` answer as the main deserializer, which is
+/// `false` because candid is a binary format.
+///
+/// The fast path hands each element to a serde value deserializer, which inherits
+/// serde's default `is_human_readable() == true`. A `Deserialize` impl that branches
+/// on it — the common "string when human-readable, native when binary" pattern — then
+/// took the wrong branch inside a `vec`, silently decoding to a different value than
+/// the same bytes decoded on their own, with no error raised.
+#[test]
+fn test_primitive_vec_reports_binary_format() {
+    #[derive(CandidType, Debug, PartialEq)]
+    struct Flag(u32);
+
+    impl<'de> Deserialize<'de> for Flag {
+        fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+            // Stand in for the string-parsing branch such impls would take.
+            let human_readable = d.is_human_readable();
+            let v = u32::deserialize(d)?;
+            Ok(Flag(if human_readable { u32::MAX } else { v }))
+        }
+    }
+
+    // Scalar: goes through the main `Deserializer`.
+    let config = get_config();
+    let scalar = decode_one_with_config::<Flag>(&encode(&Flag(7)), &config).unwrap();
+    assert_eq!(
+        scalar,
+        Flag(7),
+        "main deserializer must report a binary format"
+    );
+
+    // Inside a vec: goes through the bulk primitive-vec fast path, which must agree.
+    let v = vec![Flag(7), Flag(8)];
+    let decoded = decode_one_with_config::<Vec<Flag>>(&encode(&v), &config).unwrap();
+    assert_eq!(
+        decoded, v,
+        "bulk primitive-vec fast path must report a binary format like the main deserializer"
+    );
 }
 
 #[test]
