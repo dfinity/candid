@@ -5,7 +5,9 @@
 ### Candid 0.10.33
 
 * Breaking changes:
-  + Migrated from the deprecated [`binread`](https://github.com/jam1garner/binread) crate to its successor `binrw`. The types in the public `candid::binary_parser` module (`Header`, `PrincipalBytes`, `Len`, `BoolValue`) now implement `binrw::BinRead` instead of `binread::BinRead`, and `From<binread::Error> for candid::Error` is replaced by `From<binrw::Error>`. Decoder error messages and byte offsets are unchanged. Only code that names those trait impls directly is affected; ordinary encoding and decoding is not.
+  + Migrated from the deprecated [`binread`](https://github.com/jam1garner/binread) crate to its successor `binrw`. The types in the `candid::binary_parser` module (`Header`, `PrincipalBytes`, `Len`, `BoolValue`) now implement `binrw::BinRead` instead of `binread::BinRead`, and `From<binread::Error> for candid::Error` is replaced by `From<binrw::Error>`.
+
+    Released as a patch rather than a minor bump because the affected surface is limited to those trait impls. `binary_parser` is an internal wire-format parsing module that is `pub` only incidentally — it is used nowhere outside candid's own deserializer, and it is now `#[doc(hidden)]` to say so. Code is affected only if it depends on `binread` directly *and* names these impls; the wire format, decoder error messages, byte offsets, type layouts, and all function signatures are unchanged, so the worst case is a compile error rather than a behaviour change.
 
 * Non-breaking changes:
   + Decoding is faster as a side effect of the `binrw` migration, which drops `binread`'s `debug_template` codegen: up to 37% fewer instructions on variant-heavy payloads (`multi_arg` −36.6%, `result_variant` −10.3%, `large_variant` −9.5%, `subtype_decode` −8.0%, `double_option` −7.0%), with no regressions.
