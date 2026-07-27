@@ -1,7 +1,7 @@
 [package]
 name = "candid"
 # sync with the version in `candid_derive/Cargo.toml`
-version = "0.10.32"
+version = "0.10.33"
 edition = "2021"
 rust-version.workspace = true
 authors = ["DFINITY Team"]
@@ -16,9 +16,11 @@ keywords = ["internet-computer", "idl", "candid", "dfinity"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
-candid_derive = { path = "../candid_derive", version = "=0.10.32" }
+candid_derive = { path = "../candid_derive", version = "=0.10.33" }
 ic_principal = { path = "../ic_principal", version = "0.1.0" }
-binrw = "0.15"
+# `verbose-backtrace` (a default feature) pulls in `owo-colors` and generates
+# backtrace frames that `get_binread_labels` discards, so keep it off.
+binrw = { version = "0.15", default-features = false, features = ["std"] }
 byteorder = "1.5.0"
 leb128 = "0.2.5"
 paste = "1.0"

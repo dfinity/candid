@@ -155,7 +155,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6df92e0e9baae4dc82c7bad7715ca40c0a5c71539057bf2ea04a5c29c980410b"
 dependencies = [
  "either",
- "owo-colors",
  "proc-macro2 1.0.86",
  "quote 1.0.36",
  "syn 2.0.87",
@@ -245,13 +244,13 @@ dependencies = [
 
 [[package]]
 name = "candid"
-version = "0.10.32"
+version = "0.10.33"
 dependencies = [
  "anyhow",
  "bincode",
  "binrw",
  "byteorder",
- "candid_derive 0.10.32",
+ "candid_derive 0.10.33",
  "candid_parser 0.4.0",
  "hex",
  "ic_principal 0.1.5",
@@ -283,7 +282,7 @@ dependencies = [
 
 [[package]]
 name = "candid_derive"
-version = "0.10.32"
+version = "0.10.33"
 dependencies = [
  "lazy_static",
  "proc-macro2 1.0.86",
@@ -316,7 +315,7 @@ version = "0.4.0"
 dependencies = [
  "anyhow",
  "arbitrary",
- "candid 0.10.32",
+ "candid 0.10.33",
  "codespan-reporting",
  "console",
  "convert_case",
@@ -1010,12 +1009,6 @@ name = "once_cell"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fdb12b2476b595f9358c5161aa467c2438859caa136dec86c26fdd2efe17b92"
-
-[[package]]
-name = "owo-colors"
-version = "4.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d211803b9b6b570f68772237e415a029d5a50c65d382910b879fb19d3271f94d"
 
 [[package]]
 name = "parking_lot"

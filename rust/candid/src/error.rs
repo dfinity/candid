@@ -97,7 +97,10 @@ fn get_binread_labels(e: &binrw::Error) -> Vec<Label> {
         }
         Io(_) => vec![],
         Backtrace(backtrace) => get_binread_labels(&backtrace.error),
-        _ => unreachable!(),
+        // `binrw::Error` is `#[non_exhaustive]`. Decoding runs on untrusted
+        // input, so degrade to a label-less error instead of panicking if a
+        // future version of binrw adds a variant.
+        _ => vec![],
     }
 }
 
