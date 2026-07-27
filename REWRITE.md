@@ -210,9 +210,26 @@ candid-bindgen    IR, name mangling, type-selector config, template helpers.
 out of tree:      candid-bindgen-{rust,js,ts,motoko}
 ```
 
-Crate names are provisional and their availability on crates.io is unchecked. Note
-that `candid-derive` is *not* available, because crates.io treats `-` and `_` as
-equivalent and `candid_derive` exists.
+**On naming.** `candid`, `candid_parser`, `candid_derive` and `ic_principal` are
+already ours, so v1 is a **new major version of the existing crates, not a new set
+of names.** Cargo links semver-incompatible versions side by side, so `candid
+0.10.x` and `candid 1.x` can both appear in one dependency graph during migration.
+
+The caveat that actually matters: coexistence works for *linking*, not for *types*.
+`candid_0_10::Nat` and `candid_1::Nat` are distinct types, so a project that pulls
+both transitively still breaks at the boundary between them. That friction is real
+and no naming scheme fixes it — it is what the migration story in §7 has to
+address.
+
+Only the genuinely new layer crates need new names, and the open choice there is
+`_` versus `-` for consistency with the existing family, which uses `_`. crates.io
+treats the two as equivalent for uniqueness, so the choice is cosmetic and either
+spelling reserves both.
+
+Rust still requires proc macros to live in a dedicated crate
+([rust-lang/rust#54727](https://github.com/rust-lang/rust/issues/54727)), so a
+derive crate persists in v1. The question is only what goes in it — see
+[crates/README.md](crates/README.md#the-derive-crate).
 
 **`conformance/`** — vectors as JSON data rather than a Candid-grammar extension,
 so an implementer in Go or Python can run vector #1 before writing a text parser.
@@ -280,8 +297,11 @@ serde-style generic traits, so today's decoder is out of reach regardless. But
   namespace, the issue tracker users already use, git history, and — most
   importantly — makes the deletion ratchet in §6 enforceable. Across two repos,
   deleting the old thing is always somebody else's problem and never happens.
-- **Not a break for anyone on 0.10.x.** New crate names throughout, so old and new
-  coexist on crates.io for the entire migration.
+- **Not a break for anyone on 0.10.x.** v1 is a new major version of the existing
+  crates. Cargo links semver-incompatible versions side by side, so 0.10.x keeps
+  working and keeps receiving fixes for as long as it needs to. Mixed dependency
+  graphs are still a real problem — see the caveat in §2 — but nobody is forced to
+  move on our schedule.
 - **Not fast at the ecosystem layer.** The code is plausibly multi-month. Getting
   dfx, ic-cdk, agent-rs, and canister authors onto it is multi-quarter and gated on
   other teams' release cycles, not on our typing speed. "Done" for this effort
@@ -346,8 +366,16 @@ move to their own repo rather than vanish.
 
 ## 7. Open questions
 
-- Crate names — availability on crates.io is unchecked, and the derive macro needs
-  a name that is not `candid-derive`.
+- Names for the new layer crates: `_` or `-`? The existing family uses `_`.
+- What stays in the derive crate. `CandidType` clearly does. `candid_method` and
+  `export_service` need rethinking — they communicate across proc-macro
+  invocations through a `lazy_static! Mutex`, which the code itself flags as
+  unsound under incremental compilation
+  ([func.rs:21](rust/candid_derive/src/func.rs#L21),
+  [rust-lang/rust#44034](https://github.com/rust-lang/rust/issues/44034)).
+- Migration for mixed dependency graphs, where a project transitively pulls both
+  `candid 0.10` and `candid 1` and the two `Nat`/`Principal`/`Type` are distinct
+  types. This is the hardest part of the migration and it is unsolved.
 - Whether the canonical encoding profile (deterministic type-table ordering, no
   unused entries, shortest-form LEB128) should be normative in the spec or a
   separate conformance profile.

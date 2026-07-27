@@ -45,6 +45,14 @@ Type derivation must be a pure function. Types are built into an explicit
 `TypeEnv` passed by the caller; recursion uses arena indices, not thread-local
 interning.
 
+The derive crate has the same defect in a worse place: `candid_method` /
+`export_service` accumulate method signatures across proc-macro invocations in a
+`lazy_static! Mutex`
+([rust/candid_derive/src/func.rs:21](../rust/candid_derive/src/func.rs#L21)),
+which the comment there notes "may get incomplete info with incremental
+compilation" — i.e. a silently truncated `.did` file. Proc macros do not get to
+carry state between expansions.
+
 ### 3. `pub` is opt-in, not the default
 
 246 public items across 23 public modules with 8 `#[doc(hidden)]` means every

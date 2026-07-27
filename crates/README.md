@@ -12,9 +12,10 @@ deleted until `candid` v1 is published *and* dfx and ic-cdk have migrated, and
 
 ## Layering
 
-Names are provisional and crates.io availability is unchecked. Note that
-`candid-derive` is **not** available: crates.io treats `-` and `_` as equivalent
-for uniqueness, and `candid_derive` exists.
+`candid`, `candid_parser` and `candid_derive` are already ours, so v1 is a new
+major version of those crates rather than a new set of names. Only the layer
+crates below are new; their spelling (`_` vs `-`) is an open question — the
+existing family uses `_`.
 
 ```
 ic_principal                    (existing crate; unchanged, already correctly split)
@@ -101,6 +102,33 @@ pub trait CandidType: Sized {
   the 0.10.34 bug class becomes structurally impossible.
 - `is_human_readable` disappears.
 - No `unsafe` in the decode path.
+
+## The derive crate
+
+Rust requires proc macros to live in a dedicated crate, so v1 still has one. It
+stays version-locked to the facade for the same reason `candid_derive` is today —
+generated code names the runtime's items — but the coupling should be narrowed to
+a documented, deliberately small "derive support" surface rather than whatever the
+macro happens to reach for.
+
+What it contains is an open question. `CandidType` obviously belongs. The other
+two exports do not obviously survive:
+
+- **`candid_method` / `export_service`** collect method signatures across separate
+  proc-macro invocations via a `lazy_static! Mutex`
+  ([rust/candid_derive/src/func.rs:21](../rust/candid_derive/src/func.rs#L21)).
+  The code says so itself:
+
+  ```rust
+  // There is no official way to communicate information across proc macro invocations.
+  // lazy_static works for now, but may get incomplete info with incremental compilation.
+  // See https://github.com/rust-lang/rust/issues/44034
+  ```
+
+  This is the same global-state defect as the `thread_local!` type environment,
+  in a place where the failure mode is a silently incomplete `.did` file. Emitting
+  the interface from Rust source is a worthwhile feature; doing it by accumulating
+  state across macro expansions is not the way to keep it.
 
 ## Verification posture
 
