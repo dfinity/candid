@@ -392,12 +392,13 @@ with their reasoning; new evidence is the reason to revisit one.
   scope it to foreign types you do not control, and make coercion failures loud
   errors rather than best-effort.
 - How `spec/` redirects are published once Verso output becomes canonical.
-- What happens to `@dfinity/didc` (`tools/didc-js`), the Rust implementation
-  compiled to wasm for JavaScript. It has sat at 0.0.4 with no functional change
-  since #602, and DFINITY separately publishes `@dfinity/candid` in agent-js, a
-  native JS implementation — so two DFINITY Candid libraries for the same language
-  can disagree, which is §1.1 in a different form. The conformance suite makes
-  either answer workable: the JS implementation is shown to conform and the wasm
-  build is redundant, or the wasm build stays as the reference-behaviour option and
-  both are tested against the same vectors. Either way it is a consumer of the
-  crates rather than part of them.
+- Whether this repo should publish a JavaScript-facing binding at all, and with
+  what surface. `@dfinity/didc` (`tools/didc-js`) compiles the Rust implementation
+  to wasm and has sat at 0.0.4 with no functional change since #602. It is not a
+  duplicate of `@dfinity/candid` from agent-js: that package is a codec over
+  programmatically constructed types and has no `.did` parser, so the two overlap
+  only at encode/decode — where two independent implementations exist and nothing
+  checks that they agree, which is §1.1 in another language. If a binding survives,
+  the surface is the real question: `getServiceMethods` returns a list of method
+  names from a parser that could return the whole type graph. Either way it is a
+  consumer of the crates, not part of them.
