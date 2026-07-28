@@ -50,7 +50,7 @@ jobs:
               - 'deny.toml'
               - '.github/workflows/rust.yml'
 
-  build:
+  check:
     needs: changes
     # Also runs when detection failed, so a broken filter cannot quietly skip
     # the real work.
@@ -112,16 +112,16 @@ jobs:
 
   # The required status check. Never gated, so it always reports.
   rust:
-    needs: [changes, build, fuzzing]
+    needs: [changes, check, fuzzing]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     steps:
       # `skipped` is a pass: it means the paths filter ruled the job out.
       # `changes` is deliberately not gated on — the jobs above fall open when
       # it fails, so the work still ran; its own red check is the signal.
-      - name: check build result
-        if: ${{ needs.build.result != 'success' && needs.build.result != 'skipped' }}
+      - name: verify check
+        if: ${{ needs.check.result != 'success' && needs.check.result != 'skipped' }}
         run: exit 1
-      - name: check fuzzing result
+      - name: verify fuzzing
         if: ${{ needs.fuzzing.result != 'success' && needs.fuzzing.result != 'skipped' }}
         run: exit 1
