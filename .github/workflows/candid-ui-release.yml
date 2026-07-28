@@ -1,4 +1,4 @@
-name: Release candid_ui
+name: Candid UI Release
 
 # The candid_ui canister wasm is released on the repo's date-based tags
 # (e.g. 2025-12-18). The didc binaries are released separately by
@@ -12,7 +12,6 @@ on:
 
 jobs:
   candid-ui:
-    name: Build and publish candid_ui canister
     runs-on: ubuntu-22.04
     permissions:
       contents: write

@@ -44,7 +44,6 @@ jobs:
               - '.github/workflows/rust.yml'
 
   rust:
-    name: rust
     needs: changes
     # Also runs when detection failed: a broken `changes` job must not silently
     # green-light the required check.
@@ -75,7 +74,6 @@ jobs:
         run: cargo doc
 
   fuzzing:
-    name: fuzzing
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.rust == 'true') }}
     runs-on: ubuntu-24.04

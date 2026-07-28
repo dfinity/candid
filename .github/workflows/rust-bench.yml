@@ -7,7 +7,7 @@ on:
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
-      - '.github/workflows/bench.yml'
+      - '.github/workflows/rust-bench.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -26,8 +26,7 @@ env:
   REGRESSION_THRESHOLD_PERCENT: 10
 
 jobs:
-  runBenchMark:
-    name: run benchmark
+  bench:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout pull request
