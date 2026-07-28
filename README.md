@@ -6,12 +6,6 @@
 Candid is an interface description language (IDL) for interacting with _canisters_ (also known as _services_ or _actors_) running on the Internet Computer. It provides a language-independent description of canister interfaces and
 the data they exchange, with type safety and extensibility.
 
-> **Note:** a staged rewrite of Candid's specification, reference model, and Rust
-> implementation is under way in the [lean/](lean/), [crates/](crates/) and
-> [conformance/](conformance/) directories — see [REWRITE.md](REWRITE.md). The
-> released `candid` 0.10.x crates are unaffected and continue to ship from
-> `master` as before.
-
 ## Documentation
 
 * The [spec](spec/) directory contains Candid specifications, including the [Candid language specification](spec/Candid.md) and a soundness proof.

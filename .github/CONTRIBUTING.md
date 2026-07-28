@@ -13,38 +13,6 @@ Your participation is an important factor in the success of the Internet Compute
 This repository contains source code for the canister interface description language—often referred to as Candid or IDL. Candid provides a common language for specifying the signature of a canister service and interacting with canisters running on the
 Internet Computer.
 
-## The `lean/`, `crates/` and `conformance/` directories
-
-These three directories hold an in-progress, staged rewrite of Candid's
-specification, reference model, and Rust implementation. See
-[REWRITE.md](../REWRITE.md) for the full rationale.
-
-If you are contributing a fix or feature to the shipping `candid` crates, you want
-[rust/](../rust/) and can ignore this section.
-
-Three rules apply to the new directories, and they exist so that the rewrite can
-move quickly without putting released code at risk:
-
-1. **The work is additive.** Nothing under these directories is published to
-   crates.io, nothing on `master` references them, and no existing file is
-   modified by rewrite work. A change that needs to modify an existing file is a
-   normal change and follows the normal process.
-
-2. **Merges are shallow-reviewed by design.** Because of rule 1, a merge from the
-   rewrite branch is *"adds files under `lean/`, `crates/`, `conformance/`; touches
-   nothing existing; nothing published depends on it."* Reviewers should verify
-   exactly that and approve. Design discussion belongs in issues and in
-   [REWRITE.md](../REWRITE.md), not in line comments on intermediate states.
-
-3. **The rewrite branch merges to `master` at least every two weeks**, finished or
-   not. This is the whole discipline. The `next` branch in this repository is
-   1 commit ahead of `master` and 109 behind — it was the same plan, and it died
-   from merge cadence rather than from a bad idea.
-
-Anything that is *policy* — directory reservations, [REWRITE.md](../REWRITE.md)
-itself, CI jobs, changes to this file — goes to `master` through a normal pull
-request. Only code churn lives on the branch.
-
 ## Before you contribute
 
 Before contributing, please take a few minutes to review these contributor guidelines.

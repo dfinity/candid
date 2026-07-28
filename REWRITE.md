@@ -6,11 +6,11 @@
 > modified. If you maintain something that depends on `candid`, you can stop
 > reading.
 
-This document is the charter for a staged rewrite of Candid's specification,
-reference model, and Rust implementation. It exists so that the reasoning is
-written down and citable rather than living in one person's head.
+This document proposes a staged rewrite of Candid's specification, reference
+model, and Rust implementation. It exists so that the reasoning is written down
+and citable rather than living in one person's head.
 
-**Status:** proposed. **Owner:** @lwshang.
+**Status:** proposal, not scheduled work. **Author:** @lwshang.
 
 ---
 
@@ -308,7 +308,7 @@ serde-style generic traits, so today's decoder is out of reach regardless. But
 
 ---
 
-## 5. How we work
+## 5. Proposed working model
 
 **Everything is additive.** New code goes in the three new directories. Existing
 files are not modified. This is not a style preference — it is the property that

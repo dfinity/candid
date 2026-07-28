@@ -119,4 +119,4 @@ with the general path, and it must be covered by the same conformance vectors.
 
 Nothing here is published. Nothing carries a compatibility promise until v1. Ugly
 intermediate states are expected — see
-[REWRITE.md §5](../REWRITE.md#5-how-we-work) for the working model.
+[REWRITE.md §5](../REWRITE.md#5-proposed-working-model) for the working model.
