@@ -14,8 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 # Runs benchmark code from the pull request, so it must never hold a writable
-# token — and fork PRs get a read-only one regardless. The result is posted by
-# bench-comment.yml, which runs on `workflow_run` and can comment.
+# token. The report goes to the job summary, which needs no token at all.
 permissions:
   contents: read
 
@@ -23,6 +22,8 @@ env:
   CARGO_TERM_COLOR: always # Force Cargo to use colors
   TERM: xterm-256color
   CANBENCH_VERSION: 0.2.0
+  # Fail the job when an instruction count regresses by more than this.
+  REGRESSION_THRESHOLD_PERCENT: 10
 
 jobs:
   runBenchMark:
@@ -77,30 +78,26 @@ jobs:
           canbench --show-summary --persist
           popd
           cp main/rust/bench/canbench_results.yml rust/bench/
+      # The report goes to the job summary rather than a PR comment: it needs no
+      # token, so it works the same on forks, and it stays out of the way until
+      # someone has a reason to look. diff.py exits non-zero when an instruction
+      # count regressed past the threshold — capture that, write the summary, and
+      # only then fail, so the numbers are always readable.
       - name: Run perf for PR branch
         run: |
           pushd rust/bench
           canbench --less-verbose --show-summary --persist > /tmp/perf.txt
-          python diff.py canbench_results.yml ../../main/rust/bench/canbench_results.yml > /tmp/table.md
+          diff_status=0
+          python diff.py canbench_results.yml ../../main/rust/bench/canbench_results.yml \
+            "${{ env.REGRESSION_THRESHOLD_PERCENT }}" > /tmp/table.md || diff_status=$?
           {
             cat /tmp/table.md
+            echo
             echo "<details><summary>Click to see raw report</summary>"
             echo
             echo "\`\`\`"
             cat /tmp/perf.txt
             echo "\`\`\`"
             echo "</details>"
-          } > /tmp/message.txt
-      # The PR number travels in the artifact: `workflow_run.pull_requests` is
-      # empty for fork PRs.
-      - name: Collect comment payload
-        run: |
-          mkdir -p /tmp/bench-comment
-          cp /tmp/message.txt /tmp/bench-comment/message.txt
-          echo "${{ github.event.pull_request.number }}" > /tmp/bench-comment/pr-number.txt
-      - name: Upload comment payload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: bench-comment
-          path: /tmp/bench-comment/
-          retention-days: 1
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$diff_status"
