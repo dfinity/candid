@@ -1,4 +1,4 @@
-name: Publish crates to crates.io
+name: Crates Publish
 
 on:
   workflow_dispatch:
@@ -18,7 +18,6 @@ on:
 
 jobs:
   publish:
-    name: Publish selected crates
     runs-on: ubuntu-24.04
     if: >-
       inputs.ic_principal || inputs.candid || inputs.candid_parser
