@@ -358,10 +358,9 @@ Deletion is a normal PR against `master` with the evidence in the description.
 
 Two things in this repo are **not** on the ratchet and need a new home rather than
 deletion: `tools/ui` has a live release pipeline
-([candid-ui.yml](.github/workflows/candid-ui.yml)) and is a deployed canister that
-developer tooling points users at; `tools/candiff` and `tools/didc` are consumers
-that should
-move to their own repo rather than vanish.
+([candid-ui-release.yml](.github/workflows/candid-ui-release.yml)) and is a deployed
+canister that developer tooling points users at; `tools/candiff` and `tools/didc`
+are consumers that should move to their own repo rather than vanish.
 
 ---
 
