@@ -14,10 +14,17 @@ env:
   CARGO_TERM_COLOR: always # Force Cargo to use colors
   TERM: xterm-256color
 
-# `rust` is a required status check. Do NOT add a workflow-level `paths:` filter:
-# when it does not match, no check run is created at all and branch protection
-# blocks the PR forever. Gate with the `changes` job below instead — a skipped job
-# does report as passing.
+# `rust` is a required status check, and it is the `rust` job at the bottom: an
+# aggregate that reports on the real jobs above it. Two consequences.
+#
+# Do NOT add a workflow-level `paths:` filter. When it does not match, no check
+# run is created at all and branch protection waits on it forever.
+#
+# The aggregate is `if: always()` and unconditional, so it runs and passes even
+# when everything it watches was skipped. That keeps the required check off any
+# assumption about how GitHub scores a skipped job.
+#
+# Work jobs go in `needs:` on the aggregate, and only the aggregate gates merging.
 
 jobs:
   changes:
@@ -43,10 +50,10 @@ jobs:
               - 'deny.toml'
               - '.github/workflows/rust.yml'
 
-  rust:
+  build:
     needs: changes
-    # Also runs when detection failed: a broken `changes` job must not silently
-    # green-light the required check.
+    # Also runs when detection failed, so a broken filter cannot quietly skip
+    # the real work.
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.rust == 'true') }}
     runs-on: ubuntu-24.04
     steps:
@@ -102,3 +109,19 @@ jobs:
         run: |
           host=$(rustc +nightly -vV | awk '/^host: /{print $2}')
           cargo +nightly fuzz build --target "$host"
+
+  # The required status check. Never gated, so it always reports.
+  rust:
+    needs: [changes, build, fuzzing]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    steps:
+      # `skipped` is a pass: it means the paths filter ruled the job out.
+      # `changes` is deliberately not gated on — the jobs above fall open when
+      # it fails, so the work still ran; its own red check is the signal.
+      - name: check build result
+        if: ${{ needs.build.result != 'success' && needs.build.result != 'skipped' }}
+        run: exit 1
+      - name: check fuzzing result
+        if: ${{ needs.fuzzing.result != 'success' && needs.fuzzing.result != 'skipped' }}
+        run: exit 1

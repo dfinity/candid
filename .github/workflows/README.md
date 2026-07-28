@@ -40,18 +40,33 @@ an exception.
 
 ## Required checks
 
-`rust` is the only required status check. It is the reason `rust.yml` must not
-use a workflow-level `paths:` filter — see the comment at the top of that file.
+`rust` is the only required status check, and it is an **aggregate job** at the
+bottom of `rust.yml` rather than a job that does work. It `needs:` the real jobs
+and fails if any of them did. The same shape as `test:required` in
+[icp-cli](https://github.com/dfinity/icp-cli)'s `test.yml`.
+
+Two properties make it worth the extra job:
+
+- It runs under `if: always()` with no condition, so it reports on every pull
+  request — including ones where every job it watches was skipped. The required
+  check therefore never depends on how GitHub scores a *skipped* job. (icp-cli's
+  aggregate is additionally gated on its paths filter, so it does still rely on
+  that; ours deliberately is not.)
+- New work jobs are added to its `needs:` list and gate merging immediately, with
+  no branch protection change. Only one context is ever configured.
+
+It treats `skipped` as a pass, since that means the paths filter ruled the job
+out. It does not gate on the `changes` job: the work jobs fall open when
+detection fails, so the work still ran, and `detect changes` going red is the
+signal on its own.
+
+`rust.yml` must not use a workflow-level `paths:` filter — see the comment at the
+top of that file.
 
 Workflows added for the rewrite (`crates`, `lean`, `conformance`) should **not**
 be required. [REWRITE.md](../../REWRITE.md) depends on work in those directories
 being allowed to be broken; making their checks gate merges would contradict it.
-Promote them individually at v1.
-
-Because the new checks are not gating, there is no need for an aggregate
-`ci:required` job of the kind [dfinity/cdk-rs](https://github.com/dfinity/cdk-rs)
-uses. That pattern exists to hold branch protection at a single context as checks
-multiply; here the count of required contexts stays at one either way.
+Promote them individually at v1 by adding an aggregate of their own.
 
 ## `didc-release.yml` is generated
 
