@@ -279,6 +279,13 @@ pub use types::{
     TypeEnv,
 };
 
+/// Internal wire-format parsing types, used only by candid's own deserializer.
+///
+/// Not part of the public API: the traits these types implement track whichever
+/// binary-parsing crate the deserializer happens to use, so they may change in
+/// any release. Hidden from the docs rather than made `pub(crate)` only to
+/// avoid breaking anything that already names them.
+#[doc(hidden)]
 #[allow(dead_code)]
 pub mod binary_parser;
 pub mod de;

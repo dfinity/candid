@@ -272,6 +272,10 @@ fn subtype_collect_(
         (_, Reserved) => (),
         (Empty, _) => (),
         (Nat, Int) => (),
+        // A service reference is represented by its canister's principal, so any
+        // service type is a subtype of `principal` (spec: `service <: principal`),
+        // unconditionally — like `Nat <: Int`.
+        (Service(_), Principal) => (),
         (Vec(ty1), Vec(ty2)) => {
             subtype_collect_(report, gamma, env, ty1, ty2, depth, path, errors, is_input);
         }
@@ -555,6 +559,7 @@ fn subtype_(
         (_, Reserved) => Ok(()),
         (Empty, _) => Ok(()),
         (Nat, Int) => Ok(()),
+        (Service(_), Principal) => Ok(()),
         (Vec(ty1), Vec(ty2)) => subtype_(report, gamma, env, ty1, ty2, depth),
         (Null, Opt(_)) => Ok(()),
         (Opt(ty1), Opt(ty2)) if subtype_(report, gamma, env, ty1, ty2, depth).is_ok() => Ok(()),

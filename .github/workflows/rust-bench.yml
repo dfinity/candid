@@ -1,0 +1,102 @@
+name: Rust Bench
+
+on:
+  pull_request:
+    paths:
+      - 'rust/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/rust-bench.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Runs benchmark code from the pull request, so it must never hold a writable
+# token. The report goes to the job summary, which needs no token at all.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always # Force Cargo to use colors
+  TERM: xterm-256color
+  CANBENCH_VERSION: 0.2.0
+  # Fail the job when an instruction count regresses by more than this.
+  REGRESSION_THRESHOLD_PERCENT: 10
+
+jobs:
+  bench:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout pull request
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Checkout base branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.base_ref }}
+          path: main/
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+      - name: Remove pre-installed Rust stable toolchain
+        run: rustup toolchain remove stable 2>/dev/null || true
+      # No explicit `toolchain` — uses the channel from rust-toolchain.toml.
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
+        with:
+          # rust/bench is its own workspace with its own lockfile and target dir.
+          cache-workspaces: |
+            .
+            rust/bench
+          # canbench is cached below on its own version instead; rust-cache's key
+          # includes the Cargo.lock hash and would rebuild it on every dep bump.
+          cache-bin: false
+      - name: Check bench formatting
+        working-directory: rust/bench
+        run: cargo fmt -- --check
+      - name: Lint bench
+        working-directory: rust/bench
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Cache canbench
+        id: canbench-cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ~/.cargo/bin/canbench
+          key: ${{ runner.os }}-canbench-${{ env.CANBENCH_VERSION }}
+      - name: Install canbench
+        if: steps.canbench-cache.outputs.cache-hit != 'true'
+        run: cargo install --version ${{ env.CANBENCH_VERSION }} --locked canbench
+      - name: Run perf for base branch
+        run: |
+          pushd main/rust/bench
+          canbench --show-summary --persist
+          popd
+          cp main/rust/bench/canbench_results.yml rust/bench/
+      # The report goes to the job summary rather than a PR comment: it needs no
+      # token, so it works the same on forks, and it stays out of the way until
+      # someone has a reason to look. diff.py exits non-zero when an instruction
+      # count regressed past the threshold — capture that, write the summary, and
+      # only then fail, so the numbers are always readable.
+      - name: Run perf for PR branch
+        run: |
+          pushd rust/bench
+          canbench --less-verbose --show-summary --persist > /tmp/perf.txt
+          diff_status=0
+          python diff.py canbench_results.yml ../../main/rust/bench/canbench_results.yml \
+            "${{ env.REGRESSION_THRESHOLD_PERCENT }}" > /tmp/table.md || diff_status=$?
+          {
+            cat /tmp/table.md
+            echo
+            echo "<details><summary>Click to see raw report</summary>"
+            echo
+            echo "\`\`\`"
+            cat /tmp/perf.txt
+            echo "\`\`\`"
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$diff_status"

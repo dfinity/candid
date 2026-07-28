@@ -1,30 +1,73 @@
 name: Rust
+
 on:
   push:
     branches:
       - master
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always # Force Cargo to use colors
   TERM: xterm-256color
 
+# `rust` is a required status check, and it is the `rust` job at the bottom: an
+# aggregate that reports on the real jobs above it. Two consequences.
+#
+# Do NOT add a workflow-level `paths:` filter. When it does not match, no check
+# run is created at all and branch protection waits on it forever.
+#
+# The aggregate is `if: always()` and unconditional, so it runs and passes even
+# when everything it watches was skipped. That keeps the required check off any
+# assumption about how GitHub scores a skipped job.
+#
+# Work jobs go in `needs:` on the aggregate, and only the aggregate gates merging.
+
 jobs:
-  rust:
-    runs-on: ubuntu-latest
+  changes:
+    name: detect changes
+    runs-on: ubuntu-24.04
+    outputs:
+      # Empty outside `pull_request` (filter step skipped) => 'true', run everything.
+      rust: ${{ steps.filter.outputs.rust || 'true' }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - name: Cache cargo build
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      # paths-filter reads the changed files from the API; no checkout needed.
+      - id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          filters: |
+            rust:
+              - 'rust/**'
+              - 'tools/**'
+              - 'test/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+              - 'deny.toml'
+              - '.github/workflows/rust.yml'
+
+  check:
+    needs: changes
+    # Also runs when detection failed, so a broken filter cannot quietly skip
+    # the real work.
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.rust == 'true') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      # The image's bundled stable varies by image release and would make the
+      # rust-cache key non-deterministic.
+      - name: Remove pre-installed Rust stable toolchain
+        run: rustup toolchain remove stable 2>/dev/null || true
+      # No explicit `toolchain` — uses the channel from rust-toolchain.toml.
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
       - name: Build
-        run: |
-          cargo build
+        run: cargo build
       - name: Run tests
         run: |
           cargo test --no-default-features -- --color always
@@ -36,14 +79,49 @@ jobs:
         run: cargo clippy --features all --tests -- -D warnings
       - name: doc
         run: cargo doc
+
   fuzzing:
-    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.rust == 'true') }}
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      # The image's bundled stable varies by image release and would make the
+      # rust-cache key non-deterministic.
+      - name: Remove pre-installed Rust stable toolchain
+        run: rustup toolchain remove stable 2>/dev/null || true
+      # rust-toolchain.toml pins this directory to stable, so the build below
+      # still needs an explicit `+nightly` even with nightly installed.
+      - name: Install Rust nightly toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
+        with:
+          toolchain: nightly
       - name: Install cargo-fuzz
-        run: |
-          cargo install cargo-fuzz
+        uses: taiki-e/install-action@80e6af7a2ec7f280fffe2d0a9d3a12a9d11d86e9 # v2.75.1
+        with:
+          tool: cargo-fuzz
+      # cargo-fuzz defaults `--target` to its own build-time triple, and the only
+      # prebuilt Linux asset is musl — where sanitizers cannot link. Pass the host
+      # triple explicitly.
       - name: Build fuzzers
+        working-directory: rust/candid
         run: |
-          cd rust/candid
-          cargo +nightly fuzz build
+          host=$(rustc +nightly -vV | awk '/^host: /{print $2}')
+          cargo +nightly fuzz build --target "$host"
+
+  # The required status check. Never gated, so it always reports.
+  rust:
+    needs: [changes, check, fuzzing]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    steps:
+      # `skipped` is a pass: it means the paths filter ruled the job out.
+      # `changes` is deliberately not gated on — the jobs above fall open when
+      # it fails, so the work still ran; its own red check is the signal.
+      - name: verify check
+        if: ${{ needs.check.result != 'success' && needs.check.result != 'skipped' }}
+        run: exit 1
+      - name: verify fuzzing
+        if: ${{ needs.fuzzing.result != 'success' && needs.fuzzing.result != 'skipped' }}
+        run: exit 1

@@ -306,7 +306,7 @@ fn nns_list_proposal() -> BenchResult {
         executed_timestamp_seconds: 42,
     };
     let list_proposals_info_response = ListProposalInfoResponse {
-        proposal_info: std::iter::repeat(proposal).take(1000).collect(),
+        proposal_info: std::iter::repeat_n(proposal, 1000).collect(),
     };
     bench_fn(|| {
         let bytes = {
@@ -679,7 +679,7 @@ fn wide_record() -> BenchResult {
         seed_neuron_count: 500,
     };
 
-    let metrics_vec: Vec<GovernanceCachedMetrics> = std::iter::repeat(metrics).take(100).collect();
+    let metrics_vec: Vec<GovernanceCachedMetrics> = std::iter::repeat_n(metrics, 100).collect();
 
     bench_fn(|| {
         let bytes = {
@@ -906,6 +906,66 @@ fn multi_arg() -> BenchResult {
         {
             let _p = bench_scope("2. Decoding");
             Decode!([config]; &bytes, Vec<Principal>, Vec<u64>, Vec<String>).unwrap();
+        }
+    })
+}
+
+// Encoding and decoding of large `nat` / `int` bignums.
+// A LEB128 body of BIGNUM_LEN bytes is far beyond the u64/i64 fast path, so this
+// measures the bignum encode/decode routines on a large value. Their cost should
+// scale linearly with the encoded length.
+const BIGNUM_LEN: usize = 1 << 20; // 1 MiB encoded body
+
+// Build a single-argument Candid message: "DIDL", 0 type-table entries, 1 arg,
+// the primitive type opcode (nat = 0x7d, int = 0x7c), then the value body.
+fn single_nat_int_arg(type_opcode: u8, body: &[u8]) -> Vec<u8> {
+    let mut bytes = b"DIDL\x00\x01".to_vec();
+    bytes.push(type_opcode);
+    bytes.extend_from_slice(body);
+    bytes
+}
+
+#[bench(raw)]
+fn nat_bignum() -> BenchResult {
+    // `len - 1` all-ones continuation groups then a 0x7f terminator => the nat
+    // `2^(7*BIGNUM_LEN) - 1`, whose canonical encoding is exactly this body.
+    let mut body = vec![0xffu8; BIGNUM_LEN - 1];
+    body.push(0x7f);
+    let value = Decode!(&single_nat_int_arg(0x7d, &body), Nat).unwrap();
+
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            Encode!(&value).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            Decode!([config]; &bytes, Nat).unwrap();
+        }
+    })
+}
+
+#[bench(raw)]
+fn int_bignum() -> BenchResult {
+    // `len - 1` all-ones groups then a 0x00 terminator => a large *positive*
+    // int (`2^(7*(BIGNUM_LEN-1)) - 1`); the trailing zero group keeps the sign
+    // bit clear so the value isn't sign-extended into a small negative.
+    let mut body = vec![0xffu8; BIGNUM_LEN - 1];
+    body.push(0x00);
+    let value = Decode!(&single_nat_int_arg(0x7c, &body), Int).unwrap();
+
+    let mut config = DecoderConfig::new();
+    config.set_decoding_quota(COST).set_skipping_quota(SKIP);
+    bench_fn(|| {
+        let bytes = {
+            let _p = bench_scope("1. Encoding");
+            Encode!(&value).unwrap()
+        };
+        {
+            let _p = bench_scope("2. Decoding");
+            Decode!([config]; &bytes, Int).unwrap();
         }
     })
 }

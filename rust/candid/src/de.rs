@@ -13,7 +13,7 @@ use crate::{
     types::subtype::{subtype_with_config, Gamma, OptReport},
 };
 use anyhow::{anyhow, Context};
-use binread::BinRead;
+use binrw::BinRead;
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
 use std::fmt::Write;
@@ -35,7 +35,7 @@ impl<'de> IDLDeserialize<'de> {
     pub fn new_with_config(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
         let mut de = Deserializer::from_bytes(bytes, config).with_context(|| {
             if config.full_error_message || bytes.len() <= 500 {
-                format!("Cannot parse header {}", &hex::encode(bytes))
+                format!("Cannot parse header {}", hex::encode(bytes))
             } else {
                 "Cannot parse header".to_string()
             }
@@ -311,7 +311,7 @@ struct Deserializer<'de> {
 impl<'de> Deserializer<'de> {
     fn from_bytes(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
         let mut reader = Cursor::new(bytes);
-        let header = Header::read_args(&mut reader, (config.max_type_len,))?;
+        let header = Header::read_le_args(&mut reader, (config.max_type_len,))?;
         let (env, types) = header.to_types()?;
         Ok(Deserializer {
             input: reader,
@@ -618,12 +618,24 @@ impl<'de> Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.unroll_type()?;
+        // Dispatched only when the expected type is `principal`. Accept exactly
+        // the two wire types that share the `PrincipalBytes` encoding: `principal`
+        // (reflexive) and `service <actortype>` (spec: `service <: principal`), so
+        // a service reference decodes as its principal. We match the wire type
+        // directly rather than calling `check_subtype()`: the general subtype
+        // relation also admits `empty` (bottom) `<: principal`, which would let a
+        // payload declare wire type `empty` yet be decoded as a principal from
+        // arbitrary trailing bytes. Matching also avoids the subtype-check
+        // overhead on this common decoding path.
         check!(
-            *self.expect_type == TypeInner::Principal && *self.wire_type == TypeInner::Principal,
+            matches!(
+                self.wire_type.as_ref(),
+                TypeInner::Principal | TypeInner::Service(_)
+            ),
             "principal"
         );
         let mut bytes = vec![2u8];
-        let id = PrincipalBytes::read(&mut self.input)?;
+        let id = PrincipalBytes::read_le(&mut self.input)?;
         self.add_cost(std::cmp::max(30, id.len as usize))?;
         bytes.extend_from_slice(&id.inner);
         visitor.visit_byte_buf(bytes)
@@ -643,7 +655,7 @@ impl<'de> Deserializer<'de> {
         self.unroll_type()?;
         self.check_subtype()?;
         let mut bytes = vec![4u8];
-        let id = PrincipalBytes::read(&mut self.input)?;
+        let id = PrincipalBytes::read_le(&mut self.input)?;
         self.add_cost(std::cmp::max(30, id.len as usize))?;
         bytes.extend_from_slice(&id.inner);
         visitor.visit_byte_buf(bytes)
@@ -658,7 +670,7 @@ impl<'de> Deserializer<'de> {
             return Err(Error::msg("Opaque reference not supported"));
         }
         let mut bytes = vec![5u8];
-        let id = PrincipalBytes::read(&mut self.input)?;
+        let id = PrincipalBytes::read_le(&mut self.input)?;
         let len = self.read_len()?;
         let meth = self.borrow_bytes(len)?;
         self.add_cost(
@@ -1366,7 +1378,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         self.add_cost(1)?;
         match (self.expect_type.as_ref(), self.wire_type.as_ref()) {
             (TypeInner::Variant(e), TypeInner::Variant(w)) => {
-                let index = Len::read(&mut self.input)?.0;
+                let index = Len::read_le(&mut self.input)?.0;
                 let len = w.len();
                 if index >= len {
                     return Err(Error::msg(format!(
@@ -1444,6 +1456,49 @@ struct PrimitiveVecAccess<'de> {
     prim: PrimitiveType,
 }
 
+/// Adapts serde's value deserializers to candid's contract in the two places they
+/// differ from the main `Deserializer`:
+///
+/// * they have no `deserialize_newtype_struct`, so a newtype element (e.g.
+///   `struct EventIndex(u32)`) failed to decode; it now forwards through
+///   `visit_newtype_struct` as the main `Deserializer` does, which also makes
+///   nested newtypes unwrap recursively;
+/// * they inherit serde's default `is_human_readable() == true`, which would send
+///   an impl that branches on it down its human-readable path even though candid
+///   is a binary format.
+#[cfg(target_endian = "little")]
+struct NewtypeCompat<D>(D);
+
+#[cfg(target_endian = "little")]
+impl<'de, D: de::Deserializer<'de, Error = Error>> de::Deserializer<'de> for NewtypeCompat<D> {
+    type Error = Error;
+    fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+        self.0.deserialize_any(visitor)
+    }
+    fn deserialize_newtype_struct<V: Visitor<'de>>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value> {
+        visitor.visit_newtype_struct(self)
+    }
+    fn is_human_readable(&self) -> bool {
+        false
+    }
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf option unit unit_struct seq tuple
+        tuple_struct map struct enum identifier ignored_any
+    }
+}
+
+#[cfg(target_endian = "little")]
+fn newtype_compat<'de, T: de::IntoDeserializer<'de, Error>>(
+    value: T,
+) -> NewtypeCompat<T::Deserializer> {
+    NewtypeCompat(value.into_deserializer())
+}
+
 #[cfg(target_endian = "little")]
 impl<'de> de::SeqAccess<'de> for PrimitiveVecAccess<'de> {
     type Error = Error;
@@ -1452,7 +1507,6 @@ impl<'de> de::SeqAccess<'de> for PrimitiveVecAccess<'de> {
     where
         T: de::DeserializeSeed<'de>,
     {
-        use serde::de::IntoDeserializer;
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -1462,45 +1516,43 @@ impl<'de> de::SeqAccess<'de> for PrimitiveVecAccess<'de> {
 
         match self.prim {
             PrimitiveType::Bool => match bytes[0] {
-                0 => seed.deserialize(false.into_deserializer()).map(Some),
-                1 => seed.deserialize(true.into_deserializer()).map(Some),
+                0 => seed.deserialize(newtype_compat(false)).map(Some),
+                1 => seed.deserialize(newtype_compat(true)).map(Some),
                 _ => Err(Error::msg("Expect 00 or 01")),
             },
-            PrimitiveType::Nat8 => seed.deserialize(bytes[0].into_deserializer()).map(Some),
-            PrimitiveType::Int8 => seed
-                .deserialize((bytes[0] as i8).into_deserializer())
-                .map(Some),
+            PrimitiveType::Nat8 => seed.deserialize(newtype_compat(bytes[0])).map(Some),
+            PrimitiveType::Int8 => seed.deserialize(newtype_compat(bytes[0] as i8)).map(Some),
             PrimitiveType::Nat16 => {
                 let v = u16::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
             PrimitiveType::Int16 => {
                 let v = i16::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
             PrimitiveType::Nat32 => {
                 let v = u32::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
             PrimitiveType::Int32 => {
                 let v = i32::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
             PrimitiveType::Float32 => {
                 let v = f32::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
             PrimitiveType::Nat64 => {
                 let v = u64::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
             PrimitiveType::Int64 => {
                 let v = i64::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
             PrimitiveType::Float64 => {
                 let v = f64::from_le_bytes(bytes.try_into().unwrap());
-                seed.deserialize(v.into_deserializer()).map(Some)
+                seed.deserialize(newtype_compat(v)).map(Some)
             }
         }
     }

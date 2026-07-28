@@ -1,5 +1,76 @@
 # Changelog
 
+## 2026-07-27
+
+### Candid 0.10.34
+
+* Bug fixes:
+  + Fix decoding a `vec` of fixed-width primitives into newtype elements (e.g. `struct EventIndex(u32)`), which failed with a spurious subtyping error since 0.10.27. The bulk decode fast path fed each element through serde's value deserializers, which do not implement `deserialize_newtype_struct`; they now go through a wrapper that forwards it, as the main deserializer does. Nested newtypes are unwrapped recursively.
+  + Fix `is_human_readable()` reporting `true` for elements of a `vec` of fixed-width primitives, also since 0.10.27. The bulk decode fast path inherited serde's default from the same value deserializers, so a `Deserialize` impl that branches on it took its human-readable path inside a `vec` while taking the binary path everywhere else, silently decoding to a different value with no error. It now reports `false` for the whole decoder, as candid is a binary format.
+
+### Candid 0.10.33
+
+* Breaking changes:
+  + Migrated from the deprecated [`binread`](https://github.com/jam1garner/binread) crate to its successor `binrw`. The types in the `candid::binary_parser` module (`Header`, `PrincipalBytes`, `Len`, `BoolValue`) now implement `binrw::BinRead` instead of `binread::BinRead`, and `From<binread::Error> for candid::Error` is replaced by `From<binrw::Error>`.
+
+    Released as a patch rather than a minor bump because the affected surface is limited to those trait impls. `binary_parser` is an internal wire-format parsing module that is `pub` only incidentally — it is used nowhere outside candid's own deserializer, and it is now `#[doc(hidden)]` to say so. Code is affected only if it depends on `binread` directly *and* names these impls; the wire format, decoder error messages, byte offsets, type layouts, and all function signatures are unchanged, so the worst case is a compile error rather than a behaviour change.
+
+* Non-breaking changes:
+  + Decoding is faster as a side effect of the `binrw` migration, which drops `binread`'s `debug_template` codegen: up to 37% fewer instructions on variant-heavy payloads (`multi_arg` −36.6%, `result_variant` −10.3%, `large_variant` −9.5%, `subtype_decode` −8.0%, `double_option` −7.0%), with no regressions.
+  + Dropped the duplicate `syn 1.x` dependency tree that `binread_derive` pinned (along with `rustversion`).
+  + A future unrecognized `binrw::Error` variant now degrades to a label-less error instead of panicking, since `binrw::Error` is `#[non_exhaustive]` and decoding runs on untrusted input.
+
+## 2026-07-06
+
+### Candid 0.10.32
+
+* Non-breaking changes:
+  + A service reference now decodes where a `principal` is expected: `service <actortype>` is a subtype of `principal` (spec addition: `service <: principal`, modelled analogously to `nat <: int`). The subtype checker and the deserializer accept a service reference at type `principal`; the two share an identical wire encoding, so the coercion is the identity on the reference. The reverse (a `principal` at a `service` type) remains rejected.
+
+## 2026-07-03
+
+### ic_principal 0.1.5
+
+* Non-breaking changes:
+  + Make `Principal::as_slice()`, `Principal::len()` and `Principal::as_fixed_bytes()` const functions.
+
+## 2026-07-02
+
+### ic_principal 0.1.4
+
+* Non-breaking changes:
+  + Add `Principal::as_fixed_bytes()`, returning a reference to the underlying fixed-size `[u8; MAX_LENGTH_IN_BYTES]` backing array. Bytes at index `len()` and beyond are always zero.
+  + Add `Principal::len()`, returning the number of significant bytes in the `Principal` (equivalent to `as_slice().len()`).
+
+## 2026-06-25
+
+### Candid 0.10.31
+
+* Non-breaking changes:
+  + Encode and decode large `Nat`/`Int` values in linear time. Values beyond the `u64`/`i64` fast path were previously processed one LEB128/SLEB128 group at a time, shifting the whole bignum on every byte (O(n²) in the encoded length); they now build the value in a single O(n) pass.
+
+### didc 0.6.2
+
+* Non-breaking changes:
+  + Upgrade candid_parser dependency to v0.4.0.
+
+## 2026-06-23
+
+### Candid 0.10.30
+
+* Non-breaking changes:
+  + Add `pretty::utils::sep_enclose` and `sep_enclose_space`: list/tuple pretty-printing combinators that separate items and enclose them in delimiters, emitting a trailing separator on multi-line layouts.
+  + Add `TypeEnv::to_sorted_iter()` to iterate bindings in a deterministic, key-sorted order.
+
+### candid_parser 0.4.0
+
+* Breaking changes:
+  + Parse and preserve **named function arguments and results**. The AST now carries argument names so consumers (e.g. binding generators) can emit meaningful parameter names:
+    - New `syntax::IDLArgType { typ: IDLType, name: Option<String> }` with `IDLArgType::new` / `IDLArgType::new_with_name`. Purely numeric names are normalized to `None`.
+    - `syntax::FuncType::{args, rets}`, `syntax::IDLType::ClassT`, `syntax::IDLTypes::args`, and `syntax::IDLInitArgs::args` now hold `Vec<IDLArgType>` instead of `Vec<IDLType>`.
+    - The pretty-printer now round-trips argument names (e.g. `(from : principal)`).
+  + Type checking is unchanged: names are dropped when lowering to `candid::types::Function`, so the `candid` crate is unaffected.
+
 ## 2026-05-27
 
 ### Candid 0.10.29
