@@ -7,8 +7,8 @@
 > reading.
 
 This document proposes a staged rewrite of Candid's specification, reference
-model, and Rust implementation. It exists so that the reasoning is written down
-and citable rather than living in one person's head.
+model, and Rust implementation. It exists so that the reasoning behind it is
+written down and citable rather than undocumented.
 
 **Status:** proposal, not scheduled work. **Author:** @lwshang.
 
@@ -16,11 +16,10 @@ and citable rather than living in one person's head.
 
 ## 1. Why
 
-Candid was built by the Languages team, which has since moved to Caffeine to focus
-on Motoko. Maintenance now sits with SDK — in practice, with one person. The
-codebase was designed under different assumptions about who would maintain it and
-how much formal-methods context they would have. Five specific problems follow
-from that, and none of them are fixable by incremental patches.
+Six structural problems in the current implementation, each cited to the code.
+None is fixable by an incremental patch, and several are semver breaks on their
+own — which is the argument for addressing them together rather than one at a
+time.
 
 ### 1.1 There is no single source of truth
 
@@ -250,9 +249,10 @@ relation, rather than writing a checker and a relation separately and hoping the
 match — which is what [rust/candid/src/types/subtype.rs](rust/candid/src/types/subtype.rs)
 (832 lines) and the spec are today.
 
-**What it costs.** Nobody on SDK knows Lean today. Swapping "nobody knows Coq" for
-"nobody knows Lean" is a lateral move *unless the Lean artifact is executable and
-wired into CI.* The design rule that prevents backsliding:
+**What it costs.** Lean is not used anywhere in the team's stack today, so this
+would be its first application here. Replacing an unread Coq model with an unread
+Lean one is a lateral move *unless the Lean artifact is executable and wired into
+CI.* The design rule that prevents that:
 
 > **Every Lean definition must be either (a) reachable from the reference
 > executable, or (b) a proof about something that is.** No orphan formalisation.
@@ -261,10 +261,11 @@ Additional costs, stated up front: Lean's toolchain moves faster than Coq's, so
 `lean-toolchain` is pinned and upgrades are scheduled work. Verso is young; expect
 to read its source rather than its docs. We do **not** depend on mathlib.
 
-**Bus factor.** @lwshang is committing to learn and maintain the Lean code. This is
-a real single-point-of-failure and it should be named rather than glossed. The
-mitigation is that the executable oracle delivers value even to someone who cannot
-read the proofs: it is a binary that says "Rust and the spec disagree here."
+**Bus factor.** @lwshang has been learning Lean and would own this part, though
+applying it to a production project would be new. That is a real single point of
+failure and worth naming rather than glossing over. The mitigation is that the
+executable oracle delivers value even to someone who cannot read the proofs: it
+is a binary that says "Rust and the spec disagree here."
 
 **What we are not attempting.** A full functional-correctness proof of the
 production Rust decoder is a multi-year research project. We are pursuing only the
@@ -302,7 +303,7 @@ serde-style generic traits, so today's decoder is out of reach regardless. But
   graphs are still a real problem — see the caveat in §2 — but nobody is forced to
   move on our schedule.
 - **Not fast at the ecosystem layer.** The code is plausibly multi-month. Getting
-  dfx, ic-cdk, agent-rs, and canister authors onto it is multi-quarter and gated on
+  icp-cli, ic-cdk, agent-rs, and canister authors onto it is multi-quarter and gated on
   other teams' release cycles, not on our typing speed. "Done" for this effort
   means *v1 crates exist and pass conformance*, not *everyone has migrated*.
 
@@ -353,17 +354,21 @@ Deletion is a normal PR against `master` with the evidence in the description.
 | [coq/](coq/) | Lean reproduces every MiniCandid theorem **and** the two models have been diffed | If Lean disagrees with MiniCandid anywhere, that disagreement is the most valuable thing this project will find. Investigate before deleting. |
 | [spec/](spec/) | Verso output covers all normative content | `spec/Candid.md` is externally linked from docs sites, other implementations, and papers. Needs a redirect stub, not a `git rm`. |
 | [test/](test/) | All 471 assertions exist as conformance vectors and pass | — |
-| [rust/](rust/) | `candid` v1 published and dfx + ic-cdk migrated | Long horizon. Expect 0.10.x maintenance in parallel throughout. |
+| [rust/](rust/) | `candid` v1 published and icp-cli + ic-cdk migrated | Long horizon. Expect 0.10.x maintenance in parallel throughout. |
 
 Two things in this repo are **not** on the ratchet and need a new home rather than
 deletion: `tools/ui` has a live release pipeline
 ([candid-ui.yml](.github/workflows/candid-ui.yml)) and is a deployed canister that
-dfx points users at; `tools/candiff` and `tools/didc` are consumers that should
+developer tooling points users at; `tools/candiff` and `tools/didc` are consumers
+that should
 move to their own repo rather than vanish.
 
 ---
 
 ## 7. Open questions
+
+These are what the document does not answer. The decisions in §1–§6 are recorded
+with their reasoning; new evidence is the reason to revisit one.
 
 - What stays in the derive crate. `CandidType` clearly does. `candid_method` and
   `export_service` need rethinking — they communicate across proc-macro
@@ -383,12 +388,3 @@ move to their own repo rather than vanish.
   scope it to foreign types you do not control, and make coercion failures loud
   errors rather than best-effort.
 - How `spec/` redirects are published once Verso output becomes canonical.
-
----
-
-## 8. Feedback
-
-The decisions most worth arguing with, in rough order of how much they would
-change: the serde divorce (§1.3), Lean over "just write more tests" (§3), and
-one-repo-additive over a separate repository (§4). Open an issue or comment on the
-PR that introduced this file.

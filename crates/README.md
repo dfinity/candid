@@ -4,7 +4,7 @@
 crates.io. See [REWRITE.md](../REWRITE.md) for why this exists.
 
 Eventually replaces [rust/](../rust/). That is a long horizon — `rust/` is not
-deleted until `candid` v1 is published *and* dfx and ic-cdk have migrated, and
+deleted until `candid` v1 is published *and* icp-cli and ic-cdk have migrated, and
 0.10.x maintenance continues in parallel throughout.
 
 > **Working in this directory?** Read [CLAUDE.md](CLAUDE.md) first. It lists the
