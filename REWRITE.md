@@ -356,11 +356,16 @@ Deletion is a normal PR against `master` with the evidence in the description.
 | [test/](test/) | All 471 assertions exist as conformance vectors and pass | — |
 | [rust/](rust/) | `candid` v1 published and icp-cli + ic-cdk migrated | Long horizon. Expect 0.10.x maintenance in parallel throughout. |
 
-Two things in this repo are **not** on the ratchet and need a new home rather than
-deletion: `tools/ui` has a live release pipeline
-([candid-ui-release.yml](.github/workflows/candid-ui-release.yml)) and is a deployed
-canister that developer tooling points users at; `tools/candiff` and `tools/didc`
-are consumers that should move to their own repo rather than vanish.
+### Tools
+
+`tools/` is not on the ratchet above; each entry has its own disposition.
+
+| | |
+|---|---|
+| `tools/ui` | Moves to its own repository. It is a deployed canister with a live release pipeline ([candid-ui-release.yml](.github/workflows/candid-ui-release.yml)); nothing about a web UI belongs in the language repo. |
+| `tools/candiff` | Deleted. Deprecated in #405 already; the directory is one README saying so. |
+| `tools/didc` | Stays. A general Candid CLI belongs here. Its scope narrows to parsing, checking, encoding, decoding and subtype checks — per-language binding generation moves out of tree with the bindgen crates. |
+| `tools/didc-js` | Undecided; see §7. |
 
 ---
 
@@ -387,3 +392,12 @@ with their reasoning; new evidence is the reason to revisit one.
   scope it to foreign types you do not control, and make coercion failures loud
   errors rather than best-effort.
 - How `spec/` redirects are published once Verso output becomes canonical.
+- What happens to `@dfinity/didc` (`tools/didc-js`), the Rust implementation
+  compiled to wasm for JavaScript. It has sat at 0.0.4 with no functional change
+  since #602, and DFINITY separately publishes `@dfinity/candid` in agent-js, a
+  native JS implementation — so two DFINITY Candid libraries for the same language
+  can disagree, which is §1.1 in a different form. The conformance suite makes
+  either answer workable: the JS implementation is shown to conform and the wasm
+  build is redundant, or the wasm build stays as the reference-behaviour option and
+  both are tested against the same vectors. Either way it is a consumer of the
+  crates rather than part of them.
