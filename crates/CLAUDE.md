@@ -23,7 +23,7 @@ load-bearing.
 
 Each one is a real, cited defect in the current implementation.
 
-### 1. No serde in the decode path
+### 1. No serde in the Candid data path
 
 Candid coercion needs speculative decode with backtracking; serde's `Visitor` is
 consume-once and cannot express it. The current workaround string-matches serde's
@@ -33,6 +33,22 @@ those paths and broke it. Both bugs fixed in 0.10.34 trace to the same mismatch.
 
 Use the native `CandidType::try_decode` returning `Result<Option<Self>, _>`. See
 [README.md](README.md#the-serde-divorce).
+
+This is not decode-only. A default build of `candid_types`, `candid_subtype`,
+`candid_wire`, `candid_value` or the facade resolves no `serde` — so no
+`serde_bytes` and no `#[serde(...)]` attributes, and blobs need a native spelling.
+Reaching for a `Deserialize` bound to make something work is the wrong fix. Two
+things are not violations: an optional, off-by-default feature adding
+`Serialize`/`Deserialize` to leaf types like `Nat` so they can cross into JSON (the
+shape `ic_principal` already uses), and serde as a config-file deserializer in
+`candid_bindgen`. Neither puts serde between bytes and values, which is the actual
+prohibition. See [README.md](README.md#scope-serde-leaves-the-data-path-entirely).
+
+A foreign type that needs a Candid representation gets a `#[candid(with = "...")]`
+adapter, never a serde bridge — a bridge cannot supply `ty()`, and the reasoning is
+recorded in
+[README.md](README.md#foreign-types-get-an-adapter-not-a-serde-bridge) so it does
+not get relitigated.
 
 ### 2. No global mutable state
 

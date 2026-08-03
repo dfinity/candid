@@ -102,6 +102,101 @@ pub trait CandidType: Sized {
 - `is_human_readable` disappears.
 - No `unsafe` in the decode path.
 
+### Scope: serde leaves the data path entirely
+
+"Removed from the decode path" understates this, so state it directly: **no core
+crate depends on serde in its default build, and nothing depends on it for encode,
+decode or subtyping at any feature setting.**
+
+Encode never used serde. [rust/candid/src/ser.rs](../rust/candid/src/ser.rs)
+drives Candid's own `types::Serializer`, and the current docs explain why — "We do
+not use Serde's `Serialize` trait because Candid requires serializing types along
+with the values" ([rust/candid/src/lib.rs:80](../rust/candid/src/lib.rs#L80)).
+Every remaining use is downstream of decoding: `de.rs`, the `Deserialize` impls
+under [rust/candid/src/types/](../rust/candid/src/types/), `serde::{de, ser}::Error`
+in [error.rs:3](../rust/candid/src/error.rs#L3), and
+[utils.rs:4](../rust/candid/src/utils.rs#L4). Take out the decode path and nothing
+is holding the dependency up.
+
+So a default `cargo build` of `candid_types`, `candid_subtype`, `candid_wire`,
+`candid_value` or the facade resolves no `serde` at all. Three consequences that are
+easy to miss:
+
+- **`serde_bytes` goes with it, and it is a default feature today.** Efficient
+  `blob` handling is currently spelled `#[serde(with = "serde_bytes")]`, matched by
+  string in the derive
+  ([rust/candid_derive/src/derive.rs:389](../rust/candid_derive/src/derive.rs#L389)),
+  with `CandidType for serde_bytes::ByteBuf` behind a feature that `default`
+  enables ([impls.rs:173](../rust/candid/src/types/impls.rs#L173)). v1 owes users a
+  native spelling, which is `#[candid(blob)]` on a `Vec<u8>` field — sugar over the
+  general adapter mechanism below, so blob costs no separate machinery. What must
+  not happen is `Vec<u8>` silently becoming a `vec nat8` of individually encoded
+  elements.
+- **Foreign-format impls for leaf types are a separate question from the data
+  model, and the answer is "optional feature, off by default."** `Nat`, `Int` and
+  `Reserved` implement `Serialize`/`Deserialize` today and are tested through JSON,
+  CBOR and bincode ([number.rs:576](../rust/candid/src/types/number.rs#L576)) —
+  people do put a `candid::Nat` inside a `serde_json` struct.
+  [`ic_principal`](../rust/ic_principal/Cargo.toml) already ships exactly the right
+  shape for this: an optional `serde` feature, nothing in the default build. A
+  `candid_types` feature that adds those impls for `Nat`/`Int` is compatible with
+  everything above, because it makes serde a *consumer* of a Candid type rather
+  than the mechanism Candid decodes through. What must never come back is a
+  `Deserialize` bound anywhere in encode, decode, or subtyping.
+- **`candid_bindgen` keeps serde, deliberately.** Binding generation uses it as an
+  ordinary config-file deserializer
+  ([configs.rs:3](../rust/candid_parser/src/configs.rs#L3),
+  [bindings/rust.rs:11](../rust/candid_parser/src/bindings/rust.rs#L11)) — serde
+  doing what serde is good at, on config files we define, with no Candid value
+  anywhere near it. The objection is to expressing *Candid's* data model through
+  serde, not to the crate.
+
+### Foreign types get an adapter, not a serde bridge
+
+Dropping serde raises the obvious question: what about a type from a crate you do
+not control? The answer is a local adapter. An earlier draft of this document
+floated `candid_serde_compat` — a shim accepting any `serde::Deserialize` type at a
+Candid boundary — and it is worth recording why that was rejected, because the
+reasoning generalises.
+
+**It cannot supply `ty()`.** Candid needs a type-table entry; `Serialize` and
+`Deserialize` are value-level traits with no type-level reflection. Structure can be
+recovered by driving a `Deserialize` impl with an instrumented tracing
+deserializer — [serde-reflection](https://github.com/zefchain/serde-reflection) does
+exactly this — but that is the same genre of fragility as the visitor
+string-matching in [REWRITE.md §1.3](../REWRITE.md#13-serde-is-the-wrong-data-model-and-the-workarounds-are-structural):
+multi-pass tracing to enumerate enum variants, hints for containers it cannot infer,
+and wrong answers under `#[serde(flatten)]`. It also does nothing for encoding,
+since tracing `Serialize` needs a value in hand. The honest ceiling is decode-only
+against a Candid type the caller writes by hand — at which point writing a
+`CandidType` impl is comparable effort and strictly better.
+
+**It would be a new capability, not a migration aid.** Every field type already
+needs `CandidType` for `ty()`
+([rust/candid_derive/src/derive.rs:533](../rust/candid_derive/src/derive.rs#L533)),
+so a foreign type carrying only serde impls is *already* unusable at a Candid
+boundary today. Nothing regresses by declining to build the bridge, and existing
+code is unaffected for a different reason: `#[derive(CandidType, Deserialize)]` goes
+on compiling, with the `Deserialize` half simply never consulted.
+
+The escape hatch instead mirrors `#[serde(with)]` — a module supplying `ty`,
+`encode` and `try_decode` for one field:
+
+```rust
+#[derive(CandidType)]
+struct Job {
+    #[candid(blob)]                          // built-in adapter
+    payload: Vec<u8>,
+    #[candid(with = "my_adapters::uuid_as_text")]
+    id: uuid::Uuid,                          // foreign type, local adapter
+}
+```
+
+Typed, local, both directions, no `unsafe` and no tracing. Library code generic over
+`T: DeserializeOwned` at a Candid boundary changes its bound to `T: CandidType` —
+a mechanical edit, on a major-version boundary where downstream crates are editing
+anyway.
+
 ## The derive crate
 
 Rust requires proc macros to live in a dedicated crate, so v1 still has one. It

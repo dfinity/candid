@@ -89,6 +89,20 @@ Both 0.10.34 bugs exist because there are two parallel decode implementations th
 can drift. That is a consequence of bending Candid onto serde's data model, not a
 coding mistake.
 
+The remedy is removing serde from the crates, not hardening `de.rs`. Encoding
+already does not use it — [rust/candid/src/ser.rs](rust/candid/src/ser.rs) drives
+Candid's own `Serializer`, for reasons
+[rust/candid/src/lib.rs:80](rust/candid/src/lib.rs#L80) spells out — so the decode
+path is the only thing keeping the dependency alive. Dropping it takes the
+`serde_bytes` default feature and the `#[serde(...)]` attributes with it, which
+means v1 owes `blob` a native spelling. What survives is serde used as serde and
+nothing more: an ordinary config-file deserializer in the binding generator, and an
+optional off-by-default feature letting leaf types like `Nat` cross into JSON.
+Nothing bridges serde back in: a compatibility shim cannot supply `ty()`, so foreign
+types get a local `#[candid(with = "...")]` adapter instead.
+[crates/README.md](crates/README.md#scope-serde-leaves-the-data-path-entirely)
+draws both lines.
+
 ### 1.4 Type derivation runs on global mutable state
 
 [rust/candid/src/types/internal.rs:692](rust/candid/src/types/internal.rs#L692)
@@ -386,11 +400,6 @@ with their reasoning; new evidence is the reason to revisit one.
 - Whether the canonical encoding profile (deterministic type-table ordering, no
   unused entries, shortest-form LEB128) should be normative in the spec or a
   separate conformance profile.
-- Whether `candid_serde_compat` — a bridge letting `serde::Deserialize` types be
-  used at a Candid boundary during migration — is worth shipping, given that it
-  necessarily inherits the bug class described in §1.3. Current thinking: ship it,
-  scope it to foreign types you do not control, and make coercion failures loud
-  errors rather than best-effort.
 - How `spec/` redirects are published once Verso output becomes canonical.
 - Whether this repo should publish a JavaScript-facing binding at all, and with
   what surface. `@dfinity/didc` (`tools/didc-js`) compiles the Rust implementation
