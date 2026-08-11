@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-11
+
+### Candid 0.10.35
+
+* Bug fixes:
+  + Bound the allocation when reading a length-prefixed byte field in the type-table header. A byte vector (a future type's payload, or a service method's name) previously reserved its full declared length up front, so a length larger than the remaining input requested a correspondingly large allocation instead of failing on the short read. These fields now grow their buffer incrementally, so an out-of-range or truncated length surfaces as an ordinary parse error. The wire format is unchanged and valid messages decode identically.
+
 ## 2026-07-27
 
 ### Candid 0.10.34
