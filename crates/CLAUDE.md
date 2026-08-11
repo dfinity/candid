@@ -58,7 +58,7 @@ Name uniquification uses an incrementing counter, so generated `.did` type names
 depend on the order types were first derived in that thread.
 
 Type derivation must be a pure function. Types are built into an explicit
-`TypeEnv` passed by the caller; recursion uses arena indices, not thread-local
+`TypeTable` passed by the caller; recursion uses arena indices, not thread-local
 interning.
 
 The derive crate has the same defect in a worse place: `candid_method` /
@@ -100,6 +100,12 @@ decode_one_with_skipping_quota, decode_one_with_decoding_and_skipping_quota,
 
 Write names out. Options go in a config struct or a builder, never into the
 function name.
+
+The core type names are already settled, and are shared with [`lean/`](../lean/) so the
+two read alike — see [README.md](README.md#naming). In particular `TypeTable` is the
+index-keyed table and `TypeEnv` is reserved for the name-keyed `.did` declaration
+environment; do not reuse `TypeEnv` for the former, which is the mistake `rust/`
+makes.
 
 ### 5. No `unsafe` in `candid_subtype` or `candid_wire`
 

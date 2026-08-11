@@ -204,13 +204,13 @@ definition for everyone else.
 ```
 ic_principal                    (existing; unchanged, already correctly split)
    ↑
-candid_types      Type, Label, Field, Function, TypeEnv, field-id hash.
+candid_types      TypeExpr, TypeTable, TypeRef, FieldId, ClosedType, field-id hash.
                   no_std-capable. No serde, no binary, NO GLOBAL STATE.
    ↑
 candid_subtype    Subtyping + coercion decision procedures. Mirrors Lean 1:1.
    ↑               The verified core: small, pure, Aeneas-shaped.
 candid_wire       Type table + memory encoding, untyped:
-   ↑               bytes <-> (TypeEnv, Vec<Type>, values). Cost metering.
+   ↑               bytes <-> (TypeTable, Vec<TypeExpr>, values). Cost metering.
    ├───────────────────────────┐
 candid_value                candid (facade) + derive macro
    IDLValue equivalent,     CandidType trait, native decode trait (no serde),
@@ -325,17 +325,18 @@ serde-style generic traits, so today's decoder is out of reach regardless. But
 
 ## 5. Proposed working model
 
-**Everything is additive.** New code goes in the three new directories. Existing
-files are not modified. This is not a style preference — it is the property that
-makes everything else work:
+**Everything is additive.** Work is confined to the three new directories — plus this
+document, which is where the plan itself gets corrected. **Nothing under `rust/`,
+`spec/`, `test/`, `coq/` or `tools/` is touched.** This is not a style preference — it
+is the property that makes everything else work:
 
 - Nothing on `master` can break, because nothing on `master` references the new
   directories.
 - There are **structurally zero merge conflicts** with a `master` that keeps
   shipping 0.10.x releases.
-- Therefore review of a merge is *"adds files under `lean/`, `crates/`,
-  `conformance/`; touches nothing existing; nothing published depends on it"* —
-  approvable in minutes without deep review.
+- Therefore review of a merge is *"changes only `lean/`, `crates/`, `conformance/` and
+  `REWRITE.md`; nothing published depends on any of it"* — approvable in minutes
+  without deep review.
 
 **Working branch, merged fortnightly.** Day-to-day work happens on a working
 branch pushed directly, so iteration is not gated on review latency. It merges to
@@ -347,10 +348,24 @@ this experiment and lost. The `next` branch in this repository is **1 commit ahe
 of `master` and 109 behind.** It was the same plan. It died from merge cadence, not
 from a bad idea. A missed merge is a bug.
 
-**Policy lands on `master` through normal PRs.** Anything that is policy, or that
-`master` needs to know about — directory reservations, this document, CI jobs,
-CONTRIBUTING changes — goes through the standard process. Only code churn lives on
-the branch.
+**The three new directories belong to the working branch, in full.** Everything under
+[lean/](lean/), [crates/](crates/) and [conformance/](conformance/) is working-branch
+material — not only code, but the `README.md` and `CLAUDE.md` files in them. Design
+decisions get recorded next to the thing they constrain, at the moment they are made,
+because a decision that has to wait for a policy review is a decision that gets made
+in someone's head and written down later, or not at all.
+
+**Policy is what lives outside those three directories.** This document, `.github/`,
+`CONTRIBUTING`, and the deletion PRs in §6 go to `master` through the standard
+process. One carve-out: a CI workflow that gates only the new directories may ride the
+working branch so that it actually runs while the code is being written, and reach
+`master` with the next merge — it cannot affect any existing check, because its path
+filter matches nothing that exists on `master` today.
+
+The boundary is *location*, not subject matter, which makes it decidable by looking at
+a diff rather than by arguing about what counts as policy. It is also the same property
+the rest of this section rests on: a merge that only adds files under the three new
+directories cannot break `master`.
 
 **Unstable means unstable.** Nothing under the new directories is published, and
 nothing in it carries a compatibility promise until v1. Ugly intermediate states
@@ -365,10 +380,31 @@ Deletion is a normal PR against `master` with the evidence in the description.
 
 | Delete | When | Caveat |
 |---|---|---|
-| [coq/](coq/) | Lean reproduces every MiniCandid theorem **and** the two models have been diffed | If Lean disagrees with MiniCandid anywhere, that disagreement is the most valuable thing this project will find. Investigate before deleting. |
+| [coq/](coq/) | Every MiniCandid theorem's *purpose* is covered — see below | Not a model-to-model diff; the two are not comparable artifacts. |
 | [spec/](spec/) | Verso output covers all normative content | `spec/Candid.md` is externally linked from docs sites, other implementations, and papers. Needs a redirect stub, not a `git rm`. |
 | [test/](test/) | All 471 assertions exist as conformance vectors and pass | — |
 | [rust/](rust/) | `candid` v1 published and icp-cli + ic-cdk migrated | Long horizon. Expect 0.10.x maintenance in parallel throughout. |
+
+### What the `coq/` condition means
+
+An earlier version of this table asked that Lean "reproduce every MiniCandid theorem
+**and** the two models have been diffed." That was wrong on both halves, because it
+treated the two as the same kind of artifact differing only in coverage.
+
+MiniCandid is not an incomplete implementation. It is a **justification** device: it
+exists to show that non-obvious design decisions — the `opt` coercion rule above all —
+are sound, and to check that a proposed spec change can be accommodated by the existing
+system. The Lean model answers a different question: given this input, what happens?
+
+So the condition is that each MiniCandid theorem's *purpose* is discharged. For each
+one, either the property is stated and proved about the Lean definitions, or it is
+recorded as a justification the Lean model subsumes. And because the two use different
+representations — MiniCandid's types are `CoInductive` infinite trees, Lean's are finite
+with an explicit type table — there is no structural diff to perform.
+
+What is still worth doing, and is *not* a deletion gate: checking the two against each
+other on the nine constructors they share. A disagreement there would be a finding about
+the spec, and finding it is worth more than the deletion.
 
 ### Tools
 
