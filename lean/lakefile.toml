@@ -1,0 +1,15 @@
+name = "candid"
+version = "0.1.0"
+defaultTargets = ["Candid", "oracle"]
+
+# No mathlib, deliberately. See README.md -- it would dominate build times and
+# breakage surface, and nothing here needs it.
+
+[[lean_lib]]
+name = "Candid"
+
+# The reference executable. Slice 1 runs built-in examples; it will grow into the
+# differential oracle that reads conformance vectors.
+[[lean_exe]]
+name = "oracle"
+root = "Main"

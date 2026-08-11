@@ -1,0 +1,39 @@
+name: Lean
+
+on:
+  push:
+    branches:
+      - master
+      - rewrite
+  pull_request:
+    paths:
+      - 'lean/**'
+      - '.github/workflows/lean.yml'
+
+# Not a required status check. If it becomes one, the workflow-level `paths:` filter
+# above has to go and be replaced with the job-level `dorny/paths-filter` pattern
+# used by `rust.yml` -- see the comment at the top of that file for why.
+
+permissions:
+  contents: read
+
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # Installs the toolchain named in `lean/lean-toolchain` and caches the build.
+      # `lake test` is not configured yet; the reference executable is the test.
+      - uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1.5.0
+        with:
+          lake-package-directory: lean
+          build: true
+          test: false
+          use-mathlib-cache: false
+
+      # The model checks itself and exits nonzero on any disagreement, so this step
+      # is the one that makes the job mean something.
+      - name: run the reference model
+        working-directory: lean
+        run: lake exe oracle
