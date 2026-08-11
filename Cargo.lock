@@ -244,13 +244,13 @@ dependencies = [
 
 [[package]]
 name = "candid"
-version = "0.10.34"
+version = "0.10.35"
 dependencies = [
  "anyhow",
  "bincode",
  "binrw",
  "byteorder",
- "candid_derive 0.10.34",
+ "candid_derive 0.10.35",
  "candid_parser 0.4.0",
  "hex",
  "ic_principal 0.1.5",
@@ -282,7 +282,7 @@ dependencies = [
 
 [[package]]
 name = "candid_derive"
-version = "0.10.34"
+version = "0.10.35"
 dependencies = [
  "lazy_static",
  "proc-macro2 1.0.86",
@@ -315,7 +315,7 @@ version = "0.4.0"
 dependencies = [
  "anyhow",
  "arbitrary",
- "candid 0.10.34",
+ "candid 0.10.35",
  "codespan-reporting",
  "console",
  "convert_case",

@@ -6,6 +6,55 @@ use std::convert::TryInto;
 
 const MAX_TYPE_TABLE_LEN: u64 = 10_000; // Max type entries
 
+// Upper bound on a single allocation step while reading a length-prefixed byte
+// blob. The buffer grows in steps of at most this size.
+const READ_CHUNK: u64 = 8 * 1024;
+
+/// Read `len` bytes into a fresh `Vec`, growing the buffer in bounded steps.
+///
+/// A plain `#[br(count = len)]` on a `Vec<u8>` passes the wire-declared length
+/// straight to `reserve_exact`, allocating `len` bytes up front before any are
+/// read. A length prefix need not match the amount of data actually present, so
+/// a value far larger than the input would reserve a correspondingly large
+/// buffer instead of failing cleanly on the short read. Growing the buffer in
+/// bounded chunks keeps the reservation proportional to the bytes available, so
+/// an out-of-range or truncated length surfaces as an ordinary parse error.
+fn read_len_prefixed<R: std::io::Read>(reader: &mut R, pos: u64, len: u64) -> BinResult<Vec<u8>> {
+    use std::io::Read;
+    let mut buf = Vec::new();
+    let mut remaining = len;
+    while remaining > 0 {
+        let want = remaining.min(READ_CHUNK);
+        // `read_to_end` on a bounded `Take` reserves at most `want`, so the
+        // buffer never grows faster than the input is consumed.
+        let read = reader.by_ref().take(want).read_to_end(&mut buf)? as u64;
+        if read < want {
+            // Fewer bytes were available than declared: short input.
+            return Err(BError::Custom {
+                pos,
+                err: Box::new("not enough bytes"),
+            });
+        }
+        remaining -= read;
+    }
+    Ok(buf)
+}
+
+#[binrw::parser(reader)]
+fn read_bytes(len: u64) -> BinResult<Vec<u8>> {
+    let pos = reader.stream_position()?;
+    read_len_prefixed(reader, pos, len)
+}
+#[binrw::parser(reader)]
+fn read_text(len: u64) -> BinResult<String> {
+    let pos = reader.stream_position()?;
+    let bytes = read_len_prefixed(reader, pos, len)?;
+    String::from_utf8(bytes).map_err(|_| BError::Custom {
+        pos,
+        err: Box::new("invalid utf8"),
+    })
+}
+
 #[binrw::parser(reader)]
 fn read_leb(name: &'static str) -> BinResult<u64> {
     let pos = reader.stream_position()?;
@@ -130,14 +179,14 @@ struct FutureType {
     opcode: i64,
     #[br(parse_with = read_leb, args("len"))]
     len: u64,
-    #[br(count = len)]
+    #[br(parse_with = read_bytes, args(len))]
     blob: Vec<u8>,
 }
 #[derive(BinRead, Debug)]
 struct Meths {
     #[br(parse_with = read_leb, args("len"))]
     len: u64,
-    #[br(count = len, try_map = |x:Vec<u8>| String::from_utf8(x).map_err(|_| "invalid utf8"))]
+    #[br(parse_with = read_text, args(len))]
     name: String,
     ty: IndexType,
 }
