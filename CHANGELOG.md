@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-14
+
+### candid_parser 0.4.1
+
+* Bug fixes:
+  + Escape the method names of a service type in the Rust binding. A Candid method name is an arbitrary text value, but `pp_ty_service` emitted it raw between the quotes of a Rust string literal inside `candid::define_service!`. A name containing `"` therefore closed the literal and the macro invocation, and the rest of the name was compiled as Rust — a `.did` file could inject arbitrary items into the bindings generated from it, and from there into the consumer's binary. Names are now escaped with `escape_debug`, as `pp_function` and the `#[serde(rename)]` attributes already were. The value seen by `define_service!` is unchanged, and names that are ordinary identifiers generate byte-identical output.
+
 ## 2026-08-11
 
 ### Candid 0.10.35
