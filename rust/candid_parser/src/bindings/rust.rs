@@ -606,8 +606,11 @@ fn test_{test_name}() {{
                 TypeInner::Var(_) => self.pp_ty(func, true).append("::ty()"),
                 _ => unreachable!(),
             };
+            // The method name is emitted as a Rust string literal, so it has to be escaped.
+            // A Candid method name is an arbitrary text value, and a name containing `"` would
+            // otherwise close the literal and let the rest of the name be parsed as Rust code.
             RcDoc::text("\"")
-                .append(id)
+                .append(id.escape_debug().to_string())
                 .append(kwd("\" :"))
                 .append(func_doc)
         });

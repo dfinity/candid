@@ -1,0 +1,18 @@
+// The method names of a service type are arbitrary Candid text values, but every binding emits
+// them into a string literal of the target language. Names containing quotes, backslashes, comment
+// markers or newlines have to be escaped for the generated code to stay well-formed.
+type f = func () -> ();
+
+type inner = service {
+  "quote\"" : f;
+  "backslash\\" : f;
+  "newline\nand carriage return\r" : f;
+  "tab\tand semicolon;" : f;
+  "comment markers // and /* */" : f;
+  "braces { } and parens ( )" : f;
+};
+
+service : {
+  use_inner : (inner) -> ();
+  ping : () -> (text);
+};

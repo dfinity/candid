@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-08-14
+
+### candid_parser 0.4.1
+
+* Bug fixes:
+  + Escape the method names of a service type in the Rust binding. A Candid method name is an arbitrary text value, but `pp_ty_service` emitted it raw between the quotes of a Rust string literal inside `candid::define_service!`. A name containing `"` therefore closed the literal and the macro invocation, and the rest of the name was compiled as Rust — a `.did` file could inject arbitrary items into the bindings generated from it, and from there into the consumer's binary. Names are now escaped with `escape_debug`, as `pp_function` and the `#[serde(rename)]` attributes already were. The value seen by `define_service!` is unchanged, and names that are ordinary identifiers generate byte-identical output.
+
+## 2026-08-11
+
+### Candid 0.10.35
+
+* Bug fixes:
+  + Bound the allocation when reading a length-prefixed byte field in the type-table header. A byte vector (a future type's payload, or a service method's name) previously reserved its full declared length up front, so a length larger than the remaining input requested a correspondingly large allocation instead of failing on the short read. These fields now grow their buffer incrementally, so an out-of-range or truncated length surfaces as an ordinary parse error. The wire format is unchanged and valid messages decode identically.
+
 ## 2026-07-27
 
 ### Candid 0.10.34
