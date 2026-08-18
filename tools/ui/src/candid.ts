@@ -6,6 +6,8 @@ import {
 import {Principal} from '@icp-sdk/core/principal'
 import { IcManagementCanister } from '@icp-sdk/canisters/ic-management';
 import { getCanisterEnv } from '@icp-sdk/core/agent/canister-env';
+import { createActor as createProfilerActor } from './bindings/profiler/profiler';
+import { idlFactory as didjsIdlFactory, type _SERVICE as DidjsService } from './bindings/didjs/declarations/didjs.did';
 import './candid.css';
 import { AuthClient, type AuthClientCreateOptions } from "@icp-sdk/auth/client";
 
@@ -70,13 +72,6 @@ export async function fetchActor(canisterId: Principal): Promise<ActorSubclass> 
   return Actor.createActor(candid.idlFactory, { agent, canisterId });
 }
 
-export function getProfilerActor(canisterId: Principal): ActorSubclass {
-  const profiler_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
-    __get_profiling: IDL.Func([IDL.Int32], [IDL.Vec(IDL.Tuple(IDL.Int32, IDL.Int64)), IDL.Opt(IDL.Int32)], ['query']),
-    __get_cycles: IDL.Func([], [IDL.Int64], ['query']),
-  });
-  return Actor.createActor(profiler_interface, { agent, canisterId });
-}
 function uint8ArrayToDisplay(array: Uint8Array | number[]) {
   const uint8Array = new Uint8Array(array);
   try {
@@ -136,8 +131,8 @@ function postToPlayground(id: Principal) {
 
 export async function getCycles(canisterId: Principal): Promise<bigint|undefined> {
   try {
-    const actor = getProfilerActor(canisterId);
-    const cycles = await actor.__get_cycles() as bigint;
+    const actor = createProfilerActor(canisterId.toText(), { agent });
+    const cycles = await actor.__get_cycles();
     return cycles;
   } catch(err) {
     return undefined;
@@ -158,11 +153,6 @@ export async function getNames(canisterId: Principal) {
   }
 }
 
-async function getDidJsFromPostMessage(canisterId: Principal): Promise<undefined | string> {
-  return new Promise((resolve,reject)=>{})
-}
-
-
 async function getDidJsFromMetadata(canisterId: Principal): Promise<undefined | string> {
   // The 'candid' path resolves to the `candid:service` metadata section and is
   // read (and certified) via the canister's read_state endpoint.
@@ -180,15 +170,15 @@ async function getDidJsFromMetadata(canisterId: Principal): Promise<undefined | 
 
 export async function getProfiling(canisterId: Principal): Promise<Array<[number, bigint]>|undefined> {
   try {
-    const actor = getProfilerActor(canisterId);
+    const actor = createProfilerActor(canisterId.toText(), { agent });
     let info: Array<[number, bigint]> = [];
     let idx = 0;
     let cnt = 0;
     while (cnt < 50) {
-      const [res, next] = await actor.__get_profiling(idx) as [Array<[number, bigint]>, [number]|[]];
+      const [res, next] = await actor.__get_profiling(idx);
       info = info.concat(res);
-      if (next.length === 1) {
-        idx = next[0];
+      if (next !== null) {
+        idx = next;
         cnt++;
       } else {
         break;
@@ -263,15 +253,9 @@ async function renderFlameGraph(profiler: any) {
 async function didToJs(candid_source: string): Promise<undefined | string> {
   // call didjs canister
   const didjs_id = canisterEnv["CANISTER_ID"];
-  const didjs_interface: IDL.InterfaceFactory = ({ IDL }) => IDL.Service({
-    did_to_js: IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
-  });
-  const didjs: ActorSubclass = Actor.createActor(didjs_interface, { agent, canisterId: didjs_id });
-  const js: any = await didjs.did_to_js(candid_source);
-  if (JSON.stringify(js) === JSON.stringify([])) {
-    return undefined;
-  }
-  return js[0];
+  const didjs = Actor.createActor<DidjsService>(didjsIdlFactory, { agent, canisterId: didjs_id });
+  const [js] = await didjs.did_to_js(candid_source);
+  return js;
 }
 
 function is_query(func: IDL.FuncClass): boolean {
@@ -314,7 +298,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
   item.appendChild(inputContainer);
 
   const inputs: InputBox[] = [];
-  idlFunc.argTypes.forEach((arg, i) => {
+  idlFunc.argTypes.forEach((arg, _i) => {
     const inputbox = renderInput(arg);
     inputs.push(inputbox);
     inputbox.render(inputContainer);
@@ -445,7 +429,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       containers.push(jsonContainer);
       jsonContainer.style.display = setContainerVisibility('json');
       left.appendChild(jsonContainer);
-      jsonContainer.innerText = JSON.stringify(callResult, (k,v) => typeof v === 'bigint'?v.toString():v);
+      jsonContainer.innerText = JSON.stringify(callResult, (_k,v) => typeof v === 'bigint'?v.toString():v);
     })().catch(err => {
       resultDiv.classList.add('error');
       left.innerText = err.message;

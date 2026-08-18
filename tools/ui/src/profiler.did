@@ -1,0 +1,10 @@
+// Interface injected into a canister's Wasm by `ic-wasm instrument`.
+// Present only on instrumented canisters; the Candid UI probes for it to
+// render the cycle counter and the profiling flamegraph.
+service : {
+  // Get the current cycle counter.
+  __get_cycles : () -> (int64) query;
+  // Get the execution trace starting at the given index. Returns the trace
+  // chunk and, if the log exceeds one chunk, the next index to fetch.
+  __get_profiling : (int32) -> (vec record { int32; int64 }, opt int32) query;
+}
