@@ -16,6 +16,12 @@ structure Check where
   name : String
   ok : Bool
   detail : String
+  /-- A gap the model is known to have. Reported, but not a build failure -- and if
+  it starts passing, *that* is a failure, so a fix cannot land unnoticed. -/
+  known : Bool := false
+
+/-- Record a check as a known gap rather than a requirement. -/
+def Check.asKnown (c : Check) : Check := { c with known := true }
 
 def verdictStr : Verdict → String
   | some true => "<:"
@@ -193,9 +199,10 @@ def serviceChecks : List Check :=
 /-! ## Recursive types across two independent tables
 
 These are the cases the reference-pair memo exists for. `selfLoop` and `twoCycle`
-denote the same infinite type through different table shapes, which is why the memo
-has to be keyed on reference pairs rather than on unfolded expressions -- the
-expressions never repeat, the reference pairs do. -/
+denote the same infinite type through different table shapes, and every state on
+their cycle has a reference on *both* sides, so the memo fires and the recursion
+stops. `vecOmega` below is the same idea with the references on alternating sides,
+where it does not. -/
 
 /-- `type S = record { next : S }`, as one self-referential entry. -/
 def selfLoop : ClosedType :=
@@ -246,6 +253,75 @@ def recursiveChecks : List Check :=
   , expectWellFormed (.ofExpr (.record [(0, nat), (0, text)])) false
       "duplicate field id is malformed" ]
 
+/-! ## `vec`-omega: a cycle the reference-pair memo does not catch
+
+`T.0 = vec (vec T.0)`, so `ref 0` and `vec (ref 0)` denote the same infinite type,
+`vec (vec (vec ...))`. Both are well formed and both directions are `true`.
+
+The memo never fires, because every state on the cycle has a reference on exactly
+one side:
+
+    (ref 0, vec (ref 0))
+      -> (vec (vec (ref 0)), vec (ref 0))     unfold left
+      -> (vec (ref 0), ref 0)                 descend
+      -> (vec (ref 0), vec (vec (ref 0)))     unfold right
+      -> (ref 0, vec (ref 0))                 descend -- back to the start
+
+`seen` stays empty, so `decSubtype` returns `none` and no larger `fuel` helps. These
+two are recorded as known gaps: `expectSubIn` states the answer the model owes, and
+the run reports it as `known` until the representation or the memo keying changes. -/
+
+def vecOmegaTable : TypeTable := { entries := #[ .vec (.vec (.ref 0)) ] }
+
+/-- `vec`-omega as a reference. -/
+def vecOmegaRef : ClosedType := { table := vecOmegaTable, root := .ref 0 }
+
+/-- The same type, one `vec` unrolled ahead of the reference. -/
+def vecOmegaUnrolled : ClosedType := { table := vecOmegaTable, root := .vec (.ref 0) }
+
+def vecOmegaChecks : List Check :=
+  [ expectWellFormed vecOmegaRef true "vec-omega: ref 0 is well formed"
+  , expectWellFormed vecOmegaUnrolled true "vec-omega: vec (ref 0) is well formed"
+  , (expectSubIn vecOmegaRef vecOmegaUnrolled true
+      "vec-omega <: its own unrolling").asKnown
+  , (expectSubIn vecOmegaUnrolled vecOmegaRef true
+      "vec-omega's unrolling <: it").asKnown ]
+
+/-! ## Contravariance: the memo swaps with the tables
+
+The parameter premise of the function rule swaps the two tables, so it must swap the
+memo with them. An entry `(i, j)` asserts `A`'s `i` against `B`'s `j`; read unswapped
+inside the swapped call it asserts `B`'s `i` against `A`'s `j`, which is a different
+question, and subtyping is not symmetric.
+
+The witness below reduces `contraOuter <: contraOuter'` to `contraFuncs <:
+contraFuncs'`, two functions whose parameter premise asks `contraB.1 <: contraA.2`,
+i.e. `vec text <: vec nat` -- false. Reaching that premise puts `(1, 2)` in the memo,
+so an unswapped read answers it `true` from the memo and both queries come out
+`true`. -/
+
+/-- `A.0 = record { f : A.1 }`, `A.1 = func (A.2) -> ()`, `A.2 = vec nat`. -/
+def contraA : TypeTable :=
+  { entries := #[ recordOf [("f", .ref 1)], .func [.ref 2] [] [], .vec nat ] }
+
+/-- `B.0 = record { f : B.2 }`, `B.1 = vec text`, `B.2 = func (B.1) -> ()`. The
+indices are deliberately transposed against `contraA`. -/
+def contraB : TypeTable :=
+  { entries := #[ recordOf [("f", .ref 2)], .vec text, .func [.ref 1] [] [] ] }
+
+def contraOuter : ClosedType := { table := contraA, root := .ref 0 }
+def contraOuter' : ClosedType := { table := contraB, root := .ref 0 }
+def contraFuncs : ClosedType := { table := contraA, root := .ref 1 }
+def contraFuncs' : ClosedType := { table := contraB, root := .ref 2 }
+
+def contraChecks : List Check :=
+  [ expectWellFormed contraOuter true "contravariance witness: subtype side is well formed"
+  , expectWellFormed contraOuter' true "contravariance witness: supertype side is well formed"
+  , expectSubIn contraFuncs contraFuncs' false
+      "func (vec nat) -> () !<: func (vec text) -> () (parameter premise fails)"
+  , expectSubIn contraOuter contraOuter' false
+      "record { f : func (vec nat) -> () } !<: record { f : func (vec text) -> () }" ]
+
 /-! ## Transitivity spot-check
 
 The spec keeps transitivity as a design goal, and the unusual `opt` rules exist to
@@ -263,18 +339,20 @@ def transitivityChecks : List Check :=
 def allChecks : List Check :=
   hashChecks ++ primChecks ++ optChecks ++ vecChecks ++ recordChecks ++
   variantChecks ++ funcChecks ++ serviceChecks ++ recursiveChecks ++
-  transitivityChecks
+  vecOmegaChecks ++ contraChecks ++ transitivityChecks
 
 def main : IO UInt32 := do
-  let failures := allChecks.filter (fun c => !c.ok)
+  let failures := allChecks.filter (fun c => if c.known then c.ok else !c.ok)
+  let known := allChecks.filter (·.known)
   for c in allChecks do
-    if c.ok then
-      IO.println s!"ok    {c.name}"
-    else
-      IO.println s!"FAIL  {c.name} -- {c.detail}"
+    match c.known, c.ok with
+    | false, true => IO.println s!"ok    {c.name}"
+    | false, false => IO.println s!"FAIL  {c.name} -- {c.detail}"
+    | true, false => IO.println s!"known {c.name} -- {c.detail}"
+    | true, true => IO.println s!"FAIL  {c.name} -- known gap now passes; promote it"
   IO.println ""
   if failures.isEmpty then
-    IO.println s!"{allChecks.length} checks passed"
+    IO.println s!"{allChecks.length - known.length} checks passed, {known.length} known gaps"
     return 0
   else
     IO.eprintln s!"{failures.length} of {allChecks.length} checks failed"

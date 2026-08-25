@@ -129,15 +129,20 @@ and `b`'s in `B`.
 
 `seen` is the coinductive hypothesis: a pair of *references* already under
 consideration. Recursive types make the relation a greatest fixed point, so
-re-encountering a pair means the obligation is discharged, not that it failed. The
-memo must be keyed on reference pairs and not on expressions -- unfolded expressions
-can nest without bound, while reference pairs are bounded by `|A| x |B|`.
+re-encountering a pair means the obligation is discharged, not that it failed.
 
-`fuel` bounds recursion depth. It is a device, not the real argument: the intended
-termination measure is lexicographic on (reference pairs not yet in `seen`,
-structural size), which needs `TypeTable.wellFormed`'s "every entry is composite"
-invariant carried in the type to prove that resolving a reference makes progress.
-Replacing `fuel` with that measure is the first proof obligation of the next slice.
+**Keying the memo on reference pairs is not enough**, and the `vecOmega` checks in
+`Main.lean` are the witness: a cycle whose states always have a reference on exactly one side
+never reaches this memo point, so `seen` stays empty and no `fuel` value suffices.
+Rust keys on *expression* pairs and inserts whenever either side is a variable
+(`rust/candid/src/types/subtype.rs:214`), which closes that cycle -- and unfolded
+expressions do not in fact nest without bound, since unfolding only ever replaces a
+reference at the top, leaving every state a subterm of a root or of an entry.
+
+So `fuel` is not a placeholder for a measure that exists: for this algorithm there
+is none. Either the memo is keyed on expression pairs -- terminating, but the proof
+then needs "all reachable states lie in a finite set" threaded through -- or the
+representation changes so that every recursive call passes through a reference pair.
 -/
 def sub (A B : TypeTable) (seen : List (TypeRef × TypeRef)) : Nat → TypeExpr → TypeExpr → Verdict
   | 0, _, _ => none
@@ -196,10 +201,16 @@ def sub (A B : TypeTable) (seen : List (TypeRef × TypeRef)) : Nat → TypeExpr 
 
     -- Parameters generalise, results specialise, and both behave like tuple-shaped
     -- records -- so arguments may be dropped and results added.
+    --
+    -- The parameter premise swaps the tables, so it must swap the memo with them: an
+    -- entry `(i, j)` means "A's `i` against B's `j`", and reading it unswapped in the
+    -- swapped call asserts `B`'s `i` against `A`'s `j` -- a different, and generally
+    -- false, question. See the `contra` checks in `Main.lean`.
     | .func args rets ann, .func args' rets' ann' =>
       if annotsAgree ann ann' then
         Verdict.and
-          (sub B A seen fuel (.record (indexedFrom 1 args')) (.record (indexedFrom 1 args)))
+          (sub B A (seen.map Prod.swap) fuel
+            (.record (indexedFrom 1 args')) (.record (indexedFrom 1 args)))
           fun _ => sub A B seen fuel (.record (indexedFrom 1 rets)) (.record (indexedFrom 1 rets'))
       else some false
 
@@ -220,14 +231,15 @@ def budgetFor (a b : ClosedType) : Nat :=
 
 /-- Decide `a <: b` for two types carrying their own tables.
 
-`none` means the budget was exhausted, which a well-formed input should never
-provoke -- `budgetFor` is derived from the inputs. -/
+`none` means the budget was exhausted. Well-formed input *can* provoke it -- see
+the `vecOmega` checks in `Main.lean` -- so `none` is a real answer callers must handle, not a
+theoretical one. -/
 def decSubtype (a b : ClosedType) : Verdict :=
   sub a.table b.table [] (budgetFor a b) a.root b.root
 
 /- Note the argument order flip in the `func` case above: parameters are
-contravariant, so the tables swap with the types. Getting this wrong is invisible
-when both types share one table, which is the second reason the two-table signature
-is worth the extra parameter. -/
+contravariant, so the tables swap with the types -- and the memo swaps with the
+tables. Getting either wrong is invisible when both types share one table, which is
+the second reason the two-table signature is worth the extra parameter. -/
 
 end Candid

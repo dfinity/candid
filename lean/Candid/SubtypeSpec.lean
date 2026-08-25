@@ -105,9 +105,14 @@ The obligation this file exists to create, and the first proof of the next slice
 Soundness (`some true` implies `Subty`) should follow by coinduction on the
 procedure's recursion, with `seen` as the coinductive hypothesis -- that is what
 `seen` *means*, and stating it this way is what will confirm the memo is keyed
-correctly. Completeness additionally needs that the budget never runs out on
-well-formed input, which is the same fact that would let `fuel` be replaced by a
-proper termination measure.
+correctly.
+
+The completeness direction is **false of the current procedure**, not merely
+unproved: the `vecOmega` pair in `Main.lean` is well formed and satisfies `Subty`
+(close the
+consistent set under `unfoldLeft`, `unfoldRight` and `vec`), while `decSubtype`
+returns `none` on it for every budget. Stating the theorem is therefore blocked on
+the procedure, not on the proof -- see the header of `Subtype.lean`.
 
 Deliberately not stated with `sorry`: an unproved `theorem` in the build reads as
 established once it scrolls past. The properties `coq/MiniCandid.v` establishes
