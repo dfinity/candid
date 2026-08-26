@@ -19,13 +19,13 @@ crates below are new, and they use `_` to match the existing family.
 ```
 ic_principal                    (existing crate; unchanged, already correctly split)
    ↑
-candid_types      Type, Label, Field, Function, TypeEnv, field-id hash.
-                  no_std-capable. No serde, no binary, no global state.
+candid_types      Slot, Composite, TypeTable, TypeRef, FieldId, ClosedType,
+                  field-id hash. no_std-capable. No serde, no binary, no global state.
    ↑
 candid_subtype    Subtyping + coercion decision procedures.
    ↑              Mirrors lean/ 1:1. The verified core.
 candid_wire       Type table + memory encoding, untyped:
-   ↑              bytes <-> (TypeEnv, Vec<Type>, values). Cost metering.
+   ↑              bytes <-> (TypeTable, Vec<Slot>, values). Cost metering.
    ├───────────────────────────┐
 candid_value                candid (facade) + derive macro
    Dynamic value repr,      CandidType trait, native decode trait (no serde),
@@ -45,7 +45,7 @@ out of tree:      candid_bindgen_{rust,js,ts,motoko}
   ([rust/candid/src/types/internal.rs:692](../rust/candid/src/types/internal.rs#L692)),
   which makes `CandidType::ty()` impure and makes generated `.did` type names
   depend on the order types were first derived. Here, types are built into an
-  explicit `TypeEnv` passed by the caller, with recursion handled by arena indices.
+  explicit `TypeTable` passed by the caller, with recursion handled by arena indices.
 - **`candid_subtype` is a separate crate** specifically so the Lean-mirrored
   surface has a crate boundary. As a module inside something larger, the
   correspondence rots silently.
@@ -57,6 +57,43 @@ out of tree:      candid_bindgen_{rust,js,ts,motoko}
   one crate; the layer crates are for tool authors. That is how the split stays
   fine-grained without forcing ten dependencies into every canister's
   `Cargo.toml`.
+
+## Naming
+
+Identifiers are shared with [lean/](../lean/) wherever they name the same thing. That
+is what turns "`candid_subtype` should read as a transcription of its Lean
+counterpart" into a checkable property rather than an aspiration.
+
+| | |
+|---|---|
+| `Slot` | a `<datatype>` where the wire format writes `I`: a primitive or a `TypeRef`, never an inline composite |
+| `Composite` | a `<comptype>`: what a table entry is. Its children are `Slot`s, so it is one flat node |
+| `TypeTable` | `TypeRef` → `Composite`, index-keyed — what the spec calls the type definition table |
+| `TypeRef` | index into a `TypeTable` |
+| `ClosedType` | a `TypeTable` and a root `Slot` together |
+| `FieldId` | a record or variant label: a 32-bit id |
+| `CandidType` | the derive trait |
+| `TypeEnv` | **reserved**, see below |
+
+`Type` cannot be used in Lean (it is the universe) and `Ty` would violate
+[CLAUDE.md](CLAUDE.md) anti-pattern 4, so "Type" is a family prefix and never a whole
+name.
+
+`Slot` and `Composite` take no such prefix, because neither is a type: a slot cannot
+express one, and a composite means nothing without the table its children index into.
+Both are named after the grammar position they occupy in `spec/Candid.md`. Nothing
+here is a nested tree — the type table is the only recursion, which is what the wire
+format already does (`spec/Candid.md:1208`) and what makes the subtype procedure in
+[lean/](../lean/) terminate without a depth limit.
+
+`TypeEnv` is deliberately *not* this crate's table. In `rust/` it is a
+`BTreeMap<String, Type>`
+([rust/candid/src/types/type_env.rs:7](../rust/candid/src/types/type_env.rs#L7)) — a
+*name*-keyed environment of `.did` type declarations, which is a different structure
+from an index-keyed table, and both will exist here. The name stays reserved for the
+`candid_syntax` one, where "environment" is accurate. Spending it on the table is how
+the earlier draft of this document ended up describing a "type table" that no
+identifier called a table.
 
 ## The serde divorce
 
@@ -76,7 +113,7 @@ The replacement makes backtracking first-class:
 
 ```rust
 pub trait CandidType: Sized {
-    fn ty(env: &mut TypeEnv) -> TypeRef;
+    fn ty(table: &mut TypeTable) -> TypeRef;
     fn encode<E: Encoder>(&self, e: E) -> Result<(), E::Error>;
 
     /// Returns Ok(None) when the wire value cannot be coerced to Self.
