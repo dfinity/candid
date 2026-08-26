@@ -32,7 +32,7 @@ takes a single `env` for both types (`rust/candid/src/types/subtype.rs:19`), whi
 works only because callers merge tables first.
 
 **The table bounds the recursion.** A composite's children are slots, and composites
-live only in the table (`TypeExpr.lean`), so the only way to recurse is through a
+live only in the table (`Types.lean`), so the only way to recurse is through a
 pair of *references*: every other slot pair is decided outright. The procedure
 therefore carries `todo`, the reference pairs it has not yet assumed, and descending
 through a pair removes it. `todo.length` is the termination measure, and the
@@ -46,7 +46,7 @@ costs `|A| x |B|` pairs, and an implementation that carries the assumptions
 themselves rather than what is left is bounded by the same count.
 -/
 
-import Candid.TypeExpr
+import Candid.Types
 
 namespace Candid
 

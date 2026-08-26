@@ -90,9 +90,9 @@ The two names the flat representation introduced are borrowed from the spec's gr
 instead: a `Composite` is a `<comptype>`, and a `Slot` is the `<datatype>` position
 that the wire format's `I` fills with either a primitive opcode or an index. Neither
 is a "type" — a slot cannot express one and a composite is not meaningful without its
-table — so neither takes the `Type` prefix. `crates/README.md` still records
-`TypeExpr` for "one structural node; may contain references", which is the shape this
-model just abandoned; deciding whether the Rust crates follow is a separate call.
+table — so neither takes the `Type` prefix.
+[crates/README.md](../crates/README.md#naming) records the same two names for the
+Rust side, since the point of sharing identifiers is that they name the same thing.
 
 `TypeTable` rather than `TypeEnv`, the name used in `rust/`, for two reasons. The spec
 calls it a table ("type definition table", `spec/Candid.md:1311`), so the prose and the

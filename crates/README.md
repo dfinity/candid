@@ -19,13 +19,13 @@ crates below are new, and they use `_` to match the existing family.
 ```
 ic_principal                    (existing crate; unchanged, already correctly split)
    ↑
-candid_types      TypeExpr, TypeTable, TypeRef, FieldId, ClosedType, field-id hash.
-                  no_std-capable. No serde, no binary, no global state.
+candid_types      Slot, Composite, TypeTable, TypeRef, FieldId, ClosedType,
+                  field-id hash. no_std-capable. No serde, no binary, no global state.
    ↑
 candid_subtype    Subtyping + coercion decision procedures.
    ↑              Mirrors lean/ 1:1. The verified core.
 candid_wire       Type table + memory encoding, untyped:
-   ↑              bytes <-> (TypeTable, Vec<TypeExpr>, values). Cost metering.
+   ↑              bytes <-> (TypeTable, Vec<Slot>, values). Cost metering.
    ├───────────────────────────┐
 candid_value                candid (facade) + derive macro
    Dynamic value repr,      CandidType trait, native decode trait (no serde),
@@ -66,10 +66,11 @@ counterpart" into a checkable property rather than an aspiration.
 
 | | |
 |---|---|
-| `TypeExpr` | one structural node; may contain references |
-| `TypeTable` | `TypeRef` → `TypeExpr`, index-keyed — what the spec calls the type definition table |
+| `Slot` | a `<datatype>` where the wire format writes `I`: a primitive or a `TypeRef`, never an inline composite |
+| `Composite` | a `<comptype>`: what a table entry is. Its children are `Slot`s, so it is one flat node |
+| `TypeTable` | `TypeRef` → `Composite`, index-keyed — what the spec calls the type definition table |
 | `TypeRef` | index into a `TypeTable` |
-| `ClosedType` | a `TypeTable` and a root `TypeExpr` together |
+| `ClosedType` | a `TypeTable` and a root `Slot` together |
 | `FieldId` | a record or variant label: a 32-bit id |
 | `CandidType` | the derive trait |
 | `TypeEnv` | **reserved**, see below |
@@ -77,6 +78,13 @@ counterpart" into a checkable property rather than an aspiration.
 `Type` cannot be used in Lean (it is the universe) and `Ty` would violate
 [CLAUDE.md](CLAUDE.md) anti-pattern 4, so "Type" is a family prefix and never a whole
 name.
+
+`Slot` and `Composite` take no such prefix, because neither is a type: a slot cannot
+express one, and a composite means nothing without the table its children index into.
+Both are named after the grammar position they occupy in `spec/Candid.md`. Nothing
+here is a nested tree — the type table is the only recursion, which is what the wire
+format already does (`spec/Candid.md:1207`) and what makes the subtype procedure in
+[lean/](../lean/) terminate without a depth limit.
 
 `TypeEnv` is deliberately *not* this crate's table. In `rust/` it is a
 `BTreeMap<String, Type>`

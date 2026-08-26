@@ -6,6 +6,6 @@ here is reachable from the `oracle` executable, or a proof about something that 
 -/
 
 import Candid.Hash
-import Candid.TypeExpr
+import Candid.Types
 import Candid.Subtype
 import Candid.SubtypeSpec

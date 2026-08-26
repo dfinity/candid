@@ -7,7 +7,7 @@ into the differential oracle that reads conformance vectors -- at which point th
 checks become the first vectors.
 
 Every type here carries a table, because composites live only in the table
-(`TypeExpr.lean`). `atom` is a primitive, `entry` is a single composite, and
+(`Types.lean`). `atom` is a primitive, `entry` is a single composite, and
 `close do ... intern ...` builds the two-or-more-entry cases.
 -/
 

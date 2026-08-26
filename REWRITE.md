@@ -204,13 +204,13 @@ definition for everyone else.
 ```
 ic_principal                    (existing; unchanged, already correctly split)
    ↑
-candid_types      TypeExpr, TypeTable, TypeRef, FieldId, ClosedType, field-id hash.
-                  no_std-capable. No serde, no binary, NO GLOBAL STATE.
+candid_types      Slot, Composite, TypeTable, TypeRef, FieldId, ClosedType,
+                  field-id hash. no_std-capable. No serde, no binary, NO GLOBAL STATE.
    ↑
 candid_subtype    Subtyping + coercion decision procedures. Mirrors Lean 1:1.
    ↑               The verified core: small, pure, Aeneas-shaped.
 candid_wire       Type table + memory encoding, untyped:
-   ↑               bytes <-> (TypeTable, Vec<TypeExpr>, values). Cost metering.
+   ↑               bytes <-> (TypeTable, Vec<Slot>, values). Cost metering.
    ├───────────────────────────┐
 candid_value                candid (facade) + derive macro
    IDLValue equivalent,     CandidType trait, native decode trait (no serde),
