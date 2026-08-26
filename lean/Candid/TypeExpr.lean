@@ -1,5 +1,5 @@
 /-
-The Candid type language, represented finitely.
+The Candid type language, represented finitely -- and flatly.
 
 `coq/MiniCandid.v` models types as a `CoInductive T` -- infinite type trees, with
 recursion needing no constructor. Lean 4 accepts `coinductive` only for predicates,
@@ -11,8 +11,37 @@ Instead recursion is explicit, through a `TypeTable` -- which is what the binary
 format calls it (`spec/Candid.md`: "type definition table") and what `candid_types`
 is specified to do with arena indices.
 
-On the name: the old implementation calls this a `TypeEnv`, but its `TypeEnv` is a
-`BTreeMap<String, Type>` (`rust/candid/src/types/type_env.rs:7`) -- a *name*-keyed
+**Nothing here is recursive except the table.** A table entry is a `Composite`; its
+children are `Slot`s; and a `Slot` is a primitive or an index -- never an inline
+composite. That is the wire format's own shape, not an invention of this model
+(`spec/Candid.md:1207`):
+
+```
+I : <datatype> -> i8*
+I(<primtype>) = T(<primtype>)
+I(<comptype>) = sleb128(i)  where type definition i defines T(<datatype>)
+```
+
+and the spec draws the conclusion this model is built on: "Because recursion goes
+through `T`, this format by construction rules out non-well-founded definitions like
+`type t = t`" (`spec/Candid.md:1225`). Two things follow.
+
+- The rule that "the type table may only contain composite types (no `<primtype>`)"
+  (`spec/Candid.md:1227`) is a property of the representation rather than a
+  well-formedness check. A decoder still has to reject a primitive opcode in an entry
+  position; nothing downstream has to re-check it.
+- Every recursive call in the subtype procedure passes through a slot pair, so a pair
+  of *references* is the only way to recurse -- and the finite set of reference pairs
+  bounds the recursion. See `Subtype.lean`.
+
+The price is that a type means nothing without its table, and even `vec nat` needs an
+entry. `intern`/`close` below build tables for hand-written types. The surface `.did`
+syntax is nested, so the parser will produce a nested AST and flatten it here; that
+flattening is also what an encoder does, so it is a component this model needs rather
+than a translation it pays for.
+
+On the name: the implementation in `rust/` calls this a `TypeEnv`, but that `TypeEnv`
+is a `BTreeMap<String, Type>` (`rust/candid/src/types/type_env.rs:7`) -- a *name*-keyed
 environment of `.did` type declarations, which is a different structure from this
 index-keyed table. Both will exist here eventually, so `TypeEnv` is reserved for the
 one where "environment" is the accurate word.
@@ -41,111 +70,90 @@ inductive FuncAnnot where
   | query | oneway | compositeQuery
   deriving DecidableEq, Repr
 
-/-- A Candid type, possibly containing references into an accompanying `TypeTable`. -/
-inductive TypeExpr where
+/-- A `<datatype>` in the position where the wire format writes `I`: a primitive, or
+an index into the accompanying `TypeTable`.
+
+This is a leaf. Composites live in the table and only in the table, so the whole
+type graph is the table -- which is what bounds every recursion over types. -/
+inductive Slot where
   | prim (p : Prim)
-  | opt (inner : TypeExpr)
-  | vec (inner : TypeExpr)
-  | record (fields : List (FieldId × TypeExpr))
-  | variant (alts : List (FieldId × TypeExpr))
-  | func (args rets : List TypeExpr) (annots : List FuncAnnot)
-  | service (methods : List (String × TypeExpr))
   | ref (target : TypeRef)
+  deriving DecidableEq, Repr, Inhabited
+
+/-- A `<comptype>`: what a table entry is.
+
+Not a recursive type. Its children are `Slot`s, so a composite is one flat node. -/
+inductive Composite where
+  | opt (inner : Slot)
+  | vec (inner : Slot)
+  | record (fields : List (FieldId × Slot))
+  | variant (alts : List (FieldId × Slot))
+  | func (args rets : List Slot) (annots : List FuncAnnot)
+  | service (methods : List (String × Slot))
   deriving Repr, Inhabited
 
-/-- A type table: `TypeRef` -> `TypeExpr`. -/
+/-- A type table: `TypeRef` -> `Composite`. -/
 structure TypeTable where
-  entries : Array TypeExpr
+  entries : Array Composite
   deriving Repr, Inhabited
 
 namespace TypeTable
 
 def size (t : TypeTable) : Nat := t.entries.size
 
-def lookup? (t : TypeTable) (r : TypeRef) : Option TypeExpr := t.entries[r]?
+def lookup? (t : TypeTable) (r : TypeRef) : Option Composite := t.entries[r]?
 
 /-- The empty table, for types that contain no references. -/
 def empty : TypeTable := { entries := #[] }
 
 end TypeTable
 
-def TypeExpr.isRef : TypeExpr → Bool
-  | .ref _ => true
-  | _ => false
-
-/-- Is this a `<comptype>`, i.e. a `<constype>` or a `<reftype>`?
-
-`spec/Candid.md:1227` -- "The type table may only contain composite types (no
-`<primtype>`)". So this is exactly what may appear as a table entry, and it excludes
-both primitives and bare references. -/
-def TypeExpr.isComposite : TypeExpr → Bool
-  | .opt _ | .vec _ | .record _ | .variant _ | .func _ _ _ | .service _ => true
-  | .prim _ | .ref _ => false
-
 /-- No duplicates, by `BEq`. Used for field ids and for method names. -/
 def noDups [BEq α] : List α → Bool
   | [] => true
   | x :: xs => !xs.contains x && noDups xs
 
-/- Well-formedness of a type expression against a table of `bound` entries:
-every reference resolves, and no record, variant or service repeats a label.
+/-! ## Well-formedness
 
-The spec is explicit that a hash collision between field names in one record is
-*disallowed* rather than resolved, so duplicate ids make a type malformed rather
-than ambiguous. -/
-mutual
+Nothing recursive is left to check. A slot's reference must resolve, and no record,
+variant or service may repeat a label -- the spec is explicit that a hash collision
+between field names in one record is *disallowed* rather than resolved, so duplicate
+ids make a type malformed rather than ambiguous. -/
 
-/-- Every reference resolves below `bound`, and no label is repeated. -/
-def TypeExpr.wellFormed (bound : Nat) : TypeExpr → Bool
+/-- Does this slot's reference resolve below `bound`? -/
+def Slot.wellFormed (bound : Nat) : Slot → Bool
   | .prim _ => true
   | .ref r => r < bound
-  | .opt t | .vec t => t.wellFormed bound
-  | .record fs | .variant fs => noDups (fs.map (·.1)) && TypeExpr.wfFields bound fs
-  | .func args rets _ => TypeExpr.wfList bound args && TypeExpr.wfList bound rets
-  | .service ms => noDups (ms.map (·.1)) && TypeExpr.wfMethods bound ms
 
-def TypeExpr.wfList (bound : Nat) : List TypeExpr → Bool
-  | [] => true
-  | t :: ts => t.wellFormed bound && TypeExpr.wfList bound ts
+/-- The slots a composite holds, in no particular order: what has to resolve. -/
+def Composite.slots : Composite → List Slot
+  | .opt t | .vec t => [t]
+  | .record fs | .variant fs => fs.map (·.2)
+  | .func args rets _ => args ++ rets
+  | .service ms => ms.map (·.2)
 
-def TypeExpr.wfFields (bound : Nat) : List (FieldId × TypeExpr) → Bool
-  | [] => true
-  | (_, t) :: fs => t.wellFormed bound && TypeExpr.wfFields bound fs
+/-- Labels must not repeat. Vacuous for the unlabelled composites. -/
+def Composite.labelsOk : Composite → Bool
+  | .record fs | .variant fs => noDups (fs.map (·.1))
+  | .service ms => noDups (ms.map (·.1))
+  | .opt _ | .vec _ | .func _ _ _ => true
 
-def TypeExpr.wfMethods (bound : Nat) : List (String × TypeExpr) → Bool
-  | [] => true
-  | (_, t) :: ms => t.wellFormed bound && TypeExpr.wfMethods bound ms
+def Composite.wellFormed (bound : Nat) (c : Composite) : Bool :=
+  c.labelsOk && c.slots.all (Slot.wellFormed bound)
 
-end
-
-/-- A table is well formed when every entry is well formed **and composite**.
-
-The second condition is the spec's own (`spec/Candid.md:1227`), and it is load-bearing
-here: since no entry is a primitive or a bare reference, following a reference is a
-single step, which is what bounds the subtype recursion. Textual `.did` aliases
-(`type A = B;`) must therefore be resolved before they reach this model. -/
 def TypeTable.wellFormed (t : TypeTable) : Bool :=
-  t.entries.all fun e => e.wellFormed t.size && e.isComposite
-
-/-- Follow at most one reference. Returns `none` on a dangling index.
-
-In a well-formed table the result is never itself a `ref`. That is not yet expressed
-in the type, so `Subtype.lean` bounds unfolding explicitly instead of relying on it. -/
-def TypeTable.resolve (t : TypeTable) (e : TypeExpr) : Option TypeExpr :=
-  match e with
-  | .ref r => t.lookup? r
-  | _ => some e
+  t.entries.all (Composite.wellFormed t.size)
 
 /-- A type together with the table its references resolve in.
 
-This is the unit the public API speaks in, because a `TypeExpr` containing a `ref`
-means nothing without its table. The first draft of `decSubtype` took one table and
-two `TypeExpr`s, which silently assumed both types came from the same table -- false
-in the case that matters most, where a type table that arrived on the wire is compared
-against the receiver's own type graph. -/
+This is the unit the public API speaks in, because a `Slot` holding a `ref` means
+nothing without its table. The first draft of `decSubtype` took one table and two
+types, which silently assumed both came from the same table -- false in the case that
+matters most, where a type table that arrived on the wire is compared against the
+receiver's own type graph. -/
 structure ClosedType where
   table : TypeTable
-  root : TypeExpr
+  root : Slot
   deriving Repr, Inhabited
 
 namespace ClosedType
@@ -153,43 +161,70 @@ namespace ClosedType
 def wellFormed (c : ClosedType) : Bool :=
   c.table.wellFormed && c.root.wellFormed c.table.size
 
-/-- A type containing no references. -/
-def ofExpr (e : TypeExpr) : ClosedType := { table := .empty, root := e }
+/-- A type that needs no table. Primitives are the only types that need none, so
+every type this builds is well formed. -/
+def ofPrim (p : Prim) : ClosedType := { table := .empty, root := .prim p }
 
 end ClosedType
+
+/-! ## Building tables
+
+A hand-written type has to have its composites interned, since only the table can
+hold them. This is the same interning an encoder does when it emits a type table. -/
+
+/-- Table construction: append entries, taking back the slot that names each. -/
+abbrev TableM := StateM (Array Composite)
+
+/-- Add an entry, and return the slot that names it. -/
+def intern (c : Composite) : TableM Slot := do
+  let entries ← get
+  set (entries.push c)
+  return .ref entries.size
+
+/-- Run a construction into the type its resulting slot names. -/
+def close (m : TableM Slot) : ClosedType :=
+  let (root, entries) := m.run #[]
+  { table := { entries := entries }, root := root }
+
+/-- The common case: one entry, named by the root. -/
+def closeOne (c : Composite) : ClosedType := close (intern c)
 
 /-! Abbreviations for the primitives, so examples read like Candid rather than
 like an AST. -/
 
-namespace TypeExpr
+namespace Slot
 
-def null : TypeExpr := .prim .null
-def bool : TypeExpr := .prim .bool
-def nat : TypeExpr := .prim .nat
-def int : TypeExpr := .prim .int
-def nat8 : TypeExpr := .prim .nat8
-def nat16 : TypeExpr := .prim .nat16
-def nat32 : TypeExpr := .prim .nat32
-def nat64 : TypeExpr := .prim .nat64
-def int8 : TypeExpr := .prim .int8
-def int16 : TypeExpr := .prim .int16
-def int32 : TypeExpr := .prim .int32
-def int64 : TypeExpr := .prim .int64
-def float32 : TypeExpr := .prim .float32
-def float64 : TypeExpr := .prim .float64
-def text : TypeExpr := .prim .text
-def reserved : TypeExpr := .prim .reserved
-def empty : TypeExpr := .prim .empty
-def principal : TypeExpr := .prim .principal
+def null : Slot := .prim .null
+def bool : Slot := .prim .bool
+def nat : Slot := .prim .nat
+def int : Slot := .prim .int
+def nat8 : Slot := .prim .nat8
+def nat16 : Slot := .prim .nat16
+def nat32 : Slot := .prim .nat32
+def nat64 : Slot := .prim .nat64
+def int8 : Slot := .prim .int8
+def int16 : Slot := .prim .int16
+def int32 : Slot := .prim .int32
+def int64 : Slot := .prim .int64
+def float32 : Slot := .prim .float32
+def float64 : Slot := .prim .float64
+def text : Slot := .prim .text
+def reserved : Slot := .prim .reserved
+def empty : Slot := .prim .empty
+def principal : Slot := .prim .principal
+
+end Slot
+
+namespace Composite
 
 /-- A record from named fields, hashing the names. -/
-def recordOf (fs : List (String × TypeExpr)) : TypeExpr :=
+def recordOf (fs : List (String × Slot)) : Composite :=
   .record (fs.map fun (n, t) => (hashFieldName n, t))
 
 /-- A variant from named alternatives, hashing the names. -/
-def variantOf (fs : List (String × TypeExpr)) : TypeExpr :=
+def variantOf (fs : List (String × Slot)) : Composite :=
   .variant (fs.map fun (n, t) => (hashFieldName n, t))
 
-end TypeExpr
+end Composite
 
 end Candid

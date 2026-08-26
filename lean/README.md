@@ -22,8 +22,8 @@ via [Verso](https://github.com/leanprover/verso), the **specification document**
 
 **Executable first, proved second.**
 
-1. `TypeExpr`, `Value`, `subtype`, `coerce`, and the wire format as plain Lean
-   functions with `Decidable` instances.
+1. The type language, `Value`, `subtype`, `coerce`, and the wire format as plain
+   Lean functions with `Decidable` instances.
 2. A `lake`-built binary that reads a conformance vector file and reports results.
 3. CI wiring: that binary as a differential oracle against the Rust implementation.
 4. *Only then*, proofs about those definitions.
@@ -57,15 +57,44 @@ notes this in prose and `rust/candid/src/types/subtype.rs:293` implements it as 
 catch-all that only warns. Recording it as one premise-free rule is what makes the
 relation monotone.
 
+**Composites live only in the type table.** A table entry is a `Composite`, its
+children are `Slot`s, and a `Slot` is a primitive or an index — never an inline
+composite. That is not a modelling choice so much as the wire format's own shape
+(`spec/Candid.md:1207`), and the spec draws the conclusion the model is built on:
+"Because recursion goes through `T`, this format by construction rules out
+non-well-founded definitions like `type t = t`."
+
+What it bought: the only way for the subtype procedure to recurse is through a pair
+of *references*, so the finite set of reference pairs bounds the recursion. The
+procedure carries `todo` — the pairs it has not yet assumed — descends by removing
+one, and `todo.length` is the termination measure. No fuel, no `Option Bool`, and no
+"unanswered" state in the public API. The first version of this model, with
+composites nested inside each other, had no such measure: a cycle alternating which
+side holds the reference dodged the memo entirely, so no budget decided it.
+
+What it cost: a type means nothing without its table, and even `vec nat` needs an
+entry, so hand-written types are built through `intern`/`close`. The `.did` surface
+syntax *is* nested, so the parser will produce a nested AST and flatten it — which is
+also what an encoder does when it emits a type table, so the flattening pass is a
+component this model owes rather than a translation it pays for.
+
 **Naming.** `Type` is unavailable in Lean (it is the universe), and abbreviating it
 to `Ty` would reproduce exactly the defect
 [crates/CLAUDE.md](../crates/CLAUDE.md) anti-pattern 4 names. So "Type" is the family
-prefix and never the whole name: `TypeExpr`, `TypeTable`, `TypeRef`, with `CandidType`
-left for the Rust trait. These identifiers are meant to be **the same in Lean and in
-Rust**, which is what makes "`candid_subtype` reads as a transcription of its Lean
+prefix and never the whole name: `TypeTable`, `TypeRef`, with `CandidType` left for
+the Rust trait. These identifiers are meant to be **the same in Lean and in Rust**,
+which is what makes "`candid_subtype` reads as a transcription of its Lean
 counterpart" achievable rather than aspirational.
 
-`TypeTable` rather than the old implementation's `TypeEnv` for two reasons. The spec
+The two names the flat representation introduced are borrowed from the spec's grammar
+instead: a `Composite` is a `<comptype>`, and a `Slot` is the `<datatype>` position
+that the wire format's `I` fills with either a primitive opcode or an index. Neither
+is a "type" — a slot cannot express one and a composite is not meaningful without its
+table — so neither takes the `Type` prefix. `crates/README.md` still records
+`TypeExpr` for "one structural node; may contain references", which is the shape this
+model just abandoned; deciding whether the Rust crates follow is a separate call.
+
+`TypeTable` rather than `TypeEnv`, the name used in `rust/`, for two reasons. The spec
 calls it a table ("type definition table", `spec/Candid.md:1311`), so the prose and the
 identifier now agree — they did not when this was a `TypeEnv` described everywhere as
 a table. And `TypeEnv` in `rust/` is a `BTreeMap<String, Type>`
@@ -78,16 +107,20 @@ Both will exist here eventually, so `TypeEnv` stays reserved for the one where
 transcription of its Lean counterpart, and shared identifiers are most of what makes
 that checkable.
 
-**Subtyping relates two type tables, not one.** A `TypeExpr` holding a `ref` means
+**Subtyping relates two type tables, not one.** A `Slot` holding a `ref` means
 nothing without its table, so the unit the API speaks in is `ClosedType` — a table
 and a root together. The case that matters most compares a type table that arrived on
 the wire against the receiver's own type graph, and those are unrelated tables;
 `rust/candid/src/types/subtype.rs:19` takes a single `env` for both types, which works
-only because callers merge tables first. Two consequences fall out of separating
-them: the memo must be keyed on **reference pairs**, since unfolded expressions nest
-without bound while reference pairs are bounded by `|A| x |B|`; and the `func` rule's
-contravariance swaps the *tables* along with the types, which is invisible when there
-is only one table to swap.
+only because callers merge tables first.
+
+The consequence to keep hold of: the `func` rule's contravariance swaps the *tables*
+along with the types, and therefore swaps the reference-pair accounting with the
+tables — a pair `(i, j)` is about `A`'s `i` and `B`'s `j`, so reading it unswapped
+asserts something about the transposed pair. Both mistakes are invisible when there
+is only one table to swap, and the second one shipped in this model before the
+`contra` checks in [Main.lean](Main.lean) caught it: it reported `<:` for two types
+that are not related.
 
 ## Constraints
 
@@ -119,21 +152,21 @@ cover what actually breaks in production:
 
 Named here so they are obligations rather than oversights.
 
-- **`fuel` in `Candid/Subtype.lean`.** The procedure bounds recursion depth with a
-  budget instead of a termination measure, and returns `none` — not `false` — when it
-  runs out, so the model never reports an answer it did not compute. The intended
-  measure is lexicographic on (reference pairs not yet in `seen`, structural size);
-  proving it needs `TypeTable.wellFormed`'s "every entry is composite" invariant
-  carried in the type rather than checked separately.
 - **`decSubtype_iff`** — that the procedure decides the relation. Stated in
   [Candid/SubtypeSpec.lean](Candid/SubtypeSpec.lean). Soundness should follow by
-  coinduction with `seen` as the coinductive hypothesis, which is what `seen` means;
-  completeness additionally needs the budget never to run out.
-- **Unguarded recursion.** `TypeTable.wellFormed` requires every entry to be a
-  `<comptype>` — the spec's own rule (`spec/Candid.md:1227`), which rules out both
-  primitives and bare references — but it does not yet require recursion to be
-  *productive*. Textual `.did` aliases (`type A = B;`) must be resolved before
-  reaching this model.
+  coinduction, with the pairs *missing* from `todo` as the coinductive hypothesis,
+  which is what `todo` means. There is no longer a budget premise to discharge: the
+  procedure returns `Bool` and is total.
+- **The pair accounting is path-scoped and seeded eagerly.** `decSubtype` starts from
+  all `|A| x |B|` reference pairs, and `todo` is threaded down a path rather than
+  shared between siblings. That is a faithful reading of the coinductive hypothesis
+  and it is what makes the termination measure need no side conditions, but sharing
+  the accounting across siblings is also sound for a greatest fixed point and is how
+  an implementation gets a polynomial bound with no eager allocation.
+- **Flattening the surface syntax.** A `.did` type is nested; a `Composite`'s
+  children are slots. The parser will need the pass that interns nested composites
+  into a table, and textual aliases (`type A = B;`) have to be resolved by it —
+  `intern`/`close` are only the hand-written-example half of that.
 - **Verso.** Deliberately not in slice 1: bundling an undocumented doc toolchain into
   the slice whose purpose was de-risking the build would have doubled the unknowns.
 

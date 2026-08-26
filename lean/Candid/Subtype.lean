@@ -1,8 +1,8 @@
 /-
 Candid subtyping, as a decision procedure over two independent type tables.
 
-Rules are from `spec/Candid.md`, "Upgrading and Subtyping". Two things about that
-section shape everything here.
+Rules are from `spec/Candid.md`, "Upgrading and Subtyping". Three things shape
+everything here: two from that section, and one from how types are represented.
 
 **The negative premises are eliminable.** The spec states four rules for `opt`, two
 of them with negative premises:
@@ -25,65 +25,52 @@ That collapse is what makes this relation definable as a greatest fixed point at
 all: negative premises are non-monotone, so the rule functional would have no gfp.
 Restating them as one premise-free rule keeps the relation monotone.
 
-**Two tables, not one.** A `TypeExpr` holding a `ref` is meaningless without its
-table, and the case that matters most compares a type table that arrived on the wire
-against the receiver's own type graph -- two unrelated tables. The current Rust
-signature takes a single `env` for both types
-(`rust/candid/src/types/subtype.rs:19`), which works only because callers merge
-tables first.
+**Two tables, not one.** A `Slot` holding a `ref` is meaningless without its table,
+and the case that matters most compares a type table that arrived on the wire against
+the receiver's own type graph -- two unrelated tables. The current Rust signature
+takes a single `env` for both types (`rust/candid/src/types/subtype.rs:19`), which
+works only because callers merge tables first.
+
+**The table bounds the recursion.** A composite's children are slots, and composites
+live only in the table (`TypeExpr.lean`), so the only way to recurse is through a
+pair of *references*: every other slot pair is decided outright. The procedure
+therefore carries `todo`, the reference pairs it has not yet assumed, and descending
+through a pair removes it. `todo.length` is the termination measure, and the
+membership test that decides the branch is exactly the fact that measure needs -- so
+the obligation is discharged where the decision is made, and no invariant has to be
+threaded through the recursion.
+
+`todo` is the coinductive hypothesis, carried as a complement: a pair this path has
+already descended through is one the greatest fixed point lets us assume. Seeding it
+costs `|A| x |B|` pairs, and an implementation that carries the assumptions
+themselves rather than what is left is bounded by the same count.
 -/
 
 import Candid.TypeExpr
 
 namespace Candid
 
-/-- The result of a subtype question. `none` means the recursion budget ran out.
-
-Returning `Bool` here would mean reporting "not a subtype" for a question the model
-never actually answered. -/
-abbrev Verdict := Option Bool
-
-namespace Verdict
-
-/-- Short-circuiting conjunction that preserves "unanswered". -/
-def and (x : Verdict) (y : Unit → Verdict) : Verdict :=
-  match x with
-  | some true => y ()
-  | some false => some false
-  | none => none
-
-/-- `f` holds of every element. Stops at the first `false` or unanswered. -/
-def all (f : α → Verdict) : List α → Verdict
-  | [] => some true
-  | x :: xs => match f x with
-    | some true => all f xs
-    | r => r
-
-/-- `f` holds of some element. Stops at the first `true`; an unanswered question
-anywhere makes the whole disjunction unanswered, since a later `true` cannot be
-ruled out. -/
-def any (f : α → Verdict) : List α → Verdict
-  | [] => some false
-  | x :: xs => match f x with
-    | some false => any f xs
-    | some true => some true
-    | none => none
-
-end Verdict
+/-- Is this slot a type in this table at all? A primitive always is; a reference is
+one exactly when it resolves. -/
+def TypeTable.resolves (t : TypeTable) : Slot → Bool
+  | .prim _ => true
+  | .ref r => (t.lookup? r).isSome
 
 /-- `null <: t`, decided syntactically.
 
 The spec's premise `not (null <: <datatype>)` is only ever applied to a concrete
 type, and `null` is a subtype of exactly `null`, `reserved`, and any `opt` -- so this
 needs no recursion, just one step through the table. -/
-def TypeTable.acceptsNull (e : TypeTable) (t : TypeExpr) : Bool :=
-  match e.resolve t with
-  | some (.prim .null) | some (.prim .reserved) | some (.opt _) => true
-  | _ => false
+def TypeTable.acceptsNull (t : TypeTable) : Slot → Bool
+  | .prim .null | .prim .reserved => true
+  | .prim _ => false
+  | .ref r => match t.lookup? r with
+    | some (.opt _) => true
+    | _ => false
 
 /-- Label a positional list the way the spec's function rule does: "`NI*` is the
 `<nat>` sequence `1`..`|<datatypeNI>*|`". -/
-def indexedFrom (i : Nat) : List TypeExpr → List (FieldId × TypeExpr)
+def indexedFrom (i : Nat) : List Slot → List (FieldId × Slot)
   | [] => []
   | t :: ts => (UInt32.ofNat i, t) :: indexedFrom (i + 1) ts
 
@@ -92,154 +79,140 @@ def annotsAgree (xs ys : List FuncAnnot) : Bool :=
   xs.all (ys.contains ·) && ys.all (xs.contains ·)
 
 /-- Look up a label. -/
-def fieldAt (fs : List (FieldId × TypeExpr)) (id : FieldId) : Option TypeExpr :=
+def fieldAt (fs : List (FieldId × Slot)) (id : FieldId) : Option Slot :=
   (fs.find? (·.1 == id)).map (·.2)
 
 /-- Look up a method. -/
-def methodAt (ms : List (String × TypeExpr)) (name : String) : Option TypeExpr :=
+def methodAt (ms : List (String × Slot)) (name : String) : Option Slot :=
   (ms.find? (·.1 == name)).map (·.2)
 
-/- Structural depth, used only to seed the recursion budget. -/
+/-- Every reference pair of two tables: what `decSubtype` starts out permitted to
+assume. -/
+def allPairs (A B : TypeTable) : List (TypeRef × TypeRef) :=
+  (List.range A.size).flatMap fun i => (List.range B.size).map fun j => (i, j)
+
+/-! ## The procedure
+
+`sub A B todo a b` decides `a <: b`, where `a`'s references resolve in `A` and `b`'s
+in `B`, and `todo` holds the reference pairs not yet assumed. `subC` is the same
+question one step in, on the composites that two references name, and `subLabels` is
+the record rule, which the function rule reuses on its positional arguments and
+results.
+
+The measures below are lexicographic on (`todo.length`, phase), where the phase
+orders the three so that a step which does not shrink `todo` still descends:
+`subC` (2) may call `subLabels` (1), which may call `sub` (0), which shrinks `todo`
+before calling `subC` again. -/
 mutual
 
-/-- Structural depth. A `ref` counts as a leaf; unfolding is budgeted separately. -/
-def TypeExpr.depth : TypeExpr → Nat
-  | .prim _ | .ref _ => 1
-  | .opt t | .vec t => 1 + t.depth
-  | .record fs | .variant fs => 1 + TypeExpr.depthFields fs
-  | .func args rets _ => 1 + Nat.max (TypeExpr.depthList args) (TypeExpr.depthList rets)
-  | .service ms => 1 + TypeExpr.depthMethods ms
+def sub (A B : TypeTable) (todo : List (TypeRef × TypeRef)) : Slot → Slot → Bool
+  -- `<datatype> <: reserved` and `empty <: <datatype>`: the top and bottom types.
+  -- Each checks that the *other* side is a type at all. A dangling reference is not
+  -- one, and granting a subtype relation without looking is the dangerous direction
+  -- for a compatibility gate.
+  | a, .prim .reserved => A.resolves a
+  | .prim .empty, b => B.resolves b
 
-def TypeExpr.depthList : List TypeExpr → Nat
-  | [] => 0
-  | t :: ts => Nat.max t.depth (TypeExpr.depthList ts)
+  -- `<primtype> <: <primtype>`, plus `nat <: int`. `principal` is a primitive
+  -- (spec/Candid.md:80), so `principal <: principal` needs no rule of its own.
+  | .prim p, .prim q => p == q || (p == .nat && q == .int)
 
-def TypeExpr.depthFields : List (FieldId × TypeExpr) → Nat
-  | [] => 0
-  | (_, t) :: fs => Nat.max t.depth (TypeExpr.depthFields fs)
+  -- A primitive against a composite: only the `opt` rule can apply, since `empty`
+  -- and `reserved` are decided above.
+  | .prim _, .ref j =>
+    match B.lookup? j with
+    | some (.opt _) => true
+    | _ => false
 
-def TypeExpr.depthMethods : List (String × TypeExpr) → Nat
-  | [] => 0
-  | (_, t) :: ms => Nat.max t.depth (TypeExpr.depthMethods ms)
+  -- A composite against a primitive: only `service <actortype> <: principal`.
+  | .ref i, .prim q =>
+    match q, A.lookup? i with
+    | .principal, some (.service _) => true
+    | _, _ => false
+
+  -- Two references: the only recursive case, and the only place `todo` shrinks. A
+  -- pair no longer in `todo` is one this path has already descended through, so the
+  -- coinductive hypothesis discharges it. A pair that was never in `todo` is out of
+  -- range, and the lookups catch that first.
+  | .ref i, .ref j =>
+    match A.lookup? i, B.lookup? j with
+    | some x, some y =>
+      -- `_hp` is underscored because the value ignores it and the termination proof
+      -- below does not: it is the whole argument that this recursion stops.
+      if _hp : (i, j) ∈ todo then subC A B (todo.erase (i, j)) x y else true
+    | _, _ => false                   -- dangling: not well formed
+termination_by (todo.length, 0)
+decreasing_by
+  exact Prod.Lex.left _ _ (by
+    rw [List.length_erase_of_mem _hp]
+    exact Nat.sub_lt (List.length_pos_of_mem _hp) Nat.one_pos)
+
+/-- The rules on the composites that a pair of references names. -/
+def subC (A B : TypeTable) (todo : List (TypeRef × TypeRef)) : Composite → Composite → Bool
+  -- Any type is a subtype of an option. See the header: this single rule is the
+  -- spec's four `opt` rules with their negative premises eliminated.
+  | _, .opt _ => true
+
+  | .vec x, .vec y => sub A B todo x y
+
+  -- A record may specialise a field's type or add a field. It may also *omit* a
+  -- field the supertype has, provided that field accepts `null`.
+  | .record fs, .record gs => subLabels A B todo fs gs
+
+  -- A variant may specialise a tag's type or drop a tag. Every tag it does carry
+  -- must exist in the supertype.
+  | .variant fs, .variant gs =>
+    fs.all fun (id, f) =>
+      match fieldAt gs id with
+      | some g => sub A B todo f g
+      | none => false
+
+  -- Parameters generalise, results specialise, and both behave like tuple-shaped
+  -- records -- so arguments may be dropped and results added.
+  --
+  -- The parameter premise swaps the tables, so it swaps `todo` with them: a pair
+  -- `(i, j)` is about `A`'s `i` and `B`'s `j`, and reading it unswapped would assert
+  -- something about the transposed pair -- a different, and generally false, question.
+  | .func args rets ann, .func args' rets' ann' =>
+    annotsAgree ann ann'
+      && subLabels B A (todo.map Prod.swap) (indexedFrom 1 args') (indexedFrom 1 args)
+      && subLabels A B todo (indexedFrom 1 rets) (indexedFrom 1 rets')
+
+  -- Services are records of functions: a method may be specialised or added.
+  | .service ms, .service ms' =>
+    ms'.all fun (name, g) =>
+      match methodAt ms name with
+      | some f => sub A B todo f g
+      | none => false
+
+  | _, _ => false
+termination_by (todo.length, 2)
+decreasing_by
+  -- The parameter premise hands on a swapped `todo`, which is the same length.
+  all_goals (try simp only [List.length_map])
+  all_goals exact Prod.Lex.right _ (by omega)
+
+/-- The record rule: every label the supertype declares is either specialised by the
+subtype or omitted, and omitting it requires that it accept `null`. -/
+def subLabels (A B : TypeTable) (todo : List (TypeRef × TypeRef))
+    (fs gs : List (FieldId × Slot)) : Bool :=
+  gs.all fun (id, g) =>
+    match fieldAt fs id with
+    | some f => sub A B todo f g
+    | none => B.acceptsNull g
+termination_by (todo.length, 1)
+decreasing_by exact Prod.Lex.right _ (by omega)
 
 end
 
-/-- `sub A B seen fuel a b` decides `a <: b`, where `a`'s references resolve in `A`
-and `b`'s in `B`.
-
-`seen` is the coinductive hypothesis: a pair of *references* already under
-consideration. Recursive types make the relation a greatest fixed point, so
-re-encountering a pair means the obligation is discharged, not that it failed.
-
-**Keying the memo on reference pairs is not enough**, and the `vecOmega` checks in
-`Main.lean` are the witness: a cycle whose states always have a reference on exactly one side
-never reaches this memo point, so `seen` stays empty and no `fuel` value suffices.
-Rust keys on *expression* pairs and inserts whenever either side is a variable
-(`rust/candid/src/types/subtype.rs:214`), which closes that cycle -- and unfolded
-expressions do not in fact nest without bound, since unfolding only ever replaces a
-reference at the top, leaving every state a subterm of a root or of an entry.
-
-So `fuel` is not a placeholder for a measure that exists: for this algorithm there
-is none. Either the memo is keyed on expression pairs -- terminating, but the proof
-then needs "all reachable states lie in a finite set" threaded through -- or the
-representation changes so that every recursive call passes through a reference pair.
--/
-def sub (A B : TypeTable) (seen : List (TypeRef × TypeRef)) : Nat → TypeExpr → TypeExpr → Verdict
-  | 0, _, _ => none
-  | fuel + 1, a, b =>
-    match a, b with
-    -- Both sides are references: the memo point.
-    | .ref i, .ref j =>
-      if seen.contains (i, j) then some true
-      else match A.lookup? i, B.lookup? j with
-        | some a', some b' => sub A B ((i, j) :: seen) fuel a' b'
-        | _, _ => some false          -- dangling: not well formed
-    -- One side is a reference. Well-formed tables hold only composite types, so this
-    -- unfolds at most once before making structural progress.
-    | .ref i, _ =>
-      match A.lookup? i with
-      | some a' => sub A B seen fuel a' b
-      | none => some false
-    | _, .ref j =>
-      match B.lookup? j with
-      | some b' => sub A B seen fuel a b'
-      | none => some false
-
-    -- `<datatype> <: reserved` and `empty <: <datatype>`: the top and bottom types.
-    | _, .prim .reserved => some true
-    | .prim .empty, _ => some true
-
-    -- Any type is a subtype of an option. See the header: this single rule is the
-    -- spec's four `opt` rules with their negative premises eliminated.
-    | _, .opt _ => some true
-
-    | .prim p, .prim q =>
-      -- `<primtype> <: <primtype>`, plus `nat <: int`. `principal` is a primitive
-      -- (spec/Candid.md:80), so `principal <: principal` needs no rule of its own.
-      some (p == q || (p == .nat && q == .int))
-
-    -- `service <actortype> <: principal`.
-    | .service _, .prim .principal => some true
-
-    | .vec t, .vec t' => sub A B seen fuel t t'
-
-    -- A record may specialise a field's type or add a field. It may also *omit* a
-    -- field the supertype has, provided that field accepts `null`.
-    | .record fs, .record gs =>
-      Verdict.all (fun (id, g) =>
-        match fieldAt fs id with
-        | some f => sub A B seen fuel f g
-        | none => some (B.acceptsNull g)) gs
-
-    -- A variant may specialise a tag's type or drop a tag. Every tag it does carry
-    -- must exist in the supertype.
-    | .variant fs, .variant gs =>
-      Verdict.all (fun (id, f) =>
-        match fieldAt gs id with
-        | some g => sub A B seen fuel f g
-        | none => some false) fs
-
-    -- Parameters generalise, results specialise, and both behave like tuple-shaped
-    -- records -- so arguments may be dropped and results added.
-    --
-    -- The parameter premise swaps the tables, so it must swap the memo with them: an
-    -- entry `(i, j)` means "A's `i` against B's `j`", and reading it unswapped in the
-    -- swapped call asserts `B`'s `i` against `A`'s `j` -- a different, and generally
-    -- false, question. See the `contra` checks in `Main.lean`.
-    | .func args rets ann, .func args' rets' ann' =>
-      if annotsAgree ann ann' then
-        Verdict.and
-          (sub B A (seen.map Prod.swap) fuel
-            (.record (indexedFrom 1 args')) (.record (indexedFrom 1 args)))
-          fun _ => sub A B seen fuel (.record (indexedFrom 1 rets)) (.record (indexedFrom 1 rets'))
-      else some false
-
-    -- Services are records of functions: a method may be specialised or added.
-    | .service ms, .service ms' =>
-      Verdict.all (fun (name, g) =>
-        match methodAt ms name with
-        | some f => sub A B seen fuel f g
-        | none => some false) ms'
-
-    | _, _ => some false
-
-/-- A budget that is generous rather than tight: every path may unfold each
-reference pair once (`|A| x |B|`), descending the structure between unfoldings. -/
-def budgetFor (a b : ClosedType) : Nat :=
-  let pairs := (a.table.size + 1) * (b.table.size + 1)
-  pairs * (a.root.depth + b.root.depth + 2) + 2
-
-/-- Decide `a <: b` for two types carrying their own tables.
-
-`none` means the budget was exhausted. Well-formed input *can* provoke it -- see
-the `vecOmega` checks in `Main.lean` -- so `none` is a real answer callers must handle, not a
-theoretical one. -/
-def decSubtype (a b : ClosedType) : Verdict :=
-  sub a.table b.table [] (budgetFor a b) a.root b.root
+/-- Decide `a <: b` for two types carrying their own tables. Total: along any path a
+reference pair may be assumed at most once, and there are finitely many. -/
+def decSubtype (a b : ClosedType) : Bool :=
+  sub a.table b.table (allPairs a.table b.table) a.root b.root
 
 /- Note the argument order flip in the `func` case above: parameters are
-contravariant, so the tables swap with the types -- and the memo swaps with the
-tables. Getting either wrong is invisible when both types share one table, which is
-the second reason the two-table signature is worth the extra parameter. -/
+contravariant, so the tables swap with the types -- and `todo` swaps with the tables.
+Getting either wrong is invisible when both types share one table, which is the
+second reason the two-table signature is worth the extra parameter. -/
 
 end Candid

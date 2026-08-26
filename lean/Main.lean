@@ -5,42 +5,45 @@ Slice 1 runs a fixed set of checks and exits nonzero on any failure, so CI is
 actually verifying behaviour rather than only that the model compiles. It will grow
 into the differential oracle that reads conformance vectors -- at which point these
 checks become the first vectors.
+
+Every type here carries a table, because composites live only in the table
+(`TypeExpr.lean`). `atom` is a primitive, `entry` is a single composite, and
+`close do ... intern ...` builds the two-or-more-entry cases.
 -/
 
 import Candid
 
 open Candid
-open Candid.TypeExpr
+open Candid.Slot
+open Candid.Composite
 
 structure Check where
   name : String
   ok : Bool
   detail : String
   /-- A gap the model is known to have. Reported, but not a build failure -- and if
-  it starts passing, *that* is a failure, so a fix cannot land unnoticed. -/
+  it starts passing, *that* is a failure, so a fix cannot land unnoticed. Nothing is
+  marked at the moment; the field exists so that a gap can be recorded as a check
+  that runs rather than as prose that does not. -/
   known : Bool := false
 
 /-- Record a check as a known gap rather than a requirement. -/
 def Check.asKnown (c : Check) : Check := { c with known := true }
 
-def verdictStr : Verdict → String
-  | some true => "<:"
-  | some false => "!<:"
-  | none => "budget exhausted"
+/-- A type that needs no table: a primitive. -/
+def atom (p : Prim) : ClosedType := .ofPrim p
 
-/-- A subtype question about two types that carry no references. -/
-def expectSub (a b : TypeExpr) (want : Bool) (name : String) : Check :=
-  let got := decSubtype (.ofExpr a) (.ofExpr b)
-  { name := name
-    ok := got == some want
-    detail := s!"got {verdictStr got}, want {verdictStr (some want)}" }
+/-- A type that is one composite, named by the root. -/
+def entry (c : Composite) : ClosedType := closeOne c
 
-/-- A subtype question about two types with their own type tables. -/
-def expectSubIn (a b : ClosedType) (want : Bool) (name : String) : Check :=
+def relStr (b : Bool) : String := if b then "<:" else "!<:"
+
+/-- A subtype question about two types, each carrying its own table. -/
+def expectSub (a b : ClosedType) (want : Bool) (name : String) : Check :=
   let got := decSubtype a b
   { name := name
-    ok := got == some want
-    detail := s!"got {verdictStr got}, want {verdictStr (some want)}" }
+    ok := got == want
+    detail := s!"got {relStr got}, want {relStr want}" }
 
 def expectHash (input : String) (want : UInt32) : Check :=
   let got := hashFieldName input
@@ -69,19 +72,19 @@ def hashChecks : List Check :=
 /-! ## Primitives, top and bottom -/
 
 def primChecks : List Check :=
-  [ expectSub nat nat true "nat <: nat"
-  , expectSub nat int true "nat <: int"
-  , expectSub int nat false "int !<: nat"
-  , expectSub nat8 nat false "nat8 !<: nat (no width subtyping)"
-  , expectSub nat nat8 false "nat !<: nat8"
-  , expectSub nat32 int32 false "nat32 !<: int32"
-  , expectSub text reserved true "text <: reserved"
-  , expectSub (.func [] [] []) reserved true "func <: reserved"
-  , expectSub empty text true "empty <: text"
-  , expectSub empty (.vec nat) true "empty <: vec nat"
-  , expectSub text nat false "text !<: nat"
-  , expectSub (.service []) .principal true "service <: principal"
-  , expectSub .principal (.service []) false "principal !<: service" ]
+  [ expectSub (atom .nat) (atom .nat) true "nat <: nat"
+  , expectSub (atom .nat) (atom .int) true "nat <: int"
+  , expectSub (atom .int) (atom .nat) false "int !<: nat"
+  , expectSub (atom .nat8) (atom .nat) false "nat8 !<: nat (no width subtyping)"
+  , expectSub (atom .nat) (atom .nat8) false "nat !<: nat8"
+  , expectSub (atom .nat32) (atom .int32) false "nat32 !<: int32"
+  , expectSub (atom .text) (atom .reserved) true "text <: reserved"
+  , expectSub (entry (.func [] [] [])) (atom .reserved) true "func <: reserved"
+  , expectSub (atom .empty) (atom .text) true "empty <: text"
+  , expectSub (atom .empty) (entry (.vec nat)) true "empty <: vec nat"
+  , expectSub (atom .text) (atom .nat) false "text !<: nat"
+  , expectSub (entry (.service [])) (atom .principal) true "service <: principal"
+  , expectSub (atom .principal) (entry (.service [])) false "principal !<: service" ]
 
 /-! ## Options
 
@@ -90,20 +93,21 @@ negative premises eliminated. The `text <: opt nat` case is the surprising one, 
 it is deliberate: a receiver that cannot decode the value sees `null`. -/
 
 def optChecks : List Check :=
-  [ expectSub nat (.opt nat) true "nat <: opt nat"
-  , expectSub null (.opt nat) true "null <: opt nat"
-  , expectSub reserved (.opt nat) true "reserved <: opt nat"
-  , expectSub text (.opt nat) true "text <: opt nat (special opt rule)"
-  , expectSub (.opt text) (.opt nat) true "opt text <: opt nat (special opt rule)"
-  , expectSub (.opt nat) nat false "opt nat !<: nat"
-  , expectSub (.opt nat) reserved true "opt nat <: reserved" ]
+  [ expectSub (atom .nat) (entry (.opt nat)) true "nat <: opt nat"
+  , expectSub (atom .null) (entry (.opt nat)) true "null <: opt nat"
+  , expectSub (atom .reserved) (entry (.opt nat)) true "reserved <: opt nat"
+  , expectSub (atom .text) (entry (.opt nat)) true "text <: opt nat (special opt rule)"
+  , expectSub (entry (.opt text)) (entry (.opt nat)) true
+      "opt text <: opt nat (special opt rule)"
+  , expectSub (entry (.opt nat)) (atom .nat) false "opt nat !<: nat"
+  , expectSub (entry (.opt nat)) (atom .reserved) true "opt nat <: reserved" ]
 
 /-! ## Vectors -/
 
 def vecChecks : List Check :=
-  [ expectSub (.vec nat) (.vec int) true "vec nat <: vec int"
-  , expectSub (.vec int) (.vec nat) false "vec int !<: vec nat"
-  , expectSub (.vec nat) nat false "vec nat !<: nat" ]
+  [ expectSub (entry (.vec nat)) (entry (.vec int)) true "vec nat <: vec int"
+  , expectSub (entry (.vec int)) (entry (.vec nat)) false "vec int !<: vec nat"
+  , expectSub (entry (.vec nat)) (atom .nat) false "vec nat !<: nat" ]
 
 /-! ## Records
 
@@ -111,22 +115,27 @@ A subtype may add fields and specialise field types. It may also *omit* a field 
 supertype declares, provided that field accepts `null` -- the rule that makes records
 extensible in both inbound and outbound position. -/
 
+/-- `record { x : nat; y : opt text }`. Two entries: the `opt` needs one of its own. -/
+def recordWithOptField : ClosedType := close do
+  let o ← intern (.opt text)
+  intern (recordOf [("x", nat), ("y", o)])
+
 def recordChecks : List Check :=
-  [ expectSub (recordOf [("x", nat)]) (recordOf []) true
+  [ expectSub (entry (recordOf [("x", nat)])) (entry (recordOf [])) true
       "record {x:nat} <: record {}"
-  , expectSub (recordOf [("x", nat), ("y", text)]) (recordOf [("x", nat)]) true
-      "record {x;y} <: record {x} (field added)"
-  , expectSub (recordOf [("x", nat)]) (recordOf [("x", int)]) true
+  , expectSub (entry (recordOf [("x", nat), ("y", text)])) (entry (recordOf [("x", nat)]))
+      true "record {x;y} <: record {x} (field added)"
+  , expectSub (entry (recordOf [("x", nat)])) (entry (recordOf [("x", int)])) true
       "record {x:nat} <: record {x:int} (field specialised)"
-  , expectSub (recordOf [("x", int)]) (recordOf [("x", nat)]) false
+  , expectSub (entry (recordOf [("x", int)])) (entry (recordOf [("x", nat)])) false
       "record {x:int} !<: record {x:nat}"
-  , expectSub (recordOf [("x", nat)]) (recordOf [("x", nat), ("y", .opt text)]) true
+  , expectSub (entry (recordOf [("x", nat)])) recordWithOptField true
       "record {x} <: record {x; y:opt text} (omitted field accepts null)"
-  , expectSub (recordOf [("x", nat)]) (recordOf [("x", nat), ("y", reserved)]) true
-      "record {x} <: record {x; y:reserved}"
-  , expectSub (recordOf [("x", nat)]) (recordOf [("x", nat), ("y", text)]) false
-      "record {x} !<: record {x; y:text} (omitted field rejects null)"
-  , expectSub (recordOf [("x", nat)]) (recordOf [("y", nat)]) false
+  , expectSub (entry (recordOf [("x", nat)])) (entry (recordOf [("x", nat), ("y", reserved)]))
+      true "record {x} <: record {x; y:reserved}"
+  , expectSub (entry (recordOf [("x", nat)])) (entry (recordOf [("x", nat), ("y", text)]))
+      false "record {x} !<: record {x; y:text} (omitted field rejects null)"
+  , expectSub (entry (recordOf [("x", nat)])) (entry (recordOf [("y", nat)])) false
       "record {x} !<: record {y}" ]
 
 /-! ## Variants
@@ -134,16 +143,21 @@ def recordChecks : List Check :=
 Dual to records: a subtype may *drop* tags, and every tag it carries must exist in
 the supertype. Adding tags is only sound behind an `opt`. -/
 
+/-- `opt variant { ... }`. -/
+def optVariant (alts : List (String × Slot)) : ClosedType := close do
+  let v ← intern (variantOf alts)
+  intern (.opt v)
+
 def variantChecks : List Check :=
-  [ expectSub (variantOf []) (variantOf [("a", nat)]) true
+  [ expectSub (entry (variantOf [])) (entry (variantOf [("a", nat)])) true
       "variant {} <: variant {a}"
-  , expectSub (variantOf [("a", nat)]) (variantOf [("a", nat), ("b", text)]) true
-      "variant {a} <: variant {a; b} (tag dropped)"
-  , expectSub (variantOf [("a", nat), ("b", text)]) (variantOf [("a", nat)]) false
-      "variant {a; b} !<: variant {a} (tag added)"
-  , expectSub (variantOf [("a", nat)]) (variantOf [("a", int)]) true
+  , expectSub (entry (variantOf [("a", nat)])) (entry (variantOf [("a", nat), ("b", text)]))
+      true "variant {a} <: variant {a; b} (tag dropped)"
+  , expectSub (entry (variantOf [("a", nat), ("b", text)])) (entry (variantOf [("a", nat)]))
+      false "variant {a; b} !<: variant {a} (tag added)"
+  , expectSub (entry (variantOf [("a", nat)])) (entry (variantOf [("a", int)])) true
       "variant {a:nat} <: variant {a:int}"
-  , expectSub (.opt (variantOf [("a", nat), ("b", text)])) (.opt (variantOf [("a", nat)])) true
+  , expectSub (optVariant [("a", nat), ("b", text)]) (optVariant [("a", nat)]) true
       "opt variant {a; b} <: opt variant {a} (tag added behind opt)" ]
 
 /-! ## Functions
@@ -162,47 +176,65 @@ symmetric, and it is worth spelling out which is which:
 
 Annotations must match as sets. -/
 
+/-- `func (opt nat) -> ()`. -/
+def funcOptParam : ClosedType := close do
+  let o ← intern (.opt nat)
+  intern (.func [o] [] [])
+
+/-- `func () -> (opt nat)`. -/
+def funcOptResult : ClosedType := close do
+  let o ← intern (.opt nat)
+  intern (.func [] [o] [])
+
 def funcChecks : List Check :=
-  [ expectSub (.func [int] [nat] []) (.func [nat] [int] []) true
+  [ expectSub (entry (.func [int] [nat] [])) (entry (.func [nat] [int] [])) true
       "func (int) -> (nat) <: func (nat) -> (int)"
-  , expectSub (.func [nat] [int] []) (.func [int] [nat] []) false
+  , expectSub (entry (.func [nat] [int] [])) (entry (.func [int] [nat] [])) false
       "func (nat) -> (int) !<: func (int) -> (nat)"
     -- Parameters: dropping is free, adding needs to accept null.
-  , expectSub (.func [] [] []) (.func [nat] [] []) true
+  , expectSub (entry (.func [] [] [])) (entry (.func [nat] [] [])) true
       "func () -> () <: func (nat) -> () (parameter dropped, always allowed)"
-  , expectSub (.func [.opt nat] [] []) (.func [] [] []) true
+  , expectSub funcOptParam (entry (.func [] [] [])) true
       "func (opt nat) -> () <: func () -> () (optional parameter added)"
-  , expectSub (.func [nat] [] []) (.func [] [] []) false
+  , expectSub (entry (.func [nat] [] [])) (entry (.func [] [] [])) false
       "func (nat) -> () !<: func () -> () (added parameter rejects null)"
     -- Results: adding is free, dropping needs to accept null.
-  , expectSub (.func [] [nat] []) (.func [] [] []) true
+  , expectSub (entry (.func [] [nat] [])) (entry (.func [] [] [])) true
       "func () -> (nat) <: func () -> () (result added, always allowed)"
-  , expectSub (.func [] [] []) (.func [] [.opt nat] []) true
+  , expectSub (entry (.func [] [] [])) funcOptResult true
       "func () -> () <: func () -> (opt nat) (optional result dropped)"
-  , expectSub (.func [] [] []) (.func [] [nat] []) false
+  , expectSub (entry (.func [] [] [])) (entry (.func [] [nat] [])) false
       "func () -> () !<: func () -> (nat) (dropped result rejects null)"
-  , expectSub (.func [] [] [.query]) (.func [] [] []) false
+  , expectSub (entry (.func [] [] [.query])) (entry (.func [] [] [])) false
       "annotations must agree"
-  , expectSub (.func [] [] [.query]) (.func [] [] [.query]) true
+  , expectSub (entry (.func [] [] [.query])) (entry (.func [] [] [.query])) true
       "matching annotations agree" ]
 
-/-! ## Services -/
+/-! ## Services
+
+A method's type is a reference like any other -- the spec is explicit that "the
+serialised data type representing a method type must denote a function type"
+(`spec/Candid.md:1221`), so it is an index into the table, not an inline function. -/
+
+/-- A service, interning each method type first. -/
+def serviceOf (ms : List (String × Composite)) : ClosedType := close do
+  let slots ← ms.mapM fun (name, c) => do return (name, ← intern c)
+  intern (.service slots)
 
 def serviceChecks : List Check :=
-  [ expectSub (.service [("m", .func [] [] [])]) (.service []) true
+  [ expectSub (serviceOf [("m", .func [] [] [])]) (serviceOf []) true
       "service {m} <: service {}"
-  , expectSub (.service []) (.service [("m", .func [] [] [])]) false
+  , expectSub (serviceOf []) (serviceOf [("m", .func [] [] [])]) false
       "service {} !<: service {m}"
-  , expectSub (.service [("m", .func [] [nat] [])]) (.service [("m", .func [] [] [])]) true
+  , expectSub (serviceOf [("m", .func [] [nat] [])]) (serviceOf [("m", .func [] [] [])]) true
       "service method specialised" ]
 
 /-! ## Recursive types across two independent tables
 
-These are the cases the reference-pair memo exists for. `selfLoop` and `twoCycle`
-denote the same infinite type through different table shapes, and every state on
-their cycle has a reference on *both* sides, so the memo fires and the recursion
-stops. `vecOmega` below is the same idea with the references on alternating sides,
-where it does not. -/
+These are the cases the reference-pair accounting exists for. `selfLoop` and
+`twoCycle` denote the same infinite type through different table shapes, so the
+recursion only stops because descending through a pair of references removes it from
+`todo`, and meeting that pair again means the obligation is already assumed. -/
 
 /-- `type S = record { next : S }`, as one self-referential entry. -/
 def selfLoop : ClosedType :=
@@ -214,91 +246,75 @@ def twoCycle : ClosedType :=
     root := .ref 0 }
 
 /-- `type S = record { next : S; extra : nat }`. -/
-def selfLoopWith (extra : TypeExpr) : ClosedType :=
+def selfLoopWith (extra : Slot) : ClosedType :=
   { table := { entries := #[ recordOf [("next", .ref 0), ("extra", extra)] ] }, root := .ref 0 }
 
-/-- A table entry that is a bare reference: rejected, and it is the reference case
-that would otherwise make following a reference an unbounded walk. -/
-def bareRefEntry : ClosedType :=
-  { table := { entries := #[ .ref 0 ] }, root := .ref 0 }
-
-/-- A table entry that is a primitive: also rejected. `spec/Candid.md:1227` -- "The
-type table may only contain composite types (no `<primtype>`)." -/
-def primEntry : ClosedType :=
-  { table := { entries := #[ nat ] }, root := .ref 0 }
-
 /-- A reference with no entry to resolve to. -/
-def danglingRef : ClosedType :=
-  { table := { entries := #[] }, root := .ref 3 }
+def danglingRef : ClosedType := { table := .empty, root := .ref 3 }
+
+/- No check here for a primitive or a bare reference used as a table entry: an entry
+is a `Composite`, so neither is representable. The spec's rule
+(`spec/Candid.md:1227`) still has force, but it belongs to the decoder, which has to
+reject a primitive opcode in an entry position when it parses wire bytes. -/
 
 def recursiveChecks : List Check :=
-  [ expectSubIn selfLoop selfLoop true
-      "self-loop <: itself (memo terminates)"
-  , expectSubIn selfLoop twoCycle true
+  [ expectSub selfLoop selfLoop true
+      "self-loop <: itself (the reference pair is consumed once)"
+  , expectSub selfLoop twoCycle true
       "self-loop <: two-cycle (same type, different table shape)"
-  , expectSubIn twoCycle selfLoop true
+  , expectSub twoCycle selfLoop true
       "two-cycle <: self-loop"
-  , expectSubIn (selfLoopWith nat) (selfLoopWith int) true
+  , expectSub (selfLoopWith nat) (selfLoopWith int) true
       "recursive record, field specialised"
-  , expectSubIn (selfLoopWith int) (selfLoopWith nat) false
+  , expectSub (selfLoopWith int) (selfLoopWith nat) false
       "recursive record, field not specialised"
-  , expectSubIn (selfLoopWith nat) selfLoop true
+  , expectSub (selfLoopWith nat) selfLoop true
       "recursive record with extra field <: without it"
   , expectWellFormed selfLoop true "self-loop is well formed"
   , expectWellFormed twoCycle true "two-cycle is well formed"
-  , expectWellFormed bareRefEntry false "bare reference as a table entry is malformed"
-  , expectWellFormed primEntry false "primitive as a table entry is malformed"
-  , expectWellFormed (.ofExpr principal) true "principal is a primitive, not a reftype"
+  , expectWellFormed (atom .principal) true "principal is a primitive, not a reftype"
   , expectWellFormed danglingRef false "dangling reference is malformed"
-  , expectWellFormed (.ofExpr (.record [(0, nat), (0, text)])) false
+    -- A dangling reference is not a type, so it gets neither the top nor the bottom
+    -- rule for free. Deliberate: `<:` reported without looking is the dangerous
+    -- direction for a compatibility gate.
+  , expectSub danglingRef (atom .reserved) false "dangling reference !<: reserved"
+  , expectSub (atom .empty) danglingRef false "empty !<: dangling reference"
+  , expectWellFormed (entry (.record [(0, nat), (0, text)])) false
       "duplicate field id is malformed" ]
 
-/-! ## `vec`-omega: a cycle the reference-pair memo does not catch
+/-! ## `vec`-omega: a cycle that alternates sides
 
-`T.0 = vec (vec T.0)`, so `ref 0` and `vec (ref 0)` denote the same infinite type,
-`vec (vec (vec ...))`. Both are well formed and both directions are `true`.
+`T.0 = vec T.1` and `T.1 = vec T.0`, so both entries denote the same infinite type,
+`vec (vec (vec ...))`, and the answer is `true` in both directions.
 
-The memo never fires, because every state on the cycle has a reference on exactly
-one side:
+Neither side is ever the same entry twice running, so the recursion goes `(0, 1)`,
+then `(1, 0)`, then back to `(0, 1)`. Nothing is getting structurally smaller along
+the way: the pair accounting is the only thing that can stop it, and it does -- the
+third state finds its pair already taken out of `todo`. -/
 
-    (ref 0, vec (ref 0))
-      -> (vec (vec (ref 0)), vec (ref 0))     unfold left
-      -> (vec (ref 0), ref 0)                 descend
-      -> (vec (ref 0), vec (vec (ref 0)))     unfold right
-      -> (ref 0, vec (ref 0))                 descend -- back to the start
+def vecOmegaTable : TypeTable := { entries := #[ .vec (.ref 1), .vec (.ref 0) ] }
 
-`seen` stays empty, so `decSubtype` returns `none` and no larger `fuel` helps. These
-two are recorded as known gaps: `expectSubIn` states the answer the model owes, and
-the run reports it as `known` until the representation or the memo keying changes. -/
-
-def vecOmegaTable : TypeTable := { entries := #[ .vec (.vec (.ref 0)) ] }
-
-/-- `vec`-omega as a reference. -/
-def vecOmegaRef : ClosedType := { table := vecOmegaTable, root := .ref 0 }
-
-/-- The same type, one `vec` unrolled ahead of the reference. -/
-def vecOmegaUnrolled : ClosedType := { table := vecOmegaTable, root := .vec (.ref 0) }
+def vecOmegaEven : ClosedType := { table := vecOmegaTable, root := .ref 0 }
+def vecOmegaOdd : ClosedType := { table := vecOmegaTable, root := .ref 1 }
 
 def vecOmegaChecks : List Check :=
-  [ expectWellFormed vecOmegaRef true "vec-omega: ref 0 is well formed"
-  , expectWellFormed vecOmegaUnrolled true "vec-omega: vec (ref 0) is well formed"
-  , (expectSubIn vecOmegaRef vecOmegaUnrolled true
-      "vec-omega <: its own unrolling").asKnown
-  , (expectSubIn vecOmegaUnrolled vecOmegaRef true
-      "vec-omega's unrolling <: it").asKnown ]
+  [ expectWellFormed vecOmegaEven true "vec-omega: T.0 is well formed"
+  , expectWellFormed vecOmegaOdd true "vec-omega: T.1 is well formed"
+  , expectSub vecOmegaEven vecOmegaOdd true "vec-omega <: its own unrolling"
+  , expectSub vecOmegaOdd vecOmegaEven true "vec-omega's unrolling <: it" ]
 
-/-! ## Contravariance: the memo swaps with the tables
+/-! ## Contravariance: `todo` swaps with the tables
 
 The parameter premise of the function rule swaps the two tables, so it must swap the
-memo with them. An entry `(i, j)` asserts `A`'s `i` against `B`'s `j`; read unswapped
-inside the swapped call it asserts `B`'s `i` against `A`'s `j`, which is a different
-question, and subtyping is not symmetric.
+pair accounting with them. A pair `(i, j)` is about `A`'s `i` and `B`'s `j`; read
+unswapped inside the swapped call it is about `B`'s `i` and `A`'s `j`, which is a
+different question, and subtyping is not symmetric.
 
 The witness below reduces `contraOuter <: contraOuter'` to `contraFuncs <:
 contraFuncs'`, two functions whose parameter premise asks `contraB.1 <: contraA.2`,
-i.e. `vec text <: vec nat` -- false. Reaching that premise puts `(1, 2)` in the memo,
-so an unswapped read answers it `true` from the memo and both queries come out
-`true`. -/
+i.e. `vec text <: vec nat` -- false. Reaching that premise takes `(1, 2)` out of
+`todo`, so a procedure that read `todo` unswapped would answer the premise from the
+accounting instead, and both queries would come out `true`. -/
 
 /-- `A.0 = record { f : A.1 }`, `A.1 = func (A.2) -> ()`, `A.2 = vec nat`. -/
 def contraA : TypeTable :=
@@ -317,9 +333,9 @@ def contraFuncs' : ClosedType := { table := contraB, root := .ref 2 }
 def contraChecks : List Check :=
   [ expectWellFormed contraOuter true "contravariance witness: subtype side is well formed"
   , expectWellFormed contraOuter' true "contravariance witness: supertype side is well formed"
-  , expectSubIn contraFuncs contraFuncs' false
+  , expectSub contraFuncs contraFuncs' false
       "func (vec nat) -> () !<: func (vec text) -> () (parameter premise fails)"
-  , expectSubIn contraOuter contraOuter' false
+  , expectSub contraOuter contraOuter' false
       "record { f : func (vec nat) -> () } !<: record { f : func (vec text) -> () }" ]
 
 /-! ## Transitivity spot-check
@@ -329,9 +345,9 @@ preserve it. This is not a proof -- it is the shape the eventual property test a
 the Lean theorem take. -/
 
 def transitivityChecks : List Check :=
-  let a := recordOf [("x", nat)]
-  let b := recordOf [("x", nat), ("y", .opt text)]
-  let c := recordOf [("x", int)]
+  let a := entry (recordOf [("x", nat)])
+  let b := recordWithOptField
+  let c := entry (recordOf [("x", int)])
   [ expectSub a b true "transitivity: a <: b"
   , expectSub b c true "transitivity: b <: c"
   , expectSub a c true "transitivity: therefore a <: c" ]

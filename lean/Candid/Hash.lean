@@ -29,6 +29,6 @@ def hashFieldName (name : String) : FieldId :=
 
 /- The spec notes that this hash makes collisions within one record disallowed
 rather than resolved, so a record type carrying two fields with equal ids is
-malformed. Checking that is `TypeExpr.wellFormed`'s job, not the hash's. -/
+malformed. Checking that is `Composite.wellFormed`'s job, not the hash's. -/
 
 end Candid
