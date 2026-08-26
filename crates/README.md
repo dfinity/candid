@@ -83,7 +83,7 @@ name.
 express one, and a composite means nothing without the table its children index into.
 Both are named after the grammar position they occupy in `spec/Candid.md`. Nothing
 here is a nested tree — the type table is the only recursion, which is what the wire
-format already does (`spec/Candid.md:1207`) and what makes the subtype procedure in
+format already does (`spec/Candid.md:1208`) and what makes the subtype procedure in
 [lean/](../lean/) terminate without a depth limit.
 
 `TypeEnv` is deliberately *not* this crate's table. In `rust/` it is a

@@ -14,7 +14,7 @@ is specified to do with arena indices.
 **Nothing here is recursive except the table.** A table entry is a `Composite`; its
 children are `Slot`s; and a `Slot` is a primitive or an index -- never an inline
 composite. That is the wire format's own shape, not an invention of this model
-(`spec/Candid.md:1207`):
+(`spec/Candid.md:1208`):
 
 ```
 I : <datatype> -> i8*
@@ -118,7 +118,17 @@ def noDups [BEq α] : List α → Bool
 Nothing recursive is left to check. A slot's reference must resolve, and no record,
 variant or service may repeat a label -- the spec is explicit that a hash collision
 between field names in one record is *disallowed* rather than resolved, so duplicate
-ids make a type malformed rather than ambiguous. -/
+ids make a type malformed rather than ambiguous.
+
+Two further rules are not structural: a `oneway` function may not have results, and a
+service's method type must denote a function. The second is the only rule here that
+has to look through the table, since a method's type is a slot like any other.
+
+One rule is deliberately left out. "The list of parameters must be shorter than 2^32
+values; the same restriction apply to the result list" (`spec/Candid.md:209`) cannot
+be violated by anything that fits in memory, but it is not idle: `indexedFrom` labels
+positional arguments with `UInt32`, which wraps, so it is that bound that keeps the
+labels of a function's arguments distinct. -/
 
 /-- Does this slot's reference resolve below `bound`? -/
 def Slot.wellFormed (bound : Nat) : Slot → Bool
@@ -138,11 +148,27 @@ def Composite.labelsOk : Composite → Bool
   | .service ms => noDups (ms.map (·.1))
   | .opt _ | .vec _ | .func _ _ _ => true
 
+/-- `spec/Candid.md:211`: "The result list of a `oneway` function must be empty." -/
+def Composite.annotsOk : Composite → Bool
+  | .func _ rets ann => !ann.contains .oneway || rets.isEmpty
+  | .opt _ | .vec _ | .record _ | .variant _ | .service _ => true
+
 def Composite.wellFormed (bound : Nat) (c : Composite) : Bool :=
-  c.labelsOk && c.slots.all (Slot.wellFormed bound)
+  c.labelsOk && c.annotsOk && c.slots.all (Slot.wellFormed bound)
+
+/-- `spec/Candid.md:1223`: "The serialised data type representing a method type must
+denote a function type." -/
+def TypeTable.methodsDenoteFuncs (t : TypeTable) : Composite → Bool
+  | .service ms => ms.all fun (_, s) =>
+      match s with
+      | .ref r => match t.lookup? r with
+        | some (.func _ _ _) => true
+        | _ => false
+      | .prim _ => false
+  | .opt _ | .vec _ | .record _ | .variant _ | .func _ _ _ => true
 
 def TypeTable.wellFormed (t : TypeTable) : Bool :=
-  t.entries.all (Composite.wellFormed t.size)
+  t.entries.all fun c => c.wellFormed t.size && t.methodsDenoteFuncs c
 
 /-- A type together with the table its references resolve in.
 

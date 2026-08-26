@@ -1,6 +1,8 @@
 name = "candid"
 version = "0.1.0"
 defaultTargets = ["Candid", "oracle"]
+# `lake test` runs the oracle: the model checking itself *is* the test suite.
+testDriver = "oracle"
 
 # No mathlib, deliberately. See README.md -- it would dominate build times and
 # breakage surface, and nothing here needs it.

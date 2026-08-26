@@ -1,7 +1,9 @@
 # `lean/` — Lean 4 reference model and specification
 
 **Status: first slice.** Types, the field-id hash, and subtyping — as both a relation
-and a decision procedure — with a self-checking executable. Nothing is published and
+and a decision procedure — with a self-checking executable. "Slice" is a label for
+what landed in a merge window, applied after the fact; the forward-looking plan is the
+coverage checklist below and the tiers in [REWRITE.md §3](../REWRITE.md#3-lean-honestly). Nothing is published and
 nothing carries a compatibility promise. See [REWRITE.md](../REWRITE.md) for why this
 exists.
 
@@ -60,7 +62,7 @@ relation monotone.
 **Composites live only in the type table.** A table entry is a `Composite`, its
 children are `Slot`s, and a `Slot` is a primitive or an index — never an inline
 composite. That is not a modelling choice so much as the wire format's own shape
-(`spec/Candid.md:1207`), and the spec draws the conclusion the model is built on:
+(`spec/Candid.md:1208`), and the spec draws the conclusion the model is built on:
 "Because recursion goes through `T`, this format by construction rules out
 non-well-founded definitions like `type t = t`."
 
@@ -144,6 +146,8 @@ cover what actually breaks in production:
       width subtyping. Float edge cases belong to `Value`, which does not exist yet.
 - [x] Records, variants, vectors, text — as types
 - [x] Recursive types and the type-table graph
+- [x] Well-formedness of types — references resolve, labels do not repeat, a `oneway`
+      function has no results, and a method type denotes a function
 - [x] Subtyping, as a relation with a derived decision procedure
 - [ ] Coercion, including the `opt` backtracking rule
 - [ ] Binary wire format: type table, memory section, LEB128/SLEB128
@@ -172,8 +176,8 @@ Named here so they are obligations rather than oversights.
   children are slots. The parser will need the pass that interns nested composites
   into a table, and textual aliases (`type A = B;`) have to be resolved by it —
   `intern`/`close` are only the hand-written-example half of that.
-- **Verso.** Deliberately not in slice 1: bundling an undocumented doc toolchain into
-  the slice whose purpose was de-risking the build would have doubled the unknowns.
+- **Verso.** Deliberately not yet: bundling an undocumented doc toolchain into the
+  work whose purpose was de-risking the build would have doubled the unknowns.
 
 ## Relationship to `coq/`
 

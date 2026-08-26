@@ -96,7 +96,7 @@ end
 
 /-! Smoke checks that the constructors apply as intended. These are not the
 interesting theorems; they exist so that a definition which typechecks but cannot be
-used gets caught here rather than in slice 2. -/
+used gets caught here rather than when the first proof is attempted. -/
 
 example (A B : TypeTable) : Subty A B .nat .int := Subty.natInt
 
@@ -122,7 +122,7 @@ example (A B : TypeTable) (fs : List (FieldId × Slot)) :
   simp [fieldAt] at h
 
 /-
-The obligation this file exists to create, and the first proof of the next slice:
+The obligation this file exists to create, and the first theorem to prove:
 
     theorem decSubtype_iff (a b : ClosedType) :
         decSubtype a b = true <-> Subty a.table b.table a.root b.root

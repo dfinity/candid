@@ -75,7 +75,9 @@ def indexedFrom (i : Nat) : List Slot → List (FieldId × Slot)
   | [] => []
   | t :: ts => (UInt32.ofNat i, t) :: indexedFrom (i + 1) ts
 
-/-- Function annotations must be equal *as sets*, per the spec. -/
+/-- Function annotations must be equal *as sets*. The spec identifies annotation
+lists "up to reordering" (`spec/Candid.md:207`); comparing them as sets also ignores
+repetition, which no `.did` source produces and which changes no answer. -/
 def annotsAgree (xs ys : List FuncAnnot) : Bool :=
   xs.all (ys.contains ·) && ys.all (xs.contains ·)
 

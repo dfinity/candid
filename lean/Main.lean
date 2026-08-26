@@ -1,10 +1,10 @@
 /-
 The reference executable.
 
-Slice 1 runs a fixed set of checks and exits nonzero on any failure, so CI is
-actually verifying behaviour rather than only that the model compiles. It will grow
-into the differential oracle that reads conformance vectors -- at which point these
-checks become the first vectors.
+It runs a fixed set of checks and exits nonzero on any failure, so CI is actually
+verifying behaviour rather than only that the model compiles. It will grow into the
+differential oracle that reads conformance vectors -- at which point these checks
+become the first vectors.
 
 Every type here carries a table, because composites live only in the table
 (`Types.lean`). `atom` is a primitive, `entry` is a single composite, and
@@ -214,7 +214,7 @@ def funcChecks : List Check :=
 
 A method's type is a reference like any other -- the spec is explicit that "the
 serialised data type representing a method type must denote a function type"
-(`spec/Candid.md:1221`), so it is an index into the table, not an inline function. -/
+(`spec/Candid.md:1223`), so it is an index into the table, not an inline function. -/
 
 /-- A service, interning each method type first. -/
 def serviceOf (ms : List (String × Composite)) : ClosedType := close do
@@ -228,6 +228,37 @@ def serviceChecks : List Check :=
       "service {} !<: service {m}"
   , expectSub (serviceOf [("m", .func [] [nat] [])]) (serviceOf [("m", .func [] [] [])]) true
       "service method specialised" ]
+
+/-! ## Well-formedness rules that are not structural
+
+Two rules from the spec that the shape of a `Composite` does not enforce on its own.
+The second is the only rule that has to look through the table, since a method's type
+is a slot like any other. -/
+
+/-- `spec/Candid.md:211`: "The result list of a `oneway` function must be empty." -/
+def onewayWithResult : ClosedType := entry (.func [] [nat] [.oneway])
+
+def onewayWithoutResult : ClosedType := entry (.func [nat] [] [.oneway])
+
+/-- `spec/Candid.md:1223`: "The serialised data type representing a method type must
+denote a function type." -/
+def serviceWithPrimMethod : ClosedType := entry (.service [("m", nat)])
+
+def serviceWithVecMethod : ClosedType := close do
+  let v ← intern (.vec nat)
+  intern (.service [("m", v)])
+
+def wellFormedChecks : List Check :=
+  [ expectWellFormed onewayWithResult false "oneway with a result is malformed"
+  , expectWellFormed onewayWithoutResult true "oneway without results is well formed"
+  , expectWellFormed (entry (.func [] [nat] [.query])) true
+      "query with a result is well formed"
+  , expectWellFormed serviceWithPrimMethod false
+      "service method that is a primitive is malformed"
+  , expectWellFormed serviceWithVecMethod false
+      "service method that is not a function is malformed"
+  , expectWellFormed (serviceOf [("m", .func [] [] [])]) true
+      "service method that is a function is well formed" ]
 
 /-! ## Recursive types across two independent tables
 
@@ -354,8 +385,8 @@ def transitivityChecks : List Check :=
 
 def allChecks : List Check :=
   hashChecks ++ primChecks ++ optChecks ++ vecChecks ++ recordChecks ++
-  variantChecks ++ funcChecks ++ serviceChecks ++ recursiveChecks ++
-  vecOmegaChecks ++ contraChecks ++ transitivityChecks
+  variantChecks ++ funcChecks ++ serviceChecks ++ wellFormedChecks ++
+  recursiveChecks ++ vecOmegaChecks ++ contraChecks ++ transitivityChecks
 
 def main : IO UInt32 := do
   let failures := allChecks.filter (fun c => if c.known then c.ok else !c.ok)
