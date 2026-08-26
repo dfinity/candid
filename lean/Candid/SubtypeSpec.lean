@@ -54,7 +54,7 @@ coinductive Subty : TypeTable → TypeTable → Slot → Slot → Prop where
   | toOpt {A B a j y} : B.lookup? j = some (.opt y) → Subty A B a (.ref j)
   /-- References are transparent: two of them are related through their entries.
   This is the only rule that reaches `SubtyC`, and the only one that consumes a
-  reference pair -- which is what makes the procedure's `todo` a measure. -/
+  reference pair -- which is what makes the procedure's `remaining` a measure. -/
   | unfold {A B i j x y} :
       A.lookup? i = some x → B.lookup? j = some y → SubtyC A B x y →
       Subty A B (.ref i) (.ref j)
@@ -131,8 +131,8 @@ The statement carries no side condition, because `decSubtype` is total: every
 question it is asked, it answers.
 
 Soundness (`true` implies `Subty`) should follow by coinduction on the procedure's
-recursion, with the pairs *missing* from `todo` as the coinductive hypothesis -- that
-is what `todo` means, and stating it this way is what will confirm the accounting is
+recursion, with the pairs recorded in `seen` as the coinductive hypothesis -- that is
+what `seen` means, and stating it this way is what will confirm the accounting is
 right. Completeness is the converse, and needs that assuming a pair already descended
 through cannot manufacture a relation that the greatest fixed point excludes.
 

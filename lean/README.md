@@ -66,9 +66,11 @@ non-well-founded definitions like `type t = t`."
 
 What it bought: the only way for the subtype procedure to recurse is through a pair
 of *references*, so the finite set of reference pairs bounds the recursion. The
-procedure carries `todo` — the pairs it has not yet assumed — descends by removing
-one, and `todo.length` is the termination measure. No fuel, no `Option Bool`, and no
-"unanswered" state in the public API. The first version of this model, with
+procedure carries `seen` — the pairs this path has already assumed — and descends by
+recording one. The measure is `remaining`, the number of pairs `seen` does *not*
+record; it is named only by `termination_by`, so the `|A| x |B|` pair space it counts
+over is never built at run time. No fuel, no `Option Bool`, and no "unanswered" state
+in the public API. The first version of this model, with
 composites nested inside each other, had no such measure: a cycle alternating which
 side holds the reference dodged the memo entirely, so no budget decided it.
 
@@ -154,15 +156,18 @@ Named here so they are obligations rather than oversights.
 
 - **`decSubtype_iff`** — that the procedure decides the relation. Stated in
   [Candid/SubtypeSpec.lean](Candid/SubtypeSpec.lean). Soundness should follow by
-  coinduction, with the pairs *missing* from `todo` as the coinductive hypothesis,
-  which is what `todo` means. There is no longer a budget premise to discharge: the
+  coinduction, with the pairs recorded in `seen` as the coinductive hypothesis, which
+  is what `seen` means. There is no longer a budget premise to discharge: the
   procedure returns `Bool` and is total.
-- **The pair accounting is path-scoped and seeded eagerly.** `decSubtype` starts from
-  all `|A| x |B|` reference pairs, and `todo` is threaded down a path rather than
-  shared between siblings. That is a faithful reading of the coinductive hypothesis
-  and it is what makes the termination measure need no side conditions, but sharing
-  the accounting across siblings is also sound for a greatest fixed point and is how
-  an implementation gets a polynomial bound with no eager allocation.
+- **The pair accounting is path-scoped, and membership is a scan.** `seen` is
+  threaded down a path rather than shared between siblings, which is a faithful
+  reading of the coinductive hypothesis and is what lets the measure need no side
+  conditions. The cost is that `seen.contains` walks the current path, so a table of
+  *n* entries in one long cycle costs O(n²): measured 70 ms at 10,000 entries, 1.6 s
+  at 50,000, and 113 s at 400,000, with no stack overflow at any of those depths.
+  Sharing the accounting across siblings in a set is also sound for a greatest fixed
+  point and is how an implementation gets a polynomial bound; the reference model
+  keeps the simpler structure until a conformance vector makes that a problem.
 - **Flattening the surface syntax.** A `.did` type is nested; a `Composite`'s
   children are slots. The parser will need the pass that interns nested composites
   into a table, and textual aliases (`type A = B;`) have to be resolved by it —

@@ -233,8 +233,8 @@ def serviceChecks : List Check :=
 
 These are the cases the reference-pair accounting exists for. `selfLoop` and
 `twoCycle` denote the same infinite type through different table shapes, so the
-recursion only stops because descending through a pair of references removes it from
-`todo`, and meeting that pair again means the obligation is already assumed. -/
+recursion only stops because descending through a pair of references records it in
+`seen`, and meeting that pair again means the obligation is already assumed. -/
 
 /-- `type S = record { next : S }`, as one self-referential entry. -/
 def selfLoop : ClosedType :=
@@ -290,7 +290,7 @@ def recursiveChecks : List Check :=
 Neither side is ever the same entry twice running, so the recursion goes `(0, 1)`,
 then `(1, 0)`, then back to `(0, 1)`. Nothing is getting structurally smaller along
 the way: the pair accounting is the only thing that can stop it, and it does -- the
-third state finds its pair already taken out of `todo`. -/
+third state finds its pair already recorded in `seen`. -/
 
 def vecOmegaTable : TypeTable := { entries := #[ .vec (.ref 1), .vec (.ref 0) ] }
 
@@ -303,7 +303,7 @@ def vecOmegaChecks : List Check :=
   , expectSub vecOmegaEven vecOmegaOdd true "vec-omega <: its own unrolling"
   , expectSub vecOmegaOdd vecOmegaEven true "vec-omega's unrolling <: it" ]
 
-/-! ## Contravariance: `todo` swaps with the tables
+/-! ## Contravariance: `seen` swaps with the tables
 
 The parameter premise of the function rule swaps the two tables, so it must swap the
 pair accounting with them. A pair `(i, j)` is about `A`'s `i` and `B`'s `j`; read
@@ -312,8 +312,8 @@ different question, and subtyping is not symmetric.
 
 The witness below reduces `contraOuter <: contraOuter'` to `contraFuncs <:
 contraFuncs'`, two functions whose parameter premise asks `contraB.1 <: contraA.2`,
-i.e. `vec text <: vec nat` -- false. Reaching that premise takes `(1, 2)` out of
-`todo`, so a procedure that read `todo` unswapped would answer the premise from the
+i.e. `vec text <: vec nat` -- false. Reaching that premise records `(1, 2)` in
+`seen`, so a procedure that read `seen` unswapped would answer the premise from the
 accounting instead, and both queries would come out `true`. -/
 
 /-- `A.0 = record { f : A.1 }`, `A.1 = func (A.2) -> ()`, `A.2 = vec nat`. -/
