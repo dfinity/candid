@@ -4,15 +4,15 @@
 module {
   public type A = B;
   public type B = ?A;
-  public type list = ?node;
-  public type node = { head : Nat; tail : list };
+  public type List = ?Node;
+  public type Node = { head : Nat; tail : List };
   /// Doc comment for service id
-  public type s = actor { f : t; g : shared list -> async (B, tree, stream) };
-  public type stream = ?{ head : Nat; next : shared query () -> async stream };
-  public type t = shared s -> async ();
-  public type tree = {
-    #branch : { val : Int; left : tree; right : tree };
+  public type S = actor { f : T; g : shared List -> async (B, Tree, Stream) };
+  public type Stream = ?{ head : Nat; next : shared query () -> async Stream };
+  public type T = shared S -> async ();
+  public type Tree = {
+    #branch : { val : Int; left : Tree; right : Tree };
     #leaf : Int;
   };
-  public type Self = s
+  public type Self = S
 }
