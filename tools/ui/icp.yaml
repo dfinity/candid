@@ -1,0 +1,11 @@
+canisters:
+  - name: didjs
+    build:
+      steps:
+        - type: script
+          commands:
+            - npm run build
+            - cargo build --target wasm32-unknown-unknown --profile canister --package didjs
+            - wasm-opt --strip-debug -Oz target/wasm32-unknown-unknown/canister/didjs.wasm -o target/wasm32-unknown-unknown/canister/didjs_opt.wasm
+            - ic-wasm target/wasm32-unknown-unknown/canister/didjs_opt.wasm -o target/wasm32-unknown-unknown/canister/didjs_opt.wasm metadata candid:service -f src/didjs/didjs.did -v public
+            - cp target/wasm32-unknown-unknown/canister/didjs_opt.wasm "$ICP_WASM_OUTPUT_PATH"

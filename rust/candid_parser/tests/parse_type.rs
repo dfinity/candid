@@ -133,7 +133,7 @@ fn compiler_test(resource: &str) {
             }
             {
                 match filename.file_name().unwrap().to_str().unwrap() {
-                    "unicode.did" | "escape.did" => check_error(
+                    "unicode.did" | "escape.did" | "service_method_escape.did" => check_error(
                         || motoko::compile(&env, &actor, &prog),
                         "not a valid Motoko id",
                     ),

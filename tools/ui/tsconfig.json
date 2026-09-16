@@ -2,17 +2,18 @@
   "compilerOptions": {
     "allowJs": false,
     "baseUrl": "./",
-    "composite": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "incremental": true,
-    "lib": ["dom", "es2020"],
-    "module": "commonjs",
-    "outDir": "ts-out/",
+    "lib": ["dom", "dom.iterable", "es2020"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["vite/client"],
+    "noEmit": true,
+    "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
     "target": "ES2020"
   },
-  "include": ["src/**/*.ts", "src/**/*.css"],
-  "exclude": ["**/*.test.ts"],
+  "include": ["src"],
+  "exclude": ["**/*.test.ts"]
 }

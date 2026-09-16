@@ -9,11 +9,11 @@ export const idlFactory = ({ IDL }) => {
     '' : IDL.Null,
     '空的' : IDL.Null,
     '  空的  ' : IDL.Null,
-    '1⃣️2⃣️3⃣️' : IDL.Null,
+    '1⃣\u{fe0f}2⃣\u{fe0f}3⃣\u{fe0f}' : IDL.Null,
   });
   return IDL.Service({
     '' : IDL.Func([IDL.Nat], [IDL.Nat], []),
-    '✈️  🚗 ⛱️ ' : IDL.Func([], [], ['oneway']),
+    '✈\u{fe0f}  🚗 ⛱\u{fe0f} ' : IDL.Func([], [], ['oneway']),
     '函数名' : IDL.Func([A], [B], []),
     '👀' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
   });

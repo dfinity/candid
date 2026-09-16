@@ -218,21 +218,16 @@ impl Nat {
             leb128::write::unsigned(w, value)?;
             return Ok(());
         }
-        let zero = BigUint::from(0u8);
-        let mut value = self.0.clone();
-        loop {
-            let big_byte = &value & BigUint::from(0x7fu8);
-            let mut byte = big_byte.to_u8().unwrap();
-            value >>= 7;
-            if value != zero {
-                byte |= 0x80u8;
-            }
-            let buf = [byte];
-            w.write_all(&buf)?;
-            if value == zero {
-                return Ok(());
-            }
+        // Large value: emit the base-128 LEB128 groups in a single O(n) pass.
+        // Radix 128 is a power of two, so `to_radix_le` bit-unpacks in O(n)
+        // instead of the O(n^2) shift-the-whole-bignum-by-7-each-byte loop.
+        let mut groups = self.0.to_radix_le(128);
+        let last = groups.len() - 1;
+        for byte in &mut groups[..last] {
+            *byte |= 0x80u8; // continuation bit on every group but the last
         }
+        w.write_all(&groups)?;
+        Ok(())
     }
     pub fn decode<R>(r: &mut R) -> crate::Result<Self>
     where
@@ -254,23 +249,28 @@ impl Nat {
                 continue;
             }
 
-            let mut result = BigUint::from(small);
-            result |= BigUint::from(low_bits) << shift;
-            if byte & 0x80u8 == 0 {
-                return Ok(Nat(result));
+            // Value no longer fits in u64. Collect the remaining LEB128 groups
+            // and build the BigUint in a single linear pass. Each group is a
+            // base-128 digit (least significant first); radix 128 is a power of
+            // two, so `from_radix_le` bit-packs in O(n) instead of the O(n^2)
+            // repeated shifted-OR accumulation that grows the bignum each byte.
+            let digits_in_small = (shift / 7) as usize;
+            let mut groups: Vec<u8> = Vec::with_capacity(digits_in_small + 2);
+            for i in 0..digits_in_small {
+                groups.push(((small >> (7 * i)) & 0x7f) as u8);
             }
-            shift += 7;
-            loop {
+            groups.push(byte & 0x7f);
+            let mut cont = byte & 0x80u8 != 0;
+            while cont {
                 let mut buf = [0];
                 r.read_exact(&mut buf)?;
                 let byte = buf[0];
-                let low_bits = BigUint::from(byte & 0x7fu8);
-                result |= low_bits << shift;
-                if byte & 0x80u8 == 0 {
-                    return Ok(Nat(result));
-                }
-                shift += 7;
+                groups.push(byte & 0x7f);
+                cont = byte & 0x80u8 != 0;
             }
+            let result = BigUint::from_radix_le(&groups, 128)
+                .expect("LEB128 groups are valid base-128 digits");
+            return Ok(Nat(result));
         }
     }
 }
@@ -285,24 +285,48 @@ impl Int {
             leb128::write::signed(w, value)?;
             return Ok(());
         }
-        let zero = BigInt::from(0);
-        let mut value = self.0.clone();
-        loop {
-            let big_byte = &value & BigInt::from(0xff);
-            let mut byte = big_byte.to_u8().unwrap();
-            value >>= 6;
-            let done = value == zero || value == BigInt::from(-1);
-            if done {
-                byte &= 0x7f;
-            } else {
-                value >>= 1;
-                byte |= 0x80;
+        // Large value: repack the minimal two's-complement little-endian bytes
+        // into 7-bit sleb128 groups in a single O(n) pass, instead of shifting
+        // the whole bignum by 7 on every byte (which is O(n^2)).
+        let bytes = self.0.to_signed_bytes_le();
+        let sign_bit = bytes[bytes.len() - 1] >> 7; // 0 = non-negative, 1 = negative
+        let fill = if sign_bit == 1 { 0xffu8 } else { 0x00 };
+        // Highest bit position that differs from the sign bit; every bit above
+        // it is pure sign extension, so a group cut above it can terminate.
+        let mut high_diff: isize = -1;
+        for i in (0..bytes.len()).rev() {
+            if bytes[i] != fill {
+                for bit in (0..8).rev() {
+                    if (bytes[i] >> bit) & 1 != sign_bit {
+                        high_diff = (i * 8 + bit) as isize;
+                        break;
+                    }
+                }
+                break;
             }
-            let buf = [byte];
-            w.write_all(&buf)?;
-            if done {
+        }
+        let bit_at = |p: usize| -> u8 {
+            let idx = p / 8;
+            if idx < bytes.len() {
+                (bytes[idx] >> (p % 8)) & 1
+            } else {
+                sign_bit // sign-extend past the explicit bytes
+            }
+        };
+        let mut shift = 0usize;
+        loop {
+            let mut group = 0u8;
+            for k in 0..7 {
+                group |= bit_at(shift + k) << k;
+            }
+            shift += 7;
+            // sleb128 terminates once the remaining bits are all sign bits and
+            // the group's own sign bit (0x40) already matches the value's sign.
+            if (shift as isize) > high_diff && (group >> 6) == sign_bit {
+                w.write_all(&[group & 0x7f])?;
                 return Ok(());
             }
+            w.write_all(&[group | 0x80])?;
         }
     }
     pub fn decode<R>(r: &mut R) -> crate::Result<Self>
@@ -346,30 +370,35 @@ impl Int {
                 continue;
             }
 
-            let mut result = BigInt::from(small);
-            let big_low_bits = BigInt::from(byte & 0x7fu8);
-            result |= big_low_bits << shift;
-            shift += 7;
-            if byte & 0x80 == 0 {
-                if (byte & 0x40) != 0 {
-                    result |= BigInt::from(-1) << shift;
-                }
-                return Ok(Int(result));
+            // Value no longer fits in i64. Collect the remaining sleb128 groups
+            // and build the BigInt in a single linear pass. `small` holds the
+            // `shift/7` groups already consumed; none have been sign-extended
+            // yet (that only happens on the terminal byte of the i64 path), so
+            // each group can be recovered directly from its bits.
+            let digits_in_small = (shift / 7) as usize;
+            let mut groups: Vec<u8> = Vec::with_capacity(digits_in_small + 2);
+            for i in 0..digits_in_small {
+                groups.push(((small >> (7 * i)) & 0x7f) as u8);
             }
-            loop {
+            groups.push(byte & 0x7f);
+            let mut last = byte;
+            while last & 0x80 != 0 {
                 let mut buf = [0];
                 r.read_exact(&mut buf)?;
-                let byte = buf[0];
-                let big_low_bits = BigInt::from(byte & 0x7fu8);
-                result |= big_low_bits << shift;
-                shift += 7;
-                if byte & 0x80 == 0 {
-                    if (byte & 0x40) != 0 {
-                        result |= BigInt::from(-1) << shift;
-                    }
-                    return Ok(Int(result));
-                }
+                last = buf[0];
+                groups.push(last & 0x7f);
             }
+            // base-128 magnitude; radix 128 is a power of two => O(n) bit-packing.
+            let mut result = BigInt::from(
+                BigUint::from_radix_le(&groups, 128)
+                    .expect("sleb128 groups are valid base-128 digits"),
+            );
+            if last & 0x40 != 0 {
+                // Sign bit set: reinterpret the magnitude as a two's-complement
+                // value by subtracting 2^(7 * number_of_groups).
+                result -= BigInt::from(1) << (7 * groups.len());
+            }
+            return Ok(Int(result));
         }
     }
 }

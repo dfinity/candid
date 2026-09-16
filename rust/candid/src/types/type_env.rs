@@ -42,6 +42,11 @@ impl TypeEnv {
             Some(t) => Ok(t),
         }
     }
+    /// Iterate over the bindings in a deterministic, key-sorted order.
+    /// The backing map is already ordered by key, so this is a plain iteration.
+    pub fn to_sorted_iter(&self) -> impl Iterator<Item = (&String, &Type)> {
+        self.0.iter()
+    }
     pub fn rec_find_type(&self, name: &str) -> Result<&Type> {
         self.rec_find_type_with_depth(name, &RecursionDepth::new())
     }

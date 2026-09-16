@@ -1,10 +1,10 @@
-import { Principal } from "@dfinity/principal"
-import { authClient } from "../candid"
+import { Principal } from "@icp-sdk/core/principal"
+import { authClient, createAuthClient } from "../candid"
 import { refresh_actor } from "../index"
 import { dfinityLogo, copyIcon } from "./icons"
 
 export async function renderAuth() {
-  const is_logged = await authClient?.isAuthenticated();
+  const is_logged = authClient?.isAuthenticated() ?? false;
   is_logged ? await insertLogout() : insertLoginForm();
 }
 
@@ -41,10 +41,12 @@ async function insertLoginForm() {
 
   try {
     const params = new URLSearchParams(window.location.search);
-    const is_mainnet = window.location.hostname.endsWith("icp0.io") || window.location.hostname.endsWith("ic0.app");
+    const mainnet_domains = ["icp0.io", "ic0.app", "icp.net"];
+    const mainnet_domain = mainnet_domains.find((domain) => window.location.hostname.endsWith(domain));
+    const is_mainnet = mainnet_domain !== undefined;
     let provider = params.get("ii");
     if (is_mainnet && !provider) {
-      provider = "https://identity.internetcomputer.org";
+      provider = "https://id.ai/authorize";
     }
     if (!provider) {
       console.warn("If you want to use Internet Identity, please provide a URL to your local Internet Identity service using the `ii` query parameter");
@@ -56,7 +58,7 @@ async function insertLoginForm() {
     const cid = Principal.fromText(params.get("id")!);
     let origin = params.get("origin");
     if (!origin && is_mainnet && await check_alternative_origin()) {
-      origin = `https://${cid.toText()}.icp0.io`;
+      origin = `https://${cid.toText()}.${mainnet_domain}`;
     }
     if (origin) {
       if (!is_valid_url(origin)) {
@@ -66,18 +68,17 @@ async function insertLoginForm() {
     }
 
     buttonLogin.addEventListener("click", async () => {
-      let config: any = {
-        identityProvider: provider,
-        onSuccess: async () => {
-          refresh_actor(cid);
-          insertLogout();
-        },
-        onError: (err: any) => console.error(err),
-      };
-      if (origin) {
-        config = {...config, derivationOrigin: origin};
+      try {
+        const client = createAuthClient({
+          identityProvider: provider!,
+          ...(origin ? { derivationOrigin: origin } : {}),
+        });
+        await client.signIn();
+        refresh_actor(cid);
+        await insertLogout();
+      } catch (err) {
+        console.error(err);
       }
-      await authClient?.login(config);
     });
   } catch (err) {
     console.error(err);
@@ -87,11 +88,11 @@ async function insertLoginForm() {
   }
 }
 
-function insertLogout() {
+async function insertLogout() {
   const auth = document.getElementById("authentication");
   auth!.innerHTML = "";
 
-  CopyId();
+  await CopyId();
   LogoutButton();
 }
 
@@ -110,7 +111,7 @@ function LogoutButton() {
   auth!.appendChild(buttonLogout);
 }
 
-function CopyId() {
+async function CopyId() {
   if (!authClient) {
     return;
   }
@@ -119,7 +120,8 @@ function CopyId() {
 
   const copyText = document.createElement("span");
 
-  const id = authClient.getIdentity().getPrincipal().toString();
+  const identity = await authClient.getIdentity();
+  const id = identity.getPrincipal().toString();
   const idShort = id.slice(0, 5) + "..." + id.slice(-5);
   copyText.innerText = idShort;
 
@@ -143,6 +145,6 @@ function CopyId() {
 }
 
 async function logout() {
-  await authClient?.logout();
+  await authClient?.signOut();
   window.location.reload();
 }

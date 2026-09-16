@@ -32,3 +32,8 @@ uninlined_format_args = { level = "allow", priority = 1 }
 unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(wasm_bindgen_unstable_test_coverage)',
 ] }
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

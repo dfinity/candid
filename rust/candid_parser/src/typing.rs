@@ -74,11 +74,11 @@ pub fn check_type(env: &Env, t: &IDLType) -> Result<Type> {
         IDLType::FuncT(func) => {
             let mut t1 = Vec::new();
             for arg in func.args.iter() {
-                t1.push(check_type(env, arg)?);
+                t1.push(check_type(env, &arg.typ)?);
             }
             let mut t2 = Vec::new();
             for t in func.rets.iter() {
-                t2.push(check_type(env, t)?);
+                t2.push(check_type(env, &t.typ)?);
             }
             if func.modes.len() > 1 {
                 return Err(Error::msg("cannot have more than one mode"));
@@ -267,7 +267,7 @@ fn check_actor(env: &Env, actor: &Option<IDLActorType>) -> Result<Option<Type>> 
         Some(IDLType::ClassT(ts, t)) => {
             let mut args = Vec::new();
             for arg in ts.iter() {
-                args.push(check_type(env, arg)?);
+                args.push(check_type(env, &arg.typ)?);
             }
             let serv = check_type(env, t)?;
             env.te.as_service(&serv)?;
@@ -342,7 +342,7 @@ pub fn check_init_args(
     env.te.merge(main_env)?;
     let mut args = Vec::new();
     for arg in prog.args.iter() {
-        args.push(check_type(&env, arg)?);
+        args.push(check_type(&env, &arg.typ)?);
     }
     Ok(args)
 }

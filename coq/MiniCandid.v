@@ -35,6 +35,8 @@ CoInductive T :=
   | NullT : T
   | OptT : T -> T
   | FuncT : T -> T -> T
+  | ServiceT : T
+  | PrincipalT : T
   | VoidT : T
   | ReservedT : T
   .
@@ -54,6 +56,8 @@ Inductive V :=
   | NullV : V
   | SomeV : V -> V
   | FuncV : RefV -> V
+  | ServiceV : RefV -> V
+  | PrincipalV : RefV -> V
   | ReservedV : V
   .
 (**
@@ -91,6 +95,12 @@ Inductive HasType : V -> T -> Prop :=
   | FuncHT:
     case funcHT,
     forall rv t1 t2, FuncV rv :: FuncT t1 t2
+  | ServiceHT:
+    case serviceHT,
+    forall rv, ServiceV rv :: ServiceT
+  | PrincipalHT:
+    case principalHT,
+    forall rv, PrincipalV rv :: PrincipalT
   | ReservedHT:
     case reservedHT,
     ReservedV :: ReservedT
@@ -105,6 +115,9 @@ CoInductive Subtype : T -> T -> Prop :=
   | NatIntST :
     case natIntST,
     NatT <: IntT
+  | ServicePrincipalST :
+    case servicePrincipalST,
+    ServiceT <: PrincipalT
   | OptST :
     case optST,
     forall t1 t2,
@@ -179,6 +192,9 @@ Function coerce (t1 : T) (t2 : T) (v1 : V) : V :=
   | IntV n, IntT, IntT => IntV n
   | NatV n, NatT, IntT => IntV (Z.of_nat n)
   | FuncV r, FuncT ta1 tr1, FuncT ta2 tr2 => FuncV r
+  | ServiceV r, ServiceT, ServiceT => ServiceV r
+  | PrincipalV r, PrincipalT, PrincipalT => PrincipalV r
+  | ServiceV r, ServiceT, PrincipalT => PrincipalV r
 
   | SomeV v, OptT t1, OptT t2 =>
     if t1 <:? t2
@@ -195,6 +211,9 @@ Function coerce (t1 : T) (t2 : T) (v1 : V) : V :=
   | FuncV r, FuncT ta1 tr1, OptT (FuncT ta2 tr2) =>
     if ta2 <:? ta1
     then if tr1 <:? tr2 then SomeV (FuncV r) else NullV else NullV
+  | ServiceV r, ServiceT, OptT ServiceT => SomeV (ServiceV r)
+  | PrincipalV r, PrincipalT, OptT PrincipalT => SomeV (PrincipalV r)
+  | ServiceV r, ServiceT, OptT PrincipalT => SomeV (PrincipalV r)
 
   | v, t, ReservedT => ReservedV
 
@@ -237,6 +256,16 @@ Proof.
       destruct (t3 <:? t2_2); try reflexivity.
       contradict HNotST; named_constructor; assumption.
   }
+  [serviceHT]: {
+    destruct (ServiceT <:? t2) as [HST | HNotST].
+    - inversion HST; subst; clear HST; simpl; reflexivity.
+    - destruct t2; try reflexivity; contradict HNotST; named_constructor.
+  }
+  [principalHT]: {
+    destruct (PrincipalT <:? t2) as [HST | HNotST].
+    - inversion HST; subst; clear HST; simpl; reflexivity.
+    - destruct t2; try reflexivity; contradict HNotST; named_constructor.
+  }
 Qed.
 
 Lemma coerce_reservedT:
@@ -254,6 +283,9 @@ Lemma coerce_nice_ind:
   (case natC, forall n, P NatT NatT (NatV n) (NatV n)) ->
   (case intC, forall n, P IntT IntT (IntV n) (IntV n)) ->
   (case natIntC, forall n, P NatT IntT (NatV n) (IntV (Z.of_nat n))) ->
+  (case serviceC, forall r, P ServiceT ServiceT (ServiceV r) (ServiceV r)) ->
+  (case principalC, forall r, P PrincipalT PrincipalT (PrincipalV r) (PrincipalV r)) ->
+  (case servicePrincipalC, forall r, P ServiceT PrincipalT (ServiceV r) (PrincipalV r)) ->
   (case nullC, P NullT NullT NullV NullV) ->
   (case nullOptC, forall t, P NullT (OptT t) NullV NullV) ->
   (case optNullC, forall t1 t2, P (OptT t1) (OptT t2) NullV NullV) ->
@@ -293,7 +325,7 @@ Lemma coerce_nice_ind:
   (forall t1 t2 v1, t1 <: t2 -> v1 :: t1 -> P t1 t2 v1 (coerce t1 t2 v1)).
 Proof.
   intros P.
-  intros NatC IntC NatIntC NullC NullOptC OptNullC OptSomeC OpportunisticOptC ReservedOptC ConstituentOptC OpportunisticConstituentOptC FuncC ReservedC.
+  intros NatC IntC NatIntC ServiceC PrincipalC ServicePrincipalC NullC NullOptC OptNullC OptSomeC OpportunisticOptC ReservedOptC ConstituentOptC OpportunisticConstituentOptC FuncC ReservedC.
   intros t1 t2 v1 HST HHT.
   revert t2 HST.
   induction HHT; name_cases.
@@ -319,6 +351,8 @@ Proof.
           - contradict n0. named_constructor.
           - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
           - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
     }
     [reservedST]: { apply ReservedC; clear_names. named_constructor. }
   }
@@ -336,6 +370,8 @@ Proof.
         + destruct t0; inversion His_opt_like; clear His_opt_like.
           - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
           - contradict n0. named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
           - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
           - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
     }
@@ -369,6 +405,8 @@ Proof.
                ++ contradict n. named_constructor; assumption.
                ++ apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
             ** apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
           - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
     }
     [funcST]: { apply FuncC; clear_names; assumption. }
@@ -405,12 +443,56 @@ Proof.
     }
     [reservedST]: { apply ReservedC; clear_names. named_constructor; assumption. }
   }
-  [reservedHT]: { 
+  [reservedHT]: {
     intros.
     inversion HST; subst; clear HST; name_cases.
     [reflST]: { apply ReservedC; clear_names. named_constructor. }
     [optST]: { apply ReservedOptC; clear_names. }
     [reservedST]: { apply ReservedC; clear_names.  named_constructor. }
+  }
+  [serviceHT]: {
+    intros.
+    inversion HST; subst; clear HST; name_cases.
+    [reflST]: { apply ServiceC; clear_names. }
+    [servicePrincipalST]: { apply ServicePrincipalC; clear_names. }
+    [optST]: {
+      destruct (is_opt_like_type t0) eqn:His_opt_like.
+      * destruct t0; inversion His_opt_like; simpl; clear His_opt_like;
+        apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+      * destruct (subtyping_decidable ServiceT t0) as [s | Hn].
+        + destruct t0; inversion s; subst; clear s; inversion His_opt_like; clear His_opt_like.
+          - apply ConstituentOptC; clear_names; simpl; intuition; named_constructor.
+          - apply ConstituentOptC; clear_names; simpl; intuition; named_constructor.
+        + destruct t0; inversion His_opt_like; clear His_opt_like.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - contradict Hn. named_constructor.
+          - contradict Hn. named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+    }
+    [reservedST]: { apply ReservedC; clear_names. named_constructor. }
+  }
+  [principalHT]: {
+    intros.
+    inversion HST; subst; clear HST; name_cases.
+    [reflST]: { apply PrincipalC; clear_names. }
+    [optST]: {
+      destruct (is_opt_like_type t0) eqn:His_opt_like.
+      * destruct t0; inversion His_opt_like; simpl; clear His_opt_like;
+        apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+      * destruct (subtyping_decidable PrincipalT t0) as [s | Hn].
+        + destruct t0; inversion s; subst; clear s; inversion His_opt_like; clear His_opt_like.
+          - apply ConstituentOptC; clear_names; simpl; intuition; named_constructor.
+        + destruct t0; inversion His_opt_like; clear His_opt_like.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+          - contradict Hn. named_constructor.
+          - apply OpportunisticConstituentOptC; clear_names; simpl; intuition named_constructor.
+    }
+    [reservedST]: { apply ReservedC; clear_names. named_constructor. }
   }
 Qed.
 
@@ -737,6 +819,10 @@ CoInductive UpToNull : V -> V -> Prop :=
     SomeV v1 ~~ SomeV v2
   | FuncUT:
     forall r, FuncV r ~~ FuncV r
+  | ServiceUT:
+    forall r, ServiceV r ~~ ServiceV r
+  | PrincipalUT:
+    forall r, PrincipalV r ~~ PrincipalV r
   | ReservedUT:
     ReservedV ~~ ReservedV
 where "v1 ~~ v2" := (UpToNull v1 v2).

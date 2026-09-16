@@ -7,10 +7,15 @@
 .DS_Store
 **/.DS_Store
 
-# dfx temporary files
-.dfx/
+# icp-cli ephemeral state (local network + build cache).
+# Persistent data such as mainnet canister id mappings lives in .icp/data/
+# and IS committed.
+.icp/cache/
 
 # frontend code
 node_modules/
 dist/
 ts-out/
+
+.dfx
+.icp/cache
