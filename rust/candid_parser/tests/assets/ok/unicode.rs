@@ -23,7 +23,7 @@ pub enum B {
   _650764729_,
   #[serde(rename="  空的  ")]
   _1036827129_,
-  #[serde(rename="1⃣️2⃣️3⃣️")]
+  #[serde(rename="1⃣\u{fe0f}2⃣\u{fe0f}3⃣\u{fe0f}")]
   _3099250646_,
 }
 
@@ -33,7 +33,7 @@ impl Service {
     ic_cdk::call(self.0, "", (arg0,)).await
   }
   pub async fn _356566390_(&self) -> Result<()> {
-    ic_cdk::call(self.0, "✈️  🚗 ⛱️ ", ()).await
+    ic_cdk::call(self.0, "✈\u{fe0f}  🚗 ⛱\u{fe0f} ", ()).await
   }
   pub async fn _3300066460_(&self, arg0: &A) -> Result<(B,)> {
     ic_cdk::call(self.0, "函数名", (arg0,)).await

@@ -4,10 +4,10 @@ type A = record {
   "字段名" : nat;
   "字 段 名2" : nat;
 };
-type B = variant { ""; "空的"; "  空的  "; "1⃣️2⃣️3⃣️" };
+type B = variant { ""; "空的"; "  空的  "; "1⃣\u{fe0f}2⃣\u{fe0f}3⃣\u{fe0f}" };
 service : {
   "" : (nat) -> (nat);
-  "✈️  🚗 ⛱️ " : () -> () oneway;
+  "✈\u{fe0f}  🚗 ⛱\u{fe0f} " : () -> () oneway;
   "函数名" : (A) -> (B);
   "👀" : (nat) -> (nat) query;
 }
