@@ -56,7 +56,7 @@ main().catch((err) => {
   const div = document.createElement("div");
   div.innerText = "An error happened in Candid canister:";
   const pre = document.createElement("pre");
-  pre.innerHTML = err.stack;
+  pre.textContent = err.stack;
   div.appendChild(pre);
   const progress = document.getElementById("progress");
   progress!.remove();
