@@ -1,4 +1,4 @@
-name: Release candid_ui
+name: Candid UI Release
 
 # The candid_ui canister wasm is released on the repo's date-based tags
 # (e.g. 2025-12-18). The didc binaries are released separately by
@@ -12,7 +12,6 @@ on:
 
 jobs:
   candid-ui:
-    name: Build and publish candid_ui canister
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -22,8 +21,11 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
+      - name: Remove pre-installed Rust stable toolchain
+        run: rustup toolchain remove stable 2>/dev/null || true
+      # rust-toolchain.toml supplies the channel and the wasm32 target.
       - name: Install Rust toolchain
-        run: rustup show active-toolchain || rustup toolchain install
+        uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
       - name: Install binaryen
         run: |
           sudo apt-get update -yy

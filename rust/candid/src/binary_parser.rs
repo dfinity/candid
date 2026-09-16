@@ -1,24 +1,98 @@
 use crate::types::internal::{Field, Function, Label, Type, TypeInner};
 use crate::types::{FuncMode, TypeEnv};
 use anyhow::{anyhow, Context, Result};
-use binread::io::{Read, Seek};
-use binread::{BinRead, BinResult, Error as BError, ReadOptions};
+use binrw::{BinRead, BinResult, Error as BError};
 use std::convert::TryInto;
 
 const MAX_TYPE_TABLE_LEN: u64 = 10_000; // Max type entries
 
-fn read_leb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, (): ()) -> BinResult<u64> {
+// Upper bound on a single allocation step while reading a length-prefixed byte
+// blob. The buffer grows in steps of at most this size.
+const READ_CHUNK: u64 = 8 * 1024;
+
+/// Read `len` bytes into a fresh `Vec`, growing the buffer in bounded steps.
+///
+/// A plain `#[br(count = len)]` on a `Vec<u8>` passes the wire-declared length
+/// straight to `reserve_exact`, allocating `len` bytes up front before any are
+/// read. A length prefix need not match the amount of data actually present, so
+/// a value far larger than the input would reserve a correspondingly large
+/// buffer instead of failing cleanly on the short read. Growing the buffer in
+/// bounded chunks keeps the reservation proportional to the bytes available, so
+/// an out-of-range or truncated length surfaces as an ordinary parse error.
+fn read_len_prefixed<R: std::io::Read>(reader: &mut R, pos: u64, len: u64) -> BinResult<Vec<u8>> {
+    use std::io::Read;
+    let mut buf = Vec::new();
+    let mut remaining = len;
+    while remaining > 0 {
+        let want = remaining.min(READ_CHUNK);
+        // `read_to_end` on a bounded `Take` reserves at most `want`, so the
+        // buffer never grows faster than the input is consumed.
+        let read = reader.by_ref().take(want).read_to_end(&mut buf)? as u64;
+        if read < want {
+            // Fewer bytes were available than declared: short input.
+            return Err(BError::Custom {
+                pos,
+                err: Box::new("not enough bytes"),
+            });
+        }
+        remaining -= read;
+    }
+    Ok(buf)
+}
+
+#[binrw::parser(reader)]
+fn read_bytes(len: u64) -> BinResult<Vec<u8>> {
+    let pos = reader.stream_position()?;
+    read_len_prefixed(reader, pos, len)
+}
+#[binrw::parser(reader)]
+fn read_text(len: u64) -> BinResult<String> {
+    let pos = reader.stream_position()?;
+    let bytes = read_len_prefixed(reader, pos, len)?;
+    String::from_utf8(bytes).map_err(|_| BError::Custom {
+        pos,
+        err: Box::new("invalid utf8"),
+    })
+}
+
+#[binrw::parser(reader)]
+fn read_leb(name: &'static str) -> BinResult<u64> {
     let pos = reader.stream_position()?;
     leb128::read::unsigned(reader).map_err(|_| BError::Custom {
         pos,
-        err: Box::new(ro.variable_name.unwrap_or("Invalid leb128")),
+        err: Box::new(name),
     })
 }
-fn read_sleb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, (): ()) -> BinResult<i64> {
+#[binrw::parser(reader)]
+fn read_sleb(name: &'static str) -> BinResult<i64> {
     let pos = reader.stream_position()?;
     leb128::read::signed(reader).map_err(|_| BError::Custom {
         pos,
-        err: Box::new(ro.variable_name.unwrap_or("Invalid sleb128")),
+        err: Box::new(name),
+    })
+}
+#[binrw::parser(reader)]
+fn read_leb_u32(name: &'static str, range_msg: &'static str) -> BinResult<u32> {
+    let pos = reader.stream_position()?;
+    let v = leb128::read::unsigned(reader).map_err(|_| BError::Custom {
+        pos,
+        err: Box::new(name),
+    })?;
+    v.try_into().map_err(|_| BError::Custom {
+        pos,
+        err: Box::new(range_msg),
+    })
+}
+#[binrw::parser(reader)]
+fn read_leb_usize(name: &'static str, range_msg: &'static str) -> BinResult<usize> {
+    let pos = reader.stream_position()?;
+    let v = leb128::read::unsigned(reader).map_err(|_| BError::Custom {
+        pos,
+        err: Box::new(name),
+    })?;
+    v.try_into().map_err(|_| BError::Custom {
+        pos,
+        err: Box::new(range_msg),
     })
 }
 
@@ -28,7 +102,7 @@ fn read_sleb<R: Read + Seek>(reader: &mut R, ro: &ReadOptions, (): ()) -> BinRes
 pub struct Header {
     #[br(args(max_type_len))]
     table: Table,
-    #[br(parse_with = read_leb)]
+    #[br(parse_with = read_leb, args("len"))]
     len: u64,
     #[br(count = len)]
     args: Vec<IndexType>,
@@ -37,7 +111,7 @@ pub struct Header {
 #[derive(BinRead, Debug)]
 #[br(import(max_type_len: Option<usize>))]
 struct Table {
-    #[br(parse_with = read_leb)]
+    #[br(parse_with = read_leb, args("len"))]
     #[br(assert(len <= max_type_len.unwrap_or(MAX_TYPE_TABLE_LEN as usize) as u64, "type table size exceeded"))]
     len: u64,
     #[br(count = len)]
@@ -61,29 +135,29 @@ enum ConsType {
 }
 #[derive(BinRead, Debug)]
 struct IndexType {
-    #[br(parse_with = read_sleb, assert(index >= -17 || index == -24, "unknown opcode {}", index))]
+    #[br(parse_with = read_sleb, args("index"), assert(index >= -17 || index == -24, "unknown opcode {}", index))]
     index: i64,
 }
 #[derive(BinRead, Debug)]
 struct Fields {
-    #[br(parse_with = read_leb, try_map = |x:u64| x.try_into().map_err(|_| "field length out of 32-bit range"))]
+    #[br(parse_with = read_leb_u32, args("len", "field length out of 32-bit range"))]
     len: u32,
     #[br(count = len)]
     inner: Vec<FieldType>,
 }
 #[derive(BinRead, Debug)]
 struct FieldType {
-    #[br(parse_with = read_leb, try_map = |x:u64| x.try_into().map_err(|_| "field id out of 32-bit range"))]
+    #[br(parse_with = read_leb_u32, args("id", "field id out of 32-bit range"))]
     id: u32,
     index: IndexType,
 }
 #[derive(BinRead, Debug)]
 struct FuncType {
-    #[br(parse_with = read_leb)]
+    #[br(parse_with = read_leb, args("arg_len"))]
     arg_len: u64,
     #[br(count = arg_len)]
     args: Vec<IndexType>,
-    #[br(parse_with = read_leb)]
+    #[br(parse_with = read_leb, args("ret_len"))]
     ret_len: u64,
     #[br(count = ret_len)]
     rets: Vec<IndexType>,
@@ -94,25 +168,25 @@ struct FuncType {
 }
 #[derive(BinRead, Debug)]
 struct ServType {
-    #[br(parse_with = read_leb)]
+    #[br(parse_with = read_leb, args("len"))]
     len: u64,
     #[br(count = len)]
     meths: Vec<Meths>,
 }
 #[derive(BinRead, Debug)]
 struct FutureType {
-    #[br(parse_with = read_sleb, assert(opcode < -24, "{} is not a valid future type", opcode))]
+    #[br(parse_with = read_sleb, args("opcode"), assert(opcode < -24, "{} is not a valid future type", opcode))]
     opcode: i64,
-    #[br(parse_with = read_leb)]
+    #[br(parse_with = read_leb, args("len"))]
     len: u64,
-    #[br(count = len)]
+    #[br(parse_with = read_bytes, args(len))]
     blob: Vec<u8>,
 }
 #[derive(BinRead, Debug)]
 struct Meths {
-    #[br(parse_with = read_leb)]
+    #[br(parse_with = read_leb, args("len"))]
     len: u64,
-    #[br(count = len, try_map = |x:Vec<u8>| String::from_utf8(x).map_err(|_| "invalid utf8"))]
+    #[br(parse_with = read_text, args(len))]
     name: String,
     ty: IndexType,
 }
@@ -129,14 +203,13 @@ pub struct BoolValue(
 );
 #[derive(BinRead)]
 pub struct Len(
-    #[br(parse_with = read_leb, try_map = |x:u64| x.try_into().map_err(|_| "length out of usize range"))]
-    pub usize,
+    #[br(parse_with = read_leb_usize, args("len", "length out of usize range"))] pub usize,
 );
 #[derive(BinRead)]
 pub struct PrincipalBytes {
     #[br(assert(flag == 1u8, "Opaque reference not supported"))]
     pub flag: u8,
-    #[br(parse_with = read_leb, assert(len <= 29, "Principal is longer than 29 bytes"))]
+    #[br(parse_with = read_leb, args("len"), assert(len <= 29, "Principal is longer than 29 bytes"))]
     pub len: u64,
     #[br(count = len)]
     pub inner: Vec<u8>,

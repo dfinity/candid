@@ -306,7 +306,7 @@ fn nns_list_proposal() -> BenchResult {
         executed_timestamp_seconds: 42,
     };
     let list_proposals_info_response = ListProposalInfoResponse {
-        proposal_info: std::iter::repeat(proposal).take(1000).collect(),
+        proposal_info: std::iter::repeat_n(proposal, 1000).collect(),
     };
     bench_fn(|| {
         let bytes = {
@@ -679,7 +679,7 @@ fn wide_record() -> BenchResult {
         seed_neuron_count: 500,
     };
 
-    let metrics_vec: Vec<GovernanceCachedMetrics> = std::iter::repeat(metrics).take(100).collect();
+    let metrics_vec: Vec<GovernanceCachedMetrics> = std::iter::repeat_n(metrics, 100).collect();
 
     bench_fn(|| {
         let bytes = {

@@ -1,6 +1,6 @@
 [package]
 name = "candid_parser"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 rust-version.workspace = true
 authors = ["DFINITY Team"]
@@ -46,6 +46,8 @@ console = { workspace = true, optional = true }
 goldenfile = "1.1.0"
 test-generator = "0.3.0"
 rand.workspace = true
+# Used to assert the *structure* of the generated Rust bindings, which the goldenfiles cannot.
+syn = { version = "2", features = ["full", "parsing", "extra-traits"] }
 
 [features]
 random = ["dep:arbitrary", "dep:fake", "dep:rand", "dep:num-traits"]
