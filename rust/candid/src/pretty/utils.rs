@@ -84,8 +84,9 @@ pub fn ident(id: &str) -> RcDoc<'_> {
 }
 
 pub fn quote_ident(id: &str) -> RcDoc<'_> {
+    let escaped = id.escape_debug().to_string().replace('\'', "\\'");
     str("'")
-        .append(format!("{}", id.escape_debug()))
+        .append(escaped)
         .append("'")
         .append(RcDoc::space())
 }
@@ -100,5 +101,11 @@ mod test {
             .pretty(LINE_WIDTH)
             .to_string();
         assert_eq!(t, "");
+    }
+
+    #[test]
+    fn quote_ident_escapes_single_quotes() {
+        let t = quote_ident("a'b").pretty(LINE_WIDTH).to_string();
+        assert_eq!(t, "'a\\'b' ");
     }
 }
