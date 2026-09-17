@@ -60,7 +60,7 @@ give a version to the tag, so the tag is always today's date:
 * `git tag 2020-04-01 -m "2020-04-01"`
 * `git push origin 2020-04-01`
 
-This triggers [`candid-ui.yml`](.github/workflows/candid-ui.yml), which builds and
+This triggers [`candid-ui-release.yml`](.github/workflows/candid-ui-release.yml), which builds and
 uploads `candid_ui.wasm` to the matching GitHub release.
 
 ### `didc` binaries

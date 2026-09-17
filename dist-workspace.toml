@@ -21,7 +21,7 @@ install-path = "CARGO_HOME"
 install-updater = true
 # Tags of the form `didc-vX.Y.Z` (re)build only the didc binaries. The repo's
 # date-based tags (e.g. 2025-12-18) keep driving the candid_ui.wasm release in
-# .github/workflows/candid-ui.yml and never trigger this workflow.
+# .github/workflows/candid-ui-release.yml and never trigger this workflow.
 tag-namespace = "didc"
 
 # Pin GitHub Actions to exact commit SHAs in the generated release.yml (required by security policy)

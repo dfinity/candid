@@ -1,5 +1,61 @@
 # Changelog
 
+## 2026-08-14
+
+### candid_parser 0.4.1
+
+* Bug fixes:
+  + Escape the method names of a service type in the Rust binding. A Candid method name is an arbitrary text value, but `pp_ty_service` emitted it raw between the quotes of a Rust string literal inside `candid::define_service!`. A name containing `"` therefore closed the literal and the macro invocation, and the rest of the name was compiled as Rust — a `.did` file could inject arbitrary items into the bindings generated from it, and from there into the consumer's binary. Names are now escaped with `escape_debug`, as `pp_function` and the `#[serde(rename)]` attributes already were. The value seen by `define_service!` is unchanged, and names that are ordinary identifiers generate byte-identical output.
+
+## 2026-08-11
+
+### Candid 0.10.35
+
+* Bug fixes:
+  + Bound the allocation when reading a length-prefixed byte field in the type-table header. A byte vector (a future type's payload, or a service method's name) previously reserved its full declared length up front, so a length larger than the remaining input requested a correspondingly large allocation instead of failing on the short read. These fields now grow their buffer incrementally, so an out-of-range or truncated length surfaces as an ordinary parse error. The wire format is unchanged and valid messages decode identically.
+
+## 2026-07-27
+
+### Candid 0.10.34
+
+* Bug fixes:
+  + Fix decoding a `vec` of fixed-width primitives into newtype elements (e.g. `struct EventIndex(u32)`), which failed with a spurious subtyping error since 0.10.27. The bulk decode fast path fed each element through serde's value deserializers, which do not implement `deserialize_newtype_struct`; they now go through a wrapper that forwards it, as the main deserializer does. Nested newtypes are unwrapped recursively.
+  + Fix `is_human_readable()` reporting `true` for elements of a `vec` of fixed-width primitives, also since 0.10.27. The bulk decode fast path inherited serde's default from the same value deserializers, so a `Deserialize` impl that branches on it took its human-readable path inside a `vec` while taking the binary path everywhere else, silently decoding to a different value with no error. It now reports `false` for the whole decoder, as candid is a binary format.
+
+### Candid 0.10.33
+
+* Breaking changes:
+  + Migrated from the deprecated [`binread`](https://github.com/jam1garner/binread) crate to its successor `binrw`. The types in the `candid::binary_parser` module (`Header`, `PrincipalBytes`, `Len`, `BoolValue`) now implement `binrw::BinRead` instead of `binread::BinRead`, and `From<binread::Error> for candid::Error` is replaced by `From<binrw::Error>`.
+
+    Released as a patch rather than a minor bump because the affected surface is limited to those trait impls. `binary_parser` is an internal wire-format parsing module that is `pub` only incidentally — it is used nowhere outside candid's own deserializer, and it is now `#[doc(hidden)]` to say so. Code is affected only if it depends on `binread` directly *and* names these impls; the wire format, decoder error messages, byte offsets, type layouts, and all function signatures are unchanged, so the worst case is a compile error rather than a behaviour change.
+
+* Non-breaking changes:
+  + Decoding is faster as a side effect of the `binrw` migration, which drops `binread`'s `debug_template` codegen: up to 37% fewer instructions on variant-heavy payloads (`multi_arg` −36.6%, `result_variant` −10.3%, `large_variant` −9.5%, `subtype_decode` −8.0%, `double_option` −7.0%), with no regressions.
+  + Dropped the duplicate `syn 1.x` dependency tree that `binread_derive` pinned (along with `rustversion`).
+  + A future unrecognized `binrw::Error` variant now degrades to a label-less error instead of panicking, since `binrw::Error` is `#[non_exhaustive]` and decoding runs on untrusted input.
+
+## 2026-07-06
+
+### Candid 0.10.32
+
+* Non-breaking changes:
+  + A service reference now decodes where a `principal` is expected: `service <actortype>` is a subtype of `principal` (spec addition: `service <: principal`, modelled analogously to `nat <: int`). The subtype checker and the deserializer accept a service reference at type `principal`; the two share an identical wire encoding, so the coercion is the identity on the reference. The reverse (a `principal` at a `service` type) remains rejected.
+
+## 2026-07-03
+
+### ic_principal 0.1.5
+
+* Non-breaking changes:
+  + Make `Principal::as_slice()`, `Principal::len()` and `Principal::as_fixed_bytes()` const functions.
+
+## 2026-07-02
+
+### ic_principal 0.1.4
+
+* Non-breaking changes:
+  + Add `Principal::as_fixed_bytes()`, returning a reference to the underlying fixed-size `[u8; MAX_LENGTH_IN_BYTES]` backing array. Bytes at index `len()` and beyond are always zero.
+  + Add `Principal::len()`, returning the number of significant bytes in the `Principal` (equivalent to `as_slice().len()`).
+
 ## 2026-06-25
 
 ### Candid 0.10.31

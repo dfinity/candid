@@ -1,11 +1,11 @@
-# adapted from https://github.com/dfinity-lab/common/blob/master/pkgs/overlays/packages/cargo-deny/buildtime.toml
-# for context, see https://github.com/dfinity-lab/common/blob/master/pkgs/overlays/packages/cargo-deny/runtime.toml
-# we allow more licenses in the build-time check. all rust dependencies are statically linked,
-# so copyleft licenses like MPL which allow static linking are A-OK
+# candid is a library, so everything here lands in the dependency tree of every
+# crate and canister that uses it. The rule for this list: allow only licenses
+# that place no obligation on those downstream users beyond attribution. That
+# rules out copyleft of any strength, including file-scoped terms like MPL-2.0,
+# and anything with a source-disclosure or reciprocal-licensing requirement.
+#
+# Anything not listed is denied, so there is no separate deny list.
 [licenses]
-default = "deny"
-unlicensed = "allow"
-
 allow = [
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
@@ -17,8 +17,12 @@ allow = [
     "Unicode-DFS-2016",
 ]
 
-deny = [
-    "GPL-1.0",
-    "GPL-2.0",
-    "GPL-3.0",
-]
+# An entry going unused as dependencies change is not an error.
+unused-allowed-license = "allow"
+
+# candid has no git or alternate-registry dependencies and must not gain one:
+# a git revision is mutable and never reaches crates.io, so it cannot ship in a
+# published release. cargo-deny only warns about these by default.
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

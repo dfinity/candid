@@ -41,10 +41,12 @@ async function insertLoginForm() {
 
   try {
     const params = new URLSearchParams(window.location.search);
-    const is_mainnet = window.location.hostname.endsWith("icp0.io") || window.location.hostname.endsWith("ic0.app");
+    const mainnet_domains = ["icp0.io", "ic0.app", "icp.net"];
+    const mainnet_domain = mainnet_domains.find((domain) => window.location.hostname.endsWith(domain));
+    const is_mainnet = mainnet_domain !== undefined;
     let provider = params.get("ii");
     if (is_mainnet && !provider) {
-      provider = "https://identity.internetcomputer.org";
+      provider = "https://id.ai/authorize";
     }
     if (!provider) {
       console.warn("If you want to use Internet Identity, please provide a URL to your local Internet Identity service using the `ii` query parameter");
@@ -56,7 +58,7 @@ async function insertLoginForm() {
     const cid = Principal.fromText(params.get("id")!);
     let origin = params.get("origin");
     if (!origin && is_mainnet && await check_alternative_origin()) {
-      origin = `https://${cid.toText()}.icp0.io`;
+      origin = `https://${cid.toText()}.${mainnet_domain}`;
     }
     if (origin) {
       if (!is_valid_url(origin)) {
