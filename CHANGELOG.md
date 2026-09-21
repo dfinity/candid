@@ -5,8 +5,7 @@
 ### Candid
 
 * Bug fixes:
-  + Bound the remaining wire-declared structural counts in the type-table header, matching the bound the type table size already carries. The number of arguments, a record or variant's field count, a function type's argument and result counts, and a service type's method count each drive a `count`-sized allocation; a well-formed message keeps every one of them proportional to the type description, so they are now capped the same way. An out-of-range count surfaces as an ordinary parse error instead of reserving a correspondingly large buffer. The argument count reuses the configurable `max_type_len` limit; the type-table-internal counts use the same default bound as the type table. The wire format is unchanged and valid messages decode identically.
-  + Share the undecoded argument queue behind a reference count so the option/backtracking path no longer copies it. When decoding a present `opt` whose wire and expected types differ, the deserializer takes a snapshot to restore on a subtype mismatch. That snapshot only needs the fields a sub-decode can mutate, and the argument queue is not one of them — it is touched only at the top level — so it is now shared rather than cloned. Decoding many optional trailing arguments is correspondingly cheaper, and the decode result is unchanged.
+  + Share the undecoded argument queue behind a reference count. The option/backtracking path snapshots the deserializer to restore on a subtype mismatch, which previously copied the whole queue of remaining arguments on every present `opt`. The queue is only mutated at the top level, so it is now shared rather than copied and the snapshot is a refcount bump. Skipping many present optional arguments is no longer superlinear in the argument count; the decode result is unchanged.
 
 ## 2026-08-14
 
