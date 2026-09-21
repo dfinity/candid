@@ -102,7 +102,12 @@ fn read_leb_usize(name: &'static str, range_msg: &'static str) -> BinResult<usiz
 pub struct Header {
     #[br(args(max_type_len))]
     table: Table,
+    // The argument count drives a `count`-sized allocation, so bound it the same
+    // way the type table size is bounded: a well-formed message declares an
+    // argument per value it carries, and that count stays proportional to the
+    // type table describing them rather than to the raw byte length.
     #[br(parse_with = read_leb, args("len"))]
+    #[br(assert(len <= max_type_len.unwrap_or(MAX_TYPE_TABLE_LEN as usize) as u64, "number of arguments exceeded"))]
     len: u64,
     #[br(count = len)]
     args: Vec<IndexType>,
@@ -140,7 +145,10 @@ struct IndexType {
 }
 #[derive(BinRead, Debug)]
 struct Fields {
+    // Each field descriptor drives a `count`-sized allocation; keep the field
+    // count within the same structural bound as the type table itself.
     #[br(parse_with = read_leb_u32, args("len", "field length out of 32-bit range"))]
+    #[br(assert(len as u64 <= MAX_TYPE_TABLE_LEN, "number of fields exceeded"))]
     len: u32,
     #[br(count = len)]
     inner: Vec<FieldType>,
@@ -154,10 +162,12 @@ struct FieldType {
 #[derive(BinRead, Debug)]
 struct FuncType {
     #[br(parse_with = read_leb, args("arg_len"))]
+    #[br(assert(arg_len <= MAX_TYPE_TABLE_LEN, "number of function arguments exceeded"))]
     arg_len: u64,
     #[br(count = arg_len)]
     args: Vec<IndexType>,
     #[br(parse_with = read_leb, args("ret_len"))]
+    #[br(assert(ret_len <= MAX_TYPE_TABLE_LEN, "number of function results exceeded"))]
     ret_len: u64,
     #[br(count = ret_len)]
     rets: Vec<IndexType>,
@@ -169,6 +179,7 @@ struct FuncType {
 #[derive(BinRead, Debug)]
 struct ServType {
     #[br(parse_with = read_leb, args("len"))]
+    #[br(assert(len <= MAX_TYPE_TABLE_LEN, "number of service methods exceeded"))]
     len: u64,
     #[br(count = len)]
     meths: Vec<Meths>,
