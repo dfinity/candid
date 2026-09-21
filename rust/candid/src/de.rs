@@ -217,7 +217,11 @@ impl DecoderConfig {
         self.skipping_quota = Some(n);
         self
     }
-    /// Set the max type table size
+    /// Set the max type table size. This also bounds the number of top-level
+    /// arguments a message may declare, since a well-formed message declares an
+    /// argument per value it carries and that count stays proportional to the
+    /// type table describing them. For example, `set_max_type_len(1)` rejects a
+    /// message declaring two arguments even when its type table is empty.
     pub fn set_max_type_len(&mut self, n: usize) -> &mut Self {
         self.max_type_len = Some(n);
         self
