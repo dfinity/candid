@@ -856,6 +856,83 @@ fn test_nested_map_non_text_key() {
     assert_eq!(outer, decoded);
 }
 
+/// A map entry's key and value each decode under their own declared type: the key
+/// through the key type and the value through the value type, independently of each
+/// other. In particular the bignum fast path, which `deserialize_map` derives from the
+/// value type, applies only to values, so a key keeps its own encoding (SLEB128 for
+/// `int`, LEB128 for `nat`) and its own subtype check for every combination of key and
+/// value type.
+#[test]
+fn test_map_key_and_value_decode_under_own_type() {
+    use std::collections::BTreeMap;
+
+    fn round_trip<K, V>(k: K, v: V)
+    where
+        K: CandidType + for<'a> Deserialize<'a> + Ord + std::fmt::Debug + Clone,
+        V: CandidType + for<'a> Deserialize<'a> + PartialEq + std::fmt::Debug + Clone,
+    {
+        let mut m: BTreeMap<K, V> = BTreeMap::new();
+        m.insert(k, v);
+        let bytes = encode_one(&m).unwrap();
+        let decoded: BTreeMap<K, V> = decode_one_with_config(&bytes, &get_config()).unwrap();
+        assert_eq!(
+            m.keys().collect::<Vec<_>>(),
+            decoded.keys().collect::<Vec<_>>()
+        );
+        assert_eq!(
+            m.values().collect::<Vec<_>>(),
+            decoded.values().collect::<Vec<_>>()
+        );
+    }
+
+    // Signed keys keep their sign whatever the value type is.
+    for k in [-1i64, -2, -100, -128, -1000, -2147483648] {
+        round_trip(Int::from(k), Nat::from(42u64));
+        round_trip(Int::from(k), Int::from(-7));
+        round_trip(Int::from(k), 42u32);
+    }
+    // Signed values keep their sign whatever the key type is.
+    for v in [-1i64, -2, -128, -2147483648] {
+        round_trip(Nat::from(5u64), Int::from(v));
+        round_trip(Int::from(9), Int::from(v));
+        round_trip("k".to_string(), Int::from(v));
+    }
+    // Above u64, where the big-integer representation is used.
+    let big_neg: Int = "-99999999999999999999999999".parse().unwrap();
+    let big_nat: Nat = "99999999999999999999999999".parse().unwrap();
+    round_trip(big_neg.clone(), big_nat.clone());
+    round_trip(big_neg.clone(), big_neg.clone());
+    round_trip(big_nat.clone(), big_neg.clone());
+
+    // Distinct keys stay distinct entries.
+    let mut m: BTreeMap<Int, Nat> = BTreeMap::new();
+    m.insert(Int::from(127), Nat::from(1000u64));
+    m.insert(Int::from(-1), Nat::from(1u64));
+    let bytes = encode_one(&m).unwrap();
+    assert_eq!(
+        decode_one_with_config::<BTreeMap<Int, Nat>>(&bytes, &get_config()).unwrap(),
+        m
+    );
+
+    // A key's subtype check runs: int is not a subtype of nat, whatever the value type.
+    let mut int_key: BTreeMap<Int, Nat> = BTreeMap::new();
+    int_key.insert(Int::from(5), Nat::from(7u64));
+    let bytes = encode_one(&int_key).unwrap();
+    assert!(decode_one_with_config::<BTreeMap<Nat, Nat>>(&bytes, &get_config()).is_err());
+
+    let mut int_key: BTreeMap<Int, Int> = BTreeMap::new();
+    int_key.insert(Int::from(5), Int::from(7));
+    let bytes = encode_one(&int_key).unwrap();
+    assert!(decode_one_with_config::<BTreeMap<Nat, Int>>(&bytes, &get_config()).is_err());
+
+    // nat is a subtype of int, so widening a key is still accepted.
+    let mut nat_key: BTreeMap<Nat, Nat> = BTreeMap::new();
+    nat_key.insert(Nat::from(5u64), Nat::from(7u64));
+    let bytes = encode_one(&nat_key).unwrap();
+    let widened = decode_one_with_config::<BTreeMap<Int, Int>>(&bytes, &get_config()).unwrap();
+    assert_eq!(widened[&Int::from(5)], Int::from(7));
+}
+
 /// Regression test: elements decoded through the bulk primitive-vec fast path must
 /// report the same `is_human_readable()` answer as the main deserializer, which is
 /// `false` because candid is a binary format.

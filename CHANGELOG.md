@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Candid
+
+* Bug fixes:
+  + Scope the big-integer decode fast path to map values, so a map entry's key and value each decode under their own declared type. `deserialize_map` derives that fast path from the map's value type; it is now cleared for the duration of the key and restored for the value, and the value's expected and wire types are re-established on every entry. A key therefore always goes through its own type's entry point, keeping its own encoding (SLEB128 for `int`, LEB128 for `nat`) and its own subtype check, for every combination of key and value type. The wire format is unchanged, and entries whose key and value types agree decode identically.
+
 ## 2026-08-14
 
 ### candid_parser 0.4.1
