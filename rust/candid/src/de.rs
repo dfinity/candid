@@ -1828,6 +1828,12 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                 // wire_type, so the value needs its own types in place here.
                 self.de.expect_type = expect.1.clone();
                 self.de.wire_type = wire.1.clone();
+                // The text fast path is the mirror image: it is derived from the map's key
+                // type, so it too applies only to its own half of the entry. Left on, it
+                // lets a value be read as text without its subtype check -- `blob` shares
+                // text's length-prefixed encoding, so it would be accepted in a text
+                // value's place. next_key_seed sets it again for the following key.
+                self.de.text_fast_path = false;
                 #[cfg(feature = "bignum")]
                 {
                     self.de.bignum_vec_fast_path = value_bignum_fast;

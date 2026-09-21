@@ -5,7 +5,7 @@
 ### Candid
 
 * Bug fixes:
-  + Scope the big-integer decode fast path to map values, so a map entry's key and value each decode under their own declared type. `deserialize_map` derives that fast path from the map's value type; it is now cleared for the duration of the key and restored for the value, and the value's expected and wire types are re-established on every entry. A key therefore always goes through its own type's entry point, keeping its own encoding (SLEB128 for `int`, LEB128 for `nat`) and its own subtype check, for every combination of key and value type. The wire format is unchanged, and entries whose key and value types agree decode identically.
+  + Scope the decode fast paths of a map to their own half of an entry, so a map entry's key and value each decode under their own declared type. `deserialize_map` derives a big-integer fast path from the map's value type and a text fast path from its key type; each previously stayed active for the whole entry. The big-integer path is now cleared for the duration of the key and restored for the value, the text path is cleared for the duration of the value, and the value's expected and wire types are re-established on every entry. Each half of an entry therefore goes through its own type's entry point, keeping its own encoding (SLEB128 for `int`, LEB128 for `nat`) and its own subtype check, for every combination of key and value type — including a value whose type shares an encoding with the key's, such as `blob` against `text`. The wire format is unchanged, and entries whose key and value types agree decode identically.
 
 ## 2026-08-14
 

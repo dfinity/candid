@@ -931,6 +931,25 @@ fn test_map_key_and_value_decode_under_own_type() {
     let bytes = encode_one(&nat_key).unwrap();
     let widened = decode_one_with_config::<BTreeMap<Int, Int>>(&bytes, &get_config()).unwrap();
     assert_eq!(widened[&Int::from(5)], Int::from(7));
+
+    // The mirror image of the same property: a text *key* must not let the value skip
+    // its own subtype check. `blob` shares text's length-prefixed encoding, so a value
+    // read under the key's text fast path would be accepted in a text value's place.
+    let mut blob_val: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+    blob_val.insert("k".to_string(), b"hello".to_vec());
+    let bytes = encode_one(&blob_val).unwrap();
+    assert!(decode_one_with_config::<BTreeMap<String, String>>(&bytes, &get_config()).is_err());
+    // Rejected for the same reason outside a map and under a non-text key.
+    let mut blob_val2: BTreeMap<u32, Vec<u8>> = BTreeMap::new();
+    blob_val2.insert(1, b"hello".to_vec());
+    let bytes2 = encode_one(&blob_val2).unwrap();
+    assert!(decode_one_with_config::<BTreeMap<u32, String>>(&bytes2, &get_config()).is_err());
+
+    // Text keys and text values still round-trip, including a text value under a
+    // non-text key and a non-text value under a text key.
+    round_trip("k".to_string(), "v".to_string());
+    round_trip(Nat::from(1u64), "v".to_string());
+    round_trip("k".to_string(), Nat::from(1u64));
 }
 
 /// Regression test: elements decoded through the bulk primitive-vec fast path must
