@@ -1,8 +1,8 @@
 # Changelog
 
-## 2026-09-21
+## Unreleased
 
-### Candid 0.10.36
+### Candid
 
 * Bug fixes:
   + Bound the remaining wire-declared structural counts in the type-table header, matching the bound the type table size already carries. The number of arguments, a record or variant's field count, a function type's argument and result counts, and a service type's method count each drive a `count`-sized allocation; a well-formed message keeps every one of them proportional to the type description, so they are now capped the same way. An out-of-range count surfaces as an ordinary parse error instead of reserving a correspondingly large buffer. The argument count reuses the configurable `max_type_len` limit; the type-table-internal counts use the same default bound as the type table. The wire format is unchanged and valid messages decode identically.
