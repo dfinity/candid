@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Candid
+
+* Bug fixes:
+  + Share the undecoded argument queue behind a reference count. The option/backtracking path snapshots the deserializer to restore on a subtype mismatch, which previously copied the whole queue of remaining arguments on every present `opt`. The queue is only mutated at the top level, so it is now shared rather than copied and the snapshot is a refcount bump. Skipping many present optional arguments is no longer superlinear in the argument count; the decode result is unchanged.
+
 ## 2026-08-14
 
 ### candid_parser 0.4.1

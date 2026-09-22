@@ -90,7 +90,7 @@ impl<'de> IDLDeserialize<'de> {
             }
         }
 
-        let (ind, ty) = self.de.types.pop_front().unwrap();
+        let (ind, ty) = Rc::make_mut(&mut self.de.types).pop_front().unwrap();
         self.de.expect_type = if matches!(expected_type.as_ref(), TypeInner::Unknown) {
             self.de.is_untyped = true;
             ty.clone()
@@ -289,7 +289,11 @@ macro_rules! check {
 struct Deserializer<'de> {
     input: Cursor<&'de [u8]>,
     table: Rc<TypeEnv>,
-    types: VecDeque<(usize, Type)>,
+    // The undecoded argument queue. It is only ever mutated at the top level
+    // (`IDLDeserialize::get_value`), never during a value sub-decode, so holding
+    // it behind an `Rc` lets the backtracking snapshot in `recoverable_visit_some`
+    // share it with a refcount bump instead of copying the whole queue.
+    types: Rc<VecDeque<(usize, Type)>>,
     wire_type: Type,
     expect_type: Type,
     // Memo table for subtyping relation
@@ -316,7 +320,7 @@ impl<'de> Deserializer<'de> {
         Ok(Deserializer {
             input: reader,
             table: env.into(),
-            types: types.into_iter().enumerate().collect(),
+            types: Rc::new(types.into_iter().enumerate().collect()),
             wire_type: TypeInner::Unknown.into(),
             expect_type: TypeInner::Unknown.into(),
             gamma: Gamma::default(),
