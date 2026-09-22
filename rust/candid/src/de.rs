@@ -1301,6 +1301,8 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                                         expect,
                                         wire,
                                         key_text_fast,
+                                        #[cfg(feature = "bignum")]
+                                        value_bignum_fast,
                                     },
                                 ));
                                 self.text_fast_path = false;
@@ -1448,6 +1450,8 @@ enum Style {
         expect: (Type, Type),
         wire: (Type, Type),
         key_text_fast: bool,
+        #[cfg(feature = "bignum")]
+        value_bignum_fast: Option<BigNumFastPath>,
     },
 }
 
@@ -1764,13 +1768,15 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                 ref expect,
                 ref wire,
                 key_text_fast,
+                #[cfg(feature = "bignum")]
+                value_bignum_fast,
             } => {
                 if *len == 0 {
                     return Ok(None);
                 }
                 *len -= 1;
                 #[cfg(feature = "bignum")]
-                let any_fast = key_text_fast || self.de.bignum_vec_fast_path.is_some();
+                let any_fast = key_text_fast || value_bignum_fast.is_some();
                 #[cfg(not(feature = "bignum"))]
                 let any_fast = key_text_fast;
                 if !any_fast {
@@ -1782,6 +1788,15 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                 // of this (inner) map, leading to a "Type mismatch" when deserializing
                 // those keys.
                 self.de.text_fast_path = key_text_fast;
+                // The bignum fast path is derived from the map's *value* type and applies
+                // only to values, so it stays off for the duration of the key. This keeps
+                // a key decoding under its own declared type, through the regular
+                // deserialize_* entry point and its subtype check, whatever the value type
+                // happens to be. next_value_seed restores it for the value.
+                #[cfg(feature = "bignum")]
+                {
+                    self.de.bignum_vec_fast_path = None;
+                }
                 if !key_text_fast {
                     self.de.expect_type = expect.0.clone();
                     self.de.wire_type = wire.0.clone();
@@ -1796,21 +1811,36 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
         V: de::DeserializeSeed<'de>,
     {
         match &self.style {
-            Style::Map { expect, wire, .. } => {
+            Style::Map {
+                expect,
+                wire,
                 #[cfg(feature = "bignum")]
-                let any_fast = self.de.text_fast_path || self.de.bignum_vec_fast_path.is_some();
+                value_bignum_fast,
+                ..
+            } => {
+                #[cfg(feature = "bignum")]
+                let value_bignum_fast = *value_bignum_fast;
+                #[cfg(feature = "bignum")]
+                let any_fast = self.de.text_fast_path || value_bignum_fast.is_some();
                 #[cfg(not(feature = "bignum"))]
                 let any_fast = self.de.text_fast_path;
                 if !any_fast {
                     self.de.add_cost(3)?;
                 }
+                // Re-establish the value's types unconditionally: the key is decoded under
+                // the key type, and the bignum fast path still reads according to
+                // wire_type, so the value needs its own types in place here.
+                self.de.expect_type = expect.1.clone();
+                self.de.wire_type = wire.1.clone();
+                // The text fast path is the mirror image: it is derived from the map's key
+                // type, so it too applies only to its own half of the entry. Left on, it
+                // lets a value be read as text without its subtype check -- `blob` shares
+                // text's length-prefixed encoding, so it would be accepted in a text
+                // value's place. next_key_seed sets it again for the following key.
+                self.de.text_fast_path = false;
                 #[cfg(feature = "bignum")]
-                let value_fast = self.de.bignum_vec_fast_path.is_some();
-                #[cfg(not(feature = "bignum"))]
-                let value_fast = false;
-                if !value_fast {
-                    self.de.expect_type = expect.1.clone();
-                    self.de.wire_type = wire.1.clone();
+                {
+                    self.de.bignum_vec_fast_path = value_bignum_fast;
                 }
                 seed.deserialize(&mut *self.de)
             }
