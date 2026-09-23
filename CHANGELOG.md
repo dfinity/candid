@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Candid
+
+* Bug fixes:
+  + Make the decoding quota bound header parsing as it happens. The header's wire-declared element counts — the argument count, a record or variant's field count, a function type's argument and result counts, and a service type's method count — each drive a `count`-sized parse, and the quota was charged for the header only once that parse had finished, so it reported the cost rather than bounding it. Each count is now checked against the caller's budget as it is read: an element occupies at least one byte and the header is charged 4 cost units per byte, so a count above `quota / 4` describes a header the budget cannot pay for, and it is rejected before those bytes are read. The bound agrees with the charge it anticipates, so no header that the charge would have accepted is rejected, and callers that set no decoding quota are unaffected.
+
 ## 2026-09-22
 
 ### Candid 0.10.36

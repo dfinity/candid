@@ -40,7 +40,10 @@ impl<'de> IDLDeserialize<'de> {
                 "Cannot parse header".to_string()
             }
         })?;
-        de.add_cost((de.input.position() as usize).saturating_mul(4))?;
+        de.add_cost(
+            (de.input.position() as usize)
+                .saturating_mul(crate::binary_parser::HEADER_COST_PER_BYTE),
+        )?;
         Ok(IDLDeserialize { de })
     }
     /// Deserialize one value from deserializer.
@@ -315,7 +318,13 @@ struct Deserializer<'de> {
 impl<'de> Deserializer<'de> {
     fn from_bytes(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
         let mut reader = Cursor::new(bytes);
-        let header = Header::read_le_args(&mut reader, (config.max_type_len,))?;
+        let header = Header::read_le_args(
+            &mut reader,
+            (
+                config.max_type_len,
+                crate::binary_parser::max_count_for(config.decoding_quota),
+            ),
+        )?;
         let (env, types) = header.to_types()?;
         Ok(Deserializer {
             input: reader,
