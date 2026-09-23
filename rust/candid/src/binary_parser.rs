@@ -6,13 +6,25 @@ use std::convert::TryInto;
 
 const MAX_TYPE_TABLE_LEN: u64 = 10_000; // Max type entries
 
+/// Default bound on the byte length of the type-table header.
+///
+/// The header is a type description, so its size is a property of the interface
+/// rather than of the payload: the largest header among the IC's own interfaces is
+/// about 2 KB (NNS governance `manage_neuron`), and the management canister's
+/// largest is 214 bytes. 64 KiB leaves roughly a 32x margin over that while keeping
+/// the work any single header can demand bounded, independently of how large the
+/// value section is allowed to be.
+///
+/// This bounds every wire-declared count in the header at once -- the argument
+/// count, a record or variant's field count, a function type's argument and result
+/// counts, a service type's method count -- because each element it introduces
+/// occupies at least one byte. [`MAX_TYPE_TABLE_LEN`] remains a separate bound on a
+/// different dimension: the number of type-table entries, whatever their size.
+pub(crate) const DEFAULT_MAX_HEADER_LEN: usize = 64 * 1024;
+
 // Upper bound on a single allocation step while reading a length-prefixed byte
 // blob. The buffer grows in steps of at most this size.
 const READ_CHUNK: u64 = 8 * 1024;
-
-/// Cost charged per header byte once the header has been parsed, mirrored here so the
-/// per-count bound stays in step with the charge in `IDLDeserialize::new_with_config`.
-pub(crate) const HEADER_COST_PER_BYTE: usize = 4;
 
 /// Read `len` bytes into a fresh `Vec`, growing the buffer in bounded steps.
 ///
@@ -100,67 +112,41 @@ fn read_leb_usize(name: &'static str, range_msg: &'static str) -> BinResult<usiz
     })
 }
 
-/// Upper bound on any single wire-declared element count, derived from the caller's
-/// decoding quota.
-///
-/// Every element of a header vector occupies at least one byte, and the header is
-/// charged [`HEADER_COST_PER_BYTE`] cost units per byte once it has been parsed. A
-/// count above `quota / HEADER_COST_PER_BYTE` therefore describes a header the
-/// caller's budget cannot pay for, whatever the rest of the message contains.
-/// Checking it against the count as it is read reaches the same outcome as the
-/// charge that follows, before the bytes are read rather than after.
-///
-/// `None` (no quota configured) leaves counts unbounded, as before.
-pub(crate) fn max_count_for(decoding_quota: Option<usize>) -> Option<u64> {
-    decoding_quota.map(|q| (q / HEADER_COST_PER_BYTE) as u64)
-}
-
-macro_rules! count_within_quota {
-    ($len:expr, $max_count:expr) => {
-        $max_count.map_or(true, |m| $len as u64 <= m)
-    };
-}
-
 #[derive(BinRead, Debug)]
 #[br(magic = b"DIDL")]
-#[br(import(max_type_len: Option<usize>, max_count: Option<u64>))]
+#[br(import(max_type_len: Option<usize>))]
 pub struct Header {
-    #[br(args(max_type_len, max_count))]
+    #[br(args(max_type_len))]
     table: Table,
     #[br(parse_with = read_leb, args("len"))]
-    #[br(assert(
-        count_within_quota!(len, max_count),
-        "argument count exceeds decoding quota"
-    ))]
     len: u64,
     #[br(count = len)]
     args: Vec<IndexType>,
 }
 
 #[derive(BinRead, Debug)]
-#[br(import(max_type_len: Option<usize>, max_count: Option<u64>))]
+#[br(import(max_type_len: Option<usize>))]
 struct Table {
     #[br(parse_with = read_leb, args("len"))]
     #[br(assert(len <= max_type_len.unwrap_or(MAX_TYPE_TABLE_LEN as usize) as u64, "type table size exceeded"))]
     len: u64,
-    #[br(count = len, args { inner: (max_count,) })]
+    #[br(count = len)]
     table: Vec<ConsType>,
 }
 #[derive(BinRead, Debug)]
-#[br(import(max_count: Option<u64>))]
 enum ConsType {
     #[br(magic = 0x6eu8)]
     Opt(Box<IndexType>),
     #[br(magic = 0x6du8)]
     Vec(Box<IndexType>),
     #[br(magic = 0x6cu8)]
-    Record(#[br(args(max_count))] Fields),
+    Record(Fields),
     #[br(magic = 0x6bu8)]
-    Variant(#[br(args(max_count))] Fields),
+    Variant(Fields),
     #[br(magic = 0x6au8)]
-    Func(#[br(args(max_count))] FuncType),
+    Func(FuncType),
     #[br(magic = 0x69u8)]
-    Service(#[br(args(max_count))] ServType),
+    Service(ServType),
     Future(FutureType),
 }
 #[derive(BinRead, Debug)]
@@ -169,13 +155,8 @@ struct IndexType {
     index: i64,
 }
 #[derive(BinRead, Debug)]
-#[br(import(max_count: Option<u64>))]
 struct Fields {
     #[br(parse_with = read_leb_u32, args("len", "field length out of 32-bit range"))]
-    #[br(assert(
-        count_within_quota!(len, max_count),
-        "field count exceeds decoding quota"
-    ))]
     len: u32,
     #[br(count = len)]
     inner: Vec<FieldType>,
@@ -187,21 +168,12 @@ struct FieldType {
     index: IndexType,
 }
 #[derive(BinRead, Debug)]
-#[br(import(max_count: Option<u64>))]
 struct FuncType {
     #[br(parse_with = read_leb, args("arg_len"))]
-    #[br(assert(
-        count_within_quota!(arg_len, max_count),
-        "function argument count exceeds decoding quota"
-    ))]
     arg_len: u64,
     #[br(count = arg_len)]
     args: Vec<IndexType>,
     #[br(parse_with = read_leb, args("ret_len"))]
-    #[br(assert(
-        count_within_quota!(ret_len, max_count),
-        "function result count exceeds decoding quota"
-    ))]
     ret_len: u64,
     #[br(count = ret_len)]
     rets: Vec<IndexType>,
@@ -211,13 +183,8 @@ struct FuncType {
     ann: Vec<Mode>,
 }
 #[derive(BinRead, Debug)]
-#[br(import(max_count: Option<u64>))]
 struct ServType {
     #[br(parse_with = read_leb, args("len"))]
-    #[br(assert(
-        count_within_quota!(len, max_count),
-        "service method count exceeds decoding quota"
-    ))]
     len: u64,
     #[br(count = len)]
     meths: Vec<Meths>,

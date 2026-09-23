@@ -40,10 +40,7 @@ impl<'de> IDLDeserialize<'de> {
                 "Cannot parse header".to_string()
             }
         })?;
-        de.add_cost(
-            (de.input.position() as usize)
-                .saturating_mul(crate::binary_parser::HEADER_COST_PER_BYTE),
-        )?;
+        de.add_cost((de.input.position() as usize).saturating_mul(4))?;
         Ok(IDLDeserialize { de })
     }
     /// Deserialize one value from deserializer.
@@ -150,6 +147,7 @@ pub struct DecoderConfig {
     pub decoding_quota: Option<usize>,
     pub skipping_quota: Option<usize>,
     pub max_type_len: Option<usize>,
+    pub max_header_len: Option<usize>,
     full_error_message: bool,
 }
 impl DecoderConfig {
@@ -161,6 +159,7 @@ impl DecoderConfig {
             decoding_quota: None,
             skipping_quota: None,
             max_type_len: None,
+            max_header_len: None,
             #[cfg(not(target_arch = "wasm32"))]
             full_error_message: true,
             #[cfg(target_arch = "wasm32")]
@@ -225,6 +224,22 @@ impl DecoderConfig {
         self.max_type_len = Some(n);
         self
     }
+    /// Limit the byte length of the type-table header, the part of the message that
+    /// describes the types of the values that follow.
+    ///
+    /// A header's size is a property of the interface rather than of the payload, and
+    /// every element it declares -- an argument, a record or variant field, a function
+    /// argument or result, a service method -- costs at least one byte. Bounding its
+    /// length therefore bounds each of those counts at once, and bounds the work the
+    /// header can demand before any value is read.
+    ///
+    /// Defaults to 64 KiB when unset, which is roughly 32x the largest header among
+    /// the IC's own interfaces. [`set_max_type_len`](#method.set_max_type_len) remains
+    /// a separate bound on the number of type-table entries.
+    pub fn set_max_header_len(&mut self, n: usize) -> &mut Self {
+        self.max_header_len = Some(n);
+        self
+    }
     /// When set to false, error message only displays the concrete type when the type is small.
     /// The error message also doesn't include the decoding states.
     /// When set to true, error message always shows the full type and decoding states.
@@ -244,6 +259,7 @@ impl DecoderConfig {
             decoding_quota,
             skipping_quota,
             max_type_len: original.max_type_len,
+            max_header_len: original.max_header_len,
             full_error_message: original.full_error_message,
         }
     }
@@ -317,14 +333,28 @@ struct Deserializer<'de> {
 
 impl<'de> Deserializer<'de> {
     fn from_bytes(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
+        // Parse the header from a bounded prefix of the input. A header that needs
+        // more than `max_header_len` bytes runs off the end of that prefix and fails
+        // there, so an oversized header costs only the bound rather than its declared
+        // size. The value section is read from the full input afterwards.
+        let max_header_len = config
+            .max_header_len
+            .unwrap_or(crate::binary_parser::DEFAULT_MAX_HEADER_LEN);
+        let bounded = bytes.len().min(max_header_len);
+        let mut probe = Cursor::new(&bytes[..bounded]);
+        let header = Header::read_le_args(&mut probe, (config.max_type_len,)).map_err(|e| {
+            if bounded < bytes.len() {
+                // The prefix was the limit, not the end of the message, so the header
+                // is over the bound -- report that rather than a short read.
+                Error::msg(format!(
+                    "Type table header exceeds the limit of {max_header_len} bytes"
+                ))
+            } else {
+                Error::from(e)
+            }
+        })?;
         let mut reader = Cursor::new(bytes);
-        let header = Header::read_le_args(
-            &mut reader,
-            (
-                config.max_type_len,
-                crate::binary_parser::max_count_for(config.decoding_quota),
-            ),
-        )?;
+        reader.set_position(probe.position());
         let (env, types) = header.to_types()?;
         Ok(Deserializer {
             input: reader,
