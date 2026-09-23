@@ -80,9 +80,7 @@ fn one_bound_covers_every_declared_count() {
     serv.extend(leb(0x69));
     serv.extend(leb(500_000));
     for _ in 0..500_000u64 {
-        serv.push(1);
-        serv.push(b'm');
-        serv.push(0x7f);
+        serv.extend_from_slice(&[1, b'm', 0x7f]);
     }
     serv.extend(leb(1));
     serv.extend(leb(0));
@@ -91,9 +89,7 @@ fn one_bound_covers_every_declared_count() {
     func.extend(leb(1));
     func.extend(leb(0x6a));
     func.extend(leb(500_000));
-    for _ in 0..500_000u64 {
-        func.push(0x7f);
-    }
+    func.extend(std::iter::repeat(0x7f).take(500_000));
     func.extend(leb(0));
     func.push(0);
     func.extend(leb(1));
