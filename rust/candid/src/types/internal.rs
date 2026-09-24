@@ -365,6 +365,35 @@ impl fmt::Display for TypeInner {
         write!(f, "{:?}", self)
     }
 }
+/// Budget, in rendered characters, for a type named in a diagnostic.
+pub(crate) const MAX_DIAGNOSTIC_TYPE_LEN: i32 = 500;
+
+/// Stands in for a type too large to put in a diagnostic.
+pub(crate) const ELIDED_TYPE: &str = "(type elided: too large to render)";
+
+/// Renders a type for a diagnostic, eliding it when rendering would be unreasonable.
+///
+/// What it costs to render a type follows that type's own width and depth, so an
+/// outsized one must not be rendered at all: [`text_size`] settles that against a
+/// budget before any of the work is done. Types reaching a decoder come from the wire
+/// and so are chosen by the sender, which is why the budget holds for every diagnostic
+/// naming one, however verbose the caller asked its errors to be.
+pub(crate) fn elide_large(t: &Type) -> ElidedType<'_> {
+    ElidedType(t)
+}
+
+pub(crate) struct ElidedType<'a>(&'a Type);
+
+impl fmt::Display for ElidedType<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if text_size(self.0, MAX_DIAGNOSTIC_TYPE_LEN).is_ok() {
+            write!(f, "{}", self.0)
+        } else {
+            f.write_str(ELIDED_TYPE)
+        }
+    }
+}
+
 #[allow(clippy::result_unit_err)]
 pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
     use TypeInner::*;

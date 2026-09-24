@@ -1,4 +1,4 @@
-use super::internal::{find_type, Field, Label, Type, TypeInner};
+use super::internal::{elide_large, find_type, Field, Label, Type, TypeInner};
 use crate::types::TypeEnv;
 use crate::utils::RecursionDepth;
 use crate::{Error, Result};
@@ -291,7 +291,7 @@ fn subtype_collect_(
                     Ok(Null | Reserved | Opt(_))
                 ) => {}
         (_, Opt(_)) => {
-            let msg = format!("WARNING: {t1} <: {t2} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/c7659ca/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.");
+            let msg = format!("WARNING: {} <: {} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/c7659ca/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.", elide_large(t1), elide_large(t2));
             match report {
                 OptReport::Silence => (),
                 OptReport::Warning => eprintln!("{msg}"),
@@ -324,13 +324,15 @@ fn subtype_collect_(
                                 path: path.clone(),
                                 message: if is_input {
                                     format!(
-                                        "new service requires field {id} (type {ty2}), \
-                                         which old callers don't provide and is not optional"
+                                        "new service requires field {id} (type {}), \
+                                         which old callers don't provide and is not optional",
+                                        elide_large(ty2)
                                     )
                                 } else {
                                     format!(
-                                        "new type is missing required field {id} (type {ty2}), \
-                                         which is expected by the old type and is not optional"
+                                        "new type is missing required field {id} (type {}), \
+                                         which is expected by the old type and is not optional",
+                                        elide_large(ty2)
                                     )
                                 },
                             });
@@ -428,7 +430,11 @@ fn subtype_collect_(
         (_, _) => {
             errors.push(Incompatibility {
                 path: path.clone(),
-                message: format!("{t1} is not a subtype of {t2}"),
+                message: format!(
+                    "{} is not a subtype of {}",
+                    elide_large(t1),
+                    elide_large(t2)
+                ),
             });
         }
     }
@@ -573,7 +579,7 @@ fn subtype_(
             Ok(())
         }
         (_, Opt(_)) => {
-            let msg = format!("WARNING: {t1} <: {t2} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/c7659ca/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.");
+            let msg = format!("WARNING: {} <: {} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/c7659ca/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.", elide_large(t1), elide_large(t2));
             match report {
                 OptReport::Silence => (),
                 OptReport::Warning => eprintln!("{msg}"),
@@ -587,7 +593,11 @@ fn subtype_(
                 match fields.get(id) {
                     Some(ty1) => {
                         subtype_(report, gamma, env, ty1, ty2, depth).with_context(|| {
-                            format!("Record field {id}: {ty1} is not a subtype of {ty2}")
+                            format!(
+                                "Record field {id}: {} is not a subtype of {}",
+                                elide_large(ty1),
+                                elide_large(ty2)
+                            )
                         })?
                     }
                     None => {
@@ -595,7 +605,10 @@ fn subtype_(
                             env.trace_type_with_depth(ty2, depth)?.as_ref(),
                             Null | Reserved | Opt(_)
                         ) {
-                            return Err(Error::msg(format!("Record field {id}: {ty2} is only in the expected type and is not of type opt, null or reserved")));
+                            return Err(Error::msg(format!(
+                                "Record field {id}: {} is only in the expected type and is not of type opt, null or reserved",
+                                elide_large(ty2)
+                            )));
                         }
                     }
                 }
@@ -608,7 +621,11 @@ fn subtype_(
                 match fields.get(id) {
                     Some(ty2) => {
                         subtype_(report, gamma, env, ty1, ty2, depth).with_context(|| {
-                            format!("Variant field {id}: {ty1} is not a subtype of {ty2}")
+                            format!(
+                                "Variant field {id}: {} is not a subtype of {}",
+                                elide_large(ty1),
+                                elide_large(ty2)
+                            )
                         })?
                     }
                     None => {
@@ -626,7 +643,11 @@ fn subtype_(
                 match meths.get(name) {
                     Some(ty1) => {
                         subtype_(report, gamma, env, ty1, ty2, depth).with_context(|| {
-                            format!("Method {name}: {ty1} is not a subtype of {ty2}")
+                            format!(
+                                "Method {name}: {} is not a subtype of {}",
+                                elide_large(ty1),
+                                elide_large(ty2)
+                            )
                         })?
                     }
                     None => {
@@ -657,7 +678,11 @@ fn subtype_(
         (_, Class(_, t)) => subtype_(report, gamma, env, t1, t, depth),
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
-        (_, _) => Err(Error::msg(format!("{t1} is not a subtype of {t2}"))),
+        (_, _) => Err(Error::msg(format!(
+            "{} is not a subtype of {}",
+            elide_large(t1),
+            elide_large(t2)
+        ))),
     }
 }
 
@@ -770,7 +795,11 @@ fn equal_impl(
         }
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
-        (_, _) => Err(Error::msg(format!("{t1} is not equal to {t2}"))),
+        (_, _) => Err(Error::msg(format!(
+            "{} is not equal to {}",
+            elide_large(t1),
+            elide_large(t2)
+        ))),
     }
 }
 

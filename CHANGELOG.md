@@ -6,6 +6,7 @@
 
 * Bug fixes:
   + Bound the byte length of the type-table header, 64 KiB by default and configurable with `DecoderConfig::set_max_header_len`. Headers over the bound, far above any realistic interface, are now rejected; the value section is unaffected, and `set_max_type_len` still separately bounds the number of type-table entries.
+  + Bound the size of a type named in a decoder diagnostic. What it costs to render a type follows that type's own width and depth, and a type reaching the decoder is chosen by the sender, so a diagnostic now elides one whose rendering would exceed a fixed budget instead of rendering it in full. This holds for every diagnostic that names a type, including the subtyping messages and the verbose form that `set_full_error_message(true)` selects; ordinary mismatches are unchanged and still name both types.
 
 ## 2026-09-22
 
