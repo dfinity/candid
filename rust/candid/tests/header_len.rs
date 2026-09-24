@@ -104,12 +104,12 @@ fn one_bound_covers_every_declared_count() {
 fn the_bound_is_on_the_header_not_the_payload() {
     // A 2 MB value section decodes fine under a deliberately tiny header bound:
     // the bound constrains the type description, not how much data it describes.
-    let blob = serde_bytes::ByteBuf::from(vec![7u8; 2_000_000]);
+    let blob: Vec<u8> = vec![7u8; 2_000_000];
     let bytes = Encode!(&blob).unwrap();
     let mut c = cfg(Some(64));
     c.set_decoding_quota(100_000_000);
     let mut d = IDLDeserialize::new_with_config(&bytes, &c).unwrap();
-    let out = d.get_value::<serde_bytes::ByteBuf>().unwrap();
+    let out = d.get_value::<Vec<u8>>().unwrap();
     assert_eq!(out.len(), 2_000_000);
 }
 
@@ -236,5 +236,63 @@ fn malformed_headers_are_not_reported_as_oversized() {
     assert!(
         !e.contains("exceeds the limit"),
         "truncated message misdiagnosed: {e}"
+    );
+}
+
+/// A header can also run past the bound in the middle of a length-prefixed name or
+/// blob, or of a multi-byte LEB128. Those are reported at the offset they start at,
+/// which is short of the boundary they cross, so the bound is detected from the fact
+/// that the read ran out of input rather than from where it stopped.
+#[test]
+fn a_header_truncated_mid_field_still_reports_the_bound() {
+    // service type whose single method name is declared longer than the bound
+    let mut name = b"DIDL".to_vec();
+    name.extend(leb(1));
+    name.extend(leb(0x69));
+    name.extend(leb(1));
+    name.extend(leb(100_000));
+    name.extend(std::iter::repeat(b'a').take(100_000));
+    name.push(0x7f);
+    name.extend(leb(1));
+    name.extend(leb(0));
+
+    // future type whose blob is declared longer than the bound
+    let mut blob = b"DIDL".to_vec();
+    blob.extend(leb(1));
+    blob.push(0x50);
+    blob.extend(leb(100_000));
+    blob.extend(std::iter::repeat(0u8).take(100_000));
+    blob.extend(leb(1));
+    blob.extend(leb(0));
+
+    for (label, msg) in [("method name", name), ("future blob", blob)] {
+        let e = err(&msg, &cfg(None));
+        assert!(
+            e.contains("exceeds the limit"),
+            "{label} crossing the bound should report it, got: {e}"
+        );
+    }
+}
+
+/// Rejecting an oversized header must not cost a diagnostic proportional to the whole
+/// message: the error carries no dump of the input, even with full error messages on.
+#[test]
+fn the_bound_error_does_not_dump_the_input() {
+    let msg = args(4_000_000);
+    let mut c = DecoderConfig::new();
+    c.set_full_error_message(true);
+    let e = err(&msg, &c);
+    assert!(e.contains("exceeds the limit"), "unexpected error: {e}");
+    assert!(
+        e.len() < 200,
+        "the bound error should stay small, got {} chars for a {} byte message",
+        e.len(),
+        msg.len()
+    );
+    // Ordinary parse failures still carry the input when asked to.
+    let small = err(b"DIDX\x00\x00", &c);
+    assert!(
+        small.contains("444944"),
+        "a small message should still be dumped: {small}"
     );
 }

@@ -33,13 +33,7 @@ impl<'de> IDLDeserialize<'de> {
     }
     /// Create a new deserializer with IDL binary message. The config is used to adjust some parameters in the deserializer.
     pub fn new_with_config(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
-        let mut de = Deserializer::from_bytes(bytes, config).with_context(|| {
-            if config.full_error_message || bytes.len() <= 500 {
-                format!("Cannot parse header {}", hex::encode(bytes))
-            } else {
-                "Cannot parse header".to_string()
-            }
-        })?;
+        let mut de = Deserializer::from_bytes(bytes, config)?;
         de.add_cost((de.input.position() as usize).saturating_mul(4))?;
         Ok(IDLDeserialize { de })
     }
@@ -331,6 +325,16 @@ struct Deserializer<'de> {
     text_fast_path: bool,
 }
 
+/// Context attached to a header parse failure. Includes the raw input only where the
+/// configuration asks for it or the message is small enough for it to be useful.
+fn header_context(bytes: &[u8], config: &DecoderConfig) -> String {
+    if config.full_error_message || bytes.len() <= 500 {
+        format!("Cannot parse header {}", hex::encode(bytes))
+    } else {
+        "Cannot parse header".to_string()
+    }
+}
+
 impl<'de> Deserializer<'de> {
     fn from_bytes(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
         // Parse the header from a bounded prefix of the input. A header that needs
@@ -342,25 +346,33 @@ impl<'de> Deserializer<'de> {
             .unwrap_or(crate::binary_parser::DEFAULT_MAX_HEADER_LEN);
         let bounded = bytes.len().min(max_header_len);
         let mut probe = Cursor::new(&bytes[..bounded]);
-        let header = Header::read_le_args(&mut probe, (config.max_type_len,)).map_err(|e| {
-            // Report the bound only when the parse actually ran off the end of the
-            // prefix: the prefix stopped short of the message *and* the failure was at
-            // its boundary. A malformed header fails at wherever it is wrong -- bad
-            // magic, an unknown opcode, an over-long type table are all far short of
-            // the bound -- and keeps its own diagnosis. binrw rewinds the reader on
-            // error, so the offset comes from the error rather than the cursor.
-            let ran_off_the_end = crate::binary_parser::failed_at_or_beyond(&e, bounded as u64);
-            if bounded < bytes.len() && ran_off_the_end {
-                Error::msg(format!(
-                    "Type table header exceeds the limit of {max_header_len} bytes"
-                ))
-            } else {
-                Error::from(e)
+        let header = match Header::read_le_args(&mut probe, (config.max_type_len,)) {
+            Ok(header) => header,
+            Err(e) => {
+                // Report the bound only when the parse ran out of input while the
+                // prefix stopped short of the message. A malformed header -- bad magic,
+                // an unknown opcode, an over-long type table -- keeps its own
+                // diagnosis, whatever the size of the message around it.
+                if bounded < bytes.len() && crate::binary_parser::is_truncation(&e) {
+                    // Deliberately without the input dump: attaching one would make
+                    // rejecting an oversized header cost a diagnostic proportional to
+                    // the whole message, which is the cost this bound exists to avoid.
+                    // The message is self-describing in any case.
+                    return Err(Error::msg(format!(
+                        "Type table header exceeds the limit of {max_header_len} bytes"
+                    )));
+                }
+                return Err(Error::from(e))
+                    .with_context(|| header_context(bytes, config))
+                    .map_err(Error::from);
             }
-        })?;
+        };
         let mut reader = Cursor::new(bytes);
         reader.set_position(probe.position());
-        let (env, types) = header.to_types()?;
+        let (env, types) = header
+            .to_types()
+            .with_context(|| header_context(bytes, config))
+            .map_err(Error::from)?;
         Ok(Deserializer {
             input: reader,
             table: env.into(),

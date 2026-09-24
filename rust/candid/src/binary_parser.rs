@@ -26,32 +26,47 @@ pub(crate) const DEFAULT_MAX_HEADER_LEN: usize = 64 * 1024;
 // blob. The buffer grows in steps of at most this size.
 const READ_CHUNK: u64 = 8 * 1024;
 
-/// Whether a header parse failed at or beyond `limit`.
+/// Marks a header read that stopped because the reader ran out of bytes, as opposed to
+/// one that found something malformed.
 ///
-/// Used to tell a header that ran off the end of its allowed prefix from one that is
-/// simply malformed: the former fails at the prefix boundary, the latter at wherever
-/// it is wrong. The whole error tree is walked because binrw reports a failure inside
-/// an enum variant as `EnumErrors` positioned at the start of the enum, not at the
-/// offset the variant actually stopped on. A reader that came up short carries no
-/// offset at all, which for a truncated prefix is the boundary by definition.
-pub(crate) fn failed_at_or_beyond(e: &BError, limit: u64) -> bool {
+/// It displays as the plain field name, so error text is unchanged; the type is what
+/// makes the distinction recoverable from a `binrw::Error`.
+#[derive(Debug)]
+pub(crate) struct Truncated(pub(crate) &'static str);
+
+impl std::fmt::Display for Truncated {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+fn leb_failure(e: leb128::read::Error, name: &'static str) -> Box<dyn binrw::error::CustomError> {
+    match e {
+        // Ran out of input: within a bounded prefix, that is the bound.
+        leb128::read::Error::IoError(_) => Box::new(Truncated(name)),
+        // A value too large for the target type is malformed, not truncated.
+        leb128::read::Error::Overflow => Box::new(name),
+    }
+}
+
+/// Whether a header parse stopped because it ran out of input, rather than because the
+/// header was malformed.
+///
+/// Inside a bounded prefix this is exactly the signal that the header needed more than
+/// the bound. The failure offset cannot be used for it: a length-prefixed name or blob,
+/// and a multi-byte LEB128, are reported at the offset they *start* at, which can be
+/// well short of the boundary they cross. binrw also reports a failure inside an enum
+/// variant as `EnumErrors` positioned at the start of the enum, so the whole error tree
+/// is walked.
+pub(crate) fn is_truncation(e: &BError) -> bool {
     match e {
         // `Backtrace::error` is guaranteed not to be another backtrace.
-        BError::Backtrace(bt) => failed_at_or_beyond(&bt.error, limit),
-        BError::EnumErrors {
-            pos,
-            variant_errors,
-        } => {
-            *pos >= limit
-                || variant_errors
-                    .iter()
-                    .any(|(_, inner)| failed_at_or_beyond(inner, limit))
+        BError::Backtrace(bt) => is_truncation(&bt.error),
+        BError::EnumErrors { variant_errors, .. } => {
+            variant_errors.iter().any(|(_, inner)| is_truncation(inner))
         }
-        BError::BadMagic { pos, .. }
-        | BError::AssertFail { pos, .. }
-        | BError::Custom { pos, .. }
-        | BError::NoVariantMatch { pos } => *pos >= limit,
-        _ => true,
+        BError::Io(io) => io.kind() == std::io::ErrorKind::UnexpectedEof,
+        _ => e.custom_err::<Truncated>().is_some(),
     }
 }
 
@@ -77,7 +92,7 @@ fn read_len_prefixed<R: std::io::Read>(reader: &mut R, pos: u64, len: u64) -> Bi
             // Fewer bytes were available than declared: short input.
             return Err(BError::Custom {
                 pos,
-                err: Box::new("not enough bytes"),
+                err: Box::new(Truncated("not enough bytes")),
             });
         }
         remaining -= read;
@@ -103,25 +118,25 @@ fn read_text(len: u64) -> BinResult<String> {
 #[binrw::parser(reader)]
 fn read_leb(name: &'static str) -> BinResult<u64> {
     let pos = reader.stream_position()?;
-    leb128::read::unsigned(reader).map_err(|_| BError::Custom {
+    leb128::read::unsigned(reader).map_err(|e| BError::Custom {
         pos,
-        err: Box::new(name),
+        err: leb_failure(e, name),
     })
 }
 #[binrw::parser(reader)]
 fn read_sleb(name: &'static str) -> BinResult<i64> {
     let pos = reader.stream_position()?;
-    leb128::read::signed(reader).map_err(|_| BError::Custom {
+    leb128::read::signed(reader).map_err(|e| BError::Custom {
         pos,
-        err: Box::new(name),
+        err: leb_failure(e, name),
     })
 }
 #[binrw::parser(reader)]
 fn read_leb_u32(name: &'static str, range_msg: &'static str) -> BinResult<u32> {
     let pos = reader.stream_position()?;
-    let v = leb128::read::unsigned(reader).map_err(|_| BError::Custom {
+    let v = leb128::read::unsigned(reader).map_err(|e| BError::Custom {
         pos,
-        err: Box::new(name),
+        err: leb_failure(e, name),
     })?;
     v.try_into().map_err(|_| BError::Custom {
         pos,
@@ -131,9 +146,9 @@ fn read_leb_u32(name: &'static str, range_msg: &'static str) -> BinResult<u32> {
 #[binrw::parser(reader)]
 fn read_leb_usize(name: &'static str, range_msg: &'static str) -> BinResult<usize> {
     let pos = reader.stream_position()?;
-    let v = leb128::read::unsigned(reader).map_err(|_| BError::Custom {
+    let v = leb128::read::unsigned(reader).map_err(|e| BError::Custom {
         pos,
-        err: Box::new(name),
+        err: leb_failure(e, name),
     })?;
     v.try_into().map_err(|_| BError::Custom {
         pos,
