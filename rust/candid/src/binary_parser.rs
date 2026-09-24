@@ -8,29 +8,19 @@ const MAX_TYPE_TABLE_LEN: u64 = 10_000; // Max type entries
 
 /// Default bound on the byte length of the type-table header.
 ///
-/// The header is a type description, so its size is a property of the interface
-/// rather than of the payload: the largest header among the IC's own interfaces is
-/// about 2 KB (NNS governance `manage_neuron`), and the management canister's
-/// largest is 214 bytes. 64 KiB leaves roughly a 32x margin over that while keeping
-/// the work any single header can demand bounded, independently of how large the
-/// value section is allowed to be.
-///
-/// This bounds every wire-declared count in the header at once -- the argument
-/// count, a record or variant's field count, a function type's argument and result
-/// counts, a service type's method count -- because each element it introduces
-/// occupies at least one byte. [`MAX_TYPE_TABLE_LEN`] remains a separate bound on a
-/// different dimension: the number of type-table entries, whatever their size.
+/// A header describes types, so its size follows the interface rather than the payload.
+/// Every element it declares occupies at least one byte, so bounding its length bounds
+/// each declared count at once. [`MAX_TYPE_TABLE_LEN`] bounds a different dimension:
+/// the number of type-table entries, whatever their size.
 pub(crate) const DEFAULT_MAX_HEADER_LEN: usize = 64 * 1024;
 
 // Upper bound on a single allocation step while reading a length-prefixed byte
 // blob. The buffer grows in steps of at most this size.
 const READ_CHUNK: u64 = 8 * 1024;
 
-/// Marks a header read that stopped because the reader ran out of bytes, as opposed to
-/// one that found something malformed.
-///
-/// It displays as the plain field name, so error text is unchanged; the type is what
-/// makes the distinction recoverable from a `binrw::Error`.
+/// Marks a header read that stopped because the reader ran out of bytes, rather than
+/// one that found something malformed. Displays as the plain field name, so error text
+/// is unchanged; the type is what makes the distinction recoverable.
 #[derive(Debug)]
 pub(crate) struct Truncated(pub(crate) &'static str);
 
@@ -50,14 +40,13 @@ fn leb_failure(e: leb128::read::Error, name: &'static str) -> Box<dyn binrw::err
 }
 
 /// Whether a header parse stopped because it ran out of input, rather than because the
-/// header was malformed.
+/// header was malformed. Inside a bounded prefix that is the signal that the header
+/// needed more than the bound.
 ///
-/// Inside a bounded prefix this is exactly the signal that the header needed more than
-/// the bound. The failure offset cannot be used for it: a length-prefixed name or blob,
-/// and a multi-byte LEB128, are reported at the offset they *start* at, which can be
-/// well short of the boundary they cross. binrw also reports a failure inside an enum
-/// variant as `EnumErrors` positioned at the start of the enum, so the whole error tree
-/// is walked.
+/// The failure offset cannot serve here: a length-prefixed field and a multi-byte
+/// LEB128 are reported where they *start*, and binrw reports a failure inside an enum
+/// variant at the start of the enum, all of which can be short of the boundary actually
+/// crossed. Hence the marker, and the walk over the error tree.
 pub(crate) fn is_truncation(e: &BError) -> bool {
     match e {
         // `Backtrace::error` is guaranteed not to be another backtrace.

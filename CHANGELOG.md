@@ -5,7 +5,7 @@
 ### Candid
 
 * Bug fixes:
-  + Bound the byte length of the type-table header, defaulting to 64 KiB and configurable with `DecoderConfig::set_max_header_len`. A header is a type description, so its size is a property of the interface rather than of the payload -- the largest header among the IC's own interfaces is about 2 KB -- while the counts it declares were free to describe millions of elements. Because every element a header introduces occupies at least one byte, one bound on its length now covers all of them at once: the argument count, a record or variant's field count, a function type's argument and result counts, and a service type's method count. The header is parsed from a bounded prefix of the input, so an oversized one costs the bound rather than its declared size, and the value section is unaffected -- a message may still carry a payload of any size its quota allows. `set_max_type_len` is unchanged and continues to bound a different dimension, the number of type-table entries.
+  + Bound the byte length of the type-table header, 64 KiB by default and configurable with `DecoderConfig::set_max_header_len`. A header over the bound is now rejected, which is far above any realistic interface, and the value section is unaffected; `set_max_type_len` still separately bounds the number of type-table entries.
 
 ## 2026-09-22
 

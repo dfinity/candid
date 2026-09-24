@@ -219,17 +219,13 @@ impl DecoderConfig {
         self
     }
     /// Limit the byte length of the type-table header, the part of the message that
-    /// describes the types of the values that follow.
+    /// describes the types of the values that follow. Defaults to 64 KiB.
     ///
-    /// A header's size is a property of the interface rather than of the payload, and
-    /// every element it declares -- an argument, a record or variant field, a function
-    /// argument or result, a service method -- costs at least one byte. Bounding its
-    /// length therefore bounds each of those counts at once, and bounds the work the
-    /// header can demand before any value is read.
-    ///
-    /// Defaults to 64 KiB when unset, which is roughly 32x the largest header among
-    /// the IC's own interfaces. [`set_max_type_len`](#method.set_max_type_len) remains
-    /// a separate bound on the number of type-table entries.
+    /// Every element a header declares -- an argument, a record or variant field, a
+    /// function argument or result, a service method -- occupies at least one byte, so
+    /// this bounds each of those counts, and the work the header can demand, before any
+    /// value is read. [`set_max_type_len`](#method.set_max_type_len) separately bounds
+    /// the number of type-table entries.
     pub fn set_max_header_len(&mut self, n: usize) -> &mut Self {
         self.max_header_len = Some(n);
         self
@@ -337,10 +333,9 @@ fn header_context(bytes: &[u8], config: &DecoderConfig) -> String {
 
 impl<'de> Deserializer<'de> {
     fn from_bytes(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
-        // Parse the header from a bounded prefix of the input. A header that needs
-        // more than `max_header_len` bytes runs off the end of that prefix and fails
-        // there, so an oversized header costs only the bound rather than its declared
-        // size. The value section is read from the full input afterwards.
+        // Parse the header from a bounded prefix, so a header larger than the bound
+        // costs the bound rather than its declared size. The value section is read
+        // from the full input afterwards.
         let max_header_len = config
             .max_header_len
             .unwrap_or(crate::binary_parser::DEFAULT_MAX_HEADER_LEN);
@@ -349,15 +344,13 @@ impl<'de> Deserializer<'de> {
         let header = match Header::read_le_args(&mut probe, (config.max_type_len,)) {
             Ok(header) => header,
             Err(e) => {
-                // Report the bound only when the parse ran out of input while the
-                // prefix stopped short of the message. A malformed header -- bad magic,
-                // an unknown opcode, an over-long type table -- keeps its own
-                // diagnosis, whatever the size of the message around it.
+                // Only a parse that ran out of input inside a truncated prefix is
+                // over the bound; a malformed header keeps its own diagnosis whatever
+                // the size of the message around it.
                 if bounded < bytes.len() && crate::binary_parser::is_truncation(&e) {
-                    // Deliberately without the input dump: attaching one would make
-                    // rejecting an oversized header cost a diagnostic proportional to
-                    // the whole message, which is the cost this bound exists to avoid.
-                    // The message is self-describing in any case.
+                    // No input dump: it would make rejecting an oversized header
+                    // cost a diagnostic proportional to the message, which is what
+                    // the bound prevents.
                     return Err(Error::msg(format!(
                         "Type table header exceeds the limit of {max_header_len} bytes"
                     )));
