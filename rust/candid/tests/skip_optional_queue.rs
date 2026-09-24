@@ -69,8 +69,14 @@ fn opt_null_message(n: usize, present: usize) -> Vec<u8> {
 #[test]
 fn skipping_many_present_optionals_is_not_quadratic() {
     let bytes = opt_null_message(150_000, 15_000);
+    // 150_000 declared arguments is a ~150 KB header, past the default bound on
+    // header size. That bound is what stops such a message in production; this test
+    // is about the cost of skipping the arguments once they are admitted, so it opts
+    // into a header large enough to reach that code.
+    let mut config = candid::DecoderConfig::new();
+    config.set_max_header_len(1 << 20);
     let start = Instant::now();
-    let mut de = IDLDeserialize::new(&bytes).unwrap();
+    let mut de = IDLDeserialize::new_with_config(&bytes, &config).unwrap();
     let _first: Option<()> = de.get_value().unwrap();
     de.done().unwrap();
     let elapsed = start.elapsed();

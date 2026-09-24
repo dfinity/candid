@@ -33,13 +33,7 @@ impl<'de> IDLDeserialize<'de> {
     }
     /// Create a new deserializer with IDL binary message. The config is used to adjust some parameters in the deserializer.
     pub fn new_with_config(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
-        let mut de = Deserializer::from_bytes(bytes, config).with_context(|| {
-            if config.full_error_message || bytes.len() <= 500 {
-                format!("Cannot parse header {}", hex::encode(bytes))
-            } else {
-                "Cannot parse header".to_string()
-            }
-        })?;
+        let mut de = Deserializer::from_bytes(bytes, config)?;
         de.add_cost((de.input.position() as usize).saturating_mul(4))?;
         Ok(IDLDeserialize { de })
     }
@@ -147,6 +141,7 @@ pub struct DecoderConfig {
     pub decoding_quota: Option<usize>,
     pub skipping_quota: Option<usize>,
     pub max_type_len: Option<usize>,
+    pub max_header_len: Option<usize>,
     full_error_message: bool,
 }
 impl DecoderConfig {
@@ -158,6 +153,7 @@ impl DecoderConfig {
             decoding_quota: None,
             skipping_quota: None,
             max_type_len: None,
+            max_header_len: None,
             #[cfg(not(target_arch = "wasm32"))]
             full_error_message: true,
             #[cfg(target_arch = "wasm32")]
@@ -222,6 +218,18 @@ impl DecoderConfig {
         self.max_type_len = Some(n);
         self
     }
+    /// Limit the byte length of the type-table header, the part of the message that
+    /// describes the types of the values that follow. Defaults to 64 KiB.
+    ///
+    /// Every element a header declares -- an argument, a record or variant field, a
+    /// function argument or result, a service method -- occupies at least one byte, so
+    /// this bounds each of those counts, and the work the header can demand, before any
+    /// value is read. [`set_max_type_len`](#method.set_max_type_len) separately bounds
+    /// the number of type-table entries.
+    pub fn set_max_header_len(&mut self, n: usize) -> &mut Self {
+        self.max_header_len = Some(n);
+        self
+    }
     /// When set to false, error message only displays the concrete type when the type is small.
     /// The error message also doesn't include the decoding states.
     /// When set to true, error message always shows the full type and decoding states.
@@ -241,6 +249,7 @@ impl DecoderConfig {
             decoding_quota,
             skipping_quota,
             max_type_len: original.max_type_len,
+            max_header_len: original.max_header_len,
             full_error_message: original.full_error_message,
         }
     }
@@ -312,11 +321,51 @@ struct Deserializer<'de> {
     text_fast_path: bool,
 }
 
+/// Context attached to a header parse failure. Includes the raw input only where the
+/// configuration asks for it or the message is small enough for it to be useful.
+fn header_context(bytes: &[u8], config: &DecoderConfig) -> String {
+    if config.full_error_message || bytes.len() <= 500 {
+        format!("Cannot parse header {}", hex::encode(bytes))
+    } else {
+        "Cannot parse header".to_string()
+    }
+}
+
 impl<'de> Deserializer<'de> {
     fn from_bytes(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
+        // Parse the header from a bounded prefix, so a header larger than the bound
+        // costs the bound rather than its declared size. The value section is read
+        // from the full input afterwards.
+        let max_header_len = config
+            .max_header_len
+            .unwrap_or(crate::binary_parser::DEFAULT_MAX_HEADER_LEN);
+        let bounded = bytes.len().min(max_header_len);
+        let mut probe = Cursor::new(&bytes[..bounded]);
+        let header = match Header::read_le_args(&mut probe, (config.max_type_len,)) {
+            Ok(header) => header,
+            Err(e) => {
+                // Only a parse that ran out of input inside a truncated prefix is
+                // over the bound; a malformed header keeps its own diagnosis whatever
+                // the size of the message around it.
+                if bounded < bytes.len() && crate::binary_parser::is_truncation(&e) {
+                    // No input dump: it would make rejecting an oversized header
+                    // cost a diagnostic proportional to the message, which is what
+                    // the bound prevents.
+                    return Err(Error::msg(format!(
+                        "Type table header exceeds the limit of {max_header_len} bytes"
+                    )));
+                }
+                return Err(Error::from(e))
+                    .with_context(|| header_context(bytes, config))
+                    .map_err(Error::from);
+            }
+        };
         let mut reader = Cursor::new(bytes);
-        let header = Header::read_le_args(&mut reader, (config.max_type_len,))?;
-        let (env, types) = header.to_types()?;
+        reader.set_position(probe.position());
+        let (env, types) = header
+            .to_types()
+            .with_context(|| header_context(bytes, config))
+            .map_err(Error::from)?;
         Ok(Deserializer {
             input: reader,
             table: env.into(),
