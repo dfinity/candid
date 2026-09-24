@@ -26,6 +26,35 @@ pub(crate) const DEFAULT_MAX_HEADER_LEN: usize = 64 * 1024;
 // blob. The buffer grows in steps of at most this size.
 const READ_CHUNK: u64 = 8 * 1024;
 
+/// Whether a header parse failed at or beyond `limit`.
+///
+/// Used to tell a header that ran off the end of its allowed prefix from one that is
+/// simply malformed: the former fails at the prefix boundary, the latter at wherever
+/// it is wrong. The whole error tree is walked because binrw reports a failure inside
+/// an enum variant as `EnumErrors` positioned at the start of the enum, not at the
+/// offset the variant actually stopped on. A reader that came up short carries no
+/// offset at all, which for a truncated prefix is the boundary by definition.
+pub(crate) fn failed_at_or_beyond(e: &BError, limit: u64) -> bool {
+    match e {
+        // `Backtrace::error` is guaranteed not to be another backtrace.
+        BError::Backtrace(bt) => failed_at_or_beyond(&bt.error, limit),
+        BError::EnumErrors {
+            pos,
+            variant_errors,
+        } => {
+            *pos >= limit
+                || variant_errors
+                    .iter()
+                    .any(|(_, inner)| failed_at_or_beyond(inner, limit))
+        }
+        BError::BadMagic { pos, .. }
+        | BError::AssertFail { pos, .. }
+        | BError::Custom { pos, .. }
+        | BError::NoVariantMatch { pos } => *pos >= limit,
+        _ => true,
+    }
+}
+
 /// Read `len` bytes into a fresh `Vec`, growing the buffer in bounded steps.
 ///
 /// A plain `#[br(count = len)]` on a `Vec<u8>` passes the wire-declared length

@@ -343,9 +343,14 @@ impl<'de> Deserializer<'de> {
         let bounded = bytes.len().min(max_header_len);
         let mut probe = Cursor::new(&bytes[..bounded]);
         let header = Header::read_le_args(&mut probe, (config.max_type_len,)).map_err(|e| {
-            if bounded < bytes.len() {
-                // The prefix was the limit, not the end of the message, so the header
-                // is over the bound -- report that rather than a short read.
+            // Report the bound only when the parse actually ran off the end of the
+            // prefix: the prefix stopped short of the message *and* the failure was at
+            // its boundary. A malformed header fails at wherever it is wrong -- bad
+            // magic, an unknown opcode, an over-long type table are all far short of
+            // the bound -- and keeps its own diagnosis. binrw rewinds the reader on
+            // error, so the offset comes from the error rather than the cursor.
+            let ran_off_the_end = crate::binary_parser::failed_at_or_beyond(&e, bounded as u64);
+            if bounded < bytes.len() && ran_off_the_end {
                 Error::msg(format!(
                     "Type table header exceeds the limit of {max_header_len} bytes"
                 ))

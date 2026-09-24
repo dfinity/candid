@@ -174,3 +174,67 @@ fn a_larger_bound_can_be_opted_into() {
         "raised bound should admit the header: {e}"
     );
 }
+
+/// A wire-declared count far larger than the input costs only the bound, not the
+/// count. binrw reserves up front only for `Vec<u8>` (handled by `read_len_prefixed`);
+/// the header's element vectors collect an iterator whose size-hint lower bound is 0,
+/// so nothing is allocated for the declared length. If that ever changed, this test
+/// would exhaust memory rather than fail.
+#[test]
+fn a_huge_declared_count_allocates_nothing() {
+    for count in [1u64 << 32, 1 << 40, u64::MAX] {
+        let mut b = b"DIDL".to_vec();
+        b.extend(leb(0));
+        b.extend(leb(count));
+        // pad past the bound so the prefix, not the message end, is what stops it
+        b.extend(std::iter::repeat(0u8).take(100_000));
+        let e = err(&b, &cfg(None));
+        assert!(
+            e.contains("exceeds the limit"),
+            "declared {count} args should hit the header bound, got: {e}"
+        );
+    }
+}
+
+/// A header that is malformed rather than oversized keeps its own diagnosis, even when
+/// the surrounding message is larger than the bound. Only a parse that runs off the end
+/// of the allowed prefix is reported as a size violation.
+#[test]
+fn malformed_headers_are_not_reported_as_oversized() {
+    let pad = || std::iter::repeat(0u8).take(100_000);
+
+    let mut bad_magic = b"DIDX".to_vec();
+    bad_magic.extend(pad());
+    let e = err(&bad_magic, &cfg(None));
+    assert!(
+        e.contains("Unexpected bytes"),
+        "bad magic misdiagnosed: {e}"
+    );
+    assert!(
+        !e.contains("exceeds the limit"),
+        "bad magic misdiagnosed: {e}"
+    );
+
+    let mut too_many_types = b"DIDL".to_vec();
+    too_many_types.extend(leb(20_000)); // over max_type_len
+    too_many_types.extend(pad());
+    let e = err(&too_many_types, &cfg(None));
+    assert!(
+        e.contains("type table size exceeded"),
+        "type table misdiagnosed: {e}"
+    );
+    assert!(
+        !e.contains("exceeds the limit"),
+        "type table misdiagnosed: {e}"
+    );
+
+    // A message that is short rather than over-bound keeps its short-read error.
+    let mut truncated = b"DIDL".to_vec();
+    truncated.extend(leb(0));
+    truncated.extend(leb(50)); // 50 args declared, none present
+    let e = err(&truncated, &cfg(None));
+    assert!(
+        !e.contains("exceeds the limit"),
+        "truncated message misdiagnosed: {e}"
+    );
+}
