@@ -372,7 +372,11 @@ fn printed_num_width(n: u32) -> i32 {
     digits + (digits - 1) / 3
 }
 
-/// Budget, in rendered characters, for a type named in a diagnostic.
+/// Budget for a type named in a diagnostic, in approximate rendered characters.
+///
+/// [`text_size`] estimates rather than measures, so a type that passes can still render
+/// somewhat longer than this. What matters is that the estimate is proportional to the
+/// rendering, which keeps the result bounded.
 pub(crate) const MAX_DIAGNOSTIC_TYPE_LEN: i32 = 500;
 
 /// Stands in for a type a diagnostic cannot render within its budget.
@@ -445,10 +449,15 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
             let mode = if func.modes.is_empty() { 0 } else { 6 };
             let mut cnt = mode + 6;
             let mut limit = limit - cnt;
-            for t in func.args.iter().chain(func.rets.iter()) {
-                let arg = text_size(t, limit)?;
-                cnt += arg;
-                limit -= arg;
+            // arguments and results each render as a list separated by ", "; every
+            // other arm already covers its own separators through its per-item charge
+            for list in [&func.args, &func.rets] {
+                for (i, t) in list.iter().enumerate() {
+                    let sep = if i == 0 { 0 } else { 2 };
+                    let arg = sep + text_size(t, limit - sep)?;
+                    cnt += arg;
+                    limit -= arg;
+                }
             }
             cnt
         }
