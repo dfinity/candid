@@ -2,7 +2,9 @@
 
 use super::{
     error::{Error, Result},
-    types::internal::{text_size, type_of, TypeId},
+    types::internal::{
+        elide_large, text_size, type_of, TypeId, MAX_DIAGNOSTIC_LIST_LEN, MAX_DIAGNOSTIC_TYPE_LEN,
+    },
     types::{Field, Label, SharedLabel, Type, TypeEnv, TypeInner},
     CandidType,
 };
@@ -19,7 +21,22 @@ use serde::de::{self, Visitor};
 use std::fmt::Write;
 use std::{collections::VecDeque, io::Cursor, mem::replace, rc::Rc};
 
-const MAX_TYPE_LEN: i32 = 500;
+/// Render a type table for a diagnostic, eliding entries too large to render and
+/// stopping once the table itself reaches its budget.
+///
+/// A table holds as many entries as `max_type_len` allows, so bounding each entry on
+/// its own would still leave the whole rendering growing with their number.
+fn describe_table(env: &TypeEnv) -> String {
+    let mut out = String::new();
+    for (i, (name, ty)) in env.0.iter().enumerate() {
+        if out.len() >= MAX_DIAGNOSTIC_LIST_LEN {
+            let _ = writeln!(&mut out, "... and {} more", env.0.len() - i);
+            break;
+        }
+        let _ = writeln!(&mut out, "type {name} = {}", elide_large(ty));
+    }
+    out
+}
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
 pub struct IDLDeserialize<'de> {
@@ -73,9 +90,7 @@ impl<'de> IDLDeserialize<'de> {
                 self.de.expect_type = expected_type;
                 self.de.wire_type = TypeInner::Null.into();
                 return T::deserialize(&mut self.de);
-            } else if self.de.config.full_error_message
-                || text_size(&expected_type, MAX_TYPE_LEN).is_ok()
-            {
+            } else if text_size(&expected_type, MAX_DIAGNOSTIC_TYPE_LEN).is_ok() {
                 return Err(Error::msg(format!(
                     "No more values on the wire, the expected type {expected_type} is not opt, null, or reserved"
                 )));
@@ -94,9 +109,8 @@ impl<'de> IDLDeserialize<'de> {
         self.de.wire_type = ty.clone();
 
         let mut v = T::deserialize(&mut self.de).with_context(|| {
-            if self.de.config.full_error_message
-                || (text_size(&ty, MAX_TYPE_LEN).is_ok()
-                    && text_size(&expected_type, MAX_TYPE_LEN).is_ok())
+            if text_size(&ty, MAX_DIAGNOSTIC_TYPE_LEN).is_ok()
+                && text_size(&expected_type, MAX_DIAGNOSTIC_TYPE_LEN).is_ok()
             {
                 format!("Fail to decode argument {ind} from {ty} to {expected_type}")
             } else {
@@ -389,12 +403,13 @@ impl<'de> Deserializer<'de> {
         let (before, after) = hex.split_at(pos);
         let mut res = format!("input: {before}_{after}\n");
         if !self.table.0.is_empty() {
-            write!(&mut res, "table: {}", self.table).unwrap();
+            write!(&mut res, "table: {}", describe_table(&self.table)).unwrap();
         }
         write!(
             &mut res,
             "wire_type: {}, expect_type: {}",
-            self.wire_type, self.expect_type
+            elide_large(&self.wire_type),
+            elide_large(&self.expect_type)
         )
         .unwrap();
         if let Some(field) = &self.field_name {
@@ -507,9 +522,8 @@ impl<'de> Deserializer<'de> {
             &self.expect_type,
         )
         .with_context(|| {
-            if self.config.full_error_message
-                || (text_size(&self.wire_type, MAX_TYPE_LEN).is_ok()
-                    && text_size(&self.expect_type, MAX_TYPE_LEN).is_ok())
+            if text_size(&self.wire_type, MAX_DIAGNOSTIC_TYPE_LEN).is_ok()
+                && text_size(&self.expect_type, MAX_DIAGNOSTIC_TYPE_LEN).is_ok()
             {
                 format!(
                     "{} is not a subtype of {}",
@@ -619,7 +633,7 @@ impl<'de> Deserializer<'de> {
             } else {
                 return Err(Error::subtype(format!(
                     "{} cannot be deserialized to int",
-                    self.wire_type
+                    elide_large(&self.wire_type)
                 )));
             }
         }
@@ -628,7 +642,12 @@ impl<'de> Deserializer<'de> {
         let int = match self.wire_type.as_ref() {
             TypeInner::Int => Int::decode(&mut self.input).map_err(Error::msg)?,
             TypeInner::Nat => Int(Nat::decode(&mut self.input).map_err(Error::msg)?.0.into()),
-            t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
+            _ => {
+                return Err(Error::subtype(format!(
+                    "{} cannot be deserialized to int",
+                    elide_large(&self.wire_type)
+                )))
+            }
         };
         self.add_cost((self.input.position() - bignum_pos) as usize)?;
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
@@ -1038,7 +1057,12 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             TypeInner::Int => decode_int(&mut self.input)?,
             TypeInner::Nat => i128::try_from(decode_nat(&mut self.input)?)
                 .map_err(|_| Error::msg("Cannot convert nat to i128"))?,
-            t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
+            _ => {
+                return Err(Error::subtype(format!(
+                    "{} cannot be deserialized to int",
+                    elide_large(&self.wire_type)
+                )))
+            }
         };
         visitor.visit_i128(value)
     }
@@ -1244,7 +1268,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 if !self.wire_type.is_tuple() {
                     return Err(Error::subtype(format!(
                         "{} is not a tuple type",
-                        self.wire_type
+                        elide_large(&self.wire_type)
                     )));
                 }
                 let value = visitor.visit_seq(Compound::new(

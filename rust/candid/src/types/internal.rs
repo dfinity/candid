@@ -365,6 +365,53 @@ impl fmt::Display for TypeInner {
         write!(f, "{:?}", self)
     }
 }
+/// Width of a numeric field id as the printer writes it, with underscore separators,
+/// so `1136829802` counts as the 13 characters of `1_136_829_802`.
+fn printed_num_width(n: u32) -> i32 {
+    let digits = if n == 0 { 1 } else { n.ilog10() as i32 + 1 };
+    digits + (digits - 1) / 3
+}
+
+/// Budget for a type named in a diagnostic, in approximate rendered characters.
+///
+/// [`text_size`] estimates rather than measures, so a type that passes can still render
+/// somewhat longer than this. What matters is that the estimate is proportional to the
+/// rendering, which keeps the result bounded.
+pub(crate) const MAX_DIAGNOSTIC_TYPE_LEN: i32 = 500;
+
+/// Stands in for a type a diagnostic cannot render within its budget.
+pub(crate) const ELIDED_TYPE: &str = "(type elided)";
+
+/// Budget, in characters, for a list of types in a diagnostic. Bounds the list itself,
+/// which a per-element budget does not.
+pub(crate) const MAX_DIAGNOSTIC_LIST_LEN: usize = 2048;
+
+/// Renders a type for a diagnostic, eliding it when rendering would be unreasonable.
+///
+/// What it costs to render a type follows that type's own width and depth, so an
+/// outsized one must not be rendered at all: [`text_size`] settles that against a
+/// budget before any of the work is done. Types reaching a decoder come from the wire
+/// and so are chosen by the sender, which is why the budget holds for every diagnostic
+/// naming one, however verbose the caller asked its errors to be.
+///
+/// Total for every type: one that cannot be rendered at all, such as a service
+/// constructor, is refused by [`text_size`] and elided like any oversized one.
+pub(crate) fn elide_large(t: &Type) -> ElidedType<'_> {
+    ElidedType(t)
+}
+
+pub(crate) struct ElidedType<'a>(&'a Type);
+
+impl fmt::Display for ElidedType<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if text_size(self.0, MAX_DIAGNOSTIC_TYPE_LEN).is_ok() {
+            write!(f, "{}", self.0)
+        } else {
+            f.write_str(ELIDED_TYPE)
+        }
+    }
+}
+
 #[allow(clippy::result_unit_err)]
 pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
     use TypeInner::*;
@@ -388,11 +435,13 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
             for f in fs {
                 let id_size = match f.id.as_ref() {
                     Label::Named(n) => n.len() as i32,
-                    Label::Id(_) => 4,
+                    Label::Id(n) => printed_num_width(*n),
+                    // a tuple prints its fields without labels
                     Label::Unnamed(_) => 0,
                 };
-                cnt += id_size + text_size(&f.ty, limit - id_size - 3)? + 3;
-                limit -= cnt;
+                let field = id_size + text_size(&f.ty, limit - id_size - 3)? + 3;
+                cnt += field;
+                limit -= field;
             }
             9 + cnt
         }
@@ -400,13 +449,15 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
             let mode = if func.modes.is_empty() { 0 } else { 6 };
             let mut cnt = mode + 6;
             let mut limit = limit - cnt;
-            for t in &func.args {
-                cnt += text_size(t, limit)?;
-                limit -= cnt;
-            }
-            for t in &func.rets {
-                cnt += text_size(t, limit)?;
-                limit -= cnt;
+            // arguments and results each render as a list separated by ", "; every
+            // other arm already covers its own separators through its per-item charge
+            for list in [&func.args, &func.rets] {
+                for (i, t) in list.iter().enumerate() {
+                    let sep = if i == 0 { 0 } else { 2 };
+                    let arg = sep + text_size(t, limit - sep)?;
+                    cnt += arg;
+                    limit -= arg;
+                }
             }
             cnt
         }
@@ -415,14 +466,18 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
             let mut limit = limit;
             for (name, f) in ms {
                 let len = name.len() as i32;
-                cnt += len + text_size(f, limit - len - 3)? + 3;
-                limit -= cnt;
+                let method = len + text_size(f, limit - len - 3)? + 3;
+                cnt += method;
+                limit -= method;
             }
             10 + cnt
         }
         Future => 6,
         Unknown => 7,
-        Class(..) => unreachable!(),
+        // A service constructor has no rendering of its own: the pretty printer has no
+        // arm for one. Refusing it here, rather than asserting it cannot appear, keeps
+        // every caller total for a type that merely contains one.
+        Class(..) => return Err(()),
     };
     if cost > limit {
         Err(())
