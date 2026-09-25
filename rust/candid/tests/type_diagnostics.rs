@@ -193,3 +193,26 @@ fn ordinary_mismatches_still_name_their_types() {
         "an ordinary mismatch should still name both types, got: {e}"
     );
 }
+
+/// A service constructor has no rendering of its own. Naming one in a diagnostic must
+/// still produce an error rather than asking the printer for the impossible.
+#[test]
+fn a_service_constructor_is_elided_not_rendered() {
+    use candid::types::internal::{Type, TypeInner};
+    use candid::types::subtype::{equal, Gamma};
+    use candid::types::TypeEnv;
+
+    let serv: Type = TypeInner::Service(vec![("m".to_string(), TypeInner::Nat.into())]).into();
+    let class: Type = TypeInner::Class(vec![TypeInner::Nat.into()], serv).into();
+    let other: Type = TypeInner::Text.into();
+
+    let env = TypeEnv::new();
+    let mut gamma = Gamma::new();
+    let e = equal(&mut gamma, &env, &class, &other)
+        .expect_err("a service constructor is not equal to text")
+        .to_string();
+    assert!(
+        e.contains(ELIDED),
+        "a service constructor should be elided, got: {e}"
+    );
+}

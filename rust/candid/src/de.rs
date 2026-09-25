@@ -2,7 +2,7 @@
 
 use super::{
     error::{Error, Result},
-    types::internal::{elide_large, text_size, type_of, TypeId},
+    types::internal::{elide_large, text_size, type_of, TypeId, MAX_DIAGNOSTIC_TYPE_LEN},
     types::{Field, Label, SharedLabel, Type, TypeEnv, TypeInner},
     CandidType,
 };
@@ -18,8 +18,6 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use serde::de::{self, Visitor};
 use std::fmt::Write;
 use std::{collections::VecDeque, io::Cursor, mem::replace, rc::Rc};
-
-const MAX_TYPE_LEN: i32 = 500;
 
 /// Render a type table for a diagnostic, eliding entries too large to render.
 fn describe_table(env: &crate::types::TypeEnv) -> String {
@@ -82,7 +80,7 @@ impl<'de> IDLDeserialize<'de> {
                 self.de.expect_type = expected_type;
                 self.de.wire_type = TypeInner::Null.into();
                 return T::deserialize(&mut self.de);
-            } else if text_size(&expected_type, MAX_TYPE_LEN).is_ok() {
+            } else if text_size(&expected_type, MAX_DIAGNOSTIC_TYPE_LEN).is_ok() {
                 return Err(Error::msg(format!(
                     "No more values on the wire, the expected type {expected_type} is not opt, null, or reserved"
                 )));
@@ -101,8 +99,8 @@ impl<'de> IDLDeserialize<'de> {
         self.de.wire_type = ty.clone();
 
         let mut v = T::deserialize(&mut self.de).with_context(|| {
-            if text_size(&ty, MAX_TYPE_LEN).is_ok()
-                && text_size(&expected_type, MAX_TYPE_LEN).is_ok()
+            if text_size(&ty, MAX_DIAGNOSTIC_TYPE_LEN).is_ok()
+                && text_size(&expected_type, MAX_DIAGNOSTIC_TYPE_LEN).is_ok()
             {
                 format!("Fail to decode argument {ind} from {ty} to {expected_type}")
             } else {
@@ -514,8 +512,8 @@ impl<'de> Deserializer<'de> {
             &self.expect_type,
         )
         .with_context(|| {
-            if text_size(&self.wire_type, MAX_TYPE_LEN).is_ok()
-                && text_size(&self.expect_type, MAX_TYPE_LEN).is_ok()
+            if text_size(&self.wire_type, MAX_DIAGNOSTIC_TYPE_LEN).is_ok()
+                && text_size(&self.expect_type, MAX_DIAGNOSTIC_TYPE_LEN).is_ok()
             {
                 format!(
                     "{} is not a subtype of {}",
@@ -1260,7 +1258,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 if !self.wire_type.is_tuple() {
                     return Err(Error::subtype(format!(
                         "{} is not a tuple type",
-                        self.wire_type
+                        elide_large(&self.wire_type)
                     )));
                 }
                 let value = visitor.visit_seq(Compound::new(

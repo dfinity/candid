@@ -747,7 +747,9 @@ fn equal_impl(
                 }
                 equal_impl(gamma, env, &f1.ty, &f2.ty, depth).context(format!(
                     "Field {} has different types: {} and {}",
-                    f1.id, f1.ty, f2.ty
+                    f1.id,
+                    elide_large(&f1.ty),
+                    elide_large(&f2.ty)
                 ))?;
             }
             Ok(())
@@ -764,7 +766,9 @@ fn equal_impl(
                 }
                 equal_impl(gamma, env, &m1.1, &m2.1, depth).context(format!(
                     "Method {} has different types: {} and {}",
-                    m1.0, m1.1, m2.1
+                    m1.0,
+                    elide_large(&m1.1),
+                    elide_large(&m2.1)
                 ))?;
             }
             Ok(())
@@ -843,19 +847,17 @@ fn to_tuple(args: &[Type]) -> Type {
     )
     .into()
 }
-#[cfg(not(feature = "printer"))]
+/// Renders an argument list for a diagnostic, eliding any type too large to render.
+///
+/// `elide_large` renders through `Display`, which already picks the pretty printer or
+/// the fallback according to the `printer` feature, so one implementation serves both.
 fn pp_args(args: &[crate::types::Type]) -> String {
     use std::fmt::Write;
     let mut s = String::new();
-    write!(&mut s, "(").unwrap();
+    let _ = write!(&mut s, "(");
     for arg in args.iter() {
-        write!(&mut s, "{:?}, ", arg).unwrap();
+        let _ = write!(&mut s, "{}, ", elide_large(arg));
     }
-    write!(&mut s, ")").unwrap();
+    let _ = write!(&mut s, ")");
     s
-}
-#[cfg(feature = "printer")]
-fn pp_args(args: &[crate::types::Type]) -> String {
-    use crate::pretty::candid::pp_args;
-    pp_args(args).pretty(80).to_string()
 }

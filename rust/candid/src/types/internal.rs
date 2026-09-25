@@ -368,8 +368,11 @@ impl fmt::Display for TypeInner {
 /// Budget, in rendered characters, for a type named in a diagnostic.
 pub(crate) const MAX_DIAGNOSTIC_TYPE_LEN: i32 = 500;
 
-/// Stands in for a type too large to put in a diagnostic.
-pub(crate) const ELIDED_TYPE: &str = "(type elided: too large to render)";
+/// Stands in for a type whose rendering would exceed the diagnostic budget.
+pub(crate) const ELIDED_TOO_LARGE: &str = "(type elided: too large to render)";
+
+/// Stands in for a service constructor, which has no rendering of its own.
+pub(crate) const ELIDED_CLASS: &str = "(type elided: service constructor)";
 
 /// Renders a type for a diagnostic, eliding it when rendering would be unreasonable.
 ///
@@ -386,10 +389,16 @@ pub(crate) struct ElidedType<'a>(&'a Type);
 
 impl fmt::Display for ElidedType<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // A service constructor has no rendering of its own, and never arrives as a
+        // wire type; elide it rather than ask for one. This keeps the renderer total
+        // for every type a caller of `subtype` or `equal` might hand it.
+        if matches!(self.0.as_ref(), TypeInner::Class(..)) {
+            return f.write_str(ELIDED_CLASS);
+        }
         if text_size(self.0, MAX_DIAGNOSTIC_TYPE_LEN).is_ok() {
             write!(f, "{}", self.0)
         } else {
-            f.write_str(ELIDED_TYPE)
+            f.write_str(ELIDED_TOO_LARGE)
         }
     }
 }

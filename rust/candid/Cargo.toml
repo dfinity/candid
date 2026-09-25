@@ -55,6 +55,11 @@ all = ["default", "value", "ic_principal/arbitrary"]
 name = "types"
 path = "tests/types.rs"
 required-features = ["value"]
+
+[[test]]
+name = "type_diagnostics"
+path = "tests/type_diagnostics.rs"
+required-features = ["value"]
 [[test]]
 name = "serde"
 path = "tests/serde.rs"
