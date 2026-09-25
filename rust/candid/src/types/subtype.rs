@@ -1,4 +1,6 @@
-use super::internal::{elide_large, find_type, Field, Label, Type, TypeInner};
+use super::internal::{
+    elide_large, find_type, Field, Label, Type, TypeInner, MAX_DIAGNOSTIC_LIST_LEN,
+};
 use crate::types::TypeEnv;
 use crate::utils::RecursionDepth;
 use crate::{Error, Result};
@@ -847,15 +849,22 @@ fn to_tuple(args: &[Type]) -> Type {
     )
     .into()
 }
-/// Renders an argument list for a diagnostic, eliding any type too large to render.
+/// Renders an argument list for a diagnostic, eliding any type too large to render and
+/// stopping once the list itself reaches its budget.
 ///
-/// `elide_large` renders through `Display`, which already picks the pretty printer or
-/// the fallback according to the `printer` feature, so one implementation serves both.
+/// A per-element budget alone would leave the list unbounded, since the cost would then
+/// grow with the number of arguments. `elide_large` renders through `Display`, which
+/// already picks the pretty printer or the fallback according to the `printer` feature,
+/// so one implementation serves both.
 fn pp_args(args: &[crate::types::Type]) -> String {
     use std::fmt::Write;
     let mut s = String::new();
     let _ = write!(&mut s, "(");
-    for arg in args.iter() {
+    for (i, arg) in args.iter().enumerate() {
+        if s.len() >= MAX_DIAGNOSTIC_LIST_LEN {
+            let _ = write!(&mut s, "... and {} more", args.len() - i);
+            break;
+        }
         let _ = write!(&mut s, "{}, ", elide_large(arg));
     }
     let _ = write!(&mut s, ")");

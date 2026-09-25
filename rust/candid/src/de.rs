@@ -2,7 +2,9 @@
 
 use super::{
     error::{Error, Result},
-    types::internal::{elide_large, text_size, type_of, TypeId, MAX_DIAGNOSTIC_TYPE_LEN},
+    types::internal::{
+        elide_large, text_size, type_of, TypeId, MAX_DIAGNOSTIC_LIST_LEN, MAX_DIAGNOSTIC_TYPE_LEN,
+    },
     types::{Field, Label, SharedLabel, Type, TypeEnv, TypeInner},
     CandidType,
 };
@@ -19,10 +21,18 @@ use serde::de::{self, Visitor};
 use std::fmt::Write;
 use std::{collections::VecDeque, io::Cursor, mem::replace, rc::Rc};
 
-/// Render a type table for a diagnostic, eliding entries too large to render.
+/// Render a type table for a diagnostic, eliding entries too large to render and
+/// stopping once the table itself reaches its budget.
+///
+/// A table holds as many entries as `max_type_len` allows, so bounding each entry on
+/// its own would still leave the whole rendering growing with their number.
 fn describe_table(env: &crate::types::TypeEnv) -> String {
     let mut out = String::new();
-    for (name, ty) in env.0.iter() {
+    for (i, (name, ty)) in env.0.iter().enumerate() {
+        if out.len() >= MAX_DIAGNOSTIC_LIST_LEN {
+            let _ = writeln!(&mut out, "... and {} more", env.0.len() - i);
+            break;
+        }
         let _ = writeln!(&mut out, "type {name} = {}", elide_large(ty));
     }
     out

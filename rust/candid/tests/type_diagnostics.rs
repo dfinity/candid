@@ -17,7 +17,7 @@ const WIDE: u32 = 250_000;
 const SMALL_STACK: usize = 1024 * 1024;
 /// A bounded diagnostic. Rendering an outsized type in full runs far past this.
 const SANE_LEN: usize = 4096;
-/// Marker the decoder substitutes for a type too large to render.
+/// Marker substituted for a type a diagnostic cannot render.
 const ELIDED: &str = "type elided";
 
 fn record(mut fields: Vec<IDLField>) -> IDLValue {
@@ -195,24 +195,73 @@ fn ordinary_mismatches_still_name_their_types() {
 }
 
 /// A service constructor has no rendering of its own. Naming one in a diagnostic must
-/// still produce an error rather than asking the printer for the impossible.
+/// produce an error rather than asking the printer for the impossible, and that has to
+/// hold wherever it sits in the type, not only at the top.
 #[test]
-fn a_service_constructor_is_elided_not_rendered() {
-    use candid::types::internal::{Type, TypeInner};
+fn a_service_constructor_is_elided_wherever_it_sits() {
+    use candid::types::internal::{Field, Label, Type, TypeInner};
     use candid::types::subtype::{equal, Gamma};
     use candid::types::TypeEnv;
+    use std::rc::Rc;
 
     let serv: Type = TypeInner::Service(vec![("m".to_string(), TypeInner::Nat.into())]).into();
     let class: Type = TypeInner::Class(vec![TypeInner::Nat.into()], serv).into();
     let other: Type = TypeInner::Text.into();
 
+    let in_record = |ty: Type| -> Type {
+        TypeInner::Record(vec![Field {
+            id: Rc::new(Label::Named("f".to_string())),
+            ty,
+        }])
+        .into()
+    };
+
+    let cases: Vec<(&str, Type)> = vec![
+        ("top level", class.clone()),
+        ("in a record", in_record(class.clone())),
+        ("in a vec", TypeInner::Vec(class.clone()).into()),
+        (
+            "under an opt in a record",
+            in_record(TypeInner::Opt(class.clone()).into()),
+        ),
+    ];
+
+    for (label, ty) in cases {
+        let env = TypeEnv::new();
+        let mut gamma = Gamma::new();
+        let e = equal(&mut gamma, &env, &ty, &other)
+            .expect_err("a service constructor is not equal to text")
+            .to_string();
+        assert!(
+            e.contains(ELIDED),
+            "{label}: a service constructor should be elided, got: {e}"
+        );
+    }
+}
+
+/// A list of types is bounded as a list, not only per element: a long one is cut off
+/// rather than growing the diagnostic with every entry.
+#[test]
+fn a_long_type_list_is_bounded() {
+    use candid::types::internal::{Type, TypeInner};
+    use candid::types::subtype::{equal, Gamma};
+    use candid::types::TypeEnv;
+
+    // two service constructors differing only in their init arity, so the diagnostic
+    // renders both argument lists
+    let serv: Type = TypeInner::Service(vec![("m".to_string(), TypeInner::Nat.into())]).into();
+    let many: Vec<Type> = (0..20_000).map(|_| TypeInner::Nat.into()).collect();
+    let a: Type = TypeInner::Class(many.clone(), serv.clone()).into();
+    let b: Type = TypeInner::Class(vec![TypeInner::Text.into()], serv).into();
+
     let env = TypeEnv::new();
     let mut gamma = Gamma::new();
-    let e = equal(&mut gamma, &env, &class, &other)
-        .expect_err("a service constructor is not equal to text")
+    let e = equal(&mut gamma, &env, &a, &b)
+        .expect_err("differing init args are not equal")
         .to_string();
     assert!(
-        e.contains(ELIDED),
-        "a service constructor should be elided, got: {e}"
+        e.len() < 64 * 1024,
+        "a rendered argument list should stay bounded, got {} chars",
+        e.len()
     );
 }

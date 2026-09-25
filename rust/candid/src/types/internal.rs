@@ -368,11 +368,12 @@ impl fmt::Display for TypeInner {
 /// Budget, in rendered characters, for a type named in a diagnostic.
 pub(crate) const MAX_DIAGNOSTIC_TYPE_LEN: i32 = 500;
 
-/// Stands in for a type whose rendering would exceed the diagnostic budget.
-pub(crate) const ELIDED_TOO_LARGE: &str = "(type elided: too large to render)";
+/// Stands in for a type a diagnostic cannot render within its budget.
+pub(crate) const ELIDED_TYPE: &str = "(type elided)";
 
-/// Stands in for a service constructor, which has no rendering of its own.
-pub(crate) const ELIDED_CLASS: &str = "(type elided: service constructor)";
+/// Budget, in characters, for a list of types in a diagnostic. Bounds the list itself,
+/// which a per-element budget does not.
+pub(crate) const MAX_DIAGNOSTIC_LIST_LEN: usize = 2048;
 
 /// Renders a type for a diagnostic, eliding it when rendering would be unreasonable.
 ///
@@ -381,6 +382,9 @@ pub(crate) const ELIDED_CLASS: &str = "(type elided: service constructor)";
 /// budget before any of the work is done. Types reaching a decoder come from the wire
 /// and so are chosen by the sender, which is why the budget holds for every diagnostic
 /// naming one, however verbose the caller asked its errors to be.
+///
+/// Total for every type: one that cannot be rendered at all, such as a service
+/// constructor, is refused by [`text_size`] and elided like any oversized one.
 pub(crate) fn elide_large(t: &Type) -> ElidedType<'_> {
     ElidedType(t)
 }
@@ -389,16 +393,10 @@ pub(crate) struct ElidedType<'a>(&'a Type);
 
 impl fmt::Display for ElidedType<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // A service constructor has no rendering of its own, and never arrives as a
-        // wire type; elide it rather than ask for one. This keeps the renderer total
-        // for every type a caller of `subtype` or `equal` might hand it.
-        if matches!(self.0.as_ref(), TypeInner::Class(..)) {
-            return f.write_str(ELIDED_CLASS);
-        }
         if text_size(self.0, MAX_DIAGNOSTIC_TYPE_LEN).is_ok() {
             write!(f, "{}", self.0)
         } else {
-            f.write_str(ELIDED_TOO_LARGE)
+            f.write_str(ELIDED_TYPE)
         }
     }
 }
@@ -460,7 +458,10 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
         }
         Future => 6,
         Unknown => 7,
-        Class(..) => unreachable!(),
+        // A service constructor has no rendering of its own: the pretty printer has no
+        // arm for one. Refusing it here, rather than asserting it cannot appear, keeps
+        // every caller total for a type that merely contains one.
+        Class(..) => return Err(()),
     };
     if cost > limit {
         Err(())
