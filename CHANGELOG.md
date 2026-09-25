@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 2026-09-25
 
-### Candid
+### Candid 0.10.37
 
 * Bug fixes:
   + Bound the byte length of the type-table header, 64 KiB by default and configurable with `DecoderConfig::set_max_header_len`. Headers over the bound, far above any realistic interface, are now rejected; the value section is unaffected, and `set_max_type_len` still separately bounds the number of type-table entries.
