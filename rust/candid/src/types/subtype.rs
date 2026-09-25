@@ -861,11 +861,14 @@ fn pp_args(args: &[crate::types::Type]) -> String {
     let mut s = String::new();
     let _ = write!(&mut s, "(");
     for (i, arg) in args.iter().enumerate() {
+        if i > 0 {
+            let _ = write!(&mut s, ", ");
+        }
         if s.len() >= MAX_DIAGNOSTIC_LIST_LEN {
             let _ = write!(&mut s, "... and {} more", args.len() - i);
             break;
         }
-        let _ = write!(&mut s, "{}, ", elide_large(arg));
+        let _ = write!(&mut s, "{}", elide_large(arg));
     }
     let _ = write!(&mut s, ")");
     s

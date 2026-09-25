@@ -265,3 +265,73 @@ fn a_long_type_list_is_bounded() {
         e.len()
     );
 }
+
+/// The budget has to leave ordinary interfaces alone. An eleven-field record of the
+/// shape an ICRC-2 transfer takes renders to under three hundred characters, and a
+/// developer reading a failed decode off-wasm, where verbose errors are the default,
+/// should see it rather than a placeholder.
+#[test]
+fn an_ordinary_record_is_not_elided() {
+    #[derive(CandidType, Deserialize, Debug)]
+    struct Account {
+        owner: candid::Principal,
+    }
+    #[derive(CandidType, Deserialize, Debug)]
+    struct TransferFromArgs {
+        from_subaccount: Option<Vec<u8>>,
+        spender_subaccount: Option<Vec<u8>>,
+        to: Account,
+        amount: candid::Nat,
+        fee: Option<candid::Nat>,
+        memo: Option<Vec<u8>>,
+        created_at_time: Option<u64>,
+        expected_allowance: Option<candid::Nat>,
+        expires_at: Option<u64>,
+        comment: Option<String>,
+        tag: String,
+    }
+
+    // text is not this record, so the diagnostic names the expected type
+    let payload = IDLArgs::new(&[IDLValue::Text("x".to_string())])
+        .to_bytes()
+        .unwrap();
+    let mut cfg = DecoderConfig::new();
+    cfg.set_full_error_message(true);
+    let e = Decode!([cfg]; &payload, TransferFromArgs)
+        .expect_err("text is not a record")
+        .to_string();
+    assert!(
+        !e.contains(ELIDED),
+        "an ordinary record should still be named in full, got: {e}"
+    );
+    assert!(
+        e.contains("from_subaccount") && e.contains("expected_allowance"),
+        "the whole record should be rendered, got: {e}"
+    );
+}
+
+/// A rendered argument list separates its entries without a trailing separator.
+#[test]
+fn an_argument_list_has_no_trailing_separator() {
+    use candid::types::internal::{Type, TypeInner};
+    use candid::types::subtype::{equal, Gamma};
+    use candid::types::TypeEnv;
+
+    let serv: Type = TypeInner::Service(vec![("m".to_string(), TypeInner::Nat.into())]).into();
+    let a: Type = TypeInner::Class(
+        vec![TypeInner::Nat.into(), TypeInner::Text.into()],
+        serv.clone(),
+    )
+    .into();
+    let b: Type = TypeInner::Class(vec![TypeInner::Bool.into()], serv).into();
+
+    let env = TypeEnv::new();
+    let mut gamma = Gamma::new();
+    let e = equal(&mut gamma, &env, &a, &b)
+        .expect_err("differing init args are not equal")
+        .to_string();
+    assert!(
+        e.contains("(nat, text)"),
+        "an argument list should read as `(nat, text)`, got: {e}"
+    );
+}

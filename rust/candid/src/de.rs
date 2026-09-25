@@ -26,7 +26,7 @@ use std::{collections::VecDeque, io::Cursor, mem::replace, rc::Rc};
 ///
 /// A table holds as many entries as `max_type_len` allows, so bounding each entry on
 /// its own would still leave the whole rendering growing with their number.
-fn describe_table(env: &crate::types::TypeEnv) -> String {
+fn describe_table(env: &TypeEnv) -> String {
     let mut out = String::new();
     for (i, (name, ty)) in env.0.iter().enumerate() {
         if out.len() >= MAX_DIAGNOSTIC_LIST_LEN {

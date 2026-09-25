@@ -365,6 +365,13 @@ impl fmt::Display for TypeInner {
         write!(f, "{:?}", self)
     }
 }
+/// Width of a numeric field id as the printer writes it, with underscore separators,
+/// so `1136829802` counts as the 13 characters of `1_136_829_802`.
+fn printed_num_width(n: u32) -> i32 {
+    let digits = if n == 0 { 1 } else { n.ilog10() as i32 + 1 };
+    digits + (digits - 1) / 3
+}
+
 /// Budget, in rendered characters, for a type named in a diagnostic.
 pub(crate) const MAX_DIAGNOSTIC_TYPE_LEN: i32 = 500;
 
@@ -424,11 +431,13 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
             for f in fs {
                 let id_size = match f.id.as_ref() {
                     Label::Named(n) => n.len() as i32,
-                    Label::Id(_) => 4,
+                    Label::Id(n) => printed_num_width(*n),
+                    // a tuple prints its fields without labels
                     Label::Unnamed(_) => 0,
                 };
-                cnt += id_size + text_size(&f.ty, limit - id_size - 3)? + 3;
-                limit -= cnt;
+                let field = id_size + text_size(&f.ty, limit - id_size - 3)? + 3;
+                cnt += field;
+                limit -= field;
             }
             9 + cnt
         }
@@ -436,13 +445,10 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
             let mode = if func.modes.is_empty() { 0 } else { 6 };
             let mut cnt = mode + 6;
             let mut limit = limit - cnt;
-            for t in &func.args {
-                cnt += text_size(t, limit)?;
-                limit -= cnt;
-            }
-            for t in &func.rets {
-                cnt += text_size(t, limit)?;
-                limit -= cnt;
+            for t in func.args.iter().chain(func.rets.iter()) {
+                let arg = text_size(t, limit)?;
+                cnt += arg;
+                limit -= arg;
             }
             cnt
         }
@@ -451,8 +457,9 @@ pub fn text_size(t: &Type, limit: i32) -> Result<i32, ()> {
             let mut limit = limit;
             for (name, f) in ms {
                 let len = name.len() as i32;
-                cnt += len + text_size(f, limit - len - 3)? + 3;
-                limit -= cnt;
+                let method = len + text_size(f, limit - len - 3)? + 3;
+                cnt += method;
+                limit -= method;
             }
             10 + cnt
         }
