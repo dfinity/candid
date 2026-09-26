@@ -1,0 +1,4 @@
+// "self" would PascalCase to "Self" which is reserved — falls back to "self".
+type self = nat;
+// Verbatim "Self" in env — falls back to "Self_" to avoid shadowing pp_actor output.
+type Self = text;
