@@ -534,22 +534,12 @@ fn subtype_(
             return Ok(());
         }
         let res = match (t1.as_ref(), t2.as_ref()) {
-            (Var(id), _) => subtype_(
-                report,
-                gamma,
-                env,
-                env.rec_find_type_with_depth(id, depth)?,
-                t2,
-                depth,
-            ),
-            (_, Var(id)) => subtype_(
-                report,
-                gamma,
-                env,
-                t1,
-                env.rec_find_type_with_depth(id, depth)?,
-                depth,
-            ),
+            (Var(id), _) => env
+                .rec_find_type_with_depth(id, depth)
+                .and_then(|t1| subtype_(report, gamma, env, t1, t2, depth)),
+            (_, Var(id)) => env
+                .rec_find_type_with_depth(id, depth)
+                .and_then(|t2| subtype_(report, gamma, env, t1, t2, depth)),
             (Knot(id), _) => subtype_(report, gamma, env, &find_type(id).unwrap(), t2, depth),
             (_, Knot(id)) => subtype_(report, gamma, env, t1, &find_type(id).unwrap(), depth),
             (_, _) => unreachable!(),
@@ -707,20 +697,12 @@ fn equal_impl(
             return Ok(());
         }
         let res = match (t1.as_ref(), t2.as_ref()) {
-            (Var(id), _) => equal_impl(
-                gamma,
-                env,
-                env.rec_find_type_with_depth(id, depth)?,
-                t2,
-                depth,
-            ),
-            (_, Var(id)) => equal_impl(
-                gamma,
-                env,
-                t1,
-                env.rec_find_type_with_depth(id, depth)?,
-                depth,
-            ),
+            (Var(id), _) => env
+                .rec_find_type_with_depth(id, depth)
+                .and_then(|t1| equal_impl(gamma, env, t1, t2, depth)),
+            (_, Var(id)) => env
+                .rec_find_type_with_depth(id, depth)
+                .and_then(|t2| equal_impl(gamma, env, t1, t2, depth)),
             (Knot(id), _) => equal_impl(gamma, env, &find_type(id).unwrap(), t2, depth),
             (_, Knot(id)) => equal_impl(gamma, env, t1, &find_type(id).unwrap(), depth),
             (_, _) => unreachable!(),
