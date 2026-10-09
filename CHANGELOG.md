@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-09
+
+### Candid 0.10.38
+
+* Bug fixes:
+  + `nat` and `int` values decoded into `u128` and `i128` are now bounded by the width of the target type at every byte of the LEB128 body. A value that needs more than 128 bits returns a `nat overflow` or `int overflow` error, and an overlong encoding of a value that fits (zero or sign padding past bit 127) decodes to that value, so the fixed-width decoders agree with `Nat::decode` and `Int::decode` on every input.
+  + A failed type-variable lookup inside `subtype`, `subtype_check_all` and `equal` is now reported as an error rather than unwrapped.
+
 ## 2026-09-25
 
 ### Candid 0.10.37

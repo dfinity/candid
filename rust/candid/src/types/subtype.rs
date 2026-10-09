@@ -219,28 +219,24 @@ fn subtype_collect_(
         }
         let before = errors.len();
         match (t1.as_ref(), t2.as_ref()) {
-            (Var(id), _) => subtype_collect_(
-                report,
-                gamma,
-                env,
-                env.rec_find_type_with_depth(id, depth).unwrap(),
-                t2,
-                depth,
-                path,
-                errors,
-                is_input,
-            ),
-            (_, Var(id)) => subtype_collect_(
-                report,
-                gamma,
-                env,
-                t1,
-                env.rec_find_type_with_depth(id, depth).unwrap(),
-                depth,
-                path,
-                errors,
-                is_input,
-            ),
+            (Var(id), _) => match env.rec_find_type_with_depth(id, depth) {
+                Ok(t1) => {
+                    subtype_collect_(report, gamma, env, t1, t2, depth, path, errors, is_input)
+                }
+                Err(e) => errors.push(Incompatibility {
+                    path: path.clone(),
+                    message: e.to_string(),
+                }),
+            },
+            (_, Var(id)) => match env.rec_find_type_with_depth(id, depth) {
+                Ok(t2) => {
+                    subtype_collect_(report, gamma, env, t1, t2, depth, path, errors, is_input)
+                }
+                Err(e) => errors.push(Incompatibility {
+                    path: path.clone(),
+                    message: e.to_string(),
+                }),
+            },
             (Knot(id), _) => subtype_collect_(
                 report,
                 gamma,
@@ -538,22 +534,12 @@ fn subtype_(
             return Ok(());
         }
         let res = match (t1.as_ref(), t2.as_ref()) {
-            (Var(id), _) => subtype_(
-                report,
-                gamma,
-                env,
-                env.rec_find_type_with_depth(id, depth).unwrap(),
-                t2,
-                depth,
-            ),
-            (_, Var(id)) => subtype_(
-                report,
-                gamma,
-                env,
-                t1,
-                env.rec_find_type_with_depth(id, depth).unwrap(),
-                depth,
-            ),
+            (Var(id), _) => env
+                .rec_find_type_with_depth(id, depth)
+                .and_then(|t1| subtype_(report, gamma, env, t1, t2, depth)),
+            (_, Var(id)) => env
+                .rec_find_type_with_depth(id, depth)
+                .and_then(|t2| subtype_(report, gamma, env, t1, t2, depth)),
             (Knot(id), _) => subtype_(report, gamma, env, &find_type(id).unwrap(), t2, depth),
             (_, Knot(id)) => subtype_(report, gamma, env, t1, &find_type(id).unwrap(), depth),
             (_, _) => unreachable!(),
@@ -711,20 +697,12 @@ fn equal_impl(
             return Ok(());
         }
         let res = match (t1.as_ref(), t2.as_ref()) {
-            (Var(id), _) => equal_impl(
-                gamma,
-                env,
-                env.rec_find_type_with_depth(id, depth).unwrap(),
-                t2,
-                depth,
-            ),
-            (_, Var(id)) => equal_impl(
-                gamma,
-                env,
-                t1,
-                env.rec_find_type_with_depth(id, depth).unwrap(),
-                depth,
-            ),
+            (Var(id), _) => env
+                .rec_find_type_with_depth(id, depth)
+                .and_then(|t1| equal_impl(gamma, env, t1, t2, depth)),
+            (_, Var(id)) => env
+                .rec_find_type_with_depth(id, depth)
+                .and_then(|t2| equal_impl(gamma, env, t1, t2, depth)),
             (Knot(id), _) => equal_impl(gamma, env, &find_type(id).unwrap(), t2, depth),
             (_, Knot(id)) => equal_impl(gamma, env, t1, &find_type(id).unwrap(), depth),
             (_, _) => unreachable!(),

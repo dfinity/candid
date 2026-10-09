@@ -45,55 +45,87 @@ where
         }
     }
 }
+/// Decodes an unsigned LEB128 value into a `u128`.
+///
+/// The whole LEB128 body is always consumed. Groups that lie past bit 127 are
+/// accepted as long as they are zero (an overlong encoding of a value that fits),
+/// matching what [`crate::Nat::decode`] reads from the same bytes. Any set bit at
+/// position 128 or above yields a "nat overflow" error.
 pub fn decode_nat<R>(r: &mut R) -> Result<u128>
 where
     R: io::Read + ?Sized,
 {
-    let mut result = 0;
-    let mut shift = 0;
+    let mut result: u128 = 0;
+    let mut shift: u32 = 0;
+    let mut overflow = false;
     loop {
         let mut buf = [0];
         r.read_exact(&mut buf)?;
-        if shift == 127 && buf[0] != 0x00 && buf[0] != 0x01 {
-            while buf[0] & CONTINUATION_BIT != 0 {
-                r.read_exact(&mut buf)?;
+        let byte = buf[0];
+        let low_bits = (byte & !CONTINUATION_BIT) as u128;
+        if shift < 128 {
+            // Bits of this group that land at position 128 or above.
+            if shift > 121 && low_bits >> (128 - shift) != 0 {
+                overflow = true;
             }
-            return Err(Error::msg("nat overflow"));
+            result |= low_bits << shift;
+        } else if low_bits != 0 {
+            overflow = true;
         }
-        let low_bits = (buf[0] & !CONTINUATION_BIT) as u128;
-        result |= low_bits << shift;
-        if buf[0] & CONTINUATION_BIT == 0 {
-            return Ok(result);
+        if byte & CONTINUATION_BIT == 0 {
+            break;
         }
-        shift += 7;
+        shift = shift.saturating_add(7);
     }
+    if overflow {
+        return Err(Error::msg("nat overflow"));
+    }
+    Ok(result)
 }
+/// Decodes a signed LEB128 value into an `i128`.
+///
+/// The whole LEB128 body is always consumed. Groups that lie past bit 127 are
+/// accepted as long as they only sign-extend the value (an overlong encoding of a
+/// value that fits), matching what [`crate::Int::decode`] reads from the same
+/// bytes. Otherwise the result is an "int overflow" error.
 pub fn decode_int<R>(r: &mut R) -> Result<i128>
 where
     R: io::Read + ?Sized,
 {
-    let mut result = 0;
-    let mut shift = 0;
-    let size = 128;
+    let mut result: i128 = 0;
+    let mut shift: u32 = 0;
+    // Bits at position 127 and above must all equal the sign of the value, so
+    // they must be all zeros or all ones.
+    let mut high_zero = true;
+    let mut high_one = true;
     let mut byte;
     loop {
         let mut buf = [0];
         r.read_exact(&mut buf)?;
         byte = buf[0];
-        if shift == 127 && byte != 0x00 && byte != 0x7f {
-            while buf[0] & CONTINUATION_BIT != 0 {
-                r.read_exact(&mut buf)?;
+        let low_bits = byte & !CONTINUATION_BIT;
+        if shift < 128 {
+            if shift > 120 {
+                // Bits of this group from position 127 up.
+                let high = low_bits >> (127 - shift);
+                let mask = 0x7f >> (127 - shift);
+                high_zero &= high == 0;
+                high_one &= high == mask;
             }
-            return Err(Error::msg("int overflow"));
+            result |= (low_bits as i128) << shift;
+        } else {
+            high_zero &= low_bits == 0;
+            high_one &= low_bits == 0x7f;
         }
-        let low_bits = (byte & !CONTINUATION_BIT) as i128;
-        result |= low_bits << shift;
-        shift += 7;
+        shift = shift.saturating_add(7);
         if byte & CONTINUATION_BIT == 0 {
             break;
         }
     }
-    if shift < size && (byte & SIGN_BIT) == SIGN_BIT {
+    if !high_zero && !high_one {
+        return Err(Error::msg("int overflow"));
+    }
+    if shift < 128 && (byte & SIGN_BIT) == SIGN_BIT {
         result |= !0 << shift;
     }
     Ok(result)
