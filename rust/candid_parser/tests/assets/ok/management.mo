@@ -2,81 +2,79 @@
 // Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 
 module {
-  public type bitcoin_address = Text;
-  public type bitcoin_network = { #mainnet; #testnet };
-  public type block_hash = Blob;
-  public type canister_id = Principal;
-  public type canister_settings = {
+  public type BitcoinAddress = Text;
+  public type BitcoinNetwork = { #mainnet; #testnet };
+  public type BlockHash = Blob;
+  public type CanisterId = Principal;
+  public type CanisterSettings = {
     freezing_threshold : ?Nat;
     controllers : ?[Principal];
     memory_allocation : ?Nat;
     compute_allocation : ?Nat;
   };
-  public type definite_canister_settings = {
+  public type DefiniteCanisterSettings = {
     freezing_threshold : Nat;
     controllers : [Principal];
     memory_allocation : Nat;
     compute_allocation : Nat;
   };
-  public type ecdsa_curve = { #secp256k1 };
-  public type get_balance_request = {
-    network : bitcoin_network;
-    address : bitcoin_address;
+  public type EcdsaCurve = { #secp256k1 };
+  public type GetBalanceRequest = {
+    network : BitcoinNetwork;
+    address : BitcoinAddress;
     min_confirmations : ?Nat32;
   };
-  public type get_current_fee_percentiles_request = {
-    network : bitcoin_network;
-  };
-  public type get_utxos_request = {
-    network : bitcoin_network;
+  public type GetCurrentFeePercentilesRequest = { network : BitcoinNetwork };
+  public type GetUtxosRequest = {
+    network : BitcoinNetwork;
     filter : ?{ #page : Blob; #min_confirmations : Nat32 };
-    address : bitcoin_address;
+    address : BitcoinAddress;
   };
-  public type get_utxos_response = {
+  public type GetUtxosResponse = {
     next_page : ?Blob;
     tip_height : Nat32;
-    tip_block_hash : block_hash;
-    utxos : [utxo];
+    tip_block_hash : BlockHash;
+    utxos : [Utxo];
   };
-  public type http_header = { value : Text; name : Text };
-  public type http_response = {
+  public type HttpHeader = { value : Text; name : Text };
+  public type HttpResponse = {
     status : Nat;
     body : Blob;
-    headers : [http_header];
+    headers : [HttpHeader];
   };
-  public type millisatoshi_per_byte = Nat64;
-  public type outpoint = { txid : Blob; vout : Nat32 };
-  public type satoshi = Nat64;
-  public type send_transaction_request = {
+  public type MillisatoshiPerByte = Nat64;
+  public type Outpoint = { txid : Blob; vout : Nat32 };
+  public type Satoshi = Nat64;
+  public type SendTransactionRequest = {
     transaction : Blob;
-    network : bitcoin_network;
+    network : BitcoinNetwork;
   };
-  public type user_id = Principal;
-  public type utxo = { height : Nat32; value : satoshi; outpoint : outpoint };
-  public type wasm_module = Blob;
+  public type UserId = Principal;
+  public type Utxo = { height : Nat32; value : Satoshi; outpoint : Outpoint };
+  public type WasmModule = Blob;
   public type Self = actor {
-    bitcoin_get_balance : shared get_balance_request -> async satoshi;
-    bitcoin_get_current_fee_percentiles : shared get_current_fee_percentiles_request -> async [
-        millisatoshi_per_byte
+    bitcoin_get_balance : shared GetBalanceRequest -> async Satoshi;
+    bitcoin_get_current_fee_percentiles : shared GetCurrentFeePercentilesRequest -> async [
+        MillisatoshiPerByte
       ];
-    bitcoin_get_utxos : shared get_utxos_request -> async get_utxos_response;
-    bitcoin_send_transaction : shared send_transaction_request -> async ();
-    canister_status : shared { canister_id : canister_id } -> async {
+    bitcoin_get_utxos : shared GetUtxosRequest -> async GetUtxosResponse;
+    bitcoin_send_transaction : shared SendTransactionRequest -> async ();
+    canister_status : shared { canister_id : CanisterId } -> async {
         status : { #stopped; #stopping; #running };
         memory_size : Nat;
         cycles : Nat;
-        settings : definite_canister_settings;
+        settings : DefiniteCanisterSettings;
         idle_cycles_burned_per_day : Nat;
         module_hash : ?Blob;
       };
-    create_canister : shared { settings : ?canister_settings } -> async {
-        canister_id : canister_id;
+    create_canister : shared { settings : ?CanisterSettings } -> async {
+        canister_id : CanisterId;
       };
-    delete_canister : shared { canister_id : canister_id } -> async ();
-    deposit_cycles : shared { canister_id : canister_id } -> async ();
+    delete_canister : shared { canister_id : CanisterId } -> async ();
+    deposit_cycles : shared { canister_id : CanisterId } -> async ();
     ecdsa_public_key : shared {
-        key_id : { name : Text; curve : ecdsa_curve };
-        canister_id : ?canister_id;
+        key_id : { name : Text; curve : EcdsaCurve };
+        canister_id : ?CanisterId;
         derivation_path : [Blob];
       } -> async { public_key : Blob; chain_code : Blob };
     http_request : shared {
@@ -87,39 +85,39 @@ module {
         transform : ?{
           function : shared query {
               context : Blob;
-              response : http_response;
-            } -> async http_response;
+              response : HttpResponse;
+            } -> async HttpResponse;
           context : Blob;
         };
-        headers : [http_header];
-      } -> async http_response;
+        headers : [HttpHeader];
+      } -> async HttpResponse;
     install_code : shared {
         arg : Blob;
-        wasm_module : wasm_module;
+        wasm_module : WasmModule;
         mode : { #reinstall; #upgrade; #install };
-        canister_id : canister_id;
+        canister_id : CanisterId;
       } -> async ();
     provisional_create_canister_with_cycles : shared {
-        settings : ?canister_settings;
-        specified_id : ?canister_id;
+        settings : ?CanisterSettings;
+        specified_id : ?CanisterId;
         amount : ?Nat;
-      } -> async { canister_id : canister_id };
+      } -> async { canister_id : CanisterId };
     provisional_top_up_canister : shared {
-        canister_id : canister_id;
+        canister_id : CanisterId;
         amount : Nat;
       } -> async ();
     raw_rand : shared () -> async Blob;
     sign_with_ecdsa : shared {
-        key_id : { name : Text; curve : ecdsa_curve };
+        key_id : { name : Text; curve : EcdsaCurve };
         derivation_path : [Blob];
         message_hash : Blob;
       } -> async { signature : Blob };
-    start_canister : shared { canister_id : canister_id } -> async ();
-    stop_canister : shared { canister_id : canister_id } -> async ();
-    uninstall_code : shared { canister_id : canister_id } -> async ();
+    start_canister : shared { canister_id : CanisterId } -> async ();
+    stop_canister : shared { canister_id : CanisterId } -> async ();
+    uninstall_code : shared { canister_id : CanisterId } -> async ();
     update_settings : shared {
         canister_id : Principal;
-        settings : canister_settings;
+        settings : CanisterSettings;
       } -> async ();
   }
 }
