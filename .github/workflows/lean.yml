@@ -5,6 +5,9 @@ on:
     branches:
       - master
       - rewrite
+    paths:
+      - 'lean/**'
+      - '.github/workflows/lean.yml'
   pull_request:
     paths:
       - 'lean/**'

@@ -208,7 +208,10 @@ def funcChecks : List Check :=
   , expectSub (entry (.func [] [] [.query])) (entry (.func [] [] [])) false
       "annotations must agree"
   , expectSub (entry (.func [] [] [.query])) (entry (.func [] [] [.query])) true
-      "matching annotations agree" ]
+      "matching annotations agree"
+  , expectSub (entry (.func [] [] [.query, .compositeQuery]))
+      (entry (.func [] [] [.compositeQuery, .query])) true
+      "annotations agree up to reordering" ]
 
 /-! ## Services
 

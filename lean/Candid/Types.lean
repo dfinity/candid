@@ -124,11 +124,11 @@ Two further rules are not structural: a `oneway` function may not have results, 
 service's method type must denote a function. The second is the only rule here that
 has to look through the table, since a method's type is a slot like any other.
 
-One rule is deliberately left out. "The list of parameters must be shorter than 2^32
-values; the same restriction apply to the result list" (`spec/Candid.md:209`) cannot
-be violated by anything that fits in memory, but it is not idle: `indexedFrom` labels
-positional arguments with `UInt32`, which wraps, so it is that bound that keeps the
-labels of a function's arguments distinct. -/
+Function arity is bounded too: "The list of parameters must be shorter than 2^32
+values; the same restriction apply to the result list" (`spec/Candid.md:209`).
+Nothing that fits in memory violates it, but a theorem quantifies over every list:
+`indexedFrom` labels positional arguments with `UInt32`, which wraps, so it is this
+bound that keeps the labels of a function's arguments distinct. -/
 
 /-- Does this slot's reference resolve below `bound`? -/
 def Slot.wellFormed (bound : Nat) : Slot → Bool
@@ -153,8 +153,13 @@ def Composite.annotsOk : Composite → Bool
   | .func _ rets ann => !ann.contains .oneway || rets.isEmpty
   | .opt _ | .vec _ | .record _ | .variant _ | .service _ => true
 
+/-- `spec/Candid.md:209`: parameter and result lists are shorter than 2^32. -/
+def Composite.arityOk : Composite → Bool
+  | .func args rets _ => args.length < UInt32.size && rets.length < UInt32.size
+  | .opt _ | .vec _ | .record _ | .variant _ | .service _ => true
+
 def Composite.wellFormed (bound : Nat) (c : Composite) : Bool :=
-  c.labelsOk && c.annotsOk && c.slots.all (Slot.wellFormed bound)
+  c.labelsOk && c.annotsOk && c.arityOk && c.slots.all (Slot.wellFormed bound)
 
 /-- `spec/Candid.md:1223`: "The serialised data type representing a method type must
 denote a function type." -/
