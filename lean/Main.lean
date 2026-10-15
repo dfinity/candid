@@ -6,9 +6,10 @@ verifying behaviour rather than only that the model compiles. It will grow into 
 differential oracle that reads conformance vectors -- at which point these checks
 become the first vectors.
 
-Every type here carries a table, because composites live only in the table
-(`Types.lean`). `atom` is a primitive, `entry` is a single composite, and
-`close do ... intern ...` builds the two-or-more-entry cases.
+Every type here is a `Fixture`: a raw table and a root, because composites live only
+in the table (`Types.lean`). `atom` is a primitive, `entry` is a single composite, and
+`close do ... intern ...` builds the two-or-more-entry cases. A fixture is checked
+before it is asked anything, exactly as the API requires of every caller.
 -/
 
 import Candid
@@ -30,20 +31,40 @@ structure Check where
 /-- Record a check as a known gap rather than a requirement. -/
 def Check.asKnown (c : Check) : Check := { c with known := true }
 
+/-- A type as written by hand: a table that has not been checked yet, and a root. -/
+structure Fixture where
+  table : RawTypeTable
+  root : Slot
+
+instance : Coe (RawTypeTable × Slot) Fixture := ⟨fun (t, r) => ⟨t, r⟩⟩
+
+/-- Check a fixture's table and then its root: the two steps every caller takes. -/
+def Fixture.check? (f : Fixture) : Option ((t : TypeTable) × t.Root) := do
+  let t ← f.table.check
+  let r ← t.root? f.root
+  return ⟨t, r⟩
+
 /-- A type that needs no table: a primitive. -/
-def atom (p : Prim) : ClosedType := .ofPrim p
+def atom (p : Prim) : Fixture := ⟨.empty, .prim p⟩
 
 /-- A type that is one composite, named by the root. -/
-def entry (c : Composite) : ClosedType := closeOne c
+def entry (c : Composite) : Fixture := closeOne c
 
 def relStr (b : Bool) : String := if b then "<:" else "!<:"
 
-/-- A subtype question about two types, each carrying its own table. -/
-def expectSub (a b : ClosedType) (want : Bool) (name : String) : Check :=
-  let got := decSubtype a b
-  { name := name
-    ok := got == want
-    detail := s!"got {relStr got}, want {relStr want}" }
+/-- A subtype question about two types, each in its own table. A malformed fixture
+fails the check: subtyping is not defined on it, so there is no answer to compare. -/
+def expectSub (a b : Fixture) (want : Bool) (name : String) : Check :=
+  match a.check?, b.check? with
+  | some ⟨A, a⟩, some ⟨B, b⟩ =>
+    let got := decSubtype A B a b
+    { name := name
+      ok := got == want
+      detail := s!"got {relStr got}, want {relStr want}" }
+  | _, _ =>
+    { name := name
+      ok := false
+      detail := "a fixture is malformed, so subtyping is not defined on it" }
 
 def expectHash (input : String) (want : UInt32) : Check :=
   let got := hashFieldName input
@@ -51,10 +72,11 @@ def expectHash (input : String) (want : UInt32) : Check :=
     ok := got == want
     detail := s!"got {got}" }
 
-def expectWellFormed (c : ClosedType) (want : Bool) (name : String) : Check :=
+def expectWellFormed (f : Fixture) (want : Bool) (name : String) : Check :=
+  let got := f.check?.isSome
   { name := name
-    ok := c.wellFormed == want
-    detail := s!"got {c.wellFormed}, want {want}" }
+    ok := got == want
+    detail := s!"got {got}, want {want}" }
 
 /-! ## Field-id hash
 
@@ -116,7 +138,7 @@ supertype declares, provided that field accepts `null` -- the rule that makes re
 extensible in both inbound and outbound position. -/
 
 /-- `record { x : nat; y : opt text }`. Two entries: the `opt` needs one of its own. -/
-def recordWithOptField : ClosedType := close do
+def recordWithOptField : Fixture := close do
   let o ← intern (.opt text)
   intern (recordOf [("x", nat), ("y", o)])
 
@@ -144,7 +166,7 @@ Dual to records: a subtype may *drop* tags, and every tag it carries must exist 
 the supertype. Adding tags is only sound behind an `opt`. -/
 
 /-- `opt variant { ... }`. -/
-def optVariant (alts : List (String × Slot)) : ClosedType := close do
+def optVariant (alts : List (String × Slot)) : Fixture := close do
   let v ← intern (variantOf alts)
   intern (.opt v)
 
@@ -177,12 +199,12 @@ symmetric, and it is worth spelling out which is which:
 Annotations must match as sets. -/
 
 /-- `func (opt nat) -> ()`. -/
-def funcOptParam : ClosedType := close do
+def funcOptParam : Fixture := close do
   let o ← intern (.opt nat)
   intern (.func [o] [] [])
 
 /-- `func () -> (opt nat)`. -/
-def funcOptResult : ClosedType := close do
+def funcOptResult : Fixture := close do
   let o ← intern (.opt nat)
   intern (.func [] [o] [])
 
@@ -220,7 +242,7 @@ serialised data type representing a method type must denote a function type"
 (`spec/Candid.md:1223`), so it is an index into the table, not an inline function. -/
 
 /-- A service, interning each method type first. -/
-def serviceOf (ms : List (String × Composite)) : ClosedType := close do
+def serviceOf (ms : List (String × Composite)) : Fixture := close do
   let slots ← ms.mapM fun (name, c) => do return (name, ← intern c)
   intern (.service slots)
 
@@ -239,15 +261,15 @@ The second is the only rule that has to look through the table, since a method's
 is a slot like any other. -/
 
 /-- `spec/Candid.md:211`: "The result list of a `oneway` function must be empty." -/
-def onewayWithResult : ClosedType := entry (.func [] [nat] [.oneway])
+def onewayWithResult : Fixture := entry (.func [] [nat] [.oneway])
 
-def onewayWithoutResult : ClosedType := entry (.func [nat] [] [.oneway])
+def onewayWithoutResult : Fixture := entry (.func [nat] [] [.oneway])
 
 /-- `spec/Candid.md:1223`: "The serialised data type representing a method type must
 denote a function type." -/
-def serviceWithPrimMethod : ClosedType := entry (.service [("m", nat)])
+def serviceWithPrimMethod : Fixture := entry (.service [("m", nat)])
 
-def serviceWithVecMethod : ClosedType := close do
+def serviceWithVecMethod : Fixture := close do
   let v ← intern (.vec nat)
   intern (.service [("m", v)])
 
@@ -271,20 +293,26 @@ recursion only stops because descending through a pair of references records it 
 `seen`, and meeting that pair again means the obligation is already assumed. -/
 
 /-- `type S = record { next : S }`, as one self-referential entry. -/
-def selfLoop : ClosedType :=
+def selfLoop : Fixture :=
   { table := { entries := #[ recordOf [("next", .ref 0)] ] }, root := .ref 0 }
 
 /-- The same type unrolled across two entries. -/
-def twoCycle : ClosedType :=
+def twoCycle : Fixture :=
   { table := { entries := #[ recordOf [("next", .ref 1)], recordOf [("next", .ref 0)] ] }
     root := .ref 0 }
 
 /-- `type S = record { next : S; extra : nat }`. -/
-def selfLoopWith (extra : Slot) : ClosedType :=
+def selfLoopWith (extra : Slot) : Fixture :=
   { table := { entries := #[ recordOf [("next", .ref 0), ("extra", extra)] ] }, root := .ref 0 }
 
-/-- A reference with no entry to resolve to. -/
-def danglingRef : ClosedType := { table := .empty, root := .ref 3 }
+/-- A root with no entry to resolve to. -/
+def danglingRef : Fixture := { table := .empty, root := .ref 3 }
+
+/-- A root that resolves, to an entry whose own reference does not. Answering
+`empty <: this` or `this <: reserved` never unfolds the entry, so only checking the
+whole table catches it. -/
+def danglingBehindRoot : Fixture :=
+  { table := { entries := #[.vec (.ref 1)] }, root := .ref 0 }
 
 /- No check here for a primitive or a bare reference used as a table entry: an entry
 is a `Composite`, so neither is representable. The spec's rule
@@ -307,12 +335,11 @@ def recursiveChecks : List Check :=
   , expectWellFormed selfLoop true "self-loop is well formed"
   , expectWellFormed twoCycle true "two-cycle is well formed"
   , expectWellFormed (atom .principal) true "principal is a primitive, not a reftype"
-  , expectWellFormed danglingRef false "dangling reference is malformed"
-    -- A dangling reference is not a type, so it gets neither the top nor the bottom
-    -- rule for free. Deliberate: `<:` reported without looking is the dangerous
+    -- A dangling reference is not a type, so it never reaches subtyping, where the
+    -- top and bottom rules would grant it `<:` without looking -- the dangerous
     -- direction for a compatibility gate.
-  , expectSub danglingRef (atom .reserved) false "dangling reference !<: reserved"
-  , expectSub (atom .empty) danglingRef false "empty !<: dangling reference"
+  , expectWellFormed danglingRef false "dangling root is malformed"
+  , expectWellFormed danglingBehindRoot false "reference dangling behind the root is malformed"
   , expectWellFormed (entry (.record [(0, nat), (0, text)])) false
       "duplicate field id is malformed" ]
 
@@ -326,10 +353,10 @@ then `(1, 0)`, then back to `(0, 1)`. Nothing is getting structurally smaller al
 the way: the pair accounting is the only thing that can stop it, and it does -- the
 third state finds its pair already recorded in `seen`. -/
 
-def vecOmegaTable : TypeTable := { entries := #[ .vec (.ref 1), .vec (.ref 0) ] }
+def vecOmegaTable : RawTypeTable := { entries := #[ .vec (.ref 1), .vec (.ref 0) ] }
 
-def vecOmegaEven : ClosedType := { table := vecOmegaTable, root := .ref 0 }
-def vecOmegaOdd : ClosedType := { table := vecOmegaTable, root := .ref 1 }
+def vecOmegaEven : Fixture := { table := vecOmegaTable, root := .ref 0 }
+def vecOmegaOdd : Fixture := { table := vecOmegaTable, root := .ref 1 }
 
 def vecOmegaChecks : List Check :=
   [ expectWellFormed vecOmegaEven true "vec-omega: T.0 is well formed"
@@ -351,18 +378,18 @@ i.e. `vec text <: vec nat` -- false. Reaching that premise records `(1, 2)` in
 accounting instead, and both queries would come out `true`. -/
 
 /-- `A.0 = record { f : A.1 }`, `A.1 = func (A.2) -> ()`, `A.2 = vec nat`. -/
-def contraA : TypeTable :=
+def contraA : RawTypeTable :=
   { entries := #[ recordOf [("f", .ref 1)], .func [.ref 2] [] [], .vec nat ] }
 
 /-- `B.0 = record { f : B.2 }`, `B.1 = vec text`, `B.2 = func (B.1) -> ()`. The
 indices are deliberately transposed against `contraA`. -/
-def contraB : TypeTable :=
+def contraB : RawTypeTable :=
   { entries := #[ recordOf [("f", .ref 2)], .vec text, .func [.ref 1] [] [] ] }
 
-def contraOuter : ClosedType := { table := contraA, root := .ref 0 }
-def contraOuter' : ClosedType := { table := contraB, root := .ref 0 }
-def contraFuncs : ClosedType := { table := contraA, root := .ref 1 }
-def contraFuncs' : ClosedType := { table := contraB, root := .ref 2 }
+def contraOuter : Fixture := { table := contraA, root := .ref 0 }
+def contraOuter' : Fixture := { table := contraB, root := .ref 0 }
+def contraFuncs : Fixture := { table := contraA, root := .ref 1 }
+def contraFuncs' : Fixture := { table := contraB, root := .ref 2 }
 
 def contraChecks : List Check :=
   [ expectWellFormed contraOuter true "contravariance witness: subtype side is well formed"

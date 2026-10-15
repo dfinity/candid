@@ -51,12 +51,6 @@ import Candid.Types
 
 namespace Candid
 
-/-- Is this slot a type in this table at all? A primitive always is; a reference is
-one exactly when it resolves. -/
-def TypeTable.resolves (t : TypeTable) : Slot → Bool
-  | .prim _ => true
-  | .ref r => (t.lookup? r).isSome
-
 /-- `null <: t`, decided syntactically.
 
 The spec's premise `not (null <: <datatype>)` is only ever applied to a concrete
@@ -181,11 +175,10 @@ mutual
 
 def sub (A B : TypeTable) (seen : List (TypeRef × TypeRef)) : Slot → Slot → Bool
   -- `<datatype> <: reserved` and `empty <: <datatype>`: the top and bottom types.
-  -- Each checks that the *other* side is a type at all. A dangling reference is not
-  -- one, and granting a subtype relation without looking is the dangerous direction
-  -- for a compatibility gate.
-  | a, .prim .reserved => A.resolves a
-  | .prim .empty, b => B.resolves b
+  -- Neither looks at the other side, which is sound only because both tables are
+  -- well formed and the roots resolve: every slot reached here is a type.
+  | _, .prim .reserved => true
+  | .prim .empty, _ => true
 
   -- `<primtype> <: <primtype>`, plus `nat <: int`. `principal` is a primitive
   -- (spec/Candid.md:80), so `principal <: principal` needs no rule of its own.
@@ -214,12 +207,14 @@ def sub (A B : TypeTable) (seen : List (TypeRef × TypeRef)) : Slot → Slot →
     | some x, some y =>
       if _hs : seen.contains (i, j) then true
       else subC A B ((i, j) :: seen) x y
-    | _, _ => false                   -- dangling: not well formed
+    -- Unreachable: the roots resolve, and in a well-formed table so does every slot
+    -- an entry holds. The arm exists because `lookup?` returns an `Option`.
+    | _, _ => false
 termination_by (remaining A B seen, 0)
 decreasing_by
   -- The three facts the measure needs, all produced by the branch itself: the pair
   -- is fresh (`hs`), and each index resolves, so each is in range (`hx`, `hy`).
-  simp only [TypeTable.lookup?] at _hx _hy
+  simp only [TypeTable.lookup?, RawTypeTable.lookup?] at _hx _hy
   exact Prod.Lex.left _ _
     (remaining_cons_lt (Array.getElem?_eq_some_iff.1 _hx).1
       (Array.getElem?_eq_some_iff.1 _hy).1 (by simpa using _hs))
@@ -283,10 +278,10 @@ decreasing_by exact Prod.Lex.right _ (by omega)
 
 end
 
-/-- Decide `a <: b` for two types carrying their own tables. Total: along any path a
-reference pair is recorded at most once, and there are finitely many. -/
-def decSubtype (a b : ClosedType) : Bool :=
-  sub a.table b.table [] a.root b.root
+/-- Decide `a <: b`, where `a` is a type in `A` and `b` one in `B`. Total: along any
+path a reference pair is recorded at most once, and there are finitely many. -/
+def decSubtype (A B : TypeTable) (a : A.Root) (b : B.Root) : Bool :=
+  sub A B [] a.1 b.1
 
 /- Note the argument order flip in the `func` case above: parameters are
 contravariant, so the tables swap with the types -- and `seen` swaps with the tables.

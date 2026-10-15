@@ -39,11 +39,10 @@ coinductive Subty : TypeTable → TypeTable → Slot → Slot → Prop where
   | prim {A B p} : Subty A B (.prim p) (.prim p)
   /-- `nat <: int` -/
   | natInt {A B} : Subty A B (.prim .nat) (.prim .int)
-  /-- `<datatype> <: reserved`, provided the left side is a type at all: a dangling
-  reference is not one, and the procedure checks it for the same reason. -/
-  | toReserved {A B a} : A.resolves a = true → Subty A B a (.prim .reserved)
-  /-- `empty <: <datatype>`, provided the right side is a type at all. -/
-  | fromEmpty {A B b} : B.resolves b = true → Subty A B (.prim .empty) b
+  /-- `<datatype> <: reserved` -/
+  | toReserved {A B a} : Subty A B a (.prim .reserved)
+  /-- `empty <: <datatype>` -/
+  | fromEmpty {A B b} : Subty A B (.prim .empty) b
   /-- `service <actortype> <: principal`. `principal` is a `<primtype>`
   (`spec/Candid.md:80`), so `principal <: principal` follows from `prim`. -/
   | serviceToPrincipal {A B i ms} :
@@ -52,8 +51,7 @@ coinductive Subty : TypeTable → TypeTable → Slot → Slot → Prop where
   option, and a receiver that cannot decode the value sees `null`. Stated at both
   levels because an option is reachable either as the right slot of any pair (here)
   or as the right composite of a reference pair (`SubtyC.toOpt`). -/
-  | toOpt {A B a j y} :
-      A.resolves a = true → B.lookup? j = some (.opt y) → Subty A B a (.ref j)
+  | toOpt {A B a j y} : B.lookup? j = some (.opt y) → Subty A B a (.ref j)
   /-- References are transparent: two of them are related through their entries.
   This is the only rule that reaches `SubtyC`, and the only one that consumes a
   reference pair -- which is what makes the procedure's `remaining` a measure. -/
@@ -102,13 +100,11 @@ used gets caught here rather than when the first proof is attempted. -/
 
 example (A B : TypeTable) : Subty A B .nat .int := Subty.natInt
 
-example (A B : TypeTable) (p : Prim) : Subty A B (.prim p) (.prim .reserved) :=
-  Subty.toReserved rfl
+example (A B : TypeTable) (a : Slot) : Subty A B a (.prim .reserved) := Subty.toReserved
 
 /-- Any type is a subtype of an `opt`, reached through the supertype's table. -/
 example (A B : TypeTable) (a : Slot) (y : Slot) (j : TypeRef)
-    (ha : A.resolves a = true) (h : B.lookup? j = some (.opt y)) :
-    Subty A B a (.ref j) := Subty.toOpt ha h
+    (h : B.lookup? j = some (.opt y)) : Subty A B a (.ref j) := Subty.toOpt h
 
 example (A B : TypeTable) : SubtyC A B (.vec .nat) (.vec .int) := SubtyC.vec Subty.natInt
 
@@ -128,11 +124,12 @@ example (A B : TypeTable) (fs : List (FieldId × Slot)) :
 /-
 The obligation this file exists to create, and the first theorem to prove:
 
-    theorem decSubtype_iff (a b : ClosedType) :
-        decSubtype a b = true <-> Subty a.table b.table a.root b.root
+    theorem decSubtype_iff (A B : TypeTable) (a : A.Root) (b : B.Root) :
+        decSubtype A B a b = true <-> Subty A B a.1 b.1
 
-The statement carries no side condition, because `decSubtype` is total: every
-question it is asked, it answers.
+The statement carries no side condition. `decSubtype` is total, so every question it
+is asked, it answers; and the types carry the rest, since a `TypeTable` is well formed
+and a `Root` resolves.
 
 Soundness (`true` implies `Subty`) should follow by coinduction on the procedure's
 recursion, with the pairs recorded in `seen` as the coinductive hypothesis -- that is
@@ -140,13 +137,13 @@ what `seen` means, and stating it this way is what will confirm the accounting i
 right. Completeness is the converse, and needs that assuming a pair already descended
 through cannot manufacture a relation that the greatest fixed point excludes.
 
-Well-formedness should be unnecessary as a hypothesis, because the relation is
-stated to answer malformed inputs the way the procedure does: a dangling reference
-makes the procedure answer `false`, and the relation has no rule for it either --
-`unfold` demands `lookup? = some`, and the three rules that relate a slot without
-looking inside it (`toReserved`, `fromEmpty`, `toOpt`) each require that slot to
-resolve. Whether the two agree on duplicate labels is the same question about
-`fieldAt` on both sides.
+That is also why the rules above can be the spec's own, with no guards. On a malformed
+table the two would disagree -- `toReserved`, `fromEmpty` and `toOpt` relate a slot
+without looking inside it, so they would admit a dangling reference that the
+procedure rejects -- but there is no malformed `TypeTable` to ask about. The proof
+carries the invariant that every slot reached resolves: true of the roots by `Root`,
+and of every slot an entry holds by `TypeTable.wf`. Duplicate labels, where `fieldAt`
+would pick the first on both sides, are excluded the same way.
 
 Deliberately not stated with `sorry`: an unproved `theorem` in the build reads as
 established once it scrolls past. The properties `coq/MiniCandid.v` establishes

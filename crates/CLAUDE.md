@@ -103,7 +103,8 @@ function name.
 
 The core type names are already settled, and are shared with [`lean/`](../lean/) so the
 two read alike — see [README.md](README.md#naming). In particular `TypeTable` is the
-index-keyed table and `TypeEnv` is reserved for the name-keyed `.did` declaration
+index-keyed table — the checked one, with `RawTypeTable` for what a decoder or builder
+produces before checking — and `TypeEnv` is reserved for the name-keyed `.did` declaration
 environment; do not reuse `TypeEnv` for the former, which is the mistake `rust/`
 makes.
 

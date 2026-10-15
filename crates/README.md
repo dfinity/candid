@@ -19,7 +19,7 @@ crates below are new, and they use `_` to match the existing family.
 ```
 ic_principal                    (existing crate; unchanged, already correctly split)
    ↑
-candid_types      Slot, Composite, TypeTable, TypeRef, FieldId, ClosedType,
+candid_types      Slot, Composite, RawTypeTable, TypeTable, Root, TypeRef, FieldId,
                   field-id hash. no_std-capable. No serde, no binary, no global state.
    ↑
 candid_subtype    Subtyping + coercion decision procedures.
@@ -68,9 +68,10 @@ counterpart" into a checkable property rather than an aspiration.
 |---|---|
 | `Slot` | a `<datatype>` where the wire format writes `I`: a primitive or a `TypeRef`, never an inline composite |
 | `Composite` | a `<comptype>`: what a table entry is. Its children are `Slot`s, so it is one flat node |
-| `TypeTable` | `TypeRef` → `Composite`, index-keyed — what the spec calls the type definition table |
+| `RawTypeTable` | `TypeRef` → `Composite`, index-keyed — what the spec calls the type definition table — as parsed or built, not yet checked |
+| `TypeTable` | a `RawTypeTable` that has passed the well-formedness check: what every API after the decoder or builder takes |
 | `TypeRef` | index into a `TypeTable` |
-| `ClosedType` | a `TypeTable` and a root `Slot` together |
+| `Root` | a `Slot` checked to resolve in a given `TypeTable`. In Lean the table is in its type (`t.Root`); in Rust it is a view borrowing its table, `Root<'a>` |
 | `FieldId` | a record or variant label: a 32-bit id |
 | `CandidType` | the derive trait |
 | `TypeEnv` | **reserved**, see below |
@@ -113,7 +114,7 @@ The replacement makes backtracking first-class:
 
 ```rust
 pub trait CandidType: Sized {
-    fn ty(table: &mut TypeTable) -> TypeRef;
+    fn ty(table: &mut RawTypeTable) -> TypeRef;
     fn encode<E: Encoder>(&self, e: E) -> Result<(), E::Error>;
 
     /// Returns Ok(None) when the wire value cannot be coerced to Self.

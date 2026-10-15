@@ -7,7 +7,7 @@ and this model takes no mathlib dependency, so that representation is unavailabl
 would also be the wrong one: it cannot be executed, and it is unlike every
 implementation.
 
-Instead recursion is explicit, through a `TypeTable` -- which is what the binary
+Instead recursion is explicit, through a type table -- which is what the binary
 format calls it (`spec/Candid.md`: "type definition table") and what `candid_types`
 is specified to do with arena indices.
 
@@ -92,21 +92,22 @@ inductive Composite where
   | service (methods : List (String × Slot))
   deriving Repr, Inhabited
 
-/-- A type table: `TypeRef` -> `Composite`. -/
-structure TypeTable where
+/-- A type table as it is parsed or built: `TypeRef` -> `Composite`, not yet checked.
+Nothing but `RawTypeTable.check` should consume one; see `TypeTable`. -/
+structure RawTypeTable where
   entries : Array Composite
   deriving Repr, Inhabited
 
-namespace TypeTable
+namespace RawTypeTable
 
-def size (t : TypeTable) : Nat := t.entries.size
+def size (t : RawTypeTable) : Nat := t.entries.size
 
-def lookup? (t : TypeTable) (r : TypeRef) : Option Composite := t.entries[r]?
+def lookup? (t : RawTypeTable) (r : TypeRef) : Option Composite := t.entries[r]?
 
 /-- The empty table, for types that contain no references. -/
-def empty : TypeTable := { entries := #[] }
+def empty : RawTypeTable := { entries := #[] }
 
-end TypeTable
+end RawTypeTable
 
 /-- No duplicates, by `BEq`. Used for field ids and for method names. -/
 def noDups [BEq α] : List α → Bool
@@ -115,7 +116,8 @@ def noDups [BEq α] : List α → Bool
 
 /-! ## Well-formedness
 
-Nothing recursive is left to check. A slot's reference must resolve, and no record,
+Checked once per table, by `RawTypeTable.check`, and nowhere after. Nothing recursive
+is left to check. A slot's reference must resolve, and no record,
 variant or service may repeat a label -- the spec is explicit that a hash collision
 between field names in one record is *disallowed* rather than resolved, so duplicate
 ids make a type malformed rather than ambiguous.
@@ -163,7 +165,7 @@ def Composite.wellFormed (bound : Nat) (c : Composite) : Bool :=
 
 /-- `spec/Candid.md:1223`: "The serialised data type representing a method type must
 denote a function type." -/
-def TypeTable.methodsDenoteFuncs (t : TypeTable) : Composite → Bool
+def RawTypeTable.methodsDenoteFuncs (t : RawTypeTable) : Composite → Bool
   | .service ms => ms.all fun (_, s) =>
       match s with
       | .ref r => match t.lookup? r with
@@ -172,31 +174,59 @@ def TypeTable.methodsDenoteFuncs (t : TypeTable) : Composite → Bool
       | .prim _ => false
   | .opt _ | .vec _ | .record _ | .variant _ | .func _ _ _ => true
 
-def TypeTable.wellFormed (t : TypeTable) : Bool :=
+def RawTypeTable.wellFormed (t : RawTypeTable) : Bool :=
   t.entries.all fun c => c.wellFormed t.size && t.methodsDenoteFuncs c
 
-/-- A type together with the table its references resolve in.
+/-! ## The validated table
 
-This is the unit the public API speaks in, because a `Slot` holding a `ref` means
-nothing without its table. The first draft of `decSubtype` took one table and two
-types, which silently assumed both came from the same table -- false in the case that
-matters most, where a type table that arrived on the wire is compared against the
-receiver's own type graph. -/
-structure ClosedType where
-  table : TypeTable
-  root : Slot
-  deriving Repr, Inhabited
+Well-formedness is a prerequisite of everything downstream -- subtyping, decoding,
+encoding -- so it is a property of the type, not a check each operation repeats on the
+parts it happens to reach. An operation that re-checks only what it visits fails
+closed for some malformed inputs and not others: a dangling reference *at* a root is
+caught, one *behind* a root that the operation answers without unfolding is not.
 
-namespace ClosedType
+`TypeTable` is the short name because it is the one APIs take. A decoder or a builder
+produces a `RawTypeTable` and checks it once; from then on every reference inside the
+table resolves. -/
 
-def wellFormed (c : ClosedType) : Bool :=
-  c.table.wellFormed && c.root.wellFormed c.table.size
+/-- A well-formed type table. Every value carries the proof, so none is malformed;
+`RawTypeTable.check` is how one is obtained at run time. -/
+structure TypeTable where
+  raw : RawTypeTable
+  wf : raw.wellFormed = true
 
-/-- A type that needs no table. Primitives are the only types that need none, so
-every type this builds is well formed. -/
-def ofPrim (p : Prim) : ClosedType := { table := .empty, root := .prim p }
+def RawTypeTable.check (t : RawTypeTable) : Option TypeTable :=
+  if h : t.wellFormed then some ⟨t, h⟩ else none
 
-end ClosedType
+namespace TypeTable
+
+def size (t : TypeTable) : Nat := t.raw.size
+
+def lookup? (t : TypeTable) (r : TypeRef) : Option Composite := t.raw.lookup? r
+
+/-- Is this slot a type in this table at all? A primitive always is; a reference is
+one exactly when it resolves. -/
+def resolves (t : TypeTable) : Slot → Bool
+  | .prim _ => true
+  | .ref r => (t.lookup? r).isSome
+
+/-- A slot known to resolve in `t`: a type, given its table.
+
+A well-formed table says nothing about a slot handed in beside it, so a root is
+checked on its own -- one bounds check. The table is in the *type*, not stored
+alongside: one table has many roots (a message's arguments, a service's methods), and
+a slot of `A` cannot be passed where a slot of `B` is expected. That is what the
+two-table subtype procedure needs most, since the case that matters is a table that
+arrived on the wire against the receiver's own, and mixing them up is invisible when
+both are the same table.
+
+Rust has no dependent types; its counterpart is a view borrowing its table. -/
+abbrev Root (t : TypeTable) := {s : Slot // t.resolves s = true}
+
+def root? (t : TypeTable) (s : Slot) : Option t.Root :=
+  if h : t.resolves s then some ⟨s, h⟩ else none
+
+end TypeTable
 
 /-! ## Building tables
 
@@ -212,13 +242,14 @@ def intern (c : Composite) : TableM Slot := do
   set (entries.push c)
   return .ref entries.size
 
-/-- Run a construction into the type its resulting slot names. -/
-def close (m : TableM Slot) : ClosedType :=
+/-- Run a construction into the table it built and the slot it returned. The table is
+raw: building one does not check it. -/
+def close (m : TableM Slot) : RawTypeTable × Slot :=
   let (root, entries) := m.run #[]
-  { table := { entries := entries }, root := root }
+  ({ entries := entries }, root)
 
 /-- The common case: one entry, named by the root. -/
-def closeOne (c : Composite) : ClosedType := close (intern c)
+def closeOne (c : Composite) : RawTypeTable × Slot := close (intern c)
 
 /-! Abbreviations for the primitives, so examples read like Candid rather than
 like an AST. -/

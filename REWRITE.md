@@ -204,7 +204,7 @@ definition for everyone else.
 ```
 ic_principal                    (existing; unchanged, already correctly split)
    ↑
-candid_types      Slot, Composite, TypeTable, TypeRef, FieldId, ClosedType,
+candid_types      Slot, Composite, RawTypeTable, TypeTable, Root, TypeRef, FieldId,
                   field-id hash. no_std-capable. No serde, no binary, NO GLOBAL STATE.
    ↑
 candid_subtype    Subtyping + coercion decision procedures. Mirrors Lean 1:1.

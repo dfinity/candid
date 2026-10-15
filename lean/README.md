@@ -111,9 +111,19 @@ Both will exist here eventually, so `TypeEnv` stays reserved for the one where
 transcription of its Lean counterpart, and shared identifiers are most of what makes
 that checkable.
 
+**A table is checked once, and the type says so.** Well-formedness is a prerequisite
+of subtyping, decoding and encoding alike, so `TypeTable` is a table that carries the
+proof, and a decoder or builder produces a `RawTypeTable` and calls `check` on it.
+Checking only what an operation visits fails closed for some malformed inputs and not
+others: `empty <: t` never unfolds `t`, so a reference dangling behind `t`'s root went
+unnoticed while one *at* the root was rejected. `TypeTable` takes the short name
+because it is the one nearly every signature names.
+
 **Subtyping relates two type tables, not one.** A `Slot` holding a `ref` means
-nothing without its table, so the unit the API speaks in is `ClosedType` — a table
-and a root together. The case that matters most compares a type table that arrived on
+nothing without its table, so a type is a `t.Root`: a slot checked to resolve in `t`,
+with `t` in its type rather than stored beside it. One table has many roots (a
+message's arguments, a service's methods), and a root of `A` cannot be passed where a
+root of `B` is expected. The case that matters most compares a type table that arrived on
 the wire against the receiver's own type graph, and those are unrelated tables;
 `rust/candid/src/types/subtype.rs:19` takes a single `env` for both types, which works
 only because callers merge tables first.
