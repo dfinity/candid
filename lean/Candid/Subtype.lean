@@ -33,15 +33,24 @@ works only because callers merge tables first.
 
 **The table bounds the recursion.** A composite's children are slots, and composites
 live only in the table (`Types.lean`), so the only way to recurse is through a pair of
-*references*: every other slot pair is decided outright. The procedure carries `seen`,
-the reference pairs this path has already assumed -- the coinductive hypothesis, since
+*references*: every other slot pair is decided outright. The procedure carries the
+reference pairs this path has already assumed -- the coinductive hypothesis, since
 meeting a recorded pair again is an obligation the greatest fixed point discharges
 rather than one that failed.
 
-Termination is then `remaining`, the number of reference pairs `seen` has *not*
-recorded. It is mentioned only by `termination_by`, so the `|A| x |B|` pair space it
-counts over is never built when the procedure runs: `seen` grows by one cons per
-descent and is read by a scan no longer than the current path. The two facts the
+It carries them in two lists, one per direction. `seen` holds pairs `(i, j)` assumed
+as `A.i <: B.j`; `seenRev` holds pairs `(j, i)` assumed as `B.j <: A.i`, which the
+function rule's contravariant parameter premise asks. The premise swaps the tables,
+so it swaps the two lists. What it must not do is turn one list into the other: an
+assumed `A.i <: B.j` says nothing about `B.j <: A.i`, and reading it as such answers
+the converse from the accounting -- `func (A) -> (nat) <: func (B) -> (int)`, each
+taking itself, came out `true` that way while the relation rejects it.
+
+Termination is then `remaining`, the number of reference pairs the two lists have
+*not* recorded, each over its own orientation. It is mentioned only by
+`termination_by`, so the `|A| x |B|` pair space it counts over is never built when the
+procedure runs: a list grows by one cons per descent and is read by a scan no longer
+than the current path. The two facts the
 measure needs are produced where the decision is made -- the guard says the pair is
 fresh, and the table lookups say its indices are in range -- so no invariant is
 threaded through the recursion.
@@ -102,14 +111,6 @@ theorem mem_allPairs {A B : TypeTable} {i j : TypeRef}
 def unseen (A B : TypeTable) (seen : List (TypeRef × TypeRef)) : Nat :=
   (allPairs A B).countP fun p => !seen.contains p
 
-/-- Recording one more pair cannot raise the count. -/
-theorem unseen_cons_le (A B : TypeTable) (a : TypeRef × TypeRef)
-    (seen : List (TypeRef × TypeRef)) : unseen A B (a :: seen) ≤ unseen A B seen := by
-  apply List.countP_mono_left
-  intro x _ hx
-  simp only [List.contains_cons, Bool.not_eq_true', Bool.or_eq_false_iff] at hx ⊢
-  exact hx.2
-
 /-- The general fact the descent needs: a `countP` over a list drops when the
 predicate flips to `false` on one member that is present, and nowhere gains. -/
 theorem countP_cons_lt [BEq α] [LawfulBEq α] {a : α} {s : List α}
@@ -137,33 +138,31 @@ theorem countP_cons_lt [BEq α] [LawfulBEq α] {a : α} {s : List α}
         · simp [hab]
         · simp [hs, hab]
 
-/-- The measure `sub` descends on: reference pairs not yet assumed, counted in both
-orientations. Counting both is what makes the function rule's table swap leave the
+/-- The measure `sub` descends on: reference pairs not yet assumed, in both
+directions. Counting both is what makes the function rule's table swap leave the
 measure alone -- see `remaining_swap`. -/
-def remaining (A B : TypeTable) (seen : List (TypeRef × TypeRef)) : Nat :=
-  unseen A B seen + unseen B A (seen.map Prod.swap)
+def remaining (A B : TypeTable) (seen seenRev : List (TypeRef × TypeRef)) : Nat :=
+  unseen A B seen + unseen B A seenRev
 
-theorem remaining_swap (A B : TypeTable) (seen : List (TypeRef × TypeRef)) :
-    remaining B A (seen.map Prod.swap) = remaining A B seen := by
-  simp only [remaining, List.map_map, Prod.swap_swap_eq, List.map_id]
+theorem remaining_swap (A B : TypeTable) (seen seenRev : List (TypeRef × TypeRef)) :
+    remaining B A seenRev seen = remaining A B seen seenRev := by
+  simp only [remaining]
   omega
 
-theorem remaining_cons_lt {A B : TypeTable} {i j : TypeRef} {seen : List (TypeRef × TypeRef)}
+theorem remaining_cons_lt {A B : TypeTable} {i j : TypeRef}
+    {seen seenRev : List (TypeRef × TypeRef)}
     (hi : i < A.size) (hj : j < B.size) (hfresh : seen.contains (i, j) = false) :
-    remaining A B ((i, j) :: seen) < remaining A B seen := by
+    remaining A B ((i, j) :: seen) seenRev < remaining A B seen seenRev := by
   have hlt : unseen A B ((i, j) :: seen) < unseen A B seen :=
     countP_cons_lt hfresh (mem_allPairs hi hj)
-  have hle : unseen B A (((i, j) :: seen).map Prod.swap) ≤ unseen B A (seen.map Prod.swap) := by
-    simpa using unseen_cons_le B A (j, i) (seen.map Prod.swap)
   simp only [remaining]
   omega
 
 /-! ## The procedure
 
-`sub A B seen a b` decides `a <: b`, where `a`'s references resolve in `A` and `b`'s
-in `B`, and `seen` holds the reference pairs this path has already assumed. `subC` is
-the same
-question one step in, on the composites that two references name, and `subLabels` is
+`sub A B seen seenRev a b` decides `a <: b`, where `a`'s references resolve in `A`
+and `b`'s in `B`; `seen` and `seenRev` hold the reference pairs this path has already
+assumed, in each direction (see the header). `subC` is the same question one step in, on the composites that two references name, and `subLabels` is
 the record rule, which the function rule reuses on its positional arguments and
 results.
 
@@ -173,7 +172,7 @@ call `subLabels` (1), which may call `sub` (0), which records a pair before call
 `subC` again. -/
 mutual
 
-def sub (A B : TypeTable) (seen : List (TypeRef × TypeRef)) : Slot → Slot → Bool
+def sub (A B : TypeTable) (seen seenRev : List (TypeRef × TypeRef)) : Slot → Slot → Bool
   -- `<datatype> <: reserved` and `empty <: <datatype>`: the top and bottom types.
   -- Neither looks at the other side, which is sound only because both tables are
   -- well formed and the roots resolve: every slot reached here is a type.
@@ -206,11 +205,11 @@ def sub (A B : TypeTable) (seen : List (TypeRef × TypeRef)) : Slot → Slot →
     match _hx : A.lookup? i, _hy : B.lookup? j with
     | some x, some y =>
       if _hs : seen.contains (i, j) then true
-      else subC A B ((i, j) :: seen) x y
+      else subC A B ((i, j) :: seen) seenRev x y
     -- Unreachable: the roots resolve, and in a well-formed table so does every slot
     -- an entry holds. The arm exists because `lookup?` returns an `Option`.
     | _, _ => false
-termination_by (remaining A B seen, 0)
+termination_by (remaining A B seen seenRev, 0)
 decreasing_by
   -- The three facts the measure needs, all produced by the branch itself: the pair
   -- is fresh (`hs`), and each index resolves, so each is in range (`hx`, `hy`).
@@ -220,45 +219,46 @@ decreasing_by
       (Array.getElem?_eq_some_iff.1 _hy).1 (by simpa using _hs))
 
 /-- The rules on the composites that a pair of references names. -/
-def subC (A B : TypeTable) (seen : List (TypeRef × TypeRef)) : Composite → Composite → Bool
+def subC (A B : TypeTable) (seen seenRev : List (TypeRef × TypeRef)) :
+    Composite → Composite → Bool
   -- Any type is a subtype of an option. See the header: this single rule is the
   -- spec's four `opt` rules with their negative premises eliminated.
   | _, .opt _ => true
 
-  | .vec x, .vec y => sub A B seen x y
+  | .vec x, .vec y => sub A B seen seenRev x y
 
   -- A record may specialise a field's type or add a field. It may also *omit* a
   -- field the supertype has, provided that field accepts `null`.
-  | .record fs, .record gs => subLabels A B seen fs gs
+  | .record fs, .record gs => subLabels A B seen seenRev fs gs
 
   -- A variant may specialise a tag's type or drop a tag. Every tag it does carry
   -- must exist in the supertype.
   | .variant fs, .variant gs =>
     fs.all fun (id, f) =>
       match fieldAt gs id with
-      | some g => sub A B seen f g
+      | some g => sub A B seen seenRev f g
       | none => false
 
   -- Parameters generalise, results specialise, and both behave like tuple-shaped
   -- records -- so arguments may be dropped and results added.
   --
-  -- The parameter premise swaps the tables, so it swaps `seen` with them: a pair
-  -- `(i, j)` is about `A`'s `i` and `B`'s `j`, and reading it unswapped would assert
-  -- something about the transposed pair -- a different, and generally false, question.
+  -- The parameter premise swaps the tables, so it swaps the two assumption lists
+  -- with them. Each list keeps its own direction: `seen` is `A <: B` and stays that
+  -- way, becoming the swapped call's `seenRev`.
   | .func args rets ann, .func args' rets' ann' =>
     annotsAgree ann ann'
-      && subLabels B A (seen.map Prod.swap) (indexedFrom 1 args') (indexedFrom 1 args)
-      && subLabels A B seen (indexedFrom 1 rets) (indexedFrom 1 rets')
+      && subLabels B A seenRev seen (indexedFrom 1 args') (indexedFrom 1 args)
+      && subLabels A B seen seenRev (indexedFrom 1 rets) (indexedFrom 1 rets')
 
   -- Services are records of functions: a method may be specialised or added.
   | .service ms, .service ms' =>
     ms'.all fun (name, g) =>
       match methodAt ms name with
-      | some f => sub A B seen f g
+      | some f => sub A B seen seenRev f g
       | none => false
 
   | _, _ => false
-termination_by (remaining A B seen, 2)
+termination_by (remaining A B seen seenRev, 2)
 decreasing_by
   -- The parameter premise swaps the tables, and `remaining` counts both orientations
   -- precisely so that the swap leaves it alone.
@@ -267,13 +267,13 @@ decreasing_by
 
 /-- The record rule: every label the supertype declares is either specialised by the
 subtype or omitted, and omitting it requires that it accept `null`. -/
-def subLabels (A B : TypeTable) (seen : List (TypeRef × TypeRef))
+def subLabels (A B : TypeTable) (seen seenRev : List (TypeRef × TypeRef))
     (fs gs : List (FieldId × Slot)) : Bool :=
   gs.all fun (id, g) =>
     match fieldAt fs id with
-    | some f => sub A B seen f g
+    | some f => sub A B seen seenRev f g
     | none => B.acceptsNull g
-termination_by (remaining A B seen, 1)
+termination_by (remaining A B seen seenRev, 1)
 decreasing_by exact Prod.Lex.right _ (by omega)
 
 end
@@ -281,11 +281,11 @@ end
 /-- Decide `a <: b`, where `a` is a type in `A` and `b` one in `B`. Total: along any
 path a reference pair is recorded at most once, and there are finitely many. -/
 def decSubtype (A B : TypeTable) (a : A.Root) (b : B.Root) : Bool :=
-  sub A B [] a.1 b.1
+  sub A B [] [] a.1 b.1
 
 /- Note the argument order flip in the `func` case above: parameters are
-contravariant, so the tables swap with the types -- and `seen` swaps with the tables.
-Getting either wrong is invisible when both types share one table, which is the
+contravariant, so the tables swap with the types -- and the two assumption lists swap
+with the tables. Getting either wrong is invisible when both types share one table, which is the
 second reason the two-table signature is worth the extra parameter. -/
 
 end Candid

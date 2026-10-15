@@ -364,18 +364,26 @@ def vecOmegaChecks : List Check :=
   , expectSub vecOmegaEven vecOmegaOdd true "vec-omega <: its own unrolling"
   , expectSub vecOmegaOdd vecOmegaEven true "vec-omega's unrolling <: it" ]
 
-/-! ## Contravariance: `seen` swaps with the tables
+/-! ## Contravariance: the pair accounting swaps with the tables, and keeps direction
 
 The parameter premise of the function rule swaps the two tables, so it must swap the
-pair accounting with them. A pair `(i, j)` is about `A`'s `i` and `B`'s `j`; read
-unswapped inside the swapped call it is about `B`'s `i` and `A`'s `j`, which is a
-different question, and subtyping is not symmetric.
+pair accounting with them -- and each assumption must keep its direction. Two ways to
+get it wrong, one witness each, and the model shipped both.
 
-The witness below reduces `contraOuter <: contraOuter'` to `contraFuncs <:
-contraFuncs'`, two functions whose parameter premise asks `contraB.1 <: contraA.2`,
-i.e. `vec text <: vec nat` -- false. Reaching that premise records `(1, 2)` in
-`seen`, so a procedure that read `seen` unswapped would answer the premise from the
-accounting instead, and both queries would come out `true`. -/
+**Reading `seen` unswapped.** A pair `(i, j)` is about `A`'s `i` and `B`'s `j`; read
+inside the swapped call it is about `B`'s `i` and `A`'s `j`. The witness reduces
+`contraOuter <: contraOuter'` to `contraFuncs <: contraFuncs'`, two functions whose
+parameter premise asks `contraB.1 <: contraA.2`, i.e. `vec text <: vec nat` -- false.
+Reaching that premise records `(1, 2)`, so a procedure that read it unswapped would
+answer the premise from the accounting instead, and both queries would come out
+`true`.
+
+**Reading an assumption as its converse.** Swapping `seen` *element-wise* fixes the
+indices but turns an assumed `A.i <: B.j` into an assumed `B.j <: A.i`, which does not
+follow. `selfParam` is a function taking itself: comparing the `nat` and `int`
+versions assumes `A.0 <: B.0`, the parameter premise asks `B.0 <: A.0`, and a
+procedure that found the swapped pair would skip the comparison that needs
+`int <: nat`. Hence two lists, one per direction (`Subtype.lean`). -/
 
 /-- `A.0 = record { f : A.1 }`, `A.1 = func (A.2) -> ()`, `A.2 = vec nat`. -/
 def contraA : RawTypeTable :=
@@ -391,13 +399,23 @@ def contraOuter' : Fixture := { table := contraB, root := .ref 0 }
 def contraFuncs : Fixture := { table := contraA, root := .ref 1 }
 def contraFuncs' : Fixture := { table := contraB, root := .ref 2 }
 
+/-- `A.0 = func (A.0) -> (r)`: a function that takes itself. -/
+def selfParam (r : Slot) : Fixture := { table := { entries := #[ .func [.ref 0] [r] [] ] }, root := .ref 0 }
+
+def selfParamNat : Fixture := selfParam nat
+def selfParamInt : Fixture := selfParam int
+
 def contraChecks : List Check :=
   [ expectWellFormed contraOuter true "contravariance witness: subtype side is well formed"
   , expectWellFormed contraOuter' true "contravariance witness: supertype side is well formed"
   , expectSub contraFuncs contraFuncs' false
       "func (vec nat) -> () !<: func (vec text) -> () (parameter premise fails)"
   , expectSub contraOuter contraOuter' false
-      "record { f : func (vec nat) -> () } !<: record { f : func (vec text) -> () }" ]
+      "record { f : func (vec nat) -> () } !<: record { f : func (vec text) -> () }"
+  , expectSub selfParamNat selfParamInt false
+      "func (A) -> (nat) !<: func (B) -> (int), each taking itself (assumption is not its converse)"
+  , expectSub selfParamNat selfParamNat true
+      "func (A) -> (nat) <: itself, taking itself" ]
 
 /-! ## Transitivity spot-check
 

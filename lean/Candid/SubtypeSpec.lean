@@ -132,9 +132,9 @@ is asked, it answers; and the types carry the rest, since a `TypeTable` is well 
 and a `Root` resolves.
 
 Soundness (`true` implies `Subty`) should follow by coinduction on the procedure's
-recursion, with the pairs recorded in `seen` as the coinductive hypothesis -- that is
-what `seen` means, and stating it this way is what will confirm the accounting is
-right. Completeness is the converse, and needs that assuming a pair already descended
+recursion, with the pairs recorded in `seen` (as `A <: B`) and `seenRev` (as `B <: A`)
+as the coinductive hypothesis -- that is what they mean, and stating it this way is
+what will confirm the accounting is right. Completeness is the converse, and needs that assuming a pair already descended
 through cannot manufacture a relation that the greatest fixed point excludes.
 
 That is also why the rules above can be the spec's own, with no guards. On a malformed

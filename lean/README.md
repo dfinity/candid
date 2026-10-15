@@ -68,12 +68,12 @@ non-well-founded definitions like `type t = t`."
 
 What it bought: the only way for the subtype procedure to recurse is through a pair
 of *references*, so the finite set of reference pairs bounds the recursion. The
-procedure carries `seen` — the pairs this path has already assumed — and descends by
-recording one. The measure is `remaining`, the number of pairs `seen` does *not*
-record; it is named only by `termination_by`, so the `|A| x |B|` pair space it counts
-over is never built at run time. No fuel, no `Option Bool`, and no "unanswered" state
-in the public API. The first version of this model, with
-composites nested inside each other, had no such measure: a cycle alternating which
+procedure carries the pairs this path has already assumed — `seen` and `seenRev`, one
+list per direction — and descends by recording one. The measure is `remaining`, the
+number of pairs they do *not* record; it is named only by `termination_by`, so the
+`|A| x |B|` pair space it counts over is never built at run time. No fuel, no
+`Option Bool`, and no "unanswered" state in the public API. The first version of this
+model, with composites nested inside each other, had no such measure: a cycle alternating which
 side holds the reference dodged the memo entirely, so no budget decided it.
 
 What it cost: a type means nothing without its table, and even `vec nat` needs an
@@ -130,11 +130,15 @@ only because callers merge tables first.
 
 The consequence to keep hold of: the `func` rule's contravariance swaps the *tables*
 along with the types, and therefore swaps the reference-pair accounting with the
-tables — a pair `(i, j)` is about `A`'s `i` and `B`'s `j`, so reading it unswapped
-asserts something about the transposed pair. Both mistakes are invisible when there
-is only one table to swap, and the second one shipped in this model before the
-`contra` checks in [Main.lean](Main.lean) caught it: it reported `<:` for two types
-that are not related.
+tables — while each assumption keeps its direction. The procedure carries two lists,
+`seen` for assumed `A <: B` pairs and `seenRev` for assumed `B <: A` pairs, and the
+parameter premise exchanges them. This model shipped both ways of getting it wrong.
+First it read `seen` unswapped, so a pair `(i, j)` asserted something about the
+transposed indices; then it swapped `seen` element-wise, which fixes the indices but
+reads an assumed `A.i <: B.j` as `B.j <: A.i` — the converse, which does not follow.
+Both reported `<:` for two types that are not related, and both are invisible when
+there is only one table to swap. The `contra` checks in [Main.lean](Main.lean) are
+the witnesses, one per mistake.
 
 ## Constraints
 
@@ -170,13 +174,13 @@ Named here so they are obligations rather than oversights.
 
 - **`decSubtype_iff`** — that the procedure decides the relation. Stated in
   [Candid/SubtypeSpec.lean](Candid/SubtypeSpec.lean). Soundness should follow by
-  coinduction, with the pairs recorded in `seen` as the coinductive hypothesis, which
-  is what `seen` means. There is no longer a budget premise to discharge: the
+  coinduction, with the pairs recorded in `seen` and `seenRev` as the coinductive
+  hypothesis, which is what they mean. There is no longer a budget premise to discharge: the
   procedure returns `Bool` and is total.
-- **The pair accounting is path-scoped, and membership is a scan.** `seen` is
-  threaded down a path rather than shared between siblings, which is a faithful
+- **The pair accounting is path-scoped, and membership is a scan.** `seen` and
+  `seenRev` are threaded down a path rather than shared between siblings, which is a faithful
   reading of the coinductive hypothesis and is what lets the measure need no side
-  conditions. The cost is that `seen.contains` walks the current path, so a table of
+  conditions. The cost is that `contains` walks the current path, so a table of
   *n* entries in one long cycle costs O(n²): measured 70 ms at 10,000 entries, 1.6 s
   at 50,000, and 113 s at 400,000, with no stack overflow at any of those depths.
   Sharing the accounting across siblings in a set is also sound for a greatest fixed
