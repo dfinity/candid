@@ -68,13 +68,22 @@ non-well-founded definitions like `type t = t`."
 
 What it bought: the only way for the subtype procedure to recurse is through a pair
 of *references*, so the finite set of reference pairs bounds the recursion. The
-procedure carries the pairs this path has already assumed — `seen` and `seenRev`, one
-list per direction — and descends by recording one. The measure is `remaining`, the
-number of pairs they do *not* record; it is named only by `termination_by`, so the
-`|A| x |B|` pair space it counts over is never built at run time. No fuel, no
-`Option Bool`, and no "unanswered" state in the public API. The first version of this
-model, with composites nested inside each other, had no such measure: a cycle alternating which
-side holds the reference dodged the memo entirely, so no budget decided it.
+procedure is a worklist: it carries the obligations still pending and the pairs
+already assumed — `seen` and `seenRev`, one list per direction — and each step either
+records a pair or discharges an obligation. The measure is (`remaining`, pending
+obligations), where `remaining` is the number of pairs the lists do *not* record; it is
+named only by `termination_by`, so the `|A| x |B|` pair space it counts over is never
+built at run time. No fuel, no `Option Bool`, and no "unanswered" state in the public
+API. The first version of this model, with composites nested inside each other, had no
+such measure: a cycle alternating which side holds the reference dodged the memo
+entirely, so no budget decided it.
+
+The assumptions are shared by the whole run rather than scoped to a path. Every
+premise of every rule is a conjunct, so nothing backtracks: a `false` anywhere is the
+answer, and a `true` means every assumption was discharged. Path-scoped assumptions
+were the earlier design, and they re-derive a shared sub-type once per path reaching
+it — exponential in depth, 2^41 - 1 comparisons for a 41-entry chain whose entries
+each reference the next twice. Each pair is now compared at most once per direction.
 
 What it cost: a type means nothing without its table, and even `vec nat` needs an
 entry, so hand-written types are built through `intern`/`close`. The `.did` surface
@@ -175,17 +184,16 @@ Named here so they are obligations rather than oversights.
 - **`decSubtype_iff`** — that the procedure decides the relation. Stated in
   [Candid/SubtypeSpec.lean](Candid/SubtypeSpec.lean). Soundness should follow by
   coinduction, with the pairs recorded in `seen` and `seenRev` as the coinductive
-  hypothesis, which is what they mean. There is no longer a budget premise to discharge: the
-  procedure returns `Bool` and is total.
-- **The pair accounting is path-scoped, and membership is a scan.** `seen` and
-  `seenRev` are threaded down a path rather than shared between siblings, which is a faithful
-  reading of the coinductive hypothesis and is what lets the measure need no side
-  conditions. The cost is that `contains` walks the current path, so a table of
-  *n* entries in one long cycle costs O(n²): measured 70 ms at 10,000 entries, 1.6 s
-  at 50,000, and 113 s at 400,000, with no stack overflow at any of those depths.
-  Sharing the accounting across siblings in a set is also sound for a greatest fixed
-  point and is how an implementation gets a polynomial bound; the reference model
-  keeps the simpler structure until a conformance vector makes that a problem.
+  hypothesis, which is what they mean. Because the assumptions are shared across the
+  run, the invariant is about the whole worklist: when it empties, the assumed pairs
+  are a set closed under the rules. There is no budget premise to discharge: the procedure
+  returns `Bool` and is total.
+- **Membership is a scan.** `seen` and `seenRev` are lists, so `contains` walks every
+  pair recorded so far, and a table of *n* entries in one long cycle costs O(n²):
+  measured 234 ms at 10,000 entries and 6.3 s at 50,000. `run` is tail-recursive, so
+  depth costs no stack. A hash set would make this linear in the pairs compared; the
+  reference model keeps lists, which the termination measure is stated over, until a
+  conformance vector makes that a problem.
 - **Flattening the surface syntax.** A `.did` type is nested; a `Composite`'s
   children are slots. The parser will need the pass that interns nested composites
   into a table, and textual aliases (`type A = B;`) have to be resolved by it —

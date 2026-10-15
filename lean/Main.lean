@@ -417,6 +417,27 @@ def contraChecks : List Check :=
   , expectSub selfParamNat selfParamNat true
       "func (A) -> (nat) <: itself, taking itself" ]
 
+/-! ## Shared sub-types: assumptions outlive the path that made them
+
+Entries `0`..`39` each reference the next one twice, so the table is a chain but the
+type it denotes is a binary tree of depth 40 whose subtrees are all shared. Assumptions
+scoped to a path re-derive each shared subtree once per path that reaches it --
+2^41 - 1 comparisons, days of work for a few hundred bytes of type table. Shared
+across the whole run, each pair is compared once. A regression here shows up as CI
+timing out rather than as a failed check. -/
+
+/-- `T.i = record { 0 : T.(i+1); 1 : T.(i+1) }` for `i < 40`, ending in `T.40 = last`. -/
+def sharedTail (last : Composite) : Fixture :=
+  { table := { entries := ((List.range 40).map fun i =>
+      Composite.record [(0, .ref (i + 1)), (1, .ref (i + 1))]).toArray.push last }
+    root := .ref 0 }
+
+def sharedChecks : List Check :=
+  [ expectSub (sharedTail (.record [(2, nat)])) (sharedTail (.record [])) true
+      "shared tails, depth 40: each pair compared once"
+  , expectSub (sharedTail (.record [])) (sharedTail (.record [(2, nat)])) false
+      "shared tails, depth 40: the failing direction" ]
+
 /-! ## Transitivity spot-check
 
 The spec keeps transitivity as a design goal, and the unusual `opt` rules exist to
@@ -434,7 +455,7 @@ def transitivityChecks : List Check :=
 def allChecks : List Check :=
   hashChecks ++ primChecks ++ optChecks ++ vecChecks ++ recordChecks ++
   variantChecks ++ funcChecks ++ serviceChecks ++ wellFormedChecks ++
-  recursiveChecks ++ vecOmegaChecks ++ contraChecks ++ transitivityChecks
+  recursiveChecks ++ vecOmegaChecks ++ contraChecks ++ sharedChecks ++ transitivityChecks
 
 def main : IO UInt32 := do
   let failures := allChecks.filter (fun c => if c.known then c.ok else !c.ok)

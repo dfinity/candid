@@ -131,11 +131,15 @@ The statement carries no side condition. `decSubtype` is total, so every questio
 is asked, it answers; and the types carry the rest, since a `TypeTable` is well formed
 and a `Root` resolves.
 
-Soundness (`true` implies `Subty`) should follow by coinduction on the procedure's
-recursion, with the pairs recorded in `seen` (as `A <: B`) and `seenRev` (as `B <: A`)
-as the coinductive hypothesis -- that is what they mean, and stating it this way is
-what will confirm the accounting is right. Completeness is the converse, and needs that assuming a pair already descended
-through cannot manufacture a relation that the greatest fixed point excludes.
+Soundness (`true` implies `Subty`) should follow by coinduction, with the pairs
+recorded in `seen` (as `A <: B`) and `seenRev` (as `B <: A`) as the coinductive
+hypothesis -- that is what they mean, and stating it this way is what will confirm the
+accounting is right. The assumptions are shared by the whole run, so the invariant of
+`run` is about its worklist: each obligation an assumed pair expanded to is still
+pending, decided by `leaf`, or itself assumed. When the worklist empties, the assumed
+pairs are a set closed under the rules, and coinduction does the rest. Completeness is the converse, and
+needs that assuming a pair cannot manufacture a relation that the greatest fixed point
+excludes.
 
 That is also why the rules above can be the spec's own, with no guards. On a malformed
 table the two would disagree -- `toReserved`, `fromEmpty` and `toOpt` relate a slot
