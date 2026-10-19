@@ -176,6 +176,13 @@ fn incompatible_record_and_variant_changes() {
             "service : { f : () -> (vec text) }",
             "service : { f : () -> (vec nat) }",
         ),
+        (
+            // Field 0 probes `X <: Y` for the opt rule; the probe fails, and must
+            // not leave `X2 <: Y2` behind for field 1 to find.
+            "change a field reached again after a failed opt probe",
+            "type X = record { 0 : X2; 1 : nat }; type X2 = record { 0 : X }; service : { f : () -> (record { 0 : X; 1 : X2 }) }",
+            "type Y = record { 0 : Y2; 1 : text }; type Y2 = record { 0 : Y }; service : { f : () -> (record { 0 : opt Y; 1 : Y2 }) }",
+        ),
     ];
     for &(desc, new, old) in cases {
         check_incompatible(new, old, desc);
@@ -382,6 +389,10 @@ fn report_and_simple_check_agree() {
         (
             "service : { f : (nat) -> () }",
             "service : { f : (int) -> () }",
+        ),
+        (
+            "type X = record { 0 : X2; 1 : nat }; type X2 = record { 0 : X }; service : { f : () -> (record { 0 : X; 1 : X2 }) }",
+            "type Y = record { 0 : Y2; 1 : text }; type Y2 = record { 0 : Y }; service : { f : () -> (record { 0 : opt Y; 1 : Y2 }) }",
         ),
     ];
     for (new, old) in incompatible {
