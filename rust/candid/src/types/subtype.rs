@@ -1,4 +1,6 @@
-use super::internal::{find_type, Field, Label, Type, TypeInner};
+use super::internal::{
+    elide_large, find_type, Field, Label, Type, TypeInner, MAX_DIAGNOSTIC_LIST_LEN,
+};
 use crate::types::TypeEnv;
 use crate::utils::RecursionDepth;
 use crate::{Error, Result};
@@ -217,28 +219,24 @@ fn subtype_collect_(
         }
         let before = errors.len();
         match (t1.as_ref(), t2.as_ref()) {
-            (Var(id), _) => subtype_collect_(
-                report,
-                gamma,
-                env,
-                env.rec_find_type_with_depth(id, depth).unwrap(),
-                t2,
-                depth,
-                path,
-                errors,
-                is_input,
-            ),
-            (_, Var(id)) => subtype_collect_(
-                report,
-                gamma,
-                env,
-                t1,
-                env.rec_find_type_with_depth(id, depth).unwrap(),
-                depth,
-                path,
-                errors,
-                is_input,
-            ),
+            (Var(id), _) => match env.rec_find_type_with_depth(id, depth) {
+                Ok(t1) => {
+                    subtype_collect_(report, gamma, env, t1, t2, depth, path, errors, is_input)
+                }
+                Err(e) => errors.push(Incompatibility {
+                    path: path.clone(),
+                    message: e.to_string(),
+                }),
+            },
+            (_, Var(id)) => match env.rec_find_type_with_depth(id, depth) {
+                Ok(t2) => {
+                    subtype_collect_(report, gamma, env, t1, t2, depth, path, errors, is_input)
+                }
+                Err(e) => errors.push(Incompatibility {
+                    path: path.clone(),
+                    message: e.to_string(),
+                }),
+            },
             (Knot(id), _) => subtype_collect_(
                 report,
                 gamma,
@@ -291,7 +289,7 @@ fn subtype_collect_(
                     Ok(Null | Reserved | Opt(_))
                 ) => {}
         (_, Opt(_)) => {
-            let msg = format!("WARNING: {t1} <: {t2} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/c7659ca/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.");
+            let msg = format!("WARNING: {} <: {} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/c7659ca/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.", elide_large(t1), elide_large(t2));
             match report {
                 OptReport::Silence => (),
                 OptReport::Warning => eprintln!("{msg}"),
@@ -324,13 +322,15 @@ fn subtype_collect_(
                                 path: path.clone(),
                                 message: if is_input {
                                     format!(
-                                        "new service requires field {id} (type {ty2}), \
-                                         which old callers don't provide and is not optional"
+                                        "new service requires field {id} (type {}), \
+                                         which old callers don't provide and is not optional",
+                                        elide_large(ty2)
                                     )
                                 } else {
                                     format!(
-                                        "new type is missing required field {id} (type {ty2}), \
-                                         which is expected by the old type and is not optional"
+                                        "new type is missing required field {id} (type {}), \
+                                         which is expected by the old type and is not optional",
+                                        elide_large(ty2)
                                     )
                                 },
                             });
@@ -428,7 +428,11 @@ fn subtype_collect_(
         (_, _) => {
             errors.push(Incompatibility {
                 path: path.clone(),
-                message: format!("{t1} is not a subtype of {t2}"),
+                message: format!(
+                    "{} is not a subtype of {}",
+                    elide_large(t1),
+                    elide_large(t2)
+                ),
             });
         }
     }
@@ -530,22 +534,12 @@ fn subtype_(
             return Ok(());
         }
         let res = match (t1.as_ref(), t2.as_ref()) {
-            (Var(id), _) => subtype_(
-                report,
-                gamma,
-                env,
-                env.rec_find_type_with_depth(id, depth).unwrap(),
-                t2,
-                depth,
-            ),
-            (_, Var(id)) => subtype_(
-                report,
-                gamma,
-                env,
-                t1,
-                env.rec_find_type_with_depth(id, depth).unwrap(),
-                depth,
-            ),
+            (Var(id), _) => env
+                .rec_find_type_with_depth(id, depth)
+                .and_then(|t1| subtype_(report, gamma, env, t1, t2, depth)),
+            (_, Var(id)) => env
+                .rec_find_type_with_depth(id, depth)
+                .and_then(|t2| subtype_(report, gamma, env, t1, t2, depth)),
             (Knot(id), _) => subtype_(report, gamma, env, &find_type(id).unwrap(), t2, depth),
             (_, Knot(id)) => subtype_(report, gamma, env, t1, &find_type(id).unwrap(), depth),
             (_, _) => unreachable!(),
@@ -573,7 +567,7 @@ fn subtype_(
             Ok(())
         }
         (_, Opt(_)) => {
-            let msg = format!("WARNING: {t1} <: {t2} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/c7659ca/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.");
+            let msg = format!("WARNING: {} <: {} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/c7659ca/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.", elide_large(t1), elide_large(t2));
             match report {
                 OptReport::Silence => (),
                 OptReport::Warning => eprintln!("{msg}"),
@@ -587,7 +581,11 @@ fn subtype_(
                 match fields.get(id) {
                     Some(ty1) => {
                         subtype_(report, gamma, env, ty1, ty2, depth).with_context(|| {
-                            format!("Record field {id}: {ty1} is not a subtype of {ty2}")
+                            format!(
+                                "Record field {id}: {} is not a subtype of {}",
+                                elide_large(ty1),
+                                elide_large(ty2)
+                            )
                         })?
                     }
                     None => {
@@ -595,7 +593,10 @@ fn subtype_(
                             env.trace_type_with_depth(ty2, depth)?.as_ref(),
                             Null | Reserved | Opt(_)
                         ) {
-                            return Err(Error::msg(format!("Record field {id}: {ty2} is only in the expected type and is not of type opt, null or reserved")));
+                            return Err(Error::msg(format!(
+                                "Record field {id}: {} is only in the expected type and is not of type opt, null or reserved",
+                                elide_large(ty2)
+                            )));
                         }
                     }
                 }
@@ -608,7 +609,11 @@ fn subtype_(
                 match fields.get(id) {
                     Some(ty2) => {
                         subtype_(report, gamma, env, ty1, ty2, depth).with_context(|| {
-                            format!("Variant field {id}: {ty1} is not a subtype of {ty2}")
+                            format!(
+                                "Variant field {id}: {} is not a subtype of {}",
+                                elide_large(ty1),
+                                elide_large(ty2)
+                            )
                         })?
                     }
                     None => {
@@ -626,7 +631,11 @@ fn subtype_(
                 match meths.get(name) {
                     Some(ty1) => {
                         subtype_(report, gamma, env, ty1, ty2, depth).with_context(|| {
-                            format!("Method {name}: {ty1} is not a subtype of {ty2}")
+                            format!(
+                                "Method {name}: {} is not a subtype of {}",
+                                elide_large(ty1),
+                                elide_large(ty2)
+                            )
                         })?
                     }
                     None => {
@@ -657,7 +666,11 @@ fn subtype_(
         (_, Class(_, t)) => subtype_(report, gamma, env, t1, t, depth),
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
-        (_, _) => Err(Error::msg(format!("{t1} is not a subtype of {t2}"))),
+        (_, _) => Err(Error::msg(format!(
+            "{} is not a subtype of {}",
+            elide_large(t1),
+            elide_large(t2)
+        ))),
     }
 }
 
@@ -684,20 +697,12 @@ fn equal_impl(
             return Ok(());
         }
         let res = match (t1.as_ref(), t2.as_ref()) {
-            (Var(id), _) => equal_impl(
-                gamma,
-                env,
-                env.rec_find_type_with_depth(id, depth).unwrap(),
-                t2,
-                depth,
-            ),
-            (_, Var(id)) => equal_impl(
-                gamma,
-                env,
-                t1,
-                env.rec_find_type_with_depth(id, depth).unwrap(),
-                depth,
-            ),
+            (Var(id), _) => env
+                .rec_find_type_with_depth(id, depth)
+                .and_then(|t1| equal_impl(gamma, env, t1, t2, depth)),
+            (_, Var(id)) => env
+                .rec_find_type_with_depth(id, depth)
+                .and_then(|t2| equal_impl(gamma, env, t1, t2, depth)),
             (Knot(id), _) => equal_impl(gamma, env, &find_type(id).unwrap(), t2, depth),
             (_, Knot(id)) => equal_impl(gamma, env, t1, &find_type(id).unwrap(), depth),
             (_, _) => unreachable!(),
@@ -722,7 +727,9 @@ fn equal_impl(
                 }
                 equal_impl(gamma, env, &f1.ty, &f2.ty, depth).context(format!(
                     "Field {} has different types: {} and {}",
-                    f1.id, f1.ty, f2.ty
+                    f1.id,
+                    elide_large(&f1.ty),
+                    elide_large(&f2.ty)
                 ))?;
             }
             Ok(())
@@ -739,7 +746,9 @@ fn equal_impl(
                 }
                 equal_impl(gamma, env, &m1.1, &m2.1, depth).context(format!(
                     "Method {} has different types: {} and {}",
-                    m1.0, m1.1, m2.1
+                    m1.0,
+                    elide_large(&m1.1),
+                    elide_large(&m2.1)
                 ))?;
             }
             Ok(())
@@ -770,7 +779,11 @@ fn equal_impl(
         }
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
-        (_, _) => Err(Error::msg(format!("{t1} is not equal to {t2}"))),
+        (_, _) => Err(Error::msg(format!(
+            "{} is not equal to {}",
+            elide_large(t1),
+            elide_large(t2)
+        ))),
     }
 }
 
@@ -814,19 +827,27 @@ fn to_tuple(args: &[Type]) -> Type {
     )
     .into()
 }
-#[cfg(not(feature = "printer"))]
+/// Renders an argument list for a diagnostic, eliding any type too large to render and
+/// stopping once the list itself reaches its budget.
+///
+/// A per-element budget alone would leave the list unbounded, since the cost would then
+/// grow with the number of arguments. `elide_large` renders through `Display`, which
+/// already picks the pretty printer or the fallback according to the `printer` feature,
+/// so one implementation serves both.
 fn pp_args(args: &[crate::types::Type]) -> String {
     use std::fmt::Write;
     let mut s = String::new();
-    write!(&mut s, "(").unwrap();
-    for arg in args.iter() {
-        write!(&mut s, "{:?}, ", arg).unwrap();
+    let _ = write!(&mut s, "(");
+    for (i, arg) in args.iter().enumerate() {
+        if i > 0 {
+            let _ = write!(&mut s, ", ");
+        }
+        if s.len() >= MAX_DIAGNOSTIC_LIST_LEN {
+            let _ = write!(&mut s, "... and {} more", args.len() - i);
+            break;
+        }
+        let _ = write!(&mut s, "{}", elide_large(arg));
     }
-    write!(&mut s, ")").unwrap();
+    let _ = write!(&mut s, ")");
     s
-}
-#[cfg(feature = "printer")]
-fn pp_args(args: &[crate::types::Type]) -> String {
-    use crate::pretty::candid::pp_args;
-    pp_args(args).pretty(80).to_string()
 }

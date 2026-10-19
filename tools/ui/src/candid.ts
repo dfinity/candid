@@ -119,7 +119,7 @@ export async function getCanisterLogs(canisterId: Principal, logger: any) {
         const content = uint8ArrayToDisplay(e.content);
         return `[${stamp}] ${content}`;
       });
-      const content = display.join("<br>");
+      const content = display.join("\n");
       logger(content);
     }
   } catch(err) {
@@ -299,7 +299,11 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
 
   const sig = document.createElement('div');
   sig.className = 'signature';
-  sig.innerHTML = `<b>${name}</b>: ${idlFunc.display()}`;
+  // Build the node from text rather than parsing it as HTML.
+  const sigName = document.createElement('b');
+  sigName.textContent = name;
+  sig.appendChild(sigName);
+  sig.appendChild(document.createTextNode(`: ${idlFunc.display()}`));
   item.appendChild(sig);
 
   const methodListItem = document.createElement('li');
@@ -383,8 +387,8 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
   function callAndRender(args: any[]) {
     (async () => {
       resultDiv.classList.remove('error');
-      const showArgs = encodeStr(IDL.FuncClass.argsToString(idlFunc.argTypes, args));
-      log(decodeSpace(`› ${name}${showArgs}`));
+      const showArgs = IDL.FuncClass.argsToString(idlFunc.argTypes, args);
+      log(`› ${name}${showArgs}`);
       const callResult = await call(args) as any;
       let result: any;
       if (idlFunc.retTypes.length === 0) {
@@ -394,7 +398,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
       } else {
         result = callResult;
       }
-      left.innerHTML = '';
+      left.replaceChildren();
 
       let activeDisplayType = '';
       buttonsArray.forEach(button => {
@@ -408,17 +412,14 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
         }
         return 'none';
       }
-      function decodeSpace(str: string) {
-        return str.replace(/&nbsp;/g, ' ');
-      }
 
       const textContainer = document.createElement('div');
       textContainer.className = 'text-result';
       containers.push(textContainer);
       textContainer.style.display = setContainerVisibility('text');
       left.appendChild(textContainer);
-      const text = encodeStr(IDL.FuncClass.argsToString(idlFunc.retTypes, result));
-      textContainer.innerHTML = decodeSpace(text);
+      const text = IDL.FuncClass.argsToString(idlFunc.retTypes, result);
+      textContainer.textContent = text;
       if (!is_query(idlFunc)) {
         const id = Actor.canisterIdOf(canister);
         await getCanisterLogs(id, log);
@@ -427,7 +428,7 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
           await renderFlameGraph(profiler);
         }
       }
-      log(decodeSpace(text));
+      log(text);
 
       const uiContainer = document.createElement('div');
       uiContainer.className = 'ui-result';
@@ -494,19 +495,6 @@ function renderMethod(canister: ActorSubclass, name: string, idlFunc: IDL.FuncCl
   });
 }
 
-function encodeStr(str: string) {
-  const escapeChars: Record<string, string> = {
-    ' ': '&nbsp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '\n': '<br>',
-  };
-  const regex = new RegExp('[ <>\n]', 'g');
-  return str.replace(regex, m => {
-    return escapeChars[m];
-  });
-}
-
 function log(content: Element | string) {
   const outputEl = document.getElementById('output-list')!;
   const line = document.createElement('div');
@@ -514,7 +502,8 @@ function log(content: Element | string) {
   if (content instanceof Element) {
     line.appendChild(content);
   } else {
-    line.innerHTML = content;
+    // Whitespace is preserved by CSS, not by markup.
+    line.textContent = content;
   }
 
   outputEl.appendChild(line);

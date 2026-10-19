@@ -11,10 +11,10 @@ export interface A {
 export type B = { '' : null } |
   { '空的' : null } |
   { '  空的  ' : null } |
-  { '1⃣️2⃣️3⃣️' : null };
+  { '1⃣\u{fe0f}2⃣\u{fe0f}3⃣\u{fe0f}' : null };
 export interface _SERVICE {
   '' : ActorMethod<[bigint], bigint>,
-  '✈️  🚗 ⛱️ ' : ActorMethod<[], undefined>,
+  '✈\u{fe0f}  🚗 ⛱\u{fe0f} ' : ActorMethod<[], undefined>,
   '函数名' : ActorMethod<[A], B>,
   '👀' : ActorMethod<[bigint], bigint>,
 }

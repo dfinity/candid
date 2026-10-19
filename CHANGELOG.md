@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-10-09
+
+### Candid 0.10.38
+
+* Bug fixes:
+  + `nat` and `int` values decoded into `u128` and `i128` are now bounded by the width of the target type at every byte of the LEB128 body. A value that needs more than 128 bits returns a `nat overflow` or `int overflow` error, and an overlong encoding of a value that fits (zero or sign padding past bit 127) decodes to that value, so the fixed-width decoders agree with `Nat::decode` and `Int::decode` on every input.
+  + A failed type-variable lookup inside `subtype`, `subtype_check_all` and `equal` is now reported as an error rather than unwrapped.
+
+## 2026-09-25
+
+### Candid 0.10.37
+
+* Bug fixes:
+  + Bound the byte length of the type-table header, 64 KiB by default and configurable with `DecoderConfig::set_max_header_len`. Headers over the bound, far above any realistic interface, are now rejected; the value section is unaffected, and `set_max_type_len` still separately bounds the number of type-table entries.
+  + Bound the size of a type named in a decoder diagnostic. What it costs to render a type follows that type's own width and depth, and a type reaching the decoder is chosen by the sender, so a diagnostic now elides one whose rendering would exceed a fixed budget instead of rendering it in full. This holds for every diagnostic that names a type, including the subtyping messages and the verbose form that `set_full_error_message(true)` selects; ordinary mismatches are unchanged and still name both types.
+
+## 2026-09-22
+
+### Candid 0.10.36
+
+* Bug fixes:
+  + Scope the decode fast paths of a map to their own half of an entry, so a map entry's key and value each decode under their own declared type. `deserialize_map` derives a big-integer fast path from the map's value type and a text fast path from its key type; each previously stayed active for the whole entry. The big-integer path is now cleared for the duration of the key and restored for the value, the text path is cleared for the duration of the value, and the value's expected and wire types are re-established on every entry. Each half of an entry therefore goes through its own type's entry point, keeping its own encoding (SLEB128 for `int`, LEB128 for `nat`) and its own subtype check, for every combination of key and value type — including a value whose type shares an encoding with the key's, such as `blob` against `text`. The wire format is unchanged, and entries whose key and value types agree decode identically.
+  + Share the undecoded argument queue behind a reference count. The option/backtracking path snapshots the deserializer to restore on a subtype mismatch, which previously copied the whole queue of remaining arguments on every present `opt`. The queue is only mutated at the top level, so it is now shared rather than copied and the snapshot is a refcount bump. Skipping many present optional arguments is no longer superlinear in the argument count; the decode result is unchanged.
+
 ## 2026-08-14
 
 ### candid_parser 0.4.1

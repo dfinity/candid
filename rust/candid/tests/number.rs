@@ -313,3 +313,92 @@ fn bignum_random_roundtrip() {
         roundtrip_int(&(int * (-1i128))); // exercise the negative encode path too
     }
 }
+
+/// LEB128 bodies around the 128-bit boundary: `len - 1` continuation bytes built
+/// from `fill`, then `last` as the terminator.
+fn leb128_bodies() -> Vec<Vec<u8>> {
+    let mut out = Vec::new();
+    for len in 17..=22 {
+        for fill in [0x80u8, 0xff, 0xc0, 0x81] {
+            for last in 0..=0x7fu8 {
+                let mut bytes = vec![fill; len - 1];
+                bytes.push(last);
+                out.push(bytes);
+            }
+        }
+    }
+    out
+}
+
+/// The fixed-width decoders must agree with the bignum decoders on every input:
+/// the same value when it fits, an error when it does not, and never a panic.
+#[test]
+fn fixed_width_decode_matches_bignum() {
+    for bytes in leb128_bodies() {
+        let nat = Nat::decode(&mut &bytes[..]).unwrap().0.to_u128();
+        let mut r = &bytes[..];
+        let got = decode_nat(&mut r).ok();
+        assert_eq!(got, nat, "nat {}", hex::encode(&bytes));
+        assert!(
+            r.is_empty(),
+            "nat {} not fully consumed",
+            hex::encode(&bytes)
+        );
+
+        let int = Int::decode(&mut &bytes[..]).unwrap().0.to_i128();
+        let mut r = &bytes[..];
+        let got = decode_int(&mut r).ok();
+        assert_eq!(got, int, "int {}", hex::encode(&bytes));
+        assert!(
+            r.is_empty(),
+            "int {} not fully consumed",
+            hex::encode(&bytes)
+        );
+    }
+}
+
+#[test]
+fn fixed_width_decode_boundaries() {
+    let zeros = |n: usize, last: u8| {
+        let mut bytes = vec![0x80u8; n];
+        bytes.push(last);
+        bytes
+    };
+    // Largest values that fit, and overlong encodings of small ones.
+    assert_eq!(decode_nat(&mut &zeros(18, 0x03)[..]).unwrap(), 3 << 126);
+    assert_eq!(decode_nat(&mut &zeros(19, 0x00)[..]).unwrap(), 0);
+    assert_eq!(decode_nat(&mut &zeros(40, 0x00)[..]).unwrap(), 0);
+    assert_eq!(decode_int(&mut &zeros(18, 0x7e)[..]).unwrap(), i128::MIN);
+    assert_eq!(decode_int(&mut &zeros(18, 0x01)[..]).unwrap(), 1 << 126);
+    assert_eq!(decode_int(&mut &zeros(19, 0x00)[..]).unwrap(), 0);
+    // Values that need bit 128 (nat) or bit 127 as a magnitude bit (int).
+    assert!(decode_nat(&mut &zeros(18, 0x04)[..]).is_err());
+    assert!(decode_nat(&mut &zeros(19, 0x01)[..]).is_err());
+    assert!(decode_int(&mut &zeros(18, 0x02)[..]).is_err());
+    assert!(decode_int(&mut &zeros(18, 0x7d)[..]).is_err());
+    assert!(decode_int(&mut &zeros(19, 0x01)[..]).is_err());
+}
+
+/// The same bounds hold through `Decode!` into `u128`/`i128`.
+#[test]
+fn fixed_width_decode_via_idl() {
+    use candid::Decode;
+    let msg = |ty: u8, body: &[u8]| {
+        let mut bytes = b"DIDL\x00\x01".to_vec();
+        bytes.push(ty);
+        bytes.extend_from_slice(body);
+        bytes
+    };
+    let mut big = vec![0x80u8; 18];
+    big.push(0x04);
+    let mut overlong = vec![0x80u8; 19];
+    overlong.push(0x00);
+    assert!(Decode!(&msg(0x7d, &big), u128).is_err());
+    assert!(Decode!(&msg(0x7d, &big), i128).is_err());
+    assert_eq!(Decode!(&msg(0x7d, &overlong), u128).unwrap(), 0);
+    assert_eq!(Decode!(&msg(0x7c, &overlong), i128).unwrap(), 0);
+    assert_eq!(
+        Decode!(&msg(0x7d, &big), Nat).unwrap(),
+        Nat::from(u128::MAX) + 1u8
+    );
+}

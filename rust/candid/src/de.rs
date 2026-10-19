@@ -2,7 +2,9 @@
 
 use super::{
     error::{Error, Result},
-    types::internal::{text_size, type_of, TypeId},
+    types::internal::{
+        elide_large, text_size, type_of, TypeId, MAX_DIAGNOSTIC_LIST_LEN, MAX_DIAGNOSTIC_TYPE_LEN,
+    },
     types::{Field, Label, SharedLabel, Type, TypeEnv, TypeInner},
     CandidType,
 };
@@ -19,7 +21,22 @@ use serde::de::{self, Visitor};
 use std::fmt::Write;
 use std::{collections::VecDeque, io::Cursor, mem::replace, rc::Rc};
 
-const MAX_TYPE_LEN: i32 = 500;
+/// Render a type table for a diagnostic, eliding entries too large to render and
+/// stopping once the table itself reaches its budget.
+///
+/// A table holds as many entries as `max_type_len` allows, so bounding each entry on
+/// its own would still leave the whole rendering growing with their number.
+fn describe_table(env: &TypeEnv) -> String {
+    let mut out = String::new();
+    for (i, (name, ty)) in env.0.iter().enumerate() {
+        if out.len() >= MAX_DIAGNOSTIC_LIST_LEN {
+            let _ = writeln!(&mut out, "... and {} more", env.0.len() - i);
+            break;
+        }
+        let _ = writeln!(&mut out, "type {name} = {}", elide_large(ty));
+    }
+    out
+}
 
 /// Use this struct to deserialize a sequence of Rust values (heterogeneous) from IDL binary message.
 pub struct IDLDeserialize<'de> {
@@ -33,13 +50,7 @@ impl<'de> IDLDeserialize<'de> {
     }
     /// Create a new deserializer with IDL binary message. The config is used to adjust some parameters in the deserializer.
     pub fn new_with_config(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
-        let mut de = Deserializer::from_bytes(bytes, config).with_context(|| {
-            if config.full_error_message || bytes.len() <= 500 {
-                format!("Cannot parse header {}", hex::encode(bytes))
-            } else {
-                "Cannot parse header".to_string()
-            }
-        })?;
+        let mut de = Deserializer::from_bytes(bytes, config)?;
         de.add_cost((de.input.position() as usize).saturating_mul(4))?;
         Ok(IDLDeserialize { de })
     }
@@ -79,9 +90,7 @@ impl<'de> IDLDeserialize<'de> {
                 self.de.expect_type = expected_type;
                 self.de.wire_type = TypeInner::Null.into();
                 return T::deserialize(&mut self.de);
-            } else if self.de.config.full_error_message
-                || text_size(&expected_type, MAX_TYPE_LEN).is_ok()
-            {
+            } else if text_size(&expected_type, MAX_DIAGNOSTIC_TYPE_LEN).is_ok() {
                 return Err(Error::msg(format!(
                     "No more values on the wire, the expected type {expected_type} is not opt, null, or reserved"
                 )));
@@ -90,7 +99,7 @@ impl<'de> IDLDeserialize<'de> {
             }
         }
 
-        let (ind, ty) = self.de.types.pop_front().unwrap();
+        let (ind, ty) = Rc::make_mut(&mut self.de.types).pop_front().unwrap();
         self.de.expect_type = if matches!(expected_type.as_ref(), TypeInner::Unknown) {
             self.de.is_untyped = true;
             ty.clone()
@@ -100,9 +109,8 @@ impl<'de> IDLDeserialize<'de> {
         self.de.wire_type = ty.clone();
 
         let mut v = T::deserialize(&mut self.de).with_context(|| {
-            if self.de.config.full_error_message
-                || (text_size(&ty, MAX_TYPE_LEN).is_ok()
-                    && text_size(&expected_type, MAX_TYPE_LEN).is_ok())
+            if text_size(&ty, MAX_DIAGNOSTIC_TYPE_LEN).is_ok()
+                && text_size(&expected_type, MAX_DIAGNOSTIC_TYPE_LEN).is_ok()
             {
                 format!("Fail to decode argument {ind} from {ty} to {expected_type}")
             } else {
@@ -147,6 +155,7 @@ pub struct DecoderConfig {
     pub decoding_quota: Option<usize>,
     pub skipping_quota: Option<usize>,
     pub max_type_len: Option<usize>,
+    pub max_header_len: Option<usize>,
     full_error_message: bool,
 }
 impl DecoderConfig {
@@ -158,6 +167,7 @@ impl DecoderConfig {
             decoding_quota: None,
             skipping_quota: None,
             max_type_len: None,
+            max_header_len: None,
             #[cfg(not(target_arch = "wasm32"))]
             full_error_message: true,
             #[cfg(target_arch = "wasm32")]
@@ -222,6 +232,18 @@ impl DecoderConfig {
         self.max_type_len = Some(n);
         self
     }
+    /// Limit the byte length of the type-table header, the part of the message that
+    /// describes the types of the values that follow. Defaults to 64 KiB.
+    ///
+    /// Every element a header declares -- an argument, a record or variant field, a
+    /// function argument or result, a service method -- occupies at least one byte, so
+    /// this bounds each of those counts, and the work the header can demand, before any
+    /// value is read. [`set_max_type_len`](#method.set_max_type_len) separately bounds
+    /// the number of type-table entries.
+    pub fn set_max_header_len(&mut self, n: usize) -> &mut Self {
+        self.max_header_len = Some(n);
+        self
+    }
     /// When set to false, error message only displays the concrete type when the type is small.
     /// The error message also doesn't include the decoding states.
     /// When set to true, error message always shows the full type and decoding states.
@@ -241,6 +263,7 @@ impl DecoderConfig {
             decoding_quota,
             skipping_quota,
             max_type_len: original.max_type_len,
+            max_header_len: original.max_header_len,
             full_error_message: original.full_error_message,
         }
     }
@@ -289,7 +312,11 @@ macro_rules! check {
 struct Deserializer<'de> {
     input: Cursor<&'de [u8]>,
     table: Rc<TypeEnv>,
-    types: VecDeque<(usize, Type)>,
+    // The undecoded argument queue. It is only ever mutated at the top level
+    // (`IDLDeserialize::get_value`), never during a value sub-decode, so holding
+    // it behind an `Rc` lets the backtracking snapshot in `recoverable_visit_some`
+    // share it with a refcount bump instead of copying the whole queue.
+    types: Rc<VecDeque<(usize, Type)>>,
     wire_type: Type,
     expect_type: Type,
     // Memo table for subtyping relation
@@ -308,15 +335,55 @@ struct Deserializer<'de> {
     text_fast_path: bool,
 }
 
+/// Context attached to a header parse failure. Includes the raw input only where the
+/// configuration asks for it or the message is small enough for it to be useful.
+fn header_context(bytes: &[u8], config: &DecoderConfig) -> String {
+    if config.full_error_message || bytes.len() <= 500 {
+        format!("Cannot parse header {}", hex::encode(bytes))
+    } else {
+        "Cannot parse header".to_string()
+    }
+}
+
 impl<'de> Deserializer<'de> {
     fn from_bytes(bytes: &'de [u8], config: &DecoderConfig) -> Result<Self> {
+        // Parse the header from a bounded prefix, so a header larger than the bound
+        // costs the bound rather than its declared size. The value section is read
+        // from the full input afterwards.
+        let max_header_len = config
+            .max_header_len
+            .unwrap_or(crate::binary_parser::DEFAULT_MAX_HEADER_LEN);
+        let bounded = bytes.len().min(max_header_len);
+        let mut probe = Cursor::new(&bytes[..bounded]);
+        let header = match Header::read_le_args(&mut probe, (config.max_type_len,)) {
+            Ok(header) => header,
+            Err(e) => {
+                // Only a parse that ran out of input inside a truncated prefix is
+                // over the bound; a malformed header keeps its own diagnosis whatever
+                // the size of the message around it.
+                if bounded < bytes.len() && crate::binary_parser::is_truncation(&e) {
+                    // No input dump: it would make rejecting an oversized header
+                    // cost a diagnostic proportional to the message, which is what
+                    // the bound prevents.
+                    return Err(Error::msg(format!(
+                        "Type table header exceeds the limit of {max_header_len} bytes"
+                    )));
+                }
+                return Err(Error::from(e))
+                    .with_context(|| header_context(bytes, config))
+                    .map_err(Error::from);
+            }
+        };
         let mut reader = Cursor::new(bytes);
-        let header = Header::read_le_args(&mut reader, (config.max_type_len,))?;
-        let (env, types) = header.to_types()?;
+        reader.set_position(probe.position());
+        let (env, types) = header
+            .to_types()
+            .with_context(|| header_context(bytes, config))
+            .map_err(Error::from)?;
         Ok(Deserializer {
             input: reader,
             table: env.into(),
-            types: types.into_iter().enumerate().collect(),
+            types: Rc::new(types.into_iter().enumerate().collect()),
             wire_type: TypeInner::Unknown.into(),
             expect_type: TypeInner::Unknown.into(),
             gamma: Gamma::default(),
@@ -336,12 +403,13 @@ impl<'de> Deserializer<'de> {
         let (before, after) = hex.split_at(pos);
         let mut res = format!("input: {before}_{after}\n");
         if !self.table.0.is_empty() {
-            write!(&mut res, "table: {}", self.table).unwrap();
+            write!(&mut res, "table: {}", describe_table(&self.table)).unwrap();
         }
         write!(
             &mut res,
             "wire_type: {}, expect_type: {}",
-            self.wire_type, self.expect_type
+            elide_large(&self.wire_type),
+            elide_large(&self.expect_type)
         )
         .unwrap();
         if let Some(field) = &self.field_name {
@@ -454,9 +522,8 @@ impl<'de> Deserializer<'de> {
             &self.expect_type,
         )
         .with_context(|| {
-            if self.config.full_error_message
-                || (text_size(&self.wire_type, MAX_TYPE_LEN).is_ok()
-                    && text_size(&self.expect_type, MAX_TYPE_LEN).is_ok())
+            if text_size(&self.wire_type, MAX_DIAGNOSTIC_TYPE_LEN).is_ok()
+                && text_size(&self.expect_type, MAX_DIAGNOSTIC_TYPE_LEN).is_ok()
             {
                 format!(
                     "{} is not a subtype of {}",
@@ -566,7 +633,7 @@ impl<'de> Deserializer<'de> {
             } else {
                 return Err(Error::subtype(format!(
                     "{} cannot be deserialized to int",
-                    self.wire_type
+                    elide_large(&self.wire_type)
                 )));
             }
         }
@@ -575,7 +642,12 @@ impl<'de> Deserializer<'de> {
         let int = match self.wire_type.as_ref() {
             TypeInner::Int => Int::decode(&mut self.input).map_err(Error::msg)?,
             TypeInner::Nat => Int(Nat::decode(&mut self.input).map_err(Error::msg)?.0.into()),
-            t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
+            _ => {
+                return Err(Error::subtype(format!(
+                    "{} cannot be deserialized to int",
+                    elide_large(&self.wire_type)
+                )))
+            }
         };
         self.add_cost((self.input.position() - bignum_pos) as usize)?;
         bytes.extend_from_slice(&int.0.to_signed_bytes_le());
@@ -985,7 +1057,12 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             TypeInner::Int => decode_int(&mut self.input)?,
             TypeInner::Nat => i128::try_from(decode_nat(&mut self.input)?)
                 .map_err(|_| Error::msg("Cannot convert nat to i128"))?,
-            t => return Err(Error::subtype(format!("{t} cannot be deserialized to int"))),
+            _ => {
+                return Err(Error::subtype(format!(
+                    "{} cannot be deserialized to int",
+                    elide_large(&self.wire_type)
+                )))
+            }
         };
         visitor.visit_i128(value)
     }
@@ -1191,7 +1268,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 if !self.wire_type.is_tuple() {
                     return Err(Error::subtype(format!(
                         "{} is not a tuple type",
-                        self.wire_type
+                        elide_large(&self.wire_type)
                     )));
                 }
                 let value = visitor.visit_seq(Compound::new(
@@ -1297,6 +1374,8 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                                         expect,
                                         wire,
                                         key_text_fast,
+                                        #[cfg(feature = "bignum")]
+                                        value_bignum_fast,
                                     },
                                 ));
                                 self.text_fast_path = false;
@@ -1444,6 +1523,8 @@ enum Style {
         expect: (Type, Type),
         wire: (Type, Type),
         key_text_fast: bool,
+        #[cfg(feature = "bignum")]
+        value_bignum_fast: Option<BigNumFastPath>,
     },
 }
 
@@ -1760,13 +1841,15 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                 ref expect,
                 ref wire,
                 key_text_fast,
+                #[cfg(feature = "bignum")]
+                value_bignum_fast,
             } => {
                 if *len == 0 {
                     return Ok(None);
                 }
                 *len -= 1;
                 #[cfg(feature = "bignum")]
-                let any_fast = key_text_fast || self.de.bignum_vec_fast_path.is_some();
+                let any_fast = key_text_fast || value_bignum_fast.is_some();
                 #[cfg(not(feature = "bignum"))]
                 let any_fast = key_text_fast;
                 if !any_fast {
@@ -1778,6 +1861,15 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
                 // of this (inner) map, leading to a "Type mismatch" when deserializing
                 // those keys.
                 self.de.text_fast_path = key_text_fast;
+                // The bignum fast path is derived from the map's *value* type and applies
+                // only to values, so it stays off for the duration of the key. This keeps
+                // a key decoding under its own declared type, through the regular
+                // deserialize_* entry point and its subtype check, whatever the value type
+                // happens to be. next_value_seed restores it for the value.
+                #[cfg(feature = "bignum")]
+                {
+                    self.de.bignum_vec_fast_path = None;
+                }
                 if !key_text_fast {
                     self.de.expect_type = expect.0.clone();
                     self.de.wire_type = wire.0.clone();
@@ -1792,21 +1884,36 @@ impl<'de> de::MapAccess<'de> for Compound<'_, 'de> {
         V: de::DeserializeSeed<'de>,
     {
         match &self.style {
-            Style::Map { expect, wire, .. } => {
+            Style::Map {
+                expect,
+                wire,
                 #[cfg(feature = "bignum")]
-                let any_fast = self.de.text_fast_path || self.de.bignum_vec_fast_path.is_some();
+                value_bignum_fast,
+                ..
+            } => {
+                #[cfg(feature = "bignum")]
+                let value_bignum_fast = *value_bignum_fast;
+                #[cfg(feature = "bignum")]
+                let any_fast = self.de.text_fast_path || value_bignum_fast.is_some();
                 #[cfg(not(feature = "bignum"))]
                 let any_fast = self.de.text_fast_path;
                 if !any_fast {
                     self.de.add_cost(3)?;
                 }
+                // Re-establish the value's types unconditionally: the key is decoded under
+                // the key type, and the bignum fast path still reads according to
+                // wire_type, so the value needs its own types in place here.
+                self.de.expect_type = expect.1.clone();
+                self.de.wire_type = wire.1.clone();
+                // The text fast path is the mirror image: it is derived from the map's key
+                // type, so it too applies only to its own half of the entry. Left on, it
+                // lets a value be read as text without its subtype check -- `blob` shares
+                // text's length-prefixed encoding, so it would be accepted in a text
+                // value's place. next_key_seed sets it again for the following key.
+                self.de.text_fast_path = false;
                 #[cfg(feature = "bignum")]
-                let value_fast = self.de.bignum_vec_fast_path.is_some();
-                #[cfg(not(feature = "bignum"))]
-                let value_fast = false;
-                if !value_fast {
-                    self.de.expect_type = expect.1.clone();
-                    self.de.wire_type = wire.1.clone();
+                {
+                    self.de.bignum_vec_fast_path = value_bignum_fast;
                 }
                 seed.deserialize(&mut *self.de)
             }

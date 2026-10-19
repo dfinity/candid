@@ -88,6 +88,11 @@
   font-weight: bold;
 }
 
+.text-result {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
 .composite {
   margin-bottom: var(--pad-md);
 }
@@ -334,6 +339,9 @@ textarea:focus {
   width: 100%;
   padding: 0.4rem 0.8rem;
   overflow-wrap: break-word;
+  /* Log lines are plain text nodes, so newlines and runs of spaces are
+     preserved here rather than by injecting <br> / &nbsp; into innerHTML. */
+  white-space: pre-wrap;
 }
 .output-line:nth-child(2n-1) {
   background-color: var(--lighter);

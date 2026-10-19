@@ -49,13 +49,18 @@ fn get_binread_labels(e: &binrw::Error) -> Vec<Label> {
         }
         Custom { pos, err } => {
             let pos = (*pos * 2) as usize;
-            let err = err
+            // `Truncated` carries the same field name as the plain `&str` case; it is a
+            // distinct type only so a read that ran out of input stays distinguishable
+            // from a malformed one. Both render identically here.
+            let message = err
                 .downcast_ref::<&str>()
-                .unwrap_or(&"unknown error (there's a bug in error reporting)");
-            vec![Label {
-                pos,
-                message: (*err).to_string(),
-            }]
+                .map(|s| (*s).to_string())
+                .or_else(|| {
+                    err.downcast_ref::<crate::binary_parser::Truncated>()
+                        .map(|t| t.0.to_string())
+                })
+                .unwrap_or_else(|| "unknown error (there's a bug in error reporting)".to_string());
+            vec![Label { pos, message }]
         }
         EnumErrors {
             pos,
