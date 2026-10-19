@@ -7,10 +7,12 @@ on:
       - rewrite
     paths:
       - 'lean/**'
+      - 'conformance/vectors/**'
       - '.github/workflows/lean.yml'
   pull_request:
     paths:
       - 'lean/**'
+      - 'conformance/vectors/**'
       - '.github/workflows/lean.yml'
 
 # Not a required status check. If it becomes one, the workflow-level `paths:` filter
@@ -41,3 +43,17 @@ jobs:
       - name: run the reference model
         working-directory: lean
         run: lake exe oracle
+
+      # The committed vectors are the model's output. Writing them again must change
+      # nothing: a change to the model lands together with the answers it changed.
+      - name: conformance vectors are up to date
+        working-directory: lean
+        run: |
+          lake exe oracle write ../conformance/vectors
+          git diff --exit-code -- ../conformance/vectors
+          test -z "$(git status --porcelain -- ../conformance/vectors)"
+
+      # Read back as any other runner reads them, rather than as the model wrote them.
+      - name: conformance vectors agree with the model
+        working-directory: lean
+        run: lake exe oracle check ../conformance/vectors/*.json
