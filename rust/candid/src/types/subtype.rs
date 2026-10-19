@@ -278,6 +278,12 @@ fn subtype_collect_(
             return;
         }
     };
+    // Once the recursion limit is hit the check is already failed, and any
+    // result derived from that point depends on the stack, so it is neither
+    // cached nor worth exploring further.
+    if depth.overflows() > 0 {
+        return;
+    }
     use TypeInner::*;
     if t1 == t2 {
         return;
@@ -353,7 +359,9 @@ fn subtype_collect_(
             // and would otherwise take a failed pair as an assumption.
             gamma.retract(mark);
             gamma.refute(t1, t2, depth, overflows);
-            failed.insert((t1.clone(), t2.clone()));
+            if depth.overflows() == overflows {
+                failed.insert((t1.clone(), t2.clone()));
+            }
         }
         return;
     }
@@ -381,6 +389,13 @@ fn subtype_collect_(
                         .map(|t| t.as_ref().clone()),
                     Ok(Null | Reserved | Opt(_))
                 ) => {}
+        // A probe that hit the recursion limit proves nothing either way.
+        (_, Opt(_)) if depth.overflows() > 0 => {
+            errors.push(Incompatibility {
+                path: path.clone(),
+                message: "recursion limit exceeded".to_string(),
+            });
+        }
         (_, Opt(_)) => {
             let msg = format!("WARNING: {} <: {} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/c7659ca/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.", elide_large(t1), elide_large(t2));
             match report {
@@ -627,6 +642,10 @@ fn subtype_(
     depth: &RecursionDepth,
 ) -> Result<()> {
     let _guard = depth.guard()?;
+    // See `subtype_collect_`: after the recursion limit is hit, fail at once.
+    if depth.overflows() > 0 {
+        return Err(Error::msg("Recursion limit exceeded"));
+    }
     use TypeInner::*;
     if t1 == t2 {
         return Ok(());
@@ -677,6 +696,8 @@ fn subtype_(
         {
             Ok(())
         }
+        // A probe that hit the recursion limit proves nothing either way.
+        (_, Opt(_)) if depth.overflows() > 0 => Err(Error::msg("Recursion limit exceeded")),
         (_, Opt(_)) => {
             let msg = format!("WARNING: {} <: {} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/c7659ca/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.", elide_large(t1), elide_large(t2));
             match report {
