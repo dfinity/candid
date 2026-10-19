@@ -88,20 +88,23 @@ def writeFiles (dir : System.FilePath) : IO UInt32 := do
     IO.println s!"wrote {vs.length} vectors to {dir / name}"
   return 0
 
+/-- Ids are unique across the suite, not only within a file, so duplicates are counted
+over every file given. -/
 def checkFiles (paths : List String) : IO UInt32 := do
   let mut failed := 0
-  let mut total := 0
+  let mut all := []
   for path in paths do
     match parseFile (← IO.FS.readFile path) with
     | .error e =>
       IO.eprintln s!"{path}: {e}"
       return 1
     | .ok vs =>
-      for id in duplicateIds vs do
-        IO.println s!"FAIL  {path}: duplicate vector id: {id}"
-        failed := failed + 1
       failed := failed + (← checkAll vs false)
-      total := total + vs.length
+      all := all ++ vs
+  for id in duplicateIds all do
+    IO.println s!"FAIL  duplicate vector id: {id}"
+    failed := failed + 1
+  let total := all.length
   if failed == 0 then
     IO.println s!"{total} vectors agree with the model"
     return 0
