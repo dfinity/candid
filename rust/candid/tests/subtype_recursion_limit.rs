@@ -126,9 +126,10 @@ fn probe_that_hits_the_limit_fails_the_check() {
 fn pair_that_hit_the_limit_is_not_reported_as_incompatible() {
     let shortest = shortest_overflowing_chain();
     on_small_stack(move || {
+        let len = shortest - shortest / 8;
         let mut env = TypeEnv::new();
-        chain(&mut env, "C", shortest - shortest / 8, TypeInner::Nat.into());
-        chain(&mut env, "D", shortest - shortest / 8, TypeInner::Nat.into());
+        chain(&mut env, "C", len, TypeInner::Nat.into());
+        chain(&mut env, "D", len, TypeInner::Nat.into());
         env.0.insert("X".into(), record(vec![var("C0")]));
         env.0.insert("Y".into(), record(vec![var("D0")]));
         chain(&mut env, "V", shortest / 2, var("X"));
