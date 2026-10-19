@@ -114,7 +114,7 @@ The replacement makes backtracking first-class:
 
 ```rust
 pub trait CandidType: Sized {
-    fn ty(table: &mut RawTypeTable) -> TypeRef;
+    fn ty(table: &mut RawTypeTable) -> Slot;
     fn encode<E: Encoder>(&self, e: E) -> Result<(), E::Error>;
 
     /// Returns Ok(None) when the wire value cannot be coerced to Self.
