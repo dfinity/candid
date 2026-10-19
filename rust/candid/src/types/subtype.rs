@@ -18,9 +18,16 @@ pub type Gamma = HashSet<(Type, Type)>;
 /// and recovers when the probe fails: a pair proved from the failed assumption
 /// would otherwise outlive the probe and answer a later comparison, and so would
 /// one left behind by a failed check in a `Gamma` the caller reuses.
+///
+/// It also keeps the pairs this check has refuted. Assumptions only ever make
+/// a check more permissive, so a pair that fails under some assumptions fails
+/// under any, and a later probe of it can fail without exploring it again.
+/// Without this, a recursive type reached along many paths is re-explored on
+/// each one, which is exponential.
 struct Assumptions<'a> {
     gamma: &'a mut Gamma,
     log: Vec<(Type, Type)>,
+    refuted: Gamma,
 }
 
 impl<'a> Assumptions<'a> {
@@ -28,6 +35,7 @@ impl<'a> Assumptions<'a> {
         Assumptions {
             gamma,
             log: Vec::new(),
+            refuted: Gamma::new(),
         }
     }
 
@@ -46,6 +54,19 @@ impl<'a> Assumptions<'a> {
     fn retract(&mut self, mark: usize) {
         for pair in self.log.drain(mark..) {
             self.gamma.remove(&pair);
+        }
+    }
+
+    fn is_refuted(&self, t1: &Type, t2: &Type) -> bool {
+        self.refuted.contains(&(t1.clone(), t2.clone()))
+    }
+
+    /// Record that `t1 <: t2` failed, unless the recursion limit was hit while
+    /// checking it (`overflows` is `depth.overflows()` from before the check):
+    /// that failure depends on the stack, not on the types.
+    fn refute(&mut self, t1: &Type, t2: &Type, depth: &RecursionDepth, overflows: usize) {
+        if depth.overflows() == overflows {
+            self.refuted.insert((t1.clone(), t2.clone()));
         }
     }
 }
@@ -281,6 +302,7 @@ fn subtype_collect_(
             return; // co-inductive: assume OK
         };
         let before = errors.len();
+        let overflows = depth.overflows();
         match (t1.as_ref(), t2.as_ref()) {
             (Var(id), _) => match env.rec_find_type_with_depth(id, depth) {
                 Ok(t1) => subtype_collect_(
@@ -330,6 +352,7 @@ fn subtype_collect_(
             // Keep failed pairs out of `gamma`: the opt-rule probes share it
             // and would otherwise take a failed pair as an assumption.
             gamma.retract(mark);
+            gamma.refute(t1, t2, depth, overflows);
             failed.insert((t1.clone(), t2.clone()));
         }
         return;
@@ -609,9 +632,17 @@ fn subtype_(
         return Ok(());
     }
     if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
+        if gamma.is_refuted(t1, t2) {
+            return Err(Error::msg(format!(
+                "{} is not a subtype of {}",
+                elide_large(t1),
+                elide_large(t2)
+            )));
+        }
         let Some(mark) = gamma.assume(t1, t2) else {
             return Ok(());
         };
+        let overflows = depth.overflows();
         let res = match (t1.as_ref(), t2.as_ref()) {
             (Var(id), _) => env
                 .rec_find_type_with_depth(id, depth)
@@ -625,6 +656,7 @@ fn subtype_(
         };
         if res.is_err() {
             gamma.retract(mark);
+            gamma.refute(t1, t2, depth, overflows);
         }
         return res;
     }
