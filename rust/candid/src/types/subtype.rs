@@ -80,14 +80,7 @@ pub enum OptReport {
 }
 /// Check if t1 <: t2
 pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<()> {
-    subtype_(
-        OptReport::Warning,
-        &mut Assumptions::new(gamma),
-        env,
-        t1,
-        t2,
-        &RecursionDepth::new(),
-    )
+    subtype_with_config(OptReport::Warning, gamma, env, t1, t2)
 }
 /// Check if t1 <: t2, and report the special opt rule as `Slience`, `Warning` or `Error`.
 pub fn subtype_with_config(
@@ -97,14 +90,16 @@ pub fn subtype_with_config(
     t1: &Type,
     t2: &Type,
 ) -> Result<()> {
-    subtype_(
-        report,
-        &mut Assumptions::new(gamma),
-        env,
-        t1,
-        t2,
-        &RecursionDepth::new(),
-    )
+    let mut gamma = Assumptions::new(gamma);
+    let depth = RecursionDepth::new();
+    let res = subtype_(report, &mut gamma, env, t1, t2, &depth);
+    // However a probe handled it, hitting the recursion limit fails the check.
+    if depth.overflows() > 0 {
+        gamma.retract(0);
+        res?;
+        return Err(Error::msg("Recursion limit exceeded"));
+    }
+    res
 }
 
 /// A single incompatibility found during subtype checking.
@@ -237,18 +232,29 @@ pub fn subtype_check_all(
     t2: &Type,
 ) -> Vec<Incompatibility> {
     let mut errors = Vec::new();
+    let mut gamma = Assumptions::new(gamma);
+    let depth = RecursionDepth::new();
     subtype_collect_(
         OptReport::Warning,
-        &mut Assumptions::new(gamma),
+        &mut gamma,
         env,
         t1,
         t2,
-        &RecursionDepth::new(),
+        &depth,
         &mut Vec::new(),
         &mut errors,
         &mut Gamma::new(),
         false,
     );
+    // The collector stops at the recursion limit, so say that the report may
+    // be incomplete, and fail the check however a probe handled it.
+    if depth.overflows() > 0 {
+        gamma.retract(0);
+        errors.push(Incompatibility {
+            path: Vec::new(),
+            message: "recursion limit exceeded; the check stopped there, so this report may be incomplete".to_string(),
+        });
+    }
     errors
 }
 
@@ -388,7 +394,8 @@ fn subtype_collect_(
                     env.trace_type_with_depth(ty2, depth)
                         .map(|t| t.as_ref().clone()),
                     Ok(Null | Reserved | Opt(_))
-                ) => {}
+                )
+                && depth.overflows() == 0 => {}
         // A probe that hit the recursion limit proves nothing either way.
         (_, Opt(_)) if depth.overflows() > 0 => {
             errors.push(Incompatibility {

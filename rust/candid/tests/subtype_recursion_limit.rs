@@ -54,10 +54,23 @@ fn chain(env: &mut TypeEnv, prefix: &str, len: usize, end: Type) {
     env.0.insert(format!("{prefix}{len}"), end);
 }
 
+/// `{prefix}0 = {prefix}1`, …, `{prefix}{len} = end`.
+fn aliases(env: &mut TypeEnv, prefix: &str, len: usize, end: Type) {
+    for i in 0..len {
+        env.0
+            .insert(format!("{prefix}{i}"), var(&format!("{prefix}{}", i + 1)));
+    }
+    env.0.insert(format!("{prefix}{len}"), end);
+}
+
+/// The message is `recursion limit exceeded` from the collector and
+/// `Recursion limit exceeded at depth …` from type lookups.
 fn hit_limit(errors: &[Incompatibility]) -> bool {
-    errors
-        .iter()
-        .any(|e| e.message.contains("recursion limit exceeded"))
+    errors.iter().any(|e| {
+        e.message
+            .to_lowercase()
+            .contains("recursion limit exceeded")
+    })
 }
 
 /// The shortest chain `C <: D` that hits the limit on this thread.
@@ -144,5 +157,33 @@ fn pair_that_hit_the_limit_is_not_reported_as_incompatible() {
             !errors.iter().any(|e| e.message.contains("(see above)")),
             "{errors:?}"
         );
+    });
+}
+
+/// Field 0 proves `nat <: L0` and leaves it in `Gamma`. Field 1 reaches
+/// `nat <: opt L0` below `k` wrappers: the probe `nat <: L0` is answered from
+/// `Gamma`, and tracing the alias chain `L0` to see whether it is an `opt`
+/// may then hit the limit. That must not count as passing the ordinary opt
+/// rule, and field 2's `nat <: text` must still fail the check. Where exactly
+/// the limit is hit depends on frame sizes, so try every `k` around it.
+#[test]
+fn overflow_while_tracing_an_alias_fails_the_check() {
+    let shortest = shortest_overflowing_chain();
+    on_small_stack(move || {
+        let nat = || -> Type { TypeInner::Nat.into() };
+        let t1 = record(vec![nat(), var("V0"), nat()]);
+        let t2 = record(vec![var("L0"), var("W0"), TypeInner::Text.into()]);
+        for k in 0..=2 * shortest {
+            let mut env = TypeEnv::new();
+            aliases(&mut env, "L", shortest / 2, nat());
+            chain(&mut env, "V", k, record(vec![nat()]));
+            chain(&mut env, "W", k, record(vec![opt(var("L0"))]));
+            let errors = subtype_check_all(&mut Gamma::new(), &env, &t1, &t2);
+            assert!(!errors.is_empty(), "k = {k}: passed");
+            assert!(
+                subtype(&mut Gamma::new(), &env, &t1, &t2).is_err(),
+                "k = {k}: passed"
+            );
+        }
     });
 }
