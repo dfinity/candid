@@ -47,7 +47,11 @@ jobs:
       - name: fmt
         run: cargo fmt --manifest-path "$MANIFEST" -- --check
       - name: lint
-        run: cargo clippy --locked --manifest-path "$MANIFEST" -- -D warnings
+        run: cargo clippy --locked --all-targets --manifest-path "$MANIFEST" -- -D warnings
+      # The runner's own tests: that it rejects every malformed vector rather than
+      # reading it as an answer.
+      - name: test
+        run: cargo test --locked --manifest-path "$MANIFEST"
       # Exits nonzero on a disagreement not listed in the runner's `KNOWN`, or on a
       # listed one that has started to agree.
       - name: run the vectors

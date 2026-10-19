@@ -114,10 +114,16 @@ it does not already know about. Known divergences are listed in the runner with 
 reason, and a listed one that starts agreeing is also a failure, so a fix cannot land
 without its entry being removed.
 
+A runner reads as strictly as the reference reader, and a vector it cannot read fails
+the run whatever the known list says: the list excuses an answer, never a broken
+question. That includes a `subtype` vector whose types are not well formed, which a
+runner checks before asking anything -- an implementation would answer it anyway, and
+an unresolved reference typically comes back as an error that reads as `!<:`.
+
 [runners/candid-0.10/](runners/candid-0.10/) checks `rust/candid` through its public
 API, using `OptReport::Silence`: the special `opt` rule is part of the relation. It
-skips `wellformed` vectors, since 0.10 has no function that checks a type table on its
-own. Its own workspace, not a member of the root one.
+reads `wellformed` vectors but does not ask them, since 0.10 has no function that
+checks a type table on its own. Its own workspace, not a member of the root one.
 
 ### Findings
 
