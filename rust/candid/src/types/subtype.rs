@@ -225,6 +225,7 @@ pub fn subtype_check_all(
         &RecursionDepth::new(),
         &mut Vec::new(),
         &mut errors,
+        &mut Gamma::new(),
         false,
     );
     errors
@@ -243,6 +244,7 @@ fn subtype_collect_(
     depth: &RecursionDepth,
     path: &mut Vec<String>,
     errors: &mut Vec<Incompatibility>,
+    failed: &mut Gamma,
     is_input: bool,
 ) {
     let _guard = match depth.guard() {
@@ -261,24 +263,38 @@ fn subtype_collect_(
     }
     // Handle Var/Knot (type variables / recursive types)
     if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
+        // A pair already found incompatible was fully reported on its first
+        // visit. Re-exploring it on every path that reaches it is exponential
+        // on shared recursive types, so point back to it with a single entry.
+        if failed.contains(&(t1.clone(), t2.clone())) {
+            errors.push(Incompatibility {
+                path: path.clone(),
+                message: format!(
+                    "{} is not a subtype of {} (see above)",
+                    elide_large(t1),
+                    elide_large(t2)
+                ),
+            });
+            return;
+        }
         let Some(mark) = gamma.assume(t1, t2) else {
             return; // co-inductive: assume OK
         };
         let before = errors.len();
         match (t1.as_ref(), t2.as_ref()) {
             (Var(id), _) => match env.rec_find_type_with_depth(id, depth) {
-                Ok(t1) => {
-                    subtype_collect_(report, gamma, env, t1, t2, depth, path, errors, is_input)
-                }
+                Ok(t1) => subtype_collect_(
+                    report, gamma, env, t1, t2, depth, path, errors, failed, is_input,
+                ),
                 Err(e) => errors.push(Incompatibility {
                     path: path.clone(),
                     message: e.to_string(),
                 }),
             },
             (_, Var(id)) => match env.rec_find_type_with_depth(id, depth) {
-                Ok(t2) => {
-                    subtype_collect_(report, gamma, env, t1, t2, depth, path, errors, is_input)
-                }
+                Ok(t2) => subtype_collect_(
+                    report, gamma, env, t1, t2, depth, path, errors, failed, is_input,
+                ),
                 Err(e) => errors.push(Incompatibility {
                     path: path.clone(),
                     message: e.to_string(),
@@ -293,6 +309,7 @@ fn subtype_collect_(
                 depth,
                 path,
                 errors,
+                failed,
                 is_input,
             ),
             (_, Knot(id)) => subtype_collect_(
@@ -304,12 +321,16 @@ fn subtype_collect_(
                 depth,
                 path,
                 errors,
+                failed,
                 is_input,
             ),
             (_, _) => unreachable!(),
         };
         if errors.len() > before {
+            // Keep failed pairs out of `gamma`: the opt-rule probes share it
+            // and would otherwise take a failed pair as an assumption.
             gamma.retract(mark);
+            failed.insert((t1.clone(), t2.clone()));
         }
         return;
     }
@@ -322,7 +343,9 @@ fn subtype_collect_(
         // unconditionally — like `Nat <: Int`.
         (Service(_), Principal) => (),
         (Vec(ty1), Vec(ty2)) => {
-            subtype_collect_(report, gamma, env, ty1, ty2, depth, path, errors, is_input);
+            subtype_collect_(
+                report, gamma, env, ty1, ty2, depth, path, errors, failed, is_input,
+            );
         }
         (Null, Opt(_)) => (),
         // For opt rules we delegate to the existing subtype_ to test the condition,
@@ -355,7 +378,7 @@ fn subtype_collect_(
                     Some(ty1) => {
                         path.push(format!("record field {id}"));
                         subtype_collect_(
-                            report, gamma, env, ty1, ty2, depth, path, errors, is_input,
+                            report, gamma, env, ty1, ty2, depth, path, errors, failed, is_input,
                         );
                         path.pop();
                     }
@@ -393,7 +416,7 @@ fn subtype_collect_(
                     Some(ty2) => {
                         path.push(format!("variant field {id}"));
                         subtype_collect_(
-                            report, gamma, env, ty1, ty2, depth, path, errors, is_input,
+                            report, gamma, env, ty1, ty2, depth, path, errors, failed, is_input,
                         );
                         path.pop();
                     }
@@ -421,7 +444,9 @@ fn subtype_collect_(
                 match meths.get(name) {
                     Some(ty1) => {
                         path.push(format!("method \"{name}\""));
-                        subtype_collect_(report, gamma, env, ty1, ty2, depth, path, errors, false);
+                        subtype_collect_(
+                            report, gamma, env, ty1, ty2, depth, path, errors, failed, false,
+                        );
                         path.pop();
                     }
                     None => {
@@ -458,17 +483,22 @@ fn subtype_collect_(
             // Check each argument directly instead of wrapping in a tuple record,
             // so we get clean error paths like "input argument 1" instead of "record field 0".
             check_func_params(
-                report, gamma, env, &f2.args, &f1.args, depth, path, errors, "input", true,
+                report, gamma, env, &f2.args, &f1.args, depth, path, errors, failed, "input", true,
             );
             check_func_params(
-                report, gamma, env, &f1.rets, &f2.rets, depth, path, errors, "return", false,
+                report, gamma, env, &f1.rets, &f2.rets, depth, path, errors, failed, "return",
+                false,
             );
         }
         (Class(_, t), _) => {
-            subtype_collect_(report, gamma, env, t, t2, depth, path, errors, is_input);
+            subtype_collect_(
+                report, gamma, env, t, t2, depth, path, errors, failed, is_input,
+            );
         }
         (_, Class(_, t)) => {
-            subtype_collect_(report, gamma, env, t1, t, depth, path, errors, is_input);
+            subtype_collect_(
+                report, gamma, env, t1, t, depth, path, errors, failed, is_input,
+            );
         }
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
@@ -501,6 +531,7 @@ fn check_func_params(
     depth: &RecursionDepth,
     path: &mut Vec<String>,
     errors: &mut Vec<Incompatibility>,
+    failed: &mut Gamma,
     label: &str,    // "input" or "return"
     is_input: bool, // affects wording
 ) {
@@ -517,6 +548,7 @@ fn check_func_params(
             depth,
             path,
             errors,
+            failed,
             is_input,
         );
         path.pop();
@@ -542,7 +574,7 @@ fn check_func_params(
             )
         });
         subtype_collect_(
-            report, gamma, env, &sub_tuple, &sup_tuple, depth, path, errors, is_input,
+            report, gamma, env, &sub_tuple, &sup_tuple, depth, path, errors, failed, is_input,
         );
         path.pop();
     }

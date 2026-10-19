@@ -547,3 +547,51 @@ fn input_arg_count_increase_message_has_correct_counts() {
         "arg-count message has wrong old/new values: {msg}"
     );
 }
+
+/// Each `Ti` refers to `T(i+1)` twice, so there are 2^n paths to the leaf.
+fn shared_recursive_service(prefix: &str, depth: usize, leaf: &str) -> String {
+    let mut s = String::new();
+    for i in 0..depth {
+        s.push_str(&format!(
+            "type {prefix}{i} = record {{ {prefix}{} ; {prefix}{} }};\n",
+            i + 1,
+            i + 1
+        ));
+    }
+    s.push_str(&format!("type {prefix}{depth} = {leaf};\n"));
+    s.push_str(&format!("service : {{ go : () -> ({prefix}0) }}"));
+    s
+}
+
+#[test]
+fn shared_recursive_types_are_checked_once() {
+    // Before the fix this explored and reported every one of the 2^64 paths.
+    let new = shared_recursive_service("A", 64, "nat");
+    let old = shared_recursive_service("B", 64, "text");
+    let errors = error_strings(&new, &old);
+    assert_eq!(errors.len(), 65, "errors: {errors:?}");
+    assert_eq!(
+        errors
+            .iter()
+            .filter(|e| e.contains("nat is not a subtype of text"))
+            .count(),
+        1,
+        "the leaf incompatibility should be reported once: {errors:?}"
+    );
+    check_compatible(&new, &new, "shared recursive type against itself");
+}
+
+#[test]
+fn type_shared_by_two_methods_is_reported_under_both() {
+    let old = "type T = record { a : nat }; service : { f : () -> (T); g : () -> (T) }";
+    let new = "type T = record { a : text }; service : { f : () -> (T); g : () -> (T) }";
+    let errors = error_strings(new, old);
+    assert!(
+        errors.iter().any(|e| e.starts_with("method \"f\"")),
+        "missing error under f: {errors:?}"
+    );
+    assert!(
+        errors.iter().any(|e| e.starts_with("method \"g\"")),
+        "missing error under g: {errors:?}"
+    );
+}
