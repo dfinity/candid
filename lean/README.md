@@ -1,7 +1,8 @@
 # `lean/` — Lean 4 reference model and specification
 
-**Status: first slice.** Types, the field-id hash, and subtyping — as both a relation
-and a decision procedure — with a self-checking executable. "Slice" is a label for
+**Status: second slice.** Types, the field-id hash, and subtyping — as both a relation
+and a decision procedure — with an executable that writes them out as conformance
+vectors, reads them back, and is checked against `candid` 0.10 in CI. "Slice" is a label for
 what landed in a merge window, applied after the fact; the forward-looking plan is the
 coverage checklist below and the tiers in [REWRITE.md §3](../REWRITE.md#3-lean-honestly). Nothing is published and
 nothing carries a compatibility promise. See [REWRITE.md](../REWRITE.md) for why this
@@ -11,9 +12,19 @@ Eventually replaces [coq/](../coq/) and [spec/](../spec/), on the conditions in
 [REWRITE.md §6](../REWRITE.md#6-the-ratchet).
 
 ```
-lake build          # build the library and the executable
-lake exe oracle     # run the checks; exits nonzero on any disagreement
+lake build                                    # build the libraries and the executable
+lake exe oracle                               # check the model against every vector
+lake exe oracle write ../conformance/vectors  # regenerate the committed vectors
+lake exe oracle check <file>...               # check vector files against the model
 ```
+
+Two libraries. `Candid` is the model and imports nothing outside Lean's core.
+`Oracle` is about the model: the vector format and its JSON
+([Oracle/Vector.lean](Oracle/Vector.lean)), the hand-written vectors
+([Oracle/Handwritten.lean](Oracle/Handwritten.lean)), and the generator
+([Oracle/Generate.lean](Oracle/Generate.lean)). It uses `Lean.Data.Json`, which is why
+it is separate. The format itself is specified in
+[conformance/README.md](../conformance/README.md#format-version-0).
 
 ## What goes here
 
@@ -146,8 +157,36 @@ First it read `seen` unswapped, so a pair `(i, j)` asserted something about the
 transposed indices; then it swapped `seen` element-wise, which fixes the indices but
 reads an assumed `A.i <: B.j` as `B.j <: A.i` — the converse, which does not follow.
 Both reported `<:` for two types that are not related, and both are invisible when
-there is only one table to swap. The `contra` checks in [Main.lean](Main.lean) are
-the witnesses, one per mistake.
+there is only one table to swap. The `contra` vectors in
+[Oracle/Handwritten.lean](Oracle/Handwritten.lean) are the witnesses, one per mistake.
+
+## What slice 2 established
+
+**Steps 2 and 3 of the ordering rule, for subtyping.** The executable writes every
+vector it knows to [conformance/vectors/](../conformance/vectors/), reads files back as
+any runner would, and CI checks both that the committed files are current and that
+`rust/candid` agrees with them
+([conformance/runners/candid-0.10/](../conformance/runners/candid-0.10/)). The checks
+that were built into the executable are now the hand-written vectors, unchanged; the
+generated ones pair every type in a small universe with every other.
+
+**The first run found a 0.10 bug, and it is the one this model's design rules out.**
+The procedure above shares its assumptions across the whole run, and that is sound
+*because nothing backtracks*: any `false` is the final answer, so nothing assumed on
+the way to it is ever reused. `rust/candid/src/types/subtype.rs` shares its `gamma` the
+same way, but it does backtrack — the `opt` rule tries `t <: t'` and, on failure, falls
+through to the special rule. The failed attempt removes only its own pair from
+`gamma`, so pairs proved under that assumption survive and answer later questions.
+`didc check` accepts a breaking upgrade this way; the vector and the reasoning are in
+[Oracle/Handwritten.lean](Oracle/Handwritten.lean) under "Assumptions made under a
+failed comparison". The same reasoning is the constraint on `candid_subtype`: if it
+ever tries a rule and recovers from the failure, it cannot share assumptions across
+that recovery.
+
+**`Check.known` is gone.** The executable could mark one of its checks as a known gap
+in the model. None was ever marked, and in a vector file that is the runner's business,
+not the vector's: the candid 0.10 runner keeps its own `KNOWN` list, with the same rule
+that a listed divergence that starts agreeing is a failure.
 
 ## Constraints
 

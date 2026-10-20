@@ -10,8 +10,14 @@ testDriver = "oracle"
 [[lean_lib]]
 name = "Candid"
 
-# The reference executable. Slice 1 runs built-in examples; it will grow into the
-# differential oracle that reads conformance vectors.
+# Conformance vectors: the JSON reader and writer, the hand-written vectors, and the
+# generator. Separate from `Candid` because it is about the model rather than part of
+# it -- `Candid` does not import Lean's own libraries, and this does.
+[[lean_lib]]
+name = "Oracle"
+
+# The reference executable: checks the model against its vectors, writes them to
+# `conformance/vectors/`, and checks vector files. See `Main.lean`.
 [[lean_exe]]
 name = "oracle"
 root = "Main"

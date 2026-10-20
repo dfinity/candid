@@ -1,0 +1,58 @@
+name: Conformance
+
+# Runs the conformance vectors against the implementations that have a runner. The
+# vectors are the Lean model's answers; `lean.yml` checks that they are current.
+#
+# Only `conformance/**` triggers this, so a change under `rust/` does not run it yet.
+# Widening the filter to `rust/candid/**` is what would make this a differential oracle
+# for 0.10 changes, and it is a change to what runs on `master` pull requests -- so it
+# goes through `master`'s review rather than riding the working branch.
+
+on:
+  push:
+    branches:
+      - master
+      - rewrite
+    paths:
+      - 'conformance/**'
+      - '.github/workflows/conformance.yml'
+  pull_request:
+    paths:
+      - 'conformance/**'
+      - '.github/workflows/conformance.yml'
+
+# Not a required status check. If it becomes one, the workflow-level `paths:` filter
+# above has to go and be replaced with the job-level `dorny/paths-filter` pattern
+# used by `rust.yml` -- see the comment at the top of that file for why.
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  MANIFEST: conformance/runners/candid-0.10/Cargo.toml
+
+jobs:
+  candid-0-10:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      # See `rust.yml`: the image's bundled stable would make the cache key vary.
+      - name: Remove pre-installed Rust stable toolchain
+        run: rustup toolchain remove stable 2>/dev/null || true
+      # No explicit `toolchain` -- uses the channel from the root rust-toolchain.toml.
+      - uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
+        with:
+          cache-workspaces: conformance/runners/candid-0.10
+      - name: fmt
+        run: cargo fmt --manifest-path "$MANIFEST" -- --check
+      - name: lint
+        run: cargo clippy --locked --all-targets --manifest-path "$MANIFEST" -- -D warnings
+      # The runner's own tests: that it rejects every malformed vector rather than
+      # reading it as an answer.
+      - name: test
+        run: cargo test --locked --manifest-path "$MANIFEST"
+      # Exits nonzero on a disagreement not listed in the runner's `KNOWN`, or on a
+      # listed one that has started to agree.
+      - name: run the vectors
+        run: cargo run --locked --release --manifest-path "$MANIFEST" -- conformance/vectors/*.json

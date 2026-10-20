@@ -1,0 +1,15 @@
+[package]
+name = "conformance-candid-0-10"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Runs the conformance vectors against candid 0.10"
+
+# Its own workspace, not a member of the root one: joining that would mean editing the
+# root `Cargo.toml`, and nothing outside `conformance/` has any reason to know this
+# crate exists.
+[workspace]
+
+[dependencies]
+candid = { path = "../../../rust/candid" }
+serde_json = "1.0"
