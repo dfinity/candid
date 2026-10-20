@@ -130,6 +130,127 @@ def smallTypes : List Vector :=
   pairs smallPrims smallComposites ++ pairs smallComposites smallPrims ++
   pairs smallComposites smallComposites
 
+/-! ## Coercion
+
+Every sample value of every type in the universe, coerced at every type. The samples
+are drawn from the type, a few per type: enough to reach each coercion rule, not every
+value of every shape. -/
+
+/-- The identity of every generated reference value. Coercion never looks at it. -/
+def someId : PrincipalBytes := [0x2a]
+
+def primSamples : Prim → List Value
+  | .null | .reserved => [.null]
+  | .bool => [.bool true]
+  | .nat => [.nat 5]
+  | .int => [.int (-5)]
+  | .nat8 => [.nat8 255] | .nat16 => [.nat16 65535]
+  | .nat32 => [.nat32 4294967295] | .nat64 => [.nat64 18446744073709551615]
+  | .int8 => [.int8 (-128)] | .int16 => [.int16 (-32768)]
+  | .int32 => [.int32 (-2147483648)] | .int64 => [.int64 (-9223372036854775808)]
+  | .float32 => [.float32 0x3f800000] | .float64 => [.float64 0x3ff0000000000000]
+  | .text => [.text "x"]
+  | .empty => []
+  | .principal => [.principal someId]
+
+/-- Sample values of `t`, unfolding at most `fuel` references deep. An option and a
+vector give an empty and a non-empty one; a variant gives one value per tag. -/
+def samples (T : TypeTable) : Nat → Slot → List Value
+  | _, .prim p => primSamples p
+  | 0, .ref _ => []
+  | fuel + 1, .ref r => match T.lookup? r with
+    | some (.opt t) => .null :: ((samples T fuel t).take 1).map .opt
+    | some (.vec t) => .vec [] :: ((samples T fuel t).take 1).map (.vec [·])
+    | some (.record fs) =>
+      match fs.mapM fun (id, t) => (samples T fuel t).head?.map (id, ·) with
+      | some vs => [.record (sortFields vs)]
+      | none => []
+    | some (.variant fs) => fs.filterMap fun (id, t) => (samples T fuel t).head?.map (.variant id)
+    | some (.func _ _ _) => [.func someId "m"]
+    | some (.service _) => [.service someId]
+    | none => []
+
+/-- A value in the textual syntax, for vector ids. Numbers carry their type, since the
+same number is a different value at a different width. -/
+partial def showValue : Value → String
+  | .null => "null"
+  | .bool b => toString b
+  | .nat n => s!"{n}"
+  | .int i => s!"({i} : int)"
+  | .nat8 n => s!"({n} : nat8)" | .nat16 n => s!"({n} : nat16)"
+  | .nat32 n => s!"({n} : nat32)" | .nat64 n => s!"({n} : nat64)"
+  | .int8 i => s!"({i.toInt} : int8)" | .int16 i => s!"({i.toInt} : int16)"
+  | .int32 i => s!"({i.toInt} : int32)" | .int64 i => s!"({i.toInt} : int64)"
+  | .float32 b => s!"(float32 bits {hexFixed 8 b.toNat})"
+  | .float64 b => s!"(float64 bits {hexFixed 16 b.toNat})"
+  | .text t => (Lean.Json.str t).compress
+  | .opt v => s!"opt {showValue v}"
+  | .vec vs => "vec {" ++ "; ".intercalate (vs.map showValue) ++ "}"
+  | .record fs => "record {" ++ "; ".intercalate (fs.map fun (id, v) => s!"{id} = {showValue v}") ++ "}"
+  | .variant id v => s!"variant \{{id} = {showValue v}}"
+  | .principal id => s!"principal \"{bytesToHex id}\""
+  | .service id => s!"service \"{bytesToHex id}\""
+  | .func id m => s!"func \"{bytesToHex id}\".{m}"
+
+/-- Every type a sample is drawn from, and every type it is coerced at. -/
+def coerceUniverse : List Gen := Prim.all.map prim ++ smallComposites
+
+/-- A generated type, checked, with its samples. Every generated type is well formed;
+`malformed` reports one that is not. -/
+def Gen.checked? (g : Gen) : Option (Fixture × (T : TypeTable) × T.Root) := do
+  let f := g.fixture
+  let ⟨T, r⟩ ← f.check?
+  return ⟨f, T, r⟩
+
+/-- Is `u` an `opt` cycle, `type R = opt R` or a longer one? -/
+def isOptCycle (B : TypeTable) (u : Slot) : Bool := (optLayers B u (B.size + 1)).isNone
+
+/-- Coercion at an `opt` cycle is left out: the spec has no answer there (see
+`Candid/Coerce.lean`), so every such vector would assert the model's decision rather
+than a rule. One hand-written vector states that decision. -/
+def coercions : List Vector :=
+  coerceUniverse.flatMap fun a => match a.checked? with
+    | none => []
+    | some ⟨fa, A, ra⟩ => (samples A 3 ra.1).flatMap fun v =>
+      coerceUniverse.filterMap fun b => do
+        let ⟨fb, B, rb⟩ ← b.checked?
+        if isOptCycle B rb.1 then none
+        return ⟨s!"{showValue v} : {a.name} ~> {b.name}",
+          .coerce v fa fb (coerce A B v ra.1 rb.1)⟩
+
+/-! ## Properties
+
+Three of the properties `spec/Candid.md` lists for coercion, checked over every
+generated sample rather than proved. Each is a claim about the model, so a violation is
+a finding about it, or about the spec: the vectors are the model's answers whatever
+they are.
+
+- **Roundtripping**: `v : t ~> v : t`. (The spec states an equivalence, but its other
+  direction, from `v : t ~> v : t` to `v : t`, is about values that are not well typed,
+  and the samples all are.)
+- **Well-typedness**: `v : t ~> v' : t'` implies `v' : t'`.
+- **Soundness**: `t <: t'` implies that every `v : t` coerces at `t'`.
+
+Each returns a description of every counterexample. -/
+
+def propertyViolations : List String :=
+  coerceUniverse.flatMap fun a => match a.checked? with
+    | none => []
+    | some ⟨_, A, ra⟩ => (samples A 3 ra.1).flatMap fun v =>
+      let typed := if A.hasType v ra.1 then [] else
+        [s!"sample {showValue v} does not have type {a.name}"]
+      let roundtrip := if coerce A A v ra.1 ra.1 == some v then [] else
+        [s!"roundtripping: {showValue v} : {a.name} does not coerce to itself"]
+      typed ++ roundtrip ++ coerceUniverse.flatMap fun b => match b.checked? with
+        | none => []
+        | some ⟨_, B, rb⟩ =>
+          match coerce A B v ra.1 rb.1 with
+          | some w => if B.hasType w rb.1 then [] else
+              [s!"well-typedness: {showValue v} : {a.name} ~> {showValue w}, not of type {b.name}"]
+          | none => if decSubtype A B ra rb then
+              [s!"soundness: {a.name} <: {b.name}, but {showValue v} does not coerce"]
+            else []
+
 /-- Types the generator built that were not well formed. Expected to be empty: the
 oracle fails if it is not, since `pairs` drops them silently. -/
 def malformed : List String :=

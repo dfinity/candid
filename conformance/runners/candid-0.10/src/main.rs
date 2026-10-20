@@ -19,7 +19,9 @@
 //! This calls `candid` 0.10's public API only, and it never modifies `rust/`.
 
 use candid::types::subtype::{subtype_with_config, Gamma, OptReport};
+use candid::types::value::{IDLField, VariantValue};
 use candid::types::{Field, FuncMode, Function, Label, Type, TypeEnv, TypeInner};
+use candid::{IDLArgs, IDLValue, Principal};
 use serde_json::{Map, Value};
 use std::collections::BTreeSet;
 use std::process::ExitCode;
@@ -38,6 +40,13 @@ const KNOWN: &[(&str, &str)] = &[
          probe removes from `gamma` only the pair that failed, keeping pairs proved \
          under it. A later comparison is then answered from `gamma`. Reachable from \
          `didc check`, which accepts a breaking upgrade this way",
+    ),
+    (
+        "5 : nat ~> null : R where R = opt R (opt cycle; the spec has no answer)",
+        "not a bug on either side yet: the spec's `opt` rules make this question depend \
+         on its own negation, so it has no answer. The model says `null`, which keeps \
+         `nat <: R` sound; 0.10 unwraps the expected type until its recursion limit, \
+         an error the `opt` rule does not recover from, and rejects the message",
     ),
 ];
 
@@ -162,6 +171,43 @@ enum Assertion {
         sup: Fixture,
         want: bool,
     },
+    /// `value : from ~> want : to`, or no such value when `want` is `None`.
+    Coerce {
+        value: Val,
+        from: Fixture,
+        to: Fixture,
+        want: Option<Val>,
+    },
+}
+
+/// A value as a vector writes it. Mirrors `Candid.Value` in `lean/Candid/Value.lean`:
+/// one `Null` for the values `IDLValue` calls `Null`, `None` and `Reserved`; floats as
+/// their bits; `nat` and `int` as canonical decimal strings; record fields in ascending
+/// id order.
+#[derive(Debug, Clone, PartialEq)]
+enum Val {
+    Null,
+    Bool(bool),
+    Nat(String),
+    Int(String),
+    Nat8(u8),
+    Nat16(u16),
+    Nat32(u32),
+    Nat64(u64),
+    Int8(i8),
+    Int16(i16),
+    Int32(i32),
+    Int64(i64),
+    Float32(u32),
+    Float64(u64),
+    Text(String),
+    Opt(Box<Val>),
+    Vec(Vec<Val>),
+    Record(Vec<(u32, Val)>),
+    Variant(u32, Box<Val>),
+    Principal(Vec<u8>),
+    Service(Vec<u8>),
+    Func(Vec<u8>, String),
 }
 
 /// A type as a vector writes it: a table, not yet checked, and a root.
@@ -247,6 +293,19 @@ impl Vector {
                     sub: Fixture::parse(&obj["sub"])?,
                     sup: Fixture::parse(&obj["sup"])?,
                     want: boolean(&obj["expect"])?,
+                }
+            }
+            "coerce" => {
+                let obj = object(v, &["id", "kind", "value", "from", "to", "expect"])?;
+                let want = match &obj["expect"] {
+                    Value::String(s) if s == "reject" => None,
+                    e => Some(Val::parse(&object(e, &["value"])?["value"])?),
+                };
+                Assertion::Coerce {
+                    value: Val::parse(&obj["value"])?,
+                    from: Fixture::parse(&obj["from"])?,
+                    to: Fixture::parse(&obj["to"])?,
+                    want,
                 }
             }
             k => return Err(format!("unknown vector kind {k:?}")),
@@ -342,6 +401,120 @@ impl Entry {
     }
 }
 
+/// A decimal string in canonical form, as Lean's `toString` writes it: no sign, no
+/// leading zero, no separator.
+fn decimal_nat(v: &Value) -> Result<String, String> {
+    let s = string(v)?;
+    let canonical =
+        !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) && (s == "0" || !s.starts_with('0'));
+    match canonical {
+        true => Ok(s.to_string()),
+        false => Err(format!("not a canonical decimal natural: {s:?}")),
+    }
+}
+
+/// As `decimal_nat`, with an optional `-` and no `-0`.
+fn decimal_int(v: &Value) -> Result<String, String> {
+    let s = string(v)?;
+    let magnitude = s.strip_prefix('-').unwrap_or(s);
+    match decimal_nat(&Value::String(magnitude.to_string())) {
+        Ok(_) if !(s.starts_with('-') && magnitude == "0") => Ok(s.to_string()),
+        _ => Err(format!("not a canonical decimal integer: {s:?}")),
+    }
+}
+
+/// A fixed-width number, written in decimal.
+fn bounded<T: TryFrom<i128>>(v: &Value) -> Result<T, String> {
+    let s = decimal_int(v)?;
+    s.parse::<i128>()
+        .ok()
+        .and_then(|n| T::try_from(n).ok())
+        .ok_or_else(|| format!("{s} is out of range"))
+}
+
+/// Lowercase hex digits, exactly `width` of them.
+fn hex_fixed(v: &Value, width: usize) -> Result<u64, String> {
+    let s = string(v)?;
+    let lower = s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'));
+    if s.len() != width || !lower {
+        return Err(format!("expected {width} lowercase hex digits: {s:?}"));
+    }
+    u64::from_str_radix(s, 16).map_err(|e| e.to_string())
+}
+
+fn hex_bytes(v: &Value) -> Result<Vec<u8>, String> {
+    let s = string(v)?;
+    if s.len() % 2 != 0 || !s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
+        return Err(format!("not lowercase hex bytes: {s:?}"));
+    }
+    (0..s.len() / 2)
+        .map(|i| u8::from_str_radix(&s[2 * i..2 * i + 2], 16).map_err(|e| e.to_string()))
+        .collect()
+}
+
+fn two(v: &Value) -> Result<(&Value, &Value), String> {
+    match v.as_array().map(Vec::as_slice) {
+        Some([a, b]) => Ok((a, b)),
+        _ => Err(format!("not a pair: {v}")),
+    }
+}
+
+impl Val {
+    fn parse(v: &Value) -> Result<Val, String> {
+        match v {
+            Value::Null => return Ok(Val::Null),
+            Value::Bool(b) => return Ok(Val::Bool(*b)),
+            _ => {}
+        }
+        let obj = v.as_object().ok_or_else(|| format!("not a value: {v}"))?;
+        let [(key, body)] = obj.iter().collect::<Vec<_>>()[..] else {
+            return Err(format!("not a value: {v}"));
+        };
+        Ok(match key.as_str() {
+            "nat" => Val::Nat(decimal_nat(body)?),
+            "int" => Val::Int(decimal_int(body)?),
+            "nat8" => Val::Nat8(bounded(body)?),
+            "nat16" => Val::Nat16(bounded(body)?),
+            "nat32" => Val::Nat32(bounded(body)?),
+            "nat64" => Val::Nat64(bounded(body)?),
+            "int8" => Val::Int8(bounded(body)?),
+            "int16" => Val::Int16(bounded(body)?),
+            "int32" => Val::Int32(bounded(body)?),
+            "int64" => Val::Int64(bounded(body)?),
+            "float32" => Val::Float32(hex_fixed(body, 8)? as u32),
+            "float64" => Val::Float64(hex_fixed(body, 16)?),
+            "text" => Val::Text(string(body)?.to_string()),
+            "opt" => Val::Opt(Box::new(Val::parse(body)?)),
+            "vec" => Val::Vec(
+                array(body)?
+                    .iter()
+                    .map(Val::parse)
+                    .collect::<Result<_, _>>()?,
+            ),
+            "record" => Val::Record(
+                array(body)?
+                    .iter()
+                    .map(|f| {
+                        let (id, v) = two(f)?;
+                        Ok((field_id(id)?, Val::parse(v)?))
+                    })
+                    .collect::<Result<_, String>>()?,
+            ),
+            "variant" => {
+                let (id, v) = two(body)?;
+                Val::Variant(field_id(id)?, Box::new(Val::parse(v)?))
+            }
+            "principal" => Val::Principal(hex_bytes(body)?),
+            "service" => Val::Service(hex_bytes(body)?),
+            "func" => {
+                let (id, m) = two(body)?;
+                Val::Func(hex_bytes(id)?, string(m)?.to_string())
+            }
+            k => return Err(format!("unknown value {k:?}")),
+        })
+    }
+}
+
 impl Fixture {
     fn parse(v: &Value) -> Result<Fixture, String> {
         let obj = object(v, &["table", "root"])?;
@@ -423,6 +596,23 @@ impl Vector {
                 agreement(got == *want, || format!("got {got}, want {want}"))
             }
             Assertion::WellFormed => Outcome::Skip,
+            Assertion::Coerce {
+                value,
+                from,
+                to,
+                want,
+            } => {
+                if let Err(e) = from.check().and_then(|()| to.check()) {
+                    return Outcome::Invalid(format!("a type is malformed: {e}"));
+                }
+                if !from.has_type(value, &from.root) {
+                    return Outcome::Invalid("the value does not have its type".to_string());
+                }
+                if want.as_ref().is_some_and(|w| !to.has_type(w, &to.root)) {
+                    return Outcome::Invalid("the expected value does not have its type".into());
+                }
+                coerce(value, from, to, want.as_ref())
+            }
             Assertion::Subtype { sub, sup, want } => {
                 if let Err(e) = sub.check().and_then(|()| sup.check()) {
                     return Outcome::Invalid(format!("a type is malformed: {e}"));
@@ -445,6 +635,72 @@ impl Vector {
             }
         }
     }
+}
+
+/// Encode `value` at `from` and decode the bytes at `to`: coercion is what a decoder
+/// does, and 0.10 has no other entry point to it. Each table goes in its own
+/// environment, since the encoder's and the decoder's are separate anyway.
+fn coerce(value: &Val, from: &Fixture, to: &Fixture, want: Option<&Val>) -> Outcome {
+    let (mut a_env, mut b_env) = (TypeEnv::new(), TypeEnv::new());
+    let a = from.load(&mut a_env, "A");
+    let b = to.load(&mut b_env, "B");
+    let arg = match from.to_idl(value, &from.root) {
+        Ok(v) => v,
+        Err(e) => return Outcome::Disagree(format!("cannot express the value: {e}")),
+    };
+    let bytes = match IDLArgs::new(&[arg]).to_bytes_with_types(&a_env, &[a]) {
+        Ok(b) => b,
+        Err(e) => return Outcome::Disagree(format!("cannot encode the value: {e}")),
+    };
+    let got = IDLArgs::from_bytes_with_types(&bytes, &b_env, &[b]);
+    match (got, want) {
+        (Err(_), None) => Outcome::Agree,
+        (Err(e), Some(w)) => Outcome::Disagree(format!("rejected ({e}), want {w:?}")),
+        (Ok(args), want) => match (from_idl(&args.args[0]), want) {
+            (Ok(v), Some(w)) => agreement(v == *w, || format!("got {v:?}, want {w:?}")),
+            (Ok(v), None) => Outcome::Disagree(format!("got {v:?}, want reject")),
+            (Err(e), _) => Outcome::Disagree(format!("decoded to an unexpected value: {e}")),
+        },
+    }
+}
+
+/// A decoded value, in the model's terms.
+fn from_idl(v: &IDLValue) -> Result<Val, String> {
+    Ok(match v {
+        IDLValue::Null | IDLValue::None | IDLValue::Reserved => Val::Null,
+        IDLValue::Bool(b) => Val::Bool(*b),
+        IDLValue::Nat(n) => Val::Nat(n.0.to_string()),
+        IDLValue::Int(i) => Val::Int(i.0.to_string()),
+        IDLValue::Nat8(n) => Val::Nat8(*n),
+        IDLValue::Nat16(n) => Val::Nat16(*n),
+        IDLValue::Nat32(n) => Val::Nat32(*n),
+        IDLValue::Nat64(n) => Val::Nat64(*n),
+        IDLValue::Int8(i) => Val::Int8(*i),
+        IDLValue::Int16(i) => Val::Int16(*i),
+        IDLValue::Int32(i) => Val::Int32(*i),
+        IDLValue::Int64(i) => Val::Int64(*i),
+        IDLValue::Float32(f) => Val::Float32(f.to_bits()),
+        IDLValue::Float64(f) => Val::Float64(f.to_bits()),
+        IDLValue::Text(t) => Val::Text(t.clone()),
+        IDLValue::Opt(v) => Val::Opt(Box::new(from_idl(v)?)),
+        IDLValue::Vec(vs) => Val::Vec(vs.iter().map(from_idl).collect::<Result<_, _>>()?),
+        IDLValue::Blob(bs) => Val::Vec(bs.iter().map(|b| Val::Nat8(*b)).collect()),
+        IDLValue::Record(fs) => {
+            let mut fs = fs
+                .iter()
+                .map(|f| Ok((f.id.get_id(), from_idl(&f.val)?)))
+                .collect::<Result<Vec<_>, String>>()?;
+            fs.sort_by_key(|(id, _)| *id);
+            Val::Record(fs)
+        }
+        IDLValue::Variant(VariantValue(f, _)) => {
+            Val::Variant(f.id.get_id(), Box::new(from_idl(&f.val)?))
+        }
+        IDLValue::Principal(p) => Val::Principal(p.as_slice().to_vec()),
+        IDLValue::Service(p) => Val::Service(p.as_slice().to_vec()),
+        IDLValue::Func(p, m) => Val::Func(p.as_slice().to_vec(), m.clone()),
+        IDLValue::Number(n) => return Err(format!("an untyped number {n}")),
+    })
 }
 
 fn agreement(agree: bool, detail: impl FnOnce() -> String) -> Outcome {
@@ -503,6 +759,131 @@ impl Fixture {
             env.0.insert(format!("{prefix}{i}"), t.into());
         }
         ty(&self.root)
+    }
+}
+
+fn field_at<'a, K: PartialEq>(fs: &'a [(K, Slot)], k: &K) -> Option<&'a Slot> {
+    fs.iter().find(|(id, _)| id == k).map(|(_, s)| s)
+}
+
+impl Fixture {
+    fn entry(&self, s: &Slot) -> Option<&Entry> {
+        match s {
+            Slot::Ref(i) => self.table.get(*i),
+            Slot::Prim(_) => None,
+        }
+    }
+
+    /// `v : t`, as `TypeTable.hasType` in `lean/Candid/Value.lean` defines it.
+    fn has_type(&self, v: &Val, t: &Slot) -> bool {
+        if let Slot::Prim(p) = t {
+            return matches!(
+                (v, p),
+                (Val::Null, TypeInner::Null | TypeInner::Reserved)
+                    | (Val::Bool(_), TypeInner::Bool)
+                    | (Val::Nat(_), TypeInner::Nat)
+                    | (Val::Int(_), TypeInner::Int)
+                    | (Val::Nat8(_), TypeInner::Nat8)
+                    | (Val::Nat16(_), TypeInner::Nat16)
+                    | (Val::Nat32(_), TypeInner::Nat32)
+                    | (Val::Nat64(_), TypeInner::Nat64)
+                    | (Val::Int8(_), TypeInner::Int8)
+                    | (Val::Int16(_), TypeInner::Int16)
+                    | (Val::Int32(_), TypeInner::Int32)
+                    | (Val::Int64(_), TypeInner::Int64)
+                    | (Val::Float32(_), TypeInner::Float32)
+                    | (Val::Float64(_), TypeInner::Float64)
+                    | (Val::Text(_), TypeInner::Text)
+                    | (Val::Principal(_), TypeInner::Principal)
+            );
+        }
+        match (v, self.entry(t)) {
+            (Val::Null, Some(Entry::Opt(_))) => true,
+            (Val::Opt(w), Some(Entry::Opt(t))) => self.has_type(w, t),
+            (Val::Vec(ws), Some(Entry::Vec(t))) => ws.iter().all(|w| self.has_type(w, t)),
+            (Val::Record(vs), Some(Entry::Record(fs))) => {
+                vs.windows(2).all(|p| p[0].0 < p[1].0)
+                    && vs.len() == fs.len()
+                    && vs
+                        .iter()
+                        .all(|(id, w)| field_at(fs, id).is_some_and(|t| self.has_type(w, t)))
+            }
+            (Val::Variant(id, w), Some(Entry::Variant(fs))) => {
+                field_at(fs, id).is_some_and(|t| self.has_type(w, t))
+            }
+            (Val::Service(_), Some(Entry::Service(_))) => true,
+            (Val::Func(..), Some(Entry::Func { .. })) => true,
+            _ => false,
+        }
+    }
+
+    /// The value as an `IDLValue` of type `t`. The type picks which `IDLValue` a
+    /// `null` is; the rest is a change of representation.
+    fn to_idl(&self, v: &Val, t: &Slot) -> Result<IDLValue, String> {
+        let principal = |bs: &[u8]| Principal::try_from_slice(bs).map_err(|e| e.to_string());
+        let entry = self.entry(t);
+        Ok(match v {
+            Val::Null => match (t, entry) {
+                (Slot::Prim(TypeInner::Reserved), _) => IDLValue::Reserved,
+                (_, Some(Entry::Opt(_))) => IDLValue::None,
+                _ => IDLValue::Null,
+            },
+            Val::Bool(b) => IDLValue::Bool(*b),
+            Val::Nat(n) => IDLValue::Nat(n.parse().map_err(|e| format!("{e:?}"))?),
+            Val::Int(i) => IDLValue::Int(i.parse().map_err(|e| format!("{e:?}"))?),
+            Val::Nat8(n) => IDLValue::Nat8(*n),
+            Val::Nat16(n) => IDLValue::Nat16(*n),
+            Val::Nat32(n) => IDLValue::Nat32(*n),
+            Val::Nat64(n) => IDLValue::Nat64(*n),
+            Val::Int8(i) => IDLValue::Int8(*i),
+            Val::Int16(i) => IDLValue::Int16(*i),
+            Val::Int32(i) => IDLValue::Int32(*i),
+            Val::Int64(i) => IDLValue::Int64(*i),
+            Val::Float32(b) => IDLValue::Float32(f32::from_bits(*b)),
+            Val::Float64(b) => IDLValue::Float64(f64::from_bits(*b)),
+            Val::Text(s) => IDLValue::Text(s.clone()),
+            Val::Opt(w) => match entry {
+                Some(Entry::Opt(t)) => IDLValue::Opt(Box::new(self.to_idl(w, t)?)),
+                _ => return Err("an option at a type that is not one".into()),
+            },
+            Val::Vec(ws) => match entry {
+                Some(Entry::Vec(t)) => IDLValue::Vec(
+                    ws.iter()
+                        .map(|w| self.to_idl(w, t))
+                        .collect::<Result<_, _>>()?,
+                ),
+                _ => return Err("a vector at a type that is not one".into()),
+            },
+            Val::Record(vs) => match entry {
+                Some(Entry::Record(fs)) => IDLValue::Record(
+                    vs.iter()
+                        .map(|(id, w)| {
+                            let t = field_at(fs, id).ok_or("an undeclared field")?;
+                            Ok(IDLField {
+                                id: Label::Id(*id),
+                                val: self.to_idl(w, t)?,
+                            })
+                        })
+                        .collect::<Result<_, String>>()?,
+                ),
+                _ => return Err("a record at a type that is not one".into()),
+            },
+            // The index is recomputed from the type when the value is encoded.
+            Val::Variant(id, w) => match entry {
+                Some(Entry::Variant(fs)) => {
+                    let t = field_at(fs, id).ok_or("an undeclared tag")?;
+                    let field = IDLField {
+                        id: Label::Id(*id),
+                        val: self.to_idl(w, t)?,
+                    };
+                    IDLValue::Variant(VariantValue(Box::new(field), 0))
+                }
+                _ => return Err("a variant at a type that is not one".into()),
+            },
+            Val::Principal(bs) => IDLValue::Principal(principal(bs)?),
+            Val::Service(bs) => IDLValue::Service(principal(bs)?),
+            Val::Func(bs, m) => IDLValue::Func(principal(bs)?, m.clone()),
+        })
     }
 }
 
@@ -575,6 +956,71 @@ mod tests {
         assert!(matches!(Vector::parse(&ok).unwrap().run(), Outcome::Skip));
         rejects(json!({"id": "t", "kind": "wellformed", "type": {"root": "nat"}, "expect": true}));
         rejects(json!({"id": "t", "kind": "wellformed", "type": nat(), "expect": 1}));
+    }
+
+    fn coerce(value: Value, from: Value, to: Value, expect: Value) -> Value {
+        json!({"id": "t", "kind": "coerce", "value": value, "from": from, "to": to, "expect": expect})
+    }
+
+    #[test]
+    fn decodes_a_coerce_vector() {
+        let int = json!({"table": [], "root": "int"});
+        let v = coerce(
+            json!({"nat": "5"}),
+            nat(),
+            int,
+            json!({"value": {"int": "5"}}),
+        );
+        assert!(matches!(Vector::parse(&v).unwrap().run(), Outcome::Agree));
+        let v = coerce(
+            json!({"int": "-5"}),
+            json!({"table": [], "root": "int"}),
+            nat(),
+            json!("reject"),
+        );
+        assert!(matches!(Vector::parse(&v).unwrap().run(), Outcome::Agree));
+    }
+
+    #[test]
+    fn rejects_malformed_values() {
+        for value in [
+            json!({"nat": 5}),
+            json!({"nat": "05"}),
+            json!({"nat": "+5"}),
+            json!({"int": "-0"}),
+            json!({"nat8": "256"}),
+            json!({"int8": "-129"}),
+            json!({"float32": "3F800000"}),
+            json!({"float32": "3f80000"}),
+            json!({"principal": "abc"}),
+            json!({"nat": "5", "int": "5"}),
+            json!({"natural": "5"}),
+        ] {
+            rejects(coerce(value, nat(), nat(), json!("reject")));
+        }
+        rejects(coerce(json!({"nat": "5"}), nat(), nat(), json!("accept")));
+        rejects(coerce(
+            json!({"nat": "5"}),
+            nat(),
+            nat(),
+            json!({"value": {"nat": "5"}, "x": 1}),
+        ));
+    }
+
+    /// Coercion is only defined on well-typed values, and an expected result that is
+    /// not of the target type cannot be right whatever 0.10 answers.
+    #[test]
+    fn rejects_ill_typed_coerce_vectors() {
+        invalid(coerce(json!({"int": "5"}), nat(), nat(), json!("reject")));
+        invalid(coerce(
+            json!({"nat": "5"}),
+            nat(),
+            nat(),
+            json!({"value": {"int": "5"}}),
+        ));
+        let record = json!({"table": [{"record": [[0, "nat"], [1, "nat"]]}], "root": 0});
+        let unsorted = json!({"record": [[1, {"nat": "1"}], [0, {"nat": "0"}]]});
+        invalid(coerce(unsorted, record.clone(), record, json!("reject")));
     }
 
     /// The case that would otherwise pass as a negative example: an unresolved
