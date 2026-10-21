@@ -547,3 +547,96 @@ fn input_arg_count_increase_message_has_correct_counts() {
         "arg-count message has wrong old/new values: {msg}"
     );
 }
+
+/// Each `Ti` refers to `T(i+1)` twice, so there are 2^n paths to the leaf.
+fn shared_recursive_service(prefix: &str, depth: usize, leaf: &str) -> String {
+    shared_recursive_service_with(prefix, depth, leaf, |next| format!("{next}; {next}"))
+}
+
+/// Like `shared_recursive_service`, with the fields of each level given by `fields`.
+fn shared_recursive_service_with(
+    prefix: &str,
+    depth: usize,
+    leaf: &str,
+    fields: impl Fn(&str) -> String,
+) -> String {
+    let mut s = String::new();
+    for i in 0..depth {
+        let next = format!("{prefix}{}", i + 1);
+        s.push_str(&format!(
+            "type {prefix}{i} = record {{ {} }};\n",
+            fields(&next)
+        ));
+    }
+    s.push_str(&format!("type {prefix}{depth} = {leaf};\n"));
+    s.push_str(&format!("service : {{ go : () -> ({prefix}0) }}"));
+    s
+}
+
+#[test]
+fn shared_recursive_types_are_checked_once() {
+    // Before the fix this explored and reported every one of the 2^64 paths.
+    let new = shared_recursive_service("A", 64, "nat");
+    let old = shared_recursive_service("B", 64, "text");
+    let errors = error_strings(&new, &old);
+    assert_eq!(errors.len(), 65, "errors: {errors:?}");
+    assert_eq!(
+        errors
+            .iter()
+            .filter(|e| e.contains("nat is not a subtype of text"))
+            .count(),
+        1,
+        "the leaf incompatibility should be reported once: {errors:?}"
+    );
+    check_compatible(&new, &new, "shared recursive type against itself");
+}
+
+#[test]
+fn type_shared_by_two_methods_is_reported_under_both() {
+    let old = "type T = record { a : nat }; service : { f : () -> (T); g : () -> (T) }";
+    let new = "type T = record { a : text }; service : { f : () -> (T); g : () -> (T) }";
+    let errors = error_strings(new, old);
+    assert!(
+        errors.iter().any(|e| e.starts_with("method \"f\"")),
+        "missing error under f: {errors:?}"
+    );
+    assert!(
+        errors.iter().any(|e| e.starts_with("method \"g\"")),
+        "missing error under g: {errors:?}"
+    );
+}
+
+#[test]
+fn shared_recursive_types_under_opt_are_probed_once() {
+    // Each level probes `opt A(i+1) <: opt B(i+1)` twice, and the probe fails
+    // on the last field, so without caching refuted pairs both probes
+    // re-explore every level below: 2^64 steps.
+    let new = shared_recursive_service_with("A", 64, "nat", |next| {
+        format!("opt {next}; opt {next}; nat")
+    });
+    let old = shared_recursive_service_with("B", 64, "text", |next| {
+        format!("opt {next}; opt {next}; text")
+    });
+    let errors = error_strings(&new, &old);
+    assert_eq!(errors.len(), 1, "errors: {errors:?}");
+    assert!(
+        errors[0].contains("nat is not a subtype of text"),
+        "{errors:?}"
+    );
+    check_incompatible(&new, &old, "shared recursive type under opt");
+    check_compatible(&new, &new, "shared recursive type under opt against itself");
+}
+
+#[test]
+fn pair_refuted_by_a_probe_is_still_reported() {
+    // Field 0's opt probe refutes `A <: B` without reporting it; field 1
+    // reaches the same pair outside a probe and must report the cause.
+    let new = "type A = record { x : nat }; service : { f : () -> (record { 0 : opt A; 1 : A }) }";
+    let old = "type B = record { x : text }; service : { f : () -> (record { 0 : opt B; 1 : B }) }";
+    let errors = error_strings(new, old);
+    assert_eq!(errors.len(), 1, "errors: {errors:?}");
+    assert!(
+        errors[0].contains("record field 1") && errors[0].contains("nat is not a subtype of text"),
+        "{errors:?}"
+    );
+}

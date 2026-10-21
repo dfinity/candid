@@ -36,24 +36,45 @@ fn check_recursion_depth(_depth: u16) -> Result<()> {
 /// Use `guard()` to increment depth with automatic decrement via RAII.
 /// Uses interior mutability to allow passing to recursive functions and cloning.
 #[derive(Debug, Clone)]
-pub(crate) struct RecursionDepth(std::rc::Rc<std::cell::Cell<u16>>);
+pub(crate) struct RecursionDepth {
+    depth: std::rc::Rc<std::cell::Cell<u16>>,
+    overflows: std::rc::Rc<std::cell::Cell<usize>>,
+}
 
 impl RecursionDepth {
     /// Creates a new recursion depth tracker starting at 0.
     pub(crate) fn new() -> Self {
-        Self(std::rc::Rc::new(std::cell::Cell::new(0)))
+        Self {
+            depth: std::rc::Rc::new(std::cell::Cell::new(0)),
+            overflows: std::rc::Rc::new(std::cell::Cell::new(0)),
+        }
     }
 
     /// Increments depth and returns a guard that will automatically decrement on drop.
     ///
     /// Returns an error if recursion limit is exceeded.
     pub(crate) fn guard(&self) -> Result<DepthGuard> {
-        let current = self.0.get();
+        let res = self.enter();
+        if res.is_err() {
+            self.overflows.set(self.overflows.get() + 1);
+        }
+        res
+    }
+
+    /// How many times `guard()` has failed. A failure is a property of the
+    /// stack, not of the input, so callers that cache results compare this
+    /// before and after to tell the two apart.
+    pub(crate) fn overflows(&self) -> usize {
+        self.overflows.get()
+    }
+
+    fn enter(&self) -> Result<DepthGuard> {
+        let current = self.depth.get();
         let new_depth = current
             .checked_add(1)
             .ok_or_else(|| Error::msg("Recursion depth overflow"))?;
-        self.0.set(new_depth);
-        let guard = DepthGuard(self.0.clone());
+        self.depth.set(new_depth);
+        let guard = DepthGuard(self.depth.clone());
         check_recursion_depth(new_depth)?;
         Ok(guard)
     }
