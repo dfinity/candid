@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+* Spec:
+  + Coercing a value whose type does not accept `null` at an *infinite option* (`type Opt = opt Opt`) is undefined, and deserialisation fails, even under an enclosing `opt`. This writes down what `candid` has done since 0.10.20 and what `test/construct.test.did` has asserted since then; the spec's rules had become self-referential there when #678 dropped the premise that kept the rule via the constituent type from unwrapping one option inside another. The soundness property now states the exception. No implementation changes.
+
 ## 2026-10-21
 
 ### Candid 0.10.39
