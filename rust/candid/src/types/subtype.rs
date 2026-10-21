@@ -10,6 +10,46 @@ use std::fmt;
 
 pub type Gamma = HashSet<(Type, Type)>;
 
+/// The `Gamma` of one check, together with the order its pairs were assumed in.
+///
+/// A pair is assumed before it is proved, and any pair proved after it may have
+/// been proved from it. So when it fails, every pair assumed since goes with it,
+/// not only the pair itself. This matters because the opt rule probes `t <: t'`
+/// and recovers when the probe fails: a pair proved from the failed assumption
+/// would otherwise outlive the probe and answer a later comparison, and so would
+/// one left behind by a failed check in a `Gamma` the caller reuses.
+struct Assumptions<'a> {
+    gamma: &'a mut Gamma,
+    log: Vec<(Type, Type)>,
+}
+
+impl<'a> Assumptions<'a> {
+    fn new(gamma: &'a mut Gamma) -> Self {
+        Assumptions {
+            gamma,
+            log: Vec::new(),
+        }
+    }
+
+    /// Assume `t1 <: t2`. `None` if it is already assumed; otherwise the mark
+    /// to `retract` it by.
+    fn assume(&mut self, t1: &Type, t2: &Type) -> Option<usize> {
+        let pair = (t1.clone(), t2.clone());
+        if !self.gamma.insert(pair.clone()) {
+            return None;
+        }
+        self.log.push(pair);
+        Some(self.log.len() - 1)
+    }
+
+    /// Withdraw the assumption at `mark`, and every assumption made since.
+    fn retract(&mut self, mark: usize) {
+        for pair in self.log.drain(mark..) {
+            self.gamma.remove(&pair);
+        }
+    }
+}
+
 /// Error reporting style for the special opt rule
 #[derive(Debug, Copy, Clone)]
 pub enum OptReport {
@@ -21,7 +61,7 @@ pub enum OptReport {
 pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<()> {
     subtype_(
         OptReport::Warning,
-        gamma,
+        &mut Assumptions::new(gamma),
         env,
         t1,
         t2,
@@ -36,7 +76,14 @@ pub fn subtype_with_config(
     t1: &Type,
     t2: &Type,
 ) -> Result<()> {
-    subtype_(report, gamma, env, t1, t2, &RecursionDepth::new())
+    subtype_(
+        report,
+        &mut Assumptions::new(gamma),
+        env,
+        t1,
+        t2,
+        &RecursionDepth::new(),
+    )
 }
 
 /// A single incompatibility found during subtype checking.
@@ -171,7 +218,7 @@ pub fn subtype_check_all(
     let mut errors = Vec::new();
     subtype_collect_(
         OptReport::Warning,
-        gamma,
+        &mut Assumptions::new(gamma),
         env,
         t1,
         t2,
@@ -189,7 +236,7 @@ pub fn subtype_check_all(
 #[allow(clippy::too_many_arguments)]
 fn subtype_collect_(
     report: OptReport,
-    gamma: &mut Gamma,
+    gamma: &mut Assumptions,
     env: &TypeEnv,
     t1: &Type,
     t2: &Type,
@@ -214,9 +261,9 @@ fn subtype_collect_(
     }
     // Handle Var/Knot (type variables / recursive types)
     if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
-        if !gamma.insert((t1.clone(), t2.clone())) {
+        let Some(mark) = gamma.assume(t1, t2) else {
             return; // co-inductive: assume OK
-        }
+        };
         let before = errors.len();
         match (t1.as_ref(), t2.as_ref()) {
             (Var(id), _) => match env.rec_find_type_with_depth(id, depth) {
@@ -262,7 +309,7 @@ fn subtype_collect_(
             (_, _) => unreachable!(),
         };
         if errors.len() > before {
-            gamma.remove(&(t1.clone(), t2.clone()));
+            gamma.retract(mark);
         }
         return;
     }
@@ -447,7 +494,7 @@ fn subtype_collect_(
 #[allow(clippy::too_many_arguments)]
 fn check_func_params(
     report: OptReport,
-    gamma: &mut Gamma,
+    gamma: &mut Assumptions,
     env: &TypeEnv,
     sub_params: &[Type],
     sup_params: &[Type],
@@ -518,7 +565,7 @@ fn pp_modes(modes: &[super::internal::FuncMode]) -> String {
 
 fn subtype_(
     report: OptReport,
-    gamma: &mut Gamma,
+    gamma: &mut Assumptions,
     env: &TypeEnv,
     t1: &Type,
     t2: &Type,
@@ -530,9 +577,9 @@ fn subtype_(
         return Ok(());
     }
     if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
-        if !gamma.insert((t1.clone(), t2.clone())) {
+        let Some(mark) = gamma.assume(t1, t2) else {
             return Ok(());
-        }
+        };
         let res = match (t1.as_ref(), t2.as_ref()) {
             (Var(id), _) => env
                 .rec_find_type_with_depth(id, depth)
@@ -545,7 +592,7 @@ fn subtype_(
             (_, _) => unreachable!(),
         };
         if res.is_err() {
-            gamma.remove(&(t1.clone(), t2.clone()));
+            gamma.retract(mark);
         }
         return res;
     }

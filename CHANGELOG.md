@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Candid
+
+* Bug fixes:
+  + A failed step of a subtype check now withdraws every assumption made since it, not only its own. The opt rule probes `t <: t'` and falls back to the special rule when the probe fails; pairs proved inside the probe could rely on the pair that failed, and previously stayed in `Gamma`, so a later comparison in the same check was answered from them. `subtype`, `subtype_with_config` and `subtype_check_all` could therefore accept a type that is not a subtype — `service_compatible` and `didc check` accepted a breaking upgrade when a sibling `opt` field triggered the probe first — and a failed check could leave such pairs in a `Gamma` the caller reuses, as the decoder does across one message. Checks that do not reach a failed probe are unchanged.
+
 ## 2026-10-09
 
 ### Candid 0.10.38
