@@ -992,6 +992,10 @@ not (exists <w>. <v> : <t> ~> <w> : <t'>)
 <v> : <t> ~> null : opt <t'>
 ```
 
+Call a type an *infinite option* if it is an option type whose constituent is again an infinite option, so that unfolding it through `opt` never reaches anything else: `type Opt = opt Opt`, or `type A = opt B; type B = opt A`. Its values are `null`, `opt null`, `opt opt null`, and so on.
+
+Coercing a value `<v> : <t>` with `not (null <: <t>)` at an infinite option `opt <t'>` is *undefined*. The rules above cannot settle it: the rule via the constituent type needs a coercion of the same value at `<t'>`, again an infinite option, and the last rule needs there to be none, so each would apply exactly when the other does not. Undefined is not the same as failing to coerce. A premise `not (exists <w>. ...)` holds only where coercion is defined and has no result, so the rules that go to `null` do not apply, and an enclosing option does not recover. A coercion that needs an undefined one is undefined too, whether at an enclosing option, a record field, a vector element or an argument, and deserialisation fails.
+
 #### Records
 
 In the following rule:
@@ -1078,6 +1082,7 @@ The relations above have certain properties. As in the previous section, `<v> : 
   ```
   <t> <: <t'> ⇒ ∀ <v> : <t> ∃ <v'>. <v> : <t> ~> <v'> : <t'>
   ```
+  except where coercing `<v>` would need a coercion at an infinite option (see [Options](#options-2) under Coercion). There coercion is undefined: for `type Opt = opt Opt`, `nat <: Opt`, but `5 : nat` has no coercion at `Opt`.
 
 * Higher-order soundness of subtyping
   See <./IDL-Soundness.md>, with the following instantiations:
