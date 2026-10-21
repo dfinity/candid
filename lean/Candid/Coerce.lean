@@ -55,9 +55,11 @@ they become, deliberately not stated with `sorry`:
     theorem coerce_refl (A : TypeTable) (t : A.Root) (v : Value) :
         A.hasType v t.1 = true -> coerce A A v t.1 t.1 = some v
 
-    -- Well-typedness: what coercion produces has the target type.
+    -- Well-typedness: what coercion produces from a well-typed value has the target
+    -- type. The premise is not decoration: at `nat`, `coerce` passes `.bool true`
+    -- through unchanged, since it only means anything on the values of `t`.
     theorem coerce_hasType (A B : TypeTable) (t : A.Root) (u : B.Root) (v w : Value) :
-        coerce A B v t.1 u.1 = some w -> B.hasType w u.1 = true
+        A.hasType v t.1 = true -> coerce A B v t.1 u.1 = some w -> B.hasType w u.1 = true
 
     -- Soundness: subtyping means every value coerces. MiniCandid's
     -- `coerce_well_defined`, over the full type language.

@@ -731,15 +731,23 @@ impl Slot {
 
 impl Fixture {
     /// Add the table to `env`, entry `i` named `{prefix}{i}`, and return the root.
+    ///
+    /// A vector lists a type's members in no particular order, but 0.10 expects them
+    /// sorted, as its parser leaves them: its encoder writes a type's fields in the
+    /// order it is given them, and its decoder rejects a header that is not sorted. So
+    /// fields are sorted by id and methods by name here.
     fn load(&self, env: &mut TypeEnv, prefix: &str) -> Type {
         let ty = |s: &Slot| s.to_type(prefix);
         let fields = |fs: &[(u32, Slot)]| {
-            fs.iter()
+            let mut fs: Vec<Field> = fs
+                .iter()
                 .map(|(id, s)| Field {
                     id: Label::Id(*id).into(),
                     ty: ty(s),
                 })
-                .collect()
+                .collect();
+            fs.sort_by_key(|f| f.id.get_id());
+            fs
         };
         for (i, entry) in self.table.iter().enumerate() {
             let t = match entry {
@@ -753,7 +761,9 @@ impl Fixture {
                     rets: rets.iter().map(ty).collect(),
                 }),
                 Entry::Service(ms) => {
-                    TypeInner::Service(ms.iter().map(|(n, s)| (n.clone(), ty(s))).collect())
+                    let mut ms: Vec<_> = ms.iter().map(|(n, s)| (n.clone(), ty(s))).collect();
+                    ms.sort_by(|(a, _), (b, _)| a.cmp(b));
+                    TypeInner::Service(ms)
                 }
             };
             env.0.insert(format!("{prefix}{i}"), t.into());
@@ -1005,6 +1015,31 @@ mod tests {
             nat(),
             json!({"value": {"nat": "5"}, "x": 1}),
         ));
+    }
+
+    /// Members of a record, variant or service type are in no particular order in a
+    /// vector, and 0.10's encoder writes a type's fields in the order it is given them.
+    /// An unsorted type must still roundtrip, and must not reject for that reason.
+    #[test]
+    fn type_member_order_does_not_matter() {
+        let unsorted = json!({"table": [{"record": [[1, "nat"], [0, "nat"]]}], "root": 0});
+        let value = json!({"record": [[0, {"nat": "0"}], [1, {"nat": "1"}]]});
+        let v = coerce(
+            value.clone(),
+            unsorted.clone(),
+            unsorted,
+            json!({"value": value}),
+        );
+        assert!(matches!(Vector::parse(&v).unwrap().run(), Outcome::Agree));
+        let unsorted = json!({"table": [{"variant": [[1, "nat"], [0, "text"]]}], "root": 0});
+        let value = json!({"variant": [0, {"text": "x"}]});
+        let v = coerce(
+            value.clone(),
+            unsorted.clone(),
+            unsorted,
+            json!({"value": value}),
+        );
+        assert!(matches!(Vector::parse(&v).unwrap().run(), Outcome::Agree));
     }
 
     /// Coercion is only defined on well-typed values, and an expected result that is

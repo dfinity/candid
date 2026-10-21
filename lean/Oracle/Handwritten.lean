@@ -571,7 +571,12 @@ def coerceRecordChecks : List Vector :=
   , expectCoerce (recordVal [("a", .text "x")]) (entry (recordOf [("a", text)]))
       (close do let o ← intern (.opt nat); intern (recordOf [("a", o)]))
       (some (recordVal [("a", .null)]))
-      "record {a = \"x\"} ~> record {a = null} : record {a : opt nat}" ]
+      "record {a = \"x\"} ~> record {a = null} : record {a : opt nat}"
+    -- A type lists its fields in no particular order; the value lists them by id.
+  , expectCoerce (recordVal [("a", .nat 1), ("b", .nat 2)])
+      (entry (recordOf [("b", nat), ("a", nat)])) (entry (recordOf [("b", nat), ("a", nat)]))
+      (some (recordVal [("a", .nat 1), ("b", .nat 2)]))
+      "record {a = 1; b = 2} ~> itself, at a type listing b before a" ]
 
 def coerceVariantChecks : List Vector :=
   [ expectCoerce (variantVal "a" (.nat 1)) (entry (variantOf [("a", nat), ("b", text)]))
