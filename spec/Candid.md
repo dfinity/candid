@@ -1082,7 +1082,7 @@ The relations above have certain properties. As in the previous section, `<v> : 
   ```
   <t> <: <t'> ⇒ ∀ <v> : <t> ∃ <v'>. <v> : <t> ~> <v'> : <t'>
   ```
-  except where that coercion is undefined, which happens only when it needs to coerce a value whose type does not accept `null` at an infinite option (see [Options](#options-2) under Coercion). For `type Opt = opt Opt`, `nat <: Opt`, but coercing `5 : nat` at `Opt` is undefined. A value whose type accepts `null` is unaffected: `opt null : Opt` coerces to `opt null : Opt`, since its contents `null : Opt` coerce at `Opt` by the null rule.
+  except where that coercion is undefined, which happens only when it needs to coerce a value whose type does not accept `null` at an infinite option (see [Options](#options-2) under Coercion). For `type Opt = opt Opt`, `nat <: Opt`, but coercing `5 : nat` at `Opt` is undefined. Not every coercion at an infinite option is undefined: `opt null : Opt` coerces to `opt null : Opt`, since its contents `null : Opt` coerce at `Opt` by the null rule.
 
 * Higher-order soundness of subtyping
   See <./IDL-Soundness.md>, with the following instantiations:
