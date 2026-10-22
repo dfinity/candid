@@ -173,13 +173,12 @@ What the runners have found, recorded so that they outlive the run that found th
 - **`candid` 0.10 compares function annotations as a list.** The spec identifies them
   up to reordering; `query composite_query` and `composite_query query` are different
   types to 0.10. The `.did` grammar accepts both spellings.
-
-- **The spec has no answer for coercing at an `opt` cycle**, and the model and 0.10
-  give different ones. At `type R = opt R`, the spec's "else goes to `null`" rule makes
-  `5 : nat ~> w : R` depend on its own negation. The model says `null`, which keeps
-  `nat <: R` sound; 0.10 unwraps `R` until its recursion limit and rejects the message.
-  Vector: `5 : nat ~> null : R where R = opt R (...)`. Generated vectors leave `opt`
-  cycles out until the spec decides.
+- **The spec had no answer for coercing at an infinite option**, `type R = opt R`, where
+  its "else goes to `null`" rule made `5 : nat ~> w : R` depend on its own negation. The
+  model said `null` and 0.10 rejected the message. `test/construct.test.did` had asserted
+  the rejection since #679, so the spec was fixed to match (#778): the coercion is
+  undefined, nothing recovers from it, and decoding fails. The model follows. Vector:
+  `5 : nat ~> reject : R where R = opt R (undefined)`.
 - **The model, not 0.10, had coercion to `opt reserved` wrong.** It answered `null`
   where the spec gives `opt null`, since `5 : nat ~> null : reserved`. Fixed before
   these vectors were committed, and recorded here because a reference model is only

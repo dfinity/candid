@@ -192,8 +192,24 @@ partial def showValue : Value → String
   | .service id => s!"service \"{bytesToHex id}\""
   | .func id m => s!"func \"{bytesToHex id}\".{m}"
 
+/-- `type R = opt R`. -/
+def infiniteOpt : Gen := knot "R = opt R" fun r => pure (.opt r)
+
+/-- `type A = opt B; type B = opt A`: an infinite option two entries long. -/
+def infiniteOpt2 : Gen := ⟨"(A = opt B; B = opt A)", do
+  let i := (← get).size
+  modify fun es => (es.push (.opt (.ref (i + 1)))).push (.opt (.ref i))
+  return .ref i⟩
+
+/-- Types that hold an infinite option somewhere inside. Coercion at one is undefined
+for a value whose type does not accept `null` (`spec/Candid.md`, "Coercion" >
+"Options"), and so is any coercion that needs it; these are where that shows. Not part
+of `smallComposites`, so the subtyping files do not grow with them. -/
+def holdsInfiniteOpt : List Gen :=
+  [ infiniteOpt2, record [("a", infiniteOpt)], vec infiniteOpt, variant [("a", infiniteOpt)] ]
+
 /-- Every type a sample is drawn from, and every type it is coerced at. -/
-def coerceUniverse : List Gen := Prim.all.map prim ++ smallComposites
+def coerceUniverse : List Gen := Prim.all.map prim ++ smallComposites ++ holdsInfiniteOpt
 
 /-- A generated type, checked, with its samples. Every generated type is well formed;
 `malformed` reports one that is not. -/
@@ -202,21 +218,14 @@ def Gen.checked? (g : Gen) : Option (Fixture × (T : TypeTable) × T.Root) := do
   let ⟨T, r⟩ ← f.check?
   return ⟨f, T, r⟩
 
-/-- Is `u` an `opt` cycle, `type R = opt R` or a longer one? -/
-def isOptCycle (B : TypeTable) (u : Slot) : Bool := (optLayers B u (B.size + 1)).isNone
-
-/-- Coercion at an `opt` cycle is left out: the spec has no answer there (see
-`Candid/Coerce.lean`), so every such vector would assert the model's decision rather
-than a rule. One hand-written vector states that decision. -/
 def coercions : List Vector :=
   coerceUniverse.flatMap fun a => match a.checked? with
     | none => []
     | some ⟨fa, A, ra⟩ => (samples A 3 ra.1).flatMap fun v =>
       coerceUniverse.filterMap fun b => do
         let ⟨fb, B, rb⟩ ← b.checked?
-        if isOptCycle B rb.1 then none
         return ⟨s!"{showValue v} : {a.name} ~> {b.name}",
-          .coerce v fa fb (coerce A B v ra.1 rb.1)⟩
+          .coerce v fa fb (coerceResult A B v ra.1 rb.1)⟩
 
 /-! ## Properties
 
@@ -229,7 +238,8 @@ they are.
   direction, from `v : t ~> v : t` to `v : t`, is about values that are not well typed,
   and the samples all are.)
 - **Well-typedness**: `v : t ~> v' : t'` implies `v' : t'`.
-- **Soundness**: `t <: t'` implies that every `v : t` coerces at `t'`.
+- **Soundness**: `t <: t'` implies that no `v : t` fails to coerce at `t'`. It may be
+  undefined: that is the spec's exception, at an infinite option.
 
 Each returns a description of every counterexample. -/
 
@@ -239,22 +249,23 @@ def propertyViolations : List String :=
     | some ⟨_, A, ra⟩ => (samples A 3 ra.1).flatMap fun v =>
       let typed := if A.hasType v ra.1 then [] else
         [s!"sample {showValue v} does not have type {a.name}"]
-      let roundtrip := if coerce A A v ra.1 ra.1 == some v then [] else
+      let roundtrip := if coerceResult A A v ra.1 ra.1 == some v then [] else
         [s!"roundtripping: {showValue v} : {a.name} does not coerce to itself"]
       typed ++ roundtrip ++ coerceUniverse.flatMap fun b => match b.checked? with
         | none => []
         | some ⟨_, B, rb⟩ =>
-          match coerce A B v ra.1 rb.1 with
-          | some w => if B.hasType w rb.1 then [] else
+          match (coerce A B v ra.1 rb.1).run with
+          | .ok (some w) => if B.hasType w rb.1 then [] else
               [s!"well-typedness: {showValue v} : {a.name} ~> {showValue w}, not of type {b.name}"]
-          | none => if decSubtype A B ra rb then
+          | .ok none => if decSubtype A B ra rb then
               [s!"soundness: {a.name} <: {b.name}, but {showValue v} does not coerce"]
             else []
+          | .error _ => []
 
 /-- Types the generator built that were not well formed. Expected to be empty: the
 oracle fails if it is not, since `pairs` drops them silently. -/
 def malformed : List String :=
-  (Prim.all.map prim ++ smallComposites).filterMap fun g =>
+  (Prim.all.map prim ++ smallComposites ++ holdsInfiniteOpt).filterMap fun g =>
     if g.fixture.check?.isSome then none else some g.name
 
 end Oracle.Generate

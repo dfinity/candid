@@ -27,21 +27,12 @@ use std::collections::BTreeSet;
 use std::process::ExitCode;
 
 /// Vectors on which `candid` 0.10 is known to disagree with the model: `(id, why)`.
-const KNOWN: &[(&str, &str)] = &[
-    (
-        "annotations agree up to reordering",
-        "`subtype.rs` compares `Function::modes` as a `Vec`, so `query composite_query` \
+const KNOWN: &[(&str, &str)] = &[(
+    "annotations agree up to reordering",
+    "`subtype.rs` compares `Function::modes` as a `Vec`, so `query composite_query` \
          and `composite_query query` differ; the spec identifies annotation lists up to \
          reordering, and the `.did` grammar accepts `FuncMode*`",
-    ),
-    (
-        "5 : nat ~> null : R where R = opt R (opt cycle; the spec has no answer)",
-        "not a bug on either side yet: the spec's `opt` rules make this question depend \
-         on its own negation, so it has no answer. The model says `null`, which keeps \
-         `nat <: R` sound; 0.10 unwraps the expected type until its recursion limit, \
-         an error the `opt` rule does not recover from, and rejects the message",
-    ),
-];
+)];
 
 /// The vector format version this runner reads.
 const FORMAT_VERSION: u64 = 0;

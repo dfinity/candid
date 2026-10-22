@@ -204,22 +204,29 @@ function, that premise is the failure case of the inner call, so the four rules 
 case split on whether the inner coercion succeeded. Nothing about them needed the
 elimination subtyping did.
 
-**The spec has no answer for an `opt` cycle.** Coercing a value whose type does not
-accept `null` at an `opt` type asks the same question one `opt` deeper, about the same
-value. At `type R = opt R` that is the question being asked, and "else goes to `null`"
-makes it depend on its own negation: `5 : nat ~> w : R` holds exactly when it does not.
-Yet `nat <: R`, and the spec's soundness property says some coercion exists. The model
-answers `null` — the receiver cannot decode the value, which is what `null` in an `opt`
-means — and 0.10 unwraps the expected type until its recursion limit, an error its
-`opt` rule does not recover from, so it rejects the message. Neither is wrong by the
-spec, which has to decide; the hand-written vector stating the model's answer is in the
-runner's `KNOWN` list, and generated vectors leave `opt` cycles out rather than assert
-the decision once per sample value.
+**Coercion has three outcomes, and the spec had to be fixed to say so.** Coercing a
+value whose type does not accept `null` at an `opt` type asks the same question one
+`opt` deeper, about the same value. At an *infinite option*, `type R = opt R`, that is
+the question being asked, and "else goes to `null`" made it depend on its own negation:
+`5 : nat ~> w : R` held exactly when it did not. The model first answered `null`, and
+0.10 disagreed: it unwraps the expected type until its recursion limit, an error its
+`opt` rule does not recover from, and rejects the message — under an enclosing `opt`,
+in a record field and in a vector element too. Looking for which was right turned up
+`test/construct.test.did`, which has asserted the rejection since #679, with Motoko
+running the same suite. Only the spec had not been updated, and #778 updated it: the
+coercion is *undefined*, which is not the same as failing, so nothing recovers from it.
+
+`coerce` therefore returns one of three outcomes: a value; a failure, which the `opt`
+rules turn into `null`; or `Undefined`, which they pass on. It is an
+`OptionT (Except Undefined)`, so `<|>` is exactly the `opt` rules' recovery. The
+generated vectors include types that hold an infinite option in a record field, a
+vector element and a variant tag, and the two-entry cycle, and all of them agree with
+0.10.
 
 That same step is the only one where the value does not get smaller, so it is also
 where termination needed thought. The model peels the expected type's whole chain of
 `opt`s at once (`optLayers`) and coerces at what is under it; a chain that does not end
-is the cycle.
+is an infinite option.
 
 **The runner found a bug in the model.** The first run disagreed on every coercion to
 `opt reserved`: the model said `null`, 0.10 said `opt null`. 0.10 was right —
@@ -230,7 +237,8 @@ second implementation to see it.
 
 **Three of the spec's properties hold over the generated universe** — roundtripping
 (`v : t ~> v : t`), well-typedness (the result has the target type), and soundness
-(`t <: t'` means every `v : t` coerces). `lake exe oracle` checks each for every sample
+(`t <: t'` means no `v : t` fails to coerce; the spec's exception is the undefined
+coercion at an infinite option). `lake exe oracle` checks each for every sample
 value against every type and fails on a counterexample. That is a test, not a proof;
 see "Deferred, deliberately".
 
@@ -288,9 +296,6 @@ Named here so they are obligations rather than oversights.
   "What slice 3 established"); the theorems are about every value, and soundness is
   the one MiniCandid proves as `coerce_well_defined`. Stated in prose in
   [Candid/Coerce.lean](Candid/Coerce.lean)'s header, not as `sorry`s.
-- **The `opt` cycle.** The model's `null` is a decision for the spec to ratify or
-  overturn, not a rule it derived. Until then, the vector stating it is a known
-  divergence, not a finding against 0.10.
 - **Membership is a scan.** `seen` and `seenRev` are lists, so `contains` walks every
   pair recorded so far, and a table of *n* entries in one long cycle costs O(n²):
   measured 234 ms at 10,000 entries and 6.3 s at 50,000. `run` is tail-recursive, so

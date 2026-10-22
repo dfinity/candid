@@ -392,7 +392,7 @@ def Assertion.disagreement : Assertion → Option String
       else if want.any (!B.hasType · b.1) then
         some "the expected value does not have the type it is coerced to"
       else
-        let got := Candid.coerce A B v a.1 b.1
+        let got := coerceResult A B v a.1 b.1
         if got == want then none
         else some s!"got {(expectToJson got).compress}, want {(expectToJson want).compress}"
     | _, _ => some "a type is malformed, so coercion is not defined on it"

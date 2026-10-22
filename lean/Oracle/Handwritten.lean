@@ -471,6 +471,14 @@ def optOptNat : Fixture := close do
 /-- `type R = opt R`. -/
 def optCycle : Fixture := { table := { entries := #[.opt (.ref 0)] }, root := .ref 0 }
 
+/-- `type A = opt B; type B = opt A`. -/
+def optCycle2 : Fixture :=
+  { table := { entries := #[.opt (.ref 1), .opt (.ref 0)] }, root := .ref 0 }
+
+/-- `R`, entry `0`, with `c` built over it as the root. -/
+def overOptCycle (c : Composite) : Fixture :=
+  { table := { entries := #[.opt (.ref 0), c] }, root := .ref 1 }
+
 /-- `vec opt nat`. -/
 def vecOptNat : Fixture := close do
   let o ← intern (.opt nat)
@@ -534,10 +542,33 @@ def coerceOptChecks : List Vector :=
       "5 : nat ~> opt null : opt reserved"
   , expectCoerce (.opt (.nat 5)) (optOf nat) (optOf reserved) (some (.opt .null))
       "opt 5 : opt nat ~> opt null : opt reserved"
-    -- The spec's rules have no answer here; see `Candid/Coerce.lean`. `null` is the
-    -- model's decision, and the only one that keeps `nat <: R` sound.
-  , expectCoerce (.nat 5) (atom .nat) optCycle (some .null)
-      "5 : nat ~> null : R where R = opt R (opt cycle; the spec has no answer)" ]
+  ]
+
+/-! ## Coercion at an infinite option
+
+`spec/Candid.md`, "Coercion" > "Options": coercing a value whose type does not accept
+`null` at an infinite option is undefined, which is not the same as failing, so nothing
+encloses it into `null`, and the message is rejected. A value whose type accepts `null`
+coerces as usual. These mirror the assertions in `test/construct.test.did`. -/
+
+def coerceInfiniteOptChecks : List Vector :=
+  [ expectCoerce (.nat 5) (atom .nat) optCycle none
+      "5 : nat ~> reject : R where R = opt R (undefined)"
+  , expectCoerce (.bool true) (atom .bool) optCycle2 none
+      "true : bool ~> reject : A where A = opt B, B = opt A (undefined)"
+  , expectCoerce (.opt (.bool true)) (optOf bool) optCycle none
+      "opt true : opt bool ~> reject : R (undefined, so not null)"
+  , expectCoerce (.record [(0, .bool true)]) (entry (.record [(0, bool)]))
+      (overOptCycle (.record [(0, .ref 0)])) none
+      "record {true} ~> reject : record {R} (a field at R fails the record)"
+  , expectCoerce (.vec [.bool true]) (entry (.vec bool)) (overOptCycle (.vec (.ref 0))) none
+      "vec {true} ~> reject : vec R (an element at R fails the vector)"
+  , expectCoerce (.vec []) (entry (.vec bool)) (overOptCycle (.vec (.ref 0))) (some (.vec []))
+      "vec {} : vec bool ~> vec {} : vec R (nothing to coerce)"
+  , expectCoerce (.opt .null) optCycle optCycle (some (.opt .null))
+      "opt null : R ~> opt null : R (its contents accept null)"
+  , expectCoerce .null (atom .null) optCycle (some .null)
+      "null : null ~> null : R" ]
 
 def coerceVecChecks : List Vector :=
   [ expectCoerce (.vec [.nat 1, .nat 2]) (entry (.vec nat)) (entry (.vec int))
@@ -606,7 +637,7 @@ def coerceRefChecks : List Vector :=
 
 def coerceChecks : List Vector :=
   coercePrimChecks ++ coerceOptChecks ++ coerceVecChecks ++ coerceRecordChecks ++
-  coerceVariantChecks ++ coerceRefChecks
+  coerceVariantChecks ++ coerceRefChecks ++ coerceInfiniteOptChecks
 
 def handwritten : List Vector :=
   hashChecks ++ primChecks ++ optChecks ++ vecChecks ++ recordChecks ++
