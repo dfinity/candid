@@ -177,7 +177,8 @@ the way to it is ever reused. `rust/candid/src/types/subtype.rs` shares its `gam
 same way, but it does backtrack — the `opt` rule tries `t <: t'` and, on failure, falls
 through to the special rule. The failed attempt removes only its own pair from
 `gamma`, so pairs proved under that assumption survive and answer later questions.
-`didc check` accepts a breaking upgrade this way; the vector and the reasoning are in
+`didc check` accepted a breaking upgrade this way, until 0.10.39 (#775) made a failed
+step withdraw every assumption made since it; the vector and the reasoning are in
 [Oracle/Handwritten.lean](Oracle/Handwritten.lean) under "Assumptions made under a
 failed comparison". The same reasoning is the constraint on `candid_subtype`: if it
 ever tries a rule and recovers from the failure, it cannot share assumptions across

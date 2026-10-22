@@ -10,6 +10,67 @@ use std::fmt;
 
 pub type Gamma = HashSet<(Type, Type)>;
 
+/// The `Gamma` of one check, together with the order its pairs were assumed in.
+///
+/// A pair is assumed before it is proved, and any pair proved after it may have
+/// been proved from it. So when it fails, every pair assumed since goes with it,
+/// not only the pair itself. This matters because the opt rule probes `t <: t'`
+/// and recovers when the probe fails: a pair proved from the failed assumption
+/// would otherwise outlive the probe and answer a later comparison, and so would
+/// one left behind by a failed check in a `Gamma` the caller reuses.
+///
+/// It also keeps the pairs this check has refuted. Assumptions only ever make
+/// a check more permissive, so a pair that fails under some assumptions fails
+/// under any, and a later probe of it can fail without exploring it again.
+/// Without this, a recursive type reached along many paths is re-explored on
+/// each one, which is exponential.
+struct Assumptions<'a> {
+    gamma: &'a mut Gamma,
+    log: Vec<(Type, Type)>,
+    refuted: Gamma,
+}
+
+impl<'a> Assumptions<'a> {
+    fn new(gamma: &'a mut Gamma) -> Self {
+        Assumptions {
+            gamma,
+            log: Vec::new(),
+            refuted: Gamma::new(),
+        }
+    }
+
+    /// Assume `t1 <: t2`. `None` if it is already assumed; otherwise the mark
+    /// to `retract` it by.
+    fn assume(&mut self, t1: &Type, t2: &Type) -> Option<usize> {
+        let pair = (t1.clone(), t2.clone());
+        if !self.gamma.insert(pair.clone()) {
+            return None;
+        }
+        self.log.push(pair);
+        Some(self.log.len() - 1)
+    }
+
+    /// Withdraw the assumption at `mark`, and every assumption made since.
+    fn retract(&mut self, mark: usize) {
+        for pair in self.log.drain(mark..) {
+            self.gamma.remove(&pair);
+        }
+    }
+
+    fn is_refuted(&self, t1: &Type, t2: &Type) -> bool {
+        self.refuted.contains(&(t1.clone(), t2.clone()))
+    }
+
+    /// Record that `t1 <: t2` failed, unless the recursion limit was hit while
+    /// checking it (`overflows` is `depth.overflows()` from before the check):
+    /// that failure depends on the stack, not on the types.
+    fn refute(&mut self, t1: &Type, t2: &Type, depth: &RecursionDepth, overflows: usize) {
+        if depth.overflows() == overflows {
+            self.refuted.insert((t1.clone(), t2.clone()));
+        }
+    }
+}
+
 /// Error reporting style for the special opt rule
 #[derive(Debug, Copy, Clone)]
 pub enum OptReport {
@@ -19,14 +80,7 @@ pub enum OptReport {
 }
 /// Check if t1 <: t2
 pub fn subtype(gamma: &mut Gamma, env: &TypeEnv, t1: &Type, t2: &Type) -> Result<()> {
-    subtype_(
-        OptReport::Warning,
-        gamma,
-        env,
-        t1,
-        t2,
-        &RecursionDepth::new(),
-    )
+    subtype_with_config(OptReport::Warning, gamma, env, t1, t2)
 }
 /// Check if t1 <: t2, and report the special opt rule as `Slience`, `Warning` or `Error`.
 pub fn subtype_with_config(
@@ -36,7 +90,16 @@ pub fn subtype_with_config(
     t1: &Type,
     t2: &Type,
 ) -> Result<()> {
-    subtype_(report, gamma, env, t1, t2, &RecursionDepth::new())
+    let mut gamma = Assumptions::new(gamma);
+    let depth = RecursionDepth::new();
+    let res = subtype_(report, &mut gamma, env, t1, t2, &depth);
+    // However a probe handled it, hitting the recursion limit fails the check.
+    if depth.overflows() > 0 {
+        gamma.retract(0);
+        res?;
+        return Err(Error::msg("Recursion limit exceeded"));
+    }
+    res
 }
 
 /// A single incompatibility found during subtype checking.
@@ -169,17 +232,29 @@ pub fn subtype_check_all(
     t2: &Type,
 ) -> Vec<Incompatibility> {
     let mut errors = Vec::new();
+    let mut gamma = Assumptions::new(gamma);
+    let depth = RecursionDepth::new();
     subtype_collect_(
         OptReport::Warning,
-        gamma,
+        &mut gamma,
         env,
         t1,
         t2,
-        &RecursionDepth::new(),
+        &depth,
         &mut Vec::new(),
         &mut errors,
+        &mut Gamma::new(),
         false,
     );
+    // The collector stops at the recursion limit, so say that the report may
+    // be incomplete, and fail the check however a probe handled it.
+    if depth.overflows() > 0 {
+        gamma.retract(0);
+        errors.push(Incompatibility {
+            path: Vec::new(),
+            message: "recursion limit exceeded; the check stopped there, so this report may be incomplete".to_string(),
+        });
+    }
     errors
 }
 
@@ -189,13 +264,14 @@ pub fn subtype_check_all(
 #[allow(clippy::too_many_arguments)]
 fn subtype_collect_(
     report: OptReport,
-    gamma: &mut Gamma,
+    gamma: &mut Assumptions,
     env: &TypeEnv,
     t1: &Type,
     t2: &Type,
     depth: &RecursionDepth,
     path: &mut Vec<String>,
     errors: &mut Vec<Incompatibility>,
+    failed: &mut Gamma,
     is_input: bool,
 ) {
     let _guard = match depth.guard() {
@@ -208,30 +284,51 @@ fn subtype_collect_(
             return;
         }
     };
+    // Once the recursion limit is hit the check is already failed, and any
+    // result derived from that point depends on the stack, so it is neither
+    // cached nor worth exploring further.
+    if depth.overflows() > 0 {
+        return;
+    }
     use TypeInner::*;
     if t1 == t2 {
         return;
     }
     // Handle Var/Knot (type variables / recursive types)
     if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
-        if !gamma.insert((t1.clone(), t2.clone())) {
-            return; // co-inductive: assume OK
+        // A pair already found incompatible was fully reported on its first
+        // visit. Re-exploring it on every path that reaches it is exponential
+        // on shared recursive types, so point back to it with a single entry.
+        if failed.contains(&(t1.clone(), t2.clone())) {
+            errors.push(Incompatibility {
+                path: path.clone(),
+                message: format!(
+                    "{} is not a subtype of {} (see above)",
+                    elide_large(t1),
+                    elide_large(t2)
+                ),
+            });
+            return;
         }
+        let Some(mark) = gamma.assume(t1, t2) else {
+            return; // co-inductive: assume OK
+        };
         let before = errors.len();
+        let overflows = depth.overflows();
         match (t1.as_ref(), t2.as_ref()) {
             (Var(id), _) => match env.rec_find_type_with_depth(id, depth) {
-                Ok(t1) => {
-                    subtype_collect_(report, gamma, env, t1, t2, depth, path, errors, is_input)
-                }
+                Ok(t1) => subtype_collect_(
+                    report, gamma, env, t1, t2, depth, path, errors, failed, is_input,
+                ),
                 Err(e) => errors.push(Incompatibility {
                     path: path.clone(),
                     message: e.to_string(),
                 }),
             },
             (_, Var(id)) => match env.rec_find_type_with_depth(id, depth) {
-                Ok(t2) => {
-                    subtype_collect_(report, gamma, env, t1, t2, depth, path, errors, is_input)
-                }
+                Ok(t2) => subtype_collect_(
+                    report, gamma, env, t1, t2, depth, path, errors, failed, is_input,
+                ),
                 Err(e) => errors.push(Incompatibility {
                     path: path.clone(),
                     message: e.to_string(),
@@ -246,6 +343,7 @@ fn subtype_collect_(
                 depth,
                 path,
                 errors,
+                failed,
                 is_input,
             ),
             (_, Knot(id)) => subtype_collect_(
@@ -257,12 +355,19 @@ fn subtype_collect_(
                 depth,
                 path,
                 errors,
+                failed,
                 is_input,
             ),
             (_, _) => unreachable!(),
         };
         if errors.len() > before {
-            gamma.remove(&(t1.clone(), t2.clone()));
+            // Keep failed pairs out of `gamma`: the opt-rule probes share it
+            // and would otherwise take a failed pair as an assumption.
+            gamma.retract(mark);
+            gamma.refute(t1, t2, depth, overflows);
+            if depth.overflows() == overflows {
+                failed.insert((t1.clone(), t2.clone()));
+            }
         }
         return;
     }
@@ -275,7 +380,9 @@ fn subtype_collect_(
         // unconditionally — like `Nat <: Int`.
         (Service(_), Principal) => (),
         (Vec(ty1), Vec(ty2)) => {
-            subtype_collect_(report, gamma, env, ty1, ty2, depth, path, errors, is_input);
+            subtype_collect_(
+                report, gamma, env, ty1, ty2, depth, path, errors, failed, is_input,
+            );
         }
         (Null, Opt(_)) => (),
         // For opt rules we delegate to the existing subtype_ to test the condition,
@@ -287,7 +394,15 @@ fn subtype_collect_(
                     env.trace_type_with_depth(ty2, depth)
                         .map(|t| t.as_ref().clone()),
                     Ok(Null | Reserved | Opt(_))
-                ) => {}
+                )
+                && depth.overflows() == 0 => {}
+        // A probe that hit the recursion limit proves nothing either way.
+        (_, Opt(_)) if depth.overflows() > 0 => {
+            errors.push(Incompatibility {
+                path: path.clone(),
+                message: "recursion limit exceeded".to_string(),
+            });
+        }
         (_, Opt(_)) => {
             let msg = format!("WARNING: {} <: {} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/c7659ca/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.", elide_large(t1), elide_large(t2));
             match report {
@@ -308,7 +423,7 @@ fn subtype_collect_(
                     Some(ty1) => {
                         path.push(format!("record field {id}"));
                         subtype_collect_(
-                            report, gamma, env, ty1, ty2, depth, path, errors, is_input,
+                            report, gamma, env, ty1, ty2, depth, path, errors, failed, is_input,
                         );
                         path.pop();
                     }
@@ -346,7 +461,7 @@ fn subtype_collect_(
                     Some(ty2) => {
                         path.push(format!("variant field {id}"));
                         subtype_collect_(
-                            report, gamma, env, ty1, ty2, depth, path, errors, is_input,
+                            report, gamma, env, ty1, ty2, depth, path, errors, failed, is_input,
                         );
                         path.pop();
                     }
@@ -374,7 +489,9 @@ fn subtype_collect_(
                 match meths.get(name) {
                     Some(ty1) => {
                         path.push(format!("method \"{name}\""));
-                        subtype_collect_(report, gamma, env, ty1, ty2, depth, path, errors, false);
+                        subtype_collect_(
+                            report, gamma, env, ty1, ty2, depth, path, errors, failed, false,
+                        );
                         path.pop();
                     }
                     None => {
@@ -411,17 +528,22 @@ fn subtype_collect_(
             // Check each argument directly instead of wrapping in a tuple record,
             // so we get clean error paths like "input argument 1" instead of "record field 0".
             check_func_params(
-                report, gamma, env, &f2.args, &f1.args, depth, path, errors, "input", true,
+                report, gamma, env, &f2.args, &f1.args, depth, path, errors, failed, "input", true,
             );
             check_func_params(
-                report, gamma, env, &f1.rets, &f2.rets, depth, path, errors, "return", false,
+                report, gamma, env, &f1.rets, &f2.rets, depth, path, errors, failed, "return",
+                false,
             );
         }
         (Class(_, t), _) => {
-            subtype_collect_(report, gamma, env, t, t2, depth, path, errors, is_input);
+            subtype_collect_(
+                report, gamma, env, t, t2, depth, path, errors, failed, is_input,
+            );
         }
         (_, Class(_, t)) => {
-            subtype_collect_(report, gamma, env, t1, t, depth, path, errors, is_input);
+            subtype_collect_(
+                report, gamma, env, t1, t, depth, path, errors, failed, is_input,
+            );
         }
         (Unknown, _) => unreachable!(),
         (_, Unknown) => unreachable!(),
@@ -447,13 +569,14 @@ fn subtype_collect_(
 #[allow(clippy::too_many_arguments)]
 fn check_func_params(
     report: OptReport,
-    gamma: &mut Gamma,
+    gamma: &mut Assumptions,
     env: &TypeEnv,
     sub_params: &[Type],
     sup_params: &[Type],
     depth: &RecursionDepth,
     path: &mut Vec<String>,
     errors: &mut Vec<Incompatibility>,
+    failed: &mut Gamma,
     label: &str,    // "input" or "return"
     is_input: bool, // affects wording
 ) {
@@ -470,6 +593,7 @@ fn check_func_params(
             depth,
             path,
             errors,
+            failed,
             is_input,
         );
         path.pop();
@@ -495,7 +619,7 @@ fn check_func_params(
             )
         });
         subtype_collect_(
-            report, gamma, env, &sub_tuple, &sup_tuple, depth, path, errors, is_input,
+            report, gamma, env, &sub_tuple, &sup_tuple, depth, path, errors, failed, is_input,
         );
         path.pop();
     }
@@ -518,21 +642,33 @@ fn pp_modes(modes: &[super::internal::FuncMode]) -> String {
 
 fn subtype_(
     report: OptReport,
-    gamma: &mut Gamma,
+    gamma: &mut Assumptions,
     env: &TypeEnv,
     t1: &Type,
     t2: &Type,
     depth: &RecursionDepth,
 ) -> Result<()> {
     let _guard = depth.guard()?;
+    // See `subtype_collect_`: after the recursion limit is hit, fail at once.
+    if depth.overflows() > 0 {
+        return Err(Error::msg("Recursion limit exceeded"));
+    }
     use TypeInner::*;
     if t1 == t2 {
         return Ok(());
     }
     if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
-        if !gamma.insert((t1.clone(), t2.clone())) {
-            return Ok(());
+        if gamma.is_refuted(t1, t2) {
+            return Err(Error::msg(format!(
+                "{} is not a subtype of {}",
+                elide_large(t1),
+                elide_large(t2)
+            )));
         }
+        let Some(mark) = gamma.assume(t1, t2) else {
+            return Ok(());
+        };
+        let overflows = depth.overflows();
         let res = match (t1.as_ref(), t2.as_ref()) {
             (Var(id), _) => env
                 .rec_find_type_with_depth(id, depth)
@@ -545,7 +681,8 @@ fn subtype_(
             (_, _) => unreachable!(),
         };
         if res.is_err() {
-            gamma.remove(&(t1.clone(), t2.clone()));
+            gamma.retract(mark);
+            gamma.refute(t1, t2, depth, overflows);
         }
         return res;
     }
@@ -566,6 +703,8 @@ fn subtype_(
         {
             Ok(())
         }
+        // A probe that hit the recursion limit proves nothing either way.
+        (_, Opt(_)) if depth.overflows() > 0 => Err(Error::msg("Recursion limit exceeded")),
         (_, Opt(_)) => {
             let msg = format!("WARNING: {} <: {} due to special subtyping rules involving optional types/fields (see https://github.com/dfinity/candid/blob/c7659ca/spec/Candid.md#upgrading-and-subtyping). This means the two interfaces have diverged, which could cause data loss.", elide_large(t1), elide_large(t2));
             match report {

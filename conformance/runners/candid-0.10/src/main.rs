@@ -35,13 +35,6 @@ const KNOWN: &[(&str, &str)] = &[
          reordering, and the `.did` grammar accepts `FuncMode*`",
     ),
     (
-        "record { X; X' } !<: record { opt Y; Y' } (assumption from a failed opt attempt)",
-        "candid 0.10 bug: the `opt` rule probes `t <: t'` with `subtype_`, and a failed \
-         probe removes from `gamma` only the pair that failed, keeping pairs proved \
-         under it. A later comparison is then answered from `gamma`. Reachable from \
-         `didc check`, which accepts a breaking upgrade this way",
-    ),
-    (
         "5 : nat ~> null : R where R = opt R (opt cycle; the spec has no answer)",
         "not a bug on either side yet: the spec's `opt` rules make this question depend \
          on its own negation, so it has no answer. The model says `null`, which keeps \
