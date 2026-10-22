@@ -1,8 +1,8 @@
 # `lean/` — Lean 4 reference model and specification
 
-**Status: second slice.** Types, the field-id hash, and subtyping — as both a relation
-and a decision procedure — with an executable that writes them out as conformance
-vectors, reads them back, and is checked against `candid` 0.10 in CI. "Slice" is a label for
+**Status: third slice.** Types, the field-id hash, subtyping — as both a relation and a
+decision procedure — and values with coercion, with an executable that writes them out
+as conformance vectors, reads them back, and is checked against `candid` 0.10 in CI. "Slice" is a label for
 what landed in a merge window, applied after the fact; the forward-looking plan is the
 coverage checklist below and the tiers in [REWRITE.md §3](../REWRITE.md#3-lean-honestly). Nothing is published and
 nothing carries a compatibility promise. See [REWRITE.md](../REWRITE.md) for why this
@@ -189,6 +189,68 @@ in the model. None was ever marked, and in a vector file that is the runner's bu
 not the vector's: the candid 0.10 runner keeps its own `KNOWN` list, with the same rule
 that a listed divergence that starts agreeing is a failure.
 
+## What slice 3 established
+
+**Coercion, through all three steps at once.** [Candid/Value.lean](Candid/Value.lean)
+has values and what it means for one to have a type, and
+[Candid/Coerce.lean](Candid/Coerce.lean) has `coerce`: the spec's `v : t ~> v' : t'` as
+a function, `none` where no rule applies. Vectors of a new kind carry a value, the type
+it has, the type it is coerced at, and the result or `"reject"`. The 0.10 runner checks them by encoding the value at its type and
+decoding the bytes at the other, since 0.10 coerces only by decoding.
+
+**The negative premises are the `none` branch.** Two of the spec's `opt` rules say
+"and else goes to `null`", `not (exists <w>. <v> : <t> ~> <w> : <t'>)`. Stated as a
+function, that premise is the failure case of the inner call, so the four rules are one
+case split on whether the inner coercion succeeded. Nothing about them needed the
+elimination subtyping did.
+
+**Coercion has three outcomes, and the spec had to be fixed to say so.** Coercing a
+value whose type does not accept `null` at an `opt` type asks the same question one
+`opt` deeper, about the same value. At an *infinite option*, `type R = opt R`, that is
+the question being asked, and "else goes to `null`" made it depend on its own negation:
+`5 : nat ~> w : R` held exactly when it did not. The model first answered `null`, and
+0.10 disagreed: it unwraps the expected type until its recursion limit, an error its
+`opt` rule does not recover from, and rejects the message — under an enclosing `opt`,
+in a record field and in a vector element too. Looking for which was right turned up
+`test/construct.test.did`, which has asserted the rejection since #679, with Motoko
+running the same suite. Only the spec had not been updated, and #778 updated it: the
+coercion is *undefined*, which is not the same as failing, so nothing recovers from it.
+
+`coerce` therefore returns one of three outcomes: a value; a failure, which the `opt`
+rules turn into `null`; or `Undefined`, which they pass on. It is an
+`OptionT (Except Undefined)`, so `<|>` is exactly the `opt` rules' recovery. The
+generated vectors include types that hold an infinite option in a record field, a
+vector element and a variant tag, and the two-entry cycle, and all of them agree with
+0.10.
+
+That same step is the only one where the value does not get smaller, so it is also
+where termination needed thought. The model peels the expected type's whole chain of
+`opt`s at once (`optLayers`) and coerces at what is under it; a chain that does not end
+is an infinite option.
+
+**The runner found a bug in the model.** The first run disagreed on every coercion to
+`opt reserved`: the model said `null`, 0.10 said `opt null`. 0.10 was right —
+`5 : nat ~> null : reserved`, so the option around it is not empty. Once the chain of
+`opt`s was peeled, the case for `reserved` was no longer reached. Every hand-written
+vector had agreed with the model, and so had the three properties below; it took a
+second implementation to see it.
+
+**Three of the spec's properties hold over the generated universe** — roundtripping
+(`v : t ~> v : t`), well-typedness (the result has the target type), and soundness
+(`t <: t'` means no `v : t` fails to coerce; the spec's exception is the undefined
+coercion at an infinite option). `lake exe oracle` checks each for every sample
+value against every type and fails on a counterexample. That is a test, not a proof;
+see "Deferred, deliberately".
+
+**What a value is.** Numbers carry their width (`5 : nat8` and `5 : nat` are different
+values), which the spec's textual syntax leaves to context; a runner can then build a
+value without its type. Floats are their IEEE 754 bits, since coercion is the identity
+on them and bits keep what a `Float` would make unequal or lose: a NaN's payload and the
+sign of a zero. `null` is one value, as in the spec, where Rust's `IDLValue` has
+`Null`, `None` and `Reserved`. A record value lists its fields in ascending id order,
+the wire format's order, so roundtripping holds as equality rather than up to
+reordering.
+
 ## Constraints
 
 - **No mathlib.** We do not need it, and depending on it would dominate build
@@ -206,13 +268,14 @@ The Coq model covers nine type constructors and no binary format. This model mus
 cover what actually breaks in production:
 
 - [x] Primitive types — the constructors, including the numeric tower's *lack* of
-      width subtyping. Float edge cases belong to `Value`, which does not exist yet.
+      width subtyping. A float value is its bits, and coercion is the identity on it,
+      so float edge cases belong to the textual value syntax.
 - [x] Records, variants, vectors, text — as types
 - [x] Recursive types and the type-table graph
 - [x] Well-formedness of types — references resolve, labels do not repeat, a `oneway`
       function has no results, and a method type denotes a function
 - [x] Subtyping, as a relation with a derived decision procedure
-- [ ] Coercion, including the `opt` backtracking rule
+- [x] Values, and coercion, including the `opt` backtracking rule
 - [ ] Binary wire format: type table, memory section, LEB128/SLEB128
 - [ ] Cost model / resource exhaustion
 - [ ] Textual value syntax
@@ -228,6 +291,11 @@ Named here so they are obligations rather than oversights.
   run, the invariant is about the whole worklist: when it empties, the assumed pairs
   are a set closed under the rules. There is no budget premise to discharge: the procedure
   returns `Bool` and is total.
+- **Coercion's properties as theorems.** Roundtripping, well-typedness, and soundness
+  against `Subty` are checked by the executable over the generated universe (see
+  "What slice 3 established"); the theorems are about every value, and soundness is
+  the one MiniCandid proves as `coerce_well_defined`. Stated in prose in
+  [Candid/Coerce.lean](Candid/Coerce.lean)'s header, not as `sorry`s.
 - **Membership is a scan.** `seen` and `seenRev` are lists, so `contains` walks every
   pair recorded so far, and a table of *n* entries in one long cycle costs O(n²):
   measured 234 ms at 10,000 entries and 6.3 s at 50,000. `run` is tail-recursive, so

@@ -11,5 +11,5 @@ description = "Runs the conformance vectors against candid 0.10"
 [workspace]
 
 [dependencies]
-candid = { path = "../../../rust/candid" }
+candid = { path = "../../../rust/candid", features = ["value"] }
 serde_json = "1.0"

@@ -445,10 +445,204 @@ def transitivityChecks : List Vector :=
   , expectSub b c true "transitivity: b <: c"
   , expectSub a c true "transitivity: therefore a <: c" ]
 
+/-! ## Coercion
+
+`v : t ~> v' : t'`, from `spec/Candid.md`, "Coercion". Each expectation was worked
+out from the spec's rules by hand; "reject" means no rule applies, so a decoder must
+fail. -/
+
+def expectCoerce (v : Value) (a b : Fixture) (want : Option Value) (id : String) : Vector :=
+  ⟨id, .coerce v a b want⟩
+
+/-- A record value from named fields, in canonical (ascending id) order. -/
+def recordVal (fs : List (String × Value)) : Value :=
+  .record (sortFields (fs.map fun (n, v) => (hashFieldName n, v)))
+
+def variantVal (n : String) (v : Value) : Value := .variant (hashFieldName n) v
+
+/-- `opt t`, for a type that is itself a single entry or a primitive. -/
+def optOf (t : Slot) : Fixture := entry (.opt t)
+
+/-- `opt opt nat`. -/
+def optOptNat : Fixture := close do
+  let o ← intern (.opt nat)
+  intern (.opt o)
+
+/-- `type R = opt R`. -/
+def optCycle : Fixture := { table := { entries := #[.opt (.ref 0)] }, root := .ref 0 }
+
+/-- `type A = opt B; type B = opt A`. -/
+def optCycle2 : Fixture :=
+  { table := { entries := #[.opt (.ref 1), .opt (.ref 0)] }, root := .ref 0 }
+
+/-- `R`, entry `0`, with `c` built over it as the root. -/
+def overOptCycle (c : Composite) : Fixture :=
+  { table := { entries := #[.opt (.ref 0), c] }, root := .ref 1 }
+
+/-- `vec opt nat`. -/
+def vecOptNat : Fixture := close do
+  let o ← intern (.opt nat)
+  intern (.vec o)
+
+/-- `record { a : nat; c : <t> }`, with `t` given as a construction. -/
+def recordAC (c : TableM Slot) : Fixture := close do
+  let t ← c
+  intern (recordOf [("a", nat), ("c", t)])
+
+/-- `opt variant { a : nat }`. -/
+def optVariantA : Fixture := optVariant [("a", nat)]
+
+def someService : PrincipalBytes := [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01]
+
+def coercePrimChecks : List Vector :=
+  [ expectCoerce (.nat 5) (atom .nat) (atom .nat) (some (.nat 5)) "5 : nat ~> 5 : nat"
+  , expectCoerce (.nat 5) (atom .nat) (atom .int) (some (.int 5)) "5 : nat ~> 5 : int"
+  , expectCoerce (.int (-5)) (atom .int) (atom .nat) none "-5 : int ~> reject : nat"
+  , expectCoerce (.nat8 5) (atom .nat8) (atom .nat) none
+      "5 : nat8 ~> reject : nat (no width subtyping)"
+  , expectCoerce (.nat16 300) (atom .nat16) (atom .nat16) (some (.nat16 300))
+      "300 : nat16 ~> 300 : nat16"
+  , expectCoerce (.text "x") (atom .text) (atom .reserved) (some .null)
+      "\"x\" : text ~> null : reserved"
+  , expectCoerce (.float64 0x7ff8000000000001) (atom .float64) (atom .float64)
+      (some (.float64 0x7ff8000000000001)) "NaN with a payload : float64 ~> itself"
+  , expectCoerce (.float32 0x80000000) (atom .float32) (atom .float32)
+      (some (.float32 0x80000000)) "-0.0 : float32 ~> -0.0 : float32"
+  , expectCoerce (.float32 0x3f800000) (atom .float32) (atom .float64) none
+      "1.0 : float32 ~> reject : float64"
+  , expectCoerce (.service someService) (entry (.service [])) (atom .principal)
+      (some (.principal someService)) "service : service {} ~> principal"
+  , expectCoerce (.principal someService) (atom .principal) (atom .principal)
+      (some (.principal someService)) "principal ~> principal" ]
+
+def coerceOptChecks : List Vector :=
+  [ expectCoerce .null (atom .null) (optOf nat) (some .null) "null : null ~> null : opt nat"
+  , expectCoerce .null (atom .reserved) (optOf nat) (some .null)
+      "null : reserved ~> null : opt nat"
+  , expectCoerce .null (optOf nat) (optOf text) (some .null)
+      "null : opt nat ~> null : opt text"
+  , expectCoerce (.opt (.nat 5)) (optOf nat) (optOf int) (some (.opt (.int 5)))
+      "opt 5 : opt nat ~> opt 5 : opt int"
+  , expectCoerce (.opt (.text "x")) (optOf text) (optOf nat) (some .null)
+      "opt \"x\" : opt text ~> null : opt nat (inner coercion fails)"
+  , expectCoerce (.nat 5) (atom .nat) (optOf nat) (some (.opt (.nat 5)))
+      "5 : nat ~> opt 5 : opt nat"
+  , expectCoerce (.text "x") (atom .text) (optOf nat) (some .null)
+      "\"x\" : text ~> null : opt nat"
+  , expectCoerce (.nat 5) (atom .nat) optOptNat (some (.opt (.opt (.nat 5))))
+      "5 : nat ~> opt opt 5 : opt opt nat"
+  , expectCoerce (.text "x") (atom .text) optOptNat (some (.opt .null))
+      "\"x\" : text ~> opt null : opt opt nat (only the innermost option is null)"
+  , expectCoerce (.opt (.nat 5)) (optOf nat) optOptNat (some (.opt (.opt (.nat 5))))
+      "opt 5 : opt nat ~> opt opt 5 : opt opt nat"
+  , expectCoerce (.opt (.nat 5)) (optOf nat) (atom .nat) none "opt 5 : opt nat ~> reject : nat"
+    -- `5 : nat ~> null : reserved`, so the option around it is not `null`. The model
+    -- had this wrong until the candid 0.10 runner disagreed with it.
+  , expectCoerce (.nat 5) (atom .nat) (optOf reserved) (some (.opt .null))
+      "5 : nat ~> opt null : opt reserved"
+  , expectCoerce (.opt (.nat 5)) (optOf nat) (optOf reserved) (some (.opt .null))
+      "opt 5 : opt nat ~> opt null : opt reserved"
+  ]
+
+/-! ## Coercion at an infinite option
+
+`spec/Candid.md`, "Coercion" > "Options": coercing a value whose type does not accept
+`null` at an infinite option is undefined, which is not the same as failing, so nothing
+encloses it into `null`, and the message is rejected. A value whose type accepts `null`
+coerces as usual. These mirror the assertions in `test/construct.test.did`. -/
+
+def coerceInfiniteOptChecks : List Vector :=
+  [ expectCoerce (.nat 5) (atom .nat) optCycle none
+      "5 : nat ~> reject : R where R = opt R (undefined)"
+  , expectCoerce (.bool true) (atom .bool) optCycle2 none
+      "true : bool ~> reject : A where A = opt B, B = opt A (undefined)"
+  , expectCoerce (.opt (.bool true)) (optOf bool) optCycle none
+      "opt true : opt bool ~> reject : R (undefined, so not null)"
+  , expectCoerce (.record [(0, .bool true)]) (entry (.record [(0, bool)]))
+      (overOptCycle (.record [(0, .ref 0)])) none
+      "record {true} ~> reject : record {R} (a field at R fails the record)"
+  , expectCoerce (.vec [.bool true]) (entry (.vec bool)) (overOptCycle (.vec (.ref 0))) none
+      "vec {true} ~> reject : vec R (an element at R fails the vector)"
+  , expectCoerce (.vec []) (entry (.vec bool)) (overOptCycle (.vec (.ref 0))) (some (.vec []))
+      "vec {} : vec bool ~> vec {} : vec R (nothing to coerce)"
+  , expectCoerce (.opt .null) optCycle optCycle (some (.opt .null))
+      "opt null : R ~> opt null : R (its contents accept null)"
+  , expectCoerce .null (atom .null) optCycle (some .null)
+      "null : null ~> null : R" ]
+
+def coerceVecChecks : List Vector :=
+  [ expectCoerce (.vec [.nat 1, .nat 2]) (entry (.vec nat)) (entry (.vec int))
+      (some (.vec [.int 1, .int 2])) "vec {1; 2} : vec nat ~> vec {1; 2} : vec int"
+  , expectCoerce (.vec [.int 1, .int (-1)]) (entry (.vec int)) (entry (.vec nat)) none
+      "vec {1; -1} : vec int ~> reject : vec nat"
+  , expectCoerce (.vec [.text "a"]) (entry (.vec text)) vecOptNat (some (.vec [.null]))
+      "vec {\"a\"} : vec text ~> vec {null} : vec opt nat"
+    -- Pointwise, with no premise on the types: an empty vector coerces whatever its
+    -- element types, although `vec nat !<: vec text`.
+  , expectCoerce (.vec []) (entry (.vec nat)) (entry (.vec text)) (some (.vec []))
+      "vec {} : vec nat ~> vec {} : vec text (no premise on the element types)" ]
+
+def coerceRecordChecks : List Vector :=
+  [ expectCoerce (recordVal [("a", .nat 1), ("b", .text "x")])
+      (entry (recordOf [("a", nat), ("b", text)])) (entry (recordOf [("a", int)]))
+      (some (recordVal [("a", .int 1)]))
+      "record {a = 1; b = \"x\"} ~> record {a = 1} : record {a : int} (field ignored)"
+  , expectCoerce (recordVal [("a", .nat 1)]) (entry (recordOf [("a", nat)]))
+      (recordAC (intern (.opt nat))) (some (recordVal [("a", .nat 1), ("c", .null)]))
+      "record {a = 1} ~> record {a = 1; c = null} : record {a : nat; c : opt nat}"
+  , expectCoerce (recordVal [("a", .nat 1)]) (entry (recordOf [("a", nat)]))
+      (recordAC (pure reserved)) (some (recordVal [("a", .nat 1), ("c", .null)]))
+      "record {a = 1} ~> record {a = 1; c = null} : record {a : nat; c : reserved}"
+  , expectCoerce (recordVal [("a", .nat 1)]) (entry (recordOf [("a", nat)]))
+      (recordAC (pure nat)) none
+      "record {a = 1} ~> reject : record {a : nat; c : nat} (missing field rejects null)"
+  , expectCoerce (recordVal [("a", .int (-1))]) (entry (recordOf [("a", int)]))
+      (entry (recordOf [("a", nat)])) none
+      "record {a = -1} : record {a : int} ~> reject : record {a : nat}"
+  , expectCoerce (recordVal [("a", .text "x")]) (entry (recordOf [("a", text)]))
+      (close do let o ← intern (.opt nat); intern (recordOf [("a", o)]))
+      (some (recordVal [("a", .null)]))
+      "record {a = \"x\"} ~> record {a = null} : record {a : opt nat}"
+    -- A type lists its fields in no particular order; the value lists them by id.
+  , expectCoerce (recordVal [("a", .nat 1), ("b", .nat 2)])
+      (entry (recordOf [("b", nat), ("a", nat)])) (entry (recordOf [("b", nat), ("a", nat)]))
+      (some (recordVal [("a", .nat 1), ("b", .nat 2)]))
+      "record {a = 1; b = 2} ~> itself, at a type listing b before a" ]
+
+def coerceVariantChecks : List Vector :=
+  [ expectCoerce (variantVal "a" (.nat 1)) (entry (variantOf [("a", nat), ("b", text)]))
+      (entry (variantOf [("a", int)])) (some (variantVal "a" (.int 1)))
+      "variant {a = 1} : variant {a : nat; b : text} ~> variant {a = 1} : variant {a : int}"
+  , expectCoerce (variantVal "b" (.text "x")) (entry (variantOf [("a", nat), ("b", text)]))
+      (entry (variantOf [("a", nat)])) none
+      "variant {b = \"x\"} ~> reject : variant {a : nat} (unexpected tag)"
+  , expectCoerce (variantVal "b" (.text "x")) (entry (variantOf [("a", nat), ("b", text)]))
+      optVariantA (some .null)
+      "variant {b = \"x\"} ~> null : opt variant {a : nat} (unexpected tag behind opt)" ]
+
+def coerceRefChecks : List Vector :=
+  let f := Value.func someService "m"
+  [ expectCoerce f (entry (.func [int] [nat] [])) (entry (.func [nat] [int] [])) (some f)
+      "func reference : func (int) -> (nat) ~> func (nat) -> (int)"
+  , expectCoerce f (entry (.func [nat] [] [])) (entry (.func [text] [] [])) none
+      "func reference : func (nat) -> () ~> reject : func (text) -> ()"
+  , expectCoerce f (entry (.func [nat] [] [])) (close do
+        let g ← intern (.func [text] [] [])
+        intern (.opt g)) (some .null)
+      "func reference : func (nat) -> () ~> null : opt func (text) -> ()"
+  , expectCoerce (.service someService) (serviceOf [("m", .func [] [] [])]) (serviceOf [])
+      (some (.service someService)) "service reference : service {m} ~> service {}"
+  , expectCoerce (.service someService) (serviceOf []) (serviceOf [("m", .func [] [] [])])
+      none "service reference : service {} ~> reject : service {m}" ]
+
+def coerceChecks : List Vector :=
+  coercePrimChecks ++ coerceOptChecks ++ coerceVecChecks ++ coerceRecordChecks ++
+  coerceVariantChecks ++ coerceRefChecks ++ coerceInfiniteOptChecks
+
 def handwritten : List Vector :=
   hashChecks ++ primChecks ++ optChecks ++ vecChecks ++ recordChecks ++
   variantChecks ++ funcChecks ++ serviceChecks ++ wellFormedChecks ++
   recursiveChecks ++ vecOmegaChecks ++ contraChecks ++ sharedChecks ++ leakChecks ++
-  transitivityChecks
+  transitivityChecks ++ coerceChecks
 
 end Oracle
