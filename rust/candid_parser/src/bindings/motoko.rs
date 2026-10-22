@@ -7,6 +7,7 @@ use candid::pretty::utils::*;
 use candid::types::{Field, FuncMode, Function, Label, SharedLabel, Type, TypeInner};
 use candid::TypeEnv;
 use pretty::RcDoc;
+use std::collections::{HashMap, HashSet};
 
 // The definition of tuple is language specific.
 fn is_tuple(t: &Type) -> bool {
@@ -78,47 +79,104 @@ static KEYWORDS: [&str; 48] = [
     "while",
     "with",
 ];
-fn escape(id: &str, is_method: bool) -> RcDoc<'_> {
-    if KEYWORDS.contains(&id) {
-        str(id).append("_")
+
+fn escape_str(id: &str) -> String {
+    if KEYWORDS.contains(&id) || (is_valid_as_id(id) && id.ends_with('_')) {
+        format!("{id}_")
     } else if is_valid_as_id(id) {
-        if id.ends_with('_') {
-            str(id).append("_")
-        } else {
-            str(id)
-        }
-    } else if !is_method {
-        str("_")
-            .append(candid::idl_hash(id).to_string())
-            .append("_")
+        id.to_string()
     } else {
+        format!("_{}_", candid::idl_hash(id))
+    }
+}
+
+fn escape(id: &str, is_method: bool) -> RcDoc<'_> {
+    if is_method && !KEYWORDS.contains(&id) && !is_valid_as_id(id) {
         panic!("Candid method {id} is not a valid Motoko id");
     }
+    RcDoc::text(escape_str(id))
 }
 
-fn pp_ty_rich<'a>(ty: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
+// Strips underscores and capitalises each segment start. Returns None for
+// names not starting with lowercase (left as-is). Trailing '_' is consumed.
+fn to_pascal_case(s: &str) -> Option<String> {
+    if !s.starts_with(|c: char| c.is_ascii_lowercase()) {
+        return None;
+    }
+    let mut out = String::with_capacity(s.len());
+    let mut capitalize = true;
+    for c in s.chars() {
+        if c == '_' {
+            capitalize = true;
+        } else if capitalize {
+            out.extend(c.to_uppercase());
+            capitalize = false;
+        } else {
+            out.push(c);
+        }
+    }
+    Some(out)
+}
+
+// Precomputes display names for all env type aliases.
+fn build_names(env: &TypeEnv) -> HashMap<String, String> {
+    // Baseline: every id gets its escaped original name (collision-free).
+    let mut names: HashMap<String, String> = env
+        .0
+        .keys()
+        .map(|id| {
+            let f = escape_str(id);
+            // escape_str doesn't reserve "Self".
+            (id.clone(), if f == "Self" { format!("{f}_") } else { f })
+        })
+        .collect();
+
+    // Upgrade to PascalCase where the name is unclaimed (first alphabetically wins).
+    let mut taken: HashSet<String> = names.values().cloned().collect();
+    for id in env.0.keys() {
+        if let Some(pascal) = to_pascal_case(id) {
+            if pascal != "Self" && !taken.contains(&pascal) {
+                let display = names.get_mut(id).unwrap();
+                taken.remove(display.as_str());
+                taken.insert(pascal.clone());
+                *display = pascal;
+            }
+        }
+    }
+    names
+}
+
+#[derive(Copy, Clone)]
+struct BindingCtx<'a> {
+    env: &'a TypeEnv,
+    names: &'a HashMap<String, String>,
+}
+
+fn pp_ty_rich<'a>(ctx: BindingCtx<'a>, ty: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
     match (ty.as_ref(), syntax) {
         (TypeInner::Service(ref meths), Some(IDLType::ServT(methods))) => {
-            pp_service(meths, Some(methods))
+            pp_service(ctx, meths, Some(methods))
         }
         (TypeInner::Class(ref args, t), Some(IDLType::ClassT(_, syntax_t))) => {
-            pp_class((args, t), Some(syntax_t))
+            pp_class(ctx, (args, t), Some(syntax_t))
         }
         (TypeInner::Record(ref fields), Some(IDLType::RecordT(syntax_fields))) => {
-            pp_record(fields, Some(syntax_fields))
+            pp_record(ctx, fields, Some(syntax_fields))
         }
         (TypeInner::Variant(ref fields), Some(IDLType::VariantT(syntax_fields))) => {
-            pp_variant(fields, Some(syntax_fields))
+            pp_variant(ctx, fields, Some(syntax_fields))
         }
         (TypeInner::Opt(ref inner), Some(IDLType::OptT(syntax))) => {
-            str("?").append(pp_ty_rich(inner, Some(syntax)))
+            str("?").append(pp_ty_rich(ctx, inner, Some(syntax)))
         }
-        (TypeInner::Vec(ref inner), Some(IDLType::VecT(syntax))) => pp_vec(inner, Some(syntax)),
-        (_, _) => pp_ty(ty),
+        (TypeInner::Vec(ref inner), Some(IDLType::VecT(syntax))) => {
+            pp_vec(ctx, inner, Some(syntax))
+        }
+        (_, _) => pp_ty(ctx, ty),
     }
 }
 
-fn pp_ty(ty: &Type) -> RcDoc<'_> {
+fn pp_ty<'a>(ctx: BindingCtx<'a>, ty: &'a Type) -> RcDoc<'a> {
     use TypeInner::*;
     match ty.as_ref() {
         Null => str("Null"),
@@ -138,15 +196,15 @@ fn pp_ty(ty: &Type) -> RcDoc<'_> {
         Text => str("Text"),
         Reserved => str("Any"),
         Empty => str("None"),
-        Var(ref s) => escape(s, false),
+        Var(ref s) => RcDoc::text(ctx.names.get(s).cloned().unwrap_or_else(|| escape_str(s))),
         Principal => str("Principal"),
-        Opt(ref t) => str("?").append(pp_ty(t)),
-        Vec(ref t) => pp_vec(t, None),
-        Record(ref fs) => pp_record(fs, None),
-        Variant(ref fs) => pp_variant(fs, None),
-        Func(ref func) => pp_function(func),
-        Service(ref serv) => pp_service(serv, None),
-        Class(ref args, ref t) => pp_class((args, t), None),
+        Opt(ref t) => str("?").append(pp_ty(ctx, t)),
+        Vec(ref t) => pp_vec(ctx, t, None),
+        Record(ref fs) => pp_record(ctx, fs, None),
+        Variant(ref fs) => pp_variant(ctx, fs, None),
+        Func(ref func) => pp_function(ctx, func),
+        Service(ref serv) => pp_service(ctx, serv, None),
+        Class(ref args, ref t) => pp_class(ctx, (args, t), None),
         Knot(_) | Unknown | Future => unreachable!(),
     }
 }
@@ -161,9 +219,9 @@ fn pp_label(id: &SharedLabel) -> RcDoc<'_> {
     }
 }
 
-fn pp_function(func: &Function) -> RcDoc<'_> {
-    let args = pp_args(&func.args);
-    let rets = pp_rets(&func.rets);
+fn pp_function<'a>(ctx: BindingCtx<'a>, func: &'a Function) -> RcDoc<'a> {
+    let args = pp_args(ctx, &func.args);
+    let rets = pp_rets(ctx, &func.rets);
     match func.modes.as_slice() {
         [FuncMode::Oneway] => kwd("shared").append(args).append(" -> ").append("()"),
         [FuncMode::Query] => kwd("shared query")
@@ -185,27 +243,32 @@ fn pp_function(func: &Function) -> RcDoc<'_> {
     }
     .nest(INDENT_SPACE)
 }
-fn pp_args(args: &[Type]) -> RcDoc<'_> {
+
+fn pp_args<'a>(ctx: BindingCtx<'a>, args: &'a [Type]) -> RcDoc<'a> {
     match args {
         [ty] => {
             if is_tuple(ty) {
-                enclose("(", pp_ty(ty), ")")
+                enclose("(", pp_ty(ctx, ty), ")")
             } else {
-                pp_ty(ty)
+                pp_ty(ctx, ty)
             }
         }
         _ => {
-            let doc = concat(args.iter().map(pp_ty), ",");
+            let doc = concat(args.iter().map(|ty| pp_ty(ctx, ty)), ",");
             enclose("(", doc, ")")
         }
     }
 }
 
-fn pp_rets(args: &[Type]) -> RcDoc<'_> {
-    pp_args(args)
+fn pp_rets<'a>(ctx: BindingCtx<'a>, args: &'a [Type]) -> RcDoc<'a> {
+    pp_args(ctx, args)
 }
 
-fn pp_service<'a>(serv: &'a [(String, Type)], syntax: Option<&'a [syntax::Binding]>) -> RcDoc<'a> {
+fn pp_service<'a>(
+    ctx: BindingCtx<'a>,
+    serv: &'a [(String, Type)],
+    syntax: Option<&'a [syntax::Binding]>,
+) -> RcDoc<'a> {
     let methods = serv.iter().map(|(id, func)| {
         let mut docs = RcDoc::nil();
         let mut syntax_field_ty = None;
@@ -217,21 +280,21 @@ fn pp_service<'a>(serv: &'a [(String, Type)], syntax: Option<&'a [syntax::Bindin
         }
         docs.append(escape(id, true))
             .append(" : ")
-            .append(pp_ty_rich(func, syntax_field_ty))
+            .append(pp_ty_rich(ctx, func, syntax_field_ty))
     });
     kwd("actor").append(enclose_space("{", concat(methods, ";"), "}"))
 }
 
-fn pp_tuple<'a>(fields: &'a [Field]) -> RcDoc<'a> {
-    let tuple = concat(fields.iter().map(|f| pp_ty(&f.ty)), ",");
+fn pp_tuple<'a>(ctx: BindingCtx<'a>, fields: &'a [Field]) -> RcDoc<'a> {
+    let tuple = concat(fields.iter().map(|f| pp_ty(ctx, &f.ty)), ",");
     enclose("(", tuple, ")")
 }
 
-fn pp_vec<'a>(inner: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
+fn pp_vec<'a>(ctx: BindingCtx<'a>, inner: &'a Type, syntax: Option<&'a IDLType>) -> RcDoc<'a> {
     if matches!(inner.as_ref(), TypeInner::Nat8) {
         str("Blob")
     } else {
-        enclose("[", pp_ty_rich(inner, syntax), "]")
+        enclose("[", pp_ty_rich(ctx, inner, syntax), "]")
     }
 }
 
@@ -250,20 +313,28 @@ fn find_field<'a>(
     (docs, syntax_field_ty)
 }
 
-fn pp_record<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) -> RcDoc<'a> {
+fn pp_record<'a>(
+    ctx: BindingCtx<'a>,
+    fields: &'a [Field],
+    syntax: Option<&'a [syntax::TypeField]>,
+) -> RcDoc<'a> {
     if is_tuple_fields(fields) {
-        return pp_tuple(fields);
+        return pp_tuple(ctx, fields);
     }
     let fields = fields.iter().map(|field| {
         let (docs, syntax_field) = find_field(syntax, &field.id);
         docs.append(pp_label(&field.id))
             .append(" : ")
-            .append(pp_ty_rich(&field.ty, syntax_field))
+            .append(pp_ty_rich(ctx, &field.ty, syntax_field))
     });
     enclose_space("{", concat(fields, ";"), "}")
 }
 
-fn pp_variant<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) -> RcDoc<'a> {
+fn pp_variant<'a>(
+    ctx: BindingCtx<'a>,
+    fields: &'a [Field],
+    syntax: Option<&'a [syntax::TypeField]>,
+) -> RcDoc<'a> {
     if fields.is_empty() {
         return str("{#}");
     }
@@ -272,7 +343,7 @@ fn pp_variant<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) 
         let doc = docs.append(str("#")).append(pp_label(&field.id));
         if *field.ty != TypeInner::Null {
             doc.append(" : ")
-                .append(pp_ty_rich(&field.ty, syntax_field))
+                .append(pp_ty_rich(ctx, &field.ty, syntax_field))
         } else {
             doc
         }
@@ -280,11 +351,15 @@ fn pp_variant<'a>(fields: &'a [Field], syntax: Option<&'a [syntax::TypeField]>) 
     enclose_space("{", concat(fields, ";"), "}")
 }
 
-fn pp_class<'a>((args, ty): (&'a [Type], &'a Type), syntax: Option<&'a IDLType>) -> RcDoc<'a> {
-    let doc = pp_args(args).append(" -> async ");
+fn pp_class<'a>(
+    ctx: BindingCtx<'a>,
+    (args, ty): (&'a [Type], &'a Type),
+    syntax: Option<&'a IDLType>,
+) -> RcDoc<'a> {
+    let doc = pp_args(ctx, args).append(" -> async ");
     match ty.as_ref() {
-        TypeInner::Service(_) => doc.append(pp_ty_rich(ty, syntax)),
-        TypeInner::Var(_) => doc.append(pp_ty(ty)),
+        TypeInner::Service(_) => doc.append(pp_ty_rich(ctx, ty, syntax)),
+        TypeInner::Var(_) => doc.append(pp_ty(ctx, ty)),
         _ => unreachable!(),
     }
 }
@@ -293,21 +368,22 @@ fn pp_docs<'a>(docs: &'a [String]) -> RcDoc<'a> {
     lines(docs.iter().map(|line| RcDoc::text("/// ").append(line)))
 }
 
-fn pp_defs<'a>(env: &'a TypeEnv, prog: &'a IDLMergedProg) -> RcDoc<'a> {
-    lines(env.0.iter().map(|(id, ty)| {
+fn pp_defs<'a>(ctx: BindingCtx<'a>, prog: &'a IDLMergedProg) -> RcDoc<'a> {
+    lines(ctx.env.0.iter().map(|(id, ty)| {
         let syntax = prog.lookup(id);
         let docs = syntax
             .map(|b| pp_docs(b.docs.as_ref()))
             .unwrap_or(RcDoc::nil());
+        let name = ctx.names[id].clone();
         docs.append(kwd("public type"))
-            .append(escape(id, false))
+            .append(RcDoc::text(name))
             .append(" = ")
-            .append(pp_ty_rich(ty, syntax.map(|b| &b.typ)))
+            .append(pp_ty_rich(ctx, ty, syntax.map(|b| &b.typ)))
             .append(";")
     }))
 }
 
-fn pp_actor<'a>(ty: &'a Type, syntax: Option<&'a IDLActorType>) -> RcDoc<'a> {
+fn pp_actor<'a>(ctx: BindingCtx<'a>, ty: &'a Type, syntax: Option<&'a IDLActorType>) -> RcDoc<'a> {
     let self_doc = kwd("public type Self =");
     match ty.as_ref() {
         TypeInner::Service(ref serv) => match syntax {
@@ -316,9 +392,10 @@ fn pp_actor<'a>(ty: &'a Type, syntax: Option<&'a IDLActorType>) -> RcDoc<'a> {
                 docs,
             }) => {
                 let docs = pp_docs(docs);
-                docs.append(self_doc).append(pp_service(serv, Some(fields)))
+                docs.append(self_doc)
+                    .append(pp_service(ctx, serv, Some(fields)))
             }
-            _ => pp_service(serv, None),
+            _ => pp_service(ctx, serv, None),
         },
         TypeInner::Class(ref args, ref t) => match syntax {
             Some(IDLActorType {
@@ -327,33 +404,45 @@ fn pp_actor<'a>(ty: &'a Type, syntax: Option<&'a IDLActorType>) -> RcDoc<'a> {
             }) => {
                 let docs = pp_docs(docs);
                 docs.append(self_doc)
-                    .append(pp_class((args, t), Some(syntax_t)))
+                    .append(pp_class(ctx, (args, t), Some(syntax_t)))
             }
-            _ => self_doc.append(pp_class((args, t), None)),
+            _ => self_doc.append(pp_class(ctx, (args, t), None)),
         },
-        TypeInner::Var(_) => self_doc.append(pp_ty(ty)),
+        TypeInner::Var(_) => self_doc.append(pp_ty(ctx, ty)),
         _ => unreachable!(),
     }
 }
 
-pub fn compile(env: &TypeEnv, actor: &Option<Type>, prog: &IDLMergedProg) -> String {
+// Separate from `compile` so that `names` and `syntax_actor` (locals in
+// `compile`) are provably live for the entire lifetime of the RcDoc they feed.
+fn compile_inner<'a>(
+    ctx: BindingCtx<'a>,
+    actor: &'a Option<Type>,
+    syntax_actor: Option<&'a IDLActorType>,
+    prog: &'a IDLMergedProg,
+) -> String {
     let header = r#"// This is a generated Motoko binding.
 // Please use `import service "ic:canister_id"` instead to call canisters on the IC if possible.
 "#;
-    let syntax_actor = prog.resolve_actor().ok().flatten();
     let doc = match actor {
-        None => pp_defs(env, prog),
-        Some(actor) => {
-            let defs = pp_defs(env, prog);
-            let actor = pp_actor(actor, syntax_actor.as_ref());
-            defs.append(actor)
-        }
+        None => pp_defs(ctx, prog),
+        Some(actor) => pp_defs(ctx, prog).append(pp_actor(ctx, actor, syntax_actor)),
     };
-    let doc = RcDoc::text(header)
+    RcDoc::text(header)
         .append(RcDoc::line())
         .append("module ")
         .append(enclose_space("{", doc, "}"))
         .pretty(LINE_WIDTH)
-        .to_string();
-    doc
+        .to_string()
+}
+
+pub fn compile(env: &TypeEnv, actor: &Option<Type>, prog: &IDLMergedProg) -> String {
+    let syntax_actor = prog.resolve_actor().ok().flatten();
+    let names = build_names(env);
+    compile_inner(
+        BindingCtx { env, names: &names },
+        actor,
+        syntax_actor.as_ref(),
+        prog,
+    )
 }

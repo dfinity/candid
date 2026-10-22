@@ -4,6 +4,6 @@
 module {
   /// line comment
   /// 
-  public type id = Nat8;
+  public type Id = Nat8;
 
 }
