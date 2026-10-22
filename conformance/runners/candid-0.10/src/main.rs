@@ -25,21 +25,12 @@ use std::collections::BTreeSet;
 use std::process::ExitCode;
 
 /// Vectors on which `candid` 0.10 is known to disagree with the model: `(id, why)`.
-const KNOWN: &[(&str, &str)] = &[
-    (
-        "annotations agree up to reordering",
-        "`subtype.rs` compares `Function::modes` as a `Vec`, so `query composite_query` \
+const KNOWN: &[(&str, &str)] = &[(
+    "annotations agree up to reordering",
+    "`subtype.rs` compares `Function::modes` as a `Vec`, so `query composite_query` \
          and `composite_query query` differ; the spec identifies annotation lists up to \
          reordering, and the `.did` grammar accepts `FuncMode*`",
-    ),
-    (
-        "record { X; X' } !<: record { opt Y; Y' } (assumption from a failed opt attempt)",
-        "candid 0.10 bug: the `opt` rule probes `t <: t'` with `subtype_`, and a failed \
-         probe removes from `gamma` only the pair that failed, keeping pairs proved \
-         under it. A later comparison is then answered from `gamma`. Reachable from \
-         `didc check`, which accepts a breaking upgrade this way",
-    ),
-];
+)];
 
 /// The vector format version this runner reads.
 const FORMAT_VERSION: u64 = 0;

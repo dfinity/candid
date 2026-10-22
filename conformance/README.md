@@ -134,7 +134,8 @@ What the runners have found, recorded so that they outlive the run that found th
   the result. On failure it removes only the failed pair from `gamma`, so pairs proved
   *under* that assumption stay, and a later comparison is answered from them.
   `didc check` accepts a breaking upgrade this way. Vector: `record { X; X' } !<:
-  record { opt Y; Y' } (...)`.
+  record { opt Y; Y' } (...)`. Fixed in `candid` 0.10.39 (#775), which withdraws every
+  assumption made since a failed step.
 - **`candid` 0.10 compares function annotations as a list.** The spec identifies them
   up to reordering; `query composite_query` and `composite_query query` are different
   types to 0.10. The `.did` grammar accepts both spellings.
