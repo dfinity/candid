@@ -26,7 +26,7 @@ async function main() {
         const reader = new FileReader();
         reader.addEventListener("load", () => {
           const encoded = reader.result as string;
-          const candid = encoded.substr(encoded.indexOf(",") + 1);
+          const candid = encoded.substring(encoded.indexOf(",") + 1);
           // update URL with Candid data and refresh
           window.history.pushState({}, "", window.location.search);
           window.history.pushState({ candid }, "", `?${params}`);
@@ -43,7 +43,7 @@ async function main() {
     const profiling = await getCycles(canisterId);
     actor = await fetchActor(canisterId);
     await renderAuth();
-    const names = await getNames(canisterId);
+    await getNames(canisterId);
     render(canisterId, actor, profiling);
     const app = document.getElementById("app");
     const progress = document.getElementById("progress");
