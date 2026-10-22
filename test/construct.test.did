@@ -6,6 +6,8 @@ Corresponding to spec version version 0.1.6
 
 // Type definitions
 type Opt = opt Opt;
+type OptA = opt OptB;
+type OptB = opt OptA;
 type Vec = vec Vec;
 type EmptyRecord = record { EmptyRecord };
 type OptRec = opt record { OptRec };
@@ -126,6 +128,12 @@ assert blob "DIDL\01\6e\00\01\00\00" == "(null)"  : (Opt) "opt: parsing null : O
 assert blob "DIDL\01\6e\00\01\00\01\00" == "(opt null)" : (Opt) "opt: parsing opt null : Opt";
 assert blob "DIDL\01\6e\00\01\00\01\01\00" == "(opt opt null)" : (Opt) "opt: parsing opt opt null : Opt";
 assert blob "DIDL\01\6e\00\01\00\01\01\01\00" == "(opt opt opt null)" : (Opt) "opt: parsing opt opt opt null : Opt";
+assert blob "DIDL\00\01\7e\01"                   !: (OptA) "opt: parsing (true : bool) at a mutually recursive \"fix opt\" fails";
+// Coercion at "fix opt" has no result, which is not the same as failing: an enclosing opt does not turn it into null
+assert blob "DIDL\01\6e\7e\01\00\01\01"          !: (Opt) "opt: parsing (opt true : opt bool) at \"fix opt\" fails, not null";
+assert blob "DIDL\01\6c\01\00\7e\01\00\01"         !: (record { Opt }) "opt: a record field at \"fix opt\" fails the record";
+assert blob "DIDL\01\6d\7e\01\00\01\01"          !: (vec Opt) "opt: a vector element at \"fix opt\" fails the vector";
+assert blob "DIDL\01\6d\7e\01\00\00" == "(vec {})" : (vec Opt) "opt: an empty vector at vec \"fix opt\" has nothing to coerce";
 assert blob "DIDL\01\6c\01\00\00\01\00"          !: (OptRec) "opt: parsing \"fix record\" at \"fix record opt\" fails";
 
 // special opt subtyping
