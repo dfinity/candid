@@ -135,8 +135,8 @@ true / false
 
 The hex is the principal's bytes, lowercase.
 
-Readers should reject unknown keys, kinds and names rather than skip them: once the
-suite is published, the version number is how the format changes.
+The reference reader rejects unknown keys, kinds and names rather than skip them: once
+the suite is published, the version number is how the format changes.
 
 ### Runners
 
@@ -145,18 +145,20 @@ it does not already know about. Known divergences are listed in the runner with 
 reason, and a listed one that starts agreeing is also a failure, so a fix cannot land
 without its entry being removed.
 
-A runner reads as strictly as the reference reader, and a vector it cannot read fails
-the run whatever the known list says: the list excuses an answer, never a broken
-question. That includes a `subtype` vector whose types are not well formed, which a
-runner checks before asking anything -- an implementation would answer it anyway, and
-an unresolved reference typically comes back as an error that reads as `!<:`.
+A runner is a bridge to one implementation, not a second reader. Whether a vector is
+valid -- its types well formed, its values of their types -- is the reference reader's
+to say: `lake exe oracle check` checks every file, and CI runs it on the same files the
+runners read. A runner translates each vector into its implementation's types and
+values and asks; a vector it cannot translate fails the run whatever the known list
+says, since the list excuses an answer, never a broken question.
 
 [runners/candid-0.10/](runners/candid-0.10/) checks `rust/candid` through its public
 API, using `OptReport::Silence`: the special `opt` rule is part of the relation. It
-reads `wellformed` vectors but does not ask them, since 0.10 has no function that
-checks a type table on its own. It asks a `coerce` vector by encoding the value at
-`from` and decoding the bytes at `to`, since 0.10 coerces only while decoding; a vector
-whose value is not of its type is rejected before that, as a malformed type is. Its own
+skips `wellformed` vectors, since 0.10 has no function that checks a type table on its
+own. It asks a `coerce` vector by encoding the value at `from` and decoding the bytes at
+`to`, since 0.10 coerces only while decoding, and compares the result with the expected
+value by encoding both at `to`. For values of that type, encoding is one-to-one, so this
+compares the values while leaving their representation in `IDLValue` to 0.10. Its own
 workspace, not a member of the root one.
 
 ### Findings
