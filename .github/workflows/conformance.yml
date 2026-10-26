@@ -48,8 +48,8 @@ jobs:
         run: cargo fmt --manifest-path "$MANIFEST" -- --check
       - name: lint
         run: cargo clippy --locked --all-targets --manifest-path "$MANIFEST" -- -D warnings
-      # The runner's own tests: that it rejects every malformed vector rather than
-      # reading it as an answer.
+      # The runner's own tests: that it asks each kind of vector, and that a vector it
+      # cannot translate is an error rather than an answer.
       - name: test
         run: cargo test --locked --manifest-path "$MANIFEST"
       # Exits nonzero on a disagreement not listed in the runner's `KNOWN`, or on a
