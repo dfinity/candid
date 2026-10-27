@@ -229,6 +229,19 @@ termination_by (sizeOf vs, 2)
 
 end
 
+/-- A whole argument sequence, `(<v>,*) : (<t>,*) ~> (<v'>,*) : (<t'>,*)`. The spec
+coerces it "with the same rules as tuple-like records" (`spec/Candid.md`, "Tuple
+types"), so this is the record rule over positions: an argument past the expected ones
+is ignored, and a missing one is `null` if its expected type accepts `null`. -/
+def coerceArgs (A B : TypeTable) : List Value → List Slot → List Slot → Coercion (List Value)
+  | _, _, [] => pure []
+  | v :: vs, t :: ts, u :: us => do
+    let w ← coerce A B v t u
+    return w :: (← coerceArgs A B vs ts us)
+  | _, _, u :: us => do
+    unless B.acceptsNull u do failure
+    return .null :: (← coerceArgs A B [] [] us)
+
 /-- What a decoder reports for one value: the coerced value, or `none` for a rejected
 message. With nothing enclosing it, a failed coercion and an undefined one both reject. -/
 def coerceResult (A B : TypeTable) (v : Value) (t u : Slot) : Option Value :=

@@ -26,7 +26,8 @@ def files : List (String × List Vector) :=
   [ ("handwritten.json", handwritten)
   , ("subtype-primitives.json", Generate.primitives)
   , ("subtype-small.json", Generate.smallTypes)
-  , ("coerce-small.json", Generate.coercions) ]
+  , ("coerce-small.json", Generate.coercions)
+  , ("decode-small.json", Generate.decodes) ]
 
 /-- Ids that occur more than once. -/
 def duplicateIds (vs : List Vector) : List String := Id.run do
@@ -64,7 +65,7 @@ def selfTest : IO UInt32 := do
   for id in duplicateIds all do
     IO.println s!"FAIL  duplicate vector id: {id}"
     problems := problems + 1
-  for p in Generate.propertyViolations do
+  for p in Generate.propertyViolations ++ Generate.wireViolations do
     IO.println s!"FAIL  {p}"
     problems := problems + 1
   for v in all do

@@ -27,12 +27,29 @@ use std::process::ExitCode;
 use std::str::FromStr;
 
 /// Vectors on which `candid` 0.10 is known to disagree with the model: `(id, why)`.
-const KNOWN: &[(&str, &str)] = &[(
-    "annotations agree up to reordering",
-    "`subtype.rs` compares `Function::modes` as a `Vec`, so `query composite_query` \
-     and `composite_query query` differ; the spec identifies annotation lists up to \
-     reordering, and the `.did` grammar accepts `FuncMode*`",
-)];
+const KNOWN: &[(&str, &str)] = &[
+    (
+        "annotations agree up to reordering",
+        "`subtype.rs` compares `Function::modes` as a `Vec`, so `query composite_query` \
+         and `composite_query query` differ; the spec identifies annotation lists up to \
+         reordering, and the `.did` grammar accepts `FuncMode*`",
+    ),
+    (
+        "decode: a function type with two annotations",
+        "`binary_parser.rs` asserts that a function type has at most one annotation; the \
+         spec's `T(func ...)` writes `T*(<funcann>*)`, any number",
+    ),
+    (
+        "decode: oneway function with a result",
+        "`binary_parser.rs` does not check a decoded function type, so it accepts a \
+         `oneway` function with results; the spec says that result list must be empty",
+    ),
+    (
+        "decode: a principal of 30 bytes",
+        "0.10 bounds a principal at 29 bytes, the Internet Computer's limit, in both its \
+         decoder and `Principal`; the spec bounds neither",
+    ),
+];
 
 /// The vector format version this runner reads.
 const FORMAT_VERSION: u64 = 0;
@@ -153,6 +170,7 @@ fn run(v: &Value) -> Result<Outcome> {
             }))
         }
         "coerce" => coerce(v),
+        "decode" => decode(v),
         k => Err(format!("unknown vector kind {k:?}")),
     }
 }
@@ -190,6 +208,48 @@ fn coerce(v: &Value) -> Result<Outcome> {
                 .map_err(|e| format!("cannot encode the expected value: {e}"))?;
             let same = encode(g.clone(), &b_env, &b).is_ok_and(|got| got == want);
             agreement(same, || format!("got {g}, want {w}"))
+        }
+    })
+}
+
+/// Decode the bytes at the vector's types, as a receiver would. The decoded values are
+/// compared with the expected ones by encoding both at those types, as for `coerce`.
+fn decode(v: &Value) -> Result<Outcome> {
+    let bytes = hex(&v["bytes"])?;
+    let mut env = TypeEnv::new();
+    let types = load_seq(&v["types"], &mut env, "B")?;
+    let got = IDLArgs::from_bytes_with_types(&bytes, &env, &types).map(|args| args.args);
+    // An expected value that 0.10 cannot represent is a disagreement, not a broken
+    // vector: the question -- bytes and types -- translated, and what 0.10 cannot hold
+    // is the answer the model gives.
+    let want = match &v["expect"] {
+        Value::String(s) if s == "reject" => None,
+        e => match array(&e["values"])?
+            .iter()
+            .map(value)
+            .collect::<Result<Vec<_>>>()
+        {
+            Ok(w) => Some(w),
+            Err(err) => {
+                return Ok(Outcome::Disagree(match got {
+                    Ok(g) => format!("got {g:?}; the expected values are not representable: {err}"),
+                    Err(e) => {
+                        format!("rejected ({e}); the expected values are not representable: {err}")
+                    }
+                }))
+            }
+        },
+    };
+    let encode = |vals: Vec<IDLValue>| IDLArgs::new(&vals).to_bytes_with_types(&env, &types);
+    Ok(match (got, want) {
+        (Err(_), None) => Outcome::Agree,
+        (Err(e), Some(w)) => Outcome::Disagree(format!("rejected ({e}), want {w:?}")),
+        (Ok(g), None) => Outcome::Disagree(format!("got {g:?}, want reject")),
+        (Ok(g), Some(w)) => {
+            let want =
+                encode(w.clone()).map_err(|e| format!("cannot encode the expected values: {e}"))?;
+            let same = encode(g.clone()).is_ok_and(|got| got == want);
+            agreement(same, || format!("got {g:?}, want {w:?}"))
         }
     })
 }
@@ -338,6 +398,39 @@ fn load(fixture: &Value, env: &mut TypeEnv, prefix: &str) -> Result<Type> {
     ty(&fixture["root"])
 }
 
+/// A type sequence, `{"table": [...], "roots": [...]}`, as the types a message is
+/// decoded at.
+fn load_seq(seq: &Value, env: &mut TypeEnv, prefix: &str) -> Result<Vec<Type>> {
+    let roots = array(&seq["roots"])?;
+    let mut types = Vec::new();
+    for root in roots {
+        let fixture = serde_json::json!({"table": seq["table"], "root": root});
+        types.push(load(&fixture, env, prefix)?);
+    }
+    // With no roots the table is still translated, so that an entry 0.10 cannot
+    // represent is an error here as it would be with one.
+    if roots.is_empty() {
+        load(
+            &serde_json::json!({"table": seq["table"], "root": "null"}),
+            env,
+            prefix,
+        )?;
+    }
+    Ok(types)
+}
+
+/// Lowercase hex, as bytes.
+fn hex(v: &Value) -> Result<Vec<u8>> {
+    let s = string(v)?;
+    if s.len() % 2 != 0 {
+        return Err(format!("odd number of hex digits: {s:?}"));
+    }
+    (0..s.len() / 2)
+        .map(|i| u8::from_str_radix(&s[2 * i..2 * i + 2], 16))
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|_| format!("not hex bytes: {s:?}"))
+}
+
 /// A number written as a decimal string.
 fn number<T: FromStr>(v: &Value) -> Result<T> {
     let s = string(v)?;
@@ -442,6 +535,13 @@ mod tests {
         assert!(agrees(ok));
         let reject = coerce(json!({"int": "-5"}), int, nat, json!("reject"));
         assert!(agrees(reject));
+        let nats = json!({"table": [], "roots": ["nat"]});
+        let decode = |bytes: &str, expect: Value| json!({"id": "t", "kind": "decode", "bytes": bytes, "types": nats, "expect": expect});
+        assert!(agrees(decode(
+            "4449444c00017d05",
+            json!({"values": [{"nat": "5"}]})
+        )));
+        assert!(agrees(decode("4449444c00017d0500", json!("reject"))));
     }
 
     /// Members of a record, variant or service type are in no particular order in a

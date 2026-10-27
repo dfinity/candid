@@ -3,7 +3,7 @@ Conformance vectors, and their JSON form.
 
 A vector is one assertion about the model that any Candid implementation can check:
 a field-id hash, whether a type table is well formed, whether one type is a subtype
-of another, or what a value coerces to at another type. `conformance/README.md` specifies the JSON; this file is the reference
+of another, what a value coerces to at another type, or what a message decodes to. `conformance/README.md` specifies the JSON; this file is the reference
 reader and writer for it, and the two must agree.
 
 The JSON is data, not a grammar: a type is its table and a root, exactly as the model
@@ -38,6 +38,17 @@ def Fixture.check? (f : Fixture) : Option ((t : TypeTable) × t.Root) := do
   let r ← t.root? f.root
   return ⟨t, r⟩
 
+/-- A sequence of types sharing one table: what a message is decoded at. -/
+structure TypeSeq where
+  table : RawTypeTable
+  roots : List Slot
+
+/-- Check the table, then every root. -/
+def TypeSeq.check? (s : TypeSeq) : Option ((t : TypeTable) × List t.Root) := do
+  let t ← s.table.check
+  let rs ← s.roots.mapM t.root?
+  return ⟨t, rs⟩
+
 /-- What a vector asserts. A subtype vector names two well-formed types; one that does
 not is a broken vector, since subtyping is not defined on a malformed type. A coerce
 vector's value has the type it is coerced from, and the expected result, if there is
@@ -48,6 +59,9 @@ inductive Assertion where
   | subtype (sub sup : Fixture) (want : Bool)
   /-- `value : src ~> want : dst`, or no such value when `want` is `none`. -/
   | coerce (value : Value) (src dst : Fixture) (want : Option Value)
+  /-- `bytes`, deserialised at `types`, are the values `want`, one per type, or are
+  rejected when `want` is `none`. -/
+  | decode (bytes : ByteArray) (types : TypeSeq) (want : Option (List Value))
 
 structure Vector where
   /-- Unique within the suite. Human-readable, and stable: a runner's list of known
@@ -109,6 +123,10 @@ def _root_.Candid.Composite.toJson : Composite → Json
 def Fixture.toJson (f : Fixture) : Json :=
   .mkObj [("table", .arr (f.table.entries.map Composite.toJson)), ("root", f.root.toJson)]
 
+def TypeSeq.toJson (s : TypeSeq) : Json :=
+  .mkObj [("table", .arr (s.table.entries.map Composite.toJson)),
+    ("roots", .arr (s.roots.map Slot.toJson).toArray)]
+
 /-! Values. Every number in a value is a decimal string, so that no reader loses
 precision -- a JSON number past 2^53 does not survive most parsers -- and a float is its
 bit pattern in hex, so that every NaN and both zeros survive too. -/
@@ -151,6 +169,11 @@ def expectToJson : Option Value → Json
   | some v => .mkObj [("value", valueToJson v)]
   | none => .str "reject"
 
+/-- Expected decoded values, or `"reject"`. -/
+def expectValuesToJson : Option (List Value) → Json
+  | some vs => .mkObj [("values", .arr (vs.map valueToJson).toArray)]
+  | none => .str "reject"
+
 /-- One vector, on one line. Written by hand rather than through `Json.compress` so that
 `id` and `kind` come first: `compress` sorts keys, and a file read by people as often
 as by programs should lead with what a line is about. -/
@@ -169,6 +192,9 @@ def Vector.render (v : Vector) : String :=
   | .coerce v a b want =>
     head "coerce" ++ field "value" (valueToJson v) ++ field "from" a.toJson ++
       field "to" b.toJson ++ field "expect" (expectToJson want) ++ "}"
+  | .decode bs ts want =>
+    head "decode" ++ field "bytes" (.str (bytesToHex bs.toList)) ++ field "types" ts.toJson ++
+      field "expect" (expectValuesToJson want) ++ "}"
 
 /-- A whole file: one vector per line, so that a change to the model shows up in a diff
 as exactly the vectors whose answers it changed. -/
@@ -327,6 +353,17 @@ def expectFromJson? : Json → Except String (Option Value)
     expectKeys j ["value"]
     return some (← valueFromJson? (← j.getObjVal? "value"))
 
+def expectValuesFromJson? : Json → Except String (Option (List Value))
+  | .str "reject" => return none
+  | j => do
+    expectKeys j ["values"]
+    return some (← (← (← j.getObjVal? "values").getArr?).toList.mapM valueFromJson?)
+
+def TypeSeq.fromJson? (j : Json) : Except String TypeSeq := do
+  expectKeys j ["table", "roots"]
+  let entries ← (← (← j.getObjVal? "table").getArr?).mapM Composite.fromJson?
+  return { table := { entries }, roots := ← slotsFromJson? (← j.getObjVal? "roots") }
+
 def Fixture.fromJson? (j : Json) : Except String Fixture := do
   expectKeys j ["table", "root"]
   let entries ← (← (← j.getObjVal? "table").getArr?).mapM Composite.fromJson?
@@ -352,6 +389,11 @@ def Vector.fromJson? (j : Json) : Except String Vector := do
       return .coerce (← valueFromJson? (← j.getObjVal? "value"))
         (← Fixture.fromJson? (← j.getObjVal? "from")) (← Fixture.fromJson? (← j.getObjVal? "to"))
         (← expectFromJson? (← j.getObjVal? "expect"))
+    | "decode" =>
+      expectKeys j ["id", "kind", "bytes", "types", "expect"]
+      return .decode ⟨(← bytesFromHex? (← j.getObjVal? "bytes")).toArray⟩
+        (← TypeSeq.fromJson? (← j.getObjVal? "types"))
+        (← expectValuesFromJson? (← j.getObjVal? "expect"))
     | k => throw s!"unknown vector kind {repr k}" : Except String Assertion)
   return { id, assertion }
 
@@ -396,5 +438,16 @@ def Assertion.disagreement : Assertion → Option String
         if got == want then none
         else some s!"got {(expectToJson got).compress}, want {(expectToJson want).compress}"
     | _, _ => some "a type is malformed, so coercion is not defined on it"
+  | .decode bs ts want =>
+    match ts.check? with
+    | some ⟨B, us⟩ =>
+      let roots := us.map (·.1)
+      if want.any fun vs => vs.length != roots.length || (vs.zip roots).any fun (v, u) => !B.hasType v u then
+        some "the expected values are not one of each type"
+      else
+        let got := deserialize bs B roots
+        if got == want then none
+        else some s!"got {(expectValuesToJson got).compress}, want {(expectValuesToJson want).compress}"
+    | none => some "a type is malformed, so decoding at it is not defined"
 
 end Oracle
