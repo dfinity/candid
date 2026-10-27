@@ -1,7 +1,8 @@
 # `lean/` — Lean 4 reference model and specification
 
-**Status: third slice.** Types, the field-id hash, subtyping — as both a relation and a
-decision procedure — and values with coercion, with an executable that writes them out
+**Status: fourth slice.** Types, the field-id hash, subtyping — as both a relation and a
+decision procedure — values with coercion, and the binary format in both directions,
+with an executable that writes them out
 as conformance vectors, reads them back, and is checked against `candid` 0.10 in CI. "Slice" is a label for
 what landed in a merge window, applied after the fact; the forward-looking plan is the
 coverage checklist below and the tiers in [REWRITE.md §3](../REWRITE.md#3-lean-honestly). Nothing is published and
@@ -251,6 +252,50 @@ sign of a zero. `null` is one value, as in the spec, where Rust's `IDLValue` has
 the wire format's order, so roundtripping holds as equality rather than up to
 reordering.
 
+## What slice 4 established
+
+**The binary format, as a decoder that is strict and an encoder that is one choice of
+many.** [Candid/Wire.lean](Candid/Wire.lean) has LEB128, `encode`, `decode` -- the
+inverses of the spec's `T` and `M` -- and `deserialize`, which is `decode` followed by
+`coerceArgs`, the spec's "tuple types" rule: an argument sequence coerces like a
+tuple-shaped record, so an extra argument is ignored and a missing one is `null` where
+its type accepts `null`. A new vector kind carries bytes, the types to decode them at,
+and the values or `"reject"`.
+
+The encoder exists to generate vectors and for the round-trip check, not as a
+specification of bytes: the spec calls type serialisation "a relation", since an encoder
+chooses its table. That is why encoding conformance will be judged by decoding (see
+[conformance/README.md](../conformance/README.md#still-to-come)) rather than by a
+canonical encoding profile, which [REWRITE.md §2](../REWRITE.md#2-what-we-are-building)
+now records.
+
+**Decoding needed a termination argument the spec does not mention.** Every value
+consumes bytes except a record, whose encoding is only its fields', so `type R = record
+{ R }` -- or `record { null; R }` -- recurses without consuming anything. `M` is defined
+by recursion on the value, so such a type has no finite value, and nothing decodes at
+it. The decoder counts the records on its path that started at the current position and
+rejects past the table's size, which by pigeonhole is exactly "the same entry at the
+same position again". The measure is (bytes remaining, table size minus that count, the
+step's place in its list), and the proof is in the file. `candid` 0.10 agrees on both
+vectors; it gets there by rewriting such types to `empty` before decoding.
+
+**Choices the spec leaves open**, each recorded in the file's header: non-shortest
+LEB128 is accepted, as 0.10 does (REWRITE.md §7 has the open question); opaque
+references are rejected, since a `Value` has no reference table; and every value is
+decoded, including an extra argument and a record field the receiver drops, so a
+malformed one rejects the message. 0.10 agreed on that last one, which it did not have
+to: skipping a value is where a decoder is most tempted to stop checking it.
+
+**The runner found three places where 0.10 is narrower or looser than the spec**, all
+recorded as known divergences rather than fixed in either place: it allows at most one
+function annotation in a decoded type, it accepts a `oneway` function type with results
+from the wire, and it bounds a principal at 29 bytes. The first and third are questions
+about the spec as much as about 0.10.
+
+**A fourth property holds over the generated universe**: every sample encodes, and its
+bytes decode to the same value at the same type, in a table equal to the one written up
+to the order of each entry's members.
+
 ## Constraints
 
 - **No mathlib.** We do not need it, and depending on it would dominate build
@@ -276,7 +321,9 @@ cover what actually breaks in production:
       function has no results, and a method type denotes a function
 - [x] Subtyping, as a relation with a derived decision procedure
 - [x] Values, and coercion, including the `opt` backtracking rule
-- [ ] Binary wire format: type table, memory section, LEB128/SLEB128
+- [x] Binary wire format: type table, memory section, LEB128/SLEB128 -- decoding,
+      and an encoder; not future types (opcodes below `-24`), which the spec says to
+      skip and the model rejects
 - [ ] Cost model / resource exhaustion
 - [ ] Textual value syntax
 
@@ -306,6 +353,14 @@ Named here so they are obligations rather than oversights.
   children are slots. The parser will need the pass that interns nested composites
   into a table, and textual aliases (`type A = B;`) have to be resolved by it —
   `intern`/`close` are only the hand-written-example half of that.
+- **Future types.** The spec reserves opcodes below `-24` for types an older decoder
+  skips by length. The model rejects them; no vector exercises them until it does not.
+- **Encoding vectors, and type equivalence.** An encoding vector is a value and a type,
+  and the check is that an implementation's bytes decode to an *equivalent* type and
+  the same value. Equivalence -- the same infinite tree -- is decidable with the
+  subtype procedure's worklist and is not written yet.
+- **Unbounded vectors of zero-length values.** `vec null` can claim any length in a
+  few bytes, and the decoder builds a value that long. That is the cost model's job.
 - **Verso.** Deliberately not yet: bundling an undocumented doc toolchain into the
   work whose purpose was de-risking the build would have doubled the unknowns.
 

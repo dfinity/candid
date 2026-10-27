@@ -227,6 +227,22 @@ def coercions : List Vector :=
         return ⟨s!"{showValue v} : {a.name} ~> {b.name}",
           .coerce v fa fb (coerceResult A B v ra.1 rb.1)⟩
 
+/-! ## Decoding
+
+Every sample value, encoded at its own type by the model's encoder and decoded at that
+type again. These are the wire format's positive cases, one per sample rather than one
+per pair of types: what a value becomes at another type is what `coercions` asserts
+already. The ways a message can be malformed are written by hand, since an encoder only
+produces messages that are not. -/
+
+def decodes : List Vector :=
+  coerceUniverse.flatMap fun a => match a.checked? with
+    | none => []
+    | some ⟨fa, A, ra⟩ => (samples A 3 ra.1).filterMap fun v => do
+      let bs ← encode A [ra.1] [v]
+      return ⟨s!"decode {showValue v} : {a.name}",
+        .decode bs ⟨fa.table, [fa.root]⟩ (deserialize bs A [ra.1])⟩
+
 /-! ## Properties
 
 Three of the properties `spec/Candid.md` lists for coercion, checked over every
@@ -261,6 +277,42 @@ def propertyViolations : List String :=
               [s!"soundness: {a.name} <: {b.name}, but {showValue v} does not coerce"]
             else []
           | .error _ => []
+
+/-- The wire format roundtrips: every sample encodes, and the bytes decode to the same
+value at the same type, in a table that differs from the one written at most in the
+order of each entry's members. Compared by encoding the entries, which sorts them. -/
+def wireViolations : List String :=
+  coerceUniverse.flatMap fun a => match a.checked? with
+    | none => []
+    | some ⟨_, A, ra⟩ => (samples A 3 ra.1).filterMap fun v =>
+      let what := s!"{showValue v} : {a.name}"
+      match encode A [ra.1] [v] with
+      | none => some s!"wire: {what} does not encode"
+      | some bs => match decode bs with
+        | .error e => some s!"wire: {what} does not decode: {e.msg} at byte {e.pos}"
+        | .ok m =>
+          let entries (T : TypeTable) := T.raw.entries.toList.map Composite.encode
+          if m.values != [v] then some s!"wire: {what} decodes to another value"
+          else if m.types != [ra.1] then some s!"wire: {what} decodes at another type"
+          else if entries m.table != entries A then some s!"wire: {what} decodes with another table"
+          else if deserialize bs A [ra.1] != some [v] then
+            some s!"wire: {what} does not deserialise to itself"
+          else none
+
+/-- Values that are not of their type must not encode. -/
+def encodeRejections : List String :=
+  coerceUniverse.flatMap fun a => match a.checked? with
+    | none => []
+    | some ⟨_, A, ra⟩ => (samples A 3 ra.1).flatMap fun v =>
+      -- A record value missing its first field, and one with it moved last, are not
+      -- of the type, and the encoder must say so rather than write them.
+      let bad := match v with
+        | .record (f :: fs) => [Value.record fs, .record (fs ++ [f])].filter (· != v)
+        | _ => []
+      bad.filterMap fun w =>
+        if (encode A [ra.1] [w]).isSome then
+          some s!"wire: {showValue w} : {a.name} encodes, but is not of the type"
+        else none
 
 /-- Types the generator built that were not well formed. Expected to be empty: the
 oracle fails if it is not, since `pairs` drops them silently. -/

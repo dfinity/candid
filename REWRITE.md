@@ -246,9 +246,21 @@ derive crate persists in v1. The question is only what goes in it — see
 **`conformance/`** — vectors as JSON data rather than a Candid-grammar extension,
 so an implementer in Go or Python can run vector #1 before writing a text parser.
 Generated from the Lean model, which lets us be exhaustive by construction for
-small types rather than "whatever someone thought of". Covers encoding (against a
-newly-defined canonical encoding profile), subtyping as a first-class relation,
-`.did` parsing, and resource exhaustion. Published as a versioned artifact.
+small types rather than "whatever someone thought of". Covers decoding, encoding,
+subtyping as a first-class relation, `.did` parsing, and resource exhaustion.
+Published as a versioned artifact.
+
+Encoding is tested against the relation the spec defines, not against fixed bytes.
+The spec says type serialisation "is not technically a function but a relation":
+an encoder chooses its type table, and two encoders of the same value at the same
+type can differ in entry order, in sharing, and in unused entries. A canonical
+encoding profile would make the bytes comparable, but only by requiring every
+encoder to minimise its type graph and number entries in a fixed order -- a cost
+imposed on every implementation for a property no decoder needs. So an encoding
+vector is a value and a type, and the check is that the bytes decode, strictly, to
+a type *equivalent* to that one (the same infinite tree; mutual subtyping is far
+too loose) and to that value. A canonical profile remains possible as an opt-in for
+whoever needs deterministic bytes, and nothing here depends on it.
 
 ---
 
@@ -433,9 +445,9 @@ with their reasoning; new evidence is the reason to revisit one.
 - Migration for mixed dependency graphs, where a project transitively pulls both
   `candid 0.10` and `candid 1` and the two `Nat`/`Principal`/`Type` are distinct
   types. This is the hardest part of the migration and it is unsolved.
-- Whether the canonical encoding profile (deterministic type-table ordering, no
-  unused entries, shortest-form LEB128) should be normative in the spec or a
-  separate conformance profile.
+- Whether a decoder must accept non-shortest LEB128. The spec says only "LEB128";
+  `candid` 0.10 accepts overlong forms, and the Lean model follows it for now.
+  Encoding conformance does not depend on the answer (see §2), decoding does.
 - How `spec/` redirects are published once Verso output becomes canonical.
 - Whether this repo should publish a JavaScript-facing binding at all, and with
   what surface. `@dfinity/didc` (`tools/didc-js`) compiles the Rust implementation
