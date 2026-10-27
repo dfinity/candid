@@ -426,7 +426,7 @@ fn hex(v: &Value) -> Result<Vec<u8>> {
         return Err(format!("odd number of hex digits: {s:?}"));
     }
     (0..s.len() / 2)
-        .map(|i| u8::from_str_radix(&s[2 * i..2 * i + 2], 16))
+        .map(|i| u8::from_str_radix(s.get(2 * i..2 * i + 2).unwrap_or("?"), 16))
         .collect::<std::result::Result<Vec<_>, _>>()
         .map_err(|_| format!("not hex bytes: {s:?}"))
 }
@@ -583,6 +583,12 @@ mod tests {
     }
 
     /// A vector this runner cannot translate is an error, never an answer.
+    #[test]
+    fn non_ascii_bytes_are_an_error() {
+        assert!(hex(&json!("€a")).is_err());
+        assert_eq!(hex(&json!("00ff")), Ok(vec![0, 255]));
+    }
+
     #[test]
     fn untranslatable_vectors_are_errors() {
         let nat = json!({"table": [], "root": "nat"});

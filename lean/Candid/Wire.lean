@@ -198,7 +198,10 @@ def TypeTable.encodeValue (T : TypeTable) : Value → Slot → Option (List UInt
     | .null, some (.opt _) => some [0]
     | .opt w, some (.opt t) => ([1] ++ ·) <$> T.encodeValue w t
     | .vec ws, some (.vec t) => (leb128 ws.length ++ ·) <$> T.encodeAll ws t
-    | .record vs, some (.record fs) => T.encodeFields vs fs
+    | .record vs, some (.record fs) =>
+      -- Every field once, in ascending id: the order the wire is in.
+      if ascending (vs.map (·.1)) && vs.length == fs.length then T.encodeFields vs fs
+      else none
     | .variant id w, some (.variant fs) =>
       -- The index is the tag's place among the alternatives in id order: the order
       -- the type table was written in.
@@ -213,7 +216,7 @@ def TypeTable.encodeAll (T : TypeTable) : List Value → Slot → Option (List U
   | [], _ => some []
   | w :: ws, t => do return (← T.encodeValue w t) ++ (← T.encodeAll ws t)
 
-/-- A record's fields, in the value's order -- ascending id, which is the wire's. -/
+/-- A record's fields, in the value's order, which `encodeValue` has checked is the wire's. -/
 def TypeTable.encodeFields (T : TypeTable) :
     List (FieldId × Value) → List (FieldId × Slot) → Option (List UInt8)
   | [], _ => some []

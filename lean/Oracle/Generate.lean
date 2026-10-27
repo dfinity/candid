@@ -299,6 +299,21 @@ def wireViolations : List String :=
             some s!"wire: {what} does not deserialise to itself"
           else none
 
+/-- Values that are not of their type must not encode. -/
+def encodeRejections : List String :=
+  coerceUniverse.flatMap fun a => match a.checked? with
+    | none => []
+    | some ⟨_, A, ra⟩ => (samples A 3 ra.1).flatMap fun v =>
+      -- A record value missing its first field, and one with it moved last, are not
+      -- of the type, and the encoder must say so rather than write them.
+      let bad := match v with
+        | .record (f :: fs) => [Value.record fs, .record (fs ++ [f])].filter (· != v)
+        | _ => []
+      bad.filterMap fun w =>
+        if (encode A [ra.1] [w]).isSome then
+          some s!"wire: {showValue w} : {a.name} encodes, but is not of the type"
+        else none
+
 /-- Types the generator built that were not well formed. Expected to be empty: the
 oracle fails if it is not, since `pairs` drops them silently. -/
 def malformed : List String :=
