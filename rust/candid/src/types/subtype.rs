@@ -10,6 +10,44 @@ use std::fmt;
 
 pub type Gamma = HashSet<(Type, Type)>;
 
+/// Cheap reflexivity check used *inside* the subtype recursion, in place of the
+/// deep structural `t1 == t2` (#603).
+///
+/// `t1 == t2` on `Type` is a deep structural comparison (derived `PartialEq`
+/// over `Rc<TypeInner>`). The recursion reached it at *every* level, so a
+/// mismatch deep inside an otherwise-identical tree was rediscovered by
+/// re-comparing the surrounding structure at each level: O(depth^2) in the
+/// nesting depth.
+///
+/// Within the recursion we only need this short-circuit to (a) accept a shared
+/// subtree instantly and (b) supply reflexivity for the base types that have no
+/// structural subtype rule of their own (`Nat <: Nat`, `Var x <: Var x`, …).
+/// Composite types are handled by the structural match arms below, so here we
+/// deliberately return `false` for them and let the recursion descend one
+/// level, instead of re-traversing the whole subtree. That is what removes the
+/// quadratic blow-up.
+///
+/// Correctness: this only ever returns `true` when `t1 == t2` would, so it is a
+/// sound short-circuit; a `false` for equal-but-separately-allocated composites
+/// merely defers to the structural rules, which reach the same verdict. The
+/// one-shot deep `t1 == t2` kept at the public entry points still short-circuits
+/// a wholly-equal pair in a single linear pass, so equal types are not pushed
+/// through the structural recursion (unlike a bare `ptr_eq`-only patch, which
+/// regresses them — see the #603 discussion / #723).
+fn same_type_fast(t1: &Type, t2: &Type) -> bool {
+    use TypeInner::*;
+    if std::rc::Rc::ptr_eq(&t1.0, &t2.0) {
+        return true;
+    }
+    match t1.as_ref() {
+        // Composites recurse through the structural arms instead of a deep `==`.
+        Opt(_) | Vec(_) | Record(_) | Variant(_) | Func(_) | Service(_) | Class(_, _) => false,
+        // Leaves and the Var/Knot indirection nodes carry no nested `Type`, so
+        // their equality is O(1)-ish and preserves reflexivity exactly.
+        leaf => leaf == t2.as_ref(),
+    }
+}
+
 /// The `Gamma` of one check, together with the order its pairs were assumed in.
 ///
 /// A pair is assumed before it is proved, and any pair proved after it may have
@@ -90,6 +128,14 @@ pub fn subtype_with_config(
     t1: &Type,
     t2: &Type,
 ) -> Result<()> {
+    // One-shot deep equality: a wholly-equal pair is decided in a single linear
+    // pass here, so equal (even separately allocated) types never enter the
+    // structural recursion. Inside the recursion only `same_type_fast` is used,
+    // which keeps the per-level check O(1) and so avoids the quadratic blow-up
+    // (#603).
+    if t1 == t2 {
+        return Ok(());
+    }
     let mut gamma = Assumptions::new(gamma);
     let depth = RecursionDepth::new();
     let res = subtype_(report, &mut gamma, env, t1, t2, &depth);
@@ -231,6 +277,12 @@ pub fn subtype_check_all(
     t1: &Type,
     t2: &Type,
 ) -> Vec<Incompatibility> {
+    // One-shot deep equality fast path; see `subtype_with_config`. A fully-equal
+    // pair has no incompatibilities, and deciding it here keeps equal types out
+    // of the structural recursion while `same_type_fast` handles each level.
+    if t1 == t2 {
+        return Vec::new();
+    }
     let mut errors = Vec::new();
     let mut gamma = Assumptions::new(gamma);
     let depth = RecursionDepth::new();
@@ -291,7 +343,7 @@ fn subtype_collect_(
         return;
     }
     use TypeInner::*;
-    if t1 == t2 {
+    if same_type_fast(t1, t2) {
         return;
     }
     // Handle Var/Knot (type variables / recursive types)
@@ -654,7 +706,7 @@ fn subtype_(
         return Err(Error::msg("Recursion limit exceeded"));
     }
     use TypeInner::*;
-    if t1 == t2 {
+    if same_type_fast(t1, t2) {
         return Ok(());
     }
     if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
