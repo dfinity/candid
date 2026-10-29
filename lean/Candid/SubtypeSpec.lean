@@ -91,6 +91,9 @@ coinductive SubtyC : TypeTable → TypeTable → Composite → Composite → Pro
       (∀ name g, methodAt ms' name = some g →
         ∃ f, methodAt ms name = some f ∧ Subty A B f g) →
       SubtyC A B (.service ms) (.service ms')
+  /-- A future type is a subtype of itself. Not one of the spec's rules, which do not
+  mention future types; see `expand` in `Subtype.lean`. -/
+  | future {A B op d} : SubtyC A B (.future op d) (.future op d)
 
 end
 
