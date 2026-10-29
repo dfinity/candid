@@ -3,6 +3,9 @@ name: Conformance
 # Runs the conformance vectors against the implementations that have a runner. The
 # vectors are the Lean model's answers; `lean.yml` checks that they are current.
 #
+# Also checks that `lean/Oracle/TestDid/Data.lean`, the assertions of `test/*.test.did`
+# translated for the model, is current, so `test/**` triggers this too.
+#
 # Only `conformance/**` triggers this, so a change under `rust/` does not run it yet.
 # Widening the filter to `rust/candid/**` is what would make this a differential oracle
 # for 0.10 changes, and it is a change to what runs on `master` pull requests -- so it
@@ -15,10 +18,14 @@ on:
       - rewrite
     paths:
       - 'conformance/**'
+      - 'test/**'
+      - 'lean/Oracle/TestDid/Data.lean'
       - '.github/workflows/conformance.yml'
   pull_request:
     paths:
       - 'conformance/**'
+      - 'test/**'
+      - 'lean/Oracle/TestDid/Data.lean'
       - '.github/workflows/conformance.yml'
 
 # Not a required status check. If it becomes one, the workflow-level `paths:` filter
@@ -56,3 +63,24 @@ jobs:
       # listed one that has started to agree.
       - name: run the vectors
         run: cargo run --locked --release --manifest-path "$MANIFEST" -- conformance/vectors/*.json
+
+  test-did:
+    runs-on: ubuntu-24.04
+    env:
+      MANIFEST: conformance/tools/test-did/Cargo.toml
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Remove pre-installed Rust stable toolchain
+        run: rustup toolchain remove stable 2>/dev/null || true
+      - uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
+        with:
+          cache-workspaces: conformance/tools/test-did
+      - name: fmt
+        run: cargo fmt --manifest-path "$MANIFEST" -- --check
+      - name: lint
+        run: cargo clippy --locked --all-targets --manifest-path "$MANIFEST" -- -D warnings
+      # The `.test.did` files are the source; translating them again must change nothing.
+      - name: translated assertions are up to date
+        run: |
+          cargo run --locked --manifest-path "$MANIFEST" -- test/*.test.did > lean/Oracle/TestDid/Data.lean
+          git diff --exit-code -- lean/Oracle/TestDid/Data.lean

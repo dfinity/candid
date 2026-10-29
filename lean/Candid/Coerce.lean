@@ -196,6 +196,11 @@ def coerceAt (A B : TypeTable) (v : Value) (t u : Slot) : Coercion Value :=
       | some a, some b => if decSubtype A B a b then pure v else failure
       | _, _ => failure
 
+    -- A future value coerces only at its own type, and at `reserved` and the options,
+    -- which are decided above.
+    | .null, some (.future op d), some (.future op' d') =>
+      if op == op' && d == d' then pure .null else failure
+
     | _, _, _ => failure
 
   | _, _ => failure

@@ -848,10 +848,33 @@ def decodeCoerceChecks : List Vector :=
   , expectDecode "4449444c 00 01 7d 05" (typesOf do return [← intern (.opt text)]) (some [.null])
       "decode: an argument that does not coerce at opt is null" ]
 
+/-- Future types: opcode `-25` (`67`), the first the spec leaves to the future. The
+table entry is the opcode, a length and that many bytes; a value is two lengths, `m`
+and `n`, then `m` bytes. -/
+def decodeFutureChecks : List Vector :=
+  [ expectDecode "4449444c 01 67 00 01 00 00 00" (prims [reserved]) (some [.null])
+      "decode: a future value at reserved"
+  , expectDecode "4449444c 01 67 00 01 00 00 00" optNatT (some [.null])
+      "decode: a future value at an option is null"
+  , expectDecode "4449444c 01 67 00 01 00 00 00" (prims [nat]) none
+      "decode: a future value at nat"
+  , expectDecode "4449444c 01 67 00 01 00 00 00" (prims []) (some [])
+      "decode: a future value as an extra argument"
+  , expectDecode "4449444c 01 67 03 41 42 43 01 00 02 00 68 69" (prims [reserved])
+      (some [.null]) "decode: a future type's bytes and a future value's bytes are skipped"
+  , expectDecode "4449444c 01 67 00 01 00 00 03" (prims [reserved]) (some [.null])
+      "decode: a future value's reference count is ignored"
+  , expectDecode "4449444c 01 67 00 01 00 05 00 68" (prims [reserved]) none
+      "decode: a future value runs past the end"
+  , expectDecode "4449444c 01 67 05 41 42" (prims []) none
+      "decode: a future type runs past the end"
+  , expectDecode "4449444c 00 01 67 00 00" (prims []) none
+      "decode: a future type is not a primitive, so it is not an argument type" ]
+
 def decodeChecks : List Vector :=
   decodeFramingChecks ++ decodeLebChecks ++ decodeFixedChecks ++ decodeTextChecks ++
   decodeNullChecks ++ decodeOptVecChecks ++ decodeRecordChecks ++ decodeVariantChecks ++
-  decodeTableChecks ++ decodeRefChecks ++ decodeCoerceChecks
+  decodeTableChecks ++ decodeRefChecks ++ decodeCoerceChecks ++ decodeFutureChecks
 
 def handwritten : List Vector :=
   hashChecks ++ primChecks ++ optChecks ++ vecChecks ++ recordChecks ++

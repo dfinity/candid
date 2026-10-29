@@ -55,10 +55,18 @@ it sits.
   reference carried outside the byte stream, in `R`, and the spec leaves unspecified how
   the two are bundled. A `Value` has no reference table to point into, and `candid` 0.10
   rejects them too ("Opaque reference not supported").
-- **Future types are not modelled.** The spec reserves opcodes below `-24` for types an
-  older decoder can skip. This model has no such types, so it rejects them, where the
-  spec says to skip; `candid` 0.10 implements the skipping. That is a gap in the model,
-  and no vector exercises it until it is closed.
+- **A future value's references are ignored.** A future type is an opcode below `-24`,
+  a length and that many bytes; a future value is two lengths, `m` and `n`, then `m`
+  bytes, "accompanied by `n` corresponding references in `R`" (`spec/Candid.md`,
+  "Deserialisation of future types"). The model has no `R`, as above, and a future
+  value is skipped, so `n` is read and ignored, as `candid` 0.10 does.
+
+**Future types.** A decoder that meets one keeps it in the table, as
+`Composite.future`, and decodes its values to `null`: all it can know of one, and the
+value of `reserved`. That is enough, since a receiver cannot expect a type it does not
+know. Where it expects `reserved` or an option, the general rules apply; anywhere else,
+coercion fails. The spec has no subtyping rule for future types, and the model adds
+only reflexivity (`Subtype.lean`).
 
 **Termination.** Decoding a value consumes bytes, except at a record, whose encoding is
 only its fields'. So a record type can recurse into itself without consuming anything --
@@ -168,6 +176,7 @@ def Composite.encode : Composite → List UInt8
   | .service ms =>
     sleb128 (-23) ++ lebList (sortByName ms) fun (n, t) =>
       leb128 (utf8Bytes n).length ++ utf8Bytes n ++ t.encode
+  | .future op d => sleb128 op ++ leb128 d.length ++ d
 
 /-- `M(id(v*) : principal)`, and the same for a service reference. -/
 def encodeId (id : PrincipalBytes) : List UInt8 := 1 :: leb128 id.length ++ id
@@ -210,6 +219,8 @@ def TypeTable.encodeValue (T : TypeTable) : Value → Slot → Option (List UInt
       | _, _ => none
     | .service id, some (.service _) => some (encodeId id)
     | .func id m, some (.func _ _ _) => some (1 :: encodeId id ++ encodeText m)
+    -- No bytes and no references: the shortest future value.
+    | .null, some (.future _ _) => some [0, 0]
     | _, _ => none
 
 def TypeTable.encodeAll (T : TypeTable) : List Value → Slot → Option (List UInt8)
@@ -355,6 +366,12 @@ def Parse.byte : Parse UInt8 := .lift readByte
 def Parse.leb : Parse Nat := .lift readLeb
 def Parse.sleb : Parse Int := .lift readSleb
 
+/-- `n` bytes. -/
+def Parse.bytes (n : Nat) : Parse (List UInt8) :=
+  fun bs pos => match readBytes bs pos n with
+    | .ok (b, p) => .ok (b.toList, p.1)
+    | .error e => .error e
+
 /-- `n` items, in order. -/
 def Parse.times (n : Nat) (p : Parse α) : Parse (List α) :=
   go n []
@@ -417,7 +434,7 @@ def Parse.entry : Parse Composite := do
     return .service ms
   | _ =>
     if (Prim.ofOpcode? op).isSome then fail s!"primitive type {op} in the type table"
-    else if op < -24 then fail s!"future type {op}, which this model does not have"
+    else if op < -24 then return .future op (← bytes (← leb))
     else fail s!"opcode {op} is not a type"
 
 open Parse in
@@ -471,6 +488,16 @@ def readFuncRef (bs : ByteArray) (pos : Nat) : Read1 bs pos Value :=
   | .ok (0, _) => .error ⟨pos, "opaque reference"⟩
   | .ok (f, _) => .error ⟨pos, s!"reference flag {f}, neither 0 nor 1"⟩
 
+/-- A future value: `m` and `n`, then `m` bytes, skipped. See the header. -/
+def readFuture (bs : ByteArray) (pos : Nat) : Read1 bs pos Value :=
+  match readLeb bs pos with
+  | .error e => .error e
+  | .ok (m, ⟨p, hp⟩) => match readLeb bs p with
+    | .error e => .error e
+    | .ok (_, ⟨q, hq⟩) => match readBytes bs q m with
+      | .error e => .error e
+      | .ok (_, ⟨r, hr⟩) => .ok (.null, ⟨r, by omega, hr.2⟩)
+
 /-- The lexicographic order the value decoder descends in, unfolded. -/
 theorem lex3 {a b c a' b' c' : Nat}
     (h : a' < a ∨ (a' = a ∧ (b' < b ∨ (b' = b ∧ c' < c)))) :
@@ -517,6 +544,7 @@ def decodeValue (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.
           | .ok (v, ⟨q, hq⟩) => .ok (.variant id v, ⟨q, by omega, hq.2⟩)
     | some (.service _) => Read1.weaken ((readId bs pos).map fun (id, p) => (.service id, p))
     | some (.func _ _ _) => Read1.weaken (readFuncRef bs pos)
+    | some (.future _ _) => Read1.weaken (readFuture bs pos)
 termination_by (bs.size - pos, A.size - stall, 0)
 decreasing_by all_goals (apply lex3; omega)
 

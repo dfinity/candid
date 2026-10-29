@@ -90,6 +90,10 @@ inductive Composite where
   | variant (alts : List (FieldId × Slot))
   | func (args rets : List Slot) (annots : List FuncAnnot)
   | service (methods : List (String × Slot))
+  /-- A *future type* (`spec/Candid.md`, "Deserialisation of future types"): an opcode
+  below `-24`, which this version of Candid does not define, and the bytes that came
+  with it. Only a decoder makes one; see `Wire.lean`. -/
+  | future (opcode : Int) (data : List UInt8)
   deriving Repr, Inhabited
 
 /-- A type table as it is parsed or built: `TypeRef` -> `Composite`, not yet checked.
@@ -143,25 +147,31 @@ def Composite.slots : Composite → List Slot
   | .record fs | .variant fs => fs.map (·.2)
   | .func args rets _ => args ++ rets
   | .service ms => ms.map (·.2)
+  | .future _ _ => []
 
 /-- Labels must not repeat. Vacuous for the unlabelled composites. -/
 def Composite.labelsOk : Composite → Bool
   | .record fs | .variant fs => noDups (fs.map (·.1))
   | .service ms => noDups (ms.map (·.1))
-  | .opt _ | .vec _ | .func _ _ _ => true
+  | .opt _ | .vec _ | .func _ _ _ | .future _ _ => true
 
 /-- `spec/Candid.md:211`: "The result list of a `oneway` function must be empty." -/
 def Composite.annotsOk : Composite → Bool
   | .func _ rets ann => !ann.contains .oneway || rets.isEmpty
-  | .opt _ | .vec _ | .record _ | .variant _ | .service _ => true
+  | .opt _ | .vec _ | .record _ | .variant _ | .service _ | .future _ _ => true
 
 /-- `spec/Candid.md:209`: parameter and result lists are shorter than 2^32. -/
 def Composite.arityOk : Composite → Bool
   | .func args rets _ => args.length < UInt32.size && rets.length < UInt32.size
-  | .opt _ | .vec _ | .record _ | .variant _ | .service _ => true
+  | .opt _ | .vec _ | .record _ | .variant _ | .service _ | .future _ _ => true
+
+/-- A future type's opcode is one the spec leaves to the future: below `-24`. -/
+def Composite.opcodeOk : Composite → Bool
+  | .future op _ => op < -24
+  | .opt _ | .vec _ | .record _ | .variant _ | .func _ _ _ | .service _ => true
 
 def Composite.wellFormed (bound : Nat) (c : Composite) : Bool :=
-  c.labelsOk && c.annotsOk && c.arityOk && c.slots.all (Slot.wellFormed bound)
+  c.labelsOk && c.annotsOk && c.arityOk && c.opcodeOk && c.slots.all (Slot.wellFormed bound)
 
 /-- `spec/Candid.md:1223`: "The serialised data type representing a method type must
 denote a function type." -/
@@ -172,7 +182,7 @@ def RawTypeTable.methodsDenoteFuncs (t : RawTypeTable) : Composite → Bool
         | some (.func _ _ _) => true
         | _ => false
       | .prim _ => false
-  | .opt _ | .vec _ | .record _ | .variant _ | .func _ _ _ => true
+  | .opt _ | .vec _ | .record _ | .variant _ | .func _ _ _ | .future _ _ => true
 
 def RawTypeTable.wellFormed (t : RawTypeTable) : Bool :=
   t.entries.all fun c => c.wellFormed t.size && t.methodsDenoteFuncs c

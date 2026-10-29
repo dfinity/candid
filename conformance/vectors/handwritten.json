@@ -216,5 +216,14 @@
 {"id":"decode: opaque func reference","kind":"decode","bytes":"4449444c016a000000010000","types":{"roots":[0],"table":[{"func":{"annots":[],"args":[],"rets":[]}}]},"expect":"reject"},
 {"id":"decode: then coerce, nat at int","kind":"decode","bytes":"4449444c00017d05","types":{"roots":["int"],"table":[]},"expect":{"values":[{"int":"5"}]}},
 {"id":"decode: an argument that does not coerce rejects the message","kind":"decode","bytes":"4449444c00017d05","types":{"roots":["text"],"table":[]},"expect":"reject"},
-{"id":"decode: an argument that does not coerce at opt is null","kind":"decode","bytes":"4449444c00017d05","types":{"roots":[0],"table":[{"opt":"text"}]},"expect":{"values":[null]}}
+{"id":"decode: an argument that does not coerce at opt is null","kind":"decode","bytes":"4449444c00017d05","types":{"roots":[0],"table":[{"opt":"text"}]},"expect":{"values":[null]}},
+{"id":"decode: a future value at reserved","kind":"decode","bytes":"4449444c01670001000000","types":{"roots":["reserved"],"table":[]},"expect":{"values":[null]}},
+{"id":"decode: a future value at an option is null","kind":"decode","bytes":"4449444c01670001000000","types":{"roots":[0],"table":[{"opt":"nat"}]},"expect":{"values":[null]}},
+{"id":"decode: a future value at nat","kind":"decode","bytes":"4449444c01670001000000","types":{"roots":["nat"],"table":[]},"expect":"reject"},
+{"id":"decode: a future value as an extra argument","kind":"decode","bytes":"4449444c01670001000000","types":{"roots":[],"table":[]},"expect":{"values":[]}},
+{"id":"decode: a future type's bytes and a future value's bytes are skipped","kind":"decode","bytes":"4449444c016703414243010002006869","types":{"roots":["reserved"],"table":[]},"expect":{"values":[null]}},
+{"id":"decode: a future value's reference count is ignored","kind":"decode","bytes":"4449444c01670001000003","types":{"roots":["reserved"],"table":[]},"expect":{"values":[null]}},
+{"id":"decode: a future value runs past the end","kind":"decode","bytes":"4449444c0167000100050068","types":{"roots":["reserved"],"table":[]},"expect":"reject"},
+{"id":"decode: a future type runs past the end","kind":"decode","bytes":"4449444c0167054142","types":{"roots":[],"table":[]},"expect":"reject"},
+{"id":"decode: a future type is not a primitive, so it is not an argument type","kind":"decode","bytes":"4449444c0001670000","types":{"roots":[],"table":[]},"expect":"reject"}
 ]}

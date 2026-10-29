@@ -1,0 +1,12 @@
+[package]
+name = "conformance-test-did"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Translates test/*.test.did into the Lean model's terms"
+
+# Its own workspace, like the runner beside it: see `runners/candid-0.10/Cargo.toml`.
+[workspace]
+
+[dependencies]
+candid_parser = { path = "../../../rust/candid_parser" }

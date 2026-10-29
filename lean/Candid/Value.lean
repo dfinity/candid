@@ -98,6 +98,8 @@ def TypeTable.hasType (T : TypeTable) : Value → Slot → Bool
       | none => false
     | .service _, some (.service _) => true
     | .func _ _, some (.func _ _ _) => true
+    -- A future value is decoded to `null`: all a receiver can know of it. See `Wire.lean`.
+    | .null, some (.future _ _) => true
     | _, _ => false
 
 /-- Every value has type `t`. -/

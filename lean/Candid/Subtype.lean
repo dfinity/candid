@@ -267,6 +267,11 @@ def expand (T U : TypeTable) (fwd : Bool) : Composite → Composite → Option (
   | .service ms, .service ms' =>
     ms'.mapM fun (name, g) => (methodAt ms name).map fun f => ⟨fwd, f, g⟩
 
+  -- A future type is a subtype of itself. The spec has no rule for future types; this
+  -- one is reflexivity, which it states as a property. Beyond that, the general rules
+  -- make a future type a subtype of `reserved` and of every option, and of nothing else.
+  | .future op d, .future op' d' => if op == op' && d == d' then some [] else none
+
   | _, _ => none
 
 /-- Discharge `goals`, given the pairs assumed so far: `seen` holds `(i, j)` for an
