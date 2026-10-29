@@ -871,6 +871,48 @@ def decodeFutureChecks : List Vector :=
   , expectDecode "4449444c 00 01 67 00 00" (prims []) none
       "decode: a future type is not a primitive, so it is not an argument type" ]
 
+/-! Future types are also checked where an implementation cannot be: as the type a
+value is expected at. An implementation's future types are the ones it does not know,
+so it is never given one, and these are not vectors. The oracle checks them, and
+`futureViolations` is every one the model gets wrong. -/
+
+def future (op : Int) (d : List UInt8) : Fixture := entry (.future op d)
+
+def subtypeOf? (a b : Fixture) : Option Bool := do
+  let ⟨A, x⟩ ← a.check?
+  let ⟨B, y⟩ ← b.check?
+  return decSubtype A B x y
+
+def coerceOf? (v : Value) (a b : Fixture) : Option (Option Value) := do
+  let ⟨A, x⟩ ← a.check?
+  let ⟨B, y⟩ ← b.check?
+  return coerceResult A B v x.1 y.1
+
+def futureFacts : List (String × Bool) :=
+  let f := future (-25) []
+  [ ("opcode -25 is well formed", f.check?.isSome)
+  , ("opcode -24 is not a future type", (future (-24) []).check?.isNone)
+  , ("a future type is a subtype of itself", subtypeOf? f f == some true)
+  , ("a future type is a subtype of an identical one",
+      subtypeOf? (future (-25) [1, 2]) (future (-25) [1, 2]) == some true)
+  , ("not of one with another opcode", subtypeOf? f (future (-26) []) == some false)
+  , ("not of one with other bytes",
+      subtypeOf? (future (-25) [1]) (future (-25) [2]) == some false)
+  , ("a future type is a subtype of reserved", subtypeOf? f (atom .reserved) == some true)
+  , ("a future type is a subtype of opt nat", subtypeOf? f (entry (.opt nat)) == some true)
+  , ("a future type is not a subtype of nat", subtypeOf? f (atom .nat) == some false)
+  , ("nat is not a subtype of a future type", subtypeOf? (atom .nat) f == some false)
+  , ("a future value coerces to itself", coerceOf? .null f f == some (some .null))
+  , ("a future value coerces to an identical type",
+      coerceOf? .null (future (-25) [1]) (future (-25) [1]) == some (some .null))
+  , ("not to one with another opcode", coerceOf? .null f (future (-26) []) == some none)
+  , ("not to one with other bytes",
+      coerceOf? .null (future (-25) [1]) (future (-25) [2]) == some none)
+  , ("a future value at opt nat is null", coerceOf? .null f (entry (.opt nat)) == some (some .null)) ]
+
+def futureViolations : List String :=
+  futureFacts.filterMap fun (name, ok) => if ok then none else some s!"future types: {name}"
+
 def decodeChecks : List Vector :=
   decodeFramingChecks ++ decodeLebChecks ++ decodeFixedChecks ++ decodeTextChecks ++
   decodeNullChecks ++ decodeOptVecChecks ++ decodeRecordChecks ++ decodeVariantChecks ++

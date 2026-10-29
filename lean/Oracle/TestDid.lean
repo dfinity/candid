@@ -18,6 +18,12 @@ not exist (`deferral?`):
   that a metered decoder should reject. That is the cost model's question, and the
   model, which has none, would spend the time.
 
+**Equality.** `==` and `!=` are "the host language's equality" (`test/README.md`), and
+here that is `Value`'s: floats are equal when their bits are. Rust's runner compares
+them numerically, so the two differ on `-0` against `0`, and on a NaN against itself. No
+assertion depends on either; one that did would hold in one host and not another, and
+would show up here as a violation to settle.
+
 **Disagreements.** `disputed` lists the assertions the model disagrees with on purpose,
 each with the reason. Each is a question about the spec, so the list is empty unless one
 is open.
