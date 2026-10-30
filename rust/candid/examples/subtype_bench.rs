@@ -5,11 +5,17 @@
 //! - widening  : vec^d(nat) <: vec^d(int)  -> succeeds (Nat <: Int at leaf)
 //! - rejection : vec^d(nat) <: vec^d(text) -> fails at the leaf
 //! - equal     : vec^d(nat) <: vec^d(nat)  -> succeeds, two separately allocated
-//!   but structurally equal trees (the case the naive ptr_eq patch regressed)
+//!   but structurally equal trees, caught by the whole-type `==` fast path
+//! - subtree   : record{0: vec^d nat; 1: nat} <: record{0: vec^d nat} -> the
+//!   shared field is a separately allocated equal subtree, but the records
+//!   differ so the whole-type fast path cannot fire; it must be accepted by the
+//!   per-level memoized equality without walking the field into the guard (the
+//!   case a ptr_eq-only patch regressed; PR #780 review)
 //!
 //! BEFORE the fix, widening/rejection are O(depth^2) (the `t1 == t2` deep
 //! structural compare runs at every recursion level). `equal` is O(depth) via
-//! the deep-compare short-circuit and is the regression guard.
+//! the whole-type short-circuit. `subtree` is the regression guard: it stays
+//! O(depth) via the memoized per-level equality.
 //!
 //! Run: cargo run --release --example subtype_bench
 
@@ -24,6 +30,23 @@ fn nest(depth: usize, leaf: TypeInner) -> Type {
         t = TypeInner::Vec(t).into();
     }
     t
+}
+
+/// `record { 0: vec^depth(leaf); extra... }`, with field ids 0, 1, 2, …
+fn record(fields: Vec<Type>) -> Type {
+    use candid::types::internal::{Field, Label};
+    use std::rc::Rc;
+    TypeInner::Record(
+        fields
+            .into_iter()
+            .enumerate()
+            .map(|(id, ty)| Field {
+                id: Rc::new(Label::Id(id as u32)),
+                ty,
+            })
+            .collect(),
+    )
+    .into()
 }
 
 /// Median per-operation time in nanoseconds, over `runs` runs of `iters` ops.
@@ -75,6 +98,16 @@ fn main() {
         (
             "equal     vec^d(nat) <: vec^d(nat)",
             Box::new(|d: usize| (nest(d, TypeInner::Nat), nest(d, TypeInner::Nat), true)),
+        ),
+        (
+            "subtree   record{vec^d nat; nat} <: record{vec^d nat}",
+            Box::new(|d: usize| {
+                (
+                    record(vec![nest(d, TypeInner::Nat), TypeInner::Nat.into()]),
+                    record(vec![nest(d, TypeInner::Nat)]),
+                    true,
+                )
+            }),
         ),
     ] {
         println!("## {name}");
