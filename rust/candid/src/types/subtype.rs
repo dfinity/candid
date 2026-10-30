@@ -5,48 +5,17 @@ use crate::types::TypeEnv;
 use crate::utils::RecursionDepth;
 use crate::{Error, Result};
 use anyhow::Context;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 pub type Gamma = HashSet<(Type, Type)>;
 
-/// Cheap reflexivity check used *inside* the subtype recursion, in place of the
-/// deep structural `t1 == t2` (#603).
-///
-/// `t1 == t2` on `Type` is a deep structural comparison (derived `PartialEq`
-/// over `Rc<TypeInner>`). The recursion reached it at *every* level, so a
-/// mismatch deep inside an otherwise-identical tree was rediscovered by
-/// re-comparing the surrounding structure at each level: O(depth^2) in the
-/// nesting depth.
-///
-/// Within the recursion we only need this short-circuit to (a) accept a shared
-/// subtree instantly and (b) supply reflexivity for the base types that have no
-/// structural subtype rule of their own (`Nat <: Nat`, `Var x <: Var x`, …).
-/// Composite types are handled by the structural match arms below, so here we
-/// deliberately return `false` for them and let the recursion descend one
-/// level, instead of re-traversing the whole subtree. That is what removes the
-/// quadratic blow-up.
-///
-/// Correctness: this only ever returns `true` when `t1 == t2` would, so it is a
-/// sound short-circuit; a `false` for equal-but-separately-allocated composites
-/// merely defers to the structural rules, which reach the same verdict. The
-/// one-shot deep `t1 == t2` kept at the public entry points still short-circuits
-/// a wholly-equal pair in a single linear pass, so equal types are not pushed
-/// through the structural recursion (unlike a bare `ptr_eq`-only patch, which
-/// regresses them — see the #603 discussion / #723).
-fn same_type_fast(t1: &Type, t2: &Type) -> bool {
-    use TypeInner::*;
-    if std::rc::Rc::ptr_eq(&t1.0, &t2.0) {
-        return true;
-    }
-    match t1.as_ref() {
-        // Composites recurse through the structural arms instead of a deep `==`.
-        Opt(_) | Vec(_) | Record(_) | Variant(_) | Func(_) | Service(_) | Class(_, _) => false,
-        // Leaves and the Var/Knot indirection nodes carry no nested `Type`, so
-        // their equality is O(1)-ish and preserves reflexivity exactly.
-        leaf => leaf == t2.as_ref(),
-    }
-}
+/// Pointer identity of a `Type`, used to key the structural-equality memo in
+/// [`Assumptions`]. The `Type`s a key is taken from are pinned alive for the
+/// life of the check (see `Assumptions::eq_pins`), so an address is never freed
+/// and reused under a live key.
+type TypePtr = *const TypeInner;
 
 /// The `Gamma` of one check, together with the order its pairs were assumed in.
 ///
@@ -66,6 +35,12 @@ struct Assumptions<'a> {
     gamma: &'a mut Gamma,
     log: Vec<(Type, Type)>,
     refuted: Gamma,
+    /// Memo for `same_type`, keyed by the pointer identity of the two `Type`s.
+    /// Each entry's `Type`s are kept alive in `eq_pins`, so a cached verdict can
+    /// never be read for a different type that happens to reuse a freed address.
+    eq_memo: RefCell<HashMap<(TypePtr, TypePtr), bool>>,
+    /// Keeps every `Type` that `eq_memo` keys on alive for the whole check.
+    eq_pins: RefCell<Vec<Type>>,
 }
 
 impl<'a> Assumptions<'a> {
@@ -74,7 +49,72 @@ impl<'a> Assumptions<'a> {
             gamma,
             log: Vec::new(),
             refuted: Gamma::new(),
+            eq_memo: RefCell::new(HashMap::new()),
+            eq_pins: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Reflexivity short-circuit used *inside* the subtype recursion, in place
+    /// of the deep structural `t1 == t2` (#603).
+    ///
+    /// `t1 == t2` on `Type` is a deep structural comparison (derived `PartialEq`
+    /// over `Rc<TypeInner>`). The recursion reached it at *every* level, so a
+    /// mismatch deep inside an otherwise-identical tree was rediscovered by
+    /// re-comparing the surrounding structure at each level: O(depth^2) in the
+    /// nesting depth.
+    ///
+    /// This returns exactly what `t1 == t2` would — so it is a sound,
+    /// behaviour-preserving replacement for it — but memoizes by pointer
+    /// identity, so each subtree pair is compared at most once across the whole
+    /// check. The memo makes both directions linear: an equal subtree is
+    /// accepted after one comparison, and a mismatch deep in an otherwise-equal
+    /// tree is found once and then answered from the cache at every enclosing
+    /// level, instead of being rewalked. A first cut of this PR used a bare
+    /// `ptr_eq`/leaf check, which was O(1) but stopped detecting
+    /// separately-allocated equal composite subtrees; one whose parents differ
+    /// (so the entry-point whole-type `==` cannot fire) was then walked
+    /// level-by-level into the recursion guard, turning a valid check into a
+    /// "recursion limit exceeded" error (PR #780 review). Memoized deep equality
+    /// keeps the O(1)-amortized per level while restoring that acceptance.
+    fn same_type(&self, t1: &Type, t2: &Type) -> bool {
+        use TypeInner::*;
+        if std::rc::Rc::ptr_eq(&t1.0, &t2.0) {
+            return true;
+        }
+        let key: (TypePtr, TypePtr) = (std::rc::Rc::as_ptr(&t1.0), std::rc::Rc::as_ptr(&t2.0));
+        if let Some(&cached) = self.eq_memo.borrow().get(&key) {
+            return cached;
+        }
+        let result = match (t1.as_ref(), t2.as_ref()) {
+            // Composites that can form deep chains recurse through `same_type`,
+            // so each nested pair is memoized too; that is what keeps the whole
+            // traversal linear rather than quadratic.
+            (Opt(a), Opt(b)) | (Vec(a), Vec(b)) => self.same_type(a, b),
+            (Record(f1), Record(f2)) | (Variant(f1), Variant(f2)) => {
+                f1.len() == f2.len()
+                    && f1
+                        .iter()
+                        .zip(f2.iter())
+                        .all(|(x, y)| x.id == y.id && self.same_type(&x.ty, &y.ty))
+            }
+            (Class(a1, r1), Class(a2, r2)) => {
+                a1.len() == a2.len()
+                    && a1.iter().zip(a2.iter()).all(|(x, y)| self.same_type(x, y))
+                    && self.same_type(r1, r2)
+            }
+            // Leaves, the `Var`/`Knot` indirection nodes, `Func`/`Service`, and
+            // any cross-variant pair carry no deep-nesting chain to re-walk per
+            // level here, so the derived deep `==` settles them directly; its
+            // verdict is still cached by pointer below.
+            (a, b) => a == b,
+        };
+        self.eq_memo.borrow_mut().insert(key, result);
+        // Pin both operands so their addresses stay valid (and unique) for every
+        // later cache hit on this key.
+        let mut pins = self.eq_pins.borrow_mut();
+        pins.push(t1.clone());
+        pins.push(t2.clone());
+        result
     }
 
     /// Assume `t1 <: t2`. `None` if it is already assumed; otherwise the mark
@@ -129,10 +169,10 @@ pub fn subtype_with_config(
     t2: &Type,
 ) -> Result<()> {
     // One-shot deep equality: a wholly-equal pair is decided in a single linear
-    // pass here, so equal (even separately allocated) types never enter the
-    // structural recursion. Inside the recursion only `same_type_fast` is used,
-    // which keeps the per-level check O(1) and so avoids the quadratic blow-up
-    // (#603).
+    // pass here, so the common equal case never allocates the `Assumptions`
+    // state. Inside the recursion `Assumptions::same_type` is used, which is the
+    // same deep equality but memoized by pointer identity, so the per-level
+    // check is O(1)-amortized and the quadratic blow-up (#603) stays fixed.
     if t1 == t2 {
         return Ok(());
     }
@@ -278,8 +318,9 @@ pub fn subtype_check_all(
     t2: &Type,
 ) -> Vec<Incompatibility> {
     // One-shot deep equality fast path; see `subtype_with_config`. A fully-equal
-    // pair has no incompatibilities, and deciding it here keeps equal types out
-    // of the structural recursion while `same_type_fast` handles each level.
+    // pair has no incompatibilities, and deciding it here avoids allocating the
+    // `Assumptions` state, while `Assumptions::same_type` handles each level of
+    // the partial-overlap cases.
     if t1 == t2 {
         return Vec::new();
     }
@@ -343,7 +384,7 @@ fn subtype_collect_(
         return;
     }
     use TypeInner::*;
-    if same_type_fast(t1, t2) {
+    if gamma.same_type(t1, t2) {
         return;
     }
     // Handle Var/Knot (type variables / recursive types)
@@ -706,7 +747,7 @@ fn subtype_(
         return Err(Error::msg("Recursion limit exceeded"));
     }
     use TypeInner::*;
-    if same_type_fast(t1, t2) {
+    if gamma.same_type(t1, t2) {
         return Ok(());
     }
     if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
@@ -1041,4 +1082,225 @@ fn pp_args(args: &[crate::types::Type]) -> String {
     }
     let _ = write!(&mut s, ")");
     s
+}
+
+#[cfg(test)]
+mod tests {
+    //! `Assumptions::same_type` is a memoized stand-in for the deep structural
+    //! `t1 == t2` it replaced inside the subtype recursion (#603). These tests
+    //! pin it to its oracle: for every pair it must return exactly what the
+    //! derived `==` returns, including for separately allocated but equal trees
+    //! (the case a `ptr_eq`-only check regressed; PR #780 review).
+    use super::*;
+    use crate::types::internal::{Function, Label};
+    use std::rc::Rc;
+
+    fn leaf(t: TypeInner) -> Type {
+        t.into()
+    }
+    /// `vec^depth(leaf)`, freshly allocated so no node is shared with any other
+    /// tree built the same way.
+    fn vec(depth: usize, l: TypeInner) -> Type {
+        let mut t: Type = l.into();
+        for _ in 0..depth {
+            t = TypeInner::Vec(t).into();
+        }
+        t
+    }
+    fn opt(t: Type) -> Type {
+        TypeInner::Opt(t).into()
+    }
+    fn rec(fields: Vec<(u32, Type)>) -> Type {
+        TypeInner::Record(
+            fields
+                .into_iter()
+                .map(|(id, ty)| Field {
+                    id: Rc::new(Label::Id(id)),
+                    ty,
+                })
+                .collect(),
+        )
+        .into()
+    }
+    fn variant(fields: Vec<(u32, Type)>) -> Type {
+        TypeInner::Variant(
+            fields
+                .into_iter()
+                .map(|(id, ty)| Field {
+                    id: Rc::new(Label::Id(id)),
+                    ty,
+                })
+                .collect(),
+        )
+        .into()
+    }
+    fn func(args: Vec<Type>, rets: Vec<Type>) -> Type {
+        TypeInner::Func(Function {
+            modes: vec![],
+            args,
+            rets,
+        })
+        .into()
+    }
+    fn class(args: Vec<Type>, ret: Type) -> Type {
+        TypeInner::Class(args, ret).into()
+    }
+    fn service(ms: Vec<(&str, Type)>) -> Type {
+        TypeInner::Service(ms.into_iter().map(|(n, t)| (n.to_string(), t)).collect()).into()
+    }
+
+    /// `same_type` must agree with the derived `==` in both directions.
+    fn assert_oracle(a: &Type, b: &Type) {
+        let mut g = Gamma::new();
+        let asm = Assumptions::new(&mut g);
+        assert_eq!(
+            asm.same_type(a, b),
+            a == b,
+            "same_type disagreed with `==` on {a:?} vs {b:?}"
+        );
+        assert_eq!(
+            asm.same_type(b, a),
+            b == a,
+            "same_type disagreed with `==` on {b:?} vs {a:?}"
+        );
+    }
+
+    #[test]
+    fn same_type_matches_eq_on_leaves_and_mismatched_variants() {
+        assert_oracle(&leaf(TypeInner::Nat), &leaf(TypeInner::Nat));
+        assert_oracle(&leaf(TypeInner::Nat), &leaf(TypeInner::Int));
+        assert_oracle(&leaf(TypeInner::Principal), &leaf(TypeInner::Principal));
+        // Cross-variant pairs fall to the derived `==` arm and must be unequal.
+        assert_oracle(&opt(leaf(TypeInner::Nat)), &vec(1, TypeInner::Nat));
+        assert_oracle(&vec(1, TypeInner::Nat), &leaf(TypeInner::Nat));
+        assert_oracle(
+            &TypeInner::Var("a".into()).into(),
+            &TypeInner::Var("b".into()).into(),
+        );
+    }
+
+    #[test]
+    fn same_type_accepts_separately_allocated_equal_deep_subtrees() {
+        // The regression from PR #780: these share no allocation (ptr_eq is
+        // false at every level) yet are structurally equal, so `same_type` must
+        // still return true without being walked level by level.
+        let d = 400;
+        assert!(Rc::as_ptr(&vec(d, TypeInner::Nat).0) != Rc::as_ptr(&vec(d, TypeInner::Nat).0));
+        assert_oracle(&vec(d, TypeInner::Nat), &vec(d, TypeInner::Nat));
+        // ...and must still distinguish a deep leaf mismatch or a depth change.
+        assert_oracle(&vec(d, TypeInner::Nat), &vec(d, TypeInner::Int));
+        assert_oracle(&vec(d, TypeInner::Nat), &vec(d - 1, TypeInner::Nat));
+    }
+
+    #[test]
+    fn same_type_matches_eq_on_records_and_variants() {
+        let r = || {
+            rec(vec![
+                (0, vec(3, TypeInner::Nat)),
+                (1, leaf(TypeInner::Text)),
+            ])
+        };
+        assert_oracle(&r(), &r());
+        // Reordered fields, a renamed field, an extra field, and a changed field
+        // type must each be unequal — exactly as the derived `==` sees them.
+        assert_oracle(
+            &r(),
+            &rec(vec![
+                (1, leaf(TypeInner::Text)),
+                (0, vec(3, TypeInner::Nat)),
+            ]),
+        );
+        assert_oracle(
+            &r(),
+            &rec(vec![
+                (0, vec(3, TypeInner::Nat)),
+                (2, leaf(TypeInner::Text)),
+            ]),
+        );
+        assert_oracle(
+            &r(),
+            &rec(vec![
+                (0, vec(3, TypeInner::Nat)),
+                (1, leaf(TypeInner::Text)),
+                (2, leaf(TypeInner::Nat)),
+            ]),
+        );
+        assert_oracle(
+            &r(),
+            &rec(vec![
+                (0, vec(3, TypeInner::Int)),
+                (1, leaf(TypeInner::Text)),
+            ]),
+        );
+        let v = || variant(vec![(0, leaf(TypeInner::Nat)), (1, leaf(TypeInner::Null))]);
+        assert_oracle(&v(), &v());
+        assert_oracle(
+            &v(),
+            &variant(vec![
+                (0, leaf(TypeInner::Nat)),
+                (1, leaf(TypeInner::Reserved)),
+            ]),
+        );
+        // A record and a variant with identical fields are still different types.
+        assert_oracle(
+            &rec(vec![(0, leaf(TypeInner::Nat))]),
+            &variant(vec![(0, leaf(TypeInner::Nat))]),
+        );
+    }
+
+    #[test]
+    fn same_type_matches_eq_on_func_class_service() {
+        let f = || func(vec![vec(2, TypeInner::Nat)], vec![leaf(TypeInner::Bool)]);
+        assert_oracle(&f(), &f());
+        assert_oracle(
+            &f(),
+            &func(vec![vec(2, TypeInner::Int)], vec![leaf(TypeInner::Bool)]),
+        );
+        assert_oracle(&f(), &func(vec![vec(2, TypeInner::Nat)], vec![]));
+
+        let s = || service(vec![("m", f()), ("n", leaf(TypeInner::Nat))]);
+        assert_oracle(&s(), &s());
+        assert_oracle(
+            &s(),
+            &service(vec![("m", f()), ("other", leaf(TypeInner::Nat))]),
+        );
+
+        let c = || class(vec![vec(2, TypeInner::Nat), leaf(TypeInner::Bool)], s());
+        assert_oracle(&c(), &c());
+        assert_oracle(&c(), &class(vec![vec(2, TypeInner::Nat)], s()));
+        assert_oracle(
+            &c(),
+            &class(vec![vec(2, TypeInner::Nat), leaf(TypeInner::Bool)], f()),
+        );
+        // A deeply nested leaf mismatch inside a class must still be caught.
+        assert_oracle(
+            &c(),
+            &class(vec![vec(2, TypeInner::Int), leaf(TypeInner::Bool)], s()),
+        );
+    }
+
+    #[test]
+    fn same_type_matches_eq_on_nested_composites() {
+        let big = || {
+            opt(rec(vec![
+                (0, vec(5, TypeInner::Nat)),
+                (1, variant(vec![(7, opt(leaf(TypeInner::Text)))])),
+                (
+                    2,
+                    func(vec![leaf(TypeInner::Nat)], vec![vec(3, TypeInner::Bool)]),
+                ),
+            ]))
+        };
+        assert_oracle(&big(), &big());
+        // Change one leaf five levels down; `==` sees it, so `same_type` must too.
+        let other = opt(rec(vec![
+            (0, vec(5, TypeInner::Int)),
+            (1, variant(vec![(7, opt(leaf(TypeInner::Text)))])),
+            (
+                2,
+                func(vec![leaf(TypeInner::Nat)], vec![vec(3, TypeInner::Bool)]),
+            ),
+        ]));
+        assert_oracle(&big(), &other);
+    }
 }
