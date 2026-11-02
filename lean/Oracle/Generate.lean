@@ -168,6 +168,7 @@ def samples (T : TypeTable) : Nat → Slot → List Value
     | some (.variant fs) => fs.filterMap fun (id, t) => (samples T fuel t).head?.map (.variant id)
     | some (.func _ _ _) => [.func someId "m"]
     | some (.service _) => [.service someId]
+    | some (.future _ _) => [.null]
     | none => []
 
 /-- A value in the textual syntax, for vector ids. Numbers carry their type, since the

@@ -391,6 +391,10 @@ fn load(fixture: &Value, env: &mut TypeEnv, prefix: &str) -> Result<Type> {
                 ms.sort_by(|(a, _), (b, _)| a.cmp(b));
                 TypeInner::Service(ms)
             }
+            // `TypeInner::Future` has no opcode or bytes, so it is not the same type.
+            ("future", _) => {
+                return Err("candid 0.10 cannot be given a future type, only decode one".into())
+            }
             (k, _) => return Err(format!("unknown table entry {k:?}")),
         };
         env.0.insert(format!("{prefix}{i}"), t.into());

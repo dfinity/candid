@@ -1,9 +1,10 @@
 # `lean/` — Lean 4 reference model and specification
 
-**Status: fourth slice.** Types, the field-id hash, subtyping — as both a relation and a
+**Status: fifth slice.** Types, the field-id hash, subtyping — as both a relation and a
 decision procedure — values with coercion, and the binary format in both directions,
 with an executable that writes them out
-as conformance vectors, reads them back, and is checked against `candid` 0.10 in CI. "Slice" is a label for
+as conformance vectors, reads them back, and is checked against `candid` 0.10 in CI. It
+is also held to the decoding assertions of [test/](../test/). "Slice" is a label for
 what landed in a merge window, applied after the fact; the forward-looking plan is the
 coverage checklist below and the tiers in [REWRITE.md §3](../REWRITE.md#3-lean-honestly). Nothing is published and
 nothing carries a compatibility promise. See [REWRITE.md](../REWRITE.md) for why this
@@ -296,6 +297,29 @@ about the spec as much as about 0.10.
 bytes decode to the same value at the same type, in a table equal to the one written up
 to the order of each entry's members.
 
+## What slice 5 established
+
+**The model agrees with every assertion of `test/` it can be asked**: 447 of the 471,
+all of them about decoding. [Oracle/TestDid.lean](Oracle/TestDid.lean) holds the model to
+each assertion's claim -- accepted, rejected, or equal to some value -- and the oracle
+fails on any it disagrees with; none needed an exception. The vectors carry the model's
+answers, so they say more than the assertions did: `assert blob "..." : (nat)` says
+that a message is accepted, and its vector says as what. 0.10 agrees with all of them.
+
+The `.test.did` files stay the source. `conformance/tools/test-did` reads them with
+`candid_parser` and writes [Oracle/TestDid/Data.lean](Oracle/TestDid/Data.lean): the
+bytes, the types as a table, and the claim. The model has no textual syntax yet, so
+text on the right of `==` arrives as the values `candid_parser` reads it as, at the
+assertion's types. The 24 assertions left wait on the textual syntax (7, with text on
+the left) and on the cost model (the 17 of `spacebomb.test.did`).
+
+**Future types.** A decoder that meets an opcode below `-24` now skips it as the spec
+says, keeping the type in the table as `Composite.future` and decoding its values to
+`null`. The general rules make a future type a subtype of `reserved` and of every
+option, which is what `test/subtypes.test.did` asserts; the spec has no rule of its own
+for them, and the model adds only reflexivity. A future value's reference count is read
+and ignored, as 0.10 does, since the model has no reference table.
+
 ## Constraints
 
 - **No mathlib.** We do not need it, and depending on it would dominate build
@@ -321,9 +345,8 @@ cover what actually breaks in production:
       function has no results, and a method type denotes a function
 - [x] Subtyping, as a relation with a derived decision procedure
 - [x] Values, and coercion, including the `opt` backtracking rule
-- [x] Binary wire format: type table, memory section, LEB128/SLEB128 -- decoding,
-      and an encoder; not future types (opcodes below `-24`), which the spec says to
-      skip and the model rejects
+- [x] Binary wire format: type table, memory section, LEB128/SLEB128, future
+      types -- decoding, and an encoder
 - [ ] Cost model / resource exhaustion
 - [ ] Textual value syntax
 
@@ -353,8 +376,6 @@ Named here so they are obligations rather than oversights.
   children are slots. The parser will need the pass that interns nested composites
   into a table, and textual aliases (`type A = B;`) have to be resolved by it —
   `intern`/`close` are only the hand-written-example half of that.
-- **Future types.** The spec reserves opcodes below `-24` for types an older decoder
-  skips by length. The model rejects them; no vector exercises them until it does not.
 - **Encoding vectors, and type equivalence.** An encoding vector is a value and a type,
   and the check is that an implementation's bytes decode to an *equivalent* type and
   the same value. Equivalence -- the same infinite tree -- is decidable with the

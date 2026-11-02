@@ -99,6 +99,16 @@ def _root_.Candid.FuncAnnot.ofName? : String → Option FuncAnnot
 
 /-! ## Writing -/
 
+/-! Bytes are lowercase hex, two digits each. -/
+
+def hexDigit (n : Nat) : Char := "0123456789abcdef".toList.getD n '0'
+
+/-- `n` as exactly `width` lowercase hex digits. -/
+def hexFixed (width n : Nat) : String :=
+  String.ofList ((List.range width).reverse.map fun i => hexDigit (n / 16 ^ i % 16))
+
+def bytesToHex (bs : PrincipalBytes) : String := String.join (bs.map (hexFixed 2 ·.toNat))
+
 /-- A primitive is its name; a reference is its table index. -/
 def _root_.Candid.Slot.toJson : Slot → Json
   | .prim p => .str p.name
@@ -119,6 +129,7 @@ def _root_.Candid.Composite.toJson : Composite → Json
       , ("annots", .arr (ann.map (Json.str ·.name)).toArray) ])]
   | .service ms => .mkObj [("service",
       .arr (ms.map fun (n, s) => Json.arr #[.str n, s.toJson]).toArray)]
+  | .future op d => .mkObj [("future", .arr #[.num op, .str (bytesToHex d)])]
 
 def Fixture.toJson (f : Fixture) : Json :=
   .mkObj [("table", .arr (f.table.entries.map Composite.toJson)), ("root", f.root.toJson)]
@@ -130,14 +141,6 @@ def TypeSeq.toJson (s : TypeSeq) : Json :=
 /-! Values. Every number in a value is a decimal string, so that no reader loses
 precision -- a JSON number past 2^53 does not survive most parsers -- and a float is its
 bit pattern in hex, so that every NaN and both zeros survive too. -/
-
-def hexDigit (n : Nat) : Char := "0123456789abcdef".toList.getD n '0'
-
-/-- `n` as exactly `width` lowercase hex digits. -/
-def hexFixed (width n : Nat) : String :=
-  String.ofList ((List.range width).reverse.map fun i => hexDigit (n / 16 ^ i % 16))
-
-def bytesToHex (bs : PrincipalBytes) : String := String.join (bs.map (hexFixed 2 ·.toNat))
 
 partial def valueToJson : Value → Json
   | .null => .null
@@ -223,6 +226,24 @@ def _root_.Candid.Slot.fromJson? : Json → Except String Slot
     | none => throw s!"unknown primitive type {repr s}"
   | j => do return .ref (← j.getNat?)
 
+def hexValue? (c : Char) : Option Nat :=
+  if '0' ≤ c && c ≤ '9' then some (c.toNat - '0'.toNat)
+  else if 'a' ≤ c && c ≤ 'f' then some (c.toNat - 'a'.toNat + 10)
+  else none
+
+/-- Lowercase hex digits, read as one number. -/
+def hexDigits? (s : String) : Except String Nat :=
+  s.toList.foldlM (init := 0) fun acc c => match hexValue? c with
+    | some d => pure (acc * 16 + d)
+    | none => throw s!"not lowercase hex: {repr s}"
+
+def bytesFromHex? (j : Json) : Except String PrincipalBytes := do
+  let s ← j.getStr?
+  unless s.length % 2 == 0 do throw s!"odd number of hex digits: {repr s}"
+  let cs := s.toList
+  (List.range (cs.length / 2)).mapM fun i =>
+    return (← hexDigits? (String.ofList [cs[2 * i]!, cs[2 * i + 1]!])).toUInt8
+
 def fieldIdFromJson? (j : Json) : Except String FieldId := do
   let n ← j.getNat?
   unless n < UInt32.size do throw s!"field id {n} does not fit in 32 bits"
@@ -256,6 +277,10 @@ def _root_.Candid.Composite.fromJson? (j : Json) : Except String Composite := do
       (← slotsFromJson? (← f.getObjVal? "rets")) ann
   | [("service", ms)] =>
     return .service (← (← ms.getArr?).toList.mapM (pairFromJson? Json.getStr?))
+  | [("future", f)] =>
+    match (← f.getArr?).toList with
+    | [op, d] => return .future (← op.getInt?) (← bytesFromHex? d)
+    | _ => throw "expected a two-element array"
   | _ => throw s!"not a table entry: {j.compress}"
 
 /-- A decimal string, in canonical form: what `toString` writes and nothing else, so
@@ -285,29 +310,11 @@ def boundedInt? (bits : Nat) (j : Json) : Except String Int := do
     throw s!"{i} does not fit in int{bits}"
   return i
 
-def hexValue? (c : Char) : Option Nat :=
-  if '0' ≤ c && c ≤ '9' then some (c.toNat - '0'.toNat)
-  else if 'a' ≤ c && c ≤ 'f' then some (c.toNat - 'a'.toNat + 10)
-  else none
-
-/-- Lowercase hex digits, read as one number. -/
-def hexDigits? (s : String) : Except String Nat :=
-  s.toList.foldlM (init := 0) fun acc c => match hexValue? c with
-    | some d => pure (acc * 16 + d)
-    | none => throw s!"not lowercase hex: {repr s}"
-
 /-- Exactly `width` lowercase hex digits. -/
 def hexFixed? (width : Nat) (j : Json) : Except String Nat := do
   let s ← j.getStr?
   unless s.length == width do throw s!"expected {width} hex digits: {repr s}"
   hexDigits? s
-
-def bytesFromHex? (j : Json) : Except String PrincipalBytes := do
-  let s ← j.getStr?
-  unless s.length % 2 == 0 do throw s!"odd number of hex digits: {repr s}"
-  let cs := s.toList
-  (List.range (cs.length / 2)).mapM fun i =>
-    return (← hexDigits? (String.ofList [cs[2 * i]!, cs[2 * i + 1]!])).toUInt8
 
 partial def valueFromJson? (j : Json) : Except String Value := do
   match j with

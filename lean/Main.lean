@@ -27,7 +27,8 @@ def files : List (String × List Vector) :=
   , ("subtype-primitives.json", Generate.primitives)
   , ("subtype-small.json", Generate.smallTypes)
   , ("coerce-small.json", Generate.coercions)
-  , ("decode-small.json", Generate.decodes) ]
+  , ("decode-small.json", Generate.decodes)
+  , ("test-did.json", TestDid.vectors) ]
 
 /-- Ids that occur more than once. -/
 def duplicateIds (vs : List Vector) : List String := Id.run do
@@ -65,9 +66,15 @@ def selfTest : IO UInt32 := do
   for id in duplicateIds all do
     IO.println s!"FAIL  duplicate vector id: {id}"
     problems := problems + 1
-  for p in Generate.propertyViolations ++ Generate.wireViolations ++ Generate.encodeRejections do
+  for p in Generate.propertyViolations ++ Generate.wireViolations ++ Generate.encodeRejections ++
+      futureViolations do
     IO.println s!"FAIL  {p}"
     problems := problems + 1
+  for p in TestDid.violations do
+    IO.println s!"FAIL  test/{p}"
+    problems := problems + 1
+  for (why, n) in TestDid.deferred do
+    IO.println s!"wait  {n} assertions of test/ on {why}"
   for v in all do
     unless roundTrips v do
       IO.println s!"FAIL  does not survive JSON: {v.id}"
