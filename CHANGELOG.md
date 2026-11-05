@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 2026-11-05
+
+### Candid 0.10.40
 
 * Bug fixes:
   + Decoding a `vec` into a Rust array `[T; N]` now fails when the vec has more than `N` elements. Previously the decoder kept the first `N` and left the rest unread, so the values after it in the message were decoded from the wrong offset: a 33-byte `vec nat8` subaccount decoded into `[u8; 32]` succeeded, and the field after it (e.g. an `amount`) got the wrong value. A vec shorter than `N` was already rejected.
