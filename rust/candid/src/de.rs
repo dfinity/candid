@@ -1217,11 +1217,12 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                             element_size: byte_size,
                             prim,
                         };
-                        let result = visitor.visit_seq(&mut access);
-                        // Advance by bytes actually consumed, not total_bytes, so
-                        // the cursor is correct if the visitor short-circuits.
-                        self.input.set_position((pos + access.offset) as u64);
-                        return result;
+                        let result = visitor.visit_seq(&mut access)?;
+                        // A visitor that stops early (e.g. `[u8; N]`) would leave
+                        // elements unread and misalign everything after this vec.
+                        check_vec_consumed(access.remaining)?;
+                        self.input.set_position((pos + total_bytes) as u64);
+                        return Ok(result);
                     }
 
                     #[cfg(not(target_endian = "little"))]
@@ -1250,7 +1251,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                     self.expect_type = expect.clone();
                     self.wire_type = wire.clone();
                 }
-                let result = visitor.visit_seq(Compound::new(
+                let mut compound = Compound::new(
                     self,
                     Style::Vector {
                         len,
@@ -1258,8 +1259,10 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                         wire,
                         exact_primitive,
                     },
-                ));
-                result
+                );
+                let result = visitor.visit_seq(&mut compound)?;
+                compound.finish_seq()?;
+                Ok(result)
             }
             (TypeInner::Record(_), TypeInner::Record(_)) => {
                 let expect = self.expect_type.clone();
@@ -1271,7 +1274,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                         elide_large(&self.wire_type)
                     )));
                 }
-                let value = visitor.visit_seq(Compound::new(
+                let mut compound = Compound::new(
                     self,
                     Style::Struct {
                         expect,
@@ -1279,7 +1282,9 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                         expect_idx: 0,
                         wire_idx: 0,
                     },
-                ))?;
+                );
+                let value = visitor.visit_seq(&mut compound)?;
+                compound.finish_seq()?;
                 Ok(value)
             }
             _ => check!(false),
@@ -1671,6 +1676,32 @@ impl Style {
 impl<'a, 'de> Compound<'a, 'de> {
     fn new(de: &'a mut Deserializer<'de>, style: Style) -> Self {
         Compound { de, style }
+    }
+    /// Called after a visitor returns from `visit_seq`. Serde visitors for
+    /// fixed-size types (`[T; N]`, tuples) stop after N elements without
+    /// draining the rest, so the remaining input must be handled here or the
+    /// values that follow are decoded from the wrong offset.
+    fn finish_seq(&mut self) -> Result<()> {
+        match self.style {
+            // A vector longer than the Rust type can hold has no valid value.
+            Style::Vector { len, .. } => check_vec_consumed(len),
+            // Extra trailing tuple fields are allowed by subtyping: skip them.
+            Style::Struct { .. } => {
+                while de::SeqAccess::next_element::<de::IgnoredAny>(self)?.is_some() {}
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+fn check_vec_consumed(remaining: usize) -> Result<()> {
+    if remaining == 0 {
+        Ok(())
+    } else {
+        Err(Error::msg(format!(
+            "invalid length: vec has {remaining} more element(s) than the expected type can hold"
+        )))
     }
 }
 
