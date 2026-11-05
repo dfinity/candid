@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+* Bug fixes:
+  + Decoding a `vec` into a Rust array `[T; N]` now fails when the vec has more than `N` elements. Previously the decoder kept the first `N` and left the rest unread, so the values after it in the message were decoded from the wrong offset: a 33-byte `vec nat8` subaccount decoded into `[u8; 32]` succeeded, and the field after it (e.g. an `amount`) got the wrong value. A vec shorter than `N` was already rejected.
+  + Decoding a wire tuple with extra trailing fields into a Rust tuple or tuple struct now skips those fields, as subtyping allows. Previously they were left unread and the values that followed were decoded from the wrong offset.
+
 * Spec:
   + Coercing a value whose type does not accept `null` at an *infinite option* (`type Opt = opt Opt`) is undefined, and deserialisation fails, even under an enclosing `opt`. This writes down what `candid` has done since 0.10.20 and what `test/construct.test.did` has asserted since then; the spec's rules had become self-referential there when #678 dropped the premise that kept the rule via the constituent type from unwrapping one option inside another. The soundness property now states the exception. No implementation changes.
 
