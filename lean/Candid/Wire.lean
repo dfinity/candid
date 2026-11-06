@@ -81,11 +81,24 @@ current position, and gives up when it would pass the table's size. The measure 
 (bytes remaining, `size - stall`, the step's place in its list), and every step lowers
 it.
 
-**What is not bounded.** A vector of a type with zero-length values -- `vec null`,
-`vec record {}` -- can claim any length in a few bytes, and decoding it builds a value
-that long. That is the cost model's problem (`spec/Candid.md`, "Deserialisation":
-"deserialising data of exponential size"), and the model does not have one yet.
--/
+**Protected decoding.** Most values take at least a byte on the wire. Those of some
+types take none: `null`, `reserved`, and records of nothing else. A
+vector of such a type can claim any length in a few bytes -- `vec null` of length 10^9
+is 5 -- and a record whose two fields have one type, itself such a record, doubles
+the values at each level, so a message can stand for more values than any decoder can afford. The spec
+leaves those messages valid, and they are: `deserialize` decodes them, and would build
+every value.
+
+Protected decoding (`spec/Candid.md`, "Protected decoding") rejects them as well. It
+counts every value decoded, wherever it is -- inside another, in an argument past the
+expected ones, in a field the expected type does not declare -- and rejects a message
+with more than `perByte` values for each of its bytes, and `base` more (`Budget`). The
+count is checked as it grows, so the decoder stops at the limit rather than build what
+is past it, which is what lets the model answer for a message of 10^9 values at all.
+
+What coercion produces is not counted. It is a function of the values decoded and the
+receiver's types, so it is at most a constant factor more than the count, and that
+factor is the receiver's to choose. -/
 
 import Candid.Coerce
 
@@ -507,60 +520,74 @@ theorem lex3 {a b c a' b' c' : Nat}
   · exact Prod.Lex.right _ (Prod.Lex.left _ _ h)
   · exact Prod.Lex.right _ (Prod.Lex.right _ h)
 
+/-- Why protected decoding rejects a message that is otherwise valid. -/
+def overBudget : String := "more values than protected decoding allows for the message's size"
+
+/-- Count one value against `limit`: the count with it, or a rejection if that passes the
+limit. See "Protected decoding" in the header. -/
+def charge (pos : Nat) (limit : Option Nat) (used : Nat) :
+    Except DecodeError Nat :=
+  if limit.any (· < used + 1) then .error ⟨pos, overBudget⟩ else .ok (used + 1)
+
 mutual
 
 /-- The inverse of `M`: a value of type `t` in `A`, read from `pos`. `stall` is the
-number of records on the path here that started at `pos`; see the header. -/
+number of records on the path here that started at `pos`; see the header. `used` is the
+number of values decoded before this one, and the result carries the count after it. -/
 def decodeValue (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size)
-    (stall : Nat) (t : Slot) : Read bs pos Value :=
-  match t with
-  | .prim p => decodePrim bs pos hpos p
+    (stall : Nat) (limit : Option Nat) (used : Nat) (t : Slot) : Read bs pos (Value × Nat) :=
+  match charge pos limit used with
+  | .error e => .error e
+  | .ok used => match t with
+  | .prim p => (decodePrim bs pos hpos p).map fun (v, q) => ((v, used), q)
   | .ref r => match A.lookup? r with
     | none => .error ⟨pos, s!"type index {r} does not resolve"⟩
     | some (.opt inner) => match readByte bs pos with
       | .error e => .error e
-      | .ok (0, ⟨p, hp⟩) => .ok (.null, ⟨p, Nat.le_of_lt hp.1, hp.2⟩)
-      | .ok (1, ⟨p, hp⟩) => match decodeValue A bs p hp.2 0 inner with
+      | .ok (0, ⟨p, hp⟩) => .ok ((.null, used), ⟨p, Nat.le_of_lt hp.1, hp.2⟩)
+      | .ok (1, ⟨p, hp⟩) => match decodeValue A bs p hp.2 0 limit used inner with
         | .error e => .error e
-        | .ok (v, ⟨q, hq⟩) => .ok (.opt v, ⟨q, by omega, hq.2⟩)
+        | .ok ((v, used), ⟨q, hq⟩) => .ok ((.opt v, used), ⟨q, by omega, hq.2⟩)
       | .ok (b, _) => .error ⟨pos, s!"option tag {b}, neither 0 nor 1"⟩
     | some (.vec inner) => match readLeb bs pos with
       | .error e => .error e
-      | .ok (n, ⟨p, hp⟩) => match decodeElems A bs p hp.2 n inner with
+      | .ok (n, ⟨p, hp⟩) => match decodeElems A bs p hp.2 limit used n inner with
         | .error e => .error e
-        | .ok (vs, ⟨q, hq⟩) => .ok (.vec vs, ⟨q, by omega, hq.2⟩)
+        | .ok ((vs, used), ⟨q, hq⟩) => .ok ((.vec vs, used), ⟨q, by omega, hq.2⟩)
     | some (.record fs) =>
       if h : stall < A.size then
-        match decodeFields A bs pos hpos (stall + 1) fs with
+        match decodeFields A bs pos hpos (stall + 1) limit used fs with
         | .error e => .error e
-        | .ok (vs, q) => .ok (.record vs, q)
+        | .ok ((vs, used), q) => .ok ((.record vs, used), q)
       else .error ⟨pos, "a record type that contains itself at no cost has no value"⟩
     | some (.variant fs) => match readLeb bs pos with
       | .error e => .error e
       | .ok (i, ⟨p, hp⟩) => match fs[i]? with
         | none => .error ⟨pos, s!"variant index {i} past the last of {fs.length} alternatives"⟩
-        | some (id, inner) => match decodeValue A bs p hp.2 0 inner with
+        | some (id, inner) => match decodeValue A bs p hp.2 0 limit used inner with
           | .error e => .error e
-          | .ok (v, ⟨q, hq⟩) => .ok (.variant id v, ⟨q, by omega, hq.2⟩)
-    | some (.service _) => Read1.weaken ((readId bs pos).map fun (id, p) => (.service id, p))
-    | some (.func _ _ _) => Read1.weaken (readFuncRef bs pos)
-    | some (.future _ _) => Read1.weaken (readFuture bs pos)
+          | .ok ((v, used), ⟨q, hq⟩) => .ok ((.variant id v, used), ⟨q, by omega, hq.2⟩)
+    | some (.service _) =>
+      Read1.weaken ((readId bs pos).map fun (id, p) => ((.service id, used), p))
+    | some (.func _ _ _) => Read1.weaken ((readFuncRef bs pos).map fun (v, p) => ((v, used), p))
+    | some (.future _ _) => Read1.weaken ((readFuture bs pos).map fun (v, p) => ((v, used), p))
 termination_by (bs.size - pos, A.size - stall, 0)
 decreasing_by all_goals (apply lex3; omega)
 
 /-- A record's fields, in order. The first starts where the record does, so it shares
 the record's `stall`; a later one does too unless bytes were consumed in between. -/
 def decodeFields (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size)
-    (stall : Nat) (fs : List (FieldId × Slot)) : Read bs pos (List (FieldId × Value)) :=
+    (stall : Nat) (limit : Option Nat) (used : Nat) (fs : List (FieldId × Slot)) :
+    Read bs pos (List (FieldId × Value) × Nat) :=
   match fs with
-  | [] => .ok ([], ⟨pos, Nat.le_refl _, hpos⟩)
-  | (id, t) :: rest => match decodeValue A bs pos hpos stall t with
+  | [] => .ok (([], used), ⟨pos, Nat.le_refl _, hpos⟩)
+  | (id, t) :: rest => match decodeValue A bs pos hpos stall limit used t with
     | .error e => .error e
-    | .ok (v, ⟨p, hp⟩) =>
+    | .ok ((v, used), ⟨p, hp⟩) =>
       let next := if p = pos then stall else 0
-      match decodeFields A bs p hp.2 next rest with
+      match decodeFields A bs p hp.2 next limit used rest with
       | .error e => .error e
-      | .ok (vs, ⟨q, hq⟩) => .ok ((id, v) :: vs, ⟨q, by omega, hq.2⟩)
+      | .ok ((vs, used), ⟨q, hq⟩) => .ok (((id, v) :: vs, used), ⟨q, by omega, hq.2⟩)
 termination_by (bs.size - pos, A.size - stall, fs.length + 1)
 decreasing_by
   all_goals apply lex3
@@ -570,61 +597,89 @@ decreasing_by
 /-- `n` elements of type `t`. None starts where the vector did, since the length came
 first, so each starts with no stall. -/
 def decodeElems (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size)
-    (n : Nat) (t : Slot) : Read bs pos (List Value) :=
+    (limit : Option Nat) (used : Nat) (n : Nat) (t : Slot) : Read bs pos (List Value × Nat) :=
   match n with
-  | 0 => .ok ([], ⟨pos, Nat.le_refl _, hpos⟩)
-  | n + 1 => match decodeValue A bs pos hpos 0 t with
+  | 0 => .ok (([], used), ⟨pos, Nat.le_refl _, hpos⟩)
+  | n + 1 => match decodeValue A bs pos hpos 0 limit used t with
     | .error e => .error e
-    | .ok (v, ⟨p, hp⟩) => match decodeElems A bs p hp.2 n t with
+    | .ok ((v, used), ⟨p, hp⟩) => match decodeElems A bs p hp.2 limit used n t with
       | .error e => .error e
-      | .ok (vs, ⟨q, hq⟩) => .ok (v :: vs, ⟨q, by omega, hq.2⟩)
+      | .ok ((vs, used), ⟨q, hq⟩) => .ok ((v :: vs, used), ⟨q, by omega, hq.2⟩)
 termination_by (bs.size - pos, A.size, n + 1)
 decreasing_by all_goals (apply lex3; omega)
 
 end
 
 /-- The values of a message, one per argument type. -/
-def decodeArgs (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size) :
-    List Slot → Read bs pos (List Value)
-  | [] => .ok ([], ⟨pos, Nat.le_refl _, hpos⟩)
-  | t :: ts => match decodeValue A bs pos hpos 0 t with
+def decodeArgs (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size)
+    (limit : Option Nat) (used : Nat) : List Slot → Read bs pos (List Value × Nat)
+  | [] => .ok (([], used), ⟨pos, Nat.le_refl _, hpos⟩)
+  | t :: ts => match decodeValue A bs pos hpos 0 limit used t with
     | .error e => .error e
-    | .ok (v, ⟨p, hp⟩) => match decodeArgs A bs p hp.2 ts with
+    | .ok ((v, used), ⟨p, hp⟩) => match decodeArgs A bs p hp.2 limit used ts with
       | .error e => .error e
-      | .ok (vs, ⟨q, hq⟩) => .ok (v :: vs, ⟨q, by omega, hq.2⟩)
+      | .ok ((vs, used), ⟨q, hq⟩) => .ok ((v :: vs, used), ⟨q, by omega, hq.2⟩)
 
 /-! ## Messages -/
 
 /-- A decoded message: its type table, its argument types, and its values, each of its
-type. Nothing has been coerced. -/
+type, and how many values were decoded, counting every value inside another. Nothing has
+been coerced. -/
 structure Message where
   table : TypeTable
   types : List Slot
   values : List Value
+  count : Nat
 
-/-- The inverse of `B`: the header, then the values at the header's types, then nothing. -/
-def decode (bs : ByteArray) : Except DecodeError Message := do
+/-- The inverse of `B`: the header, then the values at the header's types, then nothing.
+With a `limit`, a message with more values than that is rejected as soon as the count
+passes it; see "Protected decoding" in the header. -/
+def decode (bs : ByteArray) (limit : Option Nat := none) : Except DecodeError Message := do
   let ((raw, types), pos) ← (Parse.header.run bs).run 0
   let some table := raw.check
     | throw ⟨pos, "the type table is not well formed"⟩
   unless types.all table.resolves do
     throw ⟨pos, "an argument type does not resolve"⟩
   if hpos : pos ≤ bs.size then
-    match decodeArgs table bs pos hpos types with
+    match decodeArgs table bs pos hpos limit 0 types with
     | .error e => throw e
-    | .ok (values, ⟨q, _⟩) =>
+    | .ok ((values, count), ⟨q, _⟩) =>
       unless q == bs.size do throw ⟨q, s!"{bs.size - q} bytes after the last value"⟩
-      return { table, types, values }
+      return { table, types, values, count }
   else throw ⟨pos, "unreachable: the header ends past the input"⟩
 
-/-- Deserialisation at the expected types `expected` in `B`: decode, then coerce the
-whole argument sequence. `none` is a rejected message, for whatever reason. -/
-def deserialize (bs : ByteArray) (B : TypeTable) (expected : List Slot) :
-    Option (List Value) :=
-  match decode bs with
+/-- Deserialisation at the expected types `expected` in `B`, decoding at most `limit`
+values if there is a limit: decode, then coerce the whole argument sequence. `none` is a
+rejected message, for whatever reason. -/
+def deserializeWithin (limit : Option Nat) (bs : ByteArray) (B : TypeTable)
+    (expected : List Slot) : Option (List Value) :=
+  match decode bs limit with
   | .error _ => none
   | .ok m => match (coerceArgs m.table B m.values m.types expected).run with
     | .ok r => r
     | .error _ => none
+
+/-- Deserialisation, as the spec defines it: with no limit. -/
+def deserialize (bs : ByteArray) (B : TypeTable) (expected : List Slot) :
+    Option (List Value) :=
+  deserializeWithin none bs B expected
+
+/-- What protected decoding allows a message: `perByte` values for each of its bytes,
+and `base` more. -/
+structure Budget where
+  perByte : Nat
+  base : Nat
+
+def Budget.limit (b : Budget) (bs : ByteArray) : Nat := b.perByte * bs.size + b.base
+
+/-- The budget the spec names. Provisional: these are Motoko's defaults (`max_values`,
+0.13.0), and the spec has not settled on constants. -/
+def Budget.default : Budget := ⟨1, 1024⟩
+
+/-- Deserialisation in protected decoding: rejected as well when it costs more than the
+budget allows for the message's size. -/
+def deserializeProtected (b : Budget) (bs : ByteArray) (B : TypeTable)
+    (expected : List Slot) : Option (List Value) :=
+  deserializeWithin (some (b.limit bs)) bs B expected
 
 end Candid

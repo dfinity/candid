@@ -97,7 +97,8 @@ the source: [tools/test-did/](tools/test-did/) translates them into Lean with
 {"id":"...","kind":"coerce","value":<value>,"from":<type>,"to":<type>,"expect":{"value":<value>}},
 {"id":"...","kind":"coerce","value":<value>,"from":<type>,"to":<type>,"expect":"reject"},
 {"id":"...","kind":"decode","bytes":"4449444c...","types":<types>,"expect":{"values":[<value>, ...]}},
-{"id":"...","kind":"decode","bytes":"4449444c...","types":<types>,"expect":"reject"}
+{"id":"...","kind":"decode","bytes":"4449444c...","types":<types>,"expect":"reject"},
+{"id":"...","kind":"decode","protected":true,"bytes":"4449444c...","types":<types>,"expect":"reject"}
 ]}
 ```
 
@@ -121,6 +122,11 @@ the format, so it changes in place.
   `types` is `{"table": [<entry>, ...], "roots": [<slot>, ...]}`: one table, any
   number of types in it. The types are well formed and each expected value has its
   type. The bytes need not be well formed; most of the hand-written ones are not.
+- **`decode` with `"protected": true`**: the same, in protected decoding
+  (`spec/Candid.md`, "Protected decoding"), at the spec's budget. Every `decode` vector
+  without it holds in protected decoding too, unless a `protected` vector with the same
+  `bytes` and `types` gives another answer: protected decoding only adds rejections,
+  and the vectors that show one say so. `protected` is `true` or absent, never `false`.
 
 A `<type>` is `{"table": [<entry>, ...], "root": <slot>}`. A `<slot>` is a primitive's
 name (`"nat"`, `"principal"`, ...) or a table index (`3`). An `<entry>` is a composite,
@@ -181,7 +187,8 @@ says, since the list excuses an answer, never a broken question.
 [runners/candid-0.10/](runners/candid-0.10/) checks `rust/candid` through its public
 API, using `OptReport::Silence`: the special `opt` rule is part of the relation. It
 skips `wellformed` vectors, since 0.10 has no function that checks a type table on its
-own. It asks a `coerce` vector by encoding the value at `from` and decoding the bytes at
+own, and `protected` ones, since 0.10 has no protected decoding: its quotas are a
+different measure, configured per call, and no setting of them is the spec's budget. It asks a `coerce` vector by encoding the value at `from` and decoding the bytes at
 `to`, since 0.10 coerces only while decoding, and compares the result with the expected
 value by encoding both at `to`. For values of that type, encoding is one-to-one, so this
 compares the values while leaving their representation in `IDLValue` to 0.10. Its own
@@ -228,7 +235,7 @@ What the runners have found, recorded so that they outlive the run that found th
   spec does not. Whether it should is a question about the spec. Vector: `decode: a
   principal of 30 bytes`.
 - **The model and 0.10 agree with every assertion of `test/` they can be asked.** All
-  447 that are about decoding, including the ones on future types and on lengths that
+  447 that are about decoding, outside `spacebomb.test.did`, including the ones on future types and on lengths that
   overshoot the input. The model needed no special case for any of them.
 - **The spec has no subtyping rule for future types.** `test/subtypes.test.did`
   asserts that one is a subtype of `opt empty` and not of `nat`, which the general
@@ -251,19 +258,18 @@ What the runners have found, recorded so that they outlive the run that found th
   [REWRITE.md §2](../REWRITE.md#2-what-we-are-building).
 - **`.did` parsing** -- the `*.good.did` / `*.bad.did` cases that were always
   documented and never written.
-- **Resource exhaustion / cost model** as normative.
-  [test/spacebomb.test.did](../test/spacebomb.test.did) is a good start; every
-  implementation faces the zip-bomb problem and currently invents its own defense.
+- **Protected decoding in 0.10.** Its quotas are another measure, so the `protected`
+  vectors are skipped until `candid` has the spec's budget.
 - **Published as a versioned artifact** -- data crate, npm package, and a tarball on
   GitHub Releases -- rather than a directory reachable only by cloning.
 
 ## Migration
 
 All 471 existing assertions must exist as vectors and pass before
-[test/](../test/) is deleted. 447 do, in `test-did.json`. The other 24 wait on parts
-of the model that do not exist yet: 7 have text on the left, which is a question for
-the textual syntax, and the 17 in `spacebomb.test.did` are valid messages a metered
-decoder should reject, which is the cost model's.
+[test/](../test/) is deleted. 464 do, in `test-did.json`: the 17 in
+`spacebomb.test.did` as `protected` vectors, since they are valid messages that
+protected decoding rejects. The other 7 have text on the left, which is a question for
+the textual syntax, and wait on it.
 
 For now the `.test.did` files stay the source, translated by
 [tools/test-did/](tools/test-did/), so `candid_parser`'s own test suite and these

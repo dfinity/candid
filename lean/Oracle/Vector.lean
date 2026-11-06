@@ -62,6 +62,8 @@ inductive Assertion where
   /-- `bytes`, deserialised at `types`, are the values `want`, one per type, or are
   rejected when `want` is `none`. -/
   | decode (bytes : ByteArray) (types : TypeSeq) (want : Option (List Value))
+  /-- The same, in protected decoding (`Candid/Wire.lean`), with `Budget.default`. -/
+  | decodeProtected (bytes : ByteArray) (types : TypeSeq) (want : Option (List Value))
 
 structure Vector where
   /-- Unique within the suite. Human-readable, and stable: a runner's list of known
@@ -198,6 +200,9 @@ def Vector.render (v : Vector) : String :=
   | .decode bs ts want =>
     head "decode" ++ field "bytes" (.str (bytesToHex bs.toList)) ++ field "types" ts.toJson ++
       field "expect" (expectValuesToJson want) ++ "}"
+  | .decodeProtected bs ts want =>
+    head "decode" ++ field "protected" (.bool true) ++ field "bytes" (.str (bytesToHex bs.toList)) ++
+      field "types" ts.toJson ++ field "expect" (expectValuesToJson want) ++ "}"
 
 /-- A whole file: one vector per line, so that a change to the model shows up in a diff
 as exactly the vectors whose answers it changed. -/
@@ -397,10 +402,16 @@ def Vector.fromJson? (j : Json) : Except String Vector := do
         (← Fixture.fromJson? (← j.getObjVal? "from")) (← Fixture.fromJson? (← j.getObjVal? "to"))
         (← expectFromJson? (← j.getObjVal? "expect"))
     | "decode" =>
-      expectKeys j ["id", "kind", "bytes", "types", "expect"]
-      return .decode ⟨(← bytesFromHex? (← j.getObjVal? "bytes")).toArray⟩
-        (← TypeSeq.fromJson? (← j.getObjVal? "types"))
-        (← expectValuesFromJson? (← j.getObjVal? "expect"))
+      -- `protected` is either `true` or absent: there is one way to write each vector.
+      let prot := (j.getObjVal? "protected").toOption
+      if prot.isSome then
+        expectKeys j ["id", "kind", "protected", "bytes", "types", "expect"]
+        unless (← prot.get!.getBool?) do throw "`protected` is present but not `true`"
+      else expectKeys j ["id", "kind", "bytes", "types", "expect"]
+      let bs : ByteArray := ⟨(← bytesFromHex? (← j.getObjVal? "bytes")).toArray⟩
+      let ts ← TypeSeq.fromJson? (← j.getObjVal? "types")
+      let want ← expectValuesFromJson? (← j.getObjVal? "expect")
+      return if prot.isSome then .decodeProtected bs ts want else .decode bs ts want
     | k => throw s!"unknown vector kind {repr k}" : Except String Assertion)
   return { id, assertion }
 
@@ -445,16 +456,28 @@ def Assertion.disagreement : Assertion → Option String
         if got == want then none
         else some s!"got {(expectToJson got).compress}, want {(expectToJson want).compress}"
     | _, _ => some "a type is malformed, so coercion is not defined on it"
-  | .decode bs ts want =>
+  | .decode bs ts want => decodeDisagreement deserialize bs ts want
+  | .decodeProtected bs ts want =>
+    decodeDisagreement (deserializeProtected Budget.default) bs ts want
+where
+  decodeDisagreement (deser : ByteArray → (B : TypeTable) → List Slot → Option (List Value))
+      (bs : ByteArray) (ts : TypeSeq) (want : Option (List Value)) : Option String :=
     match ts.check? with
     | some ⟨B, us⟩ =>
       let roots := us.map (·.1)
       if want.any fun vs => vs.length != roots.length || (vs.zip roots).any fun (v, u) => !B.hasType v u then
         some "the expected values are not one of each type"
       else
-        let got := deserialize bs B roots
+        let got := deser bs B roots
         if got == want then none
         else some s!"got {(expectValuesToJson got).compress}, want {(expectValuesToJson want).compress}"
     | none => some "a type is malformed, so decoding at it is not defined"
+
+/-- A `decode` vector's answer holds in protected decoding too: protected decoding only
+rejects what costs more than its budget, and no `decode` vector does. A vector that
+should be rejected in protected decoding alone is a `protected` one. `none` if it holds. -/
+def Assertion.protectedDisagreement : Assertion → Option String
+  | .decode bs ts want => (Assertion.decodeProtected bs ts want).disagreement
+  | _ => none
 
 end Oracle

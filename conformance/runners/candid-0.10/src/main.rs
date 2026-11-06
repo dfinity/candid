@@ -22,7 +22,7 @@ use candid::types::value::{IDLField, VariantValue};
 use candid::types::{Field, FuncMode, Function, Label, Type, TypeEnv, TypeInner};
 use candid::{IDLArgs, IDLValue, Principal};
 use serde_json::Value;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::process::ExitCode;
 use std::str::FromStr;
 
@@ -55,15 +55,18 @@ const KNOWN: &[(&str, &str)] = &[
 const FORMAT_VERSION: u64 = 0;
 
 const SKIP_WELLFORMED: &str =
-    "candid 0.10 has no public function that checks a type table on its own";
+    "wellformed vectors -- candid 0.10 has no public function that checks a type table on its own";
+
+const SKIP_PROTECTED: &str = "protected decode vectors -- candid 0.10 has no protected decoding; \
+     its quotas are another measure, which cannot answer for the spec's budget";
 
 type Result<T> = std::result::Result<T, String>;
 
 enum Outcome {
     Agree,
     Disagree(String),
-    /// The vector asks something this runner has no way to put to `candid` 0.10.
-    Skip,
+    /// The vector asks something this runner has no way to put to `candid` 0.10, and why.
+    Skip(&'static str),
 }
 
 fn main() -> ExitCode {
@@ -74,7 +77,8 @@ fn main() -> ExitCode {
     }
     let known: BTreeSet<&str> = KNOWN.iter().map(|(id, _)| *id).collect();
     let mut ids = BTreeSet::new();
-    let (mut agree, mut skipped, mut known_hits, mut failed) = (0, 0, 0, 0);
+    let (mut agree, mut known_hits, mut failed) = (0, 0, 0);
+    let mut skipped: BTreeMap<&str, usize> = BTreeMap::new();
 
     for path in &paths {
         let vectors = match read_file(path) {
@@ -91,7 +95,7 @@ fn main() -> ExitCode {
                     println!("FAIL  {path}: vector {i} ({id}) cannot be run -- {e}");
                     failed += 1;
                 }
-                (Ok(Outcome::Skip), _) => skipped += 1,
+                (Ok(Outcome::Skip(why)), _) => *skipped.entry(why).or_default() += 1,
                 (Ok(Outcome::Agree), false) => agree += 1,
                 (Ok(Outcome::Agree), true) => {
                     println!("FAIL  {id} -- listed in KNOWN but now agrees; remove it");
@@ -117,9 +121,10 @@ fn main() -> ExitCode {
     }
 
     println!();
-    println!("{agree} agree, {known_hits} known divergences, {skipped} skipped, {failed} failed");
-    if skipped > 0 {
-        println!("skipped: wellformed vectors -- {SKIP_WELLFORMED}");
+    let skips: usize = skipped.values().sum();
+    println!("{agree} agree, {known_hits} known divergences, {skips} skipped, {failed} failed");
+    for (why, n) in &skipped {
+        println!("skipped {n}: {why}");
     }
     if failed == 0 {
         ExitCode::SUCCESS
@@ -151,7 +156,8 @@ fn run(v: &Value) -> Result<Outcome> {
             let want = field_id(&v["expect"])?;
             Ok(agreement(got == want, || format!("got {got}, want {want}")))
         }
-        "wellformed" => Ok(Outcome::Skip),
+        "wellformed" => Ok(Outcome::Skip(SKIP_WELLFORMED)),
+        "decode" if v["protected"] == Value::Bool(true) => Ok(Outcome::Skip(SKIP_PROTECTED)),
         "subtype" => {
             // `candid` 0.10 takes one environment for both types, so the two tables
             // go into one, each under its own prefix. This is the merge every caller
