@@ -1334,9 +1334,26 @@ Deserialisation at an expected type sequence `(<t'>,*)` proceeds by
  * using the inverse of the `M` function, indexed by `(<t>,*)`, to decode the values `(<v>,*)`
  * use the coercion function `v : t ~> v' : t'` to understand the decoded values at the expected type.
 
-Note on implementation:
+### Protected decoding
 
-Due to the wire format and subtyping, deserializing different messages at a fixed type sequence `(<t'>,*)` requires significantly different resources, e.g., stack size, time and memory. The implementation is encouraged to self-meter the deserialisation cost to prevent: 1) stack overflow; 2) spending too much time on unneeded data, due to subtyping; 3) deserialising data of exponential size.
+Due to the wire format and subtyping, deserialising different messages at a fixed type sequence `(<t'>,*)` requires significantly different resources, e.g., stack size, time and memory. Most values take at least one byte in `M`, but values of `null`, `reserved`, and records of only such fields take none. So a vector of them can claim any length in a few bytes (`vec null` of length 10^9 takes 5), and a record type whose fields share one such type doubles the number of values at each level of nesting. Such messages are valid, and deserialising them can cost more than any implementation can afford. Since a message may come from an untrusted party, and subtyping lets it carry extra arguments and record fields the receiver never asked for, a receiver cannot avoid them by choosing its types.
+
+*Protected decoding* is deserialisation that rejects these messages as well. It counts the values the inverse of `M` decodes: every value, including each value inside another (the elements of a vector, the fields of a record, the value of an option or a variant), and including the values of extra arguments and of record fields that the expected type does not have, which deserialisation decodes and then ignores. A message `B` is rejected in protected decoding when this count exceeds
+
+```
+|B| + 1024
+```
+
+where `|B|` is the length of `B` in bytes. The values produced by coercion are not counted: their number is bounded by the count and the expected types, which the receiver chooses.
+
+* An implementation that may deserialise messages from untrusted parties should offer protected decoding, and should make it the default.
+* In protected decoding, a message whose count exceeds the limit must be rejected. Implementations need not decode the whole message to find out; they can stop as soon as the count exceeds the limit.
+* A message within the limit is deserialised as above. An implementation may still reject it because a resource of its environment runs out, e.g., stack space or an instruction limit.
+* A rejection for lack of resources, in either case, rejects the whole message. It is not a failed coercion, so no enclosing option turns it into `null`, and it does not determine the result of any subtype check.
+* Running out of a resource should be reported as such, distinctly from an invalid message, and should be an error the caller can handle, not an abort of the program.
+* The work of checking subtyping between the types of the message and the expected types should be polynomial in the size of the two type tables, and not depend on the number of values.
+
+Note: the limit is provisional, and may change before it is published.
 
 ### Deserialisation of future types
 

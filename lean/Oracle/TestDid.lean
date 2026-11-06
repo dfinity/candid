@@ -8,15 +8,16 @@ that they say more than an assertion did -- `assert blob "..." : (nat)` says onl
 a message is accepted, and its vector says as what. A message on the right of `==` is a
 vector of its own.
 
-**Not every assertion is checked yet.** Two kinds wait on parts of the model that do
-not exist (`deferral?`):
+**Not every assertion is checked yet.** Those with text on the left wait on the textual
+syntax (`deferral?`): whether text parses at a type is its question. Text on the
+*right* of `==` is checked, against the values `candid_parser` reads it as, since there
+it only spells out the expected values.
 
-- Text on the left: whether text parses at a type is the textual syntax's question.
-  Text on the *right* of `==` is checked, against the values `candid_parser` reads it
-  as, since there it only spells out the expected values.
-- `spacebomb.test.did`: valid messages that take a lot of time or memory to decode, and
-  that a metered decoder should reject. That is the cost model's question, and the
-  model, which has none, would spend the time.
+**`spacebomb.test.did` is about protected decoding.** Its messages are valid, and take
+a lot of time or memory to decode; the file says a decoder with self-metering should
+reject them. Protected decoding is that decoder (`Candid/Wire.lean`), so these
+assertions are checked in it, and become `protected` vectors. The model would spend the
+time deserialising them without it.
 
 **Equality.** `==` and `!=` are "the host language's equality" (`test/README.md`), and
 here that is `Value`'s: floats are equal when their bits are. Rust's runner compares
@@ -39,10 +40,16 @@ def Assert.id (a : Assert) : String := s!"{a.file}.test.did: {a.name}"
 
 /-- Why an assertion is not checked yet, if it is not. See the header. -/
 def Assert.deferral? (a : Assert) : Option String :=
-  if a.file == "spacebomb" then some "the cost model"
-  else match a.input with
-    | .text _ _ => some "the textual syntax"
-    | .blob _ => none
+  match a.input with
+  | .text _ _ => some "the textual syntax"
+  | .blob _ => none
+
+/-- Is the assertion about protected decoding? See the header. -/
+def Assert.isProtected (a : Assert) : Bool := a.file == "spacebomb"
+
+/-- How the assertion's messages are deserialised. -/
+def Assert.deserializer (a : Assert) : ByteArray → TypeTable → List Slot → Option (List Value) :=
+  if a.isProtected then deserializeProtected Budget.default else deserialize
 
 /-- The assertions the model disagrees with on purpose, by id, and why. -/
 def disputed : List (String × String) := []
@@ -51,10 +58,11 @@ def showValues (vs : List Value) : String := (expectValuesToJson (some vs)).comp
 
 /-- The model's reading of one side: deserialised at `roots` in `B`, or for text, what
 `candid_parser` reads it as. `none` is a rejection. -/
-def Input.answer (B : TypeTable) (roots : List Slot) : Input → Except String (Option (List Value))
+def Input.answer (deser : ByteArray → TypeTable → List Slot → Option (List Value))
+    (B : TypeTable) (roots : List Slot) : Input → Except String (Option (List Value))
   | .blob hex => do
     let bs ← bytesFromHex? (.str hex)
-    return deserialize ⟨bs.toArray⟩ B roots
+    return deser ⟨bs.toArray⟩ B roots
   | .text src none => throw s!"candid_parser could not read {repr src} at these types"
   | .text _ (some vs) => return some vs
 
@@ -62,9 +70,9 @@ def Input.answer (B : TypeTable) (roots : List Slot) : Input → Except String (
 def Assert.check (a : Assert) : Except String Unit := do
   let some ⟨B, us⟩ := a.types.check? | throw "a type is malformed"
   let roots := us.map (·.1)
-  let left ← a.input.answer B roots
+  let left ← a.input.answer a.deserializer B roots
   let both (o : Input) : Except String (List Value × List Value) := do
-    match left, ← o.answer B roots with
+    match left, ← o.answer a.deserializer B roots with
     | some l, some r => return (l, r)
     | none, _ => throw "the model rejects the left-hand side"
     | _, none => throw "the model rejects the right-hand side"
@@ -88,7 +96,9 @@ def Assert.vectors (a : Assert) : List Vector :=
       match bytesFromHex? (.str hex) with
       | .ok bs =>
         let bs : ByteArray := ⟨bs.toArray⟩
-        [⟨a.id ++ suffix, .decode bs a.types (deserialize bs B (us.map (·.1)))⟩]
+        let want := a.deserializer bs B (us.map (·.1))
+        [⟨a.id ++ suffix, if a.isProtected then .decodeProtected bs a.types want
+          else .decode bs a.types want⟩]
       | .error _ => []
     let right := match a.claim with
       | .equals (.blob hex) | .differs (.blob hex) => one " (right)" hex

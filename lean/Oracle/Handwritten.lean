@@ -913,10 +913,42 @@ def futureFacts : List (String × Bool) :=
 def futureViolations : List String :=
   futureFacts.filterMap fun (name, ok) => if ok then none else some s!"future types: {name}"
 
+/-! ## Protected decoding
+
+At the edge of `Budget.default`: 1024 values, and one for each byte of the message. A
+message of `vec null` with a two-byte length is 11 bytes, so it may have 1035 values:
+the vector and 1034 elements. With a second argument, `record {}`, it is 14 bytes and
+may have 1038: a vector of 1037 elements alone would fit, and the record is one too
+many. -/
+
+def expectProtected (hex : String) (ts : TypeSeq) (want : Option (List Value)) (id : String) :
+    Vector :=
+  ⟨id, .decodeProtected (hexBytes hex) ts want⟩
+
+def vecNullT : TypeSeq := typesOf do return [← intern (.vec null)]
+
+def nulls (n : Nat) : Value := .vec (List.replicate n .null)
+
+def decodeProtectedChecks : List Vector :=
+  [ expectProtected "4449444c 01 6d 7f 01 00 8a 08" vecNullT (some [nulls 1034])
+      "protected: as many values as the budget allows"
+  , expectProtected "4449444c 01 6d 7f 01 00 8b 08" vecNullT none
+      "protected: one value more than the budget allows"
+  , expectDecode "4449444c 01 6d 7f 01 00 8b 08" vecNullT (some [nulls 1035])
+      "protected: one value more than the budget allows, without protection"
+  , expectProtected "4449444c 01 6d 7f 01 00 8b 08" (prims []) none
+      "protected: an extra argument's values count"
+  , expectProtected "4449444c 02 6d 7f 6c 00 02 00 01 8d 08" vecNullT none
+      "protected: the values of every argument count"
+  , expectProtected "4449444c 01 6d 7f 01 00 8a 08"
+      (typesOf do return [← intern (.vec (← intern (.opt nat)))])
+      (some [nulls 1034]) "protected: the values coercion produces do not count" ]
+
 def decodeChecks : List Vector :=
   decodeFramingChecks ++ decodeLebChecks ++ decodeFixedChecks ++ decodeTextChecks ++
   decodeNullChecks ++ decodeOptVecChecks ++ decodeRecordChecks ++ decodeVariantChecks ++
-  decodeTableChecks ++ decodeRefChecks ++ decodeCoerceChecks ++ decodeFutureChecks
+  decodeTableChecks ++ decodeRefChecks ++ decodeCoerceChecks ++ decodeFutureChecks ++
+  decodeProtectedChecks
 
 def handwritten : List Vector :=
   hashChecks ++ primChecks ++ optChecks ++ vecChecks ++ recordChecks ++
