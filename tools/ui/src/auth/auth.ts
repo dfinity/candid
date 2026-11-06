@@ -18,13 +18,13 @@ function is_valid_url(url: string): boolean {
   return obj.protocol === "http:" || obj.protocol === "https:";
 }
 
-async function check_alternative_origin(): Promise<boolean> {
+async function check_alternative_origin(canisterOrigin: string): Promise<boolean> {
   try {
-    const url = window.location.origin;
-    const response = await fetch(`${url}/.well-known/ii-alternative-origins`);
+    const currentOrigin = window.location.origin;
+    const response = await fetch(`${canisterOrigin}/.well-known/ii-alternative-origins`);
     const data = await response.json();
-    if (data.hasProperty("alternativeOrigins") && Array.isArray(data["alternativeOrigins"])) {
-      return data["alternativeOrigins"].some((origin: string) => origin === url);
+    if (Array.isArray(data?.alternativeOrigins)) {
+      return data.alternativeOrigins.some((origin: string) => origin === currentOrigin);
     }
     return false;
   } catch (_) {
@@ -42,7 +42,8 @@ async function insertLoginForm() {
   try {
     const params = new URLSearchParams(window.location.search);
     const mainnet_domains = ["icp0.io", "ic0.app", "icp.net"];
-    const mainnet_domain = mainnet_domains.find((domain) => window.location.hostname.endsWith(domain));
+    const hostname = window.location.hostname;
+    const mainnet_domain = mainnet_domains.find((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
     const is_mainnet = mainnet_domain !== undefined;
     let provider = params.get("ii");
     if (is_mainnet && !provider) {
@@ -57,8 +58,9 @@ async function insertLoginForm() {
     }
     const cid = Principal.fromText(params.get("id")!);
     let origin = params.get("origin");
-    if (!origin && is_mainnet && await check_alternative_origin()) {
-      origin = `https://${cid.toText()}.${mainnet_domain}`;
+    const canisterOrigin = is_mainnet ? `https://${cid.toText()}.${mainnet_domain}` : undefined;
+    if (!origin && canisterOrigin && await check_alternative_origin(canisterOrigin)) {
+      origin = canisterOrigin;
     }
     if (origin) {
       if (!is_valid_url(origin)) {
