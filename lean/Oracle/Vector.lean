@@ -473,4 +473,15 @@ def Assertion.disagreement : Assertion → Option String
       | some got => some s!"not costly: the model answers {(expectValuesToJson got).compress}"
     | none => some "a type is malformed, so decoding at it is not defined"
 
+/-- A `decode` vector gets its answer within `costlyLimit` too: the limit only tells
+costly messages apart, and none of these is one. `none` if it does. -/
+def Assertion.withinDisagreement : Assertion → Option String
+  | .decode bs ts want =>
+    ts.check?.bind fun ⟨B, us⟩ =>
+      match deserializeWithin costlyLimit bs B (us.map (·.1)) with
+      | some got => if got == want then none
+        else some s!"within the limit, got {(expectValuesToJson got).compress}"
+      | none => some "the model runs out within its limit"
+  | _ => none
+
 end Oracle

@@ -913,6 +913,48 @@ def futureFacts : List (String × Bool) :=
 def futureViolations : List String :=
   futureFacts.filterMap fun (name, ok) => if ok then none else some s!"future types: {name}"
 
+/-! ## The model's limit
+
+`deserializeWithin` is what tells a `costly` vector from one the model answers, and those
+vectors only show it running out. These show the rest: that it answers at exactly the
+number of values a message has, and runs out one below; that nested and ignored values
+count; and that within the limit, a malformed message is rejected, not counted as costly.
+Every `decode` vector is also checked to get its answer within `costlyLimit`
+(`Assertion.withinDisagreement`). -/
+
+def within (hex : String) (ts : TypeSeq) (limit : Nat) : Option (Option (List Value)) :=
+  ts.check?.bind fun ⟨B, us⟩ => deserializeWithin limit (hexBytes hex) B (us.map (·.1))
+
+def plain (hex : String) (ts : TypeSeq) : Option (List Value) :=
+  ts.check?.bind fun ⟨B, us⟩ => deserialize (hexBytes hex) B (us.map (·.1))
+
+def limitFacts : List (String × Bool) :=
+  let vecNull := typesOf do return [← intern (.vec null)]
+  let vecNat8 := typesOf do return [← intern (.vec nat8)]
+  let vecPair := typesOf do return [← intern (.vec (← intern (.record [(0, null), (1, null)])))]
+  -- `vec null` of 3: the vector and its elements, 4 values.
+  let nulls3 := "4449444c 01 6d 7f 01 00 03"
+  -- `vec record { null; null }` of 2: the vector, 2 records, 4 nulls, 7 values.
+  let pairs2 := "4449444c 02 6c 02 00 7f 01 7f 6d 00 01 01 02"
+  let answersAt (hex : String) (ts : TypeSeq) (n : Nat) :=
+    (plain hex ts).isSome && within hex ts n == some (plain hex ts)
+  [ ("a message of no values decodes at limit 0", within "4449444c 00 00" (prims []) 0 == some (some []))
+  , ("vec null of 3 decodes at limit 4", answersAt nulls3 vecNull 4)
+  , ("vec null of 3 runs out at limit 3", within nulls3 vecNull 3 == none)
+  , ("nested values count: vec record { null; null } of 2 decodes at limit 7",
+      answersAt pairs2 vecPair 7)
+  , ("and runs out at limit 6", within pairs2 vecPair 6 == none)
+  , ("ignored values count: the same at no types decodes at limit 7",
+      within pairs2 (prims []) 7 == some (some []))
+  , ("and runs out at limit 6", within pairs2 (prims []) 6 == none)
+  , ("a byte after the values is rejected within the limit",
+      within (nulls3 ++ " 00") vecNull 1000 == some none)
+  , ("a vector cut short is rejected within the limit",
+      within "4449444c 01 6d 7b 01 00 03 01" vecNat8 1000 == some none) ]
+
+def limitViolations : List String :=
+  limitFacts.filterMap fun (name, ok) => if ok then none else some s!"the model's limit: {name}"
+
 def decodeChecks : List Vector :=
   decodeFramingChecks ++ decodeLebChecks ++ decodeFixedChecks ++ decodeTextChecks ++
   decodeNullChecks ++ decodeOptVecChecks ++ decodeRecordChecks ++ decodeVariantChecks ++

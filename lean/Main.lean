@@ -67,9 +67,13 @@ def selfTest : IO UInt32 := do
     IO.println s!"FAIL  duplicate vector id: {id}"
     problems := problems + 1
   for p in Generate.propertyViolations ++ Generate.wireViolations ++ Generate.encodeRejections ++
-      futureViolations do
+      futureViolations ++ limitViolations do
     IO.println s!"FAIL  {p}"
     problems := problems + 1
+  for v in all do
+    if let some d := v.assertion.withinDisagreement then
+      IO.println s!"FAIL  {v.id}: {d}"
+      problems := problems + 1
   for p in TestDid.violations do
     IO.println s!"FAIL  test/{p}"
     problems := problems + 1
