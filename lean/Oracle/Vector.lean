@@ -62,6 +62,10 @@ inductive Assertion where
   /-- `bytes`, deserialised at `types`, are the values `want`, one per type, or are
   rejected when `want` is `none`. -/
   | decode (bytes : ByteArray) (types : TypeSeq) (want : Option (List Value))
+  /-- `bytes`, deserialised at `types`, cost more than the model will spend
+  (`costlyLimit`), so it gives no answer. An implementation may reject them for lack of
+  resources, or decode them; it must not crash. -/
+  | decodeCostly (bytes : ByteArray) (types : TypeSeq)
 
 structure Vector where
   /-- Unique within the suite. Human-readable, and stable: a runner's list of known
@@ -198,6 +202,9 @@ def Vector.render (v : Vector) : String :=
   | .decode bs ts want =>
     head "decode" ++ field "bytes" (.str (bytesToHex bs.toList)) ++ field "types" ts.toJson ++
       field "expect" (expectValuesToJson want) ++ "}"
+  | .decodeCostly bs ts =>
+    head "decode" ++ field "bytes" (.str (bytesToHex bs.toList)) ++ field "types" ts.toJson ++
+      field "expect" (.str "costly") ++ "}"
 
 /-- A whole file: one vector per line, so that a change to the model shows up in a diff
 as exactly the vectors whose answers it changed. -/
@@ -398,9 +405,11 @@ def Vector.fromJson? (j : Json) : Except String Vector := do
         (← expectFromJson? (← j.getObjVal? "expect"))
     | "decode" =>
       expectKeys j ["id", "kind", "bytes", "types", "expect"]
-      return .decode ⟨(← bytesFromHex? (← j.getObjVal? "bytes")).toArray⟩
-        (← TypeSeq.fromJson? (← j.getObjVal? "types"))
-        (← expectValuesFromJson? (← j.getObjVal? "expect"))
+      let bs : ByteArray := ⟨(← bytesFromHex? (← j.getObjVal? "bytes")).toArray⟩
+      let ts ← TypeSeq.fromJson? (← j.getObjVal? "types")
+      let expect ← j.getObjVal? "expect"
+      if expect == .str "costly" then return .decodeCostly bs ts
+      return .decode bs ts (← expectValuesFromJson? expect)
     | k => throw s!"unknown vector kind {repr k}" : Except String Assertion)
   return { id, assertion }
 
@@ -456,5 +465,23 @@ def Assertion.disagreement : Assertion → Option String
         if got == want then none
         else some s!"got {(expectValuesToJson got).compress}, want {(expectValuesToJson want).compress}"
     | none => some "a type is malformed, so decoding at it is not defined"
+  | .decodeCostly bs ts =>
+    match ts.check? with
+    | some ⟨B, us⟩ =>
+      match deserializeWithin costlyLimit bs B (us.map (·.1)) with
+      | none => none
+      | some got => some s!"not costly: the model answers {(expectValuesToJson got).compress}"
+    | none => some "a type is malformed, so decoding at it is not defined"
+
+/-- A `decode` vector gets its answer within `costlyLimit` too: the limit only tells
+costly messages apart, and none of these is one. `none` if it does. -/
+def Assertion.withinDisagreement : Assertion → Option String
+  | .decode bs ts want =>
+    ts.check?.bind fun ⟨B, us⟩ =>
+      match deserializeWithin costlyLimit bs B (us.map (·.1)) with
+      | some got => if got == want then none
+        else some s!"within the limit, got {(expectValuesToJson got).compress}"
+      | none => some "the model runs out within its limit"
+  | _ => none
 
 end Oracle

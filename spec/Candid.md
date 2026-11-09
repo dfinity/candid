@@ -1334,9 +1334,14 @@ Deserialisation at an expected type sequence `(<t'>,*)` proceeds by
  * using the inverse of the `M` function, indexed by `(<t>,*)`, to decode the values `(<v>,*)`
  * use the coercion function `v : t ~> v' : t'` to understand the decoded values at the expected type.
 
-Note on implementation:
+### Resource limits
 
-Due to the wire format and subtyping, deserializing different messages at a fixed type sequence `(<t'>,*)` requires significantly different resources, e.g., stack size, time and memory. The implementation is encouraged to self-meter the deserialisation cost to prevent: 1) stack overflow; 2) spending too much time on unneeded data, due to subtyping; 3) deserialising data of exponential size.
+Due to the wire format and subtyping, deserialising different messages at a fixed type sequence `(<t'>,*)` requires significantly different resources, e.g., stack size, time and memory. Most values take at least one byte in `M`, but values of `null`, `reserved`, and records of only such fields take none. So a vector of them can claim any length in a few bytes (`vec null` of length 10^9 takes 5), and a record type whose fields share one such type doubles the number of values at each level of nesting. Such messages are valid, and deserialising them can cost more than any implementation can afford. Since a message may come from an untrusted party, and subtyping lets it carry extra arguments and record fields the receiver never asked for, a receiver cannot avoid them by choosing its types.
+
+An implementation may therefore reject a message because deserialising it needs more of a resource than the implementation has or allows, e.g., stack space, memory, an instruction limit, or a limit it sets on the work per message. Which messages it rejects that way depends on the implementation and its environment, and is not defined here. Such a rejection:
+
+* rejects the whole message. It is not a failed coercion, so no enclosing option turns it into `null`, and it does not determine the result of any subtype check.
+* should be reported as such, distinctly from an invalid message, and should be an error the caller can handle, not an abort of the program.
 
 ### Deserialisation of future types
 

@@ -20,9 +20,9 @@
 use candid::types::subtype::{subtype_with_config, Gamma, OptReport};
 use candid::types::value::{IDLField, VariantValue};
 use candid::types::{Field, FuncMode, Function, Label, Type, TypeEnv, TypeInner};
-use candid::{IDLArgs, IDLValue, Principal};
+use candid::{DecoderConfig, IDLArgs, IDLValue, Principal};
 use serde_json::Value;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::process::ExitCode;
 use std::str::FromStr;
 
@@ -55,15 +55,15 @@ const KNOWN: &[(&str, &str)] = &[
 const FORMAT_VERSION: u64 = 0;
 
 const SKIP_WELLFORMED: &str =
-    "candid 0.10 has no public function that checks a type table on its own";
+    "wellformed vectors -- candid 0.10 has no public function that checks a type table on its own";
 
 type Result<T> = std::result::Result<T, String>;
 
 enum Outcome {
     Agree,
     Disagree(String),
-    /// The vector asks something this runner has no way to put to `candid` 0.10.
-    Skip,
+    /// The vector asks something this runner has no way to put to `candid` 0.10, and why.
+    Skip(&'static str),
 }
 
 fn main() -> ExitCode {
@@ -74,7 +74,8 @@ fn main() -> ExitCode {
     }
     let known: BTreeSet<&str> = KNOWN.iter().map(|(id, _)| *id).collect();
     let mut ids = BTreeSet::new();
-    let (mut agree, mut skipped, mut known_hits, mut failed) = (0, 0, 0, 0);
+    let (mut agree, mut known_hits, mut failed) = (0, 0, 0);
+    let mut skipped: BTreeMap<&str, usize> = BTreeMap::new();
 
     for path in &paths {
         let vectors = match read_file(path) {
@@ -91,7 +92,7 @@ fn main() -> ExitCode {
                     println!("FAIL  {path}: vector {i} ({id}) cannot be run -- {e}");
                     failed += 1;
                 }
-                (Ok(Outcome::Skip), _) => skipped += 1,
+                (Ok(Outcome::Skip(why)), _) => *skipped.entry(why).or_default() += 1,
                 (Ok(Outcome::Agree), false) => agree += 1,
                 (Ok(Outcome::Agree), true) => {
                     println!("FAIL  {id} -- listed in KNOWN but now agrees; remove it");
@@ -117,9 +118,10 @@ fn main() -> ExitCode {
     }
 
     println!();
-    println!("{agree} agree, {known_hits} known divergences, {skipped} skipped, {failed} failed");
-    if skipped > 0 {
-        println!("skipped: wellformed vectors -- {SKIP_WELLFORMED}");
+    let skips: usize = skipped.values().sum();
+    println!("{agree} agree, {known_hits} known divergences, {skips} skipped, {failed} failed");
+    for (why, n) in &skipped {
+        println!("skipped {n}: {why}");
     }
     if failed == 0 {
         ExitCode::SUCCESS
@@ -151,7 +153,7 @@ fn run(v: &Value) -> Result<Outcome> {
             let want = field_id(&v["expect"])?;
             Ok(agreement(got == want, || format!("got {got}, want {want}")))
         }
-        "wellformed" => Ok(Outcome::Skip),
+        "wellformed" => Ok(Outcome::Skip(SKIP_WELLFORMED)),
         "subtype" => {
             // `candid` 0.10 takes one environment for both types, so the two tables
             // go into one, each under its own prefix. This is the merge every caller
@@ -170,6 +172,7 @@ fn run(v: &Value) -> Result<Outcome> {
             }))
         }
         "coerce" => coerce(v),
+        "decode" if v["expect"] == "costly" => costly(v),
         "decode" => decode(v),
         k => Err(format!("unknown vector kind {k:?}")),
     }
@@ -210,6 +213,23 @@ fn coerce(v: &Value) -> Result<Outcome> {
             agreement(same, || format!("got {g}, want {w}"))
         }
     })
+}
+
+/// A costly message, which the model gives no answer for: 0.10 passes unless it panics.
+/// It is decoded with quotas, as a canister would decode it -- without them, 0.10 would
+/// try to build every value, and the run would not finish.
+fn costly(v: &Value) -> Result<Outcome> {
+    let bytes = hex(&v["bytes"])?;
+    let mut env = TypeEnv::new();
+    let types = load_seq(&v["types"], &mut env, "B")?;
+    let mut config = DecoderConfig::new();
+    config
+        .set_decoding_quota(2_000_000)
+        .set_skipping_quota(10_000);
+    let decoded = std::panic::catch_unwind(|| {
+        IDLArgs::from_bytes_with_types_with_config(&bytes, &env, &types, &config).is_ok()
+    });
+    Ok(agreement(decoded.is_ok(), || "panicked".to_string()))
 }
 
 /// Decode the bytes at the vector's types, as a receiver would. The decoded values are

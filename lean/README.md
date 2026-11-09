@@ -347,7 +347,10 @@ cover what actually breaks in production:
 - [x] Values, and coercion, including the `opt` backtracking rule
 - [x] Binary wire format: type table, memory section, LEB128/SLEB128, future
       types -- decoding, and an encoder
-- [ ] Cost model / resource exhaustion
+- [x] Resource limits -- the spec leaves to an implementation which messages it
+      rejects for lack of resources. The model's decoder stops at `costlyLimit`
+      values, so the oracle can tell a message it cannot afford, such as those of
+      `test/spacebomb.test.did`, from one it answers
 - [ ] Textual value syntax
 
 ## Deferred, deliberately
@@ -380,8 +383,6 @@ Named here so they are obligations rather than oversights.
   and the check is that an implementation's bytes decode to an *equivalent* type and
   the same value. Equivalence -- the same infinite tree -- is decidable with the
   subtype procedure's worklist and is not written yet.
-- **Unbounded vectors of zero-length values.** `vec null` can claim any length in a
-  few bytes, and the decoder builds a value that long. That is the cost model's job.
 - **Verso.** Deliberately not yet: bundling an undocumented doc toolchain into the
   work whose purpose was de-risking the build would have doubled the unknowns.
 

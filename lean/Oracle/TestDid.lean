@@ -8,15 +8,18 @@ that they say more than an assertion did -- `assert blob "..." : (nat)` says onl
 a message is accepted, and its vector says as what. A message on the right of `==` is a
 vector of its own.
 
-**Not every assertion is checked yet.** Two kinds wait on parts of the model that do
-not exist (`deferral?`):
+**Not every assertion is checked yet.** Those with text on the left wait on the textual
+syntax (`deferral?`): whether text parses at a type is its question. Text on the
+*right* of `==` is checked, against the values `candid_parser` reads it as, since there
+it only spells out the expected values.
 
-- Text on the left: whether text parses at a type is the textual syntax's question.
-  Text on the *right* of `==` is checked, against the values `candid_parser` reads it
-  as, since there it only spells out the expected values.
-- `spacebomb.test.did`: valid messages that take a lot of time or memory to decode, and
-  that a metered decoder should reject. That is the cost model's question, and the
-  model, which has none, would spend the time.
+**`spacebomb.test.did` is about resources.** Its messages are valid, and take a lot of
+time or memory to decode; the file asserts that they are rejected, by a decoder with
+self-metering. The spec lets an implementation reject a message for lack of resources,
+and leaves to it which ones (`spec/Candid.md`, "Resource limits"), so the claim is read
+as that: these messages are costly. The model holds to it by running out too -- it
+decodes none of them within `costlyLimit` (`Candid/Wire.lean`) -- and they become
+`costly` vectors, which ask an implementation not to crash on them.
 
 **Equality.** `==` and `!=` are "the host language's equality" (`test/README.md`), and
 here that is `Value`'s: floats are equal when their bits are. Rust's runner compares
@@ -39,10 +42,13 @@ def Assert.id (a : Assert) : String := s!"{a.file}.test.did: {a.name}"
 
 /-- Why an assertion is not checked yet, if it is not. See the header. -/
 def Assert.deferral? (a : Assert) : Option String :=
-  if a.file == "spacebomb" then some "the cost model"
-  else match a.input with
-    | .text _ _ => some "the textual syntax"
-    | .blob _ => none
+  match a.input with
+  | .text _ _ => some "the textual syntax"
+  | .blob _ => none
+
+/-- Does the assertion claim its message is costly, rather than rejected? See the
+header. -/
+def Assert.isCostly (a : Assert) : Bool := a.file == "spacebomb"
 
 /-- The assertions the model disagrees with on purpose, by id, and why. -/
 def disputed : List (String × String) := []
@@ -62,6 +68,14 @@ def Input.answer (B : TypeTable) (roots : List Slot) : Input → Except String (
 def Assert.check (a : Assert) : Except String Unit := do
   let some ⟨B, us⟩ := a.types.check? | throw "a type is malformed"
   let roots := us.map (·.1)
+  if a.isCostly then
+    match a.claim, a.input with
+    | .rejects, .blob hex =>
+      let bs ← bytesFromHex? (.str hex)
+      if let some got := deserializeWithin costlyLimit ⟨bs.toArray⟩ B roots then
+        throw s!"not costly: the model answers {(expectValuesToJson got).compress}"
+      return
+    | _, _ => throw "a spacebomb assertion is a blob claimed to be rejected"
   let left ← a.input.answer B roots
   let both (o : Input) : Except String (List Value × List Value) := do
     match left, ← o.answer B roots with
@@ -88,7 +102,8 @@ def Assert.vectors (a : Assert) : List Vector :=
       match bytesFromHex? (.str hex) with
       | .ok bs =>
         let bs : ByteArray := ⟨bs.toArray⟩
-        [⟨a.id ++ suffix, .decode bs a.types (deserialize bs B (us.map (·.1)))⟩]
+        [⟨a.id ++ suffix, if a.isCostly then .decodeCostly bs a.types
+          else .decode bs a.types (deserialize bs B (us.map (·.1)))⟩]
       | .error _ => []
     let right := match a.claim with
       | .equals (.blob hex) | .differs (.blob hex) => one " (right)" hex
