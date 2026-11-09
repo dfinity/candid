@@ -347,10 +347,10 @@ cover what actually breaks in production:
 - [x] Values, and coercion, including the `opt` backtracking rule
 - [x] Binary wire format: type table, memory section, LEB128/SLEB128, future
       types -- decoding, and an encoder
-- [x] Protected decoding -- a budget of values proportional to the message's size,
-      which rejects the messages of `test/spacebomb.test.did`. The constants are
-      provisional. Other resources -- stack, instructions -- are the environment's
-      and not modelled
+- [x] Resource limits -- the spec leaves to an implementation which messages it
+      rejects for lack of resources. The model's decoder stops at `costlyLimit`
+      values, so the oracle can tell a message it cannot afford, such as those of
+      `test/spacebomb.test.did`, from one it answers
 - [ ] Textual value syntax
 
 ## Deferred, deliberately

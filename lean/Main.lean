@@ -70,17 +70,6 @@ def selfTest : IO UInt32 := do
       futureViolations do
     IO.println s!"FAIL  {p}"
     problems := problems + 1
-  -- A `protected` vector is the exception to its `decode` vector's answer, if it has one.
-  let excepted := all.filterMap fun v => match v.assertion with
-    | .decodeProtected bs ts _ => some (bs.toList, ts.toJson.compress)
-    | _ => none
-  for v in all do
-    let isExcepted := match v.assertion with
-      | .decode bs ts _ => excepted.contains (bs.toList, ts.toJson.compress)
-      | _ => false
-    if !isExcepted then if let some d := v.assertion.protectedDisagreement then
-      IO.println s!"FAIL  {v.id}: changes in protected decoding -- {d}"
-      problems := problems + 1
   for p in TestDid.violations do
     IO.println s!"FAIL  test/{p}"
     problems := problems + 1

@@ -20,7 +20,7 @@
 use candid::types::subtype::{subtype_with_config, Gamma, OptReport};
 use candid::types::value::{IDLField, VariantValue};
 use candid::types::{Field, FuncMode, Function, Label, Type, TypeEnv, TypeInner};
-use candid::{IDLArgs, IDLValue, Principal};
+use candid::{DecoderConfig, IDLArgs, IDLValue, Principal};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::process::ExitCode;
@@ -56,9 +56,6 @@ const FORMAT_VERSION: u64 = 0;
 
 const SKIP_WELLFORMED: &str =
     "wellformed vectors -- candid 0.10 has no public function that checks a type table on its own";
-
-const SKIP_PROTECTED: &str = "protected decode vectors -- candid 0.10 has no protected decoding; \
-     its quotas are another measure, which cannot answer for the spec's budget";
 
 type Result<T> = std::result::Result<T, String>;
 
@@ -157,7 +154,6 @@ fn run(v: &Value) -> Result<Outcome> {
             Ok(agreement(got == want, || format!("got {got}, want {want}")))
         }
         "wellformed" => Ok(Outcome::Skip(SKIP_WELLFORMED)),
-        "decode" if v["protected"] == Value::Bool(true) => Ok(Outcome::Skip(SKIP_PROTECTED)),
         "subtype" => {
             // `candid` 0.10 takes one environment for both types, so the two tables
             // go into one, each under its own prefix. This is the merge every caller
@@ -176,6 +172,7 @@ fn run(v: &Value) -> Result<Outcome> {
             }))
         }
         "coerce" => coerce(v),
+        "decode" if v["expect"] == "costly" => costly(v),
         "decode" => decode(v),
         k => Err(format!("unknown vector kind {k:?}")),
     }
@@ -216,6 +213,23 @@ fn coerce(v: &Value) -> Result<Outcome> {
             agreement(same, || format!("got {g}, want {w}"))
         }
     })
+}
+
+/// A costly message, which the model gives no answer for: 0.10 passes unless it panics.
+/// It is decoded with quotas, as a canister would decode it -- without them, 0.10 would
+/// try to build every value, and the run would not finish.
+fn costly(v: &Value) -> Result<Outcome> {
+    let bytes = hex(&v["bytes"])?;
+    let mut env = TypeEnv::new();
+    let types = load_seq(&v["types"], &mut env, "B")?;
+    let mut config = DecoderConfig::new();
+    config
+        .set_decoding_quota(2_000_000)
+        .set_skipping_quota(10_000);
+    let decoded = std::panic::catch_unwind(|| {
+        IDLArgs::from_bytes_with_types_with_config(&bytes, &env, &types, &config).is_ok()
+    });
+    Ok(agreement(decoded.is_ok(), || "panicked".to_string()))
 }
 
 /// Decode the bytes at the vector's types, as a receiver would. The decoded values are

@@ -81,24 +81,21 @@ current position, and gives up when it would pass the table's size. The measure 
 (bytes remaining, `size - stall`, the step's place in its list), and every step lowers
 it.
 
-**Protected decoding.** Most values take at least a byte on the wire. Those of some
-types take none: `null`, `reserved`, and records of nothing else. A
-vector of such a type can claim any length in a few bytes -- `vec null` of length 10^9
-is 5 -- and a record whose two fields have one type, itself such a record, doubles
-the values at each level, so a message can stand for more values than any decoder can afford. The spec
-leaves those messages valid, and they are: `deserialize` decodes them, and would build
-every value.
+**Costly messages.** Most values take at least a byte on the wire. Those of some
+types take none: `null`, `reserved`, and records of nothing else. A vector of such a
+type can claim any length in a few bytes -- `vec null` of length 10^9 is 5 -- and a
+record whose two fields have one type, itself such a record, doubles the values at each
+level, so a message can stand for more values than any decoder can afford. The spec
+leaves those messages valid, and lets an implementation reject one for lack of
+resources (`spec/Candid.md`, "Resource limits"); which ones is up to the implementation.
 
-Protected decoding (`spec/Candid.md`, "Protected decoding") rejects them as well. It
-counts every value decoded, wherever it is -- inside another, in an argument past the
-expected ones, in a field the expected type does not declare -- and rejects a message
-with more than `perByte` values for each of its bytes, and `base` more (`Budget`). The
-count is checked as it grows, so the decoder stops at the limit rather than build what
-is past it, which is what lets the model answer for a message of 10^9 values at all.
-
-What coercion produces is not counted. It is a function of the values decoded and the
-receiver's types, so it is at most a constant factor more than the count, and that
-factor is the receiver's to choose. -/
+The model has no answer for them either: `deserialize` would build every value. So the
+decoder can be given a `limit` on the values it decodes, counting every one wherever it
+is -- inside another, in an argument past the expected ones, in a field the expected type
+does not declare. It checks the count as it grows and stops at the limit, rather than
+build what is past it (`deserializeWithin`). That is the model running out, not an
+answer: the message may be valid. It is how the oracle tells a costly message from one
+it can answer (`costlyLimit`). -/
 
 import Candid.Coerce
 
@@ -520,14 +517,16 @@ theorem lex3 {a b c a' b' c' : Nat}
   · exact Prod.Lex.right _ (Prod.Lex.left _ _ h)
   · exact Prod.Lex.right _ (Prod.Lex.right _ h)
 
-/-- Why protected decoding rejects a message that is otherwise valid. -/
-def overBudget : String := "more values than protected decoding allows for the message's size"
+/-- Why the decoder stopped at its limit. Not a rejection: the message may be valid. -/
+def exhausted : String := "more values than the decoder's limit"
 
-/-- Count one value against `limit`: the count with it, or a rejection if that passes the
-limit. See "Protected decoding" in the header. -/
+def DecodeError.isExhaustion (e : DecodeError) : Bool := e.msg == exhausted
+
+/-- Count one value against `limit`: the count with it, or `exhausted` if that passes the
+limit. See "Costly messages" in the header. -/
 def charge (pos : Nat) (limit : Option Nat) (used : Nat) :
     Except DecodeError Nat :=
-  if limit.any (· < used + 1) then .error ⟨pos, overBudget⟩ else .ok (used + 1)
+  if limit.any (· < used + 1) then .error ⟨pos, exhausted⟩ else .ok (used + 1)
 
 mutual
 
@@ -632,8 +631,8 @@ structure Message where
   count : Nat
 
 /-- The inverse of `B`: the header, then the values at the header's types, then nothing.
-With a `limit`, a message with more values than that is rejected as soon as the count
-passes it; see "Protected decoding" in the header. -/
+With a `limit`, decoding stops with `exhausted` as soon as the count passes it; see
+"Costly messages" in the header. -/
 def decode (bs : ByteArray) (limit : Option Nat := none) : Except DecodeError Message := do
   let ((raw, types), pos) ← (Parse.header.run bs).run 0
   let some table := raw.check
@@ -649,37 +648,30 @@ def decode (bs : ByteArray) (limit : Option Nat := none) : Except DecodeError Me
   else throw ⟨pos, "unreachable: the header ends past the input"⟩
 
 /-- Deserialisation at the expected types `expected` in `B`, decoding at most `limit`
-values if there is a limit: decode, then coerce the whole argument sequence. `none` is a
-rejected message, for whatever reason. -/
-def deserializeWithin (limit : Option Nat) (bs : ByteArray) (B : TypeTable)
-    (expected : List Slot) : Option (List Value) :=
-  match decode bs limit with
+values: decode, then coerce the whole argument sequence. `some` is the answer, `none` in
+it a rejected message; `none` alone is the decoder reaching its limit first. -/
+def deserializeWithin (limit : Nat) (bs : ByteArray) (B : TypeTable)
+    (expected : List Slot) : Option (Option (List Value)) :=
+  match decode bs (some limit) with
+  | .error e => if e.isExhaustion then none else some none
+  | .ok m => match (coerceArgs m.table B m.values m.types expected).run with
+    | .ok r => some r
+    | .error _ => some none
+
+/-- Deserialisation, as the spec defines it. `none` is a rejected message. -/
+def deserialize (bs : ByteArray) (B : TypeTable) (expected : List Slot) :
+    Option (List Value) :=
+  match decode bs with
   | .error _ => none
   | .ok m => match (coerceArgs m.table B m.values m.types expected).run with
     | .ok r => r
     | .error _ => none
 
-/-- Deserialisation, as the spec defines it: with no limit. -/
-def deserialize (bs : ByteArray) (B : TypeTable) (expected : List Slot) :
-    Option (List Value) :=
-  deserializeWithin none bs B expected
-
-/-- What protected decoding allows a message: `perByte` values for each of its bytes,
-and `base` more. -/
-structure Budget where
-  perByte : Nat
-  base : Nat
-
-def Budget.limit (b : Budget) (bs : ByteArray) : Nat := b.perByte * bs.size + b.base
-
-/-- The budget the spec names. Provisional: these are Motoko's defaults (`max_values`,
-0.13.0), and the spec has not settled on constants. -/
-def Budget.default : Budget := ⟨1, 1024⟩
-
-/-- Deserialisation in protected decoding: rejected as well when it costs more than the
-budget allows for the message's size. -/
-def deserializeProtected (b : Budget) (bs : ByteArray) (B : TypeTable)
-    (expected : List Slot) : Option (List Value) :=
-  deserializeWithin (some (b.limit bs)) bs B expected
+/-- How many values the oracle decodes before it calls a message costly and gives no
+answer for it. Well above every message it answers -- the largest has about a thousand
+values -- and far below the spacebombs, which have a million or more. Not much higher,
+since a vector's elements are a recursion as deep as its length, and the model has a
+stack too. Not the spec's: the spec names no limit. -/
+def costlyLimit : Nat := 10000
 
 end Candid

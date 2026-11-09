@@ -13,11 +13,13 @@ syntax (`deferral?`): whether text parses at a type is its question. Text on the
 *right* of `==` is checked, against the values `candid_parser` reads it as, since there
 it only spells out the expected values.
 
-**`spacebomb.test.did` is about protected decoding.** Its messages are valid, and take
-a lot of time or memory to decode; the file says a decoder with self-metering should
-reject them. Protected decoding is that decoder (`Candid/Wire.lean`), so these
-assertions are checked in it, and become `protected` vectors. The model would spend the
-time deserialising them without it.
+**`spacebomb.test.did` is about resources.** Its messages are valid, and take a lot of
+time or memory to decode; the file asserts that they are rejected, by a decoder with
+self-metering. The spec lets an implementation reject a message for lack of resources,
+and leaves to it which ones (`spec/Candid.md`, "Resource limits"), so the claim is read
+as that: these messages are costly. The model holds to it by running out too -- it
+decodes none of them within `costlyLimit` (`Candid/Wire.lean`) -- and they become
+`costly` vectors, which ask an implementation not to crash on them.
 
 **Equality.** `==` and `!=` are "the host language's equality" (`test/README.md`), and
 here that is `Value`'s: floats are equal when their bits are. Rust's runner compares
@@ -44,12 +46,9 @@ def Assert.deferral? (a : Assert) : Option String :=
   | .text _ _ => some "the textual syntax"
   | .blob _ => none
 
-/-- Is the assertion about protected decoding? See the header. -/
-def Assert.isProtected (a : Assert) : Bool := a.file == "spacebomb"
-
-/-- How the assertion's messages are deserialised. -/
-def Assert.deserializer (a : Assert) : ByteArray → TypeTable → List Slot → Option (List Value) :=
-  if a.isProtected then deserializeProtected Budget.default else deserialize
+/-- Does the assertion claim its message is costly, rather than rejected? See the
+header. -/
+def Assert.isCostly (a : Assert) : Bool := a.file == "spacebomb"
 
 /-- The assertions the model disagrees with on purpose, by id, and why. -/
 def disputed : List (String × String) := []
@@ -58,11 +57,10 @@ def showValues (vs : List Value) : String := (expectValuesToJson (some vs)).comp
 
 /-- The model's reading of one side: deserialised at `roots` in `B`, or for text, what
 `candid_parser` reads it as. `none` is a rejection. -/
-def Input.answer (deser : ByteArray → TypeTable → List Slot → Option (List Value))
-    (B : TypeTable) (roots : List Slot) : Input → Except String (Option (List Value))
+def Input.answer (B : TypeTable) (roots : List Slot) : Input → Except String (Option (List Value))
   | .blob hex => do
     let bs ← bytesFromHex? (.str hex)
-    return deser ⟨bs.toArray⟩ B roots
+    return deserialize ⟨bs.toArray⟩ B roots
   | .text src none => throw s!"candid_parser could not read {repr src} at these types"
   | .text _ (some vs) => return some vs
 
@@ -70,9 +68,17 @@ def Input.answer (deser : ByteArray → TypeTable → List Slot → Option (List
 def Assert.check (a : Assert) : Except String Unit := do
   let some ⟨B, us⟩ := a.types.check? | throw "a type is malformed"
   let roots := us.map (·.1)
-  let left ← a.input.answer a.deserializer B roots
+  if a.isCostly then
+    match a.claim, a.input with
+    | .rejects, .blob hex =>
+      let bs ← bytesFromHex? (.str hex)
+      if let some got := deserializeWithin costlyLimit ⟨bs.toArray⟩ B roots then
+        throw s!"not costly: the model answers {(expectValuesToJson got).compress}"
+      return
+    | _, _ => throw "a spacebomb assertion is a blob claimed to be rejected"
+  let left ← a.input.answer B roots
   let both (o : Input) : Except String (List Value × List Value) := do
-    match left, ← o.answer a.deserializer B roots with
+    match left, ← o.answer B roots with
     | some l, some r => return (l, r)
     | none, _ => throw "the model rejects the left-hand side"
     | _, none => throw "the model rejects the right-hand side"
@@ -96,9 +102,8 @@ def Assert.vectors (a : Assert) : List Vector :=
       match bytesFromHex? (.str hex) with
       | .ok bs =>
         let bs : ByteArray := ⟨bs.toArray⟩
-        let want := a.deserializer bs B (us.map (·.1))
-        [⟨a.id ++ suffix, if a.isProtected then .decodeProtected bs a.types want
-          else .decode bs a.types want⟩]
+        [⟨a.id ++ suffix, if a.isCostly then .decodeCostly bs a.types
+          else .decode bs a.types (deserialize bs B (us.map (·.1)))⟩]
       | .error _ => []
     let right := match a.claim with
       | .equals (.blob hex) | .differs (.blob hex) => one " (right)" hex
