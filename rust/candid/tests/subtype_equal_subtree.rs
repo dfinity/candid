@@ -130,6 +130,32 @@ fn deep_equal_subtree_under_differing_parents_is_accepted() {
     });
 }
 
+/// Stack-safety half of the PR #780 review: a subtree so deep that the memoized
+/// equality check would itself run out of stack must fail *gracefully*, never
+/// overflow the native stack and abort the process. `same_type` shares the
+/// structural recursion's `RecursionDepth`, so once the stack runs low it stops
+/// and defers to the guarded structural rules, which end the check with
+/// "recursion limit exceeded". A multiple of the structural limit is used so the
+/// equality check is driven well past its own (lighter-frame, so deeper) limit;
+/// if it were unguarded this test would crash the process rather than fail.
+#[test]
+fn deep_equal_subtree_beyond_guard_fails_gracefully() {
+    let d = shortest_overflowing_depth().saturating_mul(16);
+    on_small_stack(move || {
+        let env = TypeEnv::new();
+        let t1 = record(vec![vec_chain(d, TypeInner::Nat), TypeInner::Nat.into()]);
+        let t2 = record(vec![vec_chain(d, TypeInner::Nat)]);
+        assert!(
+            subtype(&mut Gamma::new(), &env, &t1, &t2).is_err(),
+            "a subtree too deep for the equality check to verify must fail gracefully, not crash"
+        );
+        assert!(
+            hit_limit(&subtype_check_all(&mut Gamma::new(), &env, &t1, &t2)),
+            "the collector must report the recursion limit rather than overflow the stack"
+        );
+    });
+}
+
 /// The same, but the equal subtree is reached through two different `Var`
 /// aliases (`A` and `B`, each a separately allocated `vec^d nat`). The
 /// entry-point `==` misses it because the aliases differ by name; after one

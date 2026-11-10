@@ -76,7 +76,7 @@ impl<'a> Assumptions<'a> {
     /// level-by-level into the recursion guard, turning a valid check into a
     /// "recursion limit exceeded" error (PR #780 review). Memoized deep equality
     /// keeps the O(1)-amortized per level while restoring that acceptance.
-    fn same_type(&self, t1: &Type, t2: &Type) -> bool {
+    fn same_type(&self, t1: &Type, t2: &Type, depth: &RecursionDepth) -> bool {
         use TypeInner::*;
         if std::rc::Rc::ptr_eq(&t1.0, &t2.0) {
             return true;
@@ -85,22 +85,40 @@ impl<'a> Assumptions<'a> {
         if let Some(&cached) = self.eq_memo.borrow().get(&key) {
             return cached;
         }
+        // Recurse under the same stack guard as the structural subtype rules. This
+        // traversal descends one native frame per nesting level, so on a deeply
+        // nested equal subtree it could overflow the stack on its own — exactly
+        // what `RecursionDepth` prevents everywhere else here (PR #780 review).
+        // When the stack runs low, stop and report "not trivially equal" so the
+        // caller falls through to the guarded structural rules, which end the whole
+        // check with a graceful "Recursion limit exceeded" rather than aborting the
+        // process. The bail means "undetermined here", not "unequal", so the result
+        // below is cached only when no limit was hit in this subtree.
+        let Ok(_guard) = depth.guard() else {
+            return false;
+        };
+        if depth.overflows() > 0 {
+            return false;
+        }
         let result = match (t1.as_ref(), t2.as_ref()) {
             // Composites that can form deep chains recurse through `same_type`,
             // so each nested pair is memoized too; that is what keeps the whole
             // traversal linear rather than quadratic.
-            (Opt(a), Opt(b)) | (Vec(a), Vec(b)) => self.same_type(a, b),
+            (Opt(a), Opt(b)) | (Vec(a), Vec(b)) => self.same_type(a, b, depth),
             (Record(f1), Record(f2)) | (Variant(f1), Variant(f2)) => {
                 f1.len() == f2.len()
                     && f1
                         .iter()
                         .zip(f2.iter())
-                        .all(|(x, y)| x.id == y.id && self.same_type(&x.ty, &y.ty))
+                        .all(|(x, y)| x.id == y.id && self.same_type(&x.ty, &y.ty, depth))
             }
             (Class(a1, r1), Class(a2, r2)) => {
                 a1.len() == a2.len()
-                    && a1.iter().zip(a2.iter()).all(|(x, y)| self.same_type(x, y))
-                    && self.same_type(r1, r2)
+                    && a1
+                        .iter()
+                        .zip(a2.iter())
+                        .all(|(x, y)| self.same_type(x, y, depth))
+                    && self.same_type(r1, r2, depth)
             }
             // `Func` and `Service` also form arbitrarily deep chains — a function
             // whose return is a function, a service whose method is such a
@@ -120,19 +138,19 @@ impl<'a> Assumptions<'a> {
                         .args
                         .iter()
                         .zip(f2.args.iter())
-                        .all(|(x, y)| self.same_type(x, y))
+                        .all(|(x, y)| self.same_type(x, y, depth))
                     && f1
                         .rets
                         .iter()
                         .zip(f2.rets.iter())
-                        .all(|(x, y)| self.same_type(x, y))
+                        .all(|(x, y)| self.same_type(x, y, depth))
             }
             (Service(m1), Service(m2)) => {
                 m1.len() == m2.len()
                     && m1
                         .iter()
                         .zip(m2.iter())
-                        .all(|(x, y)| x.0 == y.0 && self.same_type(&x.1, &y.1))
+                        .all(|(x, y)| x.0 == y.0 && self.same_type(&x.1, &y.1, depth))
             }
             // Leaves, the `Var`/`Knot` indirection nodes, and any cross-variant
             // pair carry no deep-nesting chain to re-walk per level here, so the
@@ -140,12 +158,17 @@ impl<'a> Assumptions<'a> {
             // by pointer below.
             (a, b) => a == b,
         };
-        self.eq_memo.borrow_mut().insert(key, result);
-        // Pin both operands so their addresses stay valid (and unique) for every
-        // later cache hit on this key.
-        let mut pins = self.eq_pins.borrow_mut();
-        pins.push(t1.clone());
-        pins.push(t2.clone());
+        // Cache only a verdict reached without hitting the stack guard anywhere in
+        // this subtree; a bail above returns a bare `false` that must not be
+        // remembered as "unequal".
+        if depth.overflows() == 0 {
+            self.eq_memo.borrow_mut().insert(key, result);
+            // Pin both operands so their addresses stay valid (and unique) for
+            // every later cache hit on this key.
+            let mut pins = self.eq_pins.borrow_mut();
+            pins.push(t1.clone());
+            pins.push(t2.clone());
+        }
         result
     }
 
@@ -416,7 +439,7 @@ fn subtype_collect_(
         return;
     }
     use TypeInner::*;
-    if gamma.same_type(t1, t2) {
+    if gamma.same_type(t1, t2, depth) {
         return;
     }
     // Handle Var/Knot (type variables / recursive types)
@@ -779,7 +802,7 @@ fn subtype_(
         return Err(Error::msg("Recursion limit exceeded"));
     }
     use TypeInner::*;
-    if gamma.same_type(t1, t2) {
+    if gamma.same_type(t1, t2, depth) {
         return Ok(());
     }
     if matches!(t1.as_ref(), Var(_) | Knot(_)) || matches!(t2.as_ref(), Var(_) | Knot(_)) {
@@ -1185,13 +1208,14 @@ mod tests {
     fn assert_oracle(a: &Type, b: &Type) {
         let mut g = Gamma::new();
         let asm = Assumptions::new(&mut g);
+        let depth = crate::utils::RecursionDepth::new();
         assert_eq!(
-            asm.same_type(a, b),
+            asm.same_type(a, b, &depth),
             a == b,
             "same_type disagreed with `==` on {a:?} vs {b:?}"
         );
         assert_eq!(
-            asm.same_type(b, a),
+            asm.same_type(b, a, &depth),
             b == a,
             "same_type disagreed with `==` on {b:?} vs {a:?}"
         );
