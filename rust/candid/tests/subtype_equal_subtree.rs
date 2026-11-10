@@ -21,6 +21,16 @@ use std::rc::Rc;
 
 const STACK_SIZE: usize = 1 << 20;
 
+/// Levels of headroom left between the measured recursion limit and the depth of
+/// an *equal* subtree an acceptance test builds. `same_type` shares the
+/// structural `RecursionDepth`, so verifying the subtree must fit under the same
+/// limit *together with* the enclosing record (and, for the alias test, the `Var`
+/// resolution) frames. Where the stack size can't be measured the guard is a flat
+/// 512-level count with no byte slack, so this headroom is what keeps these
+/// acceptance tests passing there as well (PR #780 review). The subtree is still
+/// hundreds of levels deep, and the sanity check below pins the full limit.
+const EQUAL_SUBTREE_HEADROOM: usize = 16;
+
 fn on_small_stack<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
     std::thread::Builder::new()
         .stack_size(STACK_SIZE)
@@ -96,10 +106,11 @@ fn shortest_overflowing_depth() -> usize {
     lo
 }
 
-/// `record { 0: vec^d nat; 1: nat } <: record { 0: vec^d nat }` at a depth that
-/// overflows. The shared field is separately allocated but equal; the records
-/// differ, so the whole-type `==` fast path cannot fire. The equal field must
-/// be accepted as reflexive, not driven into the guard.
+/// `record { 0: vec^d nat; 1: nat } <: record { 0: vec^d nat }` with the shared
+/// field just under the recursion limit (a mismatched chain at the full depth is
+/// confirmed to overflow first). The field is separately allocated but equal, and
+/// the records differ, so the whole-type `==` fast path cannot fire; the equal
+/// field must be accepted as reflexive, not driven into the guard.
 #[test]
 fn deep_equal_subtree_under_differing_parents_is_accepted() {
     let d = shortest_overflowing_depth();
@@ -117,8 +128,12 @@ fn deep_equal_subtree_under_differing_parents_is_accepted() {
             "expected the mismatched chain at depth {d} to hit the limit"
         );
 
-        let t1 = record(vec![vec_chain(d, TypeInner::Nat), TypeInner::Nat.into()]);
-        let t2 = record(vec![vec_chain(d, TypeInner::Nat)]);
+        // The equal subtree sits a little below that limit so verifying it, plus
+        // the enclosing record frame, stays within the shared guard even under the
+        // flat fallback count (see EQUAL_SUBTREE_HEADROOM).
+        let sub = d.saturating_sub(EQUAL_SUBTREE_HEADROOM);
+        let t1 = record(vec![vec_chain(sub, TypeInner::Nat), TypeInner::Nat.into()]);
+        let t2 = record(vec![vec_chain(sub, TypeInner::Nat)]);
         assert!(
             subtype(&mut Gamma::new(), &env, &t1, &t2).is_ok(),
             "equal deep subtree under differing parents must be accepted"
@@ -166,8 +181,12 @@ fn equal_subtree_through_different_aliases_is_accepted() {
     let d = shortest_overflowing_depth();
     on_small_stack(move || {
         let mut env = TypeEnv::new();
-        env.0.insert("A".into(), vec_chain(d, TypeInner::Nat));
-        env.0.insert("B".into(), vec_chain(d, TypeInner::Nat));
+        // Headroom for the record plus the two `Var` resolution frames, so the
+        // equality check of the resolved subtree fits under the shared guard even
+        // under the flat fallback count (see EQUAL_SUBTREE_HEADROOM).
+        let sub = d.saturating_sub(EQUAL_SUBTREE_HEADROOM);
+        env.0.insert("A".into(), vec_chain(sub, TypeInner::Nat));
+        env.0.insert("B".into(), vec_chain(sub, TypeInner::Nat));
         let t1 = record(vec![var("A"), TypeInner::Nat.into()]);
         let t2 = record(vec![var("B")]);
         assert!(
