@@ -102,10 +102,42 @@ impl<'a> Assumptions<'a> {
                     && a1.iter().zip(a2.iter()).all(|(x, y)| self.same_type(x, y))
                     && self.same_type(r1, r2)
             }
-            // Leaves, the `Var`/`Knot` indirection nodes, `Func`/`Service`, and
-            // any cross-variant pair carry no deep-nesting chain to re-walk per
-            // level here, so the derived deep `==` settles them directly; its
-            // verdict is still cached by pointer below.
+            // `Func` and `Service` also form arbitrarily deep chains — a function
+            // whose return is a function, a service whose method is such a
+            // function, and so on — and the subtype recursion reaches `same_type`
+            // at each level, so they must recurse through `same_type` too. Left to
+            // the derived `==` arm, a mismatch deep in an otherwise-equal chain
+            // would be re-walked in full at every enclosing level: the #603
+            // quadratic, still live for these two until PR #780 review flagged it.
+            // The non-type metadata (`modes`, method names) holds no nested `Type`,
+            // so it is compared directly; child types go through `same_type`, so
+            // each nested pair is memoized and the traversal stays linear.
+            (Func(f1), Func(f2)) => {
+                f1.modes == f2.modes
+                    && f1.args.len() == f2.args.len()
+                    && f1.rets.len() == f2.rets.len()
+                    && f1
+                        .args
+                        .iter()
+                        .zip(f2.args.iter())
+                        .all(|(x, y)| self.same_type(x, y))
+                    && f1
+                        .rets
+                        .iter()
+                        .zip(f2.rets.iter())
+                        .all(|(x, y)| self.same_type(x, y))
+            }
+            (Service(m1), Service(m2)) => {
+                m1.len() == m2.len()
+                    && m1
+                        .iter()
+                        .zip(m2.iter())
+                        .all(|(x, y)| x.0 == y.0 && self.same_type(&x.1, &y.1))
+            }
+            // Leaves, the `Var`/`Knot` indirection nodes, and any cross-variant
+            // pair carry no deep-nesting chain to re-walk per level here, so the
+            // derived deep `==` settles them directly; its verdict is still cached
+            // by pointer below.
             (a, b) => a == b,
         };
         self.eq_memo.borrow_mut().insert(key, result);
@@ -1276,6 +1308,48 @@ mod tests {
         assert_oracle(
             &c(),
             &class(vec![vec(2, TypeInner::Int), leaf(TypeInner::Bool)], s()),
+        );
+    }
+
+    #[test]
+    fn same_type_matches_eq_on_deep_func_and_service_chains() {
+        // `func () -> (func () -> (... leaf))` nested `d` deep, separately
+        // allocated at every level (ptr_eq false throughout). Before the
+        // dedicated `Func`/`Service` arms these fell to the derived `==`, which
+        // re-walked the whole tail at each recursion level (the #603 quadratic).
+        // The oracle pins that recursing through `same_type` still agrees with
+        // `==` in both the equal and the deep-mismatch case.
+        fn func_chain(d: usize, bottom: TypeInner) -> Type {
+            let mut t = leaf(bottom);
+            for _ in 0..d {
+                t = func(vec![], vec![t]);
+            }
+            t
+        }
+        fn service_chain(d: usize, bottom: TypeInner) -> Type {
+            let mut t = leaf(bottom);
+            for _ in 0..d {
+                t = service(vec![("m", t)]);
+            }
+            t
+        }
+        let d = 400;
+        assert_oracle(
+            &func_chain(d, TypeInner::Nat),
+            &func_chain(d, TypeInner::Nat),
+        );
+        // One differing leaf at the bottom of an otherwise-identical chain.
+        assert_oracle(
+            &func_chain(d, TypeInner::Nat),
+            &func_chain(d, TypeInner::Int),
+        );
+        assert_oracle(
+            &service_chain(d, TypeInner::Nat),
+            &service_chain(d, TypeInner::Nat),
+        );
+        assert_oracle(
+            &service_chain(d, TypeInner::Nat),
+            &service_chain(d, TypeInner::Int),
         );
     }
 
