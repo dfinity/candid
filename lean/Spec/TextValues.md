@@ -85,7 +85,8 @@ expected. The single value `null` is the value of type `null`, the absent value 
 option type, and the value of type `reserved`.
 
 **Sequences of bytes and characters.** `⟨b₁, …, bₙ⟩` is a sequence; `‖` concatenates.
-`utf8(c)` is the UTF-8 encoding [UNICODE] of the character *c*.
+`utf8(c)` is the UTF-8 encoding [UNICODE] of the character *c*. For a well-formed
+UTF-8 sequence β, `utf8⁻¹(β)` is the sequence of characters it encodes.
 
 ### 1.4. Terminology
 
@@ -140,9 +141,11 @@ otherwise ignored. Text that cannot be divided this way MUST be rejected.
 
 ```abnf
 token       = keyword / identifier / number / text-literal / punctuation
-punctuation = "(" / ")" / "{" / "}" / ";" / "," / "." / ":" / "="
+punctuation = "(" / ")" / "{" / "}" / ";" / "," / "." / ":" / "=" / "->"
 whitespace  = %x09 / %x0A / %x0D / %x20
 ```
+
+The arrow `->` occurs only in function types, which can appear in annotations.
 
 The longest-match rule decides cases like `optional`, which is an identifier and not
 the keyword `opt` followed by `ional`, and `1e5`, which is one number.
@@ -224,8 +227,9 @@ escape       = "\" ( "n" / "r" / "t" / "\" / DQUOTE / "'"
                    / "u{" hex "}" )
 ```
 
-A text literal may not contain a raw control character, including a line break, or
-the character U+007F; these are written as escapes.
+A text literal may not contain a raw C0 control character (U+0000 to U+001F),
+including a line break, or the character U+007F; these are written as escapes. Other
+characters, including the C1 controls U+0080 to U+009F, may appear raw, as in [WASM].
 
 The **value of a text literal** is a sequence of bytes, the concatenation of one
 sequence for each `text-char` or `escape` in order:
@@ -271,7 +275,7 @@ expr        = "(" annotated ")"
             / "func" text-literal "." name
 
 field       = label "=" annotated / annotated
-label       = decimal / "0x" hex / name
+label       = number / name    ; an integer literal without a sign
 name        = identifier / text-literal
 ```
 
@@ -312,8 +316,8 @@ of a vector, or a field value.
 
 **Field ids.** A `label` denotes a field id, a natural number less than 2³²:
 
-- A `decimal` or `hex` label denotes its value. A label whose value is 2³² or more MUST
-  be rejected.
+- A `number` label MUST be an integer literal without a sign, such as `5` or `0xff`,
+  and denotes its value. A label whose value is 2³² or more MUST be rejected.
 - A `name` denotes the field-id hash of [CANDID] applied to the name's bytes. A name
   written as a text literal MUST be well-formed UTF-8.
 
@@ -412,7 +416,7 @@ There is no literal for a NaN; see [Appendix B](#appendix-b-differences-from-can
 ### 5.4. Text, Booleans and Null
 
 ```
-textlit(β) ⇐ text ⇝ text(β)     if β is well-formed UTF-8
+textlit(β) ⇐ text ⇝ text(utf8⁻¹(β))     if β is well-formed UTF-8
 true       ⇐ bool ⇝ bool(true)
 false      ⇐ bool ⇝ bool(false)
 null       ⇐ null ⇝ null
@@ -630,7 +634,7 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
 | `1_000.5` | rejected | accepted |
 | `.5` | accepted | rejected |
 | `0x1p4` | rejected | accepted: 16 |
-| A raw tab, line break or other control character in a text literal | accepted | rejected |
+| A raw tab, line break, other C0 control character or U+007F in a text literal | accepted | rejected |
 | A principal of more than 29 bytes | rejected | accepted ([Appendix A](#appendix-a-textual-form-of-principals)) |
 
 `candid_parser` also builds a `String` from bytes that may not be UTF-8 before it checks
