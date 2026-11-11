@@ -167,6 +167,12 @@ def textAnnotationChecks : List Vector :=
       "the same type, its fields in another order (5.1)"
   , accepts "((func \"aaaaa-aa\".m : func (x : nat) -> () query))"
       (oneOf (.func [nat] [] [.query])) [.func [] "m"] "an annotation with a function type (5.1)"
+  , rejects "((func \"aaaaa-aa\".m : func (x : nat, x : nat) -> ()))" (oneOf (.func [nat, nat] [] []))
+      "a parameter name repeated in an annotation (5.1)"
+  , rejects "((func \"aaaaa-aa\".m : func (\"\\ff\" : nat) -> ()))" (oneOf (.func [nat] [] []))
+      "a parameter name that is not UTF-8 in an annotation (5.1)"
+  , accepts "((func \"aaaaa-aa\".m : func (x : nat) -> (x : nat)))" (oneOf (.func [nat] [nat] []))
+      [.func [] "m"] "a parameter and a result may share a name (5.1)"
   , rejects "((1 : t))" (prims [nat]) "a type name with no definition (5.1)"
   , rejects "(record { a = 1; b = (1 : text) })" recordAT
       "an ignored field must be well-annotated (5.1)" ]

@@ -203,15 +203,22 @@ def funcType : Nat → P TypeExpr
     expect ts "->"
     expect ts "("
     let rets ← sepBy ts (argType n) "," ")" (2 * ts.size)
-    return .func args rets (← annots ts (ts.size + 1))
+    let names (xs : List (Option String × TypeExpr)) := xs.filterMap (·.1)
+    unless noDups (names args) && noDups (names rets) do
+      throw "a parameter or result name is repeated"
+    return .func (args.map (·.2)) (rets.map (·.2)) (← annots ts (ts.size + 1))
 
-/-- `<argtype>`: a type, optionally named. The name has no meaning. -/
-def argType : Nat → P TypeExpr
+/-- `<argtype>`: a type, optionally named. A name has no meaning, but must be UTF-8, and
+must not repeat within its list (`spec/Candid.md`, "Named Parameters and Results"). -/
+def argType : Nat → P (Option String × TypeExpr)
   | 0 => throw tooDeep
   | n + 1 => do
-    if ((← peekAt ts 0).bind nameOf?).isSome && (← peekAt ts 1) == some (.punct ":") then
-      modify (· + 2)
-    type n
+    if (← peekAt ts 1) == some (.punct ":") then
+      if let some name := (← peekAt ts 0).bind nameOf? then
+        let name ← liftE name
+        modify (· + 2)
+        return (some name, ← type n)
+    return (none, ← type n)
 
 /-- `<methtype>`: a name, and a function type or the name of one. -/
 def method : Nat → P (String × TypeExpr)
