@@ -48,6 +48,73 @@ const KNOWN: &[(&str, &str)] = &[
         "decode: a principal of 30 bytes",
         "0.10 bounds a principal at 29 bytes, the Internet Computer's limit, in both its \
          decoder and `Principal`; the spec bounds neither",
+    ),    (
+        "text: an underscore cannot end a number (3.4)",
+        "0.10's lexer takes `[0-9][_0-9]*`, so `1_` is a number",
+    ),
+    (
+        "text: an underscore cannot follow another (3.4)",
+        "0.10's lexer takes `[0-9][_0-9]*`, so `1__0` is a number",
+    ),
+    (
+        "text: an underscore in a float literal (3.4)",
+        "0.10's float token has no underscores, so `1_000.5` is two tokens",
+    ),
+    (
+        "text: an underscore cannot end a code point (3.5)",
+        "0.10's `\\u{...}` takes `[0-9a-fA-F][_0-9a-fA-F]*`, so `\\u{41_}` is `A`",
+    ),
+    (
+        "text: the hexadecimal prefix is lowercase (3.4)",
+        "0.10's lexer takes `0[xX]` but strips only `0x`, then unwraps the failed parse of `0X10`: a panic",
+    ),
+    (
+        "text: a sign is part of its number (3.4)",
+        "0.10 lexes a sign as its own token, so `- 5` is `-5`",
+    ),
+    (
+        "text: a float literal begins with a digit (3.4)",
+        "0.10's float token is `[0-9]*\\.[0-9]*`, so `.5` is a float",
+    ),
+    (
+        "text: hexadecimal float literals (3.4)",
+        "0.10 has no hexadecimal float literals",
+    ),
+    (
+        "text: minus zero at nat (5.3)",
+        "0.10 reads a literal at `nat` with `BigUint`'s parser, which rejects a sign",
+    ),
+    (
+        "text: rounded once, not first to float64 (5.3)",
+        "0.10 rounds a literal to `f64`, then to `f32`; this one lands on a tie in between",
+    ),
+    (
+        "text: a raw tab in a text literal (3.5)",
+        "0.10 accepts any character but `\"` and `\\` raw in a text literal",
+    ),
+    (
+        "text: a raw line feed in a text literal (3.5)",
+        "0.10 accepts any character but `\"` and `\\` raw in a text literal",
+    ),
+    (
+        "text: a positional field after the last id (4.2)",
+        "0.10 numbers the field after 4294967295 with `id + 1`: a panic in a debug build, and id 0 in a release build",
+    ),
+    (
+        "text: an annotation does not convert (5.1)",
+        "0.10 re-annotates an annotated value at the outer type, which turns a `nat` into an `int`",
+    ),
+    (
+        "text: an annotation does not narrow (5.1)",
+        "0.10 re-annotates an annotated value at the outer type, which turns a `float64` into a `float32`",
+    ),
+    (
+        "text: an annotation at reserved (5.1)",
+        "0.10 accepts anything at `reserved`, annotated or not",
+    ),
+    (
+        "text: an argument beyond the types is ignored (5.9)",
+        "`IDLArgs::annotate_types` slices `types[args.len()..]`, which panics when there are more arguments than types",
     ),
 ];
 
@@ -174,6 +241,7 @@ fn run(v: &Value) -> Result<Outcome> {
         "coerce" => coerce(v),
         "decode" if v["expect"] == "costly" => costly(v),
         "decode" => decode(v),
+        "parse" => parse(v),
         k => Err(format!("unknown vector kind {k:?}")),
     }
 }
@@ -238,11 +306,46 @@ fn decode(v: &Value) -> Result<Outcome> {
     let bytes = hex(&v["bytes"])?;
     let mut env = TypeEnv::new();
     let types = load_seq(&v["types"], &mut env, "B")?;
-    let got = IDLArgs::from_bytes_with_types(&bytes, &env, &types).map(|args| args.args);
+    let got = IDLArgs::from_bytes_with_types(&bytes, &env, &types)
+        .map(|args| args.args)
+        .map_err(|e| e.to_string());
+    compare_values(got, &v["expect"], &env, &types)
+}
+
+/// Read the text as `candid_parser`'s own test runner does (`Input::parse` in
+/// `rust/candid_parser/src/test.rs`): parse an argument sequence, then annotate it with
+/// the types. The values are compared as for `decode`. A panic is a disagreement:
+/// 0.10 panics on some text.
+fn parse(v: &Value) -> Result<Outcome> {
+    let text = string(&v["text"])?;
+    let mut env = TypeEnv::new();
+    let types = load_seq(&v["types"], &mut env, "B")?;
+    let read = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        candid_parser::parse_idl_args(text)
+            .map_err(|e| e.to_string())
+            .and_then(|args| {
+                args.annotate_types(true, &env, &types)
+                    .map_err(|e| e.to_string())
+            })
+            .map(|args| args.args)
+    }));
+    match read {
+        Ok(got) => compare_values(got, &v["expect"], &env, &types),
+        Err(_) => Ok(Outcome::Disagree("panicked".to_string())),
+    }
+}
+
+/// Compare values that 0.10 produced, or its error, with a vector's `expect`.
+fn compare_values(
+    got: std::result::Result<Vec<IDLValue>, String>,
+    expect: &Value,
+    env: &TypeEnv,
+    types: &[Type],
+) -> Result<Outcome> {
     // An expected value that 0.10 cannot represent is a disagreement, not a broken
     // vector: the question -- bytes and types -- translated, and what 0.10 cannot hold
     // is the answer the model gives.
-    let want = match &v["expect"] {
+    let want = match expect {
         Value::String(s) if s == "reject" => None,
         e => match array(&e["values"])?
             .iter()
@@ -260,7 +363,7 @@ fn decode(v: &Value) -> Result<Outcome> {
             }
         },
     };
-    let encode = |vals: Vec<IDLValue>| IDLArgs::new(&vals).to_bytes_with_types(&env, &types);
+    let encode = |vals: Vec<IDLValue>| IDLArgs::new(&vals).to_bytes_with_types(env, types);
     Ok(match (got, want) {
         (Err(_), None) => Outcome::Agree,
         (Err(e), Some(w)) => Outcome::Disagree(format!("rejected ({e}), want {w:?}")),

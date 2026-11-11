@@ -508,8 +508,9 @@ either rejects the text or yields the value given by [Sections 3 to 5](#3-lexica
 and it rejects only where those sections require it or where
 [Section 7](#7-security-considerations) permits it.
 
-Conformance vectors, each a text, a type and the expected value or rejection, are
-generated from the reference model in [lean/](../) and published under
+Conformance vectors of kind `parse`, each a text, its types and the expected values or
+a rejection, are written from the reference model in [lean/](../), whose
+[Candid/Text/](../Candid/Text/) implements this document, and published under
 [conformance/](../../conformance/).
 
 ## 7. Security Considerations
@@ -627,10 +628,11 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
 | `(1.5 : float64)` at `float32` | accepted, rounded | rejected, as above |
 | `(1 : nat)` at `reserved` | accepted | rejected, as above |
 | `()` at `(opt nat)` | accepted by `annotate_types`, rejected by `didc encode` | accepted: `(null)` |
+| `(1, 2)` at `(nat)` | `annotate_types` panics; `didc encode` accepts | accepted: `(nat(1))` |
 | A float literal at `float32` | rounded to `float64`, then to `float32` | rounded once ([5.3](#53-numbers)) |
 | `-0` at `nat` | rejected | accepted: 0 |
 | `- 5`, `-/* */5` | accepted | rejected: a sign is part of its number |
-| `1_`, `1__0` | accepted | rejected |
+| `1_`, `1__0`, `"\u{41_}"` | accepted | rejected |
 | `1_000.5` | rejected | accepted |
 | `.5` | accepted | rejected |
 | `0x1p4` | rejected | accepted: 16 |

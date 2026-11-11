@@ -23,7 +23,7 @@ open Oracle
 
 /-- The vector files, by name. -/
 def files : List (String × List Vector) :=
-  [ ("handwritten.json", handwritten)
+  [ ("handwritten.json", handwritten ++ textChecks)
   , ("subtype-primitives.json", Generate.primitives)
   , ("subtype-small.json", Generate.smallTypes)
   , ("coerce-small.json", Generate.coercions)
@@ -74,18 +74,16 @@ def selfTest : IO UInt32 := do
     if let some d := v.assertion.withinDisagreement then
       IO.println s!"FAIL  {v.id}: {d}"
       problems := problems + 1
-  for p in TestDid.violations do
+  for p in TestDid.violations ++ TestDid.parserViolations do
     IO.println s!"FAIL  test/{p}"
     problems := problems + 1
-  for (why, n) in TestDid.deferred do
-    IO.println s!"wait  {n} assertions of test/ on {why}"
   for v in all do
     unless roundTrips v do
       IO.println s!"FAIL  does not survive JSON: {v.id}"
       problems := problems + 1
   -- Hand-written vectors are listed one by one: their names are the documentation.
   -- Generated ones only fail if the JSON or the generator is broken, so a count will do.
-  problems := problems + (← checkAll handwritten true)
+  problems := problems + (← checkAll (handwritten ++ textChecks) true)
   for (name, vs) in files.drop 1 do
     problems := problems + (← checkAll vs false)
     IO.println s!"ok    {vs.length} vectors in {name}"

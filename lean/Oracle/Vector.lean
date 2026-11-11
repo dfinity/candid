@@ -3,8 +3,9 @@ Conformance vectors, and their JSON form.
 
 A vector is one assertion about the model that any Candid implementation can check:
 a field-id hash, whether a type table is well formed, whether one type is a subtype
-of another, what a value coerces to at another type, or what a message decodes to. `conformance/README.md` specifies the JSON; this file is the reference
-reader and writer for it, and the two must agree.
+of another, what a value coerces to at another type, what a message decodes to, or
+what text reads as. `conformance/README.md` specifies the JSON; this file is the
+reference reader and writer for it, and the two must agree.
 
 The JSON is data, not a grammar: a type is its table and a root, exactly as the model
 holds it (`Candid/Types.lean`), so a runner in any language can read vector #1 before
@@ -66,6 +67,9 @@ inductive Assertion where
   (`costlyLimit`), so it gives no answer. An implementation may reject them for lack of
   resources, or decode them; it must not crash. -/
   | decodeCostly (bytes : ByteArray) (types : TypeSeq)
+  /-- `text`, read as an argument sequence at `types` (`lean/Spec/TextValues.md`), is
+  the values `want`, one per type, or is rejected when `want` is `none`. -/
+  | parse (text : String) (types : TypeSeq) (want : Option (List Value))
 
 structure Vector where
   /-- Unique within the suite. Human-readable, and stable: a runner's list of known
@@ -205,6 +209,9 @@ def Vector.render (v : Vector) : String :=
   | .decodeCostly bs ts =>
     head "decode" ++ field "bytes" (.str (bytesToHex bs.toList)) ++ field "types" ts.toJson ++
       field "expect" (.str "costly") ++ "}"
+  | .parse text ts want =>
+    head "parse" ++ field "text" (.str text) ++ field "types" ts.toJson ++
+      field "expect" (expectValuesToJson want) ++ "}"
 
 /-- A whole file: one vector per line, so that a change to the model shows up in a diff
 as exactly the vectors whose answers it changed. -/
@@ -410,6 +417,11 @@ def Vector.fromJson? (j : Json) : Except String Vector := do
       let expect ← j.getObjVal? "expect"
       if expect == .str "costly" then return .decodeCostly bs ts
       return .decode bs ts (← expectValuesFromJson? expect)
+    | "parse" =>
+      expectKeys j ["id", "kind", "text", "types", "expect"]
+      return .parse (← (← j.getObjVal? "text").getStr?)
+        (← TypeSeq.fromJson? (← j.getObjVal? "types"))
+        (← expectValuesFromJson? (← j.getObjVal? "expect"))
     | k => throw s!"unknown vector kind {repr k}" : Except String Assertion)
   return { id, assertion }
 
@@ -428,6 +440,11 @@ def parseFile (text : String) : Except String (List Vector) := do
 /-! ## Evaluating -/
 
 def relStr (b : Bool) : String := if b then "<:" else "!<:"
+
+/-- Expected values, if any, are one of each type. -/
+def oneOfEach (B : TypeTable) (roots : List Slot) : Option (List Value) → Bool
+  | none => true
+  | some vs => vs.length == roots.length && (vs.zip roots).all fun (v, u) => B.hasType v u
 
 /-- `none` if the model agrees with the assertion, otherwise what went wrong. -/
 def Assertion.disagreement : Assertion → Option String
@@ -458,13 +475,22 @@ def Assertion.disagreement : Assertion → Option String
     match ts.check? with
     | some ⟨B, us⟩ =>
       let roots := us.map (·.1)
-      if want.any fun vs => vs.length != roots.length || (vs.zip roots).any fun (v, u) => !B.hasType v u then
-        some "the expected values are not one of each type"
+      if !oneOfEach B roots want then some "the expected values are not one of each type"
       else
         let got := deserialize bs B roots
         if got == want then none
         else some s!"got {(expectValuesToJson got).compress}, want {(expectValuesToJson want).compress}"
     | none => some "a type is malformed, so decoding at it is not defined"
+  | .parse text ts want =>
+    match ts.check? with
+    | some ⟨B, us⟩ =>
+      let roots := us.map (·.1)
+      if !oneOfEach B roots want then some "the expected values are not one of each type"
+      else
+        let got := Text.readArgs text B roots
+        if got == want then none
+        else some s!"got {(expectValuesToJson got).compress}, want {(expectValuesToJson want).compress}"
+    | none => some "a type is malformed, so reading text at it is not defined"
   | .decodeCostly bs ts =>
     match ts.check? with
     | some ⟨B, us⟩ =>

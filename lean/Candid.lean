@@ -12,3 +12,9 @@ import Candid.SubtypeSpec
 import Candid.Value
 import Candid.Coerce
 import Candid.Wire
+import Candid.Equiv
+import Candid.Principal
+import Candid.Float
+import Candid.Text.Lex
+import Candid.Text.Parse
+import Candid.Text.Elab

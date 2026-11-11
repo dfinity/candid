@@ -5,8 +5,8 @@ The `.test.did` files are the suite this one replaces (`conformance/README.md`,
 "Migration"). Each assertion names a message, the types to read it at, and a claim
 about the outcome. The translation keeps all three and adds nothing: the types become a
 `TypeSeq`, and a message in the textual syntax keeps its source, with the values
-`candid_parser` reads it as, since this model has no textual syntax yet. What the model
-makes of each assertion is `Oracle/TestDid.lean`'s business.
+`candid_parser` reads it as, for the model's own reading to be checked against. What the
+model makes of each assertion is `Oracle/TestDid.lean`'s business.
 -/
 
 import Oracle.Vector
