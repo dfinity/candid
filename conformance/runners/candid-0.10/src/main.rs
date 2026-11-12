@@ -81,6 +81,38 @@ const KNOWN: &[(&str, &str)] = &[
         "0.10 has no hexadecimal float literals",
     ),
     (
+        "text: the least float32 subnormal (5.3)",
+        "0.10 has no hexadecimal float literals; the decimal twin agrees",
+    ),
+    (
+        "text: a tie below the least float32 subnormal goes to zero, a tie above it goes up (5.3)",
+        "0.10 has no hexadecimal float literals; the decimal twin agrees",
+    ),
+    (
+        "text: the greatest float32 subnormal, and a tie above it carries to the least normal (5.3)",
+        "0.10 has no hexadecimal float literals; the decimal twin agrees",
+    ),
+    (
+        "text: a float32 tie that carries into the exponent, and past the greatest finite (5.3)",
+        "0.10 has no hexadecimal float literals; the decimal twin agrees",
+    ),
+    (
+        "text: the least float64 subnormal (5.3)",
+        "0.10 has no hexadecimal float literals; the decimal twin agrees",
+    ),
+    (
+        "text: a tie below the least float64 subnormal goes to zero, a tie above it goes up (5.3)",
+        "0.10 has no hexadecimal float literals; the decimal twin agrees",
+    ),
+    (
+        "text: the greatest float64 subnormal, and a tie above it carries to the least normal (5.3)",
+        "0.10 has no hexadecimal float literals; the decimal twin agrees",
+    ),
+    (
+        "text: a float64 tie that carries into the exponent, and past the greatest finite (5.3)",
+        "0.10 has no hexadecimal float literals; the decimal twin agrees",
+    ),
+    (
         "text: minus zero at nat (5.3)",
         "0.10 reads a literal at `nat` with `BigUint`'s parser, which rejects a sign",
     ),
