@@ -304,7 +304,7 @@ def didWellFormedChecks : List Vector :=
   , rejectsDid "type S = service { m : T }; type T = opt nat;"
       "a method that is not a function, in a definition nothing uses (6.3)"
   , rejectsDid "type A = opt func () -> (); service : { m : A }" "a method that is an option (6.3)"
-  , rejectsDid "type A = nat; service : { m : A }" "a method that is a primitive type (6.3)"
+  , rejectsDid "type A = nat; service : { m : A }" "a declared service whose method is a primitive type (6.4)"
   , rejectsDid "type S = service { m : S };" "a method that is the service itself (6.3)"
   , rejectsDid "type F = func () -> (nat) oneway;" "a oneway function with a result (6.3)"
   , defines "type F = func (nat) -> () oneway;"

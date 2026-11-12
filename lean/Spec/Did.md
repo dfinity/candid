@@ -66,8 +66,8 @@ case-sensitive.
 
 **Types.** Types are those of the Candid data model [CANDID]. A type may be recursive,
 so it is in general an infinite tree, with finitely many distinct subtrees. Two types
-are the same, written `s ≡ t`, when they are the same tree; field and method lists are
-compared without regard to order. This is the equivalence of [TEXT], Section 5.1.
+are the same, written `s ≡ t`, when they are the same tree; field, method and
+annotation lists are compared without regard to order. This is the equivalence of [TEXT], Section 5.1.
 
 ### 1.4. Terminology
 
@@ -181,7 +181,7 @@ t ::= p                                  primitive type
     | opt t | vec t
     | record{i₁ : t₁; …; iₙ : tₙ}        field ids, distinct
     | variant{i₁ : t₁; …; iₙ : tₙ}       field ids, distinct
-    | func (t₁, …, tₙ) → (u₁, …, uₘ) A   A: a set of annotations
+    | func (t₁, …, tₙ) → (u₁, …, uₘ) A   A: a list of annotations, as written
     | service{m₁ : t₁; …; mₙ : tₙ}       method names, distinct
 ```
 
@@ -370,8 +370,9 @@ A type is **well-formed** if:
 A mode says how a function is called: `query`, `composite_query` or `oneway`, and an
 ordinary update call if it has none. A function is called in one way, so `query oneway`
 is not well-formed. Every annotation defined so far is a mode. One added later need not
-be, and could then combine with a mode: the abstract syntax is a set of annotations
-so that it can.
+be, and could then combine with a mode: the abstract syntax is a list of annotations
+so that it can. Since no annotation repeats, a well-formed list is a set, and its order
+has no meaning: `func () -> () query` written either way is one type.
 
 These rules are about types, wherever they come from. A type decoded from binary data
 is subject to them too.
@@ -394,9 +395,11 @@ The meaning of a description is an **interface**: a map from each name *x* defin
 - **service** `⟦s⟧`, for a declaration *s*;
 - **constructor** `(⟦t₁⟧, …, ⟦tₙ⟧) → ⟦s⟧`, for a declaration `(t₁, …, tₙ) → s`.
 
-In the last two cases, `⟦s⟧` MUST be a service type, and the description MUST be
-rejected otherwise: `service : T` is rejected if `T` names a function type. Each `⟦tᵢ⟧`
-MUST be well-formed.
+In the last two cases, `⟦s⟧` MUST be a well-formed service type, and each `⟦tᵢ⟧` MUST be
+well-formed ([Section 6.3](#63-well-formedness)); the description MUST be rejected
+otherwise. So `service : T` is rejected if `T` names a function type, and
+`type T = nat; service : { m : T }` is rejected because the method `m` is not a
+function, though every definition is well-formed.
 
 ## 7. Conformance
 
@@ -492,8 +495,9 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
   Imports are file paths, as in 0.10, which reads them from the file system only;
   they are relative to the importing description, as in 0.10; names are visible
   through indirect imports, as in 0.10; a name defined twice is rejected, as in 0.10;
-  and import cycles are rejected, as 0.10 does, with a misleading error about a
-  duplicate binding. That an imported description cannot use the importer's names is
+  and import cycles are rejected. 0.10 rejects a cycle through the file being read, with
+  a misleading error about a duplicate binding, and accepts one among the files it
+  imports ([Appendix A.2](#a2-different-from-candid-010)). That an imported description cannot use the importer's names is
   [CANDID]'s rule, which 0.10 does not check.
 - Names are not qualified by the description that defines them, and will not be: an
   import is a simple way to reuse definitions, not a module system. Candid types are
@@ -510,6 +514,7 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
 | `import "b.did"`, where `b.did` uses a name that only the importer defines | accepted | rejected: not self-contained ([5.3](#53-imports)) |
 | `import "mid.did"`, where `mid.did` has `import service "svc.did"` | `svc.did`'s methods join the importer's service | they do not: a plain import contributes no methods |
 | `import service "mid.did"`, where `mid.did` declares no service but has `import service "svc.did"` | rejected: no main service | accepted: `mid.did` provides `svc.did`'s methods |
+| `import "a.did"`, where `a.did` and `b.did` import each other | accepted: each file is read once | rejected: an import cycle ([5.3](#53-imports)) |
 | `import "sub/../a.did"; import "a.did"` | `a.did` read twice, so its names are defined twice | one description, read once |
 | Two merged methods with different names whose field-id hashes collide | rejected | accepted: method names are not hashed |
 

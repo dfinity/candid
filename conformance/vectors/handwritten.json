@@ -435,7 +435,7 @@
 {"id":"did: a method whose type is a name for a name for a function type (6.3)","kind":"did","text":"type A = B; type B = func () -> (); service : { m : A }","expect":{"interface":{"service":{"init":null,"type":1},"table":[{"func":{"annots":[],"args":[],"rets":[]}},{"service":[["m",0]]}],"types":[["A",0],["B",0]]}}},
 {"id":"did: a method that is not a function, in a definition nothing uses (6.3)","kind":"did","text":"type S = service { m : T }; type T = opt nat;","expect":"reject"},
 {"id":"did: a method that is an option (6.3)","kind":"did","text":"type A = opt func () -> (); service : { m : A }","expect":"reject"},
-{"id":"did: a method that is a primitive type (6.3)","kind":"did","text":"type A = nat; service : { m : A }","expect":"reject"},
+{"id":"did: a declared service whose method is a primitive type (6.4)","kind":"did","text":"type A = nat; service : { m : A }","expect":"reject"},
 {"id":"did: a method that is the service itself (6.3)","kind":"did","text":"type S = service { m : S };","expect":"reject"},
 {"id":"did: a oneway function with a result (6.3)","kind":"did","text":"type F = func () -> (nat) oneway;","expect":"reject"},
 {"id":"did: a oneway function with parameters (6.3)","kind":"did","text":"type F = func (nat) -> () oneway;","expect":{"interface":{"service":null,"table":[{"func":{"annots":["oneway"],"args":["nat"],"rets":[]}}],"types":[["F",0]]}}},

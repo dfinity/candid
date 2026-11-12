@@ -420,7 +420,9 @@ fn did(v: &Value) -> Result<Outcome> {
             match seg {
                 "" | "." => {}
                 ".." => {
-                    segs.pop();
+                    if segs.pop().is_none() {
+                        return Err(format!("a vector's file escapes its directory: {path:?}"));
+                    }
                 }
                 seg => segs.push(seg),
             }
