@@ -7,5 +7,6 @@ Conformance vectors for the Candid model: what they are and how they are written
 
 import Oracle.Vector
 import Oracle.Handwritten
+import Oracle.HandwrittenText
 import Oracle.Generate
 import Oracle.TestDid

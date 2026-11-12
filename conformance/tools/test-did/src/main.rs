@@ -6,9 +6,9 @@
 //!
 //! Each assertion becomes an `Oracle.TestDid.Assert` (`lean/Oracle/TestDid/Assert.lean`):
 //! its message, its types as a type table, and its claim. Nothing is decided here --
-//! whether the model agrees with a claim is `lean/Oracle/TestDid.lean`'s question -- with
-//! one exception: the model has no textual syntax yet, so text in an assertion is
-//! carried with the values `candid_parser` reads it as.
+//! whether the model agrees with a claim is `lean/Oracle/TestDid.lean`'s question. Text in
+//! an assertion is carried with the values `candid_parser` reads it as, which the model's
+//! own reading is checked against.
 //!
 //! This exists while `test/` does. CI runs it and fails if the output differs from the
 //! committed file, so the `.test.did` files stay the source of these assertions.

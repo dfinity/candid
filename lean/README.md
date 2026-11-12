@@ -1,10 +1,10 @@
 # `lean/` — Lean 4 reference model and specification
 
-**Status: fifth slice.** Types, the field-id hash, subtyping — as both a relation and a
-decision procedure — values with coercion, and the binary format in both directions,
-with an executable that writes them out
+**Status: sixth slice.** Types, the field-id hash, subtyping — as both a relation and a
+decision procedure — values with coercion, the binary format in both directions, and
+textual values, with an executable that writes them out
 as conformance vectors, reads them back, and is checked against `candid` 0.10 in CI. It
-is also held to the decoding assertions of [test/](../test/). "Slice" is a label for
+is also held to every assertion of [test/](../test/). "Slice" is a label for
 what landed in a merge window, applied after the fact; the forward-looking plan is the
 coverage checklist below and the tiers in [REWRITE.md §3](../REWRITE.md#3-lean-honestly). Nothing is published and
 nothing carries a compatibility promise. See [REWRITE.md](../REWRITE.md) for why this
@@ -310,8 +310,9 @@ The `.test.did` files stay the source. `conformance/tools/test-did` reads them w
 `candid_parser` and writes [Oracle/TestDid/Data.lean](Oracle/TestDid/Data.lean): the
 bytes, the types as a table, and the claim. The model has no textual syntax yet, so
 text on the right of `==` arrives as the values `candid_parser` reads it as, at the
-assertion's types. The 24 assertions left wait on the textual syntax (7, with text on
-the left) and on the cost model (the 17 of `spacebomb.test.did`).
+assertion's types. The 24 assertions left then waited on the cost model (the 17 of
+`spacebomb.test.did`, since checked as costly messages) and on the textual syntax (7,
+with text on the left, which slice 6 checks).
 
 **Future types.** A decoder that meets an opcode below `-24` now skips it as the spec
 says, keeping the type in the table as `Composite.future` and decoding its values to
@@ -319,6 +320,34 @@ says, keeping the type in the table as `Composite.future` and decoding its value
 option, which is what `test/subtypes.test.did` asserts; the spec has no rule of its own
 for them, and the model adds only reflexivity. A future value's reference count is read
 and ignored, as 0.10 does, since the model has no reference table.
+
+## What slice 6 established
+
+**Textual values, specified first in the new style.** [Spec/TextValues.md](Spec/TextValues.md)
+is the first section of the new specification: RFC conventions, ABNF, and elaboration
+rules `e ⇐ t ⇝ v` that give text a meaning at a type, which `spec/Candid.md` leaves to
+"context". [Candid/Text/](Candid/Text/) implements it: a lexer, a parser into the
+document's abstract syntax, and elaboration, one function per rule. The `parse` vectors
+in `handwritten.json` follow the document section by section, with their expectations
+written from it.
+
+**What it needed.** Type equivalence ([Candid/Equiv.lean](Candid/Equiv.lean)), since an
+annotation must name the expected type: the subtype procedure's worklist in one
+direction, with the same termination measure. The textual form of principals
+([Candid/Principal.lean](Candid/Principal.lean)), CRC-32 and base32. And float literals
+rounded once and exactly ([Candid/Float.lean](Candid/Float.lean)), on naturals, deciding
+an absurd exponent before multiplying anything out.
+
+**Every assertion of `test/` is checked.** The 7 with text on the left are `parse`
+vectors now, and text on the right of `==` is read by the model, not taken from
+`candid_parser`. The model reads all of it as `candid_parser` does, which the oracle
+checks (`TestDid.parserViolations`). Where the document and 0.10 differ, the runner lists
+the vectors as known divergences, and the document's Appendix B.2 says why. Three of them
+are panics in 0.10.
+
+**Types in annotations are nested and flattened.** `TypeExpr` is the type syntax as
+written, and `flatten` interns it into a table, which is half of the `.did` work below.
+Names are kept in the syntax but resolve in an empty environment, so a name is rejected.
 
 ## Constraints
 
@@ -351,7 +380,8 @@ cover what actually breaks in production:
       rejects for lack of resources. The model's decoder stops at `costlyLimit`
       values, so the oracle can tell a message it cannot afford, such as those of
       `test/spacebomb.test.did`, from one it answers
-- [ ] Textual value syntax
+- [x] Textual value syntax — lexing, parsing and elaboration at a type, after
+      [Spec/TextValues.md](Spec/TextValues.md)
 
 ## Deferred, deliberately
 
@@ -375,14 +405,17 @@ Named here so they are obligations rather than oversights.
   depth costs no stack. A hash set would make this linear in the pairs compared; the
   reference model keeps lists, which the termination measure is stated over, until a
   conformance vector makes that a problem.
-- **Flattening the surface syntax.** A `.did` type is nested; a `Composite`'s
-  children are slots. The parser will need the pass that interns nested composites
-  into a table, and textual aliases (`type A = B;`) have to be resolved by it —
-  `intern`/`close` are only the hand-written-example half of that.
-- **Encoding vectors, and type equivalence.** An encoding vector is a value and a type,
-  and the check is that an implementation's bytes decode to an *equivalent* type and
-  the same value. Equivalence -- the same infinite tree -- is decidable with the
-  subtype procedure's worklist and is not written yet.
+- **`.did` files.** Type expressions are parsed and flattened
+  ([Candid/Text/](Candid/Text/)), but without names: definitions (`type A = B;`), which
+  may be recursive, need an environment that `flatten` resolves names in, and the
+  service and import syntax of a whole file are not parsed.
+- **Encoding vectors.** An encoding vector is a value and a type, and the check is that
+  an implementation's bytes decode to an *equivalent* type and the same value.
+  Equivalence is written now ([Candid/Equiv.lean](Candid/Equiv.lean)); the vectors are not.
+- **Elaboration's properties as theorems.** That it is deterministic, that its result
+  has the type it was elaborated at, and that it terminates are stated in
+  [Spec/TextValues.md](Spec/TextValues.md), Section 5.10. Termination holds by
+  construction, since it recurses on the expression; the other two are not proved.
 - **Verso.** Deliberately not yet: bundling an undocumented doc toolchain into the
   work whose purpose was de-risking the build would have doubled the unknowns.
 

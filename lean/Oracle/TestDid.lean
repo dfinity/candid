@@ -8,10 +8,10 @@ that they say more than an assertion did -- `assert blob "..." : (nat)` says onl
 a message is accepted, and its vector says as what. A message on the right of `==` is a
 vector of its own.
 
-**Not every assertion is checked yet.** Those with text on the left wait on the textual
-syntax (`deferral?`): whether text parses at a type is its question. Text on the
-*right* of `==` is checked, against the values `candid_parser` reads it as, since there
-it only spells out the expected values.
+**Text** is read by the model (`Candid/Text`, after `lean/Spec/TextValues.md`), on
+either side. The translation also carries the values `candid_parser` reads it as, and
+the model is held to those too (`parserViolations`): text in `test/` is written for
+`candid_parser`, so where the two differ, the assertion is not testing what it says.
 
 **`spacebomb.test.did` is about resources.** Its messages are valid, and take a lot of
 time or memory to decode; the file asserts that they are rejected, by a decoder with
@@ -40,12 +40,6 @@ open Candid
 
 def Assert.id (a : Assert) : String := s!"{a.file}.test.did: {a.name}"
 
-/-- Why an assertion is not checked yet, if it is not. See the header. -/
-def Assert.deferral? (a : Assert) : Option String :=
-  match a.input with
-  | .text _ _ => some "the textual syntax"
-  | .blob _ => none
-
 /-- Does the assertion claim its message is costly, rather than rejected? See the
 header. -/
 def Assert.isCostly (a : Assert) : Bool := a.file == "spacebomb"
@@ -55,14 +49,13 @@ def disputed : List (String × String) := []
 
 def showValues (vs : List Value) : String := (expectValuesToJson (some vs)).compress
 
-/-- The model's reading of one side: deserialised at `roots` in `B`, or for text, what
-`candid_parser` reads it as. `none` is a rejection. -/
+/-- The model's reading of one side at `roots` in `B`: bytes deserialised, text read.
+`none` is a rejection. -/
 def Input.answer (B : TypeTable) (roots : List Slot) : Input → Except String (Option (List Value))
   | .blob hex => do
     let bs ← bytesFromHex? (.str hex)
     return deserialize ⟨bs.toArray⟩ B roots
-  | .text src none => throw s!"candid_parser could not read {repr src} at these types"
-  | .text _ (some vs) => return some vs
+  | .text src _ => return Text.readArgs src B roots
 
 /-- Does the model agree with the claim? -/
 def Assert.check (a : Assert) : Except String Unit := do
@@ -94,7 +87,6 @@ def Assert.check (a : Assert) : Except String Unit := do
 
 /-- The vectors an assertion becomes: one per message, with the model's answer. -/
 def Assert.vectors (a : Assert) : List Vector :=
-  if a.deferral?.isSome then [] else
   match a.types.check? with
   | none => []
   | some ⟨B, us⟩ =>
@@ -105,19 +97,22 @@ def Assert.vectors (a : Assert) : List Vector :=
         [⟨a.id ++ suffix, if a.isCostly then .decodeCostly bs a.types
           else .decode bs a.types (deserialize bs B (us.map (·.1)))⟩]
       | .error _ => []
+    let text (suffix src : String) : List Vector :=
+      [⟨a.id ++ suffix, .parse src a.types (Text.readArgs src B (us.map (·.1)))⟩]
+    let side (suffix : String) : Input → List Vector
+      | .blob hex => one suffix hex
+      | .text src _ => text suffix src
     let right := match a.claim with
-      | .equals (.blob hex) | .differs (.blob hex) => one " (right)" hex
+      | .equals o | .differs o => side " (right)" o
       | _ => []
-    (match a.input with
-      | .blob hex => one "" hex
-      | .text _ _ => []) ++ right
+    side "" a.input ++ right
 
 def vectors : List Vector := asserts.flatMap Assert.vectors
 
 /-- Assertions the model disagrees with that are not `disputed`, disputed ones it now
 agrees with, and disputes that name no assertion. -/
 def violations : List String :=
-  let checked := asserts.filter (·.deferral?.isNone)
+  let checked := asserts
   let disagreements := checked.filterMap fun a =>
     match a.check, disputed.lookup a.id with
     | .ok (), none => none
@@ -128,9 +123,20 @@ def violations : List String :=
     if checked.any (·.id == id) then none else some s!"{id}: disputed, but no such assertion"
   disagreements ++ stale
 
-/-- How many assertions wait, on what. -/
-def deferred : List (String × Nat) :=
-  let reasons := asserts.filterMap (·.deferral?)
-  reasons.eraseDups.map fun r => (r, reasons.count r)
+/-- Text that the model reads differently from `candid_parser`. See the header. -/
+def parserViolations : List String :=
+  asserts.flatMap fun a =>
+    match a.types.check? with
+    | none => []
+    | some ⟨B, us⟩ =>
+      let sides := a.input :: match a.claim with
+        | .equals o | .differs o => [o]
+        | _ => []
+      sides.filterMap fun
+        | .text src parsed =>
+          let got := Text.readArgs src B (us.map (·.1))
+          if got == parsed then none
+          else some s!"{a.id}: the model reads {repr src} as {(expectValuesToJson got).compress}, candid_parser as {(expectValuesToJson parsed).compress}"
+        | .blob _ => none
 
 end Oracle.TestDid
