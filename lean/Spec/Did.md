@@ -393,7 +393,9 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
 | `type nat = text` | accepted; `nat` still denotes the primitive type everywhere | rejected ([5.2](#52-abstract-syntax)) |
 | `type A = record { 4294967295 : nat; nat }` | panics in a debug build | rejected ([TEXT], Section 4.2) |
 
-The lexical differences of [TEXT], Appendix B.2, apply to descriptions too.
+The lexical differences of [TEXT], Appendix B.2, apply to descriptions too. Whether
+0.10 should change to reject `type nat = text` is not decided; this document rejects it
+because the definition could never be used.
 
 ### A.3. Open Issues
 
@@ -405,9 +407,6 @@ The lexical differences of [TEXT], Appendix B.2, apply to descriptions too.
   reference model's decoder accepts more than one, such as `query` and `oneway`
   together. Such a type has no textual form under [Section 4.1](#41-grammar). Either the
   decoder should reject it, or the text should allow it.
-- **Defining a primitive name.** [Section 5.2](#52-abstract-syntax) rejects
-  `type nat = text`. The alternative is to let the definition shadow the primitive
-  type, which no implementation does.
 - **One lexical chapter.** This document borrows its lexical structure from [TEXT]. The
   two should share one chapter when they become one specification.
 
