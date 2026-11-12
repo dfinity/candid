@@ -17,10 +17,12 @@
 //!
 //! This calls `candid` 0.10's public API only, and it never modifies `rust/`.
 
-use candid::types::subtype::{subtype_with_config, Gamma, OptReport};
+use candid::types::subtype::{equal, subtype_with_config, Gamma, OptReport};
 use candid::types::value::{IDLField, VariantValue};
 use candid::types::{Field, FuncMode, Function, Label, Type, TypeEnv, TypeInner};
 use candid::{DecoderConfig, IDLArgs, IDLValue, Principal};
+use candid_parser::syntax::IDLProg;
+use candid_parser::typing::check_prog;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::process::ExitCode;
@@ -49,6 +51,20 @@ const KNOWN: &[(&str, &str)] = &[
         "0.10 bounds a principal at 29 bytes, the Internet Computer's limit, in both its \
          decoder and `Principal`; the spec bounds neither",
     ),    (
+        "did: a positional field after id 2^32 - 1 (4.2)",
+        "0.10's grammar numbers positional fields with `id + 1` on a `u32`, which \
+         overflows: a debug build panics, and a release build gives the field id 0",
+    ),
+    (
+        "did: a definition of a primitive type's name (5.2)",
+        "0.10 binds the name, but its parser reads `nat` as the primitive type wherever \
+         it is used, so the definition is never reachable",
+    ),
+    (
+        "did: a definition of a primitive type's name, used (5.2)",
+        "as above: `record { reserved }` is a record of the primitive `reserved`",
+    ),
+    (
         "text: an underscore cannot end a number (3.4)",
         "0.10's lexer takes `[0-9][_0-9]*`, so `1_` is a number",
     ),
@@ -274,6 +290,7 @@ fn run(v: &Value) -> Result<Outcome> {
         "decode" if v["expect"] == "costly" => costly(v),
         "decode" => decode(v),
         "parse" => parse(v),
+        "did" => did(v),
         k => Err(format!("unknown vector kind {k:?}")),
     }
 }
@@ -365,6 +382,99 @@ fn parse(v: &Value) -> Result<Outcome> {
         Ok(got) => compare_values(got, &v["expect"], &env, &types),
         Err(_) => Ok(Outcome::Disagree("panicked".to_string())),
     }
+}
+
+/// Read the text as a `.did` file without imports, as `candid_parser::check_prog` does,
+/// and compare the interface with the expected one. Types are compared with 0.10's own
+/// `equal`, with the expected table loaded into the same environment under names no
+/// `.did` file can define, since they contain a space.
+fn did(v: &Value) -> Result<Outcome> {
+    let text = string(&v["text"])?;
+    let read = std::panic::catch_unwind(|| {
+        let prog = text.parse::<IDLProg>().map_err(|e| e.to_string())?;
+        let mut env = TypeEnv::new();
+        let actor = check_prog(&mut env, &prog).map_err(|e| e.to_string())?;
+        Ok::<_, String>((env, actor))
+    });
+    let got = match read {
+        Ok(got) => got,
+        Err(_) => return Ok(Outcome::Disagree("panicked".to_string())),
+    };
+    let want = match &v["expect"] {
+        Value::String(s) if s == "reject" => None,
+        e => Some(&e["interface"]),
+    };
+    let (mut env, actor, want) = match (got, want) {
+        (Err(_), None) => return Ok(Outcome::Agree),
+        (Err(e), Some(_)) => return Ok(Outcome::Disagree(format!("rejected ({e})"))),
+        (Ok(_), None) => return Ok(Outcome::Disagree("accepted, want reject".to_string())),
+        (Ok((env, actor)), Some(want)) => (env, actor, want),
+    };
+    let prefix = "expected ";
+    let table = serde_json::json!({"table": want["table"], "root": "null"});
+    load(&table, &mut env, prefix)?;
+    let same = |env: &TypeEnv, a: &Type, b: &Type| equal(&mut Gamma::new(), env, a, b).is_ok();
+
+    let got_names: BTreeSet<&str> = env
+        .0
+        .keys()
+        .map(String::as_str)
+        .filter(|n| !n.starts_with(prefix))
+        .collect();
+    let mut want_names = BTreeSet::new();
+    for t in array(&want["types"])? {
+        let (name, s) = pair(t)?;
+        let name = string(name)?;
+        want_names.insert(name);
+        if got_names.contains(name) {
+            let ty: Type = TypeInner::Var(name.to_string()).into();
+            if !same(&env, &ty, &slot(s, prefix)?) {
+                return Ok(Outcome::Disagree(format!(
+                    "{name} is not the expected type"
+                )));
+            }
+        }
+    }
+    if got_names != want_names {
+        return Ok(Outcome::Disagree(format!(
+            "defines {got_names:?}, want {want_names:?}"
+        )));
+    }
+    let service = &want["service"];
+    Ok(match (actor, service.is_null()) {
+        (None, true) => Outcome::Agree,
+        (None, false) => Outcome::Disagree("declares no service, want one".to_string()),
+        (Some(_), true) => Outcome::Disagree("declares a service, want none".to_string()),
+        (Some(actor), false) => {
+            let (init, serv) = match actor.as_ref() {
+                TypeInner::Class(args, serv) => (Some(args.clone()), serv.clone()),
+                _ => (None, actor.clone()),
+            };
+            let want_init = match &service["init"] {
+                Value::Null => None,
+                ts => Some(
+                    array(ts)?
+                        .iter()
+                        .map(|s| slot(s, prefix))
+                        .collect::<Result<Vec<_>>>()?,
+                ),
+            };
+            let inits_agree = match (&init, &want_init) {
+                (None, None) => true,
+                (Some(g), Some(w)) => {
+                    g.len() == w.len() && g.iter().zip(w).all(|(g, w)| same(&env, g, w))
+                }
+                _ => false,
+            };
+            if !inits_agree {
+                Outcome::Disagree("the initialization arguments are not the expected ones".into())
+            } else {
+                agreement(same(&env, &serv, &slot(&service["type"], prefix)?), || {
+                    "the service is not the expected type".to_string()
+                })
+            }
+        }
+    })
 }
 
 /// Compare values that 0.10 produced, or its error, with a vector's `expect`.

@@ -7,8 +7,8 @@ terminates whatever the type graph: a recursive type is unfolded only as far as 
 expression goes.
 
 **Annotations** carry a type of their own, written as a nested `TypeExpr`. It is
-flattened into a table of its own (`TypeExpr.toTable`), checked for well-formedness, and
-compared with the expected type by `decEquiv`. The expression inside is then elaborated
+flattened into a table of its own (`TypeExpr.toTable?`, in `Flatten.lean`), checked for
+well-formedness, and compared with the expected type by `decEquiv`. The expression inside is then elaborated
 in the annotation's table, which is why `elaborate` takes the table as an argument rather
 than a parameter. Names in an annotation resolve in an environment of type
 definitions; the model's is empty, so a name is rejected.
@@ -18,56 +18,12 @@ every annotation inside an expression must hold, even one inside a field or argu
 that elaboration ignores, or at `reserved`.
 -/
 
-import Candid.Text.Parse
+import Candid.Text.Flatten
 import Candid.Equiv
 import Candid.Coerce
 import Candid.Float
 
 namespace Candid.Text
-
-abbrev FlatM := ExceptT String (StateM (Array Composite))
-
-def pushEntry (c : Composite) : FlatM Slot := do
-  let entries ← get
-  set (entries.push c)
-  return .ref entries.size
-
-mutual
-
-def flatten : TypeExpr → FlatM Slot
-  | .prim p => return .prim p
-  | .name n => throw s!"unbound type name {n}"
-  | .opt t => do pushEntry (.opt (← flatten t))
-  | .vec t => do pushEntry (.vec (← flatten t))
-  | .record fs => do pushEntry (.record (← flattenFields fs))
-  | .variant fs => do pushEntry (.variant (← flattenFields fs))
-  | .func args rets ann => do pushEntry (.func (← flattenList args) (← flattenList rets) ann)
-  | .service ms => do pushEntry (.service (← flattenMethods ms))
-
-def flattenList : List TypeExpr → FlatM (List Slot)
-  | [] => return []
-  | t :: ts => return (← flatten t) :: (← flattenList ts)
-
-def flattenFields : List (FieldId × TypeExpr) → FlatM (List (FieldId × Slot))
-  | [] => return []
-  | (id, t) :: fs => return (id, ← flatten t) :: (← flattenFields fs)
-
-def flattenMethods : List (String × TypeExpr) → FlatM (List (String × Slot))
-  | [] => return []
-  | (m, t) :: ms => return (m, ← flatten t) :: (← flattenMethods ms)
-
-end
-
-/-- The table an annotation's type is flattened into, and its root. `none` if a name
-does not resolve or the type is malformed: a repeated field id, or a `oneway` function
-with results. -/
-def TypeExpr.toTable? (t : TypeExpr) : Option ((T : TypeTable) × T.Root) :=
-  match (flatten t).run.run #[] with
-  | (.ok root, entries) => do
-    let T ← ({ entries } : RawTypeTable).check
-    let r ← T.root? root
-    return ⟨T, r⟩
-  | (.error _, _) => none
 
 /-- An integer literal at a primitive type: in range, or nothing. -/
 def intAt (z : Int) : Prim → Option Value

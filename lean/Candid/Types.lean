@@ -36,9 +36,9 @@ through `T`, this format by construction rules out non-well-founded definitions 
 
 The price is that a type means nothing without its table, and even `vec nat` needs an
 entry. `intern`/`close` below build tables for hand-written types. The surface `.did`
-syntax is nested, so the parser will produce a nested AST and flatten it here; that
-flattening is also what an encoder does, so it is a component this model needs rather
-than a translation it pays for.
+syntax is nested, so the parser produces a nested AST and `Candid/Text/Flatten.lean`
+flattens it into a table; that flattening is also what an encoder does, so it is a
+component this model needs rather than a translation it pays for.
 
 On the name: the implementation in `rust/` calls this a `TypeEnv`, but that `TypeEnv`
 is a `BTreeMap<String, Type>` (`rust/candid/src/types/type_env.rs:7`) -- a *name*-keyed

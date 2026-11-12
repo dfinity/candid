@@ -136,22 +136,26 @@ def sepBy (item : P α) (sep close : String) : Nat → P (List α)
     expect ts close
     return [x]
 
-/-- Function annotations, as many as follow. -/
-def annots : Nat → P (List FuncAnnot)
-  | 0 => throw tooDeep
-  | n + 1 => do
-    let a? := match ← peekAt ts 0 with
-      | some (.keyword "query") => some FuncAnnot.query
-      | some (.keyword "oneway") => some .oneway
-      | some (.keyword "composite_query") => some .compositeQuery
-      | _ => none
-    match a? with
-    | some a => modify (· + 1); return a :: (← annots n)
-    | none => return []
+/-- A function type's mode, if one follows. At most one is allowed
+(`lean/Spec/Did.md`, Section 4.1). -/
+def mode : P (List FuncAnnot) := do
+  let a? := match ← peekAt ts 0 with
+    | some (.keyword "query") => some FuncAnnot.query
+    | some (.keyword "oneway") => some .oneway
+    | some (.keyword "composite_query") => some .compositeQuery
+    | _ => none
+  match a? with
+  | some a => modify (· + 1); return [a]
+  | none => return []
+
+/-- A parameter list's names must not repeat; the names are then dropped. -/
+def dropNames (xs : List (Option String × TypeExpr)) : P (List TypeExpr) := do
+  unless noDups (xs.filterMap (·.1)) do throw "a parameter or result name is repeated"
+  return xs.map (·.2)
 
 mutual
 
-/-- `<datatype>`. -/
+/-- `type` (`lean/Spec/Did.md`, Section 4.1). -/
 def type : Nat → P TypeExpr
   | 0 => throw tooDeep
   | n + 1 => do
@@ -169,12 +173,10 @@ def type : Nat → P TypeExpr
       expect ts "{"
       return .variant (← liftE (numberFields (← sepBy ts (fieldType n true) ";" "}" (2 * ts.size))))
     | .keyword "func" => funcType n
-    | .keyword "service" =>
-      expect ts "{"
-      return .service (← sepBy ts (method n) ";" "}" (2 * ts.size))
+    | .keyword "service" => return .service (← methods n)
     | t => throw s!"expected a type, got {t.describe}"
 
-/-- `<fieldtype>`. In a variant, a label alone has type `null`; in a record, a type
+/-- `field` or `alt`. In a variant, a label alone has type `null`; in a record, a type
 alone is positional. -/
 def fieldType : Nat → Bool → P (Option FieldId × TypeExpr)
   | 0, _ => throw tooDeep
@@ -194,22 +196,24 @@ def fieldType : Nat → Bool → P (Option FieldId × TypeExpr)
       if variant then throw "expected a variant field"
       return (none, ← type n)
 
-/-- `<functype>`: `(args) -> (results) annotations`. -/
+/-- `functype`: `(params) -> (params) mode`. -/
 def funcType : Nat → P TypeExpr
   | 0 => throw tooDeep
   | n + 1 => do
-    expect ts "("
-    let args ← sepBy ts (argType n) "," ")" (2 * ts.size)
+    let args ← params n
     expect ts "->"
-    expect ts "("
-    let rets ← sepBy ts (argType n) "," ")" (2 * ts.size)
-    let names (xs : List (Option String × TypeExpr)) := xs.filterMap (·.1)
-    unless noDups (names args) && noDups (names rets) do
-      throw "a parameter or result name is repeated"
-    return .func (args.map (·.2)) (rets.map (·.2)) (← annots ts (ts.size + 1))
+    let rets ← params n
+    return .func args rets (← mode ts)
 
-/-- `<argtype>`: a type, optionally named. A name has no meaning, but must be UTF-8, and
-must not repeat within its list (`spec/Candid.md`, "Named Parameters and Results"). -/
+/-- `params`, with the names checked and dropped. -/
+def params : Nat → P (List TypeExpr)
+  | 0 => throw tooDeep
+  | n + 1 => do
+    expect ts "("
+    dropNames (← sepBy ts (argType n) "," ")" (2 * ts.size))
+
+/-- `param`: a type, optionally named. A name has no meaning, but must be UTF-8, and
+must not repeat within its list (`lean/Spec/Did.md`, Section 4.2). -/
 def argType : Nat → P (Option String × TypeExpr)
   | 0 => throw tooDeep
   | n + 1 => do
@@ -220,7 +224,16 @@ def argType : Nat → P (Option String × TypeExpr)
         return (some name, ← type n)
     return (none, ← type n)
 
-/-- `<methtype>`: a name, and a function type or the name of one. -/
+/-- `methods`: names distinct. -/
+def methods : Nat → P (List (String × TypeExpr))
+  | 0 => throw tooDeep
+  | n + 1 => do
+    expect ts "{"
+    let ms ← sepBy ts (method n) ";" "}" (2 * ts.size)
+    unless noDups (ms.map (·.1)) do throw "a method name is repeated"
+    return ms
+
+/-- `method`: a name, and a function type or the name of one. -/
 def method : Nat → P (String × TypeExpr)
   | 0 => throw tooDeep
   | n + 1 => do

@@ -3,9 +3,9 @@ Conformance vectors, and their JSON form.
 
 A vector is one assertion about the model that any Candid implementation can check:
 a field-id hash, whether a type table is well formed, whether one type is a subtype
-of another, what a value coerces to at another type, what a message decodes to, or
-what text reads as. `conformance/README.md` specifies the JSON; this file is the
-reference reader and writer for it, and the two must agree.
+of another, what a value coerces to at another type, what a message decodes to,
+what text reads as, or what a description means. `conformance/README.md` specifies the
+JSON; this file is the reference reader and writer for it, and the two must agree.
 
 The JSON is data, not a grammar: a type is its table and a root, exactly as the model
 holds it (`Candid/Types.lean`), so a runner in any language can read vector #1 before
@@ -50,6 +50,14 @@ def TypeSeq.check? (s : TypeSeq) : Option ((t : TypeTable) × List t.Root) := do
   let rs ← s.roots.mapM t.root?
   return ⟨t, rs⟩
 
+/-- An interface as written down (`lean/Spec/Did.md`, Section 6.4): a table that has not
+been checked yet, each defined name's type, and the service declaration, if any, with
+its initialization arguments if it is a constructor. -/
+structure IfaceFixture where
+  table : RawTypeTable
+  types : List (String × Slot)
+  service : Option (Option (List Slot) × Slot)
+
 /-- What a vector asserts. A subtype vector names two well-formed types; one that does
 not is a broken vector, since subtyping is not defined on a malformed type. A coerce
 vector's value has the type it is coerced from, and the expected result, if there is
@@ -70,6 +78,9 @@ inductive Assertion where
   /-- `text`, read as an argument sequence at `types` (`lean/Spec/TextValues.md`), is
   the values `want`, one per type, or is rejected when `want` is `none`. -/
   | parse (text : String) (types : TypeSeq) (want : Option (List Value))
+  /-- `text`, read as a description (`lean/Spec/Did.md`), means the interface `want`, up
+  to equivalence of types, or is rejected when `want` is `none`. -/
+  | did (text : String) (want : Option IfaceFixture)
 
 structure Vector where
   /-- Unique within the suite. Human-readable, and stable: a runner's list of known
@@ -185,6 +196,20 @@ def expectValuesToJson : Option (List Value) → Json
   | some vs => .mkObj [("values", .arr (vs.map valueToJson).toArray)]
   | none => .str "reject"
 
+def IfaceFixture.toJson (i : IfaceFixture) : Json :=
+  .mkObj [("table", .arr (i.table.entries.map Composite.toJson)),
+    ("types", .arr (i.types.map fun (n, s) => Json.arr #[.str n, s.toJson]).toArray),
+    ("service", match i.service with
+      | none => .null
+      | some (init, s) => .mkObj [("init", match init with
+          | none => .null
+          | some ts => slotsToJson ts), ("type", s.toJson)])]
+
+/-- An expected interface, or `"reject"`. -/
+def expectIfaceToJson : Option IfaceFixture → Json
+  | some i => .mkObj [("interface", i.toJson)]
+  | none => .str "reject"
+
 /-- One vector, on one line. Written by hand rather than through `Json.compress` so that
 `id` and `kind` come first: `compress` sorts keys, and a file read by people as often
 as by programs should lead with what a line is about. -/
@@ -212,6 +237,8 @@ def Vector.render (v : Vector) : String :=
   | .parse text ts want =>
     head "parse" ++ field "text" (.str text) ++ field "types" ts.toJson ++
       field "expect" (expectValuesToJson want) ++ "}"
+  | .did text want =>
+    head "did" ++ field "text" (.str text) ++ field "expect" (expectIfaceToJson want) ++ "}"
 
 /-- A whole file: one vector per line, so that a change to the model shows up in a diff
 as exactly the vectors whose answers it changed. -/
@@ -390,6 +417,29 @@ def Fixture.fromJson? (j : Json) : Except String Fixture := do
   let entries ← (← (← j.getObjVal? "table").getArr?).mapM Composite.fromJson?
   return { table := { entries }, root := ← Slot.fromJson? (← j.getObjVal? "root") }
 
+def IfaceFixture.fromJson? (j : Json) : Except String IfaceFixture := do
+  expectKeys j ["table", "types", "service"]
+  let entries ← (← (← j.getObjVal? "table").getArr?).mapM Composite.fromJson?
+  let types ← (← (← j.getObjVal? "types").getArr?).toList.mapM fun t => do
+    match (← t.getArr?).toList with
+    | [n, s] => return (← n.getStr?, ← Slot.fromJson? s)
+    | _ => throw "expected a two-element array"
+  let service ← match ← j.getObjVal? "service" with
+    | .null => pure none
+    | sj => do
+      expectKeys sj ["init", "type"]
+      let init ← match ← sj.getObjVal? "init" with
+        | .null => pure none
+        | a => some <$> slotsFromJson? a
+      pure (some (init, ← Slot.fromJson? (← sj.getObjVal? "type")))
+  return { table := { entries }, types, service }
+
+def expectIfaceFromJson? : Json → Except String (Option IfaceFixture)
+  | .str "reject" => return none
+  | j => do
+    expectKeys j ["interface"]
+    return some (← IfaceFixture.fromJson? (← j.getObjVal? "interface"))
+
 def Vector.fromJson? (j : Json) : Except String Vector := do
   let id ← (← j.getObjVal? "id").getStr?
   let assertion ← (do
@@ -422,6 +472,10 @@ def Vector.fromJson? (j : Json) : Except String Vector := do
       return .parse (← (← j.getObjVal? "text").getStr?)
         (← TypeSeq.fromJson? (← j.getObjVal? "types"))
         (← expectValuesFromJson? (← j.getObjVal? "expect"))
+    | "did" =>
+      expectKeys j ["id", "kind", "text", "expect"]
+      return .did (← (← j.getObjVal? "text").getStr?)
+        (← expectIfaceFromJson? (← j.getObjVal? "expect"))
     | k => throw s!"unknown vector kind {repr k}" : Except String Assertion)
   return { id, assertion }
 
@@ -445,6 +499,37 @@ def relStr (b : Bool) : String := if b then "<:" else "!<:"
 def oneOfEach (B : TypeTable) (roots : List Slot) : Option (List Value) → Bool
   | none => true
   | some vs => vs.length == roots.length && (vs.zip roots).all fun (v, u) => B.hasType v u
+
+/-- Is slot `a` of `A` the same type as slot `b` of `B`? -/
+def equivSlots (A B : TypeTable) (a b : Slot) : Bool :=
+  match A.root? a, B.root? b with
+  | some x, some y => decEquiv A B x y
+  | _, _ => false
+
+/-- Where an interface the model read differs from the expected one, up to equivalence:
+`none` if they agree. -/
+def ifaceDifference (got : Did.Interface) (W : TypeTable) (want : IfaceFixture) :
+    Option String :=
+  let G := got.table
+  let names (ts : List (String × Slot)) := ts.map (·.1)
+  if !(names got.types).all (names want.types).contains ||
+      !(names want.types).all (names got.types).contains then
+    some s!"defines {names got.types}, want {names want.types}"
+  else match want.types.find? fun (n, w) => !(got.types.lookup n).any (equivSlots G W · w) with
+  | some (n, _) => some s!"{n} is not the expected type"
+  | none =>
+    match got.service, want.service with
+    | none, none => none
+    | some (gi, gs), some (wi, ws) =>
+      let initsAgree := match gi, wi with
+        | none, none => true
+        | some gs, some ws => gs.length == ws.length && (gs.zip ws).all fun (g, w) => equivSlots G W g w
+        | _, _ => false
+      if !initsAgree then some "the initialization arguments are not the expected ones"
+      else if !equivSlots G W gs ws then some "the service is not the expected type"
+      else none
+    | some _, none => some "declares a service, want none"
+    | none, some _ => some "declares no service, want one"
 
 /-- `none` if the model agrees with the assertion, otherwise what went wrong. -/
 def Assertion.disagreement : Assertion → Option String
@@ -491,6 +576,16 @@ def Assertion.disagreement : Assertion → Option String
         if got == want then none
         else some s!"got {(expectValuesToJson got).compress}, want {(expectValuesToJson want).compress}"
     | none => some "a type is malformed, so reading text at it is not defined"
+  | .did text want =>
+    let got := Did.readDesc text
+    match got, want with
+    | none, none => none
+    | some _, none => some "accepted, want reject"
+    | none, some _ => some "rejected, want an interface"
+    | some g, some w =>
+      match w.table.check with
+      | none => some "the expected interface's table is malformed"
+      | some W => ifaceDifference g W w
   | .decodeCostly bs ts =>
     match ts.check? with
     | some ⟨B, us⟩ =>
