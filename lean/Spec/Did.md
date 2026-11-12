@@ -111,6 +111,9 @@ defined there are the tokens of a description too. In particular:
 
 - Names of primitive types, such as `nat` and `text`, are identifiers. `null`,
   `principal` and `blob` are keywords.
+- Names of function annotations, such as `query`, are identifiers too. They name an
+  annotation only where one can appear ([Section 4.1](#41-grammar)), and are ordinary
+  identifiers elsewhere: `record { query : nat }` is a record with a field `query`.
 - A field or method name that is a keyword, or that is not an identifier, is written as
   a text literal: `record { "opt" : nat; "my field" : nat }`.
 - The arrow `->` is one token.
@@ -135,10 +138,10 @@ type       = identifier
 field      = label ":" type / type
 alt        = label ":" type / label
 
-functype   = params "->" params [mode]
+functype   = params "->" params *annotation
 params     = "(" [param *("," param) [","]] ")"
 param      = name ":" type / type
-mode       = "query" / "composite_query" / "oneway"
+annotation = "query" / "composite_query" / "oneway"
 
 methods    = "{" [method *(";" method) [";"]] "}"
 method     = name ":" (functype / identifier)
@@ -151,7 +154,14 @@ In a record, `a : nat` is a named field and `a` alone is a positional field of t
 `a`. In a variant, `a` alone is a field of type `null`. One token of lookahead, `:` or
 not, tells them apart.
 
-A function type has at most one mode.
+After a function's results, an identifier is an annotation, and one that is not an
+annotation's name ends the function type, so the text is rejected unless the grammar
+continues with it, which it never does. Which annotations a function type may have
+together is a matter of well-formedness ([Section 6.3](#63-well-formedness)).
+
+Annotation names are not keywords so that adding one does not break descriptions that
+already use the name, as a field, a method or a type. `composite_query` was added as a
+keyword, and broke any description that used it as a name.
 
 ### 4.2. Abstract Syntax
 
@@ -163,7 +173,7 @@ t ::= p                                  primitive type
     | opt t | vec t
     | record{i₁ : t₁; …; iₙ : tₙ}        field ids, distinct
     | variant{i₁ : t₁; …; iₙ : tₙ}       field ids, distinct
-    | func (t₁, …, tₙ) → (u₁, …, uₘ) a   a: no mode, query, composite_query or oneway
+    | func (t₁, …, tₙ) → (u₁, …, uₘ) A   A: a set of annotations
     | service{m₁ : t₁; …; mₙ : tₙ}       method names, distinct
 ```
 
@@ -262,7 +272,7 @@ In an environment Γ whose names are all defined and productive, every type expr
 ⟦vec t⟧                       = vec ⟦t⟧
 ⟦record{i₁ : t₁; …}⟧          = record{i₁ : ⟦t₁⟧; …}
 ⟦variant{i₁ : t₁; …}⟧         = variant{i₁ : ⟦t₁⟧; …}
-⟦func (t₁, …) → (u₁, …) a⟧    = func (⟦t₁⟧, …) → (⟦u₁⟧, …) a
+⟦func (t₁, …) → (u₁, …) A⟧    = func (⟦t₁⟧, …) → (⟦u₁⟧, …) A
 ⟦service{m₁ : t₁; …}⟧         = service{m₁ : ⟦t₁⟧; …}
 ```
 
@@ -280,8 +290,18 @@ A name and its definition denote the same type, so `type A = B` makes `A` an ali
 
 A type is **well-formed** if:
 
-1. every method of every service type in it has a function type; and
-2. every function type in it with the mode `oneway` has no results.
+1. every method of every service type in it has a function type;
+2. no function type in it has an annotation twice, or more than one **mode**; and
+3. every function type in it annotated `oneway` has no results.
+
+A mode says how a function is called: `query`, `composite_query` or `oneway`, and an
+ordinary update call if it has none. A function is called in one way, so `query oneway`
+is not well-formed. Every annotation defined so far is a mode. One added later need not
+be, and could then combine with a mode: the abstract syntax is a set of annotations
+so that it can.
+
+These rules are about types, wherever they come from. A type decoded from binary data
+is subject to them too.
 
 Every definition MUST denote a well-formed type, whether or not anything refers to it.
 A description with a definition that does not MUST be rejected. So
@@ -375,8 +395,10 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
 
 - Definitions are separated by semicolons, and one after the last is optional, even
   before the service declaration. This agrees with 0.10. [CANDID] writes `<def>;*`.
-- A function type has at most one mode, agreeing with 0.10. [CANDID] writes
-  `<funcann>*`.
+- A function type has at most one mode ([Section 6.3](#63-well-formedness)), agreeing
+  with 0.10. [CANDID] writes `<funcann>*` and allows any annotations together. The
+  grammar still allows a list, so that a future annotation that is not a mode can be
+  written with one that is.
 - A definition is checked whether or not it is used ([Section 6.3](#63-well-formedness)),
   agreeing with 0.10.
 - Names of types and fields are those of [TEXT], including the rule that a name written
@@ -392,6 +414,7 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
 |---|---|---|
 | `type nat = text` | accepted; `nat` still denotes the primitive type everywhere | rejected ([5.2](#52-abstract-syntax)) |
 | `type A = record { 4294967295 : nat; nat }` | panics in a debug build | rejected ([TEXT], Section 4.2) |
+| `type A = record { query : nat }` | rejected: `query` is a keyword | accepted ([3](#3-lexical-structure)) |
 
 The lexical differences of [TEXT], Appendix B.2, apply to descriptions too. Whether
 0.10 should change to reject `type nat = text` is not decided; this document rejects it
@@ -403,10 +426,13 @@ because the definition could never be used.
   and `import service` merges its service's methods. Defining it needs a way to name
   and fetch the other file, and rules for clashes between names and between methods,
   which 0.10 resolves in ways [CANDID] does not describe. It is left to a later draft.
-- **Modes in binary data.** The binary format writes a list of annotations, and the
-  reference model's decoder accepts more than one, such as `query` and `oneway`
-  together. Such a type has no textual form under [Section 4.1](#41-grammar). Either the
-  decoder should reject it, or the text should allow it.
+- **Unknown annotations in binary data.** A decoder that meets an annotation byte it
+  does not know rejects the whole message, even if the function type is only in a part
+  it would skip, so adding an annotation breaks every older decoder that sees one. A
+  function value is encoded the same whatever its annotations, so a decoder could skip
+  it instead, and treat a function type with an unknown annotation as a type it can only
+  accept as `reserved` or an option, as it does a future type. That is a change to the
+  binary format, for the chapter that specifies it.
 - **One lexical chapter.** This document borrows its lexical structure from [TEXT]. The
   two should share one chapter when they become one specification.
 
@@ -425,6 +451,7 @@ because the definition could never be used.
 | `type A = record { nat; 0 : text };` | rejected: id 0 twice |
 | `type f = func (x : nat, x : nat) -> ();` | rejected: parameter `x` twice |
 | `type f = func () -> () query oneway;` | rejected: two modes |
+| `type A = record { query : nat };` | `A` has a field named `query` |
 | `type f = func () -> (nat) oneway;` | rejected: `oneway` with a result |
 | `type S = service { m : T }; type T = opt nat;` | rejected: method `m` is not a function |
 | `service : { m : (nat) -> (text) query }` | a service with one method |

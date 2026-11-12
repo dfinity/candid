@@ -372,8 +372,11 @@ be the model's, or an implementation's: each name, argument and service is compa
 with `decEquiv`, and the runner uses 0.10's `subtype::equal`. Two names for one
 recursive type can be written as one entry, as the hand-written vectors do.
 
-**Decided along the way.** A function type has at most one mode, in descriptions and in
-annotations, as in 0.10. A definition may not bind a primitive type's name, which 0.10
+**Decided along the way.** A function type has at most one mode, and no annotation
+twice: a well-formedness rule, so it holds for types decoded from the wire too, where
+the model used to accept `query oneway`. The grammar still takes a list, so that a
+future annotation that is not a mode can combine with one, and annotation names are
+identifiers, not keywords, so that adding one breaks no existing name. A definition may not bind a primitive type's name, which 0.10
 accepts and then can never use. Imports are reserved syntax that the draft does not
 define yet. Each is in the document's Appendix A.
 

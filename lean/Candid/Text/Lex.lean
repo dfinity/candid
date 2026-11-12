@@ -37,8 +37,8 @@ def Token.describe : Token → String
 
 /-- Reserved for the whole of Candid's syntax, including the parts values do not use. -/
 def keywords : List String :=
-  [ "blob", "composite_query", "false", "func", "import", "null", "oneway", "opt"
-  , "principal", "query", "record", "service", "true", "type", "variant", "vec" ]
+  [ "blob", "false", "func", "import", "null", "opt"
+  , "principal", "record", "service", "true", "type", "variant", "vec" ]
 
 def isDigit (c : Char) : Bool := '0' ≤ c && c ≤ '9'
 

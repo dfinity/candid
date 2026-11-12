@@ -40,7 +40,9 @@ def textLexChecks : List Vector :=
   , accepts "(record { \"opt\" = 1 })" (oneOf (recordOf [("opt", nat)]))
       [.record [(hashFieldName "opt", .nat 1)]] "a field named like a keyword is written as text (3.3)"
   , accepts "(record { nat = 1 })" (oneOf (recordOf [("nat", nat)]))
-      [.record [(hashFieldName "nat", .nat 1)]] "a type name is an identifier, not a keyword (3.3)" ]
+      [.record [(hashFieldName "nat", .nat 1)]] "a type name is an identifier, not a keyword (3.3)"
+  , accepts "(record { query = 1 })" (oneOf (recordOf [("query", nat)]))
+      [.record [(hashFieldName "query", .nat 1)]] "an annotation name is a field name (3.3)" ]
 
 /-! ## Numbers (Sections 3.4 and 5.3) -/
 

@@ -136,17 +136,25 @@ def sepBy (item : P α) (sep close : String) : Nat → P (List α)
     expect ts close
     return [x]
 
-/-- A function type's mode, if one follows. At most one is allowed
-(`lean/Spec/Did.md`, Section 4.1). -/
-def mode : P (List FuncAnnot) := do
-  let a? := match ← peekAt ts 0 with
-    | some (.keyword "query") => some FuncAnnot.query
-    | some (.keyword "oneway") => some .oneway
-    | some (.keyword "composite_query") => some .compositeQuery
-    | _ => none
-  match a? with
-  | some a => modify (· + 1); return [a]
-  | none => return []
+/-- An annotation's name. Annotations are identifiers, not keywords: they mean an
+annotation only after a function's results (`lean/Spec/Did.md`, Section 4.1). -/
+def annotOfName? : String → Option FuncAnnot
+  | "query" => some .query
+  | "oneway" => some .oneway
+  | "composite_query" => some .compositeQuery
+  | _ => none
+
+/-- A function type's annotations, as many as follow. Whether they may repeat, or
+combine, is well-formedness, checked on the table. -/
+def annots : Nat → P (List FuncAnnot)
+  | 0 => throw tooDeep
+  | n + 1 => do
+    let a? := match ← peekAt ts 0 with
+      | some (.ident s) => annotOfName? s
+      | _ => none
+    match a? with
+    | some a => modify (· + 1); return a :: (← annots n)
+    | none => return []
 
 /-- A parameter list's names must not repeat; the names are then dropped. -/
 def dropNames (xs : List (Option String × TypeExpr)) : P (List TypeExpr) := do
@@ -203,7 +211,7 @@ def funcType : Nat → P TypeExpr
     let args ← params n
     expect ts "->"
     let rets ← params n
-    return .func args rets (← mode ts)
+    return .func args rets (← annots ts (ts.size + 1))
 
 /-- `params`, with the names checked and dropped. -/
 def params : Nat → P (List TypeExpr)

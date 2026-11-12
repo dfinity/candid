@@ -56,6 +56,14 @@ def didLexChecks : List Vector :=
       "a field named like a keyword, or not like an identifier, is written as text (3)"
   , rejectsDid "type A = record { opt : nat };" "a keyword is not a field name (3)"
   , rejectsDid "type opt = nat;" "a keyword is not a type name (3)"
+  , defines "type query = record { query : nat; oneway : opt query }; \
+      type F = func (query) -> () query;"
+      (do
+        -- Entry 0 is the record, entry 1 the option inside it.
+        let q ← intern (recordOf [("query", nat), ("oneway", .ref 1)])
+        let _ ← intern (.opt q)
+        return [("query", q), ("F", ← intern (.func [q] [] [.query]))])
+      "annotation names are identifiers elsewhere (3)"
   , rejectsDid "type A = nat; /* unclosed" "an unclosed block comment (3)" ]
 
 /-! ## Types (Section 4) -/
@@ -102,8 +110,9 @@ def didFuncChecks : List Vector :=
   , defines "type F = func (x : nat, y : nat,) -> (x : nat);"
       (return [("F", ← intern (.func [nat, nat] [nat] []))])
       "parameter names have no meaning, and a parameter and a result may share one (4.2)"
-  , rejectsDid "type F = func () -> () query oneway;" "two modes (4.1)"
-  , rejectsDid "type F = func () -> () query query;" "one mode twice (4.1)"
+  , rejectsDid "type F = func () -> () query oneway;" "two modes (6.3)"
+  , rejectsDid "type F = func () -> () query query;" "an annotation twice (6.3)"
+  , rejectsDid "type F = func () -> () update;" "a name after the results that is not an annotation (4.1)"
   , rejectsDid "type F = func (x : nat, x : text) -> ();" "a parameter name repeated (4.2)"
   , rejectsDid "type F = func () -> (r : nat, r : nat);" "a result name repeated (4.2)"
   , rejectsDid "type F = func (\"\\ff\" : nat) -> ();" "a parameter name that is not UTF-8 (4.2)" ]

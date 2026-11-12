@@ -31,15 +31,12 @@ use std::str::FromStr;
 /// Vectors on which `candid` 0.10 is known to disagree with the model: `(id, why)`.
 const KNOWN: &[(&str, &str)] = &[
     (
-        "annotations agree up to reordering",
-        "`subtype.rs` compares `Function::modes` as a `Vec`, so `query composite_query` \
-         and `composite_query query` differ; the spec identifies annotation lists up to \
-         reordering, and the `.did` grammar accepts `FuncMode*`",
+        "did: annotation names are identifiers elsewhere (3)",
+        "0.10's lexer makes `query`, `composite_query` and `oneway` keywords everywhere",
     ),
     (
-        "decode: a function type with two annotations",
-        "`binary_parser.rs` asserts that a function type has at most one annotation; the \
-         spec's `T(func ...)` writes `T*(<funcann>*)`, any number",
+        "text: an annotation name is a field name (3.3)",
+        "0.10's lexer makes `query`, `composite_query` and `oneway` keywords everywhere",
     ),
     (
         "decode: oneway function with a result",

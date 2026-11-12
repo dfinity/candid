@@ -168,9 +168,8 @@ which contains no `*/` other than those that close one. Block comments therefore
 ### 3.3. Keywords and Identifiers
 
 ```abnf
-keyword    = "blob" / "composite_query" / "false" / "func" / "import" / "null"
-           / "oneway" / "opt" / "principal" / "query" / "record" / "service"
-           / "true" / "type" / "variant" / "vec"
+keyword    = "blob" / "false" / "func" / "import" / "null" / "opt" / "principal"
+           / "record" / "service" / "true" / "type" / "variant" / "vec"
 identifier = (ALPHA / "_") *(ALPHA / DIGIT / "_")   ; that is not a keyword
 ```
 
@@ -178,7 +177,8 @@ Keywords are reserved for the whole of Candid's syntax, including the parts this
 document does not define, so some keywords never occur in a value. A field named like
 a keyword is written as text: `record { "opt" = 1 }`.
 
-Names of types, such as `nat` and `text`, are identifiers, not keywords.
+Names of types, such as `nat` and `text`, and of function annotations, such as `query`,
+are identifiers, not keywords.
 
 ### 3.4. Numbers
 
@@ -640,6 +640,7 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
 | `.5` | accepted | rejected |
 | `0x1p4` | rejected | accepted: 16 |
 | A raw tab, line break, other C0 control character or U+007F in a text literal | accepted | rejected |
+| `record { query = 1 }` | rejected: `query` is a keyword | accepted: a field named `query` |
 | A principal of more than 29 bytes | rejected | accepted ([Appendix A](#appendix-a-textual-form-of-principals)) |
 
 `candid_parser` also builds a `String` from bytes that may not be UTF-8 before it checks

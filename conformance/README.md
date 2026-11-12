@@ -252,8 +252,9 @@ What the runners have found, recorded so that they outlive the run that found th
   : opt reserved`.
 
 - **`candid` 0.10 allows at most one function annotation in a decoded type.**
-  `binary_parser.rs` asserts it; the spec writes `T*(<funcann>*)`. Vector: `decode: a
-  function type with two annotations`.
+  `binary_parser.rs` asserts it; the spec writes `T*(<funcann>*)`. Every annotation so
+  far is a mode, and [lean/Spec/Did.md](../lean/Spec/Did.md) now allows at most one,
+  so the two agree. Vector: `decode: a function type with two modes`.
 - **`candid` 0.10 accepts a `oneway` function type with results from the wire.** The
   spec says the result list must be empty, and the model rejects the message. Vector:
   `decode: oneway function with a result`.
