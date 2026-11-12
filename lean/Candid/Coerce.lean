@@ -111,12 +111,12 @@ def TypeTable.optOf? (B : TypeTable) : Slot → Option Slot
   | .prim _ => none
 
 /-- Insert into a list sorted by field id. -/
-def insertField (f : FieldId × Value) : List (FieldId × Value) → List (FieldId × Value)
+def insertField (f : FieldId × α) : List (FieldId × α) → List (FieldId × α)
   | [] => [f]
   | g :: gs => if f.1 < g.1 then f :: g :: gs else g :: insertField f gs
 
 /-- Sort fields into the canonical order: ascending id. -/
-def sortFields (fs : List (FieldId × Value)) : List (FieldId × Value) :=
+def sortFields (fs : List (FieldId × α)) : List (FieldId × α) :=
   fs.foldr insertField []
 
 mutual
@@ -174,13 +174,16 @@ def coerceAt (A B : TypeTable) (v : Value) (t u : Slot) : Coercion Value :=
 
     -- Fields in both types are coerced, and fields only in the actual type are
     -- ignored. Fields only in the expected type must accept `null`, and are `null`.
+    -- The expected fields are decided in ascending order of id, and the first that
+    -- fails or is undefined decides the record (`lean/Spec/Types.md`, Section 6.5).
+    -- Each present field's outcome is computed first, then read in that order.
     | .record vs, some (.record fs), some (.record gs) => do
-      let present ← coerceFields A B vs fs gs
-      let absent ← gs.filterMapM fun (id, g) =>
-        if vs.any (·.1 == id) then pure none
-        else if B.acceptsNull g then pure (some (id, Value.null))
-        else failure
-      pure (.record (sortFields (present ++ absent)))
+      let present := coerceFields A B vs fs gs
+      let field (f : FieldId × Slot) : Coercion (FieldId × Value) :=
+        match present.lookup f.1 with
+        | some r => (f.1, ·) <$> OptionT.mk r
+        | none => if B.acceptsNull f.2 then pure (f.1, Value.null) else failure
+      return .record (← (sortFields gs).mapM field)
 
     -- Only a variant value with an expected tag coerces.
     | .variant id w, some (.variant fs), some (.variant gs) =>
@@ -216,20 +219,22 @@ def coerceAll (A B : TypeTable) (ws : List Value) (t u : Slot) : Coercion (List 
     pure (w' :: rest')
 termination_by (sizeOf ws, 2)
 
-/-- The fields a value carries that the expected type also declares, coerced. Fields
-the expected type does not declare are dropped. -/
+/-- The outcome of coercing each field a value carries that the expected type also
+declares, by id. Fields the expected type does not declare are dropped. Every outcome is
+computed, and the caller reads them in order, so that the first to fail or be undefined
+is the one that decides. -/
 def coerceFields (A B : TypeTable) (vs : List (FieldId × Value))
-    (fs gs : List (FieldId × Slot)) : Coercion (List (FieldId × Value)) :=
+    (fs gs : List (FieldId × Slot)) : List (FieldId × Except Undefined (Option Value)) :=
   match vs with
-  | [] => pure []
-  | (id, w) :: rest => do
-    let rest' ← coerceFields A B rest fs gs
+  | [] => []
+  | (id, w) :: rest =>
+    let rest' := coerceFields A B rest fs gs
     match fieldAt gs id with
-    | none => pure rest'
+    | none => rest'
     | some u =>
-      let some t := fieldAt fs id | failure
-      let w' ← coerce A B w t u
-      pure ((id, w') :: rest')
+      match fieldAt fs id with
+      | none => (id, .ok none) :: rest'
+      | some t => (id, (coerce A B w t u).run) :: rest'
 termination_by (sizeOf vs, 2)
 
 end
