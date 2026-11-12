@@ -258,13 +258,18 @@ the descriptions it imports, becomes one description without imports, its
 **expansion**, and [Section 6](#6-meaning) gives the expansion its meaning. A
 description without imports is its own expansion.
 
-**Locations.** Every description read has a **location**, a URI reference [RFC3986]. An
-import's *r* is a URI reference too, and denotes the location obtained by resolving it
-against the location of the description that contains it, by [RFC3986], Section 5.2.
+**Locations.** Every description read has a **location**, an absolute URI [RFC3986]
+without a fragment. An import's *r* is a URI reference, and denotes the location
+obtained by resolving it against the location of the description that contains it, by
+[RFC3986], Section 5.2, and removing the fragment, if any. A fragment does not identify
+a description, so `a.did#x` and `a.did` denote the same location.
+
 For file paths this means an import is relative to the directory of the file that
 contains it, and resolution removes `.` and `..` segments, so `sub/../a.did` and `a.did`
-denote the same location. Two imports denote the same description exactly when they
-denote the same location. How the description at a location is fetched is up to the
+denote the same location. An absolute URI, such as `https://example.org/a.did`, is
+itself. An empty reference, or one that is only a fragment, denotes the description
+that contains it, so importing it is a cycle. Two imports denote the same description
+exactly when they denote the same location, compared character by character. How the description at a location is fetched is up to the
 implementation. If it cannot be fetched, or is not a description, the description being
 read MUST be rejected.
 
@@ -408,8 +413,8 @@ Conformance vectors of kind `did`, each a description and the expected interface
 rejection, are written from the reference model in [lean/](../), whose
 [Candid/Did/](../Candid/Did/) implements this document, and published under
 [conformance/](../../conformance/). A vector with imports carries the descriptions it
-imports, each with a relative path as its location; the description being read is at
-`main.did`.
+imports, each at an absolute URI or at a path relative to `file:///`; the description
+being read is at `file:///main.did`.
 
 ## 8. Security Considerations
 
@@ -507,6 +512,8 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
 | `import "mid.did"`, where `mid.did` has `import service "svc.did"` | `svc.did`'s methods join the importer's service | they do not: a plain import contributes no methods |
 | `import service "mid.did"`, where `mid.did` declares no service but has `import service "svc.did"` | rejected: no main service | accepted: `mid.did` provides `svc.did`'s methods |
 | `import "sub/../a.did"; import "a.did"` | `a.did` read twice, so its names are defined twice | one description, read once |
+| `import "a.did#x"; import "a.did"` | `a.did#x` is a file name | one description: a fragment is not part of a location |
+| `import "https://example.org/a.did"` | joined to the importer's directory as a file path | the URI itself; fetching it is up to the implementation |
 | Two merged methods with different names whose field-id hashes collide | rejected | accepted: method names are not hashed |
 
 Each of these is a case that existing descriptions are unlikely to rely on. The lexical

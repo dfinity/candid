@@ -52,6 +52,15 @@ const KNOWN: &[(&str, &str)] = &[
          so `sub/../a.did` and `a.did` are two files, and `sub/` must exist on disk",
     ),
     (
+        "did: an import by absolute URI, and a relative import inside it (5.3)",
+        "0.10 reads imports from the file system only, joining the URI to the \
+         importer's directory as a path",
+    ),
+    (
+        "did: a fragment is not part of a location (5.3)",
+        "0.10 takes `a.did#x` as a file name",
+    ),
+    (
         "did: an import cycle among imported descriptions (5.3)",
         "0.10 reads each imported file once, and accepts a cycle that does not pass \
          through the file being read",
@@ -426,7 +435,17 @@ fn did(v: &Value) -> Result<Outcome> {
     if let Some(files) = v.get("files") {
         for f in array(files)? {
             let (path, text) = pair(f)?;
-            write(string(path)?, string(text)?)?;
+            let path = string(path)?;
+            // A location with a scheme is not on the file system, which is all 0.10
+            // reads imports from, so it is not written there either.
+            if path
+                .split(['/', '?', '#'])
+                .next()
+                .is_some_and(|s| s.contains(':'))
+            {
+                continue;
+            }
+            write(path, string(text)?)?;
         }
     }
     let main = dir.join("main.did");

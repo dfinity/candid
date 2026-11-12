@@ -2,11 +2,13 @@
 Imports (`lean/Spec/Did.md`, Section 5.3): a description and those it imports, expanded
 into one description without imports, which `Check.lean` then gives its meaning.
 
-**Locations** are paths, segments separated by `/`, which is what a URI reference without
-a scheme or authority is. An import is resolved against the directory of the description
-that contains it, and `.` and `..` segments are removed (RFC 3986, Section 5.2.4), so
-every location is in one normal form and equal locations are equal strings. The
-environment is `Files`, the descriptions it can fetch by location.
+**Locations** are absolute URIs, compared as strings once resolved. An import's
+reference is resolved against the location of the description that contains it by RFC
+3986, Section 5.2: `resolveRef` follows the RFC's algorithm step by step, including its
+removal of `.` and `..` segments, and drops the fragment, which is not part of a
+location. `Files`, the descriptions the environment can fetch, may name them by absolute
+URI or by a path, which is taken relative to `file:///`, as is the description being
+read, at `main.did`.
 
 **Loading** is a depth-first walk from the description being read, carrying the path
 from it. A location on that path is a cycle. One already loaded by another path is not
@@ -30,23 +32,107 @@ abbrev Files := List (String × String)
 /-- The location of the description being read. -/
 def rootLocation : String := "main.did"
 
-/-- Remove `.` and `..` segments, as RFC 3986, Section 5.2.4, does: `..` removes the
-segment before it, if any. -/
-def removeDots (segs : List String) : List String :=
-  (segs.foldl (fun acc s =>
-    if s == "." then acc
-    else if s == ".." then acc.drop 1
-    else s :: acc) []).reverse
+/-- A URI reference split into its five components, by the regular expression of RFC
+3986, Appendix B. An absent component is `none`, which differs from an empty one. -/
+structure UriRef where
+  scheme : Option String
+  authority : Option String
+  path : String
+  query : Option String
+  fragment : Option String
 
-/-- Resolve `ref` against the location `base`: an absolute path is taken as it is, and a
-relative one is taken from the directory of `base`. -/
+/-- Split `s` at the first character in `stops`: the part before it, and the rest from
+it on. -/
+def splitAtAny (s : String) (stops : List Char) : String × String :=
+  let cs := s.toList
+  let before := cs.takeWhile (!stops.contains ·)
+  (String.ofList before, String.ofList (cs.drop before.length))
+
+def UriRef.parse (s : String) : UriRef :=
+  -- `scheme ":"`, if the text before the first of `:/?#` is nonempty and ends at `:`.
+  let (pre, rest) := splitAtAny s [':', '/', '?', '#']
+  let (scheme, s) :=
+    if !pre.isEmpty && rest.startsWith ":" then (some pre, (rest.drop 1).toString) else (none, s)
+  -- `"//" authority`, up to the first of `/?#`.
+  let (authority, s) :=
+    if s.startsWith "//" then
+      let (a, r) := splitAtAny (s.drop 2).toString ['/', '?', '#']
+      (some a, r)
+    else (none, s)
+  let (path, s) := splitAtAny s ['?', '#']
+  let (query, s) :=
+    if s.startsWith "?" then
+      let (q, r) := splitAtAny (s.drop 1).toString ['#']
+      (some q, r)
+    else (none, s)
+  let fragment := if s.startsWith "#" then some (s.drop 1).toString else none
+  { scheme, authority, path, query, fragment }
+
+/-- The text before the last `/`, if there is one. -/
+def beforeLastSlash (s : String) : Option String :=
+  match s.toList.reverse.dropWhile (· != '/') with
+  | [] => none
+  | _ :: rest => some (String.ofList rest.reverse)
+
+/-- Remove the last segment of `out`, and the `/` before it: RFC 3986, Section 5.2.4,
+step 2C. -/
+def dropLastSegment (out : String) : String := (beforeLastSlash out).getD ""
+
+/-- RFC 3986, Section 5.2.4, `remove_dot_segments`, step by step. Every step shortens
+the input, so its length is enough fuel. -/
+def removeDotSegments (input : String) : String :=
+  go input.length input ""
+where
+  go : Nat → String → String → String
+  | 0, _, out => out
+  | n + 1, inp, out =>
+    if inp.isEmpty then out
+    else if inp.startsWith "../" then go n (inp.drop 3).toString out
+    else if inp.startsWith "./" then go n (inp.drop 2).toString out
+    else if inp.startsWith "/./" then go n ("/" ++ (inp.drop 3).toString) out
+    else if inp == "/." then go n "/" out
+    else if inp.startsWith "/../" then go n ("/" ++ (inp.drop 4).toString) (dropLastSegment out)
+    else if inp == "/.." then go n "/" (dropLastSegment out)
+    else if inp == "." || inp == ".." then out
+    else
+      -- Move the first segment, with its leading `/` if any, to the output.
+      let lead := if inp.startsWith "/" then "/" else ""
+      let (seg, rest) := splitAtAny (inp.drop lead.length).toString ['/']
+      go n rest (out ++ lead ++ seg)
+
+/-- RFC 3986, Section 5.2.3: merge a relative path with the base's. -/
+def mergePaths (base : UriRef) (path : String) : String :=
+  if base.authority.isSome && base.path.isEmpty then "/" ++ path
+  else match beforeLastSlash base.path with
+    | some dir => dir ++ "/" ++ path
+    | none => path
+
+/-- RFC 3986, Section 5.3, without the fragment. -/
+def UriRef.recompose (u : UriRef) : String :=
+  (u.scheme.map (· ++ ":")).getD "" ++ (u.authority.map ("//" ++ ·)).getD "" ++ u.path ++
+    (u.query.map ("?" ++ ·)).getD ""
+
+/-- RFC 3986, Section 5.2.2: the location `ref` denotes, written in the description at
+the location `base`, an absolute URI. The fragment is dropped. -/
 def resolveRef (base ref : String) : String :=
-  if ref.startsWith "/" then
-    "/" ++ "/".intercalate (removeDots ((ref.drop 1).toString.splitOn "/"))
-  else
-    let dir := (base.splitOn "/").dropLast
-    let path := "/".intercalate (removeDots (dir ++ ref.splitOn "/"))
-    if base.startsWith "/" && !path.startsWith "/" then "/" ++ path else path
+  let b := UriRef.parse base
+  let r := UriRef.parse ref
+  let t : UriRef :=
+    if r.scheme.isSome then { r with path := removeDotSegments r.path }
+    else if r.authority.isSome then
+      { r with scheme := b.scheme, path := removeDotSegments r.path }
+    else if r.path.isEmpty then
+      { b with query := if r.query.isSome then r.query else b.query }
+    else if r.path.startsWith "/" then
+      { b with path := removeDotSegments r.path, query := r.query }
+    else
+      { b with path := removeDotSegments (mergePaths b r.path), query := r.query }
+  t.recompose
+
+/-- A location as `Files` may write it: an absolute URI as it is, and a path relative to
+`file:///`. -/
+def absolute (loc : String) : String :=
+  if (UriRef.parse loc).scheme.isSome then loc else resolveRef "file:///" loc
 
 mutual
 
@@ -107,14 +193,23 @@ def load (files : Files) : Nat → List String → List Loaded → String → Ex
       acc ← load files n (loc :: path) acc l
     return acc ++ [{ loc, desc := d, imports }]
 
+/-- The descriptions reachable from `todo` by following `edge`, besides those in `seen`,
+each visited once. Each step either pops a location already seen or marks one seen, so
+the locations plus all their imports are enough fuel. -/
+def reachFrom (all : List Loaded) (edge : Bool → Bool) :
+    Nat → List String → List String → List String
+  | 0, seen, _ => seen
+  | _, seen, [] => seen
+  | n + 1, seen, loc :: todo =>
+    if seen.contains loc then reachFrom all edge n seen todo
+    else
+      let next := ((all.find? (·.loc == loc)).map fun l =>
+        (l.imports.filter (edge ·.1)).map (·.2)).getD []
+      reachFrom all edge n (seen ++ [loc]) (next ++ todo)
+
 /-- `loc` and every description it imports, directly or indirectly, following `edge`. -/
-def reach (all : List Loaded) (edge : Bool → Bool) : Nat → String → List String
-  | 0, _ => []
-  | n + 1, loc =>
-    match all.find? (·.loc == loc) with
-    | none => []
-    | some l => (l.imports.filter (edge ·.1)).foldl
-        (fun acc (_, m) => acc ++ (reach all edge n m).filter (!acc.contains ·)) [loc]
+def reach (all : List Loaded) (edge : Bool → Bool) (loc : String) : List String :=
+  reachFrom all edge (all.length + (all.map (·.imports.length)).sum + 1) [] [loc]
 
 /-- The methods a description's own service declaration lists: written out, or those of
 the service type a name resolves to among `defs`. -/
@@ -129,17 +224,18 @@ def ownMethods (defs : List (String × TypeExpr)) : Nat → TypeExpr →
 
 /-- The expansion of the description at `rootLoc`, given the environment. -/
 def expandAt (files : Files) (rootLoc : String) : Except String Desc := do
+  let files := files.map fun (l, t) => (absolute l, t)
+  let rootLoc := absolute rootLoc
   let all ← load files (files.length + 1) [] [] rootLoc
-  let fuel := all.length + 1
   let defs := all.flatMap (·.desc.defs)
-  let defined (l : Loaded) := (reach all (fun _ => true) fuel l.loc).flatMap fun m =>
-    ((all.find? (·.loc == m)).map (·.desc.defs.map (·.1))).getD []
   for l in all do
-    if let some x := l.desc.names.find? (!(defined l).contains ·) then
+    let defined := (reach all (fun _ => true) l.loc).flatMap fun m =>
+      ((all.find? (·.loc == m)).map (·.desc.defs.map (·.1))).getD []
+    if let some x := l.desc.names.find? (!defined.contains ·) then
       throw s!"{l.loc} uses {x}, which neither it nor its imports define"
   -- The descriptions whose own service declarations a description's methods come from.
   let provides (loc : String) : List String :=
-    (reach all id fuel loc).filter fun m => ((all.find? (·.loc == m)).bind (·.desc.service)).isSome
+    (reach all id loc).filter fun m => ((all.find? (·.loc == m)).bind (·.desc.service)).isSome
   let methodsOf (loc : String) : Except String (List (String × TypeExpr)) := do
     let ms ← (provides loc).flatMapM fun m => do
       match (all.find? (·.loc == m)).bind (·.desc.service) with

@@ -195,6 +195,14 @@ def didImportChecks : List Vector :=
   , defines "import \"b.did\"; import \"c.did\";" (return [("A", nat)])
       "a description reached along two paths is included once (5.3)"
       (files := [("b.did", "import \"a.did\";"), ("c.did", "import \"a.did\";")] ++ aNat)
+  , let n := 24
+    defines "import \"f0.did\"; type T = F0;"
+      (return ([("T", nat)] ++ (List.range n).map fun i => (s!"F{i}", nat)))
+      "a chain of descriptions, each importing the next twice (5.3)"
+      (files := (List.range n).map fun i =>
+        (s!"f{i}.did", if i + 1 < n
+          then s!"import \"f{i+1}.did\"; import \"f{i+1}.did\"; type F{i} = F{i+1};"
+          else s!"type F{i} = nat;"))
   , rejectsDid "import \"a.did\"; type A = nat;" "a name defined in two descriptions (5.3)"
       (files := aNat)
   , rejectsDid "import \"a.did\"; type M = nat;" "an import cycle through the description being read (5.3)"
@@ -209,6 +217,16 @@ def didImportChecks : List Vector :=
       "an imported description cannot use a name only its importer defines (5.3)"
       (files := [("a.did", "type A = M;")])
   , rejectsDid "import \"\\ff\";" "an import that is not UTF-8 (5.2)"
+  , defines "import \"https://example.test/lib/b.did\"; type T = C;"
+      (return [("T", nat), ("B", nat), ("C", nat)])
+      "an import by absolute URI, and a relative import inside it (5.3)"
+      (files := [("https://example.test/lib/b.did", "import \"c.did\"; type B = C;"),
+                 ("https://example.test/lib/c.did", "type C = nat;")])
+  , defines "import \"a.did#x\"; import \"a.did\";" (return [("A", nat)])
+      "a fragment is not part of a location (5.3)" (files := aNat)
+  , rejectsDid "import \"\"; type M = nat;" "an empty reference denotes the importer itself (5.3)"
+  , rejectsDid "import \"#x\"; type M = nat;"
+      "a reference that is only a fragment denotes the importer itself (5.3)"
   , declares "import service \"a.did\"; service : { m : () -> () }"
       (return ([], none, ← serviceNamed ["m", "n"]))
       "import service merges the imported service's methods (5.3)" (files := aService)
