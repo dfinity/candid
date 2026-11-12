@@ -20,21 +20,24 @@ open Candid
 open Candid.Slot
 open Candid.Composite
 
-def expectDid (text : String) (want : Option IfaceFixture) (id : String) : Vector :=
-  ⟨s!"did: {id}", .did text want⟩
+def expectDid (text : String) (want : Option IfaceFixture) (id : String)
+    (files : List (String × String) := []) : Vector :=
+  ⟨s!"did: {id}", .did text files want⟩
 
 /-- A description's expected types, without a service. -/
-def defines (text : String) (m : TableM (List (String × Slot))) (id : String) : Vector :=
+def defines (text : String) (m : TableM (List (String × Slot))) (id : String)
+    (files : List (String × String) := []) : Vector :=
   let (types, entries) := m.run #[]
-  expectDid text (some { table := { entries }, types, service := none }) id
+  expectDid text (some { table := { entries }, types, service := none }) id files
 
 /-- A description's expected types and service declaration. -/
 def declares (text : String) (m : TableM (List (String × Slot) × Option (List Slot) × Slot))
-    (id : String) : Vector :=
+    (id : String) (files : List (String × String) := []) : Vector :=
   let ((types, init, s), entries) := m.run #[]
-  expectDid text (some { table := { entries }, types, service := some (init, s) }) id
+  expectDid text (some { table := { entries }, types, service := some (init, s) }) id files
 
-def rejectsDid (text : String) (id : String) : Vector := expectDid text none id
+def rejectsDid (text : String) (id : String) (files : List (String × String) := []) : Vector :=
+  expectDid text none id files
 
 /-- An entry that refers to itself: `f` is given the entry's own slot. -/
 def recursive (f : Slot → Composite) : TableM Slot := do
@@ -160,6 +163,90 @@ def didDescChecks : List Vector :=
       "a constructor with no arguments is still a constructor (5.2)"
   , rejectsDid "service : (x : nat, x : nat) -> {}" "a constructor's parameter name repeated (5.2)" ]
 
+/-! ## Imports (Section 5.3)
+
+The description being read is at `main.did`, and `files` holds the others by location. -/
+
+def aNat : List (String × String) := [("a.did", "type A = nat;")]
+
+/-- `a.did`, declaring a service with one method `n : (nat) -> ()`. -/
+def aService : List (String × String) := [("a.did", "service : { n : (nat) -> () }")]
+
+/-- A service of methods, each `(nat) -> ()` if named `n` and `() -> ()` otherwise. -/
+def serviceNamed (names : List String) : TableM Slot := do
+  let ms ← names.mapM fun m => do
+    return (m, ← intern (.func (if m == "n" then [nat] else []) [] []))
+  intern (.service ms)
+
+def didImportChecks : List Vector :=
+  [ defines "import \"a.did\"; type B = A;" (return [("A", nat), ("B", nat)])
+      "an import brings in definitions (5.3)" (files := aNat)
+  , defines "type B = A; import \"a.did\"" (return [("A", nat), ("B", nat)])
+      "imports and definitions in any order (5.1)" (files := aNat)
+  , defines "import \"sub/x.did\"; type T = X;" (return [("T", nat), ("X", nat), ("Y", nat)])
+      "an import is relative to the description that contains it (5.3)"
+      (files := [("sub/x.did", "import \"y.did\"; type X = Y;"), ("sub/y.did", "type Y = nat;")])
+  , defines "import \"b.did\"; type T = A;" (return [("T", nat), ("A", nat)])
+      "names are visible through indirect imports (5.3)"
+      (files := [("b.did", "import \"a.did\";")] ++ aNat)
+  , defines "import \"sub/../a.did\"; import \"a.did\";" (return [("A", nat)])
+      "dot segments are removed, so two imports of one location read it once (5.3)"
+      (files := aNat)
+  , defines "import \"b.did\"; import \"c.did\";" (return [("A", nat)])
+      "a description reached along two paths is included once (5.3)"
+      (files := [("b.did", "import \"a.did\";"), ("c.did", "import \"a.did\";")] ++ aNat)
+  , rejectsDid "import \"a.did\"; type A = nat;" "a name defined in two descriptions (5.3)"
+      (files := aNat)
+  , rejectsDid "import \"a.did\"; type M = nat;" "an import cycle through the description being read (5.3)"
+      (files := [("a.did", "import \"main.did\"; type A = nat;")])
+  , rejectsDid "import \"main.did\"; type M = nat;" "a description that imports itself (5.3)"
+  , rejectsDid "import \"a.did\";" "an import cycle among imported descriptions (5.3)"
+      (files := [("a.did", "import \"b.did\"; type A = nat;"), ("b.did", "import \"a.did\"; type B = nat;")])
+  , rejectsDid "import \"missing.did\";" "an import that cannot be fetched (5.3)"
+  , rejectsDid "import \"a.did\";" "an imported description that does not parse (5.3)"
+      (files := [("a.did", "type = ;")])
+  , rejectsDid "import \"a.did\"; type M = nat;"
+      "an imported description cannot use a name only its importer defines (5.3)"
+      (files := [("a.did", "type A = M;")])
+  , rejectsDid "import \"\\ff\";" "an import that is not UTF-8 (5.2)"
+  , declares "import service \"a.did\"; service : { m : () -> () }"
+      (return ([], none, ← serviceNamed ["m", "n"]))
+      "import service merges the imported service's methods (5.3)" (files := aService)
+  , declares "import \"a.did\"; service : {}" (return ([], none, ← serviceNamed []))
+      "a plain import contributes no methods (5.3)" (files := aService)
+  , declares "import \"b.did\"; service : { m : () -> () }" (return ([], none, ← serviceNamed ["m"]))
+      "a plain import contributes no methods, not even those its import imports (5.3)"
+      (files := [("b.did", "import service \"a.did\";")] ++ aService)
+  , declares "import service \"a.did\";" (return ([], none, ← serviceNamed ["n"]))
+      "import service without a service declaration of one's own (5.3)" (files := aService)
+  , declares "import service \"a.did\"; service : (text) -> { m : () -> () }"
+      (return ([], some [text], ← serviceNamed ["m", "n"]))
+      "a constructor keeps its arguments, and takes the imported methods (5.3)" (files := aService)
+  , rejectsDid "import service \"a.did\";" "import service of a constructor (5.3)"
+      (files := [("a.did", "service : (nat) -> { n : (nat) -> () }")])
+  , rejectsDid "import service \"a.did\";" "import service of a description that provides no methods (5.3)"
+      (files := aNat)
+  , declares "import service \"b.did\";" (return ([], none, ← serviceNamed ["n"]))
+      "import service of a description whose methods are all imported (5.3)"
+      (files := [("b.did", "import service \"a.did\";")] ++ aService)
+  , declares "import service \"b.did\"; service : { m : () -> () }"
+      (return ([], none, ← serviceNamed ["m", "b", "n"]))
+      "a chain of import service (5.3)"
+      (files := [("b.did", "import service \"a.did\"; service : { b : () -> () }")] ++ aService)
+  , declares "import service \"b.did\"; import service \"c.did\";"
+      (return ([], none, ← serviceNamed ["b", "c", "n"]))
+      "a diamond of import service merges each description's methods once (5.3)"
+      (files := [("b.did", "import service \"a.did\"; service : { b : () -> () }"),
+                 ("c.did", "import service \"a.did\"; service : { c : () -> () }")] ++ aService)
+  , rejectsDid "import service \"a.did\"; service : { n : () -> () }"
+      "two merged methods with one name (5.3)" (files := aService)
+  , declares "import service \"a.did\";"
+      (do
+        let s ← serviceNamed ["n"]
+        return ([("S", s)], none, s))
+      "import service of a service declared by name (5.3)"
+      (files := [("a.did", "type S = service { n : (nat) -> () }; service : S")]) ]
+
 /-! ## Meaning (Section 6) -/
 
 def didNameChecks : List Vector :=
@@ -221,6 +308,6 @@ def didInterfaceChecks : List Vector :=
 
 def didChecks : List Vector :=
   didLexChecks ++ didPrimChecks ++ didRecordChecks ++ didFuncChecks ++ didServiceTypeChecks ++
-  didDescChecks ++ didNameChecks ++ didWellFormedChecks ++ didInterfaceChecks
+  didDescChecks ++ didImportChecks ++ didNameChecks ++ didWellFormedChecks ++ didInterfaceChecks
 
 end Oracle

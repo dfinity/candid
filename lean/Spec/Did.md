@@ -8,9 +8,10 @@ and where it disagrees with `candid` 0.10.
 
 **Abstract.** This document specifies the textual syntax of Candid types and of
 interface descriptions, the `.did` files that state the types of a service's methods.
-Reading a description is defined in two steps: parsing the text into definitions and an
-optional service declaration, and checking them, which gives every name and the service
-a type. Either step can reject the input.
+Reading a description is defined in three steps: parsing the text into imports,
+definitions and an optional service declaration; expanding the imports, which gives one
+description without them; and checking that, which gives every name and the service a
+type. Any step can reject the input.
 
 ## Table of Contents
 
@@ -34,15 +35,17 @@ This document defines:
 
 - the syntax of types, as written in descriptions and in annotations of textual values
   ([Section 4](#4-types));
-- the syntax of a description: type definitions and a service declaration
+- the syntax of a description: imports, type definitions and a service declaration
   ([Section 5](#5-descriptions));
+- how imports are expanded ([Section 5.3](#53-imports));
 - what a description means: the type each name is defined as, and the type of the
   service, or that the description is rejected ([Section 6](#6-meaning)).
 
 The following are out of scope:
 
-- **Imports.** The syntax `import` and `import service` is reserved, but its meaning is
-  not yet defined by this draft. See [Appendix A.3](#a3-open-issues).
+- **Fetching.** How the description at a location is obtained, whether from a file
+  system, over a network or otherwise, is up to the implementation
+  ([Section 5.3](#53-imports)).
 - **Comments as documentation.** Tools commonly attach a comment that precedes a
   definition, method or field to it as documentation. Comments have no meaning in this
   document.
@@ -83,17 +86,23 @@ compared without regard to order. This is the equivalence of [TEXT], Section 5.1
 
 ## 2. Overview
 
-A description is read in two steps:
+A description is read in three steps:
 
 ```
-text ──parse──▶ definitions and service ──check──▶ interface
-                (Sections 3 to 5)                  (Section 6)
+text ──parse──▶ imports, definitions ──expand──▶ definitions ──check──▶ interface
+                and service                      and service
+                (Sections 3 to 5.2)              (Section 5.3)          (Section 6)
 ```
+
+A description without imports needs no expanding.
 
 Parsing does not depend on what names mean. It turns
 `type list = opt record { head : nat; tail : list }` into a definition of the name
 `list`, with field names hashed into field ids, and rejects text that is malformed
 however its names are defined, such as a record that has two fields with one id.
+
+Expanding reads every description that one imports, and combines their definitions,
+and the methods of their services where the import asks for them, into one description.
 
 Checking gives each name the type it denotes. It rejects names that are not defined,
 definitions that go round in a circle without reaching a type, such as
@@ -217,17 +226,17 @@ definition  = "type" identifier "=" type
 service     = "service" [identifier] ":" [params "->"] (methods / identifier)
 ```
 
-The definitions come first, separated by semicolons, and the service declaration, if
-any, comes last. A semicolon after the last definition is optional, whether or not a
-service declaration follows.
-
-A description that contains an `import` is outside the scope of this draft
-([Section 1.1](#11-scope)). The reference model rejects it.
+The definitions, which include imports, come first, separated by semicolons, and the
+service declaration, if any, comes last. A semicolon after the last definition is
+optional, whether or not a service declaration follows. Imports and type definitions may
+come in any order.
 
 ### 5.2. Abstract Syntax
 
-Parsing produces a sequence of definitions `x₁ = t₁; …; xₙ = tₙ` and an optional
-service declaration, of one of two forms:
+Parsing produces a sequence of imports, a sequence of definitions `x₁ = t₁; …; xₙ = tₙ`,
+and an optional service declaration. An import is `import r` or `import service r`,
+where *r* is the bytes of the text literal, which MUST be well-formed UTF-8. A service
+declaration has one of two forms:
 
 ```
 S ::= s                                  a service
@@ -241,6 +250,63 @@ parameters follow the rules for parameters in [Section 4.2](#42-abstract-syntax)
 The definitions are the **environment** Γ, which maps each *xᵢ* to *tᵢ*. A description
 MUST be rejected if two definitions define the same name, or if a definition defines the
 name of a primitive type, such as `type nat = text`.
+
+### 5.3. Imports
+
+Imports are expanded before anything else: the description being read, together with
+the descriptions it imports, becomes one description without imports, its
+**expansion**, and [Section 6](#6-meaning) gives the expansion its meaning. A
+description without imports is its own expansion.
+
+**Locations.** Every description read has a **location**, a URI reference [RFC3986]. An
+import's *r* is a URI reference too, and denotes the location obtained by resolving it
+against the location of the description that contains it, by [RFC3986], Section 5.2.
+For file paths this means an import is relative to the directory of the file that
+contains it, and resolution removes `.` and `..` segments, so `sub/../a.did` and `a.did`
+denote the same location. Two imports denote the same description exactly when they
+denote the same location. How the description at a location is fetched is up to the
+implementation. If it cannot be fetched, or is not a description, the description being
+read MUST be rejected.
+
+**The import graph.** The descriptions reachable from the one being read, by following
+imports of either kind, are its **imports, direct and indirect**. A description MUST be
+rejected if one of them imports it, or if the graph has any other cycle: an import
+cycle has no order in which the descriptions could be read, and is a mistake. A
+description reached along more than one path is included once.
+
+**Definitions.** The expansion's definitions are those of the description and of all its
+imports, direct and indirect. The names form one namespace, so
+[Section 5.2](#52-abstract-syntax) rejects the expansion if two of these descriptions
+define the same name, even as the same type.
+
+Each description MUST also be **self-contained**: every name in it is defined in it or
+in one of its imports, direct or indirect. A description cannot use a name defined only
+by a description that imports it, so that every description in the graph can be read on
+its own, with the same meaning.
+
+**Methods.** A description D **provides** methods if it declares a service or imports
+one with `import service`, and the methods it provides, M(D), are:
+
+- the methods of its own service declaration, if any: those of `service{…}`, or of the
+  service type that a type name resolves to in the expansion; and
+- M(E), for each description E that D imports with `import service`.
+
+A description that two of these reach is counted once. A plain `import` contributes
+definitions and no methods: not those of the imported description, nor any it imports
+with `import service`.
+
+For each `import service` of a description E, the description being read MUST be
+rejected if E provides no methods, or if E's own service declaration is a constructor.
+It MUST also be rejected if two of the methods in any M(D) have the same name.
+
+**The service.** The expansion's service declaration is:
+
+- the description's own, if it has no `import service`;
+- otherwise, a service whose methods are M of the description being read, with the
+  initialization arguments of its own declaration if that is a constructor.
+
+So a description with no service declaration of its own, but with an `import service`,
+declares the imported service.
 
 ## 6. Meaning
 
@@ -341,7 +407,9 @@ defined once may be held as two entries, or two names as one.
 Conformance vectors of kind `did`, each a description and the expected interface or a
 rejection, are written from the reference model in [lean/](../), whose
 [Candid/Did/](../Candid/Did/) implements this document, and published under
-[conformance/](../../conformance/).
+[conformance/](../../conformance/). A vector with imports carries the descriptions it
+imports, each with a relative path as its location; the description being read is at
+`main.did`.
 
 ## 8. Security Considerations
 
@@ -357,6 +425,11 @@ data in [CANDID], and SHOULD bound the following:
 - **Recursion.** An implementation that expands names, rather than sharing them,
   produces a tree of unbounded size from a recursive type. A type MUST be held with its
   recursion intact, as a graph.
+- **Imports.** A description from an untrusted source names the locations it imports.
+  An implementation SHOULD NOT fetch them without the user's consent, and SHOULD bound
+  how many descriptions an import graph may have, and how deep it may be. A description that
+  tools generate from a program, as a service usually publishes about itself, has no
+  imports.
 - **Field ids.** Hash collisions are rejected ([Section 4.2](#42-abstract-syntax)), and
   a description can be crafted to collide. Rejecting it is the required behavior, not a
   failure.
@@ -376,6 +449,10 @@ data in [CANDID], and SHOULD bound the following:
 [RFC2119]
 : Bradner, S., "Key words for use in RFCs to Indicate Requirement Levels", BCP 14,
   RFC 2119, March 1997.
+
+[RFC3986]
+: Berners-Lee, T., Fielding, R., and L. Masinter, "Uniform Resource Identifier (URI):
+  Generic Syntax", STD 66, RFC 3986, January 2005.
 
 [RFC5234]
 : Crocker, D., Ed., and P. Overell, "Augmented BNF for Syntax Specifications: ABNF",
@@ -407,6 +484,13 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
   say.
 - The meaning of a description ([Section 6.4](#64-the-interface)). [CANDID] describes
   the parts but not the whole.
+- How imports resolve, and what they include ([Section 5.3](#53-imports)). [CANDID]
+  says an import refers to a file "by URL" and includes its definitions "textually".
+  Imports are relative to the importing description, as in 0.10; names are visible
+  through indirect imports, as in 0.10; a name defined twice is rejected, as in 0.10;
+  and import cycles are rejected, as 0.10 does, with a misleading error about a
+  duplicate binding. That an imported description cannot use the importer's names is
+  [CANDID]'s rule, which 0.10 does not check.
 
 ### A.2. Different from candid 0.10
 
@@ -415,17 +499,23 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
 | `type nat = text` | accepted; `nat` still denotes the primitive type everywhere | rejected ([5.2](#52-abstract-syntax)) |
 | `type A = record { 4294967295 : nat; nat }` | panics in a debug build | rejected ([TEXT], Section 4.2) |
 | `type A = record { query : nat }` | rejected: `query` is a keyword | accepted ([3](#3-lexical-structure)) |
+| `import "b.did"`, where `b.did` uses a name that only the importer defines | accepted | rejected: not self-contained ([5.3](#53-imports)) |
+| `import "mid.did"`, where `mid.did` has `import service "svc.did"` | `svc.did`'s methods join the importer's service | they do not: a plain import contributes no methods |
+| `import service "mid.did"`, where `mid.did` declares no service but has `import service "svc.did"` | rejected: no main service | accepted: `mid.did` provides `svc.did`'s methods |
+| `import "sub/../a.did"; import "a.did"` | `a.did` read twice, so its names are defined twice | one description, read once |
+| Two merged methods with different names whose field-id hashes collide | rejected | accepted: method names are not hashed |
 
-The lexical differences of [TEXT], Appendix B.2, apply to descriptions too. Whether
+Each of these is a case that existing descriptions are unlikely to rely on. The lexical
+differences of [TEXT], Appendix B.2, apply to descriptions too. Whether
 0.10 should change to reject `type nat = text` is not decided; this document rejects it
 because the definition could never be used.
 
 ### A.3. Open Issues
 
-- **Imports.** [CANDID] says an import textually includes another file's definitions,
-  and `import service` merges its service's methods. Defining it needs a way to name
-  and fetch the other file, and rules for clashes between names and between methods,
-  which 0.10 resolves in ways [CANDID] does not describe. It is left to a later draft.
+- **Qualified names.** All descriptions in an import graph share one namespace, so two
+  libraries that define the same name cannot be imported together. Names qualified by
+  the import, as Thrift and Cap'n Proto have, would solve that, but would change the
+  names that bindings are generated from. They could be added later as new syntax.
 - **Unknown annotations in binary data.** A decoder that meets an annotation byte it
   does not know rejects the whole message, even if the function type is only in a part
   it would skip, so adding an annotation breaks every older decoder that sees one. A
@@ -461,6 +551,11 @@ because the definition could never be used.
 | `service : { "a b" : () -> () }` | a method named `a b` |
 | `type A = nat service : {}` | `A` is `nat`, and an empty service |
 | `service : {}; type A = nat;` | rejected: definitions come first |
+| `import "a.did"; type B = A;`, with `a.did` holding `type A = nat;` | `A` and `B` are `nat` |
+| `import "a.did"; type A = nat;`, with `a.did` holding `type A = nat;` | rejected: `A` defined twice |
+| `import "a.did";`, with `a.did` holding `import "main.did";` | rejected: an import cycle |
+| `import service "a.did"; service : { m : () -> () }`, with `a.did` declaring `service : { n : () -> () }` | a service with methods `m` and `n` |
+| `import "a.did"; service : {}`, with `a.did` declaring `service : { n : () -> () }` | a service with no methods |
 
 [CANDID]: ../../spec/Candid.md
 [TEXT]: TextValues.md

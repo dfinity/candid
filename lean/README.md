@@ -354,7 +354,7 @@ Names are kept in the syntax but resolve in an empty environment, so a name is r
 **Descriptions, specified first.** [Spec/Did.md](Spec/Did.md) is the second section of
 the new specification. It defines the syntax of types, which
 [Spec/TextValues.md](Spec/TextValues.md) used to leave to `spec/Candid.md`, and of
-descriptions: definitions, then a service or a service constructor. A description
+descriptions: imports and definitions, then a service or a service constructor. A description
 means an **interface**: the type of every name, and the service's type and
 initialization arguments. [Candid/Did/](Candid/Did/) implements it, and the `did`
 vectors in `handwritten.json` follow the document section by section.
@@ -377,8 +377,16 @@ twice: a well-formedness rule, so it holds for types decoded from the wire too, 
 the model used to accept `query oneway`. The grammar still takes a list, so that a
 future annotation that is not a mode can combine with one, and annotation names are
 identifiers, not keywords, so that adding one breaks no existing name. A definition may not bind a primitive type's name, which 0.10
-accepts and then can never use. Imports are reserved syntax that the draft does not
-define yet. Each is in the document's Appendix A.
+accepts and then can never use. Each is in the document's Appendix A.
+
+**Imports expand into one description.** A description and everything it imports
+become one description without imports, which is then checked as any other
+([Candid/Did/Import.lean](Candid/Did/Import.lean)). Imports resolve relative to the
+importing description, with `.` and `..` removed. Cycles are rejected, names are one
+namespace and are visible through indirect imports, and every description must be
+self-contained. Methods come from `import service` alone, so a plain import never adds
+any. A `did` vector carries the descriptions its text imports, and the runner writes
+them to disk for 0.10's `check_file`.
 
 ## Constraints
 
@@ -413,8 +421,8 @@ cover what actually breaks in production:
       `test/spacebomb.test.did`, from one it answers
 - [x] Textual value syntax — lexing, parsing and elaboration at a type, after
       [Spec/TextValues.md](Spec/TextValues.md)
-- [x] `.did` descriptions — the type syntax, definitions, and services, after
-      [Spec/Did.md](Spec/Did.md); imports are not defined yet
+- [x] `.did` descriptions — the type syntax, definitions, services and imports, after
+      [Spec/Did.md](Spec/Did.md)
 
 ## Deferred, deliberately
 
@@ -438,10 +446,6 @@ Named here so they are obligations rather than oversights.
   depth costs no stack. A hash set would make this linear in the pairs compared; the
   reference model keeps lists, which the termination measure is stated over, until a
   conformance vector makes that a problem.
-- **`.did` imports.** [Spec/Did.md](Spec/Did.md) reserves the syntax and leaves the
-  meaning to a later draft: it needs a way to name and fetch another file, and rules for
-  clashes between names and between methods. The model rejects a description with one,
-  and no vector has one.
 - **`candid_parser`'s `.did` test files as vectors.** `rust/candid_parser/tests/assets`
   holds about thirty descriptions, with the rejections in `ok/*.fail`. Translating them,
   as `conformance/tools/test-did` translates `test/`, would hold the model to

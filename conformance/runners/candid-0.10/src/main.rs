@@ -21,8 +21,7 @@ use candid::types::subtype::{equal, subtype_with_config, Gamma, OptReport};
 use candid::types::value::{IDLField, VariantValue};
 use candid::types::{Field, FuncMode, Function, Label, Type, TypeEnv, TypeInner};
 use candid::{DecoderConfig, IDLArgs, IDLValue, Principal};
-use candid_parser::syntax::IDLProg;
-use candid_parser::typing::check_prog;
+use candid_parser::typing::check_file;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::process::ExitCode;
@@ -48,6 +47,30 @@ const KNOWN: &[(&str, &str)] = &[
         "0.10 bounds a principal at 29 bytes, the Internet Computer's limit, in both its \
          decoder and `Principal`; the spec bounds neither",
     ),    (
+        "did: dot segments are removed, so two imports of one location read it once (5.3)",
+        "0.10 joins an import's path to the importer's directory without normalizing it, \
+         so `sub/../a.did` and `a.did` are two files, and `sub/` must exist on disk",
+    ),
+    (
+        "did: an import cycle among imported descriptions (5.3)",
+        "0.10 reads each imported file once, and accepts a cycle that does not pass \
+         through the file being read",
+    ),
+    (
+        "did: an imported description cannot use a name only its importer defines (5.3)",
+        "0.10 checks all definitions together, so an imported file may use the \
+         importer's names; Candid.md says it must not",
+    ),
+    (
+        "did: a plain import contributes no methods, not even those its import imports (5.3)",
+        "0.10 merges the methods of every file any `import service` names, however that \
+         file was reached, so they leak through a plain `import`",
+    ),
+    (
+        "did: import service of a description whose methods are all imported (5.3)",
+        "0.10 requires a file imported with `import service` to declare a service itself",
+    ),
+    (
         "did: a positional field after id 2^32 - 1 (4.2)",
         "0.10's grammar numbers positional fields with `id + 1` on a `u32`, which \
          overflows: a debug build panics, and a release build gives the field id 0",
@@ -381,18 +404,37 @@ fn parse(v: &Value) -> Result<Outcome> {
     }
 }
 
-/// Read the text as a `.did` file without imports, as `candid_parser::check_prog` does,
-/// and compare the interface with the expected one. Types are compared with 0.10's own
-/// `equal`, with the expected table loaded into the same environment under names no
-/// `.did` file can define, since they contain a space.
+/// Read the text as a `.did` file, as `candid_parser::check_file` does: the text is
+/// written to `main.did` in a directory of its own, beside the vector's `files`, so
+/// that imports resolve as they would on disk. The interface is compared with the
+/// expected one. Types are compared with 0.10's own `equal`, with the expected table
+/// loaded into the same environment under names no `.did` file can define, since they
+/// contain a space.
 fn did(v: &Value) -> Result<Outcome> {
-    let text = string(&v["text"])?;
+    let dir = scratch_dir()?;
+    let write = |path: &str, text: &str| {
+        if path.starts_with('/') || path.split('/').any(|s| s == "..") {
+            return Err(format!("a vector's file escapes its directory: {path:?}"));
+        }
+        let path = dir.join(path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(path, text).map_err(|e| e.to_string())
+    };
+    write("main.did", string(&v["text"])?)?;
+    if let Some(files) = v.get("files") {
+        for f in array(files)? {
+            let (path, text) = pair(f)?;
+            write(string(path)?, string(text)?)?;
+        }
+    }
+    let main = dir.join("main.did");
     let read = std::panic::catch_unwind(|| {
-        let prog = text.parse::<IDLProg>().map_err(|e| e.to_string())?;
-        let mut env = TypeEnv::new();
-        let actor = check_prog(&mut env, &prog).map_err(|e| e.to_string())?;
+        let (env, actor, _) = check_file(&main).map_err(|e| e.to_string())?;
         Ok::<_, String>((env, actor))
     });
+    let _ = std::fs::remove_dir_all(&dir);
     let got = match read {
         Ok(got) => got,
         Err(_) => return Ok(Outcome::Disagree("panicked".to_string())),
@@ -447,6 +489,17 @@ fn did(v: &Value) -> Result<Outcome> {
                 TypeInner::Class(args, serv) => (Some(args.clone()), serv.clone()),
                 _ => (None, actor.clone()),
             };
+            // `resolve_actor` appends imported methods after the file's own, unsorted,
+            // and `equal` compares methods by position. The interface is a set of
+            // methods, so they are sorted here, as 0.10's parser sorts a written one.
+            let serv = match serv.as_ref() {
+                TypeInner::Service(ms) => {
+                    let mut ms = ms.clone();
+                    ms.sort_by(|(a, _), (b, _)| a.cmp(b));
+                    TypeInner::Service(ms).into()
+                }
+                _ => serv,
+            };
             let want_init = match &service["init"] {
                 Value::Null => None,
                 ts => Some(
@@ -472,6 +525,20 @@ fn did(v: &Value) -> Result<Outcome> {
             }
         }
     })
+}
+
+/// A new, empty directory for one vector's files.
+fn scratch_dir() -> Result<std::path::PathBuf> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+    let dir = std::env::temp_dir().join(format!(
+        "candid-conformance-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
 }
 
 /// Compare values that 0.10 produced, or its error, with a vector's `expect`.

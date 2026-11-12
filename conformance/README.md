@@ -103,7 +103,8 @@ the source: [tools/test-did/](tools/test-did/) translates them into Lean with
 {"id":"...","kind":"parse","text":"(opt 5)","types":<types>,"expect":{"values":[<value>, ...]}},
 {"id":"...","kind":"parse","text":"(5)","types":<types>,"expect":"reject"},
 {"id":"...","kind":"did","text":"type A = nat; service : {}","expect":{"interface":<interface>}},
-{"id":"...","kind":"did","text":"type A = A;","expect":"reject"}
+{"id":"...","kind":"did","text":"type A = A;","expect":"reject"},
+{"id":"...","kind":"did","text":"import \"a.did\";","files":[["a.did","type A = nat;"]],"expect":{"interface":<interface>}}
 ]}
 ```
 
@@ -145,7 +146,9 @@ the format, so it changes in place.
   the initialization arguments of a constructor. The table is well formed. An
   implementation agrees if it defines the same names, and each name, argument and the
   service is the same type as the vector's -- *equivalent*, the same infinite tree --
-  whatever table holds it. No vector has an `import`, which the draft leaves undefined.
+  whatever table holds it. The description is at location `main.did`; `files`, present
+  only when it is not empty, holds the descriptions it can import, each as a relative
+  path and its text.
 
 A `<type>` is `{"table": [<entry>, ...], "root": <slot>}`. A `<slot>` is a primitive's
 name (`"nat"`, `"principal"`, ...) or a table index (`3`). An `<entry>` is a composite,
@@ -218,9 +221,10 @@ A `decode` vector is asked through `IDLArgs::from_bytes_with_types`, and the res
 compared by encoding, as for `coerce`. A `parse` vector is asked the way `candid_parser`'s
 own test runner reads text: `candid_parser::parse_idl_args`, then
 `IDLArgs::annotate_types` with the parser's rules (`from_parser`). A panic is a
-disagreement. A `did` vector is read with `candid_parser`'s `IDLProg` parser and
-`check_prog`, which ignores imports, and compared with 0.10's `subtype::equal`, with the
-expected table in the same environment under names no description can define. Where 0.10
+disagreement. A `did` vector is written to a directory of its own, the text as
+`main.did` beside its `files`, and read with `candid_parser::check_file`, so imports
+resolve as they would on disk. The interface is compared with 0.10's `subtype::equal`,
+with the expected table in the same environment under names no description can define. Where 0.10
 cannot represent an expected value,
 that is reported as a disagreement rather than a broken vector: the question translated,
 and the answer is what 0.10 cannot hold.
@@ -284,6 +288,15 @@ What the runners have found, recorded so that they outlive the run that found th
   that it accepts a definition of a primitive type's name, which it can then never use,
   and overflows the same positional field id in a type. These are the `did` vectors in
   its known divergences.
+- **0.10's imports differ from the document's in five cases** that existing
+  descriptions are unlikely to rely on: it does not normalize `..` in a path, accepts an
+  import cycle that avoids the file being read, lets an imported file use the importer's
+  names, merges methods that a plain `import` reaches through an `import service`, and
+  requires a file imported as a service to declare one itself.
+- **0.10 leaves a merged service's methods unsorted.** `resolve_actor` appends imported
+  methods after the file's own. Its `equal` compares methods by position, and its
+  encoder writes them in the order given, where the binary format requires them
+  sorted; the runner sorts them before comparing.
 
 ### Still to come
 
@@ -299,9 +312,8 @@ What the runners have found, recorded so that they outlive the run that found th
   comparable, but would require every encoder to produce it for a property no
   decoder needs; it stays possible as an opt-in, and nothing here depends on it. See
   [REWRITE.md §2](../REWRITE.md#2-what-we-are-building).
-- **`.did` imports**, once [lean/Spec/Did.md](../lean/Spec/Did.md) defines them, and
-  `candid_parser`'s own `.did` test files as vectors -- the `*.good.did` / `*.bad.did`
-  cases that `test/README.md` always documented and never wrote.
+- **`candid_parser`'s own `.did` test files as vectors** -- the `*.good.did` /
+  `*.bad.did` cases that `test/README.md` always documented and never wrote.
 - **Published as a versioned artifact** -- data crate, npm package, and a tarball on
   GitHub Releases -- rather than a directory reachable only by cloning.
 

@@ -23,7 +23,7 @@ root refers to it or not. Every definition is in the table, so every definition 
 checked.
 -/
 
-import Candid.Did.Parse
+import Candid.Did.Import
 import Candid.Text.Flatten
 
 namespace Candid.Did
@@ -97,10 +97,16 @@ def checkDesc (d : Desc) : Except String Interface := do
     | .prim _ => throw "the service declaration is not a service type"
   return { table, types, service }
 
-/-- A description's interface, or `none` when it is rejected. -/
-def readDesc (src : String) : Option Interface :=
-  match parseDesc src >>= checkDesc with
-  | .ok i => some i
-  | .error _ => none
+/-- The interface of the description `src`, read at `rootLocation` with the environment
+`files` to fetch its imports from, or why it is rejected. -/
+def checkDescIn (files : Files) (src : String) : Except String Interface :=
+  expand ((rootLocation, src) :: files) >>= checkDesc
+
+/-- As `checkDescIn`, `none` when the description is rejected. -/
+def readDescIn (files : Files) (src : String) : Option Interface :=
+  (checkDescIn files src).toOption
+
+/-- A description with nothing to import from. -/
+def readDesc (src : String) : Option Interface := readDescIn [] src
 
 end Candid.Did

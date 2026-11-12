@@ -78,9 +78,10 @@ inductive Assertion where
   /-- `text`, read as an argument sequence at `types` (`lean/Spec/TextValues.md`), is
   the values `want`, one per type, or is rejected when `want` is `none`. -/
   | parse (text : String) (types : TypeSeq) (want : Option (List Value))
-  /-- `text`, read as a description (`lean/Spec/Did.md`), means the interface `want`, up
-  to equivalence of types, or is rejected when `want` is `none`. -/
-  | did (text : String) (want : Option IfaceFixture)
+  /-- `text`, read as a description (`lean/Spec/Did.md`) at `main.did`, with `files` the
+  descriptions it can import, by location, means the interface `want`, up to
+  equivalence of types, or is rejected when `want` is `none`. -/
+  | did (text : String) (files : List (String × String)) (want : Option IfaceFixture)
 
 structure Vector where
   /-- Unique within the suite. Human-readable, and stable: a runner's list of known
@@ -237,8 +238,11 @@ def Vector.render (v : Vector) : String :=
   | .parse text ts want =>
     head "parse" ++ field "text" (.str text) ++ field "types" ts.toJson ++
       field "expect" (expectValuesToJson want) ++ "}"
-  | .did text want =>
-    head "did" ++ field "text" (.str text) ++ field "expect" (expectIfaceToJson want) ++ "}"
+  | .did text files want =>
+    let filesField := if files.isEmpty then "" else
+      field "files" (.arr (files.map fun (l, t) => Json.arr #[.str l, .str t]).toArray)
+    head "did" ++ field "text" (.str text) ++ filesField ++
+      field "expect" (expectIfaceToJson want) ++ "}"
 
 /-- A whole file: one vector per line, so that a change to the model shows up in a diff
 as exactly the vectors whose answers it changed. -/
@@ -473,8 +477,19 @@ def Vector.fromJson? (j : Json) : Except String Vector := do
         (← TypeSeq.fromJson? (← j.getObjVal? "types"))
         (← expectValuesFromJson? (← j.getObjVal? "expect"))
     | "did" =>
-      expectKeys j ["id", "kind", "text", "expect"]
-      return .did (← (← j.getObjVal? "text").getStr?)
+      let files ← match j.getObjVal? "files" with
+        | .error _ => do
+          expectKeys j ["id", "kind", "text", "expect"]
+          pure []
+        | .ok fs => do
+          expectKeys j ["id", "kind", "text", "files", "expect"]
+          let files ← (← fs.getArr?).toList.mapM fun f => do
+            match (← f.getArr?).toList with
+            | [l, t] => return (← l.getStr?, ← t.getStr?)
+            | _ => throw "expected a two-element array"
+          if files.isEmpty then throw "`files` is omitted when there are none"
+          pure files
+      return .did (← (← j.getObjVal? "text").getStr?) files
         (← expectIfaceFromJson? (← j.getObjVal? "expect"))
     | k => throw s!"unknown vector kind {repr k}" : Except String Assertion)
   return { id, assertion }
@@ -576,8 +591,8 @@ def Assertion.disagreement : Assertion → Option String
         if got == want then none
         else some s!"got {(expectValuesToJson got).compress}, want {(expectValuesToJson want).compress}"
     | none => some "a type is malformed, so reading text at it is not defined"
-  | .did text want =>
-    let got := Did.readDesc text
+  | .did text files want =>
+    let got := Did.readDescIn files text
     match got, want with
     | none, none => none
     | some _, none => some "accepted, want reject"

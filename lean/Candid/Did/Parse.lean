@@ -3,8 +3,8 @@ The syntax of descriptions (`lean/Spec/Did.md`, Section 5): type definitions, th
 optional service declaration.
 
 Types are parsed by the parser of `Candid/Text/Parse.lean`, which already reads them for
-annotations; this adds the two forms around them. Imports are outside the draft, so a
-description with one is rejected here.
+annotations; this adds the forms around them. Imports are kept as written, and expanded
+by `Import.lean`.
 -/
 
 import Candid.Text.Parse
@@ -20,11 +20,24 @@ structure ServiceDecl where
   service : TypeExpr
   deriving Repr
 
-/-- A description, as parsed: definitions in order, and the service declaration. -/
+/-- An import: whether it is `import service`, and the URI reference it names. -/
+structure Import where
+  service : Bool
+  ref : String
+  deriving Repr
+
+/-- A description, as parsed: imports and definitions in order, and the service
+declaration. -/
 structure Desc where
+  imports : List Import := []
   defs : List (String × TypeExpr)
   service : Option ServiceDecl
   deriving Repr
+
+/-- A `definition`: a type definition or an import. -/
+inductive Item where
+  | type (x : String) (t : TypeExpr)
+  | imp (i : Import)
 
 section
 variable (ts : Array Token)
@@ -39,17 +52,29 @@ def definition : P (String × TypeExpr) := do
   expect ts "="
   return (x, ← type ts (fuel ts))
 
+/-- `"import" ["service"] text-literal`, after `import`. -/
+def importDecl : P Import := do
+  let service ← if (← peekAt ts 0) == some (.keyword "service") then
+      modify (· + 1); pure true
+    else pure false
+  return { service, ref := ← liftE (utf8? (← textLit ts)) }
+
 /-- Definitions, separated by `;`, with one after the last optional. -/
-def definitions : Nat → P (List (String × TypeExpr))
+def definitions : Nat → P (List Item)
   | 0 => throw tooDeep
   | n + 1 => do
-    match ← peekAt ts 0 with
-    | some (.keyword "type") =>
-      modify (· + 1)
-      let d ← definition ts
-      if ← accept ts ";" then return d :: (← definitions n) else return [d]
-    | some (.keyword "import") => throw "imports are outside this draft (Did.md, Section 5.1)"
-    | _ => return []
+    let item? ← match ← peekAt ts 0 with
+      | some (.keyword "type") =>
+        modify (· + 1)
+        let (x, t) ← definition ts
+        pure (some (Item.type x t))
+      | some (.keyword "import") =>
+        modify (· + 1)
+        pure (some (.imp (← importDecl ts)))
+      | _ => pure none
+    match item? with
+    | none => return []
+    | some d => if ← accept ts ";" then return d :: (← definitions n) else return [d]
 
 /-- `service`, after the keyword: an optional name, then `:`, optional parameters and
 `->`, and a `methods` list or a type name. -/
@@ -70,7 +95,9 @@ def serviceDecl : P ServiceDecl := do
 
 /-- `description`, and nothing after it. -/
 def description : P Desc := do
-  let defs ← definitions ts (ts.size + 1)
+  let items ← definitions ts (ts.size + 1)
+  let imports := items.filterMap fun | .imp i => some i | .type .. => none
+  let defs := items.filterMap fun | .type x t => some (x, t) | .imp _ => none
   let service ← if (← peekAt ts 0) == some (.keyword "service") then
       modify (· + 1)
       let s ← serviceDecl ts
@@ -78,7 +105,7 @@ def description : P Desc := do
       pure (some s)
     else pure none
   if (← get) < ts.size then throw s!"unexpected {(← next ts).describe}"
-  return { defs, service }
+  return { imports, defs, service }
 
 end
 
