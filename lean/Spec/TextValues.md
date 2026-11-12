@@ -75,8 +75,8 @@ that the premises hold". A rule without premises holds unconditionally. Elaborat
 the least relation closed under the rules; an expression that no rule relates to any
 value is *rejected* at that type.
 
-**Values and types.** Values and types are those of the Candid data model [CANDID], and
-are written as follows. `nat(n)`, `int(n)`, `nat8(n)` … `int64(n)` are numbers of the
+**Values and types.** Values and types are those of the Candid data model [TYPES], and
+are written as there. `nat(n)`, `int(n)`, `nat8(n)` … `int64(n)` are numbers of the
 named type. `float32(b)` and `float64(b)` are IEEE 754 [IEEE754] floating-point data,
 identified by their bit patterns. `text(s)` holds a sequence of Unicode scalar values.
 `bool(b)`, `opt(v)`, `vec(v₁, …, vₙ)`, `record{i₁ = v₁; …; iₙ = vₙ}` with field ids in
@@ -120,7 +120,7 @@ used twice.
 Elaboration is guided by the type, and gives literals their meaning. The literal `5`
 denotes `nat8(5)` at `nat8`, `int(5)` at `int`, and nothing at `float64` or `text`.
 
-Elaboration is not coercion. Coercion, defined in [CANDID], converts a value of one
+Elaboration is not coercion. Coercion, defined in [TYPES], Section 6, converts a value of one
 type into a value of another, and is how a decoder takes binary data sent at one type
 into the type it expects. Elaboration reads an expression that was written for the
 type it is read at. Where the two could differ, elaboration is stricter. The
@@ -318,7 +318,7 @@ of a vector, or a field value.
 
 - A `number` label MUST be an integer literal without a sign, such as `5` or `0xff`,
   and denotes its value. A label whose value is 2³² or more MUST be rejected.
-- A `name` denotes the field-id hash of [CANDID] applied to the name's bytes. A name
+- A `name` denotes the field-id hash ([TYPES], Section 3.3) of the name's bytes. A name
   written as a text literal MUST be well-formed UTF-8.
 
 **Positional fields.** A record field without a label is given an id from its
@@ -362,10 +362,11 @@ that type must be the expected one:
 (e : s) ⇐ t ⇝ v    if s ≡ t  and  e ⇐ s ⇝ v
 ```
 
-`s ≡ t` holds when *s* and *t* are the same type: equal after every name is replaced by
-its definition, expanding recursive types as far as needed. Two types can be the same
-without being written the same way. A name and its definition are the same type, and
-so are two record types that list the same fields in a different order.
+`s ≡ t` holds when *s* and *t* are equivalent ([TYPES], Section 3.4): the same type,
+after every name is replaced by its definition, expanding recursive types as far as
+needed. Two types can be the same without being written the same way. A name and its
+definition are the same type, and so are two record types that list the same fields in
+a different order.
 
 An expression is **well-annotated** if, for every annotated subexpression `(e' : s)`,
 `e' ⇐ s` yields a value. The rules of [Sections 5.2 to 5.9](#52-reserved) apply only to
@@ -533,8 +534,8 @@ binary data in [CANDID], and SHOULD bound the following:
 ### 8.1. Normative References
 
 [CANDID]
-: DFINITY, "Candid Specification", [spec/Candid.md](../../spec/Candid.md). For the data
-  model, the field-id hash, and coercion.
+: DFINITY, "Candid Specification", [spec/Candid.md](../../spec/Candid.md). For resource
+  limits in the binary format.
 
 [DID]
 : "Candid Interface Descriptions", [Did.md](Did.md). For the syntax of types.
@@ -559,6 +560,10 @@ binary data in [CANDID], and SHOULD bound the following:
 [RFC8174]
 : Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words", BCP 14,
   RFC 8174, May 2017.
+
+[TYPES]
+: "Candid Types and Values", [Types.md](Types.md). For the data model, the field-id
+  hash, equivalence of types, and coercion.
 
 [UNICODE]
 : The Unicode Consortium, "The Unicode Standard".
@@ -691,3 +696,4 @@ them, which Rust's rules forbid, even when the check then rejects the literal.
 
 [CANDID]: ../../spec/Candid.md
 [DID]: Did.md
+[TYPES]: Types.md

@@ -1,6 +1,6 @@
 # `lean/` — Lean 4 reference model and specification
 
-**Status: seventh slice.** Types, the field-id hash, subtyping — as both a relation and a
+**Status: eighth slice.** Types, the field-id hash, subtyping — as both a relation and a
 decision procedure — values with coercion, the binary format in both directions,
 textual values, and `.did` descriptions, with an executable that writes them out
 as conformance vectors, reads them back, and is checked against `candid` 0.10 in CI. It
@@ -387,6 +387,27 @@ namespace and are visible through indirect imports, and every description must b
 self-contained. Methods come from `import service` alone, so a plain import never adds
 any. A `did` vector carries the descriptions its text imports, and the runner writes
 them to disk for 0.10's `check_file`.
+
+## What slice 8 established
+
+**The core of the spec, in the new style.** [Spec/Types.md](Spec/Types.md) is the third
+section of the new specification: the types and their values, field ids and their
+hash, equivalence and well-formedness, subtyping, and coercion. The other two drafts
+now refer to it instead of to `spec/Candid.md`. Subtyping is stated as one list of rules
+whose greatest fixed point is the relation, with the four `opt` rules as one, which is
+how [Candid/SubtypeSpec.lean](Candid/SubtypeSpec.lean) already had it. Coercion is
+stated as cases with three outcomes, which is how
+[Candid/Coerce.lean](Candid/Coerce.lean) already computed it.
+
+**Writing it down found a bug in the model.** When one part of a value fails to
+coerce and another is undefined, under an enclosing option, the first part decides
+between `null` and rejection. The model read a vector's elements in order, but a
+record's fields last-to-first, and a missing field after the present ones. candid
+0.10 decides in ascending order of the expected type's field ids, missing fields
+included, which is the order a decoder meets them in, and the document says so
+(Section 6.5). The model now computes each field's outcome and reads them in that
+order; six hand-written vectors cover records, missing fields and vectors, and 0.10
+agrees with all of them. No subtyping or coercion vector differs from 0.10.
 
 ## Constraints
 
