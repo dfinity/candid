@@ -430,7 +430,12 @@ fn did(v: &Value) -> Result<Outcome> {
     // `check_file` follows imports wherever they lead, and the model reads only the
     // vector's files. An import of anything else is a file that is not there, which
     // 0.10 rejects, so that is the answer, without letting the host's files decide it.
-    if let Some(outside) = import_outside(&staged) {
+    // Parsing can panic in 0.10, as reading can, and is a disagreement in the same way.
+    let outside = std::panic::catch_unwind(|| import_outside(&staged, &main));
+    let Ok(outside) = outside else {
+        return Ok(Outcome::Disagree("panicked".to_string()));
+    };
+    if let Some(outside) = outside {
         let detail = format!("rejected (imports {outside:?}, not among the vector's files)");
         return Ok(match &v["expect"] {
             Value::String(s) if s == "reject" => Outcome::Agree,
@@ -563,17 +568,25 @@ fn staged_path(dir: &str, path: &str) -> Option<String> {
     (!segs.is_empty()).then(|| segs.join("/"))
 }
 
-/// An import, in any staged file that parses, that names a file not staged.
-fn import_outside(staged: &BTreeMap<String, &str>) -> Option<String> {
-    for (path, text) in staged {
-        let Ok(prog) = text.parse::<IDLProg>() else {
+/// An import reachable from `main`, the staged description being read, that names a
+/// file not staged. Each staged file is visited once; one that does not parse imports
+/// nothing here, and `check_file` rejects it.
+fn import_outside(staged: &BTreeMap<String, &str>, main: &str) -> Option<String> {
+    let mut seen = BTreeSet::new();
+    let mut todo = vec![main.to_string()];
+    while let Some(path) = todo.pop() {
+        if !seen.insert(path.clone()) {
+            continue;
+        }
+        let Ok(prog) = staged[&path].parse::<IDLProg>() else {
             continue;
         };
         let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
         for dec in &prog.decs {
             if let Dec::ImportType(f) | Dec::ImportServ(f) = dec {
-                if staged_path(dir, f).is_none_or(|p| !staged.contains_key(&p)) {
-                    return Some(f.clone());
+                match staged_path(dir, f).filter(|p| staged.contains_key(p)) {
+                    Some(p) => todo.push(p),
+                    None => return Some(f.clone()),
                 }
             }
         }
