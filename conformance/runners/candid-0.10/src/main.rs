@@ -17,10 +17,12 @@
 //!
 //! This calls `candid` 0.10's public API only, and it never modifies `rust/`.
 
-use candid::types::subtype::{subtype_with_config, Gamma, OptReport};
+use candid::types::subtype::{equal, subtype_with_config, Gamma, OptReport};
 use candid::types::value::{IDLField, VariantValue};
 use candid::types::{Field, FuncMode, Function, Label, Type, TypeEnv, TypeInner};
 use candid::{DecoderConfig, IDLArgs, IDLValue, Principal};
+use candid_parser::syntax::{Dec, IDLProg};
+use candid_parser::typing::check_file;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::process::ExitCode;
@@ -29,15 +31,12 @@ use std::str::FromStr;
 /// Vectors on which `candid` 0.10 is known to disagree with the model: `(id, why)`.
 const KNOWN: &[(&str, &str)] = &[
     (
-        "annotations agree up to reordering",
-        "`subtype.rs` compares `Function::modes` as a `Vec`, so `query composite_query` \
-         and `composite_query query` differ; the spec identifies annotation lists up to \
-         reordering, and the `.did` grammar accepts `FuncMode*`",
+        "did: annotation names are identifiers elsewhere (3)",
+        "0.10's lexer makes `query`, `composite_query` and `oneway` keywords everywhere",
     ),
     (
-        "decode: a function type with two annotations",
-        "`binary_parser.rs` asserts that a function type has at most one annotation; the \
-         spec's `T(func ...)` writes `T*(<funcann>*)`, any number",
+        "text: an annotation name is a field name (3.3)",
+        "0.10's lexer makes `query`, `composite_query` and `oneway` keywords everywhere",
     ),
     (
         "decode: oneway function with a result",
@@ -49,6 +48,44 @@ const KNOWN: &[(&str, &str)] = &[
         "0.10 bounds a principal at 29 bytes, the Internet Computer's limit, in both its \
          decoder and `Principal`; the spec bounds neither",
     ),    (
+        "did: dot segments are removed, so two imports of one location read it once (5.3)",
+        "0.10 joins an import's path to the importer's directory without normalizing it, \
+         so `sub/../a.did` and `a.did` are two files, and `sub/` must exist on disk",
+    ),
+    (
+        "did: an import cycle among imported descriptions (5.3)",
+        "0.10 reads each imported file once, and accepts a cycle that does not pass \
+         through the file being read",
+    ),
+    (
+        "did: an imported description cannot use a name only its importer defines (5.3)",
+        "0.10 checks all definitions together, so an imported file may use the \
+         importer's names; Candid.md says it must not",
+    ),
+    (
+        "did: a plain import contributes no methods, not even those its import imports (5.3)",
+        "0.10 merges the methods of every file any `import service` names, however that \
+         file was reached, so they leak through a plain `import`",
+    ),
+    (
+        "did: import service of a description whose methods are all imported (5.3)",
+        "0.10 requires a file imported with `import service` to declare a service itself",
+    ),
+    (
+        "did: a positional field after id 2^32 - 1 (4.2)",
+        "0.10's grammar numbers positional fields with `id + 1` on a `u32`, which \
+         overflows: a debug build panics, and a release build gives the field id 0",
+    ),
+    (
+        "did: a definition of a primitive type's name (5.2)",
+        "0.10 binds the name, but its parser reads `nat` as the primitive type wherever \
+         it is used, so the definition is never reachable",
+    ),
+    (
+        "did: a definition of a primitive type's name, used (5.2)",
+        "as above: `record { reserved }` is a record of the primitive `reserved`",
+    ),
+    (
         "text: an underscore cannot end a number (3.4)",
         "0.10's lexer takes `[0-9][_0-9]*`, so `1_` is a number",
     ),
@@ -274,6 +311,7 @@ fn run(v: &Value) -> Result<Outcome> {
         "decode" if v["expect"] == "costly" => costly(v),
         "decode" => decode(v),
         "parse" => parse(v),
+        "did" => did(v),
         k => Err(format!("unknown vector kind {k:?}")),
     }
 }
@@ -365,6 +403,209 @@ fn parse(v: &Value) -> Result<Outcome> {
         Ok(got) => compare_values(got, &v["expect"], &env, &types),
         Err(_) => Ok(Outcome::Disagree("panicked".to_string())),
     }
+}
+
+/// Read the text as a `.did` file, as `candid_parser::check_file` does: the text is
+/// written to `root/main.did` in a directory of its own, and the vector's `files`
+/// relative to `root/`, so that imports resolve as they would on disk. No import may
+/// reach a file the vector does not hold (`import_outside`). The interface is compared with the
+/// expected one. Types are compared with 0.10's own `equal`, with the expected table
+/// loaded into the same environment under names no `.did` file can define, since they
+/// contain a space.
+fn did(v: &Value) -> Result<Outcome> {
+    // Every file goes under `root/`, its path normalized as the spec normalizes it, so
+    // that a vector may name a file above `root/` but never one outside the directory.
+    let escapes = |path: &str| format!("a vector's file escapes its directory: {path:?}");
+    let mut staged: BTreeMap<String, &str> = BTreeMap::new();
+    let main = staged_path("root", "main.did").ok_or_else(|| escapes("main.did"))?;
+    staged.insert(main.clone(), string(&v["text"])?);
+    if let Some(files) = v.get("files") {
+        for f in array(files)? {
+            let (path, text) = pair(f)?;
+            let path = string(path)?;
+            let at = staged_path("root", path).ok_or_else(|| escapes(path))?;
+            staged.insert(at, string(text)?);
+        }
+    }
+    // `check_file` follows imports wherever they lead, and the model reads only the
+    // vector's files. An import of anything else is a file that is not there, which
+    // 0.10 rejects, so that is the answer, without letting the host's files decide it.
+    // Parsing can panic in 0.10, as reading can, and is a disagreement in the same way.
+    let outside = std::panic::catch_unwind(|| import_outside(&staged, &main));
+    let Ok(outside) = outside else {
+        return Ok(Outcome::Disagree("panicked".to_string()));
+    };
+    if let Some(outside) = outside {
+        let detail = format!("rejected (imports {outside:?}, not among the vector's files)");
+        return Ok(match &v["expect"] {
+            Value::String(s) if s == "reject" => Outcome::Agree,
+            _ => Outcome::Disagree(detail),
+        });
+    }
+    let dir = scratch_dir()?;
+    for (path, text) in &staged {
+        let path = dir.join(path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(path, text).map_err(|e| e.to_string())?;
+    }
+    let main = dir.join(main);
+    let read = std::panic::catch_unwind(|| {
+        let (env, actor, _) = check_file(&main).map_err(|e| e.to_string())?;
+        Ok::<_, String>((env, actor))
+    });
+    let _ = std::fs::remove_dir_all(&dir);
+    let got = match read {
+        Ok(got) => got,
+        Err(_) => return Ok(Outcome::Disagree("panicked".to_string())),
+    };
+    let want = match &v["expect"] {
+        Value::String(s) if s == "reject" => None,
+        e => Some(&e["interface"]),
+    };
+    let (mut env, actor, want) = match (got, want) {
+        (Err(_), None) => return Ok(Outcome::Agree),
+        (Err(e), Some(_)) => return Ok(Outcome::Disagree(format!("rejected ({e})"))),
+        (Ok(_), None) => return Ok(Outcome::Disagree("accepted, want reject".to_string())),
+        (Ok((env, actor)), Some(want)) => (env, actor, want),
+    };
+    let prefix = "expected ";
+    let table = serde_json::json!({"table": want["table"], "root": "null"});
+    load(&table, &mut env, prefix)?;
+    let same = |env: &TypeEnv, a: &Type, b: &Type| equal(&mut Gamma::new(), env, a, b).is_ok();
+
+    let got_names: BTreeSet<&str> = env
+        .0
+        .keys()
+        .map(String::as_str)
+        .filter(|n| !n.starts_with(prefix))
+        .collect();
+    let mut want_names = BTreeSet::new();
+    for t in array(&want["types"])? {
+        let (name, s) = pair(t)?;
+        let name = string(name)?;
+        want_names.insert(name);
+        if got_names.contains(name) {
+            let ty: Type = TypeInner::Var(name.to_string()).into();
+            if !same(&env, &ty, &slot(s, prefix)?) {
+                return Ok(Outcome::Disagree(format!(
+                    "{name} is not the expected type"
+                )));
+            }
+        }
+    }
+    if got_names != want_names {
+        return Ok(Outcome::Disagree(format!(
+            "defines {got_names:?}, want {want_names:?}"
+        )));
+    }
+    let service = &want["service"];
+    Ok(match (actor, service.is_null()) {
+        (None, true) => Outcome::Agree,
+        (None, false) => Outcome::Disagree("declares no service, want one".to_string()),
+        (Some(_), true) => Outcome::Disagree("declares a service, want none".to_string()),
+        (Some(actor), false) => {
+            let (init, serv) = match actor.as_ref() {
+                TypeInner::Class(args, serv) => (Some(args.clone()), serv.clone()),
+                _ => (None, actor.clone()),
+            };
+            // `resolve_actor` appends imported methods after the file's own, unsorted,
+            // and `equal` compares methods by position. The interface is a set of
+            // methods, so they are sorted here, as 0.10's parser sorts a written one.
+            let serv = match serv.as_ref() {
+                TypeInner::Service(ms) => {
+                    let mut ms = ms.clone();
+                    ms.sort_by(|(a, _), (b, _)| a.cmp(b));
+                    TypeInner::Service(ms).into()
+                }
+                _ => serv,
+            };
+            let want_init = match &service["init"] {
+                Value::Null => None,
+                ts => Some(
+                    array(ts)?
+                        .iter()
+                        .map(|s| slot(s, prefix))
+                        .collect::<Result<Vec<_>>>()?,
+                ),
+            };
+            let inits_agree = match (&init, &want_init) {
+                (None, None) => true,
+                (Some(g), Some(w)) => {
+                    g.len() == w.len() && g.iter().zip(w).all(|(g, w)| same(&env, g, w))
+                }
+                _ => false,
+            };
+            if !inits_agree {
+                Outcome::Disagree("the initialization arguments are not the expected ones".into())
+            } else {
+                agreement(same(&env, &serv, &slot(&service["type"], prefix)?), || {
+                    "the service is not the expected type".to_string()
+                })
+            }
+        }
+    })
+}
+
+/// `path`, relative to the directory `dir` (itself relative to the scratch directory),
+/// normalized as the spec normalizes paths. `None` for an absolute path, or one that
+/// leaves the scratch directory.
+fn staged_path(dir: &str, path: &str) -> Option<String> {
+    if path.starts_with('/') {
+        return None;
+    }
+    let mut segs: Vec<&str> = dir.split('/').filter(|s| !s.is_empty()).collect();
+    for seg in path.split('/') {
+        match seg {
+            "" | "." => {}
+            ".." => {
+                segs.pop()?;
+            }
+            seg => segs.push(seg),
+        }
+    }
+    (!segs.is_empty()).then(|| segs.join("/"))
+}
+
+/// An import reachable from `main`, the staged description being read, that names a
+/// file not staged. Each staged file is visited once; one that does not parse imports
+/// nothing here, and `check_file` rejects it.
+fn import_outside(staged: &BTreeMap<String, &str>, main: &str) -> Option<String> {
+    let mut seen = BTreeSet::new();
+    let mut todo = vec![main.to_string()];
+    while let Some(path) = todo.pop() {
+        if !seen.insert(path.clone()) {
+            continue;
+        }
+        let Ok(prog) = staged[&path].parse::<IDLProg>() else {
+            continue;
+        };
+        let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
+        for dec in &prog.decs {
+            if let Dec::ImportType(f) | Dec::ImportServ(f) = dec {
+                match staged_path(dir, f).filter(|p| staged.contains_key(p)) {
+                    Some(p) => todo.push(p),
+                    None => return Some(f.clone()),
+                }
+            }
+        }
+    }
+    None
+}
+
+/// A new, empty directory for one vector's files.
+fn scratch_dir() -> Result<std::path::PathBuf> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+    let dir = std::env::temp_dir().join(format!(
+        "candid-conformance-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
 }
 
 /// Compare values that 0.10 produced, or its error, with a vector's `expect`.

@@ -36,9 +36,9 @@ through `T`, this format by construction rules out non-well-founded definitions 
 
 The price is that a type means nothing without its table, and even `vec nat` needs an
 entry. `intern`/`close` below build tables for hand-written types. The surface `.did`
-syntax is nested, so the parser will produce a nested AST and flatten it here; that
-flattening is also what an encoder does, so it is a component this model needs rather
-than a translation it pays for.
+syntax is nested, so the parser produces a nested AST and `Candid/Text/Flatten.lean`
+flattens it into a table; that flattening is also what an encoder does, so it is a
+component this model needs rather than a translation it pays for.
 
 On the name: the implementation in `rust/` calls this a `TypeEnv`, but that `TypeEnv`
 is a `BTreeMap<String, Type>` (`rust/candid/src/types/type_env.rs:7`) -- a *name*-keyed
@@ -69,6 +69,12 @@ inductive Prim where
 inductive FuncAnnot where
   | query | oneway | compositeQuery
   deriving DecidableEq, Repr
+
+/-- A mode says how a function is called: an update call if it has none. A function has
+at most one (`lean/Spec/Did.md`, Section 6.3). Every annotation defined so far is a mode;
+one added later need not be. -/
+def FuncAnnot.isMode : FuncAnnot → Bool
+  | .query | .oneway | .compositeQuery => true
 
 /-- A `<datatype>` in the position where the wire format writes `I`: a primitive, or
 an index into the accompanying `TypeTable`.
@@ -155,9 +161,12 @@ def Composite.labelsOk : Composite → Bool
   | .service ms => noDups (ms.map (·.1))
   | .opt _ | .vec _ | .func _ _ _ | .future _ _ => true
 
-/-- `spec/Candid.md:211`: "The result list of a `oneway` function must be empty." -/
+/-- No annotation repeats, a function has at most one mode (`lean/Spec/Did.md`,
+Section 6.3), and `spec/Candid.md:211`: "The result list of a `oneway` function must be
+empty." -/
 def Composite.annotsOk : Composite → Bool
-  | .func _ rets ann => !ann.contains .oneway || rets.isEmpty
+  | .func _ rets ann =>
+    noDups ann && (ann.filter (·.isMode)).length ≤ 1 && (!ann.contains .oneway || rets.isEmpty)
   | .opt _ | .vec _ | .record _ | .variant _ | .service _ | .future _ _ => true
 
 /-- `spec/Candid.md:209`: parameter and result lists are shorter than 2^32. -/

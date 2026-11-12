@@ -17,4 +17,8 @@ import Candid.Principal
 import Candid.Float
 import Candid.Text.Lex
 import Candid.Text.Parse
+import Candid.Text.Flatten
 import Candid.Text.Elab
+import Candid.Did.Parse
+import Candid.Did.Import
+import Candid.Did.Check

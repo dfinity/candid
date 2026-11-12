@@ -23,7 +23,7 @@ open Oracle
 
 /-- The vector files, by name. -/
 def files : List (String × List Vector) :=
-  [ ("handwritten.json", handwritten ++ textChecks)
+  [ ("handwritten.json", handwritten ++ textChecks ++ didChecks)
   , ("subtype-primitives.json", Generate.primitives)
   , ("subtype-small.json", Generate.smallTypes)
   , ("coerce-small.json", Generate.coercions)
@@ -83,7 +83,7 @@ def selfTest : IO UInt32 := do
       problems := problems + 1
   -- Hand-written vectors are listed one by one: their names are the documentation.
   -- Generated ones only fail if the JSON or the generator is broken, so a count will do.
-  problems := problems + (← checkAll (handwritten ++ textChecks) true)
+  problems := problems + (← checkAll (handwritten ++ textChecks ++ didChecks) true)
   for (name, vs) in files.drop 1 do
     problems := problems + (← checkAll vs false)
     IO.println s!"ok    {vs.length} vectors in {name}"

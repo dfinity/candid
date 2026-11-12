@@ -188,9 +188,8 @@ def funcChecks : List Vector :=
       "annotations must agree"
   , expectSub (entry (.func [] [] [.query])) (entry (.func [] [] [.query])) true
       "matching annotations agree"
-  , expectSub (entry (.func [] [] [.query, .compositeQuery]))
-      (entry (.func [] [] [.compositeQuery, .query])) true
-      "annotations agree up to reordering" ]
+  , expectSub (entry (.func [] [] [.query])) (entry (.func [] [] [.compositeQuery])) false
+      "query and composite_query are different annotations" ]
 
 /-! ## Services
 
@@ -235,6 +234,10 @@ def wellFormedChecks : List Vector :=
   , expectWellFormed onewayWithoutResult true "oneway without results is well formed"
   , expectWellFormed (entry (.func [] [nat] [.query])) true
       "query with a result is well formed"
+  , expectWellFormed (entry (.func [] [] [.query, .compositeQuery])) false
+      "a function with two modes is malformed"
+  , expectWellFormed (entry (.func [] [] [.query, .query])) false
+      "a function with an annotation repeated is malformed"
   , expectWellFormed serviceWithPrimMethod false
       "service method that is a primitive is malformed"
   , expectWellFormed serviceWithVecMethod false
@@ -811,8 +814,10 @@ def decodeTableChecks : List Vector :=
       "decode: table index 64 written as LEB128 is opcode -64"
   , expectDecode "4449444c 01 6a 00 00 01 04 00" (prims []) none
       "decode: unknown function annotation"
-  , expectDecode "4449444c 01 6a 00 00 02 01 02 00" (prims []) (some [])
-      "decode: a function type with two annotations"
+  , expectDecode "4449444c 01 6a 00 00 02 01 02 00" (prims []) none
+      "decode: a function type with two modes"
+  , expectDecode "4449444c 01 6a 00 00 02 01 01 00" (prims []) none
+      "decode: a function type with an annotation repeated"
   , expectDecode "4449444c 01 6a 00 01 7d 01 02 00" (prims []) none
       "decode: oneway function with a result"
   , expectDecode "4449444c 01 69 01 01 6d 7d 00" (prims []) none

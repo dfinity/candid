@@ -1,8 +1,8 @@
 # `lean/` — Lean 4 reference model and specification
 
-**Status: sixth slice.** Types, the field-id hash, subtyping — as both a relation and a
-decision procedure — values with coercion, the binary format in both directions, and
-textual values, with an executable that writes them out
+**Status: seventh slice.** Types, the field-id hash, subtyping — as both a relation and a
+decision procedure — values with coercion, the binary format in both directions,
+textual values, and `.did` descriptions, with an executable that writes them out
 as conformance vectors, reads them back, and is checked against `candid` 0.10 in CI. It
 is also held to every assertion of [test/](../test/). "Slice" is a label for
 what landed in a merge window, applied after the fact; the forward-looking plan is the
@@ -349,6 +349,45 @@ are panics in 0.10.
 written, and `flatten` interns it into a table, which is half of the `.did` work below.
 Names are kept in the syntax but resolve in an empty environment, so a name is rejected.
 
+## What slice 7 established
+
+**Descriptions, specified first.** [Spec/Did.md](Spec/Did.md) is the second section of
+the new specification. It defines the syntax of types, which
+[Spec/TextValues.md](Spec/TextValues.md) used to leave to `spec/Candid.md`, and of
+descriptions: imports and definitions, then a service or a service constructor. A description
+means an **interface**: the type of every name, and the service's type and
+initialization arguments. [Candid/Did/](Candid/Did/) implements it, and the `did`
+vectors in `handwritten.json` follow the document section by section.
+
+**Names become a table.** A definition whose right-hand side is a composite owns one
+entry of the table, reserved before anything is flattened, so a recursive definition
+becomes a cycle in the table. A definition that is another name or a primitive owns
+nothing, and its name denotes whatever the chain reaches. Flattening
+([Candid/Text/Flatten.lean](Candid/Text/Flatten.lean)) is the annotations' flattener,
+now given an environment. Well-formedness is the table's own check, so every definition
+is checked, used or not, as the document requires.
+
+**An interface is compared up to equivalence.** A `did` vector's expected table need not
+be the model's, or an implementation's: each name, argument and service is compared
+with `decEquiv`, and the runner uses 0.10's `subtype::equal`. Two names for one
+recursive type can be written as one entry, as the hand-written vectors do.
+
+**Decided along the way.** A function type has at most one mode, and no annotation
+twice: a well-formedness rule, so it holds for types decoded from the wire too, where
+the model used to accept `query oneway`. The grammar still takes a list, so that a
+future annotation that is not a mode can combine with one, and annotation names are
+identifiers, not keywords, so that adding one breaks no existing name. A definition may not bind a primitive type's name, which 0.10
+accepts and then can never use. Each is in the document's Appendix A.
+
+**Imports expand into one description.** A description and everything it imports
+become one description without imports, which is then checked as any other
+([Candid/Did/Import.lean](Candid/Did/Import.lean)). Imports resolve relative to the
+importing description, with `.` and `..` removed. Cycles are rejected, names are one
+namespace and are visible through indirect imports, and every description must be
+self-contained. Methods come from `import service` alone, so a plain import never adds
+any. A `did` vector carries the descriptions its text imports, and the runner writes
+them to disk for 0.10's `check_file`.
+
 ## Constraints
 
 - **No mathlib.** We do not need it, and depending on it would dominate build
@@ -382,6 +421,8 @@ cover what actually breaks in production:
       `test/spacebomb.test.did`, from one it answers
 - [x] Textual value syntax — lexing, parsing and elaboration at a type, after
       [Spec/TextValues.md](Spec/TextValues.md)
+- [x] `.did` descriptions — the type syntax, definitions, services and imports, after
+      [Spec/Did.md](Spec/Did.md)
 
 ## Deferred, deliberately
 
@@ -405,10 +446,13 @@ Named here so they are obligations rather than oversights.
   depth costs no stack. A hash set would make this linear in the pairs compared; the
   reference model keeps lists, which the termination measure is stated over, until a
   conformance vector makes that a problem.
-- **`.did` files.** Type expressions are parsed and flattened
-  ([Candid/Text/](Candid/Text/)), but without names: definitions (`type A = B;`), which
-  may be recursive, need an environment that `flatten` resolves names in, and the
-  service and import syntax of a whole file are not parsed.
+- **`candid_parser`'s `.did` test files as vectors.** `rust/candid_parser/tests/assets`
+  holds about thirty descriptions, with the rejections in `ok/*.fail`. Translating them,
+  as `conformance/tools/test-did` translates `test/`, would hold the model to
+  descriptions written for 0.10 rather than for the document.
+- **Names in annotations.** A textual value is read with an empty environment, so a type
+  name in an annotation is rejected. Reading text against a description's interface
+  would let it resolve.
 - **Encoding vectors.** An encoding vector is a value and a type, and the check is that
   an implementation's bytes decode to an *equivalent* type and the same value.
   Equivalence is written now ([Candid/Equiv.lean](Candid/Equiv.lean)); the vectors are not.
