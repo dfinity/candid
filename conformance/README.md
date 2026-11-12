@@ -223,7 +223,9 @@ own test runner reads text: `candid_parser::parse_idl_args`, then
 `IDLArgs::annotate_types` with the parser's rules (`from_parser`). A panic is a
 disagreement. A `did` vector is written to a directory of its own, the text as
 `main.did` beside its `files`, and read with `candid_parser::check_file`, so imports
-resolve as they would on disk. The interface is compared with 0.10's `subtype::equal`,
+resolve as they would on disk. An import of a file the vector does not hold is
+answered as a rejection without reading the disk, so a host's own files never decide a
+vector. The interface is compared with 0.10's `subtype::equal`,
 with the expected table in the same environment under names no description can define. Where 0.10
 cannot represent an expected value,
 that is reported as a disagreement rather than a broken vector: the question translated,

@@ -21,6 +21,7 @@ use candid::types::subtype::{equal, subtype_with_config, Gamma, OptReport};
 use candid::types::value::{IDLField, VariantValue};
 use candid::types::{Field, FuncMode, Function, Label, Type, TypeEnv, TypeInner};
 use candid::{DecoderConfig, IDLArgs, IDLValue, Principal};
+use candid_parser::syntax::{Dec, IDLProg};
 use candid_parser::typing::check_file;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -406,44 +407,45 @@ fn parse(v: &Value) -> Result<Outcome> {
 
 /// Read the text as a `.did` file, as `candid_parser::check_file` does: the text is
 /// written to `root/main.did` in a directory of its own, and the vector's `files`
-/// relative to `root/`, so that imports resolve as they would on disk. The interface is compared with the
+/// relative to `root/`, so that imports resolve as they would on disk. No import may
+/// reach a file the vector does not hold (`import_outside`). The interface is compared with the
 /// expected one. Types are compared with 0.10's own `equal`, with the expected table
 /// loaded into the same environment under names no `.did` file can define, since they
 /// contain a space.
 fn did(v: &Value) -> Result<Outcome> {
-    let dir = scratch_dir()?;
     // Every file goes under `root/`, its path normalized as the spec normalizes it, so
-    // that a vector may name a file above `root/` but never one outside `dir`.
-    let write = |path: &str, text: &str| {
-        let mut segs = vec!["root"];
-        for seg in path.split('/') {
-            match seg {
-                "" | "." => {}
-                ".." => {
-                    if segs.pop().is_none() {
-                        return Err(format!("a vector's file escapes its directory: {path:?}"));
-                    }
-                }
-                seg => segs.push(seg),
-            }
-        }
-        if path.starts_with('/') || segs.is_empty() {
-            return Err(format!("a vector's file escapes its directory: {path:?}"));
-        }
-        let path = dir.join(segs.join("/"));
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        std::fs::write(path, text).map_err(|e| e.to_string())
-    };
-    write("main.did", string(&v["text"])?)?;
+    // that a vector may name a file above `root/` but never one outside the directory.
+    let escapes = |path: &str| format!("a vector's file escapes its directory: {path:?}");
+    let mut staged: BTreeMap<String, &str> = BTreeMap::new();
+    let main = staged_path("root", "main.did").ok_or_else(|| escapes("main.did"))?;
+    staged.insert(main.clone(), string(&v["text"])?);
     if let Some(files) = v.get("files") {
         for f in array(files)? {
             let (path, text) = pair(f)?;
-            write(string(path)?, string(text)?)?;
+            let path = string(path)?;
+            let at = staged_path("root", path).ok_or_else(|| escapes(path))?;
+            staged.insert(at, string(text)?);
         }
     }
-    let main = dir.join("root/main.did");
+    // `check_file` follows imports wherever they lead, and the model reads only the
+    // vector's files. An import of anything else is a file that is not there, which
+    // 0.10 rejects, so that is the answer, without letting the host's files decide it.
+    if let Some(outside) = import_outside(&staged) {
+        let detail = format!("rejected (imports {outside:?}, not among the vector's files)");
+        return Ok(match &v["expect"] {
+            Value::String(s) if s == "reject" => Outcome::Agree,
+            _ => Outcome::Disagree(detail),
+        });
+    }
+    let dir = scratch_dir()?;
+    for (path, text) in &staged {
+        let path = dir.join(path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(path, text).map_err(|e| e.to_string())?;
+    }
+    let main = dir.join(main);
     let read = std::panic::catch_unwind(|| {
         let (env, actor, _) = check_file(&main).map_err(|e| e.to_string())?;
         Ok::<_, String>((env, actor))
@@ -539,6 +541,44 @@ fn did(v: &Value) -> Result<Outcome> {
             }
         }
     })
+}
+
+/// `path`, relative to the directory `dir` (itself relative to the scratch directory),
+/// normalized as the spec normalizes paths. `None` for an absolute path, or one that
+/// leaves the scratch directory.
+fn staged_path(dir: &str, path: &str) -> Option<String> {
+    if path.starts_with('/') {
+        return None;
+    }
+    let mut segs: Vec<&str> = dir.split('/').filter(|s| !s.is_empty()).collect();
+    for seg in path.split('/') {
+        match seg {
+            "" | "." => {}
+            ".." => {
+                segs.pop()?;
+            }
+            seg => segs.push(seg),
+        }
+    }
+    (!segs.is_empty()).then(|| segs.join("/"))
+}
+
+/// An import, in any staged file that parses, that names a file not staged.
+fn import_outside(staged: &BTreeMap<String, &str>) -> Option<String> {
+    for (path, text) in staged {
+        let Ok(prog) = text.parse::<IDLProg>() else {
+            continue;
+        };
+        let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
+        for dec in &prog.decs {
+            if let Dec::ImportType(f) | Dec::ImportServ(f) = dec {
+                if staged_path(dir, f).is_none_or(|p| !staged.contains_key(&p)) {
+                    return Some(f.clone());
+                }
+            }
+        }
+    }
+    None
 }
 
 /// A new, empty directory for one vector's files.
