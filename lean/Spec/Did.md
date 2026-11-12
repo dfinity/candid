@@ -489,7 +489,11 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
   Imports are relative to the importing description, as in 0.10; names are visible
   through indirect imports, as in 0.10; a name defined twice is rejected, as in 0.10;
   and import cycles are rejected, as 0.10 does, with a misleading error about a
-  duplicate binding. That an imported description cannot use the importer's names is
+  duplicate binding.
+- Names are not qualified by the description that defines them, and will not be: an
+  import is a simple way to reuse definitions, not a module system. Candid types are
+  structural, so a name is only a label, and a clash between two imported descriptions
+  is resolved by defining the type again under another name, which is the same type. That an imported description cannot use the importer's names is
   [CANDID]'s rule, which 0.10 does not check.
 
 ### A.2. Different from candid 0.10
@@ -512,10 +516,6 @@ because the definition could never be used.
 
 ### A.3. Open Issues
 
-- **Qualified names.** All descriptions in an import graph share one namespace, so two
-  libraries that define the same name cannot be imported together. Names qualified by
-  the import, as Thrift and Cap'n Proto have, would solve that, but would change the
-  names that bindings are generated from. They could be added later as new syntax.
 - **Unknown annotations in binary data.** A decoder that meets an annotation byte it
   does not know rejects the whole message, even if the function type is only in a part
   it would skip, so adding an annotation breaks every older decoder that sees one. A
