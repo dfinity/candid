@@ -39,8 +39,8 @@ This document defines:
 The following are out of scope:
 
 - **The syntax of types.** Annotations ([Section 4.1](#41-grammar)) contain types written
-  in the type syntax of [CANDID]. This document refers to that syntax but does not
-  define it.
+  in the type syntax of [DID], Section 4. This document refers to that syntax but does
+  not define it.
 - **Printing.** This document does not say how an implementation prints a value as text.
   It does say which text reads back as a given value, which an implementation that
   prints values can use to check its printer.
@@ -279,7 +279,7 @@ label       = number / name    ; an integer literal without a sign
 name        = identifier / text-literal
 ```
 
-`type` is the type syntax of [CANDID].
+`type` is the type syntax of [DID], Section 4.
 
 A sequence, record or argument list may end with a separator. A variant has exactly
 one field, so `variant {}` and `variant { a; }` are both rejected.
@@ -533,8 +533,11 @@ binary data in [CANDID], and SHOULD bound the following:
 ### 8.1. Normative References
 
 [CANDID]
-: DFINITY, "Candid Specification", [spec/Candid.md](../../spec/Candid.md). For the type
-  syntax, the data model, the field-id hash, and coercion.
+: DFINITY, "Candid Specification", [spec/Candid.md](../../spec/Candid.md). For the data
+  model, the field-id hash, and coercion.
+
+[DID]
+: "Candid Interface Descriptions", [Did.md](Did.md). For the syntax of types.
 
 [IEEE754]
 : IEEE, "IEEE Standard for Floating-Point Arithmetic", IEEE Std 754-2019.
@@ -686,3 +689,4 @@ them, which Rust's rules forbid, even when the check then rejects the literal.
 | `()` | `(opt nat, null)` | `(null, null)` |
 
 [CANDID]: ../../spec/Candid.md
+[DID]: Did.md
