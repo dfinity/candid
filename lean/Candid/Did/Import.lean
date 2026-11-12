@@ -2,21 +2,21 @@
 Imports (`lean/Spec/Did.md`, Section 5.3): a description and those it imports, expanded
 into one description without imports, which `Check.lean` then gives its meaning.
 
-**Locations** are absolute URIs, compared as strings once resolved. An import's
-reference is resolved against the location of the description that contains it by RFC
-3986, Section 5.2: `resolveRef` follows the RFC's algorithm step by step, including its
-removal of `.` and `..` segments, and drops the fragment, which is not part of a
-location. `Files`, the descriptions the environment can fetch, may name them by absolute
-URI or by a path, which is taken relative to `file:///`, as is the description being
-read, at `main.did`.
+**Paths** name descriptions, segments separated by `/`. An import's path is resolved
+against the directory of the description that contains it, and normalized textually
+(`normalize`), so equal files have equal paths. `..` with nothing before it stays in a
+relative path, naming the parent directory. `Files`, the descriptions the environment
+can read, is keyed by path, normalized the same way; the description being read is
+`main.did`.
 
-**Loading** is a depth-first walk from the description being read, carrying the path
-from it. A location on that path is a cycle. One already loaded by another path is not
-read again. The walk records each description after those it imports.
+**Loading** is a depth-first walk from the description being read, carrying the chain
+of imports that led to the current one. A description already in that chain is a cycle.
+One already loaded along another chain is not read again. The walk records each
+description after those it imports.
 
 **Methods** are counted by the description they come from (`provides`): the set of
 descriptions whose own service declarations contribute, reached through `import
-service` edges alone. A description two paths reach is in the set once, so a diamond of
+service` edges alone. A description two chains reach is in the set once, so a diamond of
 `import service` merges its methods once, and a plain `import` never adds to the set.
 -/
 
@@ -26,47 +26,11 @@ namespace Candid.Did
 
 open Candid.Text
 
-/-- The descriptions the environment can fetch, by location. -/
+/-- The descriptions the environment can read, by path. -/
 abbrev Files := List (String × String)
 
-/-- The location of the description being read. -/
+/-- The path of the description being read. -/
 def rootLocation : String := "main.did"
-
-/-- A URI reference split into its five components, by the regular expression of RFC
-3986, Appendix B. An absent component is `none`, which differs from an empty one. -/
-structure UriRef where
-  scheme : Option String
-  authority : Option String
-  path : String
-  query : Option String
-  fragment : Option String
-
-/-- Split `s` at the first character in `stops`: the part before it, and the rest from
-it on. -/
-def splitAtAny (s : String) (stops : List Char) : String × String :=
-  let cs := s.toList
-  let before := cs.takeWhile (!stops.contains ·)
-  (String.ofList before, String.ofList (cs.drop before.length))
-
-def UriRef.parse (s : String) : UriRef :=
-  -- `scheme ":"`, if the text before the first of `:/?#` is nonempty and ends at `:`.
-  let (pre, rest) := splitAtAny s [':', '/', '?', '#']
-  let (scheme, s) :=
-    if !pre.isEmpty && rest.startsWith ":" then (some pre, (rest.drop 1).toString) else (none, s)
-  -- `"//" authority`, up to the first of `/?#`.
-  let (authority, s) :=
-    if s.startsWith "//" then
-      let (a, r) := splitAtAny (s.drop 2).toString ['/', '?', '#']
-      (some a, r)
-    else (none, s)
-  let (path, s) := splitAtAny s ['?', '#']
-  let (query, s) :=
-    if s.startsWith "?" then
-      let (q, r) := splitAtAny (s.drop 1).toString ['#']
-      (some q, r)
-    else (none, s)
-  let fragment := if s.startsWith "#" then some (s.drop 1).toString else none
-  { scheme, authority, path, query, fragment }
 
 /-- The text before the last `/`, if there is one. -/
 def beforeLastSlash (s : String) : Option String :=
@@ -74,65 +38,32 @@ def beforeLastSlash (s : String) : Option String :=
   | [] => none
   | _ :: rest => some (String.ofList rest.reverse)
 
-/-- Remove the last segment of `out`, and the `/` before it: RFC 3986, Section 5.2.4,
-step 2C. -/
-def dropLastSegment (out : String) : String := (beforeLastSlash out).getD ""
+/-- Remove `.` and empty segments, and let `..` remove the segment before it, unless that
+is `..` too. With nothing before it, `..` stays in a relative path and is dropped from an
+absolute one. -/
+def normalizeSegments (absolute : Bool) (segs : List String) : List String :=
+  (segs.foldl (fun acc s =>
+    if s == "." || s.isEmpty then acc
+    else if s == ".." then
+      match acc with
+      | top :: rest => if top == ".." then s :: acc else rest
+      | [] => if absolute then [] else [s]
+    else s :: acc) []).reverse
 
-/-- RFC 3986, Section 5.2.4, `remove_dot_segments`, step by step. Every step shortens
-the input, so its length is enough fuel. -/
-def removeDotSegments (input : String) : String :=
-  go input.length input ""
-where
-  go : Nat → String → String → String
-  | 0, _, out => out
-  | n + 1, inp, out =>
-    if inp.isEmpty then out
-    else if inp.startsWith "../" then go n (inp.drop 3).toString out
-    else if inp.startsWith "./" then go n (inp.drop 2).toString out
-    else if inp.startsWith "/./" then go n ("/" ++ (inp.drop 3).toString) out
-    else if inp == "/." then go n "/" out
-    else if inp.startsWith "/../" then go n ("/" ++ (inp.drop 4).toString) (dropLastSegment out)
-    else if inp == "/.." then go n "/" (dropLastSegment out)
-    else if inp == "." || inp == ".." then out
-    else
-      -- Move the first segment, with its leading `/` if any, to the output.
-      let lead := if inp.startsWith "/" then "/" else ""
-      let (seg, rest) := splitAtAny (inp.drop lead.length).toString ['/']
-      go n rest (out ++ lead ++ seg)
+/-- A path in normal form (`lean/Spec/Did.md`, Section 5.3). -/
+def normalize (p : String) : String :=
+  let absolute := p.startsWith "/"
+  let body := "/".intercalate (normalizeSegments absolute (p.splitOn "/"))
+  if absolute then "/" ++ body else body
 
-/-- RFC 3986, Section 5.2.3: merge a relative path with the base's. -/
-def mergePaths (base : UriRef) (path : String) : String :=
-  if base.authority.isSome && base.path.isEmpty then "/" ++ path
-  else match beforeLastSlash base.path with
-    | some dir => dir ++ "/" ++ path
-    | none => path
-
-/-- RFC 3986, Section 5.3, without the fragment. -/
-def UriRef.recompose (u : UriRef) : String :=
-  (u.scheme.map (· ++ ":")).getD "" ++ (u.authority.map ("//" ++ ·)).getD "" ++ u.path ++
-    (u.query.map ("?" ++ ·)).getD ""
-
-/-- RFC 3986, Section 5.2.2: the location `ref` denotes, written in the description at
-the location `base`, an absolute URI. The fragment is dropped. -/
-def resolveRef (base ref : String) : String :=
-  let b := UriRef.parse base
-  let r := UriRef.parse ref
-  let t : UriRef :=
-    if r.scheme.isSome then { r with path := removeDotSegments r.path }
-    else if r.authority.isSome then
-      { r with scheme := b.scheme, path := removeDotSegments r.path }
-    else if r.path.isEmpty then
-      { b with query := if r.query.isSome then r.query else b.query }
-    else if r.path.startsWith "/" then
-      { b with path := removeDotSegments r.path, query := r.query }
-    else
-      { b with path := removeDotSegments (mergePaths b r.path), query := r.query }
-  t.recompose
-
-/-- A location as `Files` may write it: an absolute URI as it is, and a path relative to
-`file:///`. -/
-def absolute (loc : String) : String :=
-  if (UriRef.parse loc).scheme.isSome then loc else resolveRef "file:///" loc
+/-- The path an import `ref` names, in the description at the normalized path `base`. -/
+def resolvePath (base ref : String) : Except String String := do
+  if ref.isEmpty then throw "an empty import names no file"
+  if ref.startsWith "/" then return normalize ref
+  let dir := match beforeLastSlash base with
+    | some d => d ++ "/"
+    | none => ""
+  return normalize (dir ++ ref)
 
 mutual
 
@@ -166,36 +97,36 @@ def Desc.names (d : Desc) : List String :=
     | none => []
     | some s => listNames (s.init.getD []) ++ typeNames s.service
 
-/-- A description as loaded: its location, its parse, and the locations of its imports,
+/-- A description as loaded: its path, its parse, and the paths of its imports,
 resolved, with whether each is `import service`. -/
 structure Loaded where
   loc : String
   desc : Desc
   imports : List (Bool × String)
 
-def Loaded.importsResolved (loc : String) (d : Desc) : List (Bool × String) :=
-  d.imports.map fun i => (i.service, resolveRef loc i.ref)
+def Loaded.importsResolved (loc : String) (d : Desc) : Except String (List (Bool × String)) :=
+  d.imports.mapM fun i => return (i.service, ← resolvePath loc i.ref)
 
 /-- Load `loc` and everything it imports into `done`, each after its imports. `path` is
 the chain of imports from the description being read to `loc`. The fuel is the number of
-descriptions the environment has: a path longer than that repeats a location, which the
-cycle check rejects first. -/
+descriptions the environment has: a chain longer than that repeats a description, which
+the cycle check rejects first. -/
 def load (files : Files) : Nat → List String → List Loaded → String → Except String (List Loaded)
   | 0, _, _, loc => throw s!"unreachable: the import graph ran out of fuel at {loc}"
   | n + 1, path, done, loc => do
     if path.contains loc then throw s!"an import cycle through {loc}"
     if done.any (·.loc == loc) then return done
-    let some text := files.lookup loc | throw s!"cannot fetch {loc}"
+    let some text := files.lookup loc | throw s!"cannot read {loc}"
     let d ← parseDesc text
-    let imports := Loaded.importsResolved loc d
+    let imports ← Loaded.importsResolved loc d
     let mut acc := done
     for (_, l) in imports do
       acc ← load files n (loc :: path) acc l
     return acc ++ [{ loc, desc := d, imports }]
 
 /-- The descriptions reachable from `todo` by following `edge`, besides those in `seen`,
-each visited once. Each step either pops a location already seen or marks one seen, so
-the locations plus all their imports are enough fuel. -/
+each visited once. Each step either pops a path already seen or marks one seen, so
+the descriptions plus all their imports are enough fuel. -/
 def reachFrom (all : List Loaded) (edge : Bool → Bool) :
     Nat → List String → List String → List String
   | 0, seen, _ => seen
@@ -224,8 +155,8 @@ def ownMethods (defs : List (String × TypeExpr)) : Nat → TypeExpr →
 
 /-- The expansion of the description at `rootLoc`, given the environment. -/
 def expandAt (files : Files) (rootLoc : String) : Except String Desc := do
-  let files := files.map fun (l, t) => (absolute l, t)
-  let rootLoc := absolute rootLoc
+  let files := files.map fun (l, t) => (normalize l, t)
+  let rootLoc := normalize rootLoc
   let all ← load files (files.length + 1) [] [] rootLoc
   let defs := all.flatMap (·.desc.defs)
   for l in all do

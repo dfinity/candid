@@ -43,9 +43,8 @@ This document defines:
 
 The following are out of scope:
 
-- **Fetching.** How the description at a location is obtained, whether from a file
-  system, over a network or otherwise, is up to the implementation
-  ([Section 5.3](#53-imports)).
+- **File systems.** Where files are, and how an absolute path or a symbolic link
+  resolves, is up to the implementation ([Section 5.3](#53-imports)).
 - **Comments as documentation.** Tools commonly attach a comment that precedes a
   definition, method or field to it as documentation. Comments have no meaning in this
   document.
@@ -258,20 +257,23 @@ the descriptions it imports, becomes one description without imports, its
 **expansion**, and [Section 6](#6-meaning) gives the expansion its meaning. A
 description without imports is its own expansion.
 
-**Locations.** Every description read has a **location**, an absolute URI [RFC3986]
-without a fragment. An import's *r* is a URI reference, and denotes the location
-obtained by resolving it against the location of the description that contains it, by
-[RFC3986], Section 5.2, and removing the fragment, if any. A fragment does not identify
-a description, so `a.did#x` and `a.did` denote the same location.
+**Paths.** Descriptions are files, and an import names one by its **path**, *r*:
+segments separated by `/`. A path that begins with `/` is absolute; any other is
+relative to the directory of the file that contains the import. Every other character,
+including `?` and `#`, is part of a segment. An empty path names no file, and MUST be
+rejected.
 
-For file paths this means an import is relative to the directory of the file that
-contains it, and resolution removes `.` and `..` segments, so `sub/../a.did` and `a.did`
-denote the same location. An absolute URI, such as `https://example.org/a.did`, is
-itself. An empty reference, or one that is only a fragment, denotes the description
-that contains it, so importing it is a cycle. Two imports denote the same description
-exactly when they denote the same location, compared character by character. How the description at a location is fetched is up to the
-implementation. If it cannot be fetched, or is not a description, the description being
-read MUST be rejected.
+Paths are compared after **normalization**, which is textual: a `.` segment and an
+empty one are removed, and a `..` segment removes the segment before it, if that is not
+also `..`. A `..` with nothing before it remains in a relative path, where it names the
+parent directory, and is removed from an absolute one. So `sub/../a.did` and `a.did`
+name the same file, and `../shared/a.did` names a file beside the importer's directory.
+Two imports name the same description exactly when their normalized paths, made
+relative to the same directory, are equal.
+
+Where the file system is, how an absolute path resolves, and whether symbolic links are
+followed are up to the implementation. A file that cannot be read, or is not a
+description, MUST be rejected.
 
 **The import graph.** The descriptions reachable from the one being read, by following
 imports of either kind, are its **imports, direct and indirect**. A description MUST be
@@ -413,8 +415,8 @@ Conformance vectors of kind `did`, each a description and the expected interface
 rejection, are written from the reference model in [lean/](../), whose
 [Candid/Did/](../Candid/Did/) implements this document, and published under
 [conformance/](../../conformance/). A vector with imports carries the descriptions it
-imports, each at an absolute URI or at a path relative to `file:///`; the description
-being read is at `file:///main.did`.
+imports, each at a relative path; the description being read is `main.did`, and every
+path is relative to its directory.
 
 ## 8. Security Considerations
 
@@ -430,11 +432,11 @@ data in [CANDID], and SHOULD bound the following:
 - **Recursion.** An implementation that expands names, rather than sharing them,
   produces a tree of unbounded size from a recursive type. A type MUST be held with its
   recursion intact, as a graph.
-- **Imports.** A description from an untrusted source names the locations it imports.
-  An implementation SHOULD NOT fetch them without the user's consent, and SHOULD bound
-  how many descriptions an import graph may have, and how deep it may be. A description that
-  tools generate from a program, as a service usually publishes about itself, has no
-  imports.
+- **Imports.** A description from an untrusted source names files to read, possibly
+  outside its own directory. An implementation SHOULD bound how many descriptions an
+  import graph may have and how deep it may be, and MAY restrict which directories
+  imports can reach. A description that tools generate from a program, as a service
+  usually publishes about itself, has no imports.
 - **Field ids.** Hash collisions are rejected ([Section 4.2](#42-abstract-syntax)), and
   a description can be crafted to collide. Rejecting it is the required behavior, not a
   failure.
@@ -454,10 +456,6 @@ data in [CANDID], and SHOULD bound the following:
 [RFC2119]
 : Bradner, S., "Key words for use in RFCs to Indicate Requirement Levels", BCP 14,
   RFC 2119, March 1997.
-
-[RFC3986]
-: Berners-Lee, T., Fielding, R., and L. Masinter, "Uniform Resource Identifier (URI):
-  Generic Syntax", STD 66, RFC 3986, January 2005.
 
 [RFC5234]
 : Crocker, D., Ed., and P. Overell, "Augmented BNF for Syntax Specifications: ABNF",
@@ -491,15 +489,16 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
   the parts but not the whole.
 - How imports resolve, and what they include ([Section 5.3](#53-imports)). [CANDID]
   says an import refers to a file "by URL" and includes its definitions "textually".
-  Imports are relative to the importing description, as in 0.10; names are visible
+  Imports are file paths, as in 0.10, which reads them from the file system only;
+  they are relative to the importing description, as in 0.10; names are visible
   through indirect imports, as in 0.10; a name defined twice is rejected, as in 0.10;
   and import cycles are rejected, as 0.10 does, with a misleading error about a
-  duplicate binding.
+  duplicate binding. That an imported description cannot use the importer's names is
+  [CANDID]'s rule, which 0.10 does not check.
 - Names are not qualified by the description that defines them, and will not be: an
   import is a simple way to reuse definitions, not a module system. Candid types are
   structural, so a name is only a label, and a clash between two imported descriptions
-  is resolved by defining the type again under another name, which is the same type. That an imported description cannot use the importer's names is
-  [CANDID]'s rule, which 0.10 does not check.
+  is resolved by defining the type again under another name, which is the same type.
 
 ### A.2. Different from candid 0.10
 
@@ -512,8 +511,6 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
 | `import "mid.did"`, where `mid.did` has `import service "svc.did"` | `svc.did`'s methods join the importer's service | they do not: a plain import contributes no methods |
 | `import service "mid.did"`, where `mid.did` declares no service but has `import service "svc.did"` | rejected: no main service | accepted: `mid.did` provides `svc.did`'s methods |
 | `import "sub/../a.did"; import "a.did"` | `a.did` read twice, so its names are defined twice | one description, read once |
-| `import "a.did#x"; import "a.did"` | `a.did#x` is a file name | one description: a fragment is not part of a location |
-| `import "https://example.org/a.did"` | joined to the importer's directory as a file path | the URI itself; fetching it is up to the implementation |
 | Two merged methods with different names whose field-id hashes collide | rejected | accepted: method names are not hashed |
 
 Each of these is a case that existing descriptions are unlikely to rely on. The lexical

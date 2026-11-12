@@ -98,7 +98,7 @@ def checkDesc (d : Desc) : Except String Interface := do
   return { table, types, service }
 
 /-- The interface of the description `src`, read at `rootLocation` with the environment
-`files` to fetch its imports from, or why it is rejected. -/
+`files` to read its imports from, or why it is rejected. -/
 def checkDescIn (files : Files) (src : String) : Except String Interface :=
   expand ((rootLocation, src) :: files) >>= checkDesc
 

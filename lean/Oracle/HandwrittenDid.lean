@@ -217,16 +217,18 @@ def didImportChecks : List Vector :=
       "an imported description cannot use a name only its importer defines (5.3)"
       (files := [("a.did", "type A = M;")])
   , rejectsDid "import \"\\ff\";" "an import that is not UTF-8 (5.2)"
-  , defines "import \"https://example.test/lib/b.did\"; type T = C;"
-      (return [("T", nat), ("B", nat), ("C", nat)])
-      "an import by absolute URI, and a relative import inside it (5.3)"
-      (files := [("https://example.test/lib/b.did", "import \"c.did\"; type B = C;"),
-                 ("https://example.test/lib/c.did", "type C = nat;")])
-  , defines "import \"a.did#x\"; import \"a.did\";" (return [("A", nat)])
-      "a fragment is not part of a location (5.3)" (files := aNat)
-  , rejectsDid "import \"\"; type M = nat;" "an empty reference denotes the importer itself (5.3)"
-  , rejectsDid "import \"#x\"; type M = nat;"
-      "a reference that is only a fragment denotes the importer itself (5.3)"
+  , defines "import \"lib/b.did\"; type T = S;" (return [("T", nat), ("B", nat), ("S", nat)])
+      "`..` in a path names the importer's parent directory (5.3)"
+      (files := [("lib/b.did", "import \"../shared/s.did\"; type B = S;"),
+                 ("shared/s.did", "type S = nat;")])
+  , defines "import \"../shared/s.did\"; type T = S;" (return [("T", nat), ("S", nat)])
+      "`..` above the directory of the description being read (5.3)"
+      (files := [("../shared/s.did", "type S = nat;")])
+  , defines "import \"a.did#x\";" (return [("A", nat)])
+      "`#` is part of a file name (5.3)" (files := [("a.did#x", "type A = nat;")])
+  , defines "import \"./sub//a.did\"; import \"sub/a.did\";" (return [("A", nat)])
+      "`.` and empty segments are removed (5.3)" (files := [("sub/a.did", "type A = nat;")])
+  , rejectsDid "import \"\"; type M = nat;" "an empty path names no file (5.3)"
   , declares "import service \"a.did\"; service : { m : () -> () }"
       (return ([], none, ← serviceNamed ["m", "n"]))
       "import service merges the imported service's methods (5.3)" (files := aService)

@@ -146,9 +146,9 @@ the format, so it changes in place.
   the initialization arguments of a constructor. The table is well formed. An
   implementation agrees if it defines the same names, and each name, argument and the
   service is the same type as the vector's -- *equivalent*, the same infinite tree --
-  whatever table holds it. The description is at location `file:///main.did`; `files`,
-  present only when it is not empty, holds the descriptions it can import, each with
-  its location, an absolute URI or a path relative to `file:///`, and its text.
+  whatever table holds it. The description is the file `main.did`; `files`, present only
+  when it is not empty, holds the descriptions it can import, each with its path,
+  relative to the directory of `main.did`, and its text.
 
 A `<type>` is `{"table": [<entry>, ...], "root": <slot>}`. A `<slot>` is a primitive's
 name (`"nat"`, `"principal"`, ...) or a table index (`3`). An `<entry>` is a composite,

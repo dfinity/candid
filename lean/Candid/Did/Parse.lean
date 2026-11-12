@@ -20,7 +20,7 @@ structure ServiceDecl where
   service : TypeExpr
   deriving Repr
 
-/-- An import: whether it is `import service`, and the URI reference it names. -/
+/-- An import: whether it is `import service`, and the path it names. -/
 structure Import where
   service : Bool
   ref : String

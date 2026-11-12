@@ -52,15 +52,6 @@ const KNOWN: &[(&str, &str)] = &[
          so `sub/../a.did` and `a.did` are two files, and `sub/` must exist on disk",
     ),
     (
-        "did: an import by absolute URI, and a relative import inside it (5.3)",
-        "0.10 reads imports from the file system only, joining the URI to the \
-         importer's directory as a path",
-    ),
-    (
-        "did: a fragment is not part of a location (5.3)",
-        "0.10 takes `a.did#x` as a file name",
-    ),
-    (
         "did: an import cycle among imported descriptions (5.3)",
         "0.10 reads each imported file once, and accepts a cycle that does not pass \
          through the file being read",
@@ -414,18 +405,30 @@ fn parse(v: &Value) -> Result<Outcome> {
 }
 
 /// Read the text as a `.did` file, as `candid_parser::check_file` does: the text is
-/// written to `main.did` in a directory of its own, beside the vector's `files`, so
-/// that imports resolve as they would on disk. The interface is compared with the
+/// written to `root/main.did` in a directory of its own, and the vector's `files`
+/// relative to `root/`, so that imports resolve as they would on disk. The interface is compared with the
 /// expected one. Types are compared with 0.10's own `equal`, with the expected table
 /// loaded into the same environment under names no `.did` file can define, since they
 /// contain a space.
 fn did(v: &Value) -> Result<Outcome> {
     let dir = scratch_dir()?;
+    // Every file goes under `root/`, its path normalized as the spec normalizes it, so
+    // that a vector may name a file above `root/` but never one outside `dir`.
     let write = |path: &str, text: &str| {
-        if path.starts_with('/') || path.split('/').any(|s| s == "..") {
+        let mut segs = vec!["root"];
+        for seg in path.split('/') {
+            match seg {
+                "" | "." => {}
+                ".." => {
+                    segs.pop();
+                }
+                seg => segs.push(seg),
+            }
+        }
+        if path.starts_with('/') || segs.is_empty() {
             return Err(format!("a vector's file escapes its directory: {path:?}"));
         }
-        let path = dir.join(path);
+        let path = dir.join(segs.join("/"));
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
@@ -435,20 +438,10 @@ fn did(v: &Value) -> Result<Outcome> {
     if let Some(files) = v.get("files") {
         for f in array(files)? {
             let (path, text) = pair(f)?;
-            let path = string(path)?;
-            // A location with a scheme is not on the file system, which is all 0.10
-            // reads imports from, so it is not written there either.
-            if path
-                .split(['/', '?', '#'])
-                .next()
-                .is_some_and(|s| s.contains(':'))
-            {
-                continue;
-            }
-            write(path, string(text)?)?;
+            write(string(path)?, string(text)?)?;
         }
     }
-    let main = dir.join("main.did");
+    let main = dir.join("root/main.did");
     let read = std::panic::catch_unwind(|| {
         let (env, actor, _) = check_file(&main).map_err(|e| e.to_string())?;
         Ok::<_, String>((env, actor))
