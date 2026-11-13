@@ -4,7 +4,12 @@ type A = record {
   "字段名" : nat;
   "字 段 名2" : nat;
 };
-type B = variant { ""; "空的"; "  空的  "; "1⃣\u{fe0f}2⃣\u{fe0f}3⃣\u{fe0f}" };
+type B = variant {
+  "";
+  "空的";
+  "  空的  ";
+  "1\u{20e3}\u{fe0f}2\u{20e3}\u{fe0f}3\u{20e3}\u{fe0f}";
+};
 service : {
   "" : (nat) -> (nat);
   "✈\u{fe0f}  🚗 ⛱\u{fe0f} " : () -> () oneway;
