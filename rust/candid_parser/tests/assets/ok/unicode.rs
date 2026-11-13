@@ -23,7 +23,7 @@ pub enum B {
   _650764729_,
   #[serde(rename="  空的  ")]
   _1036827129_,
-  #[serde(rename="1⃣\u{fe0f}2⃣\u{fe0f}3⃣\u{fe0f}")]
+  #[serde(rename="1\u{20e3}\u{fe0f}2\u{20e3}\u{fe0f}3\u{20e3}\u{fe0f}")]
   _3099250646_,
 }
 

@@ -9,7 +9,7 @@ export const idlFactory = ({ IDL }) => {
     '' : IDL.Null,
     '空的' : IDL.Null,
     '  空的  ' : IDL.Null,
-    '1⃣\u{fe0f}2⃣\u{fe0f}3⃣\u{fe0f}' : IDL.Null,
+    '1\u{20e3}\u{fe0f}2\u{20e3}\u{fe0f}3\u{20e3}\u{fe0f}' : IDL.Null,
   });
   return IDL.Service({
     '' : IDL.Func([IDL.Nat], [IDL.Nat], []),
