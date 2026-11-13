@@ -132,7 +132,13 @@ The primitive types and their values are:
 | `null` | the single value `null` |
 | `reserved` | the single value `null`, whatever was sent ([Section 6.2](#62-reserved-and-primitive-types)) |
 | `empty` | none |
-| `principal` | the identities of services and users, each a sequence of bytes |
+| `principal` | the identities of services and users, each a sequence of at most 29 bytes |
+
+A principal is opaque to Candid: no part of this document looks inside one. The bound
+of 29 bytes is the Internet Computer's [IC-INTERFACE], whose principals Candid
+describes. A decoder MUST reject a longer one, whether it is a `principal` or the
+principal of a reference ([Section 4](#4-values)). How principals are written as text is
+in [TEXT], Appendix A.
 
 A float value is its bit pattern, so `+0.0` and `−0.0` are different values, and so are
 NaNs with different payloads.
@@ -238,7 +244,7 @@ A value *v* **has type** *t*, written `v : t`, as follows:
 - `record{i₁ = v₁; …; iₙ = vₙ} : record{i₁ : t₁; …; iₙ : tₙ}` if `vₖ : tₖ` for each *k*:
   exactly one value for each field of the type;
 - `variant{i = v} : variant{…; i : t; …}` if `v : t`;
-- `principal(p) : principal`, for every sequence of bytes *p*;
+- `principal(p) : principal`, for every principal *p*: a sequence of at most 29 bytes;
 - `service(p) : service{…}`, for every principal *p* and every service type;
 - `func(p, m) : func (…) → (…) A`, for every principal *p*, method name *m* and
   function type;
@@ -460,8 +466,13 @@ difference is always that one is `null` where the other is an option value. For 
 `null` at `opt nat`. Subtyping guarantees that a value can
 be read, not that every path to it reads the same.
 
-**Completeness**, that every successful coercion is justified by subtyping, has no
-precise statement yet.
+**Completeness does not hold.** Subtyping is sound, but it does not relate every pair
+of types for which coercion never fails. `variant{a : nat; b : empty}` is not a subtype
+of `variant{a : nat}`, because rule 9 requires each case of the first in the second.
+Yet no value has case `b`, since `empty` has no values, so every value of the first
+coerces at the second. Such pairs involve a part of a type that no value can occupy.
+Subtyping rejects them, which errs on the safe side: it can refuse an upgrade that would
+have been harmless, never accept one that is not.
 
 ## 8. Conformance
 
@@ -538,6 +549,10 @@ twice, ask it 2⁴¹ questions.
 : Garrigue, J., "Programming with Polymorphic Variants", ML Workshop, 1998. The
   field-id hash is the hash of polymorphic variant tags in OCaml.
 
+[IC-INTERFACE]
+: DFINITY, "The Internet Computer Interface Specification", section "Principals". The
+  origin of the bound on the length of a principal.
+
 [MINICANDID]
 : [coq/MiniCandid.v](../../coq/MiniCandid.v): a formalization of subtyping and coercion
   for a fragment of Candid, with proofs of reflexivity, transitivity and soundness.
@@ -569,24 +584,22 @@ it differs from `candid` 0.10, the Rust implementation.
   reordering.
 - **Transitivity.** [CANDID]'s statement of transitivity concludes `<t> <: <t'>`, a typo
   for `<t> <: <t''>`.
-- **Principals** are sequences of bytes of any length.
+- **Principals** are at most 29 bytes ([Section 3.1](#31-primitive-types)). [CANDID]
+  does not bound them. The Internet Computer and candid 0.10 do, and 0.10 relies on it
+  to hold a principal in a fixed-size array.
 
 ### A.2. Different from candid 0.10
 
-candid 0.10 agrees with every `subtype` and `coerce` vector. One `decode` vector shows a
-difference in the values of a type:
+candid 0.10 agrees with every `subtype` and `coerce` vector, and on the values of every
+type. One `decode` vector shows a difference in well-formedness:
 
 | Input | candid 0.10 | This document |
 |---|---|---|
-| A principal of 30 bytes | rejected: 0.10 bounds a principal at 29 bytes | a value of type `principal` |
-
-The bound is the Internet Computer's ([TEXT], Appendix A). Whether it belongs in Candid
-is open.
+| A `oneway` function type with a result | accepted | rejected ([Section 3.5](#35-well-formedness), item 4) |
 
 ### A.3. Open Issues
 
-- **Completeness** of subtyping has no precise statement ([Section 7](#7-properties-informative)).
-- **The length of a principal**, above.
+None.
 
 ## Appendix B. Examples (Informative)
 
@@ -598,6 +611,7 @@ Values are written without their types where the type is clear from the question
 | `int <: nat` | does not hold |
 | `nat8 <: nat` | does not hold: the fixed-width types are unrelated |
 | `text <: opt nat` | holds, by rule 6 |
+| `variant{a : nat; b : empty} <: variant{a : nat}` | does not hold, though every value of the first coerces at the second ([Section 7](#7-properties-informative)) |
 | `record{a : nat; b : text} <: record{a : int}` | holds: `b` is added |
 | `record{a : nat} <: record{a : nat; c : opt text}` | holds: `c` accepts null |
 | `record{a : nat} <: record{a : nat; c : text}` | does not hold |

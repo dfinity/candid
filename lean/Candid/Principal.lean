@@ -7,8 +7,8 @@ five characters joined by `-`. Text is read by computing that form for the bytes
 encodes and comparing, ignoring ASCII case: any other spelling is rejected, so the
 checksum, the base32 and the dashes are all checked by one comparison.
 
-The length of `p` is not bounded here. The Internet Computer bounds it at 29 bytes, and
-so does `candid` 0.10; see `conformance/README.md`, "Findings".
+Text that encodes more than `maxPrincipalLength` bytes is rejected, since it is the
+text of no principal (`lean/Spec/Types.md`, Section 3.1).
 -/
 
 import Candid.Value
@@ -65,6 +65,7 @@ def principalOfText? (s : String) : Option PrincipalBytes := do
   let all ← unbase32? (String.ofList (s.toList.filter (· != '-')))
   guard (all.length ≥ 4)
   let p := all.drop 4
+  guard (p.length ≤ maxPrincipalLength)
   guard (principalText p == String.ofList (s.toList.map Char.toLower))
   return p
 

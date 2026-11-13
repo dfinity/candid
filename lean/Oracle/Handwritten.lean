@@ -134,6 +134,8 @@ def variantChecks : List Vector :=
       true "variant {a} <: variant {a; b} (tag dropped)"
   , expectSub (entry (variantOf [("a", nat), ("b", text)])) (entry (variantOf [("a", nat)]))
       false "variant {a; b} !<: variant {a} (tag added)"
+  , expectSub (entry (variantOf [("a", nat), ("b", .prim .empty)])) (entry (variantOf [("a", nat)]))
+      false "variant {a; b : empty} !<: variant {a}, though no value has case b (incomplete)"
   , expectSub (entry (variantOf [("a", nat)])) (entry (variantOf [("a", int)])) true
       "variant {a:nat} <: variant {a:int}"
   , expectSub (optVariant [("a", nat), ("b", text)]) (optVariant [("a", nat)]) true
@@ -874,9 +876,15 @@ def decodeRefChecks : List Vector :=
       "decode: opaque principal reference"
   , expectDecode "4449444c 00 01 68 02 01 2a" (prims [principal]) none
       "decode: principal reference flag 2"
+  , expectDecode s!"4449444c 00 01 68 01 1d {String.join (List.replicate 29 "00")}"
+      (prims [principal]) (some [.principal (List.replicate 29 0)])
+      "decode: a principal of 29 bytes"
   , expectDecode s!"4449444c 00 01 68 01 1e {String.join (List.replicate 30 "00")}"
-      (prims [principal]) (some [.principal (List.replicate 30 0)])
+      (prims [principal]) none
       "decode: a principal of 30 bytes"
+  , expectDecode s!"4449444c 01 69 00 01 00 01 1e {String.join (List.replicate 30 "00")}"
+      (typesOf do return [← intern (.service [])]) none
+      "decode: a service reference of 30 bytes"
   , expectDecode "4449444c 01 69 00 01 00 01 01 2a" (typesOf do return [← intern (.service [])])
       (some [.service [0x2a]]) "decode: service reference"
   , expectDecode "4449444c 01 6a 00 00 00 01 00 01 01 01 2a 01 6d" funcT

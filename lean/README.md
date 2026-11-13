@@ -291,7 +291,8 @@ to: skipping a value is where a decoder is most tempted to stop checking it.
 recorded as known divergences rather than fixed in either place: it allows at most one
 function annotation in a decoded type, it accepts a `oneway` function type with results
 from the wire, and it bounds a principal at 29 bytes. The first and third are questions
-about the spec as much as about 0.10.
+about the spec as much as about 0.10. Both were settled in 0.10's favor: one mode
+(slice 7) and 29 bytes (slice 8).
 
 **A fourth property holds over the generated universe**: every sample encodes, and its
 bytes decode to the same value at the same type, in a table equal to the one written up
@@ -408,6 +409,12 @@ included, which is the order a decoder meets them in, and the document says so
 (Section 6.5). The model now computes each field's outcome and reads them in that
 order; six hand-written vectors cover records, missing fields and vectors, and 0.10
 agrees with all of them. No subtyping or coercion vector differs from 0.10.
+
+**Principals are at most 29 bytes.** The spec now bounds them where the Internet
+Computer and 0.10 do, so the last types-level divergence from 0.10 is gone: a decoder
+rejects a longer principal or reference, and text that encodes one is no principal. The
+document also says plainly that subtyping is not complete, with an example, rather than
+leaving completeness as an open issue.
 
 ## Constraints
 

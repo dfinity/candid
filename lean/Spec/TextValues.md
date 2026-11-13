@@ -579,7 +579,7 @@ binary data in [CANDID], and SHOULD bound the following:
 
 ## Appendix A. Textual Form of Principals
 
-A principal is a sequence of bytes *p*. Its **canonical textual form** is computed as
+A principal is a sequence of at most 29 bytes *p* ([TYPES], Section 3.1). Its **canonical textual form** is computed as
 follows:
 
 1. Let *c* be the CRC-32 of *p*, as four bytes, most significant first. CRC-32 is the
@@ -594,8 +594,9 @@ A text denotes the principal *p* if it equals the canonical form of *p*, ignorin
 case of ASCII letters. Any other text MUST be rejected: one that is not base32, whose
 checksum does not match, or whose dashes are not where the canonical form puts them.
 
-This document does not bound the length of *p*. The Internet Computer limits principals
-to 29 bytes [IC-INTERFACE], and an implementation for it MAY reject a longer one.
+A text that would denote a sequence of more than 29 bytes denotes no principal, and
+MUST be rejected. This is the same textual form as the Internet Computer's
+[IC-INTERFACE], so the longest text of a principal is 63 characters.
 
 ## Appendix B. Differences from candid 0.10 (Informative)
 
@@ -646,7 +647,6 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
 | `0x1p4` | rejected | accepted: 16 |
 | A raw tab, line break, other C0 control character or U+007F in a text literal | accepted | rejected |
 | `record { query = 1 }` | rejected: `query` is a keyword | accepted: a field named `query` |
-| A principal of more than 29 bytes | rejected | accepted ([Appendix A](#appendix-a-textual-form-of-principals)) |
 
 `candid_parser` also builds a `String` from bytes that may not be UTF-8 before it checks
 them, which Rust's rules forbid, even when the check then rejects the literal.

@@ -220,6 +220,10 @@ def textMiscChecks : List Vector :=
       [.principal [], .principal []] "a principal's text, in either case (Appendix A)"
   , rejects "(principal \"aaaaaaa\")" (prims [principal]) "a principal's dashes are checked (Appendix A)"
   , rejects "(principal \"aaaaa-ab\")" (prims [principal]) "a principal's checksum is checked (Appendix A)"
+  , accepts "(principal \"bnkmk-jqaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaa\")"
+      (prims [principal]) [.principal (List.replicate 29 0)] "a principal of 29 bytes (Appendix A)"
+  , rejects "(principal \"aacd5-niaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa\")"
+      (prims [principal]) "the text of 30 bytes is no principal (Appendix A)"
   , rejects "(principal \"w7x7r-cok77-xa\")" (oneOf (.service [])) "a principal is not a service (5.7)"
   , accepts "(service \"aaaaa-aa\")" (oneOf (.service [])) [.service []] "a service reference (5.7)"
   , accepts "(func \"aaaaa-aa\".\"mé\")" (oneOf (.func [nat] [] [.query])) [.func [] "mé"]
