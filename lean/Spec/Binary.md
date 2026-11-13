@@ -420,9 +420,10 @@ message must be bounded by something the receiver controls.
   count the values it reads, wherever they are, and stop at a limit, rather than trust
   that a short message is cheap.
 - **Lengths.** A length in a message, of a vector, a blob or a table, can be far larger
-  than the message. A decoder MUST NOT allocate in proportion to a length before it has
-  read what the length promises: a blob longer than the remaining bytes is rejected, and
-  a vector's elements are read one at a time.
+  than the message. A decoder SHOULD NOT allocate in proportion to a length unless it
+  has checked the allocation against its own budget. A blob longer than the remaining
+  bytes is rejected anyway, and reading a vector's elements one at a time costs only
+  what they take.
 - **Nesting.** Each level of an option, vector or variant takes at least a byte, so a
   message of *n* bytes can nest values *n* deep. A recursive decoder SHOULD bound its
   depth. Records nest without bytes, but only as deep as the table has entries, unless
@@ -484,7 +485,7 @@ it differs from `candid` 0.10, the Rust implementation.
   methods in ascending order of name. Here the order is required, strictly, so a
   decoder rejects a repeated field or method. 0.10 agrees.
 - **LEB128 that is not the shortest** is accepted, for every number. [CANDID] does not
-  say. 0.10 agrees, except for the opcode of a table entry (A.2).
+  say. 0.10 agrees for most numbers, with three exceptions (A.2).
 - **Every entry of the table is checked**, whether or not an argument refers to it.
   [CANDID] does not say. 0.10 agrees.
 - **Every value is checked**, including one coercion drops. [CANDID] decodes before it
@@ -501,14 +502,24 @@ it differs from `candid` 0.10, the Rust implementation.
 | Input | candid 0.10 | This document |
 |---|---|---|
 | A `oneway` function type with a result | accepted | rejected ([TYPES], Section 3.5) |
-| A table entry's opcode in more than one byte, such as `ee 7f` for `opt` | rejected | accepted ([Section 3.1](#31-leb128)) |
+| The opcode of `opt`, `vec`, `record`, `variant`, `func` or `service` in more than one byte, such as `ee 7f` for `opt` | rejected | accepted ([Section 3.1](#31-leb128)) |
+| A function's annotation count in more than one byte, such as `80 00` for 0 | rejected | accepted |
+| A length in a value in ten bytes or more, such as nine `80` and then `00` for 0 | rejected | accepted |
 
 The first difference is in well-formedness, which [TYPES] defines; 0.10's decoder does
-not check it. The second is unlikely to matter: no encoder writes an opcode in more than
-one byte. 0.10 matches the six composite opcodes as single bytes, and reads every other
-number, including a type reference, as LEB128 of any length. The conformance vectors
-are `decode: oneway function with a result` and `decode: an entry's opcode with
-redundant continuation bytes`.
+not check it. The other three are where 0.10 reads a number in a narrower way than
+LEB128 of any length:
+
+- it matches the six composite opcodes as single bytes. A future opcode it reads as
+  SLEB128, so −65, `bf 7f`, is a future type to it, as here;
+- it reads a function's annotation count as one byte;
+- it reads a length in a value, of a vector, a blob or text, in at most nine bytes,
+  and rejects a longer form as an overflow, even when the number is small.
+
+No encoder writes these forms, so the differences are unlikely to matter. The
+conformance vectors are `decode: oneway function with a result`, `decode: an entry's
+opcode with redundant continuation bytes`, `decode: an annotation count with redundant
+continuation bytes` and `decode: a vector length of zero in ten bytes`.
 
 ### A.3. Open Issues
 

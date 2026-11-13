@@ -743,6 +743,13 @@ def decodeLebChecks : List Vector :=
       "decode: an entry's opcode with redundant continuation bytes"
   , expectDecode "4449444c 01 6d 7f 01 00 83 80 00" (typesOf do return [← intern (.vec null)])
       (some [.vec [.null, .null, .null]]) "decode: a vector length with redundant continuation bytes"
+  , expectDecode "4449444c 01 6d 7f 01 00 80 80 80 80 80 80 80 80 80 00"
+      (typesOf do return [← intern (.vec null)]) (some [.vec []])
+      "decode: a vector length of zero in ten bytes"
+  , expectDecode "4449444c 01 6a 00 00 80 00 00" (prims []) (some [])
+      "decode: an annotation count with redundant continuation bytes"
+  , expectDecode "4449444c 01 bf 7f 00 00" (prims []) (some [])
+      "decode: a future opcode that takes two bytes"
   , expectDecode "4449444c 00 01 7d 80 80 80 80 80 80 80 80 80 02" (prims [nat])
       (some [.nat 18446744073709551616]) "decode: nat 2^64"
   , expectDecode "4449444c 00 01 7d 85" (prims [nat]) none "decode: nat runs past the end"

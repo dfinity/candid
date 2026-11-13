@@ -264,11 +264,14 @@ What the runners have found, recorded so that they outlive the run that found th
 - **`candid` 0.10 accepts a `oneway` function type with results from the wire.** The
   spec says the result list must be empty, and the model rejects the message. Vector:
   `decode: oneway function with a result`.
-- **`candid` 0.10 reads a table entry's opcode as one byte.** A composite opcode
-  written in more than one byte, such as `ee 7f` for −18, is no type to it, though it
-  reads type references and every other number as LEB128 of any length.
-  [lean/Spec/Binary.md](../lean/Spec/Binary.md) accepts it. Vector: `decode: an
-  entry's opcode with redundant continuation bytes`.
+- **`candid` 0.10 reads some numbers more narrowly than LEB128 of any length.** It
+  matches the six composite opcodes as single bytes, so `ee 7f` for −18 is no type to
+  it; it reads a function's annotation count as one byte; and it rejects a length in a
+  value written in ten bytes or more. Future opcodes, type references and other numbers
+  it reads as LEB128. [lean/Spec/Binary.md](../lean/Spec/Binary.md) accepts all three
+  forms. Vectors: `decode: an entry's opcode with redundant continuation bytes`,
+  `decode: an annotation count with redundant continuation bytes`, `decode: a vector
+  length of zero in ten bytes`.
 - **`candid` 0.10 bounds a principal at 29 bytes**, the Internet Computer's limit.
   [lean/Spec/Types.md](../lean/Spec/Types.md) now does too, so the two agree. Vectors:
   `decode: a principal of 30 bytes`, `decode: a service reference of 30 bytes`.

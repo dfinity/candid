@@ -433,11 +433,13 @@ is silent: no references outside the message, strictly ordered members, every ta
 entry and every value checked, types without values rejected, and LEB128 of any length
 accepted.
 
-**One new divergence from 0.10.** 0.10 reads a table entry's opcode as one fixed byte,
-so `ee 7f`, which is −18 in two bytes, is not `opt` to it, though it reads every other
-number as LEB128 of any length. The document keeps the uniform rule, since no encoder
-writes an opcode in two bytes, and the vector is a known divergence. Four other new
-vectors, on redundant LEB128 and on a type without values at `reserved`, agree.
+**Three new divergences from 0.10, all in how it reads a number.** It matches the six
+composite opcodes as single bytes, so `ee 7f`, which is −18 in two bytes, is not `opt`
+to it; it reads a function's annotation count as one byte; and it rejects a length in
+a value written in ten bytes or more. The document keeps one rule, LEB128 of any
+length, since no encoder writes these forms, and the vectors are known divergences.
+The other new vectors, on redundant LEB128, a two-byte future opcode and a type
+without values at `reserved`, agree.
 
 ## Constraints
 

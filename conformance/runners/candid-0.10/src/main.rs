@@ -40,8 +40,17 @@ const KNOWN: &[(&str, &str)] = &[
     ),
     (
         "decode: an entry's opcode with redundant continuation bytes",
-        "`binary_parser.rs` matches a composite opcode as one fixed byte, so `ee 7f`, \
-         -18 in two bytes, is no type; it reads every other number as LEB128",
+        "`binary_parser.rs` matches the six composite opcodes as single bytes, so `ee 7f`, \
+         -18 in two bytes, is no type; future opcodes it reads as SLEB128",
+    ),
+    (
+        "decode: an annotation count with redundant continuation bytes",
+        "`binary_parser.rs` reads a function's annotation count as one raw byte, not LEB128",
+    ),
+    (
+        "decode: a vector length of zero in ten bytes",
+        "`de.rs` reads a length in at most nine LEB128 bytes, and rejects a longer form as \
+         an overflow even when the number is small",
     ),
     (
         "decode: oneway function with a result",
