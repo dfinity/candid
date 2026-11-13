@@ -223,11 +223,12 @@ def coerceFields (A B : TypeTable) (vs : List (FieldId × Value))
   match gs with
   | [] => pure []
   | (gid, u) :: grest =>
-    let missing : Coercion (List (FieldId × Value)) := do
+    -- A thunk, so that the rest is coerced only for a field that is actually missing.
+    let missing (_ : Unit) : Coercion (List (FieldId × Value)) := do
       unless B.acceptsNull u do failure
       return (gid, .null) :: (← coerceFields A B vs fs grest)
     match vs with
-    | [] => missing
+    | [] => missing ()
     | (id, w) :: rest =>
       if id < gid then coerceFields A B rest fs gs
       else if id == gid then
@@ -236,7 +237,7 @@ def coerceFields (A B : TypeTable) (vs : List (FieldId × Value))
         | some t => do
           let w' ← coerce A B w t u
           return (id, w') :: (← coerceFields A B rest fs grest)
-      else missing
+      else missing ()
 termination_by (sizeOf vs, 2 + gs.length)
 
 end

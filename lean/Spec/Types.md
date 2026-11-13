@@ -112,7 +112,8 @@ the absent value. A receiver does this as part of decoding every message, withou
 consulting the subtype relation, except for function and service references.
 
 The two are connected by **soundness** ([Section 7](#7-properties-informative)): if
-`t <: t'`, every value of type *t* coerces to a value of type *t'*.
+`t <: t'`, coercing a value of type *t* at *t'* never fails. It can be undefined, but
+only at an infinite option such as `type R = opt R`.
 
 ## 3. Types
 
@@ -307,14 +308,16 @@ its clients:
   argument added at the end must accept null.
 - **Services** may gain methods, and a method's type may change as functions may.
 - **Options.** Any type may become optional (rule 6), and any value that does not fit
-  the new option is read as `null` ([Section 6.3](#63-options)). This is what keeps
-  subtyping transitive in the presence of rules 8 and 10. A field removed in one
-  version and re-added at another type in a later one is still a subtype of the field
-  across both changes; a reader that skipped the version in between reads `null`.
+  the new option is read as `null` ([Section 6.3](#63-options)). This is what lets an
+  optional field be removed in one version and re-added at another type in a later
+  one: the field is still a subtype across both changes, and a reader that skipped the
+  version in between reads `null`. A field of type `null` has no such repair, which
+  makes the relation not transitive ([Section 7](#7-properties-informative)).
 
-An implementation that checks upgrades SHOULD warn when only rule 6 relates an option
-to a type that is not `null`, `reserved` or an option, such as `nat <: opt text`: the
-change is allowed, but every value sent at the old type will be read as `null`.
+An implementation that checks upgrades SHOULD warn when `t <: opt t'` holds, *t* does
+not accept null, and `t <: t'` does not hold, such as `nat <: opt text`. The change is
+allowed, but a value sent at the old type may be read as `null`: some of them, as for
+`variant{a; b} <: opt variant{a}`, or all of them, as for `nat <: opt text`.
 
 ### 5.3. Deciding Subtyping (Informative)
 
@@ -445,11 +448,11 @@ rejected either way. Arguments beyond *m* are ignored.
 ## 7. Properties (Informative)
 
 The definitions are designed so that the following hold, for well-formed types. They are
-obligations on the definitions, checked by the reference model on every value and type
-it generates, and to be proved about it:
+obligations on the definitions, to be proved about the reference model. Roundtripping,
+well-typedness and soundness are checked by the model on every value and type it
+generates.
 
 - **Reflexivity.** `t <: t`.
-- **Transitivity.** `t <: t'` and `t' <: t''` imply `t <: t''`.
 - **Roundtripping.** If `v : t`, then `v : t ~> v : t`.
 - **Well-typedness.** If `v : t` and `v : t ~> v' : t'`, then `v' : t'`.
 - **Soundness.** If `t <: t'` and `v : t`, then `C(v : t, t')` does not fail. It can be
@@ -458,13 +461,23 @@ it generates, and to be proved about it:
 - **Equivalence.** If `s ≡ s'` and `t ≡ t'`, then `s <: t` exactly when `s' <: t'`, and
   `C(v : s, t)` and `C(v : s', t')` have the same outcome.
 
+**Transitivity does not hold.** `record{a : nat} <: record{}` by rule 8, since a
+record may lose fields, and `record{} <: record{a : null}` by rule 8, since a field of a
+type that accepts null may be added. But `record{a : nat} <: record{a : null}` does not
+hold, since `nat <: null` does not. The same happens with function parameters and
+results (rule 10). Every other type that accepts null, `reserved` and the options, is a
+supertype of every type, so `null` is the only cause. [CANDID] has the same rules, and
+claims transitivity; candid 0.10 agrees with the rules here. A future version may
+restrict fields and arguments added this way to `reserved` and options
+([Appendix A.3](#a3-open-issues)).
+
 **Coherence does not hold.** Coercing a value at *t'* and then at *t''* can give a
 different value from coercing it at *t''* directly, even when `t <: t' <: t''`. The
 difference is always that one is `null` where the other is an option value. For example,
 `nat <: reserved <: opt nat`: coercing `nat(5)` at `opt nat` directly gives
 `opt(nat(5))`, while coercing it at `reserved` first gives `null`, which then stays
-`null` at `opt nat`. Subtyping guarantees that a value can
-be read, not that every path to it reads the same.
+`null` at `opt nat`. Subtyping guarantees that a value can be read, except at an
+infinite option, not that every path to it reads the same.
 
 **Completeness does not hold.** Subtyping is sound, but it does not relate every pair
 of types for which coercion never fails. `variant{a : nat; b : empty}` is not a subtype
@@ -472,7 +485,7 @@ of `variant{a : nat}`, because rule 9 requires each case of the first in the sec
 Yet no value has case `b`, since `empty` has no values, so every value of the first
 coerces at the second. Such pairs involve a part of a type that no value can occupy.
 Subtyping rejects them, which errs on the safe side: it can refuse an upgrade that would
-have been harmless, never accept one that is not.
+have been harmless, never accept one under which a value fails to coerce.
 
 ## 8. Conformance
 
@@ -582,8 +595,9 @@ it differs from `candid` 0.10, the Rust implementation.
 - **Annotations** are a set, compared as sets by rule 10, and a function has at most one
   mode ([Section 3.5](#35-well-formedness)). [CANDID] identifies annotation lists up to
   reordering.
-- **Transitivity.** [CANDID]'s statement of transitivity concludes `<t> <: <t'>`, a typo
-  for `<t> <: <t''>`.
+- **Transitivity.** [CANDID] claims it, but its rules do not give it, through fields
+  of type `null` ([Section 7](#7-properties-informative)). Here the property is not
+  claimed.
 - **Principals** are at most 29 bytes ([Section 3.1](#31-primitive-types)). [CANDID]
   does not bound them. The Internet Computer and candid 0.10 do, and 0.10 relies on it
   to hold a principal in a fixed-size array.
@@ -599,7 +613,11 @@ type. One `decode` vector shows a difference in well-formedness:
 
 ### A.3. Open Issues
 
-None.
+- **Transitivity through `null`.** Rules 8 and 10 let a field, parameter or result of
+  type `null` be added, which breaks transitivity
+  ([Section 7](#7-properties-informative)). Allowing only `reserved` and options to be
+  added would restore it, at the cost of rejecting `record{} <: record{a : null}`,
+  which candid 0.10 accepts.
 
 ## Appendix B. Examples (Informative)
 
@@ -611,6 +629,8 @@ Values are written without their types where the type is clear from the question
 | `int <: nat` | does not hold |
 | `nat8 <: nat` | does not hold: the fixed-width types are unrelated |
 | `text <: opt nat` | holds, by rule 6 |
+| `record{} <: record{a : null}` | holds, by rule 8 |
+| `record{a : nat} <: record{a : null}` | does not hold, though `record{a : nat} <: record{}` does ([Section 7](#7-properties-informative)) |
 | `variant{a : nat; b : empty} <: variant{a : nat}` | does not hold, though every value of the first coerces at the second ([Section 7](#7-properties-informative)) |
 | `record{a : nat; b : text} <: record{a : int}` | holds: `b` is added |
 | `record{a : nat} <: record{a : nat; c : opt text}` | holds: `c` accepts null |

@@ -416,6 +416,11 @@ rejects a longer principal or reference, and text that encodes one is no princip
 document also says plainly that subtyping is not complete, with an example, rather than
 leaving completeness as an open issue.
 
+**Subtyping is not transitive.** `record{a : nat} <: record{} <: record{a : null}`, but
+`record{a : nat} <: record{a : null}` does not hold. `spec/Candid.md` has the same rules
+and claims transitivity; 0.10 agrees with the rules. The document now states the
+counterexample, and lists restricting added fields to `reserved` and options as open.
+
 ## Constraints
 
 - **No mathlib.** We do not need it, and depending on it would dominate build
