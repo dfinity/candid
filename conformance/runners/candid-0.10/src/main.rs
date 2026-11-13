@@ -39,6 +39,11 @@ const KNOWN: &[(&str, &str)] = &[
         "0.10's lexer makes `query`, `composite_query` and `oneway` keywords everywhere",
     ),
     (
+        "decode: an entry's opcode with redundant continuation bytes",
+        "`binary_parser.rs` matches a composite opcode as one fixed byte, so `ee 7f`, \
+         -18 in two bytes, is no type; it reads every other number as LEB128",
+    ),
+    (
         "decode: oneway function with a result",
         "`binary_parser.rs` does not check a decoded function type, so it accepts a \
          `oneway` function with results; the spec says that result list must be empty",
