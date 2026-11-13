@@ -227,8 +227,10 @@ def TypeTable.encodeValue (T : TypeTable) : Value → Slot → Option (List UInt
       match (sortById fs).findIdx? (·.1 == id), fieldAt fs id with
       | some i, some t => (leb128 i ++ ·) <$> T.encodeValue w t
       | _, _ => none
-    | .service id, some (.service _) => some (encodeId id)
-    | .func id m, some (.func _ _ _) => some (1 :: encodeId id ++ encodeText m)
+    | .service id, some (.service _) =>
+      if id.length ≤ maxPrincipalLength then some (encodeId id) else none
+    | .func id m, some (.func _ _ _) =>
+      if id.length ≤ maxPrincipalLength then some (1 :: encodeId id ++ encodeText m) else none
     -- No bytes and no references: the shortest future value.
     | .null, some (.future _ _) => some [0, 0]
     | _, _ => none

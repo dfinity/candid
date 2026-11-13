@@ -176,14 +176,8 @@ def coerceAt (A B : TypeTable) (v : Value) (t u : Slot) : Coercion Value :=
     -- ignored. Fields only in the expected type must accept `null`, and are `null`.
     -- The expected fields are decided in ascending order of id, and the first that
     -- fails or is undefined decides the record (`lean/Spec/Types.md`, Section 6.5).
-    -- Each present field's outcome is computed first, then read in that order.
-    | .record vs, some (.record fs), some (.record gs) => do
-      let present := coerceFields A B vs fs gs
-      let field (f : FieldId × Slot) : Coercion (FieldId × Value) :=
-        match present.lookup f.1 with
-        | some r => (f.1, ·) <$> OptionT.mk r
-        | none => if B.acceptsNull f.2 then pure (f.1, Value.null) else failure
-      return .record (← (sortFields gs).mapM field)
+    | .record vs, some (.record fs), some (.record gs) =>
+      .record <$> coerceFields A B vs fs (sortFields gs)
 
     -- Only a variant value with an expected tag coerces.
     | .variant id w, some (.variant fs), some (.variant gs) =>
@@ -219,23 +213,31 @@ def coerceAll (A B : TypeTable) (ws : List Value) (t u : Slot) : Coercion (List 
     pure (w' :: rest')
 termination_by (sizeOf ws, 2)
 
-/-- The outcome of coercing each field a value carries that the expected type also
-declares, by id. Fields the expected type does not declare are dropped. Every outcome is
-computed, and the caller reads them in order, so that the first to fail or be undefined
-is the one that decides. -/
+/-- The expected fields `gs`, in ascending order of id, against the value's fields `vs`,
+also in ascending order, as `v : t` requires: one walk over both, which stops at the
+first field that fails or is undefined. A value's field the expected type does not
+declare is dropped, and an expected field the value lacks is `null` if its type accepts
+`null`. -/
 def coerceFields (A B : TypeTable) (vs : List (FieldId × Value))
-    (fs gs : List (FieldId × Slot)) : List (FieldId × Except Undefined (Option Value)) :=
-  match vs with
-  | [] => []
-  | (id, w) :: rest =>
-    let rest' := coerceFields A B rest fs gs
-    match fieldAt gs id with
-    | none => rest'
-    | some u =>
-      match fieldAt fs id with
-      | none => (id, .ok none) :: rest'
-      | some t => (id, (coerce A B w t u).run) :: rest'
-termination_by (sizeOf vs, 2)
+    (fs gs : List (FieldId × Slot)) : Coercion (List (FieldId × Value)) :=
+  match gs with
+  | [] => pure []
+  | (gid, u) :: grest =>
+    let missing : Coercion (List (FieldId × Value)) := do
+      unless B.acceptsNull u do failure
+      return (gid, .null) :: (← coerceFields A B vs fs grest)
+    match vs with
+    | [] => missing
+    | (id, w) :: rest =>
+      if id < gid then coerceFields A B rest fs gs
+      else if id == gid then
+        match fieldAt fs id with
+        | none => failure
+        | some t => do
+          let w' ← coerce A B w t u
+          return (id, w') :: (← coerceFields A B rest fs grest)
+      else missing
+termination_by (sizeOf vs, 2 + gs.length)
 
 end
 
