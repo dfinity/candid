@@ -64,10 +64,10 @@ appear in all capitals, as shown here.
 [TEXT], Section 1.3: terminals denote Unicode scalar values, and quoted strings are
 case-sensitive.
 
-**Types.** Types are those of the Candid data model [CANDID]. A type may be recursive,
+**Types.** Types are those of the Candid data model [TYPES]. A type may be recursive,
 so it is in general an infinite tree, with finitely many distinct subtrees. Two types
-are the same, written `s ≡ t`, when they are the same tree; field, method and
-annotation lists are compared without regard to order. This is the equivalence of [TEXT], Section 5.1.
+are the same, written `s ≡ t`, when they are equivalent ([TYPES], Section 3.4): the same
+tree, with field, method and annotation lists compared without regard to order.
 
 ### 1.4. Terminology
 
@@ -361,21 +361,20 @@ A name and its definition denote the same type, so `type A = B` makes `A` an ali
 
 ### 6.3. Well-formedness
 
-A type is **well-formed** if:
+Well-formedness is defined by [TYPES], Section 3.5. Of its conditions, the parser
+already enforces distinct field ids and method names ([Section 4.2](#42-abstract-syntax)).
+The others are on the denoted type:
 
 1. every method of every service type in it has a function type;
 2. no function type in it has an annotation twice, or more than one **mode**; and
 3. every function type in it annotated `oneway` has no results.
 
 A mode says how a function is called: `query`, `composite_query` or `oneway`, and an
-ordinary update call if it has none. A function is called in one way, so `query oneway`
-is not well-formed. Every annotation defined so far is a mode. One added later need not
-be, and could then combine with a mode: the abstract syntax is a list of annotations
-so that it can. Since no annotation repeats, a well-formed list is a set, and its order
-has no meaning: `func () -> () query` written either way is one type.
-
-These rules are about types, wherever they come from. A type decoded from binary data
-is subject to them too.
+ordinary update call if it has none ([TYPES], Section 3.2). So `query oneway` is not
+well-formed. Every annotation defined so far is a mode. One added later need not be,
+and could then combine with a mode: the abstract syntax is a list of annotations so
+that it can. Since no annotation repeats, a well-formed list is a set, and its order has
+no meaning: `func () -> () query` written either way is one type.
 
 Every definition MUST denote a well-formed type, whether or not anything refers to it.
 A description with a definition that does not MUST be rejected. So
@@ -449,12 +448,16 @@ data in [CANDID], and SHOULD bound the following:
 ### 9.1. Normative References
 
 [CANDID]
-: DFINITY, "Candid Specification", [spec/Candid.md](../../spec/Candid.md). For the data
-  model and the field-id hash.
+: DFINITY, "Candid Specification", [spec/Candid.md](../../spec/Candid.md). For resource
+  limits in the binary format.
 
 [TEXT]
 : "Candid Textual Values", [TextValues.md](TextValues.md). For the lexical structure,
-  labels and names, and the equivalence of types.
+  labels and names.
+
+[TYPES]
+: "Candid Types and Values", [Types.md](Types.md). For the data model, the field-id
+  hash, equivalence and well-formedness of types.
 
 [RFC2119]
 : Bradner, S., "Key words for use in RFCs to Indicate Requirement Levels", BCP 14,
@@ -568,3 +571,4 @@ because the definition could never be used.
 
 [CANDID]: ../../spec/Candid.md
 [TEXT]: TextValues.md
+[TYPES]: Types.md

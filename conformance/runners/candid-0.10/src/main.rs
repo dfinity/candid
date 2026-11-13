@@ -44,10 +44,6 @@ const KNOWN: &[(&str, &str)] = &[
          `oneway` function with results; the spec says that result list must be empty",
     ),
     (
-        "decode: a principal of 30 bytes",
-        "0.10 bounds a principal at 29 bytes, the Internet Computer's limit, in both its \
-         decoder and `Principal`; the spec bounds neither",
-    ),    (
         "did: dot segments are removed, so two imports of one location read it once (5.3)",
         "0.10 joins an import's path to the importer's directory without normalizing it, \
          so `sub/../a.did` and `a.did` are two files, and `sub/` must exist on disk",

@@ -32,8 +32,12 @@ import Candid.Subtype
 namespace Candid
 
 /-- A principal, service or function reference's identity: the principal's bytes.
-The spec puts no bound on its length, and neither does this model. -/
+A value has its type only if these are at most `maxPrincipalLength` bytes
+(`lean/Spec/Types.md`, Section 3.1). -/
 abbrev PrincipalBytes := List UInt8
+
+/-- The most bytes a principal has. -/
+def maxPrincipalLength : Nat := 29
 
 inductive Value where
   | null
@@ -72,7 +76,7 @@ def Value.hasPrim : Value → Prim → Bool
   | .int8 _, .int8 | .int16 _, .int16 | .int32 _, .int32 | .int64 _, .int64 => true
   | .float32 _, .float32 | .float64 _, .float64 => true
   | .text _, .text => true
-  | .principal _, .principal => true
+  | .principal p, .principal => p.length ≤ maxPrincipalLength
   | _, _ => false
 
 /-! ## Typing
@@ -96,8 +100,8 @@ def TypeTable.hasType (T : TypeTable) : Value → Slot → Bool
       match fieldAt fs id with
       | some t => T.hasType w t
       | none => false
-    | .service _, some (.service _) => true
-    | .func _ _, some (.func _ _ _) => true
+    | .service p, some (.service _) => p.length ≤ maxPrincipalLength
+    | .func p _, some (.func _ _ _) => p.length ≤ maxPrincipalLength
     -- A future value is decoded to `null`: all a receiver can know of it. See `Wire.lean`.
     | .null, some (.future _ _) => true
     | _, _ => false

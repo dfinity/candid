@@ -227,8 +227,10 @@ def TypeTable.encodeValue (T : TypeTable) : Value → Slot → Option (List UInt
       match (sortById fs).findIdx? (·.1 == id), fieldAt fs id with
       | some i, some t => (leb128 i ++ ·) <$> T.encodeValue w t
       | _, _ => none
-    | .service id, some (.service _) => some (encodeId id)
-    | .func id m, some (.func _ _ _) => some (1 :: encodeId id ++ encodeText m)
+    | .service id, some (.service _) =>
+      if id.length ≤ maxPrincipalLength then some (encodeId id) else none
+    | .func id m, some (.func _ _ _) =>
+      if id.length ≤ maxPrincipalLength then some (1 :: encodeId id ++ encodeText m) else none
     -- No bytes and no references: the shortest future value.
     | .null, some (.future _ _) => some [0, 0]
     | _, _ => none
@@ -345,14 +347,16 @@ def readText (bs : ByteArray) (pos : Nat) : Read1 bs pos String :=
     | some s => .ok (s, p)
     | none => .error ⟨pos, "text is not UTF-8"⟩
 
-/-- `M(id(v*))`: flag `1`, then the bytes. Flag `0` is an opaque reference, which this
-model does not have; see the header. -/
+/-- `M(id(v*))`: flag `1`, then the bytes, at most `maxPrincipalLength` of them. Flag `0`
+is an opaque reference, which this model does not have; see the header. -/
 def readId (bs : ByteArray) (pos : Nat) : Read1 bs pos PrincipalBytes :=
   match readByte bs pos with
   | .error e => .error e
   | .ok (1, ⟨p, hp⟩) => match readBlob bs p with
     | .error e => .error e
-    | .ok (b, ⟨q, hq⟩) => .ok (b.toList, ⟨q, by omega, hq.2⟩)
+    | .ok (b, ⟨q, hq⟩) =>
+      if b.size ≤ maxPrincipalLength then .ok (b.toList, ⟨q, by omega, hq.2⟩)
+      else .error ⟨p, s!"a principal of {b.size} bytes, more than {maxPrincipalLength}"⟩
   | .ok (0, _) => .error ⟨pos, "opaque reference"⟩
   | .ok (f, _) => .error ⟨pos, s!"reference flag {f}, neither 0 nor 1"⟩
 

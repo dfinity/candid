@@ -264,9 +264,9 @@ What the runners have found, recorded so that they outlive the run that found th
 - **`candid` 0.10 accepts a `oneway` function type with results from the wire.** The
   spec says the result list must be empty, and the model rejects the message. Vector:
   `decode: oneway function with a result`.
-- **`candid` 0.10 bounds a principal at 29 bytes**, the Internet Computer's limit; the
-  spec does not. Whether it should is a question about the spec. Vector: `decode: a
-  principal of 30 bytes`.
+- **`candid` 0.10 bounds a principal at 29 bytes**, the Internet Computer's limit.
+  [lean/Spec/Types.md](../lean/Spec/Types.md) now does too, so the two agree. Vectors:
+  `decode: a principal of 30 bytes`, `decode: a service reference of 30 bytes`.
 - **The model and 0.10 agree with every assertion of `test/` they can be asked.** All
   447 that are about decoding, outside `spacebomb.test.did`, including the ones on future types and on lengths that
   overshoot the input. The model needed no special case for any of them.

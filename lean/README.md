@@ -1,6 +1,6 @@
 # `lean/` — Lean 4 reference model and specification
 
-**Status: seventh slice.** Types, the field-id hash, subtyping — as both a relation and a
+**Status: eighth slice.** Types, the field-id hash, subtyping — as both a relation and a
 decision procedure — values with coercion, the binary format in both directions,
 textual values, and `.did` descriptions, with an executable that writes them out
 as conformance vectors, reads them back, and is checked against `candid` 0.10 in CI. It
@@ -291,7 +291,8 @@ to: skipping a value is where a decoder is most tempted to stop checking it.
 recorded as known divergences rather than fixed in either place: it allows at most one
 function annotation in a decoded type, it accepts a `oneway` function type with results
 from the wire, and it bounds a principal at 29 bytes. The first and third are questions
-about the spec as much as about 0.10.
+about the spec as much as about 0.10. Both were settled in 0.10's favor: one mode
+(slice 7) and 29 bytes (slice 8).
 
 **A fourth property holds over the generated universe**: every sample encodes, and its
 bytes decode to the same value at the same type, in a table equal to the one written up
@@ -387,6 +388,38 @@ namespace and are visible through indirect imports, and every description must b
 self-contained. Methods come from `import service` alone, so a plain import never adds
 any. A `did` vector carries the descriptions its text imports, and the runner writes
 them to disk for 0.10's `check_file`.
+
+## What slice 8 established
+
+**The core of the spec, in the new style.** [Spec/Types.md](Spec/Types.md) is the third
+section of the new specification: the types and their values, field ids and their
+hash, equivalence and well-formedness, subtyping, and coercion. The other two drafts
+now refer to it instead of to `spec/Candid.md`. Subtyping is stated as one list of rules
+whose greatest fixed point is the relation, with the four `opt` rules as one, which is
+how [Candid/SubtypeSpec.lean](Candid/SubtypeSpec.lean) already had it. Coercion is
+stated as cases with three outcomes, which is how
+[Candid/Coerce.lean](Candid/Coerce.lean) already computed it.
+
+**Writing it down found a bug in the model.** When one part of a value fails to
+coerce and another is undefined, under an enclosing option, the first part decides
+between `null` and rejection. The model read a vector's elements in order, but a
+record's fields last-to-first, and a missing field after the present ones. candid
+0.10 decides in ascending order of the expected type's field ids, missing fields
+included, which is the order a decoder meets them in, and the document says so
+(Section 6.5). The model now computes each field's outcome and reads them in that
+order; six hand-written vectors cover records, missing fields and vectors, and 0.10
+agrees with all of them. No subtyping or coercion vector differs from 0.10.
+
+**Principals are at most 29 bytes.** The spec now bounds them where the Internet
+Computer and 0.10 do, so the last types-level divergence from 0.10 is gone: a decoder
+rejects a longer principal or reference, and text that encodes one is no principal. The
+document also says plainly that subtyping is not complete, with an example, rather than
+leaving completeness as an open issue.
+
+**Subtyping is not transitive.** `record{a : nat} <: record{} <: record{a : null}`, but
+`record{a : nat} <: record{a : null}` does not hold. `spec/Candid.md` has the same rules
+and claims transitivity; 0.10 agrees with the rules. The document now states the
+counterexample, and lists restricting added fields to `reserved` and options as open.
 
 ## Constraints
 

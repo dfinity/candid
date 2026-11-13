@@ -134,6 +134,8 @@ def variantChecks : List Vector :=
       true "variant {a} <: variant {a; b} (tag dropped)"
   , expectSub (entry (variantOf [("a", nat), ("b", text)])) (entry (variantOf [("a", nat)]))
       false "variant {a; b} !<: variant {a} (tag added)"
+  , expectSub (entry (variantOf [("a", nat), ("b", .prim .empty)])) (entry (variantOf [("a", nat)]))
+      false "variant {a; b : empty} !<: variant {a}, though no value has case b (incomplete)"
   , expectSub (entry (variantOf [("a", nat)])) (entry (variantOf [("a", int)])) true
       "variant {a:nat} <: variant {a:int}"
   , expectSub (optVariant [("a", nat), ("b", text)]) (optVariant [("a", nat)]) true
@@ -573,6 +575,45 @@ def coerceInfiniteOptChecks : List Vector :=
   , expectCoerce .null (atom .null) optCycle (some .null)
       "null : null ~> null : R" ]
 
+/-! ## Which part decides
+
+A record field, a vector element or an argument can fail while another is undefined.
+Under an enclosing `opt` the two outcomes differ -- a failure becomes `null`, an
+undefined coercion rejects the message -- so the order matters: the parts are decided
+in order, the expected record's fields by ascending id whether the value has them or
+not, and the first that fails or is undefined decides. That is the order a decoder
+meets them in, and candid 0.10's. The model read a record's fields last-to-first until
+these were written. Each expected type is an option around the part, with `R = opt R`
+at entry 0. -/
+
+/-- `opt c`, with `R` at entry 0 and `c` at entry 2. -/
+def optOverOptCycle (c : Composite) : Fixture :=
+  { table := { entries := #[.opt (.ref 0), .opt (.ref 2), c] }, root := .ref 1 }
+
+def coerceOrderChecks : List Vector :=
+  [ expectCoerce (.record [(0, .nat 5), (1, .nat 5)]) (entry (.record [(0, nat), (1, nat)]))
+      (optOverOptCycle (.record [(0, text), (1, .ref 0)])) (some .null)
+      "record {5; 5} ~> null : opt record {text; R} (field 0 fails first)"
+  , expectCoerce (.record [(0, .nat 5), (1, .nat 5)]) (entry (.record [(0, nat), (1, nat)]))
+      (optOverOptCycle (.record [(0, .ref 0), (1, text)])) none
+      "record {5; 5} ~> reject : opt record {R; text} (field 0 is undefined first)"
+  , expectCoerce (.record [(1, .nat 5)]) (entry (.record [(1, nat)]))
+      (optOverOptCycle (.record [(0, nat), (1, .ref 0)])) (some .null)
+      "record {1 = 5} ~> null : opt record {nat; R} (missing field 0 fails first)"
+  , expectCoerce (.record [(0, .nat 5)]) (entry (.record [(0, nat)]))
+      (optOverOptCycle (.record [(0, .ref 0), (1, nat)])) none
+      "record {5} ~> reject : opt record {R; nat} (field 0 is undefined before missing field 1)"
+  , expectCoerce (.vec [.variant 1 (.nat 5), .variant 0 (.nat 5)])
+      (close do let v ← intern (.variant [(0, nat), (1, nat)]); intern (.vec v))
+      { table := { entries := #[.opt (.ref 0), .opt (.ref 2), .vec (.ref 3), .variant [(0, .ref 0)]] }
+        root := .ref 1 } (some .null)
+      "vec {variant {1 = 5}; variant {0 = 5}} ~> null : opt vec variant {0 : R} (element 0 fails first)"
+  , expectCoerce (.vec [.variant 0 (.nat 5), .variant 1 (.nat 5)])
+      (close do let v ← intern (.variant [(0, nat), (1, nat)]); intern (.vec v))
+      { table := { entries := #[.opt (.ref 0), .opt (.ref 2), .vec (.ref 3), .variant [(0, .ref 0)]] }
+        root := .ref 1 } none
+      "vec {variant {0 = 5}; variant {1 = 5}} ~> reject : opt vec variant {0 : R} (element 0 is undefined first)" ]
+
 def coerceVecChecks : List Vector :=
   [ expectCoerce (.vec [.nat 1, .nat 2]) (entry (.vec nat)) (entry (.vec int))
       (some (.vec [.int 1, .int 2])) "vec {1; 2} : vec nat ~> vec {1; 2} : vec int"
@@ -640,7 +681,7 @@ def coerceRefChecks : List Vector :=
 
 def coerceChecks : List Vector :=
   coercePrimChecks ++ coerceOptChecks ++ coerceVecChecks ++ coerceRecordChecks ++
-  coerceVariantChecks ++ coerceRefChecks ++ coerceInfiniteOptChecks
+  coerceVariantChecks ++ coerceRefChecks ++ coerceInfiniteOptChecks ++ coerceOrderChecks
 
 /-! ## Decoding
 
@@ -835,9 +876,15 @@ def decodeRefChecks : List Vector :=
       "decode: opaque principal reference"
   , expectDecode "4449444c 00 01 68 02 01 2a" (prims [principal]) none
       "decode: principal reference flag 2"
+  , expectDecode s!"4449444c 00 01 68 01 1d {String.join (List.replicate 29 "00")}"
+      (prims [principal]) (some [.principal (List.replicate 29 0)])
+      "decode: a principal of 29 bytes"
   , expectDecode s!"4449444c 00 01 68 01 1e {String.join (List.replicate 30 "00")}"
-      (prims [principal]) (some [.principal (List.replicate 30 0)])
+      (prims [principal]) none
       "decode: a principal of 30 bytes"
+  , expectDecode s!"4449444c 01 69 00 01 00 01 1e {String.join (List.replicate 30 "00")}"
+      (typesOf do return [← intern (.service [])]) none
+      "decode: a service reference of 30 bytes"
   , expectDecode "4449444c 01 69 00 01 00 01 01 2a" (typesOf do return [← intern (.service [])])
       (some [.service [0x2a]]) "decode: service reference"
   , expectDecode "4449444c 01 6a 00 00 00 01 00 01 01 01 2a 01 6d" funcT

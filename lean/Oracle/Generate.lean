@@ -306,9 +306,14 @@ def encodeRejections : List String :=
     | none => []
     | some ⟨_, A, ra⟩ => (samples A 3 ra.1).flatMap fun v =>
       -- A record value missing its first field, and one with it moved last, are not
-      -- of the type, and the encoder must say so rather than write them.
+      -- of the type, and neither is a reference to a principal of more than
+      -- `maxPrincipalLength` bytes. The encoder must say so rather than write them.
+      let long := List.replicate (maxPrincipalLength + 1) (0 : UInt8)
       let bad := match v with
         | .record (f :: fs) => [Value.record fs, .record (fs ++ [f])].filter (· != v)
+        | .principal _ => [.principal long]
+        | .service _ => [.service long]
+        | .func _ m => [.func long m]
         | _ => []
       bad.filterMap fun w =>
         if (encode A [ra.1] [w]).isSome then
