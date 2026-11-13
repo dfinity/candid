@@ -1,6 +1,6 @@
 # `lean/` — Lean 4 reference model and specification
 
-**Status: eighth slice.** Types, the field-id hash, subtyping — as both a relation and a
+**Status: ninth slice.** Types, the field-id hash, subtyping — as both a relation and a
 decision procedure — values with coercion, the binary format in both directions,
 textual values, and `.did` descriptions, with an executable that writes them out
 as conformance vectors, reads them back, and is checked against `candid` 0.10 in CI. It
@@ -420,6 +420,28 @@ leaving completeness as an open issue.
 `record{a : nat} <: record{a : null}` does not hold. `spec/Candid.md` has the same rules
 and claims transitivity; 0.10 agrees with the rules. The document now states the
 counterexample, and lists restricting added fields to `reserved` and options as open.
+
+## What slice 9 established
+
+**The binary format, in the new style.** [Spec/Binary.md](Spec/Binary.md) is the fourth
+section of the new specification, and the last part of `spec/Candid.md` it restates:
+LEB128 and the other encodings, the layout of a message, the type table, values,
+deserialisation as decoding then coercion, serialisation, and resource limits. The
+other three drafts now refer to it, and cite `spec/Candid.md` only informatively, for
+comparison. It writes down what the model's decoder already did where `spec/Candid.md`
+is silent: no references outside the message, strictly ordered members, every table
+entry and every value checked, types without values rejected, and LEB128 of any length
+accepted.
+
+**Four new divergences from 0.10, three in how it reads a number.** It matches the six
+composite opcodes as single bytes, so `ee 7f`, which is −18 in two bytes, is not `opt`
+to it; it reads a function's annotation count as one byte; and it rejects a length in
+a value written in ten bytes or more. The document keeps one rule, LEB128 of any
+length, since no encoder writes these forms, and the vectors are known divergences. A
+fourth: 0.10 does not check the method name of a function reference that coercion
+drops, where the document checks every value.
+The other new vectors, on redundant LEB128, a two-byte future opcode and a type
+without values at `reserved`, agree.
 
 ## Constraints
 

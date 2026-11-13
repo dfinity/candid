@@ -425,7 +425,7 @@ path is relative to its directory.
 A description is often fetched from a service it describes, which need not be trusted:
 a tool that shows a service's interface reads the description the service provides. An
 implementation MAY reject a description for lack of resources, as described for binary
-data in [CANDID], and SHOULD bound the following:
+data in [BINARY], Section 9, and SHOULD bound the following:
 
 - **Nesting.** Every bracket adds a level of recursion to a straightforward parser.
 - **Chains of names.** A naïve check of productivity follows each name to its end, which
@@ -447,9 +447,8 @@ data in [CANDID], and SHOULD bound the following:
 
 ### 9.1. Normative References
 
-[CANDID]
-: DFINITY, "Candid Specification", [spec/Candid.md](../../spec/Candid.md). For resource
-  limits in the binary format.
+[BINARY]
+: "Candid Binary Format", [Binary.md](Binary.md). For resource limits.
 
 [TEXT]
 : "Candid Textual Values", [TextValues.md](TextValues.md). For the lexical structure,
@@ -470,6 +469,12 @@ data in [CANDID], and SHOULD bound the following:
 [RFC8174]
 : Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words", BCP 14,
   RFC 8174, May 2017.
+
+### 9.2. Informative References
+
+[CANDID]
+: DFINITY, "Candid Specification", [spec/Candid.md](../../spec/Candid.md). The current
+  specification, which this document is compared with in Appendix A.
 
 ## Appendix A. Differences from candid 0.10 (Informative)
 

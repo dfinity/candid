@@ -519,7 +519,7 @@ a rejection, are written from the reference model in [lean/](../), whose
 Text values are often typed by people and are rarely hostile. They can still come from
 outside: a web interface may send typed text to a service that parses it. An
 implementation MAY reject a well-formed input for lack of resources, as described for
-binary data in [CANDID], and SHOULD bound the following:
+binary data in [BINARY], Section 9, and SHOULD bound the following:
 
 - **Nesting.** Every bracket adds a level of recursion to a straightforward parser.
 - **Integer literals.** The value of an integer literal is unbounded, and converting a
@@ -533,9 +533,8 @@ binary data in [CANDID], and SHOULD bound the following:
 
 ### 8.1. Normative References
 
-[CANDID]
-: DFINITY, "Candid Specification", [spec/Candid.md](../../spec/Candid.md). For resource
-  limits in the binary format.
+[BINARY]
+: "Candid Binary Format", [Binary.md](Binary.md). For resource limits.
 
 [DID]
 : "Candid Interface Descriptions", [Did.md](Did.md). For the syntax of types.
@@ -569,6 +568,10 @@ binary data in [CANDID], and SHOULD bound the following:
 : The Unicode Consortium, "The Unicode Standard".
 
 ### 8.2. Informative References
+
+[CANDID]
+: DFINITY, "Candid Specification", [spec/Candid.md](../../spec/Candid.md). The current
+  specification, which this document is compared with in Appendix A.
 
 [IC-INTERFACE]
 : DFINITY, "The Internet Computer Interface Specification", section "Principals".

@@ -131,7 +131,7 @@ the format, so it changes in place.
 - **`decode` with `"expect": "costly"`**: deserialising `bytes` at `types` costs more
   than the model will spend, so it gives no answer. The spec lets an implementation
   reject a message for lack of resources, and leaves which ones to it
-  (`spec/Candid.md`, "Resource limits"). A runner passes if the implementation decodes
+  ([lean/Spec/Binary.md](../lean/Spec/Binary.md), Section 9). A runner passes if the implementation decodes
   the message or rejects it, and fails if it panics or aborts. How long it takes, and
   what it allocates, is for a runner to bound as its environment would.
 - **`parse`**: `text`, read as an argument sequence at `types`
@@ -264,6 +264,19 @@ What the runners have found, recorded so that they outlive the run that found th
 - **`candid` 0.10 accepts a `oneway` function type with results from the wire.** The
   spec says the result list must be empty, and the model rejects the message. Vector:
   `decode: oneway function with a result`.
+- **`candid` 0.10 reads some numbers more narrowly than LEB128 of any length.** It
+  matches the six composite opcodes as single bytes, so `ee 7f` for −18 is no type to
+  it; it reads a function's annotation count as one byte; and it rejects a length in a
+  value written in ten bytes or more. Future opcodes, type references and other numbers
+  it reads as LEB128. [lean/Spec/Binary.md](../lean/Spec/Binary.md) accepts all three
+  forms. Vectors: `decode: an entry's opcode with redundant continuation bytes`,
+  `decode: an annotation count with redundant continuation bytes`, `decode: a vector
+  length of zero in ten bytes`.
+- **`candid` 0.10 does not check a dropped function reference's method name.** Every
+  other value coercion drops is still checked, but a function reference is skipped
+  without checking that its method name is UTF-8.
+  [lean/Spec/Binary.md](../lean/Spec/Binary.md) checks every value. Vector: `decode: a
+  dropped function reference's method name is still checked`.
 - **`candid` 0.10 bounds a principal at 29 bytes**, the Internet Computer's limit.
   [lean/Spec/Types.md](../lean/Spec/Types.md) now does too, so the two agree. Vectors:
   `decode: a principal of 30 bytes`, `decode: a service reference of 30 bytes`.

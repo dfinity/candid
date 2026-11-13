@@ -737,6 +737,19 @@ def decodeLebChecks : List Vector :=
   [ expectDecode "4449444c 00 01 7d 05" (prims [nat]) (some [.nat 5]) "decode: nat"
   , expectDecode "4449444c 00 01 7d 85 80 00" (prims [nat]) (some [.nat 5])
       "decode: nat with redundant continuation bytes"
+  , expectDecode "4449444c 00 01 fd 7f 05" (prims [nat]) (some [.nat 5])
+      "decode: a type reference with redundant continuation bytes"
+  , expectDecode "4449444c 01 ee 7f 7d 01 00 00" optNatT (some [.null])
+      "decode: an entry's opcode with redundant continuation bytes"
+  , expectDecode "4449444c 01 6d 7f 01 00 83 80 00" (typesOf do return [← intern (.vec null)])
+      (some [.vec [.null, .null, .null]]) "decode: a vector length with redundant continuation bytes"
+  , expectDecode "4449444c 01 6d 7f 01 00 80 80 80 80 80 80 80 80 80 00"
+      (typesOf do return [← intern (.vec null)]) (some [.vec []])
+      "decode: a vector length of zero in ten bytes"
+  , expectDecode "4449444c 01 6a 00 00 80 00 00" (prims []) (some [])
+      "decode: an annotation count with redundant continuation bytes"
+  , expectDecode "4449444c 01 bf 7f 00 00" (prims []) (some [])
+      "decode: a future opcode that takes two bytes"
   , expectDecode "4449444c 00 01 7d 80 80 80 80 80 80 80 80 80 02" (prims [nat])
       (some [.nat 18446744073709551616]) "decode: nat 2^64"
   , expectDecode "4449444c 00 01 7d 85" (prims [nat]) none "decode: nat runs past the end"
@@ -826,6 +839,10 @@ def decodeRecordChecks : List Vector :=
       "decode: one record entry twice at one position is not a cycle"
   , expectDecode "4449444c 01 6c 01 00 00 01 00" recordLoop none
       "decode: type R = record { R } has no value"
+  , expectDecode "4449444c 01 6c 01 00 00 01 00" (prims [reserved]) none
+      "decode: type R = record { R } has no value, even at reserved"
+  , expectDecode "4449444c 01 6c 02 00 7d 01 00 01 00 05 06" (prims [reserved]) none
+      "decode: type R = record { nat; R } has no value, and runs out of input"
   , expectDecode "4449444c 01 6c 02 00 7f 01 00 01 00" recordLoopAfterNull none
       "decode: type R = record { null; R } has no value" ]
 
@@ -890,7 +907,9 @@ def decodeRefChecks : List Vector :=
   , expectDecode "4449444c 01 6a 00 00 00 01 00 01 01 01 2a 01 6d" funcT
       (some [.func [0x2a] "m"]) "decode: func reference"
   , expectDecode "4449444c 01 6a 00 00 00 01 00 00" funcT none
-      "decode: opaque func reference" ]
+      "decode: opaque func reference"
+  , expectDecode "4449444c 01 6a 00 00 00 01 00 01 01 00 01 ff" (prims []) none
+      "decode: a dropped function reference's method name is still checked" ]
 
 def decodeCoerceChecks : List Vector :=
   [ expectDecode "4449444c 00 01 7d 05" (prims [int]) (some [.int 5])
