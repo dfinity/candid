@@ -314,19 +314,20 @@ this version can step over them.
 
 ### 6.6. Types Without Values
 
-Every value is finite, and every value of a type with infinitely many nested records is
-infinite. Such a type has no values. `type R = record { R }` is one, and so is
-`record { null; R }`, while `record { opt R }` has values, since `null` ends the
-recursion.
+Every value is finite, so a type whose every value would contain itself without end
+has no values. `type R = record { R }` is one, and so are `record { null; R }`,
+`record { nat; R }` and `variant { a : R }`, while `record { opt R }` has values, since
+`null` ends the recursion. A decoder MUST reject a message with a value of such a type.
 
-A record takes no bytes of its own, so reading a value of such a type consumes no input
-and never reaches the end of the message. A decoder MUST reject a message with a value
-of such a type rather than read forever. (A decoder can detect one exactly: it is about
-to read a record of some entry at the position where it already began reading a record
-of the same entry, enclosing this one.)
-
-Recursion through any other constructor consumes at least one byte per level, so it
-ends when the message does.
+Reading a value of most such types consumes input at each level, so it reaches the end
+of the message and is rejected there: `record { nat; R }` reads a number at each level,
+and `variant { a : R }` an index. The exception is recursion through records alone,
+with no bytes read between one level and the next, as in `record { R }` and
+`record { null; R }`. A record takes no bytes of its own, so reading one of those
+consumes nothing and would never reach the end. A decoder MUST detect this case rather
+than read forever. (It can do so exactly: it is about to read a record of some entry at
+the position where it already began reading a record of the same entry, enclosing this
+one.)
 
 ## 7. Deserialisation
 
@@ -427,8 +428,8 @@ message must be bounded by something the receiver controls.
 - **Nesting.** Each level of an option, vector or variant takes at least a byte, so a
   message of *n* bytes can nest values *n* deep. A recursive decoder SHOULD bound its
   depth. Records nest without bytes, but only as deep as the table has entries, unless
-  the type has no values ([Section 6.6](#66-types-without-values)), which a decoder MUST
-  detect.
+  they recurse through records alone ([Section 6.6](#66-types-without-values)), which a
+  decoder MUST detect.
 - **Numbers.** `nat` and `int` are unbounded, and a number of *b* bytes has 7*b* bits.
   Reading one takes time linear in its length; converting it to decimal, if a receiver
   does, can take time quadratic.
@@ -489,7 +490,8 @@ it differs from `candid` 0.10, the Rust implementation.
 - **Every entry of the table is checked**, whether or not an argument refers to it.
   [CANDID] does not say. 0.10 agrees.
 - **Every value is checked**, including one coercion drops. [CANDID] decodes before it
-  coerces, which implies this. 0.10 agrees.
+  coerces, which implies this. 0.10 agrees, except for the method name of a function
+  reference it drops (A.2).
 - **Types without values** ([Section 6.6](#66-types-without-values)) are rejected.
   [CANDID] does not mention them. 0.10 agrees.
 - **Bytes after the last value** are rejected. [CANDID] implies it, by reading a message
@@ -505,6 +507,7 @@ it differs from `candid` 0.10, the Rust implementation.
 | The opcode of `opt`, `vec`, `record`, `variant`, `func` or `service` in more than one byte, such as `ee 7f` for `opt` | rejected | accepted ([Section 3.1](#31-leb128)) |
 | A function's annotation count in more than one byte, such as `80 00` for 0 | rejected | accepted |
 | A length in a value in ten bytes or more, such as nine `80` and then `00` for 0 | rejected | accepted |
+| A function reference whose method name is not UTF-8, in an argument the receiver drops | accepted | rejected ([Section 6.4](#64-references)) |
 
 The first difference is in well-formedness, which [TYPES] defines; 0.10's decoder does
 not check it. The other three are where 0.10 reads a number in a narrower way than
@@ -516,10 +519,17 @@ LEB128 of any length:
 - it reads a length in a value, of a vector, a blob or text, in at most nine bytes,
   and rejects a longer form as an overflow, even when the number is small.
 
-No encoder writes these forms, so the differences are unlikely to matter. The
-conformance vectors are `decode: oneway function with a result`, `decode: an entry's
-opcode with redundant continuation bytes`, `decode: an annotation count with redundant
-continuation bytes` and `decode: a vector length of zero in ten bytes`.
+No encoder writes these forms, so the differences are unlikely to matter.
+
+The last difference is in checking a value that coercion drops. 0.10 skips a dropped
+function reference without checking its method name, though it checks every other
+dropped value, and checks the name of a reference it keeps. A conforming encoder never
+writes a name that is not UTF-8, so this too is unlikely to matter.
+
+The conformance vectors are `decode: oneway function with a result`, `decode: an
+entry's opcode with redundant continuation bytes`, `decode: an annotation count with
+redundant continuation bytes`, `decode: a vector length of zero in ten bytes` and
+`decode: a dropped function reference's method name is still checked`.
 
 ### A.3. Open Issues
 

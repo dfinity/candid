@@ -53,6 +53,11 @@ const KNOWN: &[(&str, &str)] = &[
          an overflow even when the number is small",
     ),
     (
+        "decode: a dropped function reference's method name is still checked",
+        "0.10 skips a function reference that coercion drops without checking that its \
+         method name is UTF-8",
+    ),
+    (
         "decode: oneway function with a result",
         "`binary_parser.rs` does not check a decoded function type, so it accepts a \
          `oneway` function with results; the spec says that result list must be empty",

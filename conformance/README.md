@@ -272,6 +272,11 @@ What the runners have found, recorded so that they outlive the run that found th
   forms. Vectors: `decode: an entry's opcode with redundant continuation bytes`,
   `decode: an annotation count with redundant continuation bytes`, `decode: a vector
   length of zero in ten bytes`.
+- **`candid` 0.10 does not check a dropped function reference's method name.** Every
+  other value coercion drops is still checked, but a function reference is skipped
+  without checking that its method name is UTF-8.
+  [lean/Spec/Binary.md](../lean/Spec/Binary.md) checks every value. Vector: `decode: a
+  dropped function reference's method name is still checked`.
 - **`candid` 0.10 bounds a principal at 29 bytes**, the Internet Computer's limit.
   [lean/Spec/Types.md](../lean/Spec/Types.md) now does too, so the two agree. Vectors:
   `decode: a principal of 30 bytes`, `decode: a service reference of 30 bytes`.

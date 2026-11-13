@@ -841,6 +841,8 @@ def decodeRecordChecks : List Vector :=
       "decode: type R = record { R } has no value"
   , expectDecode "4449444c 01 6c 01 00 00 01 00" (prims [reserved]) none
       "decode: type R = record { R } has no value, even at reserved"
+  , expectDecode "4449444c 01 6c 02 00 7d 01 00 01 00 05 06" (prims [reserved]) none
+      "decode: type R = record { nat; R } has no value, and runs out of input"
   , expectDecode "4449444c 01 6c 02 00 7f 01 00 01 00" recordLoopAfterNull none
       "decode: type R = record { null; R } has no value" ]
 
@@ -905,7 +907,9 @@ def decodeRefChecks : List Vector :=
   , expectDecode "4449444c 01 6a 00 00 00 01 00 01 01 01 2a 01 6d" funcT
       (some [.func [0x2a] "m"]) "decode: func reference"
   , expectDecode "4449444c 01 6a 00 00 00 01 00 00" funcT none
-      "decode: opaque func reference" ]
+      "decode: opaque func reference"
+  , expectDecode "4449444c 01 6a 00 00 00 01 00 01 01 00 01 ff" (prims []) none
+      "decode: a dropped function reference's method name is still checked" ]
 
 def decodeCoerceChecks : List Vector :=
   [ expectDecode "4449444c 00 01 7d 05" (prims [int]) (some [.int 5])
