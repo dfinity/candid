@@ -1,7 +1,8 @@
 /-
 The binary format: a message as bytes, in both directions.
 
-Rules are from `spec/Candid.md`, "Binary Format". A message is
+The rules are `lean/Spec/Binary.md`'s, which restates `spec/Candid.md`, "Binary
+Format", and decides what it leaves open. A message is
 
 ```
 B(kv* : <datatype>*) =
@@ -46,7 +47,8 @@ expected ones, and a record field the expected type does not declare. The spec d
 the whole message and then coerces, so a malformed value is a malformed message wherever
 it sits.
 
-**Choices the spec leaves open**, made here and recorded so they can be revisited:
+**Choices `spec/Candid.md` leaves open**, made here and in `lean/Spec/Binary.md`
+(Appendix A.1):
 
 - **Non-shortest LEB128 is accepted.** The spec says "LEB128" and nothing about
   redundant continuation bytes; `candid` 0.10 accepts them. Encoding writes the shortest
@@ -87,7 +89,7 @@ type can claim any length in a few bytes -- `vec null` of length 10^9 is 5 -- an
 record whose two fields have one type, itself such a record, doubles the values at each
 level, so a message can stand for more values than any decoder can afford. The spec
 leaves those messages valid, and lets an implementation reject one for lack of
-resources (`spec/Candid.md`, "Resource limits"); which ones is up to the implementation.
+resources (`lean/Spec/Binary.md`, Section 9); which ones is up to the implementation.
 
 The model has no answer for them either: `deserialize` would build every value. So the
 decoder can be given a `limit` on the values it decodes, counting every one wherever it

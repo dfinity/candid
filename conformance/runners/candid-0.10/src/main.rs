@@ -39,6 +39,25 @@ const KNOWN: &[(&str, &str)] = &[
         "0.10's lexer makes `query`, `composite_query` and `oneway` keywords everywhere",
     ),
     (
+        "decode: an entry's opcode with redundant continuation bytes",
+        "`binary_parser.rs` matches the six composite opcodes as single bytes, so `ee 7f`, \
+         -18 in two bytes, is no type; future opcodes it reads as SLEB128",
+    ),
+    (
+        "decode: an annotation count with redundant continuation bytes",
+        "`binary_parser.rs` reads a function's annotation count as one raw byte, not LEB128",
+    ),
+    (
+        "decode: a vector length of zero in ten bytes",
+        "`de.rs` reads a length in at most nine LEB128 bytes, and rejects a longer form as \
+         an overflow even when the number is small",
+    ),
+    (
+        "decode: a dropped function reference's method name is still checked",
+        "0.10 skips a function reference that coercion drops without checking that its \
+         method name is UTF-8",
+    ),
+    (
         "decode: oneway function with a result",
         "`binary_parser.rs` does not check a decoded function type, so it accepts a \
          `oneway` function with results; the spec says that result list must be empty",

@@ -46,9 +46,9 @@ The following are defined elsewhere:
   This document writes both in the abstract notation of
   [Section 1.3](#13-notation).
 - **The binary format.** How types and values are encoded in a message, and how a
-  message is decoded, is specified in [CANDID], Section "Binary Format". Decoding a
-  message at a type is decoding the values at the types the message carries, then
-  coercing them as an argument sequence ([Section 6.8](#68-argument-sequences)).
+  message is decoded, is specified in [BINARY]. Decoding a message at a type is
+  decoding the values at the types the message carries, then coercing them as an
+  argument sequence ([Section 6.8](#68-argument-sequences)).
 
 ### 1.2. Requirements Language
 
@@ -180,7 +180,7 @@ methods named *m₁* … *mₙ*, each a sequence of Unicode scalar values, of fu
 
 **Future types.** `future(o, β)` is a type that a later version of Candid defines and
 this one does not: only the binary format can carry one, identified by an opcode *o* and
-the bytes β that came with it ([CANDID], Section "Deserialisation of future types").
+the bytes β that came with it ([BINARY], Section 5.2).
 This version knows nothing of its values, and represents every one of them as `null`.
 
 ### 3.3. Field Ids
@@ -532,9 +532,8 @@ twice, ask it 2⁴¹ questions.
 
 ### 10.1. Normative References
 
-[CANDID]
-: DFINITY, "Candid Specification", [spec/Candid.md](../../spec/Candid.md). For the binary
-  format and deserialisation.
+[BINARY]
+: "Candid Binary Format", [Binary.md](Binary.md). For the format of messages, and how a message is decoded.
 
 [DID]
 : "Candid Interface Descriptions", [Did.md](Did.md). For the syntax of types.
@@ -557,6 +556,10 @@ twice, ask it 2⁴¹ questions.
 : The Unicode Consortium, "The Unicode Standard".
 
 ### 10.2. Informative References
+
+[CANDID]
+: DFINITY, "Candid Specification", [spec/Candid.md](../../spec/Candid.md). The current
+  specification, which this document is compared with in Appendix A.
 
 [GARRIGUE]
 : Garrigue, J., "Programming with Polymorphic Variants", ML Workshop, 1998. The
