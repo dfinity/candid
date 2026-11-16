@@ -78,6 +78,9 @@ pub enum Token {
     Decimal(String),
     #[regex("0[xX][0-9a-fA-F][_0-9a-fA-F]*", parse_number)]
     Hex(String),
+    // Two patterns sharing a callback, not a duplicate; clippy flags the
+    // repeated `parse_number` argument.
+    #[allow(clippy::duplicated_attributes)]
     #[regex("[0-9]*\\.[0-9]*", parse_number)]
     #[regex("[0-9]+(\\.[0-9]*)?[eE][+-]?[0-9]+", parse_number)]
     Float(String),
