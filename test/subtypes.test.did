@@ -78,6 +78,18 @@ assert blob "DIDL\02\6a\00\01\01\00\6c\00\01\00\01\01\00\01m"
 assert blob "DIDL\02\6a\00\01\01\00\6c\00\01\00\01\01\00\01m"
    == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (record { a : null })) "record {} <: record { a : null }";
 
+// record field merging (non-empty wire records)
+assert blob "DIDL\02\6a\00\01\01\00\6c\02\61\7d\62\7d\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (record { b : nat })) "record { a : nat; b : nat } <: record { b : nat }";
+assert blob "DIDL\02\6a\00\01\01\00\6c\01\62\7d\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (record { a : opt nat; b : nat })) "record { b : nat } <: record { a : opt nat; b : nat }";
+assert blob "DIDL\02\6a\00\01\01\00\6c\02\62\7d\64\7d\01\00\01\01\00\01m"
+   == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (record { a : opt nat; c : opt nat; d : nat })) "record { b : nat; d : nat } <: record { a : opt nat; c : opt nat; d : nat }";
+assert blob "DIDL\02\6a\00\01\01\00\6c\01\61\7d\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (record { b : nat })) "record { a : nat } </: record { b : nat }";
+assert blob "DIDL\02\6a\00\01\01\00\6c\02\62\7d\64\7d\01\00\01\01\00\01m"
+   == "(null)" : (opt func () -> (record { a : opt nat; c : nat; d : nat })) "record { b : nat; d : nat } </: record { a : opt nat; c : nat; d : nat }";
+
 // optional func results
 assert blob "DIDL\02\6a\00\01\01\00\6a\00\00\00\01\00\01\01\00\01m"
    == "(opt func \"aaaaa-aa\".m)" : (opt func () -> (func () -> ())) "func () -> () <: func () -> ()";
