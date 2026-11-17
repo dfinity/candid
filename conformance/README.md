@@ -303,11 +303,13 @@ What the runners have found, recorded so that they outlive the run that found th
   that it accepts a definition of a primitive type's name, which it can then never use,
   and overflows the same positional field id in a type. These are the `did` vectors in
   its known divergences.
-- **0.10's imports differ from the document's in five cases** that existing
+- **0.10's imports differ from the document's in six cases** that existing
   descriptions are unlikely to rely on: it does not normalize `..` in a path, accepts an
   import cycle that avoids the file being read, lets an imported file use the importer's
-  names, merges methods that a plain `import` reaches through an `import service`, and
-  requires a file imported as a service to declare one itself.
+  names, merges methods that a plain `import` reaches through an `import service`,
+  requires a file imported as a service to declare one itself, and never checks the
+  service declaration of a file reached by a plain `import`, so it accepts importing a
+  file that it rejects when that file is read on its own.
 - **0.10 leaves a merged service's methods unsorted.** `resolve_actor` appends imported
   methods after the file's own. Its `equal` compares methods by position, and its
   encoder writes them in the order given, where the binary format requires them

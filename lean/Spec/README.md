@@ -163,7 +163,7 @@ and where it gives a different answer from `candid` 0.10:
 |---|---|---|
 | [TYPES] | [A](Types.md#appendix-a-differences-from-candidmd-and-candid-010-informative) | 1 |
 | [BINARY] | [A](Binary.md#appendix-a-differences-from-candidmd-and-candid-010-informative) | 5, including the one in [TYPES] |
-| [DID] | [A](Did.md#appendix-a-differences-from-candid-010-informative) | 9 |
+| [DID] | [A](Did.md#appendix-a-differences-from-candid-010-informative) | 10 |
 | [TEXT] | [B](TextValues.md#appendix-b-differences-from-candid-010-informative) | 16 |
 
 The open issues that are still undecided, across all four documents:

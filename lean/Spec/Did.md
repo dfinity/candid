@@ -291,6 +291,14 @@ in one of its imports, direct or indirect. A description cannot use a name defin
 by a description that imports it, so that every description in the graph can be read on
 its own, with the same meaning.
 
+Each of the description's imports, direct or indirect, MUST also be **valid on its
+own**: read as the description being read, with the same files to import from, it is
+not rejected. This holds even where the expansion discards part of it. A plain import
+contributes no methods, but the imported description's service declaration is still
+checked: `import "bad.did"` is rejected if `bad.did` declares
+`service : { m : () -> (nat) oneway }`, and so is an import of a description whose
+constructor takes an argument that is not well-formed.
+
 **Methods.** A description D **provides** methods if it declares a service or imports
 one with `import service`, and the methods it provides, M(D), are:
 
@@ -523,6 +531,7 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
 | `import "mid.did"`, where `mid.did` has `import service "svc.did"` | `svc.did`'s methods join the importer's service | they do not: a plain import contributes no methods |
 | `import service "mid.did"`, where `mid.did` declares no service but has `import service "svc.did"` | rejected: no main service | accepted: `mid.did` provides `svc.did`'s methods |
 | `import "a.did"`, where `a.did` and `b.did` import each other | accepted: each file is read once | rejected: an import cycle ([5.3](#53-imports)) |
+| `import "a.did"`, where `a.did` declares `service : { n : () -> (nat) oneway }` | accepted: the service is discarded unchecked, though `a.did` alone is rejected | rejected: `a.did` is not valid on its own ([5.3](#53-imports)) |
 | `import "sub/../a.did"; import "a.did"` | `a.did` read twice, so its names are defined twice | one description, read once |
 | Two merged methods with different names whose field-id hashes collide | rejected | accepted: method names are not hashed |
 

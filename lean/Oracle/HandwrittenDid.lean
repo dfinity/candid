@@ -217,6 +217,15 @@ def didImportChecks : List Vector :=
       "an imported description cannot use a name only its importer defines (5.3)"
       (files := [("a.did", "type A = M;")])
   , rejectsDid "import \"\\ff\";" "an import that is not UTF-8 (5.2)"
+  , rejectsDid "import \"a.did\"; service : { m : () -> () }"
+      "an imported description must be valid on its own, its service declaration too (5.3)"
+      (files := [("a.did", "service : { n : () -> (nat) oneway }")])
+  , rejectsDid "import \"a.did\"; service : { m : () -> () }"
+      "an imported description must be valid on its own, its constructor's arguments too (5.3)"
+      (files := [("a.did", "service : (service { x : nat }) -> { n : () -> () }")])
+  , rejectsDid "import \"b.did\";"
+      "an indirect import must be valid on its own too (5.3)"
+      (files := [("b.did", "import \"a.did\";"), ("a.did", "service : { n : () -> (nat) oneway }")])
   , defines "import \"lib/b.did\"; type T = S;" (return [("T", nat), ("B", nat), ("S", nat)])
       "`..` in a path names the importer's parent directory (5.3)"
       (files := [("lib/b.did", "import \"../shared/s.did\"; type B = S;"),

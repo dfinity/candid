@@ -87,6 +87,21 @@ const KNOWN: &[(&str, &str)] = &[
         "0.10 requires a file imported with `import service` to declare a service itself",
     ),
     (
+        "did: an imported description must be valid on its own, its service declaration too (5.3)",
+        "0.10 checks only the expansion's service, so it never checks the service \
+         declaration of a description that a plain `import` reaches",
+    ),
+    (
+        "did: an imported description must be valid on its own, its constructor's arguments too (5.3)",
+        "0.10 checks only the expansion's service, so it never checks the service \
+         declaration of a description that a plain `import` reaches",
+    ),
+    (
+        "did: an indirect import must be valid on its own too (5.3)",
+        "0.10 checks only the expansion's service, so it never checks the service \
+         declaration of a description that a plain `import` reaches",
+    ),
+    (
         "did: a positional field after id 2^32 - 1 (4.2)",
         "0.10's grammar numbers positional fields with `id + 1` on a `u32`, which \
          overflows: a debug build panics, and a release build gives the field id 0",

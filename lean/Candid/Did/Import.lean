@@ -193,4 +193,12 @@ def expandAt (files : Files) (rootLoc : String) : Except String Desc := do
 /-- The expansion of the description at `rootLocation`. -/
 def expand (files : Files) : Except String Desc := expandAt files rootLocation
 
+/-- The paths of the descriptions that the one at `rootLoc` imports, directly or
+indirectly, normalized as `expandAt` normalizes them. -/
+def importsOf (files : Files) (rootLoc : String) : Except String (List String) := do
+  let files := files.map fun (l, t) => (normalize l, t)
+  let rootLoc := normalize rootLoc
+  let all ← load files (files.length + 1) [] [] rootLoc
+  return (all.map (·.loc)).filter (· != rootLoc)
+
 end Candid.Did
