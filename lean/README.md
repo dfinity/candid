@@ -13,6 +13,10 @@ exists.
 Eventually replaces [coq/](../coq/) and [spec/](../spec/), on the conditions in
 [REWRITE.md §6](../REWRITE.md#6-the-ratchet).
 
+The specification drafts are in [Spec/](Spec/), starting from
+[Spec/README.md](Spec/README.md): the four documents, how they fit together, and which
+of them covers each part of `spec/Candid.md`.
+
 ```
 lake build                                    # build the libraries and the executable
 lake exe oracle                               # check the model against every vector
