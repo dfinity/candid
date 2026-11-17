@@ -1,0 +1,23 @@
+name = "candid"
+version = "0.1.0"
+defaultTargets = ["Candid", "oracle"]
+# `lake test` runs the oracle: the model checking itself *is* the test suite.
+testDriver = "oracle"
+
+# No mathlib, deliberately. See README.md -- it would dominate build times and
+# breakage surface, and nothing here needs it.
+
+[[lean_lib]]
+name = "Candid"
+
+# Conformance vectors: the JSON reader and writer, the hand-written vectors, and the
+# generator. Separate from `Candid` because it is about the model rather than part of
+# it -- `Candid` does not import Lean's own libraries, and this does.
+[[lean_lib]]
+name = "Oracle"
+
+# The reference executable: checks the model against its vectors, writes them to
+# `conformance/vectors/`, and checks vector files. See `Main.lean`.
+[[lean_exe]]
+name = "oracle"
+root = "Main"

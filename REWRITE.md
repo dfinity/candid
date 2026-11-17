@@ -10,7 +10,8 @@ This document proposes a staged rewrite of Candid's specification, reference
 model, and Rust implementation. It exists so that the reasoning behind it is
 written down and citable rather than undocumented.
 
-**Status:** proposal, not scheduled work. **Author:** @lwshang.
+**Status:** in progress. The Lean model, the conformance vectors and the spec drafts
+exist on the `rewrite` branch; the crates have not started. **Author:** @lwshang.
 
 ---
 
@@ -145,7 +146,7 @@ patience for nothing. They have to be bundled.
 
 ### 1.6 The conformance suite cannot bootstrap a new implementation
 
-[test/](test/) holds 471 assertions across six files, and they are good assertions.
+[test/](test/) holds 476 assertions across six files, and they are good assertions.
 But:
 
 - The format is a **bespoke extension of the Candid text grammar**, so you need a
@@ -179,7 +180,7 @@ needed when the old thing is deleted.**
 
 | New | Replaces | Contains |
 |---|---|---|
-| [lean/](lean/) | [coq/](coq/), [spec/](spec/) | Lean 4 reference implementation + Verso spec sources |
+| [lean/](lean/) | [coq/](coq/), [spec/](spec/) | Lean 4 reference implementation + spec drafts |
 | [crates/](crates/) | [rust/](rust/) | Redesigned Rust crates |
 | [conformance/](conformance/) | [test/](test/) | Machine-readable vectors, generator, runner |
 
@@ -192,25 +193,25 @@ wired into CI as a differential oracle against the Rust implementation. Only the
 do we prove things about those definitions. Inverting this produces MiniCandid
 again, in a different language.
 
-The spec is authored with [Verso](https://github.com/leanprover/verso), the Lean
-FRO's literate-documentation system (the one used for the official Lean Language
-Reference). Prose, inference rules, and elaborated Lean live in one document; the
-build fails if the examples stop type-checking. Every rule gets stated twice — as
-an inference rule for readers who think in those terms, and as an executable
-definition for everyone else.
+The spec is written as Markdown in [lean/Spec/](lean/Spec/), next to the model, in
+the style of RFCs and the Wasm specification. It is held to the model through the
+conformance vectors: each document names the model files that implement it, and the
+vectors those files generate run against the Rust implementation in CI. Whether to
+move it to [Verso](https://github.com/leanprover/verso), so that the build also
+checks its examples, is open (§7).
 
 **`crates/`** — a layered redesign. Provisional shape:
 
 ```
 ic_principal                    (existing; unchanged, already correctly split)
    ↑
-candid_types      Type, Label, Field, Function, TypeEnv, field-id hash.
-                  no_std-capable. No serde, no binary, NO GLOBAL STATE.
+candid_types      Slot, Composite, RawTypeTable, TypeTable, Root, TypeRef, FieldId,
+                  field-id hash. no_std-capable. No serde, no binary, NO GLOBAL STATE.
    ↑
 candid_subtype    Subtyping + coercion decision procedures. Mirrors Lean 1:1.
    ↑               The verified core: small, pure, Aeneas-shaped.
 candid_wire       Type table + memory encoding, untyped:
-   ↑               bytes <-> (TypeEnv, Vec<Type>, values). Cost metering.
+   ↑               bytes <-> (TypeTable, Vec<Slot>, values). Cost metering.
    ├───────────────────────────┐
 candid_value                candid (facade) + derive macro
    IDLValue equivalent,     CandidType trait, native decode trait (no serde),
@@ -246,9 +247,21 @@ derive crate persists in v1. The question is only what goes in it — see
 **`conformance/`** — vectors as JSON data rather than a Candid-grammar extension,
 so an implementer in Go or Python can run vector #1 before writing a text parser.
 Generated from the Lean model, which lets us be exhaustive by construction for
-small types rather than "whatever someone thought of". Covers encoding (against a
-newly-defined canonical encoding profile), subtyping as a first-class relation,
-`.did` parsing, and resource exhaustion. Published as a versioned artifact.
+small types rather than "whatever someone thought of". Covers decoding, encoding,
+subtyping as a first-class relation, `.did` parsing, and resource exhaustion.
+Published as a versioned artifact.
+
+Encoding is tested against the relation the spec defines, not against fixed bytes.
+The spec says type serialisation "is not technically a function but a relation":
+an encoder chooses its type table, and two encoders of the same value at the same
+type can differ in entry order, in sharing, and in unused entries. A canonical
+encoding profile would make the bytes comparable, but only by requiring every
+encoder to minimise its type graph and number entries in a fixed order -- a cost
+imposed on every implementation for a property no decoder needs. So an encoding
+vector is a value and a type, and the check is that the bytes decode, strictly, to
+a type *equivalent* to that one (the same infinite tree; mutual subtyping is far
+too loose) and to that value. A canonical profile remains possible as an opt-in for
+whoever needs deterministic bytes, and nothing here depends on it.
 
 ---
 
@@ -272,8 +285,8 @@ CI.* The design rule that prevents that:
 > executable, or (b) a proof about something that is.** No orphan formalisation.
 
 Additional costs, stated up front: Lean's toolchain moves faster than Coq's, so
-`lean-toolchain` is pinned and upgrades are scheduled work. Verso is young; expect
-to read its source rather than its docs. We do **not** depend on mathlib.
+`lean-toolchain` is pinned and upgrades are scheduled work. We do **not** depend on
+mathlib.
 
 **Bus factor.** @lwshang has been learning Lean and would own this part, though
 applying it to a production project would be new. That is a real single point of
@@ -304,7 +317,7 @@ serde-style generic traits, so today's decoder is out of reach regardless. But
 
 - **Not a clean-room restart.** The existing implementation is a *requirements
   document*. It encodes years of hard-won knowledge — the spacebomb defenses, the
-  cost-metering constants, the 471 assertions, and every edge case with a
+  cost-metering constants, the 476 assertions, and every edge case with a
   CHANGELOG entry behind it. Losing those is the one thing that would genuinely
   cost us years. We mine it; we do not imitate it.
 - **Not a separate repository.** Keeping it here preserves the crates.io
@@ -325,17 +338,18 @@ serde-style generic traits, so today's decoder is out of reach regardless. But
 
 ## 5. Proposed working model
 
-**Everything is additive.** New code goes in the three new directories. Existing
-files are not modified. This is not a style preference — it is the property that
-makes everything else work:
+**Everything is additive.** Work is confined to the three new directories — plus this
+document, which is where the plan itself gets corrected. **Nothing under `rust/`,
+`spec/`, `test/`, `coq/` or `tools/` is touched.** This is not a style preference — it
+is the property that makes everything else work:
 
 - Nothing on `master` can break, because nothing on `master` references the new
   directories.
 - There are **structurally zero merge conflicts** with a `master` that keeps
   shipping 0.10.x releases.
-- Therefore review of a merge is *"adds files under `lean/`, `crates/`,
-  `conformance/`; touches nothing existing; nothing published depends on it"* —
-  approvable in minutes without deep review.
+- Therefore review of a merge is *"changes only `lean/`, `crates/`, `conformance/` and
+  `REWRITE.md`; nothing published depends on any of it"* — approvable in minutes
+  without deep review.
 
 **Working branch, merged fortnightly.** Day-to-day work happens on a working
 branch pushed directly, so iteration is not gated on review latency. It merges to
@@ -347,10 +361,24 @@ this experiment and lost. The `next` branch in this repository is **1 commit ahe
 of `master` and 109 behind.** It was the same plan. It died from merge cadence, not
 from a bad idea. A missed merge is a bug.
 
-**Policy lands on `master` through normal PRs.** Anything that is policy, or that
-`master` needs to know about — directory reservations, this document, CI jobs,
-CONTRIBUTING changes — goes through the standard process. Only code churn lives on
-the branch.
+**The three new directories belong to the working branch, in full.** Everything under
+[lean/](lean/), [crates/](crates/) and [conformance/](conformance/) is working-branch
+material — not only code, but the `README.md` and `CLAUDE.md` files in them. Design
+decisions get recorded next to the thing they constrain, at the moment they are made,
+because a decision that has to wait for a policy review is a decision that gets made
+in someone's head and written down later, or not at all.
+
+**Policy is what lives outside those three directories.** This document, `.github/`,
+`CONTRIBUTING`, and the deletion PRs in §6 go to `master` through the standard
+process. One carve-out: a CI workflow that gates only the new directories may ride the
+working branch so that it actually runs while the code is being written, and reach
+`master` with the next merge — it cannot affect any existing check, because its path
+filter matches nothing that exists on `master` today.
+
+The boundary is *location*, not subject matter, which makes it decidable by looking at
+a diff rather than by arguing about what counts as policy. It is also the same property
+the rest of this section rests on: a merge that only adds files under the three new
+directories cannot break `master`.
 
 **Unstable means unstable.** Nothing under the new directories is published, and
 nothing in it carries a compatibility promise until v1. Ugly intermediate states
@@ -365,10 +393,31 @@ Deletion is a normal PR against `master` with the evidence in the description.
 
 | Delete | When | Caveat |
 |---|---|---|
-| [coq/](coq/) | Lean reproduces every MiniCandid theorem **and** the two models have been diffed | If Lean disagrees with MiniCandid anywhere, that disagreement is the most valuable thing this project will find. Investigate before deleting. |
-| [spec/](spec/) | Verso output covers all normative content | `spec/Candid.md` is externally linked from docs sites, other implementations, and papers. Needs a redirect stub, not a `git rm`. |
-| [test/](test/) | All 471 assertions exist as conformance vectors and pass | — |
+| [coq/](coq/) | Every MiniCandid theorem's *purpose* is covered — see below | Not a model-to-model diff; the two are not comparable artifacts. |
+| [spec/](spec/) | The drafts in [lean/Spec/](lean/Spec/) cover all normative content | `spec/Candid.md` is externally linked from docs sites, other implementations, and papers. Needs a redirect stub, not a `git rm`. |
+| [test/](test/) | All 476 assertions exist as conformance vectors and pass | — |
 | [rust/](rust/) | `candid` v1 published and icp-cli + ic-cdk migrated | Long horizon. Expect 0.10.x maintenance in parallel throughout. |
+
+### What the `coq/` condition means
+
+An earlier version of this table asked that Lean "reproduce every MiniCandid theorem
+**and** the two models have been diffed." That was wrong on both halves, because it
+treated the two as the same kind of artifact differing only in coverage.
+
+MiniCandid is not an incomplete implementation. It is a **justification** device: it
+exists to show that non-obvious design decisions — the `opt` coercion rule above all —
+are sound, and to check that a proposed spec change can be accommodated by the existing
+system. The Lean model answers a different question: given this input, what happens?
+
+So the condition is that each MiniCandid theorem's *purpose* is discharged. For each
+one, either the property is stated and proved about the Lean definitions, or it is
+recorded as a justification the Lean model subsumes. And because the two use different
+representations — MiniCandid's types are `CoInductive` infinite trees, Lean's are finite
+with an explicit type table — there is no structural diff to perform.
+
+What is still worth doing, and is *not* a deletion gate: checking the two against each
+other on the nine constructors they share. A disagreement there would be a finding about
+the spec, and finding it is worth more than the deletion.
 
 ### Tools
 
@@ -397,10 +446,13 @@ with their reasoning; new evidence is the reason to revisit one.
 - Migration for mixed dependency graphs, where a project transitively pulls both
   `candid 0.10` and `candid 1` and the two `Nat`/`Principal`/`Type` are distinct
   types. This is the hardest part of the migration and it is unsolved.
-- Whether the canonical encoding profile (deterministic type-table ordering, no
-  unused entries, shortest-form LEB128) should be normative in the spec or a
-  separate conformance profile.
-- How `spec/` redirects are published once Verso output becomes canonical.
+- How `spec/` redirects are published once [lean/Spec/](lean/Spec/) becomes
+  canonical.
+- Whether to move the spec to [Verso](https://github.com/leanprover/verso), the Lean
+  FRO's literate-documentation system, so that the build fails when an example in it
+  stops type-checking. It has not been tried. Verso is young, so the first step is a
+  trial on one document, [lean/Spec/Types.md](lean/Spec/Types.md), which has the most
+  rules. Nothing else in this plan depends on the answer.
 - Whether this repo should publish a JavaScript-facing binding at all, and with
   what surface. `@dfinity/didc` (`tools/didc-js`) compiles the Rust implementation
   to wasm and has sat at 0.0.4 with no functional change since #602. It is not a

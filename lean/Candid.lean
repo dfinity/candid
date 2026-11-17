@@ -1,0 +1,24 @@
+/-
+Candid reference model.
+
+The ordering rule from README.md: executable first, proved second. Every definition
+here is reachable from the `oracle` executable, or a proof about something that is.
+-/
+
+import Candid.Hash
+import Candid.Types
+import Candid.Subtype
+import Candid.SubtypeSpec
+import Candid.Value
+import Candid.Coerce
+import Candid.Wire
+import Candid.Equiv
+import Candid.Principal
+import Candid.Float
+import Candid.Text.Lex
+import Candid.Text.Parse
+import Candid.Text.Flatten
+import Candid.Text.Elab
+import Candid.Did.Parse
+import Candid.Did.Import
+import Candid.Did.Check

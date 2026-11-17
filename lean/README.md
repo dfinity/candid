@@ -1,25 +1,48 @@
 # `lean/` — Lean 4 reference model and specification
 
-**Status: reserved, empty.** No content yet. See [REWRITE.md](../REWRITE.md) for
-why this exists.
+**Status: ninth slice.** Types, the field-id hash, subtyping — as both a relation and a
+decision procedure — values with coercion, the binary format in both directions,
+textual values, and `.did` descriptions, with an executable that writes them out
+as conformance vectors, reads them back, and is checked against `candid` 0.10 in CI. It
+is also held to every assertion of [test/](../test/). "Slice" is a label for
+what landed in a merge window, applied after the fact; the forward-looking plan is the
+coverage checklist below and the tiers in [REWRITE.md §3](../REWRITE.md#3-lean-honestly). Nothing is published and
+nothing carries a compatibility promise. See [REWRITE.md](../REWRITE.md) for why this
+exists.
+
+Eventually replaces [coq/](../coq/) and [spec/](../spec/), on the conditions in
+[REWRITE.md §6](../REWRITE.md#6-the-ratchet).
+
+The specification drafts are in [Spec/](Spec/), starting from
+[Spec/README.md](Spec/README.md): the four documents, how they fit together, and which
+of them covers each part of `spec/Candid.md`.
+
+```
+lake build                                    # build the libraries and the executable
+lake exe oracle                               # check the model against every vector
+lake exe oracle write ../conformance/vectors  # regenerate the committed vectors
+lake exe oracle check <file>...               # check vector files against the model
+```
+
+Two libraries. `Candid` is the model and imports nothing outside Lean's core.
+`Oracle` is about the model: the vector format and its JSON
+([Oracle/Vector.lean](Oracle/Vector.lean)), the hand-written vectors
+([Oracle/Handwritten.lean](Oracle/Handwritten.lean)), and the generator
+([Oracle/Generate.lean](Oracle/Generate.lean)). It uses `Lean.Data.Json`, which is why
+it is separate. The format itself is specified in
+[conformance/README.md](../conformance/README.md#format-version-0).
 
 ## What goes here
 
-A Lean 4 model of Candid that serves as both the **reference implementation** and,
-via [Verso](https://github.com/leanprover/verso), the **specification document**.
-
-Eventually replaces [coq/](../coq/) and [spec/](../spec/). See the ratchet in
-[REWRITE.md §6](../REWRITE.md#6-the-ratchet) for the conditions under which those
-are deleted — in particular, `coq/` is not removed until the two models have been
-diffed, because a disagreement between them would be the most valuable finding of
-this project.
+A Lean 4 model of Candid that serves as the **reference implementation**, and next
+to it, in [Spec/](Spec/), the **specification**.
 
 ## The ordering rule
 
 **Executable first, proved second.**
 
-1. `Ty`, `Value`, `subtype`, `coerce`, and the wire format as plain Lean functions
-   with `Decidable` instances.
+1. The type language, `Value`, `subtype`, `coerce`, and the wire format as plain
+   Lean functions with `Decidable` instances.
 2. A `lake`-built binary that reads a conformance vector file and reports results.
 3. CI wiring: that binary as a differential oracle against the Rust implementation.
 4. *Only then*, proofs about those definitions.
@@ -33,31 +56,491 @@ The rule that keeps it honest:
 > Every Lean definition must be either (a) reachable from the reference
 > executable, or (b) a proof about something that is. No orphan formalisation.
 
+## What slice 1 established
+
+**Coinductive predicates are available; coinductive data types are not.** Lean 4.32
+accepts `coinductive` only for `Prop`-valued definitions — `coinductive T : Type`
+fails with "`coinductive` keyword can only be used to define predicates." So
+MiniCandid's `CoInductive Subtype : T -> T -> Prop` ports directly and lives in
+[Candid/SubtypeSpec.lean](Candid/SubtypeSpec.lean), while its `CoInductive T` does
+not. Types are therefore finite, with recursion through explicit references into a
+type table — which is what the binary format does anyway, and what `candid_types` is
+specified to do with arena indices.
+
+**The spec's negative premises are eliminable.** Two of the four `opt` rules in
+`spec/Candid.md` carry negative premises, and a rule functional with negative
+premises is non-monotone, so it has no greatest fixed point — the relation would not
+be definable coinductively at all. Pairing each negative rule with its positive
+counterpart collapses them: `t <: opt t'` holds for *every* `t` and `t'`. The spec
+notes this in prose and `rust/candid/src/types/subtype.rs:293` implements it as a
+catch-all that only warns. Recording it as one premise-free rule is what makes the
+relation monotone.
+
+**Composites live only in the type table.** A table entry is a `Composite`, its
+children are `Slot`s, and a `Slot` is a primitive or an index — never an inline
+composite. That is not a modelling choice so much as the wire format's own shape
+(`spec/Candid.md:1208`), and the spec draws the conclusion the model is built on:
+"Because recursion goes through `T`, this format by construction rules out
+non-well-founded definitions like `type t = t`."
+
+What it bought: the only way for the subtype procedure to recurse is through a pair
+of *references*, so the finite set of reference pairs bounds the recursion. The
+procedure is a worklist: it carries the obligations still pending and the pairs
+already assumed — `seen` and `seenRev`, one list per direction — and each step either
+records a pair or discharges an obligation. The measure is (`remaining`, pending
+obligations), where `remaining` is the number of pairs the lists do *not* record; it is
+named only by `termination_by`, so the `|A| x |B|` pair space it counts over is never
+built at run time. No fuel, no `Option Bool`, and no "unanswered" state in the public
+API. The first version of this model, with composites nested inside each other, had no
+such measure: a cycle alternating which side holds the reference dodged the memo
+entirely, so no budget decided it.
+
+The assumptions are shared by the whole run rather than scoped to a path. Every
+premise of every rule is a conjunct, so nothing backtracks: a `false` anywhere is the
+answer, and a `true` means every assumption was discharged. Path-scoped assumptions
+were the earlier design, and they re-derive a shared sub-type once per path reaching
+it — exponential in depth, 2^41 - 1 comparisons for a 41-entry chain whose entries
+each reference the next twice. Each pair is now compared at most once per direction.
+
+What it cost: a type means nothing without its table, and even `vec nat` needs an
+entry, so hand-written types are built through `intern`/`close`. The `.did` surface
+syntax *is* nested, so the parser will produce a nested AST and flatten it — which is
+also what an encoder does when it emits a type table, so the flattening pass is a
+component this model owes rather than a translation it pays for.
+
+**Naming.** `Type` is unavailable in Lean (it is the universe), and abbreviating it
+to `Ty` would reproduce exactly the defect
+[crates/CLAUDE.md](../crates/CLAUDE.md) anti-pattern 4 names. So "Type" is the family
+prefix and never the whole name: `TypeTable`, `TypeRef`, with `CandidType` left for
+the Rust trait. These identifiers are meant to be **the same in Lean and in Rust**,
+which is what makes "`candid_subtype` reads as a transcription of its Lean
+counterpart" achievable rather than aspirational.
+
+The two names the flat representation introduced are borrowed from the spec's grammar
+instead: a `Composite` is a `<comptype>`, and a `Slot` is the `<datatype>` position
+that the wire format's `I` fills with either a primitive opcode or an index. Neither
+is a "type" — a slot cannot express one and a composite is not meaningful without its
+table — so neither takes the `Type` prefix.
+[crates/README.md](../crates/README.md#naming) records the same two names for the
+Rust side, since the point of sharing identifiers is that they name the same thing.
+
+`TypeTable` rather than `TypeEnv`, the name used in `rust/`, for two reasons. The spec
+calls it a table ("type definition table", `spec/Candid.md:1311`), so the prose and the
+identifier now agree — they did not when this was a `TypeEnv` described everywhere as
+a table. And `TypeEnv` in `rust/` is a `BTreeMap<String, Type>`
+(`rust/candid/src/types/type_env.rs:7`), a *name*-keyed environment of `.did`
+declarations, which is a genuinely different structure from this index-keyed table.
+Both will exist here eventually, so `TypeEnv` stays reserved for the one where
+"environment" is the accurate word. The same names are recorded for the Rust side in
+[crates/README.md](../crates/README.md#naming), because
+[crates/CLAUDE.md](../crates/CLAUDE.md) asks `candid_subtype` to read as a
+transcription of its Lean counterpart, and shared identifiers are most of what makes
+that checkable.
+
+**A table is checked once, and the type says so.** Well-formedness is a prerequisite
+of subtyping, decoding and encoding alike, so `TypeTable` is a table that carries the
+proof, and a decoder or builder produces a `RawTypeTable` and calls `check` on it.
+Checking only what an operation visits fails closed for some malformed inputs and not
+others: `empty <: t` never unfolds `t`, so a reference dangling behind `t`'s root went
+unnoticed while one *at* the root was rejected. `TypeTable` takes the short name
+because it is the one nearly every signature names.
+
+**Subtyping relates two type tables, not one.** A `Slot` holding a `ref` means
+nothing without its table, so a type is a `t.Root`: a slot checked to resolve in `t`,
+with `t` in its type rather than stored beside it. One table has many roots (a
+message's arguments, a service's methods), and a root of `A` cannot be passed where a
+root of `B` is expected. The case that matters most compares a type table that arrived on
+the wire against the receiver's own type graph, and those are unrelated tables;
+`rust/candid/src/types/subtype.rs:19` takes a single `env` for both types, which works
+only because callers merge tables first.
+
+The consequence to keep hold of: the `func` rule's contravariance swaps the *tables*
+along with the types, and therefore swaps the reference-pair accounting with the
+tables — while each assumption keeps its direction. The procedure carries two lists,
+`seen` for assumed `A <: B` pairs and `seenRev` for assumed `B <: A` pairs, and the
+parameter premise exchanges them. This model shipped both ways of getting it wrong.
+First it read `seen` unswapped, so a pair `(i, j)` asserted something about the
+transposed indices; then it swapped `seen` element-wise, which fixes the indices but
+reads an assumed `A.i <: B.j` as `B.j <: A.i` — the converse, which does not follow.
+Both reported `<:` for two types that are not related, and both are invisible when
+there is only one table to swap. The `contra` vectors in
+[Oracle/Handwritten.lean](Oracle/Handwritten.lean) are the witnesses, one per mistake.
+
+## What slice 2 established
+
+**Steps 2 and 3 of the ordering rule, for subtyping.** The executable writes every
+vector it knows to [conformance/vectors/](../conformance/vectors/), reads files back as
+any runner would, and CI checks both that the committed files are current and that
+`rust/candid` agrees with them
+([conformance/runners/candid-0.10/](../conformance/runners/candid-0.10/)). The checks
+that were built into the executable are now the hand-written vectors, unchanged; the
+generated ones pair every type in a small universe with every other.
+
+**The first run found a 0.10 bug, and it is the one this model's design rules out.**
+The procedure above shares its assumptions across the whole run, and that is sound
+*because nothing backtracks*: any `false` is the final answer, so nothing assumed on
+the way to it is ever reused. `rust/candid/src/types/subtype.rs` shares its `gamma` the
+same way, but it does backtrack — the `opt` rule tries `t <: t'` and, on failure, falls
+through to the special rule. The failed attempt removes only its own pair from
+`gamma`, so pairs proved under that assumption survive and answer later questions.
+`didc check` accepted a breaking upgrade this way, until 0.10.39 (#775) made a failed
+step withdraw every assumption made since it; the vector and the reasoning are in
+[Oracle/Handwritten.lean](Oracle/Handwritten.lean) under "Assumptions made under a
+failed comparison". The same reasoning is the constraint on `candid_subtype`: if it
+ever tries a rule and recovers from the failure, it cannot share assumptions across
+that recovery.
+
+**`Check.known` is gone.** The executable could mark one of its checks as a known gap
+in the model. None was ever marked, and in a vector file that is the runner's business,
+not the vector's: the candid 0.10 runner keeps its own `KNOWN` list, with the same rule
+that a listed divergence that starts agreeing is a failure.
+
+## What slice 3 established
+
+**Coercion, through all three steps at once.** [Candid/Value.lean](Candid/Value.lean)
+has values and what it means for one to have a type, and
+[Candid/Coerce.lean](Candid/Coerce.lean) has `coerce`: the spec's `v : t ~> v' : t'` as
+a function, `none` where no rule applies. Vectors of a new kind carry a value, the type
+it has, the type it is coerced at, and the result or `"reject"`. The 0.10 runner checks them by encoding the value at its type and
+decoding the bytes at the other, since 0.10 coerces only by decoding.
+
+**The negative premises are the `none` branch.** Two of the spec's `opt` rules say
+"and else goes to `null`", `not (exists <w>. <v> : <t> ~> <w> : <t'>)`. Stated as a
+function, that premise is the failure case of the inner call, so the four rules are one
+case split on whether the inner coercion succeeded. Nothing about them needed the
+elimination subtyping did.
+
+**Coercion has three outcomes, and the spec had to be fixed to say so.** Coercing a
+value whose type does not accept `null` at an `opt` type asks the same question one
+`opt` deeper, about the same value. At an *infinite option*, `type R = opt R`, that is
+the question being asked, and "else goes to `null`" made it depend on its own negation:
+`5 : nat ~> w : R` held exactly when it did not. The model first answered `null`, and
+0.10 disagreed: it unwraps the expected type until its recursion limit, an error its
+`opt` rule does not recover from, and rejects the message — under an enclosing `opt`,
+in a record field and in a vector element too. Looking for which was right turned up
+`test/construct.test.did`, which has asserted the rejection since #679, with Motoko
+running the same suite. Only the spec had not been updated, and #778 updated it: the
+coercion is *undefined*, which is not the same as failing, so nothing recovers from it.
+
+`coerce` therefore returns one of three outcomes: a value; a failure, which the `opt`
+rules turn into `null`; or `Undefined`, which they pass on. It is an
+`OptionT (Except Undefined)`, so `<|>` is exactly the `opt` rules' recovery. The
+generated vectors include types that hold an infinite option in a record field, a
+vector element and a variant tag, and the two-entry cycle, and all of them agree with
+0.10.
+
+That same step is the only one where the value does not get smaller, so it is also
+where termination needed thought. The model peels the expected type's whole chain of
+`opt`s at once (`optLayers`) and coerces at what is under it; a chain that does not end
+is an infinite option.
+
+**The runner found a bug in the model.** The first run disagreed on every coercion to
+`opt reserved`: the model said `null`, 0.10 said `opt null`. 0.10 was right —
+`5 : nat ~> null : reserved`, so the option around it is not empty. Once the chain of
+`opt`s was peeled, the case for `reserved` was no longer reached. Every hand-written
+vector had agreed with the model, and so had the three properties below; it took a
+second implementation to see it.
+
+**Three of the spec's properties hold over the generated universe** — roundtripping
+(`v : t ~> v : t`), well-typedness (the result has the target type), and soundness
+(`t <: t'` means no `v : t` fails to coerce; the spec's exception is the undefined
+coercion at an infinite option). `lake exe oracle` checks each for every sample
+value against every type and fails on a counterexample. That is a test, not a proof;
+see "Deferred, deliberately".
+
+**What a value is.** Numbers carry their width (`5 : nat8` and `5 : nat` are different
+values), which the spec's textual syntax leaves to context; a runner can then build a
+value without its type. Floats are their IEEE 754 bits, since coercion is the identity
+on them and bits keep what a `Float` would make unequal or lose: a NaN's payload and the
+sign of a zero. `null` is one value, as in the spec, where Rust's `IDLValue` has
+`Null`, `None` and `Reserved`. A record value lists its fields in ascending id order,
+the wire format's order, so roundtripping holds as equality rather than up to
+reordering.
+
+## What slice 4 established
+
+**The binary format, as a decoder that is strict and an encoder that is one choice of
+many.** [Candid/Wire.lean](Candid/Wire.lean) has LEB128, `encode`, `decode` -- the
+inverses of the spec's `T` and `M` -- and `deserialize`, which is `decode` followed by
+`coerceArgs`, the spec's "tuple types" rule: an argument sequence coerces like a
+tuple-shaped record, so an extra argument is ignored and a missing one is `null` where
+its type accepts `null`. A new vector kind carries bytes, the types to decode them at,
+and the values or `"reject"`.
+
+The encoder exists to generate vectors and for the round-trip check, not as a
+specification of bytes: the spec calls type serialisation "a relation", since an encoder
+chooses its table. That is why encoding conformance will be judged by decoding (see
+[conformance/README.md](../conformance/README.md#still-to-come)) rather than by a
+canonical encoding profile, which [REWRITE.md §2](../REWRITE.md#2-what-we-are-building)
+now records.
+
+**Decoding needed a termination argument the spec does not mention.** Every value
+consumes bytes except a record, whose encoding is only its fields', so `type R = record
+{ R }` -- or `record { null; R }` -- recurses without consuming anything. `M` is defined
+by recursion on the value, so such a type has no finite value, and nothing decodes at
+it. The decoder counts the records on its path that started at the current position and
+rejects past the table's size, which by pigeonhole is exactly "the same entry at the
+same position again". The measure is (bytes remaining, table size minus that count, the
+step's place in its list), and the proof is in the file. `candid` 0.10 agrees on both
+vectors; it gets there by rewriting such types to `empty` before decoding.
+
+**Choices the spec leaves open**, each recorded in the file's header: non-shortest
+LEB128 is accepted, as 0.10 does (REWRITE.md §7 has the open question); opaque
+references are rejected, since a `Value` has no reference table; and every value is
+decoded, including an extra argument and a record field the receiver drops, so a
+malformed one rejects the message. 0.10 agreed on that last one, which it did not have
+to: skipping a value is where a decoder is most tempted to stop checking it.
+
+**The runner found three places where 0.10 is narrower or looser than the spec**, all
+recorded as known divergences rather than fixed in either place: it allows at most one
+function annotation in a decoded type, it accepts a `oneway` function type with results
+from the wire, and it bounds a principal at 29 bytes. The first and third are questions
+about the spec as much as about 0.10. Both were settled in 0.10's favor: one mode
+(slice 7) and 29 bytes (slice 8).
+
+**A fourth property holds over the generated universe**: every sample encodes, and its
+bytes decode to the same value at the same type, in a table equal to the one written up
+to the order of each entry's members.
+
+## What slice 5 established
+
+**The model agrees with every assertion of `test/` it can be asked**: 447 of the 471,
+all of them about decoding. [Oracle/TestDid.lean](Oracle/TestDid.lean) holds the model to
+each assertion's claim -- accepted, rejected, or equal to some value -- and the oracle
+fails on any it disagrees with; none needed an exception. The vectors carry the model's
+answers, so they say more than the assertions did: `assert blob "..." : (nat)` says
+that a message is accepted, and its vector says as what. 0.10 agrees with all of them.
+
+The `.test.did` files stay the source. `conformance/tools/test-did` reads them with
+`candid_parser` and writes [Oracle/TestDid/Data.lean](Oracle/TestDid/Data.lean): the
+bytes, the types as a table, and the claim. The model has no textual syntax yet, so
+text on the right of `==` arrives as the values `candid_parser` reads it as, at the
+assertion's types. The 24 assertions left then waited on the cost model (the 17 of
+`spacebomb.test.did`, since checked as costly messages) and on the textual syntax (7,
+with text on the left, which slice 6 checks).
+
+**Future types.** A decoder that meets an opcode below `-24` now skips it as the spec
+says, keeping the type in the table as `Composite.future` and decoding its values to
+`null`. The general rules make a future type a subtype of `reserved` and of every
+option, which is what `test/subtypes.test.did` asserts; the spec has no rule of its own
+for them, and the model adds only reflexivity. A future value's reference count is read
+and ignored, as 0.10 does, since the model has no reference table.
+
+## What slice 6 established
+
+**Textual values, specified first in the new style.** [Spec/TextValues.md](Spec/TextValues.md)
+is the first section of the new specification: RFC conventions, ABNF, and elaboration
+rules `e ⇐ t ⇝ v` that give text a meaning at a type, which `spec/Candid.md` leaves to
+"context". [Candid/Text/](Candid/Text/) implements it: a lexer, a parser into the
+document's abstract syntax, and elaboration, one function per rule. The `parse` vectors
+in `handwritten.json` follow the document section by section, with their expectations
+written from it.
+
+**What it needed.** Type equivalence ([Candid/Equiv.lean](Candid/Equiv.lean)), since an
+annotation must name the expected type: the subtype procedure's worklist in one
+direction, with the same termination measure. The textual form of principals
+([Candid/Principal.lean](Candid/Principal.lean)), CRC-32 and base32. And float literals
+rounded once and exactly ([Candid/Float.lean](Candid/Float.lean)), on naturals, deciding
+an absurd exponent before multiplying anything out.
+
+**Every assertion of `test/` is checked.** The 7 with text on the left are `parse`
+vectors now, and text on the right of `==` is read by the model, not taken from
+`candid_parser`. The model reads all of it as `candid_parser` does, which the oracle
+checks (`TestDid.parserViolations`). Where the document and 0.10 differ, the runner lists
+the vectors as known divergences, and the document's Appendix B.2 says why. Three of them
+are panics in 0.10.
+
+**Types in annotations are nested and flattened.** `TypeExpr` is the type syntax as
+written, and `flatten` interns it into a table, which is half of the `.did` work below.
+Names are kept in the syntax but resolve in an empty environment, so a name is rejected.
+
+## What slice 7 established
+
+**Descriptions, specified first.** [Spec/Did.md](Spec/Did.md) is the second section of
+the new specification. It defines the syntax of types, which
+[Spec/TextValues.md](Spec/TextValues.md) used to leave to `spec/Candid.md`, and of
+descriptions: imports and definitions, then a service or a service constructor. A description
+means an **interface**: the type of every name, and the service's type and
+initialization arguments. [Candid/Did/](Candid/Did/) implements it, and the `did`
+vectors in `handwritten.json` follow the document section by section.
+
+**Names become a table.** A definition whose right-hand side is a composite owns one
+entry of the table, reserved before anything is flattened, so a recursive definition
+becomes a cycle in the table. A definition that is another name or a primitive owns
+nothing, and its name denotes whatever the chain reaches. Flattening
+([Candid/Text/Flatten.lean](Candid/Text/Flatten.lean)) is the annotations' flattener,
+now given an environment. Well-formedness is the table's own check, so every definition
+is checked, used or not, as the document requires.
+
+**An interface is compared up to equivalence.** A `did` vector's expected table need not
+be the model's, or an implementation's: each name, argument and service is compared
+with `decEquiv`, and the runner uses 0.10's `subtype::equal`. Two names for one
+recursive type can be written as one entry, as the hand-written vectors do.
+
+**Decided along the way.** A function type has at most one mode, and no annotation
+twice: a well-formedness rule, so it holds for types decoded from the wire too, where
+the model used to accept `query oneway`. The grammar still takes a list, so that a
+future annotation that is not a mode can combine with one, and annotation names are
+identifiers, not keywords, so that adding one breaks no existing name. A definition may not bind a primitive type's name, which 0.10
+accepts and then can never use. Each is in the document's Appendix A.
+
+**Imports expand into one description.** A description and everything it imports
+become one description without imports, which is then checked as any other
+([Candid/Did/Import.lean](Candid/Did/Import.lean)). Imports resolve relative to the
+importing description, with `.` and `..` removed. Cycles are rejected, names are one
+namespace and are visible through indirect imports, and every description must be
+self-contained. Methods come from `import service` alone, so a plain import never adds
+any. A `did` vector carries the descriptions its text imports, and the runner writes
+them to disk for 0.10's `check_file`.
+
+## What slice 8 established
+
+**The core of the spec, in the new style.** [Spec/Types.md](Spec/Types.md) is the third
+section of the new specification: the types and their values, field ids and their
+hash, equivalence and well-formedness, subtyping, and coercion. The other two drafts
+now refer to it instead of to `spec/Candid.md`. Subtyping is stated as one list of rules
+whose greatest fixed point is the relation, with the four `opt` rules as one, which is
+how [Candid/SubtypeSpec.lean](Candid/SubtypeSpec.lean) already had it. Coercion is
+stated as cases with three outcomes, which is how
+[Candid/Coerce.lean](Candid/Coerce.lean) already computed it.
+
+**Writing it down found a bug in the model.** When one part of a value fails to
+coerce and another is undefined, under an enclosing option, the first part decides
+between `null` and rejection. The model read a vector's elements in order, but a
+record's fields last-to-first, and a missing field after the present ones. candid
+0.10 decides in ascending order of the expected type's field ids, missing fields
+included, which is the order a decoder meets them in, and the document says so
+(Section 6.5). The model now computes each field's outcome and reads them in that
+order; six hand-written vectors cover records, missing fields and vectors, and 0.10
+agrees with all of them. No subtyping or coercion vector differs from 0.10.
+
+**Principals are at most 29 bytes.** The spec now bounds them where the Internet
+Computer and 0.10 do, so the last types-level divergence from 0.10 is gone: a decoder
+rejects a longer principal or reference, and text that encodes one is no principal. The
+document also says plainly that subtyping is not complete, with an example, rather than
+leaving completeness as an open issue.
+
+**Subtyping is not transitive.** `record{a : nat} <: record{} <: record{a : null}`, but
+`record{a : nat} <: record{a : null}` does not hold. `spec/Candid.md` has the same rules
+and claims transitivity; 0.10 agrees with the rules. The document now states the
+counterexample, and lists restricting added fields to `reserved` and options as open.
+
+## What slice 9 established
+
+**The binary format, in the new style.** [Spec/Binary.md](Spec/Binary.md) is the fourth
+section of the new specification, and the last part of `spec/Candid.md` it restates:
+LEB128 and the other encodings, the layout of a message, the type table, values,
+deserialisation as decoding then coercion, serialisation, and resource limits. The
+other three drafts now refer to it, and cite `spec/Candid.md` only informatively, for
+comparison. It writes down what the model's decoder already did where `spec/Candid.md`
+is silent: no references outside the message, strictly ordered members, every table
+entry and every value checked, types without values rejected, and LEB128 of any length
+accepted.
+
+**Four new divergences from 0.10, three in how it reads a number.** It matches the six
+composite opcodes as single bytes, so `ee 7f`, which is −18 in two bytes, is not `opt`
+to it; it reads a function's annotation count as one byte; and it rejects a length in
+a value written in ten bytes or more. The document keeps one rule, LEB128 of any
+length, since no encoder writes these forms, and the vectors are known divergences. A
+fourth: 0.10 does not check the method name of a function reference that coercion
+drops, where the document checks every value.
+The other new vectors, on redundant LEB128, a two-byte future opcode and a type
+without values at `reserved`, agree.
+
 ## Constraints
 
 - **No mathlib.** We do not need it, and depending on it would dominate build
   times and breakage surface.
 - **Pin `lean-toolchain`.** Lean's toolchain moves faster than Coq's. Upgrades are
-  scheduled work, not incidental.
-- **Verso is young.** Expect to read its source rather than its documentation.
+  scheduled work, not incidental. Currently `v4.32.2`.
+- **No `sorry`.** An unproved `theorem` in the build reads as established once it
+  scrolls past. Obligations are written as prose next to the definitions they
+  constrain, and become `theorem`s when they are proved.
 
 ## Coverage target
 
 The Coq model covers nine type constructors and no binary format. This model must
 cover what actually breaks in production:
 
-- [ ] Primitive types, including the numeric tower and float edge cases
-- [ ] Records, variants, vectors, text
-- [ ] Recursive types and the type-table graph
-- [ ] Subtyping, as a relation with a derived decision procedure
-- [ ] Coercion, including the `opt` backtracking rule
-- [ ] Binary wire format: type table, memory section, LEB128/SLEB128
-- [ ] Cost model / resource exhaustion
-- [ ] Textual value syntax
+- [x] Primitive types — the constructors, including the numeric tower's *lack* of
+      width subtyping. A float value is its bits, and coercion is the identity on it,
+      so float edge cases belong to the textual value syntax.
+- [x] Records, variants, vectors, text — as types
+- [x] Recursive types and the type-table graph
+- [x] Well-formedness of types — references resolve, labels do not repeat, a `oneway`
+      function has no results, and a method type denotes a function
+- [x] Subtyping, as a relation with a derived decision procedure
+- [x] Values, and coercion, including the `opt` backtracking rule
+- [x] Binary wire format: type table, memory section, LEB128/SLEB128, future
+      types -- decoding, and an encoder
+- [x] Resource limits -- the spec leaves to an implementation which messages it
+      rejects for lack of resources. The model's decoder stops at `costlyLimit`
+      values, so the oracle can tell a message it cannot afford, such as those of
+      `test/spacebomb.test.did`, from one it answers
+- [x] Textual value syntax — lexing, parsing and elaboration at a type, after
+      [Spec/TextValues.md](Spec/TextValues.md)
+- [x] `.did` descriptions — the type syntax, definitions, services and imports, after
+      [Spec/Did.md](Spec/Did.md)
 
-## Prior art in this repo
+## Deferred, deliberately
 
-[coq/MiniCandid.v](../coq/MiniCandid.v) proves `subtyping_refl`,
-`subtyping_trans`, `coerce_roundtrip`, `coerce_well_defined`, `soundness`, and
-`transitive_coherence`. These are real theorems about the genuinely subtle part of
-the language and they should be ported, not discarded. Read it before starting.
+Named here so they are obligations rather than oversights.
+
+- **`decSubtype_iff`** — that the procedure decides the relation. Stated in
+  [Candid/SubtypeSpec.lean](Candid/SubtypeSpec.lean). Soundness should follow by
+  coinduction, with the pairs recorded in `seen` and `seenRev` as the coinductive
+  hypothesis, which is what they mean. Because the assumptions are shared across the
+  run, the invariant is about the whole worklist: when it empties, the assumed pairs
+  are a set closed under the rules. There is no budget premise to discharge: the procedure
+  returns `Bool` and is total.
+- **Coercion's properties as theorems.** Roundtripping, well-typedness, and soundness
+  against `Subty` are checked by the executable over the generated universe (see
+  "What slice 3 established"); the theorems are about every value, and soundness is
+  the one MiniCandid proves as `coerce_well_defined`. Stated in prose in
+  [Candid/Coerce.lean](Candid/Coerce.lean)'s header, not as `sorry`s.
+- **Membership is a scan.** `seen` and `seenRev` are lists, so `contains` walks every
+  pair recorded so far, and a table of *n* entries in one long cycle costs O(n²):
+  measured 234 ms at 10,000 entries and 6.3 s at 50,000. `run` is tail-recursive, so
+  depth costs no stack. A hash set would make this linear in the pairs compared; the
+  reference model keeps lists, which the termination measure is stated over, until a
+  conformance vector makes that a problem.
+- **`candid_parser`'s `.did` test files as vectors.** `rust/candid_parser/tests/assets`
+  holds about thirty descriptions, with the rejections in `ok/*.fail`. Translating them,
+  as `conformance/tools/test-did` translates `test/`, would hold the model to
+  descriptions written for 0.10 rather than for the document.
+- **Names in annotations.** A textual value is read with an empty environment, so a type
+  name in an annotation is rejected. Reading text against a description's interface
+  would let it resolve.
+- **Encoding vectors.** An encoding vector is a value and a type, and the check is that
+  an implementation's bytes decode to an *equivalent* type and the same value.
+  Equivalence is written now ([Candid/Equiv.lean](Candid/Equiv.lean)); the vectors are not.
+- **Elaboration's properties as theorems.** That it is deterministic, that its result
+  has the type it was elaborated at, and that it terminates are stated in
+  [Spec/TextValues.md](Spec/TextValues.md), Section 5.10. Termination holds by
+  construction, since it recurses on the expression; the other two are not proved.
+- **Verso.** Deliberately not yet: bundling an undocumented doc toolchain into the
+  work whose purpose was de-risking the build would have doubled the unknowns. The
+  spec is Markdown, and whether to move it is open
+  ([REWRITE.md §7](../REWRITE.md#7-open-questions)).
+
+## Relationship to `coq/`
+
+MiniCandid is not an incomplete implementation — it is a *justification* device. It
+exists to show that non-obvious design decisions are sound, and to check that a
+proposed spec change can be accommodated by the existing system. This model answers a
+different question: given this input, what happens?
+
+[REWRITE.md §6](../REWRITE.md#what-the-coq-condition-means) now states the deletion
+condition accordingly — each MiniCandid theorem's *purpose* discharged, rather than a
+model-to-model diff, which is not available anyway once one side has finite types and
+an explicit table.
+
+What remains worth doing, and is not a deletion gate: checking this model against
+MiniCandid on the nine constructors they share. A disagreement there would be a
+finding about the spec.
+
+[coq/MiniCandid.v](../coq/MiniCandid.v) proves `subtyping_refl`, `subtyping_trans`,
+`coerce_roundtrip`, `coerce_well_defined`, `soundness`, and `transitive_coherence`.
+These are real theorems about the genuinely subtle part of the language, they attach
+to `Subty` here, and they are worth restating over records, variants, vectors and
+recursion rather than over nine constructors. Read it before starting.
