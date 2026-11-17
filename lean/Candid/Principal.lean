@@ -8,7 +8,9 @@ encodes and comparing, ignoring ASCII case: any other spelling is rejected, so t
 checksum, the base32 and the dashes are all checked by one comparison.
 
 Text that encodes more than `maxPrincipalLength` bytes is rejected, since it is the
-text of no principal (`lean/Spec/Types.md`, Section 3.1).
+text of no principal (`lean/Spec/Types.md`, Section 3.1). Text longer than the text of
+any such principal is rejected before it is decoded, so reading it costs time linear in
+its length.
 -/
 
 import Candid.Value
@@ -60,8 +62,13 @@ def unbase32? (s : String) : Option (List UInt8) := do
   return (List.range (bits.length / 8)).map fun i =>
     ((bits.drop (8 * i)).take 8).foldl (2 * · + ·) 0 |>.toUInt8
 
+/-- The length of the longest text of a principal: the base32 of 4 checksum bytes and
+`maxPrincipalLength` bytes, 53 characters, with 10 dashes. -/
+def maxPrincipalTextLength : Nat := 63
+
 /-- The principal that `s` is the text of, if any. -/
 def principalOfText? (s : String) : Option PrincipalBytes := do
+  guard (s.length ≤ maxPrincipalTextLength)
   let all ← unbase32? (String.ofList (s.toList.filter (· != '-')))
   guard (all.length ≥ 4)
   let p := all.drop 4
