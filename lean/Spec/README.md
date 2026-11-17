@@ -58,9 +58,11 @@ the conformance vectors and [spec/Candid.md][CANDID].
 - **Text** is read at a type the reader already has. [TEXT] elaborates an expression at
   that type and gives a value of it. Type annotations inside text use the type syntax of
   [DID].
-- **Upgrades** are checked by subtyping ([TYPES], Section 5). The relation guarantees
-  that a message sent at a subtype never fails to decode at its supertype
-  ([TYPES], Section 7).
+- **Upgrades** are checked by subtyping ([TYPES], Section 5). If `t <: t'`, coercing a
+  value of type *t* at *t'* never fails ([TYPES], Section 7). It can still be
+  undefined, at an infinite option such as `type R = opt R`, and a message that is
+  undefined there is rejected ([BINARY], Section 7). A receiver may also reject any
+  message for lack of resources ([BINARY], Section 9).
 
 [DID] and [TEXT] share one lexical structure, defined in [TEXT], Section 3.
 
