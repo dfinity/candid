@@ -30,7 +30,7 @@ Eventually replaces [test/](../test/).
 
 ## What is wrong with the current suite
 
-[test/](../test/) contains 471 assertions across six files. They are good
+[test/](../test/) contains 476 assertions across six files. They are good
 assertions — the problem is packaging, not content.
 
 - **It cannot bootstrap.** The format is a bespoke extension of the Candid text
@@ -334,8 +334,8 @@ What the runners have found, recorded so that they outlive the run that found th
 
 ## Migration
 
-All 471 existing assertions must exist as vectors and pass before
-[test/](../test/) is deleted. All 471 do, in `test-did.json`, and the model and 0.10
+All 476 existing assertions must exist as vectors and pass before
+[test/](../test/) is deleted. All 476 do, in `test-did.json`, and the model and 0.10
 agree on every one. The 17 in `spacebomb.test.did` are `costly` vectors: they assert
 that a decoder with self-metering rejects valid messages, and the spec leaves which
 ones to the implementation. The 7 with text on the left are `parse` vectors.

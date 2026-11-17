@@ -146,7 +146,7 @@ patience for nothing. They have to be bundled.
 
 ### 1.6 The conformance suite cannot bootstrap a new implementation
 
-[test/](test/) holds 471 assertions across six files, and they are good assertions.
+[test/](test/) holds 476 assertions across six files, and they are good assertions.
 But:
 
 - The format is a **bespoke extension of the Candid text grammar**, so you need a
@@ -317,7 +317,7 @@ serde-style generic traits, so today's decoder is out of reach regardless. But
 
 - **Not a clean-room restart.** The existing implementation is a *requirements
   document*. It encodes years of hard-won knowledge — the spacebomb defenses, the
-  cost-metering constants, the 471 assertions, and every edge case with a
+  cost-metering constants, the 476 assertions, and every edge case with a
   CHANGELOG entry behind it. Losing those is the one thing that would genuinely
   cost us years. We mine it; we do not imitate it.
 - **Not a separate repository.** Keeping it here preserves the crates.io
@@ -395,7 +395,7 @@ Deletion is a normal PR against `master` with the evidence in the description.
 |---|---|---|
 | [coq/](coq/) | Every MiniCandid theorem's *purpose* is covered — see below | Not a model-to-model diff; the two are not comparable artifacts. |
 | [spec/](spec/) | The drafts in [lean/Spec/](lean/Spec/) cover all normative content | `spec/Candid.md` is externally linked from docs sites, other implementations, and papers. Needs a redirect stub, not a `git rm`. |
-| [test/](test/) | All 471 assertions exist as conformance vectors and pass | — |
+| [test/](test/) | All 476 assertions exist as conformance vectors and pass | — |
 | [rust/](rust/) | `candid` v1 published and icp-cli + ic-cdk migrated | Long horizon. Expect 0.10.x maintenance in parallel throughout. |
 
 ### What the `coq/` condition means
