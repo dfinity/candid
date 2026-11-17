@@ -817,6 +817,153 @@ fn test_vector() {
     );
 }
 
+/// Regression test: a `vec` longer than a Rust array used to decode without
+/// error, leaving the extra elements unread so the following fields were
+/// decoded from the wrong offset (e.g. a 33-byte `vec nat8` into `[u8; 32]`).
+#[test]
+fn test_vec_longer_than_array() {
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct WithVec<T> {
+        sub: Vec<T>,
+        amount: Nat,
+    }
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct WithBytes32 {
+        sub: [u8; 32],
+        amount: Nat,
+    }
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct WithNats2 {
+        sub: [Nat; 2],
+        amount: Nat,
+    }
+    let with_vec = |sub: Vec<u8>| {
+        encode(&WithVec {
+            sub,
+            amount: Nat::from(1u8),
+        })
+    };
+
+    // Exact length decodes.
+    test_decode(
+        &with_vec(vec![0x80; 32]),
+        &WithBytes32 {
+            sub: [0x80u8; 32],
+            amount: Nat::from(1u8),
+        },
+    );
+    // Too long and too short are both rejected (primitive fast path).
+    check_error(
+        || {
+            test_decode(
+                &with_vec(vec![0x80; 33]),
+                &WithBytes32 {
+                    sub: [0; 32],
+                    amount: Nat::from(0u8),
+                },
+            )
+        },
+        "invalid length",
+    );
+    check_error(
+        || {
+            test_decode(
+                &with_vec(vec![0x80; 31]),
+                &WithBytes32 {
+                    sub: [0; 32],
+                    amount: Nat::from(0u8),
+                },
+            )
+        },
+        "invalid length",
+    );
+    // Non-primitive element types go through the generic vector path.
+    let bytes = encode(&WithVec {
+        sub: vec![Nat::from(9u8); 3],
+        amount: Nat::from(1u8),
+    });
+    check_error(
+        || {
+            test_decode(
+                &bytes,
+                &WithNats2 {
+                    sub: [Nat::from(9u8), Nat::from(9u8)],
+                    amount: Nat::from(1u8),
+                },
+            )
+        },
+        "invalid length",
+    );
+    // At the top level too.
+    check_error(
+        || test_decode(&encode(&vec![1u32; 3]), &[1u32; 2]),
+        "invalid length",
+    );
+}
+
+/// Regression test: a Rust tuple decoded from a wire tuple with extra
+/// trailing fields (allowed by subtyping) used to leave those fields unread,
+/// so the following fields were decoded from the wrong offset.
+#[test]
+fn test_tuple_extra_trailing_fields() {
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct T3 {
+        t: (u8, u8, u8),
+        amount: Nat,
+    }
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct T2 {
+        t: (u8, u8),
+        amount: Nat,
+    }
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct Pair(u8, String);
+    #[derive(PartialEq, Debug, Deserialize, CandidType)]
+    struct WithPair {
+        p: Pair,
+        amount: Nat,
+    }
+
+    let bytes = encode(&T3 {
+        t: (1, 2, 200),
+        amount: Nat::from(1u8),
+    });
+    test_decode(
+        &bytes,
+        &T2 {
+            t: (1, 2),
+            amount: Nat::from(1u8),
+        },
+    );
+    // Trailing fields of non-primitive types, into a tuple struct.
+    let bytes_record = {
+        #[derive(CandidType)]
+        struct Wire {
+            p: (u8, String, Vec<Nat>, Option<T2>),
+            amount: Nat,
+        }
+        encode(&Wire {
+            p: (
+                7,
+                "x".to_string(),
+                vec![Nat::from(300u32)],
+                Some(T2 {
+                    t: (3, 4),
+                    amount: Nat::from(5u8),
+                }),
+            ),
+            amount: Nat::from(1u8),
+        })
+    };
+    test_decode(
+        &bytes_record,
+        &WithPair {
+            p: Pair(7, "x".to_string()),
+            amount: Nat::from(1u8),
+        },
+    );
+}
+
 /// Regression test: decoding a `BTreeMap<String, V>` where `V` is an enum containing
 /// a `BTreeMap<K, V2>` with a non-text enum key used to fail with "Type mismatch".
 ///

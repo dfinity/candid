@@ -11,7 +11,7 @@ export interface A {
 export type B = { '' : null } |
   { '空的' : null } |
   { '  空的  ' : null } |
-  { '1⃣\u{fe0f}2⃣\u{fe0f}3⃣\u{fe0f}' : null };
+  { '1\u{20e3}\u{fe0f}2\u{20e3}\u{fe0f}3\u{20e3}\u{fe0f}' : null };
 export interface _SERVICE {
   '' : ActorMethod<[bigint], bigint>,
   '✈\u{fe0f}  🚗 ⛱\u{fe0f} ' : ActorMethod<[], undefined>,
