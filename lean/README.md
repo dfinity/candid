@@ -34,8 +34,8 @@ it is separate. The format itself is specified in
 
 ## What goes here
 
-A Lean 4 model of Candid that serves as both the **reference implementation** and,
-via [Verso](https://github.com/leanprover/verso), the **specification document**.
+A Lean 4 model of Candid that serves as the **reference implementation**, and next
+to it, in [Spec/](Spec/), the **specification**.
 
 ## The ordering rule
 
@@ -453,7 +453,6 @@ without values at `reserved`, agree.
   times and breakage surface.
 - **Pin `lean-toolchain`.** Lean's toolchain moves faster than Coq's. Upgrades are
   scheduled work, not incidental. Currently `v4.32.2`.
-- **Verso is young.** Expect to read its source rather than its documentation.
 - **No `sorry`.** An unproved `theorem` in the build reads as established once it
   scrolls past. Obligations are written as prose next to the definitions they
   constrain, and become `theorem`s when they are proved.
@@ -520,7 +519,9 @@ Named here so they are obligations rather than oversights.
   [Spec/TextValues.md](Spec/TextValues.md), Section 5.10. Termination holds by
   construction, since it recurses on the expression; the other two are not proved.
 - **Verso.** Deliberately not yet: bundling an undocumented doc toolchain into the
-  work whose purpose was de-risking the build would have doubled the unknowns.
+  work whose purpose was de-risking the build would have doubled the unknowns. The
+  spec is Markdown, and whether to move it is open
+  ([REWRITE.md §7](../REWRITE.md#7-open-questions)).
 
 ## Relationship to `coq/`
 
