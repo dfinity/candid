@@ -10,7 +10,8 @@ This document proposes a staged rewrite of Candid's specification, reference
 model, and Rust implementation. It exists so that the reasoning behind it is
 written down and citable rather than undocumented.
 
-**Status:** proposal, not scheduled work. **Author:** @lwshang.
+**Status:** in progress. The Lean model, the conformance vectors and the spec drafts
+exist on the `rewrite` branch; the crates have not started. **Author:** @lwshang.
 
 ---
 
@@ -179,7 +180,7 @@ needed when the old thing is deleted.**
 
 | New | Replaces | Contains |
 |---|---|---|
-| [lean/](lean/) | [coq/](coq/), [spec/](spec/) | Lean 4 reference implementation + Verso spec sources |
+| [lean/](lean/) | [coq/](coq/), [spec/](spec/) | Lean 4 reference implementation + spec drafts |
 | [crates/](crates/) | [rust/](rust/) | Redesigned Rust crates |
 | [conformance/](conformance/) | [test/](test/) | Machine-readable vectors, generator, runner |
 
@@ -192,12 +193,12 @@ wired into CI as a differential oracle against the Rust implementation. Only the
 do we prove things about those definitions. Inverting this produces MiniCandid
 again, in a different language.
 
-The spec is authored with [Verso](https://github.com/leanprover/verso), the Lean
-FRO's literate-documentation system (the one used for the official Lean Language
-Reference). Prose, inference rules, and elaborated Lean live in one document; the
-build fails if the examples stop type-checking. Every rule gets stated twice — as
-an inference rule for readers who think in those terms, and as an executable
-definition for everyone else.
+The spec is written as Markdown in [lean/Spec/](lean/Spec/), next to the model, in
+the style of RFCs and the Wasm specification. It is held to the model through the
+conformance vectors: each document names the model files that implement it, and the
+vectors those files generate run against the Rust implementation in CI. Whether to
+move it to [Verso](https://github.com/leanprover/verso), so that the build also
+checks its examples, is open (§7).
 
 **`crates/`** — a layered redesign. Provisional shape:
 
@@ -284,8 +285,8 @@ CI.* The design rule that prevents that:
 > executable, or (b) a proof about something that is.** No orphan formalisation.
 
 Additional costs, stated up front: Lean's toolchain moves faster than Coq's, so
-`lean-toolchain` is pinned and upgrades are scheduled work. Verso is young; expect
-to read its source rather than its docs. We do **not** depend on mathlib.
+`lean-toolchain` is pinned and upgrades are scheduled work. We do **not** depend on
+mathlib.
 
 **Bus factor.** @lwshang has been learning Lean and would own this part, though
 applying it to a production project would be new. That is a real single point of
@@ -393,7 +394,7 @@ Deletion is a normal PR against `master` with the evidence in the description.
 | Delete | When | Caveat |
 |---|---|---|
 | [coq/](coq/) | Every MiniCandid theorem's *purpose* is covered — see below | Not a model-to-model diff; the two are not comparable artifacts. |
-| [spec/](spec/) | Verso output covers all normative content | `spec/Candid.md` is externally linked from docs sites, other implementations, and papers. Needs a redirect stub, not a `git rm`. |
+| [spec/](spec/) | The drafts in [lean/Spec/](lean/Spec/) cover all normative content | `spec/Candid.md` is externally linked from docs sites, other implementations, and papers. Needs a redirect stub, not a `git rm`. |
 | [test/](test/) | All 471 assertions exist as conformance vectors and pass | — |
 | [rust/](rust/) | `candid` v1 published and icp-cli + ic-cdk migrated | Long horizon. Expect 0.10.x maintenance in parallel throughout. |
 
@@ -445,10 +446,13 @@ with their reasoning; new evidence is the reason to revisit one.
 - Migration for mixed dependency graphs, where a project transitively pulls both
   `candid 0.10` and `candid 1` and the two `Nat`/`Principal`/`Type` are distinct
   types. This is the hardest part of the migration and it is unsolved.
-- Whether a decoder must accept non-shortest LEB128. The spec says only "LEB128";
-  `candid` 0.10 accepts overlong forms, and the Lean model follows it for now.
-  Encoding conformance does not depend on the answer (see §2), decoding does.
-- How `spec/` redirects are published once Verso output becomes canonical.
+- How `spec/` redirects are published once [lean/Spec/](lean/Spec/) becomes
+  canonical.
+- Whether to move the spec to [Verso](https://github.com/leanprover/verso), the Lean
+  FRO's literate-documentation system, so that the build fails when an example in it
+  stops type-checking. It has not been tried. Verso is young, so the first step is a
+  trial on one document, [lean/Spec/Types.md](lean/Spec/Types.md), which has the most
+  rules. Nothing else in this plan depends on the answer.
 - Whether this repo should publish a JavaScript-facing binding at all, and with
   what surface. `@dfinity/didc` (`tools/didc-js`) compiles the Rust implementation
   to wasm and has sat at 0.0.4 with no functional change since #602. It is not a
