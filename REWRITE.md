@@ -445,9 +445,6 @@ with their reasoning; new evidence is the reason to revisit one.
 - Migration for mixed dependency graphs, where a project transitively pulls both
   `candid 0.10` and `candid 1` and the two `Nat`/`Principal`/`Type` are distinct
   types. This is the hardest part of the migration and it is unsolved.
-- Whether a decoder must accept non-shortest LEB128. The spec says only "LEB128";
-  `candid` 0.10 accepts overlong forms, and the Lean model follows it for now.
-  Encoding conformance does not depend on the answer (see §2), decoding does.
 - How `spec/` redirects are published once Verso output becomes canonical.
 - Whether this repo should publish a JavaScript-facing binding at all, and with
   what surface. `@dfinity/didc` (`tools/didc-js`) compiles the Rust implementation
