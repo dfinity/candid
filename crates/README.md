@@ -1,7 +1,14 @@
 # `crates/` — redesigned Rust implementation
 
-**Status: reserved, empty.** No content yet. Nothing here is published to
-crates.io. See [REWRITE.md](../REWRITE.md) for why this exists.
+**Status: `candid_types` started.** One crate, in a workspace of its own
+([Cargo.toml](Cargo.toml)): the type language of [lean/Candid/Types.lean](../lean/Candid/Types.lean)
+and [Hash.lean](../lean/Candid/Hash.lean), checked against the `hash` and `wellformed`
+vectors, and against every table the other vectors promise is well formed. Nothing here
+is published to crates.io. See [REWRITE.md](../REWRITE.md) for why this exists.
+
+```
+cargo test --manifest-path crates/Cargo.toml
+```
 
 Eventually replaces [rust/](../rust/). That is a long horizon — `rust/` is not
 deleted until `candid` v1 is published *and* icp-cli and ic-cdk have migrated, and
@@ -75,6 +82,11 @@ counterpart" into a checkable property rather than an aspiration.
 | `FieldId` | a record or variant label: a 32-bit id |
 | `CandidType` | the derive trait |
 | `TypeEnv` | **reserved**, see below |
+
+Shared names are for *things*. Functions follow Rust's conventions where Lean's would
+read oddly: `lookup?` is `lookup`, `size` is `len`, `hashFieldName` is
+`hash_field_name`, and `check` returns a `Result` naming the malformed entry where
+Lean's returns an `Option`.
 
 `Type` cannot be used in Lean (it is the universe) and `Ty` would violate
 [CLAUDE.md](CLAUDE.md) anti-pattern 4, so "Type" is a family prefix and never a whole
