@@ -72,5 +72,40 @@ fn long_chain_to_a_bad_service_is_rejected() {
     // Validation still reaches the end of the chain: the service there has a
     // method whose type is not a function.
     let err = load_err(chain("opt ", "service { m : leaf };\ntype leaf = nat"));
-    assert!(err.contains("not a function"), "{err}");
+    assert!(err.contains("method m is a non-function type"), "{err}");
+}
+
+/// `METHODS` methods all typed `f0`, where `f0 = f1 = … = f{LINKS}` and that is
+/// a function of `ARGS` arguments. Each name and each argument is visited
+/// once, not once per method: per method, walking the chain took
+/// `METHODS × LINKS` steps and queuing the arguments `METHODS × ARGS` memory.
+const METHODS: usize = 10_000;
+const ARGS: usize = 1_000;
+
+fn shared_signature(service: impl Fn(&str) -> String) -> String {
+    let mut s = String::new();
+    for i in 0..LINKS {
+        s.push_str(&format!("type f{i} = f{};\n", i + 1));
+    }
+    let args = vec!["nat"; ARGS].join(", ");
+    s.push_str(&format!("type f{LINKS} = func ({args}) -> ();\n"));
+    let methods: Vec<String> = (0..METHODS).map(|i| format!("m{i} : f0")).collect();
+    s.push_str(&service(&methods.join("; ")));
+    s
+}
+
+#[test]
+fn many_methods_share_a_long_chain_in_the_main_service() {
+    let text = shared_signature(|ms| format!("service : {{ {ms} }}\n"));
+    on_small_stack(move || {
+        CandidSource::Text(&text).load().unwrap();
+    });
+}
+
+#[test]
+fn many_methods_share_a_long_chain_in_a_definition() {
+    let text = shared_signature(|ms| format!("type s = service {{ {ms} }};\nservice : s\n"));
+    on_small_stack(move || {
+        CandidSource::Text(&text).load().unwrap();
+    });
 }

@@ -10,7 +10,7 @@
 //! debug build, and fail if a check takes more than `LIMIT`, which is over a
 //! hundred times what the linear version needs.
 
-use candid::types::internal::{Type, TypeInner};
+use candid::types::internal::{Field, Label, Type, TypeInner};
 use candid::types::subtype::{subtype_check_all, subtype_with_config, Gamma, OptReport};
 use candid::types::TypeEnv;
 use std::time::{Duration, Instant};
@@ -97,5 +97,41 @@ fn failing_opt_chains_check_all() {
                 .all(|e| !e.message.contains("recursion limit")),
             "{errors:?}"
         );
+    });
+}
+
+/// `a0 = a1 = … = a{LONG} = nat`, a chain of aliases with nothing in between.
+const LONG: usize = 20_000;
+
+/// `record { 0 : bool; … }` against `record { 0 : opt a0; … }`, with `FIELDS`
+/// fields. Each field fails the probe `bool <: a0`; once that is refuted the
+/// later fields must not walk `a0`'s chain again just to test the side
+/// condition, which would take `FIELDS × LONG` steps.
+const FIELDS: usize = 20_000;
+
+fn record(ty: impl Fn() -> Type) -> Type {
+    TypeInner::Record(
+        (0..FIELDS as u32)
+            .map(|i| Field {
+                id: Label::Id(i).into(),
+                ty: ty(),
+            })
+            .collect(),
+    )
+    .into()
+}
+
+#[test]
+fn refuted_probe_against_long_alias_chain() {
+    on_big_stack(|| {
+        let mut env = TypeEnv::new();
+        for i in 0..LONG {
+            env.0.insert(format!("a{i}"), var(&format!("a{}", i + 1)));
+        }
+        env.0.insert(format!("a{LONG}"), TypeInner::Nat.into());
+        let bools = record(|| TypeInner::Bool.into());
+        let opts = record(|| TypeInner::Opt(var("a0")).into());
+        // The special rule accepts every field.
+        subtype_with_config(OptReport::Silence, &mut Gamma::new(), &env, &bools, &opts).unwrap();
     });
 }

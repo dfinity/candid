@@ -57,8 +57,11 @@ impl<'a> Assumptions<'a> {
         }
     }
 
+    /// Only pairs with a type variable on one side are ever refuted, so any
+    /// other pair is answered without hashing its (possibly large) types.
     fn is_refuted(&self, t1: &Type, t2: &Type) -> bool {
-        self.refuted.contains(&(t1.clone(), t2.clone()))
+        let named = |t: &Type| matches!(t.as_ref(), TypeInner::Var(_) | TypeInner::Knot(_));
+        (named(t1) || named(t2)) && self.refuted.contains(&(t1.clone(), t2.clone()))
     }
 
     /// Record that `t1 <: t2` failed, unless the recursion limit was hit while
@@ -390,11 +393,14 @@ fn subtype_collect_(
         (Opt(ty1), Opt(ty2)) if subtype_(report, gamma, env, ty1, ty2, depth).is_ok() => {}
         // Test the side condition before the probe: when it fails the probe's
         // answer is unused, and on opt chains probing anyway explores a fresh
-        // pair at every level, which is quadratic in the chain length.
+        // pair at every level, which is quadratic in the chain length. A probe
+        // already refuted goes first of all, since tracing `ty2` walks its
+        // whole alias chain and the refutation answers without it.
         (_, Opt(ty2))
-            if !env
-                .trace_type_with_depth(ty2, depth)
-                .is_ok_and(|t| matches!(t.as_ref(), Null | Reserved | Opt(_)))
+            if !gamma.is_refuted(t1, ty2)
+                && !env
+                    .trace_type_with_depth(ty2, depth)
+                    .is_ok_and(|t| matches!(t.as_ref(), Null | Reserved | Opt(_)))
                 && subtype_(report, gamma, env, t1, ty2, depth).is_ok()
                 && depth.overflows() == 0 => {}
         // A probe that hit the recursion limit proves nothing either way.
@@ -695,12 +701,14 @@ fn subtype_(
         (Vec(ty1), Vec(ty2)) => subtype_(report, gamma, env, ty1, ty2, depth),
         (Null, Opt(_)) => Ok(()),
         (Opt(ty1), Opt(ty2)) if subtype_(report, gamma, env, ty1, ty2, depth).is_ok() => Ok(()),
-        // See `subtype_collect_`: side condition first, then the probe.
+        // See `subtype_collect_`: known refutation, side condition, then the probe.
         (_, Opt(ty2))
-            if !matches!(
-                env.trace_type_with_depth(ty2, depth)?.as_ref(),
-                Null | Reserved | Opt(_)
-            ) && subtype_(report, gamma, env, t1, ty2, depth).is_ok() =>
+            if !gamma.is_refuted(t1, ty2)
+                && !matches!(
+                    env.trace_type_with_depth(ty2, depth)?.as_ref(),
+                    Null | Reserved | Opt(_)
+                )
+                && subtype_(report, gamma, env, t1, ty2, depth).is_ok() =>
         {
             Ok(())
         }
