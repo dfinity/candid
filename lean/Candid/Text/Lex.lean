@@ -18,22 +18,22 @@ namespace Candid.Text
 
 inductive Token where
   | keyword (k : String)
-  | ident (s : String)
+  | identifier (s : String)
   /-- An integer literal: its value, and whether it was written with a sign. -/
   | int (z : Int) (signed : Bool)
   /-- A float literal: `(-1)^neg * m * base^exp`, where `base` is 2 if `binary`, else 10. -/
   | float (neg : Bool) (m : Nat) (binary : Bool) (exp : Int)
   | text (bytes : List UInt8)
-  | punct (p : String)
+  | punctuation (p : String)
   deriving Repr, BEq, Inhabited
 
 def Token.describe : Token → String
   | .keyword k => s!"keyword {k}"
-  | .ident s => s!"identifier {s}"
+  | .identifier s => s!"identifier {s}"
   | .int z _ => s!"number {z}"
   | .float .. => "a float literal"
   | .text _ => "a text literal"
-  | .punct p => s!"`{p}`"
+  | .punctuation p => s!"`{p}`"
 
 /-- Reserved for the whole of Candid's syntax, including the parts values do not use. -/
 def keywords : List String :=
@@ -43,13 +43,13 @@ def keywords : List String :=
 def isDigit (c : Char) : Bool := '0' ≤ c && c ≤ '9'
 
 /-- A hexadecimal digit's value, either case. -/
-def hexVal? (c : Char) : Option Nat :=
+def hexValue? (c : Char) : Option Nat :=
   if isDigit c then some (c.toNat - '0'.toNat)
   else if 'a' ≤ c && c ≤ 'f' then some (c.toNat - 'a'.toNat + 10)
   else if 'A' ≤ c && c ≤ 'F' then some (c.toNat - 'A'.toNat + 10)
   else none
 
-def isHex (c : Char) : Bool := (hexVal? c).isSome
+def isHex (c : Char) : Bool := (hexValue? c).isSome
 
 def isIdStart (c : Char) : Bool := c.isAlpha || c == '_'
 def isIdChar (c : Char) : Bool := c.isAlphanum || c == '_'
@@ -85,7 +85,7 @@ def digits (p : Char → Bool) : List Char → Option (List Char × List Char)
   | [] => none
 
 def digitsValue (base : Nat) (ds : List Char) : Nat :=
-  ds.foldl (fun n c => n * base + (hexVal? c).getD 0) 0
+  ds.foldl (fun n c => n * base + (hexValue? c).getD 0) 0
 
 /-- `[sign] decimal`: an exponent, always decimal. -/
 def exponent (cs : List Char) : Option (Int × List Char) :=
@@ -163,10 +163,10 @@ def lexText (st : TextState) (acc : Array UInt8) : List Char → Except String (
       | '"' => lexText .plain (acc.push 0x22) cs
       | '\'' => lexText .plain (acc.push 0x27) cs
       | 'u' => lexText .brace acc cs
-      | _ => match hexVal? c with
+      | _ => match hexValue? c with
         | some h => lexText (.byte h) acc cs
         | none => throw s!"unknown escape \\{c}"
-    | .byte hi => match hexVal? c with
+    | .byte hi => match hexValue? c with
       | some lo => lexText .plain (acc.push (hi * 16 + lo).toUInt8) cs
       | none => throw "a byte escape needs two hexadecimal digits"
     | .brace =>
@@ -178,7 +178,7 @@ def lexText (st : TextState) (acc : Array UInt8) : List Char → Except String (
         | some ch => lexText .plain (acc ++ (String.utf8EncodeChar ch).toArray) cs
         | none => throw "\\u{...} is not a Unicode scalar value"
       else if c == '_' && any && !underscore then lexText (.codepoint n any true) acc cs
-      else match hexVal? c with
+      else match hexValue? c with
         | some d => lexText (.codepoint (n * 16 + d) true false) acc cs
         | none => throw "malformed \\u{...} escape"
 
@@ -209,7 +209,7 @@ def lexAux : Nat → List Char → Array Token → Except String (Array Token)
     | '"', rest =>
       let (bs, r) ← lexText .plain #[] rest
       lexAux fuel r (acc.push (.text bs))
-    | '-', '>' :: rest => lexAux fuel rest (acc.push (.punct "->"))
+    | '-', '>' :: rest => lexAux fuel rest (acc.push (.punctuation "->"))
     | '-', rest | '+', rest =>
       let (t, r) ← lexNumber (c == '-') true rest
       lexAux fuel r (acc.push t)
@@ -220,9 +220,9 @@ def lexAux : Nat → List Char → Array Token → Except String (Array Token)
       else if isIdStart c then
         let (name, r) := (c :: cs).span isIdChar
         let s := String.ofList name
-        lexAux fuel r (acc.push (if keywords.contains s then .keyword s else .ident s))
+        lexAux fuel r (acc.push (if keywords.contains s then .keyword s else .identifier s))
       else if "(){};,.:=".toList.contains c then
-        lexAux fuel cs (acc.push (.punct (String.singleton c)))
+        lexAux fuel cs (acc.push (.punctuation (String.singleton c)))
       else throw s!"unexpected character {repr c}"
 
 def lex (s : String) : Except String (Array Token) := lexAux (s.length + 1) s.toList #[]

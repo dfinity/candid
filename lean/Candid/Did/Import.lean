@@ -68,31 +68,31 @@ def resolvePath (base ref : String) : Except String String := do
 mutual
 
 /-- The type names a type expression uses. -/
-def typeNames : TypeExpr → List String
-  | .prim _ => []
+def typeNames : TypeExpression → List String
+  | .primitive _ => []
   | .name n => [n]
   | .opt t | .vec t => typeNames t
   | .record fs | .variant fs => fieldNames fs
   | .func args rets _ => listNames args ++ listNames rets
   | .service ms => methodNames ms
 
-def listNames : List TypeExpr → List String
+def listNames : List TypeExpression → List String
   | [] => []
   | t :: ts => typeNames t ++ listNames ts
 
-def fieldNames : List (FieldId × TypeExpr) → List String
+def fieldNames : List (FieldId × TypeExpression) → List String
   | [] => []
   | (_, t) :: fs => typeNames t ++ fieldNames fs
 
-def methodNames : List (String × TypeExpr) → List String
+def methodNames : List (String × TypeExpression) → List String
   | [] => []
   | (_, t) :: ms => typeNames t ++ methodNames ms
 
 end
 
 /-- Every type name a description uses, in its definitions and its service declaration. -/
-def Desc.names (d : Desc) : List String :=
-  listNames (d.defs.map (·.2)) ++
+def Description.names (d : Description) : List String :=
+  listNames (d.definitions.map (·.2)) ++
     match d.service with
     | none => []
     | some s => listNames (s.init.getD []) ++ typeNames s.service
@@ -100,11 +100,11 @@ def Desc.names (d : Desc) : List String :=
 /-- A description as loaded: its path, its parse, and the paths of its imports,
 resolved, with whether each is `import service`. -/
 structure Loaded where
-  loc : String
-  desc : Desc
+  location : String
+  description : Description
   imports : List (Bool × String)
 
-def Loaded.importsResolved (loc : String) (d : Desc) : Except String (List (Bool × String)) :=
+def Loaded.importsResolved (loc : String) (d : Description) : Except String (List (Bool × String)) :=
   d.imports.mapM fun i => return (i.service, ← resolvePath loc i.ref)
 
 /-- Load `loc` and everything it imports into `done`, each after its imports. `path` is
@@ -115,14 +115,14 @@ def load (files : Files) : Nat → List String → List Loaded → String → Ex
   | 0, _, _, loc => throw s!"unreachable: the import graph ran out of fuel at {loc}"
   | n + 1, path, done, loc => do
     if path.contains loc then throw s!"an import cycle through {loc}"
-    if done.any (·.loc == loc) then return done
+    if done.any (·.location == loc) then return done
     let some text := files.lookup loc | throw s!"cannot read {loc}"
-    let d ← parseDesc text
+    let d ← parseDescription text
     let imports ← Loaded.importsResolved loc d
     let mut acc := done
     for (_, l) in imports do
       acc ← load files n (loc :: path) acc l
-    return acc ++ [{ loc, desc := d, imports }]
+    return acc ++ [{ location := loc, description := d, imports }]
 
 /-- The descriptions reachable from `todo` by following `edge`, besides those in `seen`,
 each visited once. Each step either pops a path already seen or marks one seen, so
@@ -134,7 +134,7 @@ def reachFrom (all : List Loaded) (edge : Bool → Bool) :
   | n + 1, seen, loc :: todo =>
     if seen.contains loc then reachFrom all edge n seen todo
     else
-      let next := ((all.find? (·.loc == loc)).map fun l =>
+      let next := ((all.find? (·.location == loc)).map fun l =>
         (l.imports.filter (edge ·.1)).map (·.2)).getD []
       reachFrom all edge n (seen ++ [loc]) (next ++ todo)
 
@@ -144,8 +144,8 @@ def reach (all : List Loaded) (edge : Bool → Bool) (loc : String) : List Strin
 
 /-- The methods a description's own service declaration lists: written out, or those of
 the service type a name resolves to among `defs`. -/
-def ownMethods (defs : List (String × TypeExpr)) : Nat → TypeExpr →
-    Except String (List (String × TypeExpr))
+def ownMethods (defs : List (String × TypeExpression)) : Nat → TypeExpression →
+    Except String (List (String × TypeExpression))
   | _, .service ms => return ms
   | n + 1, .name x => match defs.lookup x with
     | some t => ownMethods defs n t
@@ -163,23 +163,23 @@ def loadAll (files : Files) (rootLoc : String) : Except String (List Loaded) :=
 itself, in the order of `all`: what `loadAll` gives for `loc` alone. -/
 def within (all : List Loaded) (loc : String) : List Loaded :=
   let r := reach all (fun _ => true) loc
-  all.filter (r.contains ·.loc)
+  all.filter (r.contains ·.location)
 
 /-- The expansion of the description at the normalized path `rootLoc`, given `all`, the
 descriptions `loadAll` loads for it. -/
-def expandLoaded (all : List Loaded) (rootLoc : String) : Except String Desc := do
-  let defs := all.flatMap (·.desc.defs)
+def expandLoaded (all : List Loaded) (rootLoc : String) : Except String Description := do
+  let defs := all.flatMap (·.description.definitions)
   for l in all do
-    let defined := (reach all (fun _ => true) l.loc).flatMap fun m =>
-      ((all.find? (·.loc == m)).map (·.desc.defs.map (·.1))).getD []
-    if let some x := l.desc.names.find? (!defined.contains ·) then
-      throw s!"{l.loc} uses {x}, which neither it nor its imports define"
+    let defined := (reach all (fun _ => true) l.location).flatMap fun m =>
+      ((all.find? (·.location == m)).map (·.description.definitions.map (·.1))).getD []
+    if let some x := l.description.names.find? (!defined.contains ·) then
+      throw s!"{l.location} uses {x}, which neither it nor its imports define"
   -- The descriptions whose own service declarations a description's methods come from.
   let provides (loc : String) : List String :=
-    (reach all id loc).filter fun m => ((all.find? (·.loc == m)).bind (·.desc.service)).isSome
-  let methodsOf (loc : String) : Except String (List (String × TypeExpr)) := do
+    (reach all id loc).filter fun m => ((all.find? (·.location == m)).bind (·.description.service)).isSome
+  let methodsOf (loc : String) : Except String (List (String × TypeExpression)) := do
     let ms ← (provides loc).flatMapM fun m => do
-      match (all.find? (·.loc == m)).bind (·.desc.service) with
+      match (all.find? (·.location == m)).bind (·.description.service) with
       | some s => ownMethods defs (defs.length + 1) s.service
       | none => return []
     unless noDups (ms.map (·.1)) do throw s!"{loc} merges two methods with one name"
@@ -187,21 +187,21 @@ def expandLoaded (all : List Loaded) (rootLoc : String) : Except String Desc := 
   for l in all do
     for (svc, m) in l.imports do
       if svc then
-        let some e := all.find? (·.loc == m) | throw s!"unreachable: {m} was not loaded"
+        let some e := all.find? (·.location == m) | throw s!"unreachable: {m} was not loaded"
         if (provides m).isEmpty then throw s!"{m} is imported as a service, and provides none"
-        if (e.desc.service.bind (·.init)).isSome then
+        if (e.description.service.bind (·.init)).isSome then
           throw s!"{m} is imported as a service, and declares a constructor"
-    let _ ← methodsOf l.loc
-  let some root := all.find? (·.loc == rootLoc)
+    let _ ← methodsOf l.location
+  let some root := all.find? (·.location == rootLoc)
     | throw "unreachable: the description being read was not loaded"
   let service ← if root.imports.any (·.1) then
-      pure (some { init := root.desc.service.bind (·.init),
+      pure (some { init := root.description.service.bind (·.init),
                    service := .service (← methodsOf rootLoc) })
-    else pure root.desc.service
-  return { defs, service }
+    else pure root.description.service
+  return { definitions := defs, service }
 
 /-- The expansion of the description at `rootLocation`. -/
-def expand (files : Files) : Except String Desc := do
+def expand (files : Files) : Except String Description := do
   expandLoaded (← loadAll files rootLocation) rootLocation
 
 end Candid.Did

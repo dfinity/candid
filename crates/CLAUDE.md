@@ -101,6 +101,22 @@ decode_one_with_skipping_quota, decode_one_with_decoding_and_skipping_quota,
 Write names out. Options go in a config struct or a builder, never into the
 function name.
 
+Precisely, every word in a name is one of:
+
+- **a complete word**: `Primitive`, `Annotation`, `parameters`, `Description`;
+- **a Candid keyword, naming the construct it is the keyword for**: `opt`, `vec`,
+  `func`, `nat8`, `record`, `query`, `composite_query`. `Composite::Func` is `func`,
+  as `Composite::Opt` is `opt`; spelling either out would put a translation between
+  the code and the language it implements, and `Opt` would become Rust's `Option`;
+- **a proper name or acronym**: LEB128, UTF-8, IEEE's `emin`/`emax`, and `did` for
+  the description file format;
+- **`Ref`**, the one accepted abbreviation: `TypeRef` and `Slot::Ref`.
+
+Local variables are exempt, and so are Lean's proof-naming conventions (`_refl`,
+`_iff`, `dec…`, `…Aux`). The rule covers [`lean/`](../lean/), the conformance format,
+and the grammar in [`lean/Spec/`](../lean/Spec/), since those names are shared with
+these crates.
+
 The core type names are already settled, and are shared with [`lean/`](../lean/) so the
 two read alike — see [README.md](README.md#naming). In particular `TypeTable` is the
 index-keyed table — the checked one, with `RawTypeTable` for what a decoder or builder

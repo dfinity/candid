@@ -321,7 +321,7 @@ impl<'a> TableBuilder<'a> {
                 return Ok(format!(".ref {i}"));
             }
         };
-        Ok(format!(".prim .{prim}"))
+        Ok(format!(".primitive .{prim}"))
     }
 
     /// A named type: its entry, made on first use. A name that stands for a primitive,

@@ -6,8 +6,8 @@ when the expression is rejected at that type. It recurses on the expression, so 
 terminates whatever the type graph: a recursive type is unfolded only as far as the
 expression goes.
 
-**Annotations** carry a type of their own, written as a nested `TypeExpr`. It is
-flattened into a table of its own (`TypeExpr.toTable?`, in `Flatten.lean`), checked for
+**Annotations** carry a type of their own, written as a nested `TypeExpression`. It is
+flattened into a table of its own (`TypeExpression.toTable?`, in `Flatten.lean`), checked for
 well-formedness, and compared with the expected type by `decEquiv`. The expression inside is then elaborated
 in the annotation's table, which is why `elaborate` takes the table as an argument rather
 than a parameter. Names in an annotation resolve in an environment of type
@@ -26,7 +26,7 @@ import Candid.Float
 namespace Candid.Text
 
 /-- An integer literal at a primitive type: in range, or nothing. -/
-def intAt (z : Int) : Prim → Option Value
+def intAt (z : Int) : Primitive → Option Value
   | .nat => if 0 ≤ z then some (.nat z.toNat) else none
   | .int => some (.int z)
   | .nat8 => if 0 ≤ z && z < 2 ^ 8 then some (.nat8 z.toNat.toUInt8) else none
@@ -49,28 +49,28 @@ def fillFields (T : TypeTable) (given : List FieldId) (gs : List (FieldId × Slo
 mutual
 
 /-- `e ⇐ t ⇝ v`, for `t` in `T`. -/
-def elaborate : TypeTable → Expr → Slot → Option Value
-  | T, .ann e te, t => do
+def elaborate : TypeTable → Expression → Slot → Option Value
+  | T, .annotated e te, t => do
     let ⟨S, s⟩ ← te.toTable?
     let r ← T.root? t
     guard (decEquiv S T s r)
     elaborate S e s.1
-  | _, _, .prim .reserved => some .null
-  | _, .int z, .prim p => intAt z p
-  | _, .float neg m b x, .prim .float32 =>
+  | _, _, .primitive .reserved => some .null
+  | _, .int z, .primitive p => intAt z p
+  | _, .float neg m b x, .primitive .float32 =>
     some (.float32 (roundLiteral binary32 neg m b x).toUInt32)
-  | _, .float neg m b x, .prim .float64 =>
+  | _, .float neg m b x, .primitive .float64 =>
     some (.float64 (roundLiteral binary64 neg m b x).toUInt64)
-  | _, .text bs, .prim .text => (String.fromUTF8? ⟨bs.toArray⟩).map .text
-  | _, .bool b, .prim .bool => some (.bool b)
-  | _, .null, .prim .null => some .null
-  | _, .principal p, .prim .principal => some (.principal p)
+  | _, .text bs, .primitive .text => (String.fromUTF8? ⟨bs.toArray⟩).map .text
+  | _, .bool b, .primitive .bool => some (.bool b)
+  | _, .null, .primitive .null => some .null
+  | _, .principal p, .primitive .principal => some (.principal p)
   | T, e, .ref r =>
     match e, T.lookup? r with
     | .null, some (.opt _) => some .null
     | .opt e, some (.opt t) => (elaborate T e t).map .opt
     | .vec es, some (.vec t) => (elaborateList T es t).map .vec
-    | .blob bs, some (.vec (.prim .nat8)) => some (.vec (bs.map .nat8))
+    | .blob bs, some (.vec (.primitive .nat8)) => some (.vec (bs.map .nat8))
     | .record fs, some (.record gs) => do
       let given ← elaborateFields T fs gs
       let filled ← fillFields T (fs.map (·.1)) gs
@@ -83,12 +83,12 @@ def elaborate : TypeTable → Expr → Slot → Option Value
     | _, _ => none
   | _, _, _ => none
 
-def elaborateList : TypeTable → List Expr → Slot → Option (List Value)
+def elaborateList : TypeTable → List Expression → Slot → Option (List Value)
   | _, [], _ => some []
   | T, e :: es, t => return (← elaborate T e t) :: (← elaborateList T es t)
 
 /-- The expression's fields that the type has, elaborated; the others are ignored. -/
-def elaborateFields : TypeTable → List (FieldId × Expr) → List (FieldId × Slot) →
+def elaborateFields : TypeTable → List (FieldId × Expression) → List (FieldId × Slot) →
     Option (List (FieldId × Value))
   | _, [], _ => some []
   | T, (id, e) :: fs, gs =>
@@ -101,8 +101,8 @@ end
 mutual
 
 /-- Every annotation in the expression holds (Section 5.1). -/
-def wellAnnotated : Expr → Bool
-  | .ann e te =>
+def wellAnnotated : Expression → Bool
+  | .annotated e te =>
     (match te.toTable? with
       | some ⟨S, s⟩ => (elaborate S e s.1).isSome
       | none => false) && wellAnnotated e
@@ -112,11 +112,11 @@ def wellAnnotated : Expr → Bool
   | .int _ | .float .. | .text _ | .bool _ | .null | .blob _
   | .principal _ | .service _ | .func _ _ => true
 
-def wellAnnotatedList : List Expr → Bool
+def wellAnnotatedList : List Expression → Bool
   | [] => true
   | e :: es => wellAnnotated e && wellAnnotatedList es
 
-def wellAnnotatedFields : List (FieldId × Expr) → Bool
+def wellAnnotatedFields : List (FieldId × Expression) → Bool
   | [] => true
   | (_, e) :: fs => wellAnnotated e && wellAnnotatedFields fs
 
@@ -124,19 +124,19 @@ end
 
 /-- Arguments at their types, position by position (Section 5.9). Arguments beyond the
 types are ignored, and types beyond the arguments must accept `null`. -/
-def elaborateArgsFrom (T : TypeTable) : List Expr → List Slot → Option (List Value)
+def elaborateArgumentsFrom (T : TypeTable) : List Expression → List Slot → Option (List Value)
   | _, [] => some []
-  | e :: es, t :: ts => return (← elaborate T e t) :: (← elaborateArgsFrom T es ts)
-  | [], t :: ts => if T.acceptsNull t then (.null :: ·) <$> elaborateArgsFrom T [] ts else none
+  | e :: es, t :: ts => return (← elaborate T e t) :: (← elaborateArgumentsFrom T es ts)
+  | [], t :: ts => if T.acceptsNull t then (.null :: ·) <$> elaborateArgumentsFrom T [] ts else none
 
-def elaborateArgs (T : TypeTable) (es : List Expr) (ts : List Slot) : Option (List Value) :=
-  if es.all wellAnnotated then elaborateArgsFrom T es ts else none
+def elaborateArguments (T : TypeTable) (es : List Expression) (ts : List Slot) : Option (List Value) :=
+  if es.all wellAnnotated then elaborateArgumentsFrom T es ts else none
 
 /-- Text read as an argument sequence at `ts`, types in `T`: the values, or `none` when
 it is rejected, whether by the parser or by elaboration. -/
-def readArgs (src : String) (T : TypeTable) (ts : List Slot) : Option (List Value) :=
-  match parseArgs src with
-  | .ok es => elaborateArgs T es ts
+def readArguments (src : String) (T : TypeTable) (ts : List Slot) : Option (List Value) :=
+  match parseArguments src with
+  | .ok es => elaborateArguments T es ts
   | .error _ => none
 
 end Candid.Text

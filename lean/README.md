@@ -262,7 +262,7 @@ reordering.
 **The binary format, as a decoder that is strict and an encoder that is one choice of
 many.** [Candid/Wire.lean](Candid/Wire.lean) has LEB128, `encode`, `decode` -- the
 inverses of the spec's `T` and `M` -- and `deserialize`, which is `decode` followed by
-`coerceArgs`, the spec's "tuple types" rule: an argument sequence coerces like a
+`coerceArguments`, the spec's "tuple types" rule: an argument sequence coerces like a
 tuple-shaped record, so an extra argument is ignored and a missing one is `null` where
 its type accepts `null`. A new vector kind carries bytes, the types to decode them at,
 and the values or `"reject"`.
@@ -350,7 +350,7 @@ checks (`TestDid.parserViolations`). Where the document and 0.10 differ, the run
 the vectors as known divergences, and the document's Appendix B.2 says why. Three of them
 are panics in 0.10.
 
-**Types in annotations are nested and flattened.** `TypeExpr` is the type syntax as
+**Types in annotations are nested and flattened.** `TypeExpression` is the type syntax as
 written, and `flatten` interns it into a table, which is half of the `.did` work below.
 Names are kept in the syntax but resolve in an empty environment, so a name is rejected.
 
@@ -456,6 +456,10 @@ without values at `reserved`, agree.
 - **No `sorry`.** An unproved `theorem` in the build reads as established once it
   scrolls past. Obligations are written as prose next to the definitions they
   constrain, and become `theorem`s when they are proved.
+- **No abbreviations.** Names are complete words, Candid keywords, or proper names,
+  with `Ref` the one exception. The rule, with its exemptions, is in
+  [crates/CLAUDE.md](../crates/CLAUDE.md#4-no-abbreviations-no-config-by-function-name),
+  since `candid_types` and this model share their names.
 
 ## Coverage target
 

@@ -94,7 +94,7 @@ the source: [tools/test-did/](tools/test-did/) translates them into Lean with
 {"version":0,"vectors":[
 {"id":"...","kind":"hash","name":"Ok","expect":17724},
 {"id":"...","kind":"wellformed","type":<type>,"expect":false},
-{"id":"...","kind":"subtype","sub":<type>,"sup":<type>,"expect":true},
+{"id":"...","kind":"subtype","subtype":<type>,"supertype":<type>,"expect":true},
 {"id":"...","kind":"coerce","value":<value>,"from":<type>,"to":<type>,"expect":{"value":<value>}},
 {"id":"...","kind":"coerce","value":<value>,"from":<type>,"to":<type>,"expect":"reject"},
 {"id":"...","kind":"decode","bytes":"4449444c...","types":<types>,"expect":{"values":[<value>, ...]}},
@@ -117,9 +117,9 @@ the format, so it changes in place.
 - **`hash`**: `expect` is the field-id hash of `name`.
 - **`wellformed`**: whether the type is well formed -- every reference resolves, no
   label repeats, a `oneway` function has no results, every method is a function.
-- **`subtype`**: whether `sub <: sup`. Both types are well formed, and each has its
-  own table: `sub`'s references index `sub`'s table, and `sup`'s index `sup`'s. An
-  implementation that takes one environment for both has to merge them.
+- **`subtype`**: whether `subtype <: supertype`. Both types are well formed, and each
+  has its own table: `subtype`'s references index `subtype`'s table, and `supertype`'s
+  index `supertype`'s. An implementation that takes one environment for both has to merge them.
 - **`coerce`**: `value : from ~> v : to`, where `expect` is `{"value": v}`, or
   `"reject"` when no `v` exists and a decoder must fail. Both types are well formed,
   `value` has type `from`, and an expected `v` has type `to`.
@@ -159,7 +159,7 @@ an object with exactly one key, and never a primitive:
 {"vec": <slot>}
 {"record":  [[<field id>, <slot>], ...]}   // ids are u32, in no particular order
 {"variant": [[<field id>, <slot>], ...]}
-{"func": {"args": [<slot>, ...], "rets": [<slot>, ...], "annots": ["query", ...]}}
+{"func": {"parameters": [<slot>, ...], "results": [<slot>, ...], "annotations": ["query", ...]}}
 {"service": [["<method name>", <slot>], ...]}
 {"future": [<opcode>, "<hex>"]}            // a type this version does not define
 ```

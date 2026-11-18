@@ -55,7 +55,7 @@ def Input.answer (B : TypeTable) (roots : List Slot) : Input → Except String (
   | .blob hex => do
     let bs ← bytesFromHex? (.str hex)
     return deserialize ⟨bs.toArray⟩ B roots
-  | .text src _ => return Text.readArgs src B roots
+  | .text src _ => return Text.readArguments src B roots
 
 /-- Does the model agree with the claim? -/
 def Assert.check (a : Assert) : Except String Unit := do
@@ -98,7 +98,7 @@ def Assert.vectors (a : Assert) : List Vector :=
           else .decode bs a.types (deserialize bs B (us.map (·.1)))⟩]
       | .error _ => []
     let text (suffix src : String) : List Vector :=
-      [⟨a.id ++ suffix, .parse src a.types (Text.readArgs src B (us.map (·.1)))⟩]
+      [⟨a.id ++ suffix, .parse src a.types (Text.readArguments src B (us.map (·.1)))⟩]
     let side (suffix : String) : Input → List Vector
       | .blob hex => one suffix hex
       | .text src _ => text suffix src
@@ -134,7 +134,7 @@ def parserViolations : List String :=
         | _ => []
       sides.filterMap fun
         | .text src parsed =>
-          let got := Text.readArgs src B (us.map (·.1))
+          let got := Text.readArguments src B (us.map (·.1))
           if got == parsed then none
           else some s!"{a.id}: the model reads {repr src} as {(expectValuesToJson got).compress}, candid_parser as {(expectValuesToJson parsed).compress}"
         | .blob _ => none

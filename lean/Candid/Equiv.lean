@@ -4,7 +4,7 @@ Type equivalence: whether two types are the same type.
 Two types are the same when they unfold to the same infinite tree: a name is the same
 type as its definition, and two tables that share structure differently can still hold
 the same type. Field and method lists are compared as sets, since the spec identifies
-them up to reordering, and so are function annotations (`annotsAgree`).
+them up to reordering, and so are function annotations (`annotationsAgree`).
 
 Mutual subtyping is not equivalence. `record {}` and `record { a : opt nat }` are each a
 subtype of the other, since a record may omit a field that accepts `null`, but they are
@@ -29,7 +29,7 @@ namespace Candid
 /-- Two slots that need no unfolding: `none` for a pair of references. A primitive is
 only ever the same type as itself, and never the same as a composite. -/
 def equivLeaf : Slot → Slot → Option Bool
-  | .prim p, .prim q => some (p == q)
+  | .primitive p, .primitive q => some (p == q)
   | .ref _, .ref _ => none
   | _, _ => some false
 
@@ -45,7 +45,7 @@ def equivExpand : Composite → Composite → Option (List (Slot × Slot))
   | .opt x, .opt y | .vec x, .vec y => some [(x, y)]
   | .record fs, .record gs | .variant fs, .variant gs => pairLabels fs gs
   | .func args rets ann, .func args' rets' ann' =>
-    if annotsAgree ann ann' && args.length == args'.length && rets.length == rets'.length
+    if annotationsAgree ann ann' && args.length == args'.length && rets.length == rets'.length
     then some (args.zip args' ++ rets.zip rets')
     else none
   | .service ms, .service ms' => pairLabels ms ms'

@@ -68,7 +68,7 @@ def ascending : List FieldId → Bool
 
 /-- Does a primitive value have this primitive type? `reserved` has the one value
 `null`, and `empty` has none. -/
-def Value.hasPrim : Value → Prim → Bool
+def Value.hasPrimitive : Value → Primitive → Bool
   | .null, .null | .null, .reserved => true
   | .bool _, .bool => true
   | .nat _, .nat | .int _, .int => true
@@ -89,7 +89,7 @@ mutual
 
 /-- `v : t`, where `t` is a type in `T`. -/
 def TypeTable.hasType (T : TypeTable) : Value → Slot → Bool
-  | v, .prim p => v.hasPrim p
+  | v, .primitive p => v.hasPrimitive p
   | v, .ref r => match v, T.lookup? r with
     | .null, some (.opt _) => true
     | .opt w, some (.opt t) => T.hasType w t

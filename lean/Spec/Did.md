@@ -135,21 +135,21 @@ Whitespace and comments may appear between any two tokens. `label` and `name` ar
 of [TEXT], Section 4.1.
 
 ```abnf
-type       = identifier
-           / "null" / "principal"
-           / "opt" type / "vec" type / "blob"
-           / "record" "{" [field *(";" field) [";"]] "}"
-           / "variant" "{" [alt *(";" alt) [";"]] "}"
-           / "func" functype
-           / "service" methods
+type        = identifier
+            / "null" / "principal"
+            / "opt" type / "vec" type / "blob"
+            / "record" "{" [field *(";" field) [";"]] "}"
+            / "variant" "{" [alternative *(";" alternative) [";"]] "}"
+            / "func" functype
+            / "service" methods
 
-field      = label ":" type / type
-alt        = label ":" type / label
+field       = label ":" type / type
+alternative = label ":" type / label
 
-functype   = params "->" params *annotation
-params     = "(" [param *("," param) [","]] ")"
-param      = name ":" type / type
-annotation = "query" / "composite_query" / "oneway"
+functype    = parameters "->" parameters *annotation
+parameters  = "(" [parameter *("," parameter) [","]] ")"
+parameter   = name ":" type / type
+annotation  = "query" / "composite_query" / "oneway"
 
 methods    = "{" [method *(";" method) [";"]] "}"
 method     = name ":" (functype / identifier)
@@ -203,7 +203,7 @@ labels are hashed and positions numbered, MUST be rejected.
 **Variants.** A variant field written as a `label` alone has type `null`:
 `variant { a }` is `variant{hash("a") : null}`.
 
-**Parameters and results.** A `param` may be named. The name has no meaning, but MUST
+**Parameters and results.** A `parameter` may be named. The name has no meaning, but MUST
 be well-formed UTF-8, and two parameters, or two results, of one function type MUST NOT
 have the same name. A parameter and a result may share a name.
 
@@ -222,7 +222,7 @@ description = [definition *(";" definition) [";"]] [service [";"]]
 definition  = "type" identifier "=" type
             / "import" ["service"] text-literal
 
-service     = "service" [identifier] ":" [params "->"] (methods / identifier)
+service     = "service" [identifier] ":" [parameters "->"] (methods / identifier)
 ```
 
 The definitions, which include imports, come first, separated by semicolons, and the
