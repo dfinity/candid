@@ -392,11 +392,10 @@ fn subtype_collect_(
         // answer is unused, and on opt chains probing anyway explores a fresh
         // pair at every level, which is quadratic in the chain length.
         (_, Opt(ty2))
-            if !matches!(
-                env.trace_type_with_depth(ty2, depth)
-                    .map(|t| t.as_ref().clone()),
-                Ok(Null | Reserved | Opt(_))
-            ) && subtype_(report, gamma, env, t1, ty2, depth).is_ok()
+            if !env
+                .trace_type_with_depth(ty2, depth)
+                .is_ok_and(|t| matches!(t.as_ref(), Null | Reserved | Opt(_)))
+                && subtype_(report, gamma, env, t1, ty2, depth).is_ok()
                 && depth.overflows() == 0 => {}
         // A probe that hit the recursion limit proves nothing either way.
         (_, Opt(_)) if depth.overflows() > 0 => {
