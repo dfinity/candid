@@ -132,7 +132,7 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "candid"
-version = "0.10.40"
+version = "0.10.41"
 dependencies = [
  "anyhow",
  "binrw",
@@ -153,7 +153,7 @@ dependencies = [
 
 [[package]]
 name = "candid_derive"
-version = "0.10.40"
+version = "0.10.41"
 dependencies = [
  "lazy_static",
  "proc-macro2",
@@ -163,7 +163,7 @@ dependencies = [
 
 [[package]]
 name = "candid_parser"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "candid",
