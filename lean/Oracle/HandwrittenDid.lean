@@ -222,7 +222,7 @@ def didImportChecks : List Vector :=
       (files := [("a.did", "service : { n : () -> (nat) oneway }")])
   , rejectsDid "import \"a.did\"; service : { m : () -> () }"
       "an imported description must be valid on its own, its constructor's arguments too (5.3)"
-      (files := [("a.did", "service : (service { x : nat }) -> { n : () -> () }")])
+      (files := [("a.did", "type N = nat; service : (service { x : N }) -> { n : () -> () }")])
   , rejectsDid "import \"b.did\";"
       "an indirect import must be valid on its own too (5.3)"
       (files := [("b.did", "import \"a.did\";"), ("a.did", "service : { n : () -> (nat) oneway }")])

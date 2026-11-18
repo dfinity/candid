@@ -153,11 +153,21 @@ def ownMethods (defs : List (String × TypeExpr)) : Nat → TypeExpr →
   | 0, .name x => throw s!"type name {x} is not productive"
   | _, _ => throw "an imported service declaration is not a service type"
 
-/-- The expansion of the description at `rootLoc`, given the environment. -/
-def expandAt (files : Files) (rootLoc : String) : Except String Desc := do
+/-- The description at `rootLoc` and every description it imports, directly or
+indirectly, loaded from the environment, each after those it imports. -/
+def loadAll (files : Files) (rootLoc : String) : Except String (List Loaded) :=
   let files := files.map fun (l, t) => (normalize l, t)
-  let rootLoc := normalize rootLoc
-  let all ← load files (files.length + 1) [] [] rootLoc
+  load files (files.length + 1) [] [] (normalize rootLoc)
+
+/-- The descriptions of `all` that `loc` imports, directly or indirectly, and `loc`
+itself, in the order of `all`: what `loadAll` gives for `loc` alone. -/
+def within (all : List Loaded) (loc : String) : List Loaded :=
+  let r := reach all (fun _ => true) loc
+  all.filter (r.contains ·.loc)
+
+/-- The expansion of the description at the normalized path `rootLoc`, given `all`, the
+descriptions `loadAll` loads for it. -/
+def expandLoaded (all : List Loaded) (rootLoc : String) : Except String Desc := do
   let defs := all.flatMap (·.desc.defs)
   for l in all do
     let defined := (reach all (fun _ => true) l.loc).flatMap fun m =>
@@ -191,14 +201,7 @@ def expandAt (files : Files) (rootLoc : String) : Except String Desc := do
   return { defs, service }
 
 /-- The expansion of the description at `rootLocation`. -/
-def expand (files : Files) : Except String Desc := expandAt files rootLocation
-
-/-- The paths of the descriptions that the one at `rootLoc` imports, directly or
-indirectly, normalized as `expandAt` normalizes them. -/
-def importsOf (files : Files) (rootLoc : String) : Except String (List String) := do
-  let files := files.map fun (l, t) => (normalize l, t)
-  let rootLoc := normalize rootLoc
-  let all ← load files (files.length + 1) [] [] rootLoc
-  return (all.map (·.loc)).filter (· != rootLoc)
+def expand (files : Files) : Except String Desc := do
+  expandLoaded (← loadAll files rootLocation) rootLocation
 
 end Candid.Did
