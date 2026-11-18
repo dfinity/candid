@@ -388,13 +388,15 @@ fn subtype_collect_(
         // For opt rules we delegate to the existing subtype_ to test the condition,
         // since these are probes, not things that generate multiple independent errors.
         (Opt(ty1), Opt(ty2)) if subtype_(report, gamma, env, ty1, ty2, depth).is_ok() => {}
+        // Test the side condition before the probe: when it fails the probe's
+        // answer is unused, and on opt chains probing anyway explores a fresh
+        // pair at every level, which is quadratic in the chain length.
         (_, Opt(ty2))
-            if subtype_(report, gamma, env, t1, ty2, depth).is_ok()
-                && !matches!(
-                    env.trace_type_with_depth(ty2, depth)
-                        .map(|t| t.as_ref().clone()),
-                    Ok(Null | Reserved | Opt(_))
-                )
+            if !matches!(
+                env.trace_type_with_depth(ty2, depth)
+                    .map(|t| t.as_ref().clone()),
+                Ok(Null | Reserved | Opt(_))
+            ) && subtype_(report, gamma, env, t1, ty2, depth).is_ok()
                 && depth.overflows() == 0 => {}
         // A probe that hit the recursion limit proves nothing either way.
         (_, Opt(_)) if depth.overflows() > 0 => {
@@ -694,12 +696,12 @@ fn subtype_(
         (Vec(ty1), Vec(ty2)) => subtype_(report, gamma, env, ty1, ty2, depth),
         (Null, Opt(_)) => Ok(()),
         (Opt(ty1), Opt(ty2)) if subtype_(report, gamma, env, ty1, ty2, depth).is_ok() => Ok(()),
+        // See `subtype_collect_`: side condition first, then the probe.
         (_, Opt(ty2))
-            if subtype_(report, gamma, env, t1, ty2, depth).is_ok()
-                && !matches!(
-                    env.trace_type_with_depth(ty2, depth)?.as_ref(),
-                    Null | Reserved | Opt(_)
-                ) =>
+            if !matches!(
+                env.trace_type_with_depth(ty2, depth)?.as_ref(),
+                Null | Reserved | Opt(_)
+            ) && subtype_(report, gamma, env, t1, ty2, depth).is_ok() =>
         {
             Ok(())
         }

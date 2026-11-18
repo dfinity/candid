@@ -147,99 +147,85 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
+/// Reject a chain of aliases that leads back to itself with no type
+/// constructor in between (`type a = b; type b = a`).
+///
+/// Each name is walked once: a chain that reaches a name already known to be
+/// acyclic stops there. Restarting from every name would be quadratic on long
+/// alias chains, and the walk is a loop, not a recursion, so its stack use
+/// does not grow with the chain either.
 fn check_cycle(env: &TypeEnv) -> Result<()> {
-    fn has_cycle<'a>(seen: &mut BTreeSet<&'a str>, env: &'a TypeEnv, t: &'a Type) -> Result<bool> {
+    let mut acyclic: BTreeSet<&str> = BTreeSet::new();
+    for (id, ty) in env.0.iter() {
+        let mut path: BTreeSet<&str> = BTreeSet::new();
+        path.insert(id.as_str());
+        let mut t = ty;
+        while let TypeInner::Var(next) = t.as_ref() {
+            if acyclic.contains(next.as_str()) {
+                break;
+            }
+            if !path.insert(next.as_str()) {
+                return Err(Error::msg(format!("{id} has cyclic type definition")));
+            }
+            t = env.find_type(next)?;
+        }
+        acyclic.extend(path);
+    }
+    Ok(())
+}
+
+/// Check that every type reachable from the definitions is well formed (so
+/// far: every method of a service has a function type).
+///
+/// It visits each named type once and uses an explicit worklist rather than
+/// recursion, so a long chain of aliases cannot overflow the stack.
+fn validate_decs(env: &TypeEnv) -> Result<()> {
+    let mut seen: BTreeSet<&str> = BTreeSet::new();
+    let mut todo: Vec<&Type> = env.0.values().collect();
+    while let Some(t) = todo.pop() {
         match t.as_ref() {
+            TypeInner::Null
+            | TypeInner::Bool
+            | TypeInner::Nat
+            | TypeInner::Int
+            | TypeInner::Nat8
+            | TypeInner::Nat16
+            | TypeInner::Nat32
+            | TypeInner::Nat64
+            | TypeInner::Int8
+            | TypeInner::Int16
+            | TypeInner::Int32
+            | TypeInner::Int64
+            | TypeInner::Float32
+            | TypeInner::Float64
+            | TypeInner::Text
+            | TypeInner::Reserved
+            | TypeInner::Empty
+            | TypeInner::Unknown
+            | TypeInner::Principal
+            | TypeInner::Future
+            | TypeInner::Knot(_) => (),
             TypeInner::Var(id) => {
-                if seen.insert(id) {
-                    let ty = env.find_type(id)?;
-                    has_cycle(seen, env, ty)
-                } else {
-                    Ok(true)
+                if seen.insert(id.as_str()) {
+                    todo.push(env.find_type(id)?);
                 }
             }
-            _ => Ok(false),
-        }
-    }
-    for (id, ty) in env.0.iter() {
-        let mut seen = BTreeSet::new();
-        if has_cycle(&mut seen, env, ty)? {
-            return Err(Error::msg(format!("{id} has cyclic type definition")));
-        }
-    }
-    Ok(())
-}
-
-fn validate_func(env: &TypeEnv, seen: &mut BTreeMap<String, bool>, func: &Function) -> Result<()> {
-    for arg in func.args.iter() {
-        validate_type(env, seen, arg)?;
-    }
-    for ret in func.rets.iter() {
-        validate_type(env, seen, ret)?;
-    }
-    Ok(())
-}
-
-fn validate_type(env: &TypeEnv, seen: &mut BTreeMap<String, bool>, t: &Type) -> Result<()> {
-    match t.as_ref() {
-        TypeInner::Null
-        | TypeInner::Bool
-        | TypeInner::Nat
-        | TypeInner::Int
-        | TypeInner::Nat8
-        | TypeInner::Nat16
-        | TypeInner::Nat32
-        | TypeInner::Nat64
-        | TypeInner::Int8
-        | TypeInner::Int16
-        | TypeInner::Int32
-        | TypeInner::Int64
-        | TypeInner::Float32
-        | TypeInner::Float64
-        | TypeInner::Text
-        | TypeInner::Reserved
-        | TypeInner::Empty
-        | TypeInner::Unknown
-        | TypeInner::Principal
-        | TypeInner::Future
-        | TypeInner::Knot(_) => Ok(()),
-        TypeInner::Var(id) => match seen.get(id) {
-            Some(true) | Some(false) => Ok(()),
-            None => {
-                seen.insert(id.clone(), false);
-                let res = validate_type(env, seen, env.find_type(id)?);
-                seen.insert(id.clone(), true);
-                res
+            TypeInner::Opt(ty) | TypeInner::Vec(ty) => todo.push(ty),
+            TypeInner::Record(fields) | TypeInner::Variant(fields) => {
+                todo.extend(fields.iter().map(|f| &f.ty));
             }
-        },
-        TypeInner::Opt(ty) | TypeInner::Vec(ty) => validate_type(env, seen, ty),
-        TypeInner::Record(fields) | TypeInner::Variant(fields) => {
-            for field in fields.iter() {
-                validate_type(env, seen, &field.ty)?;
+            TypeInner::Func(func) => todo.extend(func.args.iter().chain(func.rets.iter())),
+            TypeInner::Service(methods) => {
+                for (_, ty) in methods.iter() {
+                    let func = env.as_func(ty)?;
+                    todo.extend(func.args.iter().chain(func.rets.iter()));
+                }
             }
-            Ok(())
-        }
-        TypeInner::Func(func) => validate_func(env, seen, func),
-        TypeInner::Service(methods) => {
-            for (_, ty) in methods.iter() {
-                let func = env.as_func(ty)?;
-                validate_func(env, seen, func)?;
+            TypeInner::Class(args, ty) => {
+                todo.extend(args.iter());
+                todo.push(ty);
             }
-            Ok(())
         }
-        TypeInner::Class(args, ty) => {
-            for arg in args.iter() {
-                validate_type(env, seen, arg)?;
-            }
-            validate_type(env, seen, ty)
-        }
-    }
-}
-
-fn validate_decs(env: &TypeEnv) -> Result<()> {
-    let mut seen = BTreeMap::new();
-    for ty in env.0.values() {
-        validate_type(env, &mut seen, ty)?;
     }
     Ok(())
 }
