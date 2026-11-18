@@ -98,9 +98,24 @@ def checkDesc (d : Desc) : Except String Interface := do
   return { table, types, service }
 
 /-- The interface of the description `src`, read at `rootLocation` with the environment
-`files` to read its imports from, or why it is rejected. -/
-def checkDescIn (files : Files) (src : String) : Except String Interface :=
-  expand ((rootLocation, src) :: files) >>= checkDesc
+`files` to read its imports from, or why it is rejected. Each of its imports, direct or
+indirect, must be valid on its own (Section 5.3): it is read the same way, as the
+description being read, though the expansion discards its service declaration.
+
+The descriptions are loaded and parsed once. An import is checked again on its own only
+if it has a service declaration: one without is valid on its own once the expansion of
+`src` is. Its definitions are among those of that expansion, and use only names it or
+its imports define. The methods it merges by `import service` are checked where they are
+declared, and their names were checked to be distinct when `src` was expanded. -/
+def checkDescIn (files : Files) (src : String) : Except String Interface := do
+  let all ← loadAll ((rootLocation, src) :: files) rootLocation
+  let i ← expandLoaded all rootLocation >>= checkDesc
+  for l in all do
+    if l.loc != rootLocation && l.desc.service.isSome then
+      match expandLoaded (within all l.loc) l.loc >>= checkDesc with
+      | .ok _ => pure ()
+      | .error e => throw s!"{l.loc} is not valid on its own: {e}"
+  return i
 
 /-- As `checkDescIn`, `none` when the description is rejected. -/
 def readDescIn (files : Files) (src : String) : Option Interface :=
