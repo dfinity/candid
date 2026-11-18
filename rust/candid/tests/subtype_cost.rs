@@ -100,18 +100,26 @@ fn failing_opt_chains_check_all() {
     });
 }
 
-/// `a0 = a1 = … = a{LONG} = nat`, a chain of aliases with nothing in between.
+/// `a0 = a1 = … = a{LONG} = leaf`, a chain of aliases with nothing in between.
 const LONG: usize = 20_000;
 
-/// `record { 0 : bool; … }` against `record { 0 : opt a0; … }`, with `FIELDS`
-/// fields. Each field fails the probe `bool <: a0`; once that is refuted the
-/// later fields must not walk `a0`'s chain again just to test the side
-/// condition, which would take `FIELDS × LONG` steps.
+/// Fields in each record below. Checking whether `a0` is `null`, `reserved`
+/// or an `opt` walks its chain; doing that once per field would take
+/// `FIELDS × LONG` steps, so the answer is kept for the rest of the check.
 const FIELDS: usize = 20_000;
 
-fn record(ty: impl Fn() -> Type) -> Type {
+fn alias_chain(leaf: TypeInner) -> TypeEnv {
+    let mut env = TypeEnv::new();
+    for i in 0..LONG {
+        env.0.insert(format!("a{i}"), var(&format!("a{}", i + 1)));
+    }
+    env.0.insert(format!("a{LONG}"), leaf.into());
+    env
+}
+
+fn record(n: usize, ty: impl Fn() -> Type) -> Type {
     TypeInner::Record(
-        (0..FIELDS as u32)
+        (0..n as u32)
             .map(|i| Field {
                 id: Label::Id(i).into(),
                 ty: ty(),
@@ -121,17 +129,62 @@ fn record(ty: impl Fn() -> Type) -> Type {
     .into()
 }
 
+/// `record { 0 : bool; … }` against `record { 0 : opt a0; … }`.
+fn bools_against_opts(leaf: TypeInner) -> (TypeEnv, Type, Type) {
+    let bools = record(FIELDS, || TypeInner::Bool.into());
+    let opts = record(FIELDS, || TypeInner::Opt(var("a0")).into());
+    (alias_chain(leaf), bools, opts)
+}
+
+/// `record {}` against `record { 0 : a0; … }`: every field is missing.
+fn missing_fields(leaf: TypeInner) -> (TypeEnv, Type, Type) {
+    let empty = record(0, || unreachable!());
+    let fields = record(FIELDS, || var("a0"));
+    (alias_chain(leaf), empty, fields)
+}
+
+/// The special rule accepts every field, in both kinds of check.
+fn special_rule_accepts((env, t1, t2): (TypeEnv, Type, Type)) {
+    subtype_with_config(OptReport::Silence, &mut Gamma::new(), &env, &t1, &t2).unwrap();
+    let errors = subtype_check_all(&mut Gamma::new(), &env, &t1, &t2);
+    assert!(errors.is_empty(), "{:?}", &errors[..1]);
+}
+
 #[test]
-fn refuted_probe_against_long_alias_chain() {
+fn probe_refuted_against_long_alias_chain() {
+    // `bool <: a0` fails, so the probe is refuted for the later fields.
+    on_big_stack(|| special_rule_accepts(bools_against_opts(TypeInner::Nat)));
+}
+
+#[test]
+fn probe_skipped_against_long_alias_chain() {
+    // `a0` is `null`, so the side condition fails and nothing is probed.
+    on_big_stack(|| special_rule_accepts(bools_against_opts(TypeInner::Null)));
+}
+
+#[test]
+fn probe_holds_against_long_alias_chain() {
+    // `bool <: a0` holds, and stays assumed for the later fields.
     on_big_stack(|| {
-        let mut env = TypeEnv::new();
-        for i in 0..LONG {
-            env.0.insert(format!("a{i}"), var(&format!("a{}", i + 1)));
-        }
-        env.0.insert(format!("a{LONG}"), TypeInner::Nat.into());
-        let bools = record(|| TypeInner::Bool.into());
-        let opts = record(|| TypeInner::Opt(var("a0")).into());
-        // The special rule accepts every field.
-        subtype_with_config(OptReport::Silence, &mut Gamma::new(), &env, &bools, &opts).unwrap();
+        let (env, t1, t2) = bools_against_opts(TypeInner::Bool);
+        subtype_with_config(OptReport::Error, &mut Gamma::new(), &env, &t1, &t2).unwrap();
+        assert!(subtype_check_all(&mut Gamma::new(), &env, &t1, &t2).is_empty());
+    });
+}
+
+#[test]
+fn missing_fields_typed_by_long_alias_chain() {
+    on_big_stack(|| {
+        // Each missing field may be left out: `a0` is an `opt`.
+        let (env, t1, t2) = missing_fields(TypeInner::Opt(TypeInner::Nat.into()));
+        subtype_with_config(OptReport::Error, &mut Gamma::new(), &env, &t1, &t2).unwrap();
+        assert!(subtype_check_all(&mut Gamma::new(), &env, &t1, &t2).is_empty());
+        // Each one is required: `a0` is `nat`, so all are reported.
+        let (env, t1, t2) = missing_fields(TypeInner::Nat);
+        subtype_with_config(OptReport::Error, &mut Gamma::new(), &env, &t1, &t2).unwrap_err();
+        assert_eq!(
+            subtype_check_all(&mut Gamma::new(), &env, &t1, &t2).len(),
+            FIELDS
+        );
     });
 }

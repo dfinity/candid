@@ -5,7 +5,8 @@
 ### Candid 0.10.41
 
 * Bug fixes:
-  + The special opt rule now tests its side condition (the expected type is not `null`, `reserved` or an `opt`) before it probes `t <: t'`, not after. When the condition fails the probe's answer is unused, but on a chain of `opt`s the probe explored a fresh pair at every level, so comparing two chains that differ at the leaf took time quadratic in their depth: about a second for 1,000 aliases, and minutes for a few thousand, bounded only by how much stack the caller gave the check. This affected `subtype`, `subtype_with_config`, `subtype_check_all` (and so `service_compatible`, `service_compatibility_report` and `didc check`) on two interfaces of a few tens of KB. It is now linear. A probe already refuted is answered before the side condition, so many fields probing the same long alias chain do not each walk it. Results are unchanged.
+  + The special opt rule now tests its side condition (the expected type is not `null`, `reserved` or an `opt`) before it probes `t <: t'`, not after. When the condition fails the probe's answer is unused, but on a chain of `opt`s the probe explored a fresh pair at every level, so comparing two chains that differ at the leaf took time quadratic in their depth: about a second for 1,000 aliases, and minutes for a few thousand, bounded only by how much stack the caller gave the check. This affected `subtype`, `subtype_with_config`, `subtype_check_all` (and so `service_compatible`, `service_compatibility_report` and `didc check`) on two interfaces of a few tens of KB. It is now linear. Results are unchanged.
+  + A subtype check now remembers which type names resolve to `null`, `reserved` or an `opt`. Both the special opt rule's side condition and the check for a record field missing from the subtype ask this, and each walked the name's whole alias chain: many fields typed by one long chain took fields × aliases steps (20,000 of each: minutes).
 
 ### candid_parser 0.4.2
 

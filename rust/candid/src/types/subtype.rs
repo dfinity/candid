@@ -24,10 +24,14 @@ pub type Gamma = HashSet<(Type, Type)>;
 /// under any, and a later probe of it can fail without exploring it again.
 /// Without this, a recursive type reached along many paths is re-explored on
 /// each one, which is exponential.
+///
+/// And it remembers which names resolve to `null`, `reserved` or an `opt`, so
+/// that many fields typed by one long chain of aliases walk it once.
 struct Assumptions<'a> {
     gamma: &'a mut Gamma,
     log: Vec<(Type, Type)>,
     refuted: Gamma,
+    null_like: HashMap<String, bool>,
 }
 
 impl<'a> Assumptions<'a> {
@@ -36,6 +40,7 @@ impl<'a> Assumptions<'a> {
             gamma,
             log: Vec::new(),
             refuted: Gamma::new(),
+            null_like: HashMap::new(),
         }
     }
 
@@ -62,6 +67,40 @@ impl<'a> Assumptions<'a> {
     fn is_refuted(&self, t1: &Type, t2: &Type) -> bool {
         let named = |t: &Type| matches!(t.as_ref(), TypeInner::Var(_) | TypeInner::Knot(_));
         (named(t1) || named(t2)) && self.refuted.contains(&(t1.clone(), t2.clone()))
+    }
+
+    /// Whether `t` resolves to `null`, `reserved` or an `opt`: the types a
+    /// missing record field may have, and that the special opt rule's side
+    /// condition excludes. The answer depends only on `env`, so it is kept
+    /// for every name on the way for the rest of the check.
+    fn null_like(&mut self, env: &TypeEnv, t: &Type, depth: &RecursionDepth) -> Result<bool> {
+        let mut path = Vec::new();
+        let mut t = t.clone();
+        let res = loop {
+            match t.as_ref() {
+                TypeInner::Var(id) => {
+                    if let Some(&res) = self.null_like.get(id) {
+                        break res;
+                    }
+                    // A walk longer than there are names has met a cycle.
+                    if path.len() > env.0.len() {
+                        return Err(Error::msg(format!("{id} has cyclic type definition")));
+                    }
+                    let next = env.find_type(id)?.clone();
+                    path.push(id.clone());
+                    t = next;
+                }
+                TypeInner::Knot(_) => {
+                    break matches!(
+                        env.trace_type_with_depth(&t, depth)?.as_ref(),
+                        TypeInner::Null | TypeInner::Reserved | TypeInner::Opt(_)
+                    )
+                }
+                t => break matches!(t, TypeInner::Null | TypeInner::Reserved | TypeInner::Opt(_)),
+            }
+        };
+        self.null_like.extend(path.into_iter().map(|id| (id, res)));
+        Ok(res)
     }
 
     /// Record that `t1 <: t2` failed, unless the recursion limit was hit while
@@ -394,13 +433,10 @@ fn subtype_collect_(
         // Test the side condition before the probe: when it fails the probe's
         // answer is unused, and on opt chains probing anyway explores a fresh
         // pair at every level, which is quadratic in the chain length. A probe
-        // already refuted goes first of all, since tracing `ty2` walks its
-        // whole alias chain and the refutation answers without it.
+        // already refuted goes first of all.
         (_, Opt(ty2))
             if !gamma.is_refuted(t1, ty2)
-                && !env
-                    .trace_type_with_depth(ty2, depth)
-                    .is_ok_and(|t| matches!(t.as_ref(), Null | Reserved | Opt(_)))
+                && !gamma.null_like(env, ty2, depth).unwrap_or(false)
                 && subtype_(report, gamma, env, t1, ty2, depth).is_ok()
                 && depth.overflows() == 0 => {}
         // A probe that hit the recursion limit proves nothing either way.
@@ -435,10 +471,7 @@ fn subtype_collect_(
                         path.pop();
                     }
                     None => {
-                        let is_optional = env
-                            .trace_type_with_depth(ty2, depth)
-                            .map(|t| matches!(t.as_ref(), Null | Reserved | Opt(_)))
-                            .unwrap_or(false);
+                        let is_optional = gamma.null_like(env, ty2, depth).unwrap_or(false);
                         if !is_optional {
                             errors.push(Incompatibility {
                                 path: path.clone(),
@@ -704,10 +737,7 @@ fn subtype_(
         // See `subtype_collect_`: known refutation, side condition, then the probe.
         (_, Opt(ty2))
             if !gamma.is_refuted(t1, ty2)
-                && !matches!(
-                    env.trace_type_with_depth(ty2, depth)?.as_ref(),
-                    Null | Reserved | Opt(_)
-                )
+                && !gamma.null_like(env, ty2, depth)?
                 && subtype_(report, gamma, env, t1, ty2, depth).is_ok() =>
         {
             Ok(())
@@ -737,10 +767,7 @@ fn subtype_(
                         })?
                     }
                     None => {
-                        if !matches!(
-                            env.trace_type_with_depth(ty2, depth)?.as_ref(),
-                            Null | Reserved | Opt(_)
-                        ) {
+                        if !gamma.null_like(env, ty2, depth)? {
                             return Err(Error::msg(format!(
                                 "Record field {id}: {} is only in the expected type and is not of type opt, null or reserved",
                                 elide_large(ty2)
