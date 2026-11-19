@@ -1,4 +1,4 @@
-//! The conformance vectors this crate can be asked: `hash` and `wellformed`.
+//! The conformance vectors this crate can be asked: `hash`, `wellformed` and `subtype`.
 //!
 //! Every other vector carries types too, and the format promises they are well formed
 //! (`conformance/README.md`), so each of those tables is checked as well: thousands of
@@ -10,7 +10,9 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use candid_types::{Annotation, Composite, FieldId, Primitive, RawTypeTable, Slot, TypeRef};
+use candid_types::{
+    Annotation, Composite, FieldId, Primitive, RawTypeTable, Slot, TypeRef, TypeTable,
+};
 use serde_json::{Map, Value};
 
 type Json = Map<String, Value>;
@@ -45,8 +47,8 @@ fn conformance_vectors() {
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
-    // Not vacuous: the suite has vectors of both kinds this crate answers.
-    for kind in ["hash", "wellformed"] {
+    // Not vacuous: the suite has vectors of every kind this crate answers.
+    for kind in ["hash", "wellformed", "subtype"] {
         assert!(
             asked.get(kind).copied().unwrap_or(0) > 0,
             "no {kind} vectors"
@@ -84,9 +86,14 @@ fn ask(vector: &Value) -> Result<&'static str, String> {
         }
         "subtype" => {
             let v = obj(vector, &["id", "kind", "subtype", "supertype", "expect"]);
-            well_formed_type(&v["subtype"])?;
-            well_formed_type(&v["supertype"])?;
-            Ok("subtype (types only)")
+            let expect = v["expect"].as_bool().ok_or("expect")?;
+            let (a, s) = checked_type(&v["subtype"])?;
+            let (b, t) = checked_type(&v["supertype"])?;
+            let got = candid_types::is_subtype(a.root(s).unwrap(), b.root(t).unwrap());
+            agree(got == expect, || {
+                format!("subtype is {got}, expected {expect}")
+            })?;
+            Ok("subtype")
         }
         "coerce" => {
             let v = obj(vector, &["id", "kind", "value", "from", "to", "expect"]);
@@ -138,6 +145,13 @@ fn ask(vector: &Value) -> Result<&'static str, String> {
 
 fn agree(ok: bool, why: impl FnOnce() -> String) -> Result<(), String> {
     if ok { Ok(()) } else { Err(why()) }
+}
+
+/// A `<type>` the format promises is well formed, checked, with its root.
+fn checked_type(t: &Value) -> Result<(TypeTable, Slot), String> {
+    well_formed_type(t)?;
+    let (raw, root) = read_type(t)?;
+    Ok((raw.check().unwrap(), root))
 }
 
 /// A `<type>` the format promises is well formed.
