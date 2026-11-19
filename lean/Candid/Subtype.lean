@@ -65,8 +65,8 @@ The spec's premise `not (null <: <datatype>)` is only ever applied to a concrete
 type, and `null` is a subtype of exactly `null`, `reserved`, and any `opt` -- so this
 needs no recursion, just one step through the table. -/
 def TypeTable.acceptsNull (t : TypeTable) : Slot → Bool
-  | .prim .null | .prim .reserved => true
-  | .prim _ => false
+  | .primitive .null | .primitive .reserved => true
+  | .primitive _ => false
   | .ref r => match t.lookup? r with
     | some (.opt _) => true
     | _ => false
@@ -80,7 +80,7 @@ def indexedFrom (i : Nat) : List Slot → List (FieldId × Slot)
 /-- Function annotations must be equal *as sets*. The spec identifies annotation
 lists "up to reordering" (`spec/Candid.md:207`); comparing them as sets also ignores
 repetition, which no `.did` source produces and which changes no answer. -/
-def annotsAgree (xs ys : List FuncAnnot) : Bool :=
+def annotationsAgree (xs ys : List Annotation) : Bool :=
   xs.all (ys.contains ·) && ys.all (xs.contains ·)
 
 /-- Look up a label. -/
@@ -186,9 +186,9 @@ step. Recording a pair lowers the first; any other step drops an obligation. -/
 `A` and `sup` in `B`, or -- for the function rule's contravariant parameter premise --
 the reverse. -/
 structure Goal where
-  fwd : Bool
-  sub : Slot
-  sup : Slot
+  forward : Bool
+  subtype : Slot
+  supertype : Slot
 
 /-- A slot pair that needs no unfolding, decided in tables `T` (the subtype's) and `U`
 (the supertype's). `none` for a pair of references, the only kind that unfolds. -/
@@ -196,22 +196,22 @@ def leaf (T U : TypeTable) : Slot → Slot → Option Bool
   -- `<datatype> <: reserved` and `empty <: <datatype>`: the top and bottom types.
   -- Neither looks at the other side, which is sound only because both tables are
   -- well formed and the roots resolve: every slot reached here is a type.
-  | _, .prim .reserved => some true
-  | .prim .empty, _ => some true
+  | _, .primitive .reserved => some true
+  | .primitive .empty, _ => some true
 
   -- `<primtype> <: <primtype>`, plus `nat <: int`. `principal` is a primitive
   -- (spec/Candid.md:80), so `principal <: principal` needs no rule of its own.
-  | .prim p, .prim q => some (p == q || (p == .nat && q == .int))
+  | .primitive p, .primitive q => some (p == q || (p == .nat && q == .int))
 
   -- A primitive against a composite: only the `opt` rule can apply, since `empty`
   -- and `reserved` are decided above.
-  | .prim _, .ref j =>
+  | .primitive _, .ref j =>
     match U.lookup? j with
     | some (.opt _) => some true
     | _ => some false
 
   -- A composite against a primitive: only `service <actortype> <: principal`.
-  | .ref i, .prim q =>
+  | .ref i, .primitive q =>
     match q, T.lookup? i with
     | .principal, some (.service _) => some true
     | _, _ => some false
@@ -257,7 +257,7 @@ def expand (T U : TypeTable) (fwd : Bool) : Composite → Composite → Option (
   -- table. An obligation's direction is what selects the assumption list it is
   -- checked against, so an assumed `A.i <: B.j` is never read as `B.j <: A.i`.
   | .func args rets ann, .func args' rets' ann' =>
-    if annotsAgree ann ann' then do
+    if annotationsAgree ann ann' then do
       let params ← labelGoals T (!fwd) (indexedFrom 1 args') (indexedFrom 1 args)
       let results ← labelGoals U fwd (indexedFrom 1 rets) (indexedFrom 1 rets')
       some (params ++ results)

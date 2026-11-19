@@ -1,0 +1,17 @@
+[package]
+name = "candid_types"
+version = "0.0.0"
+description = "Candid's type language: slots, composites and the type table"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

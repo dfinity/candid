@@ -21,7 +21,7 @@ open Candid.Slot
 open Candid.Composite
 
 /-- A type that needs no table: a primitive. -/
-def atom (p : Prim) : Fixture := ⟨.empty, .prim p⟩
+def atom (p : Primitive) : Fixture := ⟨.empty, .primitive p⟩
 
 /-- A type that is one composite, named by the root. -/
 def entry (c : Composite) : Fixture := closeOne c
@@ -50,7 +50,7 @@ def hashChecks : List Vector :=
 
 /-! ## Primitives, top and bottom -/
 
-def primChecks : List Vector :=
+def primitiveChecks : List Vector :=
   [ expectSub (atom .nat) (atom .nat) true "nat <: nat"
   , expectSub (atom .nat) (atom .int) true "nat <: int"
   , expectSub (atom .int) (atom .nat) false "int !<: nat"
@@ -134,7 +134,7 @@ def variantChecks : List Vector :=
       true "variant {a} <: variant {a; b} (tag dropped)"
   , expectSub (entry (variantOf [("a", nat), ("b", text)])) (entry (variantOf [("a", nat)]))
       false "variant {a; b} !<: variant {a} (tag added)"
-  , expectSub (entry (variantOf [("a", nat), ("b", .prim .empty)])) (entry (variantOf [("a", nat)]))
+  , expectSub (entry (variantOf [("a", nat), ("b", .primitive .empty)])) (entry (variantOf [("a", nat)]))
       false "variant {a; b : empty} !<: variant {a}, though no value has case b (incomplete)"
   , expectSub (entry (variantOf [("a", nat)])) (entry (variantOf [("a", int)])) true
       "variant {a:nat} <: variant {a:int}"
@@ -225,7 +225,7 @@ def onewayWithoutResult : Fixture := entry (.func [nat] [] [.oneway])
 
 /-- `spec/Candid.md:1223`: "The serialised data type representing a method type must
 denote a function type." -/
-def serviceWithPrimMethod : Fixture := entry (.service [("m", nat)])
+def serviceWithPrimitiveMethod : Fixture := entry (.service [("m", nat)])
 
 def serviceWithVecMethod : Fixture := close do
   let v ← intern (.vec nat)
@@ -240,7 +240,7 @@ def wellFormedChecks : List Vector :=
       "a function with two modes is malformed"
   , expectWellFormed (entry (.func [] [] [.query, .query])) false
       "a function with an annotation repeated is malformed"
-  , expectWellFormed serviceWithPrimMethod false
+  , expectWellFormed serviceWithPrimitiveMethod false
       "service method that is a primitive is malformed"
   , expectWellFormed serviceWithVecMethod false
       "service method that is not a function is malformed"
@@ -499,7 +499,7 @@ def optVariantA : Fixture := optVariant [("a", nat)]
 
 def someService : PrincipalBytes := [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01]
 
-def coercePrimChecks : List Vector :=
+def coercePrimitiveChecks : List Vector :=
   [ expectCoerce (.nat 5) (atom .nat) (atom .nat) (some (.nat 5)) "5 : nat ~> 5 : nat"
   , expectCoerce (.nat 5) (atom .nat) (atom .int) (some (.int 5)) "5 : nat ~> 5 : int"
   , expectCoerce (.int (-5)) (atom .int) (atom .nat) none "-5 : int ~> reject : nat"
@@ -680,7 +680,7 @@ def coerceRefChecks : List Vector :=
       none "service reference : service {} ~> reject : service {m}" ]
 
 def coerceChecks : List Vector :=
-  coercePrimChecks ++ coerceOptChecks ++ coerceVecChecks ++ coerceRecordChecks ++
+  coercePrimitiveChecks ++ coerceOptChecks ++ coerceVecChecks ++ coerceRecordChecks ++
   coerceVariantChecks ++ coerceRefChecks ++ coerceInfiniteOptChecks ++ coerceOrderChecks
 
 /-! ## Decoding
@@ -698,46 +698,46 @@ def hexBytes (s : String) : ByteArray :=
   | .error e => panic! s!"bad hex in a hand-written vector: {e}"
 
 /-- Types with no table: primitives. -/
-def prims (ss : List Slot) : TypeSeq := ⟨.empty, ss⟩
+def primitives (ss : List Slot) : TypeSequence := ⟨.empty, ss⟩
 
 /-- Types built into one table. -/
-def typesOf (m : TableM (List Slot)) : TypeSeq :=
+def typesOf (m : TableM (List Slot)) : TypeSequence :=
   let (roots, entries) := m.run #[]
   ⟨{ entries }, roots⟩
 
-def expectDecode (hex : String) (ts : TypeSeq) (want : Option (List Value)) (id : String) :
+def expectDecode (hex : String) (ts : TypeSequence) (want : Option (List Value)) (id : String) :
     Vector :=
   ⟨id, .decode (hexBytes hex) ts want⟩
 
-def optNatT : TypeSeq := typesOf do return [← intern (.opt nat)]
+def optNatT : TypeSequence := typesOf do return [← intern (.opt nat)]
 
-def recordABT : TypeSeq := typesOf do return [← intern (recordOf [("a", nat), ("b", nat)])]
+def recordABT : TypeSequence := typesOf do return [← intern (recordOf [("a", nat), ("b", nat)])]
 
-def variantABT : TypeSeq := typesOf do return [← intern (variantOf [("a", nat), ("b", null)])]
+def variantABT : TypeSequence := typesOf do return [← intern (variantOf [("a", nat), ("b", null)])]
 
 def decodeFramingChecks : List Vector :=
-  [ expectDecode "4449444c 00 00" (prims []) (some []) "decode: no arguments"
-  , expectDecode "4449444d 00 00" (prims []) none "decode: the magic number is DIDL"
-  , expectDecode "4449444c" (prims []) none "decode: nothing after the magic number"
-  , expectDecode "4449444c 00" (prims []) none "decode: no argument count"
-  , expectDecode "4449444c 00 01 7d 05 00" (prims [nat]) none
+  [ expectDecode "4449444c 00 00" (primitives []) (some []) "decode: no arguments"
+  , expectDecode "4449444d 00 00" (primitives []) none "decode: the magic number is DIDL"
+  , expectDecode "4449444c" (primitives []) none "decode: nothing after the magic number"
+  , expectDecode "4449444c 00" (primitives []) none "decode: no argument count"
+  , expectDecode "4449444c 00 01 7d 05 00" (primitives [nat]) none
       "decode: a byte after the last value"
-  , expectDecode "4449444c 00 02 7d 71 05 01 78" (prims [nat, text])
+  , expectDecode "4449444c 00 02 7d 71 05 01 78" (primitives [nat, text])
       (some [.nat 5, .text "x"]) "decode: two arguments"
-  , expectDecode "4449444c 00 02 7d 71 05 01 78" (prims [nat]) (some [.nat 5])
+  , expectDecode "4449444c 00 02 7d 71 05 01 78" (primitives [nat]) (some [.nat 5])
       "decode: an extra argument is ignored"
-  , expectDecode "4449444c 00 02 7d 7e 05 02" (prims [nat]) none
+  , expectDecode "4449444c 00 02 7d 7e 05 02" (primitives [nat]) none
       "decode: an extra argument is ignored, but still decoded"
   , expectDecode "4449444c 00 00" optNatT (some [.null]) "decode: a missing argument at opt is null"
-  , expectDecode "4449444c 00 00" (prims [reserved]) (some [.null])
+  , expectDecode "4449444c 00 00" (primitives [reserved]) (some [.null])
       "decode: a missing argument at reserved is null"
-  , expectDecode "4449444c 00 00" (prims [nat]) none "decode: a missing argument at nat" ]
+  , expectDecode "4449444c 00 00" (primitives [nat]) none "decode: a missing argument at nat" ]
 
 def decodeLebChecks : List Vector :=
-  [ expectDecode "4449444c 00 01 7d 05" (prims [nat]) (some [.nat 5]) "decode: nat"
-  , expectDecode "4449444c 00 01 7d 85 80 00" (prims [nat]) (some [.nat 5])
+  [ expectDecode "4449444c 00 01 7d 05" (primitives [nat]) (some [.nat 5]) "decode: nat"
+  , expectDecode "4449444c 00 01 7d 85 80 00" (primitives [nat]) (some [.nat 5])
       "decode: nat with redundant continuation bytes"
-  , expectDecode "4449444c 00 01 fd 7f 05" (prims [nat]) (some [.nat 5])
+  , expectDecode "4449444c 00 01 fd 7f 05" (primitives [nat]) (some [.nat 5])
       "decode: a type reference with redundant continuation bytes"
   , expectDecode "4449444c 01 ee 7f 7d 01 00 00" optNatT (some [.null])
       "decode: an entry's opcode with redundant continuation bytes"
@@ -746,52 +746,52 @@ def decodeLebChecks : List Vector :=
   , expectDecode "4449444c 01 6d 7f 01 00 80 80 80 80 80 80 80 80 80 00"
       (typesOf do return [← intern (.vec null)]) (some [.vec []])
       "decode: a vector length of zero in ten bytes"
-  , expectDecode "4449444c 01 6a 00 00 80 00 00" (prims []) (some [])
+  , expectDecode "4449444c 01 6a 00 00 80 00 00" (primitives []) (some [])
       "decode: an annotation count with redundant continuation bytes"
-  , expectDecode "4449444c 01 bf 7f 00 00" (prims []) (some [])
+  , expectDecode "4449444c 01 bf 7f 00 00" (primitives []) (some [])
       "decode: a future opcode that takes two bytes"
-  , expectDecode "4449444c 00 01 7d 80 80 80 80 80 80 80 80 80 02" (prims [nat])
+  , expectDecode "4449444c 00 01 7d 80 80 80 80 80 80 80 80 80 02" (primitives [nat])
       (some [.nat 18446744073709551616]) "decode: nat 2^64"
-  , expectDecode "4449444c 00 01 7d 85" (prims [nat]) none "decode: nat runs past the end"
-  , expectDecode "4449444c 00 01 7c ff 7e" (prims [int]) (some [.int (-129)]) "decode: int -129"
-  , expectDecode "4449444c 00 01 7c c0 00" (prims [int]) (some [.int 64])
+  , expectDecode "4449444c 00 01 7d 85" (primitives [nat]) none "decode: nat runs past the end"
+  , expectDecode "4449444c 00 01 7c ff 7e" (primitives [int]) (some [.int (-129)]) "decode: int -129"
+  , expectDecode "4449444c 00 01 7c c0 00" (primitives [int]) (some [.int 64])
       "decode: int 64 takes two bytes"
-  , expectDecode "4449444c 00 01 7c 40" (prims [int]) (some [.int (-64)])
+  , expectDecode "4449444c 00 01 7c 40" (primitives [int]) (some [.int (-64)])
       "decode: int 0x40 is -64" ]
 
 def decodeFixedChecks : List Vector :=
-  [ expectDecode "4449444c 00 01 7e 01" (prims [bool]) (some [.bool true]) "decode: bool"
-  , expectDecode "4449444c 00 01 7e 02" (prims [bool]) none "decode: bool 2"
-  , expectDecode "4449444c 00 01 7a 34 12" (prims [nat16]) (some [.nat16 0x1234])
+  [ expectDecode "4449444c 00 01 7e 01" (primitives [bool]) (some [.bool true]) "decode: bool"
+  , expectDecode "4449444c 00 01 7e 02" (primitives [bool]) none "decode: bool 2"
+  , expectDecode "4449444c 00 01 7a 34 12" (primitives [nat16]) (some [.nat16 0x1234])
       "decode: nat16 is little-endian"
-  , expectDecode "4449444c 00 01 76 fe ff" (prims [int16]) (some [.int16 (-2)])
+  , expectDecode "4449444c 00 01 76 fe ff" (primitives [int16]) (some [.int16 (-2)])
       "decode: int16 -2"
-  , expectDecode "4449444c 00 01 79 01 02" (prims [nat32]) none "decode: nat32 runs past the end"
-  , expectDecode "4449444c 00 01 73 00 00 80 3f" (prims [float32]) (some [.float32 0x3f800000])
+  , expectDecode "4449444c 00 01 79 01 02" (primitives [nat32]) none "decode: nat32 runs past the end"
+  , expectDecode "4449444c 00 01 73 00 00 80 3f" (primitives [float32]) (some [.float32 0x3f800000])
       "decode: float32 1.0"
-  , expectDecode "4449444c 00 01 72 01 00 00 00 00 00 f8 7f" (prims [float64])
+  , expectDecode "4449444c 00 01 72 01 00 00 00 00 00 f8 7f" (primitives [float64])
       (some [.float64 0x7ff8000000000001]) "decode: float64 NaN keeps its payload" ]
 
 def decodeTextChecks : List Vector :=
-  [ expectDecode "4449444c 00 01 71 03 61 62 63" (prims [text]) (some [.text "abc"])
+  [ expectDecode "4449444c 00 01 71 03 61 62 63" (primitives [text]) (some [.text "abc"])
       "decode: text"
-  , expectDecode "4449444c 00 01 71 02 c3 a9" (prims [text]) (some [.text "é"])
+  , expectDecode "4449444c 00 01 71 02 c3 a9" (primitives [text]) (some [.text "é"])
       "decode: text is UTF-8"
-  , expectDecode "4449444c 00 01 71 02 c0 80" (prims [text]) none
+  , expectDecode "4449444c 00 01 71 02 c0 80" (primitives [text]) none
       "decode: text with an overlong UTF-8 sequence"
-  , expectDecode "4449444c 00 01 71 03 ed a0 80" (prims [text]) none
+  , expectDecode "4449444c 00 01 71 03 ed a0 80" (primitives [text]) none
       "decode: text with a UTF-16 surrogate"
-  , expectDecode "4449444c 00 01 71 05 61 62" (prims [text]) none
+  , expectDecode "4449444c 00 01 71 05 61 62" (primitives [text]) none
       "decode: text runs past the end" ]
 
 def decodeNullChecks : List Vector :=
-  [ expectDecode "4449444c 00 02 7f 7d 05" (prims [null, nat]) (some [.null, .nat 5])
+  [ expectDecode "4449444c 00 02 7f 7d 05" (primitives [null, nat]) (some [.null, .nat 5])
       "decode: null takes no bytes"
-  , expectDecode "4449444c 00 01 70" (prims [reserved]) (some [.null]) "decode: reserved"
-  , expectDecode "4449444c 00 01 6f" (prims [empty]) none "decode: empty has no value"
-  , expectDecode "4449444c 00 01 6f" (prims [reserved]) none
+  , expectDecode "4449444c 00 01 70" (primitives [reserved]) (some [.null]) "decode: reserved"
+  , expectDecode "4449444c 00 01 6f" (primitives [empty]) none "decode: empty has no value"
+  , expectDecode "4449444c 00 01 6f" (primitives [reserved]) none
       "decode: empty has no value, even where it would be ignored"
-  , expectDecode "4449444c 00 01 6f" (prims []) none
+  , expectDecode "4449444c 00 01 6f" (primitives []) none
       "decode: empty has no value, even as an extra argument" ]
 
 def decodeOptVecChecks : List Vector :=
@@ -807,15 +807,15 @@ def decodeOptVecChecks : List Vector :=
       (some [.vec [.null, .null, .null]]) "decode: vec null, whose elements take no bytes" ]
 
 /-- `record { a : record {}; b : record {} }`, the two fields sharing one entry. -/
-def sharedEmptyRecords : TypeSeq := typesOf do
+def sharedEmptyRecords : TypeSequence := typesOf do
   let e ← intern (.record [])
   return [← intern (recordOf [("a", e), ("b", e)])]
 
 /-- `type R = record { R }`. -/
-def recordLoop : TypeSeq := ⟨{ entries := #[.record [(0, .ref 0)]] }, [.ref 0]⟩
+def recordLoop : TypeSequence := ⟨{ entries := #[.record [(0, .ref 0)]] }, [.ref 0]⟩
 
 /-- `type R = record { null; R }`. -/
-def recordLoopAfterNull : TypeSeq :=
+def recordLoopAfterNull : TypeSequence :=
   ⟨{ entries := #[.record [(0, .null), (1, .ref 0)]] }, [.ref 0]⟩
 
 def decodeRecordChecks : List Vector :=
@@ -839,9 +839,9 @@ def decodeRecordChecks : List Vector :=
       "decode: one record entry twice at one position is not a cycle"
   , expectDecode "4449444c 01 6c 01 00 00 01 00" recordLoop none
       "decode: type R = record { R } has no value"
-  , expectDecode "4449444c 01 6c 01 00 00 01 00" (prims [reserved]) none
+  , expectDecode "4449444c 01 6c 01 00 00 01 00" (primitives [reserved]) none
       "decode: type R = record { R } has no value, even at reserved"
-  , expectDecode "4449444c 01 6c 02 00 7d 01 00 01 00 05 06" (prims [reserved]) none
+  , expectDecode "4449444c 01 6c 02 00 7d 01 00 01 00 05 06" (primitives [reserved]) none
       "decode: type R = record { nat; R } has no value, and runs out of input"
   , expectDecode "4449444c 01 6c 02 00 7f 01 00 01 00" recordLoopAfterNull none
       "decode: type R = record { null; R } has no value" ]
@@ -858,46 +858,46 @@ def decodeVariantChecks : List Vector :=
 def optNatEntries (n : Nat) : String := String.join (List.replicate n "6e7d ")
 
 def decodeTableChecks : List Vector :=
-  [ expectDecode "4449444c 01 7d 00" (prims []) none "decode: a primitive in the type table"
-  , expectDecode "4449444c 00 01 00" (prims []) none "decode: an index past the type table"
-  , expectDecode "4449444c 00 01 6e" (prims []) none
+  [ expectDecode "4449444c 01 7d 00" (primitives []) none "decode: a primitive in the type table"
+  , expectDecode "4449444c 00 01 00" (primitives []) none "decode: an index past the type table"
+  , expectDecode "4449444c 00 01 6e" (primitives []) none
       "decode: a composite opcode as an argument type"
-  , expectDecode "4449444c 02 6e 7d 6d 7e 01 7d 05" (prims [nat]) (some [.nat 5])
+  , expectDecode "4449444c 02 6e 7d 6d 7e 01 7d 05" (primitives [nat]) (some [.nat 5])
       "decode: unused table entries are allowed"
-  , expectDecode "4449444c 01 6e 05 01 7d 05" (prims [nat]) none
+  , expectDecode "4449444c 01 6e 05 01 7d 05" (primitives [nat]) none
       "decode: an unused table entry must still resolve"
   , expectDecode s!"4449444c 41 {optNatEntries 65} 01 c0 00 00" optNatT (some [.null])
       "decode: table index 64 is SLEB128"
   , expectDecode s!"4449444c 41 {optNatEntries 65} 01 40 00" optNatT none
       "decode: table index 64 written as LEB128 is opcode -64"
-  , expectDecode "4449444c 01 6a 00 00 01 04 00" (prims []) none
+  , expectDecode "4449444c 01 6a 00 00 01 04 00" (primitives []) none
       "decode: unknown function annotation"
-  , expectDecode "4449444c 01 6a 00 00 02 01 02 00" (prims []) none
+  , expectDecode "4449444c 01 6a 00 00 02 01 02 00" (primitives []) none
       "decode: a function type with two modes"
-  , expectDecode "4449444c 01 6a 00 00 02 01 01 00" (prims []) none
+  , expectDecode "4449444c 01 6a 00 00 02 01 01 00" (primitives []) none
       "decode: a function type with an annotation repeated"
-  , expectDecode "4449444c 01 6a 00 01 7d 01 02 00" (prims []) none
+  , expectDecode "4449444c 01 6a 00 01 7d 01 02 00" (primitives []) none
       "decode: oneway function with a result"
-  , expectDecode "4449444c 01 69 01 01 6d 7d 00" (prims []) none
+  , expectDecode "4449444c 01 69 01 01 6d 7d 00" (primitives []) none
       "decode: a method that is not a function"
-  , expectDecode "4449444c 02 6a 00 00 00 69 02 01 6e 00 01 6d 00 00" (prims []) none
+  , expectDecode "4449444c 02 6a 00 00 00 69 02 01 6e 00 01 6d 00 00" (primitives []) none
       "decode: methods out of order"
-  , expectDecode "4449444c 02 6a 00 00 00 69 01 01 ff 00 00" (prims []) none
+  , expectDecode "4449444c 02 6a 00 00 00 69 01 01 ff 00 00" (primitives []) none
       "decode: a method name that is not UTF-8" ]
 
 def decodeRefChecks : List Vector :=
   let funcT := typesOf do return [← intern (.func [] [] [])]
-  [ expectDecode "4449444c 00 01 68 01 01 2a" (prims [principal]) (some [.principal [0x2a]])
+  [ expectDecode "4449444c 00 01 68 01 01 2a" (primitives [principal]) (some [.principal [0x2a]])
       "decode: principal"
-  , expectDecode "4449444c 00 01 68 00" (prims [principal]) none
+  , expectDecode "4449444c 00 01 68 00" (primitives [principal]) none
       "decode: opaque principal reference"
-  , expectDecode "4449444c 00 01 68 02 01 2a" (prims [principal]) none
+  , expectDecode "4449444c 00 01 68 02 01 2a" (primitives [principal]) none
       "decode: principal reference flag 2"
   , expectDecode s!"4449444c 00 01 68 01 1d {String.join (List.replicate 29 "00")}"
-      (prims [principal]) (some [.principal (List.replicate 29 0)])
+      (primitives [principal]) (some [.principal (List.replicate 29 0)])
       "decode: a principal of 29 bytes"
   , expectDecode s!"4449444c 00 01 68 01 1e {String.join (List.replicate 30 "00")}"
-      (prims [principal]) none
+      (primitives [principal]) none
       "decode: a principal of 30 bytes"
   , expectDecode s!"4449444c 01 69 00 01 00 01 1e {String.join (List.replicate 30 "00")}"
       (typesOf do return [← intern (.service [])]) none
@@ -908,13 +908,13 @@ def decodeRefChecks : List Vector :=
       (some [.func [0x2a] "m"]) "decode: func reference"
   , expectDecode "4449444c 01 6a 00 00 00 01 00 00" funcT none
       "decode: opaque func reference"
-  , expectDecode "4449444c 01 6a 00 00 00 01 00 01 01 00 01 ff" (prims []) none
+  , expectDecode "4449444c 01 6a 00 00 00 01 00 01 01 00 01 ff" (primitives []) none
       "decode: a dropped function reference's method name is still checked" ]
 
 def decodeCoerceChecks : List Vector :=
-  [ expectDecode "4449444c 00 01 7d 05" (prims [int]) (some [.int 5])
+  [ expectDecode "4449444c 00 01 7d 05" (primitives [int]) (some [.int 5])
       "decode: then coerce, nat at int"
-  , expectDecode "4449444c 00 01 7d 05" (prims [text]) none
+  , expectDecode "4449444c 00 01 7d 05" (primitives [text]) none
       "decode: an argument that does not coerce rejects the message"
   , expectDecode "4449444c 00 01 7d 05" (typesOf do return [← intern (.opt text)]) (some [.null])
       "decode: an argument that does not coerce at opt is null" ]
@@ -923,23 +923,23 @@ def decodeCoerceChecks : List Vector :=
 table entry is the opcode, a length and that many bytes; a value is two lengths, `m`
 and `n`, then `m` bytes. -/
 def decodeFutureChecks : List Vector :=
-  [ expectDecode "4449444c 01 67 00 01 00 00 00" (prims [reserved]) (some [.null])
+  [ expectDecode "4449444c 01 67 00 01 00 00 00" (primitives [reserved]) (some [.null])
       "decode: a future value at reserved"
   , expectDecode "4449444c 01 67 00 01 00 00 00" optNatT (some [.null])
       "decode: a future value at an option is null"
-  , expectDecode "4449444c 01 67 00 01 00 00 00" (prims [nat]) none
+  , expectDecode "4449444c 01 67 00 01 00 00 00" (primitives [nat]) none
       "decode: a future value at nat"
-  , expectDecode "4449444c 01 67 00 01 00 00 00" (prims []) (some [])
+  , expectDecode "4449444c 01 67 00 01 00 00 00" (primitives []) (some [])
       "decode: a future value as an extra argument"
-  , expectDecode "4449444c 01 67 03 41 42 43 01 00 02 00 68 69" (prims [reserved])
+  , expectDecode "4449444c 01 67 03 41 42 43 01 00 02 00 68 69" (primitives [reserved])
       (some [.null]) "decode: a future type's bytes and a future value's bytes are skipped"
-  , expectDecode "4449444c 01 67 00 01 00 00 03" (prims [reserved]) (some [.null])
+  , expectDecode "4449444c 01 67 00 01 00 00 03" (primitives [reserved]) (some [.null])
       "decode: a future value's reference count is ignored"
-  , expectDecode "4449444c 01 67 00 01 00 05 00 68" (prims [reserved]) none
+  , expectDecode "4449444c 01 67 00 01 00 05 00 68" (primitives [reserved]) none
       "decode: a future value runs past the end"
-  , expectDecode "4449444c 01 67 05 41 42" (prims []) none
+  , expectDecode "4449444c 01 67 05 41 42" (primitives []) none
       "decode: a future type runs past the end"
-  , expectDecode "4449444c 00 01 67 00 00" (prims []) none
+  , expectDecode "4449444c 00 01 67 00 00" (primitives []) none
       "decode: a future type is not a primitive, so it is not an argument type" ]
 
 /-! Future types are also checked where an implementation cannot be: as the type a
@@ -993,10 +993,10 @@ count; and that within the limit, a malformed message is rejected, not counted a
 Every `decode` vector is also checked to get its answer within `costlyLimit`
 (`Assertion.withinDisagreement`). -/
 
-def within (hex : String) (ts : TypeSeq) (limit : Nat) : Option (Option (List Value)) :=
+def within (hex : String) (ts : TypeSequence) (limit : Nat) : Option (Option (List Value)) :=
   ts.check?.bind fun ⟨B, us⟩ => deserializeWithin limit (hexBytes hex) B (us.map (·.1))
 
-def plain (hex : String) (ts : TypeSeq) : Option (List Value) :=
+def plain (hex : String) (ts : TypeSequence) : Option (List Value) :=
   ts.check?.bind fun ⟨B, us⟩ => deserialize (hexBytes hex) B (us.map (·.1))
 
 def limitFacts : List (String × Bool) :=
@@ -1007,17 +1007,17 @@ def limitFacts : List (String × Bool) :=
   let nulls3 := "4449444c 01 6d 7f 01 00 03"
   -- `vec record { null; null }` of 2: the vector, 2 records, 4 nulls, 7 values.
   let pairs2 := "4449444c 02 6c 02 00 7f 01 7f 6d 00 01 01 02"
-  let answersAt (hex : String) (ts : TypeSeq) (n : Nat) :=
+  let answersAt (hex : String) (ts : TypeSequence) (n : Nat) :=
     (plain hex ts).isSome && within hex ts n == some (plain hex ts)
-  [ ("a message of no values decodes at limit 0", within "4449444c 00 00" (prims []) 0 == some (some []))
+  [ ("a message of no values decodes at limit 0", within "4449444c 00 00" (primitives []) 0 == some (some []))
   , ("vec null of 3 decodes at limit 4", answersAt nulls3 vecNull 4)
   , ("vec null of 3 runs out at limit 3", within nulls3 vecNull 3 == none)
   , ("nested values count: vec record { null; null } of 2 decodes at limit 7",
       answersAt pairs2 vecPair 7)
   , ("and runs out at limit 6", within pairs2 vecPair 6 == none)
   , ("ignored values count: the same at no types decodes at limit 7",
-      within pairs2 (prims []) 7 == some (some []))
-  , ("and runs out at limit 6", within pairs2 (prims []) 6 == none)
+      within pairs2 (primitives []) 7 == some (some []))
+  , ("and runs out at limit 6", within pairs2 (primitives []) 6 == none)
   , ("a byte after the values is rejected within the limit",
       within (nulls3 ++ " 00") vecNull 1000 == some none)
   , ("a vector cut short is rejected within the limit",
@@ -1032,7 +1032,7 @@ def decodeChecks : List Vector :=
   decodeTableChecks ++ decodeRefChecks ++ decodeCoerceChecks ++ decodeFutureChecks
 
 def handwritten : List Vector :=
-  hashChecks ++ primChecks ++ optChecks ++ vecChecks ++ recordChecks ++
+  hashChecks ++ primitiveChecks ++ optChecks ++ vecChecks ++ recordChecks ++
   variantChecks ++ funcChecks ++ serviceChecks ++ wellFormedChecks ++
   recursiveChecks ++ vecOmegaChecks ++ contraChecks ++ sharedChecks ++ leakChecks ++
   transitivityChecks ++ coerceChecks ++ decodeChecks

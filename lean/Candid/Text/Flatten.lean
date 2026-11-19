@@ -24,8 +24,8 @@ variable (env : String → Option Slot)
 
 mutual
 
-def flatten : TypeExpr → FlatM Slot
-  | .prim p => return .prim p
+def flatten : TypeExpression → FlatM Slot
+  | .primitive p => return .primitive p
   | .name n => match env n with
     | some s => return s
     | none => throw s!"unbound type name {n}"
@@ -36,15 +36,15 @@ def flatten : TypeExpr → FlatM Slot
   | .func args rets ann => do pushEntry (.func (← flattenList args) (← flattenList rets) ann)
   | .service ms => do pushEntry (.service (← flattenMethods ms))
 
-def flattenList : List TypeExpr → FlatM (List Slot)
+def flattenList : List TypeExpression → FlatM (List Slot)
   | [] => return []
   | t :: ts => return (← flatten t) :: (← flattenList ts)
 
-def flattenFields : List (FieldId × TypeExpr) → FlatM (List (FieldId × Slot))
+def flattenFields : List (FieldId × TypeExpression) → FlatM (List (FieldId × Slot))
   | [] => return []
   | (id, t) :: fs => return (id, ← flatten t) :: (← flattenFields fs)
 
-def flattenMethods : List (String × TypeExpr) → FlatM (List (String × Slot))
+def flattenMethods : List (String × TypeExpression) → FlatM (List (String × Slot))
   | [] => return []
   | (m, t) :: ms => return (m, ← flatten t) :: (← flattenMethods ms)
 
@@ -55,7 +55,7 @@ end
 /-- The table an annotation's type is flattened into, and its root. `none` if a name
 appears, since an annotation's environment is empty, or the type is malformed: a
 repeated field id, or a `oneway` function with results. -/
-def TypeExpr.toTable? (t : TypeExpr) : Option ((T : TypeTable) × T.Root) :=
+def TypeExpression.toTable? (t : TypeExpression) : Option ((T : TypeTable) × T.Root) :=
   match (flatten (fun _ => none) t).run.run #[] with
   | (.ok root, entries) => do
     let T ← ({ entries } : RawTypeTable).check

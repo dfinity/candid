@@ -36,17 +36,17 @@ mutual
 
 coinductive Subty : TypeTable → TypeTable → Slot → Slot → Prop where
   /-- `<primtype> <: <primtype>` -/
-  | prim {A B p} : Subty A B (.prim p) (.prim p)
+  | primitive {A B p} : Subty A B (.primitive p) (.primitive p)
   /-- `nat <: int` -/
-  | natInt {A B} : Subty A B (.prim .nat) (.prim .int)
+  | natInt {A B} : Subty A B (.primitive .nat) (.primitive .int)
   /-- `<datatype> <: reserved` -/
-  | toReserved {A B a} : Subty A B a (.prim .reserved)
+  | toReserved {A B a} : Subty A B a (.primitive .reserved)
   /-- `empty <: <datatype>` -/
-  | fromEmpty {A B b} : Subty A B (.prim .empty) b
+  | fromEmpty {A B b} : Subty A B (.primitive .empty) b
   /-- `service <actortype> <: principal`. `principal` is a `<primtype>`
-  (`spec/Candid.md:80`), so `principal <: principal` follows from `prim`. -/
+  (`spec/Candid.md:80`), so `principal <: principal` follows from `primitive`. -/
   | serviceToPrincipal {A B i ms} :
-      A.lookup? i = some (.service ms) → Subty A B (.ref i) (.prim .principal)
+      A.lookup? i = some (.service ms) → Subty A B (.ref i) (.primitive .principal)
   /-- All four `opt` rules of the spec, collapsed: any type is a subtype of any
   option, and a receiver that cannot decode the value sees `null`. Stated at both
   levels because an option is reachable either as the right slot of any pair (here)
@@ -82,7 +82,7 @@ coinductive SubtyC : TypeTable → TypeTable → Composite → Composite → Pro
   synthesised, not table entries: the rule is about labelled slot lists, and
   `.record` is how the spec says to compare them. -/
   | func {A B args rets ann args' rets' ann'} :
-      annotsAgree ann ann' = true →
+      annotationsAgree ann ann' = true →
       SubtyC B A (.record (indexedFrom 1 args')) (.record (indexedFrom 1 args)) →
       SubtyC A B (.record (indexedFrom 1 rets)) (.record (indexedFrom 1 rets')) →
       SubtyC A B (.func args rets ann) (.func args' rets' ann')
@@ -103,7 +103,7 @@ used gets caught here rather than when the first proof is attempted. -/
 
 example (A B : TypeTable) : Subty A B .nat .int := Subty.natInt
 
-example (A B : TypeTable) (a : Slot) : Subty A B a (.prim .reserved) := Subty.toReserved
+example (A B : TypeTable) (a : Slot) : Subty A B a (.primitive .reserved) := Subty.toReserved
 
 /-- Any type is a subtype of an `opt`, reached through the supertype's table. -/
 example (A B : TypeTable) (a : Slot) (y : Slot) (j : TypeRef)

@@ -127,7 +127,7 @@ decreasing_by
 
 /-! ## Opcodes -/
 
-def Prim.opcode : Prim → Int
+def Primitive.opcode : Primitive → Int
   | .null => -1 | .bool => -2 | .nat => -3 | .int => -4
   | .nat8 => -5 | .nat16 => -6 | .nat32 => -7 | .nat64 => -8
   | .int8 => -9 | .int16 => -10 | .int32 => -11 | .int64 => -12
@@ -135,7 +135,7 @@ def Prim.opcode : Prim → Int
   | .text => -15 | .reserved => -16 | .empty => -17
   | .principal => -24
 
-def Prim.ofOpcode? (op : Int) : Option Prim :=
+def Primitive.ofOpcode? (op : Int) : Option Primitive :=
   match (-op).toNat with
   | 1 => some .null | 2 => some .bool | 3 => some .nat | 4 => some .int
   | 5 => some .nat8 | 6 => some .nat16 | 7 => some .nat32 | 8 => some .nat64
@@ -145,10 +145,10 @@ def Prim.ofOpcode? (op : Int) : Option Prim :=
   | 24 => some .principal
   | _ => none
 
-def FuncAnnot.code : FuncAnnot → UInt8
+def Annotation.code : Annotation → UInt8
   | .query => 1 | .oneway => 2 | .compositeQuery => 3
 
-def FuncAnnot.ofCode? : UInt8 → Option FuncAnnot
+def Annotation.ofCode? : UInt8 → Option Annotation
   | 1 => some .query | 2 => some .oneway | 3 => some .compositeQuery
   | _ => none
 
@@ -164,7 +164,7 @@ def leBytes (k n : Nat) : List UInt8 :=
 
 /-- `I`: a primitive's opcode, or a table index -- signed, like the opcodes. -/
 def Slot.encode : Slot → List UInt8
-  | .prim p => sleb128 p.opcode
+  | .primitive p => sleb128 p.opcode
   | .ref r => sleb128 r
 
 def sortById (fs : List (FieldId × α)) : List (FieldId × α) :=
@@ -195,7 +195,7 @@ def encodeId (id : PrincipalBytes) : List UInt8 := 1 :: leb128 id.length ++ id
 
 def encodeText (s : String) : List UInt8 := leb128 (utf8Bytes s).length ++ utf8Bytes s
 
-def encodePrim : Value → Option (List UInt8)
+def encodePrimitive : Value → Option (List UInt8)
   | .null => some []
   | .bool b => some [if b then 1 else 0]
   | .nat n => some (leb128 n)
@@ -214,7 +214,7 @@ mutual
 /-- `M(v : t)`, for a `v` of type `t` in `T`; `none` if it is not. Recurses on the value,
 as `TypeTable.hasType` does. -/
 def TypeTable.encodeValue (T : TypeTable) : Value → Slot → Option (List UInt8)
-  | v, .prim p => if v.hasPrim p then encodePrim v else none
+  | v, .primitive p => if v.hasPrimitive p then encodePrimitive v else none
   | v, .ref r => match v, T.lookup? r with
     | .null, some (.opt _) => some [0]
     | .opt w, some (.opt t) => ([1] ++ ·) <$> T.encodeValue w t
@@ -270,8 +270,8 @@ argument for values needs. -/
 /-- Why a message was rejected, and where. Vectors say only *that* a message is
 rejected; the reason is for people. -/
 structure DecodeError where
-  pos : Nat
-  msg : String
+  position : Nat
+  message : String
   deriving Repr
 
 /-- Read from `pos`, consuming at least one byte. -/
@@ -405,8 +405,8 @@ is `RawTypeTable.check`'s to say. -/
 def Parse.slot : Parse Slot := do
   let op ← sleb
   if 0 ≤ op then return .ref op.toNat
-  match Prim.ofOpcode? op with
-  | some p => return .prim p
+  match Primitive.ofOpcode? op with
+  | some p => return .primitive p
   | none => fail s!"opcode {op} where a primitive type or a table index belongs"
 
 open Parse in
@@ -437,7 +437,7 @@ def Parse.entry : Parse Composite := do
     let rets ← list slot
     let ann ← list do
       let b ← byte
-      match FuncAnnot.ofCode? b with
+      match Annotation.ofCode? b with
       | some a => return a
       | none => fail s!"unknown function annotation {b}"
     return .func args rets ann
@@ -449,7 +449,7 @@ def Parse.entry : Parse Composite := do
       fail "methods not in strictly ascending name order"
     return .service ms
   | _ =>
-    if (Prim.ofOpcode? op).isSome then fail s!"primitive type {op} in the type table"
+    if (Primitive.ofOpcode? op).isSome then fail s!"primitive type {op} in the type table"
     else if op < -24 then return .future op (← bytes (← leb))
     else fail s!"opcode {op} is not a type"
 
@@ -465,7 +465,7 @@ def Parse.header : Parse (RawTypeTable × List Slot) := do
 /-! ## Decoding values -/
 
 /-- A primitive value. `null` and `reserved` consume nothing; `empty` has no value. -/
-def decodePrim (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size) : Prim → Read bs pos Value
+def decodePrimitive (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size) : Primitive → Read bs pos Value
   | .null | .reserved => .ok (.null, ⟨pos, Nat.le_refl _, hpos⟩)
   | .empty => .error ⟨pos, "a value of type empty"⟩
   | .bool => match readByte bs pos with
@@ -526,7 +526,7 @@ theorem lex3 {a b c a' b' c' : Nat}
 /-- Why the decoder stopped at its limit. Not a rejection: the message may be valid. -/
 def exhausted : String := "more values than the decoder's limit"
 
-def DecodeError.isExhaustion (e : DecodeError) : Bool := e.msg == exhausted
+def DecodeError.isExhaustion (e : DecodeError) : Bool := e.message == exhausted
 
 /-- Count one value against `limit`: the count with it, or `exhausted` if that passes the
 limit. See "Costly messages" in the header. -/
@@ -544,7 +544,7 @@ def decodeValue (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.
   match charge pos limit used with
   | .error e => .error e
   | .ok used => match t with
-  | .prim p => (decodePrim bs pos hpos p).map fun (v, q) => ((v, used), q)
+  | .primitive p => (decodePrimitive bs pos hpos p).map fun (v, q) => ((v, used), q)
   | .ref r => match A.lookup? r with
     | none => .error ⟨pos, s!"type index {r} does not resolve"⟩
     | some (.opt inner) => match readByte bs pos with
@@ -556,7 +556,7 @@ def decodeValue (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.
       | .ok (b, _) => .error ⟨pos, s!"option tag {b}, neither 0 nor 1"⟩
     | some (.vec inner) => match readLeb bs pos with
       | .error e => .error e
-      | .ok (n, ⟨p, hp⟩) => match decodeElems A bs p hp.2 limit used n inner with
+      | .ok (n, ⟨p, hp⟩) => match decodeElements A bs p hp.2 limit used n inner with
         | .error e => .error e
         | .ok ((vs, used), ⟨q, hq⟩) => .ok ((.vec vs, used), ⟨q, by omega, hq.2⟩)
     | some (.record fs) =>
@@ -601,13 +601,13 @@ decreasing_by
 
 /-- `n` elements of type `t`. None starts where the vector did, since the length came
 first, so each starts with no stall. -/
-def decodeElems (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size)
+def decodeElements (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size)
     (limit : Option Nat) (used : Nat) (n : Nat) (t : Slot) : Read bs pos (List Value × Nat) :=
   match n with
   | 0 => .ok (([], used), ⟨pos, Nat.le_refl _, hpos⟩)
   | n + 1 => match decodeValue A bs pos hpos 0 limit used t with
     | .error e => .error e
-    | .ok ((v, used), ⟨p, hp⟩) => match decodeElems A bs p hp.2 limit used n t with
+    | .ok ((v, used), ⟨p, hp⟩) => match decodeElements A bs p hp.2 limit used n t with
       | .error e => .error e
       | .ok ((vs, used), ⟨q, hq⟩) => .ok ((v :: vs, used), ⟨q, by omega, hq.2⟩)
 termination_by (bs.size - pos, A.size, n + 1)
@@ -616,12 +616,12 @@ decreasing_by all_goals (apply lex3; omega)
 end
 
 /-- The values of a message, one per argument type. -/
-def decodeArgs (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size)
+def decodeArguments (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size)
     (limit : Option Nat) (used : Nat) : List Slot → Read bs pos (List Value × Nat)
   | [] => .ok (([], used), ⟨pos, Nat.le_refl _, hpos⟩)
   | t :: ts => match decodeValue A bs pos hpos 0 limit used t with
     | .error e => .error e
-    | .ok ((v, used), ⟨p, hp⟩) => match decodeArgs A bs p hp.2 limit used ts with
+    | .ok ((v, used), ⟨p, hp⟩) => match decodeArguments A bs p hp.2 limit used ts with
       | .error e => .error e
       | .ok ((vs, used), ⟨q, hq⟩) => .ok ((v :: vs, used), ⟨q, by omega, hq.2⟩)
 
@@ -646,7 +646,7 @@ def decode (bs : ByteArray) (limit : Option Nat := none) : Except DecodeError Me
   unless types.all table.resolves do
     throw ⟨pos, "an argument type does not resolve"⟩
   if hpos : pos ≤ bs.size then
-    match decodeArgs table bs pos hpos limit 0 types with
+    match decodeArguments table bs pos hpos limit 0 types with
     | .error e => throw e
     | .ok ((values, count), ⟨q, _⟩) =>
       unless q == bs.size do throw ⟨q, s!"{bs.size - q} bytes after the last value"⟩
@@ -660,7 +660,7 @@ def deserializeWithin (limit : Nat) (bs : ByteArray) (B : TypeTable)
     (expected : List Slot) : Option (Option (List Value)) :=
   match decode bs (some limit) with
   | .error e => if e.isExhaustion then none else some none
-  | .ok m => match (coerceArgs m.table B m.values m.types expected).run with
+  | .ok m => match (coerceArguments m.table B m.values m.types expected).run with
     | .ok r => some r
     | .error _ => some none
 
@@ -669,7 +669,7 @@ def deserialize (bs : ByteArray) (B : TypeTable) (expected : List Slot) :
     Option (List Value) :=
   match decode bs with
   | .error _ => none
-  | .ok m => match (coerceArgs m.table B m.values m.types expected).run with
+  | .ok m => match (coerceArguments m.table B m.values m.types expected).run with
     | .ok r => r
     | .error _ => none
 

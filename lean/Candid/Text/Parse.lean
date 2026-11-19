@@ -2,10 +2,10 @@
 The syntax of textual values (`lean/Spec/TextValues.md`, Section 4), and of the types
 that annotations contain.
 
-Parsing produces the abstract syntax of Section 4.2: `Expr`, with every field id
+Parsing produces the abstract syntax of Section 4.2: `Expression`, with every field id
 explicit. Labels are hashed, positional fields numbered, and a record that repeats an id
 is rejected here, since that does not depend on the type. A type in an annotation is
-parsed into `TypeExpr`, which is nested, as written; `Elab.lean` flattens it into a type
+parsed into `TypeExpression`, which is nested, as written; `Elaborate.lean` flattens it into a type
 table.
 
 The parser is recursive descent over the tokens. Each function takes `fuel`, which
@@ -20,39 +20,39 @@ namespace Candid.Text
 
 /-- A type as written in an annotation. Names are kept: resolving them is the
 environment's business, and the model's environment is empty. -/
-inductive TypeExpr where
-  | prim (p : Prim)
+inductive TypeExpression where
+  | primitive (p : Primitive)
   | name (n : String)
-  | opt (t : TypeExpr)
-  | vec (t : TypeExpr)
-  | record (fs : List (FieldId × TypeExpr))
-  | variant (fs : List (FieldId × TypeExpr))
-  | func (args rets : List TypeExpr) (annots : List FuncAnnot)
-  | service (methods : List (String × TypeExpr))
+  | opt (t : TypeExpression)
+  | vec (t : TypeExpression)
+  | record (fs : List (FieldId × TypeExpression))
+  | variant (fs : List (FieldId × TypeExpression))
+  | func (parameters results : List TypeExpression) (annotations : List Annotation)
+  | service (methods : List (String × TypeExpression))
   deriving Repr, Inhabited
 
 /-- An expression: the abstract syntax of Section 4.2. -/
-inductive Expr where
+inductive Expression where
   | int (z : Int)
   | float (neg : Bool) (m : Nat) (binary : Bool) (exp : Int)
   | text (bytes : List UInt8)
   | bool (b : Bool)
   | null
-  | opt (e : Expr)
-  | vec (es : List Expr)
+  | opt (e : Expression)
+  | vec (es : List Expression)
   | blob (bytes : List UInt8)
   /-- Field ids distinct, in the order written. -/
-  | record (fs : List (FieldId × Expr))
-  | variant (id : FieldId) (e : Expr)
+  | record (fs : List (FieldId × Expression))
+  | variant (id : FieldId) (e : Expression)
   | principal (p : PrincipalBytes)
   | service (p : PrincipalBytes)
   | func (p : PrincipalBytes) (method : String)
-  | ann (e : Expr) (t : TypeExpr)
+  | annotated (e : Expression) (t : TypeExpression)
   deriving Repr, Inhabited
 
 /-- Primitive types that are spelled as identifiers. `null` and `principal` are keywords,
 and are parsed as such. -/
-def primOfName? : String → Option Prim
+def primitiveOfName? : String → Option Primitive
   | "bool" => some .bool | "nat" => some .nat | "int" => some .int
   | "nat8" => some .nat8 | "nat16" => some .nat16 | "nat32" => some .nat32
   | "nat64" => some .nat64 | "int8" => some .int8 | "int16" => some .int16
@@ -70,13 +70,13 @@ def utf8? (bs : List UInt8) : Except String String :=
 name, hashed. -/
 def labelOf? : Token → Option (Except String FieldId)
   | .int z false => some (if z < 2 ^ 32 then .ok z.toNat.toUInt32 else .error "field id out of range")
-  | .ident s => some (.ok (hashFieldName s))
+  | .identifier s => some (.ok (hashFieldName s))
   | .text bs => some ((utf8? bs).map hashFieldName)
   | _ => none
 
 /-- A `name`, if the token is one. -/
 def nameOf? : Token → Option (Except String String)
-  | .ident s => some (.ok s)
+  | .identifier s => some (.ok s)
   | .text bs => some (utf8? bs)
   | _ => none
 
@@ -111,15 +111,15 @@ def next : P Token := do
   | some t => modify (· + 1); return t
   | none => throw "unexpected end of input"
 
-def isPunct (p : String) : P Bool := do return (← peekAt ts 0) == some (.punct p)
+def isPunctuation (p : String) : P Bool := do return (← peekAt ts 0) == some (.punctuation p)
 
 /-- Take the punctuation `p` if it is next. -/
 def accept (p : String) : P Bool := do
-  if ← isPunct ts p then modify (· + 1); return true else return false
+  if ← isPunctuation ts p then modify (· + 1); return true else return false
 
 def expect (p : String) : P Unit := do
   let t ← next ts
-  unless t == .punct p do throw s!"expected `{p}`, got {t.describe}"
+  unless t == .punctuation p do throw s!"expected `{p}`, got {t.describe}"
 
 def liftE (x : Except String α) : P α := StateT.lift x
 
@@ -138,7 +138,7 @@ def sepBy (item : P α) (sep close : String) : Nat → P (List α)
 
 /-- An annotation's name. Annotations are identifiers, not keywords: they mean an
 annotation only after a function's results (`lean/Spec/Did.md`, Section 4.1). -/
-def annotOfName? : String → Option FuncAnnot
+def annotationOfName? : String → Option Annotation
   | "query" => some .query
   | "oneway" => some .oneway
   | "composite_query" => some .compositeQuery
@@ -146,34 +146,34 @@ def annotOfName? : String → Option FuncAnnot
 
 /-- A function type's annotations, as many as follow. Whether they may repeat, or
 combine, is well-formedness, checked on the table. -/
-def annots : Nat → P (List FuncAnnot)
+def annotations : Nat → P (List Annotation)
   | 0 => throw tooDeep
   | n + 1 => do
     let a? := match ← peekAt ts 0 with
-      | some (.ident s) => annotOfName? s
+      | some (.identifier s) => annotationOfName? s
       | _ => none
     match a? with
-    | some a => modify (· + 1); return a :: (← annots n)
+    | some a => modify (· + 1); return a :: (← annotations n)
     | none => return []
 
 /-- A parameter list's names must not repeat; the names are then dropped. -/
-def dropNames (xs : List (Option String × TypeExpr)) : P (List TypeExpr) := do
+def dropNames (xs : List (Option String × TypeExpression)) : P (List TypeExpression) := do
   unless noDups (xs.filterMap (·.1)) do throw "a parameter or result name is repeated"
   return xs.map (·.2)
 
 mutual
 
 /-- `type` (`lean/Spec/Did.md`, Section 4.1). -/
-def type : Nat → P TypeExpr
+def type : Nat → P TypeExpression
   | 0 => throw tooDeep
   | n + 1 => do
     match ← next ts with
-    | .ident s => return (match primOfName? s with | some p => .prim p | none => .name s)
-    | .keyword "null" => return .prim .null
-    | .keyword "principal" => return .prim .principal
+    | .identifier s => return (match primitiveOfName? s with | some p => .primitive p | none => .name s)
+    | .keyword "null" => return .primitive .null
+    | .keyword "principal" => return .primitive .principal
     | .keyword "opt" => return .opt (← type n)
     | .keyword "vec" => return .vec (← type n)
-    | .keyword "blob" => return .vec (.prim .nat8)
+    | .keyword "blob" => return .vec (.primitive .nat8)
     | .keyword "record" =>
       expect ts "{"
       return .record (← liftE (numberFields (← sepBy ts (fieldType n false) ";" "}" (2 * ts.size))))
@@ -184,13 +184,13 @@ def type : Nat → P TypeExpr
     | .keyword "service" => return .service (← methods n)
     | t => throw s!"expected a type, got {t.describe}"
 
-/-- `field` or `alt`. In a variant, a label alone has type `null`; in a record, a type
+/-- `field` or `alternative`. In a variant, a label alone has type `null`; in a record, a type
 alone is positional. -/
-def fieldType : Nat → Bool → P (Option FieldId × TypeExpr)
+def fieldType : Nat → Bool → P (Option FieldId × TypeExpression)
   | 0, _ => throw tooDeep
   | n + 1, variant => do
     let t ← peekAt ts 0
-    let labelled := (← peekAt ts 1) == some (.punct ":")
+    let labelled := (← peekAt ts 1) == some (.punctuation ":")
     match t.bind labelOf? with
     | some l =>
       if labelled then
@@ -198,34 +198,34 @@ def fieldType : Nat → Bool → P (Option FieldId × TypeExpr)
         return (some (← liftE l), ← type n)
       if variant then
         modify (· + 1)
-        return (some (← liftE l), .prim .null)
+        return (some (← liftE l), .primitive .null)
       return (none, ← type n)
     | none =>
       if variant then throw "expected a variant field"
       return (none, ← type n)
 
-/-- `functype`: `(params) -> (params) mode`. -/
-def funcType : Nat → P TypeExpr
+/-- `functype`: `(parameters) -> (parameters) mode`. -/
+def funcType : Nat → P TypeExpression
   | 0 => throw tooDeep
   | n + 1 => do
-    let args ← params n
+    let args ← parameters n
     expect ts "->"
-    let rets ← params n
-    return .func args rets (← annots ts (ts.size + 1))
+    let rets ← parameters n
+    return .func args rets (← annotations ts (ts.size + 1))
 
-/-- `params`, with the names checked and dropped. -/
-def params : Nat → P (List TypeExpr)
+/-- `parameters`, with the names checked and dropped. -/
+def parameters : Nat → P (List TypeExpression)
   | 0 => throw tooDeep
   | n + 1 => do
     expect ts "("
-    dropNames (← sepBy ts (argType n) "," ")" (2 * ts.size))
+    dropNames (← sepBy ts (parameter n) "," ")" (2 * ts.size))
 
-/-- `param`: a type, optionally named. A name has no meaning, but must be UTF-8, and
+/-- `parameter`: a type, optionally named. A name has no meaning, but must be UTF-8, and
 must not repeat within its list (`lean/Spec/Did.md`, Section 4.2). -/
-def argType : Nat → P (Option String × TypeExpr)
+def parameter : Nat → P (Option String × TypeExpression)
   | 0 => throw tooDeep
   | n + 1 => do
-    if (← peekAt ts 1) == some (.punct ":") then
+    if (← peekAt ts 1) == some (.punctuation ":") then
       if let some name := (← peekAt ts 0).bind nameOf? then
         let name ← liftE name
         modify (· + 2)
@@ -233,7 +233,7 @@ def argType : Nat → P (Option String × TypeExpr)
     return (none, ← type n)
 
 /-- `methods`: names distinct. -/
-def methods : Nat → P (List (String × TypeExpr))
+def methods : Nat → P (List (String × TypeExpression))
   | 0 => throw tooDeep
   | n + 1 => do
     expect ts "{"
@@ -242,27 +242,27 @@ def methods : Nat → P (List (String × TypeExpr))
     return ms
 
 /-- `method`: a name, and a function type or the name of one. -/
-def method : Nat → P (String × TypeExpr)
+def method : Nat → P (String × TypeExpression)
   | 0 => throw tooDeep
   | n + 1 => do
     let some name := (← next ts) |> nameOf? | throw "expected a method name"
     let name ← liftE name
     expect ts ":"
-    if ← isPunct ts "(" then return (name, ← funcType n)
+    if ← isPunctuation ts "(" then return (name, ← funcType n)
     match ← next ts with
-    | .ident s => return (name, .name s)
+    | .identifier s => return (name, .name s)
     | t => throw s!"expected a function type, got {t.describe}"
 
 end
 
 /-- The bytes of a text literal, which must be next. -/
-def textLit : P (List UInt8) := do
+def textLiteral : P (List UInt8) := do
   match ← next ts with
   | .text bs => return bs
   | t => throw s!"expected a text literal, got {t.describe}"
 
-def principalLit : P PrincipalBytes := do
-  let bs ← textLit ts
+def principalLiteral : P PrincipalBytes := do
+  let bs ← textLiteral ts
   let s ← liftE (utf8? bs)
   match principalOfText? s with
   | some p => return p
@@ -271,19 +271,19 @@ def principalLit : P PrincipalBytes := do
 mutual
 
 /-- `annotated`: an expression, optionally followed by `: <datatype>`. -/
-def annotated : Nat → P Expr
+def annotated : Nat → P Expression
   | 0 => throw tooDeep
   | n + 1 => do
-    let e ← expr n
-    if ← accept ts ":" then return .ann e (← type ts (2 * ts.size + 2))
+    let e ← expression n
+    if ← accept ts ":" then return .annotated e (← type ts (2 * ts.size + 2))
     return e
 
-/-- `expr`. -/
-def expr : Nat → P Expr
+/-- `expression`. -/
+def expression : Nat → P Expression
   | 0 => throw tooDeep
   | n + 1 => do
     match ← next ts with
-    | .punct "(" =>
+    | .punctuation "(" =>
       let e ← annotated n
       expect ts ")"
       return e
@@ -293,11 +293,11 @@ def expr : Nat → P Expr
     | .keyword "true" => return .bool true
     | .keyword "false" => return .bool false
     | .keyword "null" => return .null
-    | .keyword "opt" => return .opt (← expr n)
+    | .keyword "opt" => return .opt (← expression n)
     | .keyword "vec" =>
       expect ts "{"
       return .vec (← sepBy ts (annotated n) ";" "}" (2 * ts.size))
-    | .keyword "blob" => return .blob (← textLit ts)
+    | .keyword "blob" => return .blob (← textLiteral ts)
     | .keyword "record" =>
       expect ts "{"
       return .record (← liftE (numberFields (← sepBy ts (field n) ";" "}" (2 * ts.size))))
@@ -308,20 +308,20 @@ def expr : Nat → P Expr
       let e ← if ← accept ts "=" then annotated n else pure .null
       expect ts "}"
       return .variant id e
-    | .keyword "principal" => return .principal (← principalLit ts)
-    | .keyword "service" => return .service (← principalLit ts)
+    | .keyword "principal" => return .principal (← principalLiteral ts)
+    | .keyword "service" => return .service (← principalLiteral ts)
     | .keyword "func" =>
-      let p ← principalLit ts
+      let p ← principalLiteral ts
       expect ts "."
       let some m := (← next ts) |> nameOf? | throw "expected a method name"
       return .func p (← liftE m)
     | t => throw s!"expected a value, got {t.describe}"
 
 /-- A record field: `label = annotated`, or `annotated` alone, positional. -/
-def field : Nat → P (Option FieldId × Expr)
+def field : Nat → P (Option FieldId × Expression)
   | 0 => throw tooDeep
   | n + 1 => do
-    if (← peekAt ts 1) == some (.punct "=") then
+    if (← peekAt ts 1) == some (.punctuation "=") then
       if let some l := (← peekAt ts 0).bind labelOf? then
         modify (· + 2)
         return (some (← liftE l), ← annotated n)
@@ -329,8 +329,8 @@ def field : Nat → P (Option FieldId × Expr)
 
 end
 
-/-- `args`, and nothing after it. -/
-def args : P (List Expr) := do
+/-- `arguments`, and nothing after it. -/
+def arguments : P (List Expression) := do
   expect ts "("
   let es ← sepBy ts (annotated ts (2 * ts.size + 2)) "," ")" (2 * ts.size)
   if (← get) < ts.size then throw "unexpected input after the arguments"
@@ -339,8 +339,8 @@ def args : P (List Expr) := do
 end
 
 /-- Parse an argument sequence. -/
-def parseArgs (src : String) : Except String (List Expr) := do
+def parseArguments (src : String) : Except String (List Expression) := do
   let ts ← lex src
-  (args ts).run' 0
+  (arguments ts).run' 0
 
 end Candid.Text

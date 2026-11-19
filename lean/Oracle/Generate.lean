@@ -21,45 +21,45 @@ open Candid
 
 /-- A type to generate: what to call it, and how to intern it. The name is Candid
 syntax, so that a vector's id can be pasted into a `.did` file. -/
-structure Gen where
+structure Generator where
   name : String
   build : TableM Slot
 
-def Gen.fixture (g : Gen) : Fixture := close g.build
+def Generator.fixture (g : Generator) : Fixture := close g.build
 
-def prim (p : Prim) : Gen := ⟨p.name, pure (.prim p)⟩
+def primitive (p : Primitive) : Generator := ⟨p.name, pure (.primitive p)⟩
 
-def opt (g : Gen) : Gen := ⟨s!"opt {g.name}", do intern (.opt (← g.build))⟩
+def opt (g : Generator) : Generator := ⟨s!"opt {g.name}", do intern (.opt (← g.build))⟩
 
-def vec (g : Gen) : Gen := ⟨s!"vec {g.name}", do intern (.vec (← g.build))⟩
+def vec (g : Generator) : Generator := ⟨s!"vec {g.name}", do intern (.vec (← g.build))⟩
 
-def fieldsName (fs : List (String × Gen)) : String :=
+def fieldsName (fs : List (String × Generator)) : String :=
   if fs.isEmpty then "{}" else "{ " ++ "; ".intercalate (fs.map fun (n, g) => s!"{n} : {g.name}") ++ " }"
 
-def buildFields (fs : List (String × Gen)) : TableM (List (String × Slot)) :=
+def buildFields (fs : List (String × Generator)) : TableM (List (String × Slot)) :=
   fs.mapM fun (n, g) => do return (n, ← g.build)
 
-def record (fs : List (String × Gen)) : Gen :=
+def record (fs : List (String × Generator)) : Generator :=
   ⟨s!"record {fieldsName fs}", do intern (Composite.recordOf (← buildFields fs))⟩
 
-def variant (fs : List (String × Gen)) : Gen :=
+def variant (fs : List (String × Generator)) : Generator :=
   ⟨s!"variant {fieldsName fs}", do intern (Composite.variantOf (← buildFields fs))⟩
 
-def func (args rets : List Gen) (ann : List FuncAnnot := []) : Gen :=
-  let list (gs : List Gen) := "(" ++ ", ".intercalate (gs.map (·.name)) ++ ")"
+def func (args rets : List Generator) (ann : List Annotation := []) : Generator :=
+  let list (gs : List Generator) := "(" ++ ", ".intercalate (gs.map (·.name)) ++ ")"
   let annots := String.join (ann.map (" " ++ ·.name))
   ⟨s!"func {list args} -> {list rets}{annots}", do
     let a ← args.mapM (·.build)
     let r ← rets.mapM (·.build)
     intern (.func a r ann)⟩
 
-def service (ms : List (String × Gen)) : Gen :=
+def service (ms : List (String × Generator)) : Generator :=
   ⟨s!"service {fieldsName ms}", do intern (.service (← buildFields ms))⟩
 
 /-- A recursive type: `body` is given the slot that names the type being defined. The
 entry is reserved before `body` runs, since `body` may intern entries of its own that
 refer to it. -/
-def knot (name : String) (body : Slot → TableM Composite) : Gen :=
+def knot (name : String) (body : Slot → TableM Composite) : Generator :=
   ⟨s!"({name})", do
     let i := (← get).size
     modify (·.push default)
@@ -69,19 +69,19 @@ def knot (name : String) (body : Slot → TableM Composite) : Gen :=
 
 /-! ## The universe -/
 
-def null := prim .null
-def bool := prim .bool
-def nat := prim .nat
-def int := prim .int
-def text := prim .text
-def reserved := prim .reserved
-def empty := prim .empty
+def null := primitive .null
+def bool := primitive .bool
+def nat := primitive .nat
+def int := primitive .int
+def text := primitive .text
+def reserved := primitive .reserved
+def empty := primitive .empty
 
 /-- The arguments composites are built over: the numeric pair that is related, an
 unrelated primitive, the three that accept `null`, and the bottom type. -/
-def inner : List Gen := [null, bool, nat, int, text, reserved, empty]
+def inner : List Generator := [null, bool, nat, int, text, reserved, empty]
 
-def recursive : List Gen :=
+def recursive : List Generator :=
   [ knot "R = opt R" fun r => pure (.opt r)
   , knot "V = vec V" fun v => pure (.vec v)
   , knot "L = record { head : nat; tail : opt L }" fun l => do
@@ -96,10 +96,10 @@ def recursive : List Gen :=
 
 /-- The primitives paired with composites. Pairs of two primitives are all in
 `primitives` already. -/
-def smallPrims : List Gen :=
-  [ null, bool, nat, int, prim .nat8, text, reserved, empty, prim .principal ]
+def smallPrimitives : List Generator :=
+  [ null, bool, nat, int, primitive .nat8, text, reserved, empty, primitive .principal ]
 
-def smallComposites : List Gen :=
+def smallComposites : List Generator :=
   (inner ++ [opt nat]).map opt ++
   (inner ++ [vec nat]).map vec ++
   [ record [], record [("b", nat)] ] ++ (inner ++ [opt nat]).map (fun g => record [("a", g)]) ++
@@ -115,7 +115,7 @@ def smallComposites : List Gen :=
 
 /-- Every pair with its subtype from `subs` and its supertype from `sups`, each type in
 its own table. -/
-def pairs (subs sups : List Gen) : List Vector :=
+def pairs (subs sups : List Generator) : List Vector :=
   subs.flatMap fun a => sups.filterMap fun b =>
     let (sub, sup) := (a.fixture, b.fixture)
     -- Every generated type is well formed; a pair that is not would be a bug here.
@@ -124,10 +124,10 @@ def pairs (subs sups : List Gen) : List Vector :=
       some ⟨s!"{a.name} <:? {b.name}", .subtype sub sup (decSubtype A B x y)⟩
     | _, _ => none
 
-def primitives : List Vector := pairs (Prim.all.map prim) (Prim.all.map prim)
+def primitives : List Vector := pairs (Primitive.all.map primitive) (Primitive.all.map primitive)
 
 def smallTypes : List Vector :=
-  pairs smallPrims smallComposites ++ pairs smallComposites smallPrims ++
+  pairs smallPrimitives smallComposites ++ pairs smallComposites smallPrimitives ++
   pairs smallComposites smallComposites
 
 /-! ## Coercion
@@ -139,7 +139,7 @@ value of every shape. -/
 /-- The identity of every generated reference value. Coercion never looks at it. -/
 def someId : PrincipalBytes := [0x2a]
 
-def primSamples : Prim → List Value
+def primitiveSamples : Primitive → List Value
   | .null | .reserved => [.null]
   | .bool => [.bool true]
   | .nat => [.nat 5]
@@ -156,7 +156,7 @@ def primSamples : Prim → List Value
 /-- Sample values of `t`, unfolding at most `fuel` references deep. An option and a
 vector give an empty and a non-empty one; a variant gives one value per tag. -/
 def samples (T : TypeTable) : Nat → Slot → List Value
-  | _, .prim p => primSamples p
+  | _, .primitive p => primitiveSamples p
   | 0, .ref _ => []
   | fuel + 1, .ref r => match T.lookup? r with
     | some (.opt t) => .null :: ((samples T fuel t).take 1).map .opt
@@ -194,10 +194,10 @@ partial def showValue : Value → String
   | .func id m => s!"func \"{bytesToHex id}\".{m}"
 
 /-- `type R = opt R`. -/
-def infiniteOpt : Gen := knot "R = opt R" fun r => pure (.opt r)
+def infiniteOpt : Generator := knot "R = opt R" fun r => pure (.opt r)
 
 /-- `type A = opt B; type B = opt A`: an infinite option two entries long. -/
-def infiniteOpt2 : Gen := ⟨"(A = opt B; B = opt A)", do
+def infiniteOpt2 : Generator := ⟨"(A = opt B; B = opt A)", do
   let i := (← get).size
   modify fun es => (es.push (.opt (.ref (i + 1)))).push (.opt (.ref i))
   return .ref i⟩
@@ -206,15 +206,15 @@ def infiniteOpt2 : Gen := ⟨"(A = opt B; B = opt A)", do
 for a value whose type does not accept `null` (`spec/Candid.md`, "Coercion" >
 "Options"), and so is any coercion that needs it; these are where that shows. Not part
 of `smallComposites`, so the subtyping files do not grow with them. -/
-def holdsInfiniteOpt : List Gen :=
+def holdsInfiniteOpt : List Generator :=
   [ infiniteOpt2, record [("a", infiniteOpt)], vec infiniteOpt, variant [("a", infiniteOpt)] ]
 
 /-- Every type a sample is drawn from, and every type it is coerced at. -/
-def coerceUniverse : List Gen := Prim.all.map prim ++ smallComposites ++ holdsInfiniteOpt
+def coerceUniverse : List Generator := Primitive.all.map primitive ++ smallComposites ++ holdsInfiniteOpt
 
 /-- A generated type, checked, with its samples. Every generated type is well formed;
 `malformed` reports one that is not. -/
-def Gen.checked? (g : Gen) : Option (Fixture × (T : TypeTable) × T.Root) := do
+def Generator.checked? (g : Generator) : Option (Fixture × (T : TypeTable) × T.Root) := do
   let f := g.fixture
   let ⟨T, r⟩ ← f.check?
   return ⟨f, T, r⟩
@@ -290,7 +290,7 @@ def wireViolations : List String :=
       match encode A [ra.1] [v] with
       | none => some s!"wire: {what} does not encode"
       | some bs => match decode bs with
-        | .error e => some s!"wire: {what} does not decode: {e.msg} at byte {e.pos}"
+        | .error e => some s!"wire: {what} does not decode: {e.message} at byte {e.position}"
         | .ok m =>
           let entries (T : TypeTable) := T.raw.entries.toList.map Composite.encode
           if m.values != [v] then some s!"wire: {what} decodes to another value"
@@ -323,7 +323,7 @@ def encodeRejections : List String :=
 /-- Types the generator built that were not well formed. Expected to be empty: the
 oracle fails if it is not, since `pairs` drops them silently. -/
 def malformed : List String :=
-  (Prim.all.map prim ++ smallComposites ++ holdsInfiniteOpt).filterMap fun g =>
+  (Primitive.all.map primitive ++ smallComposites ++ holdsInfiniteOpt).filterMap fun g =>
     if g.fixture.check?.isSome then none else some g.name
 
 end Oracle.Generate

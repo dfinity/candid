@@ -1,0 +1,26 @@
+# The v1 crates. Their own workspace, not members of the root one: joining that would
+# mean editing the root `Cargo.toml`, which is outside the three directories the rewrite
+# works in (REWRITE.md, Section 5).
+
+[workspace]
+members = ["candid_types"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/dfinity/candid"
+publish = false
+
+[workspace.dependencies]
+# Dev-only: the conformance tests read the vectors with it. Nothing builds against it.
+serde_json = "1.0"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = 0 }

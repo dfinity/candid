@@ -325,8 +325,8 @@ fn run(v: &Value) -> Result<Outcome> {
             // go into one, each under its own prefix. This is the merge every caller
             // of `subtype` does today.
             let mut env = TypeEnv::new();
-            let a = load(&v["sub"], &mut env, "A")?;
-            let b = load(&v["sup"], &mut env, "B")?;
+            let a = load(&v["subtype"], &mut env, "A")?;
+            let b = load(&v["supertype"], &mut env, "B")?;
             let want = v["expect"].as_bool().ok_or("`expect` is not a boolean")?;
             // `Silence`: the special `opt` rule is part of the relation the vectors
             // assert, and the other settings report it rather than change the answer
@@ -794,7 +794,7 @@ fn load(fixture: &Value, env: &mut TypeEnv, prefix: &str) -> Result<Type> {
             ("record", fs) => TypeInner::Record(fields(fs)?),
             ("variant", fs) => TypeInner::Variant(fields(fs)?),
             ("func", f) => TypeInner::Func(Function {
-                modes: array(&f["annots"])?
+                modes: array(&f["annotations"])?
                     .iter()
                     .map(|a| match a.as_str() {
                         Some("query") => Ok(FuncMode::Query),
@@ -803,8 +803,8 @@ fn load(fixture: &Value, env: &mut TypeEnv, prefix: &str) -> Result<Type> {
                         _ => Err(format!("unknown function annotation {a}")),
                     })
                     .collect::<Result<_>>()?,
-                args: slots(&f["args"])?,
-                rets: slots(&f["rets"])?,
+                args: slots(&f["parameters"])?,
+                rets: slots(&f["results"])?,
             }),
             ("service", ms) => {
                 let mut ms = array(ms)?
@@ -954,7 +954,8 @@ mod tests {
         assert!(agrees(
             json!({"id": "t", "kind": "hash", "name": "a", "expect": 97})
         ));
-        let sub = json!({"id": "t", "kind": "subtype", "sub": nat, "sup": int, "expect": true});
+        let sub =
+            json!({"id": "t", "kind": "subtype", "subtype": nat, "supertype": int, "expect": true});
         assert!(agrees(sub));
         let ok = coerce(
             json!({"nat": "5"}),
@@ -1022,7 +1023,7 @@ mod tests {
     #[test]
     fn untranslatable_vectors_are_errors() {
         let nat = json!({"table": [], "root": "nat"});
-        assert!(run(&json!({"id": "t", "kind": "subtype", "sub": nat})).is_err());
+        assert!(run(&json!({"id": "t", "kind": "subtype", "subtype": nat})).is_err());
         assert!(run(&coerce(
             json!({"natural": "5"}),
             nat.clone(),
