@@ -59,14 +59,21 @@ impl Header {
                 return r.fail(at, Rejection::MissingMagicNumber);
             }
         }
-        let entries = list(&mut r, entry)?;
-        let types = list(&mut r, slot)?;
-        let end = r.position();
-        let table = RawTypeTable::from_entries(entries)
-            .check()
-            .or_else(|e| r.fail(end, Rejection::MalformedTable(e)))?;
+        // Where each entry and argument type starts, so that a check made once the header
+        // is read can still say where the problem is.
+        let (entries, entry_offsets): (Vec<_>, Vec<_>) =
+            list(&mut r, offset(entry))?.into_iter().unzip();
+        let (types, type_offsets): (Vec<_>, Vec<_>) =
+            list(&mut r, offset(slot))?.into_iter().unzip();
+        let table = match RawTypeTable::from_entries(entries).check() {
+            Ok(table) => table,
+            Err(e) => {
+                let at = entry_offsets[e.entry().index()];
+                return r.fail(at, Rejection::MalformedTable(e));
+            }
+        };
         if let Some(i) = types.iter().position(|&t| !table.resolves(t)) {
-            return r.fail(end, Rejection::UnresolvedArgument(i));
+            return r.fail(type_offsets[i], Rejection::UnresolvedArgument(i));
         }
         Ok((Header { table, types }, r.rest()))
     }
@@ -166,6 +173,16 @@ fn list<'a, T>(r: &mut Reader<'a>, item: impl Fn(&mut Reader<'a>) -> Read<T>) ->
         items.push(item(r)?);
     }
     Ok(items)
+}
+
+/// `item`, with the offset it starts at.
+fn offset<'a, T>(
+    item: impl Fn(&mut Reader<'a>) -> Read<T>,
+) -> impl Fn(&mut Reader<'a>) -> Read<(T, usize)> {
+    move |r| {
+        let at = r.position();
+        Ok((item(r)?, at))
+    }
 }
 
 /// A type reference: a primitive type's opcode, or an index into the table. Whether the
@@ -483,6 +500,20 @@ mod tests {
         for (bytes, want) in cases {
             assert_eq!(decode(&bytes).err(), Some(want), "{bytes:02x?}");
         }
+    }
+
+    #[test]
+    fn checks_after_parsing_point_at_the_offending_bytes() {
+        // The argument type `0` at offset 6 dangles; the byte after it is a value.
+        let e = Header::decode(&message(&[0x00, 0x01, 0x00, 0xaa])).unwrap_err();
+        assert_eq!(
+            (e.position(), e.rejection()),
+            (6, &Rejection::UnresolvedArgument(0))
+        );
+        // Entry 1, `vec 5` at offset 7, dangles; entry 0 is `opt nat` at offset 5.
+        let e = Header::decode(&message(&[0x02, 0x6e, 0x7d, 0x6d, 0x05, 0x00])).unwrap_err();
+        assert_eq!(e.position(), 7);
+        assert!(matches!(e.rejection(), Rejection::MalformedTable(_)));
     }
 
     #[test]
