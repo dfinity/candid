@@ -3,7 +3,7 @@
 # works in (REWRITE.md, Section 5).
 
 [workspace]
-members = ["candid_types"]
+members = ["candid_binary", "candid_types", "conformance_tests"]
 resolver = "3"
 
 [workspace.package]
@@ -14,6 +14,8 @@ repository = "https://github.com/dfinity/candid"
 publish = false
 
 [workspace.dependencies]
+candid_types = { path = "candid_types" }
+candid_binary = { path = "candid_binary" }
 # Dev-only: the conformance tests read the vectors with it. Nothing builds against it.
 serde_json = "1.0"
 

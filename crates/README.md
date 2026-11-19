@@ -1,11 +1,20 @@
 # `crates/` — redesigned Rust implementation
 
-**Status: `candid_types` started.** One crate, in a workspace of its own
-([Cargo.toml](Cargo.toml)): the type language of [lean/Candid/Types.lean](../lean/Candid/Types.lean)
-and [Hash.lean](../lean/Candid/Hash.lean), and the subtyping of
-[Subtype.lean](../lean/Candid/Subtype.lean), checked against the `hash`, `wellformed`
-and `subtype` vectors, and against every table the other vectors promise is well formed. Nothing here
-is published to crates.io. See [REWRITE.md](../REWRITE.md) for why this exists.
+**Status: `candid_types` and `candid_binary` started.** In a workspace of their own
+([Cargo.toml](Cargo.toml)):
+
+- `candid_types`: the type language of [lean/Candid/Types.lean](../lean/Candid/Types.lean)
+  and [Hash.lean](../lean/Candid/Hash.lean), and the subtyping of
+  [Subtype.lean](../lean/Candid/Subtype.lean);
+- `candid_binary`: so far the header of a message -- its type table and argument types
+  -- from [Wire.lean](../lean/Candid/Wire.lean), read and written;
+- `conformance_tests`: not a library, but the one test that reads
+  [conformance/vectors/](../conformance/vectors/) and asks each crate what it can answer:
+  the `hash`, `wellformed` and `subtype` vectors, every table the other vectors promise
+  is well formed, and the header of every `decode` vector's message.
+
+Nothing here is published to crates.io. See [REWRITE.md](../REWRITE.md) for why this
+exists.
 
 ```
 cargo test --manifest-path crates/Cargo.toml
@@ -100,7 +109,8 @@ counterpart" into a checkable property rather than an aspiration.
 
 Shared names are for *things*. Functions follow Rust's conventions where Lean's would
 read oddly: `lookup?` is `lookup`, `size` is `len`, `hashFieldName` is
-`hash_field_name`, `decSubtype` is `is_subtype`, and `check` returns a `Result` naming the malformed entry where
+`hash_field_name`, `decSubtype` is `is_subtype`, `Parse.header` is
+`Header::decode`, and `check` returns a `Result` naming the malformed entry where
 Lean's returns an `Option`.
 
 `Type` cannot be used in Lean (it is the universe) and `Ty` would violate

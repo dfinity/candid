@@ -3,9 +3,22 @@
 version = 4
 
 [[package]]
-name = "candid_types"
+name = "candid_binary"
 version = "0.0.0"
 dependencies = [
+ "candid_types",
+]
+
+[[package]]
+name = "candid_types"
+version = "0.0.0"
+
+[[package]]
+name = "conformance_tests"
+version = "0.0.0"
+dependencies = [
+ "candid_binary",
+ "candid_types",
  "serde_json",
 ]
 

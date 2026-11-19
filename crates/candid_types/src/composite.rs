@@ -78,6 +78,10 @@ pub enum Composite {
     /// define, and the bytes that came with it. Only a decoder makes one.
     Future {
         /// The opcode, below `-24`.
+        ///
+        /// Lean's is unbounded. An `i64` is this implementation's choice, since Candid
+        /// will never define that many types; a decoder rejects an opcode below `-2^63`
+        /// as a resource limit (`lean/Spec/Binary.md`, Section 9).
         opcode: i64,
         /// The bytes that followed it.
         data: Vec<u8>,

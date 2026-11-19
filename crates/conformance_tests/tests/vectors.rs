@@ -1,8 +1,14 @@
-//! The conformance vectors this crate can be asked: `hash`, `wellformed` and `subtype`.
+//! The conformance vectors, asked of the crates in this workspace.
 //!
-//! Every other vector carries types too, and the format promises they are well formed
-//! (`conformance/README.md`), so each of those tables is checked as well: thousands of
-//! tables the model accepts, which `RawTypeTable::check` must accept too.
+//! - `candid_types` answers `hash`, `wellformed` and `subtype`. Every other vector
+//!   carries types too, and the format promises they are well formed
+//!   (`conformance/README.md`), so each of those tables is checked as well: thousands of
+//!   tables the model accepts, which `RawTypeTable::check` must accept too.
+//! - `candid_binary` reads message headers so far. Every message a `decode` vector
+//!   accepts, or calls costly, has a header it must accept; a message the vector rejects
+//!   may be rejected for its header or for its values, so only the count of those whose
+//!   header is already rejected is reported. And every table above is encoded as a
+//!   header and read back, which must give the same table.
 //!
 //! Like a runner, this reads strictly: an unknown key, kind or name is an error, never
 //! skipped.
@@ -48,7 +54,13 @@ fn conformance_vectors() {
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
     // Not vacuous: the suite has vectors of every kind this crate answers.
-    for kind in ["hash", "wellformed", "subtype"] {
+    for kind in [
+        "hash",
+        "wellformed",
+        "subtype",
+        "decode (header)",
+        "decode (rejected by the header)",
+    ] {
         assert!(
             asked.get(kind).copied().unwrap_or(0) > 0,
             "no {kind} vectors"
@@ -101,17 +113,29 @@ fn ask(vector: &Value) -> Result<&'static str, String> {
             well_formed_type(&v["to"])?;
             Ok("coerce (types only)")
         }
-        "decode" | "parse" => {
-            let input = if kind == "decode" { "bytes" } else { "text" };
-            let v = obj(vector, &["id", "kind", input, "types", "expect"]);
+        "decode" => {
+            let v = obj(vector, &["id", "kind", "bytes", "types", "expect"]);
             let types = obj(&v["types"], &["table", "roots"]);
             let roots = types["roots"].as_array().ok_or("roots")?;
             well_formed_types(&types["table"], roots.iter())?;
-            Ok(if kind == "decode" {
-                "decode (types only)"
-            } else {
-                "parse (types only)"
-            })
+            let bytes = hex(v["bytes"].as_str().ok_or("bytes")?)?;
+            let header = candid_binary::Header::decode(&bytes);
+            if v["expect"] == "reject" {
+                return Ok(if header.is_err() {
+                    "decode (rejected by the header)"
+                } else {
+                    "decode (rejected, header accepted)"
+                });
+            }
+            header.map_err(|e| format!("the header is rejected: {e}"))?;
+            Ok("decode (header)")
+        }
+        "parse" => {
+            let v = obj(vector, &["id", "kind", "text", "types", "expect"]);
+            let types = obj(&v["types"], &["table", "roots"]);
+            let roots = types["roots"].as_array().ok_or("roots")?;
+            well_formed_types(&types["table"], roots.iter())?;
+            Ok("parse (types only)")
         }
         "did" => {
             let keys: &[&str] = if vector.get("files").is_some() {
@@ -168,13 +192,41 @@ fn well_formed_types<'a>(
     let table = read_table(table)?
         .check()
         .map_err(|e| format!("a promised-well-formed table is rejected: {e}"))?;
+    let mut slots = Vec::new();
     for root in roots {
         let root = read_slot(root)?;
         agree(table.root(root).is_some(), || {
             format!("a promised root {root:?} does not resolve")
         })?;
+        slots.push(root);
     }
-    Ok(())
+    header_roundtrip(table, slots)
+}
+
+/// Encode a table and roots as a header, and read it back: the same table, with each
+/// entry's fields and methods in the order the format writes them, and the same roots.
+fn header_roundtrip(table: TypeTable, roots: Vec<Slot>) -> Result<(), String> {
+    let expected: Vec<Composite> = table.entries().iter().map(written_order).collect();
+    let header = candid_binary::Header::new(table, roots).ok_or("a root does not resolve")?;
+    let mut bytes = Vec::new();
+    header.encode(&mut bytes);
+    let (back, rest) = candid_binary::Header::decode(&bytes)
+        .map_err(|e| format!("an encoded header is rejected: {e}"))?;
+    agree(
+        rest.is_empty() && back.types() == header.types() && back.table().entries() == expected,
+        || "an encoded header reads back differently".to_string(),
+    )
+}
+
+/// An entry with its fields in order of id and its methods in order of name.
+fn written_order(entry: &Composite) -> Composite {
+    let mut entry = entry.clone();
+    match &mut entry {
+        Composite::Record(fs) | Composite::Variant(fs) => fs.sort_unstable_by_key(|f| f.0),
+        Composite::Service(ms) => ms.sort_unstable_by(|a, b| a.0.cmp(&b.0)),
+        _ => {}
+    }
+    entry
 }
 
 fn read_type(t: &Value) -> Result<(RawTypeTable, Slot), String> {
