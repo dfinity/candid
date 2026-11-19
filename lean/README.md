@@ -113,7 +113,7 @@ to `Ty` would reproduce exactly the defect
 [crates/CLAUDE.md](../crates/CLAUDE.md) anti-pattern 4 names. So "Type" is the family
 prefix and never the whole name: `TypeTable`, `TypeRef`, with `CandidType` left for
 the Rust trait. These identifiers are meant to be **the same in Lean and in Rust**,
-which is what makes "`candid_subtype` reads as a transcription of its Lean
+which is what makes "Rust's subtyping reads as a transcription of its Lean
 counterpart" achievable rather than aspirational.
 
 The two names the flat representation introduced are borrowed from the spec's grammar
@@ -133,7 +133,7 @@ declarations, which is a genuinely different structure from this index-keyed tab
 Both will exist here eventually, so `TypeEnv` stays reserved for the one where
 "environment" is the accurate word. The same names are recorded for the Rust side in
 [crates/README.md](../crates/README.md#naming), because
-[crates/CLAUDE.md](../crates/CLAUDE.md) asks `candid_subtype` to read as a
+[crates/CLAUDE.md](../crates/CLAUDE.md) asks Rust's subtyping to read as a
 transcription of its Lean counterpart, and shared identifiers are most of what makes
 that checkable.
 
@@ -186,7 +186,7 @@ through to the special rule. The failed attempt removes only its own pair from
 `didc check` accepted a breaking upgrade this way, until 0.10.39 (#775) made a failed
 step withdraw every assumption made since it; the vector and the reasoning are in
 [Oracle/Handwritten.lean](Oracle/Handwritten.lean) under "Assumptions made under a
-failed comparison". The same reasoning is the constraint on `candid_subtype`: if it
+failed comparison". The same reasoning is the constraint on Rust's subtyping (`candid_types`): if it
 ever tries a rule and recovers from the failure, it cannot share assumptions across
 that recovery.
 

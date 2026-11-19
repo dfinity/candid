@@ -11,7 +11,8 @@ model, and Rust implementation. It exists so that the reasoning behind it is
 written down and citable rather than undocumented.
 
 **Status:** in progress. The Lean model, the conformance vectors and the spec drafts
-exist on the `rewrite` branch; the crates have not started. **Author:** @lwshang.
+exist on the `rewrite` branch, and the crates have started: `candid_types`, with
+subtyping. **Author:** @lwshang.
 
 ---
 
@@ -200,29 +201,38 @@ vectors those files generate run against the Rust implementation in CI. Whether 
 move it to [Verso](https://github.com/leanprover/verso), so that the build also
 checks its examples, is open (§7).
 
-**`crates/`** — a layered redesign. Provisional shape:
+**`crates/`** — a layered redesign, one crate per spec document. Provisional shape:
 
 ```
 ic_principal                    (existing; unchanged, already correctly split)
    ↑
-candid_types      Slot, Composite, RawTypeTable, TypeTable, Root, TypeRef, FieldId,
-                  field-id hash. no_std-capable. No serde, no binary, NO GLOBAL STATE.
-   ↑
-candid_subtype    Subtyping + coercion decision procedures. Mirrors Lean 1:1.
-   ↑               The verified core: small, pure, Aeneas-shaped.
-candid_wire       Type table + memory encoding, untyped:
-   ↑               bytes <-> (TypeTable, Vec<Slot>, values). Cost metering.
+candid_types      Types.md, Sections 3 and 5. Slot, Composite, RawTypeTable, TypeTable,
+   ↑              Root, TypeRef, FieldId, field-id hash, subtyping.
+   │              no_std. No serde, no binary, no global state.
+candid_binary     Binary.md. Encoding, and decoding at the receiver's types -- which
+   ↑              is coercion (Types.md, Section 6). Values go in and out through
+   │              traits, so no derive and no value type is needed. Cost metering.
    ├───────────────────────────┐
 candid_value                candid (facade) + derive macro
-   IDLValue equivalent,     CandidType trait, native decode trait (no serde),
-   pretty printing          Encode!/Decode!
+   Types.md, Section 4:     CandidType trait, native decode trait (no serde),
+   the dynamic value        Encode!/Decode!
                                ↑
-candid_syntax     Lexer, AST, .did parsing, type checking, spans, diagnostics.
+candid_syntax     Did.md + TextValues.md. One lexer; .did parsing, imports and type
+                  checking; value text and printing; spans, diagnostics.
    ↑
 candid_bindgen    IR, name mangling, type-selector config, template helpers.
 
 out of tree:      candid_bindgen_{rust,js,ts,motoko}
 ```
+
+**Coercion is decoding, so it lives in one place.** The model states coercion as a
+function on values, applied after a message is decoded. Done that way in Rust, every
+typed decode would first build a dynamic value, so typed decoding would need its own
+coercion in the decoder, and there would be two implementations of one behaviour —
+which is how both 0.10.34 bugs happened. So `candid_binary` decodes straight to the
+receiver's types, and that *is* coercion; there is no value-to-value function. The
+`coerce` vectors run as encode-then-decode, as the 0.10 runner already runs them.
+Subtyping is left alone with the types, where it needs nothing else.
 
 **On naming.** `candid`, `candid_parser`, `candid_derive` and `ic_principal` are
 already ours, so v1 is a **new major version of the existing crates, not a new set
@@ -302,14 +312,14 @@ practical tiers:
 |---|---|---|
 | 1 | Lean binary as differential fuzzing oracle | **Do.** Highest value/cost by far |
 | 2 | Exhaustive small-scope vector generation from Lean | **Do.** Fixes the suite and the spec at once |
-| 3 | [Kani](https://github.com/model-checking/kani) on the wire decoder for panic-freedom | **Do.** Cheap, no proof engineering, and this code eats untrusted bytes |
+| 3 | [Kani](https://github.com/model-checking/kani) on the binary decoder for panic-freedom | **Do.** Cheap, no proof engineering, and this code eats untrusted bytes |
 | 4 | [Aeneas](https://github.com/AeneasVerif/aeneas) (Rust → Lean) on the LEB128 codec and subtype checker | **Evaluate.** Shapes the API even if never run |
 | 5 | End-to-end verified decoder incl. cost metering | **No.** Not realistic |
 
 Tier 4 is worth one note: Aeneas cannot handle `unsafe`, interior mutability, or
 serde-style generic traits, so today's decoder is out of reach regardless. But
 "written so that it *could* be Aeneas-verified" is a useful design constraint on
-`candid_subtype` and `candid_wire` even if we never run the tool.
+`candid_types` and `candid_binary` even if we never run the tool.
 
 ---
 
