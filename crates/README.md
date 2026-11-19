@@ -73,9 +73,9 @@ counterpart" into a checkable property rather than an aspiration.
 
 | | |
 |---|---|
-| `Slot` | a `<datatype>` where the wire format writes `I`: a primitive or a `TypeRef`, never an inline composite |
-| `Composite` | a `<comptype>`: what a table entry is. Its children are `Slot`s, so it is one flat node |
-| `RawTypeTable` | `TypeRef` → `Composite`, index-keyed — what the spec calls the type definition table — as parsed or built, not yet checked |
+| `Slot` | what the binary format calls a type reference: a primitive or a `TypeRef`, never an inline composite |
+| `Composite` | a composite type: what a table entry is. Its children are `Slot`s, so it is one flat node |
+| `RawTypeTable` | `TypeRef` → `Composite`, index-keyed — what the spec calls the type table — as parsed or built, not yet checked |
 | `TypeTable` | a `RawTypeTable` that has passed the well-formedness check: what every API after the decoder or builder takes |
 | `TypeRef` | index into a `TypeTable` |
 | `Root` | a `Slot` checked to resolve in a given `TypeTable`. In Lean the table is in its type (`t.Root`); in Rust it is a view borrowing its table, `Root<'a>` |
@@ -94,9 +94,10 @@ name.
 
 `Slot` and `Composite` take no such prefix, because neither is a type: a slot cannot
 express one, and a composite means nothing without the table its children index into.
-Both are named after the grammar position they occupy in `spec/Candid.md`. Nothing
-here is a nested tree — the type table is the only recursion, which is what the wire
-format already does (`spec/Candid.md:1208`) and what makes the subtype procedure in
+A slot is where the binary format puts a type reference, and a composite is a table
+entry ([lean/Spec/Binary.md](../lean/Spec/Binary.md), Section 5). Nothing here is a
+nested tree — the type table is the only recursion, which is what the binary format
+already does, and what makes the subtype procedure in
 [lean/](../lean/) terminate without a depth limit.
 
 `TypeEnv` is deliberately *not* this crate's table. In `rust/` it is a

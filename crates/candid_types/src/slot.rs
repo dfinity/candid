@@ -33,8 +33,8 @@ impl fmt::Display for TypeRef {
     }
 }
 
-/// A `<primtype>`, per the grammar at `spec/Candid.md:80` -- which includes `principal`.
-/// Only `func` and `service` are `<reftype>`s, and they are [`Composite`](crate::Composite)s.
+/// A primitive type (`lean/Spec/Types.md`, Section 3.1) -- which includes `principal`.
+/// The reference types, `func` and `service`, are [`Composite`](crate::Composite)s.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[allow(missing_docs)] // Each variant is the primitive of the same name.
 pub enum Primitive {
@@ -117,8 +117,8 @@ impl fmt::Display for Primitive {
     }
 }
 
-/// A `<datatype>` in the position where the wire format writes `I`: a primitive, or a
-/// reference into the accompanying table.
+/// A type reference, as the binary format writes it (`lean/Spec/Binary.md`, Section 5.1):
+/// a primitive, or a reference into the accompanying table.
 ///
 /// This is a leaf. Composites live in the table and only in the table, so the whole
 /// type graph is the table.

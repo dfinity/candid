@@ -47,10 +47,11 @@ impl fmt::Display for FieldId {
     }
 }
 
-/// The normative field-id hash, from `spec/Candid.md`:
+/// The field-id hash (`lean/Spec/Types.md`, Section 3.3). For a name whose UTF-8
+/// encoding is the bytes `b₀ … bₖ`:
 ///
 /// ```text
-/// hash(id) = ( Sum_(i=0..k) utf8(id)[i] * 223^(k-i) ) mod 2^32   where k = |utf8(id)|-1
+/// hash(b₀ … bₖ) = (b₀·223^k + b₁·223^(k−1) + … + bₖ·223^0) mod 2³²
 /// ```
 ///
 /// Evaluated in Horner form over the UTF-8 *bytes* of the name -- not its characters,

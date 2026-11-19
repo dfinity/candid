@@ -7,7 +7,8 @@ use core::fmt;
 use crate::hash::{FieldId, hash_field_name};
 use crate::slot::Slot;
 
-/// A `<funcann>`. Annotations are part of a function's type, not decoration.
+/// A function annotation (`lean/Spec/Types.md`, Section 3.2). Annotations are part of a
+/// function's type, not decoration.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Annotation {
     /// `query`
@@ -20,7 +21,7 @@ pub enum Annotation {
 
 impl Annotation {
     /// A mode says how a function is called: an update call if it has none. A function
-    /// has at most one (`lean/Spec/Did.md`, Section 6.3). Every annotation defined so far
+    /// has at most one (`lean/Spec/Types.md`, Section 3.2). Every annotation defined so far
     /// is a mode; one added later need not be.
     pub const fn is_mode(self) -> bool {
         match self {
@@ -44,7 +45,7 @@ impl fmt::Display for Annotation {
     }
 }
 
-/// A `<comptype>`: what a table entry is.
+/// A composite type: what a table entry is (`lean/Spec/Binary.md`, Section 5.2).
 ///
 /// Not a recursive type. Its children are [`Slot`]s, so a composite is one flat node.
 ///
@@ -72,9 +73,9 @@ pub enum Composite {
     },
     /// `service { ... }`: each method's name and type, in no particular order.
     Service(Vec<(String, Slot)>),
-    /// A *future type* (`spec/Candid.md`, "Deserialisation of future types"): an opcode
-    /// below `-24`, which this version of Candid does not define, and the bytes that
-    /// came with it. Only a decoder makes one.
+    /// A *future type* (`lean/Spec/Types.md`, Section 3.2; `lean/Spec/Binary.md`,
+    /// Section 5.2): an opcode below `-24`, which this version of Candid does not
+    /// define, and the bytes that came with it. Only a decoder makes one.
     Future {
         /// The opcode, below `-24`.
         opcode: i64,

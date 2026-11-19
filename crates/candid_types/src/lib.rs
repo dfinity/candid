@@ -5,8 +5,8 @@
 //!
 //! **Nothing here is recursive except the table.** A table entry is a [`Composite`]; its
 //! children are [`Slot`]s; and a slot is a primitive or a [`TypeRef`] -- never an inline
-//! composite. That is the wire format's own shape (`spec/Candid.md:1208`), and it is what
-//! bounds every recursion over types: the type graph is the table.
+//! composite. That is the binary format's own shape (`lean/Spec/Binary.md`, Section 5.1),
+//! and it is what bounds every recursion over types: the type graph is the table.
 //!
 //! A table is built or parsed as a [`RawTypeTable`] and checked once, by
 //! [`RawTypeTable::check`], into a [`TypeTable`]: from then on every reference in it

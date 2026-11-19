@@ -93,8 +93,8 @@ impl RawTypeTable {
         self.methods_denote_funcs(entry)
     }
 
-    /// `spec/Candid.md:1223`: "The serialised data type representing a method type must
-    /// denote a function type." The only rule here that looks through the table.
+    /// Every method has a function type (`lean/Spec/Types.md`, Section 3.5, rule 2). The
+    /// only rule here that looks through the table.
     fn methods_denote_funcs(&self, entry: &Composite) -> Result<(), Malformation> {
         let Composite::Service(methods) = entry else {
             return Ok(());
@@ -140,8 +140,8 @@ fn labels_ok(entry: &Composite) -> Result<(), Malformation> {
     }
 }
 
-/// No annotation repeats, a function has at most one mode (`lean/Spec/Did.md`, Section
-/// 6.3), and `spec/Candid.md:211`: "The result list of a `oneway` function must be empty."
+/// No annotation repeats, a function has at most one mode, and a `oneway` function has no
+/// results (`lean/Spec/Types.md`, Section 3.5, rules 3 and 4).
 fn annotations_ok(entry: &Composite) -> Result<(), Malformation> {
     let Composite::Func {
         results,
@@ -163,7 +163,8 @@ fn annotations_ok(entry: &Composite) -> Result<(), Malformation> {
     Ok(())
 }
 
-/// `spec/Candid.md:209`: parameter and result lists are shorter than 2^32.
+/// Parameter and result lists are shorter than 2^32 (`lean/Spec/Types.md`, Section 3.5,
+/// rule 5).
 fn arity_ok(entry: &Composite) -> Result<(), Malformation> {
     let Composite::Func {
         parameters,
