@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-11-18
+
+### Candid 0.10.41
+
+* Bug fixes:
+  + The special opt rule now tests its side condition (the expected type is not `null`, `reserved` or an `opt`) before it probes `t <: t'`, not after. When the condition fails the probe's answer is unused, but on a chain of `opt`s the probe explored a fresh pair at every level, so comparing two chains that differ at the leaf took time quadratic in their depth: about a second for 1,000 aliases, and minutes for a few thousand, bounded only by how much stack the caller gave the check. This affected `subtype`, `subtype_with_config`, `subtype_check_all` (and so `service_compatible`, `service_compatibility_report` and `didc check`) on two interfaces of a few tens of KB. It is now linear. Results are unchanged.
+  + A subtype check now remembers which type names resolve to `null`, `reserved` or an `opt`. Both the special opt rule's side condition and the check for a record field missing from the subtype ask this, and each walked the name's whole alias chain: many fields typed by one long chain took fields × aliases steps (20,000 of each: minutes).
+
+### candid_parser 0.4.2
+
+* Requires `candid` 0.10.41, so `service_compatible` and `service_compatibility_report` get its subtype-check fix.
+
+* Bug fixes:
+  + Loading a `.did` file no longer takes time quadratic in the length of an alias chain (`type t0 = t1; type t1 = t2; …`). The cycle check walked the rest of the chain again from every alias, so 5,000 aliases took seconds to load and 20,000 took minutes. Each alias is now walked once.
+  + Loading a `.did` file no longer overflows the stack on a long alias chain. Validation followed each alias recursively, so a chain of a few thousand aliases (or a few hundred in a debug build) aborted the process, before any check that could fail gracefully. It now uses a worklist.
+  + Many service methods typed by the same name are checked in time and memory linear in the file. Each method used to walk the name's whole alias chain to find the function type (10,000 methods and a 10,000-alias chain took over 20 seconds), and validation queued the function's arguments once per method. With little stack, the walk could also hit the recursion limit and reject a valid file. A method that is not a function is now reported as `method m is a non-function type` wherever the service appears, not only in the main actor.
+
 ## 2026-11-05
 
 ### Candid 0.10.40
