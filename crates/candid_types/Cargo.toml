@@ -1,7 +1,7 @@
 [package]
 name = "candid_types"
 version = "0.0.0"
-description = "Candid's type language: slots, composites and the type table"
+description = "Candid's type language: slots, composites, the type table and subtyping"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

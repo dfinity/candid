@@ -2,8 +2,9 @@
 
 **Status: `candid_types` started.** One crate, in a workspace of its own
 ([Cargo.toml](Cargo.toml)): the type language of [lean/Candid/Types.lean](../lean/Candid/Types.lean)
-and [Hash.lean](../lean/Candid/Hash.lean), checked against the `hash` and `wellformed`
-vectors, and against every table the other vectors promise is well formed. Nothing here
+and [Hash.lean](../lean/Candid/Hash.lean), and the subtyping of
+[Subtype.lean](../lean/Candid/Subtype.lean), checked against the `hash`, `wellformed`
+and `subtype` vectors, and against every table the other vectors promise is well formed. Nothing here
 is published to crates.io. See [REWRITE.md](../REWRITE.md) for why this exists.
 
 ```
@@ -26,19 +27,19 @@ crates below are new, and they use `_` to match the existing family.
 ```
 ic_principal                    (existing crate; unchanged, already correctly split)
    ↑
-candid_types      Slot, Composite, RawTypeTable, TypeTable, Root, TypeRef, FieldId,
-                  field-id hash. no_std-capable. No serde, no binary, no global state.
-   ↑
-candid_subtype    Subtyping + coercion decision procedures.
-   ↑              Mirrors lean/ 1:1. The verified core.
-candid_wire       Type table + memory encoding, untyped:
-   ↑              bytes <-> (TypeTable, Vec<Slot>, values). Cost metering.
+candid_types      Types.md, Sections 3 and 5. Slot, Composite, RawTypeTable, TypeTable,
+   ↑              Root, TypeRef, FieldId, field-id hash, subtyping.
+   │              no_std. No serde, no binary, no global state.
+candid_binary     Binary.md. Encoding, and decoding at the receiver's types -- which
+   ↑              is coercion (Types.md, Section 6). Values go in and out through
+   │              traits, so no derive and no value type is needed. Cost metering.
    ├───────────────────────────┐
 candid_value                candid (facade) + derive macro
-   Dynamic value repr,      CandidType trait, native decode trait (no serde),
-   pretty printing          Encode!/Decode!
+   Types.md, Section 4:     CandidType trait, native decode trait (no serde),
+   the dynamic value        Encode!/Decode!
                                ↑
-candid_syntax     Lexer, AST, .did parsing, type checking, spans, diagnostics.
+candid_syntax     Did.md + TextValues.md. One lexer; .did parsing, imports and type
+                  checking; value text and printing; spans, diagnostics.
    ↑
 candid_bindgen    IR, name mangling, type-selector config, template helpers.
 
@@ -53,10 +54,24 @@ out of tree:      candid_bindgen_{rust,js,ts,motoko}
   which makes `CandidType::ty()` impure and makes generated `.did` type names
   depend on the order types were first derived. Here, types are built into an
   explicit `TypeTable` passed by the caller, with recursion handled by arena indices.
-- **`candid_subtype` is a separate crate** specifically so the Lean-mirrored
-  surface has a crate boundary. As a module inside something larger, the
-  correspondence rots silently.
-- **`candid_wire` must be usable with zero derive and zero serde.** Anyone writing
+- **Each crate implements one spec document**, named for it. [lean/Spec/](../lean/Spec/)
+  has a core, Types.md, and three ways of writing it down; so there is `candid_types`
+  for the core and a crate for each way: `candid_binary`, and `candid_syntax` for the two
+  textual ones, which share a lexer.
+- **Subtyping is in `candid_types`.** It is a relation on types and needs nothing
+  else; Lean keeps it beside the types too. The Lean-mirrored surface is the
+  `subtype` module, which reads as a transcription of `lean/Candid/Subtype.lean`.
+- **Coercion is decoding at the receiver's types, and lives only in `candid_binary`.**
+  Lean decodes a message and then coerces the values. In Rust that would make every
+  typed decode build a dynamic value first, so typed decoding would need coercion of
+  its own, and two implementations of one behaviour is [CLAUDE.md](CLAUDE.md)
+  anti-pattern 6. So the decoder walks the sender's type and the receiver's together
+  over the bytes, handing what it reads to a builder for the receiver's side — the
+  dynamic value, or a derived Rust type — and the speculative `opt` rule rewinds to
+  the value's start, skips it and yields `null`. There is no value-to-value
+  coercion: the `coerce` vectors run as encode-then-decode, and so can a tool that
+  wants to convert a value.
+- **`candid_binary` must be usable with zero derive and zero serde.** Anyone writing
   a fuzzer, an interceptor, a `didc`-like tool, or a non-Rust FFI binding needs
   only this crate. It is also the only crate that touches untrusted bytes, which
   makes it the right place to concentrate Kani and fuzzing.
@@ -68,7 +83,7 @@ out of tree:      candid_bindgen_{rust,js,ts,motoko}
 ## Naming
 
 Identifiers are shared with [lean/](../lean/) wherever they name the same thing. That
-is what turns "`candid_subtype` should read as a transcription of its Lean
+is what turns "subtyping should read as a transcription of its Lean
 counterpart" into a checkable property rather than an aspiration.
 
 | | |
@@ -85,7 +100,7 @@ counterpart" into a checkable property rather than an aspiration.
 
 Shared names are for *things*. Functions follow Rust's conventions where Lean's would
 read oddly: `lookup?` is `lookup`, `size` is `len`, `hashFieldName` is
-`hash_field_name`, and `check` returns a `Result` naming the malformed entry where
+`hash_field_name`, `decSubtype` is `is_subtype`, and `check` returns a `Result` naming the malformed entry where
 Lean's returns an `Option`.
 
 `Type` cannot be used in Lean (it is the universe) and `Ty` would violate
@@ -169,8 +184,8 @@ in [error.rs:3](../rust/candid/src/error.rs#L3), and
 [utils.rs:4](../rust/candid/src/utils.rs#L4). Take out the decode path and nothing
 is holding the dependency up.
 
-So a default `cargo build` of `candid_types`, `candid_subtype`, `candid_wire`,
-`candid_value` or the facade resolves no `serde` at all. Three consequences that are
+So a default `cargo build` of `candid_types`, `candid_binary`, `candid_value` or
+the facade resolves no `serde` at all. Three consequences that are
 easy to miss:
 
 - **`serde_bytes` goes with it, and it is a default feature today.** Efficient
@@ -277,10 +292,10 @@ two exports do not obviously survive:
 
 ## Verification posture
 
-`candid_subtype` and `candid_wire` are written to be checkable, which constrains
+`candid_types` and `candid_binary` are written to be checkable, which constrains
 their style: pure functions, no interior mutability, no `unsafe`, no trait-object
 indirection in the core paths. Concretely this means
-[Kani](https://github.com/model-checking/kani) for panic-freedom on the wire
+[Kani](https://github.com/model-checking/kani) for panic-freedom on the binary
 decoder, differential fuzzing against the Lean binary, and — as a stretch —
 [Aeneas](https://github.com/AeneasVerif/aeneas) on the LEB128 codec and the
 subtype checker. "Written so that it *could* be Aeneas-verified" is a useful
