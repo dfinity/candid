@@ -109,3 +109,55 @@ impl fmt::Display for Rejection {
         }
     }
 }
+
+/// An argument type, the one at [`UnresolvedArgument::index`], that does not resolve in
+/// the table it was given with.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct UnresolvedArgument {
+    index: usize,
+}
+
+impl UnresolvedArgument {
+    pub(crate) fn new(index: usize) -> Self {
+        UnresolvedArgument { index }
+    }
+
+    /// Which argument.
+    pub fn index(&self) -> usize {
+        self.index
+    }
+}
+
+impl fmt::Display for UnresolvedArgument {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "the type of argument {} does not resolve", self.index)
+    }
+}
+
+impl core::error::Error for UnresolvedArgument {}
+
+/// Why a message could not be finished.
+#[derive(Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
+pub enum EncodeError {
+    /// Fewer values were written than the header has arguments.
+    MissingArguments {
+        /// How many arguments the header has.
+        expected: usize,
+        /// How many values were written.
+        written: usize,
+    },
+}
+
+impl fmt::Display for EncodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EncodeError::MissingArguments { expected, written } => write!(
+                f,
+                "the header has {expected} arguments, and {written} values were written"
+            ),
+        }
+    }
+}
+
+impl core::error::Error for EncodeError {}

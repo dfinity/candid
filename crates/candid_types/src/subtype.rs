@@ -15,8 +15,9 @@
 //! Two departures from the model, neither of which changes an answer:
 //!
 //! - Assumptions are sets, not lists, and fields and methods are looked up by binary
-//!   search, not by a scan. A table may come from untrusted bytes, and a scan per field
-//!   is quadratic in a record's width.
+//!   search, not by a scan: a checked table keeps them in order (see [`TypeTable`]). A
+//!   table may come from untrusted bytes, and a scan per field is quadratic in a
+//!   record's width.
 //! - A function's parameters and results are matched by position, where the model
 //!   labels them `1`, `2`, ... and reuses the record rule. The two are the same rule.
 
@@ -144,10 +145,9 @@ fn expand(
         // A record may specialise a field or add one, and may omit one the supertype
         // has if that field accepts `null`.
         (Composite::Record(fs), Composite::Record(gs)) => {
-            let fs = Sorted::new(fs.iter().copied());
             let mut goals = Vec::new();
             for &(id, g) in gs {
-                match fs.get(&id) {
+                match find(fs, &id) {
                     Some(f) => goals.push(goal(f, g)),
                     None if accepts_null(u, g) => {}
                     None => return None,
@@ -158,12 +158,10 @@ fn expand(
 
         // A variant may specialise a case or drop one; every case it has, the supertype
         // has too.
-        (Composite::Variant(fs), Composite::Variant(gs)) => {
-            let gs = Sorted::new(gs.iter().copied());
-            fs.iter()
-                .map(|&(id, f)| gs.get(&id).map(|g| goal(f, g)))
-                .collect()
-        }
+        (Composite::Variant(fs), Composite::Variant(gs)) => fs
+            .iter()
+            .map(|&(id, f)| find(gs, &id).map(|g| goal(f, g)))
+            .collect(),
 
         // Parameters generalise and results specialise, each like a tuple: parameters
         // may be dropped and results added. The parameter premise swaps the tables, so
@@ -190,12 +188,10 @@ fn expand(
         }
 
         // A service may specialise a method or add one.
-        (Composite::Service(ms), Composite::Service(ns)) => {
-            let ms = Sorted::new(ms.iter().map(|(name, s)| (name.as_str(), *s)));
-            ns.iter()
-                .map(|(name, g)| ms.get(&name.as_str()).map(|f| goal(f, *g)))
-                .collect()
-        }
+        (Composite::Service(ms), Composite::Service(ns)) => ns
+            .iter()
+            .map(|(name, g)| find(ms, name).map(|f| goal(f, *g)))
+            .collect(),
 
         // A future type is a subtype of itself, and otherwise only of `reserved` and of
         // the options, which are decided elsewhere.
@@ -236,26 +232,17 @@ fn positional(
 }
 
 /// Annotations agree as sets: the spec compares them without regard to order
-/// (`lean/Spec/Types.md`, Section 3.4), and a checked table repeats none.
+/// (`lean/Spec/Types.md`, Section 3.4). A checked table repeats none and keeps them in
+/// order, so as sets they are equal exactly when they are equal as lists.
 fn annotations_agree(xs: &[Annotation], ys: &[Annotation]) -> bool {
-    xs.iter().all(|x| ys.contains(x)) && ys.iter().all(|y| xs.contains(y))
+    xs == ys
 }
 
-/// Fields or methods, sorted by key, for lookup by binary search. A checked table has no
-/// two with the same key, so a lookup finds at most one.
-struct Sorted<K>(Vec<(K, Slot)>);
-
-impl<K: Ord> Sorted<K> {
-    fn new(entries: impl Iterator<Item = (K, Slot)>) -> Self {
-        let mut entries: Vec<_> = entries.collect();
-        entries.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-        Sorted(entries)
-    }
-
-    fn get(&self, key: &K) -> Option<Slot> {
-        let i = self.0.binary_search_by(|(k, _)| k.cmp(key)).ok()?;
-        Some(self.0[i].1)
-    }
+/// The slot under `key` in fields or methods, by binary search: a checked table keeps
+/// them in strictly ascending order of key.
+fn find<K: Ord>(entries: &[(K, Slot)], key: &K) -> Option<Slot> {
+    let i = entries.binary_search_by(|(k, _)| k.cmp(key)).ok()?;
+    Some(entries[i].1)
 }
 
 #[cfg(test)]

@@ -9,7 +9,7 @@ use candid_types::{
     Annotation, Composite, FieldId, Primitive, RawTypeTable, Slot, TypeRef, TypeTable,
 };
 
-use crate::error::{DecodeError, Rejection};
+use crate::error::{Rejection, UnresolvedArgument};
 use crate::leb128::{self, Signed};
 use crate::reader::{Read, Reader};
 
@@ -19,7 +19,11 @@ const MAGIC: [u8; 4] = *b"DIDL";
 /// A message's type table and the type of each of its arguments: everything in a
 /// message but the values.
 ///
-/// Every argument type resolves in the table, which is well formed.
+/// Every argument type resolves in the table, which is well formed. A [`Decoder`] reads
+/// one, and an [`Encoder`] writes one.
+///
+/// [`Decoder`]: crate::Decoder
+/// [`Encoder`]: crate::Encoder
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Header {
     table: TypeTable,
@@ -27,12 +31,12 @@ pub struct Header {
 }
 
 impl Header {
-    /// A header with these argument types, or `None` if one does not resolve in `table`.
-    pub fn new(table: TypeTable, types: Vec<Slot>) -> Option<Header> {
-        types
-            .iter()
-            .all(|&t| table.resolves(t))
-            .then_some(Header { table, types })
+    /// A header with these argument types, unless one does not resolve in `table`.
+    pub fn new(table: TypeTable, types: Vec<Slot>) -> Result<Header, UnresolvedArgument> {
+        match types.iter().position(|&t| !table.resolves(t)) {
+            Some(index) => Err(UnresolvedArgument::new(index)),
+            None => Ok(Header { table, types }),
+        }
     }
 
     /// The type table.
@@ -45,14 +49,11 @@ impl Header {
         &self.types
     }
 
-    /// Read the header at the start of `message`, and return it with the bytes after it,
-    /// which are the values.
+    /// Read the header at the start of a message, leaving `r` at the first value.
     ///
     /// Rejects what the spec says a decoder must reject in a header, and then a table
-    /// that is not well formed and an argument type that does not resolve. Error
-    /// positions are offsets in `message`.
-    pub fn decode(message: &[u8]) -> Result<(Header, &[u8]), DecodeError> {
-        let mut r = Reader::new(message);
+    /// that is not well formed and an argument type that does not resolve.
+    pub(crate) fn decode(r: &mut Reader<'_>) -> Read<Header> {
         for b in MAGIC {
             let at = r.position();
             if r.byte()? != b {
@@ -62,9 +63,8 @@ impl Header {
         // Where each entry and argument type starts, so that a check made once the header
         // is read can still say where the problem is.
         let (entries, entry_offsets): (Vec<_>, Vec<_>) =
-            list(&mut r, offset(entry))?.into_iter().unzip();
-        let (types, type_offsets): (Vec<_>, Vec<_>) =
-            list(&mut r, offset(slot))?.into_iter().unzip();
+            list(r, offset(entry))?.into_iter().unzip();
+        let (types, type_offsets): (Vec<_>, Vec<_>) = list(r, offset(slot))?.into_iter().unzip();
         let table = match RawTypeTable::from_entries(entries).check() {
             Ok(table) => table,
             Err(e) => {
@@ -75,16 +75,16 @@ impl Header {
         if let Some(i) = types.iter().position(|&t| !table.resolves(t)) {
             return r.fail(type_offsets[i], Rejection::UnresolvedArgument(i));
         }
-        Ok((Header { table, types }, r.rest()))
+        Ok(Header { table, types })
     }
 
     /// Append the header to `out`: the magic number, the whole table in its order, and
     /// the argument types.
     ///
-    /// An encoder chooses its table, and this one writes the table it is given. Within an
-    /// entry, fields are written in order of id and methods in order of name, as the
-    /// spec requires; everything else in the order it is in.
-    pub fn encode(&self, out: &mut Vec<u8>) {
+    /// An encoder chooses its table, and this one writes the table it is given. A
+    /// [`TypeTable`] keeps fields in order of id and methods in order of name, which is
+    /// the order the spec requires.
+    pub(crate) fn encode(&self, out: &mut Vec<u8>) {
         out.extend_from_slice(&MAGIC);
         let entries = self.table.entries();
         leb128::write_unsigned(out, length(entries.len()));
@@ -288,10 +288,8 @@ fn encode_slot(out: &mut Vec<u8>, s: Slot) {
 }
 
 fn encode_fields(out: &mut Vec<u8>, fields: &[(FieldId, Slot)]) {
-    let mut sorted: Vec<_> = fields.to_vec();
-    sorted.sort_unstable_by_key(|&(id, _)| id);
-    leb128::write_unsigned(out, length(sorted.len()));
-    for (id, s) in sorted {
+    leb128::write_unsigned(out, length(fields.len()));
+    for &(id, s) in fields {
         leb128::write_unsigned(out, u64::from(id.get()));
         encode_slot(out, s);
     }
@@ -335,10 +333,8 @@ fn encode_entry(out: &mut Vec<u8>, entry: &Composite) {
         }
         Composite::Service(methods) => {
             leb128::write_signed(out, opcode::SERVICE);
-            let mut sorted: Vec<_> = methods.iter().collect();
-            sorted.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-            leb128::write_unsigned(out, length(sorted.len()));
-            for (name, s) in sorted {
+            leb128::write_unsigned(out, length(methods.len()));
+            for (name, s) in methods {
                 leb128::write_unsigned(out, length(name.len()));
                 out.extend_from_slice(name.as_bytes());
                 encode_slot(out, *s);
@@ -357,8 +353,8 @@ mod tests {
     use super::*;
     use alloc::vec;
 
-    fn decode(bytes: &[u8]) -> Result<(Header, &[u8]), Rejection> {
-        Header::decode(bytes).map_err(|e| e.rejection().clone())
+    fn decode(bytes: &[u8]) -> Result<Header, Rejection> {
+        Header::decode(&mut Reader::new(bytes)).map_err(|e| e.rejection().clone())
     }
 
     /// `DIDL`, then `rest`.
@@ -383,8 +379,8 @@ mod tests {
     #[test]
     fn empty_message() {
         let bytes = message(&[0x00, 0x00]);
-        let (h, rest) = decode(&bytes).unwrap();
-        assert!(h.table().is_empty() && h.types().is_empty() && rest.is_empty());
+        let h = decode(&bytes).unwrap();
+        assert!(h.table().is_empty() && h.types().is_empty());
     }
 
     #[test]
@@ -408,25 +404,22 @@ mod tests {
         let header = Header::new(raw.check().unwrap(), vec![list, Slot::INT]).unwrap();
         let mut bytes = header.encode_to_vec();
         bytes.extend_from_slice(&[0xaa, 0xbb]);
-        let (back, rest) = decode(&bytes).unwrap();
-        assert_eq!(rest, [0xaa, 0xbb]);
-        assert_eq!(back.types(), header.types());
-        // The record's fields and the service's methods come back in order.
-        for (got, sent) in back.table().entries().iter().zip(header.table().entries()) {
-            match (got, sent) {
-                (Composite::Record(g), Composite::Record(s)) => {
-                    let mut s = s.clone();
-                    s.sort_unstable_by_key(|f| f.0);
-                    assert_eq!(*g, s);
-                }
-                (Composite::Service(g), Composite::Service(s)) => {
-                    let mut s = s.clone();
-                    s.sort_unstable();
-                    assert_eq!(*g, s);
-                }
-                _ => assert_eq!(got, sent),
-            }
-        }
+        let mut r = Reader::new(&bytes);
+        assert_eq!(Header::decode(&mut r).unwrap(), header);
+        // The reader is left at the values.
+        assert_eq!(r.rest(), [0xaa, 0xbb]);
+        // A table is written as it is held: fields in order of id, methods of name.
+        let Composite::Service(methods) = &header.table().entries()[3] else {
+            panic!("entry 3 is the service");
+        };
+        assert_eq!(methods[0].0, "a");
+    }
+
+    #[test]
+    fn an_argument_that_does_not_resolve() {
+        let table = TypeTable::default();
+        let err = Header::new(table, vec![Slot::NAT, Slot::Ref(TypeRef::new(0))]).unwrap_err();
+        assert_eq!(err.index(), 1);
     }
 
     impl Header {
@@ -505,13 +498,16 @@ mod tests {
     #[test]
     fn checks_after_parsing_point_at_the_offending_bytes() {
         // The argument type `0` at offset 6 dangles; the byte after it is a value.
-        let e = Header::decode(&message(&[0x00, 0x01, 0x00, 0xaa])).unwrap_err();
+        let e = Header::decode(&mut Reader::new(&message(&[0x00, 0x01, 0x00, 0xaa]))).unwrap_err();
         assert_eq!(
             (e.position(), e.rejection()),
             (6, &Rejection::UnresolvedArgument(0))
         );
         // Entry 1, `vec 5` at offset 7, dangles; entry 0 is `opt nat` at offset 5.
-        let e = Header::decode(&message(&[0x02, 0x6e, 0x7d, 0x6d, 0x05, 0x00])).unwrap_err();
+        let e = Header::decode(&mut Reader::new(&message(&[
+            0x02, 0x6e, 0x7d, 0x6d, 0x05, 0x00,
+        ])))
+        .unwrap_err();
         assert_eq!(e.position(), 7);
         assert!(matches!(e.rejection(), Rejection::MalformedTable(_)));
     }
@@ -526,7 +522,7 @@ mod tests {
     #[test]
     fn redundant_continuation_bytes() {
         // `opt nat`, its opcode written `ee 7f`, and the argument 0 written `80 00`.
-        let (h, _) = decode(&message(&[0x01, 0xee, 0x7f, 0x7d, 0x01, 0x80, 0x00])).unwrap();
+        let h = decode(&message(&[0x01, 0xee, 0x7f, 0x7d, 0x01, 0x80, 0x00])).unwrap();
         assert_eq!(h.table().entries(), [Composite::Opt(Slot::NAT)]);
         // An index past the end of any table dangles rather than overflowing.
         let mut huge = message(&[0x00, 0x01]);

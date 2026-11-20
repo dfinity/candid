@@ -7,8 +7,10 @@
 //! - `candid_binary` reads message headers so far. Every message a `decode` vector
 //!   accepts, or calls costly, has a header it must accept; a message the vector rejects
 //!   may be rejected for its header or for its values, so only the count of those whose
-//!   header is already rejected is reported. And every table above is encoded as a
-//!   header and read back, which must give the same table.
+//!   header is already rejected is reported. And every table above is written in a
+//!   message with no arguments and read back, which must give the same table. (Writing
+//!   the roots as argument types too waits for values: a message with arguments cannot
+//!   be finished without them.)
 //!
 //! Like a runner, this reads strictly: an unknown key, kind or name is an error, never
 //! skipped.
@@ -119,7 +121,7 @@ fn ask(vector: &Value) -> Result<&'static str, String> {
             let roots = types["roots"].as_array().ok_or("roots")?;
             well_formed_types(&types["table"], roots.iter())?;
             let bytes = hex(v["bytes"].as_str().ok_or("bytes")?)?;
-            let header = candid_binary::Header::decode(&bytes);
+            let header = candid_binary::Decoder::new(&bytes);
             if v["expect"] == "reject" {
                 return Ok(if header.is_err() {
                     "decode (rejected by the header)"
@@ -192,41 +194,27 @@ fn well_formed_types<'a>(
     let table = read_table(table)?
         .check()
         .map_err(|e| format!("a promised-well-formed table is rejected: {e}"))?;
-    let mut slots = Vec::new();
     for root in roots {
         let root = read_slot(root)?;
         agree(table.root(root).is_some(), || {
             format!("a promised root {root:?} does not resolve")
         })?;
-        slots.push(root);
     }
-    header_roundtrip(table, slots)
+    table_roundtrip(table)
 }
 
-/// Encode a table and roots as a header, and read it back: the same table, with each
-/// entry's fields and methods in the order the format writes them, and the same roots.
-fn header_roundtrip(table: TypeTable, roots: Vec<Slot>) -> Result<(), String> {
-    let expected: Vec<Composite> = table.entries().iter().map(written_order).collect();
-    let header = candid_binary::Header::new(table, roots).ok_or("a root does not resolve")?;
-    let mut bytes = Vec::new();
-    header.encode(&mut bytes);
-    let (back, rest) = candid_binary::Header::decode(&bytes)
-        .map_err(|e| format!("an encoded header is rejected: {e}"))?;
+/// Write a table in a message and read it back: the same table.
+fn table_roundtrip(table: TypeTable) -> Result<(), String> {
+    let header = candid_binary::Header::new(table, Vec::new()).map_err(|e| e.to_string())?;
+    let bytes = candid_binary::Encoder::new(header.clone())
+        .finish()
+        .map_err(|e| format!("a message cannot be finished: {e}"))?;
+    let decoder = candid_binary::Decoder::new(&bytes)
+        .map_err(|e| format!("a written table is rejected: {e}"))?;
     agree(
-        rest.is_empty() && back.types() == header.types() && back.table().entries() == expected,
-        || "an encoded header reads back differently".to_string(),
+        decoder.header() == &header && decoder.position() == bytes.len(),
+        || "a written table reads back differently".to_string(),
     )
-}
-
-/// An entry with its fields in order of id and its methods in order of name.
-fn written_order(entry: &Composite) -> Composite {
-    let mut entry = entry.clone();
-    match &mut entry {
-        Composite::Record(fs) | Composite::Variant(fs) => fs.sort_unstable_by_key(|f| f.0),
-        Composite::Service(ms) => ms.sort_unstable_by(|a, b| a.0.cmp(&b.0)),
-        _ => {}
-    }
-    entry
 }
 
 fn read_type(t: &Value) -> Result<(RawTypeTable, Slot), String> {

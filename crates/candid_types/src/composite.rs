@@ -58,9 +58,11 @@ pub enum Composite {
     Opt(Slot),
     /// `vec t`
     Vec(Slot),
-    /// `record { ... }`, its fields in no particular order.
+    /// `record { ... }`: its fields, in no particular order -- but in a
+    /// [`TypeTable`](crate::TypeTable), in order of id.
     Record(Vec<(FieldId, Slot)>),
-    /// `variant { ... }`, its alternatives in no particular order.
+    /// `variant { ... }`: its alternatives, in no particular order -- but in a
+    /// [`TypeTable`](crate::TypeTable), in order of id.
     Variant(Vec<(FieldId, Slot)>),
     /// `func (parameters) -> (results) annotations`
     Func {
@@ -68,10 +70,12 @@ pub enum Composite {
         parameters: Vec<Slot>,
         /// The result types.
         results: Vec<Slot>,
-        /// The annotations, in no particular order.
+        /// The annotations, in no particular order -- but in a
+        /// [`TypeTable`](crate::TypeTable), in the order [`Annotation`] declares them.
         annotations: Vec<Annotation>,
     },
-    /// `service { ... }`: each method's name and type, in no particular order.
+    /// `service { ... }`: each method's name and type, in no particular order -- but in a
+    /// [`TypeTable`](crate::TypeTable), in order of name.
     Service(Vec<(String, Slot)>),
     /// A *future type* (`lean/Spec/Types.md`, Section 3.2; `lean/Spec/Binary.md`,
     /// Section 5.2): an opcode below `-24`, which this version of Candid does not

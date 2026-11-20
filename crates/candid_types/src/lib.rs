@@ -28,6 +28,6 @@ mod table;
 
 pub use composite::{Annotation, Composite};
 pub use hash::{FieldId, hash_field_name};
-pub use slot::{Primitive, Slot, TypeRef};
+pub use slot::{ParsePrimitiveError, Primitive, Slot, TypeRef};
 pub use subtype::is_subtype;
 pub use table::{Malformation, MalformedTable, RawTypeTable, Root, TypeTable};
