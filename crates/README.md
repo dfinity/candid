@@ -75,9 +75,11 @@ out of tree:      candid_bindgen_{rust,js,ts,motoko}
   typed decode build a dynamic value first, so typed decoding would need coercion of
   its own, and two implementations of one behaviour is [CLAUDE.md](CLAUDE.md)
   anti-pattern 6. So the decoder walks the sender's type and the receiver's together
-  over the bytes, handing what it reads to a builder for the receiver's side — the
-  dynamic value, or a derived Rust type — and the speculative `opt` rule rewinds to
-  the value's start, skips it and yields `null`. There is no value-to-value
+  over the bytes, for a receiver -- the dynamic value, or a derived Rust type -- that
+  says what it builds. The speculative `opt` rule is speculative about the *coercion*,
+  not the bytes: when the value under an `opt` does not coerce, the decoder skips
+  forward to the value's end, validating it, and yields `null`. It never rewinds
+  ([Values](#values)). There is no value-to-value
   coercion: the `coerce` vectors run as encode-then-decode, and so can a tool that
   wants to convert a value.
 - **`candid_binary` must be usable with zero derive and zero serde.** Anyone writing
@@ -110,9 +112,15 @@ pub trait Decode<'a>: Sized {
 }
 ```
 
-`candid_value::Value` implements both, and so will derived types; the facade's
-`CandidType` is `Encode + Decode` plus `ty()`. `'a` is the message's lifetime, so a
-receiver can borrow text and blobs from it instead of copying.
+`candid_value::Value` implements both, and so will derived types. `'a` is the message's
+lifetime, so a receiver can borrow text and blobs from it instead of copying: a
+`View<'b> { text: &'b str }` implements `Decode<'a>` for every `'a: 'b`.
+
+So the facade's `CandidType` is `Encode` plus `ty()`, and does not require `Decode`: a
+bound such as `for<'a> Decode<'a>` would shut out every borrowing type, even where it
+is only encoded. A decoding call site asks for `Decode<'a>` at the message's lifetime,
+or for `DecodeOwned` -- `for<'a> Decode<'a>`, as serde's `DeserializeOwned` -- when
+the value must outlive the message. The derive implements all three.
 
 **The receiver drives; the decoder decides.** A reader is one value of the message,
 paired with the receiver's type for it: a sender's slot and position, and a `Root` in
@@ -222,9 +230,12 @@ the spec.
 
 ### Order of work
 
-1. `candid_value`, and writing values. Checked by encoding each `decode` vector's values
-   at its types and comparing with its bytes, where the vector's bytes are in shortest
-   form.
+1. `candid_value`, and writing values. A `decode` vector's values are the receiver's,
+   after coercion, so they give back its bytes only where nothing was coerced. The check
+   is therefore on the vectors whose own header is the receiver's -- the same table and
+   argument types, which the header decoder can already tell -- and whose bytes are in
+   shortest form: writing their values with that header must give their bytes. The rest
+   wait for step 3, which compares by decoding.
 2. Lean's `decodeAt`, and the theorem.
 3. Reading values at the receiver's types. Checked by every `decode` vector in full, and
    every `coerce` vector as encode-then-decode.
@@ -281,19 +292,22 @@ identifier called a table.
 This is the change that motivates the version bump, so it is worth stating
 precisely.
 
-Candid's coercion rule requires **speculative decoding with backtracking**: when a
-value cannot be coerced to the expected type inside an `opt`, the result is `null`
-rather than an error. serde's `Visitor` is a consume-once, move-in API that
+Candid's coercion rule requires **speculative coercion**: when a value cannot be
+coerced to the expected type inside an `opt`, the result is `null` rather than an
+error, and the receiver has to be able to give up on a value it has started to build.
+serde's `Visitor` is a consume-once, move-in API that
 provides no "would you accept this?" query, so the current implementation
 identifies visitors by string-matching serde's private module paths and `ptr::read`s
 them ([rust/candid/src/de.rs:740](../rust/candid/src/de.rs#L740)). serde 1.0.220
 moved those paths and broke it. Both bugs fixed in 0.10.34 trace to the same
 mismatch.
 
-The replacement makes backtracking first-class:
+The replacement makes giving up first-class. A receiver that cannot coerce returns
+`Ok(None)`, and the decoder, not the receiver, skips forward past the rest of the
+value; nothing goes back over bytes already read.
 
 ```rust
-pub trait CandidType: Encode + for<'a> Decode<'a> {
+pub trait CandidType: Encode {
     fn ty(table: &mut RawTypeTable) -> Slot;
 }
 
