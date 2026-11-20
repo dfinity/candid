@@ -31,7 +31,7 @@ mod header;
 mod leb128;
 mod reader;
 
-pub use decoder::Decoder;
+pub use decoder::{Decoder, Limits};
 pub use encoder::Encoder;
 pub use error::{DecodeError, EncodeError, Rejection, UnresolvedArgument};
 pub use header::Header;

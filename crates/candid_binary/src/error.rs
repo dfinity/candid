@@ -43,8 +43,8 @@ impl core::error::Error for DecodeError {}
 
 /// One reason a message is rejected (`lean/Spec/Binary.md`).
 ///
-/// All but [`Rejection::OpcodeOutOfRange`] are rejections the spec requires. That one is
-/// a resource limit, which the spec allows (Section 9).
+/// All are rejections the spec requires, except the resource limits it allows (Section
+/// 9), which [`Rejection::is_resource_limit`] tells apart.
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[non_exhaustive]
 pub enum Rejection {
@@ -78,6 +78,22 @@ pub enum Rejection {
     /// A resource limit: Candid will not define that many types, so this implementation
     /// keeps an opcode in an `i64`, where the Lean model's is unbounded.
     OpcodeOutOfRange,
+    /// A header longer than [`Limits::header_bytes`](crate::Limits::header_bytes).
+    ///
+    /// A resource limit: a header takes some tens of times its length in memory once
+    /// read, and the sender chooses its length.
+    HeaderTooLarge,
+}
+
+impl Rejection {
+    /// Whether this is a resource limit (`lean/Spec/Binary.md`, Section 9): a message
+    /// this decoder will not read, rather than one that is not valid.
+    pub fn is_resource_limit(&self) -> bool {
+        matches!(
+            self,
+            Rejection::OpcodeOutOfRange | Rejection::HeaderTooLarge
+        )
+    }
 }
 
 impl fmt::Display for Rejection {
@@ -106,6 +122,7 @@ impl fmt::Display for Rejection {
             Rejection::OpcodeOutOfRange => {
                 f.write_str("a future type's opcode is below -2^63, past this decoder's limit")
             }
+            Rejection::HeaderTooLarge => f.write_str("the header is longer than the limit"),
         }
     }
 }

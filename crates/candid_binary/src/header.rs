@@ -62,9 +62,8 @@ impl Header {
         }
         // Where each entry and argument type starts, so that a check made once the header
         // is read can still say where the problem is.
-        let (entries, entry_offsets): (Vec<_>, Vec<_>) =
-            list(r, offset(entry))?.into_iter().unzip();
-        let (types, type_offsets): (Vec<_>, Vec<_>) = list(r, offset(slot))?.into_iter().unzip();
+        let (entries, entry_offsets) = list_with_offsets(r, entry)?;
+        let (types, type_offsets) = list_with_offsets(r, slot)?;
         let table = match RawTypeTable::from_entries(entries).check() {
             Ok(table) => table,
             Err(e) => {
@@ -175,14 +174,19 @@ fn list<'a, T>(r: &mut Reader<'a>, item: impl Fn(&mut Reader<'a>) -> Read<T>) ->
     Ok(items)
 }
 
-/// `item`, with the offset it starts at.
-fn offset<'a, T>(
+/// `T*`, and the offset each item starts at, in a list of its own so that neither has to
+/// be copied out of a list of pairs.
+fn list_with_offsets<'a, T>(
+    r: &mut Reader<'a>,
     item: impl Fn(&mut Reader<'a>) -> Read<T>,
-) -> impl Fn(&mut Reader<'a>) -> Read<(T, usize)> {
-    move |r| {
-        let at = r.position();
-        Ok((item(r)?, at))
+) -> Read<(Vec<T>, Vec<usize>)> {
+    let n = r.unsigned()?;
+    let (mut items, mut offsets) = (Vec::new(), Vec::new());
+    for _ in 0..n {
+        offsets.push(r.position());
+        items.push(item(r)?);
     }
+    Ok((items, offsets))
 }
 
 /// A type reference: a primitive type's opcode, or an index into the table. Whether the

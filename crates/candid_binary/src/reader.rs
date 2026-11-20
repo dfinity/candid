@@ -20,6 +20,15 @@ impl<'a> Reader<'a> {
         Reader { bytes, position: 0 }
     }
 
+    /// A reader of `bytes` that has read up to `position`, which is at most their length.
+    pub(crate) fn starting_at(bytes: &'a [u8], position: usize) -> Self {
+        debug_assert!(position <= bytes.len());
+        Reader {
+            bytes,
+            position: position.min(bytes.len()),
+        }
+    }
+
     pub(crate) fn position(&self) -> usize {
         self.position
     }
