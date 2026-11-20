@@ -53,11 +53,12 @@ jobs:
         run: cargo doc --locked --no-deps --manifest-path "$MANIFEST"
         env:
           RUSTDOCFLAGS: -D warnings
-      # `candid_types` is `no_std`; building for a target that has no `std` at all is
-      # what keeps it so. (`wasm32-unknown-unknown` would not: it ships one.)
+      # `candid_types` and `candid_binary` are `no_std`; building for a target that has no
+      # `std` at all is what keeps them so. (`wasm32-unknown-unknown` would not: it ships
+      # one.)
       - name: no_std
         run: |
           rustup target add thumbv7em-none-eabi
-          cargo build --locked --manifest-path "$MANIFEST" -p candid_types --target thumbv7em-none-eabi
+          cargo build --locked --manifest-path "$MANIFEST" -p candid_types -p candid_binary --target thumbv7em-none-eabi
       - name: test
         run: cargo test --locked --manifest-path "$MANIFEST"

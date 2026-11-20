@@ -117,6 +117,27 @@ impl fmt::Display for Primitive {
     }
 }
 
+/// [`Primitive::from_name`], as `"nat".parse()`.
+impl core::str::FromStr for Primitive {
+    type Err = ParsePrimitiveError;
+
+    fn from_str(name: &str) -> Result<Self, Self::Err> {
+        Primitive::from_name(name).ok_or(ParsePrimitiveError)
+    }
+}
+
+/// A name that is not a primitive type's keyword.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct ParsePrimitiveError;
+
+impl fmt::Display for ParsePrimitiveError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("not the name of a primitive type")
+    }
+}
+
+impl core::error::Error for ParsePrimitiveError {}
+
 /// A type reference, as the binary format writes it (`lean/Spec/Binary.md`, Section 5.1):
 /// a primitive, or a reference into the accompanying table.
 ///
@@ -174,7 +195,9 @@ mod tests {
     fn names_round_trip() {
         for p in Primitive::ALL {
             assert_eq!(Primitive::from_name(p.name()), Some(p));
+            assert_eq!(p.name().parse(), Ok(p));
         }
         assert_eq!(Primitive::from_name("vec"), None);
+        assert_eq!("vec".parse::<Primitive>(), Err(ParsePrimitiveError));
     }
 }

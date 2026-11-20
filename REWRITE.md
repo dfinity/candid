@@ -12,7 +12,7 @@ written down and citable rather than undocumented.
 
 **Status:** in progress. The Lean model, the conformance vectors and the spec drafts
 exist on the `rewrite` branch, and the crates have started: `candid_types`, with
-subtyping. **Author:** @lwshang.
+subtyping, and the header of a message in `candid_binary`. **Author:** @lwshang.
 
 ---
 

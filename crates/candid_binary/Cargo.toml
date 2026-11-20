@@ -1,0 +1,15 @@
+[package]
+name = "candid_binary"
+version = "0.0.0"
+description = "Candid's binary format: messages as bytes"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+candid_types.workspace = true
+
+[lints]
+workspace = true

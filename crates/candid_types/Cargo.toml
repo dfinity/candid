@@ -10,8 +10,5 @@ publish.workspace = true
 
 [dependencies]
 
-[dev-dependencies]
-serde_json.workspace = true
-
 [lints]
 workspace = true

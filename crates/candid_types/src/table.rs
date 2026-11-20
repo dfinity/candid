@@ -63,8 +63,11 @@ impl RawTypeTable {
     /// no record, variant or service repeats a label, a function's annotations are
     /// allowed, and every method's type is a function.
     ///
+    /// Puts each entry's labels in order as it goes: see [`TypeTable`].
+    ///
     /// On failure, names the first malformed entry and one thing wrong with it.
-    pub fn check(self) -> Result<TypeTable, MalformedTable> {
+    pub fn check(mut self) -> Result<TypeTable, MalformedTable> {
+        self.entries.iter_mut().for_each(sort_labels);
         for (index, entry) in self.entries.iter().enumerate() {
             if let Err(malformation) = self.check_entry(entry) {
                 return Err(MalformedTable {
@@ -118,14 +121,33 @@ impl From<Vec<Composite>> for RawTypeTable {
     }
 }
 
+impl FromIterator<Composite> for RawTypeTable {
+    fn from_iter<I: IntoIterator<Item = Composite>>(entries: I) -> Self {
+        RawTypeTable::from_entries(entries.into_iter().collect())
+    }
+}
+
+/// Put an entry's fields in order of id, its methods in order of name and its annotations
+/// in their declared order. None of these orders means anything (`lean/Spec/Types.md`,
+/// Section 3), so this changes no type.
+fn sort_labels(entry: &mut Composite) {
+    match entry {
+        Composite::Record(fs) | Composite::Variant(fs) => fs.sort_unstable_by_key(|f| f.0),
+        // `str`'s order is that of the UTF-8 bytes, which is the binary format's.
+        Composite::Service(ms) => ms.sort_unstable_by(|a, b| a.0.cmp(&b.0)),
+        Composite::Func { annotations, .. } => annotations.sort_unstable(),
+        Composite::Opt(_) | Composite::Vec(_) | Composite::Future { .. } => {}
+    }
+}
+
 /// Labels must not repeat: the spec makes a hash collision between field names in one
 /// record *disallowed* rather than resolved, so duplicate ids make a type malformed
 /// rather than ambiguous.
 fn labels_ok(entry: &Composite) -> Result<(), Malformation> {
     match entry {
         Composite::Record(fs) | Composite::Variant(fs) => {
-            match first_duplicate(fs.iter().map(|(id, _)| *id)) {
-                Some(id) => Err(Malformation::DuplicateField(id)),
+            match first_duplicate(fs.iter().map(|(id, _)| id)) {
+                Some(id) => Err(Malformation::DuplicateField(*id)),
                 None => Ok(()),
             }
         }
@@ -151,8 +173,8 @@ fn annotations_ok(entry: &Composite) -> Result<(), Malformation> {
     else {
         return Ok(());
     };
-    if let Some(a) = first_duplicate(annotations.iter().copied()) {
-        return Err(Malformation::RepeatedAnnotation(a));
+    if let Some(a) = first_duplicate(annotations.iter()) {
+        return Err(Malformation::RepeatedAnnotation(*a));
     }
     if annotations.iter().filter(|a| a.is_mode()).count() > 1 {
         return Err(Malformation::MultipleModes);
@@ -193,17 +215,16 @@ fn opcode_ok(entry: &Composite) -> Result<(), Malformation> {
     }
 }
 
-/// Some item that occurs more than once, if any does.
+/// Some item that occurs more than once in `sorted`, if any does: the first that equals
+/// the one before it.
 ///
 /// Lean's `noDups` is quadratic, which is fine for a model and not for a table that
-/// arrived on the wire with a hundred thousand fields in one record. Sorting gives the
-/// same answer.
-fn first_duplicate<T: Ord>(items: impl Iterator<Item = T>) -> Option<T> {
-    let mut items: Vec<T> = items.collect();
-    items.sort_unstable();
-    let mut items = items.into_iter();
-    let mut prev = items.next()?;
-    for item in items {
+/// arrived on the wire with a hundred thousand fields in one record. [`sort_labels`] has
+/// already sorted the labels, which leaves a linear scan and gives the same answer.
+fn first_duplicate<T: PartialEq>(sorted: impl Iterator<Item = T>) -> Option<T> {
+    let mut sorted = sorted;
+    let mut prev = sorted.next()?;
+    for item in sorted {
         if item == prev {
             return Some(item);
         }
@@ -290,8 +311,16 @@ impl fmt::Display for Malformation {
 ///
 /// Well-formedness is a prerequisite of everything downstream -- subtyping, decoding,
 /// encoding -- so it is a property of the type, not a check each operation repeats on
-/// the parts it happens to reach. [`RawTypeTable::check`] is the only way to get one.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+/// the parts it happens to reach. [`RawTypeTable::check`] is the only way to get one,
+/// and the empty table is the [`Default`].
+///
+/// Its labels are in order, too: each record's and variant's fields in strictly
+/// ascending order of id, each service's methods in strictly ascending order of name, and
+/// each function's annotations in the order [`Annotation`] declares them. That is the
+/// order the binary format writes them in, and what lets a lookup by label be a binary
+/// search. Lean's table keeps them in any order, since the order means nothing; this one
+/// fixes it once so that no operation has to sort.
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Default)]
 pub struct TypeTable {
     raw: RawTypeTable,
 }
@@ -354,10 +383,17 @@ impl TypeTable {
 /// passed where a slot of another is expected. Rust has no dependent types; this is a
 /// view borrowing its table, which keeps the two together instead. One table has many
 /// roots -- a message's arguments, a service's methods.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Root<'a> {
     table: &'a TypeTable,
     slot: Slot,
+}
+
+/// Only the slot: the table would be printed with every root of it.
+impl fmt::Debug for Root<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Root").field(&self.slot).finish()
+    }
 }
 
 impl<'a> Root<'a> {
@@ -494,6 +530,29 @@ mod tests {
             rejected(vec![future(-24)]),
             Malformation::NotFutureOpcode(-24)
         );
+    }
+
+    #[test]
+    fn checking_puts_labels_in_order() {
+        use Annotation::*;
+        let f = Slot::Ref(TypeRef::new(0));
+        let table: TypeTable = [
+            func(vec![], vec![], vec![CompositeQuery]),
+            Composite::Record(vec![(FieldId::new(9), Slot::NAT), (FieldId::new(2), f)]),
+            Composite::Service(vec![("b".into(), f), ("B".into(), f), ("a".into(), f)]),
+        ]
+        .into_iter()
+        .collect::<RawTypeTable>()
+        .check()
+        .unwrap();
+        assert_eq!(
+            table.entries()[1..],
+            [
+                Composite::Record(vec![(FieldId::new(2), f), (FieldId::new(9), Slot::NAT)]),
+                Composite::Service(vec![("B".into(), f), ("a".into(), f), ("b".into(), f)]),
+            ]
+        );
+        assert_eq!(TypeTable::default().len(), 0);
     }
 
     #[test]
